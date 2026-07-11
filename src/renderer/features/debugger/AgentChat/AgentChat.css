@@ -2006,9 +2006,29 @@
   animation: work-process-trace-flash 1.6s ease-out;
 }
 
+.is-trace-flash-static {
+  border-radius: var(--radius-md);
+  background: var(--token-interactive-focus);
+  box-shadow: 0 0 0 2px var(--token-border-focus);
+}
+
 @keyframes work-process-trace-flash {
-  0% { background: rgb(var(--color-accent-500) / 0.22); box-shadow: 0 0 0 2px rgb(var(--color-accent-500) / 0.4); }
-  100% { background: transparent; box-shadow: 0 0 0 0 rgb(var(--color-accent-500) / 0); }
+  0% {
+    background: var(--token-interactive-focus);
+    box-shadow: 0 0 0 2px var(--token-border-focus);
+  }
+  100% {
+    background: transparent;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-trace-flash {
+    animation: none;
+    background: var(--token-interactive-focus);
+    box-shadow: 0 0 0 2px var(--token-border-focus);
+  }
 }
 
 .work-process-subagent-header {

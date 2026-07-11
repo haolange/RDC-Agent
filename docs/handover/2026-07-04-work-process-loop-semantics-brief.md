@@ -170,7 +170,7 @@ UI 不能暴露 hidden chain-of-thought，也不能 fabricate reasoning content�
 
 候选 group 类型：
 
-- `explore`：`read_file`、`glob`、`grep`、`search_codebase`、`memory_read`。
+- `explore`：`read_file`、`glob`、`grep`、`memory_read`。（注：`search_codebase` 已移除，改用 glob/grep。）
 - `web`：`web_search`、`web_fetch`。
 - `change`：`write_file`、`edit_file`、`move_file`、`copy_file`、`delete_file`、git mutation。
 - `verify`：`bash`、tests、build、browser checks。

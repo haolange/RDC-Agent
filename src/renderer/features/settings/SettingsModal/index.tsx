@@ -7,6 +7,7 @@ import { WorkspaceSettings } from './sections/WorkspaceSettings';
 import { ModelsSettings } from './sections/ModelsSettings';
 import { AgentsSettings } from './sections/AgentsSettings';
 import { ToolsSettings } from './sections/ToolsSettings';
+import { McpStatusDashboard } from './sections/McpStatusDashboard';
 import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
 import { SettingsNavIcon } from './SettingsNavIcon';
 import { useRdxRuntimeOverview } from './useRdxRuntimeOverview';
@@ -102,7 +103,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
       case 'tools':
         return '';
       case 'hooks':
-        return '结构化生命周期命令、Project Hash 授信与运行诊断';
+        return t('settings.hooksSubtitle');
       default:
         return '';
     }
@@ -230,6 +231,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
               {activeSection === 'tools' && (
                 <section className="settings-page settings-page-tools">
                 <RuntimeScopePanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} kinds={['mcp']} onChanged={runtime.setOverview} />
+                <McpStatusDashboard />
                 <ToolsSettings
                   rdxCliDraft={rdxCliDraft}
                   rdxActionsDraft={rdxActionsDraft}

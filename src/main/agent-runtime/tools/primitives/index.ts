@@ -21,7 +21,6 @@ import { grepTool } from './GrepTool';
 import { gitAddTool, gitCommitTool, gitDiffTool, gitLogTool, gitStatusTool, gitUnstageTool } from './GitTool';
 import { webFetchTool, webSearchTool } from './WebTools';
 import { deleteFileTool, moveFileTool, copyFileTool } from '../file';
-import { searchCodebaseTool } from '../search';
 import { notebookEditTool } from '../system';
 
 /** 获取所有内置 primitive 工具。 */
@@ -44,7 +43,6 @@ export function getPrimitiveTools(): AgentTool[] {
     deleteFileTool as unknown as AgentTool,
     moveFileTool as unknown as AgentTool,
     copyFileTool as unknown as AgentTool,
-    searchCodebaseTool as unknown as AgentTool,
     notebookEditTool as unknown as AgentTool,
   ];
 }

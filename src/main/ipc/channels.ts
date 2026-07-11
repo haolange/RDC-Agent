@@ -85,6 +85,7 @@ export const IPC_HANDLER_DOMAINS = {
   toolsEvidenceRuntime: [
     'tool:getCatalog',
     'tool:getRuntimeSummary',
+    'mcp:getStatusSummary',
     'evidence:getChain',
     'evidence:getEvents',
     'runtimeLog:list',

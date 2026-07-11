@@ -150,7 +150,7 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
       <div className="settings-section-header">
         <div>
           <div className="settings-section-title">{title}</div>
-          <div className="settings-section-subtitle">{subtitle}</div>
+          {subtitle ? <div className="settings-section-subtitle">{subtitle}</div> : null}
         </div>
       </div>
       <div className="settings-provider-row-list" data-empty-label={t('settings.noProvidersInGroup')}>
@@ -181,7 +181,7 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
     <>
       {renderProviderGroup(
         t('settings.oauthAccounts'),
-        t('settings.oauthAccountsHint'),
+        '',
         accountProviders,
         'settings-oauth-accounts',
         'account',

@@ -31,9 +31,11 @@ composer-usage-indicator
 composer-user-input-panel
 context-breakdown
 control-panel-scroll
+control-rdx-runtime-context
 conversation-thread
 cp-section-${id}
 cp-section-trace-lane-${id}
+cp-section-trace-lane-requestInspector
 empty-workbench-prompt
 empty-workbench-tool-${toolMode}
 memory-detail
@@ -72,7 +74,11 @@ session-working-folder-panel
 settings-${mode
 settings-add-provider
 settings-agent-manifest-editor
+settings-agent-tool-diagnostics
 settings-center-panel
+settings-mcp-status-dashboard
+settings-mcp-status-refresh
+settings-mcp-status-row
 settings-modal
 settings-model-cascade-trigger
 settings-nav-${section.id}
@@ -87,6 +93,7 @@ settings-provider-connect-layer
 settings-provider-connect-models
 settings-provider-connect-protocol
 settings-provider-connect-protocol-badge
+settings-provider-connect-protocol-base-url
 settings-provider-connect-save
 settings-provider-connect-test
 settings-provider-disconnect-${provider.id}
@@ -119,6 +126,7 @@ sidebar-user-settings-trigger
 terminal-toggle
 titlebar-left-panel-toggle
 titlebar-right-panel-toggle
+trace-plan-preview
 trace-progress-item
 work-process
 work-process-approval
@@ -128,11 +136,13 @@ work-process-reasoning-indicator
 work-process-response
 work-process-result-preview
 work-process-section
+work-process-source-pills
 work-process-step-group
 work-process-task
 work-process-tool-approval
 work-process-tool-call
-work-process-source-pills
+work-process-tool-preview
+work-process-tool-raw
 work-process-user-input
 work-process-user-input-transcript
 work-process-view-toggle

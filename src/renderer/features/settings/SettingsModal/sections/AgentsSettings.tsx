@@ -123,8 +123,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   };
 
   return (
-    <section className="settings-page settings-page-agents">
-      <div className="settings-manifest-page">
+    <div className="settings-manifest-page">
         <div className="settings-manifest-layout">
           <div className="settings-manifest-list-column">
             <div className="settings-manifest-toolbar settings-manifest-list-toolbar">
@@ -172,7 +171,6 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
             />
           )}
         </div>
-      </div>
-    </section>
+    </div>
   );
 };

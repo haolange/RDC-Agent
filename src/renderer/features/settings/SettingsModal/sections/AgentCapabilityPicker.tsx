@@ -67,7 +67,7 @@ export const AgentCapabilityPicker: React.FC<AgentCapabilityPickerProps> = ({ gr
                   <span>{option}</span>
                 </label>
               )) : (
-                <div className="settings-capability-empty">{t('settings.noCapabilityOptions')}</div>
+                <div className="settings-empty settings-empty-dashed">{t('settings.noCapabilityOptions')}</div>
               )}
             </div>
 

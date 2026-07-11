@@ -48,6 +48,7 @@ import type {
 } from './session';
 import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
 import type { ToolCatalog, ToolRuntimeSummary } from './tool';
+import type { MCPServerStatusSummary } from './mcp';
 import type { CommandExecuteRequest, CommandListResult, CommandResult } from './command';
 import type { AgentRun, AgentRunPresentation, TraceEvent } from './agenticTrace';
 import type {
@@ -210,6 +211,10 @@ export interface ElectronAPI {
   tool: {
     getCatalog: () => Promise<ToolCatalog>;
     getRuntimeSummary: () => Promise<ToolRuntimeSummary>;
+  };
+
+  mcp: {
+    getStatusSummary: () => Promise<MCPServerStatusSummary[]>;
   };
 
   evidence: {

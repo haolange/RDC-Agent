@@ -30,7 +30,7 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
   };
 
   return (
-    <section className="settings-page settings-page-tools">
+    <>
       <div className="settings-browser-block settings-tool-card" data-testid="settings-rdx-block">
         <RdxCliInvokerSettingsFields
           rdxCliDraft={rdxCliDraft}
@@ -44,6 +44,6 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
         <span className="settings-save-status">{status}</span>
         <button type="button" className="button button-primary" onClick={() => void save()}>{t('settings.saveTools')}</button>
       </div>
-    </section>
+    </>
   );
 };

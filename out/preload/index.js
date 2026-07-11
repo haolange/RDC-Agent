@@ -216,6 +216,9 @@ const createToolApi = () => ({
   getCatalog: () => electron.ipcRenderer.invoke("tool:getCatalog"),
   getRuntimeSummary: () => electron.ipcRenderer.invoke("tool:getRuntimeSummary")
 });
+const createMcpApi = () => ({
+  getStatusSummary: () => electron.ipcRenderer.invoke("mcp:getStatusSummary")
+});
 const createEvidenceApi = () => ({
   getChain: () => electron.ipcRenderer.invoke("evidence:getChain"),
   getEvents: (eventType) => electron.ipcRenderer.invoke("evidence:getEvents", eventType)
@@ -266,6 +269,7 @@ const electronAPI = {
   memory: createMemoryApi(),
   rdxRuntime: createRdxRuntimeApi(),
   tool: createToolApi(),
+  mcp: createMcpApi(),
   evidence: createEvidenceApi(),
   llm: createLlmApi(),
   settings: createSettingsApi(),

@@ -551,6 +551,7 @@ const componentSource = [
   fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessRowRenderer.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessViewToggle.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessRows.tsx', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessRowParts.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessResponseRow.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessIcons.tsx', 'utf8'),
 ].join('\n');

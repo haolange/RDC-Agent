@@ -58,7 +58,7 @@ export const CaptureLibrary: React.FC = () => {
   };
 
   if (!currentProject) {
-    return <div className="capture-library-empty">{t('control.captureLibraryProjectHint')}</div>;
+    return <div className="panel-empty">{t('control.captureLibraryProjectHint')}</div>;
   }
 
   return (
@@ -95,7 +95,7 @@ export const CaptureLibrary: React.FC = () => {
       {errorMessage ? <div className="capture-library-error" role="alert">{errorMessage}</div> : null}
 
       {projectInputs.length === 0 ? (
-        <div className="capture-library-empty">{t('control.captureLibraryEmpty')}</div>
+        <div className="panel-empty">{t('control.captureLibraryEmpty')}</div>
       ) : (
         <div className="capture-library-list">
           {projectInputs.map((input, index) => {

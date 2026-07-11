@@ -16,7 +16,7 @@ import { createProjectApi, createRunApi, createSessionApi } from './api/projectS
 import { createRuntimeLogApi, createTerminalApi } from './api/runtime';
 import { createLlmApi, createSettingsApi } from './api/settings';
 import { createAppMetaApi, createAppShellApi, createDialogApi, createWindowControlsApi } from './api/shell';
-import { createEvidenceApi, createToolApi } from './api/toolEvidence';
+import { createEvidenceApi, createMcpApi, createToolApi } from './api/toolEvidence';
 import { createWorkflowApi } from './api/workflow';
 import { createTraceApi } from './api/trace';
 import { createRdxRuntimeApi } from './api/rdxRuntime';
@@ -44,6 +44,7 @@ const electronAPI = {
   memory: createMemoryApi(),
   rdxRuntime: createRdxRuntimeApi(),
   tool: createToolApi(),
+  mcp: createMcpApi(),
   evidence: createEvidenceApi(),
   llm: createLlmApi(),
   settings: createSettingsApi(),

@@ -4,6 +4,7 @@ const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
 
 const { AGENT_WORKBENCH_TOOL_CATALOG } = require('../src/shared/constants/agentWorkbenchCatalog.ts');
+const { BUILTIN_AGENT_TOOL_IDS } = require('../src/shared/constants/agentToolTokens.ts');
 const {
   WORK_PROCESS_TOOL_DISPLAY_CATALOG,
   createToolRowForPresentation,
@@ -65,17 +66,9 @@ const FIXTURES = {
     argsPreview: JSON.stringify({ source: 'a.txt', destination: 'b.txt' }),
     resultPreview: JSON.stringify({ ok: true }),
   },
-  search_codebase: {
-    argsPreview: JSON.stringify({ query: 'ConversationService' }),
-    resultPreview: JSON.stringify({ matches: ['src/main/conversation/ConversationService.ts'] }),
-  },
   notebook_edit: {
     argsPreview: JSON.stringify({ path: 'notes.ipynb' }),
     resultPreview: JSON.stringify({ ok: true }),
-  },
-  notebook_edit: {
-    argsPreview: '{}',
-    resultPreview: JSON.stringify({ status: 'M README.md' }),
   },
   git_status: {
     argsPreview: JSON.stringify({ cwd: '.' }),
@@ -190,49 +183,16 @@ const FIXTURES = {
   },
 };
 
-const PLAN_REQUIRED_TOOLS = [
-  'read_file',
-  'write_file',
-  'edit_file',
-  'bash',
-  'glob',
-  'grep',
-  'web_fetch',
-  'web_search',
-  'git_status',
-  'git_diff',
-  'git_log',
-  'git_add',
-  'git_unstage',
-  'git_commit',
-  'delete_file',
-  'move_file',
-  'copy_file',
-  'search_codebase',
-  'notebook_edit',
-  'tool_search',
-  'ask_user',
-  'agent_handoff',
-  'plan_artifact',
-  'memory_search',
-  'memory_read',
-  'memory_write',
-  'memory_delete',
-  'skills',
-  'skill_read',
-  'mcp',
-  'rdx_context',
-  'subagent',
-  'task_create',
-  'task_update',
-  'task_get',
-  'task_list',
-  'task_stop',
-  'mcp__filesystem__read_file',
-];
+const workbenchToolIds = AGENT_WORKBENCH_TOOL_CATALOG.map((tool) => tool.id);
+const builtinIds = [...BUILTIN_AGENT_TOOL_IDS];
+const missingFromCatalog = builtinIds.filter((id) => !workbenchToolIds.includes(id));
+const extraInCatalog = workbenchToolIds.filter((id) => !builtinIds.includes(id));
+assert(missingFromCatalog.length === 0, `AGENT_WORKBENCH_TOOL_CATALOG missing builtin ids: ${missingFromCatalog.join(', ')}`);
+assert(extraInCatalog.length === 0, `AGENT_WORKBENCH_TOOL_CATALOG has unknown ids: ${extraInCatalog.join(', ')}`);
+assert(new Set(workbenchToolIds).size === workbenchToolIds.length, 'AGENT_WORKBENCH_TOOL_CATALOG has duplicate ids');
 
-const workbenchTools = AGENT_WORKBENCH_TOOL_CATALOG.map((tool) => tool.id);
-const allTools = [...new Set([...workbenchTools, ...PLAN_REQUIRED_TOOLS])];
+const PLAN_REQUIRED_TOOLS = [...workbenchToolIds, 'mcp__filesystem__read_file'];
+const allTools = [...new Set(PLAN_REQUIRED_TOOLS)];
 
 for (const toolName of allTools) {
   const fixture = FIXTURES[toolName];

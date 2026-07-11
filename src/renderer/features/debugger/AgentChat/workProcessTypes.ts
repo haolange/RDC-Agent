@@ -132,6 +132,8 @@ export type WorkProcessRow =
   | {
     type: 'task';
     id: string;
+    /** 与进度泳道 ProgressTask.id 对齐的稳定任务锚点。 */
+    taskId: string;
     status: WorkProcessRowStatus;
     title: string;
     taskStatus: string;

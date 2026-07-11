@@ -13,6 +13,7 @@ export type {
   EvidenceApi,
   LlmApi,
   MemoryApi,
+  McpApi,
   PlatformApi,
   ProjectApi,
   RawChannelSubscriptionApi,

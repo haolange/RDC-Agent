@@ -20,6 +20,7 @@ export type {
   SessionApi,
   SettingsApi,
   TerminalApi,
+  McpApi,
   ToolApi,
   WindowControlsApi,
   WorkflowApi,
@@ -73,6 +74,15 @@ export type {
   ReasoningDelivery,
   ToolCallingMode,
 } from './agentRuntime';
+export type {
+  MCPConnectionInfo,
+  MCPConnectionStatus,
+  MCPServerConfig,
+  MCPServerStatusSummary,
+  MCPToolDefinition,
+  MCPToolResult,
+  MCPTransport,
+} from './mcp';
 export type {
   ConversationAnswerUserInputRequest,
   ConversationAnswerUserInputResult,

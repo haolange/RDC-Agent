@@ -40,9 +40,11 @@ tools:
   - bash
   - askUser
   - agent
-  - todo
+  - task
   - memory
   - rdxContext
+  - subagent
+  - tool_search
 agents:
   - analyzer
   - optimizer
@@ -88,7 +90,7 @@ Composer and orchestrator switch lists are derived from `.agent.md` definitions 
 
 ## Tool Tokens
 
-Manifest-facing tool names are canonical tokens:
+Manifest-facing tool names are canonical tokens (see `CANONICAL_TOOL_TOKEN_EXPANSIONS` in `src/shared/constants/agentToolTokens.ts`):
 
 - `read`
 - `search`
@@ -96,16 +98,22 @@ Manifest-facing tool names are canonical tokens:
 - `bash`
 - `write`
 - `edit`
+- `git`
 - `askUser`
 - `agent`
 - `handoff`
-- `todo`
+- `task` (expands to `task_create`, `task_update`, `task_get`, `task_list`, `task_stop`)
 - `memory`
-- `skills`
+- `planArtifact`
+- `skills` / `skill`
 - `mcp`
+- `subagent`
+- `tool_search`
 - `rdxContext`
 
-`ask` is read-only by default. `plan` uses research, questions, handoffs, memory or plan artifacts rather than direct implementation. `edit`、`debugger`、`analyzer`、`optimizer` are executable profiles and may use configured tools such as `bash`、`write`、`edit` and `rdxContext` when policy allows.
+Removed tokens `todo` and `search_codebase` are rejected (`REJECTED_TOOL_TOKENS`); use `task` and `glob`/`grep` instead.
+
+`ask` is read-only by default (`read` / `search` / `web` / `askUser` / `task` / `tool_search`; policy keeps Ask on `task_list` rather than task mutation). `plan` uses research, questions, handoffs, memory or plan artifacts rather than direct implementation. `edit`、`debugger`、`analyzer`、`optimizer` are executable profiles and may use configured tools such as `bash`、`write`、`edit` and `rdxContext` when policy allows.
 
 ## Plan 输出
 

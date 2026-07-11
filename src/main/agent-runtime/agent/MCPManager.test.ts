@@ -62,6 +62,34 @@ describe('MCPManager', () => {
     });
   });
 
+  describe('getServerStatusSummary', () => {
+    it('初始为空', () => {
+      expect(manager.getServerStatusSummary()).toEqual([]);
+    });
+
+    it('connect 失败后应记录 error 状态且不留下连接', async () => {
+      await expect(
+        manager.connect({
+          name: 'broken',
+          type: 'stdio',
+          // missing command → fail before spawn
+        }),
+      ).rejects.toThrow(/missing command/);
+
+      expect(manager.listServers()).toHaveLength(0);
+      expect(manager.getServerStatusSummary()).toEqual([
+        {
+          id: 'broken',
+          name: 'broken',
+          connectionStatus: 'error',
+          toolCount: 0,
+          tools: [],
+          lastError: 'MCP stdio server "broken" missing command',
+        },
+      ]);
+    });
+  });
+
   describe('executeTool — 无效名称', () => {
     it('无效的 prefixedName 应返回错误', async () => {
       const result = await manager.executeTool('invalid_name', {});

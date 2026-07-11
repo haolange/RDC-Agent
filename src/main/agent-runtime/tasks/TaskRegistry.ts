@@ -123,6 +123,7 @@ export class TaskRegistry {
     const now = Date.now();
     const id = this.generateId();
     const blockedBy = dedupe(options.blockedBy ?? []);
+    await this.assertNoDependencyCycle(id, blockedBy);
 
     const task: TaskRecord = {
       id,
@@ -187,6 +188,7 @@ export class TaskRegistry {
     }
 
     if (updates.addBlockedBy && updates.addBlockedBy.length > 0) {
+      await this.assertNoDependencyCycle(task.id, updates.addBlockedBy);
       const added = appendUnique(task.blockedBy, updates.addBlockedBy);
       for (const upstreamId of added) {
         await this.linkBlocks(upstreamId, task.id);
@@ -194,6 +196,9 @@ export class TaskRegistry {
     }
 
     if (updates.addBlocks && updates.addBlocks.length > 0) {
+      for (const downstreamId of updates.addBlocks) {
+        await this.assertNoDependencyCycle(downstreamId, [task.id]);
+      }
       const added = appendUnique(task.blocks, updates.addBlocks);
       for (const downstreamId of added) {
         await this.linkBlockedBy(downstreamId, task.id);
@@ -275,6 +280,44 @@ export class TaskRegistry {
   }
 
   // ── 私有辅助 ──────────────────────────────────────────────
+
+  /**
+   * 若为 `taskId` 追加 `newBlockedByIds` 依赖会形成环，则抛错。
+   * 环判定：某个上游已（直接或间接）依赖 `taskId`，再让 `taskId` 依赖该上游即成环。
+   */
+  private async assertNoDependencyCycle(
+    taskId: string,
+    newBlockedByIds: readonly string[],
+  ): Promise<void> {
+    for (const upstreamId of dedupe(newBlockedByIds)) {
+      if (upstreamId === taskId) {
+        throw new Error(`依赖环检测失败：任务不能依赖自身（${taskId}）`);
+      }
+      if (await this.dependsOn(upstreamId, taskId)) {
+        throw new Error(
+          `依赖环检测失败：添加「${taskId} blockedBy ${upstreamId}」会形成环`,
+        );
+      }
+    }
+  }
+
+  /** 判断 `fromId` 是否经 blockedBy 链（直接或间接）依赖 `targetId`。 */
+  private async dependsOn(fromId: string, targetId: string): Promise<boolean> {
+    const visited = new Set<string>();
+    const stack = [fromId];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      if (current === targetId) return true;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      const task = await this.loadTask(current);
+      if (!task) continue;
+      for (const dep of task.blockedBy) {
+        if (!visited.has(dep)) stack.push(dep);
+      }
+    }
+    return false;
+  }
 
   /** 生成任务 ID。 */
   private generateId(): string {

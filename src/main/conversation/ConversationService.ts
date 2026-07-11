@@ -1462,14 +1462,28 @@ export class ConversationService {
                   title?: string;
                   status?: string;
                 };
+                const taskId = typeof payload.taskId === 'string' && payload.taskId.trim()
+                  ? payload.taskId.trim()
+                  : 'runtime-tasks';
+                const title = typeof payload.title === 'string' && payload.title.trim()
+                  ? payload.title.trim()
+                  : taskId;
+                const blockStatus: ConversationWorkBlock['status'] = payload.status === 'failed'
+                  || payload.status === 'deleted'
+                  ? 'error'
+                  : payload.status === 'in_progress'
+                    ? 'running'
+                    : payload.status === 'pending'
+                      ? 'pending'
+                      : 'complete';
                 commitAssistantMessage('message_patched', {
-                  workTrace: upsertWorkBlock(assistantMessage.workTrace, 'runtime-tasks', {
-                    kind: 'subagent',
-                    title: 'Task status',
+                  workTrace: upsertWorkBlock(assistantMessage.workTrace, taskId, {
+                    kind: 'command',
+                    title,
                     stage: 'tool',
-                    status: payload.status === 'failed' ? 'error' : 'complete',
-                    summary: `${payload.title ?? payload.taskId ?? 'Task'}${payload.status ? `: ${payload.status}` : ''}`,
-                    completedAt: nowMs(),
+                    status: blockStatus,
+                    summary: title,
+                    completedAt: blockStatus === 'running' || blockStatus === 'pending' ? undefined : nowMs(),
                   }),
                 });
               }

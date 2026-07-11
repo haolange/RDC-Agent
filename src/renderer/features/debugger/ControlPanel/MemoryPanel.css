@@ -22,7 +22,7 @@
   font-size: var(--text-xs);
   color: var(--token-status-error);
   padding: var(--space-1) var(--space-2);
-  background: rgb(var(--color-bg-raised));
+  background: var(--token-bg-raised);
   border-radius: var(--radius-sm);
 }
 
@@ -37,21 +37,14 @@
   overflow-y: auto;
 }
 
-.memory-panel-empty {
-  font-size: var(--text-xs);
-  color: var(--token-text-caption);
-  padding: var(--space-2);
-  text-align: center;
-}
-
 .memory-panel-item {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   width: 100%;
   padding: var(--space-2);
-  background: rgb(var(--color-bg-raised));
-  border: 1px solid rgb(var(--token-border-muted));
+  background: var(--token-bg-raised);
+  border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-sm);
   cursor: pointer;
   text-align: left;
@@ -59,16 +52,16 @@
 }
 
 .memory-panel-item:hover {
-  border-color: rgb(var(--token-border-default));
-  background: rgb(var(--token-interactive-hover));
+  border-color: var(--token-border-default);
+  background: var(--token-interactive-hover);
 }
 
 .memory-panel-item:active {
-  background: rgb(var(--token-interactive-active));
+  background: var(--token-interactive-active);
 }
 
 .memory-panel-item:focus-visible {
-  outline: 2px solid rgb(var(--token-interactive-focus));
+  outline: 2px solid var(--token-interactive-focus);
   outline-offset: 1px;
 }
 
@@ -115,7 +108,7 @@
   font-size: var(--text-xs);
   color: var(--token-text-caption);
   padding: 0 var(--space-1);
-  border: 1px solid rgb(var(--token-border-muted));
+  border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-sm);
   text-transform: uppercase;
 }
@@ -132,8 +125,8 @@
   font-size: var(--text-xs);
   line-height: 1.5;
   color: var(--token-text-body);
-  background: rgb(var(--color-bg-raised));
-  border: 1px solid rgb(var(--token-border-muted));
+  background: var(--token-bg-raised);
+  border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-sm);
   max-height: 240px;
   overflow-y: auto;
@@ -162,8 +155,8 @@
   padding: var(--space-2);
   font-size: var(--text-sm);
   color: var(--token-text-body);
-  background: rgb(var(--color-bg-raised));
-  border: 1px solid rgb(var(--token-border-input));
+  background: var(--token-bg-raised);
+  border: 1px solid var(--token-border-input);
   border-radius: var(--radius-sm);
   font-family: inherit;
   box-sizing: border-box;
@@ -172,9 +165,9 @@
 .memory-panel-input:focus,
 .memory-panel-select:focus,
 .memory-panel-textarea:focus {
-  outline: 2px solid rgb(var(--token-interactive-focus));
+  outline: 2px solid var(--token-interactive-focus);
   outline-offset: -1px;
-  border-color: rgb(var(--token-border-focus));
+  border-color: var(--token-border-focus);
 }
 
 .memory-panel-textarea {

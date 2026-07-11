@@ -2,15 +2,14 @@
 import type {
   ContextKind,
   ProgressTask,
-  TraceArtifactRecord,
   TraceContextRecord,
 } from '@shared/types/trace';
-import { getElectronApi } from '../../../platform/getElectronApi';
 import { useI18n, type TranslationKey } from '../../../i18n';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
-import { Button } from '../../../ui/Button';
 import { SessionContextPanel } from './SessionContextPanel';
+import { RdxRuntimeContextPanel } from './RdxRuntimeContextPanel';
+import { TraceArtifactList } from './TraceArtifactList';
 import { TraceProgressMarker } from './TraceProgressMarker';
 import { TraceRequestInspectorSection } from './TraceRequestInspectorSection';
 
@@ -32,14 +31,25 @@ const formatTime = (value?: string): string => {
 
 /** 将「进度」任务点击定位到聊天区 Work Process 中对应任务行（滚动 + 高亮闪烁）。 */
 const focusWorkProcessTask = (taskId: string): void => {
-  if (typeof document === 'undefined') return;
-  const escaped = window.CSS && typeof window.CSS.escape === 'function' ? window.CSS.escape(taskId) : taskId;
-  const target = document.querySelector<HTMLElement>(`[data-work-process-task-id="${escaped}"]`)
-    ?? document.querySelector<HTMLElement>('[data-work-process-block-id="runtime-tasks"]');
-  if (!target) return;
-  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  target.classList.add('is-trace-flash');
-  window.setTimeout(() => target.classList.remove('is-trace-flash'), 1600);
+  if (typeof document === 'undefined' || !taskId) return;
+  try {
+    const escaped = window.CSS && typeof window.CSS.escape === 'function' ? window.CSS.escape(taskId) : taskId;
+    const target = document.querySelector<HTMLElement>(`[data-work-process-task-id="${escaped}"]`)
+      ?? document.querySelector<HTMLElement>('[data-work-process-block-id="runtime-tasks"]');
+    if (!target) return;
+    const prefersReducedMotion = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'center' });
+    target.classList.remove('is-trace-flash', 'is-trace-flash-static');
+    // 强制重排，确保连续点击同一锚点时动画可重触发。
+    void target.offsetWidth;
+    target.classList.add(prefersReducedMotion ? 'is-trace-flash-static' : 'is-trace-flash');
+    window.setTimeout(() => {
+      target.classList.remove('is-trace-flash', 'is-trace-flash-static');
+    }, prefersReducedMotion ? 800 : 1600);
+  } catch {
+    // 空态 / 选择器异常时静默忽略，不阻断泳道交互。
+  }
 };
 
 const Section: React.FC<{
@@ -75,7 +85,7 @@ const ProgressList: React.FC<{
 }> = ({ current, history, onFocusTask }) => {
   const { t } = useI18n();
   if (current.length === 0 && history.length === 0) {
-    return <p className="trace-lane-empty">{t('control.traceEmptyProgress')}</p>;
+    return <p className="panel-empty">{t('control.traceEmptyProgress')}</p>;
   }
 
   const renderRow = (task: ProgressTask, index: number) => {
@@ -120,38 +130,6 @@ const ProgressList: React.FC<{
           <ol className="trace-progress-list is-history">
             {history.map((task, index) => renderRow(task, index + 1))}
           </ol>
-        </details>
-      ) : null}
-    </div>
-  );
-};
-
-const ArtifactList: React.FC<{ current: TraceArtifactRecord[]; previous: TraceArtifactRecord[] }> = ({ current, previous }) => {
-  const { t } = useI18n();
-  if (current.length === 0 && previous.length === 0) {
-    return <p className="trace-lane-empty">{t('control.traceEmptyArtifacts')}</p>;
-  }
-  const renderArtifact = (artifact: TraceArtifactRecord) => (
-    <div key={artifact.id} className={`trace-lane-artifact-item status-${artifact.status}`}>
-      <div className="trace-lane-artifact-main">
-        <span className="trace-lane-artifact-name">{artifact.displayName}</span>
-        <span className="trace-lane-artifact-meta">{artifact.type} · {artifact.taskTitle || artifact.traceLaneId}</span>
-      </div>
-      <div className="trace-lane-artifact-actions">
-        <Button variant="ghost" size="sm" onClick={() => artifact.path && void getElectronApi()?.appShell.openPath(artifact.path)}>{t('control.traceArtifactOpen')}</Button>
-        <Button variant="ghost" size="sm" onClick={() => artifact.path && void getElectronApi()?.appShell.copyText(artifact.path)}>{t('control.traceArtifactCopyPath')}</Button>
-        <Button variant="ghost" size="sm" title={artifact.rawRef}>{t('control.traceArtifactRaw')}</Button>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="trace-lane-artifact-list">
-      {current.map(renderArtifact)}
-      {previous.length > 0 ? (
-        <details className="trace-lane-history">
-          <summary>{t('control.tracePreviousTasks', { count: previous.length })}</summary>
-          {previous.map(renderArtifact)}
         </details>
       ) : null}
     </div>
@@ -241,7 +219,7 @@ export const TraceRightPanel: React.FC = () => {
           onToggle={() => toggle('artifacts')}
           summary={rightPanel?.artifacts.current.length ? <span className="cp-section-summary-main">{t('control.traceArtifactsReady', { count: rightPanel.artifacts.current.length })}</span> : undefined}
         >
-          <ArtifactList current={rightPanel?.artifacts.current ?? []} previous={rightPanel?.artifacts.previous ?? []} />
+          <TraceArtifactList current={rightPanel?.artifacts.current ?? []} previous={rightPanel?.artifacts.previous ?? []} />
         </Section>
         <Section
           id="context"
@@ -250,7 +228,7 @@ export const TraceRightPanel: React.FC = () => {
           onToggle={() => toggle('context')}
         >
           {visibleContextGroups.length === 0 ? (
-            <p className="trace-lane-empty">{t('control.traceEmptyContext')}</p>
+            <p className="panel-empty">{t('control.traceEmptyContext')}</p>
           ) : (
             visibleContextGroups.map((group) => (
               <section key={group.kind} className="trace-lane-context-group">
@@ -260,6 +238,9 @@ export const TraceRightPanel: React.FC = () => {
             ))
           )}
           <SessionContextPanel />
+          <div className="session-capabilities-stack">
+            <RdxRuntimeContextPanel />
+          </div>
         </Section>
         <TraceRequestInspectorSection
           expanded={expanded.requestInspector}
@@ -271,5 +252,3 @@ export const TraceRightPanel: React.FC = () => {
 };
 
 export default TraceRightPanel;
-
-

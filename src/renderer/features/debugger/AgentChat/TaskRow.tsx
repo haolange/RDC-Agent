@@ -23,7 +23,11 @@ export const TaskRow: React.FC<TaskRowProps> = ({ row }) => {
   const icon = TASK_STATUS_ICON[row.taskStatus] ?? TASK_STATUS_ICON.pending;
 
   return (
-    <li className={`work-process-task status-${row.status}`} data-testid="work-process-task">
+    <li
+      className={`work-process-task status-${row.status}`}
+      data-testid="work-process-task"
+      data-work-process-task-id={row.taskId}
+    >
       <span className={`work-process-task-icon task-${row.taskStatus}`} aria-hidden="true">{icon}</span>
       <span className="work-process-task-title">{row.title}</span>
       {statusLabel ? <span className={`work-process-task-status status-${row.status}`}>{statusLabel}</span> : null}

@@ -55,6 +55,7 @@ export class FileTaskStore implements TaskStore {
 
   async saveTask(task: TaskRecord): Promise<void> {
     await this.ensureDir();
+    // 单文件覆盖写；同进程内按 await 串行化同一 taskId 的调用即可，不做跨进程锁。
     await fs.writeFile(this.taskPath(task.id), JSON.stringify(task, null, 2), 'utf8');
   }
 

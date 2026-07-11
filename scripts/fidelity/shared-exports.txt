@@ -112,10 +112,14 @@ Blocker
 BLOCKER_CODES
 BlockerCodeDef
 BranchNavigatorViewModel
+BUILTIN_AGENT_TOOL_ID_SET
+BUILTIN_AGENT_TOOL_IDS
 BUILTIN_LLM_PROVIDER_DEFINITIONS
 BuiltinAgentMode
+BuiltinAgentToolId
 BuiltinLlmProviderId
 BuiltinProviderDefinition
+CANONICAL_TOOL_TOKEN_EXPANSIONS
 canonicalAgentModelId
 CanonicalAgentModelId
 CapabilityProfile
@@ -214,6 +218,7 @@ DEFAULT_CONTEXT_WINDOW_TOKENS
 DEFAULT_MODEL_ROUTING
 DEFAULT_TOKEN_TTL_SECONDS
 DeviceApi
+diagnoseManifestToolTokens
 DialogApi
 DiffPreview
 EffectiveAgentProfile
@@ -234,6 +239,7 @@ EvidenceRefKind
 EvidenceStrength
 ExecutableAgentMode
 ExecutableAppMode
+expandCanonicalToolToken
 filterJsonl
 FinalResponseNode
 FindingNode
@@ -258,6 +264,7 @@ getBlockersByCategory
 getBlockersBySeverity
 getBuiltinProviderCatalogOwnership
 getBuiltinProviderDefinition
+getBuiltinProviderProtocolBaseUrls
 getBuiltinProviderProtocolOptions
 getManagedProviderModelCatalog
 getManagedProviderModelIds
@@ -339,10 +346,12 @@ MAIN_STAGES
 MANAGED_PROVIDER_MODEL_CATALOG
 ManagedModelCatalogEntry
 MAX_CONTEXT_MODE_MIN_TOKENS
+McpApi
 MCPConnectionInfo
 MCPConnectionStatus
 MCPResponse
 MCPServerConfig
+MCPServerStatusSummary
 MCPToolCall
 MCPToolDefinition
 MCPToolResult
@@ -422,6 +431,7 @@ ReasoningSemantic
 ReasoningSummary
 ReasoningVisibility
 ReasoningWireProfile
+REJECTED_TOOL_TOKENS
 RendererElectronApi
 ReplayBackendHint
 ReplayDeviceEntry
@@ -436,6 +446,8 @@ RequestBranchStatus
 RequestEnvelopeSnapshot
 resolveActiveContextWindowTokens
 resolveAgentDisplay
+resolveBaseUrlForProtocolChange
+resolveBuiltinProtocolBaseUrl
 resolveBuiltinProviderProtocol
 resolveConversationLoopOutputPhase
 ResolveConversationLoopOutputPhaseInput
@@ -558,6 +570,7 @@ ToolReturn
 ToolRuntimeMetadata
 ToolRuntimeSource
 ToolRuntimeSummary
+ToolTokenDiagnostic
 ToolTraceEntry
 TOP_LEVEL_AGENT_IDS
 TraceArtifactRecord

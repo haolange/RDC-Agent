@@ -67,6 +67,8 @@ export interface TraceArtifactRecord {
   path?: string;
   uri?: string;
   rawRef?: string;
+  /** 会话内预览用 markdown（如 plan.md）；缺省时 UI 不展示预览。 */
+  previewMarkdown?: string;
   createdAt: string;
   updatedAt: string;
 }

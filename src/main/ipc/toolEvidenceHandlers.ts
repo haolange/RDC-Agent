@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
+import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
 export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void {
@@ -16,6 +17,14 @@ export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void
 
   ipcMain.handle('tool:getRuntimeSummary', async () => {
     return rdxCliInvokerService.getRuntimeSummary();
+  });
+
+  ipcMain.handle('mcp:getStatusSummary', async () => {
+    const projectId = state.currentProjectId ?? storageAdapter.getCurrentProjectId();
+    const projectRoot = projectId
+      ? storageAdapter.getProjectById(projectId)?.rootPath ?? null
+      : null;
+    return agentOrchestrator.getMcpServerStatusSummary(projectRoot);
   });
 
   ipcMain.handle('evidence:getChain', async () => {
