@@ -1642,7 +1642,13 @@ export class AgentOrchestrator {
 
         return {
           content: [{ type: 'text', text: skill.instructions }],
-          details: { skillId: skill.id, agentId },
+          details: {
+            skillId: skill.id,
+            agentId,
+            name: skill.name,
+            description: skill.description,
+            sourcePath: skill.sourcePath,
+          },
         };
       },
     };

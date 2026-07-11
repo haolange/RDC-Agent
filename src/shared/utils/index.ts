@@ -28,3 +28,4 @@ export {
   normalizeAskUserAnswers,
   normalizeAskUserQuestions,
 } from './askUser';
+export { buildToolResultPreview } from './toolResultPreview';

@@ -10,10 +10,6 @@ const LABEL_TO_KEY: Record<string, TranslationKey> = {
   '正在思考': 'chat.workProcessThinkingStreaming',
   '已思考': 'chat.workProcessThinkingComplete',
   '收束摘要': 'chat.workProcessThinkingClosing',
-  '回复': 'chat.workProcessResponseTitle',
-  '正在生成最终回复': 'chat.workProcessResponseGenerating',
-  '回复未完成': 'chat.workProcessResponseIncomplete',
-  '回复已生成': 'chat.workProcessResponseGenerated',
   '等待审批': 'chat.workProcessApprovalPending',
   '自动检查中': 'chat.workProcessAutoReviewPending',
   '已批准': 'chat.workProcessApprovalApproved',
@@ -36,7 +32,7 @@ const LABEL_TO_KEY: Record<string, TranslationKey> = {
   ...CATALOG_VERB_LABEL_KEYS,
 };
 
-const THOUGHT_FOR_PATTERN = /^思考了 (.+)$/;
+const THOUGHT_FOR_PATTERN = /^已思考 · (.+)$/;
 
 const AGGREGATE_PART_PATTERNS: Array<{
   pattern: RegExp;

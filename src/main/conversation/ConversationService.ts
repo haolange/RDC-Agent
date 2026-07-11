@@ -40,6 +40,7 @@ import type { ReplayDeviceEntry } from '@shared/types/device';
 import { isTopLevelAgentId } from '@shared/types/agent';
 import { createFallbackAskUserQuestion, normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { generateEventId, nowMs } from '@shared/utils/id';
+import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 import { promptPlanBuilder } from '../agent-runtime/prompt';
@@ -1326,7 +1327,7 @@ export class ConversationService {
                     id: String(event.payload.toolCallId),
                     toolName: String(event.payload.toolName),
                     status: 'error',
-                    resultPreview: JSON.stringify(event.payload.result ?? { reason }).slice(0, 800),
+                    resultPreview: buildToolResultPreview(event.payload.result ?? { reason }),
                     error: reason,
                     completedAt: nowMs(),
                   }, loopScopedDenied ? currentLoopOptions() : undefined),
@@ -1445,7 +1446,7 @@ export class ConversationService {
                   completedAt: nowMs(),
                 };
                 if (!(isAskUserTool && result?.ok)) {
-                  toolCallPatch.resultPreview = JSON.stringify(event.payload.result ?? {}).slice(0, 800);
+                  toolCallPatch.resultPreview = buildToolResultPreview(event.payload.result ?? {});
                 }
                 const loopScopedCompleted = isLoopTool(String(event.payload.toolName));
                 commitAssistantMessage('message_patched', {

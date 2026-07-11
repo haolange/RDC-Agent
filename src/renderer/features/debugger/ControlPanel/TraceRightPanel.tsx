@@ -8,12 +8,10 @@ import { useI18n, type TranslationKey } from '../../../i18n';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { SessionContextPanel } from './SessionContextPanel';
-import { RdxRuntimeContextPanel } from './RdxRuntimeContextPanel';
 import { TraceArtifactList } from './TraceArtifactList';
 import { TraceProgressMarker } from './TraceProgressMarker';
-import { TraceRequestInspectorSection } from './TraceRequestInspectorSection';
 
-type SectionId = 'progress' | 'artifacts' | 'context' | 'requestInspector';
+type SectionId = 'progress' | 'artifacts' | 'context';
 
 const kindLabelKey: Record<ContextKind, TranslationKey> = {
   capture: 'control.traceKindCapture',
@@ -156,7 +154,6 @@ export const TraceRightPanel: React.FC = () => {
     progress: true,
     artifacts: true,
     context: true,
-    requestInspector: false,
   });
   const lastSessionId = useRef<string | null>(null);
 
@@ -164,7 +161,7 @@ export const TraceRightPanel: React.FC = () => {
     const nextSessionId = currentSession?.sessionId ?? null;
     if (nextSessionId === lastSessionId.current) return;
     lastSessionId.current = nextSessionId;
-    setExpanded({ progress: true, artifacts: true, context: true, requestInspector: false });
+    setExpanded({ progress: true, artifacts: true, context: true });
   }, [currentSession?.sessionId]);
 
   const rightPanel = presentation?.rightPanel ?? null;
@@ -238,14 +235,7 @@ export const TraceRightPanel: React.FC = () => {
             ))
           )}
           <SessionContextPanel />
-          <div className="session-capabilities-stack">
-            <RdxRuntimeContextPanel />
-          </div>
         </Section>
-        <TraceRequestInspectorSection
-          expanded={expanded.requestInspector}
-          onToggle={() => toggle('requestInspector')}
-        />
       </div>
     </div>
   );

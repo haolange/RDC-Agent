@@ -14,8 +14,6 @@ import { SessionWorkingFolderPanel } from './SessionWorkingFolderPanel';
 import { ArtifactTree } from './ArtifactTree';
 import { MemoryPanel } from './MemoryPanel';
 import { CollapsibleSection } from './CollapsibleSection';
-import { RequestInspector } from './RequestInspector';
-import { useRequestInspectorTarget } from './useRequestInspectorTarget';
 
 export const ClassicSessionControlPanel: React.FC = () => {
   const { t } = useI18n();
@@ -26,7 +24,6 @@ export const ClassicSessionControlPanel: React.FC = () => {
   const openedCapture = useCaptureStore((state) => state.openedCapture);
   const projectInputs = useProjectStore((state) => state.projectInputs);
   const actionEvents = useEvidenceStore((state) => state.actionEvents);
-  const { sessionId, turnId: inspectorTurnId, active: inspectorActive } = useRequestInspectorTarget();
 
   const progressSnapshot = useMemo(
     () => getSessionProgressSnapshot(currentRun, workflowState, reasoningSummaries, t),
@@ -42,7 +39,6 @@ export const ClassicSessionControlPanel: React.FC = () => {
     sessionContext: true,
     artifactTree: true,
     memory: false,
-    requestInspector: false,
   }));
   const lastSessionIdRef = useRef<string | null>(null);
 
@@ -60,7 +56,6 @@ export const ClassicSessionControlPanel: React.FC = () => {
       sessionContext: true,
       artifactTree: true,
       memory: false,
-      requestInspector: false,
     });
   }, [currentRun, currentSession?.sessionId]);
 
@@ -178,34 +173,6 @@ export const ClassicSessionControlPanel: React.FC = () => {
           summary={<span className="cp-section-summary-main">{contextSummary}</span>}
         >
           <SessionContextPanel />
-        </CollapsibleSection>
-
-        <CollapsibleSection
-          id="requestInspector"
-          title={t('control.requestInspector')}
-          icon={(
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="8" y1="13" x2="16" y2="13" />
-              <line x1="8" y1="17" x2="13" y2="17" />
-            </svg>
-          )}
-          variant="session"
-          isExpanded={expandedSections.requestInspector}
-          onToggle={() => toggleSection('requestInspector')}
-        >
-          {sessionId && inspectorTurnId ? (
-            <RequestInspector
-              sessionId={sessionId}
-              turnId={inspectorTurnId}
-              active={inspectorActive}
-            />
-          ) : (
-            <div className="request-inspector is-loading" data-testid="request-inspector">
-              {t('control.requestInspectorWaiting')}
-            </div>
-          )}
         </CollapsibleSection>
 
         <CollapsibleSection

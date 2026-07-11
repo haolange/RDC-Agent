@@ -58,11 +58,6 @@ export interface LoopProjectionDeps {
   };
   isNonFinalStopReason: (stopReason?: ConversationLoopStopReason) => boolean;
   normalizeThinkingDedupKey: (value: string) => string;
-  createResponseRow: (
-    block: ConversationWorkBlock,
-    hasVisibleProcessEvidence: boolean,
-    outputPhase: ConversationLoopOutputPhase,
-  ) => Extract<WorkProcessRow, { type: 'response' }> | null;
   createReasoningIndicatorRow: (
     block: ConversationWorkBlock,
     state: Extract<ConversationReasoningState, 'opaque' | 'hidden'>,
@@ -264,6 +259,8 @@ function createDeferredVisibleStep(row: WorkProcessRow): WorkProcessRow {
       argsLines: [],
       previewLines: [],
       rawLines: [],
+      bodyText: undefined,
+      bodyLines: undefined,
       approval: row.approval
         ? { ...row.approval, message: '', metaLines: [] }
         : undefined,
@@ -301,20 +298,58 @@ function projectLlmTurn(
   const isFinalAnswer = outputPhase === 'final_answer' && !deps.isNonFinalStopReason(stopReason);
 
   if (isFinalAnswer) {
-    const responseRow = deps.createResponseRow(block, ctx.hasVisibleProcessEvidence, outputPhase);
-    if (!responseRow) return null;
-    dedupeResponseThinking(responseRow, ctx, deps);
-    if (!responseRow.thinkingLabel && !responseRow.thinkingPreview) {
+    // Answer-only turns never create a Reply boundary row. Provider-visible closing
+    // thinking folds into a quiet thinking-only section; otherwise the turn is silent
+    // and the assistant body below the Work Process is the only final-answer surface.
+    const thinking = deps.resolveResponseThinking(block);
+    if (!thinking.label && !thinking.preview) {
       if (!ctx.hasVisibleProcessEvidence) return null;
+      return null;
+    }
+    const sectionThinking = {
+      preview: thinking.preview,
+      label: thinking.label,
+      kind: thinking.kind,
+      source: '',
+      visibility: thinking.visibility,
+      status: thinking.status,
+      expandable: thinking.expandable,
+      openByDefault: thinking.openByDefault,
+    };
+    dedupeSectionThinking(sectionThinking, ctx, deps);
+    if (!sectionThinking.label && !sectionThinking.preview) {
+      return null;
     }
     ctx.hasVisibleProcessEvidence = true;
     return {
       kind: 'loop',
       loopId: block.id,
-      rows: [responseRow],
-      hasDisplayableThinking: Boolean(responseRow.thinkingExpandable && responseRow.thinkingPreview),
-      hasSummaryThinking: responseRow.thinkingKind === 'summary' && Boolean(responseRow.thinkingPreview),
-      isResponseBoundary: true,
+      rows: [{
+        type: 'section',
+        id: block.id,
+        loopId: block.id,
+        status: block.status,
+        proseText: '',
+        proseStreaming: false,
+        thinkingPreview: sectionThinking.preview,
+        thinkingLabel: sectionThinking.label,
+        thinkingKind: sectionThinking.kind,
+        thinkingSource: sectionThinking.source,
+        thinkingVisibility: sectionThinking.visibility,
+        thinkingStatus: sectionThinking.status,
+        thinkingExpandable: sectionThinking.expandable,
+        thinkingOpenByDefault: sectionThinking.openByDefault,
+        stepCount: 0,
+        stepsDisclosure: 'visible',
+        duration: formatDurationMs(block.startedAt, block.completedAt),
+        defaultOpen: false,
+        steps: [],
+        visibleSteps: [],
+        outputPhase,
+        stopReason,
+      }],
+      hasDisplayableThinking: sectionThinking.expandable && Boolean(sectionThinking.preview),
+      hasSummaryThinking: sectionThinking.kind === 'summary' && Boolean(sectionThinking.preview),
     };
   }
 
@@ -403,23 +438,6 @@ function dedupeSectionThinking(
     sectionThinking.source = '';
     sectionThinking.expandable = false;
     sectionThinking.openByDefault = false;
-    return;
-  }
-  ctx.visibleThinkingKeys.add(thinkingKey);
-}
-
-function dedupeResponseThinking(
-  responseRow: Extract<WorkProcessRow, { type: 'response' }>,
-  ctx: BlockProjectionContext,
-  deps: LoopProjectionDeps,
-): void {
-  if (!responseRow.thinkingPreview || responseRow.thinkingKind === 'raw') return;
-  const thinkingKey = deps.normalizeThinkingDedupKey(responseRow.thinkingPreview);
-  if (ctx.visibleThinkingKeys.has(thinkingKey)) {
-    responseRow.thinkingPreview = '';
-    responseRow.thinkingLabel = '';
-    responseRow.thinkingExpandable = false;
-    responseRow.thinkingOpenByDefault = false;
     return;
   }
   ctx.visibleThinkingKeys.add(thinkingKey);

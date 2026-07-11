@@ -1,4 +1,8 @@
-import type { WorkProcessIconKey, WorkProcessToolGroupKind } from './workProcessTypes';
+import type {
+  WorkProcessIconKey,
+  WorkProcessToolFamily,
+  WorkProcessToolGroupKind,
+} from './workProcessTypes';
 
 export interface WorkProcessToolDisplay {
   icon: WorkProcessIconKey;
@@ -98,4 +102,36 @@ export const getToolDisplay = (toolName: string): WorkProcessToolDisplay => {
 export const formatMcpTarget = (toolName: string): string => {
   const parts = getMcpParts(normalizeToolName(toolName));
   return parts ? `${parts.server}/${parts.tool}` : '';
+};
+
+const FILE_FAMILY_TOOLS = new Set([
+  'read_file',
+  'write_file',
+  'edit_file',
+  'delete_file',
+  'move_file',
+  'copy_file',
+  'notebook_edit',
+]);
+
+const SEARCH_FAMILY_TOOLS = new Set(['glob', 'grep']);
+
+const GIT_FAMILY_TOOLS = new Set([
+  'git_status',
+  'git_diff',
+  'git_log',
+  'git_add',
+  'git_unstage',
+  'git_commit',
+]);
+
+/** Map a tool name onto the unified Work Process card family. */
+export const getToolFamily = (toolName: string): WorkProcessToolFamily => {
+  const normalized = normalizeToolName(toolName);
+  if (FILE_FAMILY_TOOLS.has(normalized) || normalized === 'read') return 'file';
+  if (SEARCH_FAMILY_TOOLS.has(normalized)) return 'search';
+  if (normalized === 'bash' || normalized.includes('shell')) return 'shell';
+  if (GIT_FAMILY_TOOLS.has(normalized) || normalized.startsWith('git_')) return 'git';
+  if (normalized === 'web_search' || normalized === 'web_fetch') return 'web';
+  return 'generic';
 };

@@ -84,13 +84,6 @@ const renderChildRow = (row: WorkProcessRow): React.ReactNode => {
       </li>
     );
   }
-  if (row.type === 'response') {
-    return (
-      <li key={row.id} className={`work-process-child-summary status-${row.status}`}>
-        <span className="work-process-child-text">{row.summary}</span>
-      </li>
-    );
-  }
   if (row.type === 'section') {
     // 子 agent 的简化扁平视图：把小节内步骤直接展开为子 row。
     return (

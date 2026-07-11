@@ -7,7 +7,6 @@ export interface LoopPresentationUnit {
   rows: WorkProcessRow[];
   hasDisplayableThinking: boolean;
   hasSummaryThinking: boolean;
-  isResponseBoundary?: boolean;
 }
 
 export interface StandalonePresentationUnit {
