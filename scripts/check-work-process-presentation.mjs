@@ -40,8 +40,11 @@ assert(activeSignalSource.includes('data-active-signal={active ? tone : undefine
 assert(activeSignalHelper.includes("status === 'running' || status === 'pending'"), 'active signal must be driven by running/pending Work Process status');
 assert(activeSignalHelper.includes("thinkingStatus === 'streaming'"), 'active signal must recognize streaming thinking lifecycle');
 assert(activeSignalStyles.includes('.active-signal-text.is-active'), 'active signal text CSS class is missing');
+assert(activeSignalStyles.includes('background-clip: text'), 'active signal must use clipped-gradient energy shimmer');
+assert(activeSignalStyles.includes('@keyframes active-signal-shimmer'), 'active signal shimmer keyframe is missing');
+assert(!activeSignalStyles.includes('active-signal-pulse'), 'legacy active-signal pulse must be removed');
 assert(activeSignalStyles.includes('@media (prefers-reduced-motion: reduce)'), 'active signal must honor reduced-motion preferences');
-assert(activeSignalRenderSource.includes('ActiveSignalText active={active}'), 'Work Process rows should use shared ActiveSignalText for active labels');
+assert(activeSignalRenderSource.includes('ActiveSignalText active={active}') || activeSignalRenderSource.includes('ActiveSignalText active '), 'Work Process rows should use shared ActiveSignalText for active labels');
 assert(activeSignalRenderSource.includes('tone="interaction"'), 'ask_user interaction surfaces should use the interaction active signal tone');
 assert(!activeSignalRenderSource.includes("row.status === 'complete' &&"), 'complete rows must not be a trigger for active signal text');
 
@@ -175,13 +178,13 @@ for (const forbidden of ['Agent Loop complete', 'Generate final answer', 'Final 
 }
 const loopSection = presentation.rows.find((row) => row.type === 'section');
 assert(loopSection?.type === 'section', 'llm turn should render a work-process section');
-assert(loopSection.resultText === 'Read files before answering.', 'tool-backed no-thinking loop should show its direct result');
-assert(loopSection.thinkingLabel === '', 'no-thinking loop should not render a fake reasoning label');
+assert(loopSection.resultText === '', 'tool-backed commentary must not occupy a separate result box');
+assert(loopSection.thinkingLabel === '思考过程', 'no-thinking loop should promote commentary into the thinking slot');
+assert(loopSection.thinkingPreview === 'Read files before answering.', 'no-thinking loop should surface commentary as thinking preview');
+assert(loopSection.thinkingExpandable === true, 'promoted commentary should be expandable');
 assert(loopSection.stepCount === 2, `expected 2 tool actions in section, got ${loopSection.stepCount}`);
-assert(loopSection.steps.length === 1 && loopSection.steps[0].type === 'toolGroup', 'loop section should group adjacent file exploration actions');
-const explorationGroup = loopSection.steps[0];
-assert(explorationGroup.title === '探索', `expected exploration group, got ${explorationGroup.title}`);
-assert(explorationGroup.countLabel === '2 文件', `expected file count label, got ${explorationGroup.countLabel}`);
+assert(loopSection.steps.length === 2, `loop section should keep flat tool rows, got ${loopSection.steps.length}`);
+assert(loopSection.steps.every((row) => row.type === 'tool'), 'loop section tools must be flat tool rows without toolGroup shells');
 const globRow = flatRows.find((row) => row.type === 'tool' && row.toolName === 'glob');
 const readRow = flatRows.find((row) => row.type === 'tool' && row.toolName === 'read_file');
 assert(readRow?.verb === '已读取', 'read_file row should use Chinese semantic verb');
@@ -216,7 +219,7 @@ const rawThinkingPresentation = buildWorkProcessPresentation({
 });
 const rawThinkingSection = rawThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(rawThinkingSection?.type === 'section', 'raw thinking loop should render a section');
-assert(rawThinkingSection.thinkingLabel === 'Raw reasoning', 'raw thinking should expose its verified semantic label');
+assert(rawThinkingSection.thinkingLabel === '思考过程', 'raw thinking should use the unified settled thinking label');
 assert(rawThinkingSection.thinkingPreview === 'provider-visible raw thinking', 'raw provider thinking should remain available behind disclosure');
 assert(rawThinkingSection.thinkingOpenByDefault === false, 'raw thinking should stay folded by default');
 
@@ -247,7 +250,7 @@ const summaryThinkingPresentation = buildWorkProcessPresentation({
 const summaryThinkingSection = summaryThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(summaryThinkingSection?.type === 'section', 'summary thinking should render as process evidence');
 assert(summaryThinkingSection.resultText === '', 'answer-only thinking must not duplicate final answer text');
-assert(summaryThinkingSection.thinkingLabel === 'Reasoning summary', 'summary thinking should expose its verified semantic label');
+assert(summaryThinkingSection.thinkingLabel === '思考过程', 'summary thinking should use the unified settled thinking label');
 assert(summaryThinkingSection.thinkingOpenByDefault === true, 'summary thinking should be open by default');
 
 const duplicateSummary = 'I have all the answers from memory. Let me respond concisely in Chinese.';
@@ -462,14 +465,12 @@ const askUserPresentation = buildWorkProcessPresentation({
   ],
 });
 const askUserRows = flattenRows(askUserPresentation.rows);
-const askUserGroup = askUserRows.find((row) => row.type === 'toolGroup');
 const askUserRow = askUserRows.find((row) => row.type === 'userInput');
-assert(askUserGroup?.title === '正在询问', 'pending ask_user should render in an asking interaction group');
-assert(askUserGroup?.countLabel === '2 个问题', `batch ask_user should count real questions, got ${askUserGroup?.countLabel}`);
-assert(askUserGroup?.summary === '', 'ask_user group should not duplicate the first question in the header preview');
-assert(askUserRow?.verb === '等待用户', 'pending ask_user should render waiting-user verb');
+assert(askUserRow?.verb === '正在询问', 'pending ask_user should render asking verb');
+assert(askUserRow?.questionCount === 2, `batch ask_user should count real questions, got ${askUserRow?.questionCount}`);
 assert(askUserRow.items.length === 2, 'ask_user should expose each batch question as a transcript item');
 assert(askUserRow.items[0].prompt.includes('Which smoke path'), 'ask_user first question should be visible');
+assert(!askUserRows.some((row) => row.type === 'toolGroup'), 'ask_user must not wrap in a toolGroup shell');
 
 const webSearchPresentation = buildWorkProcessPresentation({
   status: 'complete',
@@ -507,6 +508,8 @@ const webSearchRow = flattenRows(webSearchPresentation.rows).find((row) => row.t
 assert(webSearchRow?.verb === '已联网搜索', 'web_search should use dedicated web search verb');
 assert(webSearchRow.previewLines.includes('Provider: DuckDuckGo HTML'), 'web_search preview should include provider');
 assert(webSearchRow.previewLines.includes('https://renderdoc.org/'), 'web_search preview should include first result URL');
+assert(Array.isArray(webSearchRow.sourcePills) && webSearchRow.sourcePills.length > 0, 'web_search should expose source pills');
+assert(webSearchRow.sourcePills.some((pill) => pill.domain === 'renderdoc.org'), 'web_search source pill should include result domain');
 
 const mcpPresentation = buildWorkProcessPresentation({
   status: 'complete',
@@ -535,10 +538,10 @@ const mcpPresentation = buildWorkProcessPresentation({
   ],
 });
 const mcpRows = flattenRows(mcpPresentation.rows);
-const mcpGroup = mcpRows.find((row) => row.type === 'toolGroup');
 const mcpRow = mcpRows.find((row) => row.type === 'tool');
-assert(mcpGroup?.title === 'MCP · filesystem', 'dynamic MCP tools should group by server');
+assert(!mcpRows.some((row) => row.type === 'toolGroup'), 'dynamic MCP tools must stay flat without toolGroup shells');
 assert(mcpRow?.target === 'filesystem/read_file', 'dynamic MCP target should show server/tool');
+assert(mcpRow?.category === 'MCP' || mcpRow?.groupKind === 'mcp', 'dynamic MCP tools should keep MCP semantics');
 
 const componentSource = [
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcess.tsx', 'utf8'),
@@ -569,22 +572,26 @@ const orchestratorSource = fs.readFileSync('src/main/workflow/debugger/AgentOrch
 
 assert(presentationSource.includes("block.kind === 'llm_turn'"), 'Work Process sections should be sourced from LLM loop blocks');
 assert(presentationSource.includes('WORK_PROCESS_TOOL_DISPLAY_CATALOG'), 'tool display catalog should be canonical');
-assert(presentationSource.includes("type: 'toolGroup'"), 'presentation should expose semantic tool groups');
+assert(!presentationSource.includes("type: 'toolGroup'"), 'presentation must not expose toolGroup shells');
 assert(presentationSource.includes("type: 'response'"), 'presentation should expose a final response boundary row');
 assert(presentationSource.includes('createResponseRow'), 'presentation should route answer-only loops through response boundaries');
 assert(presentationSource.includes('actionCount'), 'presentation should expose actionCount for top-level transcript meta');
 assert(presentationSource.includes("normalized.startsWith('mcp__')"), 'dynamic MCP wildcard should have a semantic display path');
-assert(!presentationSource.includes("isSummary ? '思考过程'"), 'loop-level summary thinking label must not duplicate the Work Process header');
+assert(presentationSource.includes("label: status === 'streaming' || isActiveBlock"), 'thinking labels should branch on active vs settled state');
+assert(presentationSource.includes("'思考过程'"), 'settled thinking label should be 思考过程');
+assert(!presentationSource.includes("'原始思考'"), 'product copy must not use 原始思考');
+assert(!presentationSource.includes("isSummary ? '思考'"), 'settled thinking must not split summary/raw labels');
 for (const forbidden of ['Called tool']) {
   assert(!presentationSource.includes(forbidden), `presentation source should not contain ${forbidden}`);
 }
 
-assert(componentSource.includes('ToolGroupRow'), 'component should render semantic tool groups');
+assert(!componentSource.includes('ToolGroupRow'), 'component must not render toolGroup shells');
 assert(componentSource.includes('ResponseRow'), 'component should render the final response boundary row');
 assert(componentSource.includes("t('chat.workProcessTitle')"), 'header should use the process title translation');
+assert(componentSource.includes('ActiveSignalText'), 'running header should use ActiveSignalText');
 assert(!componentSource.includes('TRACE_HEADLINE_KEY'), 'top Work Process header must not fall back to status-first copy');
 assert(!componentSource.includes('statusMeta'), 'top Work Process meta should be duration/action context, not completion-status copy');
-assert(componentSource.includes('work-process-tool-group'), 'group row class should exist in component source');
+assert(!componentSource.includes('work-process-tool-group'), 'tool group class must be removed from component source');
 assert(componentSource.includes('work-process-step-group'), 'semantic step group row class should exist in component source');
 assert(componentSource.includes('WorkProcessViewToggle'), 'component should expose grouped/detail view toggle');
 assert(componentSource.includes('<details className={thinkingClassName}'), 'thinking should render as a user-collapsible top disclosure');
@@ -592,9 +599,21 @@ assert(!componentSource.includes('isSummaryThinking'), 'summary thinking must no
 assert(!componentSource.includes("t('chat.workProcessViewSteps'"), 'section should not expose the legacy tool-step disclosure');
 assert(!componentSource.includes('StepsListIcon'), 'legacy steps icon component should be removed');
 assert(!componentSource.includes('thinking-full'), 'component must not render full hidden CoT mode');
+assert(!componentSource.includes('RequestInspector'), 'Request Inspector must not embed in Work Process transcript');
 
-assert(cssSource.includes('.work-process-tool-group'), 'tool group styling should exist');
+assert(componentSource.includes('work-process-tool-target is-toggle'), 'tool target should be clickable to expand raw data');
+assert(componentSource.includes('work-process-tool-verb is-toggle'), 'tool verb should be clickable to expand console preview');
+assert(componentSource.includes("aria-label={t('chat.workProcessRawData')}"), 'Raw data copy should remain as aria-label only');
+assert(componentSource.includes("aria-label={t('chat.workProcessConsole')}"), 'Console copy should remain as aria-label only');
+assert(!componentSource.includes('work-process-debug-toggle'), 'nested Raw data toggle button must be removed');
+assert(!componentSource.includes('work-process-debug-disclosure'), 'nested raw details disclosure must be removed');
+assert(!componentSource.includes('work-process-preview-disclosure'), 'nested Console output disclosure must be removed');
+assert(!componentSource.includes('work-process-preview-toggle'), 'nested Console output toggle must be removed');
+
+assert(!cssSource.includes('.work-process-tool-group'), 'tool group styling must be removed');
 assert(cssSource.includes('.work-process-step-group'), 'semantic step group styling should exist');
+assert(cssSource.includes('.work-process-source-pills') || cssSource.includes('.work-process-source-pill'), 'web source pill styling should exist');
+assert(cssSource.includes('.work-process-step.is-appear'), 'step appear animation should exist');
 assert(cssSource.includes('.work-process-response'), 'response boundary styling should exist');
 assert(cssSource.includes('.work-process-icon'), 'local tool icon styling should exist');
 assert(cssSource.includes('.work-process-section-list'), 'section list styling should exist');
@@ -615,11 +634,14 @@ assert(appShellSource.includes('.composer-shell.is-running:focus-within'), 'comp
 assert(appShellSource.includes('@media (prefers-reduced-motion: reduce)'), 'composer running border should honor reduced motion');
 assert(responsiveThemeSource.includes('--composer-shell-radius: 12px'), 'composer responsive radius token should stay synchronized with the running border');
 
-assert(i18nSource.includes("'chat.workProcessTitle': 'Process'"), 'English process title copy should exist');
+assert(i18nSource.includes("'chat.workProcessTitle': 'Thinking process'"), 'English process title copy should be Thinking process');
 assert(i18nSource.includes("'chat.workProcessTitle': '思考过程'"), 'Chinese process title copy should exist');
+assert(i18nSource.includes("'chat.workProcessThinkingComplete': 'Thinking process'"), 'English settled thinking label should exist');
+assert(i18nSource.includes("'chat.workProcessThinkingComplete': '思考过程'"), 'Chinese settled thinking label should exist');
 assert(!i18nSource.includes('Tool steps {count}'), 'English legacy tool-step copy should be removed');
 assert(!i18nSource.includes('工具步骤'), 'Chinese legacy tool-step copy should be removed');
 assert(!i18nSource.includes('Reasoning summary'), 'legacy reasoning label should not exist in i18n');
+assert(!i18nSource.includes("'chat.workProcessTitle': 'Process'"), 'English Process title must be removed');
 
 assert(!userInputPanelSource.includes('window.electronAPI'), 'composer user input panel must not call Electron APIs directly');
 assert(userInputSubmitHookSource.includes('answerUserInput'), 'composer user input hook must submit through conversation.answerUserInput');

@@ -41,22 +41,71 @@ export function shouldResyncTurnControls(
     || previous.sessionControlsKey !== next.sessionControlsKey;
 }
 
+export function isPendingCapabilityKey(capabilityKey: string): boolean {
+  return capabilityKey.endsWith(':pending');
+}
+
+export function resolveTurnControlsForCapabilityChange(input: {
+  previousCapabilityKey: string | null;
+  nextCapabilityKey: string;
+  sessionChanged: boolean;
+  sessionControlsChanged: boolean;
+  capability: ResolvedModelCapability | null;
+  sessionControls: SessionTurnControlsInput;
+  currentControls: ConversationTurnControls;
+  rememberedControls: ConversationTurnControls | undefined;
+}): ConversationTurnControls {
+  const {
+    previousCapabilityKey,
+    nextCapabilityKey,
+    sessionChanged,
+    sessionControlsChanged,
+    capability,
+    sessionControls,
+    rememberedControls,
+  } = input;
+
+  if (sessionChanged || sessionControlsChanged || isPendingCapabilityKey(previousCapabilityKey ?? '')) {
+    return buildInitialTurnControls(capability, sessionControls);
+  }
+
+  if (previousCapabilityKey !== nextCapabilityKey) {
+    if (rememberedControls) {
+      return sanitizeTurnControls(rememberedControls, capability);
+    }
+    return buildInitialTurnControls(capability, null);
+  }
+
+  return sanitizeTurnControls(input.currentControls, capability);
+}
+
 interface TurnControlsState {
   turnControls: ConversationTurnControls;
   capability: ResolvedModelCapability | null;
+  controlsByCapabilityKey: Record<string, ConversationTurnControls>;
   setTurnControls: (
     next: ConversationTurnControls | ((prev: ConversationTurnControls) => ConversationTurnControls),
   ) => void;
   setCapability: (capability: ResolvedModelCapability | null) => void;
+  rememberControls: (capabilityKey: string, controls: ConversationTurnControls) => void;
+  clearRememberedControls: () => void;
 }
 
 export const useTurnControlsStore = create<TurnControlsState>((set) => ({
   turnControls: buildInitialTurnControls(null),
   capability: null,
+  controlsByCapabilityKey: {},
   setTurnControls: (next) => set((state) => ({
     turnControls: typeof next === 'function' ? next(state.turnControls) : next,
   })),
   setCapability: (capability) => set({ capability }),
+  rememberControls: (capabilityKey, controls) => set((state) => ({
+    controlsByCapabilityKey: {
+      ...state.controlsByCapabilityKey,
+      [capabilityKey]: controls,
+    },
+  })),
+  clearRememberedControls: () => set({ controlsByCapabilityKey: {} }),
 }));
 
 export function useTurnControls(agentId: string, currentSession: SessionRecord | null) {
@@ -64,6 +113,8 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const capability = useTurnControlsStore((state) => state.capability);
   const setTurnControls = useTurnControlsStore((state) => state.setTurnControls);
   const setCapability = useTurnControlsStore((state) => state.setCapability);
+  const rememberControls = useTurnControlsStore((state) => state.rememberControls);
+  const clearRememberedControls = useTurnControlsStore((state) => state.clearRememberedControls);
   const llmSettings = useAppSettingsStore((state) => state.settings.llm);
   const settingsHydrated = useAppSettingsStore((state) => state.hydrated);
   const sessionId = currentSession?.sessionId ?? null;
@@ -122,13 +173,49 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
     if (!shouldResyncTurnControls(previousFingerprint, nextFingerprint)) {
       return;
     }
+
+    const sessionChanged = previousFingerprint.sessionId !== nextFingerprint.sessionId;
+    const sessionControlsChanged = previousFingerprint.sessionControlsKey !== nextFingerprint.sessionControlsKey;
+    const previousCapabilityKey = lastCapabilityKeyRef.current;
+    const store = useTurnControlsStore.getState();
+
+    if (sessionChanged) {
+      clearRememberedControls();
+    } else if (
+      previousCapabilityKey
+      && previousCapabilityKey !== capabilityKey
+      && !isPendingCapabilityKey(previousCapabilityKey)
+      && previousFingerprint.sessionId === sessionId
+    ) {
+      rememberControls(previousCapabilityKey, store.turnControls);
+    }
+
+    const rememberedControls = useTurnControlsStore.getState().controlsByCapabilityKey[capabilityKey];
+
+    setTurnControls(resolveTurnControlsForCapabilityChange({
+      previousCapabilityKey,
+      nextCapabilityKey: capabilityKey,
+      sessionChanged,
+      sessionControlsChanged,
+      capability,
+      sessionControls,
+      currentControls: store.turnControls,
+      rememberedControls,
+    }));
+
     lastSessionIdRef.current = sessionId;
     lastCapabilityKeyRef.current = capabilityKey;
     lastSessionControlsKeyRef.current = sessionControlsKey;
-    // Capability resolves asynchronously after session bootstrap. Always reapply
-    // persisted session controls on sync so reload does not fall back to model defaults.
-    setTurnControls(buildInitialTurnControls(capability, sessionControls));
-  }, [sessionId, capabilityKey, sessionControlsKey, sessionControls, capability, setTurnControls]);
+  }, [
+    sessionId,
+    capabilityKey,
+    sessionControlsKey,
+    sessionControls,
+    capability,
+    setTurnControls,
+    rememberControls,
+    clearRememberedControls,
+  ]);
 
   useEffect(() => {
     if (!capability) {
@@ -138,15 +225,25 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   }, [capability, setTurnControls]);
 
   const updateTurnControls = useCallback((patch: Partial<ConversationTurnControls>) => {
-    setTurnControls((current) => sanitizeTurnControls({ ...current, ...patch }, capability));
-  }, [capability, setTurnControls]);
+    setTurnControls((current) => {
+      const next = sanitizeTurnControls({ ...current, ...patch }, capability);
+      if (!isPendingCapabilityKey(capabilityKey)) {
+        rememberControls(capabilityKey, next);
+      }
+      return next;
+    });
+  }, [capability, capabilityKey, rememberControls, setTurnControls]);
 
   return {
     turnControls,
     capability,
     updateTurnControls,
     setTurnControls: (next: ConversationTurnControls) => {
-      setTurnControls(sanitizeTurnControls(next, capability));
+      const sanitized = sanitizeTurnControls(next, capability);
+      if (!isPendingCapabilityKey(capabilityKey)) {
+        rememberControls(capabilityKey, sanitized);
+      }
+      setTurnControls(sanitized);
     },
   };
 }

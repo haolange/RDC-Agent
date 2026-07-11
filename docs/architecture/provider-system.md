@@ -29,6 +29,8 @@ RDC-Agent 的 Provider 体系把供应商身份、`wire protocol`、认证方式
 
 `protocol` 只回答“主进程用哪种 wire adapter 发请求”。Agent Runtime、Settings 连接测试和模型刷新必须读取 `protocol`，不得从 `category` 或 provider label 猜测。
 
+OpenAI Chat Completions（`OpenAICompatibleChatCompletions`）与 OpenAI Responses（`OpenAIResponses`）是两套不同协议，Settings 不得合成一项。对官方同时提供 Anthropic Messages 与 OpenAI 协议的厂商，catalog 通过 `protocolEditable` + `protocolOptions` + `protocolBaseUrls` 暴露可切换协议；切换协议时，若当前 Base URL 仍是上一协议默认值，则同步到新协议默认 URL。无官方 Responses 文档的厂商不得开放 Responses 选项。
+
 ## Catalog Ownership
 
 `catalogOwnership` 说明模型列表和能力表由谁维护：
@@ -80,6 +82,7 @@ Settings 与 Composer 必须使用同一套 capability-driven reasoning 语义�
 - 官方资料不完整时，用 `conservative` source kind 标记，并使用保守能力值；
 - 低成本实测只用于验证 endpoint/model 可用性，不把 runtime 探测结果当作永久 capability 来源；
 - 更新模型列表时同步 `llm.ts` 的 provider ownership 派生、相关测试和 Settings 只读展示。
+- 2026-07-11：OpenAI GPT-5.6 家族（`gpt-5.6-sol` / `terra` / `luna`，alias `gpt-5.6`→sol）在 Responses 路由暴露产品档 `extra→xhigh` 与 `max→max`；xAI 新增 `grok-4.5`（500k context，low/medium/high，默认 high）。Claude Fable 5 既有 `max` 档保持不变。OpenAI multi-agent `ultra` 与 `reasoning.mode: pro` 本轮不进入 Composer 滑杆。
 
 Composer compact controls are display-only consumers of resolved capability. They may render labels, values, and short disabled reasons, but must not render provider documentation excerpts, source claims, marketing notes, catalog research notes, or explanatory paragraphs. Long capability rationale belongs in Settings details, catalog source metadata, or this architecture document.
 
@@ -142,7 +145,7 @@ Provider adapters must preserve the difference between UI-visible thinking and p
 
 - OpenAI Responses keeps the stateless `store:false` route, requests `reasoning.summary='auto'` when summary events are enabled, and requests `include: ['reasoning.encrypted_content']` for provider replay. The replay item stays a Responses `reasoning` item, not assistant text.
 - Anthropic Messages preserves `thinking`, `signature_delta`, and `redacted_thinking` blocks for tool-use continuation. Replay uses native Anthropic content blocks only when the stored artifact belongs to the same protocol.
-- OpenAI-compatible Chat Completions, OpenRouter-style routes, Gemini, Ollama, and DeepSeek/Qwen/Kimi/GLM-style readable `reasoning_content` are raw thinking artifacts with `replayPolicy: 'none'` unless a provider-specific opaque replay artifact is explicitly captured.
+- OpenAI-compatible Chat Completions routes that emit readable `reasoning_content` (DeepSeek, Kimi, GLM, MiniMax, MiMo, and similar) store raw thinking with `replayPolicy: 'openai-reasoning-content'`. Assistant turns that carry `tool_calls` must replay that field on subsequent requests. OpenRouter-style, Gemini, and Ollama readable thinking remain `replayPolicy: 'none'` unless a provider-specific opaque replay artifact is explicitly captured.
 - Context compaction and token estimation count ordinary visible transcript separately from provider artifact replay payloads; raw readable thinking must not inflate the ordinary conversation budget.
 
 Work Process consumes provider thinking through `ConversationWorkTrace` only. Its visible header uses process-first copy and must not regress to status-first labels. Each provider turn is projected as an `llm_turn` section with a fixed hierarchy: thinking disclosure first when available, loop result/narration second, and nested tool-call / approval / `ask_user` evidence third.

@@ -1,19 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
 import { useI18n } from '../../../i18n';
+import { ActiveSignalText } from '../../../ui/ActiveSignalText';
 import { buildWorkProcessPresentation } from './workProcessPresentation';
 import { createWorkProcessRowRenderer } from './workProcessRowRenderer';
 import { getDefaultGroupOpen, WorkProcessStepGroupRow } from './WorkProcessStepGroupRow';
 import { WorkProcessViewToggle } from './WorkProcessViewToggle';
-import { RequestInspector } from './RequestInspector';
 
 interface WorkProcessProps {
   trace: ConversationWorkTrace;
-  sessionId?: string | null;
-  turnId?: string;
 }
 
-export const WorkProcess: React.FC<WorkProcessProps> = ({ trace, sessionId, turnId }) => {
+export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
   const { t } = useI18n();
   const [detailView, setDetailView] = useState(false);
   const presentation = useMemo(
@@ -40,7 +38,9 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace, sessionId, turn
 
   const headlineCopy = trace.status === 'stopped'
     ? t('chat.workProcessHeadlineStopped')
-    : t('chat.workProcessTitle');
+    : trace.status === 'running'
+      ? t('chat.workProcessThinkingStreaming')
+      : t('chat.workProcessTitle');
   const actionMeta = presentation.actionCount > 0
     ? t('chat.workProcessActions', { count: presentation.actionCount })
     : '';
@@ -48,8 +48,7 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace, sessionId, turn
   const metaParts = [durationMeta, actionMeta].filter(Boolean);
   const hasBody = Boolean(presentation.summary)
     || presentation.groups.length > 0
-    || presentation.rows.length > 0
-    || Boolean(sessionId && turnId);
+    || presentation.rows.length > 0;
 
   return (
     <section
@@ -70,7 +69,13 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace, sessionId, turn
             </svg>
           </span>
           <span className={`work-process-status-dot status-${trace.status}`} aria-hidden="true" />
-          <span className={`work-process-label status-${trace.status}`}>{headlineCopy}</span>
+          {trace.status === 'running' ? (
+            <ActiveSignalText active tone="info" className={`work-process-label status-${trace.status}`}>
+              {headlineCopy}
+            </ActiveSignalText>
+          ) : (
+            <span className={`work-process-label status-${trace.status}`}>{headlineCopy}</span>
+          )}
           {metaParts.length > 0 ? <span className="work-process-meta">{metaParts.join(' · ')}</span> : null}
         </button>
         <WorkProcessViewToggle
@@ -84,7 +89,6 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace, sessionId, turn
           {presentation.summary ? (
             <p className="work-process-summary">{presentation.summary}</p>
           ) : null}
-          {sessionId && turnId ? <RequestInspector sessionId={sessionId} turnId={turnId} active={trace.status === 'running'} /> : null}
           {detailView ? (
             presentation.rows.length > 0 ? (
               <ol className="work-process-steps">

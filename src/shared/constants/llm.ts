@@ -30,6 +30,8 @@ export interface BuiltinProviderDefinition {
   baseUrlEditable?: boolean;
   protocolEditable?: boolean;
   protocolOptions?: LlmProviderProtocol[];
+  /** Per-protocol default base URLs when the provider exposes multiple wire protocols. */
+  protocolBaseUrls?: Partial<Record<LlmProviderProtocol, string>>;
   docsUrl?: string;
   recommendedModels: string[];
   capabilities?: LlmProviderCapability[];
@@ -132,42 +134,34 @@ export const LLM_PROVIDER_PROTOCOL_DEFINITIONS: LlmProviderProtocolDescriptor[] 
 const ANTHROPIC_ALIAS_MODELS = ['sonnet', 'opus', 'haiku'];
 const ANTHROPIC_FIRST_PARTY_MODELS = ['sonnet', 'opus'];
 export const CLAUDE_ACCOUNT_MODELS = [
-  'claude-opus-4-7',
-  'claude-sonnet-4-6',
+  'claude-fable-5',
+  'claude-sonnet-5',
+  'claude-opus-4-8',
   'claude-haiku-4-5-20251001',
 ];
 export const CHATGPT_ACCOUNT_MODELS = [
-  'gpt-5.5',
-  'gpt-5.4',
-  'gpt-5.4-mini',
-  'gpt-5.3-codex',
-  'gpt-5.2-codex',
-  'gpt-5.1-codex',
-  'gpt-5',
-  'o4-mini',
-  'o3',
-  'gpt-4o',
+  'gpt-5.6-sol',
+  'gpt-5.6-terra',
+  'gpt-5.6-luna',
+  'gpt-5.5-instant',
+  'gpt-5.5-thinking',
+  'gpt-5.5-pro',
 ];
 export const GITHUB_COPILOT_ACCOUNT_MODELS = [
+  'gpt-5.6-sol',
+  'gpt-5.6-terra',
+  'gpt-5.6-luna',
   'gpt-5.5',
-  'gpt-5.4',
-  'gpt-5.4-mini',
   'gpt-5.3-codex',
-  'gpt-5.2-codex',
-  'gpt-5.2',
-  'gpt-5-mini',
-  'claude-opus-4-7',
-  'claude-sonnet-4-6',
-  'claude-haiku-4-5',
-  'claude-opus-4-6',
-  'claude-opus-4-5',
-  'claude-sonnet-4-5',
-  'gpt-4.1',
+  'claude-sonnet-5',
+  'claude-opus-4-8',
+  'gemini-3.1-pro-preview',
+  'gemini-3.5-flash',
 ];
 export const GROK_ACCOUNT_MODELS = [
+  'grok-4.5',
   'grok-4.3',
   'grok-build-0.1',
-  'grok-4',
   'grok-code-fast-1',
 ];
 export const GEMINI_ACCOUNT_MODELS = [
@@ -181,7 +175,16 @@ export const QWEN_ACCOUNT_MODELS = [
   'qwen-max',
   'qwen-vl-max',
 ];
-const OPENAI_CODE_MODELS = ['gpt-5.2', 'gpt-4.1', 'gpt-5-mini'];
+const OPENAI_CODE_MODELS = [
+  'gpt-5.6-sol',
+  'gpt-5.6-terra',
+  'gpt-5.6-luna',
+  'gpt-5.5',
+  'gpt-5.4',
+  'gpt-5.4-mini',
+  'gpt-5.3-codex',
+  'gpt-4.1',
+];
 
 const CAPS_OPENAI_COMPATIBLE: LlmProviderCapability[] = ['chat', 'tool-calling', 'model-discovery'];
 const CAPS_ANTHROPIC: LlmProviderCapability[] = ['chat', 'tool-calling', 'reasoning', 'prompt-cache', 'model-discovery'];
@@ -196,6 +199,14 @@ const CAPS_STATIC_CLOUD: LlmProviderCapability[] = ['chat'];
 
 const OPENAI_RESPONSES_OPTIONS: LlmProviderProtocol[] = ['OpenAICompatibleChatCompletions', 'OpenAIResponses'];
 const LOCAL_PROTOCOL_OPTIONS: LlmProviderProtocol[] = ['OllamaOpenAICompatibleChatCompletions', 'OpenAIResponses'];
+const ANTHROPIC_OPENAI_CHAT_OPTIONS: LlmProviderProtocol[] = ['AnthropicMessages', 'OpenAICompatibleChatCompletions'];
+const ANTHROPIC_OPENAI_CHAT_RESPONSES_OPTIONS: LlmProviderProtocol[] = [
+  'AnthropicMessages',
+  'OpenAICompatibleChatCompletions',
+  'OpenAIResponses',
+];
+
+const CAPS_COMPAT_REASONING: LlmProviderCapability[] = ['chat', 'tool-calling', 'reasoning', 'model-discovery'];
 
 const APP_MANAGED_PROVIDER_CATEGORIES = new Set<LlmProviderCategory>([
   'login-authorization',
@@ -390,9 +401,15 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     modelDiscovery: 'anthropic-candidate-validation',
     label: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com/anthropic',
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: 'https://api.deepseek.com/anthropic',
+      OpenAICompatibleChatCompletions: 'https://api.deepseek.com',
+    },
     recommendedModels: ['deepseek-v4-pro', 'deepseek-v4-flash'],
     docsUrl: 'https://platform.deepseek.com/api_keys',
-    capabilities: CAPS_ANTHROPIC,
+    capabilities: CAPS_COMPAT_REASONING,
   },
   {
     id: 'bailian',
@@ -438,9 +455,15 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     modelDiscovery: 'anthropic-candidate-validation',
     label: 'Zhipu AI GLM (CN)',
     baseUrl: 'https://open.bigmodel.cn/api/anthropic',
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: 'https://open.bigmodel.cn/api/anthropic',
+      OpenAICompatibleChatCompletions: 'https://open.bigmodel.cn/api/paas/v4',
+    },
     recommendedModels: ANTHROPIC_ALIAS_MODELS,
     docsUrl: 'https://open.bigmodel.cn/',
-    capabilities: CAPS_ANTHROPIC,
+    capabilities: CAPS_COMPAT_REASONING,
   },
   {
     id: 'glm-global',
@@ -450,9 +473,15 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     modelDiscovery: 'anthropic-candidate-validation',
     label: 'Z.ai GLM (Global)',
     baseUrl: 'https://api.z.ai/api/anthropic',
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: 'https://api.z.ai/api/anthropic',
+      OpenAICompatibleChatCompletions: 'https://api.z.ai/api/paas/v4',
+    },
     recommendedModels: ANTHROPIC_ALIAS_MODELS,
     docsUrl: 'https://platform.z.ai/',
-    capabilities: CAPS_ANTHROPIC,
+    capabilities: CAPS_COMPAT_REASONING,
   },
   {
     id: 'minimax-cn',
@@ -462,9 +491,15 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     modelDiscovery: 'anthropic-candidate-validation',
     label: 'MiniMax (CN)',
     baseUrl: 'https://api.minimaxi.com/anthropic',
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: 'https://api.minimaxi.com/anthropic',
+      OpenAICompatibleChatCompletions: 'https://api.minimaxi.com/v1',
+    },
     recommendedModels: ['MiniMax-M2.7'],
     docsUrl: 'https://platform.minimaxi.com/',
-    capabilities: CAPS_ANTHROPIC,
+    capabilities: CAPS_COMPAT_REASONING,
   },
   {
     id: 'minimax-global',
@@ -474,9 +509,15 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     modelDiscovery: 'anthropic-candidate-validation',
     label: 'MiniMax (Global)',
     baseUrl: 'https://api.minimax.io/anthropic',
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: 'https://api.minimax.io/anthropic',
+      OpenAICompatibleChatCompletions: 'https://api.minimax.io/v1',
+    },
     recommendedModels: ['MiniMax-M2.7'],
     docsUrl: 'https://platform.minimaxi.com/',
-    capabilities: CAPS_ANTHROPIC,
+    capabilities: CAPS_COMPAT_REASONING,
   },
   {
     id: 'xiaomi-mimo',
@@ -486,9 +527,16 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     modelDiscovery: 'anthropic-candidate-validation',
     label: 'Xiaomi MiMo',
     baseUrl: 'https://api.xiaomimimo.com/anthropic',
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_RESPONSES_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: 'https://api.xiaomimimo.com/anthropic',
+      OpenAICompatibleChatCompletions: 'https://api.xiaomimimo.com/v1',
+      OpenAIResponses: 'https://api.xiaomimimo.com/v1',
+    },
     recommendedModels: ['mimo-v2.5-pro'],
     docsUrl: 'https://platform.xiaomimimo.com/#/console/api-keys',
-    capabilities: CAPS_ANTHROPIC,
+    capabilities: CAPS_COMPAT_REASONING,
   },
   {
     id: 'moonshot',
@@ -498,9 +546,15 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     modelDiscovery: 'anthropic-candidate-validation',
     label: 'Kimi / Moonshot AI',
     baseUrl: 'https://api.moonshot.cn/anthropic',
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: 'https://api.moonshot.cn/anthropic',
+      OpenAICompatibleChatCompletions: 'https://api.moonshot.cn/v1',
+    },
     recommendedModels: ['sonnet'],
     docsUrl: 'https://platform.moonshot.cn/console/api-keys',
-    capabilities: CAPS_ANTHROPIC,
+    capabilities: CAPS_COMPAT_REASONING,
   },
   {
     id: 'xai',
@@ -557,10 +611,16 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     category: 'coding-token-plan',
     modelDiscovery: 'anthropic-candidate-validation',
     label: 'Kimi Coding Plan',
-    baseUrl: 'https://api.kimi.com/coding/v1',
+    baseUrl: 'https://api.kimi.com/coding/',
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: 'https://api.kimi.com/coding/',
+      OpenAICompatibleChatCompletions: 'https://api.kimi.com/coding/v1',
+    },
     recommendedModels: ['kimi-for-coding'],
     docsUrl: 'https://www.kimi.com/code/docs/en/',
-    capabilities: CAPS_ANTHROPIC,
+    capabilities: CAPS_COMPAT_REASONING,
   },
   {
     id: 'bailian-coding-plan',
@@ -572,7 +632,7 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     baseUrl: 'https://coding.dashscope.aliyuncs.com/apps/anthropic',
     recommendedModels: ['qwen3.6-plus', 'qwen3-coder-next', 'qwen3-coder-plus', 'kimi-k2.5', 'glm-5', 'glm-4.7'],
     docsUrl: 'https://bailian.console.aliyun.com/',
-    capabilities: CAPS_ANTHROPIC,
+    capabilities: CAPS_COMPAT_REASONING,
   },
   {
     id: 'volcengine-coding-plan',
@@ -582,57 +642,87 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     modelDiscovery: 'anthropic-candidate-validation',
     label: 'Volcengine Ark Coding Plan',
     baseUrl: 'https://ark.cn-beijing.volces.com/api/coding',
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: 'https://ark.cn-beijing.volces.com/api/coding',
+      OpenAICompatibleChatCompletions: 'https://ark.cn-beijing.volces.com/api/coding/v3',
+    },
     recommendedModels: ['doubao-seed-2.1-pro', 'doubao-seed-2.1-turbo', 'glm-4.6', 'deepseek-v4-pro', 'kimi-k2.5'],
     docsUrl: 'https://www.volcengine.com/docs/82379/1928262',
-    capabilities: CAPS_ANTHROPIC,
+    capabilities: CAPS_COMPAT_REASONING,
   },
   {
     id: 'glm-cn-coding-plan',
     protocol: 'AnthropicMessages',
     authMode: 'api-key',
     category: 'coding-token-plan',
-    modelDiscovery: null,
+    modelDiscovery: 'anthropic-candidate-validation',
     label: 'Zhipu AI GLM Coding Plan (CN)',
-    recommendedModels: ['sonnet', 'opus', 'haiku'],
+    baseUrl: 'https://open.bigmodel.cn/api/anthropic',
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: 'https://open.bigmodel.cn/api/anthropic',
+      OpenAICompatibleChatCompletions: 'https://open.bigmodel.cn/api/coding/paas/v4',
+    },
+    recommendedModels: ['glm-5', 'glm-4.7', 'sonnet', 'opus', 'haiku'],
     docsUrl: 'https://open.bigmodel.cn/',
-    unavailableReason: 'The official GLM CN Coding Plan endpoint is not pinned in this catalog.',
-    capabilities: CAPS_ANTHROPIC,
+    capabilities: CAPS_COMPAT_REASONING,
   },
   {
     id: 'glm-global-coding-plan',
     protocol: 'AnthropicMessages',
     authMode: 'api-key',
     category: 'coding-token-plan',
-    modelDiscovery: null,
+    modelDiscovery: 'anthropic-candidate-validation',
     label: 'Z.ai GLM Coding Plan (Global)',
-    recommendedModels: ['sonnet', 'opus', 'haiku'],
+    baseUrl: 'https://api.z.ai/api/anthropic',
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: 'https://api.z.ai/api/anthropic',
+      OpenAICompatibleChatCompletions: 'https://api.z.ai/api/coding/paas/v4',
+    },
+    recommendedModels: ['glm-5', 'glm-4.7', 'sonnet', 'opus', 'haiku'],
     docsUrl: 'https://platform.z.ai/',
-    unavailableReason: 'The official GLM Global Coding Plan endpoint is not pinned in this catalog.',
-    capabilities: CAPS_ANTHROPIC,
+    capabilities: CAPS_COMPAT_REASONING,
   },
   {
     id: 'minimax-cn-coding-plan',
     protocol: 'AnthropicMessages',
     authMode: 'api-key',
     category: 'coding-token-plan',
-    modelDiscovery: null,
+    modelDiscovery: 'anthropic-candidate-validation',
     label: 'MiniMax Coding Plan (CN)',
+    baseUrl: 'https://api.minimaxi.com/anthropic',
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: 'https://api.minimaxi.com/anthropic',
+      OpenAICompatibleChatCompletions: 'https://api.minimaxi.com/v1',
+    },
     recommendedModels: ['MiniMax-M2.7'],
     docsUrl: 'https://platform.minimaxi.com/',
-    unavailableReason: 'The official MiniMax CN Coding Plan endpoint is not pinned in this catalog.',
-    capabilities: CAPS_ANTHROPIC,
+    capabilities: CAPS_COMPAT_REASONING,
   },
   {
     id: 'minimax-global-coding-plan',
     protocol: 'AnthropicMessages',
     authMode: 'api-key',
     category: 'coding-token-plan',
-    modelDiscovery: null,
+    modelDiscovery: 'anthropic-candidate-validation',
     label: 'MiniMax Coding Plan (Global)',
+    baseUrl: 'https://api.minimax.io/anthropic',
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: 'https://api.minimax.io/anthropic',
+      OpenAICompatibleChatCompletions: 'https://api.minimax.io/v1',
+    },
     recommendedModels: ['MiniMax-M2.7'],
     docsUrl: 'https://platform.minimaxi.com/',
-    unavailableReason: 'The official MiniMax Global Coding Plan endpoint is not pinned in this catalog.',
-    capabilities: CAPS_ANTHROPIC,
+    capabilities: CAPS_COMPAT_REASONING,
   },
   {
     id: 'xiaomi-mimo-token-plan',
@@ -642,9 +732,16 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     modelDiscovery: 'anthropic-candidate-validation',
     label: 'Xiaomi MiMo Token Plan',
     baseUrl: 'https://token-plan-cn.xiaomimimo.com/anthropic',
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_RESPONSES_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: 'https://token-plan-cn.xiaomimimo.com/anthropic',
+      OpenAICompatibleChatCompletions: 'https://token-plan-cn.xiaomimimo.com/v1',
+      OpenAIResponses: 'https://token-plan-cn.xiaomimimo.com/v1',
+    },
     recommendedModels: ['mimo-v2.5-pro'],
     docsUrl: 'https://platform.xiaomimimo.com/#/console/plan-manage',
-    capabilities: CAPS_ANTHROPIC,
+    capabilities: CAPS_COMPAT_REASONING,
   },
   {
     id: 'openrouter',
@@ -817,6 +914,43 @@ export function resolveBuiltinProviderProtocol(id: string, candidate: unknown): 
   return definition.protocol;
 }
 
+export function resolveBuiltinProtocolBaseUrl(
+  id: string,
+  protocol: LlmProviderProtocol,
+): string | undefined {
+  const definition = getBuiltinProviderDefinition(id);
+  if (!definition) return undefined;
+  const mapped = definition.protocolBaseUrls?.[protocol];
+  if (typeof mapped === 'string' && mapped.trim()) return mapped.trim().replace(/\/+$/, '');
+  if (protocol === definition.protocol && typeof definition.baseUrl === 'string') {
+    return definition.baseUrl.trim().replace(/\/+$/, '');
+  }
+  return typeof definition.baseUrl === 'string' ? definition.baseUrl.trim().replace(/\/+$/, '') : undefined;
+}
+
+export function resolveBaseUrlForProtocolChange(
+  id: string,
+  previousProtocol: LlmProviderProtocol,
+  nextProtocol: LlmProviderProtocol,
+  currentBaseUrl: string | undefined,
+): string {
+  const previousDefault = resolveBuiltinProtocolBaseUrl(id, previousProtocol) ?? '';
+  const nextDefault = resolveBuiltinProtocolBaseUrl(id, nextProtocol) ?? '';
+  const current = (currentBaseUrl ?? '').trim().replace(/\/+$/, '');
+  if (!current || current === previousDefault) {
+    return nextDefault || current;
+  }
+  return currentBaseUrl?.trim() ?? current;
+}
+
+export function getBuiltinProviderProtocolBaseUrls(
+  id: string,
+): Partial<Record<LlmProviderProtocol, string>> | undefined {
+  const definition = getBuiltinProviderDefinition(id);
+  if (!definition?.protocolBaseUrls) return undefined;
+  return { ...definition.protocolBaseUrls };
+}
+
 const toModels = (modelIds: string[]): LlmProviderModel[] =>
   Array.from(new Set(modelIds)).map((modelId) => ({
     id: modelId,
@@ -854,6 +988,7 @@ export const createBuiltinProviderEntry = (id: BuiltinLlmProviderId): LlmProvide
     baseUrlEditable: definition.baseUrlEditable,
     protocolEditable: definition.protocolEditable,
     protocolOptions: getBuiltinProviderProtocolOptions(definition.id),
+    protocolBaseUrls: getBuiltinProviderProtocolBaseUrls(definition.id),
     models: managedModels.length > 0
       ? managedModels
       : definition.modelDiscovery === 'static' && definition.authMode === 'environment'

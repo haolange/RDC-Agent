@@ -2,7 +2,9 @@ import {
   getBuiltinProviderCatalogOwnership,
   getBuiltinProviderDefinition,
   isBuiltinProviderId,
+  resolveBaseUrlForProtocolChange,
   resolveBuiltinProviderProtocol,
+  resolveBuiltinProtocolBaseUrl,
 } from '@shared/constants/llm';
 import { getManagedProviderModels } from '@shared/constants/modelCapabilityCatalog';
 import type {
@@ -20,6 +22,22 @@ import { settingsService } from '../settings/SettingsService';
 import { providerAccountAuthService } from './ProviderAccountAuthService';
 
 const REQUEST_TIMEOUT_MS = 20000;
+
+function resolveDiscoveryStrategy(
+  protocol: LlmProviderEntry['protocol'],
+  catalogStrategy: LlmProviderModelDiscoveryStrategy | null | undefined,
+): LlmProviderModelDiscoveryStrategy | null {
+  if (protocol === 'OpenAICompatibleChatCompletions' || protocol === 'OpenAIResponses' || protocol === 'OpenRouterChatCompletions') {
+    return 'openai-compatible';
+  }
+  if (protocol === 'AnthropicMessages') {
+    return 'anthropic-candidate-validation';
+  }
+  if (protocol === 'OllamaOpenAICompatibleChatCompletions') {
+    return catalogStrategy === 'ollama-tags' ? 'ollama-tags' : 'openai-compatible';
+  }
+  return catalogStrategy ?? null;
+}
 
 export function normalizeDiscoveredModels(
   values: unknown[],
@@ -163,6 +181,15 @@ const formatHttpError = (status: number): string => {
 
 const appendPath = (baseUrl: string, path: string): string =>
   `${baseUrl.trim().replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+
+/** Coding Plan models list: align with CodePilot — append `/v1/models` when base has no `/v1`. */
+export const resolveCodingPlanModelsUrl = (baseUrl: string): string => {
+  const trimmed = baseUrl.trim().replace(/\/+$/, '');
+  if (/\/v1$/i.test(trimmed)) {
+    return `${trimmed}/models`;
+  }
+  return `${trimmed}/v1/models`;
+};
 
 const appendQueryParam = (url: string, key: string, value: string): string => {
   const separator = url.includes('?') ? '&' : '?';
@@ -343,7 +370,14 @@ export class ProviderConnectionService {
     if (!protocol) {
       throw new ProviderConnectionError(`Provider ${provider.id} is not in the built-in catalog.`);
     }
-    return protocol === provider.protocol ? provider : { ...provider, protocol };
+    if (protocol === provider.protocol) return provider;
+    const nextBaseUrl = resolveBaseUrlForProtocolChange(
+      provider.id,
+      provider.protocol,
+      protocol,
+      provider.baseUrl,
+    );
+    return { ...provider, protocol, baseUrl: nextBaseUrl || provider.baseUrl };
   }
 
   private async discoverModels(provider: LlmProviderEntry, apiKeyDraft: string, baseUrlDraft: string): Promise<LlmProviderModel[]> {
@@ -358,11 +392,8 @@ export class ProviderConnectionService {
     if (provider.unavailableReason) {
       throw new ProviderConnectionError(provider.unavailableReason);
     }
-    if (!definition?.modelDiscovery) {
-      if (catalogOwnership === 'app-managed') {
-        return managedModels;
-      }
-      throw new ProviderConnectionError('Provider 缺少模型发现配置');
+    if (!definition) {
+      throw new ProviderConnectionError('Provider 不在内置 catalog 中');
     }
     const apiKey = provider.authMode === 'api-key'
       ? apiKeyDraft || settingsService.getProviderSecret(provider.id)
@@ -371,20 +402,32 @@ export class ProviderConnectionService {
       throw new ProviderConnectionError('请输入 API Key');
     }
 
-    const strategy = definition.modelDiscovery;
+    const strategy = resolveDiscoveryStrategy(provider.protocol, definition.modelDiscovery);
+    if (!strategy) {
+      if (catalogOwnership === 'app-managed') {
+        return managedModels;
+      }
+      throw new ProviderConnectionError('Provider 缺少模型发现配置');
+    }
     if (strategy === 'static') {
       return catalogOwnership === 'app-managed'
         ? managedModels
         : toStaticModels(definition.recommendedModels);
     }
-    const baseUrl = (baseUrlDraft || provider.baseUrl || definition.baseUrl || '').trim().replace(/\/+$/, '');
+    const baseUrl = (
+      baseUrlDraft
+      || provider.baseUrl
+      || resolveBuiltinProtocolBaseUrl(provider.id, provider.protocol)
+      || definition.baseUrl
+      || ''
+    ).trim().replace(/\/+$/, '');
     if (!baseUrl) {
       throw new ProviderConnectionError('请填写 Provider Base URL');
     }
     const candidateModelIds = catalogOwnership === 'app-managed'
       ? managedModels.map((model) => model.id)
       : definition.recommendedModels;
-    if (provider.id === 'kimi-coding-plan') {
+    if (provider.id === 'kimi-coding-plan' && provider.protocol === 'AnthropicMessages') {
       return this.validateCodingPlanModels(apiKey, baseUrl, candidateModelIds, managedModels);
     }
     if (strategy === 'anthropic-candidate-validation') {
@@ -457,10 +500,11 @@ export class ProviderConnectionService {
     modelIds: string[],
     managedModels: LlmProviderModel[] = [],
   ): Promise<LlmProviderModel[]> {
-    const payload = await getJson(appendPath(baseUrl, '/models'), {
+    const payload = await getJson(resolveCodingPlanModelsUrl(baseUrl), {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${apiKey}`,
+        'User-Agent': 'RDC-Agent',
       },
     });
     const availableModelIds = new Set(

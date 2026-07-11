@@ -34,6 +34,7 @@ describe('workProcessActiveSignal', () => {
     expect(stepGroupSource).not.toContain('ActiveSignalText');
     expect(rowsSource).not.toContain('className="work-process-tool-verb">{label(row.verb)}</ActiveSignalText>');
     expect(rowsSource).not.toContain('work-process-tool-approval-verb">{label(approval.verb)}</ActiveSignalText>');
-    expect(rowsSource).toContain('<ActiveSignalText active tone="interaction" className="work-process-tool-group-title">');
+    expect(rowsSource).not.toContain('work-process-tool-group-title');
+    expect(rowsSource).toContain('<ActiveSignalText active tone="interaction" className="work-process-user-input-verb">');
   });
 });

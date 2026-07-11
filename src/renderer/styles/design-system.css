@@ -266,6 +266,11 @@
   --token-effort-fill-6:       hsl(265 60% 40%);
   --token-effort-thumb:        hsl(265 52% 50%);
   --token-effort-track:        color-mix(in srgb, var(--token-border-muted) 80%, transparent);
+  --token-effort-max-from:     hsl(250 48% 42%);
+  --token-effort-max-mid:      hsl(265 58% 50%);
+  --token-effort-max-to:       hsl(280 70% 62%);
+  --token-effort-max-highlight: rgb(255 255 255 / 0.34);
+  --token-effort-max-sparkle:  rgb(255 255 255 / 0.92);
 }
 
 :root[data-font-scale='small'] {
@@ -366,9 +371,9 @@
   to { background-position: 20px 0; }
 }
 
-@keyframes active-signal-pulse {
-  0%, 100% { opacity: 0.45; transform: scale(0.86); }
-  50% { opacity: 1; transform: scale(1); }
+@keyframes active-signal-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }
 
 @keyframes float {
@@ -387,7 +392,7 @@
 .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
 .animate-spin { animation: spin 1s linear infinite; }
 .animate-float { animation: float 3s ease-in-out infinite; }
-/* Active runtime signal text */
+/* Active runtime signal text — left-to-right energy shimmer on live phrases */
 .active-signal-text {
   --active-signal-highlight: var(--token-text-heading);
   color: inherit;
@@ -406,27 +411,28 @@
 }
 
 .active-signal-text.is-active {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.active-signal-text.is-active::after {
-  content: '';
-  width: var(--space-1);
-  height: var(--space-1);
-  border-radius: var(--radius-full);
-  flex: none;
-  background: var(--active-signal-highlight);
-  box-shadow: 0 0 0 var(--space-1) color-mix(in srgb, var(--active-signal-highlight) 14%, transparent);
-  animation: active-signal-pulse var(--animation-pulse) var(--ease-standard) infinite;
+  display: inline;
+  background-image: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 0%,
+    var(--active-signal-highlight) 46%,
+    color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 92%
+  );
+  background-size: 220% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: active-signal-shimmer 1.6s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .active-signal-text.is-active::after {
+  .active-signal-text.is-active {
     animation: none;
-    opacity: 0.8;
-    transform: none;
+    background-image: none;
+    background-clip: border-box;
+    -webkit-background-clip: border-box;
+    color: var(--active-signal-highlight);
   }
 }
 
@@ -775,6 +781,11 @@
   --token-effort-fill-6:       hsl(265 66% 36%);
   --token-effort-thumb:        hsl(265 58% 54%);
   --token-effort-track:        color-mix(in srgb, var(--token-border-muted) 72%, transparent);
+  --token-effort-max-from:     hsl(248 52% 34%);
+  --token-effort-max-mid:      hsl(265 64% 44%);
+  --token-effort-max-to:       hsl(282 72% 58%);
+  --token-effort-max-highlight: rgb(255 255 255 / 0.28);
+  --token-effort-max-sparkle:  rgb(255 255 255 / 0.88);
 
   /* ── Elevation (macOS-style depth) ──
    *  Components express depth through these tokens instead of hard 1px borders.

@@ -109,6 +109,7 @@ import { providerAccountAuthService } from '../../settings/ProviderAccountAuthSe
 import { settingsService } from '../../settings/SettingsService';
 import {
   resolveEffectiveModelId,
+  resolveEffectiveTemperature,
   resolveModelCapability,
   resolveReasoningSelection,
   resolveTurnControls,
@@ -1760,6 +1761,7 @@ export class AgentOrchestrator {
     const settings = settingsService.getAll();
     const routeProvider = settings.llm.providers.find((entry) => entry.id === input.providerId);
     const routeCapability = resolveAgentRouteCapability(routeProvider, input.modelId);
+    const modelCapability = resolveModelCapability(input.providerId, input.modelId, settings);
     const mcpConnectionErrors = await this.ensureMcpConnections(input.agentId, input.projectRootPath);
     const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
     const activeToolDefinitions = routeCapability.toolCallingMode === 'native-structured'
@@ -1796,7 +1798,7 @@ export class AgentOrchestrator {
     });
     const streamOptions: StreamOptions = {
       maxTokens: input.maxTokens,
-      temperature: input.temperature,
+      temperature: resolveEffectiveTemperature(modelCapability, input.temperature),
       reasoning: input.options?.reasoning,
       reasoningVisibility: input.options?.reasoning?.selection === 'off' ? 'none' : routeCapability.reasoningVisibility,
       signal: input.options?.signal,

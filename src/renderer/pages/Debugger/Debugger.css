@@ -725,6 +725,13 @@
   font-weight: var(--font-semibold);
 }
 
+.composer-effort-pill.is-level-max .composer-effort-pill-label,
+.composer-effort-pill.is-level-ultra .composer-effort-pill-label,
+.composer-effort-pill.is-level-max .composer-effort-pill-icon,
+.composer-effort-pill.is-level-ultra .composer-effort-pill-icon {
+  color: var(--token-effort-fill-6);
+}
+
 .composer-effort-pill-modes {
   flex: 0 0 auto;
   display: inline-flex;
@@ -847,17 +854,72 @@
   border-radius: var(--radius-full);
   border: 1px solid color-mix(in srgb, var(--token-border-focus) 52%, var(--token-border-muted));
   background: var(--composer-effort-track-fill);
-  transition: background var(--transition-fast);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--token-text-inverse) 18%, transparent),
-    inset 0 -1px 0 color-mix(in srgb, var(--token-bg-app) 38%, transparent),
-    0 0 0 1px color-mix(in srgb, var(--token-border-focus) 18%, transparent);
+  overflow: hidden;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
   pointer-events: none;
+}
+
+.composer-effort-slider-sparks {
+  display: none;
+}
+
+.composer-effort-slider.is-level-max .composer-effort-slider-track,
+.composer-effort-slider.is-level-ultra .composer-effort-slider-track {
+  border-color: color-mix(in srgb, var(--token-effort-max-to) 40%, var(--token-border-muted));
+  /* Soft stepped bands + fine dither — restrained 8-bit hint, not a noisy grid */
+  background-color: var(--token-effort-max-mid);
+  background-image:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 1px,
+      color-mix(in srgb, var(--token-effort-max-sparkle) 5%, transparent) 1px 2px
+    ),
+    linear-gradient(
+      90deg,
+      var(--token-effort-max-from) 0%,
+      var(--token-effort-max-from) 18%,
+      var(--token-effort-max-mid) 40%,
+      var(--token-effort-max-mid) 58%,
+      var(--token-effort-max-to) 80%,
+      var(--token-effort-max-to) 100%
+    );
+  box-shadow: none;
+}
+
+.composer-effort-slider.is-level-max .composer-effort-slider-sparks,
+.composer-effort-slider.is-level-ultra .composer-effort-slider-sparks {
+  display: block;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.composer-effort-slider-spark {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 2px;
+  height: 2px;
+  margin: 0;
+  border-radius: 0;
+  background: var(--token-effort-max-sparkle);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+  transform: translate3d(-12px, 0, 0);
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-effort-slider-spark {
+    will-change: auto;
+  }
 }
 
 .composer-effort-slider.is-disabled .composer-effort-slider-track {
   border-color: var(--token-border-muted);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--token-text-inverse) 8%, transparent);
+  box-shadow: none;
 }
 
 .composer-effort-slider-stops {

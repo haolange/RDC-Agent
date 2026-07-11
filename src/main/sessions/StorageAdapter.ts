@@ -164,6 +164,9 @@ export class StorageAdapter {
     const location = this.findSessionLocation(sessionId);
     if (!location) return;
 
+    const runIds = this.listRuns(sessionId).map((run) => run.runId);
+    this.removeSessionSideChannels(sessionId, runIds);
+
     if (fs.existsSync(location.sessionPath)) {
       fs.rmSync(location.sessionPath, { recursive: true, force: true });
     }
@@ -183,6 +186,40 @@ export class StorageAdapter {
       this.touchProject(projectId, remaining[0]?.sessionId ?? null);
     } else {
       this.touchProject(projectId);
+    }
+  }
+
+  /**
+   * Clear app-state side channels that are keyed by session/run but live outside the session directory.
+   * Does not touch ~/.rdx or project .rdx.
+   */
+  private removeSessionSideChannels(sessionId: string, runIds: string[]): void {
+    const paths = appPathService.getAppStatePaths();
+    const safeSessionId = sessionId.replace(/[^\w.-]/g, '_');
+    const sideDirs = [
+      path.join(paths.tasksPath, safeSessionId),
+      path.join(paths.llmCallsPath, safeSessionId),
+    ];
+    for (const dir of sideDirs) {
+      if (fs.existsSync(dir)) {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+    }
+
+    const tracesRunsDir = path.join(paths.tracesPath, 'runs');
+    const tracesEventsDir = path.join(paths.tracesPath, 'events');
+    for (const runId of runIds) {
+      const safeRunId = runId.replace(/[^\w.-]/g, '_');
+      for (const filePath of [
+        path.join(tracesRunsDir, `${safeRunId}.json`),
+        path.join(tracesRunsDir, `${runId}.json`),
+        path.join(tracesEventsDir, `${safeRunId}.jsonl`),
+        path.join(tracesEventsDir, `${runId}.jsonl`),
+      ]) {
+        if (fs.existsSync(filePath)) {
+          fs.rmSync(filePath, { force: true });
+        }
+      }
     }
   }
 

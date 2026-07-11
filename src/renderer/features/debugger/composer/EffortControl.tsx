@@ -1,5 +1,9 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { ReasoningSelection } from '@shared/types/modelCapability';
+import {
+  clampReasoningSelection,
+  type ReasoningControl,
+  type ReasoningSelection,
+} from '@shared/types/modelCapability';
 import { useI18n } from '../../../i18n';
 import { useTurnControls } from './useTurnControls';
 import type { SessionRecord } from '@shared/types/session';
@@ -16,7 +20,24 @@ import {
   ReasoningLevelIcon,
   resolveNearestSnapLevel,
 } from './effortControlParts';
+import { EffortMaxSparks } from './EffortMaxSparks';
 import { formatTokenCount } from './turnControlsUtils';
+
+function resolveSelectedLevel(
+  reasoningLevel: ReasoningSelection,
+  reasoningControl: ReasoningControl | null,
+  displayLevels: ReasoningSelection[],
+): ReasoningSelection {
+  if (!reasoningControl) {
+    return displayLevels[0] ?? 'off';
+  }
+  const clamped = clampReasoningSelection(reasoningLevel, reasoningControl)
+    ?? reasoningControl.defaultSelection;
+  if (displayLevels.includes(clamped)) {
+    return clamped;
+  }
+  return displayLevels[displayLevels.length - 1] ?? 'off';
+}
 
 export const EffortControl: React.FC<{
   agentId: string;
@@ -27,6 +48,7 @@ export const EffortControl: React.FC<{
   const { turnControls, capability, updateTurnControls } = useTurnControls(agentId, currentSession);
   const [open, setOpen] = useState(false);
   const [dragRatio, setDragRatio] = useState<number | null>(null);
+  const [snapLevel, setSnapLevel] = useState<ReasoningSelection | null>(null);
   const [popupShift, setPopupShift] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -35,25 +57,48 @@ export const EffortControl: React.FC<{
   const popupShiftRef = useRef(0);
   const isDragging = dragRatio !== null;
   const reasoningControl = capability?.reasoningControl ?? null;
+  const capabilityKey = capability
+    ? `${capability.providerId}:${capability.modelId}`
+    : 'pending';
 
   const displayLevels = useMemo(
     () => buildDisplaySelections(reasoningControl),
     [reasoningControl],
   );
+  const displayLevelsKey = displayLevels.join('|');
   const hasAdjustableReasoning = displayLevels.length > 1 && reasoningControl?.kind !== 'always-on';
-  const selectedIndex = Math.max(0, displayLevels.indexOf(turnControls.reasoningLevel));
-  const selectedLevel = displayLevels[selectedIndex] ?? 'off';
-  const visualLevel = isDragging
+
+  useEffect(() => {
+    setSnapLevel(null);
+    setDragRatio(null);
+    dragActiveRef.current = false;
+  }, [capabilityKey, displayLevelsKey]);
+
+  const selectedLevel = resolveSelectedLevel(
+    turnControls.reasoningLevel,
+    reasoningControl,
+    displayLevels,
+  );
+
+  useEffect(() => {
+    if (snapLevel !== null && selectedLevel === snapLevel) {
+      setSnapLevel(null);
+    }
+  }, [selectedLevel, snapLevel]);
+
+  const validSnapLevel = snapLevel && displayLevels.includes(snapLevel) ? snapLevel : null;
+  const displayLevel = isDragging
     ? resolveNearestSnapLevel(dragRatio, displayLevels)
-    : selectedLevel;
-  const visualIndex = Math.max(0, displayLevels.indexOf(visualLevel));
+    : (validSnapLevel ?? selectedLevel);
+  const displayIndex = Math.max(0, displayLevels.indexOf(displayLevel));
   const thumbRatio = isDragging
     ? clampSliderRatio(dragRatio)
-    : getStopPosition(visualIndex, displayLevels.length);
+    : getStopPosition(displayIndex, displayLevels.length);
   const thumbPercent = thumbRatio * 100;
+  const isMaxTier = displayLevel === 'max' || displayLevel === 'ultra';
 
   const effortLabel = t(EFFORT_LABEL_KEYS[selectedLevel]);
-  const tooltipLabel = t(EFFORT_LABEL_KEYS[visualLevel]);
+  const tooltipLabel = t(EFFORT_LABEL_KEYS[displayLevel]);
   const maxContextBadgeLabel = capability?.maxContextWindowTokens
     ? formatTokenCount(capability.maxContextWindowTokens)
     : t('composer.effort.maxContextBadge');
@@ -115,8 +160,10 @@ export const EffortControl: React.FC<{
     return () => window.removeEventListener('resize', syncPopupPosition);
   }, [open]);
 
-  const selectEffort = useCallback((level: ReasoningSelection) => {
-    if (displayLevels.includes(level)) updateTurnControls({ reasoningLevel: level });
+  const commitEffort = useCallback((level: ReasoningSelection) => {
+    if (!displayLevels.includes(level)) return;
+    setSnapLevel(level);
+    updateTurnControls({ reasoningLevel: level });
   }, [displayLevels, updateTurnControls]);
 
   const getRatioFromClientX = (clientX: number): number => {
@@ -138,6 +185,7 @@ export const EffortControl: React.FC<{
     event.currentTarget.setPointerCapture(event.pointerId);
     const ratio = getRatioFromClientX(event.clientX);
     dragActiveRef.current = true;
+    setSnapLevel(null);
     setDragRatio(ratio);
   };
 
@@ -152,27 +200,28 @@ export const EffortControl: React.FC<{
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    selectEffort(resolveLevelFromClientX(event.clientX));
+    const level = resolveLevelFromClientX(event.clientX);
+    commitEffort(level);
     dragActiveRef.current = false;
     setDragRatio(null);
   };
 
   const handleTrackClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!hasAdjustableReasoning) return;
-    selectEffort(resolveLevelFromClientX(event.clientX));
+    commitEffort(resolveLevelFromClientX(event.clientX));
   };
 
   const handleThumbKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (!hasAdjustableReasoning) return;
     if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
       event.preventDefault();
-      const next = findAdjacentSupportedLevel(selectedLevel, -1, displayLevels);
-      if (next) selectEffort(next);
+      const next = findAdjacentSupportedLevel(displayLevel, -1, displayLevels);
+      if (next) commitEffort(next);
     }
     if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
       event.preventDefault();
-      const next = findAdjacentSupportedLevel(selectedLevel, 1, displayLevels);
-      if (next) selectEffort(next);
+      const next = findAdjacentSupportedLevel(displayLevel, 1, displayLevels);
+      if (next) commitEffort(next);
     }
   };
 
@@ -188,7 +237,7 @@ export const EffortControl: React.FC<{
     <div ref={menuRef} className="composer-effort-menu">
       <button
         type="button"
-        className={`composer-effort-pill ${open ? 'open' : ''}`}
+        className={`composer-effort-pill ${open ? 'open' : ''}${selectedLevel === 'max' || selectedLevel === 'ultra' ? ` is-level-${selectedLevel}` : ''}`}
         data-testid="composer-effort-pill"
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -218,7 +267,7 @@ export const EffortControl: React.FC<{
           <div className={`composer-effort-slider-section ${hasAdjustableReasoning ? '' : 'is-disabled'}`}>
             <div
               ref={trackRef}
-              className={`composer-effort-slider is-level-${visualLevel}${hasAdjustableReasoning ? '' : ' is-disabled'}${isDragging ? ' is-dragging' : ''}`}
+              className={`composer-effort-slider is-level-${displayLevel}${hasAdjustableReasoning ? '' : ' is-disabled'}${isDragging ? ' is-dragging' : ''}`}
               data-testid="composer-effort-slider"
               onPointerDown={handleTrackPointerDown}
               onPointerMove={handleTrackPointerMove}
@@ -231,7 +280,7 @@ export const EffortControl: React.FC<{
                   {displayLevels.map((level, index) => {
                     const classes = [
                       'composer-effort-slider-stop',
-                      level === visualLevel ? 'is-current' : '',
+                      level === displayLevel ? 'is-current' : '',
                     ].filter(Boolean).join(' ');
                     return (
                       <div
@@ -244,7 +293,9 @@ export const EffortControl: React.FC<{
                 </div>
               ) : null}
 
-              <div className="composer-effort-slider-track" aria-hidden="true" />
+              <div className="composer-effort-slider-track" aria-hidden="true">
+                {isMaxTier ? <EffortMaxSparks /> : null}
+              </div>
 
               <div
                 className={`composer-effort-slider-thumb${isDragging ? ' is-dragging' : ''}${thumbEdgeClass}`}
@@ -253,8 +304,8 @@ export const EffortControl: React.FC<{
                 tabIndex={hasAdjustableReasoning ? 0 : -1}
                 aria-valuemin={0}
                 aria-valuemax={displayLevels.length - 1}
-                aria-valuenow={selectedIndex}
-                aria-valuetext={t(EFFORT_LABEL_KEYS[selectedLevel])}
+                aria-valuenow={displayIndex}
+                aria-valuetext={t(EFFORT_LABEL_KEYS[displayLevel])}
                 aria-disabled={!hasAdjustableReasoning}
                 onKeyDown={handleThumbKeyDown}
               >

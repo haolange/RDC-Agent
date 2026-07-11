@@ -1187,7 +1187,9 @@ export class ConversationService {
                   beginAssistantContentLoop();
                   rawResponse += chunk;
                   currentLoopText += chunk;
-                  if (!loopHasTools) {
+                  // Final answer streams into the bubble only when this loop is not
+                  // producing process commentary (no tools yet, no thinking channel).
+                  if (!loopHasTools && !currentLoopThinking) {
                     visibleResponse = currentLoopText;
                   }
                   commitVisibleAssistantText();
@@ -1211,6 +1213,11 @@ export class ConversationService {
                 );
                 if (currentLoopThinking) {
                   currentLoopThinkingStatus = 'streaming';
+                  // Thinking owns the process area; clear any optimistic bubble text.
+                  if (visibleResponse) {
+                    visibleResponse = '';
+                    commitVisibleAssistantText();
+                  }
                   commitThinkingTrace(upsertLoopResult(
                     assistantMessage.workTrace,
                     currentLoopId(),
@@ -1276,7 +1283,14 @@ export class ConversationService {
                 };
                 if (payload.toolCall?.id && payload.toolCall.name) {
                   const loopScoped = isLoopTool(String(payload.toolCall.name));
-                  if (loopScoped) loopHasTools = true;
+                  if (loopScoped) {
+                    loopHasTools = true;
+                    // Tool loops keep commentary in Work Process; clear bubble flash.
+                    if (visibleResponse) {
+                      visibleResponse = '';
+                      commitVisibleAssistantText();
+                    }
+                  }
                   commitAssistantMessage('message_patched', {
                     workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                       id: String(payload.toolCall.id),

@@ -17,16 +17,18 @@ describe('ActiveSignalText', () => {
     expect(markup).toContain('data-active-signal="info"');
   });
 
-
-  it('does not rely on clipped transparent text for the active state', () => {
+  it('uses clipped-gradient energy shimmer for the active state', () => {
     const cssPath = path.resolve(process.cwd(), 'src/renderer/styles/design-system.css');
     const css = fs.readFileSync(cssPath, 'utf8');
     const activeBlock = css.match(/\.active-signal-text\.is-active\s*\{[\s\S]*?\}/)?.[0] ?? '';
 
-    expect(activeBlock).toContain('inline-flex');
-    expect(activeBlock).not.toContain('color: transparent');
-    expect(activeBlock).not.toContain('background-clip: text');
+    expect(activeBlock).toContain('background-clip: text');
+    expect(activeBlock).toContain('color: transparent');
+    expect(css).toContain('@keyframes active-signal-shimmer');
+    expect(css).not.toContain('active-signal-pulse');
+    expect(activeBlock).not.toContain('::after');
   });
+
   it('keeps inactive text static', () => {
     const markup = renderToStaticMarkup(
       React.createElement(ActiveSignalText, { tone: 'interaction', children: 'Asked' }),

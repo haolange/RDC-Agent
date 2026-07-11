@@ -6,7 +6,6 @@ import {
   ApprovalRow,
   DiagnosticRow,
   SummaryRow,
-  ToolGroupRow,
   ToolRow,
   UserInputRow,
 } from './WorkProcessRows';
@@ -16,7 +15,6 @@ import { WorkProcessSectionRow } from './WorkProcessSectionRow';
 
 export function createWorkProcessRowRenderer(showLoopMeta: boolean) {
   const renderRow = (row: WorkProcessRow): React.ReactNode => {
-    if (row.type === 'toolGroup') return <ToolGroupRow key={row.id} row={row} renderRow={renderRow} />;
     if (row.type === 'tool') return <ToolRow key={row.id} row={row} />;
     if (row.type === 'userInput') return <UserInputRow key={row.id} row={row} />;
     if (row.type === 'approval') return <ApprovalRow key={row.id} row={row} />;

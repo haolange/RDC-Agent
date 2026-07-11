@@ -43,7 +43,6 @@ function deriveGroupStatus(rows: WorkProcessRow[]): WorkProcessRowStatus {
 function countActionsInRows(rows: WorkProcessRow[]): number {
   return rows.reduce((total, row) => {
     if (row.type === 'section') return total + row.stepCount;
-    if (row.type === 'toolGroup') return total + row.rows.length;
     if (row.type === 'tool' || row.type === 'userInput') return total + 1;
     return total;
   }, 0);

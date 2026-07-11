@@ -46,13 +46,13 @@ Scoped Runtime Resolution
 
 `PromptPlan` 的每个 segment 都保存 kind、scope、path、hash、precedence、content 与 token estimate。`RequestEnvelopeBuilder` 负责 provider-neutral 的完整合并；Provider Adapter 只映射 wire protocol。
 
-每次 `llm_turn` 保存脱敏 `RequestEnvelopeSnapshot`，包含 effective instructions、messages、tools、resource provenance、provider/model/protocol、usage 与 redaction metadata。Credential、capture binary 和 provider protected payload 不落盘；protected payload 只保留 hash 与脱敏原因。
+每次 `llm_turn` 保存脱敏 `RequestEnvelopeSnapshot`，包含 effective instructions、messages、tools、resource provenance、provider/model/protocol、usage 与 redaction metadata。Credential、capture binary 和 provider protected payload 不落盘；protected payload 只保留 hash 与脱敏原因。Request Inspector 在 Control Panel Runtime 调试面浏览这些快照，不得嵌入 Work Process 消息流。
 
 ## Memory 与 Reasoning
 
 Memory 只有 `memory_search`、`memory_read`、`memory_write`、`memory_delete` 四个 scoped tool。Write 需要明确用户意图或批准，Delete 需要确认；没有自动抽取、turn counter、consolidation 或全索引 Prompt 注入。
 
-Reasoning 使用 `raw | summary | opaque | none | unknown`。语义来自 Provider/Model contract，不从 OpenAI/Anthropic compatibility protocol 推断。普通 result 永远属于回答正文；`none` 不创建 Thinking；`unknown` 只在有可读文本时显示 “Provider reasoning（语义未验证）”。
+Reasoning 使用 `raw | summary | opaque | none | unknown`。语义来自 Provider/Model contract，不从 OpenAI/Anthropic compatibility protocol 推断。App-managed 且有文档证据的 DeepSeek / Kimi / GLM / MiniMax / MiMo 等解析为 `raw`；真正未核实的第三方路由才是 `unknown`。Work Process 产品文案对可读 thinking 统一使用「正在思考 / 思考过程」，不展示「语义未验证」。有 thinking 时 commentary 不进过程区结果框；无 thinking 时 commentary 可顶 thinking 槽；最终答案只在气泡。
 
 ## 受控 API
 

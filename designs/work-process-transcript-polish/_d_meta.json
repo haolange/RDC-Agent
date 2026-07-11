@@ -1,0 +1,13 @@
+{
+  "name": "work-process-transcript-polish",
+  "title": "Work Process Transcript Polish",
+  "status": "approved-baseline",
+  "designSystems": ["rdc-agent-design-system"],
+  "assets": [
+    {
+      "path": "Work Process Polish.html",
+      "kind": "interactive-prototype",
+      "notes": "Header A+B, flat tools, Active Signal shimmer, web pills, Inspector in Control Panel"
+    }
+  ]
+}

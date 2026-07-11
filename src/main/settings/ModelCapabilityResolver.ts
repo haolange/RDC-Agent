@@ -82,6 +82,11 @@ export function resolveModelCapability(
   const reasoningControl = sanitizeReasoningControl(profile?.reasoningControl);
   const fastVariantModelId = profile?.fastVariantModelId ?? null;
 
+  const fixedTemperature = typeof profile?.fixedTemperature === 'number'
+    && Number.isFinite(profile.fixedTemperature)
+    ? profile.fixedTemperature
+    : null;
+
   return {
     providerId,
     modelId,
@@ -93,10 +98,22 @@ export function resolveModelCapability(
     maxContextAvailable,
     fastVariantModelId,
     fastModelAvailable: isFastVariantAvailable(provider, fastVariantModelId),
+    fixedTemperature,
     toolCalling: Boolean(profile?.toolCalling),
     visionInput: Boolean(profile?.visionInput),
     structuredOutput: Boolean(profile?.structuredOutput),
   };
+}
+
+/** Prefer catalog-fixed temperature when the model rejects other values (e.g. kimi-for-coding). */
+export function resolveEffectiveTemperature(
+  capability: ResolvedModelCapability,
+  requested: number | undefined,
+): number | undefined {
+  if (typeof capability.fixedTemperature === 'number') {
+    return capability.fixedTemperature;
+  }
+  return requested;
 }
 
 export function resolveTurnControls(

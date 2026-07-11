@@ -27,13 +27,3 @@ export const compactText = (value: string, maxLength: number): string => {
   if (text.length <= maxLength) return text;
   return `${text.slice(0, Math.max(0, maxLength - 3))}...`;
 };
-
-export const COMMENTARY_CLAMP_CHARS = 280;
-export const COMMENTARY_CLAMP_LINES = 4;
-
-export function isCommentaryClampable(text: string): boolean {
-  const normalized = normalizeWorkProcessText(text);
-  if (!normalized) return false;
-  const lineCount = normalized.split('\n').length;
-  return normalized.length > COMMENTARY_CLAMP_CHARS || lineCount > COMMENTARY_CLAMP_LINES;
-}

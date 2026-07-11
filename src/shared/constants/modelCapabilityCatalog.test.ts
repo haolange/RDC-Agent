@@ -55,11 +55,29 @@ describe('managed provider model catalog', () => {
   });
 
   it('captures multi-level and always-on variants without legacy fields', () => {
+    expect(lookupManagedModelCatalogEntry('openai', 'gpt-5.6-sol')?.profile.reasoningControl).toMatchObject({
+      kind: 'levels',
+      supportsOff: true,
+      levels: ['low', 'medium', 'high', 'extra', 'max'],
+      defaultSelection: 'medium',
+    });
+    expect(lookupManagedModelCatalogEntry('openai', 'gpt-5.6')?.id).toBe('gpt-5.6-sol');
+
     expect(lookupManagedModelCatalogEntry('openai', 'gpt-5.5')?.profile.reasoningControl).toMatchObject({
       kind: 'levels',
       supportsOff: true,
       levels: ['low', 'medium', 'high', 'extra'],
       defaultSelection: 'medium',
+    });
+
+    expect(lookupManagedModelCatalogEntry('xai', 'grok-4.5')?.profile).toMatchObject({
+      nominalContextWindowTokens: 500_000,
+      reasoningControl: {
+        kind: 'levels',
+        supportsOff: true,
+        levels: ['low', 'medium', 'high'],
+        defaultSelection: 'high',
+      },
     });
 
     expect(lookupManagedModelCatalogEntry('anthropic', 'claude-fable-5')?.profile.reasoningControl).toMatchObject({

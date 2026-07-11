@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import type { RdxRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdxRuntime';
 
 const templateFor = (kind: ScopedResourceKind, id: string): string => {
@@ -16,7 +16,8 @@ export const RuntimeScopePanel: React.FC<{
   onScopeChange: (scope: 'user' | 'project') => void;
   kinds: ScopedResourceKind[];
   onChanged?: (overview: RdxRuntimeOverview) => void;
-}> = ({ overview, scope, onScopeChange, kinds, onChanged }) => {
+  showResourceStrip?: boolean;
+}> = ({ overview, scope, onScopeChange, kinds, onChanged, showResourceStrip = true }) => {
   const resources = overview?.resources.filter((entry) => entry.scope === scope && kinds.includes(entry.kind)) ?? [];
   const kind = kinds[0];
   const [editing, setEditing] = useState<ScopedResourceDocument | null>(null);
@@ -24,7 +25,6 @@ export const RuntimeScopePanel: React.FC<{
   const [content, setContent] = useState('');
   const [message, setMessage] = useState('');
   const canProject = Boolean(overview?.projectRoot);
-  const title = useMemo(() => scope === 'user' ? overview?.userRoot : overview?.projectRoot ?? '当前未打开 Project', [overview, scope]);
   const start = (resource?: ScopedResourceDocument) => {
     const nextId = resource?.id ?? `new-${kind}`;
     setEditing(resource ?? ({ id: nextId, kind, scope, sourcePath: '', sourceHash: '', effectiveStatus: 'effective', content: '', diagnostics: [] }));
@@ -45,20 +45,22 @@ export const RuntimeScopePanel: React.FC<{
   return (
     <section className="settings-runtime-scope" data-testid="settings-runtime-scope">
       <div className="settings-runtime-scope-head">
-        <div><div className="settings-runtime-kicker">RDX Runtime</div><div className="settings-runtime-path">{title}</div></div>
+        <div className="settings-runtime-kicker">RDX Runtime</div>
         <div className="settings-runtime-scope-switch" role="group" aria-label="Resource scope">
           <button type="button" className={`button button-ghost ${scope === 'user' ? 'active' : ''}`} onClick={() => onScopeChange('user')}>User</button>
           <button type="button" className={`button button-ghost ${scope === 'project' ? 'active' : ''}`} disabled={!canProject} onClick={() => onScopeChange('project')}>Project</button>
           <button type="button" className="button button-secondary" disabled={scope === 'project' && !canProject} onClick={() => start()}>新增 {kind}</button>
         </div>
       </div>
-      <div className="settings-runtime-resource-strip">
-        {resources.length ? resources.map((resource) => (
-          <button type="button" className={`settings-runtime-resource status-${resource.effectiveStatus}`} key={`${resource.kind}:${resource.id}`} onClick={() => start(resource)}>
-            <span>{resource.id}</span><small>{resource.kind} · {resource.effectiveStatus}</small>
-          </button>
-        )) : <div className="settings-runtime-empty">此 Scope 暂无资源；继承资源仍按 builtin &lt; user &lt; project 生效。</div>}
-      </div>
+      {showResourceStrip ? (
+        <div className="settings-runtime-resource-strip">
+          {resources.length ? resources.map((resource) => (
+            <button type="button" className={`settings-runtime-resource status-${resource.effectiveStatus}`} key={`${resource.kind}:${resource.id}`} onClick={() => start(resource)}>
+              <span>{resource.id}</span>
+            </button>
+          )) : <div className="settings-runtime-empty">此 Scope 暂无资源；继承资源仍按 builtin &lt; user &lt; project 生效。</div>}
+        </div>
+      ) : null}
       {editing && <div className="settings-runtime-editor">
         <input value={id} disabled={Boolean(editing.sourcePath)} onChange={(event) => setId(event.target.value)} aria-label="Resource id" />
         <textarea value={content} onChange={(event) => setContent(event.target.value)} aria-label="Resource content" />

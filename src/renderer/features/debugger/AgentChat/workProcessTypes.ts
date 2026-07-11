@@ -89,6 +89,8 @@ export type WorkProcessRow =
     rawLines: string[];
     approval?: WorkProcessToolApproval;
     compact?: boolean;
+    sourcePills?: Array<{ domain: string; url?: string; title?: string }>;
+    browseLink?: { label: string; url: string };
   }
   | {
     type: 'userInput';
@@ -99,19 +101,6 @@ export type WorkProcessRow =
     items: WorkProcessUserInputItem[];
     error?: string;
     duration: string;
-  }
-  | {
-    type: 'toolGroup';
-    id: string;
-    status: WorkProcessRowStatus;
-    kind: WorkProcessToolGroupKind;
-    icon: WorkProcessIconKey;
-    title: string;
-    countLabel: string;
-    summary: string;
-    duration: string;
-    defaultOpen: boolean;
-    rows: WorkProcessRow[];
   }
   | {
     type: 'approval';

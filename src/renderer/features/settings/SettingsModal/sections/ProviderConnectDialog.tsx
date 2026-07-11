@@ -6,6 +6,7 @@ import {
   getProviderCategoryLabel,
   getProviderProtocolOptions,
   providerSupportsProtocolSelection,
+  resolveConnectionBaseUrlForProtocol,
 } from '../utils';
 import { ProviderAccountOAuthPanel } from './ProviderAccountOAuthPanel';
 import { ProviderApiKeyFields } from './ProviderApiKeyFields';
@@ -122,6 +123,14 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
           readOnly={!showProtocolSelector}
           onChange={(protocol) => onUpdateConnectionDraft({
             protocol,
+            baseUrl: resolveConnectionBaseUrlForProtocol(
+              {
+                id: connectionProvider.id,
+                protocol: connectionDraft.protocol,
+                baseUrl: connectionDraft.baseUrl,
+              },
+              protocol,
+            ),
             error: '',
             testedApiKey: '',
             testedBaseUrl: '',
@@ -156,6 +165,16 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             })}
           />
         </label>
+      )}
+      {connectionProvider.authMode === 'api-key'
+        && Boolean(connectionProvider.protocolEditable && connectionDraft.baseUrl) && (
+        <div className="settings-field settings-provider-protocol-field">
+          <span className="settings-field-label">{t('settings.providerBaseUrl')}</span>
+          <span className="settings-provider-protocol-readonly" data-testid="settings-provider-connect-protocol-base-url">
+            {connectionDraft.baseUrl}
+          </span>
+          <span className="settings-help-text">{t('settings.providerProtocolBaseUrlHint')}</span>
+        </div>
       )}
       {connectionProvider.authMode === 'local' && (
         <div className="settings-provider-notice">

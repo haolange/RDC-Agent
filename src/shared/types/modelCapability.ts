@@ -89,6 +89,8 @@ export interface ModelCapabilityProfile {
   nominalContextWindowTokens?: number;
   reasoningControl?: ReasoningControl;
   fastVariantModelId?: string;
+  /** When set, provider requests must use this temperature (e.g. kimi-for-coding allows only 1). */
+  fixedTemperature?: number;
   toolCalling?: boolean;
   visionInput?: boolean;
   structuredOutput?: boolean;
@@ -105,6 +107,7 @@ export interface ResolvedModelCapability {
   maxContextAvailable: boolean;
   fastVariantModelId: string | null;
   fastModelAvailable: boolean;
+  fixedTemperature: number | null;
   toolCalling: boolean;
   visionInput: boolean;
   structuredOutput: boolean;

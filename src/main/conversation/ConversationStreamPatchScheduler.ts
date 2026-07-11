@@ -31,8 +31,8 @@ interface FlushPendingOptions {
   publishTrace?: boolean;
 }
 
-const DEFAULT_TEXT_FLUSH_MS = 80;
-const DEFAULT_TRACE_FLUSH_MS = 160;
+const DEFAULT_TEXT_FLUSH_MS = 48;
+const DEFAULT_TRACE_FLUSH_MS = 48;
 const DEFAULT_PERSIST_FLUSH_MS = 600;
 
 export class ConversationStreamPatchScheduler {

@@ -3,6 +3,7 @@ import { createBuiltinProviderEntry } from '@shared/constants/llm';
 import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 import {
   resolveEffectiveModelId,
+  resolveEffectiveTemperature,
   resolveModelCapability,
   resolveReasoningSelection,
   resolveTurnControls,
@@ -141,6 +142,15 @@ describe('resolveModelCapability', () => {
 
   it('drives provider/model variants from the managed catalog', () => {
     const openAiProvider = makeProvider(createBuiltinProviderEntry('openai'));
+    const openAi56 = resolveModelCapability('openai', 'gpt-5.6-sol', makeSettings(openAiProvider));
+    expect(openAi56.reasoningControl).toMatchObject({
+      kind: 'levels',
+      supportsOff: true,
+      levels: ['low', 'medium', 'high', 'extra', 'max'],
+      defaultSelection: 'medium',
+    });
+    expect(openAi56.maxContextAvailable).toBe(true);
+
     const openAi = resolveModelCapability('openai', 'gpt-5.5', makeSettings(openAiProvider));
     expect(openAi.reasoningControl).toMatchObject({
       kind: 'levels',
@@ -148,6 +158,15 @@ describe('resolveModelCapability', () => {
       levels: ['low', 'medium', 'high', 'extra'],
       defaultSelection: 'medium',
     });
+
+    const grokProvider = makeProvider(createBuiltinProviderEntry('xai'));
+    const grok45 = resolveModelCapability('xai', 'grok-4.5', makeSettings(grokProvider));
+    expect(grok45.reasoningControl).toMatchObject({
+      kind: 'levels',
+      levels: ['low', 'medium', 'high'],
+      defaultSelection: 'high',
+    });
+    expect(grok45.maxContextAvailable).toBe(false);
 
     const qwenProvider = makeProvider(createBuiltinProviderEntry('qwen'));
     const qwen = resolveModelCapability('qwen', 'qwen-plus', makeSettings(qwenProvider));
@@ -182,6 +201,9 @@ describe('resolveModelCapability', () => {
     expect(capability.maxContextWindowTokens).toBeNull();
     expect(capability.fastVariantModelId).toBeNull();
     expect(capability.fastModelAvailable).toBe(false);
+    expect(capability.fixedTemperature).toBe(1);
+    expect(resolveEffectiveTemperature(capability, 0.35)).toBe(1);
+    expect(resolveEffectiveTemperature(capability, 0.7)).toBe(1);
   });
 
   it('exposes fast variant only when the catalog variant is enabled', () => {

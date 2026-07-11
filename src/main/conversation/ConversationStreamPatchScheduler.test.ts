@@ -9,7 +9,7 @@ describe('ConversationStreamPatchScheduler', () => {
     const scheduler = new ConversationStreamPatchScheduler({
       now: () => now,
       commit: (commit) => commits.push(commit),
-      textFlushMs: 80,
+      textFlushMs: 48,
       persistFlushMs: 600,
     });
 
@@ -17,7 +17,7 @@ describe('ConversationStreamPatchScheduler', () => {
     scheduler.queueText({ status: 'streaming', content: 'ab' });
     expect(commits).toHaveLength(0);
 
-    vi.advanceTimersByTime(80);
+    vi.advanceTimersByTime(48);
 
     expect(commits).toEqual([
       {
@@ -29,7 +29,7 @@ describe('ConversationStreamPatchScheduler', () => {
 
     now += 100;
     scheduler.queueText({ status: 'streaming', content: 'abc' });
-    vi.advanceTimersByTime(80);
+    vi.advanceTimersByTime(48);
 
     expect(commits[1]).toEqual({
       type: 'message_patched',
@@ -47,8 +47,8 @@ describe('ConversationStreamPatchScheduler', () => {
     const scheduler = new ConversationStreamPatchScheduler({
       now: () => 2_000,
       commit: (commit) => commits.push(commit),
-      textFlushMs: 80,
-      traceFlushMs: 160,
+      textFlushMs: 48,
+      traceFlushMs: 48,
     });
 
     scheduler.queueText({ status: 'streaming', content: 'partial' });

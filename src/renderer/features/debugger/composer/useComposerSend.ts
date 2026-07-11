@@ -10,6 +10,8 @@ import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
 import {
   applyConversationTurnResult,
   buildLocalConversationErrorTurn,
+  buildOptimisticConversationTurn,
+  removeOptimisticConversationMessages,
   syncE2EConversationState,
   toConversationMode,
   toConversationAttachmentInputs,
@@ -95,6 +97,22 @@ export function useComposerSend(options: {
     }
 
     setIsPromptSending(true);
+    const sentPrompt = trimmed;
+    const sentAttachments = [...pendingAttachments];
+    const optimistic = buildOptimisticConversationTurn({
+      trimmed: sentPrompt,
+      currentMode,
+      currentProject,
+      currentSession,
+      currentRun,
+      pendingAttachments: sentAttachments,
+      selectedAgentId,
+    });
+    const messagesBeforeSend = useConversationStore.getState().conversationMessages ?? [];
+    setPromptValue('');
+    setPendingAttachments([]);
+    upsertConversationMessages([optimistic.userMessage, optimistic.assistantDraftMessage]);
+
     try {
       const conversationMode = toConversationMode(currentMode);
       const turnControls = { ...useTurnControlsStore.getState().turnControls };
@@ -105,13 +123,16 @@ export function useComposerSend(options: {
         replayDeviceId: selectedDeviceEntry?.id ?? null,
         mode: conversationMode,
         agentId: selectedAgentId || null,
-        message: trimmed,
-        attachments: toConversationAttachmentInputs(pendingAttachments),
+        message: sentPrompt,
+        attachments: toConversationAttachmentInputs(sentAttachments),
         turnControls,
       });
 
-      setPromptValue('');
-      setPendingAttachments([]);
+      // Drop optimistic placeholders before applying authoritative turn messages.
+      setConversationMessages(removeOptimisticConversationMessages(
+        useConversationStore.getState().conversationMessages ?? [],
+        optimistic.optimisticIds,
+      ));
 
       await applyConversationTurnResult({
         electronAPI,
@@ -136,15 +157,21 @@ export function useComposerSend(options: {
         setBranchState,
       });
     } catch (error) {
+      setConversationMessages(removeOptimisticConversationMessages(
+        useConversationStore.getState().conversationMessages ?? messagesBeforeSend,
+        optimistic.optimisticIds,
+      ));
+      setPromptValue(sentPrompt);
+      setPendingAttachments(sentAttachments);
       const currentMessages = useConversationStore.getState().conversationMessages ?? [];
       const failedSummary = t('app.conversationRequestFailed');
       setConversationMessages(currentMessages.concat(buildLocalConversationErrorTurn({
-        trimmed,
+        trimmed: sentPrompt,
         currentMode,
         currentProject,
         currentSession,
         currentRun,
-        pendingAttachments,
+        pendingAttachments: sentAttachments,
         errorMessage: error instanceof Error ? error.message : failedSummary,
         failedSummary,
         selectedAgentId,

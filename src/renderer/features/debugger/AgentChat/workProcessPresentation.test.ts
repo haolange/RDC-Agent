@@ -8,7 +8,6 @@ const now = 1_700_000_000_000;
 function flattenWorkRows(rows: ReturnType<typeof buildWorkProcessPresentation>['rows']): Array<(typeof rows)[number]> {
   return rows.flatMap((row) => {
     if (row.type === 'section') return [row, ...flattenWorkRows(row.steps)];
-    if (row.type === 'toolGroup') return [row, ...flattenWorkRows(row.rows)];
     return [row];
   });
 }
@@ -16,7 +15,6 @@ function flattenWorkRows(rows: ReturnType<typeof buildWorkProcessPresentation>['
 function flattenVisibleWorkRows(rows: ReturnType<typeof buildWorkProcessPresentation>['rows']): Array<(typeof rows)[number]> {
   return rows.flatMap((row) => {
     if (row.type === 'section') return [row, ...flattenVisibleWorkRows(row.visibleSteps)];
-    if (row.type === 'toolGroup') return [row, ...flattenVisibleWorkRows(row.rows)];
     return [row];
   });
 }
@@ -118,9 +116,9 @@ describe('buildWorkProcessPresentation', () => {
     const section = presentation.rows.find((row) => row.type === 'section');
     expect(section).toMatchObject({
       type: 'section',
-      resultText: 'Read files before answering.',
+      resultText: '',
       resultToolSummary: '',
-      thinkingLabel: 'Raw reasoning',
+      thinkingLabel: '思考过程',
       thinkingSource: '',
       thinkingPreview: 'raw chain-of-thought that must not be result text',
       thinkingExpandable: true,
@@ -164,7 +162,7 @@ describe('buildWorkProcessPresentation', () => {
     expect(section).toMatchObject({
       type: 'section',
       resultText: '',
-      thinkingLabel: '推理中',
+      thinkingLabel: '正在思考',
       thinkingPreview: 'The model is planning the next tool call.',
       thinkingExpandable: true,
       thinkingOpenByDefault: true,
@@ -207,7 +205,7 @@ describe('buildWorkProcessPresentation', () => {
     expect(section).toMatchObject({
       type: 'section',
       resultText: '',
-      thinkingLabel: 'Reasoning summary',
+      thinkingLabel: '思考过程',
       thinkingPreview: 'Provider summary for this turn.',
       thinkingExpandable: true,
       thinkingOpenByDefault: true,
@@ -266,7 +264,7 @@ describe('buildWorkProcessPresentation', () => {
     const sections = presentation.rows.filter((row) => row.type === 'section');
     expect(sections).toHaveLength(1);
     expect(sections[0]).toMatchObject({
-      thinkingLabel: 'Reasoning summary',
+      thinkingLabel: '思考过程',
       thinkingPreview: repeatedSummary,
       thinkingExpandable: true,
       stepCount: 1,
@@ -416,7 +414,7 @@ describe('buildWorkProcessPresentation', () => {
     expect(section).toMatchObject({
       type: 'section',
       resultText: '',
-      thinkingLabel: 'Raw reasoning',
+      thinkingLabel: '思考过程',
       thinkingPreview: 'Provider thought.',
       thinkingExpandable: true,
       thinkingOpenByDefault: false,
@@ -463,7 +461,7 @@ describe('buildWorkProcessPresentation', () => {
     expect(presentation.rows.find((row) => row.type === 'section')).toMatchObject({
       type: 'section',
       resultText: '',
-      thinkingLabel: 'Reasoning summary',
+      thinkingLabel: '思考过程',
       thinkingPreview: 'The user asks in Chinese. Now answer in Chinese.',
       thinkingExpandable: true,
       thinkingOpenByDefault: true,
@@ -505,8 +503,8 @@ describe('buildWorkProcessPresentation', () => {
     const section = presentation.rows.find((row) => row.type === 'section');
     expect(section).toMatchObject({
       type: 'section',
-      resultText: 'Turn result.',
-      thinkingLabel: 'Reasoning summary',
+      resultText: '',
+      thinkingLabel: '思考过程',
       thinkingStatus: 'complete',
       thinkingPreview: 'Provider thought.',
       thinkingExpandable: true,
@@ -581,21 +579,22 @@ describe('buildWorkProcessPresentation', () => {
       type: 'section',
       stepsDisclosure: 'deferred',
     });
-    const askGroup = sectionSteps.find((row) => row.type === 'toolGroup' && row.kind === 'interaction');
-    expect(askGroup).toMatchObject({
-      type: 'toolGroup',
-      kind: 'interaction',
-      title: '正在询问',
-      countLabel: '2 个问题',
-      summary: '',
+    const askRow = sectionSteps.find((row) => row.type === 'userInput');
+    expect(askRow).toMatchObject({
+      type: 'userInput',
+      status: 'running',
+      verb: '正在询问',
+      questionCount: 2,
     });
-    const visibleAskGroup = flattenVisibleWorkRows(presentation.rows).find((row) => row.type === 'toolGroup' && row.kind === 'interaction');
-    expect(visibleAskGroup).toMatchObject({
-      type: 'toolGroup',
-      rows: [],
-      defaultOpen: false,
+    const visibleAskRow = flattenVisibleWorkRows(presentation.rows).find((row) => row.type === 'userInput');
+    expect(visibleAskRow).toMatchObject({
+      type: 'userInput',
+      verb: '正在询问',
+      items: [
+        { questionId: 'smoke-path', prompt: 'Which smoke path should I use?' },
+        { questionId: 'smoke-name', prompt: 'What should I call this smoke run?' },
+      ],
     });
-    expect(flattenVisibleWorkRows(presentation.rows).filter((row) => row.type === 'userInput')).toHaveLength(0);
     const userInputRows = flattenWorkRows(presentation.rows).filter((row) => row.type === 'userInput');
     expect(userInputRows).toHaveLength(1);
     expect(userInputRows[0]).toMatchObject({
@@ -652,17 +651,11 @@ describe('buildWorkProcessPresentation', () => {
     });
 
     const rows = flattenWorkRows(presentation.rows);
-    const askUserGroup = rows.find((row) => row.type === 'toolGroup');
-    expect(askUserGroup).toMatchObject({
-      type: 'toolGroup',
-      title: '已询问',
-      countLabel: '2 个问题',
-      summary: '',
-    });
     const askUserRow = rows.find((row) => row.type === 'userInput');
     expect(askUserRow).toMatchObject({
       type: 'userInput',
       status: 'complete',
+      verb: '已询问',
       questionCount: 2,
       items: [
         { questionId: 'route', prompt: 'Which route should I use?', answer: 'A route', selectedOptionId: 'a' },
@@ -735,7 +728,7 @@ describe('buildWorkProcessPresentation', () => {
     expect(sections[0]).toMatchObject({
       type: 'section',
       status: 'error',
-      thinkingLabel: 'Reasoning summary',
+      thinkingLabel: '思考过程',
       thinkingPreview: staleSummary,
       thinkingExpandable: true,
       stepCount: 1,
@@ -770,11 +763,11 @@ describe('buildWorkProcessPresentation', () => {
     const flatRows = flattenWorkRows(presentation.rows);
     expect(section).toMatchObject({
       type: 'section',
-      resultText: 'I need to inspect the project files.',
+      resultText: '',
       resultToolSummary: '',
-      thinkingLabel: '',
-      thinkingPreview: '',
-      thinkingExpandable: false,
+      thinkingLabel: '正在思考',
+      thinkingPreview: 'I need to inspect the project files.',
+      thinkingExpandable: true,
       stepCount: 2,
     });
     expect(flatRows.filter((row) => row.type === 'tool')).toHaveLength(2);
@@ -827,12 +820,13 @@ describe('buildWorkProcessPresentation', () => {
       stepCount: 1,
     });
     expect(flattenWorkRows(presentation.rows).filter((row) => row.type === 'tool')).toHaveLength(1);
-    expect(flattenVisibleWorkRows(presentation.rows).filter((row) => row.type === 'tool')).toHaveLength(0);
-    const visibleGroup = flattenVisibleWorkRows(presentation.rows).find((row) => row.type === 'toolGroup');
-    expect(visibleGroup).toMatchObject({
-      type: 'toolGroup',
-      defaultOpen: false,
-      rows: [],
+    expect(flattenVisibleWorkRows(presentation.rows).filter((row) => row.type === 'tool')).toHaveLength(1);
+    const visibleTool = flattenVisibleWorkRows(presentation.rows).find((row) => row.type === 'tool');
+    expect(visibleTool).toMatchObject({
+      type: 'tool',
+      previewLines: [],
+      argsLines: [],
+      rawLines: [],
     });
   });
 
@@ -1066,14 +1060,8 @@ describe('buildWorkProcessPresentation', () => {
     });
 
     const section = presentation.rows.find((row) => row.type === 'section');
-    expect(section?.type === 'section' ? section.steps : []).toHaveLength(1);
-    expect(section?.type === 'section' ? section.steps[0] : undefined).toMatchObject({
-      type: 'toolGroup',
-      title: '探索',
-      icon: 'file',
-      countLabel: '3 文件',
-      defaultOpen: true,
-    });
+    expect(section?.type === 'section' ? section.steps : []).toHaveLength(3);
+    expect(section?.type === 'section' ? section.steps.map((step) => step.type) : []).toEqual(['tool', 'tool', 'tool']);
     expect(flattenWorkRows(presentation.rows).filter((row) => row.type === 'tool')).toHaveLength(3);
   });
 
@@ -1105,12 +1093,6 @@ describe('buildWorkProcessPresentation', () => {
       ],
     });
 
-    expect(flattenWorkRows(presentation.rows).find((row) => row.type === 'toolGroup')).toMatchObject({
-      type: 'toolGroup',
-      title: 'MCP · filesystem',
-      icon: 'plug',
-      countLabel: '1 调用',
-    });
     expect(flattenWorkRows(presentation.rows).find((row) => row.type === 'tool')).toMatchObject({
       type: 'tool',
       toolName: 'mcp__filesystem__read_file',
@@ -1148,12 +1130,6 @@ describe('buildWorkProcessPresentation', () => {
       ],
     });
 
-    expect(flattenWorkRows(presentation.rows).find((row) => row.type === 'toolGroup')).toMatchObject({
-      type: 'toolGroup',
-      title: '协作',
-      icon: 'handoff',
-      countLabel: '1 子任务',
-    });
     expect(flattenWorkRows(presentation.rows).find((row) => row.type === 'tool')).toMatchObject({
       type: 'tool',
       verb: '已调用子代理',
@@ -1218,7 +1194,7 @@ describe('semantic step groups', () => {
     const rawSection = rawPresentation.rows.find((row) => row.type === 'section');
     expect(rawSection).toMatchObject({
       type: 'section',
-      thinkingLabel: 'Raw reasoning',
+      thinkingLabel: '思考过程',
       thinkingPreview: 'raw chain visible',
     });
     expect(rawPresentation.rows.some((row) => row.type === 'reasoningIndicator')).toBe(false);
@@ -1249,7 +1225,7 @@ describe('semantic step groups', () => {
     const summarySection = summaryPresentation.rows.find((row) => row.type === 'section');
     expect(summarySection).toMatchObject({
       type: 'section',
-      thinkingLabel: 'Reasoning summary',
+      thinkingLabel: '思考过程',
       thinkingPreview: 'summary visible',
     });
 
@@ -1327,9 +1303,9 @@ describe('semantic step groups', () => {
     const noneSection = nonePresentation.rows.find((row) => row.type === 'section');
     expect(noneSection).toMatchObject({
       type: 'section',
-      thinkingLabel: '',
-      thinkingPreview: '',
-      thinkingExpandable: false,
+      thinkingLabel: '思考过程',
+      thinkingPreview: 'Tool only.',
+      thinkingExpandable: true,
     });
     expect(nonePresentation.rows.some((row) => row.type === 'reasoningIndicator')).toBe(false);
   });
@@ -1477,7 +1453,7 @@ describe('semantic step groups', () => {
       loopIds: ['loop-ask'],
     });
     const askGroupRows = askUserPresentation.groups[1].rows;
-    expect(askGroupRows.some((row) => row.type === 'section' && row.steps.some((step) => step.type === 'toolGroup' && step.kind === 'interaction'))).toBe(true);
+    expect(askGroupRows.some((row) => row.type === 'section' && row.steps.some((step) => step.type === 'userInput'))).toBe(true);
   });
 
   it('places subagent blocks with children in a standalone collaboration group', () => {
@@ -1579,7 +1555,9 @@ describe('semantic step groups', () => {
         type: 'section',
         outputPhase: 'commentary',
         stopReason,
-        resultText: `Truncated output for ${stopReason}`,
+        resultText: '',
+        thinkingPreview: `Truncated output for ${stopReason}`,
+        thinkingExpandable: true,
       });
     }
   });
@@ -1754,11 +1732,11 @@ describe('semantic step groups', () => {
     const secondSection = notPromotedPresentation.groups[0].rows.find((row) => row.type === 'section' && row.loopId === 'loop-no-promote-2');
     expect(firstSection).toMatchObject({
       thinkingPreview: 'First loop summary.',
-      thinkingLabel: 'Reasoning summary',
+      thinkingLabel: '思考过程',
     });
     expect(secondSection).toMatchObject({
       thinkingPreview: 'Second loop still has visible thinking.',
-      thinkingLabel: 'Reasoning summary',
+      thinkingLabel: '思考过程',
     });
   });
 

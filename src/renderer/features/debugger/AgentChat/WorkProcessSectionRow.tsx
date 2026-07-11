@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useI18n } from '../../../i18n';
 import { ActiveSignalText } from '../../../ui/ActiveSignalText';
 import type { WorkProcessRow } from './workProcessPresentation';
@@ -19,18 +19,9 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
 }) => {
   const { t } = useI18n();
   const label = useWorkProcessLabel();
-  const [commentaryExpanded, setCommentaryExpanded] = useState(false);
   const hasError = row.status === 'error' || row.steps.some((step) => step.status === 'error');
   const visibleSteps = row.visibleSteps;
   const showSteps = visibleSteps.length > 0;
-  const shouldClamp = row.clampable && row.clampResult && !commentaryExpanded;
-  const resultClassName = [
-    'work-process-loop-result',
-    row.resultStreaming ? 'is-streaming' : '',
-    shouldClamp ? 'is-clamped' : '',
-    commentaryExpanded ? 'is-expanded' : '',
-    row.clampable === false ? 'is-not-clampable' : '',
-  ].filter(Boolean).join(' ');
   const hasResult = Boolean(row.resultText || row.resultToolSummary);
   const thinkingActive = isActiveThinkingStatus(row.thinkingStatus, row.status);
   const thinkingClassName = [
@@ -74,18 +65,9 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
           </p>
         ) : null}
         {hasResult ? (
-          <div className={resultClassName}>
+          <div className={`work-process-loop-result${row.resultStreaming ? ' is-streaming' : ''}`}>
             {row.resultText ? <p className="work-process-loop-result-text">{row.resultText}</p> : null}
             {row.resultToolSummary ? <p className="work-process-loop-tool-summary">{row.resultToolSummary}</p> : null}
-            {row.clampable && row.clampResult ? (
-              <button
-                type="button"
-                className="button button-ghost work-process-clamp-toggle"
-                onClick={() => setCommentaryExpanded((prev) => !prev)}
-              >
-                {commentaryExpanded ? t('chat.workProcessCollapse') : t('chat.workProcessExpand')}
-              </button>
-            ) : null}
           </div>
         ) : null}
         {showSteps ? (
