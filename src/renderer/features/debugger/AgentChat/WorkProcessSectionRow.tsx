@@ -5,6 +5,7 @@ import { useWorkProcessLabel } from './workProcessUseLabel';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import { isActiveThinkingStatus } from './workProcessActiveSignal';
 import { MessageMarkdown } from './MessageMarkdown';
+import { WorkProcessIcon } from './WorkProcessIcons';
 
 interface WorkProcessSectionRowProps {
   row: Extract<WorkProcessRow, { type: 'section' }>;
@@ -29,6 +30,13 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
     row.thinkingStatus ? `status-${row.thinkingStatus}` : '',
   ].filter(Boolean).join(' ');
 
+  const thinkingLabelNode = (
+    <>
+      <WorkProcessIcon icon="spark" className="work-process-thinking-icon" />
+      <ActiveSignalText active={thinkingActive} tone="info">{label(row.thinkingLabel)}</ActiveSignalText>
+    </>
+  );
+
   return (
     <li
       className={`work-process-step work-process-section kind-section status-${row.status}${hasProse ? ' has-prose' : ''}${firstLineCaption ? ' first-line-caption' : ''}`}
@@ -39,15 +47,15 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
         {row.thinkingExpandable ? (
           <details className={thinkingClassName} open={row.thinkingOpenByDefault}>
             <summary className="work-process-thinking-summary">
-              <ActiveSignalText active={thinkingActive} tone="info">{label(row.thinkingLabel)}</ActiveSignalText>
+              {thinkingLabelNode}
               {row.thinkingSource ? <span className="work-process-thinking-source">{row.thinkingSource}</span> : null}
               <span className="work-process-row-caret" aria-hidden="true" />
             </summary>
             <div className="work-process-thinking-preview">{row.thinkingPreview}</div>
           </details>
         ) : row.thinkingLabel ? (
-          <p className={thinkingClassName}>
-            <ActiveSignalText active={thinkingActive} tone="info">{label(row.thinkingLabel)}</ActiveSignalText>
+          <p className={`${thinkingClassName} work-process-thinking-caption`}>
+            {thinkingLabelNode}
             {row.thinkingSource ? <span className="work-process-thinking-source">{row.thinkingSource}</span> : null}
           </p>
         ) : null}

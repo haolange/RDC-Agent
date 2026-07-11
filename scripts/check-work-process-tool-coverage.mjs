@@ -8,6 +8,7 @@ const { BUILTIN_AGENT_TOOL_IDS } = require('../src/shared/constants/agentToolTok
 const {
   WORK_PROCESS_TOOL_DISPLAY_CATALOG,
   createToolRowForPresentation,
+  getToolFamily,
 } = require('../src/renderer/features/debugger/AgentChat/workProcessPresentation.ts');
 const { buildToolAggregateSummary } = require('../src/renderer/features/debugger/AgentChat/workProcessToolAggregate.ts');
 
@@ -22,146 +23,165 @@ const assert = (condition, message) => {
 
 const now = 1_700_000_000_000;
 
+const toolEnvelope = (text, details = {}, extra = {}) => JSON.stringify({
+  ok: true,
+  data: {
+    content: text ? [{ type: 'text', text }] : [],
+    details,
+  },
+  duration_ms: 16,
+  ...extra,
+});
+
 const FIXTURES = {
   read_file: {
     argsPreview: JSON.stringify({ path: 'src/main/index.ts' }),
-    resultPreview: JSON.stringify({ content: 'export {}', lineCount: 12 }),
+    resultPreview: toolEnvelope('     1→export {}\n     2→', { path: 'src/main/index.ts', totalLines: 12, offset: 1, limit: 2000, truncated: false }),
   },
   glob: {
     argsPreview: JSON.stringify({ pattern: '**/package.json' }),
-    resultPreview: JSON.stringify({ matches: ['package.json', 'tools/package.json'] }),
+    resultPreview: toolEnvelope('package.json\ntools/package.json', { pattern: '**/package.json', cwd: '.', matched: 2, truncated: false }),
   },
   grep: {
     argsPreview: JSON.stringify({ pattern: 'export', path: 'src' }),
-    resultPreview: JSON.stringify({ matches: ['src/index.ts:1'] }),
+    resultPreview: toolEnvelope('src/index.ts:1: export const x = 1', { pattern: 'export', root: 'src', matchedFiles: 1, matchedLines: 1, truncated: false }),
   },
   web_fetch: {
     argsPreview: JSON.stringify({ url: 'https://example.com' }),
-    resultPreview: JSON.stringify({ ok: true, data: { content: [{ type: 'text', text: 'Status: 200 OK' }], details: { kind: 'fetch', url: 'https://example.com/', status: 200, statusText: 'OK', bytes: 1256, truncated: false } } }),
+    resultPreview: toolEnvelope('Status: 200 OK', { kind: 'fetch', url: 'https://example.com/', status: 200, statusText: 'OK', bytes: 1256, truncated: false }),
   },
   web_search: {
     argsPreview: JSON.stringify({ query: 'renderdoc' }),
-    resultPreview: JSON.stringify({ ok: true, data: { content: [{ type: 'text', text: 'Search query: renderdoc' }], details: { kind: 'search', provider: 'DuckDuckGo HTML', resultCount: 1, results: [{ title: 'RenderDoc', url: 'https://renderdoc.org/', snippet: 'Graphics debugger.' }] } } }),
+    resultPreview: toolEnvelope('Search query: renderdoc', {
+      kind: 'search',
+      provider: 'DuckDuckGo HTML',
+      resultCount: 1,
+      results: [{ title: 'RenderDoc', url: 'https://renderdoc.org/', snippet: 'Graphics debugger.' }],
+    }),
   },
   bash: {
     argsPreview: JSON.stringify({ command: 'npm run typecheck' }),
-    resultPreview: JSON.stringify({ exitCode: 0, stdout: 'OK' }),
+    resultPreview: toolEnvelope('OK', { command: 'npm run typecheck', exitCode: 0, durationMs: 120, truncated: false, cwd: '.' }),
   },
   write_file: {
     argsPreview: JSON.stringify({ path: 'notes.md', content: 'hello' }),
-    resultPreview: JSON.stringify({ ok: true, bytes: 5 }),
+    resultPreview: toolEnvelope('Created notes.md (5 bytes)', { path: 'notes.md', bytesWritten: 5, created: true }),
   },
   edit_file: {
-    argsPreview: JSON.stringify({ path: 'src/foo.ts', patch: '...' }),
-    resultPreview: JSON.stringify({ ok: true, additions: 3, deletions: 1 }),
+    argsPreview: JSON.stringify({ path: 'src/foo.ts', old_text: 'a', new_text: 'b' }),
+    resultPreview: toolEnvelope('Updated src/foo.ts', { path: 'src/foo.ts', oldLength: 1, newLength: 1, occurrence: 1, delta: 0 }),
   },
   delete_file: {
     argsPreview: JSON.stringify({ path: 'tmp.txt' }),
-    resultPreview: JSON.stringify({ ok: true }),
+    resultPreview: toolEnvelope('Deleted tmp.txt', { path: 'tmp.txt' }),
   },
   move_file: {
     argsPreview: JSON.stringify({ source: 'a.txt', destination: 'b.txt' }),
-    resultPreview: JSON.stringify({ ok: true }),
+    resultPreview: toolEnvelope('Moved a.txt → b.txt', { source: 'a.txt', destination: 'b.txt' }),
   },
   copy_file: {
     argsPreview: JSON.stringify({ source: 'a.txt', destination: 'b.txt' }),
-    resultPreview: JSON.stringify({ ok: true }),
+    resultPreview: toolEnvelope('Copied a.txt → b.txt', { source: 'a.txt', destination: 'b.txt' }),
   },
   notebook_edit: {
-    argsPreview: JSON.stringify({ path: 'notes.ipynb' }),
-    resultPreview: JSON.stringify({ ok: true }),
+    argsPreview: JSON.stringify({ notebook_path: 'notes.ipynb', cell_index: 0, new_source: 'print(1)' }),
+    resultPreview: toolEnvelope('Updated notes.ipynb cell 0', { notebook_path: 'notes.ipynb', cell_index: 0 }),
   },
   git_status: {
     argsPreview: JSON.stringify({ cwd: '.' }),
-    resultPreview: JSON.stringify({ summary: 'M README.md', status: 'dirty' }),
+    resultPreview: toolEnvelope('M README.md', { summary: 'M README.md', status: 'dirty' }),
   },
   git_diff: {
     argsPreview: JSON.stringify({ path: 'README.md' }),
-    resultPreview: JSON.stringify({ output: '+ added line' }),
+    resultPreview: toolEnvelope('+ added line', { path: 'README.md' }),
   },
   git_log: {
     argsPreview: JSON.stringify({ limit: 5 }),
-    resultPreview: JSON.stringify({ output: 'abc123 message' }),
+    resultPreview: toolEnvelope('abc123 message', { limit: 5 }),
   },
   git_add: {
     argsPreview: JSON.stringify({ path: 'README.md' }),
-    resultPreview: JSON.stringify({ ok: true }),
+    resultPreview: toolEnvelope('Staged README.md', { path: 'README.md' }),
   },
   git_unstage: {
     argsPreview: JSON.stringify({ path: 'README.md' }),
-    resultPreview: JSON.stringify({ ok: true }),
+    resultPreview: toolEnvelope('Unstaged README.md', { path: 'README.md' }),
   },
   git_commit: {
     argsPreview: JSON.stringify({ message: 'Update work process' }),
-    resultPreview: JSON.stringify({ output: '[main abc123] Update work process' }),
+    resultPreview: toolEnvelope('[main abc123] Update work process', { message: 'Update work process' }),
   },
   task_list: {
     argsPreview: '{}',
-    resultPreview: JSON.stringify({ tasks: [{ subject: 'Ship feature' }] }),
+    resultPreview: toolEnvelope('- Ship feature', { total: 1, tasks: [{ subject: 'Ship feature' }] }),
   },
   task_create: {
     argsPreview: JSON.stringify({ subject: 'New task' }),
-    resultPreview: JSON.stringify({ taskId: 'task-1', subject: 'New task' }),
+    resultPreview: toolEnvelope('Created task-1: New task', { taskId: 'task-1', subject: 'New task' }),
   },
   task_update: {
     argsPreview: JSON.stringify({ taskId: 'task-1', status: 'done' }),
-    resultPreview: JSON.stringify({ taskId: 'task-1' }),
+    resultPreview: toolEnvelope('Updated task-1', { taskId: 'task-1' }),
   },
   task_get: {
     argsPreview: JSON.stringify({ taskId: 'task-1' }),
-    resultPreview: JSON.stringify({ subject: 'New task' }),
+    resultPreview: toolEnvelope('New task', { taskId: 'task-1', subject: 'New task' }),
   },
   task_stop: {
     argsPreview: JSON.stringify({ taskId: 'task-1' }),
-    resultPreview: JSON.stringify({ taskId: 'task-1', status: 'stopped' }),
+    resultPreview: toolEnvelope('Stopped task-1', { taskId: 'task-1', status: 'stopped' }),
   },
   agent_handoff: {
     argsPreview: JSON.stringify({ agent: 'edit', prompt: 'Implement fix' }),
-    resultPreview: JSON.stringify({ ok: true }),
+    resultPreview: toolEnvelope('Handoff ready', { agent: 'edit' }),
   },
   subagent: {
     argsPreview: JSON.stringify({ profile: 'reviewer', prompt: 'Review this' }),
-    resultPreview: JSON.stringify({ ok: true, summary: 'Reviewed' }),
+    resultPreview: toolEnvelope('Reviewed', { summary: 'Reviewed' }),
   },
   memory_search: {
     argsPreview: JSON.stringify({ scope: 'project', query: 'project-notes' }),
-    resultPreview: JSON.stringify({ count: 1 }),
+    resultPreview: toolEnvelope('project-notes', { count: 1 }),
   },
   memory_read: {
     argsPreview: JSON.stringify({ scope: 'project', name: 'project-notes' }),
-    resultPreview: JSON.stringify({ name: 'project-notes', content: '...' }),
+    resultPreview: toolEnvelope('note body', { name: 'project-notes' }),
   },
   memory_write: {
     argsPreview: JSON.stringify({ scope: 'project', name: 'project-notes', description: 'd', type: 'project', content: 'c', approved: true }),
-    resultPreview: JSON.stringify({ name: 'project-notes' }),
+    resultPreview: toolEnvelope('Wrote project-notes', { name: 'project-notes' }),
   },
   memory_delete: {
     argsPreview: JSON.stringify({ scope: 'project', name: 'project-notes', confirmed: true }),
-    resultPreview: JSON.stringify({ ok: true }),
+    resultPreview: toolEnvelope('Deleted project-notes', { name: 'project-notes' }),
   },
   plan_artifact: {
     argsPreview: JSON.stringify({ title: 'Plan', content: '# Plan' }),
-    resultPreview: JSON.stringify({ ok: true }),
+    resultPreview: toolEnvelope('Plan artifact ready', { title: 'Plan' }),
   },
   tool_search: {
     argsPreview: JSON.stringify({ query: 'node_repl' }),
-    resultPreview: JSON.stringify({ tools: ['node_repl.js'] }),
+    resultPreview: toolEnvelope('node_repl.js', { total: 1, matches: [{ name: 'node_repl.js' }] }),
   },
   skills: {
     argsPreview: JSON.stringify({ query: 'lint' }),
-    resultPreview: JSON.stringify({ skills: ['eslint'] }),
+    resultPreview: toolEnvelope('eslint', { total: 1, skills: ['eslint'] }),
   },
   skill_read: {
     argsPreview: JSON.stringify({ skill_id: 'baoyu-design' }),
-    resultPreview: JSON.stringify({ ok: true }),
+    resultPreview: toolEnvelope('# Design\n\nFull body stays in raw.', {
+      skillId: 'baoyu-design',
+      description: 'Create polished design artifacts.',
+      sourcePath: '/skills/baoyu-design/SKILL.md',
+    }),
   },
   mcp: {
     argsPreview: JSON.stringify({ query: 'fs' }),
-    resultPreview: JSON.stringify({ servers: ['filesystem'] }),
+    resultPreview: toolEnvelope('filesystem', { servers: ['filesystem'] }),
   },
   rdx_context: {
     argsPreview: '{}',
-    resultPreview: JSON.stringify({ capturePath: 'demo.rdc' }),
+    resultPreview: toolEnvelope('capture: demo.rdc', { capturePath: 'demo.rdc' }),
   },
   ask_user: {
     argsPreview: JSON.stringify({
@@ -174,13 +194,13 @@ const FIXTURES = {
         ],
       }],
     }),
-    resultPreview: JSON.stringify({
+    resultPreview: toolEnvelope('Yes', {
       answers: [{ questionId: 'continue', answer: 'Yes', selectedOptionId: 'yes' }],
     }),
   },
   mcp__filesystem__read_file: {
     argsPreview: JSON.stringify({ path: 'README.md' }),
-    resultPreview: JSON.stringify({ ok: true, content: 'hello' }),
+    resultPreview: toolEnvelope('hello', { path: 'README.md' }),
   },
 };
 
@@ -238,10 +258,35 @@ for (const toolName of allTools) {
   assert(row.groupKind && row.groupKind !== 'diagnostic', `${toolName} should have a semantic group`);
   assert(row.category.length > 0, `${toolName} should have a category`);
   assert(row.target.length > 0 || row.previewLines.length > 0, `${toolName} should expose target or preview`);
+  assert(
+    ['file', 'search', 'shell', 'git', 'web', 'generic'].includes(row.family),
+    `${toolName} should expose a unified card family, got "${row.family}"`,
+  );
+  assert(row.family === getToolFamily(toolName), `${toolName} family should match getToolFamily()`);
 
   if (toolName.startsWith('mcp__')) {
     assert(row.target === 'filesystem/read_file', `dynamic MCP target should be server/tool, got "${row.target}"`);
     assert(row.groupKind === 'mcp', `dynamic MCP tool should be in mcp group, got "${row.groupKind}"`);
+    assert(row.family === 'generic', `dynamic MCP tools should use the generic card family`);
+  }
+
+  if (toolName === 'glob') {
+    assert(row.bodyText && /\d+\s+files?/.test(row.bodyText), `glob bodyText should be a file count, got "${row.bodyText}"`);
+    assert(row.bodyText !== '**/package.json', 'glob collapsed body must not be only the pattern');
+    assert(row.bodyLines?.includes('package.json'), 'glob should expose path samples in bodyLines');
+    assert(row.previewLines.includes('package.json'), 'glob previewLines should include matched paths');
+  }
+
+  if (toolName === 'grep') {
+    assert(row.bodyText && /match/i.test(row.bodyText), `grep bodyText should summarize matches, got "${row.bodyText}"`);
+    assert(row.bodyText !== 'export' && row.bodyText !== 'src', 'grep collapsed body must not be only args');
+    assert(row.previewLines.some((line) => line.includes('src/index.ts')), 'grep preview should include match lines');
+  }
+
+  if (toolName === 'read_file') {
+    assert(row.bodyText && row.bodyText.includes('src/main/index.ts'), 'read_file body should keep the path');
+    assert(row.bodyText.includes('12 lines'), `read_file body should include totalLines, got "${row.bodyText}"`);
+    assert(row.previewLines.some((line) => line.includes('export')), 'read_file preview should include file content');
   }
 }
 

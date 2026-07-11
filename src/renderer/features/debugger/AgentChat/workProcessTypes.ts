@@ -41,6 +41,15 @@ export type WorkProcessToolGroupKind =
   | 'mcp'
   | 'diagnostic';
 
+/** Presentation family that drives the unified tool card body/detail templates. */
+export type WorkProcessToolFamily =
+  | 'file'
+  | 'search'
+  | 'shell'
+  | 'git'
+  | 'web'
+  | 'generic';
+
 export interface WorkProcessToolApproval {
   status: import('@shared/types/conversation').ConversationToolApprovalStatus;
   verb: string;
@@ -72,12 +81,27 @@ export type WorkProcessRow =
     category: string;
     icon: WorkProcessIconKey;
     groupKind: WorkProcessToolGroupKind;
+    /** Unified card family for body/detail templates. */
+    family: WorkProcessToolFamily;
     toolName: string;
     target: string;
     duration: string;
     argsLines: string[];
     previewLines: string[];
     rawLines: string[];
+    /**
+     * Outcome-first collapsed summary (e.g. `42 files`, `12 matches · 3 files`).
+     * When absent, the card falls back to args target / path / command.
+     */
+    bodyText?: string;
+    /** Optional short result sample shown under bodyText while collapsed (search family). */
+    bodyLines?: string[];
+    /** Content-layer preview shape (legacy; family drives the card template). */
+    previewKind?: 'shell' | 'skill' | 'file' | 'web' | 'generic';
+    /** Shell command for the two-pane terminal header (`$ cmd`). */
+    commandText?: string;
+    /** Skill / file path chip shown beside a short description. */
+    pathChip?: string;
     /** Human-readable one-line diagnostic for failed tools (never the raw JSON envelope). */
     diagnosticCaption?: string;
     approval?: WorkProcessToolApproval;
@@ -139,23 +163,6 @@ export type WorkProcessRow =
     title: string;
     taskStatus: string;
     duration: string;
-  }
-  | {
-    type: 'response';
-    id: string;
-    status: WorkProcessRowStatus;
-    title: string;
-    summary: string;
-    duration: string;
-    thinkingPreview: string;
-    thinkingLabel: string;
-    thinkingKind?: ThinkingArtifact['kind'];
-    thinkingVisibility?: ThinkingArtifact['visibility'];
-    thinkingStatus?: ConversationWorkBlock['thinkingStatus'];
-    thinkingExpandable: boolean;
-    thinkingOpenByDefault: boolean;
-    outputPhase?: ConversationLoopOutputPhase;
-    stopReason?: ConversationLoopStopReason;
   }
   | {
     type: 'section';

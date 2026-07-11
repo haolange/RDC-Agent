@@ -1767,17 +1767,28 @@
 .session-capabilities-stack {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
 .rdx-runtime-context-panel {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  margin-top: var(--space-1);
   padding: var(--space-3);
   border-radius: var(--radius-md, 8px);
   border: 1px solid var(--token-border-card);
   background: var(--token-bg-muted);
+}
+
+.rdx-runtime-context-panel .panel-empty {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.5;
 }
 
 .rdx-runtime-context-facts {

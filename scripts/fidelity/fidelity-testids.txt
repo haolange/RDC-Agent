@@ -35,7 +35,6 @@ control-rdx-runtime-context
 conversation-thread
 cp-section-${id}
 cp-section-trace-lane-${id}
-cp-section-trace-lane-requestInspector
 empty-workbench-prompt
 empty-workbench-tool-${toolMode}
 memory-detail

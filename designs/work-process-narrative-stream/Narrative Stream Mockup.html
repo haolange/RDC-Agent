@@ -292,6 +292,107 @@
       border-left: 2px solid var(--token-border-subtle);
     }
 
+    /* ── Tool 内容层：shell 两段终端 / skill 简卡 ── */
+    .tool-expand {
+      margin: var(--space-1) 0 var(--space-2);
+      width: 100%;
+      max-width: 52rem;
+    }
+    .shell-panel {
+      overflow: hidden;
+      border: 1px solid var(--token-border-muted);
+      border-radius: var(--radius-sm);
+      background: rgb(var(--color-bg-1));
+    }
+    .shell-pane {
+      margin: 0;
+      padding: var(--space-2) var(--space-3);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      line-height: 1.55;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      color: var(--token-text-body);
+    }
+    .shell-pane.command {
+      border-bottom: 1px solid var(--token-border-muted);
+      color: var(--token-text-caption);
+      background: color-mix(in srgb, rgb(var(--color-bg-2)) 80%, transparent);
+    }
+    .shell-pane.stdout {
+      max-height: calc(var(--text-xs) * 1.55 * 16);
+      overflow-y: auto;
+      color: var(--token-text-body);
+    }
+    .skill-brief {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-2);
+      padding: var(--space-2) 0;
+    }
+    .skill-caption {
+      margin: 0;
+      font-size: var(--text-sm);
+      color: var(--token-text-caption);
+      line-height: 1.45;
+      max-width: 56ch;
+    }
+    .path-chip {
+      display: inline-flex;
+      max-width: 100%;
+      padding: 2px 8px;
+      border: 1px solid var(--token-border-muted);
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--token-text-muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .thinking-summary {
+      display: inline-flex; align-items: center; gap: 8px;
+      color: var(--token-text-caption); font-size: var(--text-xs);
+    }
+    .thinking-ico {
+      width: 14px; height: 14px; opacity: 0.85; color: var(--token-text-muted);
+    }
+    .file-strip, .web-block {
+      overflow: hidden;
+      border: 1px solid var(--token-border-muted);
+      border-radius: var(--radius-sm);
+      background: rgb(var(--color-bg-1));
+      max-width: 52rem;
+    }
+    .file-strip-head, .web-block-head {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--token-border-muted);
+      color: var(--token-text-caption); font-size: var(--text-sm);
+    }
+    .web-block-head { border-bottom: 0; }
+    .file-strip-path {
+      padding: 8px 12px;
+      font-family: var(--font-mono); font-size: var(--text-xs);
+      color: var(--token-text-body);
+    }
+    .web-pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 10px; }
+    .web-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 2px 8px; border-radius: 999px;
+      border: 1px solid var(--token-border-muted);
+      background: rgb(var(--color-bg-2));
+      font-size: var(--text-xs); color: var(--token-text-caption);
+    }
+    .anti {
+      opacity: 0.55;
+      text-decoration: line-through;
+      font-size: var(--text-xs);
+      color: var(--token-status-error);
+      margin-top: var(--space-2);
+    }
+
     /* 最终回复 */
     .assistant-final {
       margin-top: var(--space-5);
@@ -320,6 +421,7 @@
         <button class="chip" data-scene="running">运行中</button>
         <button class="chip" data-scene="error">错误态</button>
         <button class="chip" data-scene="variants">边界变体</button>
+        <button class="chip" data-scene="content">内容层 · shell/skill</button>
       </div>
     </header>
     <hr class="divider" />
@@ -622,6 +724,104 @@
                 <li class="tool-row"><span class="tool-verb">Ran</span><span class="tool-target">npm test</span></li>
               </ul>
             </details>
+          </div>
+        </li>
+      </ol>
+    </div>
+
+    <!-- ═══ 内容层投影：shell / skill ═══ -->
+    <div class="scene hidden" id="scene-content">
+      <div class="scene-label">A · shell 默认胶囊 vs 展开两段终端</div>
+      <ol class="stream">
+        <li class="loop has-prose">
+          <span class="loop-dot"></span>
+          <div class="loop-body">
+            <div class="prose"><p>核对仓库状态后跑一次类型检查。</p></div>
+            <ul class="tools">
+              <li class="tool-row">
+                <span class="tool-verb">Ran</span>
+                <span class="tool-target">git status --short</span>
+                <span class="tool-inline-meta">0.2s</span>
+                <span class="chev">›</span>
+              </li>
+              <li class="tool-row">
+                <span class="tool-verb">Ran</span>
+                <span class="tool-target">npm run typecheck</span>
+                <span class="tool-inline-meta">1.4s</span>
+                <span class="chev">›</span>
+              </li>
+            </ul>
+            <p class="skill-caption" style="margin-top: var(--space-3); color: var(--token-text-muted);">展开态（一行一命令 · 内容层，无 ok/data/trace_id）：</p>
+            <div class="tool-expand">
+              <div class="shell-panel" aria-label="Console output">
+                <pre class="shell-pane command">$ npm run typecheck</pre>
+                <pre class="shell-pane stdout">> rdc-agent@0.1.0 typecheck
+> tsc -b --pretty false
+
+src/renderer/.../workProcessPresentation.ts(412,5): error TS2322: Type 'string[]' is not assignable...
+Found 1 error.</pre>
+              </div>
+              <div class="anti">禁止：{"ok":true,"data":{"content":[...]},"duration_ms":1400,"trace_id":"..."}</div>
+            </div>
+          </div>
+        </li>
+      </ol>
+
+      <div class="scene-label">B · skill 默认一行 vs 展开描述 + path chip</div>
+      <ol class="stream">
+        <li class="loop has-prose first-line-caption">
+          <span class="loop-dot"></span>
+          <div class="loop-body">
+            <ul class="tools">
+              <li class="tool-row">
+                <span class="tool-verb">Loaded skill</span>
+                <span class="tool-target">arming-thought</span>
+                <span class="tool-inline-meta">80ms</span>
+                <span class="chev">›</span>
+              </li>
+            </ul>
+            <p class="skill-caption" style="margin-top: var(--space-3); color: var(--token-text-muted);">展开态（一句描述 + 路径 chip；全文仅 raw）：</p>
+            <div class="tool-expand">
+              <div class="skill-brief">
+                <p class="skill-caption">在每次新的顶层对话开始时建立「实事求是」总原则，并在明确适用时选择下游 skill。</p>
+                <span class="path-chip" title="~/.codex/skills/arming-thought/SKILL.md">~/.codex/skills/arming-thought/SKILL.md</span>
+              </div>
+              <div class="anti">禁止：整篇 SKILL.md markdown / ok→data.content 信封</div>
+            </div>
+          </div>
+        </li>
+      </ol>
+
+      <div class="scene-label">C · file path strip + web 摘要 pills</div>
+      <ol class="stream">
+        <li class="loop has-prose">
+          <span class="loop-dot"></span>
+          <div class="loop-body">
+            <div class="thinking-summary">
+              <svg class="thinking-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Z"/></svg>
+              <span>已思考 · 1.9s</span>
+            </div>
+            <div class="prose"><p>读取项目配置后再检索文档。</p></div>
+            <ul class="tools">
+              <li class="tool-row"><span class="tool-verb">Read file</span><span class="tool-target">.rdx/project.yaml</span></li>
+            </ul>
+            <div class="tool-expand">
+              <div class="file-strip">
+                <div class="file-strip-head"><span>📄 Read file</span><span>⧉</span></div>
+                <div class="file-strip-path">.rdx/project.yaml</div>
+              </div>
+            </div>
+            <ul class="tools" style="margin-top: 12px;">
+              <li class="tool-row"><span class="tool-verb">Searched web</span><span class="tool-target">renderdoc</span></li>
+            </ul>
+            <div class="tool-expand">
+              <div class="web-block">
+                <div class="web-block-head"><span>🔍</span><span>1 来源的 “renderdoc”</span></div>
+                <div class="web-pills">
+                  <span class="web-pill">renderdoc.org</span>
+                </div>
+              </div>
+            </div>
           </div>
         </li>
       </ol>
