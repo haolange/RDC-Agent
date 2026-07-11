@@ -46,7 +46,10 @@ import {
   createBuiltinProviderEntries,
   getBuiltinProviderDefinition,
   getBuiltinProviderCatalogOwnership,
+  getBuiltinProviderProtocolBaseUrls,
+  getBuiltinProviderProtocolOptions,
   isBuiltinProviderId,
+  resolveBuiltinProtocolBaseUrl,
 } from '@shared/constants/llm';
 import { getManagedProviderModels } from '@shared/constants/modelCapabilityCatalog';
 import { appPathService } from '../runtime/AppPathService';
@@ -669,12 +672,22 @@ function sanitizeUserProvider(
     apiKey: '',
     secretRef,
     hasStoredSecret,
-    baseUrl: definition?.baseUrlEditable
-      ? (typeof provider.baseUrl === 'string' ? provider.baseUrl.trim() : definition.baseUrl)
-      : definition?.baseUrl,
+    baseUrl: (() => {
+      const protocolDefault = resolveBuiltinProtocolBaseUrl(rawId, protocol);
+      if (definition?.baseUrlEditable) {
+        return typeof provider.baseUrl === 'string' && provider.baseUrl.trim()
+          ? provider.baseUrl.trim()
+          : protocolDefault ?? definition.baseUrl;
+      }
+      if (definition?.protocolEditable && definition.protocolBaseUrls) {
+        return protocolDefault ?? definition.baseUrl;
+      }
+      return definition?.baseUrl;
+    })(),
     baseUrlEditable: definition?.baseUrlEditable,
     protocolEditable: definition?.protocolEditable,
-    protocolOptions: builtinFallback.protocolOptions,
+    protocolOptions: getBuiltinProviderProtocolOptions(rawId),
+    protocolBaseUrls: getBuiltinProviderProtocolBaseUrls(rawId),
     models,
     recommendedModels,
     docsUrl,
@@ -1198,6 +1211,10 @@ export class SettingsService {
     const hasEnabledModels = discoveredModels.some((model) => model.enabled !== false);
     const protocol = normalizeProviderProtocol({ id: provider.id, protocol: protocolDraft ?? provider.protocol });
     const timestamp = nowIso();
+    const protocolDefault = resolveBuiltinProtocolBaseUrl(provider.id, protocol);
+    const nextBaseUrl = provider.baseUrlEditable
+      ? (baseUrl.trim() || protocolDefault || provider.baseUrl)
+      : (protocolDefault || provider.baseUrl);
     const nextProvider: LlmProviderEntry = {
       ...provider,
       apiKey: apiKey.trim(),
@@ -1206,7 +1223,9 @@ export class SettingsService {
       hasStoredSecret: provider.authMode === 'api-key'
         ? Boolean(apiKey.trim() || provider.hasStoredSecret)
         : provider.authMode === 'local' || provider.authMode === 'environment' || provider.hasStoredSecret,
-      baseUrl: provider.baseUrlEditable ? baseUrl.trim() || provider.baseUrl : provider.baseUrl,
+      baseUrl: nextBaseUrl,
+      protocolOptions: getBuiltinProviderProtocolOptions(provider.id),
+      protocolBaseUrls: getBuiltinProviderProtocolBaseUrls(provider.id),
       models: discoveredModels.map((model) => ({ ...model })),
       status: 'verified',
       lastTestedAt: timestamp,

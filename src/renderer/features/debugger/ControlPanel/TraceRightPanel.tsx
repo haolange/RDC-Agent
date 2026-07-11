@@ -2,7 +2,6 @@
 import type {
   ContextKind,
   ProgressTask,
-  ProgressTaskStatus,
   TraceArtifactRecord,
   TraceContextRecord,
 } from '@shared/types/trace';
@@ -12,8 +11,10 @@ import { useProjectStore } from '../../../stores/projectStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { Button } from '../../../ui/Button';
 import { SessionContextPanel } from './SessionContextPanel';
+import { TraceProgressMarker } from './TraceProgressMarker';
+import { TraceRequestInspectorSection } from './TraceRequestInspectorSection';
 
-type SectionId = 'progress' | 'artifacts' | 'context';
+type SectionId = 'progress' | 'artifacts' | 'context' | 'requestInspector';
 
 const kindLabelKey: Record<ContextKind, TranslationKey> = {
   capture: 'control.traceKindCapture',
@@ -39,34 +40,6 @@ const focusWorkProcessTask = (taskId: string): void => {
   target.scrollIntoView({ behavior: 'smooth', block: 'center' });
   target.classList.add('is-trace-flash');
   window.setTimeout(() => target.classList.remove('is-trace-flash'), 1600);
-};
-
-const ProgressMarker: React.FC<{ status: ProgressTaskStatus; index: number }> = ({ status, index }) => {
-  if (status === 'completed') {
-    return (
-      <span className="trace-progress-marker is-completed" aria-hidden="true">
-        <svg viewBox="0 0 16 16" width="11" height="11">
-          <path d="M3.5 8.4 L6.6 11.4 L12.6 4.6" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
-    );
-  }
-  if (status === 'blocked') {
-    return (
-      <span className="trace-progress-marker is-blocked" aria-hidden="true">
-        <svg viewBox="0 0 16 16" width="12" height="12">
-          <path d="M8 2 L14.5 13 L1.5 13 Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-          <line x1="8" y1="6.4" x2="8" y2="9.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-          <circle cx="8" cy="11.1" r="0.7" fill="currentColor" />
-        </svg>
-      </span>
-    );
-  }
-  return (
-    <span className={`trace-progress-marker ${status === 'running' ? 'is-running' : 'is-pending'}`} aria-hidden="true">
-      <span className="trace-progress-index">{index}</span>
-    </span>
-  );
 };
 
 const Section: React.FC<{
@@ -119,7 +92,7 @@ const ProgressList: React.FC<{
           onClick={() => onFocusTask(task.id)}
           title={t('control.traceProgressJump')}
         >
-          <ProgressMarker status={task.status} index={index} />
+          <TraceProgressMarker status={task.status} index={index} />
           <span className="trace-progress-body">
             <span className="trace-progress-title">{label}</span>
             {task.status === 'blocked' && task.blockerSummary ? (
@@ -205,14 +178,15 @@ export const TraceRightPanel: React.FC = () => {
     progress: true,
     artifacts: true,
     context: true,
+    requestInspector: false,
   });
   const lastSessionId = useRef<string | null>(null);
 
   useEffect(() => {
-    const sessionId = currentSession?.sessionId ?? null;
-    if (sessionId === lastSessionId.current) return;
-    lastSessionId.current = sessionId;
-    setExpanded({ progress: true, artifacts: true, context: true });
+    const nextSessionId = currentSession?.sessionId ?? null;
+    if (nextSessionId === lastSessionId.current) return;
+    lastSessionId.current = nextSessionId;
+    setExpanded({ progress: true, artifacts: true, context: true, requestInspector: false });
   }, [currentSession?.sessionId]);
 
   const rightPanel = presentation?.rightPanel ?? null;
@@ -287,6 +261,10 @@ export const TraceRightPanel: React.FC = () => {
           )}
           <SessionContextPanel />
         </Section>
+        <TraceRequestInspectorSection
+          expanded={expanded.requestInspector}
+          onToggle={() => toggle('requestInspector')}
+        />
       </div>
     </div>
   );

@@ -52,17 +52,6 @@ const renderChildRow = (row: WorkProcessRow): React.ReactNode => {
       </li>
     );
   }
-  if (row.type === 'toolGroup') {
-    return (
-      <React.Fragment key={row.id}>
-        <li className={`work-process-child-summary status-${row.status}`}>
-          <span className="work-process-child-verb">{row.title}</span>
-          <span className="work-process-child-target">{row.countLabel}</span>
-        </li>
-        {row.rows.map((child) => renderChildRow(child))}
-      </React.Fragment>
-    );
-  }
   if (row.type === 'subagent') {
     return <SubagentRow key={row.id} row={row} />;
   }

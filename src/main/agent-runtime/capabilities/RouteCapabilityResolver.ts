@@ -7,6 +7,39 @@ const STREAMING_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages', '
 const OPENAI_NATIVE_IDS = new Set(['openai', 'openai-eu', 'openai-us', 'chatgpt-account']);
 const ANTHROPIC_NATIVE_IDS = new Set(['anthropic', 'claude-account']);
 
+/** App-managed vendors with documented readable CoT (not Anthropic summary). */
+const RAW_REASONING_PROVIDER_IDS = new Set([
+  'deepseek',
+  'moonshot',
+  'kimi-coding-plan',
+  'glm-cn',
+  'glm-global',
+  'glm-cn-coding-plan',
+  'glm-global-coding-plan',
+  'minimax-cn',
+  'minimax-global',
+  'minimax-cn-coding-plan',
+  'minimax-global-coding-plan',
+  'xiaomi-mimo',
+  'xiaomi-mimo-token-plan',
+]);
+
+const RAW_REASONING_EVIDENCE: Record<string, string> = {
+  deepseek: 'https://api-docs.deepseek.com/guides/thinking_mode',
+  moonshot: 'https://platform.moonshot.cn/docs/',
+  'kimi-coding-plan': 'https://www.kimi.com/code/docs/en/',
+  'glm-cn': 'https://docs.bigmodel.cn/',
+  'glm-global': 'https://docs.z.ai/',
+  'glm-cn-coding-plan': 'https://docs.bigmodel.cn/',
+  'glm-global-coding-plan': 'https://docs.z.ai/devpack/quick-start',
+  'minimax-cn': 'https://platform.minimaxi.com/docs/api-reference/text-openai-api',
+  'minimax-global': 'https://platform.minimax.io/docs/guides/text-generation',
+  'minimax-cn-coding-plan': 'https://platform.minimaxi.com/docs/api-reference/text-openai-api',
+  'minimax-global-coding-plan': 'https://platform.minimax.io/docs/token-plan/other-tools',
+  'xiaomi-mimo': 'https://mimo.mi.com/docs/en-US/quick-start/usage-guide/text-generation/deep-thinking',
+  'xiaomi-mimo-token-plan': 'https://mimo.mi.com/docs/en-US/quick-start/usage-guide/text-generation/deep-thinking',
+};
+
 const hasCapability = (provider: LlmProviderEntry | undefined, capability: LlmProviderCapability): boolean => Boolean(provider?.capabilities?.includes(capability));
 
 export function resolveProviderReasoningContract(provider: LlmProviderEntry | undefined, modelId: string): ProviderReasoningContract {
@@ -17,8 +50,14 @@ export function resolveProviderReasoningContract(provider: LlmProviderEntry | un
   if (provider.protocol === 'AnthropicMessages' && ANTHROPIC_NATIVE_IDS.has(provider.id)) {
     return { semantic: 'summary', source: 'anthropic-thinking-display-summarized', evidence: 'https://platform.claude.com/docs/en/build-with-claude/extended-thinking', displayLabel: 'Reasoning summary' };
   }
-  if (provider.id === 'deepseek' && provider.protocol === 'OpenAICompatibleChatCompletions') {
-    return { semantic: 'raw', source: 'deepseek-reasoning-content', evidence: 'https://api-docs.deepseek.com/guides/thinking_mode', displayLabel: 'Raw reasoning' };
+  // Compatible Anthropic routes must never inherit native Anthropic summary semantics.
+  if (RAW_REASONING_PROVIDER_IDS.has(provider.id)) {
+    return {
+      semantic: 'raw',
+      source: `${provider.id}-documented-raw-reasoning`,
+      evidence: RAW_REASONING_EVIDENCE[provider.id],
+      displayLabel: 'Raw reasoning',
+    };
   }
   return { semantic: 'unknown', source: `${provider.id}/${modelId}:unverified-provider-semantics`, displayLabel: 'Provider reasoning' };
 }

@@ -132,7 +132,7 @@ work-process-step-group
 work-process-task
 work-process-tool-approval
 work-process-tool-call
-work-process-tool-group
+work-process-source-pills
 work-process-user-input
 work-process-user-input-transcript
 work-process-view-toggle

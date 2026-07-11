@@ -27,6 +27,7 @@ function toCatalogEntry(provider: typeof BUILTIN_LLM_PROVIDER_DEFINITIONS[number
     baseUrlEditable: provider.baseUrlEditable,
     protocolEditable: provider.protocolEditable,
     protocolOptions: provider.protocolOptions ? [...provider.protocolOptions] : undefined,
+    protocolBaseUrls: provider.protocolBaseUrls ? { ...provider.protocolBaseUrls } : undefined,
     recommendedModels: managedModelIds.length > 0 ? managedModelIds : [...provider.recommendedModels],
     docsUrl: provider.docsUrl,
     accountLoginConfigured: provider.accountLoginConfigured,

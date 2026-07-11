@@ -1,6 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import { lookupManagedModelCapabilityProfile } from '@shared/constants/modelCapabilityCatalog';
-import { applyAnthropicReasoning } from './reasoningWire';
+import { applyAnthropicReasoning, buildOpenAiResponsesReasoning } from './reasoningWire';
+
+describe('buildOpenAiResponsesReasoning', () => {
+  it('maps GPT-5.6 product extra/max to wire xhigh/max', () => {
+    const reasoningControl = lookupManagedModelCapabilityProfile('openai', 'gpt-5.6-sol')?.reasoningControl;
+    expect(reasoningControl).toBeTruthy();
+
+    expect(buildOpenAiResponsesReasoning({
+      selection: 'extra',
+      control: reasoningControl!,
+    }).reasoning).toMatchObject({ effort: 'xhigh' });
+
+    expect(buildOpenAiResponsesReasoning({
+      selection: 'max',
+      control: reasoningControl!,
+    }).reasoning).toMatchObject({ effort: 'max' });
+  });
+});
 
 describe('applyAnthropicReasoning', () => {
   it('restores Kimi Coding Plan toggle On to the budgeted anthropic payload', () => {
@@ -45,5 +62,23 @@ describe('applyAnthropicReasoning', () => {
     });
 
     expect(body.thinking).toEqual({ type: 'disabled' });
+  });
+
+  it('maps DeepSeek v4 flash product max to enabled thinking plus effort max', () => {
+    const reasoningControl = lookupManagedModelCapabilityProfile('deepseek', 'deepseek-v4-flash')?.reasoningControl;
+    expect(reasoningControl).toBeTruthy();
+    expect(reasoningControl).toMatchObject({
+      kind: 'levels',
+      levels: ['high', 'max'],
+    });
+
+    const body: Record<string, unknown> = {};
+    applyAnthropicReasoning(body, {
+      selection: 'max',
+      control: reasoningControl!,
+    });
+
+    expect(body.thinking).toMatchObject({ type: 'enabled' });
+    expect(body.output_config).toEqual({ effort: 'max' });
   });
 });

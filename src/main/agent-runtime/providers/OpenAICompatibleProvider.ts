@@ -190,10 +190,11 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
         if (typeof reasoningDelta === 'string' && reasoningDelta.length > 0) {
           sawOutput = true;
           builder.appendThinking(THINKING_INDEX, reasoningDelta, {
-            kind: model.provider === 'deepseek' ? 'raw' : 'unknown',
+            kind: 'raw',
             source: isOpenRouterBaseUrl(baseUrl) ? 'openrouter-raw' : 'openai-compatible-raw',
             visibility: 'raw-collapsed',
-            replayPolicy: 'none',
+            // Tool-loop vendors (DeepSeek/Kimi/GLM/…) require reasoning_content replay.
+            replayPolicy: 'openai-reasoning-content',
           });
         }
         if (typeof delta.content === 'string' && delta.content.length > 0) {
@@ -274,6 +275,7 @@ interface OpenAIMessage {
     type: 'function';
     function: { name: string; arguments: string };
   }>;
+  reasoning_content?: string;
 }
 
 function toOpenAIMessages(context: Context): OpenAIMessage[] {
@@ -308,10 +310,13 @@ function convertMessage(message: Message): OpenAIMessage[] {
 
   if (message.role === 'assistant') {
     const text: string[] = [];
+    const reasoning: string[] = [];
     const toolCalls: Required<OpenAIMessage>['tool_calls'] = [];
     for (const block of message.content) {
       if (block.type === 'text') text.push(block.text);
-      else if (block.type === 'toolCall') {
+      else if (block.type === 'thinking' && typeof block.text === 'string' && block.text.length > 0) {
+        reasoning.push(block.text);
+      } else if (block.type === 'toolCall') {
         toolCalls.push({
           id: block.id,
           type: 'function',
@@ -321,13 +326,18 @@ function convertMessage(message: Message): OpenAIMessage[] {
           },
         });
       }
-      // thinking 内容不回放给 OpenAI（不属于该协议）。
     }
     const out: OpenAIMessage = {
       role: 'assistant',
       content: text.length > 0 ? text.join('') : null,
     };
-    if (toolCalls.length > 0) out.tool_calls = toolCalls;
+    if (toolCalls.length > 0) {
+      out.tool_calls = toolCalls;
+      // DeepSeek/Kimi/etc. require reasoning_content on assistant turns that carry tool_calls.
+      if (reasoning.length > 0) {
+        out.reasoning_content = reasoning.join('');
+      }
+    }
     return [out];
   }
 

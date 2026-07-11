@@ -19,7 +19,7 @@ export const WORK_PROCESS_TOOL_DISPLAY_CATALOG: Record<string, WorkProcessToolDi
   glob: { icon: 'search', groupKind: 'explore', category: '文件', groupTitle: '探索', groupUnit: '文件', completeVerb: '已列出', runningVerb: '正在列出' },
   grep: { icon: 'search', groupKind: 'search', category: '搜索', groupTitle: '搜索', groupUnit: '查询', completeVerb: '已搜索代码', runningVerb: '正在搜索代码' },
   search_codebase: { icon: 'search', groupKind: 'search', category: '搜索', groupTitle: '搜索', groupUnit: '查询', completeVerb: '已搜索代码库', runningVerb: '正在搜索代码库' },
-  web_fetch: { icon: 'globe', groupKind: 'web', category: '联网', groupTitle: '联网', groupUnit: '页面', completeVerb: '已抓取网页', runningVerb: '正在抓取网页', approval: true },
+  web_fetch: { icon: 'globe', groupKind: 'web', category: '联网', groupTitle: '联网', groupUnit: '页面', completeVerb: '已浏览', runningVerb: '正在浏览', approval: true },
   web_search: { icon: 'globe', groupKind: 'search', category: '联网搜索', groupTitle: '搜索', groupUnit: '查询', completeVerb: '已联网搜索', runningVerb: '正在联网搜索', approval: true },
   bash: { icon: 'terminal', groupKind: 'command', category: '命令', groupTitle: '命令', groupUnit: '命令', completeVerb: '已运行命令', runningVerb: '正在运行命令', approval: true, errorAccent: true },
   write_file: { icon: 'edit', groupKind: 'change', category: '变更', groupTitle: '变更', groupUnit: '文件', completeVerb: '已写入', runningVerb: '正在写入', mutation: true, approval: true },

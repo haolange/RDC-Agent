@@ -134,7 +134,7 @@ const isThinkingVisibility = (value: unknown): value is ThinkingArtifactVisibili
 );
 
 const isThinkingReplayPolicy = (value: unknown): value is ThinkingArtifactReplayPolicy => (
-  value === 'none' || value === 'provider-artifact'
+  value === 'none' || value === 'provider-artifact' || value === 'openai-reasoning-content'
 );
 
 const isThinkingSource = (value: unknown): value is ThinkingArtifactSource => (

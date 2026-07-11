@@ -5315,15 +5315,13 @@
 .settings-runtime-scope-head,
 .settings-runtime-card { justify-content: space-between; }
 .settings-runtime-kicker { color: var(--token-text-heading); font-size: var(--text-sm); font-weight: var(--font-semibold); }
-.settings-runtime-path,
-  .settings-runtime-card code { color: var(--token-text-caption); font-size: var(--text-xs); overflow-wrap: anywhere; }
+.settings-runtime-card code { color: var(--token-text-caption); font-size: var(--text-xs); overflow-wrap: anywhere; }
 .settings-runtime-scope-switch { display: flex; gap: var(--space-2); }
 .settings-runtime-scope-switch .button.active { color: var(--token-text-heading); background: var(--token-interactive-active); }
 .settings-runtime-resource-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-2); margin-top: var(--space-3); }
 .settings-runtime-resource { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; padding: var(--space-3); border: 1px solid var(--token-border-muted); border-radius: var(--radius-md); background: var(--token-bg-app); color: var(--token-text-heading); text-align: left; }
 .settings-runtime-resource:hover { border-color: var(--token-border-strong); background: var(--token-interactive-hover); }
 .settings-runtime-resource:focus-visible { outline: 2px solid var(--token-border-focus); outline-offset: 2px; }
-.settings-runtime-resource small { color: var(--token-text-caption); font-size: var(--text-xs); }
 .settings-runtime-resource.status-invalid { border-color: var(--token-status-error); }
 .settings-runtime-empty { color: var(--token-text-caption); font-size: var(--text-sm); grid-column: 1 / -1; }
 .settings-runtime-list { display: grid; gap: var(--space-3); }

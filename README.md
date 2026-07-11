@@ -8,7 +8,7 @@
 - 在工作台内浏览、导入、打开和切换 capture；失败时 fail-closed 并展示 RDX/RenderDoc 诊断。
 - 使用固定的 `~/.rdx` User Scope 与 `<project-root>/.rdx` Project Scope 管理 Agent、Skill、MCP、Hook、Policy、Knowledge 与显式 Memory。
 - 配置真实 Provider、Model 与 Agent Route，通过统一的 `PromptPlan -> RequestEnvelope -> Provider Adapter` 管线执行 LLM 调用。
-- 在 Work Process 中展示真实运行过程、provider reasoning 语义与脱敏 Request Inspector。
+- 在 Work Process 中展示真实运行过程与 provider reasoning 语义；脱敏 Request Inspector 放在 Control Panel Runtime 调试面，不嵌入消息流。
 - 通过 Settings 中的 RDX CLI 与 shell actions 接入系统安装或用户配置的外部工具链。
 
 ## Canonical Runtime

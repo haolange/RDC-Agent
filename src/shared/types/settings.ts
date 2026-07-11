@@ -245,6 +245,7 @@ export interface LlmProviderEntry {
   baseUrlEditable?: boolean;
   protocolEditable?: boolean;
   protocolOptions?: LlmProviderProtocol[];
+  protocolBaseUrls?: Partial<Record<LlmProviderProtocol, string>>;
   models: LlmProviderModel[];
   recommendedModels: string[];
   docsUrl?: string;
@@ -285,6 +286,7 @@ export interface LlmProviderCatalogEntry {
   baseUrlEditable?: boolean;
   protocolEditable?: boolean;
   protocolOptions?: LlmProviderProtocol[];
+  protocolBaseUrls?: Partial<Record<LlmProviderProtocol, string>>;
   recommendedModels: string[];
   docsUrl?: string;
   accountLoginConfigured?: boolean;

@@ -217,7 +217,7 @@ async function main() {
   assert(grokAccount?.accountLoginConfigured === true, 'grok-account must expose a configured account login path.');
   assert(grokAccount?.label === 'Super Grok Account', 'grok-account must be labeled Super Grok Account in OAuth UI.');
   assert(grokAccount?.unavailableReason === undefined, 'grok-account must not be marked unavailable.');
-  for (const modelId of ['grok-4.3', 'grok-4', 'grok-code-fast-1']) {
+  for (const modelId of ['grok-4.5', 'grok-4.3', 'grok-code-fast-1']) {
     assert(grokAccount?.recommendedModels.includes(modelId), `grok-account recommended models must include ${modelId}.`);
   }
   const xai = definitionById.get('xai');
@@ -267,6 +267,20 @@ async function main() {
     }
     if (definition.modelDiscovery === 'static') {
       assert(!definition.capabilities.includes('model-discovery'), `${definition.id} static discovery must not claim model-discovery.`);
+    }
+    if (definition.protocolEditable) {
+      assert(Array.isArray(definition.protocolOptions) && definition.protocolOptions.length > 1, `${definition.id} protocolEditable providers must declare protocolOptions.`);
+      for (const protocol of definition.protocolOptions) {
+        assertIncludes(protocols, protocol, `${definition.id}.protocolOptions`);
+      }
+      if (definition.protocolBaseUrls) {
+        for (const protocol of definition.protocolOptions) {
+          assert(
+            typeof definition.protocolBaseUrls[protocol] === 'string' && definition.protocolBaseUrls[protocol].trim(),
+            `${definition.id} protocolBaseUrls must cover ${protocol}.`,
+          );
+        }
+      }
     }
   }
 

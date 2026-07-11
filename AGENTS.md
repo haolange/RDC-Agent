@@ -69,7 +69,7 @@
 
 - 强调色（`--color-accent-*`）只用于：焦点环、激活状态、主要 CTA。不得用于正文、装饰或多处背景。
 - 状态色（success / warning / error / info）只用于语义状态，不得挪作装饰。
-- `--token-effort-*` 紫色阶专用于 Composer effort 强度渐进指示（滑杆填充/thumb），不得挪作其它装饰或背景。
+- `--token-effort-*` 紫色阶专用于 Composer effort 强度渐进指示（滑杆填充/thumb，以及 Max/Ultra 档的克制渐变与 sparkle），不得挪作其它装饰或背景。
 - 不得引入非 design-system.css 定义的新颜色；需要新颜色时先在 `--token-*` 层添加并说明用途。
 
 ### 新增组件规则
@@ -126,6 +126,7 @@
 - 代码改动后执行 `npm run typecheck`。
 - renderer 结构或 UI 锚点改动后执行 `npm run check:architecture`、`npm run check:fidelity`、`npm run check:shared-exports`。
 - Work Process 投影、工具行文案/图标或 transcript UI 改动后执行 `npm run check:work-process`、`npm run check:work-process-tool-coverage`。
+- Work Process UI 验收必须覆盖：运行中动态标题与 Active Signal 文本能量扫光、完成后「思考过程 / Thinking」+ meta、扁平 tool 行（无 `toolGroup` 双层壳）、web_search/fetch source pills、Request Inspector 不出现在消息流、真实事件驱动的逐条出现与短 CSS 入场（禁止假 stagger）。
 - provider thinking 投递或 reasoning artifact 投影改动后执行 `npm run check:reasoning-delivery`。
 - scoped resource、project instruction、prompt snapshot、skill、hook 或 memory policy 改动后，必须执行相应专项 contract check；缺少时应在同一改动中补齐。
 - 入口、构建或窗口逻辑改动后，再补 `npm run build` 或等价打包检查。

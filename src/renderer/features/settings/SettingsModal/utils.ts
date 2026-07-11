@@ -1,5 +1,5 @@
 import type { TranslationKey } from '../../../i18n';
-import { LLM_PROVIDER_PROTOCOL_DEFINITIONS } from '@shared/constants/llm';
+import { LLM_PROVIDER_PROTOCOL_DEFINITIONS, resolveBaseUrlForProtocolChange } from '@shared/constants/llm';
 import type { LlmAgentRoute, LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import type { ProviderCatalogCategory, ProviderProtocol } from './types';
 
@@ -15,6 +15,7 @@ export const joinPath = (root: string, ...segments: string[]): string => {
 export const cloneProvider = (provider: LlmProviderEntry): LlmProviderEntry => ({
   ...provider,
   protocolOptions: provider.protocolOptions ? [...provider.protocolOptions] : undefined,
+  protocolBaseUrls: provider.protocolBaseUrls ? { ...provider.protocolBaseUrls } : undefined,
   models: provider.models.map((model) => ({ ...model })),
   recommendedModels: [...provider.recommendedModels],
   capabilities: provider.capabilities ? [...provider.capabilities] : undefined,
@@ -52,6 +53,16 @@ export const getProviderProtocolOptions = (
 
 export const providerShowsResponsesHint = (protocol: ProviderProtocol): boolean =>
   protocol === 'OpenAIResponses';
+
+export const resolveConnectionBaseUrlForProtocol = (
+  provider: Pick<LlmProviderEntry, 'id' | 'protocol' | 'baseUrl'>,
+  nextProtocol: ProviderProtocol,
+): string => resolveBaseUrlForProtocolChange(
+  provider.id,
+  provider.protocol,
+  nextProtocol,
+  provider.baseUrl,
+);
 
 export const getProviderStatusLabel = (provider: Pick<LlmProviderEntry, 'status' | 'isConfigured'>): TranslationKey => {
   if (provider.status === 'verified' && provider.isConfigured) return 'settings.providerConnected';

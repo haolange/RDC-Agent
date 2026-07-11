@@ -3,7 +3,6 @@ import type { WorkProcessRow } from './workProcessTypes';
 export function countGroupActions(rows: WorkProcessRow[]): number {
   return rows.reduce((total, row) => {
     if (row.type === 'section') return total + row.stepCount;
-    if (row.type === 'toolGroup') return total + row.rows.length;
     if (row.type === 'tool' || row.type === 'userInput') return total + 1;
     if (row.type === 'subagent') return total + countGroupActions(row.children);
     return total;
@@ -39,7 +38,6 @@ export function summarizeGroupDuration(rows: WorkProcessRow[]): string {
     for (const row of items) {
       if ('duration' in row && row.duration) durations.push(row.duration);
       if (row.type === 'section') walk(row.steps);
-      if (row.type === 'toolGroup') walk(row.rows);
       if (row.type === 'subagent') walk(row.children);
     }
   };

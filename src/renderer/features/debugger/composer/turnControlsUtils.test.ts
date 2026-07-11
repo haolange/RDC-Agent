@@ -22,6 +22,7 @@ const levelsCapability: ResolvedModelCapability = {
   maxContextAvailable: true,
   fastVariantModelId: 'gpt-5.5-fast',
   fastModelAvailable: true,
+  fixedTemperature: null,
   toolCalling: true,
   visionInput: true,
   structuredOutput: true,

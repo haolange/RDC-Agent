@@ -21,9 +21,10 @@ export interface ManagedModelCatalogEntry {
   source: ModelCapabilitySource;
 }
 
-const CATALOG_UPDATED_AT = '2026-07-06';
+const CATALOG_UPDATED_AT = '2026-07-11';
 
 const OPENAI_LEVELS: NamedReasoningLevel[] = ['low', 'medium', 'high', 'extra'];
+const OPENAI_56_LEVELS: NamedReasoningLevel[] = ['low', 'medium', 'high', 'extra', 'max'];
 const OPENAI_PRO_LEVELS: NamedReasoningLevel[] = ['medium', 'high', 'extra'];
 const ANTHROPIC_5_LEVELS: NamedReasoningLevel[] = ['low', 'medium', 'high', 'extra', 'max'];
 const GEMINI_35_LEVELS: NamedReasoningLevel[] = ['minimal', 'low', 'medium', 'high'];
@@ -185,7 +186,8 @@ const CHATGPT_ACCOUNT_SOURCE: ModelCapabilitySource = {
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
     'https://help.openai.com/en/articles/12003714-chatgpt-business-models-limits',
-    'https://developers.openai.com/api/docs/models/gpt-5.5-pro',
+    'https://developers.openai.com/api/docs/guides/latest-model',
+    'https://developers.openai.com/api/docs/models/gpt-5.6-sol',
   ],
 };
 
@@ -216,9 +218,9 @@ const XAI_SOURCE: ModelCapabilitySource = {
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
     'https://docs.x.ai/developers/model-capabilities/text/reasoning',
+    'https://docs.x.ai/developers/models/grok-4.5',
     'https://docs.x.ai/developers/models/grok-4.3',
     'https://docs.x.ai/developers/models/grok-build-0.1',
-    'https://docs.x.ai/developers/migration/may-15-retirement',
   ],
 };
 
@@ -262,6 +264,7 @@ const VERTEX_SOURCE: ModelCapabilitySource = {
 const DEEPSEEK_SOURCE: ModelCapabilitySource = {
   kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
+  note: 'DeepSeek thinking effort officially exposes only high and max (not low/medium/xhigh).',
   urls: [
     'https://api-docs.deepseek.com/quick_start/pricing',
     'https://api-docs.deepseek.com/guides/thinking_mode',
@@ -518,6 +521,12 @@ const openAiLevelsDefaultMedium = levelsReasoningControl(OPENAI_LEVELS, {
   wireProfile: OPENAI_RESPONSES_WIRE,
 });
 
+const openAi56LevelsDefaultMedium = levelsReasoningControl(OPENAI_56_LEVELS, {
+  supportsOff: true,
+  defaultSelection: 'medium',
+  wireProfile: OPENAI_RESPONSES_WIRE,
+});
+
 const openAiLevelsDefaultOff = levelsReasoningControl(OPENAI_LEVELS, {
   supportsOff: true,
   defaultSelection: 'off',
@@ -531,6 +540,12 @@ const openAiProLevelsDefaultHigh = levelsReasoningControl(OPENAI_PRO_LEVELS, {
 });
 
 const openAiCompatibleLevelsDefaultMedium = levelsReasoningControl(OPENAI_LEVELS, {
+  supportsOff: true,
+  defaultSelection: 'medium',
+  wireProfile: OPENAI_COMPATIBLE_WIRE,
+});
+
+const openAi56CompatibleLevelsDefaultMedium = levelsReasoningControl(OPENAI_56_LEVELS, {
   supportsOff: true,
   defaultSelection: 'medium',
   wireProfile: OPENAI_COMPATIBLE_WIRE,
@@ -572,6 +587,12 @@ const xaiLevels = levelsReasoningControl(XAI_LEVELS, {
   wireProfile: OPENAI_COMPATIBLE_WIRE,
 });
 
+const xaiLevelsDefaultHigh = levelsReasoningControl(XAI_LEVELS, {
+  supportsOff: true,
+  defaultSelection: 'high',
+  wireProfile: OPENAI_COMPATIBLE_WIRE,
+});
+
 const qwenLevelsDefaultOff = levelsReasoningControl(QWEN_LEVELS, {
   supportsOff: true,
   defaultSelection: 'off',
@@ -592,6 +613,7 @@ const anthropicAlwaysOnToggle = alwaysOnReasoningControl('on', ANTHROPIC_ALWAYS_
 const volcengineToggleDefaultOn = toggleReasoningControl('on', VOLCENGINE_TOGGLE_WIRE);
 const xaiToggleDefaultOn = toggleReasoningControl('on', OPENAI_COMPATIBLE_WIRE);
 
+const gpt56Api = multimodal(1_050_000, openAi56LevelsDefaultMedium);
 const gpt55Api = multimodal(1_050_000, openAiLevelsDefaultMedium);
 const gpt54Api = multimodal(1_050_000, openAiLevelsDefaultOff);
 const gptMiniApi = multimodal(400_000, openAiLevelsDefaultOff);
@@ -599,12 +621,24 @@ const gptCodex = textOnly(400_000, openAiCompatibleLevelsDefaultMedium);
 const gpt41 = multimodal(1_047_576);
 
 const chatGptAccountModels = [
+  model('gpt-5.6-sol', gpt56Api, CHATGPT_ACCOUNT_SOURCE, {
+    label: 'GPT-5.6 Sol',
+    aliases: ['gpt-5.6'],
+  }),
+  model('gpt-5.6-terra', gpt56Api, CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.6 Terra' }),
+  model('gpt-5.6-luna', gpt56Api, CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.6 Luna' }),
   model('gpt-5.5-instant', { ...multimodal(128_000), fastVariantModelId: 'gpt-5.5-instant' }, CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.5 Instant' }),
   model('gpt-5.5-thinking', multimodal(128_000, openAiLevelsDefaultMedium), CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.5 Thinking' }),
   model('gpt-5.5-pro', multimodal(272_000, openAiProLevelsDefaultHigh), CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.5 Pro' }),
 ];
 
 const openAiApiModels = [
+  model('gpt-5.6-sol', gpt56Api, OPENAI_API_SOURCE, {
+    label: 'GPT-5.6 Sol',
+    aliases: ['gpt-5.6'],
+  }),
+  model('gpt-5.6-terra', gpt56Api, OPENAI_API_SOURCE, { label: 'GPT-5.6 Terra' }),
+  model('gpt-5.6-luna', gpt56Api, OPENAI_API_SOURCE, { label: 'GPT-5.6 Luna' }),
   model('gpt-5.5', gpt55Api, OPENAI_API_SOURCE),
   model('gpt-5.4', gpt54Api, OPENAI_API_SOURCE),
   model('gpt-5.4-mini', gptMiniApi, OPENAI_API_SOURCE),
@@ -633,12 +667,25 @@ const geminiModels = [
 ];
 
 const grokModels = [
+  model('grok-4.5', multimodal(500_000, xaiLevelsDefaultHigh), XAI_SOURCE, {
+    aliases: ['grok-4.5-latest', 'grok-build-latest'],
+  }),
   model('grok-4.3', multimodal(1_000_000, xaiLevels), XAI_SOURCE),
   model('grok-build-0.1', textOnly(256_000, xaiToggleDefaultOn), XAI_SOURCE),
   model('grok-code-fast-1', textOnly(256_000), XAI_SOURCE),
 ];
 
 const copilotModels = [
+  model('gpt-5.6-sol', multimodal(1_050_000, openAi56CompatibleLevelsDefaultMedium), COPILOT_SOURCE, {
+    label: 'GPT-5.6 Sol',
+    aliases: ['gpt-5.6'],
+  }),
+  model('gpt-5.6-terra', multimodal(1_050_000, openAi56CompatibleLevelsDefaultMedium), COPILOT_SOURCE, {
+    label: 'GPT-5.6 Terra',
+  }),
+  model('gpt-5.6-luna', multimodal(1_050_000, openAi56CompatibleLevelsDefaultMedium), COPILOT_SOURCE, {
+    label: 'GPT-5.6 Luna',
+  }),
   model('gpt-5.5', multimodal(1_050_000, openAiCompatibleLevelsDefaultMedium), COPILOT_SOURCE),
   model('gpt-5.3-codex', textOnly(400_000, openAiCompatibleLevelsDefaultMedium), COPILOT_SOURCE),
   model('claude-sonnet-5', multimodal(1_000_000, anthropicFiveLevelsDefaultHigh), COPILOT_SOURCE),
@@ -685,7 +732,10 @@ const kimiApiModels = [
 ];
 
 const kimiCodingPlanModels = [
-  model('kimi-for-coding', textOnly(262_144, kimiCodingPlanToggleDefaultOn), KIMI_CODING_SOURCE),
+  model('kimi-for-coding', {
+    ...textOnly(262_144, kimiCodingPlanToggleDefaultOn),
+    fixedTemperature: 1,
+  }, KIMI_CODING_SOURCE),
 ];
 
 const glmAnthropicModels = [
@@ -761,6 +811,16 @@ export const MANAGED_PROVIDER_MODEL_CATALOG: Partial<Record<BuiltinLlmProviderId
   'google-ai-studio': geminiModels,
 
   'azure-openai': [
+    model('gpt-5.6-sol', multimodal(1_050_000, openAi56CompatibleLevelsDefaultMedium), AZURE_OPENAI_SOURCE, {
+      label: 'GPT-5.6 Sol',
+      aliases: ['gpt-5.6'],
+    }),
+    model('gpt-5.6-terra', multimodal(1_050_000, openAi56CompatibleLevelsDefaultMedium), AZURE_OPENAI_SOURCE, {
+      label: 'GPT-5.6 Terra',
+    }),
+    model('gpt-5.6-luna', multimodal(1_050_000, openAi56CompatibleLevelsDefaultMedium), AZURE_OPENAI_SOURCE, {
+      label: 'GPT-5.6 Luna',
+    }),
     model('gpt-5.5', multimodal(1_050_000, levelsReasoningControl(OPENAI_LEVELS, {
       supportsOff: true,
       defaultSelection: 'medium',

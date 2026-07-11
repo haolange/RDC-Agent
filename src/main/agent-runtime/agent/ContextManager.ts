@@ -415,6 +415,8 @@ export class ContextManager {
       } else if (block.type === 'thinking') {
         if (block.replayPolicy === 'provider-artifact' && block.artifact) {
           total += this.providerArtifactChars(block.artifact);
+        } else if (block.replayPolicy === 'openai-reasoning-content' && block.text) {
+          total += block.text.length;
         }
       } else if (block.type === 'toolCall') {
         const tc = block as ToolCall;

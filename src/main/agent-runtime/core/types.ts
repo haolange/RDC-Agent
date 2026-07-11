@@ -24,7 +24,7 @@ export type ThinkingArtifactKind = 'summary' | 'raw' | 'opaque' | 'unknown';
 
 export type ThinkingArtifactVisibility = 'summary' | 'raw-collapsed' | 'hidden';
 
-export type ThinkingArtifactReplayPolicy = 'none' | 'provider-artifact';
+export type ThinkingArtifactReplayPolicy = 'none' | 'provider-artifact' | 'openai-reasoning-content';
 
 export type ThinkingArtifactSource =
   | 'openai-responses-summary'

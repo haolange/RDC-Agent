@@ -214,7 +214,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
               {activeSection === 'agents' && (
                 <section className="settings-page settings-page-agents">
-                <RuntimeScopePanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} kinds={['agent']} onChanged={runtime.setOverview} />
+                <RuntimeScopePanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} kinds={['agent']} showResourceStrip={false} onChanged={runtime.setOverview} />
                 <AgentsSettings
                   settings={settings}
                   agentManifestDrafts={agentManifestDrafts}

@@ -275,14 +275,6 @@ function shouldDeferSectionSteps(
 }
 
 function createDeferredVisibleStep(row: WorkProcessRow): WorkProcessRow {
-  if (row.type === 'toolGroup') {
-    return {
-      ...row,
-      summary: '',
-      defaultOpen: false,
-      rows: [],
-    };
-  }
   if (row.type === 'tool') {
     return {
       ...row,
@@ -292,6 +284,8 @@ function createDeferredVisibleStep(row: WorkProcessRow): WorkProcessRow {
       approval: row.approval
         ? { ...row.approval, message: '', metaLines: [] }
         : undefined,
+      sourcePills: undefined,
+      browseLink: undefined,
     };
   }
   if (row.type === 'userInput') {
@@ -353,7 +347,12 @@ function projectLlmTurn(
   const sectionResult = deps.resolveSectionResult(block, outputPhase, ctx.hasVisibleProcessEvidence);
   const sectionThinking = deps.resolveSectionThinking(
     block,
-    steps.length > 0 || reasoningState === 'raw' || reasoningState === 'summary' || reasoningState === 'unknown',
+    steps.length > 0
+      || reasoningState === 'raw'
+      || reasoningState === 'summary'
+      || reasoningState === 'unknown'
+      || ctx.hasVisibleProcessEvidence
+      || Boolean(normalizeWorkProcessText(block.result?.text ?? '')),
   );
   dedupeSectionThinking(sectionThinking, ctx, deps);
 

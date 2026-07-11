@@ -12,7 +12,6 @@ import type { ThinkingArtifact } from '@shared/types/reasoning';
 import {
   compactText,
   formatDurationMs,
-  isCommentaryClampable,
   normalizeWorkProcessText,
 } from './workProcessFormat';
 import {
@@ -28,7 +27,6 @@ import {
   formatMcpTarget,
   getToolDisplay,
   normalizeToolName,
-  WORK_PROCESS_TOOL_DISPLAY_CATALOG,
 } from './workProcessToolCatalog';
 
 export type {
@@ -137,24 +135,28 @@ const resolveOutputPhase = (
   return 'commentary';
 };
 
+const hasReadableThinkingText = (block: ConversationWorkBlock): boolean => {
+  const reasoningState = resolveReasoningState(block);
+  if (!['raw', 'summary', 'unknown'].includes(reasoningState)) return false;
+  return Boolean(normalizeWorkProcessText(block.thinking?.text ?? ''));
+};
+
 const resolveSectionResult = (
   block: ConversationWorkBlock,
   outputPhase: ConversationLoopOutputPhase,
   hasVisibleProcessEvidence: boolean,
 ): { resultText: string; resultToolSummary: string; resultStreaming: boolean; clampResult: boolean; clampable: boolean } => {
-  const rawText = normalizeWorkProcessText(block.result?.text ?? '');
+  // Industry alignment: commentary never occupies a separate result box.
+  // Readable thinking owns the process slot; otherwise commentary is promoted into the thinking slot.
+  void outputPhase;
+  void hasVisibleProcessEvidence;
   const resultStatus = block.result?.status ?? (block.status === 'running' || block.status === 'pending' ? 'streaming' : 'complete');
-  const showCommentary = outputPhase === 'commentary'
-    && isMeaningfulText(rawText)
-    && (block.toolCalls.length > 0 || hasVisibleProcessEvidence);
-  const resultText = showCommentary ? rawText : '';
-  const clampable = showCommentary ? isCommentaryClampable(rawText) : false;
   return {
-    resultText,
+    resultText: '',
     resultToolSummary: '',
     resultStreaming: resultStatus === 'streaming',
-    clampResult: clampable,
-    clampable,
+    clampResult: false,
+    clampable: false,
   };
 };
 
@@ -171,37 +173,53 @@ const resolveSectionThinking = (
   expandable: boolean;
   openByDefault: boolean;
 } => {
+  const isActiveBlock = block.status === 'running' || block.status === 'pending';
   const thinking = block.thinking;
   const reasoningState = resolveReasoningState(block);
-  if (!hasVisibleEvidence || !thinking || !['raw', 'summary', 'unknown'].includes(reasoningState)) {
+
+  if (hasVisibleEvidence && thinking && ['raw', 'summary', 'unknown'].includes(reasoningState)) {
+    const preview = normalizeWorkProcessText(thinking.text ?? '');
+    if (preview) {
+      const status = isActiveBlock ? block.thinkingStatus ?? 'streaming' : 'complete';
+      const isSummary = reasoningState === 'summary' || (thinking.kind === 'summary' && thinking.visibility === 'summary');
+      const isRaw = reasoningState === 'raw' || (thinking.kind === 'raw' && thinking.visibility === 'raw-collapsed');
+      const isUnknown = reasoningState === 'unknown' || thinking.kind === 'unknown';
+      if (isSummary || isRaw || isUnknown) {
+        return {
+          preview,
+          label: status === 'streaming' || isActiveBlock
+            ? '正在思考'
+            : '思考过程',
+          kind: thinking.kind,
+          source: '',
+          visibility: thinking.visibility,
+          status,
+          expandable: true,
+          openByDefault: isSummary,
+        };
+      }
+    }
+  }
+
+  // No provider thinking: promote visible commentary into the thinking slot.
+  const commentary = normalizeWorkProcessText(block.result?.text ?? '');
+  const canPromoteCommentary = hasVisibleEvidence
+    && isMeaningfulText(commentary)
+    && (block.toolCalls.length > 0 || isNonFinalStopReason(block.result?.stopReason));
+  if (!canPromoteCommentary || hasReadableThinkingText(block)) {
     return { preview: '', label: '', expandable: false, openByDefault: false };
   }
 
-  const preview = normalizeWorkProcessText(thinking.text ?? '');
-  if (!preview) {
-    return { preview: '', label: '', expandable: false, openByDefault: false };
-  }
-
-  const isActiveBlock = block.status === 'running' || block.status === 'pending';
-  const status = isActiveBlock ? block.thinkingStatus ?? 'streaming' : 'complete';
-  const isSummary = reasoningState === 'summary' || (thinking.kind === 'summary' && thinking.visibility === 'summary');
-  const isRaw = reasoningState === 'raw' || (thinking.kind === 'raw' && thinking.visibility === 'raw-collapsed');
-  const isUnknown = reasoningState === 'unknown' || thinking.kind === 'unknown';
-  if (!isSummary && !isRaw && !isUnknown) {
-    return { preview: '', label: '', expandable: false, openByDefault: false };
-  }
-
+  const resultStatus = block.result?.status ?? (isActiveBlock ? 'streaming' : 'complete');
   return {
-    preview,
-    label: status === 'streaming' || block.status === 'running' || block.status === 'pending'
-      ? '推理中'
-      : isSummary ? 'Reasoning summary' : isRaw ? 'Raw reasoning' : 'Provider reasoning（语义未验证）',
-    kind: thinking.kind,
+    preview: commentary,
+    label: resultStatus === 'streaming' || isActiveBlock ? '正在思考' : '思考过程',
+    kind: undefined,
     source: '',
-    visibility: thinking.visibility,
-    status,
+    visibility: undefined,
+    status: resultStatus === 'streaming' ? 'streaming' : 'complete',
     expandable: true,
-    openByDefault: isSummary,
+    openByDefault: false,
   };
 };
 
@@ -220,7 +238,7 @@ const resolveResponseThinking = (
   if (!resolved.expandable) return { ...resolved, label: '', openByDefault: false };
   return {
     preview: resolved.preview,
-    label: resolved.kind === 'summary' ? 'Reasoning summary' : resolved.label,
+    label: resolved.label,
     kind: resolved.kind,
     visibility: resolved.visibility,
     status: resolved.status,
@@ -319,14 +337,6 @@ export const buildWorkProcessPresentation = (
   };
 };
 
-const getMcpParts = (normalizedToolName: string): { server: string; tool: string } | null => {
-  if (!normalizedToolName.startsWith('mcp__')) return null;
-  const [, server = '', ...toolParts] = normalizedToolName.split('__');
-  const tool = toolParts.join('__');
-  if (!server || !tool) return null;
-  return { server, tool };
-};
-
 const createReasoningIndicatorRow = (
   block: ConversationWorkBlock,
   state: Extract<ConversationReasoningState, 'opaque' | 'hidden'>,
@@ -382,128 +392,21 @@ const getResponseSummary = (status: WorkProcessRowStatus): string => {
 
 const appendRowsToLastSection = (_rows: WorkProcessRow[], _childRows: WorkProcessRow[]): boolean => false;
 
-type GroupableWorkProcessRow = Extract<WorkProcessRow, { type: 'tool' | 'userInput' }>;
-
-const isGroupableWorkProcessRow = (row: WorkProcessRow): row is GroupableWorkProcessRow => (
-  row.type === 'tool' || row.type === 'userInput'
-);
-
-const groupProcessRows = (rows: WorkProcessRow[]): WorkProcessRow[] => {
-  const grouped: WorkProcessRow[] = [];
-  let bucket: GroupableWorkProcessRow[] = [];
-  let bucketKey = '';
-
-  const flush = (): void => {
-    if (bucket.length === 0) return;
-    grouped.push(createToolGroupRow(bucket, grouped.length));
-    bucket = [];
-    bucketKey = '';
-  };
-
-  for (const row of rows) {
-    if (!isGroupableWorkProcessRow(row)) {
-      flush();
-      grouped.push(row);
-      continue;
-    }
-
-    const nextKey = getGroupKey(row);
-    if (bucket.length > 0 && nextKey !== bucketKey) flush();
-    bucket.push(row);
-    bucketKey = nextKey;
-  }
-
-  flush();
-  return grouped;
-};
-
-const getGroupKey = (row: GroupableWorkProcessRow): string => {
-  if (row.type === 'userInput') return 'interaction:询问';
-  const display = getToolDisplay(row.toolName);
-  return `${display.groupKind}:${display.groupTitle}`;
-};
-
-const createToolGroupRow = (rows: GroupableWorkProcessRow[], index: number): Extract<WorkProcessRow, { type: 'toolGroup' }> => {
-  const first = rows[0];
-  const display = first.type === 'tool' ? getToolDisplay(first.toolName) : WORK_PROCESS_TOOL_DISPLAY_CATALOG.ask_user;
-  const status = deriveGroupStatus(rows);
-  const isUserInputGroup = rows.every((row) => row.type === 'userInput');
-  const unit = resolveGroupUnit(rows);
-  const title = isUserInputGroup ? resolveUserInputGroupTitle(status) : resolveGroupTitle(rows, display.groupTitle);
-  const count = resolveGroupCount(rows);
-
-  return {
-    type: 'toolGroup',
-    id: `tool-group-${index}-${first.id}`,
-    status,
-    kind: display.groupKind,
-    icon: display.icon,
-    title,
-    countLabel: isUserInputGroup ? `${count} 个${unit}` : `${count} ${unit}`,
-    summary: isUserInputGroup ? '' : rows.map(formatGroupRowSummary).filter(Boolean).slice(0, 3).join(' · '),
-    duration: rows.length === 1 ? first.duration : '',
-    defaultOpen: true,
-    rows,
-  };
-};
-
-const deriveGroupStatus = (rows: GroupableWorkProcessRow[]): WorkProcessRowStatus => {
-  if (rows.some((row) => row.status === 'error')) return 'error';
-  if (rows.some((row) => row.status === 'running')) return 'running';
-  if (rows.some((row) => row.status === 'pending')) return 'pending';
-  return 'complete';
-};
-
-const resolveGroupUnit = (rows: GroupableWorkProcessRow[]): string => {
-  const units = new Set(rows.map((row) => (
-    row.type === 'tool' ? getToolDisplay(row.toolName).groupUnit : WORK_PROCESS_TOOL_DISPLAY_CATALOG.ask_user.groupUnit
-  )));
-  return units.size === 1 ? [...units][0] : '动作';
-};
-
-const resolveGroupCount = (rows: GroupableWorkProcessRow[]): number => {
-  if (rows.every((row) => row.type === 'userInput')) {
-    return rows.reduce((total, row) => total + row.questionCount, 0);
-  }
-  return rows.length;
-};
-
-const resolveGroupTitle = (rows: GroupableWorkProcessRow[], fallback: string): string => {
-  const mcpServers = rows
-    .filter((row): row is Extract<WorkProcessRow, { type: 'tool' }> => row.type === 'tool')
-    .map((row) => getMcpParts(normalizeToolName(row.toolName))?.server)
-    .filter((server): server is string => Boolean(server));
-  if (mcpServers.length > 0 && new Set(mcpServers).size === 1) return `MCP · ${mcpServers[0]}`;
-  return fallback;
-};
-
-const resolveUserInputGroupTitle = (status: WorkProcessRowStatus): string => {
-  if (status === 'complete') return '已询问';
-  if (status === 'error') return '询问已中断';
-  return '正在询问';
-};
-
-const formatGroupRowSummary = (row: GroupableWorkProcessRow): string => {
-  if (row.type === 'userInput') return '';
-  return [row.verb, row.target].filter(Boolean).join(' ');
-};
+const groupProcessRows = (rows: WorkProcessRow[]): WorkProcessRow[] => rows;
 
 const countToolSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, row) => {
   if (row.type === 'section') return total + countToolSteps(row.steps);
-  if (row.type === 'toolGroup') return total + countToolSteps(row.rows);
   if (row.type === 'tool' || row.type === 'userInput') return total + 1;
   return total;
 }, 0);
 
 const countSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, row) => {
   if (row.type === 'section') return total + 1 + countSteps(row.steps);
-  if (row.type === 'toolGroup') return total + 1 + countSteps(row.rows);
   return total + 1;
 }, 0);
 
 const rowsHaveAttention = (rows: WorkProcessRow[]): boolean => rows.some((row) => {
   if (row.type === 'section') return row.status === 'running' || row.status === 'error' || rowsHaveAttention(row.steps);
-  if (row.type === 'toolGroup') return row.status === 'running' || row.status === 'error' || rowsHaveAttention(row.rows);
   return row.status === 'error' || row.status === 'running';
 });
 
@@ -539,6 +442,7 @@ const createToolRow = (call: ConversationToolCall, compact = false): WorkProcess
       ? ['Binary content omitted from preview.']
       : rawPreviewLines,
   );
+  const webPresentation = extractWebToolPresentation(call.toolName, parsedResult);
 
   return {
     type: 'tool',
@@ -556,6 +460,7 @@ const createToolRow = (call: ConversationToolCall, compact = false): WorkProcess
     rawLines: suppressApprovalPreview ? [] : createDetailLines(prettyPrint(call.error || call.resultPreview), 16),
     approval,
     compact,
+    ...webPresentation,
   };
 };
 
@@ -657,7 +562,7 @@ const createUserInputRow = (call: ConversationToolCall): WorkProcessRow => {
     type: 'userInput',
     id: call.id,
     status,
-    verb: status === 'complete' ? '已回答' : status === 'error' ? '用户交互中断' : '等待用户',
+    verb: status === 'complete' ? '已询问' : status === 'error' ? '询问已中断' : '正在询问',
     questionCount: questions.length,
     items,
     error: call.error || undefined,
@@ -889,6 +794,65 @@ const getDetailsRecord = (record: Record<string, unknown> | null | undefined): R
     ?? toRecord(readNestedValue(record, ['result', 'details']));
 };
 
+const resolveUrlHostname = (url: string): string => {
+  try {
+    return new URL(url).hostname || url;
+  } catch {
+    return url;
+  }
+};
+
+const resolveSourceDomain = (result: Record<string, unknown>): string => {
+  const url = stringifyPreview(result.url);
+  const source = stringifyPreview(result.source ?? result.domain);
+  if (source) return source.replace(/^https?:\/\//i, '').split('/')[0] || source;
+  if (url) return resolveUrlHostname(url);
+  return '';
+};
+
+export const extractWebToolPresentation = (
+  toolName: string,
+  parsedResult: unknown,
+): {
+  sourcePills?: Array<{ domain: string; url?: string; title?: string }>;
+  browseLink?: { label: string; url: string };
+} => {
+  const normalized = normalizeToolName(toolName);
+  const record = toRecord(parsedResult);
+  const details = getDetailsRecord(record);
+
+  if (normalized === 'web_search' || details?.kind === 'search') {
+    const resultRecords = getRecordArray(
+      details?.results
+      ?? record?.results
+      ?? readNestedValue(record ?? {}, ['data', 'details', 'results']),
+    );
+    const sourcePills = resultRecords
+      .slice(0, 6)
+      .map((result) => {
+        const domain = resolveSourceDomain(result);
+        if (!domain) return null;
+        const url = stringifyPreview(result.url) || undefined;
+        const title = stringifyPreview(result.title) || undefined;
+        return { domain, url, title } as { domain: string; url?: string; title?: string };
+      })
+      .filter((entry): entry is { domain: string; url?: string; title?: string } => entry != null);
+    return sourcePills.length > 0 ? { sourcePills } : {};
+  }
+
+  if (normalized === 'web_fetch') {
+    const url = stringifyPreview(
+      details?.url
+      ?? record?.url
+      ?? readNestedValue(record ?? {}, ['data', 'details', 'url']),
+    );
+    if (url) {
+      return { browseLink: { label: resolveUrlHostname(url), url } };
+    }
+  }
+
+  return {};
+};
 
 const getRecordArray = (value: unknown): Array<Record<string, unknown>> => {
   if (!Array.isArray(value)) return [];

@@ -64,7 +64,9 @@ assert(ollamaCap.reasoningDelivery === 'stream-full', 'Ollama must use stream-fu
 assert(ollamaCap.reasoningContract.semantic === 'unknown', 'Ollama-compatible reasoning must not be inferred as raw');
 
 assert(resolveAgentRouteCapability(deepseek, 'deepseek-reasoner').reasoningContract.semantic === 'raw', 'Direct DeepSeek reasoning_content is documented raw reasoning');
-assert(resolveAgentRouteCapability(kimi, 'kimi-for-coding').reasoningContract.semantic === 'unknown', 'Kimi compatible routes must not inherit Anthropic summary semantics');
+assert(resolveAgentRouteCapability(kimi, 'kimi-for-coding').reasoningContract.semantic === 'raw', 'Kimi Coding Plan must be raw, never Anthropic summary');
+assert(resolveAgentRouteCapability(configuredProvider('moonshot', 'AnthropicMessages'), 'kimi-k2.5').reasoningContract.semantic === 'raw', 'Moonshot compatible Anthropic must be raw');
+assert(resolveAgentRouteCapability(configuredProvider('deepseek', 'AnthropicMessages'), 'deepseek-v4-pro').reasoningContract.semantic === 'raw', 'DeepSeek Anthropic route must stay raw');
 
 const noReasoningProvider = {
   ...configuredProvider('openai', 'OpenAICompatibleChatCompletions'),
@@ -78,8 +80,8 @@ const openaiResponsesSource = fs.readFileSync('src/main/agent-runtime/providers/
 const anthropicSource = fs.readFileSync('src/main/agent-runtime/providers/AnthropicProvider.ts', 'utf8');
 const contextManagerSource = fs.readFileSync('src/main/agent-runtime/agent/ContextManager.ts', 'utf8');
 
-assert(openaiCompatibleSource.includes("model.provider === 'deepseek' ? 'raw' : 'unknown'"), 'Compatible reasoning must remain unknown except evidence-backed DeepSeek.');
-assert(openaiCompatibleSource.includes("replayPolicy: 'none'"), 'OpenAI-compatible raw reasoning must not be replayed.');
+assert(openaiCompatibleSource.includes("replayPolicy: 'openai-reasoning-content'"), 'OpenAI-compatible thinking must mark openai-reasoning-content replay.');
+assert(openaiCompatibleSource.includes('out.reasoning_content = reasoning.join'), 'OpenAI-compatible tool loops must replay reasoning_content.');
 assert(openaiResponsesSource.includes("'reasoning.encrypted_content'"), 'OpenAI Responses must request encrypted reasoning content for stateless continuation.');
 assert(openaiResponsesSource.includes('toResponsesReasoningReplayItem'), 'OpenAI Responses must replay only provider reasoning artifacts.');
 assert(anthropicSource.includes('signature_delta'), 'Anthropic provider must capture thinking signature deltas.');
