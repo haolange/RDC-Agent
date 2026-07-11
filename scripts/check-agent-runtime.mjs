@@ -120,7 +120,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   const planTools = extractPlanTools(agentManifestService);
   assertIncludesAll(
     planTools,
-    ['read', 'search', 'web', 'askUser', 'agent', 'todo', 'memory', 'planArtifact', 'handoff'],
+    ['read', 'search', 'web', 'askUser', 'agent', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search'],
     'Plan seed tools',
   );
   assertIncludesNone(

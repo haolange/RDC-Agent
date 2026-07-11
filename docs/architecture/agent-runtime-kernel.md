@@ -9,7 +9,7 @@ The agent runtime owns agent turns, tool mediation policy, deterministic events,
 - Provider adapters format model requests and stream model responses. They do not decide product mode, workflow stage, approval state, tool policy, or final run status.
 - Agent route capability gates tool registration before each turn. Only `native-structured` routes receive tool schemas and enter the tool execution loop.
 - Prompt composition lives in `src/main/agent-runtime/prompt`. Conversation code collects context, but does not hand-code provider/tool prompt fragments.
-- Ask mode is read-only. It may use read/glob/grep/task list/web fetch/web search style tools, but it must not request shell, write, edit, remove, task mutation, or RenderDoc mutation.
+- Ask mode is read-only. It may use `read_file`, `glob`, `grep`, `task_list`, `tool_search`, `web_fetch`, and `web_search`, but it must not request shell, write, edit, remove, task mutation (`task_create` / `task_update` / `task_stop`), or RenderDoc mutation.
 - Debugger, Analyzer, and Optimizer execution may use shell access through their runtime profiles. RDX-specific app entries are mediated by Settings shell actions and `ShellInvocationService`.
 - No RDC-specific bridge, MCP server, or skill registry is injected as a hidden default tool path.
 - Assistant text is never parsed as an executable tool call. Textual tool-call shaped output produces a diagnostic event only.

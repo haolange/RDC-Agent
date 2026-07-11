@@ -42,7 +42,6 @@ const GROUP_KIND_TO_SEMANTIC: Record<string, WorkProcessSemanticStepKind> = {
 
 const TOOL_SEMANTIC_OVERRIDES: Record<string, WorkProcessSemanticStepKind> = {
   grep: 'explore',
-  search_codebase: 'explore',
   tool_search: 'explore',
   memory_search: 'explore',
   memory_read: 'explore',

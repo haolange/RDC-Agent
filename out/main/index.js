@@ -179,8 +179,9 @@ const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
 const TERMINAL_DEFAULT_HEIGHT = 328;
 const TERMINAL_MIN_HEIGHT = 180;
 const TERMINAL_MAX_HEIGHT = 720;
-const CATALOG_UPDATED_AT = "2026-07-06";
+const CATALOG_UPDATED_AT = "2026-07-11";
 const OPENAI_LEVELS = ["low", "medium", "high", "extra"];
+const OPENAI_56_LEVELS = ["low", "medium", "high", "extra", "max"];
 const OPENAI_PRO_LEVELS = ["medium", "high", "extra"];
 const ANTHROPIC_5_LEVELS = ["low", "medium", "high", "extra", "max"];
 const GEMINI_35_LEVELS = ["minimal", "low", "medium", "high"];
@@ -321,7 +322,8 @@ const CHATGPT_ACCOUNT_SOURCE = {
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
     "https://help.openai.com/en/articles/12003714-chatgpt-business-models-limits",
-    "https://developers.openai.com/api/docs/models/gpt-5.5-pro"
+    "https://developers.openai.com/api/docs/guides/latest-model",
+    "https://developers.openai.com/api/docs/models/gpt-5.6-sol"
   ]
 };
 const ANTHROPIC_SOURCE = {
@@ -349,9 +351,9 @@ const XAI_SOURCE = {
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
     "https://docs.x.ai/developers/model-capabilities/text/reasoning",
+    "https://docs.x.ai/developers/models/grok-4.5",
     "https://docs.x.ai/developers/models/grok-4.3",
-    "https://docs.x.ai/developers/models/grok-build-0.1",
-    "https://docs.x.ai/developers/migration/may-15-retirement"
+    "https://docs.x.ai/developers/models/grok-build-0.1"
   ]
 };
 const COPILOT_SOURCE = {
@@ -390,6 +392,7 @@ const VERTEX_SOURCE = {
 const DEEPSEEK_SOURCE = {
   kind: "official",
   updatedAt: CATALOG_UPDATED_AT,
+  note: "DeepSeek thinking effort officially exposes only high and max (not low/medium/xhigh).",
   urls: [
     "https://api-docs.deepseek.com/quick_start/pricing",
     "https://api-docs.deepseek.com/guides/thinking_mode",
@@ -594,6 +597,11 @@ const openAiLevelsDefaultMedium = levelsReasoningControl(OPENAI_LEVELS, {
   defaultSelection: "medium",
   wireProfile: OPENAI_RESPONSES_WIRE
 });
+const openAi56LevelsDefaultMedium = levelsReasoningControl(OPENAI_56_LEVELS, {
+  supportsOff: true,
+  defaultSelection: "medium",
+  wireProfile: OPENAI_RESPONSES_WIRE
+});
 const openAiLevelsDefaultOff = levelsReasoningControl(OPENAI_LEVELS, {
   supportsOff: true,
   defaultSelection: "off",
@@ -605,6 +613,11 @@ const openAiProLevelsDefaultHigh = levelsReasoningControl(OPENAI_PRO_LEVELS, {
   wireProfile: OPENAI_RESPONSES_WIRE
 });
 const openAiCompatibleLevelsDefaultMedium = levelsReasoningControl(OPENAI_LEVELS, {
+  supportsOff: true,
+  defaultSelection: "medium",
+  wireProfile: OPENAI_COMPATIBLE_WIRE
+});
+const openAi56CompatibleLevelsDefaultMedium = levelsReasoningControl(OPENAI_56_LEVELS, {
   supportsOff: true,
   defaultSelection: "medium",
   wireProfile: OPENAI_COMPATIBLE_WIRE
@@ -639,6 +652,11 @@ const xaiLevels = levelsReasoningControl(XAI_LEVELS, {
   defaultSelection: "low",
   wireProfile: OPENAI_COMPATIBLE_WIRE
 });
+const xaiLevelsDefaultHigh = levelsReasoningControl(XAI_LEVELS, {
+  supportsOff: true,
+  defaultSelection: "high",
+  wireProfile: OPENAI_COMPATIBLE_WIRE
+});
 const qwenLevelsDefaultOff = levelsReasoningControl(QWEN_LEVELS, {
   supportsOff: true,
   defaultSelection: "off",
@@ -656,17 +674,30 @@ const kimiCodingPlanToggleDefaultOn = toggleReasoningControl("on", KIMI_CODING_P
 const anthropicAlwaysOnToggle = alwaysOnReasoningControl("on", ANTHROPIC_ALWAYS_ON_TOGGLE_WIRE);
 const volcengineToggleDefaultOn = toggleReasoningControl("on", VOLCENGINE_TOGGLE_WIRE);
 const xaiToggleDefaultOn = toggleReasoningControl("on", OPENAI_COMPATIBLE_WIRE);
+const gpt56Api = multimodal(105e4, openAi56LevelsDefaultMedium);
 const gpt55Api = multimodal(105e4, openAiLevelsDefaultMedium);
 const gpt54Api = multimodal(105e4, openAiLevelsDefaultOff);
 const gptMiniApi = multimodal(4e5, openAiLevelsDefaultOff);
 const gptCodex = textOnly(4e5, openAiCompatibleLevelsDefaultMedium);
 const gpt41 = multimodal(1047576);
 const chatGptAccountModels = [
+  model("gpt-5.6-sol", gpt56Api, CHATGPT_ACCOUNT_SOURCE, {
+    label: "GPT-5.6 Sol",
+    aliases: ["gpt-5.6"]
+  }),
+  model("gpt-5.6-terra", gpt56Api, CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.6 Terra" }),
+  model("gpt-5.6-luna", gpt56Api, CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.6 Luna" }),
   model("gpt-5.5-instant", { ...multimodal(128e3), fastVariantModelId: "gpt-5.5-instant" }, CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Instant" }),
   model("gpt-5.5-thinking", multimodal(128e3, openAiLevelsDefaultMedium), CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Thinking" }),
   model("gpt-5.5-pro", multimodal(272e3, openAiProLevelsDefaultHigh), CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Pro" })
 ];
 const openAiApiModels = [
+  model("gpt-5.6-sol", gpt56Api, OPENAI_API_SOURCE, {
+    label: "GPT-5.6 Sol",
+    aliases: ["gpt-5.6"]
+  }),
+  model("gpt-5.6-terra", gpt56Api, OPENAI_API_SOURCE, { label: "GPT-5.6 Terra" }),
+  model("gpt-5.6-luna", gpt56Api, OPENAI_API_SOURCE, { label: "GPT-5.6 Luna" }),
   model("gpt-5.5", gpt55Api, OPENAI_API_SOURCE),
   model("gpt-5.4", gpt54Api, OPENAI_API_SOURCE),
   model("gpt-5.4-mini", gptMiniApi, OPENAI_API_SOURCE),
@@ -692,11 +723,24 @@ const geminiModels = [
   model("gemini-2.5-flash", multimodal(1048576, gemini25Levels), GEMINI_SOURCE)
 ];
 const grokModels = [
+  model("grok-4.5", multimodal(5e5, xaiLevelsDefaultHigh), XAI_SOURCE, {
+    aliases: ["grok-4.5-latest", "grok-build-latest"]
+  }),
   model("grok-4.3", multimodal(1e6, xaiLevels), XAI_SOURCE),
   model("grok-build-0.1", textOnly(256e3, xaiToggleDefaultOn), XAI_SOURCE),
   model("grok-code-fast-1", textOnly(256e3), XAI_SOURCE)
 ];
 const copilotModels = [
+  model("gpt-5.6-sol", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), COPILOT_SOURCE, {
+    label: "GPT-5.6 Sol",
+    aliases: ["gpt-5.6"]
+  }),
+  model("gpt-5.6-terra", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), COPILOT_SOURCE, {
+    label: "GPT-5.6 Terra"
+  }),
+  model("gpt-5.6-luna", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), COPILOT_SOURCE, {
+    label: "GPT-5.6 Luna"
+  }),
   model("gpt-5.5", multimodal(105e4, openAiCompatibleLevelsDefaultMedium), COPILOT_SOURCE),
   model("gpt-5.3-codex", textOnly(4e5, openAiCompatibleLevelsDefaultMedium), COPILOT_SOURCE),
   model("claude-sonnet-5", multimodal(1e6, anthropicFiveLevelsDefaultHigh), COPILOT_SOURCE),
@@ -738,7 +782,10 @@ const kimiApiModels = [
   model("kimi-k2.5", textOnly(262144, moonshotToggleDefaultOn), KIMI_SOURCE)
 ];
 const kimiCodingPlanModels = [
-  model("kimi-for-coding", textOnly(262144, kimiCodingPlanToggleDefaultOn), KIMI_CODING_SOURCE)
+  model("kimi-for-coding", {
+    ...textOnly(262144, kimiCodingPlanToggleDefaultOn),
+    fixedTemperature: 1
+  }, KIMI_CODING_SOURCE)
 ];
 const glmAnthropicModels = [
   model("glm-5", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
@@ -802,6 +849,16 @@ const MANAGED_PROVIDER_MODEL_CATALOG = {
   anthropic: claudeApiModels,
   "google-ai-studio": geminiModels,
   "azure-openai": [
+    model("gpt-5.6-sol", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), AZURE_OPENAI_SOURCE, {
+      label: "GPT-5.6 Sol",
+      aliases: ["gpt-5.6"]
+    }),
+    model("gpt-5.6-terra", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), AZURE_OPENAI_SOURCE, {
+      label: "GPT-5.6 Terra"
+    }),
+    model("gpt-5.6-luna", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), AZURE_OPENAI_SOURCE, {
+      label: "GPT-5.6 Luna"
+    }),
     model("gpt-5.5", multimodal(105e4, levelsReasoningControl(OPENAI_LEVELS, {
       supportsOff: true,
       defaultSelection: "medium",
@@ -1009,42 +1066,34 @@ const LLM_PROVIDER_PROTOCOL_DEFINITIONS = [
 const ANTHROPIC_ALIAS_MODELS = ["sonnet", "opus", "haiku"];
 const ANTHROPIC_FIRST_PARTY_MODELS = ["sonnet", "opus"];
 const CLAUDE_ACCOUNT_MODELS = [
-  "claude-opus-4-7",
-  "claude-sonnet-4-6",
+  "claude-fable-5",
+  "claude-sonnet-5",
+  "claude-opus-4-8",
   "claude-haiku-4-5-20251001"
 ];
 const CHATGPT_ACCOUNT_MODELS = [
-  "gpt-5.5",
-  "gpt-5.4",
-  "gpt-5.4-mini",
-  "gpt-5.3-codex",
-  "gpt-5.2-codex",
-  "gpt-5.1-codex",
-  "gpt-5",
-  "o4-mini",
-  "o3",
-  "gpt-4o"
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-5.6-luna",
+  "gpt-5.5-instant",
+  "gpt-5.5-thinking",
+  "gpt-5.5-pro"
 ];
 const GITHUB_COPILOT_ACCOUNT_MODELS = [
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-5.6-luna",
   "gpt-5.5",
-  "gpt-5.4",
-  "gpt-5.4-mini",
   "gpt-5.3-codex",
-  "gpt-5.2-codex",
-  "gpt-5.2",
-  "gpt-5-mini",
-  "claude-opus-4-7",
-  "claude-sonnet-4-6",
-  "claude-haiku-4-5",
-  "claude-opus-4-6",
-  "claude-opus-4-5",
-  "claude-sonnet-4-5",
-  "gpt-4.1"
+  "claude-sonnet-5",
+  "claude-opus-4-8",
+  "gemini-3.1-pro-preview",
+  "gemini-3.5-flash"
 ];
 const GROK_ACCOUNT_MODELS = [
+  "grok-4.5",
   "grok-4.3",
   "grok-build-0.1",
-  "grok-4",
   "grok-code-fast-1"
 ];
 const GEMINI_ACCOUNT_MODELS = [
@@ -1058,7 +1107,16 @@ const QWEN_ACCOUNT_MODELS = [
   "qwen-max",
   "qwen-vl-max"
 ];
-const OPENAI_CODE_MODELS = ["gpt-5.2", "gpt-4.1", "gpt-5-mini"];
+const OPENAI_CODE_MODELS = [
+  "gpt-5.6-sol",
+  "gpt-5.6-terra",
+  "gpt-5.6-luna",
+  "gpt-5.5",
+  "gpt-5.4",
+  "gpt-5.4-mini",
+  "gpt-5.3-codex",
+  "gpt-4.1"
+];
 const CAPS_OPENAI_COMPATIBLE = ["chat", "tool-calling", "model-discovery"];
 const CAPS_ANTHROPIC = ["chat", "tool-calling", "reasoning", "prompt-cache", "model-discovery"];
 const CAPS_GOOGLE_AI_STUDIO = ["chat", "tool-calling", "reasoning", "vision-input", "model-discovery"];
@@ -1071,6 +1129,13 @@ const CAPS_XAI = ["chat", "tool-calling", "vision-input", "model-discovery"];
 const CAPS_STATIC_CLOUD = ["chat"];
 const OPENAI_RESPONSES_OPTIONS = ["OpenAICompatibleChatCompletions", "OpenAIResponses"];
 const LOCAL_PROTOCOL_OPTIONS = ["OllamaOpenAICompatibleChatCompletions", "OpenAIResponses"];
+const ANTHROPIC_OPENAI_CHAT_OPTIONS = ["AnthropicMessages", "OpenAICompatibleChatCompletions"];
+const ANTHROPIC_OPENAI_CHAT_RESPONSES_OPTIONS = [
+  "AnthropicMessages",
+  "OpenAICompatibleChatCompletions",
+  "OpenAIResponses"
+];
+const CAPS_COMPAT_REASONING = ["chat", "tool-calling", "reasoning", "model-discovery"];
 const APP_MANAGED_PROVIDER_CATEGORIES = /* @__PURE__ */ new Set([
   "login-authorization",
   "official-direct",
@@ -1262,9 +1327,15 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     modelDiscovery: "anthropic-candidate-validation",
     label: "DeepSeek",
     baseUrl: "https://api.deepseek.com/anthropic",
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: "https://api.deepseek.com/anthropic",
+      OpenAICompatibleChatCompletions: "https://api.deepseek.com"
+    },
     recommendedModels: ["deepseek-v4-pro", "deepseek-v4-flash"],
     docsUrl: "https://platform.deepseek.com/api_keys",
-    capabilities: CAPS_ANTHROPIC
+    capabilities: CAPS_COMPAT_REASONING
   },
   {
     id: "bailian",
@@ -1310,9 +1381,15 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     modelDiscovery: "anthropic-candidate-validation",
     label: "Zhipu AI GLM (CN)",
     baseUrl: "https://open.bigmodel.cn/api/anthropic",
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: "https://open.bigmodel.cn/api/anthropic",
+      OpenAICompatibleChatCompletions: "https://open.bigmodel.cn/api/paas/v4"
+    },
     recommendedModels: ANTHROPIC_ALIAS_MODELS,
     docsUrl: "https://open.bigmodel.cn/",
-    capabilities: CAPS_ANTHROPIC
+    capabilities: CAPS_COMPAT_REASONING
   },
   {
     id: "glm-global",
@@ -1322,9 +1399,15 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     modelDiscovery: "anthropic-candidate-validation",
     label: "Z.ai GLM (Global)",
     baseUrl: "https://api.z.ai/api/anthropic",
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: "https://api.z.ai/api/anthropic",
+      OpenAICompatibleChatCompletions: "https://api.z.ai/api/paas/v4"
+    },
     recommendedModels: ANTHROPIC_ALIAS_MODELS,
     docsUrl: "https://platform.z.ai/",
-    capabilities: CAPS_ANTHROPIC
+    capabilities: CAPS_COMPAT_REASONING
   },
   {
     id: "minimax-cn",
@@ -1334,9 +1417,15 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     modelDiscovery: "anthropic-candidate-validation",
     label: "MiniMax (CN)",
     baseUrl: "https://api.minimaxi.com/anthropic",
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: "https://api.minimaxi.com/anthropic",
+      OpenAICompatibleChatCompletions: "https://api.minimaxi.com/v1"
+    },
     recommendedModels: ["MiniMax-M2.7"],
     docsUrl: "https://platform.minimaxi.com/",
-    capabilities: CAPS_ANTHROPIC
+    capabilities: CAPS_COMPAT_REASONING
   },
   {
     id: "minimax-global",
@@ -1346,9 +1435,15 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     modelDiscovery: "anthropic-candidate-validation",
     label: "MiniMax (Global)",
     baseUrl: "https://api.minimax.io/anthropic",
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: "https://api.minimax.io/anthropic",
+      OpenAICompatibleChatCompletions: "https://api.minimax.io/v1"
+    },
     recommendedModels: ["MiniMax-M2.7"],
     docsUrl: "https://platform.minimaxi.com/",
-    capabilities: CAPS_ANTHROPIC
+    capabilities: CAPS_COMPAT_REASONING
   },
   {
     id: "xiaomi-mimo",
@@ -1358,9 +1453,16 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     modelDiscovery: "anthropic-candidate-validation",
     label: "Xiaomi MiMo",
     baseUrl: "https://api.xiaomimimo.com/anthropic",
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_RESPONSES_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: "https://api.xiaomimimo.com/anthropic",
+      OpenAICompatibleChatCompletions: "https://api.xiaomimimo.com/v1",
+      OpenAIResponses: "https://api.xiaomimimo.com/v1"
+    },
     recommendedModels: ["mimo-v2.5-pro"],
     docsUrl: "https://platform.xiaomimimo.com/#/console/api-keys",
-    capabilities: CAPS_ANTHROPIC
+    capabilities: CAPS_COMPAT_REASONING
   },
   {
     id: "moonshot",
@@ -1370,9 +1472,15 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     modelDiscovery: "anthropic-candidate-validation",
     label: "Kimi / Moonshot AI",
     baseUrl: "https://api.moonshot.cn/anthropic",
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: "https://api.moonshot.cn/anthropic",
+      OpenAICompatibleChatCompletions: "https://api.moonshot.cn/v1"
+    },
     recommendedModels: ["sonnet"],
     docsUrl: "https://platform.moonshot.cn/console/api-keys",
-    capabilities: CAPS_ANTHROPIC
+    capabilities: CAPS_COMPAT_REASONING
   },
   {
     id: "xai",
@@ -1429,10 +1537,16 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     category: "coding-token-plan",
     modelDiscovery: "anthropic-candidate-validation",
     label: "Kimi Coding Plan",
-    baseUrl: "https://api.kimi.com/coding/v1",
+    baseUrl: "https://api.kimi.com/coding/",
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: "https://api.kimi.com/coding/",
+      OpenAICompatibleChatCompletions: "https://api.kimi.com/coding/v1"
+    },
     recommendedModels: ["kimi-for-coding"],
     docsUrl: "https://www.kimi.com/code/docs/en/",
-    capabilities: CAPS_ANTHROPIC
+    capabilities: CAPS_COMPAT_REASONING
   },
   {
     id: "bailian-coding-plan",
@@ -1444,7 +1558,7 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     baseUrl: "https://coding.dashscope.aliyuncs.com/apps/anthropic",
     recommendedModels: ["qwen3.6-plus", "qwen3-coder-next", "qwen3-coder-plus", "kimi-k2.5", "glm-5", "glm-4.7"],
     docsUrl: "https://bailian.console.aliyun.com/",
-    capabilities: CAPS_ANTHROPIC
+    capabilities: CAPS_COMPAT_REASONING
   },
   {
     id: "volcengine-coding-plan",
@@ -1454,57 +1568,87 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     modelDiscovery: "anthropic-candidate-validation",
     label: "Volcengine Ark Coding Plan",
     baseUrl: "https://ark.cn-beijing.volces.com/api/coding",
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: "https://ark.cn-beijing.volces.com/api/coding",
+      OpenAICompatibleChatCompletions: "https://ark.cn-beijing.volces.com/api/coding/v3"
+    },
     recommendedModels: ["doubao-seed-2.1-pro", "doubao-seed-2.1-turbo", "glm-4.6", "deepseek-v4-pro", "kimi-k2.5"],
     docsUrl: "https://www.volcengine.com/docs/82379/1928262",
-    capabilities: CAPS_ANTHROPIC
+    capabilities: CAPS_COMPAT_REASONING
   },
   {
     id: "glm-cn-coding-plan",
     protocol: "AnthropicMessages",
     authMode: "api-key",
     category: "coding-token-plan",
-    modelDiscovery: null,
+    modelDiscovery: "anthropic-candidate-validation",
     label: "Zhipu AI GLM Coding Plan (CN)",
-    recommendedModels: ["sonnet", "opus", "haiku"],
+    baseUrl: "https://open.bigmodel.cn/api/anthropic",
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: "https://open.bigmodel.cn/api/anthropic",
+      OpenAICompatibleChatCompletions: "https://open.bigmodel.cn/api/coding/paas/v4"
+    },
+    recommendedModels: ["glm-5", "glm-4.7", "sonnet", "opus", "haiku"],
     docsUrl: "https://open.bigmodel.cn/",
-    unavailableReason: "The official GLM CN Coding Plan endpoint is not pinned in this catalog.",
-    capabilities: CAPS_ANTHROPIC
+    capabilities: CAPS_COMPAT_REASONING
   },
   {
     id: "glm-global-coding-plan",
     protocol: "AnthropicMessages",
     authMode: "api-key",
     category: "coding-token-plan",
-    modelDiscovery: null,
+    modelDiscovery: "anthropic-candidate-validation",
     label: "Z.ai GLM Coding Plan (Global)",
-    recommendedModels: ["sonnet", "opus", "haiku"],
+    baseUrl: "https://api.z.ai/api/anthropic",
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: "https://api.z.ai/api/anthropic",
+      OpenAICompatibleChatCompletions: "https://api.z.ai/api/coding/paas/v4"
+    },
+    recommendedModels: ["glm-5", "glm-4.7", "sonnet", "opus", "haiku"],
     docsUrl: "https://platform.z.ai/",
-    unavailableReason: "The official GLM Global Coding Plan endpoint is not pinned in this catalog.",
-    capabilities: CAPS_ANTHROPIC
+    capabilities: CAPS_COMPAT_REASONING
   },
   {
     id: "minimax-cn-coding-plan",
     protocol: "AnthropicMessages",
     authMode: "api-key",
     category: "coding-token-plan",
-    modelDiscovery: null,
+    modelDiscovery: "anthropic-candidate-validation",
     label: "MiniMax Coding Plan (CN)",
+    baseUrl: "https://api.minimaxi.com/anthropic",
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: "https://api.minimaxi.com/anthropic",
+      OpenAICompatibleChatCompletions: "https://api.minimaxi.com/v1"
+    },
     recommendedModels: ["MiniMax-M2.7"],
     docsUrl: "https://platform.minimaxi.com/",
-    unavailableReason: "The official MiniMax CN Coding Plan endpoint is not pinned in this catalog.",
-    capabilities: CAPS_ANTHROPIC
+    capabilities: CAPS_COMPAT_REASONING
   },
   {
     id: "minimax-global-coding-plan",
     protocol: "AnthropicMessages",
     authMode: "api-key",
     category: "coding-token-plan",
-    modelDiscovery: null,
+    modelDiscovery: "anthropic-candidate-validation",
     label: "MiniMax Coding Plan (Global)",
+    baseUrl: "https://api.minimax.io/anthropic",
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: "https://api.minimax.io/anthropic",
+      OpenAICompatibleChatCompletions: "https://api.minimax.io/v1"
+    },
     recommendedModels: ["MiniMax-M2.7"],
     docsUrl: "https://platform.minimaxi.com/",
-    unavailableReason: "The official MiniMax Global Coding Plan endpoint is not pinned in this catalog.",
-    capabilities: CAPS_ANTHROPIC
+    capabilities: CAPS_COMPAT_REASONING
   },
   {
     id: "xiaomi-mimo-token-plan",
@@ -1514,9 +1658,16 @@ const BUILTIN_LLM_PROVIDER_DEFINITIONS = [
     modelDiscovery: "anthropic-candidate-validation",
     label: "Xiaomi MiMo Token Plan",
     baseUrl: "https://token-plan-cn.xiaomimimo.com/anthropic",
+    protocolEditable: true,
+    protocolOptions: ANTHROPIC_OPENAI_CHAT_RESPONSES_OPTIONS,
+    protocolBaseUrls: {
+      AnthropicMessages: "https://token-plan-cn.xiaomimimo.com/anthropic",
+      OpenAICompatibleChatCompletions: "https://token-plan-cn.xiaomimimo.com/v1",
+      OpenAIResponses: "https://token-plan-cn.xiaomimimo.com/v1"
+    },
     recommendedModels: ["mimo-v2.5-pro"],
     docsUrl: "https://platform.xiaomimimo.com/#/console/plan-manage",
-    capabilities: CAPS_ANTHROPIC
+    capabilities: CAPS_COMPAT_REASONING
   },
   {
     id: "openrouter",
@@ -1681,6 +1832,30 @@ function resolveBuiltinProviderProtocol(id, candidate) {
   }
   return definition.protocol;
 }
+function resolveBuiltinProtocolBaseUrl(id, protocol) {
+  const definition = getBuiltinProviderDefinition(id);
+  if (!definition) return void 0;
+  const mapped = definition.protocolBaseUrls?.[protocol];
+  if (typeof mapped === "string" && mapped.trim()) return mapped.trim().replace(/\/+$/, "");
+  if (protocol === definition.protocol && typeof definition.baseUrl === "string") {
+    return definition.baseUrl.trim().replace(/\/+$/, "");
+  }
+  return typeof definition.baseUrl === "string" ? definition.baseUrl.trim().replace(/\/+$/, "") : void 0;
+}
+function resolveBaseUrlForProtocolChange(id, previousProtocol, nextProtocol, currentBaseUrl) {
+  const previousDefault = resolveBuiltinProtocolBaseUrl(id, previousProtocol) ?? "";
+  const nextDefault = resolveBuiltinProtocolBaseUrl(id, nextProtocol) ?? "";
+  const current = (currentBaseUrl ?? "").trim().replace(/\/+$/, "");
+  if (!current || current === previousDefault) {
+    return nextDefault || current;
+  }
+  return currentBaseUrl?.trim() ?? current;
+}
+function getBuiltinProviderProtocolBaseUrls(id) {
+  const definition = getBuiltinProviderDefinition(id);
+  if (!definition?.protocolBaseUrls) return void 0;
+  return { ...definition.protocolBaseUrls };
+}
 const toModels = (modelIds) => Array.from(new Set(modelIds)).map((modelId) => ({
   id: modelId,
   label: modelId,
@@ -1710,6 +1885,7 @@ const createBuiltinProviderEntry = (id) => {
     baseUrlEditable: definition.baseUrlEditable,
     protocolEditable: definition.protocolEditable,
     protocolOptions: getBuiltinProviderProtocolOptions(definition.id),
+    protocolBaseUrls: getBuiltinProviderProtocolBaseUrls(definition.id),
     models: managedModels.length > 0 ? managedModels : definition.modelDiscovery === "static" && definition.authMode === "environment" ? toModels(definition.recommendedModels) : toModels([]),
     recommendedModels,
     docsUrl: definition.docsUrl,
@@ -2183,7 +2359,7 @@ const createSeedDefinition = (agentId, routes) => {
   const route = routes.find((entry) => entry.agentId === agentId);
   const model2 = canonicalAgentModelId(route?.providerId ?? "", route?.modelId ?? "");
   const name = AGENT_DISPLAY_NAMES[agentId];
-  const tools = agentId === "ask" ? ["read", "search", "web", "askUser"] : agentId === "plan" ? ["read", "search", "web", "askUser", "agent", "todo", "memory", "planArtifact", "handoff"] : agentId === "edit" ? ["read", "search", "web", "bash", "write", "edit", "askUser", "agent", "todo", "memory", "skill", "mcp"] : ["read", "search", "web", "bash", "askUser", "agent", "todo", "memory", "rdxContext"];
+  const tools = agentId === "ask" ? ["read", "search", "web", "askUser", "task", "tool_search"] : agentId === "plan" ? ["read", "search", "web", "askUser", "agent", "task", "memory", "planArtifact", "handoff", "subagent", "tool_search"] : agentId === "edit" ? ["read", "search", "web", "bash", "write", "edit", "git", "askUser", "agent", "task", "memory", "skill", "mcp", "subagent", "tool_search"] : ["read", "search", "web", "bash", "askUser", "agent", "task", "memory", "rdxContext", "subagent", "tool_search"];
   return {
     id: agentId,
     fileName: fileNameForId(agentId),
@@ -2644,6 +2820,7 @@ function toCatalogEntry(provider) {
     baseUrlEditable: provider.baseUrlEditable,
     protocolEditable: provider.protocolEditable,
     protocolOptions: provider.protocolOptions ? [...provider.protocolOptions] : void 0,
+    protocolBaseUrls: provider.protocolBaseUrls ? { ...provider.protocolBaseUrls } : void 0,
     recommendedModels: managedModelIds.length > 0 ? managedModelIds : [...provider.recommendedModels],
     docsUrl: provider.docsUrl,
     accountLoginConfigured: provider.accountLoginConfigured,
@@ -3255,10 +3432,20 @@ function sanitizeUserProvider(provider, workspaceRoot = appPathService.getUserRd
     apiKey: "",
     secretRef,
     hasStoredSecret,
-    baseUrl: definition?.baseUrlEditable ? typeof provider.baseUrl === "string" ? provider.baseUrl.trim() : definition.baseUrl : definition?.baseUrl,
+    baseUrl: (() => {
+      const protocolDefault = resolveBuiltinProtocolBaseUrl(rawId, protocol);
+      if (definition?.baseUrlEditable) {
+        return typeof provider.baseUrl === "string" && provider.baseUrl.trim() ? provider.baseUrl.trim() : protocolDefault ?? definition.baseUrl;
+      }
+      if (definition?.protocolEditable && definition.protocolBaseUrls) {
+        return protocolDefault ?? definition.baseUrl;
+      }
+      return definition?.baseUrl;
+    })(),
     baseUrlEditable: definition?.baseUrlEditable,
     protocolEditable: definition?.protocolEditable,
-    protocolOptions: builtinFallback.protocolOptions,
+    protocolOptions: getBuiltinProviderProtocolOptions(rawId),
+    protocolBaseUrls: getBuiltinProviderProtocolBaseUrls(rawId),
     models,
     recommendedModels,
     docsUrl,
@@ -3671,13 +3858,17 @@ class SettingsService {
     const hasEnabledModels = discoveredModels.some((model2) => model2.enabled !== false);
     const protocol = normalizeProviderProtocol({ id: provider.id, protocol: protocolDraft ?? provider.protocol });
     const timestamp = nowIso();
+    const protocolDefault = resolveBuiltinProtocolBaseUrl(provider.id, protocol);
+    const nextBaseUrl = provider.baseUrlEditable ? baseUrl.trim() || protocolDefault || provider.baseUrl : protocolDefault || provider.baseUrl;
     const nextProvider = {
       ...provider,
       apiKey: apiKey.trim(),
       protocol,
       enabled: hasEnabledModels,
       hasStoredSecret: provider.authMode === "api-key" ? Boolean(apiKey.trim() || provider.hasStoredSecret) : provider.authMode === "local" || provider.authMode === "environment" || provider.hasStoredSecret,
-      baseUrl: provider.baseUrlEditable ? baseUrl.trim() || provider.baseUrl : provider.baseUrl,
+      baseUrl: nextBaseUrl,
+      protocolOptions: getBuiltinProviderProtocolOptions(provider.id),
+      protocolBaseUrls: getBuiltinProviderProtocolBaseUrls(provider.id),
       models: discoveredModels.map((model2) => ({ ...model2 })),
       status: "verified",
       lastTestedAt: timestamp,
@@ -4147,21 +4338,46 @@ function writeYaml(filePath, data) {
     return false;
   }
 }
-const ASK_READONLY_TOOL_ALLOWLIST = [
+const BUILTIN_AGENT_TOOL_IDS = [
+  "bash",
   "read_file",
+  "write_file",
+  "edit_file",
   "glob",
   "grep",
-  "task_list",
-  "web_fetch",
-  "web_search",
   "git_status",
   "git_diff",
   "git_log",
-  "tool_search",
+  "git_add",
+  "git_unstage",
+  "git_commit",
+  "web_fetch",
+  "web_search",
+  "delete_file",
+  "move_file",
+  "copy_file",
+  "notebook_edit",
+  "task_create",
+  "task_update",
+  "task_get",
+  "task_list",
+  "task_stop",
+  "ask_user",
+  "agent_handoff",
   "memory_search",
-  "memory_read"
+  "memory_read",
+  "memory_write",
+  "memory_delete",
+  "plan_artifact",
+  "skills",
+  "skill_read",
+  "mcp",
+  "subagent",
+  "rdx_context",
+  "tool_search"
 ];
-const CANONICAL_TOOL_EXPANSIONS = {
+new Set(BUILTIN_AGENT_TOOL_IDS);
+const CANONICAL_TOOL_TOKEN_EXPANSIONS = {
   read: ["read_file"],
   search: ["glob", "grep"],
   web: ["web_fetch", "web_search"],
@@ -4173,7 +4389,7 @@ const CANONICAL_TOOL_EXPANSIONS = {
   "vscode/askQuestions": ["ask_user"],
   agent: ["agent_handoff"],
   handoff: ["agent_handoff"],
-  task: ["task_create", "task_update", "task_get", "task_list"],
+  task: ["task_create", "task_update", "task_get", "task_list", "task_stop"],
   memory: ["memory_search", "memory_read"],
   planArtifact: ["plan_artifact"],
   artifact: ["plan_artifact"],
@@ -4184,8 +4400,24 @@ const CANONICAL_TOOL_EXPANSIONS = {
   MCP: ["mcp", "mcp__*"],
   tool_search: ["tool_search"],
   rdxContext: ["rdx_context"],
-  rdx: ["rdx_context"]
+  rdx: ["rdx_context"],
+  subagent: ["subagent"]
 };
+const ASK_READONLY_TOOL_ALLOWLIST = [
+  "read_file",
+  "glob",
+  "grep",
+  "task_list",
+  "task_get",
+  "web_fetch",
+  "web_search",
+  "git_status",
+  "git_diff",
+  "git_log",
+  "tool_search",
+  "memory_search",
+  "memory_read"
+];
 const RUNTIME_TOOL_ALIASES = {
   read: "read_file",
   read_file: "read_file",
@@ -4211,6 +4443,7 @@ const RUNTIME_TOOL_ALIASES = {
   task_update: "task_update",
   task_get: "task_get",
   task_list: "task_list",
+  task_stop: "task_stop",
   askUser: "ask_user",
   ask_user: "ask_user",
   "vscode/askQuestions": "ask_user",
@@ -4234,7 +4467,12 @@ const RUNTIME_TOOL_ALIASES = {
   MCP: "mcp",
   rdxContext: "rdx_context",
   rdx: "rdx_context",
-  rdx_context: "rdx_context"
+  rdx_context: "rdx_context",
+  tool_search: "tool_search",
+  delete_file: "delete_file",
+  move_file: "move_file",
+  copy_file: "copy_file",
+  notebook_edit: "notebook_edit"
 };
 const ASK_DENIED_TOOL_PREFIXES = ["rd.", "mcp.", "mcp__"];
 const ASK_DENIED_TOOLS = /* @__PURE__ */ new Set([
@@ -4245,12 +4483,21 @@ const ASK_DENIED_TOOLS = /* @__PURE__ */ new Set([
   "edit_file",
   "remove",
   "delete",
+  "delete_file",
+  "move_file",
+  "copy_file",
+  "notebook_edit",
   "git_add",
   "git_unstage",
   "git_commit",
   "task_create",
   "task_update",
-  "rdx_context"
+  "task_stop",
+  "rdx_context",
+  "subagent",
+  "memory_write",
+  "memory_delete",
+  "plan_artifact"
 ]);
 const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
   ...ASK_READONLY_TOOL_ALLOWLIST,
@@ -4264,6 +4511,7 @@ const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
   "task_update",
   "task_get",
   "task_list",
+  "task_stop",
   "memory_read",
   "memory_search",
   "memory_write",
@@ -4277,14 +4525,23 @@ const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
   "git_add",
   "git_unstage",
   "git_commit",
+  "delete_file",
+  "move_file",
+  "copy_file",
+  "notebook_edit",
   "tool_search"
 ];
 const SHADER_EDIT_TOOLS = ["rd.shader.edit_and_replace", "rd.macro.shader_hotfix_validate"];
+function expandToken(toolName) {
+  const expanded = CANONICAL_TOOL_TOKEN_EXPANSIONS[toolName];
+  if (expanded) return expanded;
+  return [normalizeToolName$1(toolName)];
+}
 function resolveAgentToolAllowlist(agentId, stage) {
   const settings = settingsService.getAll();
   const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, stage || "investigate", agentId);
   const manifest = settings.agents.definitions.find((definition) => definition.id === agentId && definition.enabled);
-  const profileTools = manifest ? manifest.tools.flatMap(expandCanonicalToolToken) : runtimeProfile.toolAllowlist?.length ? runtimeProfile.toolAllowlist.flatMap(expandCanonicalToolToken) : agentId === "ask" ? ASK_READONLY_TOOL_ALLOWLIST : isTopLevelAgentId(agentId) ? EXECUTABLE_AGENT_TOOL_ALLOWLIST : [];
+  const profileTools = manifest ? manifest.tools.flatMap(expandToken) : runtimeProfile.toolAllowlist?.length ? runtimeProfile.toolAllowlist.flatMap(expandToken) : agentId === "ask" ? ASK_READONLY_TOOL_ALLOWLIST : isTopLevelAgentId(agentId) ? EXECUTABLE_AGENT_TOOL_ALLOWLIST : [];
   if (agentId === "ask") {
     return Array.from(new Set(profileTools.filter((toolName) => !isDeniedAskTool(toolName, normalizeToolName$1(toolName)))));
   }
@@ -4315,9 +4572,6 @@ function isToolAllowedForAgent(toolName, agentId, stage) {
 }
 function normalizeToolName$1(toolName) {
   return RUNTIME_TOOL_ALIASES[toolName] ?? toolName;
-}
-function expandCanonicalToolToken(toolName) {
-  return CANONICAL_TOOL_EXPANSIONS[toolName] ?? [normalizeToolName$1(toolName)];
 }
 function isDeniedAskTool(originalToolName, normalizedToolName) {
   if (ASK_DENIED_TOOLS.has(originalToolName) || ASK_DENIED_TOOLS.has(normalizedToolName)) {
@@ -4819,7 +5073,7 @@ function normalizeProviderArtifact(value) {
 }
 const isThinkingKind = (value) => value === "summary" || value === "raw" || value === "opaque" || value === "unknown";
 const isThinkingVisibility = (value) => value === "summary" || value === "raw-collapsed" || value === "hidden";
-const isThinkingReplayPolicy = (value) => value === "none" || value === "provider-artifact";
+const isThinkingReplayPolicy = (value) => value === "none" || value === "provider-artifact" || value === "openai-reasoning-content";
 const isThinkingSource = (value) => value === "openai-responses-summary" || value === "openai-responses-encrypted" || value === "anthropic-thinking" || value === "anthropic-redacted-thinking" || value === "openai-compatible-raw" || value === "openrouter-raw" || value === "gemini-raw" || value === "ollama-raw" || value === "unknown";
 class StorageAdapter {
   dataRootPath = "";
@@ -4918,6 +5172,8 @@ class StorageAdapter {
   removeSession(sessionId) {
     const location = this.findSessionLocation(sessionId);
     if (!location) return;
+    const runIds = this.listRuns(sessionId).map((run) => run.runId);
+    this.removeSessionSideChannels(sessionId, runIds);
     if (fs__namespace.existsSync(location.sessionPath)) {
       fs__namespace.rmSync(location.sessionPath, { recursive: true, force: true });
     }
@@ -4933,6 +5189,38 @@ class StorageAdapter {
       this.touchProject(projectId, remaining[0]?.sessionId ?? null);
     } else {
       this.touchProject(projectId);
+    }
+  }
+  /**
+   * Clear app-state side channels that are keyed by session/run but live outside the session directory.
+   * Does not touch ~/.rdx or project .rdx.
+   */
+  removeSessionSideChannels(sessionId, runIds) {
+    const paths = appPathService.getAppStatePaths();
+    const safeSessionId = sessionId.replace(/[^\w.-]/g, "_");
+    const sideDirs = [
+      path__namespace.join(paths.tasksPath, safeSessionId),
+      path__namespace.join(paths.llmCallsPath, safeSessionId)
+    ];
+    for (const dir of sideDirs) {
+      if (fs__namespace.existsSync(dir)) {
+        fs__namespace.rmSync(dir, { recursive: true, force: true });
+      }
+    }
+    const tracesRunsDir = path__namespace.join(paths.tracesPath, "runs");
+    const tracesEventsDir = path__namespace.join(paths.tracesPath, "events");
+    for (const runId of runIds) {
+      const safeRunId = runId.replace(/[^\w.-]/g, "_");
+      for (const filePath of [
+        path__namespace.join(tracesRunsDir, `${safeRunId}.json`),
+        path__namespace.join(tracesRunsDir, `${runId}.json`),
+        path__namespace.join(tracesEventsDir, `${safeRunId}.jsonl`),
+        path__namespace.join(tracesEventsDir, `${runId}.jsonl`)
+      ]) {
+        if (fs__namespace.existsSync(filePath)) {
+          fs__namespace.rmSync(filePath, { force: true });
+        }
+      }
     }
   }
   getProjectById(projectId) {
@@ -8010,6 +8298,8 @@ class ContextManager {
       } else if (block.type === "thinking") {
         if (block.replayPolicy === "provider-artifact" && block.artifact) {
           total += this.providerArtifactChars(block.artifact);
+        } else if (block.replayPolicy === "openai-reasoning-content" && block.text) {
+          total += block.text.length;
         }
       } else if (block.type === "toolCall") {
         const tc = block;
@@ -9026,7 +9316,7 @@ function combineOutput(stdout, stderr) {
   return `${stdout}
 ${stderr}`;
 }
-const DEFAULT_LIMIT = 2e3;
+const DEFAULT_LIMIT$1 = 2e3;
 const MAX_OUTPUT_BYTES$3 = 200 * 1024;
 const readFileTool = {
   name: "read_file",
@@ -9058,7 +9348,7 @@ const readFileTool = {
     }
     const absolute = safeResolvePath(params.path, void 0, context2);
     const offset = Math.max(1, Math.floor(params.offset ?? 1));
-    const limit = Math.max(1, Math.floor(params.limit ?? DEFAULT_LIMIT));
+    const limit = Math.max(1, Math.floor(params.limit ?? DEFAULT_LIMIT$1));
     const raw = await fs__namespace$1.readFile(absolute, "utf8");
     if (signal?.aborted) {
       throw new Error("Aborted");
@@ -10136,36 +10426,6 @@ const copyFileTool = {
     };
   }
 };
-const searchCodebaseTool = {
-  name: "search_codebase",
-  label: "语义搜索代码库",
-  description: "Search the codebase using semantic meaning (not exact text). Useful for finding logic by intent when you do not know exact file names.",
-  parameters: {
-    type: "object",
-    properties: {
-      query: { type: "string", description: "High-level description of what you are looking for." },
-      limit: { type: "integer", description: "Maximum results to return (default: 10)." }
-    },
-    required: ["query"]
-  },
-  spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "search", requiresApproval: false },
-  permissionHint: "readonly",
-  async execute(_toolCallId, params) {
-    const limit = Math.max(1, Math.min(50, Math.floor(params.limit ?? 10)));
-    const query = params.query.trim();
-    if (!query) {
-      return { content: [{ type: "text", text: "Query is empty." }], details: { query, results: [] } };
-    }
-    const results = [
-      `Semantic search for "${query}" is not yet indexed.`,
-      "Consider using grep (exact regex) or glob (file patterns) for now."
-    ];
-    return {
-      content: [{ type: "text", text: results.slice(0, limit).join("\n") }],
-      details: { query, results: results.slice(0, limit) }
-    };
-  }
-};
 const notebookEditTool = {
   name: "notebook_edit",
   label: "编辑 Notebook",
@@ -10222,9 +10482,80 @@ function getPrimitiveTools() {
     deleteFileTool,
     moveFileTool,
     copyFileTool,
-    searchCodebaseTool,
     notebookEditTool
   ];
+}
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 50;
+function clampLimit(raw) {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    return DEFAULT_LIMIT;
+  }
+  return Math.min(MAX_LIMIT, Math.max(1, Math.floor(raw)));
+}
+function clampOffset(raw) {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    return 0;
+  }
+  return Math.max(0, Math.floor(raw));
+}
+function searchTools(tools, params = {}) {
+  const query = typeof params.query === "string" ? params.query.trim().toLowerCase() : "";
+  const category = typeof params.category === "string" ? params.category.trim().toLowerCase() : "";
+  const requiresApproval = typeof params.requires_approval === "boolean" ? params.requires_approval : void 0;
+  const limit = clampLimit(params.limit);
+  const offset = clampOffset(params.offset);
+  let matches = tools.slice();
+  if (query) {
+    matches = matches.filter((tool) => tool.name.toLowerCase().includes(query) || tool.description.toLowerCase().includes(query));
+  }
+  if (category) {
+    matches = matches.filter((tool) => (tool.spec?.category ?? "").toLowerCase() === category);
+  }
+  if (requiresApproval !== void 0) {
+    matches = matches.filter((tool) => (tool.spec?.requiresApproval ?? false) === requiresApproval);
+  }
+  if (query) {
+    matches.sort((a, b) => {
+      const aNameHit = a.name.toLowerCase().includes(query);
+      const bNameHit = b.name.toLowerCase().includes(query);
+      if (aNameHit !== bNameHit) {
+        return aNameHit ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  } else {
+    matches.sort((a, b) => a.name.localeCompare(b.name));
+  }
+  const total = matches.length;
+  const page = matches.slice(offset, offset + limit).map((tool) => ({
+    name: tool.name,
+    description: tool.description,
+    category: tool.spec?.category,
+    requiresApproval: tool.spec?.requiresApproval ?? false,
+    parameters: tool.parameters ?? { type: "object", properties: {} }
+  }));
+  return { total, offset, limit, matches: page };
+}
+function formatToolSearchResult(page) {
+  if (page.total === 0) {
+    return "No matching tools found.";
+  }
+  const start = page.matches.length === 0 ? 0 : page.offset + 1;
+  const end = page.offset + page.matches.length;
+  const rangeLabel = page.matches.length === 0 ? `0 of ${page.total}` : `${start}-${end} of ${page.total}`;
+  const blocks = page.matches.map((tool) => {
+    const lines = [
+      `- name: ${tool.name}`,
+      `  description: ${tool.description}`,
+      `  category: ${tool.category ?? "(none)"}`,
+      `  requiresApproval: ${tool.requiresApproval}`,
+      `  parameters: ${JSON.stringify(tool.parameters, null, 2).split("\n").join("\n  ")}`
+    ];
+    return lines.join("\n");
+  });
+  return `Found ${page.total} tools (showing ${rangeLabel}):
+${blocks.join("\n")}`;
 }
 function createToolSearchTool(getAllTools) {
   return {
@@ -10236,35 +10567,21 @@ function createToolSearchTool(getAllTools) {
       properties: {
         query: { type: "string", description: "Search query (partial name or description match)" },
         category: { type: "string", description: "Filter by category (file, search, system, comm, web, task)" },
-        requires_approval: { type: "boolean", description: "Filter by whether the tool requires approval" }
+        requires_approval: { type: "boolean", description: "Filter by whether the tool requires approval" },
+        limit: { type: "number", description: `Max results to return (default ${DEFAULT_LIMIT}, max ${MAX_LIMIT})` },
+        offset: { type: "number", description: "Result offset for pagination (default 0)" }
       },
       required: []
     },
     spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: "none", category: "search", requiresApproval: false },
     permissionHint: "readonly",
     async execute(_id, params) {
-      const p = params;
-      const query = p.query?.toLowerCase() ?? "";
-      const category = p.category?.toLowerCase() ?? "";
-      const requiresApproval = p.requires_approval;
-      const all = getAllTools();
-      let matches = all;
-      if (query) {
-        matches = matches.filter(
-          (t) => t.name.toLowerCase().includes(query) || t.description.toLowerCase().includes(query)
-        );
-      }
-      if (category) {
-        matches = matches.filter((t) => t.spec?.category === category);
-      }
-      if (requiresApproval !== void 0) {
-        matches = matches.filter((t) => (t.spec?.requiresApproval ?? false) === requiresApproval);
-      }
-      const text = matches.length > 0 ? `Found ${matches.length} tools:
-${matches.map((m) => `  - ${m.name}${m.spec ? ` [${m.spec.category}]` : ""}`).join("\n")}` : "No matching tools found.";
+      const p = params ?? {};
+      const page = searchTools(getAllTools(), p);
       return {
-        content: [{ type: "text", text }],
-        isError: false
+        content: [{ type: "text", text: formatToolSearchResult(page) }],
+        isError: false,
+        details: page
       };
     }
   };
@@ -10388,6 +10705,7 @@ class TaskRegistry {
     const now = Date.now();
     const id = this.generateId();
     const blockedBy = dedupe(options.blockedBy ?? []);
+    await this.assertNoDependencyCycle(id, blockedBy);
     const task = {
       id,
       subject: subject.trim(),
@@ -10440,12 +10758,16 @@ class TaskRegistry {
       task.metadata = { ...task.metadata ?? {}, ...updates.metadata };
     }
     if (updates.addBlockedBy && updates.addBlockedBy.length > 0) {
+      await this.assertNoDependencyCycle(task.id, updates.addBlockedBy);
       const added = appendUnique(task.blockedBy, updates.addBlockedBy);
       for (const upstreamId of added) {
         await this.linkBlocks(upstreamId, task.id);
       }
     }
     if (updates.addBlocks && updates.addBlocks.length > 0) {
+      for (const downstreamId of updates.addBlocks) {
+        await this.assertNoDependencyCycle(downstreamId, [task.id]);
+      }
       const added = appendUnique(task.blocks, updates.addBlocks);
       for (const downstreamId of added) {
         await this.linkBlockedBy(downstreamId, task.id);
@@ -10520,6 +10842,39 @@ class TaskRegistry {
     return unblocked;
   }
   // ── 私有辅助 ──────────────────────────────────────────────
+  /**
+   * 若为 `taskId` 追加 `newBlockedByIds` 依赖会形成环，则抛错。
+   * 环判定：某个上游已（直接或间接）依赖 `taskId`，再让 `taskId` 依赖该上游即成环。
+   */
+  async assertNoDependencyCycle(taskId, newBlockedByIds) {
+    for (const upstreamId of dedupe(newBlockedByIds)) {
+      if (upstreamId === taskId) {
+        throw new Error(`依赖环检测失败：任务不能依赖自身（${taskId}）`);
+      }
+      if (await this.dependsOn(upstreamId, taskId)) {
+        throw new Error(
+          `依赖环检测失败：添加「${taskId} blockedBy ${upstreamId}」会形成环`
+        );
+      }
+    }
+  }
+  /** 判断 `fromId` 是否经 blockedBy 链（直接或间接）依赖 `targetId`。 */
+  async dependsOn(fromId, targetId) {
+    const visited = /* @__PURE__ */ new Set();
+    const stack = [fromId];
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (current === targetId) return true;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      const task = await this.loadTask(current);
+      if (!task) continue;
+      for (const dep of task.blockedBy) {
+        if (!visited.has(dep)) stack.push(dep);
+      }
+    }
+    return false;
+  }
   /** 生成任务 ID。 */
   generateId() {
     return `task_${Date.now()}_${crypto__namespace.randomBytes(3).toString("hex")}`;
@@ -10772,7 +11127,7 @@ function createTaskStopTool(registry) {
   return {
     name: "task_stop",
     label: "Stop Task",
-    description: "Stop a running task (set status to deleted)",
+    description: "Stop/cancel by marking deleted",
     parameters: {
       type: "object",
       properties: {
@@ -11114,11 +11469,75 @@ function buildPrefixedName(serverName, toolName) {
 class MCPManager {
   connections = /* @__PURE__ */ new Map();
   discoveredTools = /* @__PURE__ */ new Map();
+  /** 连接生命周期状态（含失败/断开），供目录工具与仪表盘复用。 */
+  serverStatuses = /* @__PURE__ */ new Map();
+  recordServerStatus(id, name, connectionStatus, lastError) {
+    if (connectionStatus === "error") {
+      this.serverStatuses.set(id, { name, connectionStatus, lastError });
+      return;
+    }
+    this.serverStatuses.set(id, {
+      name,
+      connectionStatus,
+      ...lastError ? { lastError } : {}
+    });
+  }
+  /**
+   * 只读：返回当前已知 server 的连接/工具状态摘要。
+   * 不触发连接；未出现在本表中的已配置 server 由调用方标为 unknown。
+   */
+  getServerStatusSummary() {
+    const ids = /* @__PURE__ */ new Set([
+      ...this.connections.keys(),
+      ...this.serverStatuses.keys()
+    ]);
+    return Array.from(ids).sort((a, b) => a.localeCompare(b)).map((id) => {
+      const conn = this.connections.get(id);
+      const status = this.serverStatuses.get(id);
+      const name = conn?.config.name ?? status?.name ?? id;
+      if (conn) {
+        const summary2 = {
+          id,
+          name,
+          connectionStatus: "connected",
+          toolCount: conn.tools.length,
+          tools: conn.tools.map((tool) => tool.originalName)
+        };
+        if (status?.lastError) {
+          summary2.lastError = status.lastError;
+        }
+        return summary2;
+      }
+      const summary = {
+        id,
+        name,
+        connectionStatus: status?.connectionStatus ?? "unknown",
+        toolCount: 0,
+        tools: []
+      };
+      if (status?.lastError) {
+        summary.lastError = status.lastError;
+      }
+      return summary;
+    });
+  }
   /** 连接到 MCP 服务器，返回该服务器发现的 prefixedName 列表。 */
   async connect(config) {
     if (this.connections.has(config.name)) {
       throw new Error(`MCP server "${config.name}" already connected`);
     }
+    this.recordServerStatus(config.name, config.name, "connecting");
+    try {
+      const toolNames = await this.connectInternal(config);
+      this.recordServerStatus(config.name, config.name, "connected");
+      return toolNames;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.recordServerStatus(config.name, config.name, "error", message);
+      throw err;
+    }
+  }
+  async connectInternal(config) {
     const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS$1;
     if (config.type === "stdio") {
       if (!config.command) {
@@ -11271,7 +11690,16 @@ class MCPManager {
   /** 断开 MCP 服务器。 */
   async disconnect(serverName) {
     const conn = this.connections.get(serverName);
-    if (!conn) return;
+    if (!conn) {
+      if (this.serverStatuses.has(serverName)) {
+        this.recordServerStatus(
+          serverName,
+          this.serverStatuses.get(serverName)?.name ?? serverName,
+          "disconnected"
+        );
+      }
+      return;
+    }
     this.connections.delete(serverName);
     for (const t of conn.tools) {
       this.discoveredTools.delete(t.prefixedName);
@@ -11288,6 +11716,7 @@ class MCPManager {
       } catch {
       }
     }
+    this.recordServerStatus(serverName, conn.config.name, "disconnected");
   }
   /** 断开所有服务器。 */
   async disconnectAll() {
@@ -13057,10 +13486,11 @@ let OpenAICompatibleProvider$1 = class OpenAICompatibleProvider {
         if (typeof reasoningDelta === "string" && reasoningDelta.length > 0) {
           sawOutput = true;
           builder.appendThinking(THINKING_INDEX, reasoningDelta, {
-            kind: model2.provider === "deepseek" ? "raw" : "unknown",
+            kind: "raw",
             source: isOpenRouterBaseUrl(baseUrl) ? "openrouter-raw" : "openai-compatible-raw",
             visibility: "raw-collapsed",
-            replayPolicy: "none"
+            // Tool-loop vendors (DeepSeek/Kimi/GLM/…) require reasoning_content replay.
+            replayPolicy: "openai-reasoning-content"
           });
         }
         if (typeof delta.content === "string" && delta.content.length > 0) {
@@ -13145,10 +13575,13 @@ function convertMessage$1(message) {
   }
   if (message.role === "assistant") {
     const text = [];
+    const reasoning = [];
     const toolCalls = [];
     for (const block of message.content) {
       if (block.type === "text") text.push(block.text);
-      else if (block.type === "toolCall") {
+      else if (block.type === "thinking" && typeof block.text === "string" && block.text.length > 0) {
+        reasoning.push(block.text);
+      } else if (block.type === "toolCall") {
         toolCalls.push({
           id: block.id,
           type: "function",
@@ -13163,7 +13596,12 @@ function convertMessage$1(message) {
       role: "assistant",
       content: text.length > 0 ? text.join("") : null
     };
-    if (toolCalls.length > 0) out.tool_calls = toolCalls;
+    if (toolCalls.length > 0) {
+      out.tool_calls = toolCalls;
+      if (reasoning.length > 0) {
+        out.reasoning_content = reasoning.join("");
+      }
+    }
     return [out];
   }
   const textBlocks = [];
@@ -13859,6 +14297,36 @@ const NATIVE_TOOL_PROTOCOLS = /* @__PURE__ */ new Set(["AnthropicMessages", "Ope
 const STREAMING_PROTOCOLS = /* @__PURE__ */ new Set(["AnthropicMessages", "OpenAIResponses", "OpenAICompatibleChatCompletions", "OpenRouterChatCompletions", "GoogleGemini", "OllamaOpenAICompatibleChatCompletions"]);
 const OPENAI_NATIVE_IDS = /* @__PURE__ */ new Set(["openai", "openai-eu", "openai-us", "chatgpt-account"]);
 const ANTHROPIC_NATIVE_IDS = /* @__PURE__ */ new Set(["anthropic", "claude-account"]);
+const RAW_REASONING_PROVIDER_IDS = /* @__PURE__ */ new Set([
+  "deepseek",
+  "moonshot",
+  "kimi-coding-plan",
+  "glm-cn",
+  "glm-global",
+  "glm-cn-coding-plan",
+  "glm-global-coding-plan",
+  "minimax-cn",
+  "minimax-global",
+  "minimax-cn-coding-plan",
+  "minimax-global-coding-plan",
+  "xiaomi-mimo",
+  "xiaomi-mimo-token-plan"
+]);
+const RAW_REASONING_EVIDENCE = {
+  deepseek: "https://api-docs.deepseek.com/guides/thinking_mode",
+  moonshot: "https://platform.moonshot.cn/docs/",
+  "kimi-coding-plan": "https://www.kimi.com/code/docs/en/",
+  "glm-cn": "https://docs.bigmodel.cn/",
+  "glm-global": "https://docs.z.ai/",
+  "glm-cn-coding-plan": "https://docs.bigmodel.cn/",
+  "glm-global-coding-plan": "https://docs.z.ai/devpack/quick-start",
+  "minimax-cn": "https://platform.minimaxi.com/docs/api-reference/text-openai-api",
+  "minimax-global": "https://platform.minimax.io/docs/guides/text-generation",
+  "minimax-cn-coding-plan": "https://platform.minimaxi.com/docs/api-reference/text-openai-api",
+  "minimax-global-coding-plan": "https://platform.minimax.io/docs/token-plan/other-tools",
+  "xiaomi-mimo": "https://mimo.mi.com/docs/en-US/quick-start/usage-guide/text-generation/deep-thinking",
+  "xiaomi-mimo-token-plan": "https://mimo.mi.com/docs/en-US/quick-start/usage-guide/text-generation/deep-thinking"
+};
 const hasCapability = (provider, capability) => Boolean(provider?.capabilities?.includes(capability));
 function resolveProviderReasoningContract(provider, modelId) {
   if (!provider || !hasCapability(provider, "reasoning")) return { semantic: "none", source: "provider-capability", displayLabel: "None" };
@@ -13868,8 +14336,13 @@ function resolveProviderReasoningContract(provider, modelId) {
   if (provider.protocol === "AnthropicMessages" && ANTHROPIC_NATIVE_IDS.has(provider.id)) {
     return { semantic: "summary", source: "anthropic-thinking-display-summarized", evidence: "https://platform.claude.com/docs/en/build-with-claude/extended-thinking", displayLabel: "Reasoning summary" };
   }
-  if (provider.id === "deepseek" && provider.protocol === "OpenAICompatibleChatCompletions") {
-    return { semantic: "raw", source: "deepseek-reasoning-content", evidence: "https://api-docs.deepseek.com/guides/thinking_mode", displayLabel: "Raw reasoning" };
+  if (RAW_REASONING_PROVIDER_IDS.has(provider.id)) {
+    return {
+      semantic: "raw",
+      source: `${provider.id}-documented-raw-reasoning`,
+      evidence: RAW_REASONING_EVIDENCE[provider.id],
+      displayLabel: "Raw reasoning"
+    };
   }
   return { semantic: "unknown", source: `${provider.id}/${modelId}:unverified-provider-semantics`, displayLabel: "Provider reasoning" };
 }
@@ -17224,6 +17697,7 @@ function resolveModelCapability(providerId, modelId, settings) {
   const maxContextAvailable = maxContextWindowTokens !== null;
   const reasoningControl = sanitizeReasoningControl(profile?.reasoningControl);
   const fastVariantModelId = profile?.fastVariantModelId ?? null;
+  const fixedTemperature = typeof profile?.fixedTemperature === "number" && Number.isFinite(profile.fixedTemperature) ? profile.fixedTemperature : null;
   return {
     providerId,
     modelId,
@@ -17235,10 +17709,17 @@ function resolveModelCapability(providerId, modelId, settings) {
     maxContextAvailable,
     fastVariantModelId,
     fastModelAvailable: isFastVariantAvailable(provider, fastVariantModelId),
+    fixedTemperature,
     toolCalling: Boolean(profile?.toolCalling),
     visionInput: Boolean(profile?.visionInput),
     structuredOutput: Boolean(profile?.structuredOutput)
   };
+}
+function resolveEffectiveTemperature(capability, requested) {
+  if (typeof capability.fixedTemperature === "number") {
+    return capability.fixedTemperature;
+  }
+  return requested;
 }
 function resolveTurnControls(capability, requestControls, sessionControls) {
   if (requestControls) {
@@ -19142,11 +19623,36 @@ ${record.content}` : `No memory named "${args.name}" was found.` }], details: { 
       }
     };
   }
+  /**
+   * Settings / IPC 与 mcp 目录工具共用：合并已配置 MCP 与运行时连接状态。
+   */
+  getMcpServerStatusSummary(projectRootPath, query) {
+    const normalizedQuery = query?.trim().toLowerCase() ?? "";
+    const configured = agentRuntimeConfigService.listMcpServers(projectRootPath ?? void 0).filter((server2) => !normalizedQuery || `${server2.id} ${server2.name} ${server2.description}`.toLowerCase().includes(normalizedQuery));
+    const runtimeById = new Map(
+      this.mcpManager.getServerStatusSummary().map((entry) => [entry.id, entry])
+    );
+    return configured.map((server2) => {
+      const runtime = runtimeById.get(server2.id) ?? runtimeById.get(server2.name);
+      const summary = {
+        id: server2.id,
+        name: server2.name,
+        connectionStatus: runtime?.connectionStatus ?? "unknown",
+        toolCount: runtime?.toolCount ?? 0,
+        tools: runtime?.tools ?? []
+      };
+      if (runtime?.lastError) {
+        summary.lastError = runtime.lastError;
+      }
+      return summary;
+    });
+  }
   createMcpCatalogTool() {
+    const orchestrator = this;
     return {
       name: "mcp",
       label: "List MCP Services",
-      description: "List MCP services configured for the current workspace.",
+      description: "List MCP services configured for the current workspace, including connection status and tools.",
       parameters: {
         type: "object",
         properties: {
@@ -19155,12 +19661,23 @@ ${record.content}` : `No memory named "${args.name}" was found.` }], details: { 
       },
       permissionHint: "readonly",
       async execute(_toolCallId, args, _signal, _onUpdate, context2) {
-        const query = typeof args.query === "string" ? args.query.trim().toLowerCase() : "";
-        const servers = agentRuntimeConfigService.listMcpServers(context2?.projectRootPath ?? void 0).filter((server2) => !query || `${server2.id} ${server2.name} ${server2.description}`.toLowerCase().includes(query));
-        const lines = servers.map((server2) => `${server2.id}: ${server2.name} (${server2.transport})${server2.enabledByDefault ? "" : " - disabled by default"}`);
+        const query = typeof args.query === "string" ? args.query : void 0;
+        const servers = orchestrator.getMcpServerStatusSummary(context2?.projectRootPath ?? null, query);
+        const lines = servers.map((server2) => {
+          const toolNames = (server2.tools ?? []).slice(0, 12);
+          const toolsLabel = toolNames.length > 0 ? toolNames.join(", ") + ((server2.tools?.length ?? 0) > toolNames.length ? ", …" : "") : "(none)";
+          const errorLine = server2.lastError ? `
+  lastError: ${server2.lastError}` : "";
+          return [
+            `${server2.id}: ${server2.name}`,
+            `  connectionStatus: ${server2.connectionStatus}`,
+            `  toolCount: ${server2.toolCount}`,
+            `  tools: ${toolsLabel}${errorLine}`
+          ].join("\n");
+        });
         return {
           content: [{ type: "text", text: lines.length > 0 ? lines.join("\n") : "No configured MCP services matched the query." }],
-          details: { count: servers.length }
+          details: { count: servers.length, servers }
         };
       }
     };
@@ -19222,6 +19739,7 @@ ${record.content}` : `No memory named "${args.name}" was found.` }], details: { 
     const settings = settingsService.getAll();
     const routeProvider = settings.llm.providers.find((entry) => entry.id === input.providerId);
     const routeCapability = resolveAgentRouteCapability(routeProvider, input.modelId);
+    const modelCapability = resolveModelCapability(input.providerId, input.modelId, settings);
     const mcpConnectionErrors = await this.ensureMcpConnections(input.agentId, input.projectRootPath);
     const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
     const activeToolDefinitions = routeCapability.toolCallingMode === "native-structured" ? runtimeTools.definitions : [];
@@ -19255,7 +19773,7 @@ ${record.content}` : `No memory named "${args.name}" was found.` }], details: { 
     });
     const streamOptions = {
       maxTokens: input.maxTokens,
-      temperature: input.temperature,
+      temperature: resolveEffectiveTemperature(modelCapability, input.temperature),
       reasoning: input.options?.reasoning,
       reasoningVisibility: input.options?.reasoning?.selection === "off" ? "none" : routeCapability.reasoningVisibility,
       signal: input.options?.signal
@@ -21047,7 +21565,7 @@ class TraceService {
     for (const run of runs) {
       const runEvents = events.filter((e) => e.run_id === run.runId).sort((a, b) => a.ts_ms - b.ts_ms);
       const planStatus = mapRunPlanStatus(run);
-      const branchId = state2.activeBranchId || "branch-main";
+      const branchId2 = state2.activeBranchId || "branch-main";
       const agentType = run.mode ?? "debugger";
       mode = agentType;
       const profile = agentProfileRegistry.getForMode(agentType);
@@ -21145,8 +21663,8 @@ class TraceService {
       const timeline = projectionBuilder.build(agentRun, nodes, profile);
       runViewModels.push({ run: agentRun, timeline });
       const traceExecutionId = `ws-${runId}-execution`;
-      artifacts.push(...this.mapArtifacts(sessionId, runId, branchId, traceExecutionId, runEvents));
-      context2.push(...this.mapContext(sessionId, runId, branchId, traceExecutionId, run));
+      artifacts.push(...this.mapArtifacts(sessionId, runId, branchId2, traceExecutionId, runEvents));
+      context2.push(...this.mapContext(sessionId, runId, branchId2, traceExecutionId, run));
     }
     for (const turn of this.groupAskTurns(conversations)) {
       if (turn.messages.some((m) => m.runId)) continue;
@@ -21197,7 +21715,12 @@ class TraceService {
         timeline: projectionBuilder.build(agentRun, nodes, profile)
       });
     }
-    const progress = await this.mapSessionProgress(sessionId, state2.activeBranchId || "branch-main");
+    const branchId = state2.activeBranchId || "branch-main";
+    const sessionPlan = this.mapSessionPlanArtifact(sessionId, branchId, `ws-${sessionId}-plan`);
+    if (sessionPlan && !artifacts.some((item) => item.type === "plan" && item.path === sessionPlan.path)) {
+      artifacts.unshift(sessionPlan);
+    }
+    const progress = await this.mapSessionProgress(sessionId, branchId);
     const rightPanel = this.buildRightPanel(progress, artifacts, context2);
     return {
       sessionId,
@@ -21284,6 +21807,37 @@ class TraceService {
       };
     });
   }
+  /**
+   * 读取会话级 plan.md（由 plan_artifact 工具写入），供右侧产物泳道做会话内 markdown 预览。
+   */
+  mapSessionPlanArtifact(sessionId, branchId, traceLaneId) {
+    try {
+      const session = storageAdapter.readSession(sessionId);
+      if (!session?.sessionPath) return null;
+      const planPath = path.join(session.sessionPath, "artifacts", "plan.md");
+      if (!fs.existsSync(planPath)) return null;
+      const stat = fs.statSync(planPath);
+      if (!stat.isFile()) return null;
+      const previewMarkdown = fs.readFileSync(planPath, "utf8");
+      const updatedAt = toIso(stat.mtimeMs);
+      return {
+        id: `session-plan-${sessionId}`,
+        sessionId,
+        traceLaneId,
+        branchId,
+        type: "plan",
+        status: "ready",
+        displayName: "plan.md",
+        path: planPath,
+        rawRef: `session-plan:${sessionId}`,
+        previewMarkdown,
+        createdAt: toIso(stat.birthtimeMs || stat.mtimeMs),
+        updatedAt
+      };
+    } catch {
+      return null;
+    }
+  }
   mapArtifacts(sessionId, runId, branchId, traceLaneId, runEvents) {
     const registered = artifactStore.list(sessionId, runId).map((record) => ({
       id: record.artifactId,
@@ -21357,14 +21911,18 @@ class TraceService {
     return [...captureContext, ...packetContext];
   }
   buildRightPanel(progress, artifacts, context2) {
+    const planArtifacts = artifacts.filter((item) => item.type === "plan");
+    const otherArtifacts = artifacts.filter((item) => item.type !== "plan");
+    const recentOthers = otherArtifacts.slice(-6);
+    const previousOthers = otherArtifacts.slice(0, Math.max(0, otherArtifacts.length - 6));
     return {
       progress: {
         current: progress.filter((t) => ["running", "blocked", "pending", "reopened"].includes(t.status)),
         history: progress.filter((t) => ["completed", "cancelled"].includes(t.status))
       },
       artifacts: {
-        current: artifacts.slice(-6),
-        previous: artifacts.slice(0, Math.max(0, artifacts.length - 6))
+        current: [...planArtifacts, ...recentOthers],
+        previous: previousOthers
       },
       context: {
         groups: ["capture", "file", "source", "capability"].map((kind) => {
@@ -22343,7 +22901,7 @@ const toolsCommand = {
     }
     return {
       success: true,
-      message: "Available tools: bash, read_file, write_file, edit_file, delete_file, move_file, copy_file, glob, grep, search_codebase, web_fetch, web_search, ask_user, notebook_edit, task_create, task_update, task_get, task_list, task_stop, mcp, skill"
+      message: "Available tools: bash, read_file, write_file, edit_file, delete_file, move_file, copy_file, glob, grep, git_status, git_diff, git_log, git_add, git_unstage, git_commit, web_fetch, web_search, ask_user, notebook_edit, task_create, task_update, task_get, task_list, task_stop, tool_search, skill_read, skills, subagent, mcp, rdx_context"
     };
   }
 };
@@ -22980,8 +23538,8 @@ function collectBranchPath(branchId, allMessages, forks, minCreatedAt) {
   const suffix = collectBranchPath(activeBranch.branchId, allMessages, forks, turnEnd);
   return [...beforeFork, ...turnMessages, ...suffix];
 }
-const DEFAULT_TEXT_FLUSH_MS = 80;
-const DEFAULT_TRACE_FLUSH_MS = 160;
+const DEFAULT_TEXT_FLUSH_MS = 48;
+const DEFAULT_TRACE_FLUSH_MS = 48;
 const DEFAULT_PERSIST_FLUSH_MS = 600;
 class ConversationStreamPatchScheduler {
   commit;
@@ -24014,7 +24572,7 @@ class ConversationService {
                   beginAssistantContentLoop();
                   rawResponse += chunk;
                   currentLoopText += chunk;
-                  if (!loopHasTools) {
+                  if (!loopHasTools && !currentLoopThinking) {
                     visibleResponse = currentLoopText;
                   }
                   commitVisibleAssistantText();
@@ -24038,6 +24596,10 @@ class ConversationService {
                 );
                 if (currentLoopThinking) {
                   currentLoopThinkingStatus = "streaming";
+                  if (visibleResponse) {
+                    visibleResponse = "";
+                    commitVisibleAssistantText();
+                  }
                   commitThinkingTrace(upsertLoopResult(
                     assistantMessage.workTrace,
                     currentLoopId(),
@@ -24090,7 +24652,13 @@ class ConversationService {
                 const payload = event.payload;
                 if (payload.toolCall?.id && payload.toolCall.name) {
                   const loopScoped = isLoopTool(String(payload.toolCall.name));
-                  if (loopScoped) loopHasTools = true;
+                  if (loopScoped) {
+                    loopHasTools = true;
+                    if (visibleResponse) {
+                      visibleResponse = "";
+                      commitVisibleAssistantText();
+                    }
+                  }
                   commitAssistantMessage("message_patched", {
                     workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                       id: String(payload.toolCall.id),
@@ -24231,14 +24799,17 @@ class ConversationService {
               }
               if (event.type === "task.created" || event.type === "task.updated") {
                 const payload = event.payload;
+                const taskId = typeof payload.taskId === "string" && payload.taskId.trim() ? payload.taskId.trim() : "runtime-tasks";
+                const title = typeof payload.title === "string" && payload.title.trim() ? payload.title.trim() : taskId;
+                const blockStatus = payload.status === "failed" || payload.status === "deleted" ? "error" : payload.status === "in_progress" ? "running" : payload.status === "pending" ? "pending" : "complete";
                 commitAssistantMessage("message_patched", {
-                  workTrace: upsertWorkBlock(assistantMessage.workTrace, "runtime-tasks", {
-                    kind: "subagent",
-                    title: "Task status",
+                  workTrace: upsertWorkBlock(assistantMessage.workTrace, taskId, {
+                    kind: "command",
+                    title,
                     stage: "tool",
-                    status: payload.status === "failed" ? "error" : "complete",
-                    summary: `${payload.title ?? payload.taskId ?? "Task"}${payload.status ? `: ${payload.status}` : ""}`,
-                    completedAt: nowMs()
+                    status: blockStatus,
+                    summary: title,
+                    completedAt: blockStatus === "running" || blockStatus === "pending" ? void 0 : nowMs()
                   })
                 });
               }
@@ -25062,6 +25633,18 @@ function registerRuntimeTerminalHandlers() {
   });
 }
 const REQUEST_TIMEOUT_MS = 2e4;
+function resolveDiscoveryStrategy(protocol, catalogStrategy) {
+  if (protocol === "OpenAICompatibleChatCompletions" || protocol === "OpenAIResponses" || protocol === "OpenRouterChatCompletions") {
+    return "openai-compatible";
+  }
+  if (protocol === "AnthropicMessages") {
+    return "anthropic-candidate-validation";
+  }
+  if (protocol === "OllamaOpenAICompatibleChatCompletions") {
+    return catalogStrategy === "ollama-tags" ? "ollama-tags" : "openai-compatible";
+  }
+  return catalogStrategy ?? null;
+}
 function normalizeDiscoveredModels(values, filterModelId = () => true) {
   const models = /* @__PURE__ */ new Map();
   for (const value of values) {
@@ -25160,6 +25743,13 @@ const formatHttpError = (status) => {
   return `连接测试失败（HTTP ${status}）`;
 };
 const appendPath = (baseUrl, path2) => `${baseUrl.trim().replace(/\/+$/, "")}/${path2.replace(/^\/+/, "")}`;
+const resolveCodingPlanModelsUrl = (baseUrl) => {
+  const trimmed = baseUrl.trim().replace(/\/+$/, "");
+  if (/\/v1$/i.test(trimmed)) {
+    return `${trimmed}/models`;
+  }
+  return `${trimmed}/v1/models`;
+};
 const appendQueryParam = (url2, key, value) => {
   const separator = url2.includes("?") ? "&" : "?";
   return `${url2}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
@@ -25317,7 +25907,14 @@ class ProviderConnectionService {
     if (!protocol) {
       throw new ProviderConnectionError(`Provider ${provider.id} is not in the built-in catalog.`);
     }
-    return protocol === provider.protocol ? provider : { ...provider, protocol };
+    if (protocol === provider.protocol) return provider;
+    const nextBaseUrl = resolveBaseUrlForProtocolChange(
+      provider.id,
+      provider.protocol,
+      protocol,
+      provider.baseUrl
+    );
+    return { ...provider, protocol, baseUrl: nextBaseUrl || provider.baseUrl };
   }
   async discoverModels(provider, apiKeyDraft, baseUrlDraft) {
     if (provider.authMode === "account") {
@@ -25329,26 +25926,29 @@ class ProviderConnectionService {
     if (provider.unavailableReason) {
       throw new ProviderConnectionError(provider.unavailableReason);
     }
-    if (!definition?.modelDiscovery) {
-      if (catalogOwnership === "app-managed") {
-        return managedModels;
-      }
-      throw new ProviderConnectionError("Provider 缺少模型发现配置");
+    if (!definition) {
+      throw new ProviderConnectionError("Provider 不在内置 catalog 中");
     }
     const apiKey = provider.authMode === "api-key" ? apiKeyDraft || settingsService.getProviderSecret(provider.id) : "";
     if (provider.authMode === "api-key" && !apiKey) {
       throw new ProviderConnectionError("请输入 API Key");
     }
-    const strategy = definition.modelDiscovery;
+    const strategy = resolveDiscoveryStrategy(provider.protocol, definition.modelDiscovery);
+    if (!strategy) {
+      if (catalogOwnership === "app-managed") {
+        return managedModels;
+      }
+      throw new ProviderConnectionError("Provider 缺少模型发现配置");
+    }
     if (strategy === "static") {
       return catalogOwnership === "app-managed" ? managedModels : toStaticModels(definition.recommendedModels);
     }
-    const baseUrl = (baseUrlDraft || provider.baseUrl || definition.baseUrl || "").trim().replace(/\/+$/, "");
+    const baseUrl = (baseUrlDraft || provider.baseUrl || resolveBuiltinProtocolBaseUrl(provider.id, provider.protocol) || definition.baseUrl || "").trim().replace(/\/+$/, "");
     if (!baseUrl) {
       throw new ProviderConnectionError("请填写 Provider Base URL");
     }
     const candidateModelIds = catalogOwnership === "app-managed" ? managedModels.map((model2) => model2.id) : definition.recommendedModels;
-    if (provider.id === "kimi-coding-plan") {
+    if (provider.id === "kimi-coding-plan" && provider.protocol === "AnthropicMessages") {
       return this.validateCodingPlanModels(apiKey, baseUrl, candidateModelIds, managedModels);
     }
     if (strategy === "anthropic-candidate-validation") {
@@ -25401,10 +26001,11 @@ class ProviderConnectionService {
     return managedModels.length > 0 ? mergeManagedModelAvailability(managedModels, validatedModels) : validatedModels;
   }
   async validateCodingPlanModels(apiKey, baseUrl, modelIds, managedModels = []) {
-    const payload = await getJson(appendPath(baseUrl, "/models"), {
+    const payload = await getJson(resolveCodingPlanModelsUrl(baseUrl), {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${apiKey}`
+        Authorization: `Bearer ${apiKey}`,
+        "User-Agent": "RDC-Agent"
       }
     });
     const availableModelIds = new Set(
@@ -25894,6 +26495,11 @@ function registerToolEvidenceHandlers(context2) {
   });
   electron.ipcMain.handle("tool:getRuntimeSummary", async () => {
     return rdxCliInvokerService.getRuntimeSummary();
+  });
+  electron.ipcMain.handle("mcp:getStatusSummary", async () => {
+    const projectId = state2.currentProjectId ?? storageAdapter.getCurrentProjectId();
+    const projectRoot = projectId ? storageAdapter.getProjectById(projectId)?.rootPath ?? null : null;
+    return agentOrchestrator.getMcpServerStatusSummary(projectRoot);
   });
   electron.ipcMain.handle("evidence:getChain", async () => {
     const sessionId = await storageAdapter.getCurrentSessionId();

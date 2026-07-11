@@ -1,11 +1,12 @@
 /**
- * TaskTools — 把 TaskRegistry 暴露为 4 个 AgentTool。
+ * TaskTools — 把 TaskRegistry 暴露为 5 个 AgentTool。
  *
  * 工具列表：
  *  - `task_create`：创建任务；
  *  - `task_update`：更新任务（状态 / 描述 / 依赖）；
  *  - `task_get`：读取单个任务详情；
- *  - `task_list`：列出全部任务。
+ *  - `task_list`：列出全部任务；
+ *  - `task_stop`：Stop/cancel by marking deleted（软删除，status=deleted）。
  *
  * 设计要点：
  *  - 所有工具都是 `readonly` 权限提示（任务存储是 agent 自管的私有目录，
@@ -302,14 +303,14 @@ interface TaskStopParams {
   taskId: string;
 }
 
-/** 构造 `task_stop` 工具 — 停止/取消一个进行中的任务。 */
+/** 构造 `task_stop` 工具 — Stop/cancel by marking deleted。 */
 export function createTaskStopTool(
   registry: TaskRegistry,
 ): AgentTool<TaskStopParams, { id: string }> {
   return {
     name: 'task_stop',
     label: 'Stop Task',
-    description: 'Stop a running task (set status to deleted)',
+    description: 'Stop/cancel by marking deleted',
     parameters: {
       type: 'object',
       properties: {

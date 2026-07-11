@@ -1,5 +1,6 @@
 import React from 'react';
 import type { ToolDefinition } from '@shared/types/tool';
+import { useI18n } from '../../../i18n';
 
 const TOOL_GROUP_PREFIXES: Array<{ key: string; label: string; prefix: string }> = [
   { key: 'core', label: 'RDC Core', prefix: 'rd.core.' },
@@ -119,7 +120,9 @@ export const ToolsSection: React.FC<{
   totalToolCount,
   openToolGroups,
   onToggleToolGroup,
-}) => (
+}) => {
+  const { t } = useI18n();
+  return (
   <TreeSection
     testId="artifact-tree-tools"
     open={open}
@@ -129,11 +132,11 @@ export const ToolsSection: React.FC<{
     count={totalToolCount}
   >
     {catalogLoading ? (
-      <div className="artifact-tree-empty">Loading catalog...</div>
+      <div className="panel-empty">{t('control.artifactCatalogLoading')}</div>
     ) : catalogError ? (
-      <div className="artifact-tree-empty error">{catalogError}</div>
+      <div className="panel-empty error">{catalogError}</div>
     ) : groups.length === 0 ? (
-      <div className="artifact-tree-empty">No tools available</div>
+      <div className="panel-empty">{t('control.artifactNoTools')}</div>
     ) : (
       groups.map((group) => {
         const groupOpen = openToolGroups[group.key] ?? group.key === 'core';
@@ -168,7 +171,8 @@ export const ToolsSection: React.FC<{
       })
     )}
   </TreeSection>
-);
+  );
+};
 
 export const SkillsSection: React.FC<{
   open: boolean;
@@ -199,7 +203,9 @@ export const ArtifactsSection: React.FC<{
   open: boolean;
   onToggle: () => void;
   artifacts: ArtifactEntry[];
-}> = ({ open, onToggle, artifacts }) => (
+}> = ({ open, onToggle, artifacts }) => {
+  const { t } = useI18n();
+  return (
   <TreeSection
     testId="artifact-tree-artifacts"
     open={open}
@@ -209,7 +215,7 @@ export const ArtifactsSection: React.FC<{
     count={artifacts.length}
   >
     {artifacts.length === 0 ? (
-      <div className="artifact-tree-empty">Run outputs will appear here</div>
+      <div className="panel-empty">{t('control.artifactOutputsEmpty')}</div>
     ) : (
       <ul className="artifact-tree-leaf-list flat">
         {artifacts.map((artifact) => (
@@ -226,4 +232,5 @@ export const ArtifactsSection: React.FC<{
       </ul>
     )}
   </TreeSection>
-);
+  );
+};

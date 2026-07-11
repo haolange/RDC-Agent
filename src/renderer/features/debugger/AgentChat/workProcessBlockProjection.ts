@@ -204,6 +204,7 @@ export function buildPresentationUnits(
           rows: [{
             type: 'task',
             id: block.id,
+            taskId: block.id,
             status: block.status,
             title: summaryText,
             taskStatus,

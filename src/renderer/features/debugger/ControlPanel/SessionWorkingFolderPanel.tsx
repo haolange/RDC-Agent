@@ -61,7 +61,7 @@ export const SessionWorkingFolderPanel: React.FC = () => {
   const hasTaskMaterial = Boolean(currentRun) || outputs.length > 0 || actionEvents.length > 0;
 
   if (!currentSession) {
-    return <div className="session-working-folder-empty">{t('control.sessionWorkingFolderUnavailable')}</div>;
+    return <div className="panel-empty">{t('control.sessionWorkingFolderUnavailable')}</div>;
   }
 
   const openPath = async (targetPath: string) => {
@@ -111,7 +111,7 @@ export const SessionWorkingFolderPanel: React.FC = () => {
                 </button>
               ))
             ) : (
-              <span className="session-working-folder-empty">{t('control.sessionOutputsEmpty')}</span>
+              <span className="panel-empty">{t('control.sessionOutputsEmpty')}</span>
             )}
           </div>
         </>

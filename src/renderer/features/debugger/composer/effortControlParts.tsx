@@ -4,8 +4,25 @@ import type {
 } from '@shared/types/modelCapability';
 import {
   REASONING_SELECTIONS,
+  clampReasoningSelection,
   getReasoningSelectionOrder,
 } from '@shared/types/modelCapability';
+
+export function resolveSelectedLevel(
+  reasoningLevel: ReasoningSelection,
+  reasoningControl: ReasoningControl | null,
+  displayLevels: ReasoningSelection[],
+): ReasoningSelection {
+  if (!reasoningControl) {
+    return displayLevels[0] ?? 'off';
+  }
+  const clamped = clampReasoningSelection(reasoningLevel, reasoningControl)
+    ?? reasoningControl.defaultSelection;
+  if (displayLevels.includes(clamped)) {
+    return clamped;
+  }
+  return displayLevels[displayLevels.length - 1] ?? 'off';
+}
 
 export const EFFORT_LABEL_KEYS = {
   off: 'composer.effort.levelOff',

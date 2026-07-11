@@ -1,9 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import {
-  clampReasoningSelection,
-  type ReasoningControl,
-  type ReasoningSelection,
-} from '@shared/types/modelCapability';
+import type { ReasoningSelection } from '@shared/types/modelCapability';
 import { useI18n } from '../../../i18n';
 import { useTurnControls } from './useTurnControls';
 import type { SessionRecord } from '@shared/types/session';
@@ -13,31 +9,14 @@ import {
   ChevronIcon,
   clampSliderRatio,
   EFFORT_LABEL_KEYS,
-  EffortFastModeSwitchRow,
-  EffortMaxContextSwitchRow,
   findAdjacentSupportedLevel,
   getStopPosition,
   ReasoningLevelIcon,
   resolveNearestSnapLevel,
+  resolveSelectedLevel,
 } from './effortControlParts';
-import { EffortMaxSparks } from './EffortMaxSparks';
+import { EffortControlPopup } from './EffortControlPopup';
 import { formatTokenCount } from './turnControlsUtils';
-
-function resolveSelectedLevel(
-  reasoningLevel: ReasoningSelection,
-  reasoningControl: ReasoningControl | null,
-  displayLevels: ReasoningSelection[],
-): ReasoningSelection {
-  if (!reasoningControl) {
-    return displayLevels[0] ?? 'off';
-  }
-  const clamped = clampReasoningSelection(reasoningLevel, reasoningControl)
-    ?? reasoningControl.defaultSelection;
-  if (displayLevels.includes(clamped)) {
-    return clamped;
-  }
-  return displayLevels[displayLevels.length - 1] ?? 'off';
-}
 
 export const EffortControl: React.FC<{
   agentId: string;
@@ -263,80 +242,34 @@ export const EffortControl: React.FC<{
       </button>
 
       {open ? (
-        <div ref={popupRef} className="composer-effort-popup" data-testid="composer-effort-popup" role="dialog" aria-label={t('composer.effort.popupTitle')} style={popupStyle}>
-          <div className={`composer-effort-slider-section ${hasAdjustableReasoning ? '' : 'is-disabled'}`}>
-            <div
-              ref={trackRef}
-              className={`composer-effort-slider is-level-${displayLevel}${hasAdjustableReasoning ? '' : ' is-disabled'}${isDragging ? ' is-dragging' : ''}`}
-              data-testid="composer-effort-slider"
-              onPointerDown={handleTrackPointerDown}
-              onPointerMove={handleTrackPointerMove}
-              onPointerUp={handleTrackPointerUp}
-              onPointerCancel={handleTrackPointerUp}
-              onClick={handleTrackClick}
-            >
-              {hasAdjustableReasoning ? (
-                <div className="composer-effort-slider-stops" aria-hidden="true">
-                  {displayLevels.map((level, index) => {
-                    const classes = [
-                      'composer-effort-slider-stop',
-                      level === displayLevel ? 'is-current' : '',
-                    ].filter(Boolean).join(' ');
-                    return (
-                      <div
-                        key={level}
-                        className={classes}
-                        style={{ left: `${getStopPosition(index, displayLevels.length) * 100}%` }}
-                      />
-                    );
-                  })}
-                </div>
-              ) : null}
-
-              <div className="composer-effort-slider-track" aria-hidden="true">
-                {isMaxTier ? <EffortMaxSparks /> : null}
-              </div>
-
-              <div
-                className={`composer-effort-slider-thumb${isDragging ? ' is-dragging' : ''}${thumbEdgeClass}`}
-                style={thumbStyle}
-                role="slider"
-                tabIndex={hasAdjustableReasoning ? 0 : -1}
-                aria-valuemin={0}
-                aria-valuemax={displayLevels.length - 1}
-                aria-valuenow={displayIndex}
-                aria-valuetext={t(EFFORT_LABEL_KEYS[displayLevel])}
-                aria-disabled={!hasAdjustableReasoning}
-                onKeyDown={handleThumbKeyDown}
-              >
-                {isDragging ? <span className="composer-effort-slider-tooltip">{tooltipLabel}</span> : null}
-              </div>
-            </div>
-
-            <div className="composer-effort-slider-labels" aria-hidden="true">
-              <span>{t('composer.effort.faster')}</span>
-              <span>{t('composer.effort.smarter')}</span>
-            </div>
-          </div>
-
-          <div className="composer-effort-popup-divider" aria-hidden="true" />
-
-          <EffortMaxContextSwitchRow
-            label={t('composer.effort.maxContext')}
-            status={maxContextStatus}
-            available={Boolean(capability?.maxContextAvailable)}
-            active={turnControls.maxContextMode}
-            onToggle={() => updateTurnControls({ maxContextMode: !turnControls.maxContextMode })}
-          />
-
-          <EffortFastModeSwitchRow
-            label={t('composer.effort.fastModel')}
-            status={fastModelStatus}
-            available={Boolean(capability?.fastModelAvailable)}
-            active={turnControls.fastModel}
-            onToggle={() => updateTurnControls({ fastModel: !turnControls.fastModel })}
-          />
-        </div>
+        <EffortControlPopup
+          popupRef={popupRef}
+          popupStyle={popupStyle}
+          trackRef={trackRef}
+          hasAdjustableReasoning={hasAdjustableReasoning}
+          displayLevel={displayLevel}
+          displayLevels={displayLevels}
+          displayIndex={displayIndex}
+          isDragging={isDragging}
+          isMaxTier={isMaxTier}
+          thumbStyle={thumbStyle}
+          thumbEdgeClass={thumbEdgeClass}
+          tooltipLabel={tooltipLabel}
+          maxContextStatus={maxContextStatus}
+          fastModelStatus={fastModelStatus}
+          maxContextAvailable={Boolean(capability?.maxContextAvailable)}
+          fastModelAvailable={Boolean(capability?.fastModelAvailable)}
+          maxContextMode={turnControls.maxContextMode}
+          fastModel={turnControls.fastModel}
+          t={t}
+          onTrackPointerDown={handleTrackPointerDown}
+          onTrackPointerMove={handleTrackPointerMove}
+          onTrackPointerUp={handleTrackPointerUp}
+          onTrackClick={handleTrackClick}
+          onThumbKeyDown={handleThumbKeyDown}
+          onToggleMaxContext={() => updateTurnControls({ maxContextMode: !turnControls.maxContextMode })}
+          onToggleFastModel={() => updateTurnControls({ fastModel: !turnControls.fastModel })}
+        />
       ) : null}
     </div>
   );

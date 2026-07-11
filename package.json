@@ -22,6 +22,7 @@
     "check:conversation-branch": "node scripts/check-conversation-branch.mjs",
     "check:reasoning-delivery": "node scripts/check-reasoning-delivery.mjs",
     "check:agent-runtime": "node scripts/check-agent-runtime.mjs",
+    "check:tool-system": "node scripts/check-tool-system.mjs",
     "check:provider-system": "node scripts/check-provider-system.mjs",
     "check:settings-agents": "node scripts/check-settings-agents.mjs",
     "check:scoped-resources": "vitest run src/main/runtime/ScopedResourceResolver.test.ts src/main/runtime/RdxRuntimeService.test.ts",

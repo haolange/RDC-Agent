@@ -55,7 +55,7 @@ export const MemoryPanel: React.FC = () => {
 
   const handleDelete = async () => {
     if (!selected) return;
-    if (window.confirm('确认删除这条记忆？此操作不可撤销。')) await remove(selected.name);
+    if (window.confirm(t('memory.deleteConfirm'))) await remove(selected.name);
   };
 
   return (
@@ -127,9 +127,9 @@ export const MemoryPanel: React.FC = () => {
         </div>
       ) : (
         <ul className="memory-panel-list" data-testid="memory-list">
-          {loading && memories.length === 0 && <li className="memory-panel-empty">…</li>}
+          {loading && memories.length === 0 && <li className="panel-empty">…</li>}
           {!loading && memories.length === 0 && (
-            <li className="memory-panel-empty">{t('memory.empty')}</li>
+            <li className="panel-empty">{t('memory.empty')}</li>
           )}
           {memories.map((mem) => (
             <li key={mem.name}>

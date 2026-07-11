@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { RdxRuntimeOverview } from '@shared/types/rdxRuntime';
+import { useI18n } from '../../../../i18n';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
 
 export const HooksSettings: React.FC<{
@@ -8,6 +9,7 @@ export const HooksSettings: React.FC<{
   onScopeChange: (scope: 'user' | 'project') => void;
   onChanged: (overview: RdxRuntimeOverview) => void;
 }> = ({ overview, scope, onScopeChange, onChanged }) => {
+  const { t } = useI18n();
   const [busyId, setBusyId] = useState('');
   const [message, setMessage] = useState('');
   const hooks = overview?.hooks.filter((hook) => hook.scope === scope) ?? [];
@@ -32,12 +34,12 @@ export const HooksSettings: React.FC<{
         <div><strong>{hook.id}</strong><p>{hook.event} · {hook.failurePolicy} · {hook.trusted ? 'Trusted' : 'Untrusted'}</p><code>{hook.sourcePath}</code></div>
         <div className="settings-runtime-actions">
           {hook.scope === 'project' && (hook.trusted
-            ? <button type="button" className="button button-secondary" disabled={busyId === hook.id} onClick={() => void run(hook.id, 'revoke')}>撤销授信</button>
-            : <button type="button" className="button button-primary" disabled={busyId === hook.id} onClick={() => void run(hook.id, 'trust')}>授信当前 Hash</button>)}
-          <button type="button" className="button button-secondary" disabled={busyId === hook.id || (hook.scope === 'project' && !hook.trusted)} onClick={() => void run(hook.id, 'test')}>测试</button>
+            ? <button type="button" className="button button-secondary" disabled={busyId === hook.id} onClick={() => void run(hook.id, 'revoke')}>{t('settings.hookRevoke')}</button>
+            : <button type="button" className="button button-primary" disabled={busyId === hook.id} onClick={() => void run(hook.id, 'trust')}>{t('settings.hookTrust')}</button>)}
+          <button type="button" className="button button-secondary" disabled={busyId === hook.id || (hook.scope === 'project' && !hook.trusted)} onClick={() => void run(hook.id, 'test')}>{t('settings.hookTest')}</button>
         </div>
       </article>)}
-      {!hooks.length && <div className="settings-runtime-empty-card">暂无 Hook。使用独立 <code>*.hook.yml</code> 文件添加。</div>}
+      {!hooks.length && <div className="settings-empty settings-empty-dashed">{t('settings.hooksEmpty')}</div>}
       {message && <pre className="settings-runtime-result">{message}</pre>}
     </div>
   </section>;

@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ArtifactRecord } from '@shared/types/harness';
@@ -330,7 +332,13 @@ export class TraceService {
       });
     }
 
-    const progress = await this.mapSessionProgress(sessionId, state.activeBranchId || 'branch-main');
+    const branchId = state.activeBranchId || 'branch-main';
+    const sessionPlan = this.mapSessionPlanArtifact(sessionId, branchId, `ws-${sessionId}-plan`);
+    if (sessionPlan && !artifacts.some((item) => item.type === 'plan' && item.path === sessionPlan.path)) {
+      artifacts.unshift(sessionPlan);
+    }
+
+    const progress = await this.mapSessionProgress(sessionId, branchId);
     const rightPanel = this.buildRightPanel(progress, artifacts, context);
 
     return {
@@ -443,6 +451,42 @@ export class TraceService {
     });
   }
 
+  /**
+   * 读取会话级 plan.md（由 plan_artifact 工具写入），供右侧产物泳道做会话内 markdown 预览。
+   */
+  private mapSessionPlanArtifact(
+    sessionId: string,
+    branchId: string,
+    traceLaneId: string,
+  ): TraceArtifactRecord | null {
+    try {
+      const session = storageAdapter.readSession(sessionId);
+      if (!session?.sessionPath) return null;
+      const planPath = path.join(session.sessionPath, 'artifacts', 'plan.md');
+      if (!fs.existsSync(planPath)) return null;
+      const stat = fs.statSync(planPath);
+      if (!stat.isFile()) return null;
+      const previewMarkdown = fs.readFileSync(planPath, 'utf8');
+      const updatedAt = toIso(stat.mtimeMs);
+      return {
+        id: `session-plan-${sessionId}`,
+        sessionId,
+        traceLaneId,
+        branchId,
+        type: 'plan',
+        status: 'ready',
+        displayName: 'plan.md',
+        path: planPath,
+        rawRef: `session-plan:${sessionId}`,
+        previewMarkdown,
+        createdAt: toIso(stat.birthtimeMs || stat.mtimeMs),
+        updatedAt,
+      };
+    } catch {
+      return null;
+    }
+  }
+
   private mapArtifacts(
     sessionId: string,
     runId: string,
@@ -536,14 +580,18 @@ export class TraceService {
     artifacts: TraceArtifactRecord[],
     context: TraceContextRecord[],
   ): RightPanelViewModel {
+    const planArtifacts = artifacts.filter((item) => item.type === 'plan');
+    const otherArtifacts = artifacts.filter((item) => item.type !== 'plan');
+    const recentOthers = otherArtifacts.slice(-6);
+    const previousOthers = otherArtifacts.slice(0, Math.max(0, otherArtifacts.length - 6));
     return {
       progress: {
         current: progress.filter((t) => ['running', 'blocked', 'pending', 'reopened'].includes(t.status)),
         history: progress.filter((t) => ['completed', 'cancelled'].includes(t.status)),
       },
       artifacts: {
-        current: artifacts.slice(-6),
-        previous: artifacts.slice(0, Math.max(0, artifacts.length - 6)),
+        current: [...planArtifacts, ...recentOthers],
+        previous: previousOthers,
       },
       context: {
         groups: (['capture', 'file', 'source', 'capability'] as const).map((kind) => {

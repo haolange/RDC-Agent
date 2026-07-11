@@ -140,14 +140,18 @@ Providers that officially expose multiple wire protocols must offer an explicit 
 
 ## Tool and Command Catalog
 
-Tools must be declared with name, permission level, input schema, result summary, UI icon, and approval requirement. The canonical catalog covers:
+Tools must be declared with name, permission level, input schema, result summary, UI icon, and approval requirement. The canonical builtin catalog is the 36 ids in `BUILTIN_AGENT_TOOL_IDS` (`src/shared/constants/agentToolTokens.ts`):
 
-- file and search: `read_file`, `glob`, `grep`;
+- file and search: `read_file`, `glob`, `grep` (`search_codebase` has been removed; use `glob`/`grep`);
 - web: `web_fetch`, `web_search`;
-- execution and mutation: `bash`, `write_file`, `edit_file`;
-- workflow: `ask_user`, `todo`, `task_*`, `agent`, `handoff`;
-- context: `memory`, `skills`, `MCP`;
-- RDC/RDX: capture context, open/preview/close, remote connection, and RDX shell actions.
+- execution and mutation: `bash`, `write_file`, `edit_file`, `delete_file`, `move_file`, `copy_file`, `notebook_edit`;
+- git: `git_status`, `git_diff`, `git_log`, `git_add`, `git_unstage`, `git_commit`;
+- workflow: `ask_user`, `task_create`, `task_update`, `task_get`, `task_list`, `task_stop`, `agent_handoff`, `subagent`, `plan_artifact`;
+- discovery: `tool_search`;
+- context: `memory_search`, `memory_read`, `memory_write`, `memory_delete`, `skills`, `skill_read`, `mcp`;
+- RDC/RDX: `rdx_context`, plus Settings-managed capture open/preview/close, remote connection, and RDX shell actions.
+
+Manifest-facing tokens expand through `CANONICAL_TOOL_TOKEN_EXPANSIONS`. The `task` token expands to `task_create`, `task_update`, `task_get`, `task_list`, and `task_stop`. Removed tokens such as `todo` and `search_codebase` are rejected via `REJECTED_TOOL_TOKENS` with no silent fallback. Catalog includes `subagent`, `tool_search`, and `task_stop`.
 
 Slash commands are runtime inputs, not bypasses around profile permission. Baseline commands are `/help`, `/compact`, `/context`, `/memory`, `/agents`, `/skills`, `/mcp`, `/status`, and `/model`.
 
@@ -224,6 +228,9 @@ Code changes should run:
 - `npm run check:architecture`;
 - `npm run check:fidelity`;
 - `npm run check:shared-exports`;
+- `npm run check:agent-runtime`;
+- `npm run check:provider-system`;
+- `npm run check:tool-system`;
 - `npm run check:work-process` and `npm run check:work-process-tool-coverage` when Work Process projection, tool catalog labels, or transcript UI changes;
 - `npm run check:reasoning-delivery` when provider thinking delivery or reasoning artifact projection changes;
 - `npm run check:settings-agents`;

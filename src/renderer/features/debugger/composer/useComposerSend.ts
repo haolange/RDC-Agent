@@ -7,18 +7,9 @@ import { useSessionStore } from '../../../stores/sessionStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import type { useI18n } from '../../../i18n';
 import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
-import {
-  applyConversationTurnResult,
-  buildLocalConversationErrorTurn,
-  buildOptimisticConversationTurn,
-  removeOptimisticConversationMessages,
-  syncE2EConversationState,
-  toConversationMode,
-  toConversationAttachmentInputs,
-} from './composerSendHelpers';
+import { sendComposerConversationTurn } from './composerSendFlow';
 import { useComposerStop } from './useComposerStop';
 import { executeSlashCommand } from './slashCommandExecutor';
-import { useTurnControlsStore } from './useTurnControls';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -97,85 +88,29 @@ export function useComposerSend(options: {
     }
 
     setIsPromptSending(true);
-    const sentPrompt = trimmed;
-    const sentAttachments = [...pendingAttachments];
-    const optimistic = buildOptimisticConversationTurn({
-      trimmed: sentPrompt,
-      currentMode,
-      currentProject,
-      currentSession,
-      currentRun,
-      pendingAttachments: sentAttachments,
-      selectedAgentId,
-    });
-    const messagesBeforeSend = useConversationStore.getState().conversationMessages ?? [];
-    setPromptValue('');
-    setPendingAttachments([]);
-    upsertConversationMessages([optimistic.userMessage, optimistic.assistantDraftMessage]);
-
     try {
-      const conversationMode = toConversationMode(currentMode);
-      const turnControls = { ...useTurnControlsStore.getState().turnControls };
-      const result = await electronAPI.conversation.sendMessage({
-        projectId: currentProject?.projectId ?? null,
-        sessionId: currentSession?.sessionId ?? null,
-        currentRunId: currentRun?.runId ?? null,
-        replayDeviceId: selectedDeviceEntry?.id ?? null,
-        mode: conversationMode,
-        agentId: selectedAgentId || null,
-        message: sentPrompt,
-        attachments: toConversationAttachmentInputs(sentAttachments),
-        turnControls,
-      });
-
-      // Drop optimistic placeholders before applying authoritative turn messages.
-      setConversationMessages(removeOptimisticConversationMessages(
-        useConversationStore.getState().conversationMessages ?? [],
-        optimistic.optimisticIds,
-      ));
-
-      await applyConversationTurnResult({
+      await sendComposerConversationTurn({
         electronAPI,
-        result,
+        trimmed,
+        pendingAttachments,
+        currentMode,
         currentProject,
+        currentSession,
+        currentRun,
+        selectedAgentId,
+        selectedDeviceEntry,
+        setPromptValue,
+        setPendingAttachments,
+        setConversationMessages,
+        setBranchState,
+        upsertConversationMessages,
         setCurrentSession,
         setSessions,
         setCurrentRun,
         setRuns,
         setTracePresentation,
-        setConversationMessages,
-        setBranchState,
-        upsertConversationMessages,
+        failedSummary: t('app.conversationRequestFailed'),
       });
-
-      await syncE2EConversationState({
-        electronAPI,
-        sessionId: result.session?.sessionId ?? currentSession?.sessionId ?? null,
-        turnId: result.userMessage.turnId,
-        setConversationMessages,
-        setTracePresentation,
-        setBranchState,
-      });
-    } catch (error) {
-      setConversationMessages(removeOptimisticConversationMessages(
-        useConversationStore.getState().conversationMessages ?? messagesBeforeSend,
-        optimistic.optimisticIds,
-      ));
-      setPromptValue(sentPrompt);
-      setPendingAttachments(sentAttachments);
-      const currentMessages = useConversationStore.getState().conversationMessages ?? [];
-      const failedSummary = t('app.conversationRequestFailed');
-      setConversationMessages(currentMessages.concat(buildLocalConversationErrorTurn({
-        trimmed: sentPrompt,
-        currentMode,
-        currentProject,
-        currentSession,
-        currentRun,
-        pendingAttachments: sentAttachments,
-        errorMessage: error instanceof Error ? error.message : failedSummary,
-        failedSummary,
-        selectedAgentId,
-      })));
     } finally {
       setIsPromptSending(false);
     }

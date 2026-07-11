@@ -1,4 +1,5 @@
 import React from 'react';
+import { diagnoseManifestToolTokens } from '@shared/constants/agentToolTokens';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
@@ -22,7 +23,26 @@ interface AgentManifestEditorProps {
   t: Translate;
 }
 
-const BUILTIN_TOOL_OPTIONS = ['read', 'search', 'web'];
+const BUILTIN_TOOL_OPTIONS = [
+  'read',
+  'search',
+  'web',
+  'git',
+  'bash',
+  'write',
+  'edit',
+  'askUser',
+  'agent',
+  'handoff',
+  'task',
+  'memory',
+  'planArtifact',
+  'skill',
+  'mcp',
+  'tool_search',
+  'rdxContext',
+  'subagent',
+];
 
 const uniqueOptions = (...groups: string[][]): string[] =>
   Array.from(new Set(groups.flat().map((value) => value.trim()).filter(Boolean)))
@@ -83,6 +103,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
 }) => {
   const selectedModel = selectedAgent.models[0] ?? '';
   const capabilityGroups = buildCapabilityGroups(settings, selectedAgent, onUpdateAgent, t);
+  const toolDiagnostics = diagnoseManifestToolTokens(selectedAgent.tools);
   const saveStatusMessage = agentManifestSaveState === 'saving'
     ? t('settings.saving')
     : agentManifestSaveMessage;
@@ -178,6 +199,25 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           </summary>
           <div className="settings-advanced-content">
             <AgentCapabilityPicker groups={capabilityGroups} t={t} />
+            {toolDiagnostics.length > 0 ? (
+              <div
+                className="settings-agent-tool-diagnostics"
+                data-testid="settings-agent-tool-diagnostics"
+                role="status"
+              >
+                <div className="settings-agent-tool-diagnostics-title">
+                  {t('settings.agentToolDiagnosticsTitle')}
+                </div>
+                <ul className="settings-agent-tool-diagnostics-list">
+                  {toolDiagnostics.map((item) => (
+                    <li key={item.token}>
+                      <code>{item.token}</code>
+                      <span>{item.message}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         </details>
 

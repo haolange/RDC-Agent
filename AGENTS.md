@@ -133,6 +133,7 @@
 - 浏览器真实会话使用 `npm run start:agent-browser` 或 `scripts/start-browser-session.cmd`，然后用 Codex 内置浏览器打开主进程输出的 `/app`。
 - 人类开发入口使用 `scripts/start-rdc-agent-dev.cmd`；人类构建产物入口使用 `scripts/start-rdc-agent.cmd`；发布模式直接双击 exe / app 包。
 - Provider 体系契约验证使用 `npm run check:provider-system`。
+- Builtin 工具目录、manifest token 展开与 `REJECTED_TOOL_TOKENS` 契约验证使用 `npm run check:tool-system`。
 - Settings Agents 路由契约验证使用 `npm run check:settings-agents`。
 - 产品级本地验收通过真实浏览器会话完成，并指向真实 project 和 `.rdc`；RDX/RenderDoc 失败必须 fail-closed 并显示诊断。
 - 涉及工作台交互、页面结构、样式引用或共享契约的改动后，至少补一次关键 E2E smoke 或等价人工回归，确认主界面、关键面板和主要交互未退化。

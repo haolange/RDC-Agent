@@ -5,8 +5,16 @@
 /** MCP 传输类型 */
 export type MCPTransport = 'stdio' | 'sse' | 'streamable-http';
 
-/** MCP 连接状态 */
-export type MCPConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
+/**
+ * MCP 连接状态。
+ * `unknown`：已配置但运行时尚未尝试连接（仪表盘 / mcp 目录工具用）。
+ */
+export type MCPConnectionStatus =
+  | 'disconnected'
+  | 'connecting'
+  | 'connected'
+  | 'error'
+  | 'unknown';
 
 /** MCP Server 配置 */
 export interface MCPServerConfig {
@@ -52,4 +60,18 @@ export interface MCPConnectionInfo {
   tools: MCPToolDefinition[];
   connectedAt?: string;
   error?: string;
+}
+
+/**
+ * MCP 服务器运行时状态摘要。
+ * 供 mcp 目录工具与前端 MCP 仪表盘共用（Phase 2 IPC 复用）。
+ */
+export interface MCPServerStatusSummary {
+  id: string;
+  name: string;
+  connectionStatus: MCPConnectionStatus;
+  toolCount: number;
+  lastError?: string;
+  /** 工具短名称列表（不含 mcp__ 前缀） */
+  tools?: string[];
 }

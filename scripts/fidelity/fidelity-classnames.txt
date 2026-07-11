@@ -29,7 +29,6 @@ artifact-search-icon
 artifact-toolbar
 artifact-tree
 artifact-tree-chevron
-artifact-tree-empty
 artifact-tree-group
 artifact-tree-group-count
 artifact-tree-group-header
@@ -63,7 +62,6 @@ button-sm
 capture-item-separator
 capture-library
 capture-library-context-note
-capture-library-empty
 capture-library-error
 capture-library-item
 capture-library-item-copy
@@ -346,14 +344,19 @@ footer-user-trigger
 icon-button
 importance-
 input
+is-
 is-active
+is-appear
 is-blocked
 is-completed
 is-error
+is-fallback
 is-history
 is-level-
 is-loading
+is-open
 is-stopped
+is-toggle
 loading
 loading-bar
 loading-logo
@@ -375,7 +378,6 @@ memory-panel-detail-name
 memory-panel-detail-type
 memory-panel-editor
 memory-panel-editor-actions
-memory-panel-empty
 memory-panel-error
 memory-panel-header
 memory-panel-input
@@ -430,6 +432,7 @@ orb-a
 orb-b
 orb-c
 panel-action-btn
+panel-empty
 panel-resize-handle
 panel-resize-handle-left
 panel-resize-handle-right
@@ -444,6 +447,8 @@ project-list
 project-sessions-panel
 project-stack
 project-stack-item
+rdx-runtime-context-facts
+rdx-runtime-context-panel
 request-inspector
 request-inspector-body
 request-inspector-call
@@ -490,6 +495,7 @@ runtime-terminal-workspace
 runtime-terminal-workspace-body
 scrollbar-thin
 session-capabilities-panel
+session-capabilities-stack
 session-capability-block
 session-capability-chip
 session-capability-chip-list
@@ -509,7 +515,6 @@ session-capability-status-dot
 session-context-actions
 session-context-capture-select
 session-context-clear-btn
-session-context-empty
 session-context-fact
 session-context-facts
 session-context-label
@@ -548,7 +553,6 @@ session-output-list
 session-output-list-title
 session-output-meta
 session-output-title
-session-progress-empty
 session-progress-idle-copy
 session-progress-idle-link
 session-progress-idle-state
@@ -582,7 +586,6 @@ session-task-monitor-marker
 session-task-monitor-meta
 session-task-monitor-summary
 session-task-monitor-title
-session-working-folder-empty
 session-working-folder-idle-copy
 session-working-folder-idle-icon
 session-working-folder-idle-state
@@ -613,6 +616,9 @@ settings-agent-identity-grid
 settings-agent-instructions
 settings-agent-route-panel
 settings-agent-textarea-compact
+settings-agent-tool-diagnostics
+settings-agent-tool-diagnostics-list
+settings-agent-tool-diagnostics-title
 settings-appearance-list
 settings-appearance-section
 settings-appearance-section--compact
@@ -621,7 +627,6 @@ settings-browser-page-head
 settings-browser-section-head
 settings-browser-section-title
 settings-capability-custom
-settings-capability-empty
 settings-capability-group
 settings-capability-group-head
 settings-capability-option
@@ -641,6 +646,8 @@ settings-center-panel
 settings-center-sidebar
 settings-checkbox-row
 settings-choice-group
+settings-empty
+settings-empty-dashed
 settings-field
 settings-field-label
 settings-general-grid
@@ -664,6 +671,18 @@ settings-manifest-list-column
 settings-manifest-list-toolbar
 settings-manifest-page
 settings-manifest-toolbar
+settings-mcp-status-badge
+settings-mcp-status-dashboard
+settings-mcp-status-error
+settings-mcp-status-header
+settings-mcp-status-heading
+settings-mcp-status-list
+settings-mcp-status-name
+settings-mcp-status-row
+settings-mcp-status-row-main
+settings-mcp-status-row-meta
+settings-mcp-status-title
+settings-mcp-status-tools
 settings-modal
 settings-modal-backdrop
 settings-modal-close
@@ -774,8 +793,6 @@ settings-renderdoc-toolchain
 settings-runtime-actions
 settings-runtime-card
 settings-runtime-editor
-settings-runtime-empty
-settings-runtime-empty-card
 settings-runtime-kicker
 settings-runtime-list
 settings-runtime-resource
@@ -804,7 +821,6 @@ settings-tool-card
 settings-tool-section
 settings-toolchain-details
 settings-toolchain-status
-settings-workspace-footer-actions
 settings-workspace-hero
 settings-workspace-hero-copy
 settings-workspace-note-card
@@ -853,8 +869,13 @@ trace-lane-context-importance
 trace-lane-context-item
 trace-lane-context-label
 trace-lane-context-list
-trace-lane-empty
 trace-lane-history
+trace-plan-preview
+trace-plan-preview-body
+trace-plan-preview-chevron
+trace-plan-preview-expand
+trace-plan-preview-markdown
+trace-plan-preview-toggle
 trace-progress
 trace-progress-blocker
 trace-progress-body
@@ -924,6 +945,7 @@ work-process-grouped-steps
 work-process-header
 work-process-header-row
 work-process-label
+work-process-loop-result
 work-process-loop-result-text
 work-process-loop-tag
 work-process-loop-tool-summary
@@ -997,10 +1019,12 @@ work-process-tool-summary-static
 work-process-tool-target
 work-process-tool-verb
 work-process-user-input
+work-process-user-input-header
 work-process-user-input-transcript
 work-process-user-input-transcript-answer
 work-process-user-input-transcript-error
 work-process-user-input-transcript-item
 work-process-user-input-transcript-pending
 work-process-user-input-transcript-question
+work-process-user-input-verb
 work-process-view-toggle

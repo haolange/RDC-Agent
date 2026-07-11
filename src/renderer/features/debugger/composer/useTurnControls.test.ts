@@ -6,7 +6,7 @@ import {
   isPendingCapabilityKey,
   resolveTurnControlsForCapabilityChange,
   shouldResyncTurnControls,
-} from './useTurnControls';
+} from './turnControlHelpers';
 
 const limitedLevelsCapability: ResolvedModelCapability = {
   providerId: 'deepseek',

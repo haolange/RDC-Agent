@@ -17,6 +17,7 @@
 
 import { spawn, type ChildProcess } from 'child_process';
 
+import type { MCPConnectionStatus, MCPServerStatusSummary } from '@shared/types/mcp';
 import type {
   ImageContent,
   JsonSchema,
@@ -408,12 +409,88 @@ function buildPrefixedName(serverName: string, toolName: string): string {
 export class MCPManager {
   private connections = new Map<string, MCPConnection>();
   private discoveredTools = new Map<string, MCPDiscoveredTool>();
+  /** 连接生命周期状态（含失败/断开），供目录工具与仪表盘复用。 */
+  private serverStatuses = new Map<string, {
+    name: string;
+    connectionStatus: MCPConnectionStatus;
+    lastError?: string;
+  }>();
+
+  private recordServerStatus(
+    id: string,
+    name: string,
+    connectionStatus: MCPConnectionStatus,
+    lastError?: string,
+  ): void {
+    if (connectionStatus === 'error') {
+      this.serverStatuses.set(id, { name, connectionStatus, lastError });
+      return;
+    }
+    this.serverStatuses.set(id, {
+      name,
+      connectionStatus,
+      ...(lastError ? { lastError } : {}),
+    });
+  }
+
+  /**
+   * 只读：返回当前已知 server 的连接/工具状态摘要。
+   * 不触发连接；未出现在本表中的已配置 server 由调用方标为 unknown。
+   */
+  getServerStatusSummary(): MCPServerStatusSummary[] {
+    const ids = new Set<string>([
+      ...this.connections.keys(),
+      ...this.serverStatuses.keys(),
+    ]);
+    return Array.from(ids).sort((a, b) => a.localeCompare(b)).map((id) => {
+      const conn = this.connections.get(id);
+      const status = this.serverStatuses.get(id);
+      const name = conn?.config.name ?? status?.name ?? id;
+      if (conn) {
+        const summary: MCPServerStatusSummary = {
+          id,
+          name,
+          connectionStatus: 'connected',
+          toolCount: conn.tools.length,
+          tools: conn.tools.map((tool) => tool.originalName),
+        };
+        if (status?.lastError) {
+          summary.lastError = status.lastError;
+        }
+        return summary;
+      }
+      const summary: MCPServerStatusSummary = {
+        id,
+        name,
+        connectionStatus: status?.connectionStatus ?? 'unknown',
+        toolCount: 0,
+        tools: [],
+      };
+      if (status?.lastError) {
+        summary.lastError = status.lastError;
+      }
+      return summary;
+    });
+  }
 
   /** 连接到 MCP 服务器，返回该服务器发现的 prefixedName 列表。 */
   async connect(config: MCPServerConfig): Promise<string[]> {
     if (this.connections.has(config.name)) {
       throw new Error(`MCP server "${config.name}" already connected`);
     }
+    this.recordServerStatus(config.name, config.name, 'connecting');
+    try {
+      const toolNames = await this.connectInternal(config);
+      this.recordServerStatus(config.name, config.name, 'connected');
+      return toolNames;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.recordServerStatus(config.name, config.name, 'error', message);
+      throw err;
+    }
+  }
+
+  private async connectInternal(config: MCPServerConfig): Promise<string[]> {
     const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
     if (config.type === 'stdio') {
@@ -595,7 +672,16 @@ export class MCPManager {
   /** 断开 MCP 服务器。 */
   async disconnect(serverName: string): Promise<void> {
     const conn = this.connections.get(serverName);
-    if (!conn) return;
+    if (!conn) {
+      if (this.serverStatuses.has(serverName)) {
+        this.recordServerStatus(
+          serverName,
+          this.serverStatuses.get(serverName)?.name ?? serverName,
+          'disconnected',
+        );
+      }
+      return;
+    }
     this.connections.delete(serverName);
     for (const t of conn.tools) {
       this.discoveredTools.delete(t.prefixedName);
@@ -613,6 +699,7 @@ export class MCPManager {
         // ignore
       }
     }
+    this.recordServerStatus(serverName, conn.config.name, 'disconnected');
   }
 
   /** 断开所有服务器。 */

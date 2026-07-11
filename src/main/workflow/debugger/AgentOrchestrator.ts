@@ -40,6 +40,7 @@ import type {
   AgentRuntimeMcpDescriptor,
   AgentSubagentEventPayload,
 } from '@shared/types/agentRuntime';
+import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import type { LLMConfig } from '@shared/types/llm';
 import type {
   ConversationTurnControls,
@@ -1647,14 +1648,42 @@ export class AgentOrchestrator {
     };
   }
 
+  /**
+   * Settings / IPC 与 mcp 目录工具共用：合并已配置 MCP 与运行时连接状态。
+   */
+  getMcpServerStatusSummary(projectRootPath?: string | null, query?: string): MCPServerStatusSummary[] {
+    const normalizedQuery = query?.trim().toLowerCase() ?? '';
+    const configured = agentRuntimeConfigService.listMcpServers(projectRootPath ?? undefined)
+      .filter((server) => !normalizedQuery
+        || `${server.id} ${server.name} ${server.description}`.toLowerCase().includes(normalizedQuery));
+    const runtimeById = new Map(
+      this.mcpManager.getServerStatusSummary().map((entry) => [entry.id, entry]),
+    );
+    return configured.map((server) => {
+      const runtime = runtimeById.get(server.id) ?? runtimeById.get(server.name);
+      const summary: MCPServerStatusSummary = {
+        id: server.id,
+        name: server.name,
+        connectionStatus: runtime?.connectionStatus ?? 'unknown',
+        toolCount: runtime?.toolCount ?? 0,
+        tools: runtime?.tools ?? [],
+      };
+      if (runtime?.lastError) {
+        summary.lastError = runtime.lastError;
+      }
+      return summary;
+    });
+  }
+
   private createMcpCatalogTool(): AgentTool<
     { query?: string },
-    { count: number }
+    { count: number; servers: MCPServerStatusSummary[] }
   > {
+    const orchestrator = this;
     return {
       name: 'mcp',
       label: 'List MCP Services',
-      description: 'List MCP services configured for the current workspace.',
+      description: 'List MCP services configured for the current workspace, including connection status and tools.',
       parameters: {
         type: 'object',
         properties: {
@@ -1663,15 +1692,24 @@ export class AgentOrchestrator {
       },
       permissionHint: 'readonly',
       async execute(_toolCallId, args, _signal, _onUpdate, context) {
-        const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
-        const servers = agentRuntimeConfigService.listMcpServers(context?.projectRootPath ?? undefined)
-          .filter((server) => !query || `${server.id} ${server.name} ${server.description}`.toLowerCase().includes(query));
-        const lines = servers.map((server) => (
-          `${server.id}: ${server.name} (${server.transport})${server.enabledByDefault ? '' : ' - disabled by default'}`
-        ));
+        const query = typeof args.query === 'string' ? args.query : undefined;
+        const servers = orchestrator.getMcpServerStatusSummary(context?.projectRootPath ?? null, query);
+        const lines = servers.map((server) => {
+          const toolNames = (server.tools ?? []).slice(0, 12);
+          const toolsLabel = toolNames.length > 0
+            ? toolNames.join(', ') + ((server.tools?.length ?? 0) > toolNames.length ? ', …' : '')
+            : '(none)';
+          const errorLine = server.lastError ? `\n  lastError: ${server.lastError}` : '';
+          return [
+            `${server.id}: ${server.name}`,
+            `  connectionStatus: ${server.connectionStatus}`,
+            `  toolCount: ${server.toolCount}`,
+            `  tools: ${toolsLabel}${errorLine}`,
+          ].join('\n');
+        });
         return {
           content: [{ type: 'text', text: lines.length > 0 ? lines.join('\n') : 'No configured MCP services matched the query.' }],
-          details: { count: servers.length },
+          details: { count: servers.length, servers },
         };
       },
     };

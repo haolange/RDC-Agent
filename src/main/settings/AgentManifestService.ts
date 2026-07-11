@@ -158,12 +158,12 @@ const createSeedDefinition = (
   const model = canonicalAgentModelId(route?.providerId ?? '', route?.modelId ?? '');
   const name = AGENT_DISPLAY_NAMES[agentId];
   const tools = agentId === 'ask'
-    ? ['read', 'search', 'web', 'askUser']
+    ? ['read', 'search', 'web', 'askUser', 'task', 'tool_search']
     : agentId === 'plan'
-      ? ['read', 'search', 'web', 'askUser', 'agent', 'todo', 'memory', 'planArtifact', 'handoff']
+      ? ['read', 'search', 'web', 'askUser', 'agent', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search']
       : agentId === 'edit'
-        ? ['read', 'search', 'web', 'bash', 'write', 'edit', 'askUser', 'agent', 'todo', 'memory', 'skill', 'mcp']
-        : ['read', 'search', 'web', 'bash', 'askUser', 'agent', 'todo', 'memory', 'rdxContext'];
+        ? ['read', 'search', 'web', 'bash', 'write', 'edit', 'git', 'askUser', 'agent', 'task', 'memory', 'skill', 'mcp', 'subagent', 'tool_search']
+        : ['read', 'search', 'web', 'bash', 'askUser', 'agent', 'task', 'memory', 'rdxContext', 'subagent', 'tool_search'];
   return {
     id: agentId,
     fileName: fileNameForId(agentId),

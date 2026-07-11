@@ -214,7 +214,7 @@ export const SessionProgressPanel: React.FC = () => {
             ))}
           </div>
           {taskItems.length === 0 ? (
-            <div className="session-progress-empty">{t('control.sessionProgressNoUpdates')}</div>
+            <div className="panel-empty">{t('control.sessionProgressNoUpdates')}</div>
           ) : null}
         </div>
       )}

@@ -9,6 +9,7 @@ import { useWorkflowStore } from '../../../stores/workflowStore';
 import { getSessionContextSummary, SessionContextPanel } from './SessionContextPanel';
 import { getSessionProgressSnapshot, SessionProgressPanel } from './SessionProgressPanel';
 import { SessionCapabilitiesPanel } from './SessionCapabilitiesPanel';
+import { RdxRuntimeContextPanel } from './RdxRuntimeContextPanel';
 import { SessionWorkingFolderPanel } from './SessionWorkingFolderPanel';
 import { ArtifactTree } from './ArtifactTree';
 import { MemoryPanel } from './MemoryPanel';
@@ -155,7 +156,10 @@ export const ClassicSessionControlPanel: React.FC = () => {
             </span>
           ) : undefined}
         >
-          <SessionCapabilitiesPanel />
+          <div className="session-capabilities-stack">
+            <SessionCapabilitiesPanel />
+            <RdxRuntimeContextPanel />
+          </div>
         </CollapsibleSection>
 
         <CollapsibleSection

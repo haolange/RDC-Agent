@@ -8,6 +8,18 @@ export type {
   AgentWorkbenchToolPermission,
 } from './agentWorkbenchCatalog';
 export {
+  BUILTIN_AGENT_TOOL_IDS,
+  BUILTIN_AGENT_TOOL_ID_SET,
+  CANONICAL_TOOL_TOKEN_EXPANSIONS,
+  REJECTED_TOOL_TOKENS,
+  diagnoseManifestToolTokens,
+  expandCanonicalToolToken,
+} from './agentToolTokens';
+export type {
+  BuiltinAgentToolId,
+  ToolTokenDiagnostic,
+} from './agentToolTokens';
+export {
   AGENT_CATEGORIES,
   AGENT_COLORS,
   AGENT_DESCRIPTIONS,

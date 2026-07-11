@@ -19,7 +19,7 @@ export const SessionContextQuickEntry: React.FC<SessionContextQuickEntryProps> =
   } = vm;
 
   if (projectInputs.length === 0) {
-    return <div className="session-context-empty">{t('control.sessionContextNoCapture')}</div>;
+    return <div className="panel-empty">{t('control.sessionContextNoCapture')}</div>;
   }
 
   return (

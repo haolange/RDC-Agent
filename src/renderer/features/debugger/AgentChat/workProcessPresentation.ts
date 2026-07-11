@@ -715,7 +715,7 @@ const enhanceToolPreviewLines = (
     if (lines.length > 0) return lines.slice(0, 4);
   }
 
-  if (/grep|glob|search_codebase/.test(normalized)) {
+  if (/grep|glob/.test(normalized)) {
     const matches = collectReadableText(
       record?.matches ?? record?.files ?? record?.paths ?? readNestedValue(record ?? {}, ['data', 'matches']),
       4,

@@ -101,6 +101,9 @@ class BrowserAppBridgeClient {
       getCatalog: () => this.invoke('tool:getCatalog'),
       getRuntimeSummary: () => this.invoke('tool:getRuntimeSummary'),
     },
+    mcp: {
+      getStatusSummary: () => this.invoke('mcp:getStatusSummary'),
+    },
     evidence: {
       getChain: () => this.invoke('evidence:getChain'),
       getEvents: (eventType) => this.invoke('evidence:getEvents', eventType),
