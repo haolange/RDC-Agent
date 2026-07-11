@@ -126,7 +126,7 @@
 - 代码改动后执行 `npm run typecheck`。
 - renderer 结构或 UI 锚点改动后执行 `npm run check:architecture`、`npm run check:fidelity`、`npm run check:shared-exports`。
 - Work Process 投影、工具行文案/图标或 transcript UI 改动后执行 `npm run check:work-process`、`npm run check:work-process-tool-coverage`。
-- Work Process UI 验收必须覆盖：运行中动态标题与 Active Signal 文本能量扫光、完成后「思考过程 / Thinking」+ meta、扁平 tool 行（无 `toolGroup` 双层壳）、web_search/fetch source pills、Request Inspector 不出现在消息流、真实事件驱动的逐条出现与短 CSS 入场（禁止假 stagger）。
+- Work Process UI 验收必须覆盖：运行中顶层「工作中 / Working」与 Active Signal 文本能量扫光、完成后「工作过程 / Work process」+ meta、loop thinking 完成态「思考了 / Thought for」+ 时长、commentary 散文（markdown，不进 thinking 槽）、扁平 tool 行或 ≥3 聚合摘要行（无语义分组灰框、无 `toolGroup` 双层壳）、安静 loop 级轨道点、web_search/fetch source pills、Request Inspector 不出现在消息流、真实事件驱动的逐条出现与短 CSS 入场（禁止假 stagger）。
 - provider thinking 投递或 reasoning artifact 投影改动后执行 `npm run check:reasoning-delivery`。
 - scoped resource、project instruction、prompt snapshot、skill、hook 或 memory policy 改动后，必须执行相应专项 contract check；缺少时应在同一改动中补齐。
 - 入口、构建或窗口逻辑改动后，再补 `npm run build` 或等价打包检查。

@@ -9,6 +9,7 @@ const {
   WORK_PROCESS_TOOL_DISPLAY_CATALOG,
   createToolRowForPresentation,
 } = require('../src/renderer/features/debugger/AgentChat/workProcessPresentation.ts');
+const { buildToolAggregateSummary } = require('../src/renderer/features/debugger/AgentChat/workProcessToolAggregate.ts');
 
 const fail = (message) => {
   console.error(`[work-process-tool-coverage] ${message}`);
@@ -190,6 +191,18 @@ const extraInCatalog = workbenchToolIds.filter((id) => !builtinIds.includes(id))
 assert(missingFromCatalog.length === 0, `AGENT_WORKBENCH_TOOL_CATALOG missing builtin ids: ${missingFromCatalog.join(', ')}`);
 assert(extraInCatalog.length === 0, `AGENT_WORKBENCH_TOOL_CATALOG has unknown ids: ${extraInCatalog.join(', ')}`);
 assert(new Set(workbenchToolIds).size === workbenchToolIds.length, 'AGENT_WORKBENCH_TOOL_CATALOG has duplicate ids');
+
+const aggregateTools = ['read_file', 'read_file', 'glob'].map((toolName, index) => createToolRowForPresentation({
+  id: `tool-aggregate-${index}`,
+  toolName,
+  status: 'complete',
+  argsPreview: FIXTURES[toolName].argsPreview,
+  resultPreview: FIXTURES[toolName].resultPreview,
+  startedAt: now + index,
+  completedAt: now + index + 10,
+}, true));
+assert(typeof buildToolAggregateSummary === 'function', 'buildToolAggregateSummary should be exported');
+assert(buildToolAggregateSummary(aggregateTools).includes('读取了'), 'tool aggregate summary should classify read_file actions');
 
 const PLAN_REQUIRED_TOOLS = [...workbenchToolIds, 'mcp__filesystem__read_file'];
 const allTools = [...new Set(PLAN_REQUIRED_TOOLS)];

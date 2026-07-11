@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import type { AppLanguage } from '@shared/types/settings';
 import { useI18n, type TranslationKey } from '../../../i18n';
 import { CATALOG_VERB_LABEL_KEYS } from './workProcessCatalogVerbLabels';
 
@@ -7,7 +8,7 @@ const LABEL_TO_KEY: Record<string, TranslationKey> = {
   '进行中': 'chat.workProcessStatusRunning',
   '失败': 'chat.workProcessStatusError',
   '正在思考': 'chat.workProcessThinkingStreaming',
-  '思考过程': 'chat.workProcessThinkingComplete',
+  '已思考': 'chat.workProcessThinkingComplete',
   '收束摘要': 'chat.workProcessThinkingClosing',
   '回复': 'chat.workProcessResponseTitle',
   '正在生成最终回复': 'chat.workProcessResponseGenerating',
@@ -32,23 +33,73 @@ const LABEL_TO_KEY: Record<string, TranslationKey> = {
   '已调用工具': 'chat.workProcessToolGenericComplete',
   '正在调用工具': 'chat.workProcessToolGenericRunning',
   '等待调用工具': 'chat.workProcessToolGenericPending',
-  '探索': 'chat.workProcessSemanticExplore',
-  '联网': 'chat.workProcessSemanticWeb',
-  '修改': 'chat.workProcessSemanticChange',
-  '验证': 'chat.workProcessSemanticVerify',
-  '交互': 'chat.workProcessSemanticInteraction',
-  '协作': 'chat.workProcessSemanticCollaboration',
-  '记忆': 'chat.workProcessSemanticMemory',
-  '诊断': 'chat.workProcessSemanticDiagnostic',
-  '上下文压缩': 'chat.workProcessSemanticCompaction',
-  '阶段思考摘要': 'chat.workProcessGroupThinking',
   ...CATALOG_VERB_LABEL_KEYS,
 };
 
+const THOUGHT_FOR_PATTERN = /^思考了 (.+)$/;
+
+const AGGREGATE_PART_PATTERNS: Array<{
+  pattern: RegExp;
+  oneKey: TranslationKey;
+  manyKey: TranslationKey;
+}> = [
+  { pattern: /^创建了 (\d+) 个文件$/, oneKey: 'chat.workProcessAggregateCreatedOne', manyKey: 'chat.workProcessAggregateCreatedMany' },
+  { pattern: /^编辑了 (\d+) 个文件$/, oneKey: 'chat.workProcessAggregateEditedOne', manyKey: 'chat.workProcessAggregateEditedMany' },
+  { pattern: /^删除了 (\d+) 个文件$/, oneKey: 'chat.workProcessAggregateDeletedOne', manyKey: 'chat.workProcessAggregateDeletedMany' },
+  { pattern: /^读取了 (\d+) 个文件$/, oneKey: 'chat.workProcessAggregateReadOne', manyKey: 'chat.workProcessAggregateReadMany' },
+  { pattern: /^运行了 (\d+) 条命令$/, oneKey: 'chat.workProcessAggregateRanOne', manyKey: 'chat.workProcessAggregateRanMany' },
+  { pattern: /^搜索了 (\d+) 次$/, oneKey: 'chat.workProcessAggregateSearchedOne', manyKey: 'chat.workProcessAggregateSearchedMany' },
+  { pattern: /^列出了 (\d+) 项$/, oneKey: 'chat.workProcessAggregateListedOne', manyKey: 'chat.workProcessAggregateListedMany' },
+  { pattern: /^使用了 (\d+) 个工具$/, oneKey: 'chat.workProcessAggregateUsedOne', manyKey: 'chat.workProcessAggregateUsedMany' },
+];
+
+function translateThinkingLabel(
+  label: string,
+  language: AppLanguage,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): string {
+  if (language === 'zh-CN') return label;
+  const thoughtFor = label.match(THOUGHT_FOR_PATTERN);
+  if (thoughtFor) return t('chat.workProcessThoughtFor', { duration: thoughtFor[1] });
+  return label;
+}
+
+function translateAggregatePart(
+  part: string,
+  language: AppLanguage,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): string {
+  if (language === 'zh-CN') return part;
+  for (const { pattern, oneKey, manyKey } of AGGREGATE_PART_PATTERNS) {
+    const match = part.match(pattern);
+    if (!match) continue;
+    const count = Number(match[1]);
+    return count === 1 ? t(oneKey) : t(manyKey, { count });
+  }
+  return part;
+}
+
+function translateAggregateSummary(
+  summary: string,
+  language: AppLanguage,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): string {
+  if (!summary || language === 'zh-CN') return summary;
+  const separator = summary.includes('，') ? '，' : ', ';
+  return summary
+    .split(separator)
+    .map((part) => translateAggregatePart(part.trim(), language, t))
+    .join(', ');
+}
+
 export function useWorkProcessLabel() {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   return useCallback((label: string) => {
+    const thinking = translateThinkingLabel(label, language, t);
+    if (thinking !== label) return thinking;
+    const aggregate = translateAggregateSummary(label, language, t);
+    if (aggregate !== label) return aggregate;
     const key = LABEL_TO_KEY[label];
     return key ? t(key) : label;
-  }, [t]);
+  }, [language, t]);
 }

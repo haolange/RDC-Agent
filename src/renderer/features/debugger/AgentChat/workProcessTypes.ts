@@ -5,7 +5,6 @@ import type {
   ConversationWorkBlock,
 } from '@shared/types/conversation';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
-import type { WorkProcessSemanticStepKind } from './workProcessSemanticKind';
 
 export type WorkProcessRowStatus = 'pending' | 'running' | 'complete' | 'error';
 
@@ -49,14 +48,6 @@ export interface WorkProcessToolApproval {
   metaLines: string[];
 }
 
-export interface WorkProcessGroupThinking {
-  preview: string;
-  label: string;
-  kind?: ThinkingArtifact['kind'];
-  visibility?: ThinkingArtifact['visibility'];
-  status?: ConversationWorkBlock['thinkingStatus'];
-}
-
 export interface WorkProcessUserInputItem {
   questionId: string;
   prompt: string;
@@ -87,10 +78,20 @@ export type WorkProcessRow =
     argsLines: string[];
     previewLines: string[];
     rawLines: string[];
+    /** Human-readable one-line diagnostic for failed tools (never the raw JSON envelope). */
+    diagnosticCaption?: string;
     approval?: WorkProcessToolApproval;
     compact?: boolean;
     sourcePills?: Array<{ domain: string; url?: string; title?: string }>;
     browseLink?: { label: string; url: string };
+  }
+  | {
+    type: 'toolAggregate';
+    id: string;
+    status: WorkProcessRowStatus;
+    summary: string;
+    duration: string;
+    children: Extract<WorkProcessRow, { type: 'tool' }>[];
   }
   | {
     type: 'userInput';
@@ -160,11 +161,9 @@ export type WorkProcessRow =
     type: 'section';
     id: string;
     status: WorkProcessRowStatus;
-    resultText: string;
-    resultToolSummary: string;
-    resultStreaming: boolean;
-    clampResult: boolean;
-    clampable: boolean;
+    /** Loop commentary rendered as markdown prose (never in the thinking slot). */
+    proseText: string;
+    proseStreaming: boolean;
     thinkingPreview: string;
     thinkingLabel: string;
     thinkingKind?: ThinkingArtifact['kind'];
@@ -192,22 +191,7 @@ export type WorkProcessRow =
     loopId: string;
   };
 
-export interface WorkProcessStepGroup {
-  id: string;
-  kind: WorkProcessSemanticStepKind;
-  title: string;
-  status: WorkProcessRowStatus;
-  rows: WorkProcessRow[];
-  loopIds: string[];
-  groupThinking?: WorkProcessGroupThinking;
-}
-
-export interface WorkProcessPresentationOptions {
-  view?: 'grouped' | 'detail';
-}
-
 export interface WorkProcessPresentation {
-  groups: WorkProcessStepGroup[];
   rows: WorkProcessRow[];
   stepCount: number;
   toolCount: number;

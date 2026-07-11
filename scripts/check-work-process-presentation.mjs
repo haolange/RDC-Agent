@@ -27,7 +27,7 @@ const activeSignalStyles = readSource('src/renderer/styles/design-system.css');
 const activeSignalHelper = readSource('src/renderer/features/debugger/AgentChat/workProcessActiveSignal.ts');
 const activeSignalRenderSource = [
   'src/renderer/features/debugger/AgentChat/WorkProcessSectionRow.tsx',
-  'src/renderer/features/debugger/AgentChat/WorkProcessStepGroupRow.tsx',
+  'src/renderer/features/debugger/AgentChat/ToolAggregateRow.tsx',
   'src/renderer/features/debugger/AgentChat/WorkProcessRows.tsx',
   'src/renderer/features/debugger/AgentChat/WorkProcessResponseRow.tsx',
   'src/renderer/features/debugger/AgentChat/SubagentRow.tsx',
@@ -50,18 +50,22 @@ assert(!activeSignalRenderSource.includes("row.status === 'complete' &&"), 'comp
 
 const flattenRows = (rows) => rows.flatMap((row) => {
   if (row.type === 'section') return [row, ...flattenRows(row.steps)];
+  if (row.type === 'toolAggregate') return [row, ...row.children];
   if (row.type === 'toolGroup') return [row, ...flattenRows(row.rows)];
   return [row];
 });
 
 const collectVisible = (rows) => rows.flatMap((row) => {
   if (row.type === 'section') return [
-    row.resultText,
-    row.resultToolSummary,
+    row.proseText,
     row.thinkingLabel,
     row.thinkingSource,
     row.thinkingOpenByDefault ? row.thinkingPreview : '',
     ...collectVisible(row.steps),
+  ].filter(Boolean);
+  if (row.type === 'toolAggregate') return [
+    row.summary,
+    ...collectVisible(row.children),
   ].filter(Boolean);
   if (row.type === 'toolGroup') return [
     row.title,
@@ -178,12 +182,11 @@ for (const forbidden of ['Agent Loop complete', 'Generate final answer', 'Final 
 }
 const loopSection = presentation.rows.find((row) => row.type === 'section');
 assert(loopSection?.type === 'section', 'llm turn should render a work-process section');
-assert(loopSection.resultText === '', 'tool-backed commentary must not occupy a separate result box');
-assert(loopSection.thinkingLabel === '思考过程', 'no-thinking loop should promote commentary into the thinking slot');
-assert(loopSection.thinkingPreview === 'Read files before answering.', 'no-thinking loop should surface commentary as thinking preview');
-assert(loopSection.thinkingExpandable === true, 'promoted commentary should be expandable');
+assert(loopSection.proseText === 'Read files before answering.', 'tool-backed commentary should render as narrative prose');
+assert(loopSection.thinkingLabel === '', 'commentary must not be promoted into the thinking slot');
+assert(loopSection.thinkingPreview === '', 'commentary must not occupy thinking preview');
 assert(loopSection.stepCount === 2, `expected 2 tool actions in section, got ${loopSection.stepCount}`);
-assert(loopSection.steps.length === 2, `loop section should keep flat tool rows, got ${loopSection.steps.length}`);
+assert(loopSection.steps.length === 2, `loop section should keep flat tool rows for two tools, got ${loopSection.steps.length}`);
 assert(loopSection.steps.every((row) => row.type === 'tool'), 'loop section tools must be flat tool rows without toolGroup shells');
 const globRow = flatRows.find((row) => row.type === 'tool' && row.toolName === 'glob');
 const readRow = flatRows.find((row) => row.type === 'tool' && row.toolName === 'read_file');
@@ -219,7 +222,7 @@ const rawThinkingPresentation = buildWorkProcessPresentation({
 });
 const rawThinkingSection = rawThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(rawThinkingSection?.type === 'section', 'raw thinking loop should render a section');
-assert(rawThinkingSection.thinkingLabel === '思考过程', 'raw thinking should use the unified settled thinking label');
+assert(rawThinkingSection.thinkingLabel === '思考了 0ms', 'raw thinking should use Thought-for settled label with duration to first tool');
 assert(rawThinkingSection.thinkingPreview === 'provider-visible raw thinking', 'raw provider thinking should remain available behind disclosure');
 assert(rawThinkingSection.thinkingOpenByDefault === false, 'raw thinking should stay folded by default');
 
@@ -249,8 +252,8 @@ const summaryThinkingPresentation = buildWorkProcessPresentation({
 });
 const summaryThinkingSection = summaryThinkingPresentation.rows.find((row) => row.type === 'section');
 assert(summaryThinkingSection?.type === 'section', 'summary thinking should render as process evidence');
-assert(summaryThinkingSection.resultText === '', 'answer-only thinking must not duplicate final answer text');
-assert(summaryThinkingSection.thinkingLabel === '思考过程', 'summary thinking should use the unified settled thinking label');
+assert(summaryThinkingSection.proseText === '', 'answer-only thinking must not duplicate final answer text');
+assert(summaryThinkingSection.thinkingLabel === '思考了 5ms', 'summary thinking should use Thought-for settled label');
 assert(summaryThinkingSection.thinkingOpenByDefault === true, 'summary thinking should be open by default');
 
 const duplicateSummary = 'I have all the answers from memory. Let me respond concisely in Chinese.';
@@ -546,10 +549,9 @@ assert(mcpRow?.category === 'MCP' || mcpRow?.groupKind === 'mcp', 'dynamic MCP t
 const componentSource = [
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcess.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessSectionRow.tsx', 'utf8'),
-  fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessStepGroupRow.tsx', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/ToolAggregateRow.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessReasoningIndicatorRow.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessRowRenderer.tsx', 'utf8'),
-  fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessViewToggle.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessRows.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessRowParts.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessResponseRow.tsx', 'utf8'),
@@ -561,7 +563,7 @@ const responsiveThemeSource = fs.readFileSync('src/renderer/styles/global/respon
 const presentationSource = [
   fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessPresentation.ts', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessBlockProjection.ts', 'utf8'),
-  fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessGrouping.ts', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessToolAggregate.ts', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessToolCatalog.ts', 'utf8'),
 ].join('\n');
 const i18nSource = fs.readFileSync('src/renderer/i18n.ts', 'utf8');
@@ -571,6 +573,12 @@ const toolApprovalPanelSource = fs.readFileSync('src/renderer/features/debugger/
 const toolApprovalSubmitHookSource = fs.readFileSync('src/renderer/features/debugger/composer/useToolApprovalSubmit.ts', 'utf8');
 const orchestratorSource = fs.readFileSync('src/main/workflow/debugger/AgentOrchestrator.ts', 'utf8');
 
+assert(presentationSource.includes('resolveSectionProse'), 'commentary should route through resolveSectionProse');
+assert(presentationSource.includes('proseText'), 'presentation should expose narrative prose on sections');
+assert(presentationSource.includes('aggregateSectionSteps'), 'presentation should aggregate consecutive tools');
+assert(presentationSource.includes("type: 'toolAggregate'"), 'presentation should expose toolAggregate rows');
+assert(presentationSource.includes('buildToolAggregateSummary'), 'tool aggregate summaries should be built centrally');
+assert(!presentationSource.includes('buildSemanticStepGroups'), 'semantic step grouping must be removed');
 assert(presentationSource.includes("block.kind === 'llm_turn'"), 'Work Process sections should be sourced from LLM loop blocks');
 assert(presentationSource.includes('WORK_PROCESS_TOOL_DISPLAY_CATALOG'), 'tool display catalog should be canonical');
 assert(!presentationSource.includes("type: 'toolGroup'"), 'presentation must not expose toolGroup shells');
@@ -579,7 +587,9 @@ assert(presentationSource.includes('createResponseRow'), 'presentation should ro
 assert(presentationSource.includes('actionCount'), 'presentation should expose actionCount for top-level transcript meta');
 assert(presentationSource.includes("normalized.startsWith('mcp__')"), 'dynamic MCP wildcard should have a semantic display path');
 assert(presentationSource.includes("label: status === 'streaming' || isActiveBlock"), 'thinking labels should branch on active vs settled state');
-assert(presentationSource.includes("'思考过程'"), 'settled thinking label should be 思考过程');
+assert(presentationSource.includes('resolveSettledThinkingLabel'), 'settled thinking should resolve Thought-for labels centrally');
+assert(presentationSource.includes('思考了'), 'settled thinking label should use 思考了 duration copy');
+assert(!presentationSource.includes(": '思考过程'"), 'settled thinking must not reuse the Work process header title 思考过程');
 assert(!presentationSource.includes("'原始思考'"), 'product copy must not use 原始思考');
 assert(!presentationSource.includes("isSummary ? '思考'"), 'settled thinking must not split summary/raw labels');
 for (const forbidden of ['Called tool']) {
@@ -587,14 +597,36 @@ for (const forbidden of ['Called tool']) {
 }
 
 assert(!componentSource.includes('ToolGroupRow'), 'component must not render toolGroup shells');
+assert(componentSource.includes('ToolAggregateRow'), 'component should render tool aggregate rows');
+assert(componentSource.includes('work-process-narrative-stream'), 'component should use narrative stream list class');
+assert(componentSource.includes('work-process-prose'), 'component should render narrative prose');
 assert(componentSource.includes('ResponseRow'), 'component should render the final response boundary row');
 assert(componentSource.includes("t('chat.workProcessTitle')"), 'header should use the process title translation');
+assert(componentSource.includes("t('chat.workProcessHeadlineRunning')"), 'running header should use Working copy');
 assert(componentSource.includes('ActiveSignalText'), 'running header should use ActiveSignalText');
 assert(!componentSource.includes('TRACE_HEADLINE_KEY'), 'top Work Process header must not fall back to status-first copy');
 assert(!componentSource.includes('statusMeta'), 'top Work Process meta should be duration/action context, not completion-status copy');
 assert(!componentSource.includes('work-process-tool-group'), 'tool group class must be removed from component source');
-assert(componentSource.includes('work-process-step-group'), 'semantic step group row class should exist in component source');
-assert(componentSource.includes('WorkProcessViewToggle'), 'component should expose grouped/detail view toggle');
+assert(!componentSource.includes('work-process-step-group'), 'semantic step group row class must be removed');
+assert(!componentSource.includes('WorkProcessViewToggle'), 'grouped/detail view toggle must be removed');
+assert(!componentSource.includes('buildSemanticStepGroups'), 'semantic grouping must not remain in components');
+for (const removedPath of [
+  'src/renderer/features/debugger/AgentChat/workProcessGrouping.ts',
+  'src/renderer/features/debugger/AgentChat/WorkProcessStepGroupRow.tsx',
+  'src/renderer/features/debugger/AgentChat/WorkProcessViewToggle.tsx',
+  'src/renderer/features/debugger/AgentChat/workProcessGroupMetrics.ts',
+  'src/renderer/features/debugger/AgentChat/workProcessSemanticIcons.ts',
+  'src/renderer/features/debugger/AgentChat/workProcessSemanticKind.ts',
+]) {
+  assert(!fs.existsSync(removedPath), `legacy path must be deleted: ${removedPath}`);
+}
+assert(fs.existsSync('src/renderer/features/debugger/AgentChat/workProcessToolAggregate.ts'), 'tool aggregate helper must exist');
+assert(fs.existsSync('src/renderer/features/debugger/AgentChat/ToolAggregateRow.tsx'), 'ToolAggregateRow must exist');
+assert(fs.existsSync('src/renderer/features/debugger/AgentChat/workProcessUnits.ts'), 'presentation units helper must exist');
+assert(componentSource.includes('work-process-tool-diagnostic'), 'failed tools should expose a diagnostic caption exit');
+assert(componentSource.includes('diagnosticCaption'), 'tool rows should carry diagnosticCaption from projection');
+assert(componentSource.includes("setRawOpen(false)"), 'failed tools must not auto-open raw JSON by default');
+assert(!componentSource.includes('setRawOpen(true);\n      setPreviewOpen(true);'), 'failed tools must not force-open preview and raw together on error');
 assert(componentSource.includes('<details className={thinkingClassName}'), 'thinking should render as a user-collapsible top disclosure');
 assert(!componentSource.includes('isSummaryThinking'), 'summary thinking must not bypass the top disclosure hierarchy');
 assert(!componentSource.includes("t('chat.workProcessViewSteps'"), 'section should not expose the legacy tool-step disclosure');
@@ -612,14 +644,17 @@ assert(!componentSource.includes('work-process-preview-disclosure'), 'nested Con
 assert(!componentSource.includes('work-process-preview-toggle'), 'nested Console output toggle must be removed');
 
 assert(!cssSource.includes('.work-process-tool-group'), 'tool group styling must be removed');
-assert(cssSource.includes('.work-process-step-group'), 'semantic step group styling should exist');
+assert(!cssSource.includes('.work-process-step-group'), 'semantic step group styling must be removed');
 assert(cssSource.includes('.work-process-source-pills') || cssSource.includes('.work-process-source-pill'), 'web source pill styling should exist');
 assert(cssSource.includes('.work-process-step.is-appear'), 'step appear animation should exist');
 assert(cssSource.includes('.work-process-response'), 'response boundary styling should exist');
 assert(cssSource.includes('.work-process-icon'), 'local tool icon styling should exist');
 assert(cssSource.includes('.work-process-section-list'), 'section list styling should exist');
 assert(cssSource.includes('.work-process-step-rail.status-complete'), 'rail marker color should be status-driven, not section-driven');
-assert(cssSource.includes('.work-process-loop-result.is-streaming'), 'result streaming indicator should exist');
+assert(cssSource.includes('.work-process-prose.is-streaming'), 'prose streaming indicator should exist');
+assert(cssSource.includes('.work-process-tool-aggregate'), 'tool aggregate styling should exist');
+assert(cssSource.includes('.work-process-section-list .work-process-step-rail'), 'nested tool rails must be suppressed under section lists');
+assert(cssSource.includes('width: 6px'), 'loop rail marker should be 6px');
 assert(cssSource.includes('@media (prefers-reduced-motion: reduce)'), 'streaming motion should honor reduced motion');
 assert(cssSource.includes('.work-process-tool-approval'), 'tool approval styling should exist');
 assert(cssSource.includes('.work-process-disclosure:not([open]) > :not(summary)'), 'closed disclosure must not render expanded body content');
@@ -635,14 +670,28 @@ assert(appShellSource.includes('.composer-shell.is-running:focus-within'), 'comp
 assert(appShellSource.includes('@media (prefers-reduced-motion: reduce)'), 'composer running border should honor reduced motion');
 assert(responsiveThemeSource.includes('--composer-shell-radius: 12px'), 'composer responsive radius token should stay synchronized with the running border');
 
-assert(i18nSource.includes("'chat.workProcessTitle': 'Thinking process'"), 'English process title copy should be Thinking process');
-assert(i18nSource.includes("'chat.workProcessTitle': '思考过程'"), 'Chinese process title copy should exist');
-assert(i18nSource.includes("'chat.workProcessThinkingComplete': 'Thinking process'"), 'English settled thinking label should exist');
-assert(i18nSource.includes("'chat.workProcessThinkingComplete': '思考过程'"), 'Chinese settled thinking label should exist');
+assert(i18nSource.includes("'chat.workProcessTitle': 'Work process'"), 'English process title copy should be Work process');
+assert(i18nSource.includes("'chat.workProcessTitle': '工作过程'"), 'Chinese process title copy should exist');
+assert(i18nSource.includes("'chat.workProcessHeadlineRunning': 'Working'"), 'English running header copy should be Working');
+assert(i18nSource.includes("'chat.workProcessHeadlineRunning': '工作中'"), 'Chinese running header copy should exist');
+assert(i18nSource.includes("'chat.workProcessThoughtFor': 'Thought for {duration}'"), 'English Thought-for copy should exist');
+assert(i18nSource.includes("'chat.workProcessThoughtFor': '思考了 {duration}'"), 'Chinese Thought-for copy should exist');
+assert(i18nSource.includes("'chat.workProcessThinkingComplete': 'Thought'"), 'English durationless settled thinking fallback should exist');
+assert(i18nSource.includes("'chat.workProcessThinkingComplete': '已思考'"), 'Chinese durationless settled thinking fallback should exist');
+assert(!i18nSource.includes("'chat.workProcessTitle': 'Thinking process'"), 'header must not reuse Thinking process title');
+assert(!i18nSource.includes("'chat.workProcessThinkingComplete': 'Thinking process'"), 'settled thinking must not reuse Thinking process');
 assert(!i18nSource.includes('Tool steps {count}'), 'English legacy tool-step copy should be removed');
 assert(!i18nSource.includes('工具步骤'), 'Chinese legacy tool-step copy should be removed');
 assert(!i18nSource.includes('Reasoning summary'), 'legacy reasoning label should not exist in i18n');
 assert(!i18nSource.includes("'chat.workProcessTitle': 'Process'"), 'English Process title must be removed');
+assert(presentationSource.includes('extractDiagnosticCaption'), 'failed tools should extract a human-readable diagnostic caption');
+assert(presentationSource.includes('diagnosticCaption'), 'tool projection should expose diagnosticCaption');
+assert(cssSource.includes('.work-process-tool-diagnostic'), 'failed-tool diagnostic caption styling should exist');
+assert(cssSource.includes('.work-process-tool.status-error .work-process-tool-verb'), 'failed tool verbs should use error color only on the verb');
+assert(i18nSource.includes("'chat.workProcessShowDiagnostic': 'Show details'"), 'diagnostic detail affordance English copy should exist');
+assert(i18nSource.includes("'chat.workProcessShowDiagnostic': '查看详情'"), 'diagnostic detail affordance Chinese copy should exist');
+assert(!i18nSource.includes('workProcessShowLoopDetail'), 'grouped/detail view i18n keys must be removed');
+assert(!i18nSource.includes('workProcessSemanticExplore'), 'semantic grouping i18n keys must be removed');
 
 assert(!userInputPanelSource.includes('window.electronAPI'), 'composer user input panel must not call Electron APIs directly');
 assert(userInputSubmitHookSource.includes('answerUserInput'), 'composer user input hook must submit through conversation.answerUserInput');

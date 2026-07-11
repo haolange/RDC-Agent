@@ -1,29 +1,27 @@
 import React from 'react';
-import { useI18n } from '../../../i18n';
 import { ActiveSignalText } from '../../../ui/ActiveSignalText';
 import type { WorkProcessRow } from './workProcessPresentation';
 import { useWorkProcessLabel } from './workProcessUseLabel';
 import { WorkProcessRailIcon } from './WorkProcessRailIcon';
 import { isActiveThinkingStatus } from './workProcessActiveSignal';
+import { MessageMarkdown } from './MessageMarkdown';
 
 interface WorkProcessSectionRowProps {
   row: Extract<WorkProcessRow, { type: 'section' }>;
-  showLoopMeta?: boolean;
   renderRow: (row: WorkProcessRow) => React.ReactNode;
 }
 
 export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
   row,
-  showLoopMeta = false,
   renderRow,
 }) => {
-  const { t } = useI18n();
   const label = useWorkProcessLabel();
   const hasError = row.status === 'error' || row.steps.some((step) => step.status === 'error');
   const visibleSteps = row.visibleSteps;
   const showSteps = visibleSteps.length > 0;
-  const hasResult = Boolean(row.resultText || row.resultToolSummary);
+  const hasProse = Boolean(row.proseText);
   const thinkingActive = isActiveThinkingStatus(row.thinkingStatus, row.status);
+  const firstLineCaption = Boolean(row.thinkingExpandable || row.thinkingLabel) && !hasProse;
   const thinkingClassName = [
     'work-process-thinking-state',
     row.thinkingKind ? `kind-${row.thinkingKind}` : '',
@@ -32,23 +30,12 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
   ].filter(Boolean).join(' ');
 
   return (
-    <li className={`work-process-step work-process-section status-${row.status} kind-section`} data-testid="work-process-section">
+    <li
+      className={`work-process-step work-process-section kind-section status-${row.status}${hasProse ? ' has-prose' : ''}${firstLineCaption ? ' first-line-caption' : ''}`}
+      data-testid="work-process-section"
+    >
       <WorkProcessRailIcon variant="section" status={row.status} />
       <div className="work-process-step-content">
-        {showLoopMeta ? (
-          <div className="work-process-section-meta">
-            {row.outputPhase ? (
-              <span className="work-process-loop-tag">
-                {row.outputPhase === 'final_answer'
-                  ? t('chat.workProcessOutputPhaseFinal')
-                  : t('chat.workProcessOutputPhaseCommentary')}
-              </span>
-            ) : null}
-            {row.stopReason ? (
-              <span className="work-process-loop-tag">{row.stopReason}</span>
-            ) : null}
-          </div>
-        ) : null}
         {row.thinkingExpandable ? (
           <details className={thinkingClassName} open={row.thinkingOpenByDefault}>
             <summary className="work-process-thinking-summary">
@@ -56,7 +43,7 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
               {row.thinkingSource ? <span className="work-process-thinking-source">{row.thinkingSource}</span> : null}
               <span className="work-process-row-caret" aria-hidden="true" />
             </summary>
-            <pre className="work-process-thinking-preview">{row.thinkingPreview}</pre>
+            <div className="work-process-thinking-preview">{row.thinkingPreview}</div>
           </details>
         ) : row.thinkingLabel ? (
           <p className={thinkingClassName}>
@@ -64,10 +51,9 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
             {row.thinkingSource ? <span className="work-process-thinking-source">{row.thinkingSource}</span> : null}
           </p>
         ) : null}
-        {hasResult ? (
-          <div className={`work-process-loop-result${row.resultStreaming ? ' is-streaming' : ''}`}>
-            {row.resultText ? <p className="work-process-loop-result-text">{row.resultText}</p> : null}
-            {row.resultToolSummary ? <p className="work-process-loop-tool-summary">{row.resultToolSummary}</p> : null}
+        {hasProse ? (
+          <div className={`work-process-prose${row.proseStreaming ? ' is-streaming' : ''}`}>
+            <MessageMarkdown content={row.proseText} />
           </div>
         ) : null}
         {showSteps ? (

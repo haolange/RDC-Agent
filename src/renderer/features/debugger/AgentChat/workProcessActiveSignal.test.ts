@@ -20,10 +20,10 @@ describe('workProcessActiveSignal', () => {
     expect(isActiveThinkingStatus(undefined, 'running')).toBe(true);
   });
 
-  it('keeps active signal off semantic group titles and ordinary tool verbs', () => {
+  it('keeps active signal off tool aggregate summaries and ordinary tool verbs', () => {
     const root = process.cwd();
-    const stepGroupSource = fs.readFileSync(
-      path.resolve(root, 'src/renderer/features/debugger/AgentChat/WorkProcessStepGroupRow.tsx'),
+    const aggregateSource = fs.readFileSync(
+      path.resolve(root, 'src/renderer/features/debugger/AgentChat/ToolAggregateRow.tsx'),
       'utf8',
     );
     const rowsSource = fs.readFileSync(
@@ -31,7 +31,7 @@ describe('workProcessActiveSignal', () => {
       'utf8',
     );
 
-    expect(stepGroupSource).not.toContain('ActiveSignalText');
+    expect(aggregateSource).not.toContain('ActiveSignalText');
     expect(rowsSource).not.toContain('className="work-process-tool-verb">{label(row.verb)}</ActiveSignalText>');
     expect(rowsSource).not.toContain('work-process-tool-approval-verb">{label(approval.verb)}</ActiveSignalText>');
     expect(rowsSource).not.toContain('work-process-tool-group-title');
