@@ -86,19 +86,22 @@ export const ToolRow: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   const hasPreview = row.previewLines.length > 0;
   const hasApproval = Boolean(row.approval);
   const sourcePills = row.sourcePills?.length ? row.sourcePills : null;
-  const [rawOpen, setRawOpen] = React.useState(row.status === 'error');
-  const [previewOpen, setPreviewOpen] = React.useState(
-    row.status === 'running' || row.status === 'error',
-  );
+  const diagnosticCaption = row.diagnosticCaption?.trim() || '';
+  const hasDiagnostic = row.status === 'error' && Boolean(diagnosticCaption);
+  const [rawOpen, setRawOpen] = React.useState(false);
+  const [previewOpen, setPreviewOpen] = React.useState(row.status === 'running');
   const durationTitleFull = row.duration ? `${row.toolName} · ${row.duration}` : row.toolName;
   const verbLabel = label(row.verb);
 
   React.useEffect(() => {
+    if (row.status === 'running') {
+      setPreviewOpen(true);
+      return;
+    }
     if (row.status === 'error') {
-      setRawOpen(true);
-      setPreviewOpen(true);
-    } else if (row.status === 'running') {
-      setPreviewOpen(true);
+      // Keep failed details collapsed; diagnostic caption is the exit.
+      setRawOpen(false);
+      setPreviewOpen(false);
     }
   }, [row.status]);
 
@@ -113,6 +116,25 @@ export const ToolRow: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     event.stopPropagation();
     setPreviewOpen((open) => !open);
   };
+
+  const toggleDiagnosticDetails = (event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (hasPreview) {
+      setPreviewOpen((open) => {
+        const next = !open;
+        if (next && hasDebugDetails) setRawOpen(true);
+        if (!next) setRawOpen(false);
+        return next;
+      });
+      return;
+    }
+    if (hasDebugDetails) {
+      setRawOpen((open) => !open);
+    }
+  };
+
+  const detailsExpanded = (hasPreview && previewOpen) || (hasDebugDetails && rawOpen);
 
   const verbNode = hasPreview ? (
     <button
@@ -168,10 +190,33 @@ export const ToolRow: React.FC<{ row: ToolRowModel }> = ({ row }) => {
             {compact ? null : (
               <span className="work-process-tool-meta">
                 {row.duration ? <span>{row.duration}</span> : null}
-                {statusLabel ? <span>{statusLabel}</span> : null}
+                {statusLabel ? (
+                  row.status === 'error' ? (
+                    <span className="work-process-tool-status-error">{statusLabel}</span>
+                  ) : (
+                    <span>{statusLabel}</span>
+                  )
+                ) : null}
               </span>
             )}
           </div>
+          {hasDiagnostic ? (
+            <button
+              type="button"
+              className={`work-process-tool-diagnostic${detailsExpanded ? ' is-open' : ''}`}
+              data-testid="work-process-tool-diagnostic"
+              aria-expanded={detailsExpanded}
+              title={t('chat.workProcessShowDiagnostic')}
+              onClick={toggleDiagnosticDetails}
+            >
+              <span className="work-process-tool-diagnostic-text">{diagnosticCaption}</span>
+              {(hasPreview || hasDebugDetails) ? (
+                <span className="work-process-tool-diagnostic-action">
+                  {detailsExpanded ? t('chat.workProcessHideDiagnostic') : t('chat.workProcessShowDiagnostic')}
+                </span>
+              ) : null}
+            </button>
+          ) : null}
           {hasApproval ? <ToolApprovalCallout approval={row.approval!} /> : null}
           {hasPreview && previewOpen ? (
             <div

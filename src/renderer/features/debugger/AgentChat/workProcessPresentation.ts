@@ -20,22 +20,15 @@ import {
   normalizeAskUserQuestions,
 } from '@shared/utils/askUser';
 import {
-  buildSemanticStepGroups,
-  flattenStepGroups,
-} from './workProcessGrouping';
-import {
   formatMcpTarget,
   getToolDisplay,
   normalizeToolName,
 } from './workProcessToolCatalog';
 
 export type {
-  WorkProcessGroupThinking,
   WorkProcessIconKey,
-  WorkProcessPresentationOptions,
   WorkProcessRow,
   WorkProcessRowStatus,
-  WorkProcessStepGroup,
   WorkProcessToolApproval,
   WorkProcessToolGroupKind,
   WorkProcessUserInputItem,
@@ -46,7 +39,6 @@ export { normalizeWorkProcessText, formatDurationMs } from './workProcessFormat'
 
 import type {
   WorkProcessPresentation,
-  WorkProcessPresentationOptions,
   WorkProcessRow,
   WorkProcessRowStatus,
   WorkProcessToolApproval,
@@ -135,29 +127,41 @@ const resolveOutputPhase = (
   return 'commentary';
 };
 
-const hasReadableThinkingText = (block: ConversationWorkBlock): boolean => {
-  const reasoningState = resolveReasoningState(block);
-  if (!['raw', 'summary', 'unknown'].includes(reasoningState)) return false;
-  return Boolean(normalizeWorkProcessText(block.thinking?.text ?? ''));
-};
-
-const resolveSectionResult = (
+const resolveSectionProse = (
   block: ConversationWorkBlock,
   outputPhase: ConversationLoopOutputPhase,
-  hasVisibleProcessEvidence: boolean,
-): { resultText: string; resultToolSummary: string; resultStreaming: boolean; clampResult: boolean; clampable: boolean } => {
-  // Industry alignment: commentary never occupies a separate result box.
-  // Readable thinking owns the process slot; otherwise commentary is promoted into the thinking slot.
+): { proseText: string; proseStreaming: boolean } => {
+  // Commentary is narrative prose — never promoted into the thinking slot.
   void outputPhase;
-  void hasVisibleProcessEvidence;
-  const resultStatus = block.result?.status ?? (block.status === 'running' || block.status === 'pending' ? 'streaming' : 'complete');
+  const commentary = normalizeWorkProcessText(block.result?.text ?? '');
+  const resultStatus = block.result?.status
+    ?? (block.status === 'running' || block.status === 'pending' ? 'streaming' : 'complete');
+  const canShow = isMeaningfulText(commentary)
+    && (block.toolCalls.length > 0 || isNonFinalStopReason(block.result?.stopReason) || resultStatus === 'streaming');
   return {
-    resultText: '',
-    resultToolSummary: '',
-    resultStreaming: resultStatus === 'streaming',
-    clampResult: false,
-    clampable: false,
+    proseText: canShow ? commentary : '',
+    proseStreaming: canShow && resultStatus === 'streaming',
   };
+};
+
+const resolveThinkingDurationLabel = (block: ConversationWorkBlock): string => {
+  const start = typeof block.startedAt === 'number' && Number.isFinite(block.startedAt)
+    ? block.startedAt
+    : undefined;
+  if (!start) return '';
+
+  const firstToolStart = block.toolCalls
+    .map((call) => call.startedAt)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+    .sort((a, b) => a - b)[0];
+  const end = firstToolStart
+    ?? (typeof block.completedAt === 'number' && Number.isFinite(block.completedAt) ? block.completedAt : undefined);
+  return formatDurationMs(start, end);
+};
+
+const resolveSettledThinkingLabel = (block: ConversationWorkBlock): string => {
+  const duration = resolveThinkingDurationLabel(block);
+  return duration ? `思考了 ${duration}` : '已思考';
 };
 
 const resolveSectionThinking = (
@@ -189,7 +193,7 @@ const resolveSectionThinking = (
           preview,
           label: status === 'streaming' || isActiveBlock
             ? '正在思考'
-            : '思考过程',
+            : resolveSettledThinkingLabel(block),
           kind: thinking.kind,
           source: '',
           visibility: thinking.visibility,
@@ -201,26 +205,8 @@ const resolveSectionThinking = (
     }
   }
 
-  // No provider thinking: promote visible commentary into the thinking slot.
-  const commentary = normalizeWorkProcessText(block.result?.text ?? '');
-  const canPromoteCommentary = hasVisibleEvidence
-    && isMeaningfulText(commentary)
-    && (block.toolCalls.length > 0 || isNonFinalStopReason(block.result?.stopReason));
-  if (!canPromoteCommentary || hasReadableThinkingText(block)) {
-    return { preview: '', label: '', expandable: false, openByDefault: false };
-  }
-
-  const resultStatus = block.result?.status ?? (isActiveBlock ? 'streaming' : 'complete');
-  return {
-    preview: commentary,
-    label: resultStatus === 'streaming' || isActiveBlock ? '正在思考' : '思考过程',
-    kind: undefined,
-    source: '',
-    visibility: undefined,
-    status: resultStatus === 'streaming' ? 'streaming' : 'complete',
-    expandable: true,
-    openByDefault: false,
-  };
+  // No provider thinking and no commentary promotion — empty thinking slot.
+  return { preview: '', label: '', expandable: false, openByDefault: false };
 };
 
 const resolveResponseThinking = (
@@ -264,14 +250,13 @@ export const getRowStatusLabel = (status: WorkProcessRowStatus): string => ROW_S
 const getLoopProjectionDeps = () => ({
   resolveOutputPhase,
   resolveReasoningState,
-  resolveSectionResult,
+  resolveSectionProse,
   resolveSectionThinking,
   resolveResponseThinking,
   isNonFinalStopReason,
   normalizeThinkingDedupKey,
   createResponseRow,
   createReasoningIndicatorRow,
-  appendRowsToLastSection,
   createApprovalRow,
   createDiagnosticRow,
   shouldSkipBlock,
@@ -286,7 +271,7 @@ const buildProjectionContext = (): {
   groupProcessRows: typeof groupProcessRows;
   blocksToDetailRows: typeof blocksToDetailRows;
 } => ({
-  visibleThinkingKeys: new Set<string>(),
+  visibleThinkingKeys: new Set(),
   hasVisibleProcessEvidence: false,
   createToolRow,
   groupProcessRows,
@@ -299,33 +284,17 @@ function blocksToDetailRows(blocks: ConversationWorkBlock[]): WorkProcessRow[] {
   return presentationUnitsToDetailRows(units);
 }
 
-function blocksToGroupedRows(blocks: ConversationWorkBlock[]): {
-  groups: import('./workProcessTypes').WorkProcessStepGroup[];
-  rows: WorkProcessRow[];
-} {
-  const ctx = buildProjectionContext();
-  const units = buildPresentationUnits(blocks, getLoopProjectionDeps(), ctx);
-  const groups = buildSemanticStepGroups(units);
-  const rows = flattenStepGroups(groups);
-  markLastSectionOpen(rows);
-  return { groups, rows };
-}
-
 export const buildWorkProcessPresentation = (
   trace: ConversationWorkTrace,
-  options: WorkProcessPresentationOptions = {},
 ): WorkProcessPresentation => {
-  const view = options.view ?? 'grouped';
-  const { groups, rows: groupedRows } = blocksToGroupedRows(trace.blocks);
-  const detailRows = view === 'detail' ? blocksToDetailRows(trace.blocks) : groupedRows;
-  const rows = view === 'detail' ? detailRows : groupedRows;
+  const rows = blocksToDetailRows(trace.blocks);
+  markLastSectionOpen(rows);
   const toolCount = countToolSteps(rows);
   const stepCount = countSteps(rows);
   const important = trace.status === 'error' || rowsHaveAttention(rows);
   const summary = isMeaningfulText(trace.summary) ? trace.summary?.trim() ?? '' : '';
 
   return {
-    groups: view === 'detail' ? [] : groups,
     rows,
     stepCount,
     toolCount,
@@ -390,23 +359,24 @@ const getResponseSummary = (status: WorkProcessRowStatus): string => {
   return '回复已生成';
 };
 
-const appendRowsToLastSection = (_rows: WorkProcessRow[], _childRows: WorkProcessRow[]): boolean => false;
-
 const groupProcessRows = (rows: WorkProcessRow[]): WorkProcessRow[] => rows;
 
 const countToolSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, row) => {
   if (row.type === 'section') return total + countToolSteps(row.steps);
+  if (row.type === 'toolAggregate') return total + row.children.length;
   if (row.type === 'tool' || row.type === 'userInput') return total + 1;
   return total;
 }, 0);
 
 const countSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, row) => {
   if (row.type === 'section') return total + 1 + countSteps(row.steps);
+  if (row.type === 'toolAggregate') return total + 1;
   return total + 1;
 }, 0);
 
 const rowsHaveAttention = (rows: WorkProcessRow[]): boolean => rows.some((row) => {
   if (row.type === 'section') return row.status === 'running' || row.status === 'error' || rowsHaveAttention(row.steps);
+  if (row.type === 'toolAggregate') return row.status === 'error' || row.status === 'running';
   return row.status === 'error' || row.status === 'running';
 });
 
@@ -443,6 +413,13 @@ const createToolRow = (call: ConversationToolCall, compact = false): WorkProcess
       : rawPreviewLines,
   );
   const webPresentation = extractWebToolPresentation(call.toolName, parsedResult);
+  const diagnosticCaption = status === 'error'
+    ? (extractDiagnosticCaption(
+      parsePreview(call.resultPreview) ?? parsedResult,
+      call.error || call.resultPreview,
+      previewLines,
+    ) || undefined)
+    : undefined;
 
   return {
     type: 'tool',
@@ -458,10 +435,41 @@ const createToolRow = (call: ConversationToolCall, compact = false): WorkProcess
     argsLines: createDetailLines(prettyPrint(call.argsPreview), 10),
     previewLines,
     rawLines: suppressApprovalPreview ? [] : createDetailLines(prettyPrint(call.error || call.resultPreview), 16),
+    diagnosticCaption,
     approval,
     compact,
     ...webPresentation,
   };
+};
+
+/** Prefer a short human-readable failure line over the full tool JSON envelope. */
+export const extractDiagnosticCaption = (
+  parsedResult: unknown,
+  raw?: string,
+  previewLines: string[] = [],
+): string => {
+  const record = toRecord(parsedResult);
+  const fromNested = record
+    ? (
+      readNestedString(record, ['error', 'message'])
+      || readNestedString(record, ['message'])
+      || readNestedString(record, ['data', 'error', 'message'])
+    )
+    : '';
+  const candidates = [
+    fromNested,
+    ...previewLines,
+    typeof parsedResult === 'string' ? parsedResult : '',
+    raw ?? '',
+  ]
+    .map((value) => normalizeWorkProcessText(value).replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .filter((value) => !isJsonLike(value) && !/^\{?\s*"?ok"?\s*:/i.test(value));
+
+  const caption = candidates[0] ?? '';
+  if (!caption) return '';
+  const firstLine = caption.split(/\r?\n/).map((line) => line.trim()).find(Boolean) ?? caption;
+  return compactText(firstLine, 160);
 };
 
 const createToolApprovalPresentation = (

@@ -10,12 +10,11 @@ import type {
   LoopPresentationUnit,
   PresentationUnit,
   StandalonePresentationUnit,
-} from './workProcessGrouping';
-import {
-  countLoopActions,
-  getLoopPrimarySemanticKind,
-} from './workProcessSemanticKind';
+} from './workProcessUnits';
+import { aggregateSectionSteps } from './workProcessToolAggregate';
 import type { WorkProcessRow } from './workProcessTypes';
+
+export type { LoopPresentationUnit, PresentationUnit, StandalonePresentationUnit } from './workProcessUnits';
 
 export interface BlockProjectionContext {
   visibleThinkingKeys: Set<string>;
@@ -28,16 +27,12 @@ export interface BlockProjectionContext {
 export interface LoopProjectionDeps {
   resolveOutputPhase: (block: ConversationWorkBlock, hasVisibleProcessEvidence: boolean) => ConversationLoopOutputPhase;
   resolveReasoningState: (block: ConversationWorkBlock) => ConversationReasoningState;
-  resolveSectionResult: (
+  resolveSectionProse: (
     block: ConversationWorkBlock,
     outputPhase: ConversationLoopOutputPhase,
-    hasVisibleProcessEvidence: boolean,
   ) => {
-    resultText: string;
-    resultToolSummary: string;
-    resultStreaming: boolean;
-    clampResult: boolean;
-    clampable: boolean;
+    proseText: string;
+    proseStreaming: boolean;
   };
   resolveSectionThinking: (
     block: ConversationWorkBlock,
@@ -72,7 +67,6 @@ export interface LoopProjectionDeps {
     block: ConversationWorkBlock,
     state: Extract<ConversationReasoningState, 'opaque' | 'hidden'>,
   ) => Extract<WorkProcessRow, { type: 'reasoningIndicator' }>;
-  appendRowsToLastSection: (rows: WorkProcessRow[], childRows: WorkProcessRow[]) => boolean;
   createApprovalRow: (block: ConversationWorkBlock) => WorkProcessRow;
   createDiagnosticRow: (block: ConversationWorkBlock) => WorkProcessRow;
   shouldSkipBlock: (block: ConversationWorkBlock) => boolean;
@@ -107,9 +101,9 @@ export function buildPresentationUnits(
             sectionRow.steps.push(...userInputRows);
             const shouldDeferMergedRows = shouldDeferMergedSectionSteps(sectionRow);
             sectionRow.stepsDisclosure = shouldDeferMergedRows ? 'deferred' : 'visible';
-            sectionRow.visibleSteps.push(...(shouldDeferMergedRows
-              ? userInputRows.map(createDeferredVisibleStep)
-              : userInputRows));
+            sectionRow.visibleSteps = aggregateSectionSteps(
+              createVisibleSectionSteps(sectionRow.steps, shouldDeferMergedRows),
+            );
             sectionRow.stepCount = deps.countToolSteps(sectionRow.steps);
             if (sectionRow.status === 'complete' && userInputRows.some((child) => child.status === 'running' || child.status === 'pending')) {
               sectionRow.status = 'running';
@@ -118,15 +112,11 @@ export function buildPresentationUnits(
               sectionRow.status = 'error';
               sectionRow.defaultOpen = true;
             }
-            lastUnit.actionCount += userInputRows.filter((row) => row.type === 'tool' || row.type === 'userInput').length;
-            lastUnit.semanticKind = 'interaction';
-            lastUnit.forceNewGroup = true;
             continue;
           }
         }
         units.push({
           kind: 'standalone',
-          semanticKind: 'interaction',
           rows: userInputRows,
           loopIds: [],
         } satisfies StandalonePresentationUnit);
@@ -142,7 +132,6 @@ export function buildPresentationUnits(
       ctx.hasVisibleProcessEvidence = true;
       units.push({
         kind: 'standalone',
-        semanticKind: 'interaction',
         rows: [deps.createApprovalRow(block)],
         loopIds: [],
       });
@@ -154,7 +143,6 @@ export function buildPresentationUnits(
       ctx.hasVisibleProcessEvidence = true;
       units.push({
         kind: 'standalone',
-        semanticKind: 'collaboration',
         rows: [{
           type: 'subagent',
           id: block.id,
@@ -173,7 +161,6 @@ export function buildPresentationUnits(
       ctx.hasVisibleProcessEvidence = true;
       units.push({
         kind: 'standalone',
-        semanticKind: 'compaction',
         rows: [{
           type: 'summary',
           id: block.id,
@@ -200,7 +187,6 @@ export function buildPresentationUnits(
               : 'completed';
         units.push({
           kind: 'standalone',
-          semanticKind: 'collaboration',
           rows: [{
             type: 'task',
             id: block.id,
@@ -220,7 +206,6 @@ export function buildPresentationUnits(
       ctx.hasVisibleProcessEvidence = true;
       units.push({
         kind: 'standalone',
-        semanticKind: 'diagnostic',
         rows: [deps.createDiagnosticRow(block)],
         loopIds: [block.id],
       });
@@ -232,7 +217,6 @@ export function buildPresentationUnits(
       ctx.hasVisibleProcessEvidence = true;
       units.push({
         kind: 'standalone',
-        semanticKind: 'diagnostic',
         rows: [{
           type: 'summary',
           id: block.id,
@@ -257,22 +241,20 @@ function shouldDeferMergedSectionSteps(row: Extract<WorkProcessRow, { type: 'sec
   if (row.steps.length === 0) return false;
   const hasStreamingThinking = row.thinkingStatus === 'streaming'
     && Boolean(row.thinkingLabel || row.thinkingPreview);
-  const hasStreamingResult = row.resultStreaming
-    && Boolean(row.resultText || row.resultToolSummary);
-  return hasStreamingThinking || hasStreamingResult;
+  const hasStreamingProse = row.proseStreaming && Boolean(row.proseText);
+  return hasStreamingThinking || hasStreamingProse;
 }
 
 function shouldDeferSectionSteps(
   steps: WorkProcessRow[],
-  sectionResult: ReturnType<LoopProjectionDeps['resolveSectionResult']>,
+  sectionProse: ReturnType<LoopProjectionDeps['resolveSectionProse']>,
   sectionThinking: ReturnType<LoopProjectionDeps['resolveSectionThinking']>,
 ): boolean {
   if (steps.length === 0) return false;
   const hasStreamingThinking = sectionThinking.status === 'streaming'
     && Boolean(sectionThinking.label || sectionThinking.preview);
-  const hasStreamingResult = sectionResult.resultStreaming
-    && Boolean(sectionResult.resultText || sectionResult.resultToolSummary);
-  return hasStreamingThinking || hasStreamingResult;
+  const hasStreamingProse = sectionProse.proseStreaming && Boolean(sectionProse.proseText);
+  return hasStreamingThinking || hasStreamingProse;
 }
 
 function createDeferredVisibleStep(row: WorkProcessRow): WorkProcessRow {
@@ -329,8 +311,6 @@ function projectLlmTurn(
     return {
       kind: 'loop',
       loopId: block.id,
-      semanticKind: getLoopPrimarySemanticKind(block),
-      actionCount: 0,
       rows: [responseRow],
       hasDisplayableThinking: Boolean(responseRow.thinkingExpandable && responseRow.thinkingPreview),
       hasSummaryThinking: responseRow.thinkingKind === 'summary' && Boolean(responseRow.thinkingPreview),
@@ -345,7 +325,7 @@ function projectLlmTurn(
     }
   }
 
-  const sectionResult = deps.resolveSectionResult(block, outputPhase, ctx.hasVisibleProcessEvidence);
+  const sectionProse = deps.resolveSectionProse(block, outputPhase);
   const sectionThinking = deps.resolveSectionThinking(
     block,
     steps.length > 0
@@ -359,8 +339,7 @@ function projectLlmTurn(
 
   const hasIndicator = loopRows.some((row) => row.type === 'reasoningIndicator');
   const shouldRenderSection = steps.length > 0
-    || sectionResult.resultText
-    || sectionResult.resultToolSummary
+    || Boolean(sectionProse.proseText)
     || sectionThinking.label
     || sectionThinking.expandable;
 
@@ -372,56 +351,43 @@ function projectLlmTurn(
   }
 
   if (shouldRenderSection) {
-    const deferSteps = shouldDeferSectionSteps(steps, sectionResult, sectionThinking);
-    const visibleSteps = createVisibleSectionSteps(steps, deferSteps);
+    const deferSteps = shouldDeferSectionSteps(steps, sectionProse, sectionThinking);
+    const visibleSteps = aggregateSectionSteps(createVisibleSectionSteps(steps, deferSteps));
     loopRows.push({
-    type: 'section',
-    id: block.id,
-    loopId: block.id,
-    status: block.status,
-    resultText: sectionResult.resultText,
-    resultToolSummary: sectionResult.resultToolSummary,
-    resultStreaming: sectionResult.resultStreaming,
-    clampResult: sectionResult.clampResult,
-    clampable: sectionResult.clampable,
-    thinkingPreview: sectionThinking.preview,
-    thinkingLabel: sectionThinking.label,
-    thinkingKind: sectionThinking.kind,
-    thinkingSource: sectionThinking.source,
-    thinkingVisibility: sectionThinking.visibility,
-    thinkingStatus: sectionThinking.status,
-    thinkingExpandable: sectionThinking.expandable,
-    thinkingOpenByDefault: sectionThinking.openByDefault,
-    stepCount: deps.countToolSteps(steps),
-    stepsDisclosure: deferSteps ? 'deferred' : 'visible',
-    duration: formatDurationMs(block.startedAt, block.completedAt),
-    defaultOpen: false,
-    steps,
-    visibleSteps,
-    outputPhase,
-    stopReason,
+      type: 'section',
+      id: block.id,
+      loopId: block.id,
+      status: block.status,
+      proseText: sectionProse.proseText,
+      proseStreaming: sectionProse.proseStreaming,
+      thinkingPreview: sectionThinking.preview,
+      thinkingLabel: sectionThinking.label,
+      thinkingKind: sectionThinking.kind,
+      thinkingSource: sectionThinking.source,
+      thinkingVisibility: sectionThinking.visibility,
+      thinkingStatus: sectionThinking.status,
+      thinkingExpandable: sectionThinking.expandable,
+      thinkingOpenByDefault: sectionThinking.openByDefault,
+      stepCount: deps.countToolSteps(steps),
+      stepsDisclosure: deferSteps ? 'deferred' : 'visible',
+      duration: formatDurationMs(block.startedAt, block.completedAt),
+      defaultOpen: false,
+      steps,
+      visibleSteps,
+      outputPhase,
+      stopReason,
     });
   }
 
   ctx.hasVisibleProcessEvidence = true;
 
-  const hasAskUser = block.toolCalls.some((call) => normalizeToolName(call.toolName) === 'ask_user');
-  const hasApprovalTool = block.toolCalls.some((call) => Boolean(call.approval));
-
   return {
     kind: 'loop',
     loopId: block.id,
-    semanticKind: hasAskUser || hasApprovalTool ? 'interaction' : getLoopPrimarySemanticKind(block),
-    actionCount: countLoopActions(block.toolCalls),
     rows: loopRows,
     hasDisplayableThinking: sectionThinking.expandable && Boolean(sectionThinking.preview),
     hasSummaryThinking: sectionThinking.kind === 'summary' && Boolean(sectionThinking.preview),
-    forceNewGroup: hasAskUser || hasApprovalTool || block.status === 'error',
   };
-}
-
-function normalizeToolName(toolName: string): string {
-  return toolName.trim().toLowerCase().replace(/[.-]/g, '_');
 }
 
 function dedupeSectionThinking(

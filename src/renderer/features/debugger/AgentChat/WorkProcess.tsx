@@ -1,11 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { ConversationWorkTrace } from '@shared/types/conversation';
 import { useI18n } from '../../../i18n';
 import { ActiveSignalText } from '../../../ui/ActiveSignalText';
 import { buildWorkProcessPresentation } from './workProcessPresentation';
 import { createWorkProcessRowRenderer } from './workProcessRowRenderer';
-import { getDefaultGroupOpen, WorkProcessStepGroupRow } from './WorkProcessStepGroupRow';
-import { WorkProcessViewToggle } from './WorkProcessViewToggle';
 
 interface WorkProcessProps {
   trace: ConversationWorkTrace;
@@ -13,13 +11,8 @@ interface WorkProcessProps {
 
 export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
   const { t } = useI18n();
-  const [detailView, setDetailView] = useState(false);
-  const presentation = useMemo(
-    () => buildWorkProcessPresentation(trace, { view: detailView ? 'detail' : 'grouped' }),
-    [trace, detailView],
-  );
+  const presentation = useMemo(() => buildWorkProcessPresentation(trace), [trace]);
   const [expanded, setExpanded] = useState<boolean>(presentation.defaultExpanded);
-  const [groupOpenState, setGroupOpenState] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (trace.status === 'running' || presentation.important) {
@@ -27,28 +20,19 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
     }
   }, [trace.status, presentation.important]);
 
-  const renderRow = useMemo(
-    () => createWorkProcessRowRenderer(detailView),
-    [detailView],
-  );
-
-  const handleGroupToggle = useCallback((groupId: string, open: boolean) => {
-    setGroupOpenState((prev) => ({ ...prev, [groupId]: open }));
-  }, []);
+  const renderRow = useMemo(() => createWorkProcessRowRenderer(), []);
 
   const headlineCopy = trace.status === 'stopped'
     ? t('chat.workProcessHeadlineStopped')
     : trace.status === 'running'
-      ? t('chat.workProcessThinkingStreaming')
+      ? t('chat.workProcessHeadlineRunning')
       : t('chat.workProcessTitle');
   const actionMeta = presentation.actionCount > 0
     ? t('chat.workProcessActions', { count: presentation.actionCount })
     : '';
   const durationMeta = presentation.duration ? t('chat.workProcessDuration', { duration: presentation.duration }) : '';
   const metaParts = [durationMeta, actionMeta].filter(Boolean);
-  const hasBody = Boolean(presentation.summary)
-    || presentation.groups.length > 0
-    || presentation.rows.length > 0;
+  const hasBody = Boolean(presentation.summary) || presentation.rows.length > 0;
 
   return (
     <section
@@ -78,10 +62,6 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
           )}
           {metaParts.length > 0 ? <span className="work-process-meta">{metaParts.join(' · ')}</span> : null}
         </button>
-        <WorkProcessViewToggle
-          detailView={detailView}
-          onToggle={() => setDetailView((prev) => !prev)}
-        />
       </div>
 
       {expanded && hasBody ? (
@@ -89,27 +69,11 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
           {presentation.summary ? (
             <p className="work-process-summary">{presentation.summary}</p>
           ) : null}
-          {detailView ? (
-            presentation.rows.length > 0 ? (
-              <ol className="work-process-steps">
-                {presentation.rows.map((row) => renderRow(row))}
-              </ol>
-            ) : null
-          ) : (
-            presentation.groups.length > 0 ? (
-              <ol className="work-process-steps work-process-grouped-steps">
-                {presentation.groups.map((group) => (
-                  <WorkProcessStepGroupRow
-                    key={group.id}
-                    group={group}
-                    isOpen={groupOpenState[group.id] ?? getDefaultGroupOpen(group)}
-                    onToggle={handleGroupToggle}
-                    renderRow={renderRow}
-                  />
-                ))}
-              </ol>
-            ) : null
-          )}
+          {presentation.rows.length > 0 ? (
+            <ol className="work-process-steps work-process-narrative-stream">
+              {presentation.rows.map((row) => renderRow(row))}
+            </ol>
+          ) : null}
         </div>
       ) : null}
     </section>

@@ -12,10 +12,12 @@ import {
 import { ResponseRow } from './WorkProcessResponseRow';
 import { WorkProcessReasoningIndicatorRow } from './WorkProcessReasoningIndicatorRow';
 import { WorkProcessSectionRow } from './WorkProcessSectionRow';
+import { ToolAggregateRow } from './ToolAggregateRow';
 
-export function createWorkProcessRowRenderer(showLoopMeta: boolean) {
+export function createWorkProcessRowRenderer() {
   const renderRow = (row: WorkProcessRow): React.ReactNode => {
     if (row.type === 'tool') return <ToolRow key={row.id} row={row} />;
+    if (row.type === 'toolAggregate') return <ToolAggregateRow key={row.id} row={row} />;
     if (row.type === 'userInput') return <UserInputRow key={row.id} row={row} />;
     if (row.type === 'approval') return <ApprovalRow key={row.id} row={row} />;
     if (row.type === 'diagnostic') return <DiagnosticRow key={row.id} row={row} />;
@@ -30,7 +32,6 @@ export function createWorkProcessRowRenderer(showLoopMeta: boolean) {
         <WorkProcessSectionRow
           key={row.id}
           row={row}
-          showLoopMeta={showLoopMeta}
           renderRow={renderRow}
         />
       );

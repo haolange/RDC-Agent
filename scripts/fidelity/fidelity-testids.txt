@@ -137,12 +137,12 @@ work-process-response
 work-process-result-preview
 work-process-section
 work-process-source-pills
-work-process-step-group
+work-process-tool-aggregate
 work-process-task
 work-process-tool-approval
 work-process-tool-call
+work-process-tool-diagnostic
 work-process-tool-preview
 work-process-tool-raw
 work-process-user-input
 work-process-user-input-transcript
-work-process-view-toggle
