@@ -7,7 +7,8 @@ import {
   EffortMaxContextSwitchRow,
   getStopPosition,
 } from './effortControlParts';
-import { EffortMaxSparks } from './EffortMaxSparks';
+import type { MaxVisualPhase } from './maxVisual';
+import { EffortMaxField } from './EffortMaxField';
 
 export const EffortControlPopup: React.FC<{
   popupRef: React.RefObject<HTMLDivElement>;
@@ -19,6 +20,11 @@ export const EffortControlPopup: React.FC<{
   displayIndex: number;
   isDragging: boolean;
   isMaxTier: boolean;
+  showMaxTrack: boolean;
+  maxPhase: MaxVisualPhase;
+  maxProgress: number;
+  thumbRatio: number;
+  stopsOpacity: number;
   thumbStyle: React.CSSProperties;
   thumbEdgeClass: string;
   tooltipLabel: string;
@@ -46,6 +52,11 @@ export const EffortControlPopup: React.FC<{
   displayIndex,
   isDragging,
   isMaxTier,
+  showMaxTrack,
+  maxPhase,
+  maxProgress,
+  thumbRatio,
+  stopsOpacity,
   thumbStyle,
   thumbEdgeClass,
   tooltipLabel,
@@ -68,8 +79,10 @@ export const EffortControlPopup: React.FC<{
     <div className={`composer-effort-slider-section ${hasAdjustableReasoning ? '' : 'is-disabled'}`}>
       <div
         ref={trackRef}
-        className={`composer-effort-slider is-level-${displayLevel}${hasAdjustableReasoning ? '' : ' is-disabled'}${isDragging ? ' is-dragging' : ''}`}
+        className={`composer-effort-slider is-level-${displayLevel}${hasAdjustableReasoning ? '' : ' is-disabled'}${isDragging ? ' is-dragging' : ''}${showMaxTrack ? ' is-max-visual' : ''} is-max-phase-${maxPhase}`}
         data-testid="composer-effort-slider"
+        data-max-phase={maxPhase}
+        data-max-progress={maxProgress.toFixed(3)}
         onPointerDown={onTrackPointerDown}
         onPointerMove={onTrackPointerMove}
         onPointerUp={onTrackPointerUp}
@@ -77,16 +90,16 @@ export const EffortControlPopup: React.FC<{
         onClick={onTrackClick}
       >
         {hasAdjustableReasoning ? (
-          <div className="composer-effort-slider-stops" aria-hidden="true">
+          <div
+            className="composer-effort-slider-stops"
+            aria-hidden="true"
+            style={{ opacity: isMaxTier || showMaxTrack ? stopsOpacity : 1 }}
+          >
             {displayLevels.map((level, index) => {
-              const classes = [
-                'composer-effort-slider-stop',
-                level === displayLevel ? 'is-current' : '',
-              ].filter(Boolean).join(' ');
               return (
                 <div
                   key={level}
-                  className={classes}
+                  className={`composer-effort-slider-stop${level === displayLevel ? ' is-current' : ''}`}
                   style={{ left: `${getStopPosition(index, displayLevels.length) * 100}%` }}
                 />
               );
@@ -95,7 +108,7 @@ export const EffortControlPopup: React.FC<{
         ) : null}
 
         <div className="composer-effort-slider-track" aria-hidden="true">
-          {isMaxTier ? <EffortMaxSparks /> : null}
+          <EffortMaxField phase={maxPhase} progress={maxProgress} thumbRatio={thumbRatio} />
         </div>
 
         <div

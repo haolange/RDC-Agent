@@ -8,6 +8,13 @@ import {
   resolveReasoningIconVariant,
   resolveNearestSnapLevel,
 } from './effortControlParts';
+import {
+  isMaxTierLevel,
+  MAX_VISUAL_EVOLVE_MS,
+  MAX_VISUAL_RETREAT_MS,
+  resolveMaxFieldCoverage,
+  resolveMaxStopsOpacity,
+} from './maxVisual';
 
 describe('effortControlParts', () => {
   it('builds visible selections for levels, toggle, and always-on controls', () => {
@@ -88,5 +95,31 @@ describe('effortControlParts', () => {
     expect(findAdjacentSupportedLevel('medium', -1, [...supported])).toBe('low');
     expect(findAdjacentSupportedLevel('medium', 1, [...supported])).toBe('high');
     expect(findAdjacentSupportedLevel('off', -1, [...supported])).toBeNull();
+  });
+
+  it('treats max and ultra as the shared top-tier visual pipeline', () => {
+    expect(isMaxTierLevel('max')).toBe(true);
+    expect(isMaxTierLevel('ultra')).toBe(true);
+    expect(isMaxTierLevel('high')).toBe(false);
+    expect(MAX_VISUAL_EVOLVE_MS).toBe(800);
+    expect(MAX_VISUAL_RETREAT_MS).toBe(800);
+  });
+
+  it('maps max visual phases to stop opacity and field coverage', () => {
+    expect(resolveMaxStopsOpacity({ phase: 'idle', progress: 0, evolveHideStops: false })).toBe(1);
+    expect(resolveMaxStopsOpacity({ phase: 'preview', progress: 0, evolveHideStops: false })).toBe(1);
+    expect(resolveMaxStopsOpacity({ phase: 'evolve', progress: 0.25, evolveHideStops: false })).toBe(0.75);
+    expect(resolveMaxStopsOpacity({ phase: 'evolve', progress: 0.25, evolveHideStops: true })).toBe(0);
+    expect(resolveMaxStopsOpacity({ phase: 'settled', progress: 1, evolveHideStops: false })).toBe(0);
+    expect(resolveMaxStopsOpacity({ phase: 'retreat', progress: 0.4, evolveHideStops: false })).toBe(0.4);
+    expect(resolveMaxStopsOpacity({ phase: 'retreat', progress: 0.4, evolveHideStops: false, retreatStopsFrom: 0 })).toBe(0.4);
+    expect(resolveMaxStopsOpacity({ phase: 'retreat', progress: 0.5, evolveHideStops: false, retreatStopsFrom: 1 })).toBe(1);
+    expect(resolveMaxStopsOpacity({ phase: 'retreat', progress: 0.5, evolveHideStops: false, retreatStopsFrom: 0.2 })).toBeCloseTo(0.6);
+
+    expect(resolveMaxFieldCoverage({ phase: 'idle', progress: 0 })).toBe(0);
+    expect(resolveMaxFieldCoverage({ phase: 'preview', progress: 0 })).toBe(0);
+    expect(resolveMaxFieldCoverage({ phase: 'evolve', progress: 0.6 })).toBe(0.6);
+    expect(resolveMaxFieldCoverage({ phase: 'settled', progress: 1 })).toBe(1);
+    expect(resolveMaxFieldCoverage({ phase: 'retreat', progress: 0.25 })).toBe(0.75);
   });
 });
