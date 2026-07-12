@@ -91,4 +91,89 @@ describe('conversation loop runtime state', () => {
     });
     expect(JSON.stringify(trace.blocks[0])).not.toContain(finalLoopThinking.text);
   });
+
+  it('starts a fresh loop after ask_user pause when pendingNewLoop is set', () => {
+    let state: ConversationLoopRuntimeState = {
+      loopSeq: 1,
+      currentLoopText: 'Need a few answers first.',
+      currentLoopThinking: toolLoopThinking,
+      currentLoopThinkingStatus: 'complete',
+      loopHasTools: false,
+      // ask_user is not loop-scoped, but ConversationService sets this on pause complete.
+      pendingNewLoop: true,
+      visibleResponse: '',
+    };
+    let trace = upsertLoopResult(
+      undefined,
+      'runtime-loop-1',
+      state.currentLoopText,
+      state.currentLoopThinking,
+      state.currentLoopThinkingStatus,
+      'complete',
+      'end_turn',
+      'commentary',
+      'summary',
+    );
+
+    state = beginAssistantContentLoopIfPending(state);
+    expect(state).toMatchObject({
+      loopSeq: 2,
+      currentLoopText: '',
+      pendingNewLoop: false,
+      visibleResponse: '',
+    });
+
+    state.currentLoopText = 'Thanks — here is the final answer.';
+    trace = upsertLoopResult(
+      trace,
+      `runtime-loop-${state.loopSeq}`,
+      state.currentLoopText,
+      undefined,
+      undefined,
+      'complete',
+      'end_turn',
+      'final_answer',
+      'none',
+    );
+
+    expect(trace.blocks.map((block) => block.id)).toEqual(['runtime-loop-1', 'runtime-loop-2']);
+    expect(trace.blocks[0]).toMatchObject({
+      id: 'runtime-loop-1',
+      result: expect.objectContaining({ text: 'Need a few answers first.', outputPhase: 'commentary' }),
+    });
+    expect(trace.blocks[1]).toMatchObject({
+      id: 'runtime-loop-2',
+      result: expect.objectContaining({
+        text: 'Thanks — here is the final answer.',
+        outputPhase: 'final_answer',
+      }),
+    });
+  });
+
+  it('clears stale outputPhase when streaming resumes on the same loop without an explicit phase', () => {
+    let trace = upsertLoopResult(
+      undefined,
+      'runtime-loop-1',
+      'Ask commentary before questions.',
+      undefined,
+      undefined,
+      'complete',
+      'tool_use',
+      'commentary',
+      'none',
+    );
+    expect(trace.blocks[0]?.result?.outputPhase).toBe('commentary');
+
+    trace = upsertLoopResult(
+      trace,
+      'runtime-loop-1',
+      'Ask commentary before questions. Final answer after answers.',
+      undefined,
+      undefined,
+      'streaming',
+    );
+    expect(trace.blocks[0]?.result?.outputPhase).toBeUndefined();
+    expect(trace.blocks[0]?.result?.stopReason).toBeUndefined();
+    expect(trace.blocks[0]?.result?.status).toBe('streaming');
+  });
 });

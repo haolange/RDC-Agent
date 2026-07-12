@@ -23,6 +23,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
   const conversationMessages = useConversationStore((state) => state.conversationMessages);
   const setConversationMessages = useConversationStore((state) => state.setConversationMessages);
   const setBranchState = useConversationStore((state) => state.setBranchState);
+  const setConversationSnapshot = useConversationStore((state) => state.setConversationSnapshot);
   const upsertConversationMessages = useConversationStore((state) => state.upsertConversationMessages);
   const currentProject = useProjectStore((state) => state.currentProject);
   const setSessions = useProjectStore((state) => state.setSessions);
@@ -42,7 +43,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
       throw new Error('App bridge is not available.');
     }
 
-    const previousMessages = useConversationStore.getState().conversationMessages;
+    const previousMessages = useConversationStore.getState().allConversationMessages;
     const previousBranchState = useConversationStore.getState().branchState;
 
     try {
@@ -75,6 +76,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         setTracePresentation,
         setConversationMessages,
         setBranchState,
+        setConversationSnapshot,
         upsertConversationMessages,
       });
 
@@ -93,8 +95,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         console.warn('[conversation] Rewrite terminal sync failed.', error);
       });
     } catch (error) {
-      setConversationMessages(previousMessages);
-      setBranchState(previousBranchState);
+      setConversationSnapshot(previousMessages, previousBranchState);
       throw error;
     }
   }, [
@@ -103,6 +104,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
     pairedAssistant,
     setBranchState,
     setConversationMessages,
+    setConversationSnapshot,
     setCurrentRun,
     setCurrentSession,
     setRuns,

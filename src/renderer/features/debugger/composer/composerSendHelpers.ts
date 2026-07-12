@@ -180,6 +180,10 @@ export async function applyConversationTurnResult(options: {
   setTracePresentation: (presentation: AgentRunPresentation | null) => void;
   setConversationMessages: (messages: ConversationMessage[]) => void;
   setBranchState: (branchState: ConversationBranchState | null) => void;
+  setConversationSnapshot?: (
+    messages: ConversationMessage[],
+    branchState?: ConversationBranchState | null,
+  ) => void;
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
 }) {
   const {
@@ -193,6 +197,7 @@ export async function applyConversationTurnResult(options: {
     setTracePresentation,
     setConversationMessages,
     setBranchState,
+    setConversationSnapshot,
     upsertConversationMessages,
   } = options;
   const refreshTasks: Array<Promise<void>> = [];
@@ -214,19 +219,32 @@ export async function applyConversationTurnResult(options: {
   }
 
   if (result.messages) {
-    setConversationMessages(reconcileTurnMessages(
-      useConversationStore.getState().conversationMessages,
-      result.messages,
-    ));
+    // Merge into the full store set so inactive branch siblings survive rewrite snapshots.
+    // reconcileTurnMessages only refreshes overlapping ids; visible projection happens in the store.
+    const allMessages = useConversationStore.getState().allConversationMessages;
+    const reconciled = reconcileTurnMessages(allMessages, result.messages);
+    const reconciledIds = new Set(reconciled.map((message) => message.id));
+    const merged = [
+      ...allMessages.filter((message) => !reconciledIds.has(message.id)),
+      ...reconciled,
+    ];
+    // Atomically align messages + branchState so upsert races cannot leak sibling branches.
+    if (setConversationSnapshot && result.branchState !== undefined) {
+      setConversationSnapshot(merged, result.branchState ?? null);
+    } else {
+      setConversationMessages(merged);
+      if (result.branchState !== undefined) {
+        setBranchState(result.branchState ?? null);
+      }
+    }
   } else {
     upsertConversationMessages([
       result.userMessage,
       result.assistantDraftMessage,
     ]);
-  }
-
-  if (result.branchState !== undefined) {
-    setBranchState(result.branchState ?? null);
+    if (result.branchState !== undefined) {
+      setBranchState(result.branchState ?? null);
+    }
   }
 
   if (result.runUpdate) {

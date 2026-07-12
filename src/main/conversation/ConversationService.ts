@@ -7,6 +7,7 @@ import type {
   ConversationCancelActiveTurnRequest,
   ConversationCancelActiveTurnResult,
   ConversationLoopStopReason,
+  ConversationLoopOutputPhase,
   ConversationMessage,
   ConversationMessageDiagnostic,
   ConversationRewriteFromMessageRequest,
@@ -186,6 +187,8 @@ interface ActiveConversationTurn {
   startedAt: number;
   abortController: AbortController;
   stop: () => void;
+  /** Resolves after stop() has flushed terminal state (or immediately if already idle). */
+  stopped: Promise<void>;
 }
 
 function resolveConversationAgentId(requestedMode: AppMode, requestedAgentId?: string | null): AgentRole {
@@ -599,10 +602,16 @@ export class ConversationService {
     const downstreamTurnIds = new Set(
       history.slice(targetIndex + 1).map((message) => message.turnId),
     );
-    for (const activeTurn of Array.from(this.activeTurns.values())) {
-      if (activeTurn.sessionId === sessionId && downstreamTurnIds.has(activeTurn.turnId)) {
-        activeTurn.stop();
-      }
+    // Also stop the target turn itself if it is still streaming (edit during reply).
+    downstreamTurnIds.add(targetMessage.turnId);
+    const turnsToStop = Array.from(this.activeTurns.values()).filter((activeTurn) => (
+      activeTurn.sessionId === sessionId && downstreamTurnIds.has(activeTurn.turnId)
+    ));
+    for (const activeTurn of turnsToStop) {
+      activeTurn.stop();
+    }
+    if (turnsToStop.length > 0) {
+      await Promise.allSettled(turnsToStop.map((turn) => turn.stopped));
     }
 
     let branchState = storageAdapter.readConversationBranchState(sessionId) ?? createDefaultBranchState(sessionId);
@@ -628,7 +637,7 @@ export class ConversationService {
       if (!targetMessage.forkId) {
         targetMessage.forkId = forkId;
         targetMessage.variantIndex = targetMessage.variantIndex ?? 0;
-        storageAdapter.appendConversationMessage(sessionId, {
+        this.persistConversationSnapshot(sessionId, {
           ...targetMessage,
           updatedAt: nowMs(),
         });
@@ -657,7 +666,22 @@ export class ConversationService {
     });
     fork.activeBranchId = newBranchId;
     branchState.activeLeafBranchId = newBranchId;
-    storageAdapter.writeConversationBranchState(sessionId, branchState);
+    try {
+      storageAdapter.writeConversationBranchState(sessionId, branchState);
+    } catch (error) {
+      console.error(`[ConversationService] Failed to persist branch state during rewrite for ${sessionId}:`, error);
+      throw new Error(
+        error instanceof Error
+          ? `Edit and resend failed: ${error.message}`
+          : 'Edit and resend failed: could not persist conversation branch state.',
+      );
+    }
+
+    // Truncate agent threads to the active-branch prefix so LLM history cannot
+    // retain downstream messages from the discarded sibling branch.
+    const visiblePrefix = resolveVisibleConversationMessages(history, branchState);
+    const conversationAgentId = resolveConversationAgentId(input.mode, input.agentId ?? null);
+    this.rebuildAgentThreadForBranch(sessionId, conversationAgentId, visiblePrefix);
 
     const updatedContext: ResolvedConversationContext = {
       ...context,
@@ -676,6 +700,47 @@ export class ConversationService {
       },
       input.turnControls,
     );
+  }
+
+  private rebuildAgentThreadForBranch(
+    sessionId: string,
+    agentId: AgentRole,
+    visibleMessages: ConversationMessage[],
+  ): void {
+    try {
+      const thread: import('../agent-runtime/core/types').AgentMessage[] = [];
+      for (const message of visibleMessages) {
+        if (message.role === 'user') {
+          thread.push({
+            role: 'user',
+            content: message.content,
+            timestamp: message.createdAt,
+          });
+          continue;
+        }
+        if (message.role === 'assistant' && message.content.trim()) {
+          thread.push({
+            role: 'assistant',
+            content: [{ type: 'text', text: message.content }],
+            model: 'branch-rewrite',
+            provider: 'branch-rewrite',
+            usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+            stopReason: 'stop',
+            timestamp: message.createdAt,
+          });
+        }
+      }
+      storageAdapter.clearAgentThread(sessionId, agentId);
+      storageAdapter.writeAgentThread(sessionId, agentId, thread);
+      agentOrchestrator.invalidateSessionAgentSlots(sessionId);
+    } catch (error) {
+      console.error(`[ConversationService] rebuildAgentThreadForBranch failed for ${sessionId}:`, error);
+      throw new Error(
+        error instanceof Error
+          ? `Edit and resend failed while rebuilding agent thread: ${error.message}`
+          : 'Edit and resend failed while rebuilding agent thread.',
+      );
+    }
   }
 
   async switchConversationBranch(input: ConversationSwitchBranchRequest): Promise<ConversationSwitchBranchResult> {
@@ -974,18 +1039,32 @@ export class ConversationService {
       });
     };
 
+    let settleStopped = () => {};
+    const stopped = new Promise<void>((resolve) => {
+      settleStopped = resolve;
+    });
     this.registerActiveTurn({
       turnId: assistantMessage.turnId,
       sessionId,
       startedAt: nowMs(),
       abortController,
+      stopped,
       stop: () => {
         if (!abortController.signal.aborted) {
-          streamScheduler?.flushPending({ forcePersist: true, publishTrace: true });
+          try {
+            streamScheduler?.flushPending({ forcePersist: true, publishTrace: true });
+          } catch (error) {
+            console.error('[ConversationService] stop flush failed:', error);
+          }
           abortController.abort();
-          commitStoppedMessage();
+          try {
+            commitStoppedMessage();
+          } catch (error) {
+            console.error('[ConversationService] stop commit failed:', error);
+          }
           this.clearActiveTurn(assistantMessage.turnId, abortController);
         }
+        settleStopped();
       },
     });
 
@@ -1013,11 +1092,60 @@ export class ConversationService {
     let loopSeq = 1;
     let loopHasTools = false;
     let pendingNewLoop = false;
+    /** Once true for this turn, process commentary must not stream into the answer bubble. */
+    let turnHasProcessEvidence = false;
+    /** After ask_user pause, subsequent assistant content must not reuse the ask commentary loop. */
+    let turnHadAskPause = false;
     const pendingContinuation: ConversationLoopContinuationState = {
       approval: false,
       userInput: false,
       subagent: false,
       handoff: false,
+    };
+    const markProcessEvidence = () => {
+      turnHasProcessEvidence = true;
+    };
+    const hasPendingContinuation = () => (
+      pendingContinuation.approval
+      || pendingContinuation.userInput
+      || pendingContinuation.subagent
+      || pendingContinuation.handoff
+    );
+    const resolveStreamingOutputPhase = (): ConversationLoopOutputPhase | undefined => {
+      if (loopHasTools || hasPendingContinuation()) {
+        return 'commentary';
+      }
+      // Post-ask / post-process finals must not sit in WP prose while streaming.
+      // While thinking is in flight, still stamp final_answer so interleaved text tokens
+      // cannot render as commentary prose under Work Process.
+      if (turnHadAskPause || turnHasProcessEvidence || Boolean(currentLoopThinking)) {
+        return 'final_answer';
+      }
+      return undefined;
+    };
+    const syncVisibleResponseForStreaming = () => {
+      const phase = resolveStreamingOutputPhase();
+      const thinkingInFlight = currentLoopThinkingStatus === 'streaming';
+      // Stream into the bubble only for clear finals — never while thinking/tools/ask are active.
+      if (
+        phase === 'final_answer'
+        && !thinkingInFlight
+        && !loopHasTools
+        && !hasPendingContinuation()
+      ) {
+        visibleResponse = currentLoopText;
+      } else if (
+        phase === undefined
+        && !turnHasProcessEvidence
+        && !loopHasTools
+        && !currentLoopThinking
+        && !hasPendingContinuation()
+        && !turnHadAskPause
+      ) {
+        visibleResponse = currentLoopText;
+      } else if (visibleResponse) {
+        visibleResponse = '';
+      }
     };
     const currentLoopId = () => `runtime-loop-${loopSeq}`;
     let errorViewModel: ConversationTurnResult['errorViewModel'] = null;
@@ -1188,11 +1316,7 @@ export class ConversationService {
                   beginAssistantContentLoop();
                   rawResponse += chunk;
                   currentLoopText += chunk;
-                  // Final answer streams into the bubble only when this loop is not
-                  // producing process commentary (no tools yet, no thinking channel).
-                  if (!loopHasTools && !currentLoopThinking) {
-                    visibleResponse = currentLoopText;
-                  }
+                  syncVisibleResponseForStreaming();
                   commitVisibleAssistantText();
                   commitThinkingTrace(upsertLoopResult(
                     assistantMessage.workTrace,
@@ -1201,12 +1325,15 @@ export class ConversationService {
                     currentLoopThinking,
                     currentLoopThinkingStatus,
                     'streaming',
+                    undefined,
+                    resolveStreamingOutputPhase(),
                   ));
                 }
               }
               if (event.type === 'assistant.thinking_delta') {
                 const payload = event.payload as { text?: string; thinking?: ThinkingArtifact };
                 beginAssistantContentLoop();
+                markProcessEvidence();
                 currentLoopThinking = mergeThinkingPayload(
                   currentLoopThinking,
                   payload.thinking,
@@ -1215,6 +1342,8 @@ export class ConversationService {
                 if (currentLoopThinking) {
                   currentLoopThinkingStatus = 'streaming';
                   // Thinking owns the process area; clear any optimistic bubble text.
+                  // Do not force outputPhase=commentary — that flashes final tokens into WP prose
+                  // when text deltas arrive on the same loop before completed reclassifies.
                   if (visibleResponse) {
                     visibleResponse = '';
                     commitVisibleAssistantText();
@@ -1226,17 +1355,24 @@ export class ConversationService {
                     currentLoopThinking,
                     currentLoopThinkingStatus,
                     'streaming',
+                    undefined,
+                    resolveStreamingOutputPhase(),
                   ));
                 }
               }
               if (event.type === 'assistant.thinking_end') {
                 const payload = event.payload as { text?: string; thinking?: ThinkingArtifact };
                 beginAssistantContentLoop();
+                markProcessEvidence();
                 currentLoopThinking = mergeThinkingPayload(
                   currentLoopThinking,
                   payload.thinking,
                   typeof payload.text === 'string' ? payload.text : '',
                 );
+                if (visibleResponse) {
+                  visibleResponse = '';
+                  commitVisibleAssistantText();
+                }
                 if (currentLoopThinking) {
                   currentLoopThinkingStatus = 'complete';
                   commitThinkingTrace(upsertLoopResult(
@@ -1246,6 +1382,8 @@ export class ConversationService {
                     currentLoopThinking,
                     currentLoopThinkingStatus,
                     'streaming',
+                    undefined,
+                    resolveStreamingOutputPhase(),
                   ));
                 }
               }
@@ -1286,10 +1424,24 @@ export class ConversationService {
                   const loopScoped = isLoopTool(String(payload.toolCall.name));
                   if (loopScoped) {
                     loopHasTools = true;
+                    markProcessEvidence();
                     // Tool loops keep commentary in Work Process; clear bubble flash.
                     if (visibleResponse) {
                       visibleResponse = '';
                       commitVisibleAssistantText();
+                    }
+                    // Stamp commentary explicitly so projection does not hide pre-tool narrative.
+                    if (currentLoopText.trim()) {
+                      commitThinkingTrace(upsertLoopResult(
+                        assistantMessage.workTrace,
+                        currentLoopId(),
+                        currentLoopText,
+                        currentLoopThinking,
+                        currentLoopThinkingStatus,
+                        'streaming',
+                        undefined,
+                        'commentary',
+                      ));
                     }
                   }
                   commitAssistantMessage('message_patched', {
@@ -1305,7 +1457,10 @@ export class ConversationService {
               }
               if (event.type === 'tool.started') {
                 const loopScoped = isLoopTool(String(event.payload.toolName));
-                if (loopScoped) loopHasTools = true;
+                if (loopScoped) {
+                  loopHasTools = true;
+                  markProcessEvidence();
+                }
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                     id: String(event.payload.toolCallId),
@@ -1349,16 +1504,36 @@ export class ConversationService {
                 const toolName = String(payload.toolName ?? 'approval');
                 if (payload.kind === 'ask_user' || normalizeToolName(toolName) === 'ask_user') {
                   pendingContinuation.userInput = true;
+                  turnHadAskPause = true;
+                  // Insurance: assistant.completed(tool_use) arrives before ask_user approval.
+                  // Force the next assistant content onto a fresh loop even if that earlier
+                  // completed handler missed the pause (ask_user is not a loop-scoped tool).
+                  pendingNewLoop = true;
+                  markProcessEvidence();
+                  // Retract any mis-classified final_answer bubble text from the ask pause.
+                  if (visibleResponse) {
+                    visibleResponse = '';
+                    commitVisibleAssistantText();
+                  }
                   const questions = normalizeAskUserQuestions({ questions: payload.questions });
                   const previewQuestions = questions.length > 0 ? questions : [createFallbackAskUserQuestion()];
                   commitAssistantMessage('message_patched', {
-                    workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
-                      id: toolCallId,
-                      toolName: 'ask_user',
-                      status: 'running',
-                      argsPreview: JSON.stringify({ questions: previewQuestions }),
-                      startedAt: nowMs(),
-                    }),
+                    workTrace: upsertLoopResult(
+                      upsertRuntimeToolCall(assistantMessage.workTrace, {
+                        id: toolCallId,
+                        toolName: 'ask_user',
+                        status: 'running',
+                        argsPreview: JSON.stringify({ questions: previewQuestions }),
+                        startedAt: nowMs(),
+                      }),
+                      currentLoopId(),
+                      currentLoopText || undefined,
+                      currentLoopThinking,
+                      currentLoopThinkingStatus,
+                      'complete',
+                      'tool_use',
+                      'commentary',
+                    ),
                   });
                   return;
                 }
@@ -1366,6 +1541,7 @@ export class ConversationService {
                   ? payload.reason
                   : 'This action requires user approval before it can run.';
                 pendingContinuation.approval = true;
+                markProcessEvidence();
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertRuntimeToolApproval(assistantMessage.workTrace, {
                     approvalId,
@@ -1605,11 +1781,20 @@ export class ConversationService {
                 }
                 if (outputPhase === 'final_answer') {
                   visibleResponse = loopResult;
-                } else if (!loopHasTools) {
+                } else {
+                  // Commentary stays in Work Process; never leave process text in the bubble.
                   visibleResponse = '';
                 }
                 commitVisibleAssistantText();
-                if (loopHasTools) {
+                // Any commentary / pending continuation ends this loop so the next assistant
+                // content (including post-ask final answers) cannot reuse a stale commentary phase.
+                if (
+                  outputPhase === 'commentary'
+                  || hasPendingContinuation()
+                  || loopHasTools
+                  || turnHadAskPause
+                  || stopReason === 'tool_use'
+                ) {
                   pendingNewLoop = true;
                 }
                 commitAssistantMessage('message_patched', {
@@ -1674,6 +1859,7 @@ export class ConversationService {
 
     if (abortController.signal.aborted || runWasCancelled) {
       this.clearActiveTurn(assistantMessage.turnId, abortController);
+      settleStopped();
       return;
     }
     const assistantContent = (currentLoopText.trim() || rawResponse || visibleResponse).trim();
@@ -1692,6 +1878,7 @@ export class ConversationService {
 
     if (abortController.signal.aborted || runWasCancelled) {
       this.clearActiveTurn(assistantMessage.turnId, abortController);
+      settleStopped();
       return;
     }
 
@@ -1752,11 +1939,21 @@ export class ConversationService {
     }
 
     this.clearActiveTurn(assistantMessage.turnId, abortController);
+    settleStopped();
   }
 
   private persistConversationSnapshot(sessionId: string | null | undefined, message: ConversationMessage) {
-    if (sessionId) {
+    if (!sessionId) {
+      return;
+    }
+    try {
       storageAdapter.appendConversationMessage(sessionId, message);
+    } catch (error) {
+      // Fail-soft: missing/deleted session must not crash rewrite or streaming flushes.
+      console.error(
+        `[ConversationService] Failed to persist conversation snapshot for ${sessionId}:`,
+        error instanceof Error ? error.message : error,
+      );
     }
   }
 

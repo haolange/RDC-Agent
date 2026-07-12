@@ -10,6 +10,7 @@ import { useUserMessageRewrite } from './useUserMessageRewrite';
 import { MessageAttachments } from './MessageAttachments';
 import { MessageMarkdown } from './MessageMarkdown';
 import { useConversationStore } from '../../../stores/conversationStore';
+import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useI18n } from '../../../i18n';
 
 interface MessageBubbleProps {
@@ -83,6 +84,7 @@ const MessageMetaBar: React.FC<{
 
 const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => {
   const time = formatClockTime(message.createdAt);
+  const composerMarkdown = useAppSettingsStore((state) => state.settings.appearance.composerMarkdown);
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
   const [editError, setEditError] = useState('');
@@ -140,7 +142,11 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
           ) : (
             <>
               <div className="conversation-bubble conversation-bubble-user">
-                <span className="conversation-bubble-text">{message.content}</span>
+                {composerMarkdown ? (
+                  <MessageMarkdown content={message.content} />
+                ) : (
+                  <span className="conversation-bubble-text">{message.content}</span>
+                )}
               </div>
               <MessageMetaBar
                 message={message}
@@ -179,7 +185,7 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
     >
       <div className="conversation-message-row">
         <div className="conversation-message-stack">
-          {trace && (trace.blocks.length > 0 || trace.summary || trace.status === 'running') ? (
+          {trace && ((trace.blocks?.length ?? 0) > 0 || trace.summary || trace.status === 'running') ? (
               <WorkProcess trace={trace} />
           ) : null}
           {message.attachments && message.attachments.length > 0 ? (

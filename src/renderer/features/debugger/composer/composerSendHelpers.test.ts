@@ -63,6 +63,7 @@ describe('composerSendHelpers', () => {
     const setConversationMessages = vi.fn();
     const upsertConversationMessages = vi.fn();
     const setBranchState = vi.fn();
+    const setConversationSnapshot = vi.fn();
 
     await applyConversationTurnResult({
       electronAPI: makeElectronApi(),
@@ -75,11 +76,13 @@ describe('composerSendHelpers', () => {
       setTracePresentation: vi.fn(),
       setConversationMessages,
       setBranchState,
+      setConversationSnapshot,
       upsertConversationMessages,
     });
 
-    expect(setConversationMessages).toHaveBeenCalledWith(visibleMessages);
-    expect(setBranchState).toHaveBeenCalledWith(branchState);
+    expect(setConversationSnapshot).toHaveBeenCalledWith(visibleMessages, branchState);
+    expect(setConversationMessages).not.toHaveBeenCalled();
+    expect(setBranchState).not.toHaveBeenCalled();
     expect(upsertConversationMessages).not.toHaveBeenCalled();
   });
 

@@ -3,6 +3,7 @@ import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ReasoningSummary } from '@shared/types/workflow';
+import { resolveVisibleConversationMessages } from '@shared/conversation/conversationBranchResolver';
 
 const sortConversationMessages = (messages: ConversationMessage[]): ConversationMessage[] =>
   messages
@@ -32,7 +33,17 @@ const mergeConversationMessages = (
   return sortConversationMessages(Array.from(byId.values()));
 };
 
+const projectVisibleMessages = (
+  allMessages: ConversationMessage[],
+  branchState: ConversationBranchState | null,
+): ConversationMessage[] => (
+  resolveVisibleConversationMessages(allMessages, branchState)
+);
+
 interface ConversationState {
+  /** Full merge of every known message id (may include inactive branch siblings). */
+  allConversationMessages: ConversationMessage[];
+  /** Active-branch projection used by the transcript UI. */
   conversationMessages: ConversationMessage[];
   branchState: ConversationBranchState | null;
   timeline: AgentTimelineEntry[];
@@ -40,6 +51,11 @@ interface ConversationState {
 
   setConversationMessages: (messages: ConversationMessage[]) => void;
   setBranchState: (branchState: ConversationBranchState | null) => void;
+  /** Atomically replace the message set and branch state (rewrite / history load). */
+  setConversationSnapshot: (
+    messages: ConversationMessage[],
+    branchState?: ConversationBranchState | null,
+  ) => void;
   addConversationMessage: (message: ConversationMessage) => void;
   upsertConversationMessage: (message: ConversationMessage) => void;
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
@@ -55,44 +71,84 @@ interface ConversationState {
 }
 
 export const useConversationStore = create<ConversationState>((set) => ({
+  allConversationMessages: [],
   conversationMessages: [],
   branchState: null,
   timeline: [],
   reasoningSummaries: [],
 
-  setConversationMessages: (conversationMessages) => set({ conversationMessages: sortConversationMessages(conversationMessages) }),
-  setBranchState: (branchState) => set({ branchState }),
-  addConversationMessage: (message) => set((state) => ({
-    conversationMessages: mergeConversationMessages(state.conversationMessages, [message]),
+  setConversationMessages: (messages) => set((state) => {
+    const allConversationMessages = sortConversationMessages(messages);
+    return {
+      allConversationMessages,
+      conversationMessages: projectVisibleMessages(allConversationMessages, state.branchState),
+    };
+  }),
+  setBranchState: (branchState) => set((state) => ({
+    branchState,
+    conversationMessages: projectVisibleMessages(state.allConversationMessages, branchState),
   })),
-  upsertConversationMessage: (message) => set((state) => ({
-    conversationMessages: mergeConversationMessages(state.conversationMessages, [message]),
-  })),
-  upsertConversationMessages: (messages) => set((state) => ({
-    conversationMessages: mergeConversationMessages(state.conversationMessages, messages),
-  })),
-  patchAssistantMessageByTurnId: (turnId, patch) => set((state) => ({
-    conversationMessages: sortConversationMessages(
-      state.conversationMessages.map((message) => (
+  setConversationSnapshot: (messages, branchState) => set((state) => {
+    const nextBranchState = branchState === undefined ? state.branchState : branchState;
+    const allConversationMessages = sortConversationMessages(messages);
+    return {
+      allConversationMessages,
+      branchState: nextBranchState,
+      conversationMessages: projectVisibleMessages(allConversationMessages, nextBranchState),
+    };
+  }),
+  addConversationMessage: (message) => set((state) => {
+    const allConversationMessages = mergeConversationMessages(state.allConversationMessages, [message]);
+    return {
+      allConversationMessages,
+      conversationMessages: projectVisibleMessages(allConversationMessages, state.branchState),
+    };
+  }),
+  upsertConversationMessage: (message) => set((state) => {
+    const allConversationMessages = mergeConversationMessages(state.allConversationMessages, [message]);
+    return {
+      allConversationMessages,
+      conversationMessages: projectVisibleMessages(allConversationMessages, state.branchState),
+    };
+  }),
+  upsertConversationMessages: (messages) => set((state) => {
+    const allConversationMessages = mergeConversationMessages(state.allConversationMessages, messages);
+    return {
+      allConversationMessages,
+      conversationMessages: projectVisibleMessages(allConversationMessages, state.branchState),
+    };
+  }),
+  patchAssistantMessageByTurnId: (turnId, patch) => set((state) => {
+    const allConversationMessages = sortConversationMessages(
+      state.allConversationMessages.map((message) => (
         message.turnId === turnId && message.role === 'assistant'
           ? { ...message, ...patch, updatedAt: Date.now() }
           : message
       )),
-    ),
-  })),
-  updateAssistantMessageByTurnId: (turnId, updater) => set((state) => ({
-    conversationMessages: sortConversationMessages(
-      state.conversationMessages.map((message) => (
+    );
+    return {
+      allConversationMessages,
+      conversationMessages: projectVisibleMessages(allConversationMessages, state.branchState),
+    };
+  }),
+  updateAssistantMessageByTurnId: (turnId, updater) => set((state) => {
+    const allConversationMessages = sortConversationMessages(
+      state.allConversationMessages.map((message) => (
         message.turnId === turnId && message.role === 'assistant'
           ? updater(message)
           : message
       )),
-    ),
-  })),
+    );
+    return {
+      allConversationMessages,
+      conversationMessages: projectVisibleMessages(allConversationMessages, state.branchState),
+    };
+  }),
   addTimelineEntry: (entry) => set((state) => ({ timeline: [...state.timeline, entry] })),
   setTimeline: (timeline) => set({ timeline }),
   setReasoningSummaries: (reasoningSummaries) => set({ reasoningSummaries }),
   reset: () => set({
+    allConversationMessages: [],
     conversationMessages: [],
     branchState: null,
     timeline: [],

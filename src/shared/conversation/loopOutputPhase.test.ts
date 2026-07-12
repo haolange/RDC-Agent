@@ -37,11 +37,11 @@ describe('resolveConversationLoopOutputPhase', () => {
     })).toBe('commentary');
   });
 
-  it('returns commentary for end_turn when approval is still pending', () => {
+  it('returns commentary for end_turn when userInput continuation is pending', () => {
     expect(resolveConversationLoopOutputPhase({
       stopReason: 'end_turn',
       loopHasTools: false,
-      hasPendingContinuation: { approval: true },
+      hasPendingContinuation: { userInput: true },
     })).toBe('commentary');
   });
 });

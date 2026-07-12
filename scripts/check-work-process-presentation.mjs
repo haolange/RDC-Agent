@@ -229,7 +229,7 @@ const summaryThinkingPresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'complete',
-      result: { text: 'Turn result.', status: 'complete', toolCallIds: [] },
+      result: { text: 'Turn result.', status: 'complete', toolCallIds: [], stopReason: 'end_turn', outputPhase: 'final_answer' },
       thinking: {
         text: 'The user asks in Chinese. Now answer in Chinese.',
         kind: 'summary',
@@ -248,7 +248,7 @@ const summaryThinkingSection = summaryThinkingPresentation.rows.find((row) => ro
 assert(summaryThinkingSection?.type === 'section', 'summary thinking should render as process evidence');
 assert(summaryThinkingSection.proseText === '', 'answer-only thinking must not duplicate final answer text');
 assert(summaryThinkingSection.thinkingLabel === '已思考 · 5ms', 'summary thinking should use 已思考 · duration settled label');
-assert(summaryThinkingSection.thinkingOpenByDefault === true, 'summary thinking should be open by default');
+assert(summaryThinkingSection.thinkingOpenByDefault === false, 'final-answer quiet thinking stays folded by default');
 
 const duplicateSummary = 'I have all the answers from memory. Let me respond concisely in Chinese.';
 const duplicateSummaryPresentation = buildWorkProcessPresentation({
@@ -369,7 +369,13 @@ const opaquePresentation = buildWorkProcessPresentation({
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'complete',
-      result: { text: 'Provider state retained.', status: 'complete', toolCallIds: [] },
+      result: {
+        text: 'Provider state retained.',
+        status: 'complete',
+        toolCallIds: [],
+        stopReason: 'end_turn',
+        outputPhase: 'final_answer',
+      },
       thinking: {
         kind: 'opaque',
         source: 'openai-responses-encrypted',
@@ -672,6 +678,7 @@ const componentSource = [
   fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessRowRenderer.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessRows.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessRowParts.tsx', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessToolCardParts.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessIcons.tsx', 'utf8'),
 ].join('\n');
 const cssSource = fs.readFileSync('src/renderer/features/debugger/AgentChat/AgentChat.css', 'utf8');
@@ -691,6 +698,45 @@ const toolApprovalSubmitHookSource = fs.readFileSync('src/renderer/features/debu
 const orchestratorSource = fs.readFileSync('src/main/workflow/debugger/AgentOrchestrator.ts', 'utf8');
 
 assert(presentationSource.includes('resolveSectionProse'), 'commentary should route through resolveSectionProse');
+assert(
+  /outputPhase\s*===\s*'commentary'/.test(presentationSource)
+    && !presentationSource.includes('void outputPhase'),
+  'settled commentary prose must follow outputPhase, not void it',
+);
+assert(
+  !/canShow\s*=\s*[\s\S]*toolCalls\.length\s*>\s*0/.test(presentationSource),
+  'commentary visibility must not require toolCalls on the same loop',
+);
+assert(
+  /isStreaming\s*&&\s*outputPhase\s*!==\s*'final_answer'/.test(presentationSource),
+  'streaming final_answer must not enter Work Process prose',
+);
+assert(
+  (() => {
+    const source = readSource('src/main/conversation/ConversationService.ts');
+    return source.includes('turnHadAskPause')
+      && source.includes('resolveStreamingOutputPhase')
+      && source.includes('syncVisibleResponseForStreaming')
+      && source.includes("outputPhase === 'commentary'")
+      && source.includes("stopReason === 'tool_use'")
+      && /pendingNewLoop\s*=\s*true/.test(source);
+  })(),
+  'ask/commentary pauses must set pendingNewLoop, stamp streaming outputPhase, and avoid CoT final flash',
+);
+assert(
+  /\.work-process-user-input-transcript\s*\{[^}]*gap:\s*var\(--space-3\)/.test(cssSource),
+  'Asked transcript items should use space-3 gap between numbered Q/A pairs',
+);
+assert(
+  componentSource.includes('work-process-user-input-transcript-index')
+    && /\.work-process-user-input-transcript-item\s*\{[^}]*grid-template-columns:\s*auto\s+minmax\(0,\s*1fr\)/.test(cssSource)
+    && /\.work-process-user-input-transcript-answer[\s\S]*?padding-left:\s*var\(--space-3\)/.test(cssSource),
+  'Asked transcript should number questions in a grid and indent answers under the prompt',
+);
+assert(
+  /\.work-process-user-input\s*\{[^}]*border:\s*1px\s+solid\s+var\(--token-border-muted\)/.test(cssSource),
+  'Asked rows should use the same card border chrome as tool cards',
+);
 assert(presentationSource.includes('proseText'), 'presentation should expose narrative prose on sections');
 assert(presentationSource.includes('aggregateSectionSteps'), 'presentation should aggregate consecutive tools');
 assert(presentationSource.includes("type: 'toolAggregate'"), 'presentation should expose toolAggregate rows');
@@ -752,7 +798,10 @@ assert(fs.existsSync('src/renderer/features/debugger/AgentChat/ToolAggregateRow.
 assert(fs.existsSync('src/renderer/features/debugger/AgentChat/workProcessUnits.ts'), 'presentation units helper must exist');
 assert(componentSource.includes('work-process-tool-diagnostic'), 'failed tools should expose a diagnostic caption exit');
 assert(componentSource.includes('diagnosticCaption'), 'tool rows should carry diagnosticCaption from projection');
-const toolRowSource = fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessRowParts.tsx', 'utf8');
+const toolRowSource = [
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessRowParts.tsx', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessToolCardParts.tsx', 'utf8'),
+].join('\n');
 assert(toolRowSource.includes('useState(false)'), 'tool cards must start collapsed by default');
 assert(!toolRowSource.includes("row.status === 'running' && canExpand"), 'running tools must not auto-expand detail/Raw');
 assert(!toolRowSource.includes('setExpanded(true)'), 'tool cards must not programmatically auto-expand');
@@ -814,12 +863,20 @@ assert(
   'non-prose section adjacency should lock top padding to zero',
 );
 assert(
-  /\.work-process\s*\+\s*\.conversation-bubble-assistant\s*\{[^}]*margin-top:\s*5px/.test(cssSource),
-  'final answer body should separate from the Work Process block with 5px',
+  /\.work-process\s*\+\s*\.conversation-bubble-assistant\s*\{[^}]*margin-top:\s*calc\(10px\s*-\s*var\(--space-2\)\)/.test(cssSource),
+  'final answer body should separate from the Work Process block with a true 10px (cancel stack gap)',
 );
 assert(
   !/\.work-process\.is-collapsed\s*\+\s*\.conversation-bubble-assistant\s*\{[^}]*margin-top:/.test(cssSource),
-  'collapsed and expanded should share the same 5px process-to-result break',
+  'collapsed and expanded should share the same 10px process-to-result break',
+);
+assert(
+  /\.work-process-steps\s*>\s*\.work-process-step:last-child\s*\{[^}]*padding-bottom:\s*0/.test(cssSource),
+  'last process step must zero bottom padding so expanded ends flush like collapsed',
+);
+assert(
+  /\.work-process-section-list\s+\.work-process-step\s*\{[^}]*padding:\s*var\(--space-1\)\s+0\s+0/.test(cssSource),
+  'nested tool rows should use top-only padding so the last tool does not pad into the answer',
 );
 assert(
   cssSource.includes('.work-process.is-collapsed .work-process-label'),
@@ -847,8 +904,12 @@ assert(
   'loop rail-to-thinking gap should be space-1',
 );
 assert(
-  /\.work-process-section-list\s*\{[^}]*padding-left:\s*calc\(14px\s*\+\s*var\(--space-1\)\)/.test(cssSource),
-  'section tool rows should align with thinking caption text after the spark icon',
+  !/\.work-process-section-list\s*\{[^}]*padding-left:\s*calc\(14px\s*\+\s*var\(--space-1\)\)/.test(cssSource),
+  'section tool rows must not keep spark-aligned padding-left; they share commentary left edge',
+);
+assert(
+  /\.work-process-section-list\s*\{[^}]*padding:\s*0/.test(cssSource),
+  'section tool list should use padding: 0 so tool cards align with commentary prose',
 );
 assert(cssSource.includes('.work-process-icon'), 'local tool icon styling should exist');
 assert(cssSource.includes('.work-process-section-list'), 'section list styling should exist');

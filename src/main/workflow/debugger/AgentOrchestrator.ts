@@ -823,6 +823,19 @@ export class AgentOrchestrator {
   }
 
   /**
+   * Drop in-memory agent slots for a session so the next turn reloads from
+   * the (possibly truncated) persisted agent-thread after a branch rewrite.
+   */
+  invalidateSessionAgentSlots(sessionId: string): void {
+    const prefix = `${sessionId}::`;
+    for (const key of Array.from(this.agentSlots.keys())) {
+      if (key.startsWith(prefix)) {
+        this.agentSlots.delete(key);
+      }
+    }
+  }
+
+  /**
    * 解析 Agent 的工具执行轮数上限。
    *
    * 优先用 `.agent.md` frontmatter 的 `max-turns`；
@@ -1992,7 +2005,7 @@ export class AgentOrchestrator {
       this.currentTurnEventSink = null;
       // 长生命周期 Agent：turn 结束后持久化完整 message 线程，
       // 使重开 session 可从 StorageAdapter 回填并完整续接。
-      if (input.sessionId) {
+      if (input.sessionId && !input.options?.signal?.aborted) {
         try {
           storageAdapter.writeAgentThread(input.sessionId, input.agentId, [...slot.agent.messages]);
         } catch (error) {

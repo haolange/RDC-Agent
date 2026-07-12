@@ -115,9 +115,13 @@ const resolveOutputPhase = (
   block: ConversationWorkBlock,
   hasVisibleProcessEvidence: boolean,
 ): ConversationLoopOutputPhase => {
+  // Prefer the runtime-persisted phase. Heuristics must not invent "commentary" for
+  // streaming finals (that flashes WP prose before assistant.completed settles).
   if (block.result?.outputPhase) return block.result.outputPhase;
   if (block.status === 'running' || block.status === 'pending') {
-    if (block.toolCalls.length === 0 && hasVisibleProcessEvidence) {
+    // Without an explicit phase, hide streaming text from WP prose whenever this turn
+    // already has process evidence. Runtime must stamp commentary for true narrative.
+    if (hasVisibleProcessEvidence) {
       return 'final_answer';
     }
     return 'commentary';
@@ -140,15 +144,20 @@ const resolveSectionProse = (
   outputPhase: ConversationLoopOutputPhase,
 ): { proseText: string; proseStreaming: boolean } => {
   // Commentary is narrative prose — never promoted into the thinking slot.
-  void outputPhase;
+  // Final answers render only in the assistant body, never as WP prose.
   const commentary = normalizeWorkProcessText(block.result?.text ?? '');
   const resultStatus = block.result?.status
     ?? (block.status === 'running' || block.status === 'pending' ? 'streaming' : 'complete');
+  const isStreaming = resultStatus === 'streaming';
   const canShow = isMeaningfulText(commentary)
-    && (block.toolCalls.length > 0 || isNonFinalStopReason(block.result?.stopReason) || resultStatus === 'streaming');
+    && (
+      (isStreaming && outputPhase !== 'final_answer')
+      || outputPhase === 'commentary'
+      || isNonFinalStopReason(block.result?.stopReason)
+    );
   return {
     proseText: canShow ? commentary : '',
-    proseStreaming: canShow && resultStatus === 'streaming',
+    proseStreaming: canShow && isStreaming,
   };
 };
 
@@ -294,7 +303,8 @@ function blocksToDetailRows(blocks: ConversationWorkBlock[]): WorkProcessRow[] {
 export const buildWorkProcessPresentation = (
   trace: ConversationWorkTrace,
 ): WorkProcessPresentation => {
-  const rows = blocksToDetailRows(trace.blocks);
+  const blocks = Array.isArray(trace.blocks) ? trace.blocks : [];
+  const rows = blocksToDetailRows(blocks);
   markLastSectionOpen(rows);
   const toolCount = countToolSteps(rows);
   const stepCount = countSteps(rows);
@@ -307,7 +317,7 @@ export const buildWorkProcessPresentation = (
     toolCount,
     actionCount: toolCount,
     summary,
-    duration: formatTraceDuration(trace.blocks),
+    duration: formatTraceDuration(blocks),
     defaultExpanded: trace.status !== 'idle' || rows.length > 0 || Boolean(summary),
     important,
   };

@@ -30,6 +30,10 @@ export async function sendComposerConversationTurn(options: {
   setPendingAttachments: (value: PendingAttachmentDraft[]) => void;
   setConversationMessages: (messages: ConversationMessage[]) => void;
   setBranchState: (branchState: ConversationBranchState | null) => void;
+  setConversationSnapshot?: (
+    messages: ConversationMessage[],
+    branchState?: ConversationBranchState | null,
+  ) => void;
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
   setCurrentSession: (session: SessionRecord | null) => void;
   setSessions: (sessions: SessionRecord[]) => void;
@@ -52,6 +56,7 @@ export async function sendComposerConversationTurn(options: {
     setPendingAttachments,
     setConversationMessages,
     setBranchState,
+    setConversationSnapshot,
     upsertConversationMessages,
     setCurrentSession,
     setSessions,
@@ -94,7 +99,7 @@ export async function sendComposerConversationTurn(options: {
 
     // Drop optimistic placeholders before applying authoritative turn messages.
     setConversationMessages(removeOptimisticConversationMessages(
-      useConversationStore.getState().conversationMessages ?? [],
+      useConversationStore.getState().allConversationMessages ?? [],
       optimistic.optimisticIds,
     ));
 
@@ -109,6 +114,7 @@ export async function sendComposerConversationTurn(options: {
       setTracePresentation,
       setConversationMessages,
       setBranchState,
+      setConversationSnapshot,
       upsertConversationMessages,
     });
 
