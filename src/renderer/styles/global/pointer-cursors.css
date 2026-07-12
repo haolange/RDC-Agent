@@ -1,0 +1,62 @@
+/**
+ * Pointer cursor preference — driven by html[data-pointer-cursors].
+ * When true: interactive controls use pointer.
+ * When false (default): system arrow, overriding feature CSS that hard-coded pointer.
+ */
+
+html[data-pointer-cursors='true'] button:not(:disabled),
+html[data-pointer-cursors='true'] a[href],
+html[data-pointer-cursors='true'] summary,
+html[data-pointer-cursors='true'] label[for],
+html[data-pointer-cursors='true'] select:not(:disabled),
+html[data-pointer-cursors='true'] input[type='checkbox']:not(:disabled),
+html[data-pointer-cursors='true'] input[type='radio']:not(:disabled),
+html[data-pointer-cursors='true'] input[type='button']:not(:disabled),
+html[data-pointer-cursors='true'] input[type='submit']:not(:disabled),
+html[data-pointer-cursors='true'] input[type='reset']:not(:disabled),
+html[data-pointer-cursors='true'] [role='button']:not([aria-disabled='true']),
+html[data-pointer-cursors='true'] [role='menuitem']:not([aria-disabled='true']),
+html[data-pointer-cursors='true'] [role='tab']:not([aria-disabled='true']),
+html[data-pointer-cursors='true'] [role='option']:not([aria-disabled='true']),
+html[data-pointer-cursors='true'] [role='switch']:not([aria-disabled='true']),
+html[data-pointer-cursors='true'] .button:not(:disabled),
+html[data-pointer-cursors='true'] .user-menu-pill,
+html[data-pointer-cursors='true'] [data-pointer-interactive] {
+  cursor: pointer;
+}
+
+html:not([data-pointer-cursors='true']) button,
+html:not([data-pointer-cursors='true']) a,
+html:not([data-pointer-cursors='true']) summary,
+html:not([data-pointer-cursors='true']) label,
+html:not([data-pointer-cursors='true']) select,
+html:not([data-pointer-cursors='true']) input[type='checkbox'],
+html:not([data-pointer-cursors='true']) input[type='radio'],
+html:not([data-pointer-cursors='true']) input[type='button'],
+html:not([data-pointer-cursors='true']) input[type='submit'],
+html:not([data-pointer-cursors='true']) input[type='reset'],
+html:not([data-pointer-cursors='true']) [role='button'],
+html:not([data-pointer-cursors='true']) [role='menuitem'],
+html:not([data-pointer-cursors='true']) [role='tab'],
+html:not([data-pointer-cursors='true']) [role='option'],
+html:not([data-pointer-cursors='true']) [role='switch'],
+html:not([data-pointer-cursors='true']) .button,
+html:not([data-pointer-cursors='true']) .user-menu-pill,
+html:not([data-pointer-cursors='true']) [data-pointer-interactive] {
+  cursor: default;
+}
+
+html:not([data-pointer-cursors='true']) input:not([type='checkbox']):not([type='radio']):not([type='button']):not([type='submit']):not([type='reset']):not([type='file']),
+html:not([data-pointer-cursors='true']) textarea {
+  cursor: text;
+}
+
+html:not([data-pointer-cursors='true']) input[type='range'] {
+  cursor: default;
+}
+
+button:disabled,
+.button:disabled,
+[aria-disabled='true'] {
+  cursor: not-allowed;
+}

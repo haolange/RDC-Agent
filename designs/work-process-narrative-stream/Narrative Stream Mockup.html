@@ -200,6 +200,8 @@
     }
     .thinking[open] > summary .tw { transform: rotate(90deg); }
     .thinking-preview {
+      width: 100%;
+      max-width: 100%;
       margin: var(--space-1) 0 var(--space-1);
       padding: 0 0 0 var(--space-3);
       border-left: 2px solid var(--token-border-subtle);
@@ -296,7 +298,7 @@
     .tool-expand {
       margin: var(--space-1) 0 var(--space-2);
       width: 100%;
-      max-width: 52rem;
+      max-width: 100%;
     }
     .shell-panel {
       overflow: hidden;
@@ -363,7 +365,7 @@
       border: 1px solid var(--token-border-muted);
       border-radius: var(--radius-sm);
       background: rgb(var(--color-bg-1));
-      max-width: 52rem;
+      max-width: 100%;
     }
     .file-strip-head, .web-block-head {
       display: flex; align-items: center; gap: 8px;

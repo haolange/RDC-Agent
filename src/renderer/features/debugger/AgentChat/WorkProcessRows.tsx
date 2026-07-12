@@ -73,19 +73,26 @@ export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'user
               <span className="work-process-user-input-verb">{headerText}</span>
             )}
           </div>
-          <div className="work-process-user-input-transcript">
-            {row.items.map((item) => (
-              <div className="work-process-user-input-transcript-item" key={item.questionId}>
+          <ol className="work-process-user-input-transcript">
+            {row.items.map((item, index) => (
+              <li className="work-process-user-input-transcript-item" key={item.questionId}>
+                <span className="work-process-user-input-transcript-index" aria-hidden="true">
+                  {index + 1}.
+                </span>
                 <p className="work-process-user-input-transcript-question">{item.prompt}</p>
                 {item.answer ? (
                   <p className="work-process-user-input-transcript-answer">{item.answer}</p>
                 ) : (
                   <p className="work-process-user-input-transcript-pending">{pendingAnswerLabel}</p>
                 )}
-              </div>
+              </li>
             ))}
-            {row.error ? <p className="work-process-user-input-transcript-error">{row.error}</p> : null}
-          </div>
+            {row.error ? (
+              <li className="work-process-user-input-transcript-error" role="presentation">
+                {row.error}
+              </li>
+            ) : null}
+          </ol>
         </div>
       </div>
     </li>

@@ -141,6 +141,8 @@ const DEFAULT_APPEARANCE: UiPreferences = {
   theme: 'dark',
   language: 'zh-CN',
   fontScale: 'medium',
+  composerMarkdown: false,
+  usePointerCursors: false,
 };
 
 const DEFAULT_LAYOUT: LayoutPreferences = {
@@ -919,6 +921,12 @@ export class SettingsService {
         theme: pickEnum(candidate.appearance?.theme, VALID_THEMES, fallback.appearance?.theme ?? 'dark'),
         language: pickEnum(candidate.appearance?.language, VALID_LANGUAGES, fallback.appearance?.language ?? 'zh-CN'),
         fontScale: pickEnum(candidate.appearance?.fontScale, VALID_FONT_SCALES, fallback.appearance?.fontScale ?? 'medium'),
+        composerMarkdown: typeof candidate.appearance?.composerMarkdown === 'boolean'
+          ? candidate.appearance.composerMarkdown
+          : (fallback.appearance?.composerMarkdown ?? DEFAULT_APPEARANCE.composerMarkdown),
+        usePointerCursors: typeof candidate.appearance?.usePointerCursors === 'boolean'
+          ? candidate.appearance.usePointerCursors
+          : (fallback.appearance?.usePointerCursors ?? DEFAULT_APPEARANCE.usePointerCursors),
       },
       layout: {
         leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
@@ -965,6 +973,12 @@ export class SettingsService {
         theme: pickEnum(candidate.appearance?.theme, VALID_THEMES, fallback.appearance?.theme ?? 'dark'),
         language: pickEnum(candidate.appearance?.language, VALID_LANGUAGES, fallback.appearance?.language ?? 'zh-CN'),
         fontScale: pickEnum(candidate.appearance?.fontScale, VALID_FONT_SCALES, fallback.appearance?.fontScale ?? 'medium'),
+        composerMarkdown: typeof candidate.appearance?.composerMarkdown === 'boolean'
+          ? candidate.appearance.composerMarkdown
+          : (fallback.appearance?.composerMarkdown ?? DEFAULT_APPEARANCE.composerMarkdown),
+        usePointerCursors: typeof candidate.appearance?.usePointerCursors === 'boolean'
+          ? candidate.appearance.usePointerCursors
+          : (fallback.appearance?.usePointerCursors ?? DEFAULT_APPEARANCE.usePointerCursors),
       },
       layout: {
         leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
@@ -1127,6 +1141,12 @@ export class SettingsService {
           VALID_FONT_SCALES,
           DEFAULT_APPEARANCE.fontScale,
         ),
+        composerMarkdown: typeof (patch.appearance?.composerMarkdown ?? currentPersisted.appearance?.composerMarkdown) === 'boolean'
+          ? Boolean(patch.appearance?.composerMarkdown ?? currentPersisted.appearance?.composerMarkdown)
+          : DEFAULT_APPEARANCE.composerMarkdown,
+        usePointerCursors: typeof (patch.appearance?.usePointerCursors ?? currentPersisted.appearance?.usePointerCursors) === 'boolean'
+          ? Boolean(patch.appearance?.usePointerCursors ?? currentPersisted.appearance?.usePointerCursors)
+          : DEFAULT_APPEARANCE.usePointerCursors,
       },
       layout: {
         leftSidebar: sanitizeSidebar(

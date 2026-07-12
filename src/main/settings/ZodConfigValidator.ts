@@ -7,6 +7,8 @@ const UiPreferencesSchema = z.object({
   theme: z.enum(['dark', 'light', 'system']).optional().default('dark'),
   language: z.string().optional().default('en'),
   fontScale: z.enum(['small', 'medium', 'large']).optional().default('medium'),
+  composerMarkdown: z.boolean().optional().default(false),
+  usePointerCursors: z.boolean().optional().default(false),
 }).passthrough();
 
 const AgentPermissionSchema = z.object({

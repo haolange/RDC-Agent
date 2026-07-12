@@ -149,6 +149,10 @@ export interface UiPreferences {
   theme: AppTheme;
   language: AppLanguage;
   fontScale: FontScale;
+  /** Opt-in: Markdown syntax highlight + Write/Preview in composer; also renders user bubbles as Markdown. */
+  composerMarkdown: boolean;
+  /** Opt-in: use pointer cursor on interactive elements instead of the system default arrow. */
+  usePointerCursors: boolean;
 }
 
 export interface ProfileSettings {

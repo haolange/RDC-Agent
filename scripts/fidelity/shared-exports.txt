@@ -112,6 +112,7 @@ Blocker
 BLOCKER_CODES
 BlockerCodeDef
 BranchNavigatorViewModel
+buildToolResultPreview
 BUILTIN_AGENT_TOOL_ID_SET
 BUILTIN_AGENT_TOOL_IDS
 BUILTIN_LLM_PROVIDER_DEFINITIONS
@@ -489,6 +490,7 @@ ScopedInstructionSource
 ScopedResourceCandidate
 ScopedResourceCatalog
 ScopedResourceDocument
+ScopedResourceImportRequest
 ScopedResourceKind
 ScopedResourceWriteRequest
 SessionApi

@@ -44,8 +44,7 @@ export function useAppBootstrap(options: {
   const currentRun = useSessionStore((state) => state.currentRun);
   const currentRunUsage = useSessionStore((state) => state.currentRunUsage);
 
-  const setConversationMessages = useConversationStore((state) => state.setConversationMessages);
-  const setBranchState = useConversationStore((state) => state.setBranchState);
+  const setConversationSnapshot = useConversationStore((state) => state.setConversationSnapshot);
   const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
   const setCurrentRunUsage = useSessionStore((state) => state.setCurrentRunUsage);
   const clearUsageSnapshot = useSessionStore((state) => state.clearUsageSnapshot);
@@ -56,6 +55,7 @@ export function useAppBootstrap(options: {
     document.documentElement.dataset.theme = settings.appearance.theme;
     document.documentElement.dataset.resolvedTheme = resolvedTheme;
     document.documentElement.dataset.fontScale = settings.appearance.fontScale;
+    document.documentElement.dataset.pointerCursors = settings.appearance.usePointerCursors ? 'true' : 'false';
   }, [resolvedTheme, settings.appearance]);
 
   useEffect(() => {
@@ -104,7 +104,7 @@ export function useAppBootstrap(options: {
     }
 
     if (!currentSession?.sessionId) {
-      setConversationMessages([]);
+      setConversationSnapshot([], null);
       return;
     }
 
@@ -118,14 +118,16 @@ export function useAppBootstrap(options: {
         electronAPI.evidence.getChain().catch(() => ({ events: [] as ActionEvent[] })),
         electronAPI.trace.getProjection(currentSession.sessionId).catch(() => ({ success: false, presentation: null })),
       ]);
-      setConversationMessages(hydrateMessagesWithActionEvents(
-        historyResult.messages ?? [],
-        (evidenceResult.events ?? []) as ActionEvent[],
-      ));
-      setBranchState(historyResult.branchState ?? null);
+      setConversationSnapshot(
+        hydrateMessagesWithActionEvents(
+          historyResult.messages ?? [],
+          (evidenceResult.events ?? []) as ActionEvent[],
+        ),
+        historyResult.branchState ?? null,
+      );
       setTracePresentation(traceResult.presentation ?? null);
     })();
-  }, [currentSession?.sessionId, runtimeTestMode, setBranchState, setConversationMessages, setTracePresentation]);
+  }, [currentSession?.sessionId, runtimeTestMode, setConversationSnapshot, setTracePresentation]);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
@@ -230,7 +232,7 @@ function useSessionRestoreBootstrap(runtimeTestMode: boolean | null): void {
         useConversationStore.getState().setTimeline(timeline);
         useConversationStore.getState().setConversationMessages(
           hydrateMessagesWithActionEvents(
-            useConversationStore.getState().conversationMessages,
+            useConversationStore.getState().allConversationMessages,
             (result.events ?? []) as ActionEvent[],
           ),
         );
