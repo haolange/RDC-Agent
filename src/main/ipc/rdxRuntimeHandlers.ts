@@ -1,5 +1,5 @@
 import { ipcMain, shell } from 'electron';
-import type { HookEvent, ScopedResourceKind, ScopedResourceWriteRequest } from '@shared/types/rdxRuntime';
+import type { HookEvent, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from '@shared/types/rdxRuntime';
 import { hookEngine } from '../hooks/HookEngine';
 import { requestSnapshotStore } from '../agent-runtime/prompt';
 import { rdxRuntimeService } from '../runtime/RdxRuntimeService';
@@ -13,6 +13,10 @@ export function registerRdxRuntimeHandlers(): void {
   ipcMain.handle('rdx-runtime:upsert', (_event, request: ScopedResourceWriteRequest) => {
     rdxRuntimeService.upsert(request);
     return rdxRuntimeService.overview(request.projectRoot);
+  });
+  ipcMain.handle('rdx-runtime:import', (_event, request: ScopedResourceImportRequest) => {
+    const document = rdxRuntimeService.importFromFile(request);
+    return { overview: rdxRuntimeService.overview(request.projectRoot), id: document.id };
   });
   ipcMain.handle('rdx-runtime:delete', (_event, kind: ScopedResourceKind, scope: 'user' | 'project', id: string, projectRoot?: string) => {
     rdxRuntimeService.delete(kind, scope, id, projectRoot);

@@ -5,6 +5,7 @@ export const createRdxRuntimeApi = (): ElectronAPI['rdxRuntime'] => ({
   getOverview: (projectRoot) => ipcRenderer.invoke('rdx-runtime:overview', projectRoot),
   validateResource: (request) => ipcRenderer.invoke('rdx-runtime:validate', request),
   upsertResource: (request) => ipcRenderer.invoke('rdx-runtime:upsert', request),
+  importResource: (request) => ipcRenderer.invoke('rdx-runtime:import', request),
   deleteResource: (kind, scope, id, projectRoot) => ipcRenderer.invoke('rdx-runtime:delete', kind, scope, id, projectRoot),
   revealResource: (sourcePath) => ipcRenderer.invoke('rdx-runtime:reveal', sourcePath),
   trustHook: (projectRoot, hookId) => ipcRenderer.invoke('rdx-runtime:trustHook', projectRoot, hookId),

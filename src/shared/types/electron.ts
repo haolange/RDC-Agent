@@ -55,7 +55,7 @@ import type {
   TraceBranchSwitchResult,
   TraceSessionResult,
 } from './trace';
-import type { HookEvent, RdxRuntimeOverview, RequestEnvelopeSnapshot, ScopedResourceKind, ScopedResourceWriteRequest } from './rdxRuntime';
+import type { HookEvent, RdxRuntimeOverview, RequestEnvelopeSnapshot, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from './rdxRuntime';
 
 /** Memory 面板列表项摘要（对应 MemoryRecord 的精简视图）。 */
 export interface MemorySummary {
@@ -191,6 +191,7 @@ export interface ElectronAPI {
     getOverview: (projectRoot?: string) => Promise<RdxRuntimeOverview>;
     validateResource: (request: ScopedResourceWriteRequest) => Promise<{ valid: boolean; diagnostics: string[] }>;
     upsertResource: (request: ScopedResourceWriteRequest) => Promise<RdxRuntimeOverview>;
+    importResource: (request: ScopedResourceImportRequest) => Promise<{ overview: RdxRuntimeOverview; id: string }>;
     deleteResource: (kind: ScopedResourceKind, scope: 'user' | 'project', id: string, projectRoot?: string) => Promise<RdxRuntimeOverview>;
     revealResource: (sourcePath: string) => Promise<{ success: boolean; error?: string }>;
     trustHook: (projectRoot: string, hookId: string) => Promise<RdxRuntimeOverview>;
