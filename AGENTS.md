@@ -71,6 +71,7 @@
 - 强调色（`--color-accent-*`）只用于：焦点环、激活状态、主要 CTA。不得用于正文、装饰或多处背景。
 - 状态色（success / warning / error / info）只用于语义状态，不得挪作装饰。
 - `--token-effort-*` 紫色阶专用于 Composer effort 强度渐进指示（滑杆填充/thumb，以及 Max/Ultra 档的克制渐变与 sparkle），不得挪作其它装饰或背景。
+- `--token-context-*` 色阶专用于 Context breakdown 弹窗的分段条与图例色点，不得挪作其它装饰或背景。
 - 不得引入非 design-system.css 定义的新颜色；需要新颜色时先在 `--token-*` 层添加并说明用途。
 
 ### 新增组件规则

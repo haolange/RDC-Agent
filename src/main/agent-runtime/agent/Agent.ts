@@ -115,7 +115,7 @@ export class Agent {
     this._state = {
       systemPrompt: options.initialState.systemPrompt,
       model: options.initialState.model,
-      tools: options.initialState.tools,
+      tools: options.initialState.tools ? [...options.initialState.tools] : [],
       messages: options.initialState.messages ? [...options.initialState.messages] : [],
     };
   }
@@ -202,9 +202,18 @@ export class Agent {
     this._state.model = model;
   }
 
-  /** 动态更新工具列表。 */
+  /**
+   * 动态更新工具列表。
+   *
+   * 原地改写同一数组引用，使正在运行的 AgentLoop `context.tools`
+   *（与 `_state.tools` 共享引用）在同 turn 内下一次 LLM 调用立刻可见。
+   */
   setTools(tools: ToolDefinition[]): void {
-    this._state.tools = [...tools];
+    if (!this._state.tools) {
+      this._state.tools = [...tools];
+      return;
+    }
+    this._state.tools.splice(0, this._state.tools.length, ...tools);
   }
 
   /** 动态更新系统提示。 */

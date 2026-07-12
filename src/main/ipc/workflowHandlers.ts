@@ -53,8 +53,9 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
       return { usage: null as RunContextUsageSummary | null };
     }
 
+    const fallbackSessionId = sessionId ?? state.currentSessionId ?? null;
     return {
-      usage: debuggerLlmService.getRunContextUsage(targetKey),
+      usage: debuggerLlmService.getRunContextUsage(targetKey, fallbackSessionId),
     };
   });
 

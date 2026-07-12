@@ -46,6 +46,8 @@ interface ResponsesCompletedPayload {
     input_tokens?: number;
     output_tokens?: number;
     total_tokens?: number;
+    input_tokens_details?: { cached_tokens?: number };
+    output_tokens_details?: { reasoning_tokens?: number };
   };
 }
 
@@ -456,12 +458,16 @@ function toResponsesTool(tool: ToolDefinition): Record<string, unknown> {
 
 function applyCompletedResponse(builder: AssistantStreamBuilder, payload: ResponsesCompletedPayload): void {
   if (payload.usage) {
+    const cacheReadTokens = payload.usage.input_tokens_details?.cached_tokens;
+    const reasoningTokens = payload.usage.output_tokens_details?.reasoning_tokens;
     builder.setUsage({
       inputTokens: payload.usage.input_tokens ?? 0,
       outputTokens: payload.usage.output_tokens ?? 0,
       totalTokens:
         payload.usage.total_tokens
         ?? (payload.usage.input_tokens ?? 0) + (payload.usage.output_tokens ?? 0),
+      ...(typeof cacheReadTokens === 'number' ? { cacheReadTokens } : {}),
+      ...(typeof reasoningTokens === 'number' ? { reasoningTokens } : {}),
     });
   }
 }

@@ -153,6 +153,8 @@ export interface UiPreferences {
   composerMarkdown: boolean;
   /** Opt-in: use pointer cursor on interactive elements instead of the system default arrow. */
   usePointerCursors: boolean;
+  /** UI memory: whether Context breakdown popover details are expanded. Driven by popover toggle only. */
+  contextBreakdownExpanded: boolean;
 }
 
 export interface ProfileSettings {

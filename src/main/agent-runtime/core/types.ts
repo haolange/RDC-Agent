@@ -151,6 +151,12 @@ export interface Usage {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
+  /** Provider 上报的 cache read tokens；未提供时缺省。 */
+  cacheReadTokens?: number;
+  /** Provider 上报的 cache write / creation tokens；未提供时缺省。 */
+  cacheWriteTokens?: number;
+  /** Provider 上报的 reasoning tokens；未提供时缺省。 */
+  reasoningTokens?: number;
   /** 可选成本信息（单位：美元）。 */
   cost?: {
     input: number;

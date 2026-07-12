@@ -61,13 +61,22 @@ interface AnthropicContentBlockStop extends AnthropicEventBase {
 interface AnthropicMessageDelta extends AnthropicEventBase {
   type: 'message_delta';
   delta: { stop_reason?: string | null };
-  usage?: { output_tokens?: number };
+  usage?: {
+    output_tokens?: number;
+    cache_read_input_tokens?: number;
+    cache_creation_input_tokens?: number;
+  };
 }
 
 interface AnthropicMessageStart extends AnthropicEventBase {
   type: 'message_start';
   message: {
-    usage?: { input_tokens?: number; output_tokens?: number };
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      cache_read_input_tokens?: number;
+      cache_creation_input_tokens?: number;
+    };
   };
 }
 
@@ -171,6 +180,8 @@ export class AnthropicProvider implements ProviderStrategy {
       let stopReason: string | null = null;
       let inputTokens = 0;
       let outputTokens = 0;
+      let cacheReadTokens: number | undefined;
+      let cacheWriteTokens: number | undefined;
       let sawOutput = false;
 
       for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
@@ -187,7 +198,20 @@ export class AnthropicProvider implements ProviderStrategy {
             const evt = event as AnthropicMessageStart;
             inputTokens = evt.message.usage?.input_tokens ?? inputTokens;
             outputTokens = evt.message.usage?.output_tokens ?? outputTokens;
-            builder.setUsage({ inputTokens, outputTokens });
+            if (typeof evt.message.usage?.cache_read_input_tokens === 'number') {
+              cacheReadTokens = evt.message.usage.cache_read_input_tokens;
+            }
+            if (typeof evt.message.usage?.cache_creation_input_tokens === 'number') {
+              cacheWriteTokens = evt.message.usage.cache_creation_input_tokens;
+            }
+            builder.setUsage({
+              // Anthropic 的 input_tokens 不含 prompt cache 命中/写入部分；
+              // agent-runtime Usage.inputTokens 归一为完整 prompt 占用（与 OpenAI prompt_tokens 口径一致）。
+              inputTokens: inputTokens + (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0),
+              outputTokens,
+              ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+              ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
+            });
             break;
           }
           case 'content_block_start': {
@@ -283,7 +307,20 @@ export class AnthropicProvider implements ProviderStrategy {
             if (evt.delta.stop_reason) stopReason = evt.delta.stop_reason;
             if (typeof evt.usage?.output_tokens === 'number') {
               outputTokens = evt.usage.output_tokens;
-              builder.setUsage({ inputTokens, outputTokens });
+            }
+            if (typeof evt.usage?.cache_read_input_tokens === 'number') {
+              cacheReadTokens = evt.usage.cache_read_input_tokens;
+            }
+            if (typeof evt.usage?.cache_creation_input_tokens === 'number') {
+              cacheWriteTokens = evt.usage.cache_creation_input_tokens;
+            }
+            if (evt.usage) {
+              builder.setUsage({
+                inputTokens: inputTokens + (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0),
+                outputTokens,
+                ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+                ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
+              });
             }
             break;
           }
