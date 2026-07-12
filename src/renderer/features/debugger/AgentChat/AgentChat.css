@@ -1044,9 +1044,64 @@
 }
 
 .work-process-user-input-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
   margin: 0;
   padding: var(--space-2) var(--space-3);
+  border: 0;
   border-bottom: 1px solid var(--token-border-muted);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.work-process-user-input-header:hover {
+  background: var(--token-interactive-hover);
+}
+
+.work-process-user-input-header:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: -2px;
+}
+
+.work-process-user-input:not(.is-expanded) .work-process-user-input-header {
+  border-bottom: 0;
+}
+
+.work-process-user-input-progress {
+  margin-left: auto;
+  color: var(--token-text-muted);
+  font-size: var(--text-xs);
+}
+
+.work-process-user-input-collapsed-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0 var(--space-3) var(--space-2);
+  color: var(--token-text-muted);
+  font-size: var(--text-sm);
+}
+
+.work-process-user-input-collapsed-question {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.work-process-user-input-collapsed-count {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.work-process-user-input .work-process-row-caret.is-open {
+  transform: rotate(90deg);
 }
 
 .work-process-user-input-verb {
@@ -1065,10 +1120,10 @@
 .work-process-user-input-transcript {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
   min-width: 0;
   margin: 0;
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-3);
   list-style: none;
 }
 
@@ -1463,7 +1518,6 @@
 .work-process-user-input-transcript-answer,
 .work-process-user-input-transcript-pending {
   grid-column: 2;
-  padding-left: var(--space-3);
   color: var(--token-text-muted);
 }
 

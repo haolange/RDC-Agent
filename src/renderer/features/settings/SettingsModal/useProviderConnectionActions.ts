@@ -25,7 +25,7 @@ export const useProviderConnectionActions = (
 
   const handleTestProviderDraft = async () => {
     if (!connectionDraft) return;
-    updateConnectionDraft({ busy: 'testing', error: '' });
+    updateConnectionDraft({ busy: 'testing', error: '', discoveryDiagnostic: null });
     try {
       if (connectionProvider?.authMode === 'account') {
         const result = await window.electronAPI.llm.refreshProviderModels(connectionDraft.providerId);
@@ -36,6 +36,7 @@ export const useProviderConnectionActions = (
         updateConnectionDraft({
           busy: 'idle',
           error: '',
+          discoveryDiagnostic: result.discoveryDiagnostic ?? null,
           testedApiKey: connectionDraft.apiKey,
           testedBaseUrl: connectionDraft.baseUrl,
           testedProtocol: connectionDraft.protocol,
@@ -58,6 +59,7 @@ export const useProviderConnectionActions = (
       updateConnectionDraft({
         busy: 'idle',
         error: '',
+        discoveryDiagnostic: result.discoveryDiagnostic ?? null,
         testedApiKey: connectionDraft.apiKey,
         testedBaseUrl: connectionDraft.baseUrl,
         testedProtocol: connectionDraft.protocol,
@@ -73,7 +75,7 @@ export const useProviderConnectionActions = (
 
   const handleSaveProviderConnection = async () => {
     if (!connectionDraft) return;
-    updateConnectionDraft({ busy: 'saving', error: '' });
+    updateConnectionDraft({ busy: 'saving', error: '', discoveryDiagnostic: null });
     try {
       if (connectionProvider?.authMode === 'account') {
         if (connectionProvider.isConfigured && !connectionDraft.accountStatus?.requiresCodeInput) {

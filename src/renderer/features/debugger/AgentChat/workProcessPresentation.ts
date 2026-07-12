@@ -14,11 +14,7 @@ import {
   formatDurationMs,
   normalizeWorkProcessText,
 } from './workProcessFormat';
-import {
-  createFallbackAskUserQuestion,
-  normalizeAskUserAnswers,
-  normalizeAskUserQuestions,
-} from '@shared/utils/askUser';
+import { normalizeAskUserAnswers } from '@shared/utils/askUser';
 import {
   formatMcpTarget,
   getToolDisplay,
@@ -113,30 +109,18 @@ const isNonFinalStopReason = (stopReason?: ConversationLoopStopReason): boolean 
 
 const resolveOutputPhase = (
   block: ConversationWorkBlock,
-  hasVisibleProcessEvidence: boolean,
+  _hasVisibleProcessEvidence: boolean,
 ): ConversationLoopOutputPhase => {
-  // Prefer the runtime-persisted phase. Heuristics must not invent "commentary" for
-  // streaming finals (that flashes WP prose before assistant.completed settles).
+  // Runtime phase is authoritative. Unknown streaming text is treated as final-side
+  // withheld output so it can never flash as Work Process prose.
   if (block.result?.outputPhase) return block.result.outputPhase;
-  if (block.status === 'running' || block.status === 'pending') {
-    // Without an explicit phase, hide streaming text from WP prose whenever this turn
-    // already has process evidence. Runtime must stamp commentary for true narrative.
-    if (hasVisibleProcessEvidence) {
-      return 'final_answer';
-    }
+  if (block.toolCalls.length > 0 || isNonFinalStopReason(block.result?.stopReason)) {
     return 'commentary';
   }
-  const stopReason = block.result?.stopReason;
-  if (isNonFinalStopReason(stopReason)) return 'commentary';
-  if (
-    block.toolCalls.length === 0
-    && (stopReason === 'end_turn' || stopReason === undefined)
-    && hasVisibleProcessEvidence
-    && (block.status === 'complete' || block.status === 'error')
-  ) {
+  if (block.status === 'running' || block.status === 'pending') {
     return 'final_answer';
   }
-  return 'commentary';
+  return 'final_answer';
 };
 
 const resolveSectionProse = (
@@ -149,12 +133,7 @@ const resolveSectionProse = (
   const resultStatus = block.result?.status
     ?? (block.status === 'running' || block.status === 'pending' ? 'streaming' : 'complete');
   const isStreaming = resultStatus === 'streaming';
-  const canShow = isMeaningfulText(commentary)
-    && (
-      (isStreaming && outputPhase !== 'final_answer')
-      || outputPhase === 'commentary'
-      || isNonFinalStopReason(block.result?.stopReason)
-    );
+  const canShow = isMeaningfulText(commentary) && outputPhase === 'commentary';
   return {
     proseText: canShow ? commentary : '',
     proseStreaming: canShow && isStreaming,
@@ -521,10 +500,11 @@ export const createToolRowForPresentation = (
 ): WorkProcessRow => createToolRow(call, compact);
 
 const createUserInputRow = (call: ConversationToolCall): WorkProcessRow => {
-  const args = parsePreview(call.argsPreview);
-  const parsedQuestions = normalizeAskUserQuestions(args);
-  const questions = parsedQuestions.length > 0 ? parsedQuestions : [createFallbackAskUserQuestion()];
-  const status = call.status === 'complete'
+  const questions = call.userInputQuestions ?? [];
+  const incomplete = questions.length === 0;
+  const status = incomplete
+    ? 'error'
+    : call.status === 'complete'
     ? 'complete'
     : call.status === 'error' || call.error
       ? 'error'
@@ -540,7 +520,6 @@ const createUserInputRow = (call: ConversationToolCall): WorkProcessRow => {
       questionId: question.questionId,
       prompt: question.prompt,
       answer: answer?.answer,
-      selectedOptionId: answer?.selectedOptionId,
     };
   });
 
@@ -548,10 +527,12 @@ const createUserInputRow = (call: ConversationToolCall): WorkProcessRow => {
     type: 'userInput',
     id: call.id,
     status,
-    verb: status === 'complete' ? '已询问' : status === 'error' ? '询问已中断' : '正在询问',
+    verb: incomplete ? '问题数据不完整' : status === 'complete' ? '已询问' : status === 'error' ? '询问已中断' : '正在询问',
     questionCount: questions.length,
     items,
-    error: call.error || undefined,
+    answeredCount: items.filter((item) => Boolean(item.answer)).length,
+    incomplete,
+    error: incomplete ? undefined : call.error || undefined,
     duration: formatDurationMs(call.startedAt, call.completedAt),
   };
 };

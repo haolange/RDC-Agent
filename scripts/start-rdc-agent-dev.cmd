@@ -14,6 +14,7 @@ if not exist "node_modules\.bin\electron-vite.cmd" (
 )
 
 echo [RDC-Agent] Starting visible Electron React WebUI in development mode...
+set "RDC_AGENT_HEADLESS=0"
+set "RDC_AGENT_TEST_MODE=0"
 call "node_modules\.bin\electron-vite.cmd" dev
 exit /b %ERRORLEVEL%
-

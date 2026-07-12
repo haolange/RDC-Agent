@@ -1,4 +1,5 @@
 import { useCaptureStore } from '../../../stores/captureStore';
+import { useConversationStore } from '../../../stores/conversationStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 import type { TranslationKey } from '../../../i18n';
@@ -97,6 +98,10 @@ export async function selectSessionOp(
 
   useSessionStore.getState().clearUsageSnapshot();
   ctx.setCurrentSession(result.session);
+  const history = await window.electronAPI.conversation.getHistory(result.session.sessionId).catch(() => null);
+  if (history && ctx.isLatestSelectionRequest(options.requestId)) {
+    useConversationStore.getState().setConversationSnapshot(history.messages ?? [], history.branchState ?? null);
+  }
   ctx.setRightRailTarget('session');
   ctx.setCurrentRun(result.currentRun ?? null);
   ctx.setCaptures(result.currentRun?.captures ?? []);

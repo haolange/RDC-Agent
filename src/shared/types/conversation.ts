@@ -63,6 +63,8 @@ export interface ConversationToolCall {
   id: string;
   toolName: string;
   status: ConversationToolCallStatus;
+  /** Canonical ask_user payload. Renderer state must never be reconstructed from argsPreview. */
+  userInputQuestions?: ConversationAskUserQuestion[];
   argsPreview?: string;
   resultPreview?: string;
   error?: string;

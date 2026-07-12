@@ -150,4 +150,55 @@ describe('SettingsService provider persistence', () => {
       modelId: 'deepseek-v4-flash',
     });
   });
+
+  it('preserves only the verified Volc Coding Plan model subset after saving and reloading', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    service.initialize();
+
+    service.saveProviderConnection('volcengine-coding-plan', 'test-key', [
+      { id: 'doubao-seed-2.0-code', label: 'Doubao Seed 2.0 Code', enabled: true, availability: 'available' },
+      { id: 'glm-4.7', label: 'GLM 4.7', enabled: true, availability: 'available' },
+    ]);
+
+    const reloaded = service.getAll();
+    expect(reloaded.llm.providers
+      .find((provider) => provider.id === 'volcengine-coding-plan')
+      ?.models.map((model) => model.id)).toEqual(['doubao-seed-2.0-code', 'glm-4.7']);
+  });
+
+  it('preserves an invalid Volc route id so Settings can require an explicit reselection', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    service.initialize();
+    service.saveProviderConnection('volcengine-coding-plan', 'test-key', [
+      { id: 'glm-4.7', label: 'GLM 4.7', enabled: true, availability: 'available' },
+    ]);
+
+    service.setAll({
+      llm: {
+        agentRoutes: [{ agentId: 'ask', providerId: 'volcengine-coding-plan', modelId: 'glm-5.2' }],
+      },
+    });
+
+    expect(service.getAll().llm.agentRoutes).toContainEqual({
+      agentId: 'ask',
+      providerId: 'volcengine-coding-plan',
+      modelId: 'glm-5.2',
+    });
+  });
+
+  it('keeps the established sanitize behavior for invalid non-Volc routes', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    service.initialize();
+    service.setAll({
+      llm: {
+        agentRoutes: [{ agentId: 'ask', providerId: 'missing-provider', modelId: 'missing-model' }],
+      },
+    });
+    expect(service.getAll().llm.agentRoutes).toContainEqual({
+      agentId: 'ask', providerId: '', modelId: '',
+    });
+  });
 });

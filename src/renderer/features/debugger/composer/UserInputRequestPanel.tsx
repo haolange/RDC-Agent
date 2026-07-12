@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useI18n } from '../../../i18n';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { ActiveSignalText } from '../../../ui/ActiveSignalText';
 import { Button } from '../../../ui/Button';
@@ -27,6 +28,7 @@ export const usePendingUserInputRequest = (): PendingUserInputRequest | null => 
 export const UserInputRequestPanel: React.FC<{
   request: PendingUserInputRequest;
 }> = ({ request }) => {
+  const { t } = useI18n();
   const submitUserInput = useUserInputRequestSubmit();
   const requestFingerprint = useMemo(() => createRequestFingerprint(request), [request]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -38,6 +40,7 @@ export const UserInputRequestPanel: React.FC<{
 
   const questionCount = request.questions.length;
   const currentQuestion = request.questions[Math.min(currentIndex, questionCount - 1)];
+  const hasValidQuestions = questionCount > 0;
   const currentDraft = currentQuestion ? drafts[currentQuestion.questionId] : undefined;
   const selectedOptionId = currentDraft?.selectedOptionId;
   const customAnswer = selectedOptionId ? '' : currentDraft?.answer ?? '';
@@ -45,10 +48,11 @@ export const UserInputRequestPanel: React.FC<{
   const isLastQuestion = currentIndex >= questionCount - 1;
   const currentAnswered = currentQuestion ? isQuestionAnswered(currentQuestion, drafts) : false;
   const allAnswered = areAllQuestionsAnswered(request.questions, drafts);
-  const footerActionLabel = !isLastQuestion ? 'Next' : 'Submit';
+  const footerActionLabel = t(!isLastQuestion ? 'chat.userInputNext' : 'chat.userInputSubmit');
+  const enterAction = t(isLastQuestion ? 'chat.userInputEnterSubmit' : 'chat.userInputEnterContinue');
   const footerHint = currentQuestion?.allowFreeform
-    ? (isLastQuestion ? 'Enter to submit · Shift+Enter for newline' : 'Enter to continue · Shift+Enter for newline')
-    : (isLastQuestion ? 'Enter to submit' : 'Enter to continue');
+    ? t('chat.userInputNewlineHint', { action: enterAction })
+    : enterAction;
 
   const resizeTextarea = useCallback(() => {
     const textarea = textareaRef.current;
@@ -81,7 +85,7 @@ export const UserInputRequestPanel: React.FC<{
   const submitAnswers = useCallback(async () => {
     const answers = buildAnswerPayload(request.questions, drafts);
     if (answers.length !== request.questions.length || isSubmitting) {
-      setError('Answer every question before submitting.');
+      setError(t('chat.userInputAnswerAll'));
       return;
     }
 
@@ -90,16 +94,24 @@ export const UserInputRequestPanel: React.FC<{
     try {
       await submitUserInput(request, answers);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to submit the answers.');
+      const message = err instanceof Error ? err.message : t('chat.userInputSubmitFailed');
+      const missingQuestionId = /question\s+([^:\s.]+)/i.exec(message)?.[1];
+      const missingQuestionIndex = missingQuestionId
+        ? request.questions.findIndex((question) => question.questionId === missingQuestionId)
+        : -1;
+      if (missingQuestionIndex >= 0) {
+        setCurrentIndex(missingQuestionIndex);
+      }
+      setError(message);
     } finally {
       setIsSubmitting(false);
     }
-  }, [drafts, isSubmitting, request, submitUserInput]);
+  }, [drafts, isSubmitting, request, submitUserInput, t]);
 
   const advanceOrSubmit = useCallback(() => {
     if (!currentQuestion || isSubmitting) return;
     if (!currentAnswered) {
-      setError('Answer the current question before continuing.');
+      setError(t('chat.userInputAnswerCurrent'));
       return;
     }
     if (!isLastQuestion) {
@@ -109,7 +121,7 @@ export const UserInputRequestPanel: React.FC<{
     if (!allAnswered) {
       const firstMissing = request.questions.findIndex((question) => !isQuestionAnswered(question, drafts));
       goToQuestion(firstMissing >= 0 ? firstMissing : currentIndex);
-      setError('Answer every question before submitting.');
+      setError(t('chat.userInputAnswerAll'));
       return;
     }
     void submitAnswers();
@@ -124,6 +136,7 @@ export const UserInputRequestPanel: React.FC<{
     isSubmitting,
     request.questions,
     submitAnswers,
+    t,
   ]);
 
   const selectOption = useCallback((optionId: string) => {
@@ -182,8 +195,6 @@ export const UserInputRequestPanel: React.FC<{
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [advanceOrSubmit, currentQuestion, isSubmitting, selectOption]);
 
-  if (!currentQuestion) return null;
-
   return (
     <section
       ref={panelRef}
@@ -192,31 +203,31 @@ export const UserInputRequestPanel: React.FC<{
     >
       <div className="composer-user-input-question-bar">
         <div className="composer-user-input-header">
-          <ActiveSignalText active tone="interaction" className="composer-user-input-kicker">Input requested</ActiveSignalText>
-          <p>{currentQuestion.prompt}</p>
-          {currentQuestion.description ? (
+          <ActiveSignalText active tone="interaction" className="composer-user-input-kicker">{t('chat.userInputRequested')}</ActiveSignalText>
+          <p>{currentQuestion?.prompt ?? t('chat.userInputIncomplete')}</p>
+          {currentQuestion?.description ? (
             <span className="composer-user-input-question-description">{currentQuestion.description}</span>
           ) : null}
         </div>
-        {isBatch ? (
-          <div className="composer-user-input-progress" aria-label="Question navigation">
+        {hasValidQuestions && isBatch ? (
+          <div className="composer-user-input-progress" aria-label={t('chat.userInputQuestionProgress', { current: currentIndex + 1, count: questionCount })}>
             <Button
               variant="ghost"
               size="sm"
               className="composer-user-input-nav-button"
               disabled={currentIndex === 0 || isSubmitting}
-              aria-label="Previous question"
+              aria-label={t('chat.userInputPreviousQuestion')}
               onClick={() => goToQuestion(currentIndex - 1)}
             >
               <ChevronIcon direction="left" />
             </Button>
-            <span>{currentIndex + 1} of {questionCount}</span>
+            <span>{t('chat.userInputQuestionProgress', { current: currentIndex + 1, count: questionCount })}</span>
             <Button
               variant="ghost"
               size="sm"
               className="composer-user-input-nav-button"
               disabled={currentIndex >= questionCount - 1 || !currentAnswered || isSubmitting}
-              aria-label="Next question"
+              aria-label={t('chat.userInputNextQuestion')}
               onClick={() => goToQuestion(currentIndex + 1)}
             >
               <ChevronIcon direction="right" />
@@ -225,7 +236,7 @@ export const UserInputRequestPanel: React.FC<{
         ) : null}
       </div>
 
-      {currentQuestion.options.length > 0 ? (
+      {currentQuestion && currentQuestion.options.length > 0 ? (
         <UserInputOptionList
           question={currentQuestion}
           selectedOptionId={selectedOptionId}
@@ -234,7 +245,7 @@ export const UserInputRequestPanel: React.FC<{
         />
       ) : null}
 
-      {currentQuestion.allowFreeform ? (
+      {currentQuestion?.allowFreeform ? (
         <UserInputCustomAnswer
           question={currentQuestion}
           selectedOptionId={selectedOptionId}
@@ -251,7 +262,7 @@ export const UserInputRequestPanel: React.FC<{
           variant="primary"
           size="sm"
           className="composer-user-input-submit"
-          disabled={isSubmitting || (isLastQuestion ? !allAnswered : !currentAnswered)}
+          disabled={!hasValidQuestions || isSubmitting || (isLastQuestion ? !allAnswered : !currentAnswered)}
           onClick={advanceOrSubmit}
         >
           {footerActionLabel}
@@ -261,6 +272,11 @@ export const UserInputRequestPanel: React.FC<{
       {error ? (
         <p className="composer-user-input-error" role="alert">
           {error}
+        </p>
+      ) : null}
+      {!hasValidQuestions ? (
+        <p className="composer-user-input-error" role="alert">
+          {t('chat.userInputIncomplete')}
         </p>
       ) : null}
     </section>

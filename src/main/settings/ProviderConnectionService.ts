@@ -26,6 +26,11 @@ import { providerAccountAuthService } from './ProviderAccountAuthService';
 
 const REQUEST_TIMEOUT_MS = 20000;
 
+interface ModelDiscoveryResult {
+  models: LlmProviderModel[];
+  discoveryDiagnostic?: LlmProviderConnectionResult['discoveryDiagnostic'];
+}
+
 function resolveDiscoveryStrategy(
   protocol: LlmProviderEntry['protocol'],
   catalogStrategy: LlmProviderModelDiscoveryStrategy | null | undefined,
@@ -167,8 +172,6 @@ export const mergeManagedModelAvailability = (
   discoveredModels: LlmProviderModel[],
   options?: {
     aliasesByModelId?: ReadonlyMap<string, readonly string[]>;
-    /** When list auth succeeds but no catalog row matches (meta-only / id-format drift), keep catalog available. */
-    fallbackAvailableOnEmptyMatch?: boolean;
   },
 ): LlmProviderModel[] => {
   if (discoveredModels.length === 0) {
@@ -215,24 +218,17 @@ export const mergeManagedModelAvailability = (
     };
   });
 
-  // Coding Plan `/models` is known-unreliable: meta-only lists, date-suffixed ids, or
-  // pay-as-you-go-shaped payloads. Auth already succeeded; prefer catalog availability
-  // over a false "all unavailable" wall when nothing matched.
-  if (
-    options?.fallbackAvailableOnEmptyMatch
-    && merged.length > 0
-    && merged.every((model) => model.enabled === false)
-  ) {
-    return managedModels.map((model) => ({
-      ...model,
-      enabled: true,
-      availability: 'available' as const,
-      availabilityReason: undefined,
-    }));
-  }
-
   return merged;
 };
+
+export const selectSupportedCodingPlanModels = (
+  providerId: string,
+  models: LlmProviderModel[],
+): LlmProviderModel[] => (
+  providerId === 'volcengine-coding-plan'
+    ? models.filter((model) => model.enabled !== false && model.availability === 'available')
+    : models
+);
 
 const buildManagedAliasIndex = (providerId: string): Map<string, readonly string[]> => {
   const map = new Map<string, readonly string[]>();
@@ -352,7 +348,7 @@ export class ProviderConnectionService {
   async testProviderDraft(request: LlmProviderDraftRequest): Promise<LlmProviderConnectionResult> {
     try {
       const provider = this.resolveProviderProtocol(this.getProvider(request.providerId), request.protocol);
-      const models = await this.discoverModels(
+      const discovery = await this.discoverModels(
         provider,
         request.apiKey?.trim() ?? '',
         request.baseUrl?.trim() ?? '',
@@ -360,7 +356,7 @@ export class ProviderConnectionService {
       return {
         success: true,
         provider,
-        models,
+        ...discovery,
       };
     } catch (error) {
       return {
@@ -376,13 +372,14 @@ export class ProviderConnectionService {
       const provider = this.resolveProviderProtocol(this.getProvider(request.providerId), request.protocol);
       const apiKey = request.apiKey?.trim() ?? '';
       const baseUrl = request.baseUrl?.trim() ?? '';
-      const models = await this.discoverModels(provider, apiKey, baseUrl);
+      const discovery = await this.discoverModels(provider, apiKey, baseUrl);
+      const { models } = discovery;
       const nextSettings = settingsService.saveProviderConnection(provider.id, apiKey, models, baseUrl, provider.protocol);
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
       return {
         success: true,
         provider: nextProvider,
-        models,
+        ...discovery,
       };
     } catch (error) {
       return {
@@ -408,13 +405,14 @@ export class ProviderConnectionService {
           models: nextProvider?.models ?? [],
         };
       }
-      const models = await this.discoverModels(provider, '', '');
+      const discovery = await this.discoverModels(provider, '', '');
+      const { models } = discovery;
       const nextSettings = settingsService.saveProviderConnection(provider.id, '', models, '', provider.protocol);
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
       return {
         success: true,
         provider: nextProvider,
-        models,
+        ...discovery,
       };
     } catch (error) {
       return {
@@ -482,7 +480,7 @@ export class ProviderConnectionService {
     return { ...provider, protocol, baseUrl: nextBaseUrl || provider.baseUrl };
   }
 
-  private async discoverModels(provider: LlmProviderEntry, apiKeyDraft: string, baseUrlDraft: string): Promise<LlmProviderModel[]> {
+  private async discoverModels(provider: LlmProviderEntry, apiKeyDraft: string, baseUrlDraft: string): Promise<ModelDiscoveryResult> {
     if (provider.authMode === 'account') {
       throw new ProviderConnectionError('Account providers must be tested through the account login flow.');
     }
@@ -507,14 +505,16 @@ export class ProviderConnectionService {
     const strategy = resolveDiscoveryStrategy(provider.protocol, definition.modelDiscovery);
     if (!strategy) {
       if (catalogOwnership === 'app-managed') {
-        return managedModels;
+        return { models: managedModels };
       }
       throw new ProviderConnectionError('Provider 缺少模型发现配置');
     }
     if (strategy === 'static') {
-      return catalogOwnership === 'app-managed'
-        ? managedModels
-        : toStaticModels(definition.recommendedModels);
+      return {
+        models: catalogOwnership === 'app-managed'
+          ? managedModels
+          : toStaticModels(definition.recommendedModels),
+      };
     }
     const baseUrl = (
       baseUrlDraft
@@ -539,21 +539,23 @@ export class ProviderConnectionService {
       return this.validateCodingPlanModels(provider.id, apiKey, baseUrl, candidateModelIds, managedModels);
     }
     if (strategy === 'anthropic-candidate-validation') {
-      return this.validateAnthropicCandidateModels(provider, apiKey, baseUrl, candidateModelIds, managedModels);
+      return { models: await this.validateAnthropicCandidateModels(provider, apiKey, baseUrl, candidateModelIds, managedModels) };
     }
     if (strategy === 'azure-openai') {
-      return this.validateAzureCandidateModels(apiKey, baseUrl, candidateModelIds, managedModels);
+      return { models: await this.validateAzureCandidateModels(apiKey, baseUrl, candidateModelIds, managedModels) };
     }
     if (strategy === 'google-ai-studio') {
       const payload = await getJson(appendQueryParam(appendPath(baseUrl, '/models'), 'key', apiKey), {
         method: 'GET',
       });
       const discoveredModels = requireModels(parseModelsPayload(strategy, payload));
-      return catalogOwnership === 'app-managed'
-        ? mergeManagedModelAvailability(managedModels, discoveredModels, {
+      return {
+        models: catalogOwnership === 'app-managed'
+          ? mergeManagedModelAvailability(managedModels, discoveredModels, {
           aliasesByModelId: buildManagedAliasIndex(provider.id),
-        })
-        : discoveredModels;
+          })
+          : discoveredModels,
+      };
     }
     const url = strategy === 'ollama-tags'
       ? appendPath(new URL(baseUrl).origin, '/api/tags')
@@ -564,11 +566,13 @@ export class ProviderConnectionService {
       headers,
     });
     const discoveredModels = requireModels(parseModelsPayload(strategy, payload));
-    return catalogOwnership === 'app-managed'
-      ? mergeManagedModelAvailability(managedModels, discoveredModels, {
+    return {
+      models: catalogOwnership === 'app-managed'
+        ? mergeManagedModelAvailability(managedModels, discoveredModels, {
         aliasesByModelId: buildManagedAliasIndex(provider.id),
-      })
-      : discoveredModels;
+        })
+        : discoveredModels,
+    };
   }
 
   private async validateAnthropicCandidateModels(
@@ -616,7 +620,7 @@ export class ProviderConnectionService {
     baseUrl: string,
     modelIds: string[],
     managedModels: LlmProviderModel[] = [],
-  ): Promise<LlmProviderModel[]> {
+  ): Promise<ModelDiscoveryResult> {
     const modelsUrl = providerId === 'volcengine-coding-plan'
       ? resolveVolcengineCodingPlanModelsUrl(baseUrl)
       : resolveCodingPlanModelsUrl(baseUrl);
@@ -649,15 +653,24 @@ export class ProviderConnectionService {
     if (validatedModels.length === 0) {
       throw new ProviderConnectionError('Provider 暂未返回可用于 Agent 路由的模型');
     }
-    return managedModels.length > 0
+    const mergedModels = managedModels.length > 0
       ? mergeManagedModelAvailability(managedModels, discoveredModels.length > 0 ? discoveredModels : validatedModels, {
         aliasesByModelId,
-        // Volcengine Coding Plan list payloads frequently mismatch friendly catalog ids
-        // (meta-only, date suffixes, vendor prefixes). Auth success should not strand the UI
-        // in an all-Unavailable state — chat accepts the catalog routing ids.
-        fallbackAvailableOnEmptyMatch: providerId === 'volcengine-coding-plan',
       })
       : validatedModels;
+    const models = selectSupportedCodingPlanModels(providerId, mergedModels);
+    const filteredModelCount = providerId === 'volcengine-coding-plan'
+      ? Math.max(0, mergedModels.length - models.length)
+      : 0;
+    return {
+      models,
+      discoveryDiagnostic: {
+        status: models.length === 0 ? 'no-supported-models' : 'matched',
+        discoveredModelCount: discoveredModels.length,
+        matchedModelCount: matchedIds.length,
+        filteredModelCount,
+      },
+    };
   }
 
   private async validateAzureCandidateModels(

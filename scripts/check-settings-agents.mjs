@@ -212,7 +212,11 @@ function main() {
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RuntimeScopePanel.tsx'),
     'utf8',
   );
-  assert(runtimeScopePanel.includes("kind === 'skill'") && runtimeScopePanel.includes('allowed-tools'), 'Skill settings should create standard scoped SKILL.md content.');
+  const scopedResourceForm = fs.readFileSync(
+    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/scopedResourceForm.ts'),
+    'utf8',
+  );
+  assert(scopedResourceForm.includes("kind === 'skill'") && scopedResourceForm.includes('allowed-tools'), 'Skill settings should create standard scoped SKILL.md content through the canonical scoped resource form.');
   assert(runtimeScopePanel.includes('rdxRuntime.upsertResource') && runtimeScopePanel.includes('rdxRuntime.deleteResource'), 'Scoped resources should use the canonical RDX Runtime write API.');
   const toolsSettings = fs.readFileSync(
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/ToolsSettings.tsx'),

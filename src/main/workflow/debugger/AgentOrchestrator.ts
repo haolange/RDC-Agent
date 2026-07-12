@@ -75,7 +75,9 @@ import type {
   ToolDefinition,
   ToolResultMessage,
   UserMessage,
+  Message,
 } from '../../agent-runtime/core/types';
+import { sessionContextJournal, type SessionContextRoute } from '../../conversation/SessionContextJournal';
 import { createToolSearchTool, getPrimitiveTools } from '../../agent-runtime/tools';
 import { MCPManager, type MCPServerConfig } from '../../agent-runtime/agent/MCPManager';
 import {
@@ -149,6 +151,15 @@ interface AgentProfileTurnOptions extends AgentTurnOptions {
   /** 当前激活项目 id。 */
   projectId?: string | null;
   promptPlan?: PromptPlan;
+  visibleTurnIds?: string[];
+  activeBranchId?: string;
+  onTerminalContext?: (result: {
+    messages: Message[];
+    route: SessionContextRoute;
+    status: 'complete' | 'stopped' | 'error';
+    selectedTurnCount: number;
+    filteredArtifactCount: number;
+  }) => void;
 }
 
 /** 单个 AgentRole 在内部维护的运行态。 */
@@ -440,6 +451,14 @@ export class AgentOrchestrator {
       const activeContextWindow = resolveActiveContextWindowTokens(capability, turnControls);
       const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
       const reasoning = options?.reasoning ?? resolveReasoningSelection(capability, turnControls);
+      const protocol = settings.llm.providers.find((provider) => provider.id === routeProviderId)?.protocol ?? 'unknown';
+      const contextRoute: SessionContextRoute = { providerId: routeProviderId, modelId: effectiveModelId, protocol };
+      const journalSessionId = options?.sessionId && !options.sessionId.includes('::subagent::')
+        ? options.sessionId
+        : null;
+      const materialized = journalSessionId
+        ? sessionContextJournal.materialize(journalSessionId, options?.visibleTurnIds ?? [], contextRoute)
+        : { messages: [], selectedTurnCount: 0, filteredArtifactCount: 0, migrated: false };
 
       const responseText = await this.runAgentTurn({
         agentId,
@@ -464,6 +483,22 @@ export class AgentOrchestrator {
         promptPlan: options?.promptPlan,
         contextWindow: activeContextWindow,
         contextTokenLimit,
+        initialMessages: materialized.messages,
+        contextDiagnostic: {
+          selectedTurnCount: materialized.selectedTurnCount,
+          activeBranchId: options?.activeBranchId ?? null,
+          filteredArtifactCount: materialized.filteredArtifactCount,
+          compactionState: 'derived-view-only',
+        },
+        terminalContext: options?.onTerminalContext
+          ? (messages, status) => options.onTerminalContext?.({
+              messages,
+              route: contextRoute,
+              status,
+              selectedTurnCount: materialized.selectedTurnCount,
+              filteredArtifactCount: materialized.filteredArtifactCount,
+            })
+          : undefined,
       });
 
       runtimeLogService.log({
@@ -714,6 +749,8 @@ export class AgentOrchestrator {
     contextWindow?: number,
     contextTokenLimit?: number,
     promptPlan?: PromptPlan,
+    initialMessages: Message[] = [],
+    contextDiagnostic?: Record<string, unknown>,
   ): AgentSlot {
     const slotKey = this.agentSlotKey(sessionId, agentId);
     const toolSignature = this.createToolSignature(tools);
@@ -733,12 +770,8 @@ export class AgentOrchestrator {
       return existing;
     }
 
-    // 长生命周期 Agent：首次创建时从持久化线程回填历史 messages，
-    // 使 Agent 跨轮记忆真实工具调用，重开 session 可完整续接。
-    const persistedMessages = sessionId
-      ? storageAdapter.readAgentThread(sessionId, agentId)
-      : [];
-
+    // Every turn starts from the active branch materialized by the canonical
+    // session journal. The in-memory slot is only an execution cache.
     const agentModel = encodeAgentModel(providerId, modelId, { contextWindow });
     const routeProvider = settingsService.getAll().llm.providers.find((provider) => provider.id === providerId);
     const reasoningContract = resolveAgentRouteCapability(
@@ -762,7 +795,7 @@ export class AgentOrchestrator {
         model: agentModel,
         systemPrompt,
         tools,
-        messages: persistedMessages,
+        messages: initialMessages,
       },
       provider: configuredRuntimeProvider,
       toolExecutor,
@@ -787,6 +820,7 @@ export class AgentOrchestrator {
             maxTokens: requestOptions.maxTokens,
             topP: requestOptions.topP,
             reasoningSelection: requestOptions.reasoning?.selection,
+            contextDiagnostic,
           },
           reasoning: reasoningContract,
         });
@@ -817,22 +851,9 @@ export class AgentOrchestrator {
     return slot;
   }
 
-  /** 复合 slot key：`${sessionId}::${agentId}`，使 Agent 按 session+profile 隔离。 */
+  /** Execution-cache key; canonical session history remains agent-neutral. */
   private agentSlotKey(sessionId: string | null | undefined, agentId: AgentRole): string {
     return sessionId ? `${sessionId}::${agentId}` : `__no_session__::${agentId}`;
-  }
-
-  /**
-   * Drop in-memory agent slots for a session so the next turn reloads from
-   * the (possibly truncated) persisted agent-thread after a branch rewrite.
-   */
-  invalidateSessionAgentSlots(sessionId: string): void {
-    const prefix = `${sessionId}::`;
-    for (const key of Array.from(this.agentSlots.keys())) {
-      if (key.startsWith(prefix)) {
-        this.agentSlots.delete(key);
-      }
-    }
   }
 
   /**
@@ -1810,6 +1831,9 @@ export class AgentOrchestrator {
     promptPlan?: PromptPlan;
     contextWindow?: number;
     contextTokenLimit?: number;
+    initialMessages?: Message[];
+    contextDiagnostic?: Record<string, unknown>;
+    terminalContext?: (messages: Message[], status: 'complete' | 'stopped' | 'error') => void;
   }): Promise<string> {
     if (!input.providerId || !input.modelId) {
       throw new Error('No provider/model route is configured for this agent.');
@@ -1890,6 +1914,8 @@ export class AgentOrchestrator {
       input.contextWindow,
       input.contextTokenLimit,
       input.promptPlan,
+      input.initialMessages,
+      input.contextDiagnostic,
     );
 
     const userMessage: UserMessage = {
@@ -1990,11 +2016,16 @@ export class AgentOrchestrator {
       input.options.signal.addEventListener('abort', abortListener, { once: true });
     }
 
+    const initialMessageCount = slot.agent.messages.length;
+    let terminalStatus: 'complete' | 'stopped' | 'error' = 'complete';
     try {
       // Agent.prompt 内部跑完整循环；返回值是新增的全部消息，
       // 我们只在订阅里收集助手文本，最后返回 `responseText`。
       await slot.agent.prompt(userMessage);
       return responseText;
+    } catch (error) {
+      terminalStatus = input.options?.signal?.aborted ? 'stopped' : 'error';
+      throw error;
     } finally {
       unsubscribe();
       if (abortListener && input.options?.signal) {
@@ -2003,15 +2034,7 @@ export class AgentOrchestrator {
       agentUserInputRequestService.cancelTurn(input.turnId);
       agentToolApprovalRequestService.cancelTurn(input.turnId);
       this.currentTurnEventSink = null;
-      // 长生命周期 Agent：turn 结束后持久化完整 message 线程，
-      // 使重开 session 可从 StorageAdapter 回填并完整续接。
-      if (input.sessionId && !input.options?.signal?.aborted) {
-        try {
-          storageAdapter.writeAgentThread(input.sessionId, input.agentId, [...slot.agent.messages]);
-        } catch (error) {
-          console.error(`[AgentOrchestrator] writeAgentThread failed for ${input.sessionId}::${input.agentId}:`, error);
-        }
-      }
+      input.terminalContext?.(slot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus);
     }
   }
 

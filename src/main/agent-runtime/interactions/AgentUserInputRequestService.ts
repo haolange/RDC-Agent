@@ -125,7 +125,10 @@ export class AgentUserInputRequestService {
     const answerByQuestionId = new Map(answers.map((answer) => [answer.questionId, answer]));
     const missingQuestion = pending.questions.find((question) => !answerByQuestionId.has(question.questionId));
     if (missingQuestion) {
-      return { success: false, error: `Answer cannot be empty for question ${missingQuestion.questionId}.` };
+      return {
+        success: false,
+        error: `Answer cannot be empty for question ${missingQuestion.questionId}: ${missingQuestion.prompt}`,
+      };
     }
 
     for (const question of pending.questions) {

@@ -12,9 +12,7 @@ import { ProviderAccountOAuthPanel } from './ProviderAccountOAuthPanel';
 import { ProviderApiKeyFields } from './ProviderApiKeyFields';
 import { ProviderConnectModelRow } from './ProviderConnectModelRow';
 import { ProviderProtocolField } from './ProviderProtocolField';
-
 type Translate = ReturnType<typeof useI18n>['t'];
-
 interface ProviderConnectDialogProps {
   connectionDraft: ProviderConnectionDraft;
   connectionProvider: LlmProviderEntry;
@@ -29,10 +27,9 @@ interface ProviderConnectDialogProps {
   onUpdateConnectionDraft: (patch: Partial<ProviderConnectionDraft>) => void;
   onTest: () => void | Promise<void>;
   onSave: () => void | Promise<void>;
-  onStartAccountLogin: (accountLoginMode?: ProviderConnectionDraft['accountLoginMode']) => void | Promise<void>;
+  onStartAccountLogin: (mode?: ProviderConnectionDraft['accountLoginMode']) => void | Promise<void>;
   t: Translate;
 }
-
 export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   connectionDraft,
   connectionProvider,
@@ -50,23 +47,18 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   onStartAccountLogin,
   t,
 }) => {
-  const accountRequiresCode = Boolean(
-    connectionProvider.authMode === 'account'
-    && connectionDraft.accountStatus?.requiresCodeInput,
-  );
-  const accountSaveBlocked = Boolean(
-    connectionProvider.authMode === 'account'
+  const accountRequiresCode = Boolean(connectionProvider.authMode === 'account'
+    && connectionDraft.accountStatus?.requiresCodeInput);
+  const accountSaveBlocked = Boolean(connectionProvider.authMode === 'account'
     && !connectionAccountConnected
-    && (!accountRequiresCode || !connectionDraft.authCode.trim()),
-  );
-  const accountTestBlocked = Boolean(
-    connectionProvider.authMode === 'account'
-    && !connectionAccountConnected,
-  );
+    && (!accountRequiresCode || !connectionDraft.authCode.trim()));
+  const accountTestBlocked = Boolean(connectionProvider.authMode === 'account'
+    && !connectionAccountConnected);
   const commonActionBlocked = connectionDraft.busy !== 'idle'
     || connectionNeedsApiKey
     || connectionNeedsBaseUrl
     || connectionDevicePending;
+  const noSupportedModels = connectionProvider.catalogOwnership === 'app-managed' && connectionHasFreshTest && connectionDraft.models.length === 0;
   const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
   const catalogModelCount = Math.max(
     connectionDraft.models.length,
@@ -109,8 +101,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             {getResolvedProviderLabel(connectionProvider)}
           </div>
         </div>
-        <button
-          type="button"
+        <button type="button"
           className="settings-modal-close"
           onClick={onClose}
           aria-label={t('settings.close')}
@@ -139,6 +130,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
               protocol,
             ),
             error: '',
+            discoveryDiagnostic: null,
             testedApiKey: '',
             testedBaseUrl: '',
             testedProtocol: protocol,
@@ -166,6 +158,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             onChange={(event) => onUpdateConnectionDraft({
               baseUrl: event.target.value,
               error: '',
+              discoveryDiagnostic: null,
               testedApiKey: '',
               testedBaseUrl: '',
               models: [],
@@ -219,6 +212,17 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         </div>
       )}
 
+      {!connectionDraft.error && connectionDraft.discoveryDiagnostic && (
+        <div className="settings-provider-notice" data-testid="settings-provider-connect-discovery-diagnostic">
+          {t(
+            connectionDraft.discoveryDiagnostic.status === 'no-supported-models'
+              ? 'settings.providerDiscoveryNoSupportedModels'
+              : 'settings.providerDiscoveryMatched',
+            connectionDraft.discoveryDiagnostic,
+          )}
+        </div>
+      )}
+
       {!connectionDraft.error && allModelsUnavailable && (
         <div className="settings-provider-notice" data-testid="settings-provider-connect-unavailable-hint">
           {t('settings.providers.allModelsUnavailableHint')}
@@ -262,8 +266,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         <button type="button" className="button button-secondary" onClick={onClose}>
           {t('settings.cancel')}
         </button>
-        <button
-          type="button"
+        <button type="button"
           className="button button-secondary"
           data-testid="settings-provider-connect-test"
           onClick={() => void onTest()}
@@ -276,7 +279,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
           className="button button-primary"
           data-testid="settings-provider-connect-save"
           onClick={() => void onSave()}
-          disabled={commonActionBlocked || accountSaveBlocked}
+          disabled={commonActionBlocked || accountSaveBlocked || noSupportedModels}
         >
           {connectionDraft.busy === 'saving'
             ? t('settings.saving')

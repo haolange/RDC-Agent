@@ -3,19 +3,10 @@ import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ReasoningSummary } from '@shared/types/workflow';
-import { resolveVisibleConversationMessages } from '@shared/conversation/conversationBranchResolver';
+import { compareConversationMessages, resolveVisibleConversationMessages } from '@shared/conversation/conversationBranchResolver';
 
 const sortConversationMessages = (messages: ConversationMessage[]): ConversationMessage[] =>
-  messages
-    .slice()
-    .sort((left, right) => {
-      if (left.createdAt !== right.createdAt) {
-        return left.createdAt - right.createdAt;
-      }
-      const leftUpdatedAt = left.updatedAt ?? left.createdAt;
-      const rightUpdatedAt = right.updatedAt ?? right.createdAt;
-      return leftUpdatedAt - rightUpdatedAt;
-    });
+  messages.slice().sort(compareConversationMessages);
 
 const mergeConversationMessages = (
   currentMessages: ConversationMessage[],

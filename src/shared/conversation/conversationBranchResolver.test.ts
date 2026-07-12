@@ -3,6 +3,7 @@ import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import {
+  compareConversationMessages,
   findForkForVisibleUserMessage,
   getConcreteForkBranches,
   shouldShowForkNavigatorForMessage,
@@ -21,6 +22,15 @@ const msg = (
   content: extras.content ?? id,
   createdAt: extras.createdAt ?? 1,
   ...extras,
+});
+
+describe('conversation message ordering', () => {
+  it('keeps the user before the assistant when same-turn timestamps collide', () => {
+    const user = msg('user', 'user', { turnId: 'turn-1', createdAt: 10, updatedAt: 30 });
+    const assistant = msg('assistant', 'assistant', { turnId: 'turn-1', createdAt: 10, updatedAt: 20 });
+    expect([assistant, user].sort(compareConversationMessages).map((message) => message.role))
+      .toEqual(['user', 'assistant']);
+  });
 });
 
 describe('conversationBranchResolver navigator isolation', () => {
