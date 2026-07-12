@@ -397,6 +397,36 @@ async function main() {
   assert(!sharedExports.includes('LlmProviderCatalogGroup'), 'shared-exports.txt must not keep LlmProviderCatalogGroup.');
   assert(!sharedExports.includes('LlmProviderKind'), 'shared-exports.txt must not keep LlmProviderKind.');
 
+  const connectionService = read('src/main/settings/ProviderConnectionService.ts');
+  assert(
+    /provider\.id === 'kimi-coding-plan'[\s\S]*provider\.id === 'volcengine-coding-plan'/.test(connectionService)
+      && !/volcengine-coding-plan'\)\s*&&\s*provider\.protocol === 'AnthropicMessages'/.test(connectionService),
+    'volcengine-coding-plan discovery must share the Coding Plan models-list path for both protocols',
+  );
+  assert(
+    connectionService.includes('resolveVolcengineCodingPlanModelsUrl')
+      && connectionService.includes('/v3/models'),
+    'volcengine-coding-plan must discover models via /api/coding/v3/models, not Kimi-style /v1/models',
+  );
+  assert(
+    connectionService.includes('aliasesByModelId')
+      && connectionService.includes('normalizeCodingPlanModelMatchKey')
+      && connectionService.includes('fallbackAvailableOnEmptyMatch'),
+    'managed catalog merge must honor aliases, normalize Volcengine list ids, and fall back when list/catalog mismatch',
+  );
+
+  const modelRow = read('src/renderer/features/settings/SettingsModal/sections/ProviderConnectModelRow.tsx');
+  assert(
+    !modelRow.includes('settings-model-row-meta'),
+    'unavailable model rows must not inline long availability meta next to the model id',
+  );
+
+  const connectionActions = read('src/renderer/features/settings/SettingsModal/useProviderConnectionActions.ts');
+  assert(
+    !/updateConnectionDraft\(\{\s*busy:\s*'testing',\s*error:\s*'',\s*models:\s*\[\]\s*\}\)/.test(connectionActions),
+    'provider Test must not clear models to [] at start (dialog shrink)',
+  );
+
   console.log('[provider-system] OK');
 }
 

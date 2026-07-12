@@ -68,7 +68,14 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
     || connectionNeedsBaseUrl
     || connectionDevicePending;
   const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
-  const modelListSize = connectionDraft.models.length >= 24 ? 'long' : connectionDraft.models.length >= 8 ? 'medium' : 'short';
+  const catalogModelCount = Math.max(
+    connectionDraft.models.length,
+    connectionProvider.models?.length ?? 0,
+    connectionProvider.recommendedModels?.length ?? 0,
+  );
+  const modelListSize = catalogModelCount >= 24 ? 'long' : catalogModelCount >= 8 ? 'medium' : 'short';
+  const allModelsUnavailable = connectionDraft.models.length > 0
+    && connectionDraft.models.every((model) => model.enabled === false);
   const showProtocolField = connectionProvider.authMode !== 'account';
   const showProtocolSelector = showProtocolField && providerSupportsProtocolSelection(connectionProvider);
   const protocolOptions = showProtocolField ? getProviderProtocolOptions(connectionProvider) : [];
@@ -209,6 +216,12 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
       {connectionDraft.error && (
         <div className="settings-provider-notice error" data-testid="settings-provider-connect-error">
           {connectionDraft.error}
+        </div>
+      )}
+
+      {!connectionDraft.error && allModelsUnavailable && (
+        <div className="settings-provider-notice" data-testid="settings-provider-connect-unavailable-hint">
+          {t('settings.providers.allModelsUnavailableHint')}
         </div>
       )}
 

@@ -6,7 +6,10 @@ import {
   resolveBuiltinProviderProtocol,
   resolveBuiltinProtocolBaseUrl,
 } from '@shared/constants/llm';
-import { getManagedProviderModels } from '@shared/constants/modelCapabilityCatalog';
+import {
+  getManagedProviderModelCatalog,
+  getManagedProviderModels,
+} from '@shared/constants/modelCapabilityCatalog';
 import type {
   LlmProviderAccountLoginFinishRequest,
   LlmProviderAccountLoginStartRequest,
@@ -128,25 +131,133 @@ const requireManagedModels = (providerId: string): LlmProviderModel[] => {
   return models;
 };
 
+/**
+ * Volcengine Coding Plan `/models` often returns date-suffixed or vendor-prefixed ids
+ * (`doubao-seed-2-0-code-preview-260215`, `volcengine/doubao-seed-2-0-pro-260215`)
+ * while the product/docs use friendly ids (`doubao-seed-2.0-code`). Normalize both
+ * sides for matching. Also collapses known product synonyms (mini ↔ lite).
+ */
+export const normalizeCodingPlanModelMatchKey = (modelId: string): string => {
+  let normalized = modelId.trim().toLowerCase();
+  // Strip vendor / namespace prefixes used by some clients and list payloads.
+  normalized = normalized.replace(/^[^/\s]+\/+/, '');
+  // Strip preview + 6–8 digit date suffixes: -260215, -preview-260215, -20260215.
+  normalized = normalized.replace(/(?:-preview)?-\d{6,8}$/i, '');
+  normalized = normalized.replace(/\./g, '-');
+  // Product synonym: Seed 2.0 "mini" list ids map to the catalog "lite" routing id.
+  if (normalized === 'doubao-seed-2-0-mini') {
+    return 'doubao-seed-2-0-lite';
+  }
+  return normalized;
+};
+
+const isCodingPlanMetaModelId = (modelId: string): boolean => {
+  const normalized = modelId.trim().toLowerCase().replace(/^[^/\s]+\/+/, '');
+  return normalized === 'ark-code-latest'
+    || normalized.endsWith('-latest')
+    || normalized.startsWith('ark-code-');
+};
+
+const isConcreteCodingPlanDiscovery = (model: LlmProviderModel): boolean => (
+  !isCodingPlanMetaModelId(model.id)
+);
+
 export const mergeManagedModelAvailability = (
   managedModels: LlmProviderModel[],
   discoveredModels: LlmProviderModel[],
+  options?: {
+    aliasesByModelId?: ReadonlyMap<string, readonly string[]>;
+    /** When list auth succeeds but no catalog row matches (meta-only / id-format drift), keep catalog available. */
+    fallbackAvailableOnEmptyMatch?: boolean;
+  },
 ): LlmProviderModel[] => {
   if (discoveredModels.length === 0) {
     return managedModels;
   }
-  const discoveredIds = new Set(discoveredModels.map((model) => model.id.toLowerCase()));
-  return managedModels.map((model) => {
-    const available = discoveredIds.has(model.id.toLowerCase());
+  const discoveredKeys = new Set(
+    discoveredModels.flatMap((model) => [
+      model.id.toLowerCase(),
+      normalizeCodingPlanModelMatchKey(model.id),
+    ]),
+  );
+  const isDiscovered = (modelId: string, aliases?: readonly string[]): boolean => {
+    const candidates = [modelId, ...(aliases ?? [])];
+    return candidates.some((candidate) => (
+      discoveredKeys.has(candidate.toLowerCase())
+      || discoveredKeys.has(normalizeCodingPlanModelMatchKey(candidate))
+    ));
+  };
+  const concreteDiscovery = discoveredModels.filter(isConcreteCodingPlanDiscovery);
+  const metaOnlyDiscovery = concreteDiscovery.length === 0;
+  const discoveredSample = discoveredModels
+    .slice(0, 8)
+    .map((model) => model.id)
+    .join(', ');
+
+  const merged = managedModels.map((model) => {
+    const aliases = options?.aliasesByModelId?.get(model.id);
+    const available = isDiscovered(model.id, aliases);
+    if (available) {
+      return {
+        ...model,
+        enabled: true,
+        availability: 'available' as const,
+        availabilityReason: undefined,
+      };
+    }
     return {
       ...model,
-      enabled: available,
-      availability: available ? 'available' : 'unavailable',
-      availabilityReason: available
-        ? undefined
-        : 'This catalog model was not returned by the current account or endpoint.',
+      enabled: false,
+      availability: 'unavailable' as const,
+      availabilityReason: metaOnlyDiscovery
+        ? `Endpoint returned only meta model ids (${discoveredSample || 'ark-code-latest'}). Coding Plan chat still accepts catalog model ids after a successful connection test.`
+        : `This catalog model was not returned by the current account or endpoint${discoveredSample ? ` (endpoint sample: ${discoveredSample})` : ''}.`,
     };
   });
+
+  // Coding Plan `/models` is known-unreliable: meta-only lists, date-suffixed ids, or
+  // pay-as-you-go-shaped payloads. Auth already succeeded; prefer catalog availability
+  // over a false "all unavailable" wall when nothing matched.
+  if (
+    options?.fallbackAvailableOnEmptyMatch
+    && merged.length > 0
+    && merged.every((model) => model.enabled === false)
+  ) {
+    return managedModels.map((model) => ({
+      ...model,
+      enabled: true,
+      availability: 'available' as const,
+      availabilityReason: undefined,
+    }));
+  }
+
+  return merged;
+};
+
+const buildManagedAliasIndex = (providerId: string): Map<string, readonly string[]> => {
+  const map = new Map<string, readonly string[]>();
+  for (const entry of getManagedProviderModelCatalog(providerId)) {
+    map.set(entry.id, entry.aliases ?? []);
+  }
+  return map;
+};
+
+/** Volcengine Coding Plan lists models on `/api/coding/v3/models` for both Anthropic and OpenAI bases. */
+export const resolveVolcengineCodingPlanModelsUrl = (baseUrl: string): string => {
+  const trimmed = baseUrl.trim().replace(/\/+$/, '');
+  if (/\/api\/coding(?:\/v3)?$/i.test(trimmed)) {
+    return `${trimmed.replace(/\/v3$/i, '')}/v3/models`;
+  }
+  return resolveCodingPlanModelsUrl(trimmed);
+};
+
+/** Coding Plan models list: align with CodePilot — append `/v1/models` when base has no `/v1`. */
+export const resolveCodingPlanModelsUrl = (baseUrl: string): string => {
+  const trimmed = baseUrl.trim().replace(/\/+$/, '');
+  if (/\/v1$/i.test(trimmed)) {
+    return `${trimmed}/models`;
+  }
+  return `${trimmed}/v1/models`;
 };
 
 const getJson = async (url: string, init: RequestInit): Promise<unknown> => {
@@ -181,15 +292,6 @@ const formatHttpError = (status: number): string => {
 
 const appendPath = (baseUrl: string, path: string): string =>
   `${baseUrl.trim().replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
-
-/** Coding Plan models list: align with CodePilot — append `/v1/models` when base has no `/v1`. */
-export const resolveCodingPlanModelsUrl = (baseUrl: string): string => {
-  const trimmed = baseUrl.trim().replace(/\/+$/, '');
-  if (/\/v1$/i.test(trimmed)) {
-    return `${trimmed}/models`;
-  }
-  return `${trimmed}/v1/models`;
-};
 
 const appendQueryParam = (url: string, key: string, value: string): string => {
   const separator = url.includes('?') ? '&' : '?';
@@ -427,8 +529,14 @@ export class ProviderConnectionService {
     const candidateModelIds = catalogOwnership === 'app-managed'
       ? managedModels.map((model) => model.id)
       : definition.recommendedModels;
-    if (provider.id === 'kimi-coding-plan' && provider.protocol === 'AnthropicMessages') {
-      return this.validateCodingPlanModels(apiKey, baseUrl, candidateModelIds, managedModels);
+    if (
+      provider.id === 'kimi-coding-plan'
+      || provider.id === 'volcengine-coding-plan'
+    ) {
+      // Both Anthropic and OpenAI Coding Plan protocols share the same /models surface.
+      // Always resolve through the Coding Plan helper so OpenAI never hits a wrong
+      // `baseUrl + /models` shape when the draft base is still the Anthropic `/api/coding`.
+      return this.validateCodingPlanModels(provider.id, apiKey, baseUrl, candidateModelIds, managedModels);
     }
     if (strategy === 'anthropic-candidate-validation') {
       return this.validateAnthropicCandidateModels(provider, apiKey, baseUrl, candidateModelIds, managedModels);
@@ -442,7 +550,9 @@ export class ProviderConnectionService {
       });
       const discoveredModels = requireModels(parseModelsPayload(strategy, payload));
       return catalogOwnership === 'app-managed'
-        ? mergeManagedModelAvailability(managedModels, discoveredModels)
+        ? mergeManagedModelAvailability(managedModels, discoveredModels, {
+          aliasesByModelId: buildManagedAliasIndex(provider.id),
+        })
         : discoveredModels;
     }
     const url = strategy === 'ollama-tags'
@@ -455,7 +565,9 @@ export class ProviderConnectionService {
     });
     const discoveredModels = requireModels(parseModelsPayload(strategy, payload));
     return catalogOwnership === 'app-managed'
-      ? mergeManagedModelAvailability(managedModels, discoveredModels)
+      ? mergeManagedModelAvailability(managedModels, discoveredModels, {
+        aliasesByModelId: buildManagedAliasIndex(provider.id),
+      })
       : discoveredModels;
   }
 
@@ -491,27 +603,61 @@ export class ProviderConnectionService {
       }
     }
     const validatedModels = toStaticModels(validModels);
-    return managedModels.length > 0 ? mergeManagedModelAvailability(managedModels, validatedModels) : validatedModels;
+    return managedModels.length > 0
+      ? mergeManagedModelAvailability(managedModels, validatedModels, {
+        aliasesByModelId: buildManagedAliasIndex(provider.id),
+      })
+      : validatedModels;
   }
 
   private async validateCodingPlanModels(
+    providerId: string,
     apiKey: string,
     baseUrl: string,
     modelIds: string[],
     managedModels: LlmProviderModel[] = [],
   ): Promise<LlmProviderModel[]> {
-    const payload = await getJson(resolveCodingPlanModelsUrl(baseUrl), {
+    const modelsUrl = providerId === 'volcengine-coding-plan'
+      ? resolveVolcengineCodingPlanModelsUrl(baseUrl)
+      : resolveCodingPlanModelsUrl(baseUrl);
+    const payload = await getJson(modelsUrl, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'User-Agent': 'RDC-Agent',
       },
     });
-    const availableModelIds = new Set(
-      parseModelsPayload('openai-compatible', payload).map((model) => model.id),
+    const discoveredModels = parseModelsPayload('openai-compatible', payload);
+    const availableKeys = new Set(
+      discoveredModels.flatMap((model) => [
+        model.id.toLowerCase(),
+        normalizeCodingPlanModelMatchKey(model.id),
+      ]),
     );
-    const validatedModels = toStaticModels(modelIds.filter((modelId) => availableModelIds.has(modelId)));
-    return managedModels.length > 0 ? mergeManagedModelAvailability(managedModels, validatedModels) : validatedModels;
+    const aliasesByModelId = buildManagedAliasIndex(providerId);
+    const matchedIds = modelIds.filter((modelId) => {
+      const aliases = aliasesByModelId.get(modelId) ?? [];
+      return [modelId, ...aliases].some((candidate) => (
+        availableKeys.has(candidate.toLowerCase())
+        || availableKeys.has(normalizeCodingPlanModelMatchKey(candidate))
+      ));
+    });
+    // Prefer full discovered payload for merge so alias/meta reasons stay accurate.
+    const validatedModels = matchedIds.length > 0
+      ? toStaticModels(matchedIds)
+      : discoveredModels;
+    if (validatedModels.length === 0) {
+      throw new ProviderConnectionError('Provider 暂未返回可用于 Agent 路由的模型');
+    }
+    return managedModels.length > 0
+      ? mergeManagedModelAvailability(managedModels, discoveredModels.length > 0 ? discoveredModels : validatedModels, {
+        aliasesByModelId,
+        // Volcengine Coding Plan list payloads frequently mismatch friendly catalog ids
+        // (meta-only, date suffixes, vendor prefixes). Auth success should not strand the UI
+        // in an all-Unavailable state — chat accepts the catalog routing ids.
+        fallbackAvailableOnEmptyMatch: providerId === 'volcengine-coding-plan',
+      })
+      : validatedModels;
   }
 
   private async validateAzureCandidateModels(
