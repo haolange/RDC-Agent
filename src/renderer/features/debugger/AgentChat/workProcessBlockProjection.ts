@@ -301,6 +301,22 @@ function projectLlmTurn(
     // Answer-only turns never create a Reply boundary row. Provider-visible closing
     // thinking folds into a quiet thinking-only section; otherwise the turn is silent
     // and the assistant body below the Work Process is the only final-answer surface.
+    // Opaque/hidden reasoning stays as an indicator only — never as WP prose.
+    if (reasoningState === 'opaque' || reasoningState === 'hidden') {
+      const hasThinkingText = Boolean(normalizeWorkProcessText(block.thinking?.text ?? ''));
+      if (hasThinkingText) {
+        if (!ctx.hasVisibleProcessEvidence) return null;
+        return null;
+      }
+      ctx.hasVisibleProcessEvidence = true;
+      return {
+        kind: 'loop',
+        loopId: block.id,
+        rows: [deps.createReasoningIndicatorRow(block, reasoningState)],
+        hasDisplayableThinking: false,
+        hasSummaryThinking: false,
+      };
+    }
     const thinking = deps.resolveResponseThinking(block);
     if (!thinking.label && !thinking.preview) {
       if (!ctx.hasVisibleProcessEvidence) return null;

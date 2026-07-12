@@ -7,7 +7,7 @@ const {
   resolveVisibleConversationMessages,
   createDefaultBranchState,
   repairConversationBranchState,
-} = require('../src/main/conversation/ConversationBranchResolver.ts');
+} = require('../src/shared/conversation/conversationBranchResolver.ts');
 const { ROOT_BRANCH_ID } = require('../src/shared/types/conversationBranch.ts');
 
 const fail = (message) => {
@@ -190,5 +190,69 @@ assert(restoredVisible.map((message) => message.id).join(',') === [
 ].join(','), 'switching branch should restore original downstream conversation');
 
 assert(!restoredVisible.some((message) => message.content.includes('v2')), 'inactive branch messages must stay hidden');
+
+const {
+  shouldShowForkNavigatorForMessage,
+  getConcreteForkBranches,
+  findForkForVisibleUserMessage,
+} = require('../src/shared/conversation/conversationBranchResolver.ts');
+
+branchState.forks[0].activeBranchId = 'branch-v2';
+branchState.activeLeafBranchId = 'branch-v2';
+assert(
+  shouldShowForkNavigatorForMessage(branchState, { id: 'msg-user-1b', forkId, role: 'user' }),
+  'navigator must only render on the active variant user message',
+);
+assert(
+  !shouldShowForkNavigatorForMessage(branchState, { id: 'msg-user-1', forkId, role: 'user' }),
+  'navigator must not render on inactive sibling variants',
+);
+assert(
+  getConcreteForkBranches(branchState.forks[0]).length === 2,
+  'navigator totals must only count branches with concrete anchors',
+);
+assert(
+  findForkForVisibleUserMessage(branchState, { id: 'msg-user-1b', forkId, role: 'user' })?.forkId === forkId,
+  'visible user messages must resolve to their own fork without cross-matching',
+);
+
+const fs = require('node:fs');
+const path = require('node:path');
+const mainShim = fs.readFileSync(
+  path.join(process.cwd(), 'src/main/conversation/ConversationBranchResolver.ts'),
+  'utf8',
+);
+assert(
+  mainShim.includes('@shared/conversation/conversationBranchResolver')
+    && !mainShim.includes('export function resolveVisibleConversationMessages'),
+  'main ConversationBranchResolver must re-export shared resolver only (no dual implementation)',
+);
+const conversationService = fs.readFileSync(
+  path.join(process.cwd(), 'src/main/conversation/ConversationService.ts'),
+  'utf8',
+);
+assert(
+  conversationService.includes('rebuildAgentThreadForBranch')
+    && conversationService.includes('invalidateSessionAgentSlots')
+    && conversationService.includes('await Promise.allSettled')
+    && conversationService.includes('Failed to persist conversation snapshot')
+    && conversationService.includes('settleStopped()'),
+  'rewriteFromMessage must await stopped turns, truncate agent threads, settle stop, and fail-soft on persist',
+);
+assert(
+  conversationService.includes('turnHadAskPause')
+    && conversationService.includes('resolveStreamingOutputPhase')
+    && conversationService.includes('syncVisibleResponseForStreaming'),
+  'assistant loops must stamp streaming outputPhase and gate bubble writes after ask pauses',
+);
+const conversationStore = fs.readFileSync(
+  path.join(process.cwd(), 'src/renderer/stores/conversationStore.ts'),
+  'utf8',
+);
+assert(
+  conversationStore.includes('allConversationMessages')
+    && conversationStore.includes('resolveVisibleConversationMessages'),
+  'renderer conversationStore must project visible messages from branchState',
+);
 
 console.log('[conversation-branch] OK');

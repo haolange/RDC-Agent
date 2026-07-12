@@ -1,6 +1,11 @@
 import React, { useCallback, useMemo } from 'react';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
+import {
+  findForkForVisibleUserMessage,
+  getConcreteForkBranches,
+  shouldShowForkNavigatorForMessage,
+} from '@shared/conversation/conversationBranchResolver';
 import { getElectronApi } from '../../../platform/getElectronApi';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
@@ -16,25 +21,28 @@ export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = (
   branchState,
 }) => {
   const { t } = useI18n();
-  const setConversationMessages = useConversationStore((state) => state.setConversationMessages);
-  const setBranchState = useConversationStore((state) => state.setBranchState);
+  const setConversationSnapshot = useConversationStore((state) => state.setConversationSnapshot);
   const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
 
   const fork = useMemo(() => {
-    if (!branchState) return null;
-    const forkId = message.forkId ?? message.id;
-    return branchState.forks.find((entry) => (
-      entry.forkId === forkId
-      || entry.branches.some((branch) => branch.anchorUserMessageId === message.id)
-    )) ?? null;
-  }, [branchState, message.forkId, message.id]);
+    if (!branchState || !shouldShowForkNavigatorForMessage(branchState, message)) {
+      return null;
+    }
+    return findForkForVisibleUserMessage(branchState, message);
+  }, [branchState, message]);
 
   const navigator = useMemo(() => {
-    if (!fork || fork.branches.length <= 1) return null;
-    const activeIndex = Math.max(0, fork.branches.findIndex((branch) => branch.branchId === fork.activeBranchId));
+    if (!fork) return null;
+    const concreteBranches = getConcreteForkBranches(fork);
+    if (concreteBranches.length <= 1) return null;
+    const activeIndex = Math.max(
+      0,
+      concreteBranches.findIndex((branch) => branch.branchId === fork.activeBranchId),
+    );
     return {
       variantIndex: activeIndex,
-      variantCount: fork.branches.length,
+      variantCount: concreteBranches.length,
+      branches: concreteBranches,
       activeBranchId: fork.activeBranchId,
     };
   }, [fork]);
@@ -43,7 +51,7 @@ export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = (
     if (!fork || !navigator || !message.sessionId) return;
     const nextIndex = navigator.variantIndex + direction;
     if (nextIndex < 0 || nextIndex >= navigator.variantCount) return;
-    const nextBranch = fork.branches[nextIndex];
+    const nextBranch = navigator.branches[nextIndex];
     if (!nextBranch) return;
 
     const electronAPI = getElectronApi();
@@ -55,14 +63,11 @@ export const MessageVariantNavigator: React.FC<MessageVariantNavigatorProps> = (
       branchId: nextBranch.branchId,
     });
     if (!result.success) return;
-    setConversationMessages(result.messages);
-    if (result.branchState) {
-      setBranchState(result.branchState);
-    }
+    setConversationSnapshot(result.messages, result.branchState ?? null);
     if (result.tracePresentation) {
       setTracePresentation(result.tracePresentation);
     }
-  }, [fork, message.sessionId, navigator, setBranchState, setConversationMessages, setTracePresentation]);
+  }, [fork, message.sessionId, navigator, setConversationSnapshot, setTracePresentation]);
 
   if (!navigator) return null;
 

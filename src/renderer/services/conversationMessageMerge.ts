@@ -11,9 +11,9 @@ const cloneWorkTrace = (trace: ConversationWorkTrace | null | undefined): Conver
   trace
     ? {
         ...trace,
-        blocks: trace.blocks.map((block) => ({
+        blocks: (trace.blocks ?? []).map((block) => ({
           ...block,
-          toolCalls: block.toolCalls.map((toolCall) => ({ ...toolCall })),
+          toolCalls: (block.toolCalls ?? []).map((toolCall) => ({ ...toolCall })),
         })),
       }
     : {

@@ -67,6 +67,206 @@ describe('buildWorkProcessPresentation', () => {
     });
   });
 
+  it('keeps settled commentary prose even when the loop has no tool calls', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'running',
+      updatedAt: now + 2000,
+      blocks: [
+        {
+          id: 'runtime-loop-ask',
+          kind: 'llm_turn',
+          title: 'LLM turn',
+          status: 'complete',
+          result: {
+            text: 'Need a few answers first.',
+            status: 'complete',
+            toolCallIds: ['ask-1'],
+            stopReason: 'tool_use',
+            outputPhase: 'commentary',
+          },
+          toolCalls: [
+            {
+              id: 'ask-1',
+              toolName: 'ask_user',
+              status: 'complete',
+              argsPreview: JSON.stringify({ questions: [{ prompt: 'Drink?' }] }),
+              resultPreview: JSON.stringify({ answers: [{ answer: '茶' }] }),
+              startedAt: now,
+              completedAt: now + 500,
+            },
+          ],
+          startedAt: now,
+          completedAt: now + 500,
+        },
+        {
+          id: 'runtime-loop-commentary',
+          kind: 'llm_turn',
+          title: 'LLM turn',
+          status: 'complete',
+          result: {
+            text: 'Thanks — summarizing the parameter combinations next.',
+            status: 'complete',
+            toolCallIds: [],
+            stopReason: 'end_turn',
+            outputPhase: 'commentary',
+          },
+          toolCalls: [],
+          startedAt: now + 600,
+          completedAt: now + 900,
+        },
+      ],
+    });
+
+    const sections = presentation.rows.filter((row) => row.type === 'section');
+    expect(sections).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        type: 'section',
+        proseText: 'Need a few answers first.',
+      }),
+      expect.objectContaining({
+        type: 'section',
+        proseText: 'Thanks — summarizing the parameter combinations next.',
+      }),
+    ]));
+  });
+
+  it('does not project settled final_answer text into Work Process prose', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'complete',
+      updatedAt: now + 3000,
+      blocks: [
+        {
+          id: 'runtime-loop-process',
+          kind: 'llm_turn',
+          title: 'LLM turn',
+          status: 'complete',
+          result: {
+            text: 'Checking files.',
+            status: 'complete',
+            toolCallIds: ['tool-read'],
+            stopReason: 'tool_use',
+            outputPhase: 'commentary',
+          },
+          toolCalls: [
+            {
+              id: 'tool-read',
+              toolName: 'read_file',
+              status: 'complete',
+              argsPreview: JSON.stringify({ path: 'a.ts' }),
+              resultPreview: JSON.stringify({ ok: true }),
+              startedAt: now + 100,
+              completedAt: now + 200,
+            },
+          ],
+          startedAt: now,
+          completedAt: now + 200,
+        },
+        {
+          id: 'runtime-loop-final',
+          kind: 'llm_turn',
+          title: 'LLM turn',
+          status: 'complete',
+          result: {
+            text: 'Final answer body only',
+            status: 'complete',
+            toolCallIds: [],
+            stopReason: 'end_turn',
+            outputPhase: 'final_answer',
+          },
+          toolCalls: [],
+          startedAt: now + 300,
+          completedAt: now + 400,
+        },
+      ],
+    });
+
+    const finalSection = presentation.rows.find((row) => (
+      row.type === 'section' && row.proseText === 'Final answer body only'
+    ));
+    expect(finalSection).toBeUndefined();
+    expect(presentation.rows.some((row) => (
+      row.type === 'section' && row.proseText === 'Checking files.'
+    ))).toBe(true);
+  });
+
+  it('keeps streaming final_answer text out of Work Process prose', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'running',
+      updatedAt: now + 3100,
+      blocks: [
+        {
+          id: 'runtime-loop-ask',
+          kind: 'llm_turn',
+          title: 'LLM turn',
+          status: 'complete',
+          result: {
+            text: 'Need a few answers first.',
+            status: 'complete',
+            toolCallIds: [],
+            stopReason: 'end_turn',
+            outputPhase: 'commentary',
+          },
+          toolCalls: [],
+          startedAt: now,
+          completedAt: now + 200,
+        },
+        {
+          id: 'runtime-user-input',
+          kind: 'user_input',
+          title: 'User input requested',
+          status: 'complete',
+          result: {
+            text: '',
+            status: 'complete',
+            toolCallIds: ['ask-batch'],
+          },
+          toolCalls: [
+            {
+              id: 'ask-batch',
+              toolName: 'ask_user',
+              status: 'complete',
+              argsPreview: JSON.stringify({
+                questions: [
+                  { prompt: 'Drink?' },
+                  { prompt: 'Quality?' },
+                ],
+              }),
+              resultPreview: JSON.stringify({
+                answers: [{ answer: '茶' }, { answer: '还行' }],
+              }),
+              startedAt: now + 200,
+              completedAt: now + 400,
+            },
+          ],
+          startedAt: now + 200,
+          completedAt: now + 400,
+        },
+        {
+          id: 'runtime-loop-final-stream',
+          kind: 'llm_turn',
+          title: 'LLM turn',
+          status: 'running',
+          result: {
+            text: 'Streaming final answer tokens after ask_user.',
+            status: 'streaming',
+            toolCallIds: [],
+            outputPhase: 'final_answer',
+          },
+          toolCalls: [],
+          startedAt: now + 500,
+        },
+      ],
+    });
+
+    expect(presentation.rows.some((row) => (
+      row.type === 'section'
+      && row.proseText === 'Streaming final answer tokens after ask_user.'
+    ))).toBe(false);
+    expect(presentation.rows.some((row) => (
+      row.type === 'section' && row.proseText === 'Need a few answers first.'
+    ))).toBe(true);
+  });
+
   it('uses Thought-for settled labels with duration to the first tool', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'complete',

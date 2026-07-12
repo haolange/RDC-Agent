@@ -28,7 +28,7 @@ export const stopWorkTrace = (message: ConversationMessage): ConversationMessage
       status: 'stopped',
       summary: message.workTrace.summary || 'Request stopped.',
       updatedAt: stoppedAt,
-      blocks: message.workTrace.blocks.map((block) => (
+      blocks: (message.workTrace.blocks ?? []).map((block) => (
         block.status === 'running'
           ? { ...block, status: 'complete', completedAt: stoppedAt }
           : block

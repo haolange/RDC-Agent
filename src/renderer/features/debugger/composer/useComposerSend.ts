@@ -48,6 +48,7 @@ export function useComposerSend(options: {
   const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
   const setConversationMessages = useConversationStore((state) => state.setConversationMessages);
   const setBranchState = useConversationStore((state) => state.setBranchState);
+  const setConversationSnapshot = useConversationStore((state) => state.setConversationSnapshot);
   const upsertConversationMessages = useConversationStore((state) => state.upsertConversationMessages);
 
   const { handlePrimaryStop } = useComposerStop({ showNotice, t, currentSession, currentRun, setIsPromptSending });
@@ -103,6 +104,7 @@ export function useComposerSend(options: {
         setPendingAttachments,
         setConversationMessages,
         setBranchState,
+        setConversationSnapshot,
         upsertConversationMessages,
         setCurrentSession,
         setSessions,
@@ -129,7 +131,7 @@ export function useComposerSend(options: {
     setSelectedAgentId,
     setCurrentMode,
     openSettings,
-    setConversationMessages, setBranchState,
+    setConversationMessages, setBranchState, setConversationSnapshot,
     setCurrentRun, setCurrentSession,
     setPendingAttachments,
     setPromptValue,

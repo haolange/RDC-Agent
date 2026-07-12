@@ -357,6 +357,14 @@ function applyLoopFields(block: ConversationWorkBlock, options: LoopTraceOptions
     }
     if (options.loopResultStatus) {
       result.status = options.loopResultStatus;
+      // Defense: if content resumes as streaming on a previously settled loop without an
+      // explicit phase, drop stale commentary/final markers so projection cannot flash
+      // a new final answer through the Work Process prose slot.
+      // Thinking-only updates (no nextText) must not clear a phase already stamped by text/tools.
+      if (options.loopResultStatus === 'streaming' && !options.loopOutputPhase && nextText) {
+        delete result.outputPhase;
+        delete result.stopReason;
+      }
     }
     if (options.loopStopReason) {
       result.stopReason = options.loopStopReason;
