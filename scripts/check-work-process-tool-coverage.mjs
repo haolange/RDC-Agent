@@ -219,7 +219,7 @@ const aggregateTools = ['read_file', 'read_file', 'glob'].map((toolName, index) 
   resultPreview: FIXTURES[toolName].resultPreview,
   startedAt: now + index,
   completedAt: now + index + 10,
-}, true));
+}));
 assert(typeof buildToolAggregateSummary === 'function', 'buildToolAggregateSummary should be exported');
 assert(buildToolAggregateSummary(aggregateTools).includes('读取了'), 'tool aggregate summary should classify read_file actions');
 
@@ -243,7 +243,7 @@ for (const toolName of allTools) {
     resultPreview: fixture.resultPreview,
     startedAt: now,
     completedAt: now + 50,
-  }, true);
+  });
 
   if (toolName === 'ask_user') {
     assert(row.type === 'userInput', 'ask_user should render as userInput row');

@@ -19,7 +19,7 @@ export type { LoopPresentationUnit, PresentationUnit, StandalonePresentationUnit
 export interface BlockProjectionContext {
   visibleThinkingKeys: Set<string>;
   hasVisibleProcessEvidence: boolean;
-  createToolRow: (call: import('@shared/types/conversation').ConversationToolCall, compact?: boolean) => WorkProcessRow;
+  createToolRow: (call: import('@shared/types/conversation').ConversationToolCall) => WorkProcessRow;
   groupProcessRows: (rows: WorkProcessRow[]) => WorkProcessRow[];
   blocksToDetailRows: (blocks: ConversationWorkBlock[]) => WorkProcessRow[];
 }
@@ -288,7 +288,7 @@ function projectLlmTurn(
   const outputPhase = deps.resolveOutputPhase(block, ctx.hasVisibleProcessEvidence);
   const reasoningState = deps.resolveReasoningState(block);
   const stopReason = block.result?.stopReason;
-  const steps = ctx.groupProcessRows(block.toolCalls.map((call) => ctx.createToolRow(call, true)));
+  const steps = ctx.groupProcessRows(block.toolCalls.map((call) => ctx.createToolRow(call)));
   const loopRows: WorkProcessRow[] = [];
 
   const isFinalAnswer = outputPhase === 'final_answer' && !deps.isNonFinalStopReason(stopReason);

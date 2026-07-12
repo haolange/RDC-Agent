@@ -875,8 +875,8 @@ assert(
   'last process step must zero bottom padding so expanded ends flush like collapsed',
 );
 assert(
-  /\.work-process-section-list\s+\.work-process-step\s*\{[^}]*padding:\s*var\(--space-1\)\s+0\s+0/.test(cssSource),
-  'nested tool rows should use top-only padding so the last tool does not pad into the answer',
+  /\.work-process-section-list\s+\.work-process-step\s*\{[^}]*padding:\s*var\(--space-3\)\s+0\s+0/.test(cssSource),
+  'nested tool rows should use top-only space-3 padding so sibling cards breathe without padding into the answer',
 );
 assert(
   cssSource.includes('.work-process.is-collapsed .work-process-label'),
