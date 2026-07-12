@@ -12,6 +12,8 @@ import {
   isMaxTierLevel,
   MAX_VISUAL_EVOLVE_MS,
   MAX_VISUAL_RETREAT_MS,
+  resolveMaxAnimationProgress,
+  resolveMaxFieldCell,
   resolveMaxFieldCoverage,
   resolveMaxStopsOpacity,
 } from './maxVisual';
@@ -121,5 +123,76 @@ describe('effortControlParts', () => {
     expect(resolveMaxFieldCoverage({ phase: 'evolve', progress: 0.6 })).toBe(0.6);
     expect(resolveMaxFieldCoverage({ phase: 'settled', progress: 1 })).toBe(1);
     expect(resolveMaxFieldCoverage({ phase: 'retreat', progress: 0.25 })).toBe(0.75);
+  });
+
+  it('uses one symmetric progress curve for evolve and retreat', () => {
+    expect(resolveMaxAnimationProgress(0, MAX_VISUAL_EVOLVE_MS)).toBe(0);
+    expect(resolveMaxAnimationProgress(400, MAX_VISUAL_EVOLVE_MS)).toBe(0.5);
+    expect(resolveMaxAnimationProgress(800, MAX_VISUAL_EVOLVE_MS)).toBe(1);
+    expect(resolveMaxAnimationProgress(1_000, MAX_VISUAL_EVOLVE_MS)).toBe(1);
+
+    const growCoverage = resolveMaxFieldCoverage({ phase: 'evolve', progress: 0.35 });
+    const retreatCoverage = resolveMaxFieldCoverage({ phase: 'retreat', progress: 0.65 });
+    expect(growCoverage).toBeCloseTo(retreatCoverage);
+  });
+
+  it('preserves stop opacity when evolve or preview transitions into retreat', () => {
+    const evolveOpacity = resolveMaxStopsOpacity({
+      phase: 'evolve',
+      progress: 0.38,
+      evolveHideStops: false,
+    });
+    expect(resolveMaxStopsOpacity({
+      phase: 'retreat',
+      progress: 0,
+      evolveHideStops: false,
+      retreatStopsFrom: evolveOpacity,
+    })).toBe(evolveOpacity);
+
+    const previewOpacity = resolveMaxStopsOpacity({
+      phase: 'preview',
+      progress: 0,
+      evolveHideStops: false,
+    });
+    expect(resolveMaxStopsOpacity({
+      phase: 'retreat',
+      progress: 0,
+      evolveHideStops: false,
+      retreatStopsFrom: previewOpacity,
+    })).toBe(1);
+    expect(resolveMaxStopsOpacity({
+      phase: 'evolve',
+      progress: 0,
+      evolveHideStops: true,
+    })).toBe(0);
+  });
+
+  it('keeps max pixel topology deterministic, porous, and brighter on the right', () => {
+    const cols = 72;
+    const rows = 5;
+    const samples = Array.from({ length: cols * rows }, (_, index) => {
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      return { col, sample: resolveMaxFieldCell({ col, row, cols, rows, coverage: 1 }) };
+    });
+    expect(samples[137]?.sample).toEqual(resolveMaxFieldCell({
+      col: 137 % cols,
+      row: Math.floor(137 / cols),
+      cols,
+      rows,
+      coverage: 1,
+    }));
+
+    const visible = samples.filter(({ sample }) => sample.visible);
+    expect(visible.length).toBeGreaterThan(samples.length * 0.65);
+    expect(visible.length).toBeLessThan(samples.length * 0.95);
+
+    const leftAlpha = samples
+      .filter(({ col, sample }) => col < cols / 3 && sample.visible)
+      .reduce((sum, { sample }) => sum + sample.alpha, 0);
+    const rightAlpha = samples
+      .filter(({ col, sample }) => col >= cols * 2 / 3 && sample.visible)
+      .reduce((sum, { sample }) => sum + sample.alpha, 0);
+    expect(rightAlpha).toBeGreaterThan(leftAlpha);
   });
 });

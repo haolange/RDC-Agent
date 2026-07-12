@@ -6,27 +6,72 @@ export type MaxVisualPhase = 'idle' | 'preview' | 'evolve' | 'settled' | 'retrea
 export const MAX_VISUAL_EVOLVE_MS = 800;
 export const MAX_VISUAL_RETREAT_MS = 800;
 
+export function clampMaxProgress(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
+}
+
+/** Symmetric easing keeps the midpoint at half coverage while softening both endpoints. */
+export function resolveMaxAnimationProgress(elapsedMs: number, durationMs: number): number {
+  const linear = durationMs > 0 ? clampMaxProgress(elapsedMs / durationMs) : 1;
+  return linear * linear * (3 - 2 * linear);
+}
+
 export function isMaxTierLevel(level: ReasoningSelection): boolean {
   return level === 'max' || level === 'ultra';
 }
 
-/**
- * Stop-dot opacity for the max-tier visual lifecycle.
- * - Ordinary / preview: fully visible
- * - Evolve after adjust: fade 1→0 with progress
- * - Evolve on reopen (`evolveHideStops`): always 0
- * - Settled: hidden
- * - Retreat: lerp from `retreatStopsFrom` → 1 with progress (gradual return)
- */
+/** Stable [0, 1) coordinate noise; wall-clock time never changes cell occupancy. */
+export function maxFieldNoise(col: number, row: number, salt = 0): number {
+  const n = Math.sin((col + 1.7) * 12.9898 + (row + 1.3) * 78.233 + salt * 45.164) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+export function resolveMaxFieldCell(input: {
+  col: number;
+  row: number;
+  cols: number;
+  rows: number;
+  coverage: number;
+}): {
+  visible: boolean;
+  alpha: number;
+  tone: number;
+} {
+  const { col, row } = input;
+  const coverage = clampMaxProgress(input.coverage);
+  const fromRight = Math.max(0, input.cols - 1 - col);
+  const distance = input.cols <= 1 ? 0 : fromRight / (input.cols - 1);
+  const along = 1 - distance;
+  const n1 = maxFieldNoise(col, row, 0);
+  const n2 = maxFieldNoise(col, row, 1);
+  const n4 = maxFieldNoise(col, row, 4);
+
+  // A broad deterministic birth band produces a dissolve edge instead of a vertical wipe.
+  const birth = distance * 0.72 + n1 * 0.24;
+  const stableHole = n4 < 0.055 + distance * 0.035;
+  const visible = birth <= coverage && !stableHole;
+  const age = clampMaxProgress((coverage - birth) / 0.18);
+  const edge = age * age * (3 - 2 * age);
+  const rowMid = (input.rows - 1) / 2;
+  const rowWeight = 0.86 + (1 - Math.abs(row - rowMid) / (rowMid + 0.5)) * 0.14;
+  const alpha = visible
+    ? edge * (0.58 + along * 0.34) * rowWeight * (0.92 + n2 * 0.08)
+    : 0;
+
+  return {
+    visible,
+    alpha: clampMaxProgress(alpha),
+    tone: clampMaxProgress(along * 0.82 + n2 * 0.18),
+  };
+}
+
 export function resolveMaxStopsOpacity(input: {
   phase: MaxVisualPhase;
   progress: number;
   evolveHideStops: boolean;
   retreatStopsFrom?: number;
 }): number {
-  const progress = Number.isFinite(input.progress)
-    ? Math.max(0, Math.min(1, input.progress))
-    : 0;
+  const progress = clampMaxProgress(input.progress);
   switch (input.phase) {
     case 'idle':
     case 'preview':
@@ -36,9 +81,7 @@ export function resolveMaxStopsOpacity(input: {
     case 'settled':
       return 0;
     case 'retreat': {
-      const from = Number.isFinite(input.retreatStopsFrom)
-        ? Math.max(0, Math.min(1, input.retreatStopsFrom as number))
-        : 0;
+      const from = clampMaxProgress(input.retreatStopsFrom ?? 0);
       return from + (1 - from) * progress;
     }
     default:
@@ -46,22 +89,13 @@ export function resolveMaxStopsOpacity(input: {
   }
 }
 
-/**
- * How far the pixel field covers the track (0 empty → 1 full).
- * Preview uses a local cluster instead of coverage fill.
- */
+/** Preview paints a local cluster and therefore has no rail-wide coverage. */
 export function resolveMaxFieldCoverage(input: {
   phase: MaxVisualPhase;
   progress: number;
 }): number {
-  const progress = Number.isFinite(input.progress)
-    ? Math.max(0, Math.min(1, input.progress))
-    : 0;
+  const progress = clampMaxProgress(input.progress);
   switch (input.phase) {
-    case 'idle':
-      return 0;
-    case 'preview':
-      return 0;
     case 'evolve':
       return progress;
     case 'settled':

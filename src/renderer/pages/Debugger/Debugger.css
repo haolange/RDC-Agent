@@ -873,10 +873,15 @@
 .composer-effort-slider-field {
   display: block;
   position: absolute;
-  inset: 0;
+  z-index: 2;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: var(--space-6);
+  transform: translateY(-50%);
   pointer-events: none;
   overflow: hidden;
-  border-radius: inherit;
+  border-radius: var(--radius-full);
 }
 
 .composer-effort-slider-field-canvas {
@@ -970,7 +975,7 @@
 
 .composer-effort-slider-thumb {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   left: 0;
   top: 50%;
   width: var(--space-8);
@@ -989,6 +994,11 @@
     border-color var(--transition-fast),
     opacity var(--transition-fast);
   pointer-events: none;
+}
+
+.composer-effort-slider.is-max-visual .composer-effort-slider-thumb {
+  border-color: color-mix(in srgb, var(--token-effort-max-to) 52%, var(--token-border-strong));
+  background: var(--token-effort-max-thumb);
 }
 
 .composer-effort-slider.is-disabled .composer-effort-slider-thumb {
