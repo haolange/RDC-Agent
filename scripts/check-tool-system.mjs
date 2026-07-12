@@ -105,6 +105,52 @@ function main() {
   assert(REJECTED_TOOL_TOKENS.todo, 'REJECTED_TOOL_TOKENS must include todo');
   assert(REJECTED_TOOL_TOKENS.search_codebase, 'REJECTED_TOOL_TOKENS must include search_codebase');
 
+  // Context Window Phase 2：MCP deferred loading 计量 id 与前缀规则。
+  const sessionTypes = fs.readFileSync(
+    path.join(repoRoot, 'src/shared/types/session.ts'),
+    'utf8',
+  );
+  assert(
+    /ContextUsageBreakdownId\s*=[\s\S]*?'mcp_tools_deferred'/.test(sessionTypes),
+    'ContextUsageBreakdownId must include mcp_tools_deferred',
+  );
+
+  const mcpDeferredTools = fs.readFileSync(
+    path.join(repoRoot, 'src/main/workflow/debugger/mcpDeferredTools.ts'),
+    'utf8',
+  );
+  assert(
+    /export const MCP_TOOL_NAME_PREFIX\s*=\s*['"]mcp__['"]/.test(mcpDeferredTools),
+    'mcpDeferredTools MCP_TOOL_NAME_PREFIX must be mcp__',
+  );
+  const mcpManager = fs.readFileSync(
+    path.join(repoRoot, 'src/main/agent-runtime/agent/MCPManager.ts'),
+    'utf8',
+  );
+  assert(
+    /return toolName\.startsWith\(['"]mcp__['"]\)/.test(mcpManager)
+      || /startsWith\(['"]mcp__['"]\)/.test(mcpManager),
+    'MCPManager isMCPTool must use mcp__ prefix',
+  );
+  assert(
+    mcpDeferredTools.includes("startsWith(MCP_TOOL_NAME_PREFIX)")
+      || /startsWith\(['"]mcp__['"]\)/.test(mcpDeferredTools),
+    'mcpDeferredTools isMcpPrefixedToolName must match MCPManager mcp__ prefix',
+  );
+
+  const orchestrator = fs.readFileSync(
+    path.join(repoRoot, 'src/main/workflow/debugger/AgentOrchestrator.ts'),
+    'utf8',
+  );
+  assert(
+    orchestrator.includes('partitionDeferredMcpTools'),
+    'AgentOrchestrator must use partitionDeferredMcpTools for MCP deferred loading',
+  );
+  assert(
+    orchestrator.includes('mcp_tools_deferred'),
+    'AgentOrchestrator breakdown must emit mcp_tools_deferred',
+  );
+
   console.log('[tool-system] OK');
 }
 

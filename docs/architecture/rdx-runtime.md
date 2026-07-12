@@ -48,6 +48,10 @@ Scoped Runtime Resolution
 
 每次 `llm_turn` 保存脱敏 `RequestEnvelopeSnapshot`，包含 effective instructions、messages、tools、resource provenance、provider/model/protocol、usage 与 redaction metadata。Credential、capture binary 和 provider protected payload 不落盘；protected payload 只保留 hash 与脱敏原因。Request Inspector 组件可保留为代码层调试能力，但不得挂到默认 Session/Trace 右侧面板，也不得嵌入 Work Process 消息流。
 
+## Context Usage 计量
+
+Composer 的 context usage 环与弹窗由 `RunContextUsageSummary` 驱动：窗口占用率与 This run In/Out 来自 provider 上报的真实 usage（含可选 cache read/write 与 reasoning tokens，未上报不显示假值）；分类 breakdown（system_prompt、memory_files、skills、system_tools、mcp_tools、mcp_tools_deferred、subagent_definitions、summarized_conversation、conversation、free）为 chars/4 估算，按 provider `inputTokens` 缩放对齐。`memory_files` 段覆盖 RDX.md scoped instruction 链；`mcp_tools_deferred` 段仅计未激活 MCP schema 的估算量，不参与缩放、不占用堆叠条与 free 计算。Debug 与 Composer/Ask 路径均经 `PromptPlanBuilder` 产出可拆分的 metrics。最新快照随 session 落盘至 `<sessionDir>/usage.json`（subagent 隔离 session 不落盘），应用重启或内存 miss 时回读并按 stale 灰显；不做迁移，读不到即视为无数据。
+
 ## Memory 与 Reasoning
 
 Memory 只有 `memory_search`、`memory_read`、`memory_write`、`memory_delete` 四个 scoped tool。Write 需要明确用户意图或批准，Delete 需要确认；没有自动抽取、turn counter、consolidation 或全索引 Prompt 注入。

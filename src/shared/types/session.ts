@@ -167,10 +167,11 @@ export type RunSummary = RunRecord;
 
 export type ContextUsageBreakdownId =
   | 'system_prompt'
-  | 'scoped_instructions'
+  | 'memory_files'
   | 'skills'
   | 'system_tools'
   | 'mcp_tools'
+  | 'mcp_tools_deferred'
   | 'subagent_definitions'
   | 'summarized_conversation'
   | 'conversation'
@@ -198,6 +199,12 @@ export interface RunContextUsageSummary {
   breakdown: ContextUsageBreakdownEntry[] | null;
   /** 最近一次用量快照时间戳。 */
   snapshotAt: number | null;
+  /** 本 run 累计 cache read tokens；provider 未上报时缺省。 */
+  cacheReadTokens?: number;
+  /** 本 run 累计 cache write tokens；provider 未上报时缺省。 */
+  cacheWriteTokens?: number;
+  /** 本 run 累计 reasoning tokens；provider 未上报时缺省。 */
+  reasoningTokens?: number;
 }
 
 export interface HumanPreviewSnapshot {

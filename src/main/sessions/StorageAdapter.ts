@@ -30,6 +30,7 @@ import type {
   ExecutableAppMode,
   ProjectInputRecord,
   ProjectRecord,
+  RunContextUsageSummary,
   RunSummary,
   SessionAttachmentRecord,
   SessionRecord,
@@ -678,6 +679,35 @@ export class StorageAdapter {
     const artifactPath = path.join(artifactsDir, 'plan.md');
     fs.writeFileSync(artifactPath, content, 'utf8');
     return artifactPath;
+  }
+
+  /** Session 目录下的上下文用量快照路径。 */
+  getSessionUsagePath(sessionId: string): string | null {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) return null;
+    return path.join(location.sessionPath, 'usage.json');
+  }
+
+  /** 读取落盘的 RunContextUsageSummary；文件缺失或损坏时返回 null。 */
+  readSessionUsage(sessionId: string): RunContextUsageSummary | null {
+    if (sessionId.includes('::subagent::')) {
+      return null;
+    }
+    const usagePath = this.getSessionUsagePath(sessionId);
+    if (!usagePath) return null;
+    return this.readJson<RunContextUsageSummary>(usagePath);
+  }
+
+  /** 覆盖写入最新用量快照（小文件，不做迁移）。 */
+  writeSessionUsage(sessionId: string, usage: RunContextUsageSummary): void {
+    if (sessionId.includes('::subagent::')) {
+      return;
+    }
+    const usagePath = this.getSessionUsagePath(sessionId);
+    if (!usagePath) {
+      throw new Error(`Session not found for usage snapshot: ${sessionId}`);
+    }
+    this.writeJson(usagePath, usage);
   }
 
   getSessionContextJournalPath(sessionId: string): string {

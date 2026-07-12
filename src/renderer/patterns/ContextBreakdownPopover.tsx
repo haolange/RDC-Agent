@@ -1,62 +1,14 @@
 import React from 'react';
-import type {
-  ContextUsageBreakdownId,
-  RunContextUsageSummary,
-} from '@shared/types/session';
-import { useI18n, type TranslationKey } from '../i18n';
+import type { RunContextUsageSummary } from '@shared/types/session';
+import { useI18n } from '../i18n';
 import { formatTokenCount } from '../features/debugger/composer/turnControlsUtils';
-
-const ORDER: ContextUsageBreakdownId[] = [
-  'system_prompt',
-  'scoped_instructions',
-  'skills',
-  'system_tools',
-  'mcp_tools',
-  'subagent_definitions',
-  'summarized_conversation',
-  'conversation',
-  'free',
-];
-
-const SEGMENT_COLOR_VAR: Record<ContextUsageBreakdownId, string> = {
-  system_prompt:           'var(--token-text-placeholder)',
-  scoped_instructions:     'var(--token-status-warning)',
-  skills:                  'var(--token-status-info)',
-  system_tools:            'var(--token-status-success)',
-  mcp_tools:               'var(--token-accent-primary)',
-  subagent_definitions:    'var(--token-status-info)',
-  summarized_conversation: 'var(--token-text-caption)',
-  conversation:            'var(--token-text-link)',
-  free:                    'var(--token-border-muted)',
-};
-
-const GROUPS: { id: string; labelKey: TranslationKey; ids: ContextUsageBreakdownId[] }[] = [
-  { id: 'prompt', labelKey: 'contextBreakdown.groupPrompt', ids: ['system_prompt', 'scoped_instructions', 'skills'] },
-  { id: 'tools', labelKey: 'contextBreakdown.groupTools', ids: ['system_tools', 'mcp_tools', 'subagent_definitions'] },
-  { id: 'conversation', labelKey: 'contextBreakdown.groupConversation', ids: ['summarized_conversation', 'conversation'] },
-  { id: 'space', labelKey: 'contextBreakdown.groupSpace', ids: ['free'] },
-];
-
-const SEGMENT_LABEL_KEYS: Record<ContextUsageBreakdownId, TranslationKey> = {
-  system_prompt: 'contextBreakdown.segment.system_prompt',
-  scoped_instructions: 'contextBreakdown.segment.scopedInstructions',
-  skills: 'contextBreakdown.segment.skills',
-  system_tools: 'contextBreakdown.segment.system_tools',
-  mcp_tools: 'contextBreakdown.segment.mcp_tools',
-  subagent_definitions: 'contextBreakdown.segment.subagent_definitions',
-  summarized_conversation: 'contextBreakdown.segment.summarized_conversation',
-  conversation: 'contextBreakdown.segment.conversation',
-  free: 'contextBreakdown.segment.free',
-};
-
-const COUNT_SUFFIX_KEYS: Partial<Record<ContextUsageBreakdownId, TranslationKey>> = {
-  system_tools: 'contextBreakdown.countSuffix.system_tools',
-  mcp_tools: 'contextBreakdown.countSuffix.mcp_tools',
-  subagent_definitions: 'contextBreakdown.countSuffix.subagent_definitions',
-  conversation: 'contextBreakdown.countSuffix.conversation',
-};
-
-const formatPct = (value: number): string => `${value.toFixed(1)}%`;
+import { useAppSettingsStore } from '../stores/appSettingsStore';
+import { ContextBreakdownLegend } from './ContextBreakdownLegend';
+import {
+  CONTEXT_BREAKDOWN_ORDER,
+  SEGMENT_COLOR_VAR,
+  SEGMENT_LABEL_KEYS,
+} from './contextBreakdownMeta';
 
 export const ContextBreakdownPopover: React.FC<{
   usage: RunContextUsageSummary | null;
@@ -64,6 +16,12 @@ export const ContextBreakdownPopover: React.FC<{
   onClose: () => void;
 }> = ({ usage, stale, onClose }) => {
   const { t } = useI18n();
+  const detailsExpanded = useAppSettingsStore(
+    (state) => state.settings.appearance.contextBreakdownExpanded,
+  );
+  const setContextBreakdownExpanded = useAppSettingsStore(
+    (state) => state.setContextBreakdownExpanded,
+  );
 
   const renderEmpty = (message: string) => (
     <>
@@ -72,7 +30,7 @@ export const ContextBreakdownPopover: React.FC<{
         <div className="context-breakdown-header">
           <span className="context-breakdown-title">{t('contextBreakdown.title')}</span>
           <button type="button" className="context-breakdown-close" onClick={onClose} aria-label={t('contextBreakdown.close')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -93,38 +51,29 @@ export const ContextBreakdownPopover: React.FC<{
   const pct = (tokens: number): number => (denom > 0 ? (tokens / denom) * 100 : 0);
   const breakdown = usage.breakdown ?? [];
 
-  const orderedEntries = ORDER
-    .map((id) => breakdown.find((entry) => entry.id === id))
-    .filter(Boolean) as typeof breakdown;
+  // 明细恒显完整分类：后端未产出的段补 tokens=0，不隐藏空行。
+  const orderedEntries = CONTEXT_BREAKDOWN_ORDER.map((id) => {
+    const found = breakdown.find((entry) => entry.id === id);
+    return found ?? { id, tokens: 0 };
+  });
 
-  const barEntries = orderedEntries.filter((entry) => entry.tokens > 0 && entry.id !== 'free');
-  const legendEntries = orderedEntries.filter((entry) => entry.tokens > 0 || entry.id === 'free');
+  const barEntries = orderedEntries.filter(
+    (entry) => entry.tokens > 0 && entry.id !== 'free' && entry.id !== 'mcp_tools_deferred',
+  );
+  const legendEntries = orderedEntries;
   const hasRunTotals = usage.inputTokens > 0 || usage.outputTokens > 0;
 
-  const renderLegendRow = (entry: (typeof breakdown)[number]) => {
-    const suffixKey = COUNT_SUFFIX_KEYS[entry.id];
-    const suffix = suffixKey ? t(suffixKey) : '';
-    const countLabel =
-      suffix && entry.count !== undefined && entry.count > 0
-        ? `${entry.count}${suffix}`
-        : null;
-
-    return (
-      <li key={entry.id} className={`context-breakdown-row${entry.id === 'free' ? ' is-free' : ''}`}>
-        <span
-          className="context-breakdown-swatch"
-          style={{ background: SEGMENT_COLOR_VAR[entry.id] ?? 'var(--token-text-placeholder)' }}
-          aria-hidden="true"
-        />
-        <span className="context-breakdown-label">{t(SEGMENT_LABEL_KEYS[entry.id])}</span>
-        {countLabel ? <span className="context-breakdown-count">{countLabel}</span> : null}
-        <span className="context-breakdown-tokens">{formatTokenCount(entry.tokens)}</span>
-        <span className="context-breakdown-pct">
-          {hasWindow && entry.id !== 'free' ? formatPct(pct(entry.tokens)) : '—'}
-        </span>
-      </li>
-    );
-  };
+  const runExtras = [
+    usage.cacheReadTokens
+      ? `${t('contextBreakdown.cacheReadLabel')} ${formatTokenCount(usage.cacheReadTokens)}`
+      : null,
+    usage.cacheWriteTokens
+      ? `${t('contextBreakdown.cacheWriteLabel')} ${formatTokenCount(usage.cacheWriteTokens)}`
+      : null,
+    usage.reasoningTokens
+      ? `${t('contextBreakdown.reasoningLabel')} ${formatTokenCount(usage.reasoningTokens)}`
+      : null,
+  ].filter(Boolean);
 
   return (
     <>
@@ -132,13 +81,8 @@ export const ContextBreakdownPopover: React.FC<{
       <div className="context-breakdown" role="dialog" aria-label={t('contextBreakdown.title')} data-testid="context-breakdown">
         <div className="context-breakdown-header">
           <span className="context-breakdown-title">{t('contextBreakdown.title')}</span>
-          {hasWindow ? (
-            <span className="context-breakdown-header-meta">
-              {formatTokenCount(windowTokens)}
-            </span>
-          ) : null}
           <button type="button" className="context-breakdown-close" onClick={onClose} aria-label={t('contextBreakdown.close')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18" />
               <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -146,40 +90,32 @@ export const ContextBreakdownPopover: React.FC<{
         </div>
 
         {hasWindow ? (
-          <div className="context-breakdown-summary-row">
-            <span className="context-breakdown-pct-large">{usage.usagePercent}%</span>
-            <span className="context-breakdown-summary-caption">{t('contextBreakdown.windowUsed')}</span>
+          <div className="context-breakdown-hero">
+            <div className="context-breakdown-hero-row">
+              <div className="context-breakdown-hero-usage">
+                <span className="context-breakdown-pct-large">{usage.usagePercent}%</span>
+                <span className="context-breakdown-summary-caption">{t('contextBreakdown.windowUsed')}</span>
+              </div>
+              <span className="context-breakdown-hero-tokens">
+                ~{formatTokenCount(usage.occupiedTokens)} / {formatTokenCount(windowTokens)}{' '}
+                {t('contextBreakdown.tokensLabel')}
+              </span>
+            </div>
             <div className="context-breakdown-bar" aria-hidden="true">
               {barEntries.map((entry) => (
                 <span
                   key={entry.id}
                   className="context-breakdown-bar-segment"
+                  title={`${t(SEGMENT_LABEL_KEYS[entry.id])} · ${formatTokenCount(entry.tokens)}`}
                   style={{
                     width: `${pct(entry.tokens)}%`,
-                    background: SEGMENT_COLOR_VAR[entry.id] ?? 'var(--token-text-placeholder)',
+                    background: SEGMENT_COLOR_VAR[entry.id] ?? 'var(--token-context-deferred)',
                   }}
                 />
               ))}
             </div>
           </div>
         ) : null}
-
-        <ul className="context-breakdown-legend">
-          {GROUPS.map((group) => {
-            const groupEntries = group.ids
-              .map((id) => legendEntries.find((entry) => entry.id === id))
-              .filter(Boolean) as typeof legendEntries;
-            if (groupEntries.length === 0) return null;
-            return (
-              <React.Fragment key={group.id}>
-                <li className="context-breakdown-group-header">
-                  {t(group.labelKey)}
-                </li>
-                {groupEntries.map(renderLegendRow)}
-              </React.Fragment>
-            );
-          })}
-        </ul>
 
         {hasRunTotals ? (
           <div className="context-breakdown-run-totals">
@@ -190,7 +126,45 @@ export const ContextBreakdownPopover: React.FC<{
               {t('contextBreakdown.outputLabel')} {formatTokenCount(usage.outputTokens)}
               {' · '}
               {t('contextBreakdown.totalLabel')} {formatTokenCount(usage.totalTokens)}
+              {runExtras.length > 0 ? (
+                <>
+                  {' · '}
+                  {runExtras.join(' · ')}
+                </>
+              ) : null}
             </span>
+          </div>
+        ) : null}
+
+        <button
+          type="button"
+          className={`context-breakdown-details-toggle${detailsExpanded ? ' is-expanded' : ''}`}
+          aria-expanded={detailsExpanded}
+          aria-controls="context-breakdown-details"
+          aria-label={
+            detailsExpanded
+              ? t('contextBreakdown.detailsCollapseAria')
+              : t('contextBreakdown.detailsExpandAria')
+          }
+          onClick={() => {
+            void setContextBreakdownExpanded(!detailsExpanded);
+          }}
+        >
+          <span
+            className={`context-breakdown-details-chevron${detailsExpanded ? ' is-expanded' : ''}`}
+            aria-hidden="true"
+          >
+            {/* 收起 ▶ / 展开 ▼：与侧栏树披露一致，箭头始终指向内容方向 */}
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </span>
+          <span className="context-breakdown-details-label">{t('contextBreakdown.detailsLabel')}</span>
+        </button>
+
+        {detailsExpanded ? (
+          <div id="context-breakdown-details" className="context-breakdown-details">
+            <ContextBreakdownLegend entries={legendEntries} />
           </div>
         ) : null}
 

@@ -32,6 +32,7 @@ interface AppSettingsState {
   setFontScale: (fontScale: FontScale) => Promise<void>;
   setComposerMarkdown: (composerMarkdown: boolean) => Promise<void>;
   setUsePointerCursors: (usePointerCursors: boolean) => Promise<void>;
+  setContextBreakdownExpanded: (contextBreakdownExpanded: boolean) => Promise<void>;
   updateProfile: (profile: Partial<ProfileSettings>) => Promise<void>;
   saveProvider: (provider: LlmProviderEntry) => Promise<AppSettings>;
   removeProvider: (providerId: string) => Promise<void>;
@@ -68,6 +69,9 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   },
   setUsePointerCursors: async (usePointerCursors) => {
     await get().patchSettings({ appearance: { usePointerCursors } });
+  },
+  setContextBreakdownExpanded: async (contextBreakdownExpanded) => {
+    await get().patchSettings({ appearance: { contextBreakdownExpanded } });
   },
   updateProfile: async (profile) => {
     await get().patchSettings({ profile });

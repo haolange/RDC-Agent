@@ -44,7 +44,7 @@ import { generateEventId, nowMs } from '@shared/utils/id';
 import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
-import { promptPlanBuilder } from '../agent-runtime/prompt';
+import { promptPlanBuilder, resolvePromptClock } from '../agent-runtime/prompt';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
@@ -141,27 +141,6 @@ function cloneThinkingArtifact(thinking: ThinkingArtifact): ThinkingArtifact {
         }
       : undefined,
   };
-}
-function resolvePromptClock(): { currentDate: string; timeZone: string } {
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'local';
-  return {
-    currentDate: formatPromptDate(new Date(), timeZone),
-    timeZone,
-  };
-}
-
-function formatPromptDate(date: Date, timeZone: string): string {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: timeZone === 'local' ? undefined : timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const get = (type: string): string => parts.find((part) => part.type === type)?.value ?? '';
-  const year = get('year');
-  const month = get('month');
-  const day = get('day');
-  return year && month && day ? `${year}-${month}-${day}` : date.toISOString().slice(0, 10);
 }
 interface ConversationContextInput extends ConversationSendRequest {
   fallbackProjectId?: string | null;

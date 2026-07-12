@@ -61,6 +61,8 @@ interface OpenAIStreamChunk {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
+    prompt_tokens_details?: { cached_tokens?: number };
+    completion_tokens_details?: { reasoning_tokens?: number };
   };
 }
 
@@ -173,12 +175,16 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
         }
 
         if (chunk.usage) {
+          const cacheReadTokens = chunk.usage.prompt_tokens_details?.cached_tokens;
+          const reasoningTokens = chunk.usage.completion_tokens_details?.reasoning_tokens;
           builder.setUsage({
             inputTokens: chunk.usage.prompt_tokens ?? 0,
             outputTokens: chunk.usage.completion_tokens ?? 0,
             totalTokens:
               chunk.usage.total_tokens
               ?? (chunk.usage.prompt_tokens ?? 0) + (chunk.usage.completion_tokens ?? 0),
+            ...(typeof cacheReadTokens === 'number' ? { cacheReadTokens } : {}),
+            ...(typeof reasoningTokens === 'number' ? { reasoningTokens } : {}),
           });
         }
 

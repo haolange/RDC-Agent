@@ -271,6 +271,18 @@
   --token-effort-max-to:       hsl(280 70% 62%);
   --token-effort-max-highlight: rgb(255 255 255 / 0.34);
   --token-effort-max-sparkle:  rgb(255 255 255 / 0.92);
+
+  /* Context breakdown 分段专用（light），不得挪作它用 — 略加深以保证浅色底对比 */
+  --token-context-system-prompt: rgb(var(--color-purple));
+  --token-context-memory-files:  rgb(var(--color-warning));
+  --token-context-skills:        rgb(var(--color-info));
+  --token-context-system-tools:  rgb(var(--color-success));
+  --token-context-mcp-tools:     rgb(var(--color-orange));
+  --token-context-subagents:     rgb(var(--color-pink));
+  --token-context-summarized:    rgb(var(--color-primary-400));
+  --token-context-conversation:  rgb(var(--color-primary-500));
+  --token-context-deferred:      rgb(var(--color-text-muted));
+  --token-context-free:          rgb(var(--color-bg-4));
 }
 
 :root[data-font-scale='small'] {
@@ -786,6 +798,20 @@
   --token-effort-max-to:       hsl(282 72% 58%);
   --token-effort-max-highlight: rgb(255 255 255 / 0.28);
   --token-effort-max-sparkle:  rgb(255 255 255 / 0.88);
+
+  /* Context breakdown 分段专用，不得挪作它用。
+   * 多彩但克制的彩虹序：紫/金/青/绿/橙/粉 + 主蓝对话段；deferred/free 用中性灰。
+   * 不占用 --token-accent-* / --token-status-* 语义位。 */
+  --token-context-system-prompt: rgb(var(--color-purple));
+  --token-context-memory-files:  rgb(var(--color-warning));
+  --token-context-skills:        rgb(var(--color-info));
+  --token-context-system-tools:  rgb(var(--color-success));
+  --token-context-mcp-tools:     rgb(var(--color-orange));
+  --token-context-subagents:     rgb(var(--color-pink));
+  --token-context-summarized:    rgb(var(--color-primary-300));
+  --token-context-conversation:  rgb(var(--color-primary-400));
+  --token-context-deferred:      rgb(var(--color-text-muted));
+  --token-context-free:          rgb(var(--color-bg-5));
 
   /* ── Elevation (macOS-style depth) ──
    *  Components express depth through these tokens instead of hard 1px borders.

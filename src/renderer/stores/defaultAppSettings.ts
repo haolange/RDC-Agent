@@ -29,6 +29,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     fontScale: 'medium',
     composerMarkdown: false,
     usePointerCursors: false,
+    contextBreakdownExpanded: false,
   },
   layout: {
     leftSidebar: { collapsed: false, width: LEFT_SIDEBAR_DEFAULT_WIDTH, expandedWidth: LEFT_SIDEBAR_DEFAULT_WIDTH },

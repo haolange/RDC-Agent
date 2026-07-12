@@ -22,7 +22,7 @@ function makeProvider(provider: LlmProviderEntry): LlmProviderEntry {
 
 function makeSettings(provider: LlmProviderEntry): AppSettings {
   return {
-    appearance: { theme: 'dark', language: 'zh-CN', fontScale: 'medium', composerMarkdown: false, usePointerCursors: false },
+    appearance: { theme: 'dark', language: 'zh-CN', fontScale: 'medium', composerMarkdown: false, usePointerCursors: false, contextBreakdownExpanded: false },
     layout: {
       leftSidebar: { collapsed: false, width: 280, expandedWidth: 280 },
       rightPanel: { collapsed: false, width: 360, expandedWidth: 360 },

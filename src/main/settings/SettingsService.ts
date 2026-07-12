@@ -143,6 +143,7 @@ const DEFAULT_APPEARANCE: UiPreferences = {
   fontScale: 'medium',
   composerMarkdown: false,
   usePointerCursors: false,
+  contextBreakdownExpanded: false,
 };
 
 const DEFAULT_LAYOUT: LayoutPreferences = {
@@ -933,6 +934,9 @@ export class SettingsService {
         usePointerCursors: typeof candidate.appearance?.usePointerCursors === 'boolean'
           ? candidate.appearance.usePointerCursors
           : (fallback.appearance?.usePointerCursors ?? DEFAULT_APPEARANCE.usePointerCursors),
+        contextBreakdownExpanded: typeof candidate.appearance?.contextBreakdownExpanded === 'boolean'
+          ? candidate.appearance.contextBreakdownExpanded
+          : (fallback.appearance?.contextBreakdownExpanded ?? DEFAULT_APPEARANCE.contextBreakdownExpanded),
       },
       layout: {
         leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
@@ -985,6 +989,9 @@ export class SettingsService {
         usePointerCursors: typeof candidate.appearance?.usePointerCursors === 'boolean'
           ? candidate.appearance.usePointerCursors
           : (fallback.appearance?.usePointerCursors ?? DEFAULT_APPEARANCE.usePointerCursors),
+        contextBreakdownExpanded: typeof candidate.appearance?.contextBreakdownExpanded === 'boolean'
+          ? candidate.appearance.contextBreakdownExpanded
+          : (fallback.appearance?.contextBreakdownExpanded ?? DEFAULT_APPEARANCE.contextBreakdownExpanded),
       },
       layout: {
         leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
@@ -1153,6 +1160,9 @@ export class SettingsService {
         usePointerCursors: typeof (patch.appearance?.usePointerCursors ?? currentPersisted.appearance?.usePointerCursors) === 'boolean'
           ? Boolean(patch.appearance?.usePointerCursors ?? currentPersisted.appearance?.usePointerCursors)
           : DEFAULT_APPEARANCE.usePointerCursors,
+        contextBreakdownExpanded: typeof (patch.appearance?.contextBreakdownExpanded ?? currentPersisted.appearance?.contextBreakdownExpanded) === 'boolean'
+          ? Boolean(patch.appearance?.contextBreakdownExpanded ?? currentPersisted.appearance?.contextBreakdownExpanded)
+          : DEFAULT_APPEARANCE.contextBreakdownExpanded,
       },
       layout: {
         leftSidebar: sanitizeSidebar(

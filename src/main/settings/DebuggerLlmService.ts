@@ -1,7 +1,7 @@
 import type { AgentRole } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { LLMMessage, LLMRequest, LLMResponse } from '@shared/types/llm';
-import type { ContextUsageBreakdownEntry, RunContextUsageSummary } from '@shared/types/session';
+import type { ContextUsageBreakdownEntry, ContextUsageBreakdownId, RunContextUsageSummary } from '@shared/types/session';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import { resolveActiveContextWindowTokens } from '@shared/types/modelCapability';
 import type { Blocker, WorkflowStage } from '@shared/types/workflow';
@@ -50,6 +50,12 @@ export interface RunLlmExecutionSummary {
   firstRequestId?: string;
   totalInputTokens: number;
   totalOutputTokens: number;
+  /** 累计 cache read tokens；从未上报时缺省。 */
+  totalCacheReadTokens?: number;
+  /** 累计 cache write tokens；从未上报时缺省。 */
+  totalCacheWriteTokens?: number;
+  /** 累计 reasoning tokens；从未上报时缺省。 */
+  totalReasoningTokens?: number;
   /** 最近一次主对话请求的窗口占用量（=provider 上报的 inputTokens）。 */
   lastOccupiedTokens?: number;
   /** 最近一次主对话请求的分类 token 估算（系统提示 / 工具定义 / 对话）。 */
@@ -113,11 +119,14 @@ function extractTextContent(content: LLMResponse['content']): string {
     .trim();
 }
 
+/** 未注入 prompt 的估算段：不参与缩放求和，也不计入 free 计算。 */
+const NON_OCCUPYING_BREAKDOWN_IDS = new Set<ContextUsageBreakdownId>(['mcp_tools_deferred']);
+
 /**
  * 将分类估算缩放到 provider 权威占用量，并在已知窗口时追加“空闲”段。
  *
- * 分类估算为字符/4 近似，缩放后各段之和≈occupiedTokens，使堆叠条与
- * 头部占用率一致；缺少数据时返回 null。
+ * 分类估算为字符/4 近似，缩放后各注入段之和≈occupiedTokens，使堆叠条与
+ * 头部占用率一致；`mcp_tools_deferred` 等非占用段原样透传。缺少数据时返回 null。
  */
 function buildScaledBreakdown(
   raw: ContextUsageBreakdownEntry[] | null,
@@ -127,13 +136,22 @@ function buildScaledBreakdown(
   if (!raw || raw.length === 0) {
     return null;
   }
-  const estimateSum = raw.reduce((acc, entry) => acc + entry.tokens, 0);
+  const occupying = raw.filter((entry) => !NON_OCCUPYING_BREAKDOWN_IDS.has(entry.id));
+  const passthrough = raw.filter((entry) => NON_OCCUPYING_BREAKDOWN_IDS.has(entry.id));
+  const estimateSum = occupying.reduce((acc, entry) => acc + entry.tokens, 0);
   const scaleFactor = estimateSum > 0 && occupiedTokens > 0 ? occupiedTokens / estimateSum : 1;
-  const scaled: ContextUsageBreakdownEntry[] = raw.map((entry) => ({
+  const scaled: ContextUsageBreakdownEntry[] = occupying.map((entry) => ({
     id: entry.id,
     tokens: Math.max(0, Math.round(entry.tokens * scaleFactor)),
     ...(entry.count !== undefined ? { count: entry.count } : {}),
   }));
+  for (const entry of passthrough) {
+    scaled.push({
+      id: entry.id,
+      tokens: Math.max(0, entry.tokens),
+      ...(entry.count !== undefined ? { count: entry.count } : {}),
+    });
+  }
   if (contextWindowTokens) {
     scaled.push({ id: 'free', tokens: Math.max(0, contextWindowTokens - occupiedTokens) });
   }
@@ -269,6 +287,15 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** 仅在有真实累计值且 > 0 时输出，避免 0 假值污染 UI。 */
+function positiveTokenOrOmit(value: number | undefined): number | undefined {
+  return typeof value === 'number' && value > 0 ? value : undefined;
+}
+
+function isSubagentSessionId(sessionId: string | null | undefined): boolean {
+  return Boolean(sessionId && sessionId.includes('::subagent::'));
+}
+
 export class DebuggerLlmService {
   private runSummaries = new Map<string, RunLlmExecutionSummary>();
 
@@ -289,14 +316,19 @@ export class DebuggerLlmService {
     };
   }
 
-  getRunContextUsage(runId: string): RunContextUsageSummary | null {
+  getRunContextUsage(runId: string, fallbackSessionId?: string | null): RunContextUsageSummary | null {
     const summary = this.runSummaries.get(runId);
-    if (!summary) {
-      return null;
+    if (summary) {
+      return this.toContextUsageSummary(runId, summary);
     }
 
+    const fromDisk = this.readPersistedUsage(runId, fallbackSessionId);
+    return fromDisk;
+  }
+
+  private toContextUsageSummary(key: string, summary: RunLlmExecutionSummary): RunContextUsageSummary {
     const settings = settingsService.getAll();
-    const turnControls = this.resolveSessionTurnControls(runId, summary);
+    const turnControls = this.resolveSessionTurnControls(key, summary);
     const capability = resolveModelCapability(summary.providerId, summary.modelId, settings);
     const contextWindowTokens = resolveActiveContextWindowTokens(capability, turnControls ?? {
       reasoningLevel: capability.reasoningControl.defaultSelection,
@@ -305,9 +337,12 @@ export class DebuggerLlmService {
     });
     const totalTokens = summary.totalInputTokens + summary.totalOutputTokens;
     const occupiedTokens = summary.lastOccupiedTokens ?? 0;
+    const cacheReadTokens = positiveTokenOrOmit(summary.totalCacheReadTokens);
+    const cacheWriteTokens = positiveTokenOrOmit(summary.totalCacheWriteTokens);
+    const reasoningTokens = positiveTokenOrOmit(summary.totalReasoningTokens);
 
     return {
-      runId,
+      runId: key,
       providerId: summary.providerId,
       modelId: summary.modelId,
       inputTokens: summary.totalInputTokens,
@@ -318,7 +353,32 @@ export class DebuggerLlmService {
       occupiedTokens,
       breakdown: buildScaledBreakdown(summary.lastPromptBreakdown ?? null, occupiedTokens, contextWindowTokens),
       snapshotAt: summary.lastSnapshotAt ?? null,
+      ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+      ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
+      ...(reasoningTokens !== undefined ? { reasoningTokens } : {}),
     };
+  }
+
+  /**
+   * 内存 miss 时从 session 目录 `usage.json` 回读。
+   * key 可为 sessionId；Debug 路径仅有 runId 时用 fallbackSessionId 定位目录并校验 runId。
+   */
+  private readPersistedUsage(
+    key: string,
+    fallbackSessionId?: string | null,
+  ): RunContextUsageSummary | null {
+    const direct = storageAdapter.readSessionUsage(key);
+    if (direct) {
+      return direct;
+    }
+    if (!fallbackSessionId || fallbackSessionId === key || isSubagentSessionId(fallbackSessionId)) {
+      return null;
+    }
+    const viaSession = storageAdapter.readSessionUsage(fallbackSessionId);
+    if (viaSession && viaSession.runId === key) {
+      return viaSession;
+    }
+    return null;
   }
 
   private resolveSessionTurnControls(key: string, summary: RunLlmExecutionSummary): ConversationTurnControls | null {
@@ -347,6 +407,9 @@ export class DebuggerLlmService {
     modelId: string;
     inputTokens: number;
     outputTokens: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+    reasoningTokens?: number;
     /** 预计算的完整分段 breakdown（由 Orchestrator 在 message_end 处组装）。 */
     precomputedBreakdown: ContextUsageBreakdownEntry[];
   }): void {
@@ -374,12 +437,34 @@ export class DebuggerLlmService {
     existing.successfulCallCount += 1;
     existing.totalInputTokens += params.inputTokens;
     existing.totalOutputTokens += params.outputTokens;
+    if (typeof params.cacheReadTokens === 'number') {
+      existing.totalCacheReadTokens = (existing.totalCacheReadTokens ?? 0) + params.cacheReadTokens;
+    }
+    if (typeof params.cacheWriteTokens === 'number') {
+      existing.totalCacheWriteTokens = (existing.totalCacheWriteTokens ?? 0) + params.cacheWriteTokens;
+    }
+    if (typeof params.reasoningTokens === 'number') {
+      existing.totalReasoningTokens = (existing.totalReasoningTokens ?? 0) + params.reasoningTokens;
+    }
     existing.lastOccupiedTokens = params.inputTokens;
     existing.lastPromptBreakdown = params.precomputedBreakdown;
     existing.lastSnapshotAt = Date.now();
 
     this.runSummaries.set(key, existing);
     this.broadcastRunUsage(key);
+    this.persistRunUsage(key, params.sessionId ?? existing.sessionId);
+  }
+
+  /** 将最新 usage 快照写入 session 目录；subagent 隔离 session 不落盘。 */
+  private persistRunUsage(key: string, sessionId: string | null | undefined): void {
+    if (!sessionId || isSubagentSessionId(sessionId)) {
+      return;
+    }
+    const usage = this.getRunContextUsage(key);
+    if (!usage) {
+      return;
+    }
+    storageAdapter.writeSessionUsage(sessionId, usage);
   }
 
   private async refreshAccountRuntimeCredentials(route: ResolvedDebuggerRoute): Promise<void> {

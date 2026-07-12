@@ -19,8 +19,8 @@ export const ContextUsageIndicator: React.FC<{
     ? `${normalizedPercent}% · ${formatTokenCount(usage.contextWindowTokens)}`
     : `${normalizedPercent}%`;
   const ariaLabel = language === 'zh-CN'
-    ? `上下文窗口已用 ${normalizedPercent}%`
-    : `Context window ${normalizedPercent}% used`;
+    ? `上下文用量 ${normalizedPercent}% 已满`
+    : `Context Usage ${normalizedPercent}% Full`;
 
   return (
     <div className="composer-usage">
