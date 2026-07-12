@@ -35,7 +35,13 @@ const isSettingsRebuildOnly = process.env.RDC_AGENT_REBUILD_SETTINGS_ONLY === '1
 const isTestMode = process.env.RDC_AGENT_TEST_MODE === '1';
 const isHeadlessMode = process.env.RDC_AGENT_HEADLESS === '1';
 
-const hasSingleInstanceLock = isSettingsRebuildOnly || app.requestSingleInstanceLock();
+// Browser QA is a second, headless surface over the real runtime. It must not
+// own the desktop lock, otherwise a later human launcher is redirected to an
+// instance that can never show a window. The bridge port remains the headless
+// singleton boundary; visible desktop instances keep Electron's canonical lock.
+const hasSingleInstanceLock = isSettingsRebuildOnly
+  || isHeadlessMode
+  || app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   console.log('[RDC-Agent] Another instance is already running. Reusing the existing instance.');
   app.exit(0);
@@ -55,10 +61,6 @@ let headlessKeepAliveWindow: BrowserWindow | null = null;
 const allowedNavigationOrigins = new Set<string>();
 
 app.on('second-instance', () => {
-  if (isHeadlessMode) {
-    console.log('[RDC-Agent] Headless instance already running; ignoring duplicate startup.');
-    return;
-  }
   if (!mainWindow || mainWindow.isDestroyed()) {
     return;
   }

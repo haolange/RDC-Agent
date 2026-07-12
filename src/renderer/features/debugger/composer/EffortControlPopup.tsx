@@ -107,9 +107,9 @@ export const EffortControlPopup: React.FC<{
           </div>
         ) : null}
 
-        <div className="composer-effort-slider-track" aria-hidden="true">
-          <EffortMaxField phase={maxPhase} progress={maxProgress} thumbRatio={thumbRatio} />
-        </div>
+        <div className="composer-effort-slider-track" aria-hidden="true" />
+
+        <EffortMaxField phase={maxPhase} progress={maxProgress} thumbRatio={thumbRatio} />
 
         <div
           className={`composer-effort-slider-thumb${isDragging ? ' is-dragging' : ''}${thumbEdgeClass}`}

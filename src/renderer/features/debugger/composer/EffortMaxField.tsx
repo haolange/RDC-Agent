@@ -1,39 +1,80 @@
 import React, { useEffect, useRef } from 'react';
 import type { MaxVisualPhase } from './maxVisual';
 import {
-  MAX_VISUAL_EVOLVE_MS,
-  MAX_VISUAL_RETREAT_MS,
+  clampMaxProgress,
+  maxFieldNoise,
   prefersReducedMotion,
+  resolveMaxFieldCell,
   resolveMaxFieldCoverage,
 } from './maxVisual';
 
-/**
- * Reference frames (grow Max):
- * 1) dark-gray rail + all stop dots + sparse fragment cluster by thumb
- * 2) lavender pixel cloud grows left with a dithered dissolve edge
- * 3) near-full textured field, right bright / left faint, stops gone
- */
 const CELL = 3;
 const GAP = 1;
 const STRIDE = CELL + GAP;
 const ROWS = 5;
 
-function readCssColor(el: HTMLElement, name: string, fallback: string): string {
-  const value = getComputedStyle(el).getPropertyValue(name).trim();
-  return value || fallback;
+type FieldColors = {
+  from: string;
+  mid: string;
+  to: string;
+  sparkle: string;
+};
+
+function readCssColor(el: HTMLElement, name: string, fallbackName: string): string {
+  const styles = getComputedStyle(el);
+  return styles.getPropertyValue(name).trim() || styles.getPropertyValue(fallbackName).trim();
 }
 
-/** Stable [0,1) — never keyed by wall-clock (avoids stuttering reshuffles). */
-function cellNoise(col: number, row: number, salt = 0): number {
-  const n = Math.sin((col + 1.7) * 12.9898 + (row + 1.3) * 78.233 + salt * 45.164) * 43758.5453;
-  return n - Math.floor(n);
+function readFieldColors(el: HTMLElement): FieldColors {
+  return {
+    from: readCssColor(el, '--token-effort-max-from', '--token-effort-fill-5'),
+    mid: readCssColor(el, '--token-effort-max-mid', '--token-effort-fill-4'),
+    to: readCssColor(el, '--token-effort-max-to', '--token-effort-fill-4'),
+    sparkle: readCssColor(el, '--token-effort-max-sparkle', '--token-text-inverse'),
+  };
 }
 
-function mixCssColor(a: string, b: string, t: number): string {
-  const clamped = Math.max(0, Math.min(1, t));
-  if (clamped <= 0) return a;
-  if (clamped >= 1) return b;
-  return `color-mix(in srgb, ${b} ${Math.round(clamped * 100)}%, ${a})`;
+function mixCssColor(a: string, b: string, amount: number): string {
+  const percent = Math.round(clampMaxProgress(amount) * 100);
+  return `color-mix(in srgb, ${b} ${percent}%, ${a})`;
+}
+
+function resolveCellColor(colors: FieldColors, tone: number, sparkle: number): string {
+  const base = tone < 0.5
+    ? mixCssColor(colors.from, colors.mid, tone * 2)
+    : mixCssColor(colors.mid, colors.to, (tone - 0.5) * 2);
+  if (sparkle > 0.985) return colors.sparkle;
+  if (sparkle > 0.94) return mixCssColor(base, colors.sparkle, 0.2);
+  return base;
+}
+
+function paintPreview(
+  ctx: CanvasRenderingContext2D,
+  originY: number,
+  thumbCol: number,
+  colors: FieldColors,
+): void {
+  for (let col = Math.max(0, thumbCol - 7); col < thumbCol; col += 1) {
+    const distance = thumbCol - col;
+    const falloff = 1 - (distance - 1) / 7;
+    for (let row = 0; row < ROWS; row += 1) {
+      const occupancy = maxFieldNoise(col, row, 3);
+      const detail = maxFieldNoise(col, row, 5);
+      if (occupancy < 0.46 - falloff * 0.18) continue;
+      const rowMid = (ROWS - 1) / 2;
+      const rowWeight = 0.76 + (1 - Math.abs(row - rowMid) / (rowMid + 0.5)) * 0.24;
+      const alpha = (0.24 + falloff * 0.5) * rowWeight * (0.86 + detail * 0.14);
+      ctx.globalAlpha = clampMaxProgress(alpha);
+      ctx.fillStyle = resolveCellColor(colors, 0.7 + falloff * 0.3, occupancy);
+      ctx.fillRect(
+        GAP + col * STRIDE,
+        originY + row * STRIDE,
+        CELL,
+        CELL,
+      );
+    }
+  }
+  ctx.globalAlpha = 1;
 }
 
 function paintField(
@@ -45,127 +86,47 @@ function paintField(
     progress: number;
     thumbRatio: number;
     timeMs: number;
-    colorFrom: string;
-    colorMid: string;
-    colorTo: string;
-    colorSpark: string;
+    colors: FieldColors;
     reduced: boolean;
   },
 ): void {
   ctx.clearRect(0, 0, width, height);
   if (width < 2 || height < 2) return;
 
-  const coverage = resolveMaxFieldCoverage({
-    phase: input.phase,
-    progress: input.progress,
-  });
   const cols = Math.max(1, Math.floor((width - GAP) / STRIDE));
-  const gridH = ROWS * STRIDE - GAP;
-  const originY = Math.round((height - gridH) / 2);
+  const originY = Math.round((height - (ROWS * STRIDE - GAP)) / 2);
   const thumbCol = Math.max(0, Math.min(cols - 1, Math.round(input.thumbRatio * (cols - 1))));
-  // Soft shimmer only — cell occupancy stays fixed.
+  if (input.phase === 'preview') {
+    paintPreview(ctx, originY, thumbCol, input.colors);
+    return;
+  }
+
+  const coverage = resolveMaxFieldCoverage(input);
+  if (coverage <= 0) return;
   const breath = input.reduced || input.phase !== 'settled'
     ? 0
-    : Math.sin(input.timeMs / 1200) * 0.05;
+    : Math.sin(input.timeMs / 1300) * 0.035;
 
-  const colorAlong = (along: number, sparkle: number): string => {
-    const base = along < 0.5
-      ? mixCssColor(input.colorFrom, input.colorMid, along / 0.5)
-      : mixCssColor(input.colorMid, input.colorTo, (along - 0.5) / 0.5);
-    if (sparkle > 0.9) return input.colorSpark;
-    if (sparkle > 0.78) return mixCssColor(base, input.colorSpark, 0.35);
-    return base;
-  };
-
-  // Frame 1 language: tight irregular fragments just left of the thumb.
-  if (input.phase === 'preview') {
-    for (let col = 0; col < cols; col += 1) {
-      const dist = thumbCol - col;
-      if (dist < 0 || dist > 6) continue;
-      const falloff = 1 - dist / 6;
-      for (let row = 0; row < ROWS; row += 1) {
-        const n1 = cellNoise(col, row, 3);
-        const n2 = cellNoise(col, row, 5);
-        if (n1 < 0.45 - falloff * 0.15) continue;
-        if (n2 < 0.22) continue;
-        const mid = (ROWS - 1) / 2;
-        const rowSpread = 1 - Math.abs(row - mid) / (mid + 0.5);
-        const alpha = falloff * falloff * (0.22 + rowSpread * 0.38) * (0.4 + n1 * 0.55);
-        const xJitter = (n2 - 0.5) * 1.4;
-        const size = n1 > 0.75 ? CELL : Math.max(2, CELL - 1);
-        ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-        ctx.fillStyle = colorAlong(1 - dist / 6, n1);
-        ctx.fillRect(
-          Math.round(GAP + col * STRIDE + xJitter),
-          originY + row * STRIDE,
-          size,
-          size,
-        );
-      }
-    }
-    ctx.globalAlpha = 1;
-    return;
-  }
-
-  if (coverage <= 0.001 && input.phase !== 'settled') {
-    ctx.globalAlpha = 1;
-    return;
-  }
-
-  /**
-   * Frames 2→3: stochastic fill grows from the thumb leftward.
-   * Birth thresholds + soft age create a dithered dissolve front (not a hard column wipe).
-   */
   for (let col = 0; col < cols; col += 1) {
-    const fromRight = cols - 1 - col;
-    const t = cols <= 1 ? 0 : fromRight / (cols - 1);
-    const along = 1 - t;
-
     for (let row = 0; row < ROWS; row += 1) {
-      const n1 = cellNoise(col, row, 0);
-      const n2 = cellNoise(col, row, 1);
-      const n3 = cellNoise(col, row, 2);
-      const n4 = cellNoise(col, row, 4);
-
-      // Wide noisy birth band → irregular leading edge while growing / retreating.
-      const birth = t * 0.62 + n1 * 0.42;
-      if (birth > coverage) continue;
-
-      // Neighborhood voids keep the cloud from reading as a uniform lattice.
-      if (n4 < 0.12 + t * 0.28) continue;
-
-      // Right denser; left stays porous so the dark-gray rail remains readable.
-      const keepChance = (input.phase === 'settled' ? 0.28 : 0.2) + along * 0.52 + n2 * 0.14;
-      if (n3 > keepChance) continue;
-
-      const mid = (ROWS - 1) / 2;
-      const rowWeight = 0.55 + (1 - Math.abs(row - mid) / (mid + 0.5)) * 0.45;
-      // Soft dissolve at the growth front (just-born cells are faint / sparse).
-      const age = Math.min(1, (coverage - birth) / 0.22);
-      const edgeSoft = age * age;
-      let alpha = edgeSoft * (0.18 + along * 0.62) * rowWeight * (0.32 + n1 * 0.68);
-      if (input.phase === 'settled') {
-        alpha = Math.min(0.82, alpha + breath * (0.5 + n2 * 0.5));
-      }
-
-      const xJitter = (row % 2 === 0 ? 0 : 1) + (n2 - 0.5) * 1.6;
-      const size = n3 > 0.82 ? CELL + 1 : n3 < 0.25 ? Math.max(2, CELL - 1) : CELL;
-      const x = Math.round(GAP + col * STRIDE + xJitter);
-      const y = originY + row * STRIDE;
-      if (alpha <= 0.02) continue;
-      ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-      ctx.fillStyle = colorAlong(along * (0.65 + n2 * 0.35), n1);
-      ctx.fillRect(x, y, size, size);
+      const sample = resolveMaxFieldCell({ col, row, cols, rows: ROWS, coverage });
+      if (!sample.visible || sample.alpha <= 0.02) continue;
+      const shimmerWeight = 0.45 + maxFieldNoise(col, row, 6) * 0.55;
+      ctx.globalAlpha = clampMaxProgress(sample.alpha + breath * shimmerWeight);
+      ctx.fillStyle = resolveCellColor(
+        input.colors,
+        sample.tone,
+        maxFieldNoise(col, row, 0),
+      );
+      ctx.fillRect(
+        GAP + col * STRIDE,
+        originY + row * STRIDE,
+        CELL,
+        CELL,
+      );
     }
   }
   ctx.globalAlpha = 1;
-}
-
-function phaseNeedsLoop(phase: MaxVisualPhase): boolean {
-  return phase === 'preview'
-    || phase === 'evolve'
-    || phase === 'settled'
-    || phase === 'retreat';
 }
 
 export const EffortMaxField: React.FC<{
@@ -178,116 +139,81 @@ export const EffortMaxField: React.FC<{
   const phaseRef = useRef(phase);
   const progressRef = useRef(progress);
   const thumbRef = useRef(thumbRatio);
-  const phaseClockRef = useRef<{ phase: MaxVisualPhase; startedAt: number }>({
-    phase: 'idle',
-    startedAt: 0,
-  });
-  const colorsRef = useRef<{
-    from: string;
-    mid: string;
-    to: string;
-    spark: string;
-  } | null>(null);
+  const paintRef = useRef<(timeMs: number) => void>(() => undefined);
+  const fieldActive = phase !== 'idle';
 
   phaseRef.current = phase;
   progressRef.current = progress;
   thumbRef.current = thumbRatio;
 
-  const fieldActive = phase !== 'idle';
-
   useEffect(() => {
     if (!fieldActive) return undefined;
-
     const canvas = canvasRef.current;
     const layer = layerRef.current;
-    if (!canvas || !layer) return undefined;
+    const ctx = canvas?.getContext('2d', { alpha: true });
+    if (!canvas || !layer || !ctx) return undefined;
 
+    let colors = readFieldColors(layer);
     const reduced = prefersReducedMotion();
-    const ctx = canvas.getContext('2d', { alpha: true });
-    if (!ctx) return undefined;
-
-    colorsRef.current = {
-      from: readCssColor(layer, '--token-effort-max-from', '#6e6280'),
-      mid: readCssColor(layer, '--token-effort-max-mid', '#9b8bb8'),
-      to: readCssColor(layer, '--token-effort-max-to', '#c9bddc'),
-      spark: readCssColor(layer, '--token-effort-max-sparkle', 'rgba(236,230,245,0.9)'),
-    };
-
-    let frame = 0;
-    let running = true;
-
-    const syncSize = () => {
-      const w = Math.max(1, Math.floor(layer.clientWidth));
-      const h = Math.max(1, Math.floor(layer.clientHeight));
+    const paint = (timeMs: number) => {
+      const width = Math.max(1, Math.floor(layer.clientWidth));
+      const height = Math.max(1, Math.floor(layer.clientHeight));
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      const bw = Math.floor(w * dpr);
-      const bh = Math.floor(h * dpr);
-      if (canvas.width !== bw || canvas.height !== bh) {
-        canvas.width = bw;
-        canvas.height = bh;
-        canvas.style.width = `${w}px`;
-        canvas.style.height = `${h}px`;
+      const bitmapWidth = Math.floor(width * dpr);
+      const bitmapHeight = Math.floor(height * dpr);
+      if (canvas.width !== bitmapWidth || canvas.height !== bitmapHeight) {
+        canvas.width = bitmapWidth;
+        canvas.height = bitmapHeight;
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
-      return { w, h };
-    };
-
-    const resolvePaintProgress = (now: number, currentPhase: MaxVisualPhase, propProgress: number) => {
-      if (phaseClockRef.current.phase !== currentPhase) {
-        phaseClockRef.current = { phase: currentPhase, startedAt: now };
-      }
-      if (currentPhase === 'evolve') {
-        const local = Math.min(1, (now - phaseClockRef.current.startedAt) / MAX_VISUAL_EVOLVE_MS);
-        return Math.max(propProgress, local);
-      }
-      if (currentPhase === 'retreat') {
-        const local = Math.min(1, (now - phaseClockRef.current.startedAt) / MAX_VISUAL_RETREAT_MS);
-        return Math.max(propProgress, local);
-      }
-      return propProgress;
-    };
-
-    const draw = (timeMs: number) => {
-      const colors = colorsRef.current!;
-      const { w, h } = syncSize();
-      const currentPhase = phaseRef.current;
-      paintField(ctx, w, h, {
-        phase: currentPhase,
-        progress: resolvePaintProgress(timeMs, currentPhase, progressRef.current),
+      paintField(ctx, width, height, {
+        phase: phaseRef.current,
+        progress: progressRef.current,
         thumbRatio: thumbRef.current,
         timeMs,
-        colorFrom: colors.from,
-        colorMid: colors.mid,
-        colorTo: colors.to,
-        colorSpark: colors.spark,
+        colors,
         reduced,
       });
     };
+    paintRef.current = paint;
 
-    if (reduced) {
-      draw(0);
-      return undefined;
-    }
+    const resizeObserver = new ResizeObserver(() => paint(performance.now()));
+    resizeObserver.observe(layer);
+    const themeObserver = new MutationObserver(() => {
+      colors = readFieldColors(layer);
+      paint(performance.now());
+    });
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'data-theme', 'data-resolved-theme'],
+    });
+    paint(performance.now());
 
-    const tick = (now: number) => {
-      if (!running) return;
-      draw(now);
-      if (phaseNeedsLoop(phaseRef.current)) {
-        frame = window.requestAnimationFrame(tick);
-      }
-    };
-
-    frame = window.requestAnimationFrame(tick);
     return () => {
-      running = false;
-      window.cancelAnimationFrame(frame);
+      resizeObserver.disconnect();
+      themeObserver.disconnect();
+      paintRef.current = () => undefined;
     };
   }, [fieldActive]);
 
-  if (phase === 'idle') {
-    return null;
-  }
+  useEffect(() => {
+    if (fieldActive) paintRef.current(performance.now());
+  }, [fieldActive, phase, progress, thumbRatio]);
 
+  useEffect(() => {
+    if (phase !== 'settled' || prefersReducedMotion()) return undefined;
+    let frame = 0;
+    const tick = (now: number) => {
+      paintRef.current(now);
+      frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [phase]);
+
+  if (!fieldActive) return null;
   return (
     <span ref={layerRef} className="composer-effort-slider-field" aria-hidden="true">
       <canvas ref={canvasRef} className="composer-effort-slider-field-canvas" />
