@@ -38,12 +38,7 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
     >
       <div className="settings-model-row-main">
         <span className="settings-model-row-check" title={statusTitle}>{statusLabel}</span>
-        <span className="settings-model-row-label">{model.label}</span>
-        {isUnavailable ? (
-          <span className="settings-model-row-meta">
-            {model.availabilityReason || t('settings.providers.modelUnavailableReason')}
-          </span>
-        ) : null}
+        <span className="settings-model-row-label" title={model.label}>{model.label}</span>
         <span className="settings-model-capability-badge" data-testid={`settings-provider-model-capability-badge-${model.id}`}>
           {provider.catalogOwnership === 'app-managed'
             ? t('settings.providers.capability.appManagedBadge')

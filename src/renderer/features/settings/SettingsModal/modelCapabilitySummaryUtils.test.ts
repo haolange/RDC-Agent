@@ -50,7 +50,7 @@ describe('modelCapabilitySummaryUtils', () => {
     const kimiChips = buildCapabilityChips(kimiEntry, t);
     expect(kimiChips).toContainEqual(expect.objectContaining({ label: 'Context', value: '262.1k' }));
     expect(kimiChips).toContainEqual(expect.objectContaining({ label: 'Reasoning', value: 'Off, On' }));
-    expect(kimiChips).toContainEqual(expect.objectContaining({ label: 'Fast', value: 'None' }));
+    expect(kimiChips).toContainEqual(expect.objectContaining({ label: 'Fast', value: 'kimi-for-coding-highspeed' }));
     expect(kimiChips).toContainEqual(expect.objectContaining({ label: 'Tools', value: 'Supported' }));
 
     const minimaxEntry = findManagedCapabilityEntry('minimax-cn', 'app-managed', 'MiniMax-M2.7');

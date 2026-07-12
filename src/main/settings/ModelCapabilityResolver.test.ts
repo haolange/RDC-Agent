@@ -22,7 +22,7 @@ function makeProvider(provider: LlmProviderEntry): LlmProviderEntry {
 
 function makeSettings(provider: LlmProviderEntry): AppSettings {
   return {
-    appearance: { theme: 'dark', language: 'zh-CN', fontScale: 'medium' },
+    appearance: { theme: 'dark', language: 'zh-CN', fontScale: 'medium', composerMarkdown: false, usePointerCursors: false },
     layout: {
       leftSidebar: { collapsed: false, width: 280, expandedWidth: 280 },
       rightPanel: { collapsed: false, width: 360, expandedWidth: 360 },
@@ -163,6 +163,7 @@ describe('resolveModelCapability', () => {
     const grok45 = resolveModelCapability('xai', 'grok-4.5', makeSettings(grokProvider));
     expect(grok45.reasoningControl).toMatchObject({
       kind: 'levels',
+      supportsOff: false,
       levels: ['low', 'medium', 'high'],
       defaultSelection: 'high',
     });
@@ -187,11 +188,14 @@ describe('resolveModelCapability', () => {
     });
   });
 
-  it('keeps Kimi Coding Plan as an official Off/On model without fast variant', () => {
+  it('exposes Kimi Coding Plan HighSpeed via fastVariantModelId when enabled', () => {
     const provider = makeProvider(createBuiltinProviderEntry('kimi-coding-plan'));
     const capability = resolveModelCapability('kimi-coding-plan', 'kimi-for-coding', makeSettings(provider));
 
-    expect(provider.models.map((model) => model.id)).toEqual(['kimi-for-coding']);
+    expect(provider.models.map((model) => model.id)).toEqual([
+      'kimi-for-coding',
+      'kimi-for-coding-highspeed',
+    ]);
     expect(capability.reasoningControl).toMatchObject({
       kind: 'toggle',
       supportsOff: true,
@@ -199,11 +203,16 @@ describe('resolveModelCapability', () => {
     });
     expect(capability.maxContextAvailable).toBe(false);
     expect(capability.maxContextWindowTokens).toBeNull();
-    expect(capability.fastVariantModelId).toBeNull();
-    expect(capability.fastModelAvailable).toBe(false);
+    expect(capability.fastVariantModelId).toBe('kimi-for-coding-highspeed');
+    expect(capability.fastModelAvailable).toBe(true);
     expect(capability.fixedTemperature).toBe(1);
     expect(resolveEffectiveTemperature(capability, 0.35)).toBe(1);
     expect(resolveEffectiveTemperature(capability, 0.7)).toBe(1);
+    expect(resolveEffectiveModelId(capability, {
+      reasoningLevel: 'on',
+      maxContextMode: false,
+      fastModel: true,
+    })).toBe('kimi-for-coding-highspeed');
   });
 
   it('exposes fast variant only when the catalog variant is enabled', () => {

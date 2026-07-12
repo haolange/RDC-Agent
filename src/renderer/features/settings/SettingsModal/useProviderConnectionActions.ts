@@ -25,12 +25,12 @@ export const useProviderConnectionActions = (
 
   const handleTestProviderDraft = async () => {
     if (!connectionDraft) return;
-    updateConnectionDraft({ busy: 'testing', error: '', models: [] });
+    updateConnectionDraft({ busy: 'testing', error: '' });
     try {
       if (connectionProvider?.authMode === 'account') {
         const result = await window.electronAPI.llm.refreshProviderModels(connectionDraft.providerId);
         if (!result.success) {
-          updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerTestFailed'), models: [] });
+          updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerTestFailed') });
           return;
         }
         updateConnectionDraft({
@@ -52,7 +52,7 @@ export const useProviderConnectionActions = (
       } as Parameters<typeof window.electronAPI.llm.testProviderDraft>[0] & { protocol?: typeof connectionDraft.protocol };
       const result = await window.electronAPI.llm.testProviderDraft(request);
       if (!result.success) {
-        updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerTestFailed'), models: [] });
+        updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerTestFailed') });
         return;
       }
       updateConnectionDraft({
@@ -67,7 +67,6 @@ export const useProviderConnectionActions = (
       updateConnectionDraft({
         busy: 'idle',
         error: getErrorMessage(error, t('settings.providerTestFailed')),
-        models: [],
       });
     }
   };

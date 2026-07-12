@@ -52,7 +52,7 @@ OpenAI Chat Completions（`OpenAICompatibleChatCompletions`）与 OpenAI Respons
 - `reasoningControl.levels`: 官方具名档位子集，canonical naming 为 `minimal | low | medium | high | extra | max | ultra`
 - `reasoningControl.defaultSelection` / `lockedSelection?`
 - `reasoningControl.wireProfile`: provider request body 映射真相源
-- `fastVariantModelId`
+- `fastVariantModelId`：当厂商用**独立 model id** 表达 Fast/HighSpeed 时填写（例如 `kimi-for-coding` → `kimi-for-coding-highspeed`，`kimi-k2.7-code` → `kimi-k2.7-code-highspeed`，`claude-opus-4-8` → `claude-opus-4-8-fast`）。变体必须同时作为 catalog 行存在；Composer `turnControls.fastModel` 仅在该变体已启用时可用，并由 `resolveEffectiveModelId` 改写请求 model id。同一 model 下仅靠请求参数切换的 Fast，只有官方文档给出可映射 wire 时才进入 profile；否则 `fastModelAvailable=false`，不得发明假 Fast 档。
 - `toolCalling`
 - `visionInput`
 - `structuredOutput`
@@ -83,7 +83,9 @@ Settings 与 Composer 必须使用同一套 capability-driven reasoning 语义�
 - 低成本实测只用于验证 endpoint/model 可用性，不把 runtime 探测结果当作永久 capability 来源；
 - 更新模型列表时同步 `llm.ts` 的 provider ownership 派生、相关测试和 Settings 只读展示。
 - 2026-07-11：OpenAI GPT-5.6 家族（`gpt-5.6-sol` / `terra` / `luna`，alias `gpt-5.6`→sol）在 Responses 路由暴露产品档 `extra→xhigh` 与 `max→max`；xAI 新增 `grok-4.5`（500k context，low/medium/high，默认 high）。Claude Fable 5 既有 `max` 档保持不变。OpenAI multi-agent `ultra` 与 `reasoning.mode: pro` 本轮不进入 Composer 滑杆。
-
+- 2026-07-12：全量对照官方文档修订。DeepSeek 产品档固定 `Off|High|Max`（thinking off + effort high/max）。Kimi Coding Plan 增加 `kimi-for-coding-highspeed` 与 `fastVariantModelId`。`grok-4.5` `supportsOff=false`。Groq/Mistral 模型列表对齐现行 production/featured。Bailian Coding Plan 的 `qwen3-coder-*` 改为 reasoning `none`。
+- `chatgpt-account` 的模型列表对齐 Codex ChatGPT-sign-in（`https://developers.openai.com/codex/models`）：`gpt-5.6-sol/terra/luna` + `gpt-5.5` / `gpt-5.4` / `gpt-5.4-mini`。不含网页 ChatGPT Instant/Thinking/Pro 产品 ID，也不与 API-key `openai` catalog 混用；ChatGPT sign-in 已弃用的 `gpt-5.2` / `gpt-5.3-codex` 不收录。
+- `volcengine-coding-plan` 对齐方舟 Coding Plan 网关模型面与 docs `https://www.volcengine.com/docs/82379/1928261`（非失效的 `1928262`，也非通用 Ark `/api/v3`）：Doubao Seed 2.0（code/pro/lite + Fast→lite）、`doubao-seed-code`、MiniMax m2.7/m2.5、`kimi-k2.7-code`(+highspeed Fast)、kimi-k2.6/k2.5、**`glm-5.2`**（alias `glm-latest`；`glm-5.1` 降为次级保留）、glm-4.7、DeepSeek v4-pro/v4-flash/v3.2（Off|High|Max）。Anthropic / OpenAI 发现统一走 `GET …/api/coding/v3/models`（Bearer）；merge 认 catalog aliases，并把 `/models` 返回的日期后缀 / vendor 前缀 / mini→lite id 归一到友好 catalog id；仅返回 `ark-code-latest` 等元模型、或归一后与 catalog 零交集时，**鉴权成功则 fallback 为 catalog Available**（chat 接受友好路由 id，避免 Test 成功却全部 Unavailable）。
 Composer compact controls are display-only consumers of resolved capability. They may render labels, values, and short disabled reasons, but must not render provider documentation excerpts, source claims, marketing notes, catalog research notes, or explanatory paragraphs. Long capability rationale belongs in Settings details, catalog source metadata, or this architecture document.
 
 ## Catalog DTO

@@ -143,9 +143,9 @@ export const CHATGPT_ACCOUNT_MODELS = [
   'gpt-5.6-sol',
   'gpt-5.6-terra',
   'gpt-5.6-luna',
-  'gpt-5.5-instant',
-  'gpt-5.5-thinking',
-  'gpt-5.5-pro',
+  'gpt-5.5',
+  'gpt-5.4',
+  'gpt-5.4-mini',
 ];
 export const GITHUB_COPILOT_ACCOUNT_MODELS = [
   'gpt-5.6-sol',
@@ -648,8 +648,16 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
       AnthropicMessages: 'https://ark.cn-beijing.volces.com/api/coding',
       OpenAICompatibleChatCompletions: 'https://ark.cn-beijing.volces.com/api/coding/v3',
     },
-    recommendedModels: ['doubao-seed-2.1-pro', 'doubao-seed-2.1-turbo', 'glm-4.6', 'deepseek-v4-pro', 'kimi-k2.5'],
-    docsUrl: 'https://www.volcengine.com/docs/82379/1928262',
+    recommendedModels: [
+      'doubao-seed-2.0-code',
+      'doubao-seed-2.0-pro',
+      'doubao-seed-2.0-lite',
+      'glm-5.2',
+      'kimi-k2.7-code',
+      'deepseek-v4-pro',
+      'minimax-m2.7',
+    ],
+    docsUrl: 'https://www.volcengine.com/docs/82379/1928261',
     capabilities: CAPS_COMPAT_REASONING,
   },
   {

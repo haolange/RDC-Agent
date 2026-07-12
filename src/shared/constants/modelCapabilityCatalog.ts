@@ -21,11 +21,10 @@ export interface ManagedModelCatalogEntry {
   source: ModelCapabilitySource;
 }
 
-const CATALOG_UPDATED_AT = '2026-07-11';
+const CATALOG_UPDATED_AT = '2026-07-12';
 
 const OPENAI_LEVELS: NamedReasoningLevel[] = ['low', 'medium', 'high', 'extra'];
 const OPENAI_56_LEVELS: NamedReasoningLevel[] = ['low', 'medium', 'high', 'extra', 'max'];
-const OPENAI_PRO_LEVELS: NamedReasoningLevel[] = ['medium', 'high', 'extra'];
 const ANTHROPIC_5_LEVELS: NamedReasoningLevel[] = ['low', 'medium', 'high', 'extra', 'max'];
 const GEMINI_35_LEVELS: NamedReasoningLevel[] = ['minimal', 'low', 'medium', 'high'];
 const GEMINI_31_LEVELS: NamedReasoningLevel[] = ['low', 'medium', 'high'];
@@ -167,6 +166,20 @@ const VOLCENGINE_TOGGLE_WIRE: ReasoningWireProfile = {
   offMode: 'thinking-disabled',
 };
 
+/** Doubao Seed 2.0 on Coding Plan: thinking + reasoning_effort minimal|low|medium|high. */
+const VOLCENGINE_DOUBAO_LEVELS_WIRE: ReasoningWireProfile = {
+  kind: 'openai-compatible',
+  on: 'medium',
+  levels: {
+    minimal: 'minimal',
+    low: 'low',
+    medium: 'medium',
+    high: 'high',
+  },
+  onMode: 'thinking-enabled',
+  offMode: 'thinking-disabled',
+};
+
 const NONE_WIRE: ReasoningWireProfile = { kind: 'none' };
 
 const OPENAI_API_SOURCE: ModelCapabilitySource = {
@@ -185,10 +198,11 @@ const CHATGPT_ACCOUNT_SOURCE: ModelCapabilitySource = {
   kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    'https://help.openai.com/en/articles/12003714-chatgpt-business-models-limits',
-    'https://developers.openai.com/api/docs/guides/latest-model',
+    'https://developers.openai.com/codex/models',
     'https://developers.openai.com/api/docs/models/gpt-5.6-sol',
+    'https://developers.openai.com/api/docs/guides/latest-model',
   ],
+  note: 'chatgpt-account uses Codex ChatGPT-sign-in (backend-api/codex). Model IDs follow the Codex surface (Sol/Terra/Luna + gpt-5.5/5.4), not the web ChatGPT Instant/Thinking/Pro product picker and not the full API-key openai catalog. Deprecated Codex ChatGPT-sign-in IDs (gpt-5.2, gpt-5.3-codex) are omitted.',
 };
 
 const ANTHROPIC_SOURCE: ModelCapabilitySource = {
@@ -207,7 +221,6 @@ const GEMINI_SOURCE: ModelCapabilitySource = {
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
     'https://ai.google.dev/gemini-api/docs/thinking',
-    'https://ai.google.dev/gemini-api/docs/generate-content/thinking',
     'https://ai.google.dev/gemini-api/docs/function-calling',
     'https://ai.google.dev/gemini-api/docs/structured-output',
   ],
@@ -222,6 +235,7 @@ const XAI_SOURCE: ModelCapabilitySource = {
     'https://docs.x.ai/developers/models/grok-4.3',
     'https://docs.x.ai/developers/models/grok-build-0.1',
   ],
+  note: 'grok-4.5 reasoning_effort is low|medium|high (default high) and cannot be disabled. grok-code-fast-1 redirects to grok-build-0.1.',
 };
 
 const COPILOT_SOURCE: ModelCapabilitySource = {
@@ -264,7 +278,7 @@ const VERTEX_SOURCE: ModelCapabilitySource = {
 const DEEPSEEK_SOURCE: ModelCapabilitySource = {
   kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
-  note: 'DeepSeek thinking effort officially exposes only high and max (not low/medium/xhigh).',
+  note: 'DeepSeek maps product Off to thinking disabled; when thinking is on, official reasoning_effort is only high|max (low/medium→high, xhigh→max for compatibility). Composer/Settings therefore expose Off|High|Max only.',
   urls: [
     'https://api-docs.deepseek.com/quick_start/pricing',
     'https://api-docs.deepseek.com/guides/thinking_mode',
@@ -281,23 +295,26 @@ const QWEN_SOURCE: ModelCapabilitySource = {
     'https://help.aliyun.com/en/model-studio/compatibility-with-openai-responses-api',
     'https://help.aliyun.com/en/model-studio/coding-plan-faq',
   ],
+  note: 'Bailian Coding Plan FAQ: qwen3-coder-plus / qwen3-coder-next do not support thinking mode, so those rows use reasoning none.',
 };
 
 const VOLCENGINE_SOURCE: ModelCapabilitySource = {
-  kind: 'conservative',
+  kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
+    'https://www.volcengine.com/docs/82379/1928261',
+    'https://www.volcengine.com/docs/82379/1925115',
     'https://www.volcengine.com/docs/82379/1519548',
     'https://www.volcengine.com/docs/82379/1956279',
   ],
-  note: 'Volcengine public docs confirm deep-thinking can be enabled and disabled, but the exact per-model effort ladder is not stable across entrypoints. Current rows fail closed to toggle unless the model family is explicit elsewhere.',
+  note: 'Volcengine Ark Coding Plan uses ark.cn-beijing.volces.com/api/coding(+ /v3), not the general Ark /api/v3 pay-as-you-go gateway. Doubao Seed 2.0 exposes thinking enable/disable plus reasoning_effort minimal|low|medium|high. Fast maps to the independent doubao-seed-2.0-lite model id.',
 };
 
 const GLM_SOURCE: ModelCapabilitySource = {
   kind: 'conservative',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    'https://open.bigmodel.cn/dev/api',
+    'https://docs.bigmodel.cn/cn/guide/develop/openai/introduction',
     'https://help.aliyun.com/en/model-studio/glm-zhipu',
     'https://help.aliyun.com/zh/model-studio/glm',
   ],
@@ -308,8 +325,8 @@ const MINIMAX_SOURCE: ModelCapabilitySource = {
   kind: 'official',
   updatedAt: CATALOG_UPDATED_AT,
   urls: [
-    'https://platform.minimaxi.com/docs/api-reference/text-openai-api',
-    'https://platform.minimaxi.com/docs/api-reference/text-anthropic-api',
+    'https://platform.minimax.io/docs/api-reference/text-openai-api',
+    'https://platform.minimax.io/docs/api-reference/text-anthropic-api',
   ],
 };
 
@@ -341,7 +358,7 @@ const KIMI_CODING_SOURCE: ModelCapabilitySource = {
     'https://www.kimi.com/code/docs/en/kimi-code/whats-new.html',
     'https://www.kimi.com/code/docs/en/kimi-code-cli/configuration/config-files.html',
   ],
-  note: 'Kimi Coding Plan only exposes kimi-for-coding. Thinking mode is a binary product switch; the coding model upgrade only takes effect when it is on.',
+  note: 'Kimi Coding Plan exposes Standard kimi-for-coding and HighSpeed kimi-for-coding-highspeed (same ability; HighSpeed needs Allegretto+). Fast mode switches via fastVariantModelId. Thinking remains a binary product switch; the coding-model upgrade only takes effect when thinking is on.',
 };
 
 const GROQ_SOURCE: ModelCapabilitySource = {
@@ -533,12 +550,6 @@ const openAiLevelsDefaultOff = levelsReasoningControl(OPENAI_LEVELS, {
   wireProfile: OPENAI_RESPONSES_WIRE,
 });
 
-const openAiProLevelsDefaultHigh = levelsReasoningControl(OPENAI_PRO_LEVELS, {
-  supportsOff: false,
-  defaultSelection: 'high',
-  wireProfile: OPENAI_RESPONSES_WIRE,
-});
-
 const openAiCompatibleLevelsDefaultMedium = levelsReasoningControl(OPENAI_LEVELS, {
   supportsOff: true,
   defaultSelection: 'medium',
@@ -588,7 +599,7 @@ const xaiLevels = levelsReasoningControl(XAI_LEVELS, {
 });
 
 const xaiLevelsDefaultHigh = levelsReasoningControl(XAI_LEVELS, {
-  supportsOff: true,
+  supportsOff: false,
   defaultSelection: 'high',
   wireProfile: OPENAI_COMPATIBLE_WIRE,
 });
@@ -611,6 +622,11 @@ const anthropicToggleDefaultOn = toggleReasoningControl('on', ANTHROPIC_TOGGLE_W
 const kimiCodingPlanToggleDefaultOn = toggleReasoningControl('on', KIMI_CODING_PLAN_WIRE);
 const anthropicAlwaysOnToggle = alwaysOnReasoningControl('on', ANTHROPIC_ALWAYS_ON_TOGGLE_WIRE);
 const volcengineToggleDefaultOn = toggleReasoningControl('on', VOLCENGINE_TOGGLE_WIRE);
+const doubaoSeed20LevelsDefaultMedium = levelsReasoningControl(QWEN_LEVELS, {
+  supportsOff: true,
+  defaultSelection: 'medium',
+  wireProfile: VOLCENGINE_DOUBAO_LEVELS_WIRE,
+});
 const xaiToggleDefaultOn = toggleReasoningControl('on', OPENAI_COMPATIBLE_WIRE);
 
 const gpt56Api = multimodal(1_050_000, openAi56LevelsDefaultMedium);
@@ -627,9 +643,9 @@ const chatGptAccountModels = [
   }),
   model('gpt-5.6-terra', gpt56Api, CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.6 Terra' }),
   model('gpt-5.6-luna', gpt56Api, CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.6 Luna' }),
-  model('gpt-5.5-instant', { ...multimodal(128_000), fastVariantModelId: 'gpt-5.5-instant' }, CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.5 Instant' }),
-  model('gpt-5.5-thinking', multimodal(128_000, openAiLevelsDefaultMedium), CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.5 Thinking' }),
-  model('gpt-5.5-pro', multimodal(272_000, openAiProLevelsDefaultHigh), CHATGPT_ACCOUNT_SOURCE, { label: 'GPT-5.5 Pro' }),
+  model('gpt-5.5', gpt55Api, CHATGPT_ACCOUNT_SOURCE),
+  model('gpt-5.4', gpt54Api, CHATGPT_ACCOUNT_SOURCE),
+  model('gpt-5.4-mini', gptMiniApi, CHATGPT_ACCOUNT_SOURCE),
 ];
 
 const openAiApiModels = [
@@ -672,7 +688,8 @@ const grokModels = [
   }),
   model('grok-4.3', multimodal(1_000_000, xaiLevels), XAI_SOURCE),
   model('grok-build-0.1', textOnly(256_000, xaiToggleDefaultOn), XAI_SOURCE),
-  model('grok-code-fast-1', textOnly(256_000), XAI_SOURCE),
+  // Official docs redirect grok-code-fast-1 → grok-build-0.1; keep the same toggle profile.
+  model('grok-code-fast-1', textOnly(256_000, xaiToggleDefaultOn), XAI_SOURCE),
 ];
 
 const copilotModels = [
@@ -707,8 +724,9 @@ const qwenModels = [
 ];
 
 const qwenCodingPlanModels = [
-  model('qwen3-coder-plus', textOnly(131_072, anthropicToggleDefaultOn), QWEN_SOURCE),
-  model('qwen3-coder-next', textOnly(131_072, anthropicToggleDefaultOn), QWEN_SOURCE),
+  // Bailian Coding Plan FAQ: qwen3-coder-* do not support thinking mode.
+  model('qwen3-coder-plus', textOnly(131_072), QWEN_SOURCE),
+  model('qwen3-coder-next', textOnly(131_072), QWEN_SOURCE),
   model('qwen3.6-plus', textOnly(131_072, anthropicToggleDefaultOn), QWEN_SOURCE),
 ];
 
@@ -735,6 +753,11 @@ const kimiCodingPlanModels = [
   model('kimi-for-coding', {
     ...textOnly(262_144, kimiCodingPlanToggleDefaultOn),
     fixedTemperature: 1,
+    fastVariantModelId: 'kimi-for-coding-highspeed',
+  }, KIMI_CODING_SOURCE),
+  model('kimi-for-coding-highspeed', {
+    ...textOnly(262_144, kimiCodingPlanToggleDefaultOn),
+    fixedTemperature: 1,
   }, KIMI_CODING_SOURCE),
 ];
 
@@ -759,17 +782,20 @@ const doubaoModels = [
 ];
 
 const groqModels = [
-  model('moonshotai/kimi-k2-instruct-0905', textOnly(262_144), GROQ_SOURCE),
-  model('meta-llama/llama-4-maverick-17b-128e-instruct', {
+  model('llama-3.3-70b-versatile', textOnly(131_072), GROQ_SOURCE),
+  model('openai/gpt-oss-120b', textOnly(131_072), GROQ_SOURCE),
+  model('meta-llama/llama-4-scout-17b-16e-instruct', {
     ...textOnly(131_072),
     visionInput: true,
   }, GROQ_SOURCE),
-  model('openai/gpt-oss-120b', textOnly(131_072), GROQ_SOURCE),
-  model('llama-3.3-70b-versatile', textOnly(131_072), GROQ_SOURCE),
+  model('qwen/qwen3-32b', textOnly(131_072), GROQ_SOURCE),
 ];
 
 const mistralModels = [
-  model('mistral-small-3.2-25-06', multimodal(131_072), MISTRAL_SOURCE),
+  model('mistral-small-2603', multimodal(131_072), MISTRAL_SOURCE, {
+    label: 'Mistral Small 4',
+    aliases: ['mistral-small-latest'],
+  }),
   model('mistral-large-latest', multimodal(131_072), MISTRAL_SOURCE),
   model('codestral-latest', textOnly(262_144), MISTRAL_SOURCE),
 ];
@@ -878,11 +904,41 @@ export const MANAGED_PROVIDER_MODEL_CATALOG: Partial<Record<BuiltinLlmProviderId
     model('glm-4.7', textOnly(131_072, anthropicToggleDefaultOn), GLM_SOURCE),
   ],
   'volcengine-coding-plan': [
-    model('doubao-seed-2.1-pro', textOnly(131_072, anthropicToggleDefaultOn), VOLCENGINE_SOURCE),
-    model('doubao-seed-2.1-turbo', textOnly(131_072, anthropicToggleDefaultOn), VOLCENGINE_SOURCE),
-    model('glm-4.6', textOnly(131_072, anthropicToggleDefaultOn), GLM_SOURCE),
-    model('deepseek-v4-pro', textOnly(1_000_000, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE),
+    model('doubao-seed-2.0-code', {
+      ...textOnly(131_072, doubaoSeed20LevelsDefaultMedium),
+      fastVariantModelId: 'doubao-seed-2.0-lite',
+    }, VOLCENGINE_SOURCE),
+    model('doubao-seed-2.0-pro', {
+      ...textOnly(131_072, doubaoSeed20LevelsDefaultMedium),
+      fastVariantModelId: 'doubao-seed-2.0-lite',
+    }, VOLCENGINE_SOURCE),
+    model('doubao-seed-2.0-lite', textOnly(131_072, doubaoSeed20LevelsDefaultMedium), VOLCENGINE_SOURCE, {
+      aliases: ['doubao-seed-2.0-mini', 'doubao-seed-2-0-mini'],
+    }),
+    model('doubao-seed-code', textOnly(131_072, doubaoSeed20LevelsDefaultMedium), VOLCENGINE_SOURCE, {
+      aliases: ['doubao-seed-code-preview'],
+    }),
+    model('minimax-m2.7', textOnly(204_800, anthropicAlwaysOnToggle), MINIMAX_SOURCE, {
+      aliases: ['MiniMax-M2.7'],
+    }),
+    model('minimax-m2.5', textOnly(204_800, anthropicAlwaysOnToggle), MINIMAX_SOURCE, {
+      aliases: ['MiniMax-M2.5'],
+    }),
+    model('kimi-k2.7-code', {
+      ...textOnly(262_144, anthropicToggleDefaultOn),
+      fastVariantModelId: 'kimi-k2.7-code-highspeed',
+    }, KIMI_SOURCE),
+    model('kimi-k2.7-code-highspeed', textOnly(262_144, anthropicToggleDefaultOn), KIMI_SOURCE),
+    model('kimi-k2.6', textOnly(262_144, anthropicToggleDefaultOn), KIMI_SOURCE),
     model('kimi-k2.5', textOnly(262_144, anthropicToggleDefaultOn), KIMI_SOURCE),
+    model('glm-5.2', textOnly(131_072, anthropicToggleDefaultOn), GLM_SOURCE, {
+      aliases: ['glm-latest'],
+    }),
+    model('glm-5.1', textOnly(131_072, anthropicToggleDefaultOn), GLM_SOURCE),
+    model('glm-4.7', textOnly(131_072, anthropicToggleDefaultOn), GLM_SOURCE),
+    model('deepseek-v4-pro', textOnly(1_000_000, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE),
+    model('deepseek-v4-flash', textOnly(1_000_000, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE),
+    model('deepseek-v3.2', textOnly(128_000, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE),
   ],
   'glm-cn-coding-plan': glmAnthropicModels,
   'glm-global-coding-plan': glmAnthropicModels,
