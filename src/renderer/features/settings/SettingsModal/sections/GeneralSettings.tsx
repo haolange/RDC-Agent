@@ -1,6 +1,7 @@
 import React from 'react';
 import type { AppSettings, AppTheme, FontScale } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { Switch } from '../../../../ui/Switch';
 import { PersonalizationSettings } from './PersonalizationSettings';
 import { ProfileSettings } from './ProfileSettings';
 
@@ -15,6 +16,8 @@ interface GeneralSettingsProps {
   onThemeChange: (theme: AppTheme) => void | Promise<void>;
   onLanguageChange: (language: AppSettings['appearance']['language']) => void | Promise<void>;
   onFontScaleChange: (fontScale: FontScale) => void | Promise<void>;
+  onComposerMarkdownChange: (enabled: boolean) => void | Promise<void>;
+  onUsePointerCursorsChange: (enabled: boolean) => void | Promise<void>;
   globalInstructionsDraft: string;
   onGlobalInstructionsDraftChange: (value: string) => void;
   onSavePersonalization: () => void | Promise<void>;
@@ -30,6 +33,8 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
   onThemeChange,
   onLanguageChange,
   onFontScaleChange,
+  onComposerMarkdownChange,
+  onUsePointerCursorsChange,
   globalInstructionsDraft,
   onGlobalInstructionsDraftChange,
   onSavePersonalization,
@@ -109,6 +114,32 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
                       {t(`font.${fontScale}`)}
                     </button>
                   ))}
+                </div>
+              </div>
+
+              <div className="settings-appearance-toggles" role="group" aria-label={t('settings.appearance')}>
+                <div className="settings-preference-row settings-preference-row--switch">
+                  <div className="settings-preference-copy settings-option-block">
+                    <div className="settings-field-label">{t('settings.composerMarkdown')}</div>
+                    <div className="settings-help-text">{t('settings.composerMarkdownHelp')}</div>
+                  </div>
+                  <Switch
+                    checked={settings.appearance.composerMarkdown}
+                    onCheckedChange={(enabled) => void onComposerMarkdownChange(enabled)}
+                    aria-label={t('settings.composerMarkdown')}
+                  />
+                </div>
+
+                <div className="settings-preference-row settings-preference-row--switch">
+                  <div className="settings-preference-copy settings-option-block">
+                    <div className="settings-field-label">{t('settings.usePointerCursors')}</div>
+                    <div className="settings-help-text">{t('settings.usePointerCursorsHelp')}</div>
+                  </div>
+                  <Switch
+                    checked={settings.appearance.usePointerCursors}
+                    onCheckedChange={(enabled) => void onUsePointerCursorsChange(enabled)}
+                    aria-label={t('settings.usePointerCursors')}
+                  />
                 </div>
               </div>
             </div>

@@ -6,3 +6,4 @@ export { DropdownSelect } from './DropdownSelect';
 export { ModeGlyph } from './ModeGlyph';
 export { ProfileAvatar } from './ProfileAvatar';
 export { Spinner, type SpinnerProps } from './Spinner';
+export { Switch, type SwitchProps } from './Switch';

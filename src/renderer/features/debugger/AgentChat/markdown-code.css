@@ -1,7 +1,7 @@
 /* Syntax highlighting tokens mapped to design-system semantic tokens. */
 
 .markdown-body pre {
-  border: 1px solid var(--token-border-muted);
+  border: 0;
 }
 
 .markdown-body pre code.hljs {

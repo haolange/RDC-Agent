@@ -30,6 +30,8 @@ interface AppSettingsState {
   setTheme: (theme: AppTheme) => Promise<void>;
   setLanguage: (language: AppLanguage) => Promise<void>;
   setFontScale: (fontScale: FontScale) => Promise<void>;
+  setComposerMarkdown: (composerMarkdown: boolean) => Promise<void>;
+  setUsePointerCursors: (usePointerCursors: boolean) => Promise<void>;
   updateProfile: (profile: Partial<ProfileSettings>) => Promise<void>;
   saveProvider: (provider: LlmProviderEntry) => Promise<AppSettings>;
   removeProvider: (providerId: string) => Promise<void>;
@@ -60,6 +62,12 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   },
   setFontScale: async (fontScale) => {
     await get().patchSettings({ appearance: { fontScale } });
+  },
+  setComposerMarkdown: async (composerMarkdown) => {
+    await get().patchSettings({ appearance: { composerMarkdown } });
+  },
+  setUsePointerCursors: async (usePointerCursors) => {
+    await get().patchSettings({ appearance: { usePointerCursors } });
   },
   updateProfile: async (profile) => {
     await get().patchSettings({ profile });

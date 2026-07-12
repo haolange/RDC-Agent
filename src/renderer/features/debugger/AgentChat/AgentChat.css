@@ -210,7 +210,7 @@
 .conversation-message-stack {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
@@ -298,9 +298,23 @@
   box-shadow: var(--token-shadow-card), var(--token-elevation-edge);
 }
 
+.conversation-bubble-user .markdown-body {
+  font-size: inherit;
+  line-height: 1.55;
+}
+
+.conversation-bubble-user .markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
+.conversation-bubble-user .markdown-code-block,
+.conversation-bubble-user .markdown-mermaid {
+  margin-bottom: var(--space-2);
+}
+
 /* Assistant final answer reads as full-bleed prose, not a bubble */
 .conversation-bubble-assistant {
-  width: min(100%, 58rem);
+  width: 100%;
   max-width: 100%;
   padding: 0;
   white-space: normal;
@@ -402,6 +416,42 @@
   font-weight: var(--font-semibold);
 }
 
+.markdown-body em {
+  font-style: italic;
+  color: var(--token-text-body);
+}
+
+.markdown-body del {
+  color: var(--token-text-caption);
+  text-decoration: line-through;
+}
+
+.markdown-body-img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 0 var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--token-border-muted);
+}
+
+.markdown-body ul.contains-task-list {
+  list-style: none;
+  padding-left: var(--space-1);
+}
+
+.markdown-body li.task-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.markdown-task-checkbox {
+  margin-top: 0.35em;
+  flex-shrink: 0;
+  accent-color: var(--token-accent-primary);
+}
+
 .markdown-body code {
   padding: 1px var(--space-1);
   border-radius: var(--radius-sm);
@@ -413,13 +463,121 @@
 }
 
 .markdown-body pre {
-  margin: 0 0 var(--space-3);
+  margin: 0;
   padding: var(--space-3);
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  overflow: auto;
+}
+
+.markdown-code-block {
+  margin: 0 0 var(--space-3);
+  overflow: hidden;
+  border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
   background: var(--token-surface-sunken);
-  border: 1px solid color-mix(in srgb, var(--token-border-muted) 50%, transparent);
   box-shadow: inset 0 1px 3px rgb(0 0 0 / 0.16);
+}
+
+.markdown-code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--token-border-muted);
+  background: color-mix(in srgb, var(--token-bg-raised) 55%, transparent);
+}
+
+.markdown-code-block-lang {
+  min-width: 0;
+  color: var(--token-text-caption);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  text-transform: lowercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.markdown-code-block-copy {
+  flex-shrink: 0;
+  min-height: auto;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+}
+
+.markdown-code-block-pre {
+  margin: 0;
+  padding: var(--space-3);
   overflow: auto;
+}
+
+.markdown-code-block-pre code {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--token-text-body);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.markdown-mermaid {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
+  overflow: auto;
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-surface-sunken);
+}
+
+.markdown-mermaid svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.markdown-mermaid-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.markdown-mermaid-error {
+  margin: 0;
+  color: var(--token-status-error);
+  font-size: var(--text-sm);
+}
+
+.markdown-mermaid-loading {
+  margin: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+}
+
+.markdown-mermaid-source {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--token-bg-raised) 60%, transparent);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.markdown-body .katex-display {
+  margin: 0 0 var(--space-3);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.markdown-body .katex {
+  color: var(--token-text-body);
+  font-size: 1.05em;
 }
 
 .markdown-body pre code {
@@ -563,7 +721,7 @@
 /* Work Process transcript presentation - canonical runtime view */
 .work-process {
   position: relative;
-  width: min(100%, 56rem);
+  width: 100%;
   overflow: visible;
   border: 0;
   border-radius: 0;
@@ -575,7 +733,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
-  width: min(100%, 56rem);
+  width: 100%;
 }
 
 .work-process-header {
@@ -700,7 +858,7 @@
 }
 
 .work-process-summary {
-  max-width: 52rem;
+  max-width: 100%;
   margin: 0 0 var(--space-3);
   color: var(--token-text-caption);
   font-size: var(--text-sm);
@@ -736,7 +894,7 @@
   }
 }
 
-.work-process-step:last-child {
+.work-process-steps > .work-process-step:last-child {
   padding-bottom: 0;
 }
 
@@ -847,7 +1005,7 @@
 }
 
 .work-process-step-summary {
-  max-width: 52rem;
+  max-width: 100%;
   margin: 0;
   color: var(--token-text-body);
   font-size: var(--text-sm);
@@ -856,7 +1014,7 @@
 }
 
 .work-process-diagnostic-message {
-  width: min(100%, 52rem);
+  width: 100%;
   color: var(--token-status-error);
   font-size: var(--text-sm);
   line-height: 1.65;
@@ -876,9 +1034,47 @@
   font-size: var(--text-sm);
 }
 
+/* Asked / ask_user: same card chrome rhythm as unified tool cards */
+.work-process-user-input {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-surface-sunken);
+}
+
+.work-process-user-input-header {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--token-border-muted);
+}
+
+.work-process-user-input-verb {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--token-text-heading);
+}
+
+.work-process-approval-message {
+  min-width: 0;
+  color: var(--token-text-body);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.work-process-user-input-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  list-style: none;
+}
+
 /* ── Unified tool card ─────────────────────────────────────── */
 .work-process-tool-card {
-  width: min(100%, 52rem);
+  width: 100%;
   overflow: hidden;
   border: 1px solid var(--token-border-muted);
   border-radius: var(--radius-md);
@@ -1162,7 +1358,7 @@
   flex-wrap: wrap;
   gap: var(--space-2);
   width: fit-content;
-  max-width: min(100%, 54rem);
+  max-width: 100%;
   margin: 0;
   padding: var(--space-1) var(--space-3) var(--space-2);
   border: 0;
@@ -1231,35 +1427,11 @@
   color: var(--token-text-caption);
 }
 
-.work-process-user-input-header {
-  margin-bottom: var(--space-2);
-}
-
-.work-process-user-input-verb {
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
-  color: var(--token-text-heading);
-}
-
-.work-process-approval-message {
-  min-width: 0;
-  color: var(--token-text-body);
-  line-height: 1.65;
-  overflow-wrap: anywhere;
-}
-
-.work-process-user-input-transcript {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
-  padding: var(--space-1) 0;
-}
-
 .work-process-user-input-transcript-item {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-2);
+  row-gap: var(--space-1);
   min-width: 0;
 }
 
@@ -1274,12 +1446,28 @@
   overflow-wrap: anywhere;
 }
 
+.work-process-user-input-transcript-index {
+  grid-column: 1;
+  grid-row: 1;
+  color: var(--token-text-caption);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.65;
+}
+
 .work-process-user-input-transcript-question {
+  grid-column: 2;
+  grid-row: 1;
   color: var(--token-text-body);
 }
 
-.work-process-user-input-transcript-answer {
+.work-process-user-input-transcript-answer,
+.work-process-user-input-transcript-pending {
+  grid-column: 2;
+  padding-left: var(--space-3);
   color: var(--token-text-muted);
+}
+
+.work-process-user-input-transcript-answer {
   white-space: pre-wrap;
 }
 
@@ -1288,6 +1476,7 @@
 }
 
 .work-process-user-input-transcript-error {
+  grid-column: 1 / -1;
   color: var(--token-status-error);
 }
 
@@ -1356,12 +1545,17 @@
   gap: var(--space-2);
 }
 
+/* Beat kind-section / aggregate bottom padding so process→answer stays 10px. */
+.work-process-steps > .work-process-step:last-child {
+  padding-bottom: 0;
+}
+
 .work-process-reasoning-indicator {
   padding-bottom: var(--space-2);
 }
 
 .work-process-reasoning-indicator-text {
-  width: min(100%, 54rem);
+  width: 100%;
   margin: 0;
   padding-left: calc(var(--space-4) + var(--space-2));
   color: var(--token-text-caption);
@@ -1371,7 +1565,7 @@
 
 .work-process-thinking-state {
   display: block;
-  width: min(100%, 54rem);
+  width: 100%;
   margin: 0;
   color: var(--token-text-caption);
   font-size: var(--text-sm);
@@ -1467,7 +1661,8 @@
 }
 
 .work-process-thinking-preview {
-  width: min(100%, 62ch);
+  width: 100%;
+  max-width: 100%;
   max-height: none;
   margin: var(--space-1) 0 0;
   padding: 0 0 0 var(--space-3);
@@ -1493,7 +1688,7 @@
   color: var(--token-text-body);
   font-size: var(--text-base);
   line-height: 1.55;
-  max-width: 54rem;
+  max-width: 100%;
 }
 
 .work-process-prose .markdown-body {
@@ -1606,9 +1801,12 @@
   display: none;
 }
 
-/* Process block → final answer body (expanded & collapsed) */
+/*
+ * Process block → final answer (expanded & collapsed).
+ * Stack gap is space-2; cancel it here so the sole break is a true 10px.
+ */
 .conversation-message-assistant .work-process + .conversation-bubble-assistant {
-  margin-top: 5px;
+  margin-top: calc(10px - var(--space-2));
 }
 
 .work-process.is-collapsed .work-process-header {
@@ -1642,8 +1840,7 @@
   gap: 0;
   margin: var(--space-1) 0 0;
   padding: 0;
-  /* Align nested tools with thinking caption text after the 14px spark + space-1 gap. */
-  padding-left: calc(14px + var(--space-1));
+  /* Same left edge as loop commentary prose (full-bleed content column). */
   overflow: visible;
   border: 0;
   border-radius: 0;
@@ -1656,8 +1853,13 @@
 
 .work-process-section-list .work-process-step {
   grid-template-columns: minmax(0, 1fr);
-  padding: var(--space-1) 0;
+  /* Top-only rhythm between nested tools; last item must not pad into the answer. */
+  padding: var(--space-1) 0 0;
   border-bottom: 0;
+}
+
+.work-process-section-list .work-process-step:first-child {
+  padding-top: 0;
 }
 
 .work-process-section-list.disclosure-deferred .work-process-tool-card-expand,
@@ -1681,7 +1883,7 @@
 
 
 .work-process-disclosure {
-  width: min(100%, 54rem);
+  width: 100%;
 }
 
 .work-process-disclosure > summary {

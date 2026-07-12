@@ -1,19 +1,90 @@
 import React, { useMemo } from 'react';
 import Markdown from 'react-markdown';
+import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 import rehypeHighlight from 'rehype-highlight';
+import rehypeKatex from 'rehype-katex';
 import { normalizeAssistantMarkdown } from './normalizeAssistantMarkdown';
+import { MarkdownCodeBlock } from './MarkdownCodeBlock';
+import { MarkdownMermaid } from './MarkdownMermaid';
+import { flattenMarkdownText } from './markdownText';
 import './markdownHighlight';
+import 'katex/dist/katex.min.css';
 
 interface MessageMarkdownProps {
   content: string;
 }
 
+function isLanguageClass(className: unknown): string | null {
+  if (typeof className !== 'string') {
+    return null;
+  }
+  const match = /language-([\w#+-]+)/.exec(className);
+  return match?.[1] ?? null;
+}
+
+const markdownComponents: Components = {
+  a: ({ href, children }) => (
+    <a href={href} target="_blank" rel="noreferrer noopener">
+      {children}
+    </a>
+  ),
+  img: ({ src, alt }) => (
+    <img
+      src={src}
+      alt={alt ?? ''}
+      className="markdown-body-img"
+      loading="lazy"
+      referrerPolicy="no-referrer"
+    />
+  ),
+  input: (props) => {
+    if (props.type === 'checkbox') {
+      return (
+        <input
+          type="checkbox"
+          className="markdown-task-checkbox"
+          checked={Boolean(props.checked)}
+          disabled
+          readOnly
+        />
+      );
+    }
+    return <input {...props} />;
+  },
+  pre: ({ children }) => {
+    const childArray = React.Children.toArray(children);
+    const codeElement = childArray.find(
+      (child): child is React.ReactElement<{ className?: string; children?: React.ReactNode }> =>
+        React.isValidElement(child) && child.type === 'code',
+    );
+
+    if (!codeElement) {
+      return <pre>{children}</pre>;
+    }
+
+    const language = isLanguageClass(codeElement.props.className) ?? '';
+    const code = flattenMarkdownText(codeElement.props.children).replace(/\n$/, '');
+
+    if (language === 'mermaid') {
+      return <MarkdownMermaid source={code} />;
+    }
+
+    return (
+      <MarkdownCodeBlock language={language} code={code}>
+        <code className={codeElement.props.className}>{codeElement.props.children}</code>
+      </MarkdownCodeBlock>
+    );
+  },
+};
+
 /**
- * 渲染 assistant 正文为正式排版的 Markdown：表格、标题、列表、行内代码、代码块。
+ * Shared Markdown renderer for assistant answers, Work Process commentary,
+ * Plan previews, optional user bubbles, and Composer preview.
  *
- * 不允许原始 HTML（react-markdown 默认即关闭），外链统一在新窗口打开，避免在
- * 渲染进程内整页跳转。
+ * Raw HTML stays disabled (react-markdown default). External links open in a
+ * new window. Mermaid and KaTeX are opt-in via fenced / math syntax.
  */
 export const MessageMarkdown: React.FC<MessageMarkdownProps> = ({ content }) => {
   const normalized = useMemo(() => normalizeAssistantMarkdown(content), [content]);
@@ -21,15 +92,12 @@ export const MessageMarkdown: React.FC<MessageMarkdownProps> = ({ content }) => 
   return (
     <div className="markdown-body">
       <Markdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
-        components={{
-          a: ({ href, children }) => (
-            <a href={href} target="_blank" rel="noreferrer noopener">
-              {children}
-            </a>
-          ),
-        }}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[
+          rehypeKatex,
+          [rehypeHighlight, { detect: true, ignoreMissing: true }],
+        ]}
+        components={markdownComponents}
       >
         {normalized}
       </Markdown>

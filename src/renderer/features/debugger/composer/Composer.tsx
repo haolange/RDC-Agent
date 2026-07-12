@@ -8,6 +8,7 @@ import { useI18n } from '../../../i18n';
 import { useLayoutStore } from '../../../stores/layoutStore';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useProjectStore } from '../../../stores/projectStore';
+import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import type { ComposerController } from './useComposer';
 import { PermissionModeSelector } from './PermissionModeSelector';
 import { EffortControl } from './EffortControl';
@@ -15,6 +16,7 @@ import { ToolApprovalRequestPanel, usePendingToolApprovalRequest } from './ToolA
 import { UserInputRequestPanel, usePendingUserInputRequest } from './UserInputRequestPanel';
 import { SlashCommandPopover } from './SlashCommandPopover';
 import { useSlashCommand } from './useSlashCommand';
+import { ComposerMarkdownInput } from './ComposerMarkdownInput';
 
 export interface ComposerProps {
   composer: ComposerController;
@@ -30,6 +32,7 @@ export const Composer: React.FC<ComposerProps> = ({
   composer,
 }) => {
   const { t, language } = useI18n();
+  const composerMarkdown = useAppSettingsStore((state) => state.settings.appearance.composerMarkdown);
   const activeAgentId = useConversationStore((state) => {
     const activeMsg = state.conversationMessages.find(
       (m) => m.role === 'assistant' && (m.status === 'streaming' || m.status === 'draft'),
@@ -129,17 +132,27 @@ export const Composer: React.FC<ComposerProps> = ({
         </div>
       )}
       <div className="composer-input-row">
-        <textarea
-          ref={promptInputRef}
-          className="chat-input composer-textarea"
-          name="debuggerPrompt"
-          value={promptValue}
-          onChange={(event) => setPromptValue(event.target.value)}
-          onKeyDown={handlePromptKeyDown}
-          placeholder={promptPlaceholder}
-          aria-label={promptPlaceholder}
-          rows={1}
-        />
+        {composerMarkdown ? (
+          <ComposerMarkdownInput
+            value={promptValue}
+            onChange={setPromptValue}
+            onSend={() => void handlePromptSend()}
+            placeholder={promptPlaceholder}
+            disabled={isComposerBusy}
+          />
+        ) : (
+          <textarea
+            ref={promptInputRef}
+            className="chat-input composer-textarea"
+            name="debuggerPrompt"
+            value={promptValue}
+            onChange={(event) => setPromptValue(event.target.value)}
+            onKeyDown={handlePromptKeyDown}
+            placeholder={promptPlaceholder}
+            aria-label={promptPlaceholder}
+            rows={1}
+          />
+        )}
         {slashCommand.visible ? (
           <SlashCommandPopover
             filterText={slashCommand.filterText}
