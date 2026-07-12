@@ -1848,7 +1848,7 @@
 
 .work-process-tool-aggregate-body .work-process-step {
   grid-template-columns: minmax(0, 1fr);
-  padding-bottom: var(--space-1);
+  padding-bottom: var(--space-3);
 }
 
 .work-process-tool-aggregate-body .work-process-step-rail {
@@ -1892,7 +1892,7 @@
 
 .work-process-section-list {
   gap: 0;
-  margin: var(--space-1) 0 0;
+  margin: var(--space-2) 0 0;
   padding: 0;
   /* Same left edge as loop commentary prose (full-bleed content column). */
   overflow: visible;
@@ -1908,7 +1908,7 @@
 .work-process-section-list .work-process-step {
   grid-template-columns: minmax(0, 1fr);
   /* Top-only rhythm between nested tools; last item must not pad into the answer. */
-  padding: var(--space-1) 0 0;
+  padding: var(--space-3) 0 0;
   border-bottom: 0;
 }
 

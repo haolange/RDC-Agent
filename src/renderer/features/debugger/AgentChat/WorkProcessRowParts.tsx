@@ -15,7 +15,6 @@ import {
 export const ToolRow: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   const { t } = useI18n();
   const label = useWorkProcessLabel();
-  const compact = row.compact === true;
   const statusLabel = row.status === 'complete' ? '' : label(getRowStatusLabel(row.status));
   const hasDetail = row.previewLines.length > 0
     || Boolean(row.commandText)
@@ -41,7 +40,7 @@ export const ToolRow: React.FC<{ row: ToolRowModel }> = ({ row }) => {
 
   return (
     <li
-      className={`work-process-step is-appear status-${row.status} kind-tool family-${row.family}${compact ? ' is-compact' : ''}`}
+      className={`work-process-step is-appear status-${row.status} kind-tool family-${row.family}`}
       data-testid="work-process-tool-call"
     >
       <WorkProcessRailIcon variant="step" status={row.status} />

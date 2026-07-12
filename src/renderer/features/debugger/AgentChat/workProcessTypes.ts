@@ -104,7 +104,6 @@ export type WorkProcessRow =
     /** Human-readable one-line diagnostic for failed tools (never the raw JSON envelope). */
     diagnosticCaption?: string;
     approval?: WorkProcessToolApproval;
-    compact?: boolean;
     sourcePills?: Array<{ domain: string; url?: string; title?: string }>;
     browseLink?: { label: string; url: string };
   }

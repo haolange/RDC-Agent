@@ -343,7 +343,7 @@ const formatTraceDuration = (blocks: ConversationWorkBlock[]): string => {
 
 const isNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
-const createToolRow = (call: ConversationToolCall, compact = false): WorkProcessRow => {
+const createToolRow = (call: ConversationToolCall): WorkProcessRow => {
   if (normalizeToolName(call.toolName) === 'ask_user') {
     return createUserInputRow(call);
   }
@@ -394,7 +394,6 @@ const createToolRow = (call: ConversationToolCall, compact = false): WorkProcess
     pathChip: unwrapped.pathChip,
     diagnosticCaption,
     approval,
-    compact,
     ...webPresentation,
   };
 };
@@ -496,8 +495,7 @@ const isApprovalRequiredPreview = (parsedResult: unknown, raw?: string): boolean
 };
 export const createToolRowForPresentation = (
   call: ConversationToolCall,
-  compact = false,
-): WorkProcessRow => createToolRow(call, compact);
+): WorkProcessRow => createToolRow(call);
 
 const createUserInputRow = (call: ConversationToolCall): WorkProcessRow => {
   const questions = call.userInputQuestions ?? [];
