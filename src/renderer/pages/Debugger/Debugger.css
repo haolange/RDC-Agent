@@ -855,66 +855,34 @@
   border: 1px solid color-mix(in srgb, var(--token-border-focus) 52%, var(--token-border-muted));
   background: var(--composer-effort-track-fill);
   overflow: hidden;
-  transition: background var(--transition-fast), border-color var(--transition-fast);
+  /* Background must snap — animating dark Max rail ↔ solid fill reads as opacity fade. */
+  transition: border-color var(--transition-fast);
   pointer-events: none;
 }
 
-.composer-effort-slider-sparks {
-  display: none;
-}
-
-.composer-effort-slider.is-level-max .composer-effort-slider-track,
-.composer-effort-slider.is-level-ultra .composer-effort-slider-track {
-  border-color: color-mix(in srgb, var(--token-effort-max-to) 40%, var(--token-border-muted));
-  /* Soft stepped bands + fine dither — restrained 8-bit hint, not a noisy grid */
-  background-color: var(--token-effort-max-mid);
-  background-image:
-    repeating-linear-gradient(
-      90deg,
-      transparent 0 1px,
-      color-mix(in srgb, var(--token-effort-max-sparkle) 5%, transparent) 1px 2px
-    ),
-    linear-gradient(
-      90deg,
-      var(--token-effort-max-from) 0%,
-      var(--token-effort-max-from) 18%,
-      var(--token-effort-max-mid) 40%,
-      var(--token-effort-max-mid) 58%,
-      var(--token-effort-max-to) 80%,
-      var(--token-effort-max-to) 100%
-    );
+/* Top-tier Max visual: translucent dark-gray rail + lavender pixel field */
+.composer-effort-slider.is-max-visual .composer-effort-slider-track {
+  border-color: color-mix(in srgb, var(--token-border-muted) 70%, var(--token-effort-max-mid));
+  background: var(--token-effort-max-track);
+  background-image: none;
   box-shadow: none;
+  /* Forbid dark↔solid purple crossfade — that reads as opacity decay instead of energy retreat. */
+  transition: none;
 }
 
-.composer-effort-slider.is-level-max .composer-effort-slider-sparks,
-.composer-effort-slider.is-level-ultra .composer-effort-slider-sparks {
+.composer-effort-slider-field {
   display: block;
   position: absolute;
   inset: 0;
   pointer-events: none;
   overflow: hidden;
+  border-radius: inherit;
 }
 
-.composer-effort-slider-spark {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 2px;
-  height: 2px;
-  margin: 0;
-  border-radius: 0;
-  background: var(--token-effort-max-sparkle);
-  opacity: 0;
-  pointer-events: none;
-  will-change: transform, opacity;
-  transform: translate3d(-12px, 0, 0);
-  box-shadow: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .composer-effort-slider-spark {
-    will-change: auto;
-  }
+.composer-effort-slider-field-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .composer-effort-slider.is-disabled .composer-effort-slider-track {
@@ -930,6 +898,12 @@
   top: 50%;
   height: 0;
   pointer-events: none;
+  transition: opacity var(--transition-fast);
+}
+
+/* Max lifecycle drives stop opacity every frame — CSS transition fights it and feels stuttery. */
+.composer-effort-slider.is-max-visual .composer-effort-slider-stops {
+  transition: none;
 }
 
 .composer-effort-slider-stop {
@@ -974,6 +948,16 @@
   background: color-mix(in srgb, var(--token-text-inverse) 42%, transparent);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--token-bg-app) 12%, transparent);
   transform: translate(-50%, -50%);
+}
+
+/* Dark Max rail: lift stop contrast so the 0→1 fade-in is actually readable. */
+.composer-effort-slider.is-max-visual .composer-effort-slider-stop::after {
+  background: color-mix(in srgb, var(--token-text-inverse) 78%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--token-bg-app) 22%, transparent);
+}
+
+.composer-effort-slider.is-max-visual .composer-effort-slider-stop.is-current::after {
+  background: color-mix(in srgb, var(--token-text-inverse) 92%, transparent);
 }
 
 .composer-effort-slider.is-disabled .composer-effort-slider-stop::after {

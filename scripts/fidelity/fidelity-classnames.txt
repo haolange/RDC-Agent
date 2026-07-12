@@ -123,10 +123,11 @@ composer-effort-pill-modes
 composer-effort-popup
 composer-effort-popup-divider
 composer-effort-slider
+composer-effort-slider-field
+composer-effort-slider-field-canvas
 composer-effort-slider-labels
 composer-effort-slider-section
-composer-effort-slider-spark
-composer-effort-slider-sparks
+composer-effort-slider-stop
 composer-effort-slider-stops
 composer-effort-slider-thumb
 composer-effort-slider-tooltip

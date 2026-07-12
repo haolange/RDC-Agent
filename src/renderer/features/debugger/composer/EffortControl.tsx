@@ -17,6 +17,7 @@ import {
 } from './effortControlParts';
 import { EffortControlPopup } from './EffortControlPopup';
 import { formatTokenCount } from './turnControlsUtils';
+import { useMaxVisualController } from './useMaxVisualController';
 
 export const EffortControl: React.FC<{
   agentId: string;
@@ -34,6 +35,7 @@ export const EffortControl: React.FC<{
   const trackRef = useRef<HTMLDivElement>(null);
   const dragActiveRef = useRef(false);
   const popupShiftRef = useRef(0);
+  const suppressClickRef = useRef(false);
   const isDragging = dragRatio !== null;
   const reasoningControl = capability?.reasoningControl ?? null;
   const capabilityKey = capability
@@ -46,12 +48,6 @@ export const EffortControl: React.FC<{
   );
   const displayLevelsKey = displayLevels.join('|');
   const hasAdjustableReasoning = displayLevels.length > 1 && reasoningControl?.kind !== 'always-on';
-
-  useEffect(() => {
-    setSnapLevel(null);
-    setDragRatio(null);
-    dragActiveRef.current = false;
-  }, [capabilityKey, displayLevelsKey]);
 
   const selectedLevel = resolveSelectedLevel(
     turnControls.reasoningLevel,
@@ -74,7 +70,28 @@ export const EffortControl: React.FC<{
     ? clampSliderRatio(dragRatio)
     : getStopPosition(displayIndex, displayLevels.length);
   const thumbPercent = thumbRatio * 100;
-  const isMaxTier = displayLevel === 'max' || displayLevel === 'ultra';
+
+  const {
+    maxPhase,
+    maxProgress,
+    stopsOpacity,
+    showMaxTrack,
+    isMaxTier,
+    resetMaxVisual,
+    applyCommittedLevelVisual,
+  } = useMaxVisualController({
+    open,
+    isDragging,
+    displayLevel,
+    selectedLevel,
+  });
+
+  useEffect(() => {
+    setSnapLevel(null);
+    setDragRatio(null);
+    dragActiveRef.current = false;
+    resetMaxVisual();
+  }, [capabilityKey, displayLevelsKey, resetMaxVisual]);
 
   const effortLabel = t(EFFORT_LABEL_KEYS[selectedLevel]);
   const tooltipLabel = t(EFFORT_LABEL_KEYS[displayLevel]);
@@ -91,27 +108,27 @@ export const EffortControl: React.FC<{
     fastModelBadgeLabel: t('composer.effort.fastMultiplier'),
   });
   const maxContextStatus = capability?.maxContextAvailable
-    ? turnControls.maxContextMode ? maxContextBadgeLabel : t('composer.effort.stateOff')
+    ? (turnControls.maxContextMode ? maxContextBadgeLabel : t('composer.effort.stateOff'))
     : t('composer.effort.unavailable');
   const fastModelStatus = capability?.fastModelAvailable
-    ? turnControls.fastModel ? t('composer.effort.fastMultiplier') : t('composer.effort.standardMultiplier')
+    ? (turnControls.fastModel ? t('composer.effort.fastMultiplier') : t('composer.effort.standardMultiplier'))
     : t('composer.effort.unavailable');
 
   const closeMenu = useCallback(() => setOpen(false), []);
 
   useEffect(() => {
-    if (!open) return;
-    const handlePointerDown = (event: PointerEvent) => {
+    if (!open) return undefined;
+    const onPointer = (event: PointerEvent) => {
       if (!menuRef.current?.contains(event.target as Node)) closeMenu();
     };
-    const handleEscape = (event: KeyboardEvent) => {
+    const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') closeMenu();
     };
-    window.addEventListener('pointerdown', handlePointerDown);
-    window.addEventListener('keydown', handleEscape);
+    window.addEventListener('pointerdown', onPointer);
+    window.addEventListener('keydown', onKey);
     return () => {
-      window.removeEventListener('pointerdown', handlePointerDown);
-      window.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('pointerdown', onPointer);
+      window.removeEventListener('keydown', onKey);
     };
   }, [closeMenu, open]);
 
@@ -143,7 +160,8 @@ export const EffortControl: React.FC<{
     if (!displayLevels.includes(level)) return;
     setSnapLevel(level);
     updateTurnControls({ reasoningLevel: level });
-  }, [displayLevels, updateTurnControls]);
+    applyCommittedLevelVisual(level);
+  }, [applyCommittedLevelVisual, displayLevels, updateTurnControls]);
 
   const getRatioFromClientX = (clientX: number): number => {
     const track = trackRef.current;
@@ -170,8 +188,7 @@ export const EffortControl: React.FC<{
 
   const handleTrackPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     if (!dragActiveRef.current || !hasAdjustableReasoning) return;
-    const ratio = getRatioFromClientX(event.clientX);
-    setDragRatio(ratio);
+    setDragRatio(getRatioFromClientX(event.clientX));
   };
 
   const handleTrackPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -179,14 +196,18 @@ export const EffortControl: React.FC<{
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    const level = resolveLevelFromClientX(event.clientX);
-    commitEffort(level);
+    commitEffort(resolveLevelFromClientX(event.clientX));
     dragActiveRef.current = false;
     setDragRatio(null);
+    suppressClickRef.current = true;
   };
 
   const handleTrackClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!hasAdjustableReasoning) return;
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
     commitEffort(resolveLevelFromClientX(event.clientX));
   };
 
@@ -206,11 +227,7 @@ export const EffortControl: React.FC<{
 
   const popupStyle = { '--composer-effort-popup-shift-x': `${popupShift}px` } as React.CSSProperties;
   const thumbStyle = { left: `${thumbPercent}%` } as React.CSSProperties;
-  const thumbEdgeClass = thumbPercent <= 0.01
-    ? ' is-start'
-    : thumbPercent >= 99.99
-      ? ' is-end'
-      : '';
+  const thumbEdgeClass = thumbPercent <= 0.01 ? ' is-start' : thumbPercent >= 99.99 ? ' is-end' : '';
 
   return (
     <div ref={menuRef} className="composer-effort-menu">
@@ -252,6 +269,11 @@ export const EffortControl: React.FC<{
           displayIndex={displayIndex}
           isDragging={isDragging}
           isMaxTier={isMaxTier}
+          showMaxTrack={showMaxTrack}
+          maxPhase={maxPhase}
+          maxProgress={maxProgress}
+          thumbRatio={thumbRatio}
+          stopsOpacity={stopsOpacity}
           thumbStyle={thumbStyle}
           thumbEdgeClass={thumbEdgeClass}
           tooltipLabel={tooltipLabel}
