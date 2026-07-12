@@ -2,11 +2,17 @@ import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranch, ConversationBranchState, ConversationFork } from '@shared/types/conversationBranch';
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 
-const sortByCreatedAt = (left: ConversationMessage, right: ConversationMessage): number => {
+const ROLE_ORDER: Record<ConversationMessage['role'], number> = { system: 0, user: 1, assistant: 2 };
+
+export const compareConversationMessages = (left: ConversationMessage, right: ConversationMessage): number => {
   if (left.createdAt !== right.createdAt) return left.createdAt - right.createdAt;
+  if (left.turnId === right.turnId && left.role !== right.role) {
+    return ROLE_ORDER[left.role] - ROLE_ORDER[right.role];
+  }
   const leftUpdated = left.updatedAt ?? left.createdAt;
   const rightUpdated = right.updatedAt ?? right.createdAt;
-  return leftUpdated - rightUpdated;
+  if (leftUpdated !== rightUpdated) return leftUpdated - rightUpdated;
+  return left.id.localeCompare(right.id);
 };
 
 export function createDefaultBranchState(sessionId: string): ConversationBranchState {
@@ -68,7 +74,7 @@ function findRecoverableBranchAnchor(
       message.role === 'user'
       && normalizeBranchId(message.branchId) === branchId
     ))
-    .sort(sortByCreatedAt);
+    .sort(compareConversationMessages);
 
   return candidates.find((message) => (
     message.forkId === fork.forkId
@@ -89,7 +95,7 @@ export function resolveVisibleConversationMessages(
   if (!branchState || branchState.forks.length === 0) {
     return allMessages
       .filter((message) => normalizeBranchId(message.branchId) === ROOT_BRANCH_ID)
-      .sort(sortByCreatedAt);
+      .sort(compareConversationMessages);
   }
 
   return collectBranchPath(
@@ -108,7 +114,7 @@ function collectBranchPath(
 ): ConversationMessage[] {
   const branchMessages = allMessages
     .filter((message) => normalizeBranchId(message.branchId) === branchId && message.createdAt > minCreatedAt)
-    .sort(sortByCreatedAt);
+    .sort(compareConversationMessages);
 
   const forkCandidates = forks
     .map((fork) => {
@@ -142,7 +148,7 @@ function collectBranchPath(
       message.turnId === activeAnchor.turnId
       && normalizeBranchId(message.branchId) === activeBranch.branchId
     ))
-    .sort(sortByCreatedAt);
+    .sort(compareConversationMessages);
 
   if (turnMessages.length === 0) {
     return beforeFork;

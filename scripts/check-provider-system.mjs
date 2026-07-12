@@ -165,6 +165,16 @@ function loadProviderCatalog(runtimeEntries) {
 
 async function main() {
   const settingsTypes = read('src/shared/types/settings.ts');
+  const connectionServiceSource = read('src/main/settings/ProviderConnectionService.ts');
+  const providerConnectDialog = read('src/renderer/features/settings/SettingsModal/sections/ProviderConnectDialog.tsx');
+  assert(
+    settingsTypes.includes('discoveryDiagnostic?:')
+      && connectionServiceSource.includes('discoveredModelCount: discoveredModels.length')
+      && connectionServiceSource.includes("providerId === 'volcengine-coding-plan'")
+      && connectionServiceSource.includes('selectSupportedCodingPlanModels')
+      && providerConnectDialog.includes('settings-provider-connect-discovery-diagnostic'),
+    'provider connection must expose redacted discovery counts and keep empty-match fallback scoped to Volcengine Coding Plan',
+  );
   const categories = extractStringUnion(settingsTypes, 'LlmProviderCategory');
   assert(categories.length === 8, `LlmProviderCategory must expose exactly 8 UI categories, found ${categories.length}: ${categories.join(', ')}`);
   for (const legacyCategory of LEGACY_UI_CATEGORIES) {
@@ -411,8 +421,8 @@ async function main() {
   assert(
     connectionService.includes('aliasesByModelId')
       && connectionService.includes('normalizeCodingPlanModelMatchKey')
-      && connectionService.includes('fallbackAvailableOnEmptyMatch'),
-    'managed catalog merge must honor aliases, normalize Volcengine list ids, and fall back when list/catalog mismatch',
+      && connectionService.includes('filteredModelCount'),
+    'managed catalog merge must honor aliases, normalize Volcengine list ids, and hide unmatched Volc catalog models',
   );
 
   const modelRow = read('src/renderer/features/settings/SettingsModal/sections/ProviderConnectModelRow.tsx');

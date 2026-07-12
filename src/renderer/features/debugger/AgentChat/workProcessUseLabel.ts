@@ -23,6 +23,7 @@ const LABEL_TO_KEY: Record<string, TranslationKey> = {
   '已询问': 'chat.workProcessAskComplete',
   '正在询问': 'chat.workProcessAskRunning',
   '询问已中断': 'chat.workProcessAskInterrupted',
+  '问题数据不完整': 'chat.workProcessAskIncomplete',
   '已阻断': 'chat.workProcessToolBlocked',
   '执行失败': 'chat.workProcessToolFailed',
   '等待执行': 'chat.workProcessToolPending',

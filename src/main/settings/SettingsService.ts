@@ -519,6 +519,11 @@ function resolveProviderModels(providerId: string, persistedModels: unknown): Ll
   if (getBuiltinProviderCatalogOwnership(providerId) !== 'app-managed') {
     return sanitized;
   }
+  // Volc Coding Plan discovery is account-specific. Once a verified subset has
+  // been persisted, do not re-expand it to the entire application catalog.
+  if (providerId === 'volcengine-coding-plan' && sanitized.length > 0) {
+    return sanitized;
+  }
   const catalogModels = getManagedProviderModels(providerId);
   return catalogModels.length > 0 ? applyModelEnabledState(catalogModels, sanitized) : sanitized;
 }
@@ -797,13 +802,14 @@ function normalizeUserRoutes(
     }
 
     const provider = providers.find((entry) => entry.id === incoming.providerId);
-    const isValid = Boolean(
-      provider
+    const isValid = Boolean(provider
       && provider.isConfigured
-      && provider.models.some((model) => model.id === incoming.modelId && model.enabled !== false),
-    );
-
-    if (!isValid) {
+      && provider.models.some((model) => model.id === incoming.modelId && model.enabled !== false));
+    // Volc discovery deliberately persists only the verified subset. Preserve
+    // a filtered route id so Settings can identify the exact invalid choice;
+    // every other provider keeps the established sanitize behavior.
+    const preserveFilteredVolcRoute = provider?.id === 'volcengine-coding-plan';
+    if (!isValid && !preserveFilteredVolcRoute) {
       routeMap.set(agentId, { agentId, providerId: '', modelId: '' });
     }
   }

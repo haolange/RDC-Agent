@@ -39,7 +39,7 @@ import type {
 } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import { isTopLevelAgentId } from '@shared/types/agent';
-import { createFallbackAskUserQuestion, normalizeAskUserQuestions } from '@shared/utils/askUser';
+import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
 import type { AgentEvent } from '@shared/types/agentRuntime';
@@ -63,6 +63,8 @@ import {
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { sessionContextJournal, type SessionContextRoute } from './SessionContextJournal';
+import type { Message as AgentRuntimeMessage } from '../agent-runtime/core/types';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { normalizeToolName, resolveAgentToolAllowlist } from '../workflow/debugger/DebuggerRuntimePolicy';
 import {
@@ -90,8 +92,10 @@ import { beginAssistantContentLoopIfPending } from './ConversationLoopRuntimeSta
 
 interface ConversationBranchTurnContext {
   branchId: string;
-  forkId?: string;
-  variantIndex?: number;
+  forkId: string;
+  variantIndex: number;
+  parentBranchId: string;
+  branchState: ConversationBranchState;
 }
 
 function mergeThinkingPayload(
@@ -187,7 +191,7 @@ interface ActiveConversationTurn {
   startedAt: number;
   abortController: AbortController;
   stop: () => void;
-  /** Resolves after stop() has flushed terminal state (or immediately if already idle). */
+  /** Resolves only after completeProfileTurn has fully exited its terminal cleanup. */
   stopped: Promise<void>;
 }
 
@@ -464,7 +468,9 @@ export class ConversationService {
     const allMessages = storageAdapter.readConversationHistory(sessionId);
     const branchState = this.readRepairedBranchState(sessionId, allMessages);
     return {
-      messages: resolveVisibleConversationMessages(allMessages, branchState),
+      // The renderer owns visible projection and needs sibling anchors to keep
+      // variant navigation concrete after refresh or session reselection.
+      messages: allMessages,
       branchState,
     };
   }
@@ -592,18 +598,18 @@ export class ConversationService {
       );
     }
 
-    const history = storageAdapter.readConversationHistory(sessionId);
-    const targetIndex = history.findIndex((message) => message.id === input.messageId);
-    const targetMessage = targetIndex >= 0 ? history[targetIndex] : null;
-    if (!targetMessage || targetMessage.role !== 'user') {
+    const initialHistory = storageAdapter.readConversationHistory(sessionId);
+    const initialTargetIndex = initialHistory.findIndex((message) => message.id === input.messageId);
+    const initialTargetMessage = initialTargetIndex >= 0 ? initialHistory[initialTargetIndex] : null;
+    if (!initialTargetMessage || initialTargetMessage.role !== 'user') {
       throw new Error('Can only edit and resend an existing user message.');
     }
 
     const downstreamTurnIds = new Set(
-      history.slice(targetIndex + 1).map((message) => message.turnId),
+      initialHistory.slice(initialTargetIndex + 1).map((message) => message.turnId),
     );
     // Also stop the target turn itself if it is still streaming (edit during reply).
-    downstreamTurnIds.add(targetMessage.turnId);
+    downstreamTurnIds.add(initialTargetMessage.turnId);
     const turnsToStop = Array.from(this.activeTurns.values()).filter((activeTurn) => (
       activeTurn.sessionId === sessionId && downstreamTurnIds.has(activeTurn.turnId)
     ));
@@ -612,6 +618,15 @@ export class ConversationService {
     }
     if (turnsToStop.length > 0) {
       await Promise.allSettled(turnsToStop.map((turn) => turn.stopped));
+    }
+
+    // Re-read after every stopped turn has fully left completeProfileTurn. Its
+    // terminal flush may have appended a newer snapshot for the target branch.
+    const history = storageAdapter.readConversationHistory(sessionId);
+    const targetIndex = history.findIndex((message) => message.id === input.messageId);
+    const targetMessage = targetIndex >= 0 ? history[targetIndex] : null;
+    if (!targetMessage || targetMessage.role !== 'user') {
+      throw new Error('Can only edit and resend an existing user message.');
     }
 
     let branchState = storageAdapter.readConversationBranchState(sessionId) ?? createDefaultBranchState(sessionId);
@@ -634,14 +649,6 @@ export class ConversationService {
         }],
       };
       branchState.forks.push(fork);
-      if (!targetMessage.forkId) {
-        targetMessage.forkId = forkId;
-        targetMessage.variantIndex = targetMessage.variantIndex ?? 0;
-        this.persistConversationSnapshot(sessionId, {
-          ...targetMessage,
-          updatedAt: nowMs(),
-        });
-      }
     } else if (!fork.branches.some((branch) => branch.anchorUserMessageId === targetMessage.id)) {
       const variantIndex = targetMessage.variantIndex ?? fork.branches.length;
       if (!fork.branches.some((branch) => branch.variantIndex === variantIndex)) {
@@ -657,31 +664,6 @@ export class ConversationService {
 
     const newBranchId = generateEventId('branch');
     const variantIndex = fork.branches.length;
-    fork.branches.push({
-      branchId: newBranchId,
-      parentBranchId: targetBranchId,
-      variantIndex,
-      anchorUserMessageId: '',
-      rootTurnId: '',
-    });
-    fork.activeBranchId = newBranchId;
-    branchState.activeLeafBranchId = newBranchId;
-    try {
-      storageAdapter.writeConversationBranchState(sessionId, branchState);
-    } catch (error) {
-      console.error(`[ConversationService] Failed to persist branch state during rewrite for ${sessionId}:`, error);
-      throw new Error(
-        error instanceof Error
-          ? `Edit and resend failed: ${error.message}`
-          : 'Edit and resend failed: could not persist conversation branch state.',
-      );
-    }
-
-    // Truncate agent threads to the active-branch prefix so LLM history cannot
-    // retain downstream messages from the discarded sibling branch.
-    const visiblePrefix = resolveVisibleConversationMessages(history, branchState);
-    const conversationAgentId = resolveConversationAgentId(input.mode, input.agentId ?? null);
-    this.rebuildAgentThreadForBranch(sessionId, conversationAgentId, visiblePrefix);
 
     const updatedContext: ResolvedConversationContext = {
       ...context,
@@ -697,53 +679,19 @@ export class ConversationService {
         branchId: newBranchId,
         forkId,
         variantIndex,
+        parentBranchId: targetBranchId,
+        branchState,
       },
       input.turnControls,
     );
   }
 
-  private rebuildAgentThreadForBranch(
-    sessionId: string,
-    agentId: AgentRole,
-    visibleMessages: ConversationMessage[],
-  ): void {
-    try {
-      const thread: import('../agent-runtime/core/types').AgentMessage[] = [];
-      for (const message of visibleMessages) {
-        if (message.role === 'user') {
-          thread.push({
-            role: 'user',
-            content: message.content,
-            timestamp: message.createdAt,
-          });
-          continue;
-        }
-        if (message.role === 'assistant' && message.content.trim()) {
-          thread.push({
-            role: 'assistant',
-            content: [{ type: 'text', text: message.content }],
-            model: 'branch-rewrite',
-            provider: 'branch-rewrite',
-            usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
-            stopReason: 'stop',
-            timestamp: message.createdAt,
-          });
-        }
-      }
-      storageAdapter.clearAgentThread(sessionId, agentId);
-      storageAdapter.writeAgentThread(sessionId, agentId, thread);
-      agentOrchestrator.invalidateSessionAgentSlots(sessionId);
-    } catch (error) {
-      console.error(`[ConversationService] rebuildAgentThreadForBranch failed for ${sessionId}:`, error);
-      throw new Error(
-        error instanceof Error
-          ? `Edit and resend failed while rebuilding agent thread: ${error.message}`
-          : 'Edit and resend failed while rebuilding agent thread.',
-      );
-    }
-  }
-
   async switchConversationBranch(input: ConversationSwitchBranchRequest): Promise<ConversationSwitchBranchResult> {
+    const activeTurns = Array.from(this.activeTurns.values()).filter((turn) => turn.sessionId === input.sessionId);
+    for (const turn of activeTurns) turn.stop();
+    if (activeTurns.length > 0) {
+      await Promise.allSettled(activeTurns.map((turn) => turn.stopped));
+    }
     const allMessages = storageAdapter.readConversationHistory(input.sessionId);
     const branchState = this.readRepairedBranchState(input.sessionId, allMessages);
     if (!branchState) {
@@ -766,7 +714,7 @@ export class ConversationService {
 
     return {
       success: true,
-      messages: visibleMessages,
+      messages: allMessages,
       branchState,
       tracePresentation,
     };
@@ -846,9 +794,9 @@ export class ConversationService {
 
     const turnId = generateEventId('turn');
     const sessionIdForBranch = workingSession?.sessionId ?? null;
-    let branchState = sessionIdForBranch
+    let branchState = branchContext?.branchState ?? (sessionIdForBranch
       ? storageAdapter.readConversationBranchState(sessionIdForBranch)
-      : null;
+      : null);
     if (sessionIdForBranch && !branchState) {
       branchState = createDefaultBranchState(sessionIdForBranch);
       storageAdapter.writeConversationBranchState(sessionIdForBranch, branchState);
@@ -874,19 +822,6 @@ export class ConversationService {
       forkId: branchContext?.forkId,
       variantIndex: branchContext?.variantIndex,
     });
-    if (sessionIdForBranch && branchState && branchContext?.branchId) {
-      const fork = branchContext.forkId
-        ? branchState.forks.find((entry) => entry.forkId === branchContext.forkId)
-        : null;
-      const pendingBranch = fork?.branches.find((entry) => entry.branchId === branchId);
-      if (fork && pendingBranch) {
-        pendingBranch.anchorUserMessageId = userMessage.id;
-        pendingBranch.rootTurnId = turnId;
-        fork.activeBranchId = branchId;
-        branchState.activeLeafBranchId = branchContext.branchId;
-        storageAdapter.writeConversationBranchState(sessionIdForBranch, branchState);
-      }
-    }
     const assistantDraftMessage = makeConversationMessage('assistant', '', {
       turnId,
       sessionId: workingSession?.sessionId ?? null,
@@ -899,8 +834,47 @@ export class ConversationService {
       branchId,
     });
 
-    this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
-    this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
+    const previousBranchState = branchState;
+    if (sessionIdForBranch && branchState && branchContext) {
+      const nextBranchState = structuredClone(branchState);
+      const fork = nextBranchState.forks.find((entry) => entry.forkId === branchContext.forkId);
+      if (!fork || fork.branches.some((entry) => entry.branchId === branchId)) {
+        throw new Error('Edit and resend failed: conversation branch state changed before the new variant was committed.');
+      }
+      fork.branches.push({
+        branchId,
+        parentBranchId: branchContext.parentBranchId,
+        variantIndex: branchContext.variantIndex,
+        anchorUserMessageId: userMessage.id,
+        rootTurnId: turnId,
+      });
+      fork.activeBranchId = branchId;
+      nextBranchState.activeLeafBranchId = branchId;
+      try {
+        storageAdapter.writeConversationBranchState(sessionIdForBranch, nextBranchState);
+        branchState = nextBranchState;
+      } catch (error) {
+        console.error(`[ConversationService] Failed to persist branch state during rewrite for ${sessionIdForBranch}:`, error);
+        throw new Error(
+          error instanceof Error
+            ? `Edit and resend failed: ${error.message}`
+            : 'Edit and resend failed: could not persist conversation branch state.',
+        );
+      }
+    }
+    const userPersistError = this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
+    const assistantPersistError = this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
+    if (userPersistError || assistantPersistError) {
+      if (sessionIdForBranch && branchContext && previousBranchState) {
+        try {
+          storageAdapter.writeConversationBranchState(sessionIdForBranch, previousBranchState);
+        } catch (rollbackError) {
+          console.error(`[ConversationService] Failed to roll back branch state for ${sessionIdForBranch}:`, rollbackError);
+        }
+      }
+      const error = userPersistError ?? assistantPersistError;
+      throw new Error(`Conversation could not be saved: ${error?.message ?? 'unknown persistence error'}`);
+    }
     const visibleMessages = workingSession?.sessionId && branchState
       ? resolveVisibleConversationMessages(
           storageAdapter.readConversationHistory(workingSession.sessionId),
@@ -958,6 +932,9 @@ export class ConversationService {
     const traceSessionId = sessionId ?? this.ephemeralTraceSessionId(input.assistantDraftMessage.turnId);
     const abortController = new AbortController();
     const conversationAgentId: AgentRole = input.requestedAgentId;
+    const capturedBranchId = input.assistantDraftMessage.branchId
+      ?? input.userMessage.branchId
+      ?? ROOT_BRANCH_ID;
     const agentLabel = getAgentLabel(conversationAgentId);
     const showWorkTrace = true;
 
@@ -974,6 +951,12 @@ export class ConversationService {
     }
 
     let streamScheduler: ConversationStreamPatchScheduler | null = null;
+    let conversationPersistenceError: Error | null = null;
+    const terminalContext: { value: {
+      messages: AgentRuntimeMessage[];
+      route: SessionContextRoute;
+      status: 'complete' | 'stopped' | 'error';
+    } | null } = { value: null };
 
     const applyAssistantMessagePatch = (
       type: ConversationStreamEvent['type'],
@@ -989,7 +972,30 @@ export class ConversationService {
         updatedAt: nowMs(),
       };
       if (options.persist) {
-        this.persistConversationSnapshot(sessionId, assistantMessage);
+        const persistError = this.persistConversationSnapshot(sessionId, assistantMessage);
+        if (persistError) {
+          conversationPersistenceError ??= persistError;
+          abortController.abort();
+          assistantMessage = {
+            ...assistantMessage,
+            status: 'error',
+            diagnostic: {
+              code: 'CONVERSATION_LLM_REQUEST_FAILED',
+              severity: 'error',
+              userMessage: 'Conversation state could not be saved. Retry before continuing.',
+              technicalMessage: persistError.message,
+            },
+            updatedAt: nowMs(),
+          };
+          this.emitConversationEvent({
+            type: 'message_errored',
+            sessionId: sessionId ?? '',
+            turnId: assistantMessage.turnId,
+            message: assistantMessage,
+          });
+          this.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
+          return;
+        }
       }
       this.emitConversationEvent({
         type,
@@ -1057,16 +1063,11 @@ export class ConversationService {
             console.error('[ConversationService] stop flush failed:', error);
           }
           abortController.abort();
-          try {
-            commitStoppedMessage();
-          } catch (error) {
-            console.error('[ConversationService] stop commit failed:', error);
-          }
-          this.clearActiveTurn(assistantMessage.turnId, abortController);
         }
-        settleStopped();
       },
     });
+
+    try {
 
     const commitVisibleAssistantText = () => {
       streamScheduler?.queueText({
@@ -1092,6 +1093,7 @@ export class ConversationService {
     let loopSeq = 1;
     let loopHasTools = false;
     let pendingNewLoop = false;
+    let currentLoopOutputPhase: ConversationLoopOutputPhase | undefined;
     /** Once true for this turn, process commentary must not stream into the answer bubble. */
     let turnHasProcessEvidence = false;
     /** After ask_user pause, subsequent assistant content must not reuse the ask commentary loop. */
@@ -1105,6 +1107,12 @@ export class ConversationService {
     const markProcessEvidence = () => {
       turnHasProcessEvidence = true;
     };
+    const markLoopCommentary = () => {
+      // Commentary evidence is monotonic within a loop. Final-answer phase is
+      // assigned only by assistant.completed after the stop reason is known.
+      currentLoopOutputPhase = 'commentary';
+      markProcessEvidence();
+    };
     const hasPendingContinuation = () => (
       pendingContinuation.approval
       || pendingContinuation.userInput
@@ -1112,16 +1120,7 @@ export class ConversationService {
       || pendingContinuation.handoff
     );
     const resolveStreamingOutputPhase = (): ConversationLoopOutputPhase | undefined => {
-      if (loopHasTools || hasPendingContinuation()) {
-        return 'commentary';
-      }
-      // Post-ask / post-process finals must not sit in WP prose while streaming.
-      // While thinking is in flight, still stamp final_answer so interleaved text tokens
-      // cannot render as commentary prose under Work Process.
-      if (turnHadAskPause || turnHasProcessEvidence || Boolean(currentLoopThinking)) {
-        return 'final_answer';
-      }
-      return undefined;
+      return currentLoopOutputPhase;
     };
     const syncVisibleResponseForStreaming = () => {
       const phase = resolveStreamingOutputPhase();
@@ -1160,6 +1159,7 @@ export class ConversationService {
       loopThinkingStatus: currentLoopThinkingStatus,
     });
     const beginAssistantContentLoop = () => {
+      const previousLoopSeq = loopSeq;
       const next = beginAssistantContentLoopIfPending({
         loopSeq,
         currentLoopText,
@@ -1176,6 +1176,9 @@ export class ConversationService {
       loopHasTools = next.loopHasTools;
       pendingNewLoop = next.pendingNewLoop;
       visibleResponse = next.visibleResponse;
+      if (next.loopSeq !== previousLoopSeq) {
+        currentLoopOutputPhase = undefined;
+      }
     };
 
     if (!routePreflight.ok) {
@@ -1245,6 +1248,12 @@ export class ConversationService {
           timeZone: promptClock.timeZone,
           contextWindowTokens: capability?.nominalContextWindowTokens ?? undefined,
         });
+        const visibleTurnIds = sessionId
+          ? Array.from(new Set(resolveVisibleConversationMessages(
+              storageAdapter.readConversationHistory(sessionId),
+              this.readRepairedBranchState(sessionId, storageAdapter.readConversationHistory(sessionId)),
+            ).filter((message) => message.turnId !== assistantMessage.turnId).map((message) => message.turnId)))
+          : [];
         const responseText = await agentOrchestrator.sendProfileMessage(
           conversationAgentId,
           input.rawMessage,
@@ -1260,6 +1269,15 @@ export class ConversationService {
             temperature: 0.35,
             signal: abortController.signal,
             turnControls,
+            visibleTurnIds,
+            activeBranchId: assistantMessage.branchId ?? input.userMessage.branchId ?? ROOT_BRANCH_ID,
+            onTerminalContext: (result) => {
+              terminalContext.value = {
+                messages: result.messages,
+                route: result.route,
+                status: result.status,
+              };
+            },
             onEvent: (event: AgentEvent) => {
               this.emitConversationEvent({
                 type: 'agent_event',
@@ -1424,7 +1442,7 @@ export class ConversationService {
                   const loopScoped = isLoopTool(String(payload.toolCall.name));
                   if (loopScoped) {
                     loopHasTools = true;
-                    markProcessEvidence();
+                    markLoopCommentary();
                     // Tool loops keep commentary in Work Process; clear bubble flash.
                     if (visibleResponse) {
                       visibleResponse = '';
@@ -1459,7 +1477,7 @@ export class ConversationService {
                 const loopScoped = isLoopTool(String(event.payload.toolName));
                 if (loopScoped) {
                   loopHasTools = true;
-                  markProcessEvidence();
+                  markLoopCommentary();
                 }
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
@@ -1476,7 +1494,10 @@ export class ConversationService {
                   ? event.payload.reason
                   : 'Profile policy denied this tool call.';
                 const loopScopedDenied = isLoopTool(String(event.payload.toolName));
-                if (loopScopedDenied) loopHasTools = true;
+                if (loopScopedDenied) {
+                  loopHasTools = true;
+                  markLoopCommentary();
+                }
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertRuntimeToolCall(assistantMessage.workTrace, {
                     id: String(event.payload.toolCallId),
@@ -1509,21 +1530,21 @@ export class ConversationService {
                   // Force the next assistant content onto a fresh loop even if that earlier
                   // completed handler missed the pause (ask_user is not a loop-scoped tool).
                   pendingNewLoop = true;
-                  markProcessEvidence();
+                  markLoopCommentary();
                   // Retract any mis-classified final_answer bubble text from the ask pause.
                   if (visibleResponse) {
                     visibleResponse = '';
                     commitVisibleAssistantText();
                   }
                   const questions = normalizeAskUserQuestions({ questions: payload.questions });
-                  const previewQuestions = questions.length > 0 ? questions : [createFallbackAskUserQuestion()];
                   commitAssistantMessage('message_patched', {
                     workTrace: upsertLoopResult(
                       upsertRuntimeToolCall(assistantMessage.workTrace, {
                         id: toolCallId,
                         toolName: 'ask_user',
                         status: 'running',
-                        argsPreview: JSON.stringify({ questions: previewQuestions }),
+                        userInputQuestions: questions,
+                        argsPreview: questions.map((question) => question.prompt).join(' | ').slice(0, 600),
                         startedAt: nowMs(),
                       }),
                       currentLoopId(),
@@ -1541,7 +1562,7 @@ export class ConversationService {
                   ? payload.reason
                   : 'This action requires user approval before it can run.';
                 pendingContinuation.approval = true;
-                markProcessEvidence();
+                markLoopCommentary();
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertRuntimeToolApproval(assistantMessage.workTrace, {
                     approvalId,
@@ -1613,6 +1634,7 @@ export class ConversationService {
                 }
                 if (isHandoffTool && result?.ok) {
                   pendingContinuation.handoff = true;
+                  markLoopCommentary();
                 }
                 const toolCallPatch: Partial<ConversationToolCall> & { id: string; toolName: string } = {
                   id: String(event.payload.toolCallId),
@@ -1667,6 +1689,7 @@ export class ConversationService {
               if (event.type === 'subagent.started') {
                 const payload = event.payload as { subagentId: string; profile: string; parentToolCallId: string; text?: string };
                 pendingContinuation.subagent = true;
+                markLoopCommentary();
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `subagent-${payload.subagentId}`, {
                     kind: 'subagent',
@@ -1755,11 +1778,13 @@ export class ConversationService {
                   currentLoopThinking = completedThinking;
                   currentLoopThinkingStatus = 'complete';
                 }
-                const outputPhase = resolveConversationLoopOutputPhase({
+                const resolvedOutputPhase = resolveConversationLoopOutputPhase({
                   stopReason,
                   loopHasTools,
                   hasPendingContinuation: pendingContinuation,
                 });
+                const outputPhase = currentLoopOutputPhase ?? resolvedOutputPhase;
+                currentLoopOutputPhase = outputPhase;
                 const reasoningState = resolveConversationReasoningState(
                   completedThinking,
                   routePreflight.routeCapability.reasoningDelivery,
@@ -1857,11 +1882,7 @@ export class ConversationService {
       }
     }
 
-    if (abortController.signal.aborted || runWasCancelled) {
-      this.clearActiveTurn(assistantMessage.turnId, abortController);
-      settleStopped();
-      return;
-    }
+    if (abortController.signal.aborted || runWasCancelled) return;
     const assistantContent = (currentLoopText.trim() || rawResponse || visibleResponse).trim();
     visibleResponse = assistantContent;
     const isRouteMissingDiagnostic = llmDiagnostic?.code === 'CONVERSATION_LLM_ROUTE_MISSING';
@@ -1876,11 +1897,7 @@ export class ConversationService {
         ? 'error'
         : 'complete';
 
-    if (abortController.signal.aborted || runWasCancelled) {
-      this.clearActiveTurn(assistantMessage.turnId, abortController);
-      settleStopped();
-      return;
-    }
+    if (abortController.signal.aborted || runWasCancelled) return;
 
     const outputSummary = llmDiagnostic
       ? llmDiagnostic.code === 'CONVERSATION_LLM_REQUEST_FAILED'
@@ -1938,22 +1955,129 @@ export class ConversationService {
       }
     }
 
-    this.clearActiveTurn(assistantMessage.turnId, abortController);
-    settleStopped();
+    } finally {
+      if (abortController.signal.aborted && !conversationPersistenceError && assistantMessage.status === 'streaming') {
+        try {
+          commitStoppedMessage();
+        } catch (error) {
+          console.error('[ConversationService] terminal stop commit failed:', error);
+        }
+      }
+      if (sessionId && terminalContext.value && !conversationPersistenceError) {
+        const capturedContext = terminalContext.value;
+        try {
+          this.assertTerminalContextOwnership(
+            sessionId,
+            assistantMessage.turnId,
+            input.userMessage.id,
+            assistantMessage.id,
+            capturedBranchId,
+          );
+          sessionContextJournal.append(sessionId, {
+            schemaVersion: 1,
+            turnId: assistantMessage.turnId,
+            userMessageId: input.userMessage.id,
+            assistantMessageId: assistantMessage.id,
+            branchId: capturedBranchId,
+            agentId: conversationAgentId,
+            route: capturedContext.route,
+            controls: turnControls ?? { reasoningLevel: 'off', maxContextMode: false, fastModel: false },
+            status: assistantMessage.status === 'stopped' ? 'stopped' : assistantMessage.status === 'error' ? 'error' : capturedContext.status,
+            messages: capturedContext.messages,
+            createdAt: input.userMessage.createdAt,
+            completedAt: assistantMessage.updatedAt ?? nowMs(),
+          });
+        } catch (error) {
+          console.error(`[ConversationService] Context journal append failed for ${assistantMessage.turnId}:`, error);
+          if (assistantMessage.status !== 'stopped') {
+            assistantMessage = {
+              ...assistantMessage,
+              status: 'error',
+              diagnostic: {
+                code: 'CONVERSATION_LLM_REQUEST_FAILED',
+                severity: 'error',
+                userMessage: 'Conversation context could not be saved. Retry before continuing.',
+                technicalMessage: error instanceof Error ? error.message : String(error),
+              },
+              updatedAt: nowMs(),
+            };
+            const terminalPersistError = this.persistConversationSnapshot(sessionId, assistantMessage);
+            if (terminalPersistError) {
+              console.error(
+                `[ConversationService] Failed to persist context-persistence error for ${assistantMessage.turnId}; subsequent materialization will fail closed.`,
+                terminalPersistError,
+              );
+            }
+            this.emitConversationEvent({
+              type: 'message_errored',
+              sessionId,
+              turnId: assistantMessage.turnId,
+              message: assistantMessage,
+            });
+            this.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
+          }
+        }
+      }
+      this.clearActiveTurn(assistantMessage.turnId, abortController);
+      settleStopped();
+    }
   }
 
-  private persistConversationSnapshot(sessionId: string | null | undefined, message: ConversationMessage) {
+  private persistConversationSnapshot(
+    sessionId: string | null | undefined,
+    message: ConversationMessage,
+  ): Error | null {
     if (!sessionId) {
-      return;
+      return null;
     }
     try {
       storageAdapter.appendConversationMessage(sessionId, message);
+      return null;
     } catch (error) {
-      // Fail-soft: missing/deleted session must not crash rewrite or streaming flushes.
-      console.error(
-        `[ConversationService] Failed to persist conversation snapshot for ${sessionId}:`,
-        error instanceof Error ? error.message : error,
-      );
+      const normalized = error instanceof Error ? error : new Error(String(error));
+      if (/^Session not found for conversation history:/i.test(normalized.message)) {
+        console.info(`[ConversationService] Ignored conversation write after session teardown for ${sessionId}.`);
+        return null;
+      }
+      console.error(`[ConversationService] Failed to persist conversation snapshot for ${sessionId}:`, normalized);
+      return normalized;
+    }
+  }
+
+  private assertTerminalContextOwnership(
+    sessionId: string,
+    turnId: string,
+    userMessageId: string,
+    assistantMessageId: string,
+    branchId: string,
+  ): void {
+    const history = storageAdapter.readConversationHistory(sessionId);
+    const user = history.find((message) => message.id === userMessageId);
+    const assistant = history.find((message) => message.id === assistantMessageId);
+    const normalizedBranchId = normalizeBranchId(branchId);
+    if (
+      !user
+      || user.role !== 'user'
+      || user.turnId !== turnId
+      || normalizeBranchId(user.branchId) !== normalizedBranchId
+      || !assistant
+      || assistant.role !== 'assistant'
+      || assistant.turnId !== turnId
+      || normalizeBranchId(assistant.branchId) !== normalizedBranchId
+    ) {
+      throw new Error(`Conversation message ownership changed before context journal append for turn ${turnId}.`);
+    }
+    if (normalizedBranchId === ROOT_BRANCH_ID) return;
+    const branchState = storageAdapter.readConversationBranchState(sessionId);
+    const concreteBranch = branchState?.forks
+      .flatMap((fork) => fork.branches)
+      .find((branch) => branch.branchId === normalizedBranchId);
+    if (
+      !concreteBranch
+      || concreteBranch.anchorUserMessageId !== userMessageId
+      || concreteBranch.rootTurnId !== turnId
+    ) {
+      throw new Error(`Conversation branch ownership changed before context journal append for turn ${turnId}.`);
     }
   }
 

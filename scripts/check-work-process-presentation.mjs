@@ -445,8 +445,8 @@ const askUserPresentation = buildWorkProcessPresentation({
           id: 'tool-ask',
           toolName: 'ask_user',
           status: 'running',
-          argsPreview: JSON.stringify({
-            questions: [{
+          argsPreview: '2 questions',
+          userInputQuestions: [{
               questionId: 'smoke-path',
               prompt: 'Which smoke path should I use?',
               options: [
@@ -458,7 +458,6 @@ const askUserPresentation = buildWorkProcessPresentation({
               prompt: 'What should I call this smoke run?',
               options: [],
             }],
-          }),
           startedAt: now + 3000,
         },
       ],
@@ -708,8 +707,8 @@ assert(
   'commentary visibility must not require toolCalls on the same loop',
 );
 assert(
-  /isStreaming\s*&&\s*outputPhase\s*!==\s*'final_answer'/.test(presentationSource),
-  'streaming final_answer must not enter Work Process prose',
+  /canShow\s*=\s*isMeaningfulText\(commentary\)\s*&&\s*outputPhase\s*===\s*'commentary'/.test(presentationSource),
+  'only explicitly classified commentary may enter Work Process prose',
 );
 assert(
   (() => {
@@ -724,13 +723,14 @@ assert(
   'ask/commentary pauses must set pendingNewLoop, stamp streaming outputPhase, and avoid CoT final flash',
 );
 assert(
-  /\.work-process-user-input-transcript\s*\{[^}]*gap:\s*var\(--space-3\)/.test(cssSource),
+  /\.work-process-user-input-transcript\s*\{[^}]*gap:\s*var\(--space-4\)/.test(cssSource),
   'Asked transcript items should use space-3 gap between numbered Q/A pairs',
 );
 assert(
   componentSource.includes('work-process-user-input-transcript-index')
     && /\.work-process-user-input-transcript-item\s*\{[^}]*grid-template-columns:\s*auto\s+minmax\(0,\s*1fr\)/.test(cssSource)
-    && /\.work-process-user-input-transcript-answer[\s\S]*?padding-left:\s*var\(--space-3\)/.test(cssSource),
+    && !componentSource.includes('work-process-user-input-options')
+    && !componentSource.includes('work-process-user-input-transcript-description'),
   'Asked transcript should number questions in a grid and indent answers under the prompt',
 );
 assert(

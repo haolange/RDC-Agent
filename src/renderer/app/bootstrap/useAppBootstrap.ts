@@ -108,16 +108,18 @@ export function useAppBootstrap(options: {
       return;
     }
 
-    if (navigator.webdriver && runtimeTestMode) {
+    if (runtimeTestMode === null) {
       return;
     }
 
+    let cancelled = false;
     void (async () => {
       const [historyResult, evidenceResult, traceResult] = await Promise.all([
         electronAPI.conversation.getHistory(currentSession.sessionId).catch(() => ({ messages: [], branchState: null })),
         electronAPI.evidence.getChain().catch(() => ({ events: [] as ActionEvent[] })),
         electronAPI.trace.getProjection(currentSession.sessionId).catch(() => ({ success: false, presentation: null })),
       ]);
+      if (cancelled) return;
       setConversationSnapshot(
         hydrateMessagesWithActionEvents(
           historyResult.messages ?? [],
@@ -127,6 +129,7 @@ export function useAppBootstrap(options: {
       );
       setTracePresentation(traceResult.presentation ?? null);
     })();
+    return () => { cancelled = true; };
   }, [currentSession?.sessionId, runtimeTestMode, setConversationSnapshot, setTracePresentation]);
 
   useEffect(() => {
@@ -264,6 +267,4 @@ function useSessionRestoreBootstrap(runtimeTestMode: boolean | null): void {
       });
   }, [currentSession?.sessionId, runtimeTestMode]);
 }
-
-
 

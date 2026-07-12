@@ -129,6 +129,7 @@ export const useProviderConnectionDraft = ({
       usingStoredSecret: provider.authMode === 'api-key' && provider.hasStoredSecret,
       busy: 'idle',
       error: '',
+      discoveryDiagnostic: null,
       testedApiKey: '',
       testedBaseUrl: '',
       testedProtocol: provider.protocol,

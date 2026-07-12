@@ -5,10 +5,6 @@ import type {
   ConversationMessage,
   ConversationToolCall,
 } from '@shared/types/conversation';
-import {
-  createFallbackAskUserQuestion,
-  normalizeAskUserQuestions,
-} from '@shared/utils/askUser';
 
 export interface PendingUserInputRequest {
   sessionId: string | null;
@@ -27,19 +23,12 @@ export type UserInputAnswerDrafts = Record<string, UserInputAnswerDraft>;
 
 const normalizeToolName = (toolName: string): string => toolName.trim().toLowerCase().replace(/[.-]/g, '_');
 
-const safeParseJson = (value?: string): unknown => {
-  if (!value?.trim()) return undefined;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return undefined;
-  }
-};
-
-export const parseAskUserQuestions = (call: ConversationToolCall): ConversationAskUserQuestion[] => {
-  const questions = normalizeAskUserQuestions(safeParseJson(call.argsPreview));
-  return questions.length > 0 ? questions : [createFallbackAskUserQuestion()];
-};
+export const readAskUserQuestions = (call: ConversationToolCall): ConversationAskUserQuestion[] => (
+  call.userInputQuestions?.map((question) => ({
+    ...question,
+    options: question.options.map((option) => ({ ...option })),
+  })) ?? []
+);
 
 export const findPendingUserInput = (messages: ConversationMessage[]): PendingUserInputRequest | null => {
   const assistantMessages = messages
@@ -57,7 +46,7 @@ export const findPendingUserInput = (messages: ConversationMessage[]): PendingUs
           sessionId: message.sessionId,
           turnId: message.turnId,
           toolCallId: call.id,
-          questions: parseAskUserQuestions(call),
+          questions: readAskUserQuestions(call),
           agentId: message.agentId,
         };
       }

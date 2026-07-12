@@ -3,6 +3,7 @@ import type { LlmProviderModel } from '@shared/types/settings';
 import {
   mergeManagedModelAvailability,
   normalizeCodingPlanModelMatchKey,
+  selectSupportedCodingPlanModels,
   resolveCodingPlanModelsUrl,
   resolveVolcengineCodingPlanModelsUrl,
 } from './ProviderConnectionService';
@@ -61,7 +62,7 @@ describe('coding-plan Anthropic discovery routing', () => {
     );
     expect(source).toContain('resolveVolcengineCodingPlanModelsUrl');
     expect(source).toContain('validateCodingPlanModels');
-    expect(source).toContain('fallbackAvailableOnEmptyMatch');
+    expect(source).toContain('selectSupportedCodingPlanModels');
   });
 });
 
@@ -161,16 +162,13 @@ describe('mergeManagedModelAvailability', () => {
     expect(models[0]?.availabilityReason).toMatch(/meta model/i);
   });
 
-  it('falls back to catalog-available when Volcengine list auth succeeds but nothing matches', () => {
+  it('hides Volcengine catalog models that were not confirmed by discovery', () => {
     const models = mergeManagedModelAvailability(
       managed('doubao-seed-2.0-code', 'glm-5.2'),
       [{ id: 'ark-code-latest', label: 'ark-code-latest', enabled: true }],
-      { fallbackAvailableOnEmptyMatch: true },
     );
-    expect(models).toEqual([
-      expect.objectContaining({ id: 'doubao-seed-2.0-code', enabled: true, availability: 'available' }),
-      expect.objectContaining({ id: 'glm-5.2', enabled: true, availability: 'available' }),
-    ]);
+    expect(selectSupportedCodingPlanModels('volcengine-coding-plan', models)).toEqual([]);
+    expect(selectSupportedCodingPlanModels('kimi-coding-plan', models)).toEqual(models);
   });
 
   it('keeps the catalog unchanged when no live model list is available', () => {

@@ -22,7 +22,6 @@ export {
 } from './agentModelRoute';
 export { charsToTokens } from './tokens';
 export {
-  createFallbackAskUserQuestion,
   DEFAULT_ASK_USER_PROMPT,
   formatAskUserAnswersForToolResult,
   normalizeAskUserAnswers,

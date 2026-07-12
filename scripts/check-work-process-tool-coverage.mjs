@@ -184,8 +184,8 @@ const FIXTURES = {
     resultPreview: toolEnvelope('capture: demo.rdc', { capturePath: 'demo.rdc' }),
   },
   ask_user: {
-    argsPreview: JSON.stringify({
-      questions: [{
+    argsPreview: '1 question',
+    userInputQuestions: [{
         questionId: 'continue',
         prompt: 'Continue?',
         options: [
@@ -193,7 +193,6 @@ const FIXTURES = {
           { optionId: 'no', label: 'No' },
         ],
       }],
-    }),
     resultPreview: toolEnvelope('Yes', {
       answers: [{ questionId: 'continue', answer: 'Yes', selectedOptionId: 'yes' }],
     }),
@@ -239,6 +238,7 @@ for (const toolName of allTools) {
     id: `tool-${toolName}`,
     toolName,
     status: 'complete',
+    userInputQuestions: fixture.userInputQuestions,
     argsPreview: fixture.argsPreview,
     resultPreview: fixture.resultPreview,
     startedAt: now,

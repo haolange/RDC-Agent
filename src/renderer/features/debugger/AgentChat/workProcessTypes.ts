@@ -61,7 +61,6 @@ export interface WorkProcessUserInputItem {
   questionId: string;
   prompt: string;
   answer?: string;
-  selectedOptionId?: string;
 }
 
 export type WorkProcessRow =
@@ -124,6 +123,8 @@ export type WorkProcessRow =
     verb: string;
     questionCount: number;
     items: WorkProcessUserInputItem[];
+    answeredCount: number;
+    incomplete: boolean;
     error?: string;
     duration: string;
   }

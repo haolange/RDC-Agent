@@ -74,6 +74,10 @@ export function createDraftWorkTrace(summary?: string, blocks: ConversationWorkB
 function cloneToolCall(toolCall: ConversationToolCall): ConversationToolCall {
   return {
     ...toolCall,
+    userInputQuestions: toolCall.userInputQuestions?.map((question) => ({
+      ...question,
+      options: question.options.map((option) => ({ ...option })),
+    })),
     approval: toolCall.approval ? { ...toolCall.approval } : undefined,
   };
 }
@@ -256,6 +260,12 @@ export function upsertRuntimeToolCall(
     block.toolCalls[toolIndex] = {
       ...existingToolCall,
       ...patch,
+      userInputQuestions: patch.userInputQuestions
+        ? patch.userInputQuestions.map((question) => ({
+            ...question,
+            options: question.options.map((option) => ({ ...option })),
+          }))
+        : existingToolCall.userInputQuestions,
       approval: nextApproval,
     };
   } else {
@@ -263,6 +273,10 @@ export function upsertRuntimeToolCall(
       id: patch.id,
       toolName: patch.toolName,
       status: patch.status ?? 'pending',
+      userInputQuestions: patch.userInputQuestions?.map((question) => ({
+        ...question,
+        options: question.options.map((option) => ({ ...option })),
+      })),
       argsPreview: patch.argsPreview,
       resultPreview: patch.resultPreview,
       error: patch.error,

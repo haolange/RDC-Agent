@@ -24,5 +24,8 @@ if errorlevel 1 exit /b %ERRORLEVEL%
 
 echo [RDC-Agent] Starting visible Electron React WebUI from build output...
 echo [RDC-Agent] The same main process will also print the /app browser session URL.
+set "RDC_AGENT_HEADLESS=0"
+set "RDC_AGENT_TEST_MODE=0"
+set "NODE_ENV=production"
 call "node_modules\electron\dist\electron.exe" "out\main\index.js"
 exit /b %ERRORLEVEL%

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { useI18n } from '../../../i18n';
 import { ActiveSignalText } from '../../../ui/ActiveSignalText';
 import { getRowStatusLabel, type WorkProcessRow } from './workProcessPresentation';
@@ -54,45 +54,61 @@ export const UserInputRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'user
   const { t } = useI18n();
   const label = useWorkProcessLabel();
   const active = isActiveWorkProcessStatus(row.status);
-  const headerText = `${label(row.verb)} · ${row.questionCount}`;
+  const [expanded, setExpanded] = useState(row.status !== 'complete');
+  const transcriptId = useId();
+  useEffect(() => setExpanded(row.status !== 'complete'), [row.id, row.status]);
+  const headerText = row.incomplete
+    ? label(row.verb)
+    : t('chat.workProcessAskCount', { verb: label(row.verb), count: row.questionCount });
   const pendingAnswerLabel = row.status === 'error'
     ? t('chat.workProcessUserAnswerMissing')
     : t('chat.workProcessUserAnswerPending');
+  const transcriptError = row.incomplete ? t('chat.userInputIncomplete') : row.error;
 
   return (
     <li className={`work-process-step is-appear status-${row.status} kind-user-input`} data-testid="work-process-user-input">
       <WorkProcessRailIcon variant="step" status={row.status} />
       <div className="work-process-step-content">
-        <div className="work-process-user-input" data-testid="work-process-user-input-transcript">
-          <div className="work-process-user-input-header">
+        <div className={`work-process-user-input${expanded ? ' is-expanded' : ''}`} data-testid="work-process-user-input-transcript">
+          <button
+            type="button"
+            className="work-process-user-input-header"
+            aria-controls={transcriptId}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((value) => !value)}
+          >
             {active ? (
-              <ActiveSignalText active tone="interaction" className="work-process-user-input-verb">
-                {headerText}
-              </ActiveSignalText>
-            ) : (
-              <span className="work-process-user-input-verb">{headerText}</span>
-            )}
-          </div>
-          <ol className="work-process-user-input-transcript">
-            {row.items.map((item, index) => (
-              <li className="work-process-user-input-transcript-item" key={item.questionId}>
-                <span className="work-process-user-input-transcript-index" aria-hidden="true">
-                  {index + 1}.
-                </span>
-                <p className="work-process-user-input-transcript-question">{item.prompt}</p>
-                {item.answer ? (
-                  <p className="work-process-user-input-transcript-answer">{item.answer}</p>
-                ) : (
-                  <p className="work-process-user-input-transcript-pending">{pendingAnswerLabel}</p>
-                )}
-              </li>
-            ))}
-            {row.error ? (
-              <li className="work-process-user-input-transcript-error" role="presentation">
-                {row.error}
-              </li>
+              <ActiveSignalText active tone="interaction" className="work-process-user-input-verb">{headerText}</ActiveSignalText>
+            ) : <span className="work-process-user-input-verb">{headerText}</span>}
+            {row.status !== 'complete' ? (
+              <span className="work-process-user-input-progress">{row.answeredCount}/{row.questionCount}</span>
             ) : null}
-          </ol>
+            <span className={`work-process-row-caret${expanded ? ' is-open' : ''}`} aria-hidden="true" />
+          </button>
+          {!expanded && !row.incomplete && row.items[0] ? (
+            <p className="work-process-user-input-collapsed-summary">
+              <span className="work-process-user-input-collapsed-question">{row.items[0].prompt}</span>
+              {row.questionCount > 1 ? (
+                <span className="work-process-user-input-collapsed-count">
+                  {t('chat.workProcessAskRemaining', { count: row.questionCount - 1 })}
+                </span>
+              ) : null}
+            </p>
+          ) : null}
+          {expanded ? (
+            <ol id={transcriptId} className="work-process-user-input-transcript">
+              {row.items.map((item, index) => (
+                <li className="work-process-user-input-transcript-item" key={item.questionId}>
+                  <span className="work-process-user-input-transcript-index" aria-hidden="true">{index + 1}.</span>
+                  <p className="work-process-user-input-transcript-question">{item.prompt}</p>
+                  {item.answer ? <p className="work-process-user-input-transcript-answer">{item.answer}</p> : (
+                    <p className="work-process-user-input-transcript-pending">{pendingAnswerLabel}</p>
+                  )}
+                </li>
+              ))}
+              {transcriptError ? <li className="work-process-user-input-transcript-error" role="alert">{transcriptError}</li> : null}
+            </ol>
+          ) : null}
         </div>
       </div>
     </li>

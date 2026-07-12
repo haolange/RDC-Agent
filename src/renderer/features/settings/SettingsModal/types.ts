@@ -2,6 +2,7 @@ import type {
   LlmProviderAccountLoginMode,
   LlmProviderAccountStatus,
   LlmProviderCatalogResponse,
+  LlmProviderConnectionResult,
   LlmProviderModel,
   LlmProviderProtocol,
 } from '@shared/types/settings';
@@ -19,6 +20,7 @@ export interface ProviderConnectionDraft {
   usingStoredSecret: boolean;
   busy: ProviderConnectionBusyState;
   error: string;
+  discoveryDiagnostic: LlmProviderConnectionResult['discoveryDiagnostic'] | null;
   testedApiKey: string;
   testedBaseUrl: string;
   testedProtocol: ProviderProtocol;

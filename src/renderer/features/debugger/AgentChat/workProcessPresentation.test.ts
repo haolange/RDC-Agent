@@ -13,7 +13,7 @@ function flattenWorkRows(rows: ReturnType<typeof buildWorkProcessPresentation>['
 }
 
 describe('buildWorkProcessPresentation', () => {
-  it('projects streaming commentary even before tools arrive', () => {
+  it('withholds unclassified streaming prose before tools arrive', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'running',
       summary: 'Agent is working',
@@ -31,13 +31,7 @@ describe('buildWorkProcessPresentation', () => {
       ],
     });
 
-    expect(presentation.rows).toHaveLength(1);
-    expect(presentation.rows[0]).toMatchObject({
-      type: 'section',
-      proseText: 'Hello from the assistant',
-      proseStreaming: true,
-      thinkingLabel: '',
-    });
+    expect(presentation.rows).toHaveLength(0);
   });
 
   it('projects streaming commentary as prose without promoting it into thinking', () => {
@@ -50,7 +44,12 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'running',
-          result: { text: 'Inspecting capture metadata', status: 'streaming', toolCallIds: [] },
+          result: {
+            text: 'Inspecting capture metadata',
+            status: 'streaming',
+            toolCallIds: [],
+            outputPhase: 'commentary',
+          },
           toolCalls: [],
           startedAt: now,
         },

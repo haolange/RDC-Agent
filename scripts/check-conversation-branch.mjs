@@ -232,12 +232,22 @@ const conversationService = fs.readFileSync(
   'utf8',
 );
 assert(
-  conversationService.includes('rebuildAgentThreadForBranch')
-    && conversationService.includes('invalidateSessionAgentSlots')
+  conversationService.includes('sessionContextJournal.append')
+    && conversationService.includes('visibleTurnIds')
     && conversationService.includes('await Promise.allSettled')
     && conversationService.includes('Failed to persist conversation snapshot')
     && conversationService.includes('settleStopped()'),
-  'rewriteFromMessage must await stopped turns, truncate agent threads, settle stop, and fail-soft on persist',
+  'rewriteFromMessage must await stopped turns, materialize journal context, settle stop, and classify persistence failures',
+);
+const stopImplementation = conversationService.match(/stop:\s*\(\)\s*=>\s*\{([\s\S]*?)\n\s*\},\n\s*\}\);/)?.[1] ?? '';
+const awaitStoppedIndex = conversationService.indexOf('await Promise.allSettled(turnsToStop.map((turn) => turn.stopped))');
+assert(
+  awaitStoppedIndex >= 0
+    && conversationService.indexOf('const history = storageAdapter.readConversationHistory(sessionId);', awaitStoppedIndex) > awaitStoppedIndex
+    && conversationService.includes('this.clearActiveTurn(assistantMessage.turnId, abortController);\n      settleStopped();')
+    && !stopImplementation.includes('settleStopped()')
+    && !stopImplementation.includes('clearActiveTurn('),
+  'stopped must resolve only after completeProfileTurn cleanup, and rewrite must re-read history after awaiting it',
 );
 assert(
   conversationService.includes('turnHadAskPause')

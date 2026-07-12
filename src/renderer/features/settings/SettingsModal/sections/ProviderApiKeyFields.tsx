@@ -30,6 +30,7 @@ export const ProviderApiKeyFields: React.FC<ProviderApiKeyFieldsProps> = ({
           onChange={(event) => onUpdateConnectionDraft({
             baseUrl: event.target.value,
             error: '',
+            discoveryDiagnostic: null,
             testedApiKey: '',
             testedBaseUrl: '',
             models: [],
@@ -55,6 +56,7 @@ export const ProviderApiKeyFields: React.FC<ProviderApiKeyFieldsProps> = ({
             apiKey: event.target.value,
             usingStoredSecret: false,
             error: '',
+            discoveryDiagnostic: null,
             testedApiKey: '',
             testedBaseUrl: '',
             models: [],

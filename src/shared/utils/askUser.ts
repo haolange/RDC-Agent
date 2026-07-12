@@ -77,13 +77,6 @@ export const normalizeAskUserQuestions = (value: unknown): ConversationAskUserQu
   });
 };
 
-export const createFallbackAskUserQuestion = (): ConversationAskUserQuestion => ({
-  questionId: 'q1',
-  prompt: DEFAULT_ASK_USER_PROMPT,
-  options: [],
-  allowFreeform: true,
-});
-
 export const normalizeAskUserAnswers = (
   questions: ConversationAskUserQuestion[],
   value: unknown,

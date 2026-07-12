@@ -271,11 +271,7 @@ function createDeferredVisibleStep(row: WorkProcessRow): WorkProcessRow {
   if (row.type === 'userInput') {
     return {
       ...row,
-      items: row.items.map((item) => ({
-        questionId: item.questionId,
-        prompt: item.prompt,
-        selectedOptionId: item.selectedOptionId,
-      })),
+      items: [...row.items],
     };
   }
   return row;

@@ -8,7 +8,7 @@ import {
   createRequestFingerprint,
   findPendingUserInput,
   isQuestionAnswered,
-  parseAskUserQuestions,
+  readAskUserQuestions,
   type PendingUserInputRequest,
   type UserInputAnswerDrafts,
 } from './userInputRequestModel';
@@ -33,12 +33,12 @@ const questions: ConversationAskUserQuestion[] = [
 ];
 
 describe('userInputRequestModel', () => {
-  it('parses canonical batch questions from ask_user argsPreview', () => {
-    const parsed = parseAskUserQuestions({
+  it('reads canonical batch questions from the structured ask_user payload', () => {
+    const parsed = readAskUserQuestions({
       id: 'tool-ask',
       toolName: 'ask_user',
       status: 'running',
-      argsPreview: JSON.stringify({ questions }),
+      userInputQuestions: questions,
       startedAt: 1,
     });
 
@@ -46,6 +46,34 @@ describe('userInputRequestModel', () => {
     expect(parsed[0]?.questionId).toBe('direction');
     expect(parsed[0]?.prompt).toBe('Where should I start?');
     expect(parsed[0]?.options[0]).toMatchObject({ optionId: 'repo', label: 'Repo structure' });
+  });
+
+  it('fails closed when an ask_user tool call has no structured questions', () => {
+    expect(readAskUserQuestions({
+      id: 'tool-ask',
+      toolName: 'ask_user',
+      status: 'running',
+      argsPreview: JSON.stringify({ questions }),
+      startedAt: 1,
+    })).toEqual([]);
+  });
+
+  it('keeps structured questions intact when the display preview is truncated', () => {
+    const longQuestions = questions.map((question) => ({
+      ...question,
+      prompt: `${question.prompt} ${'detail '.repeat(120)}`,
+    }));
+    const parsed = readAskUserQuestions({
+      id: 'tool-ask',
+      toolName: 'ask_user',
+      status: 'running',
+      argsPreview: JSON.stringify({ questions: longQuestions }).slice(0, 600),
+      userInputQuestions: longQuestions,
+      startedAt: 1,
+    });
+
+    expect(parsed).toHaveLength(2);
+    expect(parsed[1]?.prompt).toBe(longQuestions[1]?.prompt);
   });
 
   it('builds a complete structured answer payload after option and custom drafts', () => {
@@ -104,7 +132,7 @@ describe('userInputRequestModel', () => {
             id: 'tool-ask',
             toolName: 'ask_user',
             status: 'running',
-            argsPreview: JSON.stringify({ questions }),
+            userInputQuestions: questions,
             startedAt: 1,
           }],
         }],

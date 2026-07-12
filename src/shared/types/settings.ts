@@ -389,6 +389,12 @@ export interface LlmProviderConnectionResult {
   success: boolean;
   provider?: LlmProviderEntry;
   models: LlmProviderModel[];
+  discoveryDiagnostic?: {
+    status: 'matched' | 'no-supported-models';
+    discoveredModelCount: number;
+    matchedModelCount: number;
+    filteredModelCount: number;
+  };
   error?: string;
 }
 

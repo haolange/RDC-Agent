@@ -210,7 +210,6 @@ ConversationWorkTrace
 countJsonl
 createBuiltinProviderEntries
 createBuiltinProviderEntry
-createFallbackAskUserQuestion
 createReasoningControl
 CreateRunResponse
 DebugSessionStartRequest

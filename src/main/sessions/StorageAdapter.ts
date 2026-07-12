@@ -41,8 +41,7 @@ import type {
   SelectionState,
   SessionEvidenceRecord,
 } from './storageTypes';
-import type { AgentMessage, AssistantMessage } from '../agent-runtime/core/types';
-import { normalizeThinkingContent } from '../agent-runtime/reasoning/ReasoningArtifacts';
+import type { SessionContextTurnEntry } from '../conversation/SessionContextJournal';
 
 export class StorageAdapter {
   private dataRootPath = '';
@@ -631,7 +630,16 @@ export class StorageAdapter {
     sessionId: string,
     state: import('@shared/types/conversationBranch').ConversationBranchState,
   ): void {
-    this.writeJson(this.getConversationBranchStatePath(sessionId), state);
+    const filePath = this.getConversationBranchStatePath(sessionId);
+    const temporaryPath = `${filePath}.${process.pid}.tmp`;
+    this.ensureDir(path.dirname(filePath));
+    fs.writeFileSync(temporaryPath, JSON.stringify(state, null, 2), 'utf-8');
+    try {
+      fs.renameSync(temporaryPath, filePath);
+    } catch (error) {
+      if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
+      throw error;
+    }
   }
 
   getSessionAttachmentsDir(sessionId: string): string {
@@ -672,57 +680,41 @@ export class StorageAdapter {
     return artifactPath;
   }
 
-  /**
-   * Agent 线程持久化目录：`{sessionPath}/agent-threads/`。
-   *
-   * Agent 线程保存完整 AgentMessage（含 toolCall/toolResult/usage/stopReason），
-   * 作为长生命周期 Agent 跨轮记忆与 session 续接的真实上下文来源。
-   * 与 conversation.jsonl（UI 投影源）并存，互不替代。
-   */
-  getAgentThreadPath(sessionId: string, agentId: string): string {
+  getSessionContextJournalPath(sessionId: string): string {
     const location = this.findSessionLocation(sessionId);
-    if (!location) {
-      throw new Error(`Session not found for agent thread: ${sessionId}`);
-    }
-    const threadsDir = path.join(location.sessionPath, 'agent-threads');
-    this.ensureDir(threadsDir);
-    const safeAgentId = agentId.replace(/[^a-zA-Z0-9_-]/g, '_');
-    return path.join(threadsDir, `${safeAgentId}.jsonl`);
+    if (!location) throw new Error(`Session not found for context journal: ${sessionId}`);
+    return path.join(location.sessionPath, 'session-context.jsonl');
   }
 
-  readAgentThread(sessionId: string, agentId: string): AgentMessage[] {
-    const threadPath = this.getAgentThreadPath(sessionId, agentId);
-    if (!fs.existsSync(threadPath)) {
-      return [];
-    }
-    return readJsonl<AgentMessage>(threadPath).map(normalizeAgentThreadMessage);
+  readSessionContextJournal(sessionId: string): SessionContextTurnEntry[] {
+    const journalPath = this.getSessionContextJournalPath(sessionId);
+    return fs.existsSync(journalPath) ? readJsonl<SessionContextTurnEntry>(journalPath) : [];
   }
 
-  writeAgentThread(sessionId: string, agentId: string, messages: AgentMessage[]): void {
-    writeJsonl(this.getAgentThreadPath(sessionId, agentId), messages.map(normalizeAgentThreadMessage));
+  appendSessionContextTurn(sessionId: string, entry: SessionContextTurnEntry): void {
+    appendJsonl(this.getSessionContextJournalPath(sessionId), entry);
   }
 
-  clearAgentThread(sessionId: string, agentId?: string): void {
+  readSessionContextMigrationVersion(sessionId: string): number {
     const location = this.findSessionLocation(sessionId);
-    if (!location) {
-      return;
-    }
-    const threadsDir = path.join(location.sessionPath, 'agent-threads');
-    if (!fs.existsSync(threadsDir)) {
-      return;
-    }
-    if (agentId) {
-      const safeAgentId = agentId.replace(/[^a-zA-Z0-9_-]/g, '_');
-      const threadPath = path.join(threadsDir, `${safeAgentId}.jsonl`);
-      if (fs.existsSync(threadPath)) {
-        fs.unlinkSync(threadPath);
-      }
-      return;
-    }
-    for (const entry of fs.readdirSync(threadsDir)) {
-      if (entry.endsWith('.jsonl')) {
-        fs.unlinkSync(path.join(threadsDir, entry));
-      }
+    if (!location) throw new Error(`Session not found for context migration: ${sessionId}`);
+    const markerPath = path.join(location.sessionPath, 'session-context-version.json');
+    if (!fs.existsSync(markerPath)) return 0;
+    const marker = this.readJson<{ version?: number }>(markerPath);
+    return marker?.version === 1 ? 1 : 0;
+  }
+
+  writeSessionContextMigrationVersion(sessionId: string): void {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) throw new Error(`Session not found for context migration: ${sessionId}`);
+    const markerPath = path.join(location.sessionPath, 'session-context-version.json');
+    const temporaryPath = `${markerPath}.${process.pid}.tmp`;
+    fs.writeFileSync(temporaryPath, JSON.stringify({ version: 1 }, null, 2), 'utf8');
+    try {
+      fs.renameSync(temporaryPath, markerPath);
+    } catch (error) {
+      if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
+      throw error;
     }
   }
 
@@ -1504,14 +1496,5 @@ export class StorageAdapter {
   }
 }
 
-
-function normalizeAgentThreadMessage(message: AgentMessage): AgentMessage {
-  if (message.role !== 'assistant') return message;
-  const assistant = message as AssistantMessage;
-  return {
-    ...assistant,
-    content: assistant.content.map((block) => normalizeThinkingContent(block) ?? block),
-  };
-}
 
 export const storageAdapter = new StorageAdapter();
