@@ -44,6 +44,8 @@ export interface AppStatePaths {
   logPath: string;
   capturePreviewsPath: string;
   profileStatePath: string;
+  canvasesPath: string;
+  generativeUiEvaluationPath: string;
 }
 
 /**
@@ -104,6 +106,8 @@ export class AppPathService {
       logPath: path.join(logsPath, LOG_FILE_NAME),
       capturePreviewsPath: path.join(userDataRoot, 'capture-previews'),
       profileStatePath: path.join(appStateRoot, 'profile'),
+      canvasesPath: path.join(appStateRoot, 'canvases'),
+      generativeUiEvaluationPath: path.join(appStateRoot, 'generative-ui-evaluation'),
     };
   }
 
@@ -148,6 +152,8 @@ export class AppPathService {
       paths.logsPath,
       paths.capturePreviewsPath,
       paths.profileStatePath,
+      paths.canvasesPath,
+      paths.generativeUiEvaluationPath,
     ];
     directories.forEach((directory) => fs.mkdirSync(directory, { recursive: true }));
     return paths;

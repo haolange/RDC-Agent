@@ -109,6 +109,7 @@ const ASK_DENIED_TOOLS = new Set([
   'memory_write',
   'memory_delete',
   'plan_artifact',
+  'generative_ui',
 ]);
 
 const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
@@ -142,6 +143,7 @@ const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
   'copy_file',
   'notebook_edit',
   'tool_search',
+  'generative_ui',
 ];
 
 const SHADER_EDIT_TOOLS = ['rd.shader.edit_and_replace', 'rd.macro.shader_hotfix_validate'];

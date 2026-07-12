@@ -17,6 +17,7 @@ const node_crypto = require("node:crypto");
 const node_fs = require("node:fs");
 const path$1 = require("node:path");
 const http = require("http");
+const zod = require("zod");
 const https = require("https");
 function _interopNamespaceDefault(e) {
   const n = Object.create(null, { [Symbol.toStringTag]: { value: "Module" } });
@@ -586,7 +587,7 @@ function buildProfile(nominalContextWindowTokens, reasoningControl, toolProfile)
 }
 const textOnly = (nominalContextWindowTokens, reasoningControl = noReasoningControl()) => buildProfile(nominalContextWindowTokens, reasoningControl, TOOLS_ONLY);
 const multimodal = (nominalContextWindowTokens, reasoningControl = noReasoningControl()) => buildProfile(nominalContextWindowTokens, reasoningControl, MULTIMODAL_TOOLS);
-const model = (id, profile, source, options = {}) => ({
+const model$3 = (id, profile, source, options = {}) => ({
   id,
   ...options,
   profile,
@@ -681,160 +682,160 @@ const gptMiniApi = multimodal(4e5, openAiLevelsDefaultOff);
 const gptCodex = textOnly(4e5, openAiCompatibleLevelsDefaultMedium);
 const gpt41 = multimodal(1047576);
 const chatGptAccountModels = [
-  model("gpt-5.6-sol", gpt56Api, CHATGPT_ACCOUNT_SOURCE, {
+  model$3("gpt-5.6-sol", gpt56Api, CHATGPT_ACCOUNT_SOURCE, {
     label: "GPT-5.6 Sol",
     aliases: ["gpt-5.6"]
   }),
-  model("gpt-5.6-terra", gpt56Api, CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.6 Terra" }),
-  model("gpt-5.6-luna", gpt56Api, CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.6 Luna" }),
-  model("gpt-5.5-instant", { ...multimodal(128e3), fastVariantModelId: "gpt-5.5-instant" }, CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Instant" }),
-  model("gpt-5.5-thinking", multimodal(128e3, openAiLevelsDefaultMedium), CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Thinking" }),
-  model("gpt-5.5-pro", multimodal(272e3, openAiProLevelsDefaultHigh), CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Pro" })
+  model$3("gpt-5.6-terra", gpt56Api, CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.6 Terra" }),
+  model$3("gpt-5.6-luna", gpt56Api, CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.6 Luna" }),
+  model$3("gpt-5.5-instant", { ...multimodal(128e3), fastVariantModelId: "gpt-5.5-instant" }, CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Instant" }),
+  model$3("gpt-5.5-thinking", multimodal(128e3, openAiLevelsDefaultMedium), CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Thinking" }),
+  model$3("gpt-5.5-pro", multimodal(272e3, openAiProLevelsDefaultHigh), CHATGPT_ACCOUNT_SOURCE, { label: "GPT-5.5 Pro" })
 ];
 const openAiApiModels = [
-  model("gpt-5.6-sol", gpt56Api, OPENAI_API_SOURCE, {
+  model$3("gpt-5.6-sol", gpt56Api, OPENAI_API_SOURCE, {
     label: "GPT-5.6 Sol",
     aliases: ["gpt-5.6"]
   }),
-  model("gpt-5.6-terra", gpt56Api, OPENAI_API_SOURCE, { label: "GPT-5.6 Terra" }),
-  model("gpt-5.6-luna", gpt56Api, OPENAI_API_SOURCE, { label: "GPT-5.6 Luna" }),
-  model("gpt-5.5", gpt55Api, OPENAI_API_SOURCE),
-  model("gpt-5.4", gpt54Api, OPENAI_API_SOURCE),
-  model("gpt-5.4-mini", gptMiniApi, OPENAI_API_SOURCE),
-  model("gpt-5.4-nano", gptMiniApi, OPENAI_API_SOURCE),
-  model("gpt-5.3-codex", gptCodex, OPENAI_API_SOURCE),
-  model("gpt-5.2-codex", gptCodex, OPENAI_API_SOURCE),
-  model("gpt-4.1", gpt41, OPENAI_API_SOURCE)
+  model$3("gpt-5.6-terra", gpt56Api, OPENAI_API_SOURCE, { label: "GPT-5.6 Terra" }),
+  model$3("gpt-5.6-luna", gpt56Api, OPENAI_API_SOURCE, { label: "GPT-5.6 Luna" }),
+  model$3("gpt-5.5", gpt55Api, OPENAI_API_SOURCE),
+  model$3("gpt-5.4", gpt54Api, OPENAI_API_SOURCE),
+  model$3("gpt-5.4-mini", gptMiniApi, OPENAI_API_SOURCE),
+  model$3("gpt-5.4-nano", gptMiniApi, OPENAI_API_SOURCE),
+  model$3("gpt-5.3-codex", gptCodex, OPENAI_API_SOURCE),
+  model$3("gpt-5.2-codex", gptCodex, OPENAI_API_SOURCE),
+  model$3("gpt-4.1", gpt41, OPENAI_API_SOURCE)
 ];
 const claudeApiModels = [
-  model("claude-fable-5", multimodal(1e6, anthropicFiveLevelsAlwaysOn), ANTHROPIC_SOURCE),
-  model("claude-sonnet-5", multimodal(1e6, anthropicFiveLevelsDefaultHigh), ANTHROPIC_SOURCE),
-  model("claude-opus-4-8", multimodal(1e6, anthropicFiveLevelsDefaultHigh), ANTHROPIC_SOURCE),
-  model("claude-haiku-4-5-20251001", multimodal(2e5), ANTHROPIC_SOURCE, {
+  model$3("claude-fable-5", multimodal(1e6, anthropicFiveLevelsAlwaysOn), ANTHROPIC_SOURCE),
+  model$3("claude-sonnet-5", multimodal(1e6, anthropicFiveLevelsDefaultHigh), ANTHROPIC_SOURCE),
+  model$3("claude-opus-4-8", multimodal(1e6, anthropicFiveLevelsDefaultHigh), ANTHROPIC_SOURCE),
+  model$3("claude-haiku-4-5-20251001", multimodal(2e5), ANTHROPIC_SOURCE, {
     aliases: ["claude-haiku-4-5"]
   })
 ];
 const geminiModels = [
-  model("gemini-3.5-flash", multimodal(1048576, gemini35Levels), GEMINI_SOURCE),
-  model("gemini-3.1-pro-preview", multimodal(1048576, gemini31Levels), GEMINI_SOURCE),
-  model("gemini-2.5-pro", multimodal(1048576, gemini25Levels), GEMINI_SOURCE, {
+  model$3("gemini-3.5-flash", multimodal(1048576, gemini35Levels), GEMINI_SOURCE),
+  model$3("gemini-3.1-pro-preview", multimodal(1048576, gemini31Levels), GEMINI_SOURCE),
+  model$3("gemini-2.5-pro", multimodal(1048576, gemini25Levels), GEMINI_SOURCE, {
     aliases: ["gemini-pro"]
   }),
-  model("gemini-2.5-flash", multimodal(1048576, gemini25Levels), GEMINI_SOURCE)
+  model$3("gemini-2.5-flash", multimodal(1048576, gemini25Levels), GEMINI_SOURCE)
 ];
 const grokModels = [
-  model("grok-4.5", multimodal(5e5, xaiLevelsDefaultHigh), XAI_SOURCE, {
+  model$3("grok-4.5", multimodal(5e5, xaiLevelsDefaultHigh), XAI_SOURCE, {
     aliases: ["grok-4.5-latest", "grok-build-latest"]
   }),
-  model("grok-4.3", multimodal(1e6, xaiLevels), XAI_SOURCE),
-  model("grok-build-0.1", textOnly(256e3, xaiToggleDefaultOn), XAI_SOURCE),
-  model("grok-code-fast-1", textOnly(256e3), XAI_SOURCE)
+  model$3("grok-4.3", multimodal(1e6, xaiLevels), XAI_SOURCE),
+  model$3("grok-build-0.1", textOnly(256e3, xaiToggleDefaultOn), XAI_SOURCE),
+  model$3("grok-code-fast-1", textOnly(256e3), XAI_SOURCE)
 ];
 const copilotModels = [
-  model("gpt-5.6-sol", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), COPILOT_SOURCE, {
+  model$3("gpt-5.6-sol", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), COPILOT_SOURCE, {
     label: "GPT-5.6 Sol",
     aliases: ["gpt-5.6"]
   }),
-  model("gpt-5.6-terra", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), COPILOT_SOURCE, {
+  model$3("gpt-5.6-terra", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), COPILOT_SOURCE, {
     label: "GPT-5.6 Terra"
   }),
-  model("gpt-5.6-luna", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), COPILOT_SOURCE, {
+  model$3("gpt-5.6-luna", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), COPILOT_SOURCE, {
     label: "GPT-5.6 Luna"
   }),
-  model("gpt-5.5", multimodal(105e4, openAiCompatibleLevelsDefaultMedium), COPILOT_SOURCE),
-  model("gpt-5.3-codex", textOnly(4e5, openAiCompatibleLevelsDefaultMedium), COPILOT_SOURCE),
-  model("claude-sonnet-5", multimodal(1e6, anthropicFiveLevelsDefaultHigh), COPILOT_SOURCE),
-  model("claude-opus-4-8", {
+  model$3("gpt-5.5", multimodal(105e4, openAiCompatibleLevelsDefaultMedium), COPILOT_SOURCE),
+  model$3("gpt-5.3-codex", textOnly(4e5, openAiCompatibleLevelsDefaultMedium), COPILOT_SOURCE),
+  model$3("claude-sonnet-5", multimodal(1e6, anthropicFiveLevelsDefaultHigh), COPILOT_SOURCE),
+  model$3("claude-opus-4-8", {
     ...multimodal(1e6, anthropicFiveLevelsDefaultHigh),
     fastVariantModelId: "claude-opus-4-8-fast"
   }, COPILOT_SOURCE),
-  model("claude-opus-4-8-fast", multimodal(1e6, anthropicFiveLevelsDefaultHigh), COPILOT_SOURCE),
-  model("gemini-3.1-pro-preview", multimodal(1048576, gemini31Levels), COPILOT_SOURCE),
-  model("gemini-3.5-flash", multimodal(1048576, gemini35Levels), COPILOT_SOURCE)
+  model$3("claude-opus-4-8-fast", multimodal(1e6, anthropicFiveLevelsDefaultHigh), COPILOT_SOURCE),
+  model$3("gemini-3.1-pro-preview", multimodal(1048576, gemini31Levels), COPILOT_SOURCE),
+  model$3("gemini-3.5-flash", multimodal(1048576, gemini35Levels), COPILOT_SOURCE)
 ];
 const qwenModels = [
-  model("qwen-turbo", textOnly(131072, qwenLevelsDefaultOff), QWEN_SOURCE),
-  model("qwen-plus", textOnly(131072, qwenLevelsDefaultOff), QWEN_SOURCE),
-  model("qwen-max", textOnly(131072, qwenLevelsDefaultOff), QWEN_SOURCE),
-  model("qwen-flash", textOnly(131072, qwenLevelsDefaultOff), QWEN_SOURCE),
-  model("qwen-vl-max", multimodal(131072, qwenLevelsDefaultOff), QWEN_SOURCE)
+  model$3("qwen-turbo", textOnly(131072, qwenLevelsDefaultOff), QWEN_SOURCE),
+  model$3("qwen-plus", textOnly(131072, qwenLevelsDefaultOff), QWEN_SOURCE),
+  model$3("qwen-max", textOnly(131072, qwenLevelsDefaultOff), QWEN_SOURCE),
+  model$3("qwen-flash", textOnly(131072, qwenLevelsDefaultOff), QWEN_SOURCE),
+  model$3("qwen-vl-max", multimodal(131072, qwenLevelsDefaultOff), QWEN_SOURCE)
 ];
 const qwenCodingPlanModels = [
-  model("qwen3-coder-plus", textOnly(131072, anthropicToggleDefaultOn), QWEN_SOURCE),
-  model("qwen3-coder-next", textOnly(131072, anthropicToggleDefaultOn), QWEN_SOURCE),
-  model("qwen3.6-plus", textOnly(131072, anthropicToggleDefaultOn), QWEN_SOURCE)
+  model$3("qwen3-coder-plus", textOnly(131072, anthropicToggleDefaultOn), QWEN_SOURCE),
+  model$3("qwen3-coder-next", textOnly(131072, anthropicToggleDefaultOn), QWEN_SOURCE),
+  model$3("qwen3.6-plus", textOnly(131072, anthropicToggleDefaultOn), QWEN_SOURCE)
 ];
 const deepSeekModels = [
-  model("deepseek-v4-pro", textOnly(1e6, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE, {
+  model$3("deepseek-v4-pro", textOnly(1e6, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE, {
     aliases: ["deepseek-reasoner"]
   }),
-  model("deepseek-v4-flash", textOnly(1e6, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE, {
+  model$3("deepseek-v4-flash", textOnly(1e6, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE, {
     aliases: ["deepseek-chat"]
   })
 ];
 const kimiApiModels = [
-  model("kimi-k2.7-code", {
+  model$3("kimi-k2.7-code", {
     ...multimodal(262144, moonshotAlwaysOn),
     fastVariantModelId: "kimi-k2.7-code-highspeed"
   }, KIMI_SOURCE),
-  model("kimi-k2.7-code-highspeed", multimodal(262144, moonshotAlwaysOn), KIMI_SOURCE),
-  model("kimi-k2.6", multimodal(262144, moonshotToggleDefaultOn), KIMI_SOURCE),
-  model("kimi-k2.5", textOnly(262144, moonshotToggleDefaultOn), KIMI_SOURCE)
+  model$3("kimi-k2.7-code-highspeed", multimodal(262144, moonshotAlwaysOn), KIMI_SOURCE),
+  model$3("kimi-k2.6", multimodal(262144, moonshotToggleDefaultOn), KIMI_SOURCE),
+  model$3("kimi-k2.5", textOnly(262144, moonshotToggleDefaultOn), KIMI_SOURCE)
 ];
 const kimiCodingPlanModels = [
-  model("kimi-for-coding", {
+  model$3("kimi-for-coding", {
     ...textOnly(262144, kimiCodingPlanToggleDefaultOn),
     fixedTemperature: 1
   }, KIMI_CODING_SOURCE)
 ];
 const glmAnthropicModels = [
-  model("glm-5", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
-  model("glm-4.7", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
-  model("glm-4.6", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
-  model("glm-4.5", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE)
+  model$3("glm-5", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
+  model$3("glm-4.7", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
+  model$3("glm-4.6", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
+  model$3("glm-4.5", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE)
 ];
 const minimaxModels = [
-  model("MiniMax-M2.7", textOnly(204800, anthropicAlwaysOnToggle), MINIMAX_SOURCE)
+  model$3("MiniMax-M2.7", textOnly(204800, anthropicAlwaysOnToggle), MINIMAX_SOURCE)
 ];
 const mimoModels = [
-  model("mimo-v2.5-pro", multimodal(1e6, anthropicToggleDefaultOn), MIMO_SOURCE)
+  model$3("mimo-v2.5-pro", multimodal(1e6, anthropicToggleDefaultOn), MIMO_SOURCE)
 ];
 const doubaoModels = [
-  model("doubao-seed-2.1-pro", textOnly(131072, volcengineToggleDefaultOn), VOLCENGINE_SOURCE),
-  model("doubao-seed-2.1-turbo", textOnly(131072, volcengineToggleDefaultOn), VOLCENGINE_SOURCE)
+  model$3("doubao-seed-2.1-pro", textOnly(131072, volcengineToggleDefaultOn), VOLCENGINE_SOURCE),
+  model$3("doubao-seed-2.1-turbo", textOnly(131072, volcengineToggleDefaultOn), VOLCENGINE_SOURCE)
 ];
 const groqModels = [
-  model("moonshotai/kimi-k2-instruct-0905", textOnly(262144), GROQ_SOURCE),
-  model("meta-llama/llama-4-maverick-17b-128e-instruct", {
+  model$3("moonshotai/kimi-k2-instruct-0905", textOnly(262144), GROQ_SOURCE),
+  model$3("meta-llama/llama-4-maverick-17b-128e-instruct", {
     ...textOnly(131072),
     visionInput: true
   }, GROQ_SOURCE),
-  model("openai/gpt-oss-120b", textOnly(131072), GROQ_SOURCE),
-  model("llama-3.3-70b-versatile", textOnly(131072), GROQ_SOURCE)
+  model$3("openai/gpt-oss-120b", textOnly(131072), GROQ_SOURCE),
+  model$3("llama-3.3-70b-versatile", textOnly(131072), GROQ_SOURCE)
 ];
 const mistralModels = [
-  model("mistral-small-3.2-25-06", multimodal(131072), MISTRAL_SOURCE),
-  model("mistral-large-latest", multimodal(131072), MISTRAL_SOURCE),
-  model("codestral-latest", textOnly(262144), MISTRAL_SOURCE)
+  model$3("mistral-small-3.2-25-06", multimodal(131072), MISTRAL_SOURCE),
+  model$3("mistral-large-latest", multimodal(131072), MISTRAL_SOURCE),
+  model$3("codestral-latest", textOnly(262144), MISTRAL_SOURCE)
 ];
 const cerebrasModels = [
-  model("llama-4-scout-17b-16e-instruct", textOnly(131072), CEREBRAS_SOURCE),
-  model("qwen-3-coder-480b", textOnly(131072), CEREBRAS_SOURCE),
-  model("gpt-oss-120b", textOnly(131072), CEREBRAS_SOURCE)
+  model$3("llama-4-scout-17b-16e-instruct", textOnly(131072), CEREBRAS_SOURCE),
+  model$3("qwen-3-coder-480b", textOnly(131072), CEREBRAS_SOURCE),
+  model$3("gpt-oss-120b", textOnly(131072), CEREBRAS_SOURCE)
 ];
 const bedrockClaudeModels = [
-  model("anthropic.claude-fable-5", multimodal(1e6, anthropicFiveLevelsAlwaysOn), BEDROCK_SOURCE),
-  model("anthropic.claude-sonnet-5", multimodal(1e6, anthropicFiveLevelsDefaultHigh), BEDROCK_SOURCE),
-  model("anthropic.claude-opus-4-8", multimodal(1e6, anthropicFiveLevelsDefaultHigh), BEDROCK_SOURCE),
-  model("anthropic.claude-haiku-4-5-20251001-v1:0", multimodal(2e5), BEDROCK_SOURCE)
+  model$3("anthropic.claude-fable-5", multimodal(1e6, anthropicFiveLevelsAlwaysOn), BEDROCK_SOURCE),
+  model$3("anthropic.claude-sonnet-5", multimodal(1e6, anthropicFiveLevelsDefaultHigh), BEDROCK_SOURCE),
+  model$3("anthropic.claude-opus-4-8", multimodal(1e6, anthropicFiveLevelsDefaultHigh), BEDROCK_SOURCE),
+  model$3("anthropic.claude-haiku-4-5-20251001-v1:0", multimodal(2e5), BEDROCK_SOURCE)
 ];
 const vertexModels = [
-  model("claude-fable-5", multimodal(1e6, anthropicFiveLevelsAlwaysOn), VERTEX_SOURCE),
-  model("claude-sonnet-5", multimodal(1e6, anthropicFiveLevelsDefaultHigh), VERTEX_SOURCE),
-  model("claude-opus-4-8", multimodal(1e6, anthropicFiveLevelsDefaultHigh), VERTEX_SOURCE),
-  model("claude-haiku-4-5@20251001", multimodal(2e5), VERTEX_SOURCE),
-  model("gemini-3.1-pro-preview", multimodal(1048576, gemini31Levels), VERTEX_SOURCE),
-  model("gemini-2.5-flash", multimodal(1048576, gemini25Levels), VERTEX_SOURCE)
+  model$3("claude-fable-5", multimodal(1e6, anthropicFiveLevelsAlwaysOn), VERTEX_SOURCE),
+  model$3("claude-sonnet-5", multimodal(1e6, anthropicFiveLevelsDefaultHigh), VERTEX_SOURCE),
+  model$3("claude-opus-4-8", multimodal(1e6, anthropicFiveLevelsDefaultHigh), VERTEX_SOURCE),
+  model$3("claude-haiku-4-5@20251001", multimodal(2e5), VERTEX_SOURCE),
+  model$3("gemini-3.1-pro-preview", multimodal(1048576, gemini31Levels), VERTEX_SOURCE),
+  model$3("gemini-2.5-flash", multimodal(1048576, gemini25Levels), VERTEX_SOURCE)
 ];
 const MANAGED_PROVIDER_MODEL_CATALOG = {
   "chatgpt-account": chatGptAccountModels,
@@ -849,32 +850,32 @@ const MANAGED_PROVIDER_MODEL_CATALOG = {
   anthropic: claudeApiModels,
   "google-ai-studio": geminiModels,
   "azure-openai": [
-    model("gpt-5.6-sol", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), AZURE_OPENAI_SOURCE, {
+    model$3("gpt-5.6-sol", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), AZURE_OPENAI_SOURCE, {
       label: "GPT-5.6 Sol",
       aliases: ["gpt-5.6"]
     }),
-    model("gpt-5.6-terra", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), AZURE_OPENAI_SOURCE, {
+    model$3("gpt-5.6-terra", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), AZURE_OPENAI_SOURCE, {
       label: "GPT-5.6 Terra"
     }),
-    model("gpt-5.6-luna", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), AZURE_OPENAI_SOURCE, {
+    model$3("gpt-5.6-luna", multimodal(105e4, openAi56CompatibleLevelsDefaultMedium), AZURE_OPENAI_SOURCE, {
       label: "GPT-5.6 Luna"
     }),
-    model("gpt-5.5", multimodal(105e4, levelsReasoningControl(OPENAI_LEVELS, {
+    model$3("gpt-5.5", multimodal(105e4, levelsReasoningControl(OPENAI_LEVELS, {
       supportsOff: true,
       defaultSelection: "medium",
       wireProfile: OPENAI_COMPATIBLE_WIRE
     })), AZURE_OPENAI_SOURCE),
-    model("gpt-5.4", multimodal(105e4, levelsReasoningControl(OPENAI_LEVELS, {
+    model$3("gpt-5.4", multimodal(105e4, levelsReasoningControl(OPENAI_LEVELS, {
       supportsOff: true,
       defaultSelection: "off",
       wireProfile: OPENAI_COMPATIBLE_WIRE
     })), AZURE_OPENAI_SOURCE),
-    model("gpt-5.4-mini", multimodal(4e5, levelsReasoningControl(OPENAI_LEVELS, {
+    model$3("gpt-5.4-mini", multimodal(4e5, levelsReasoningControl(OPENAI_LEVELS, {
       supportsOff: true,
       defaultSelection: "off",
       wireProfile: OPENAI_COMPATIBLE_WIRE
     })), AZURE_OPENAI_SOURCE),
-    model("gpt-4.1", gpt41, AZURE_OPENAI_SOURCE)
+    model$3("gpt-4.1", gpt41, AZURE_OPENAI_SOURCE)
   ],
   bedrock: bedrockClaudeModels,
   vertex: vertexModels,
@@ -909,16 +910,16 @@ const MANAGED_PROVIDER_MODEL_CATALOG = {
   "kimi-coding-plan": kimiCodingPlanModels,
   "bailian-coding-plan": [
     ...qwenCodingPlanModels,
-    model("kimi-k2.5", textOnly(262144, anthropicToggleDefaultOn), KIMI_SOURCE),
-    model("glm-5", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
-    model("glm-4.7", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE)
+    model$3("kimi-k2.5", textOnly(262144, anthropicToggleDefaultOn), KIMI_SOURCE),
+    model$3("glm-5", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
+    model$3("glm-4.7", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE)
   ],
   "volcengine-coding-plan": [
-    model("doubao-seed-2.1-pro", textOnly(131072, anthropicToggleDefaultOn), VOLCENGINE_SOURCE),
-    model("doubao-seed-2.1-turbo", textOnly(131072, anthropicToggleDefaultOn), VOLCENGINE_SOURCE),
-    model("glm-4.6", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
-    model("deepseek-v4-pro", textOnly(1e6, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE),
-    model("kimi-k2.5", textOnly(262144, anthropicToggleDefaultOn), KIMI_SOURCE)
+    model$3("doubao-seed-2.1-pro", textOnly(131072, anthropicToggleDefaultOn), VOLCENGINE_SOURCE),
+    model$3("doubao-seed-2.1-turbo", textOnly(131072, anthropicToggleDefaultOn), VOLCENGINE_SOURCE),
+    model$3("glm-4.6", textOnly(131072, anthropicToggleDefaultOn), GLM_SOURCE),
+    model$3("deepseek-v4-pro", textOnly(1e6, deepSeekLevelsDefaultHigh), DEEPSEEK_SOURCE),
+    model$3("kimi-k2.5", textOnly(262144, anthropicToggleDefaultOn), KIMI_SOURCE)
   ],
   "glm-cn-coding-plan": glmAnthropicModels,
   "glm-global-coding-plan": glmAnthropicModels,
@@ -1940,7 +1941,9 @@ class AppPathService {
       logsPath,
       logPath: path.join(logsPath, LOG_FILE_NAME),
       capturePreviewsPath: path.join(userDataRoot, "capture-previews"),
-      profileStatePath: path.join(appStateRoot, "profile")
+      profileStatePath: path.join(appStateRoot, "profile"),
+      canvasesPath: path.join(appStateRoot, "canvases"),
+      generativeUiEvaluationPath: path.join(appStateRoot, "generative-ui-evaluation")
     };
   }
   getProjectRdxPaths(projectRoot) {
@@ -1982,7 +1985,9 @@ class AppPathService {
       paths.secretsPath,
       paths.logsPath,
       paths.capturePreviewsPath,
-      paths.profileStatePath
+      paths.profileStatePath,
+      paths.canvasesPath,
+      paths.generativeUiEvaluationPath
     ];
     directories.forEach((directory) => fs.mkdirSync(directory, { recursive: true }));
     return paths;
@@ -2359,7 +2364,7 @@ const createSeedDefinition = (agentId, routes) => {
   const route = routes.find((entry) => entry.agentId === agentId);
   const model2 = canonicalAgentModelId(route?.providerId ?? "", route?.modelId ?? "");
   const name = AGENT_DISPLAY_NAMES[agentId];
-  const tools = agentId === "ask" ? ["read", "search", "web", "askUser", "task", "tool_search"] : agentId === "plan" ? ["read", "search", "web", "askUser", "agent", "task", "memory", "planArtifact", "handoff", "subagent", "tool_search"] : agentId === "edit" ? ["read", "search", "web", "bash", "write", "edit", "git", "askUser", "agent", "task", "memory", "skill", "mcp", "subagent", "tool_search"] : ["read", "search", "web", "bash", "askUser", "agent", "task", "memory", "rdxContext", "subagent", "tool_search"];
+  const tools = agentId === "ask" ? ["read", "search", "web", "askUser", "task", "tool_search"] : agentId === "plan" ? ["read", "search", "web", "askUser", "agent", "task", "memory", "planArtifact", "handoff", "subagent", "tool_search"] : agentId === "edit" ? ["read", "search", "web", "bash", "write", "edit", "git", "askUser", "agent", "task", "memory", "skill", "mcp", "generativeUi", "subagent", "tool_search"] : ["read", "search", "web", "bash", "askUser", "agent", "task", "memory", "rdxContext", "subagent", "tool_search"];
   return {
     id: agentId,
     fileName: fileNameForId(agentId),
@@ -4116,12 +4121,12 @@ const substitute = (value, variables) => value.replace(/\{\{\s*([A-Za-z0-9_]+)\s
   const replacement = variables[key];
   return replacement == null ? "" : String(replacement);
 });
-const isRecord = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+const isRecord$1 = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const readErrorMessage = (value) => {
   if (typeof value === "string" && value.trim()) {
     return value;
   }
-  if (isRecord(value)) {
+  if (isRecord$1(value)) {
     const message = value.message ?? value.error_message ?? value.code;
     return typeof message === "string" && message.trim() ? message : void 0;
   }
@@ -4133,11 +4138,11 @@ const parseJsonPayload = (stdout) => {
     return { data: {} };
   }
   const parsed = JSON.parse(trimmed);
-  if (!isRecord(parsed)) {
+  if (!isRecord$1(parsed)) {
     throw new Error("RDX action stdout must be a JSON object.");
   }
   if (typeof parsed.ok === "boolean" && ("data" in parsed || "result_kind" in parsed || "error" in parsed)) {
-    const envelopeData = isRecord(parsed.data) ? parsed.data : {};
+    const envelopeData = isRecord$1(parsed.data) ? parsed.data : {};
     const data = { ...envelopeData };
     const envelopeContextId = typeof parsed.context_id === "string" && parsed.context_id.trim() ? parsed.context_id.trim() : typeof parsed.contextId === "string" && parsed.contextId.trim() ? parsed.contextId.trim() : void 0;
     if (envelopeContextId && typeof data.context_id !== "string" && typeof data.contextId !== "string") {
@@ -4374,7 +4379,8 @@ const BUILTIN_AGENT_TOOL_IDS = [
   "mcp",
   "subagent",
   "rdx_context",
-  "tool_search"
+  "tool_search",
+  "generative_ui"
 ];
 new Set(BUILTIN_AGENT_TOOL_IDS);
 const CANONICAL_TOOL_TOKEN_EXPANSIONS = {
@@ -4401,7 +4407,8 @@ const CANONICAL_TOOL_TOKEN_EXPANSIONS = {
   tool_search: ["tool_search"],
   rdxContext: ["rdx_context"],
   rdx: ["rdx_context"],
-  subagent: ["subagent"]
+  subagent: ["subagent"],
+  generativeUi: ["generative_ui"]
 };
 const ASK_READONLY_TOOL_ALLOWLIST = [
   "read_file",
@@ -4497,7 +4504,8 @@ const ASK_DENIED_TOOLS = /* @__PURE__ */ new Set([
   "subagent",
   "memory_write",
   "memory_delete",
-  "plan_artifact"
+  "plan_artifact",
+  "generative_ui"
 ]);
 const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
   ...ASK_READONLY_TOOL_ALLOWLIST,
@@ -4529,7 +4537,8 @@ const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
   "move_file",
   "copy_file",
   "notebook_edit",
-  "tool_search"
+  "tool_search",
+  "generative_ui"
 ];
 const SHADER_EDIT_TOOLS = ["rd.shader.edit_and_replace", "rd.macro.shader_hotfix_validate"];
 function expandToken(toolName) {
@@ -8583,7 +8592,7 @@ class RequestEnvelopeBuilder {
   }
 }
 const requestEnvelopeBuilder = new RequestEnvelopeBuilder();
-const safeSegment$1 = (value) => value.replace(/[^a-zA-Z0-9._-]/g, "-");
+const safeSegment$2 = (value) => value.replace(/[^a-zA-Z0-9._-]/g, "-");
 class RequestSnapshotStore {
   constructor(rootPath = appPathService.getAppStatePaths().llmCallsPath) {
     this.rootPath = rootPath;
@@ -8597,7 +8606,7 @@ class RequestSnapshotStore {
   write(snapshot) {
     const dir = this.turnPath(snapshot.sessionId, snapshot.turnId);
     fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(path.join(dir, `${String(snapshot.callIndex).padStart(3, "0")}-${safeSegment$1(snapshot.id)}.json`), `${JSON.stringify(snapshot, null, 2)}
+    fs.writeFileSync(path.join(dir, `${String(snapshot.callIndex).padStart(3, "0")}-${safeSegment$2(snapshot.id)}.json`), `${JSON.stringify(snapshot, null, 2)}
 `, "utf8");
   }
   complete(snapshotId, sessionId, turnId, usage) {
@@ -8610,7 +8619,7 @@ class RequestSnapshotStore {
 `, "utf8");
   }
   list(sessionId, turnId) {
-    const base = turnId ? this.turnPath(sessionId, turnId) : path.join(this.rootPath, safeSegment$1(sessionId));
+    const base = turnId ? this.turnPath(sessionId, turnId) : path.join(this.rootPath, safeSegment$2(sessionId));
     if (!fs.existsSync(base)) return [];
     const files = [];
     const walk2 = (dir) => fs.readdirSync(dir, { withFileTypes: true }).forEach((entry) => {
@@ -8626,12 +8635,12 @@ class RequestSnapshotStore {
     return snapshotPath ? JSON.parse(fs.readFileSync(snapshotPath, "utf8")) : null;
   }
   turnPath(sessionId, turnId) {
-    return path.join(this.rootPath, safeSegment$1(sessionId || "no-session"), safeSegment$1(turnId || "no-turn"));
+    return path.join(this.rootPath, safeSegment$2(sessionId || "no-session"), safeSegment$2(turnId || "no-turn"));
   }
   findSnapshotPath(snapshotId, sessionId, turnId) {
     const dir = this.turnPath(sessionId, turnId);
     if (!fs.existsSync(dir)) return null;
-    const suffix = `-${safeSegment$1(snapshotId)}.json`;
+    const suffix = `-${safeSegment$2(snapshotId)}.json`;
     const fileName = fs.readdirSync(dir).find((entry) => entry.endsWith(suffix));
     return fileName ? path.join(dir, fileName) : null;
   }
@@ -9758,10 +9767,10 @@ function compilePattern(pattern, caseSensitive) {
   try {
     return new RegExp(pattern, caseSensitive ? "g" : "gi");
   } catch {
-    return new RegExp(escapeRegExp(pattern), caseSensitive ? "g" : "gi");
+    return new RegExp(escapeRegExp$1(pattern), caseSensitive ? "g" : "gi");
   }
 }
-function escapeRegExp(value) {
+function escapeRegExp$1(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 async function walkAndSearch(current, workspaceRoot, regex, matches, matchedFiles, maxMatches, signal) {
@@ -11159,10 +11168,10 @@ function throwIfAborted$1(signal) {
     throw new Error("Aborted");
   }
 }
-function readString$2(params, key, required) {
+function readString$2(params, key, required2) {
   const value = params[key];
   if (value === void 0 || value === null || value === "") {
-    if (required) throw new Error(`参数 "${key}" 不能为空`);
+    if (required2) throw new Error(`参数 "${key}" 不能为空`);
     return void 0;
   }
   if (typeof value !== "string") {
@@ -11207,11 +11216,11 @@ const STATUS_ICON = {
   completed: "✓",
   deleted: "✗"
 };
-function safeSegment(sessionId) {
+function safeSegment$1(sessionId) {
   return sessionId.replace(/[^\w.-]/g, "_");
 }
 function resolveSessionTasksDir(sessionId) {
-  return path__namespace.join(appPathService.getAppStatePaths().tasksPath, safeSegment(sessionId));
+  return path__namespace.join(appPathService.getAppStatePaths().tasksPath, safeSegment$1(sessionId));
 }
 function createSessionTaskStore(sessionId) {
   return new FileTaskStore(resolveSessionTasksDir(sessionId));
@@ -18390,6 +18399,866 @@ class DebuggerLlmService {
   }
 }
 const debuggerLlmService = new DebuggerLlmService();
+function summarizeGenerativeUiEvidence(canvases) {
+  const generated = canvases.filter((canvas) => canvas.versions.length > 0 && canvas.stopReason !== "no_op");
+  const versions = generated.flatMap((canvas) => canvas.versions);
+  const closed = versions.filter((version) => [1, 2, 3].every((level) => version.verification.some((result) => result.level === level && result.passed)));
+  const feedback = canvases.flatMap((canvas) => canvas.feedback);
+  const preferenceFeedback = feedback.filter((entry) => entry.preferredOverStatic !== void 0);
+  const preferred = preferenceFeedback.filter((entry) => entry.preferredOverStatic).length;
+  const iterationTimes = versions.map((version) => version.metrics.planningMs + version.metrics.generationMs + version.metrics.renderMs + version.metrics.verificationMs).sort((a, b) => a - b);
+  const median = (values) => values.length === 0 ? null : values.length % 2 === 1 ? values[Math.floor(values.length / 2)] : Math.round((values[values.length / 2 - 1] + values[values.length / 2]) / 2);
+  const previewReadyTimes = canvases.flatMap((canvas) => canvas.observations).filter((observation) => observation.eventType === "ready" && Number.isFinite(observation.latencyMs)).map((observation) => Math.max(0, Math.round(observation.latencyMs))).sort((a, b) => a - b);
+  const promptToUsableTimes = generated.flatMap((canvas) => {
+    const timestamps = canvas.versions.flatMap((version) => {
+      const level3 = version.verification.find((entry) => entry.level === 3 && entry.passed);
+      const usableAt = version.usableAt ?? level3?.observedAt;
+      return usableAt === void 0 ? [] : [usableAt];
+    });
+    return timestamps.length ? [Math.max(0, Math.min(...timestamps) - canvas.createdAt)] : [];
+  }).sort((a, b) => a - b);
+  const hasFiveClosedLineage = (canvas) => canvas.branches.some((branch) => {
+    const byId = new Map(canvas.versions.map((version) => [version.versionId, version]));
+    let current = branch.headVersionId ? byId.get(branch.headVersionId) : void 0;
+    let count = 0;
+    while (current && [1, 2, 3].every((level) => current?.verification.some((result) => result.level === level && result.passed))) {
+      count += 1;
+      if (count >= 5) return true;
+      current = current.parentVersionId ? byId.get(current.parentVersionId) : void 0;
+    }
+    return false;
+  });
+  const generationSuccessRate = generated.length ? generated.filter((canvas) => canvas.stopReason === "success").length / generated.length : 0;
+  const loopClosureRate = versions.length ? closed.length / versions.length : 0;
+  const dynamicUiPreferenceRate = preferenceFeedback.length ? preferred / preferenceFeedback.length : null;
+  return {
+    canvasCount: canvases.length,
+    generatedCanvasCount: generated.length,
+    successfulCanvasCount: generated.filter((canvas) => canvas.stopReason === "success").length,
+    generationSuccessRate,
+    versionCount: versions.length,
+    closedLoopVersionCount: closed.length,
+    loopClosureRate,
+    feedbackCount: feedback.length,
+    dynamicUiPreferredCount: preferred,
+    dynamicUiPreferenceRate,
+    medianIterationMs: median(iterationTimes),
+    medianPromptToUsableMs: median(promptToUsableTimes),
+    promptToUsableSampleCount: promptToUsableTimes.length,
+    medianPreviewReadyMs: median(previewReadyTimes),
+    previewReadySampleCount: previewReadyTimes.length,
+    canvasesWithFiveEffectiveIterations: generated.filter(hasFiveClosedLineage).length,
+    runtimeErrorCount: canvases.flatMap((canvas) => canvas.observations).filter((entry) => entry.eventType === "runtime_error" || entry.eventType === "unhandled_rejection").length,
+    targetStatus: {
+      generationSuccessRate: generationSuccessRate >= 0.85,
+      loopClosureRate: loopClosureRate >= 0.9,
+      previewReadyLatency: previewReadyTimes.length ? median(previewReadyTimes) <= 2e3 : null,
+      dynamicUiPreferenceRate: dynamicUiPreferenceRate === null ? null : dynamicUiPreferenceRate >= 0.65
+    }
+  };
+}
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'none'",
+  "style-src 'unsafe-inline'",
+  "script-src 'unsafe-inline'",
+  "img-src data: blob:",
+  "font-src data:",
+  "connect-src 'none'",
+  "form-action 'none'",
+  "base-uri 'none'"
+].join("; ");
+const GENERATIVE_UI_IFRAME_SANDBOX = "allow-scripts";
+function buildGenerativeUiSandboxDocument(source, instrument = true) {
+  const css = source.css.replace(/<\/style/gi, "<\\/style");
+  const javascript = source.javascript.replace(/<\/script/gi, "<\\/script");
+  const observer = `(function(){const channel=new MessageChannel();parent.postMessage({source:'rdc-generative-ui-channel'},'*',[channel.port2]);const send=(eventType,data={})=>channel.port1.postMessage({eventType,...data});addEventListener('error',e=>send('runtime_error',{message:e.message||'Runtime error'}));addEventListener('unhandledrejection',e=>send('unhandled_rejection',{message:String(e.reason||'Unhandled rejection')}));addEventListener('DOMContentLoaded',e=>{if(e.isTrusted)send('ready',{latencyMs:Math.max(0,Math.round(performance.now()))})});for(const type of ['click','input','change','submit'])addEventListener(type,e=>{if(e.isTrusted)send('interaction',{interactionType:type,message:(e.target?.tagName||'')+(e.target?.id?'#'+e.target.id:'')})},true)})();`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${CONTENT_SECURITY_POLICY}"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body>${source.html}${instrument ? `<script>${observer}<\/script>` : ""}<script>${javascript}<\/script></body></html>`;
+}
+function exportGenerativeUiVersion(rootPath, canvas, versionId) {
+  const version = canvas.versions.find((entry) => entry.versionId === versionId);
+  if (!version) throw new Error(`Canvas version not found: ${versionId}`);
+  const exportDirectory = path.join(rootPath, "exports");
+  fs.mkdirSync(exportDirectory, { recursive: true });
+  const title = canvas.title.replace(/[^a-zA-Z0-9_-]/g, "-").replace(/^-+|-+$/g, "") || "generative-ui";
+  const fileName = `${title}-${version.versionId.slice(0, 8)}.html`;
+  const filePath = path.join(exportDirectory, fileName);
+  const metadata = `<!-- RDC-Agent Generative UI | Canvas ${canvas.canvasId} | Version ${version.versionId} -->
+`;
+  fs.writeFileSync(filePath, `${metadata}${buildGenerativeUiSandboxDocument(version.source, false)}`, "utf8");
+  return { filePath, fileName };
+}
+const matchingInteractionIndex = (trigger, checks, used) => {
+  const value = trigger.toLowerCase();
+  const expectedType = value.includes("submit") ? "submit" : value.match(/input|adjust|edit|type|slider/) ? "input" : value.match(/change|select|filter/) ? "change" : value.match(/click|open|toggle|switch|expand|run|pause|reset|restart|add|move|copy|zoom/) ? "click" : null;
+  const expectedTarget = ["button", "form", "input", "slider", "select"].find((target) => value.includes(target));
+  return checks.findIndex((check2, index) => !used.has(index) && check2.passed && check2.id.startsWith("interaction-") && (!expectedType || check2.id === `interaction-${expectedType}`) && (!expectedTarget || check2.message.toLowerCase().includes(expectedTarget === "slider" ? "input" : expectedTarget)));
+};
+const requiredInteractionsPassed = (version, checks) => {
+  const used = /* @__PURE__ */ new Set();
+  return version.spec.interactions.every((entry) => {
+    const index = matchingInteractionIndex(entry.trigger, checks, used);
+    if (index < 0) return false;
+    used.add(index);
+    return true;
+  });
+};
+function updateGenerativeUiRuntimeVerification(version, eventType, details) {
+  if (!["ready", "interaction", "runtime_error", "unhandled_rejection"].includes(eventType)) return;
+  const passed = eventType === "ready" || eventType === "interaction";
+  const check2 = {
+    id: eventType === "ready" ? "sandbox-ready" : eventType === "interaction" ? `interaction-${details?.interactionType ?? "unknown"}` : eventType,
+    passed,
+    message: details?.message ?? (eventType === "ready" ? "Sandbox renderer reported ready." : eventType === "interaction" ? "Sandbox interaction was observed." : "Sandbox renderer reported a runtime failure.")
+  };
+  const existing = version.verification.find((entry) => entry.level === 3);
+  if (!existing) {
+    version.verification.push({ level: 3, passed: passed && eventType === "ready" && version.spec.interactions.length === 0, checks: [check2], observedAt: Date.now() });
+    return;
+  }
+  existing.checks.push(check2);
+  const hasFailure = existing.checks.some((entry) => !entry.passed);
+  const hasReady = existing.checks.some((entry) => entry.id === "sandbox-ready" && entry.passed);
+  const interactionsPassed = requiredInteractionsPassed(version, existing.checks);
+  existing.passed = !hasFailure && hasReady && interactionsPassed;
+  existing.observedAt = Date.now();
+}
+const forbiddenPatterns = [
+  { id: "no-network-fetch", pattern: /\bfetch\s*\(/i, message: "Network fetch is unavailable in the Canvas sandbox." },
+  { id: "no-network-sockets", pattern: /\b(?:WebSocket|EventSource|XMLHttpRequest)\b/i, message: "Network sockets are unavailable in the Canvas sandbox." },
+  { id: "no-dynamic-import", pattern: /\bimport\s*\(/i, message: "Dynamic imports are unavailable in the Canvas sandbox." },
+  { id: "no-remote-url", pattern: /(?:https?:)?\/\//i, message: "Remote URLs are unavailable in the Canvas sandbox." },
+  { id: "no-top-navigation", pattern: /\b(?:window\.)?(?:top|parent)\s*\./i, message: "Parent-frame access is forbidden." },
+  { id: "no-storage", pattern: /\b(?:localStorage|sessionStorage|indexedDB)\b/i, message: "Persistent browser storage is unavailable; use Canvas state." }
+];
+const check = (id, passed, message) => ({ id, passed, message });
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const referencesId = (source, id) => {
+  const escaped = escapeRegExp(id);
+  return new RegExp(`(?:id\\s*=\\s*["']${escaped}["']|#${escaped}\\b|getElementById\\(\\s*["']${escaped}["']|querySelector\\(\\s*["']#${escaped}["'])`, "i").test(source);
+};
+const referencesBindingSource = (source, name) => referencesId(source, name) || new RegExp(`\\b${escapeRegExp(name)}\\b`, "i").test(source);
+const validateHtml = (html) => {
+  if (/<\/?(?:script|style)\b/i.test(html)) return false;
+  const voidTags = /* @__PURE__ */ new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track", "wbr"]);
+  const stack = [];
+  const markup = html.replace(/<!--[\s\S]*?-->/g, "");
+  for (const match of markup.matchAll(/<\s*(\/?)\s*([a-z][\w-]*)\b[^>]*?(\/?)>/gi)) {
+    const tag = match[2].toLowerCase();
+    if (voidTags.has(tag) || match[3]) continue;
+    if (match[1]) {
+      if (stack.pop() !== tag) return false;
+    } else stack.push(tag);
+  }
+  return stack.length === 0 && !/<[^>]*$/.test(markup);
+};
+const validateCss = (css) => {
+  if (/@import\b/i.test(css)) return false;
+  const stack = [];
+  const pairs = { "}": "{", ")": "(", "]": "[" };
+  let quote = "";
+  const input = css.replace(/\/\*[\s\S]*?\*\//g, "");
+  for (let index = 0; index < input.length; index += 1) {
+    const char = input[index];
+    if (quote) {
+      if (char === quote && input[index - 1] !== "\\") quote = "";
+      continue;
+    }
+    if (char === '"' || char === "'") quote = char;
+    else if ("{([".includes(char)) stack.push(char);
+    else if ("})]".includes(char) && stack.pop() !== pairs[char]) return false;
+  }
+  return !quote && stack.length === 0;
+};
+const interactionHandled = (spec, source, trigger, effect) => {
+  const description = `${trigger} ${effect}`.toLowerCase();
+  const targets = spec.components.filter(({ id }) => description.includes(id.toLowerCase()));
+  if (targets.length > 0 && !targets.every(({ id }) => referencesId(`${source.html}
+${source.javascript}`, id))) return false;
+  const eventName = ["submit", "input", "change", "click"].find((event) => trigger.toLowerCase().includes(event)) ?? "click";
+  const aliases = eventName === "input" ? "input|change" : eventName === "change" ? "change|input" : eventName;
+  return new RegExp(`(?:addEventListener\\(\\s*["'](?:${aliases})["']|on(?:${aliases})\\s*=)`, "i").test(`${source.html}
+${source.javascript}`);
+};
+const controlsAreLabelled = (html) => {
+  for (const match of html.matchAll(/<(input|select|textarea)\b([^>]*)>/gi)) {
+    const attributes = match[2];
+    if (/\btype\s*=\s*["']?hidden\b/i.test(attributes)) continue;
+    if (/\baria-label(?:ledby)?\s*=\s*["'][^"']+["']/i.test(attributes)) continue;
+    const id = attributes.match(/\bid\s*=\s*["']([^"']+)["']/i)?.[1];
+    if (id && new RegExp(`<label\\b[^>]*\\bfor\\s*=\\s*["']${escapeRegExp(id)}["']`, "i").test(html)) continue;
+    return false;
+  }
+  return true;
+};
+class GenerativeUiVerifier {
+  verifyLevel1(source) {
+    const combined = `${source.html}
+${source.css}
+${source.javascript}`;
+    const checks = [
+      check("html-present", source.html.trim().length > 0, "Generated HTML must not be empty."),
+      check("source-size", combined.length <= 1e6, "Generated source must stay below 1 MB."),
+      check("html-structure", validateHtml(source.html), "HTML must be balanced and keep script/style in their dedicated source fields."),
+      check("css-syntax", validateCss(source.css), "CSS delimiters must be balanced and @import is forbidden."),
+      ...forbiddenPatterns.map((entry) => check(entry.id, !entry.pattern.test(combined), entry.message))
+    ];
+    try {
+      new Function(source.javascript);
+      checks.push(check("javascript-syntax", true, "JavaScript syntax is valid."));
+    } catch (error) {
+      checks.push(check("javascript-syntax", false, error instanceof Error ? error.message : String(error)));
+    }
+    return { level: 1, passed: checks.every((entry) => entry.passed), checks, observedAt: Date.now() };
+  }
+  verifyLevel2(spec, source) {
+    const combined = `${source.html}
+${source.css}
+${source.javascript}`;
+    const checks = [
+      check("spec-components", spec.components.every(({ id }) => referencesId(combined, id)), "Every declared component must expose its exact stable id."),
+      check("responsive-layout", /@media|clamp\(|minmax\(|flex|grid/i.test(source.css), "Use an explicit responsive layout strategy."),
+      check("viewport-safe", !/width\s*:\s*[1-9]\d{3,}px/i.test(source.css), "Avoid fixed desktop-only widths."),
+      check("interaction-code", spec.interactions.every(({ trigger, effect }) => interactionHandled(spec, source, trigger, effect)), "Every declared interaction requires an executable handler and any named component target."),
+      check("data-bindings", spec.dataBindings.every(({ source: from, target }) => referencesBindingSource(combined, from) && referencesId(combined, target)), "Every data binding source and target must exist."),
+      check("semantic-root", /<(?:main|article|section|form)\b/i.test(source.html), "Generated UI requires a semantic root landmark."),
+      check("image-alt", !/<img\b(?![^>]*\balt\s*=)[^>]*>/i.test(source.html), "Images require alt text, including an empty alt for decorative images."),
+      check("control-labels", controlsAreLabelled(source.html), "Form controls require a label or accessible name.")
+    ];
+    return { level: 2, passed: checks.every((entry) => entry.passed), checks, observedAt: Date.now() };
+  }
+}
+const safeSegment = (value) => value.replace(/[^a-zA-Z0-9_-]/g, "-");
+class GenerativeUiCanvasService {
+  constructor(rootPath = appPathService.getAppStatePaths().canvasesPath) {
+    this.rootPath = rootPath;
+  }
+  rootPath;
+  verifier = new GenerativeUiVerifier();
+  create(projectId, sessionId, title, originalPrompt, benchmarkCaseId) {
+    const now = Date.now();
+    const mainBranch = {
+      branchId: crypto.randomUUID(),
+      name: "main",
+      headVersionId: null,
+      createdFromVersionId: null,
+      createdAt: now
+    };
+    const canvas = {
+      schemaVersion: 1,
+      canvasId: crypto.randomUUID(),
+      projectId,
+      sessionId,
+      title: title.trim() || "Untitled Canvas",
+      originalPrompt,
+      benchmarkCaseId,
+      activeBranchId: mainBranch.branchId,
+      branches: [mainBranch],
+      versions: [],
+      observations: [],
+      feedback: [],
+      stopReason: null,
+      createdAt: now,
+      updatedAt: now
+    };
+    this.write(canvas);
+    return canvas;
+  }
+  list(sessionId) {
+    const directory = this.sessionPath(sessionId);
+    if (!fs.existsSync(directory)) return [];
+    return fs.readdirSync(directory).filter((entry) => entry.endsWith(".json")).map((entry) => this.readFile(path.join(directory, entry))).sort((left, right) => right.updatedAt - left.updatedAt);
+  }
+  summarize(sessionId) {
+    return summarizeGenerativeUiEvidence(sessionId ? this.list(sessionId) : this.listAll());
+  }
+  get(sessionId, canvasId) {
+    const filePath = this.canvasPath(sessionId, canvasId);
+    return fs.existsSync(filePath) ? this.readFile(filePath) : null;
+  }
+  commit(sessionId, request2) {
+    if (request2.runtimePolicy !== "automatic" && request2.runtimePolicy !== "human") throw new Error("Canvas version runtimePolicy must be automatic or human.");
+    const canvas = this.requireCanvas(sessionId, request2.canvasId);
+    const branch = canvas.branches.find((entry) => entry.branchId === request2.branchId);
+    if (!branch) throw new Error(`Canvas branch not found: ${request2.branchId}`);
+    if (branch.headVersionId !== request2.parentVersionId) {
+      throw new Error("Canvas branch head changed; create a branch or refresh before committing.");
+    }
+    const submittedVerification = request2.verification ?? [];
+    const verification = submittedVerification.some((entry) => entry.level === 1) && submittedVerification.some((entry) => entry.level === 2) ? submittedVerification : [
+      this.verifier.verifyLevel1(request2.source),
+      this.verifier.verifyLevel2(request2.spec, request2.source),
+      ...submittedVerification.filter((entry) => entry.level === 3)
+    ];
+    const version = {
+      versionId: crypto.randomUUID(),
+      parentVersionId: request2.parentVersionId,
+      branchId: branch.branchId,
+      prompt: request2.prompt,
+      contextReferences: request2.contextReferences ?? [],
+      spec: request2.spec,
+      source: request2.source,
+      reflection: request2.reflection ?? null,
+      runtimePolicy: request2.runtimePolicy,
+      runtimeDecision: request2.runtimePolicy === "automatic" ? "pending" : null,
+      runtimeReflection: null,
+      verification,
+      metrics: request2.metrics,
+      createdAt: Date.now()
+    };
+    branch.headVersionId = version.versionId;
+    canvas.versions.push(version);
+    canvas.activeBranchId = branch.branchId;
+    canvas.stopReason = null;
+    canvas.updatedAt = version.createdAt;
+    this.write(canvas);
+    return canvas;
+  }
+  createBranch(sessionId, canvasId, name, fromVersionId) {
+    const canvas = this.requireCanvas(sessionId, canvasId);
+    if (fromVersionId && !canvas.versions.some((version) => version.versionId === fromVersionId)) {
+      throw new Error(`Canvas version not found: ${fromVersionId}`);
+    }
+    const branch = {
+      branchId: crypto.randomUUID(),
+      name: name.trim() || `branch-${canvas.branches.length + 1}`,
+      headVersionId: fromVersionId,
+      createdFromVersionId: fromVersionId,
+      createdAt: Date.now()
+    };
+    canvas.branches.push(branch);
+    canvas.activeBranchId = branch.branchId;
+    canvas.updatedAt = branch.createdAt;
+    this.write(canvas);
+    return canvas;
+  }
+  switchBranch(sessionId, canvasId, branchId) {
+    const canvas = this.requireCanvas(sessionId, canvasId);
+    if (!canvas.branches.some((branch) => branch.branchId === branchId)) throw new Error(`Canvas branch not found: ${branchId}`);
+    canvas.activeBranchId = branchId;
+    canvas.updatedAt = Date.now();
+    this.write(canvas);
+    return canvas;
+  }
+  stop(sessionId, canvasId, reason) {
+    const canvas = this.requireCanvas(sessionId, canvasId);
+    if (reason === "success") {
+      const headId = canvas.branches.find((branch) => branch.branchId === canvas.activeBranchId)?.headVersionId;
+      const head = canvas.versions.find((version) => version.versionId === headId);
+      const passedLevels = new Set(head?.verification.filter((entry) => entry.passed).map((entry) => entry.level));
+      if (!head || ![1, 2, 3].every((level) => passedLevels.has(level))) {
+        throw new Error("Canvas cannot be completed until the active branch head passes verification Levels 1, 2, and 3.");
+      }
+    }
+    canvas.stopReason = reason;
+    canvas.updatedAt = Date.now();
+    this.write(canvas);
+    return canvas;
+  }
+  recordObservation(sessionId, canvasId, versionId, eventType, details) {
+    const canvas = this.requireCanvas(sessionId, canvasId);
+    const version = canvas.versions.find((entry) => entry.versionId === versionId);
+    if (!version) throw new Error(`Canvas version not found: ${versionId}`);
+    const observedAt = Date.now();
+    if (eventType === "ready" && Number.isFinite(details?.latencyMs) && !canvas.observations.some((entry) => entry.versionId === versionId && entry.eventType === "ready")) {
+      version.metrics.renderMs = Math.max(0, Math.round(details.latencyMs));
+    }
+    canvas.observations.push({ observationId: crypto.randomUUID(), versionId, eventType, ...details, observedAt });
+    updateGenerativeUiRuntimeVerification(version, eventType, details);
+    if (!version.usableAt && version.verification.find((entry) => entry.level === 3)?.passed) version.usableAt = observedAt;
+    canvas.updatedAt = Date.now();
+    this.write(canvas);
+    return canvas;
+  }
+  recordFeedback(sessionId, canvasId, versionId, value) {
+    const canvas = this.requireCanvas(sessionId, canvasId);
+    if (!canvas.versions.some((version) => version.versionId === versionId)) throw new Error(`Canvas version not found: ${versionId}`);
+    canvas.feedback.push({ feedbackId: crypto.randomUUID(), versionId, ...value, createdAt: Date.now() });
+    canvas.updatedAt = Date.now();
+    this.write(canvas);
+    return canvas;
+  }
+  setRuntimeDecision(sessionId, canvasId, versionId, decision, reflection, usage) {
+    const canvas = this.requireCanvas(sessionId, canvasId);
+    const version = canvas.versions.find((entry) => entry.versionId === versionId);
+    if (!version) throw new Error(`Canvas version not found: ${versionId}`);
+    version.runtimeDecision = decision;
+    version.runtimeReflection = reflection;
+    version.metrics.inputTokens = (version.metrics.inputTokens ?? 0) + (usage?.inputTokens ?? 0);
+    version.metrics.outputTokens = (version.metrics.outputTokens ?? 0) + (usage?.outputTokens ?? 0);
+    version.metrics.estimatedCostUsd = (version.metrics.estimatedCostUsd ?? 0) + (usage?.estimatedCostUsd ?? 0);
+    canvas.updatedAt = Date.now();
+    this.write(canvas);
+    return canvas;
+  }
+  exportVersion(sessionId, canvasId, versionId) {
+    return exportGenerativeUiVersion(this.rootPath, this.requireCanvas(sessionId, canvasId), versionId);
+  }
+  requireCanvas(sessionId, canvasId) {
+    const canvas = this.get(sessionId, canvasId);
+    if (!canvas) throw new Error(`Canvas not found: ${canvasId}`);
+    return canvas;
+  }
+  listAll() {
+    if (!fs.existsSync(this.rootPath)) return [];
+    return fs.readdirSync(this.rootPath, { withFileTypes: true }).filter((entry) => entry.isDirectory() && entry.name !== "exports").flatMap((entry) => this.list(entry.name));
+  }
+  sessionPath(sessionId) {
+    return path.join(this.rootPath, safeSegment(sessionId));
+  }
+  canvasPath(sessionId, canvasId) {
+    return path.join(this.sessionPath(sessionId), `${safeSegment(canvasId)}.json`);
+  }
+  readFile(filePath) {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    if (parsed.schemaVersion !== 1) throw new Error(`Unsupported Canvas schema: ${String(parsed.schemaVersion)}`);
+    parsed.observations ??= [];
+    parsed.feedback ??= [];
+    return parsed;
+  }
+  write(canvas) {
+    const directory = this.sessionPath(canvas.sessionId);
+    fs.mkdirSync(directory, { recursive: true });
+    const target = this.canvasPath(canvas.sessionId, canvas.canvasId);
+    const temporary = `${target}.${process.pid}.tmp`;
+    fs.writeFileSync(temporary, `${JSON.stringify(canvas, null, 2)}
+`, "utf8");
+    fs.renameSync(temporary, target);
+  }
+}
+const generativeUiCanvasService = new GenerativeUiCanvasService();
+const sumGenerativeUiUsage = (values) => values.reduce((total, value) => ({
+  inputTokens: (total.inputTokens ?? 0) + (value?.inputTokens ?? 0),
+  outputTokens: (total.outputTokens ?? 0) + (value?.outputTokens ?? 0),
+  estimatedCostUsd: (total.estimatedCostUsd ?? 0) + (value?.estimatedCostUsd ?? 0)
+}), {});
+const elapsed = (startedAt) => Date.now() - startedAt;
+class GenerativeUiInnerLoop {
+  constructor(planner, generator, reflector, canvases = generativeUiCanvasService, verifier = new GenerativeUiVerifier()) {
+    this.planner = planner;
+    this.generator = generator;
+    this.reflector = reflector;
+    this.canvases = canvases;
+    this.verifier = verifier;
+  }
+  planner;
+  generator;
+  reflector;
+  canvases;
+  verifier;
+  async run(request2) {
+    const startedAt = Date.now();
+    const modelPrompt = request2.modelPrompt ?? request2.prompt;
+    const diagnostics = [];
+    let canvas = request2.canvasId ? this.canvases.get(request2.sessionId, request2.canvasId) : this.canvases.create(request2.projectId, request2.sessionId, request2.title ?? "Generative UI", request2.prompt, request2.benchmarkCaseId);
+    if (!canvas) throw new Error(`Canvas not found: ${request2.canvasId}`);
+    const canvasId = canvas.canvasId;
+    let branchId = request2.branchId ?? canvas.activeBranchId;
+    let previous = canvas.versions.find((version) => version.versionId === canvas?.branches.find((branch) => branch.branchId === branchId)?.headVersionId);
+    let lastVersion = previous ?? null;
+    let iterations = 0;
+    let stagnantIterations = 0;
+    const callContext = (phase) => ({
+      sessionId: request2.sessionId,
+      turnId: `generative-ui:${canvasId}:${branchId}`,
+      phase,
+      images: phase === "reflect" ? void 0 : request2.modelImages
+    });
+    try {
+      while (iterations < request2.budget.maxIterations && elapsed(startedAt) < request2.budget.maxTotalMs) {
+        iterations += 1;
+        const planningStarted = Date.now();
+        const planned = await this.planner.plan(modelPrompt, previous ? { spec: previous.spec, reflection: previous.runtimeReflection ?? previous.reflection } : void 0, callContext("plan"));
+        if (planned.noOpReason) {
+          diagnostics.push(planned.noOpReason);
+          canvas = this.canvases.stop(request2.sessionId, canvas.canvasId, "no_op");
+          return {
+            canvas,
+            version: lastVersion,
+            iterations,
+            stopReason: "no_op",
+            awaitingCheckpoint: false,
+            diagnostics,
+            fallback: { kind: "static", message: planned.noOpReason }
+          };
+        }
+        const planningMs = elapsed(planningStarted);
+        const generationStarted = Date.now();
+        const generated = await this.generator.generate(modelPrompt, planned.spec, previous?.source, callContext("generate"));
+        const generationMs = elapsed(generationStarted);
+        const verificationStarted = Date.now();
+        const verification = [this.verifier.verifyLevel1(generated.source), this.verifier.verifyLevel2(planned.spec, generated.source)];
+        const verificationMs = elapsed(verificationStarted);
+        const reflected = await this.reflector.reflect(planned.spec, generated.source, verification, callContext("reflect"));
+        stagnantIterations = previous && JSON.stringify(previous.source) === JSON.stringify(generated.source) ? stagnantIterations + 1 : 0;
+        const usage = sumGenerativeUiUsage([planned.usage, generated.usage, reflected.usage]);
+        const metrics = {
+          planningMs,
+          generationMs,
+          renderMs: 0,
+          verificationMs,
+          ...usage
+        };
+        canvas = this.canvases.commit(request2.sessionId, {
+          canvasId: canvas.canvasId,
+          branchId,
+          parentVersionId: previous?.versionId ?? null,
+          prompt: request2.prompt,
+          contextReferences: request2.contextReferences,
+          spec: planned.spec,
+          source: generated.source,
+          reflection: reflected.reflection,
+          runtimePolicy: request2.checkpoint === "automatic" ? "automatic" : "human",
+          verification,
+          metrics
+        });
+        lastVersion = canvas.versions.at(-1) ?? null;
+        previous = lastVersion ?? void 0;
+        const passed = verification.every((result) => result.passed);
+        if (request2.checkpoint !== "automatic") {
+          return {
+            canvas,
+            version: lastVersion,
+            iterations,
+            stopReason: passed ? "success" : "exhausted",
+            awaitingCheckpoint: true,
+            diagnostics,
+            fallback: null
+          };
+        }
+        if (passed && !reflected.shouldContinue) {
+          return {
+            canvas,
+            version: lastVersion,
+            iterations,
+            stopReason: "success",
+            awaitingCheckpoint: true,
+            diagnostics,
+            fallback: null
+          };
+        }
+        if (stagnantIterations >= (request2.budget.maxStagnantIterations ?? 3)) {
+          diagnostics.push("Generated source did not change across consecutive refinement attempts.");
+          canvas = this.canvases.stop(request2.sessionId, canvas.canvasId, "blocked");
+          return {
+            canvas,
+            version: lastVersion,
+            iterations,
+            stopReason: "blocked",
+            awaitingCheckpoint: false,
+            diagnostics,
+            fallback: {
+              kind: "human",
+              message: "Generation stopped after repeated no-progress iterations. Review the latest Canvas version or revise the request."
+            }
+          };
+        }
+        diagnostics.push(
+          `Iteration ${iterations}: ${verification.flatMap((result) => result.checks).filter((entry) => !entry.passed).map((entry) => entry.id).join(", ") || "reflection requested refinement"}`
+        );
+        if (this.exceedsUsageBudget(canvas, request2)) break;
+        branchId = canvas.activeBranchId;
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      diagnostics.push(message);
+      canvas = this.canvases.stop(request2.sessionId, canvas.canvasId, "blocked");
+      return {
+        canvas,
+        version: lastVersion,
+        iterations,
+        stopReason: "blocked",
+        awaitingCheckpoint: false,
+        diagnostics,
+        fallback: {
+          kind: "human",
+          message: `Generation could not continue: ${message}`
+        }
+      };
+    }
+    canvas = this.canvases.stop(request2.sessionId, canvas.canvasId, "exhausted");
+    return {
+      canvas,
+      version: lastVersion,
+      iterations,
+      stopReason: "exhausted",
+      awaitingCheckpoint: false,
+      diagnostics,
+      fallback: {
+        kind: "human",
+        message: "Generation reached its iteration, time, token, or cost budget. Review the latest version before continuing."
+      }
+    };
+  }
+  exceedsUsageBudget(canvas, request2) {
+    const totals = canvas.versions.reduce(
+      (value, version) => ({
+        input: value.input + (version.metrics.inputTokens ?? 0),
+        output: value.output + (version.metrics.outputTokens ?? 0),
+        cost: value.cost + (version.metrics.estimatedCostUsd ?? 0)
+      }),
+      { input: 0, output: 0, cost: 0 }
+    );
+    return request2.budget.maxInputTokens !== void 0 && totals.input >= request2.budget.maxInputTokens || request2.budget.maxOutputTokens !== void 0 && totals.output >= request2.budget.maxOutputTokens || request2.budget.maxEstimatedCostUsd !== void 0 && totals.cost >= request2.budget.maxEstimatedCostUsd;
+  }
+}
+class GenerativeUiRequestTrace {
+  constructor(snapshots = requestSnapshotStore) {
+    this.snapshots = snapshots;
+  }
+  snapshots;
+  begin(systemPrompt, request2, route, context2) {
+    if (!context2) return null;
+    const promptPlan = {
+      id: generateEventId("prompt-plan"),
+      segments: [{
+        id: "generative-ui:system",
+        kind: "core-contract",
+        scope: "builtin",
+        sourcePath: "runtime://generative-ui/system",
+        sourceHash: hashScopedResource(systemPrompt),
+        precedence: 0,
+        content: systemPrompt,
+        tokenEstimate: charsToTokens(systemPrompt.length)
+      }],
+      systemPrompt,
+      totalTokenEstimate: charsToTokens(systemPrompt.length),
+      metrics: { systemPrompt: systemPrompt.length, scopedInstructions: 0, skills: 0 },
+      diagnostics: []
+    };
+    const snapshot = requestEnvelopeBuilder.build({
+      promptPlan,
+      sessionId: context2.sessionId,
+      turnId: context2.turnId,
+      callIndex: this.snapshots.nextCallIndex(context2.sessionId, context2.turnId),
+      route,
+      messages: request2.messages,
+      tools: [],
+      controls: { phase: context2.phase, temperature: request2.temperature, maxTokens: request2.maxTokens, responseFormat: request2.responseFormat },
+      reasoning: { semantic: "none", source: "generative-ui", displayLabel: "None" }
+    });
+    this.snapshots.write(snapshot);
+    return snapshot.id;
+  }
+  complete(snapshotId, response, context2) {
+    if (!snapshotId || !context2) return;
+    this.snapshots.complete(snapshotId, context2.sessionId, context2.turnId, {
+      inputTokens: response.usage.inputTokens,
+      outputTokens: response.usage.outputTokens,
+      estimated: false
+    });
+  }
+}
+const generativeUiRequestTrace = new GenerativeUiRequestTrace();
+const SYSTEM = `You are the RDC-Agent Generative UI engine. Return only valid JSON. Generate original, runnable Web UI rather than templates. Prioritize usability, accessibility, responsive behavior, and working interactions. The runtime is a sandbox with no network, storage, parent-frame access, or external assets.`;
+const responseText = (response) => typeof response.content === "string" ? response.content : response.content.map((block) => block.type === "text" ? block.text ?? "" : "").join("");
+const specSchema = zod.z.object({
+  title: zod.z.string().min(1),
+  intent: zod.z.string().min(1),
+  layout: zod.z.string().min(1),
+  components: zod.z.array(zod.z.object({ id: zod.z.string().min(1), kind: zod.z.string().min(1), purpose: zod.z.string().min(1) })).max(100),
+  interactions: zod.z.array(zod.z.object({ trigger: zod.z.string().min(1), effect: zod.z.string().min(1) })).max(100),
+  dataBindings: zod.z.array(zod.z.object({ source: zod.z.string().min(1), target: zod.z.string().min(1) })).max(100),
+  visualStyle: zod.z.string().min(1),
+  responsiveRequirements: zod.z.array(zod.z.string().min(1)).max(50)
+});
+const planSchema = zod.z.object({ suitable: zod.z.boolean(), noOpReason: zod.z.string().nullable().optional(), spec: specSchema });
+const sourceSchema = zod.z.object({ html: zod.z.string().min(1).max(1e6), css: zod.z.string().max(1e6), javascript: zod.z.string().max(1e6) });
+const reflectionSchema = zod.z.object({ reflection: zod.z.string().min(1), shouldContinue: zod.z.boolean() });
+const parseGenerativeUiJson = (response, schema) => {
+  const text = responseText(response).trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  try {
+    return schema.parse(JSON.parse(text));
+  } catch (error) {
+    const detail = error instanceof zod.z.ZodError ? error.issues.slice(0, 5).map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ") : "invalid JSON syntax";
+    throw new Error(`Generative UI model returned an invalid structured response: ${detail}`);
+  }
+};
+class LlmGenerativeUiModel {
+  constructor(adapter = llmAdapter, settings = settingsService, trace = generativeUiRequestTrace) {
+    this.adapter = adapter;
+    this.settings = settings;
+    this.trace = trace;
+  }
+  adapter;
+  settings;
+  trace;
+  async plan(prompt, previous, context2) {
+    const response = await this.call(`Plan an interactive UI for this request:
+${prompt}
+Previous state: ${JSON.stringify(previous ?? null)}
+Return {"suitable":boolean,"noOpReason":string|null,"spec":{"title":string,"intent":string,"layout":string,"components":[{"id":string,"kind":string,"purpose":string}],"interactions":[{"trigger":string,"effect":string}],"dataBindings":[{"source":string,"target":string}],"visualStyle":string,"responsiveRequirements":string[]}}.`, context2);
+    const value = parseGenerativeUiJson(response, planSchema);
+    return {
+      spec: value.spec,
+      noOpReason: value.suitable ? void 0 : value.noOpReason || "The request is not suitable for an interactive UI.",
+      usage: { ...response.usage }
+    };
+  }
+  async generate(prompt, spec, previous, context2) {
+    const response = await this.call(`Implement this UI as self-contained HTML, CSS, and JavaScript.
+Request: ${prompt}
+Spec: ${JSON.stringify(spec)}
+Previous source: ${JSON.stringify(previous ?? null)}
+Return {"html":string,"css":string,"javascript":string}. Do not use external libraries or network calls.`, context2);
+    return { source: parseGenerativeUiJson(response, sourceSchema), usage: { ...response.usage } };
+  }
+  async reflect(spec, source, verification, context2) {
+    const response = await this.call(`Review this generated UI against its spec and verifier output.
+Spec: ${JSON.stringify(spec)}
+Source: ${JSON.stringify(source)}
+Verification: ${JSON.stringify(verification)}
+Return {"reflection":string,"shouldContinue":boolean}. Continue only when a concrete repair is required.`, context2);
+    const value = parseGenerativeUiJson(response, reflectionSchema);
+    return { ...value, usage: { ...response.usage } };
+  }
+  async call(userPrompt, context2) {
+    const config = this.settings.getLlmConfig();
+    const route = config.agentRoutes.find((entry) => entry.agentId === "edit");
+    if (!route?.providerId || !route.modelId) {
+      throw new Error("Generative UI requires a configured Edit agent provider and model route.");
+    }
+    const userContent = context2?.images?.length ? [
+      { type: "text", text: userPrompt },
+      ...context2.images.map((image) => ({ type: "image", source: { type: "base64", media_type: image.mediaType, data: image.data } }))
+    ] : userPrompt;
+    const request2 = {
+      model: route.modelId,
+      responseFormat: "json_object",
+      temperature: 0.35,
+      maxTokens: 16384,
+      messages: [
+        { role: "system", content: SYSTEM },
+        { role: "user", content: userContent }
+      ]
+    };
+    const provider = config.providers.find((entry) => entry.id === route.providerId);
+    const snapshotId = this.trace.begin(SYSTEM, request2, { providerId: route.providerId, modelId: route.modelId, protocol: provider?.protocol ?? "unknown" }, context2);
+    const response = await this.adapter.chat(request2, route.providerId);
+    this.trace.complete(snapshotId, response, context2);
+    return response;
+  }
+}
+const model$2 = new LlmGenerativeUiModel();
+const loop$1 = new GenerativeUiInnerLoop(model$2, model$2, model$2);
+const required = (value, name) => {
+  const normalized = value?.trim();
+  if (!normalized) throw new Error(`${name} is required.`);
+  return normalized;
+};
+const validateInputs = (args) => {
+  if ((args.prompt?.length ?? 0) > 2e4) throw new Error("prompt exceeds the 20,000 character limit.");
+  if (args.dataContext !== void 0 && JSON.stringify(args.dataContext).length > 2e5) throw new Error("dataContext exceeds the 200,000 character limit.");
+  if (args.dataContext && !args.dataContext.source.trim()) throw new Error("dataContext.source is required.");
+  const assets = args.assets ?? [];
+  if (assets.length > 20) throw new Error("assets exceeds the 20 item limit.");
+  if (assets.some((asset) => !asset.source.trim())) throw new Error("Every asset requires a source.");
+  if (assets.some((asset) => !/^data:image\/(?:png|jpeg|webp|gif|svg\+xml);base64,/i.test(asset.dataUrl))) {
+    throw new Error("assets must be base64 image data URLs.");
+  }
+  if (assets.reduce((total, asset) => total + asset.dataUrl.length, 0) > 28e5) throw new Error("assets exceed the 2 MB encoded payload limit.");
+};
+const reference = (kind, name, source, payload) => ({
+  kind,
+  name,
+  source,
+  scope: "session",
+  hash: `sha256:${crypto.createHash("sha256").update(payload).digest("hex")}`,
+  precedence: "supplemental",
+  redaction: "caller_redacted"
+});
+const simulate = (input = {}) => {
+  const steps = Math.min(500, Math.max(1, Math.floor(input.steps ?? 30)));
+  const rate = Number.isFinite(input.rate) ? input.rate : 0.02;
+  const noise = Math.max(0, Number.isFinite(input.noise) ? input.noise : 0);
+  let seed = Math.floor(input.seed ?? 1) >>> 0;
+  let value = Number.isFinite(input.initialValue) ? input.initialValue : 100;
+  return Array.from({ length: steps }, (_, index) => {
+    seed = 1664525 * seed + 1013904223 >>> 0;
+    value *= 1 + rate + (seed / 4294967296 - 0.5) * noise;
+    return { step: index + 1, value: Number(value.toFixed(6)) };
+  });
+};
+function createGenerativeUiAgentTool() {
+  return {
+    name: "generative_ui",
+    label: "Generative UI Canvas",
+    description: "Generate, refine, inspect, export, or evaluate a persistent interactive Canvas. Compose with web/MCP data and image tools by passing explicit outputs as dataContext or embedded data-URL assets. Includes bounded deterministic simulation.",
+    parameters: { type: "object", required: ["action"], properties: {
+      action: { type: "string", enum: ["generate", "refine", "inspect", "export", "metrics", "simulate"] },
+      prompt: { type: "string" },
+      title: { type: "string" },
+      canvasId: { type: "string" },
+      branchId: { type: "string" },
+      versionId: { type: "string" },
+      dataContext: { type: "object", required: ["source", "value"], description: "Caller-redacted structured data with an explicit source.", properties: { source: { type: "string" }, value: { type: "object" } } },
+      assets: { type: "array", items: { type: "object", required: ["name", "source", "dataUrl"], properties: { name: { type: "string" }, source: { type: "string" }, dataUrl: { type: "string" }, alt: { type: "string" } } } },
+      simulation: { type: "object", properties: { steps: { type: "number" }, initialValue: { type: "number" }, rate: { type: "number" }, noise: { type: "number" }, seed: { type: "number" } } }
+    } },
+    permissionHint: "session_mutation",
+    spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: "session", category: "system", requiresApproval: false },
+    async execute(_id, args, signal, onUpdate, context2) {
+      try {
+        if (signal?.aborted) throw new Error("Generative UI operation was aborted.");
+        validateInputs(args);
+        const sessionId = context2?.sessionId;
+        if (!sessionId) throw new Error("Generative UI requires an active session.");
+        if (args.action === "simulate") {
+          const series = simulate(args.simulation);
+          return { content: [{ type: "text", text: JSON.stringify(series) }], details: { action: args.action, series } };
+        }
+        if (args.action === "metrics") {
+          const summary2 = generativeUiCanvasService.summarize(sessionId);
+          return { content: [{ type: "text", text: JSON.stringify(summary2) }], details: { action: args.action, summary: summary2 } };
+        }
+        if (args.action === "inspect") {
+          const value = args.canvasId ? generativeUiCanvasService.get(sessionId, args.canvasId) : generativeUiCanvasService.list(sessionId);
+          return { content: [{ type: "text", text: JSON.stringify(value) }], details: { action: args.action, value } };
+        }
+        if (args.action === "export") {
+          const result2 = generativeUiCanvasService.exportVersion(sessionId, required(args.canvasId, "canvasId"), required(args.versionId, "versionId"));
+          return { content: [{ type: "text", text: `Canvas exported: ${result2.filePath}` }], details: { action: args.action, ...result2 } };
+        }
+        const prompt = required(args.prompt, "prompt");
+        const dataPayload = args.dataContext === void 0 ? "" : JSON.stringify(args.dataContext.value);
+        const contextReferences = [
+          ...args.dataContext ? [reference("data", "dataContext", args.dataContext.source, dataPayload)] : [],
+          ...(args.assets ?? []).map((asset) => reference("asset", asset.name, asset.source, asset.dataUrl))
+        ];
+        const modelPrompt = `${prompt}${args.dataContext === void 0 ? "" : `
+
+Supplemental caller-redacted data (${args.dataContext.source}):
+${dataPayload}`}${args.assets?.length ? `
+
+Attached image assets:
+${JSON.stringify(args.assets.map(({ name, source, alt }) => ({ name, source, alt })))}` : ""}`;
+        const modelImages = (args.assets ?? []).map((asset) => {
+          const match = /^data:(image\/(?:png|jpeg|webp|gif|svg\+xml));base64,(.+)$/i.exec(asset.dataUrl);
+          if (!match) throw new Error(`Invalid image asset: ${asset.name}`);
+          return { mediaType: match[1].toLowerCase(), data: match[2] };
+        });
+        onUpdate?.({ stage: "generating", canvasId: args.canvasId ?? null });
+        const result = await loop$1.run({
+          projectId: context2?.projectId ?? "unscoped",
+          sessionId,
+          prompt,
+          modelPrompt,
+          modelImages,
+          contextReferences,
+          title: args.title,
+          canvasId: args.action === "refine" ? required(args.canvasId, "canvasId") : void 0,
+          branchId: args.branchId,
+          checkpoint: "automatic",
+          budget: { maxIterations: 5, maxTotalMs: 18e4, maxInputTokens: 1e5, maxOutputTokens: 6e4, maxEstimatedCostUsd: 5, maxStagnantIterations: 2 }
+        });
+        const summary = { canvasId: result.canvas.canvasId, versionId: result.version?.versionId ?? null, stopReason: result.stopReason, awaitingRuntimeVerification: result.awaitingCheckpoint, iterations: result.iterations, diagnostics: result.diagnostics, fallback: result.fallback };
+        return { content: [{ type: "text", text: JSON.stringify(summary) }], isError: result.stopReason === "blocked" || result.stopReason === "exhausted", details: { action: args.action, ...summary } };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return { content: [{ type: "text", text: message }], isError: true, details: { action: args.action, error: message } };
+      }
+    }
+  };
+}
 class AgentOrchestrator {
   agentStates = /* @__PURE__ */ new Map();
   agentConfigs = /* @__PURE__ */ new Map();
@@ -18525,7 +19394,7 @@ class AgentOrchestrator {
       const activeContextWindow = resolveActiveContextWindowTokens(capability, turnControls);
       const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
       const reasoning = options?.reasoning ?? resolveReasoningSelection(capability, turnControls);
-      const responseText = stub ? await this.streamTestModeStub(stub, options) : await this.runAgentTurn({
+      const responseText2 = stub ? await this.streamTestModeStub(stub, options) : await this.runAgentTurn({
         agentId,
         content,
         systemPrompt,
@@ -18550,8 +19419,8 @@ class AgentOrchestrator {
       });
       const finalContent = await this.finalizeRecordedAssistantMessage(
         agentId,
-        responseText,
-        responseText,
+        responseText2,
+        responseText2,
         context2
       );
       this.updateAgentStatus(agentId, "complete");
@@ -18601,7 +19470,7 @@ class AgentOrchestrator {
       const activeContextWindow = resolveActiveContextWindowTokens(capability, turnControls);
       const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
       const reasoning = options?.reasoning ?? resolveReasoningSelection(capability, turnControls);
-      const responseText = await this.runAgentTurn({
+      const responseText2 = await this.runAgentTurn({
         agentId,
         content,
         systemPrompt: this.systemPromptForAgent(agentId, config.systemPrompt),
@@ -18630,7 +19499,7 @@ class AgentOrchestrator {
         namespace: "agent",
         severity: "info",
         title: `${this.getAgentDisplayName(agentId)} profile turn`,
-        summary: responseText.slice(0, 160) || "Empty message.",
+        summary: responseText2.slice(0, 160) || "Empty message.",
         sessionId: options?.sessionId,
         raw: {
           agentId,
@@ -18639,7 +19508,7 @@ class AgentOrchestrator {
         }
       });
       this.updateAgentStatus(agentId, "complete");
-      return responseText;
+      return responseText2;
     } catch (error) {
       this.updateAgentStatus(agentId, "error");
       throw error;
@@ -19302,6 +20171,7 @@ class AgentOrchestrator {
       this.createSkillsCatalogTool(),
       this.createSkillReadTool(agentId),
       this.createMcpCatalogTool(),
+      createGenerativeUiAgentTool(),
       ...this.createSubagentTools(agentId, sessionId)
     ];
   }
@@ -19618,7 +20488,13 @@ ${record.content}` : `No memory named "${args.name}" was found.` }], details: { 
         }
         return {
           content: [{ type: "text", text: skill.instructions }],
-          details: { skillId: skill.id, agentId }
+          details: {
+            skillId: skill.id,
+            agentId,
+            name: skill.name,
+            description: skill.description,
+            sourcePath: skill.sourcePath
+          }
         };
       }
     };
@@ -19814,7 +20690,7 @@ ${record.content}` : `No memory named "${args.name}" was found.` }], details: { 
       content: input.content,
       timestamp: nowMs()
     };
-    let responseText = "";
+    let responseText2 = "";
     let sawStructuredToolCall = false;
     const unsubscribe = slot.agent.subscribe((event) => {
       if (event.type === "message_update") {
@@ -19827,7 +20703,7 @@ ${record.content}` : `No memory named "${args.name}" was found.` }], details: { 
         }
       }
       if (event.type === "message_end" && event.message.role === "assistant") {
-        responseText = event.message.content.filter((block) => block.type === "text").map((block) => block.text).join("");
+        responseText2 = event.message.content.filter((block) => block.type === "text").map((block) => block.text).join("");
         if (event.message.usage) {
           const isMcpDef = (d) => d.name.startsWith("mcp__");
           const isSubagentDef = (d) => d.name === "subagent";
@@ -19861,18 +20737,18 @@ ${record.content}` : `No memory named "${args.name}" was found.` }], details: { 
             precomputedBreakdown
           });
         }
-        if (!sawStructuredToolCall && !responseText.trim()) {
+        if (!sawStructuredToolCall && !responseText2.trim()) {
           input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
             code: "empty_response_without_tool_call",
             severity: "warning",
             message: "Provider returned an empty assistant message without a structured tool call."
           }));
-        } else if (!sawStructuredToolCall && mentionsTextualToolCall(responseText)) {
+        } else if (!sawStructuredToolCall && mentionsTextualToolCall(responseText2)) {
           input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
             code: "textual_tool_call_not_executed",
             severity: "warning",
             message: "The model wrote a textual tool call, but no structured provider tool call was returned. No tool was executed.",
-            technicalMessage: responseText.slice(0, 1200)
+            technicalMessage: responseText2.slice(0, 1200)
           }));
         }
       }
@@ -19892,7 +20768,7 @@ ${record.content}` : `No memory named "${args.name}" was found.` }], details: { 
     }
     try {
       await slot.agent.prompt(userMessage);
-      return responseText;
+      return responseText2;
     } finally {
       unsubscribe();
       if (abortListener && input.options?.signal) {
@@ -23362,6 +24238,122 @@ function registerCommandHandlers() {
   });
 }
 const ROOT_BRANCH_ID = "branch-root";
+const CONTENT_TEXT_MAX_CHARS = 4e3;
+const CONTENT_TEXT_MAX_LINES = 30;
+const WEB_RESULTS_MAX = 8;
+const PREVIEW_JSON_MAX_CHARS = 12e3;
+const isRecord = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
+const truncateText = (text, maxChars = CONTENT_TEXT_MAX_CHARS, maxLines = CONTENT_TEXT_MAX_LINES) => {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  const clippedLines = lines.length > maxLines ? [...lines.slice(0, maxLines), `… (${lines.length - maxLines} more lines)`] : lines;
+  let clipped = clippedLines.join("\n");
+  if (clipped.length > maxChars) {
+    clipped = `${clipped.slice(0, maxChars)}…`;
+  }
+  return clipped;
+};
+const extractContentText = (content) => {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  const parts = [];
+  for (const item of content) {
+    if (typeof item === "string") {
+      parts.push(item);
+      continue;
+    }
+    if (!isRecord(item)) continue;
+    if (typeof item.text === "string") parts.push(item.text);
+    else if (typeof item.content === "string") parts.push(item.content);
+  }
+  return parts.join("\n");
+};
+const resolveContentText = (data) => {
+  const fromContent = extractContentText(data.content);
+  if (fromContent) return fromContent;
+  if (Array.isArray(data.matches)) return data.matches.map(String).join("\n");
+  if (typeof data.stdout === "string") return data.stdout;
+  if (typeof data.text === "string") return data.text;
+  return "";
+};
+const compactWebResults = (results) => {
+  if (!Array.isArray(results)) return void 0;
+  return results.slice(0, WEB_RESULTS_MAX).map((entry) => {
+    if (!isRecord(entry)) return entry;
+    return {
+      title: typeof entry.title === "string" ? entry.title : void 0,
+      url: typeof entry.url === "string" ? entry.url : void 0,
+      snippet: typeof entry.snippet === "string" ? truncateText(entry.snippet, 240, 3) : void 0
+    };
+  });
+};
+const compactDetails = (details, extras) => {
+  const base = isRecord(details) ? { ...details } : {};
+  if (extras) {
+    for (const [key, value] of Object.entries(extras)) {
+      if (value !== void 0 && base[key] === void 0) base[key] = value;
+    }
+  }
+  if (Object.keys(base).length === 0) return details == null ? null : { value: details };
+  if (Array.isArray(base.results)) {
+    const originalLength = base.results.length;
+    base.results = compactWebResults(base.results);
+    if (base.resultCount == null) base.resultCount = originalLength;
+  }
+  for (const key of Object.keys(base)) {
+    const value = base[key];
+    if (typeof value === "string" && value.length > 800 && !["pattern", "query", "command", "path", "cwd", "url"].includes(key)) {
+      base[key] = truncateText(value, 800, 12);
+    }
+  }
+  return base;
+};
+const compactData = (data) => {
+  const text = resolveContentText(data);
+  const truncated = text ? truncateText(text) : "";
+  const content = truncated ? [{ type: "text", text: truncated }] : [];
+  const detailExtras = {};
+  if (Array.isArray(data.matches) && detailExtras.matched === void 0) {
+    detailExtras.matched = data.matches.length;
+  }
+  if (data.lineCount != null) detailExtras.lineCount = data.lineCount;
+  if (data.totalLines != null) detailExtras.totalLines = data.totalLines;
+  return {
+    content,
+    details: compactDetails(data.details, detailExtras)
+  };
+};
+const buildToolResultPreview = (result) => {
+  if (result == null) return "{}";
+  if (typeof result !== "object") {
+    const text = truncateText(String(result));
+    return JSON.stringify({ ok: true, data: { content: [{ type: "text", text }], details: null } });
+  }
+  const record = result;
+  if (!("ok" in record) && !("data" in record) && typeof record.reason === "string") {
+    return JSON.stringify({
+      ok: false,
+      error: { message: record.reason, code: "DENIED", category: "policy" }
+    });
+  }
+  const dataSource = isRecord(record.data) ? record.data : {
+    content: record.content,
+    details: record.details,
+    matches: record.matches,
+    stdout: record.stdout,
+    text: record.text,
+    lineCount: record.lineCount,
+    totalLines: record.totalLines
+  };
+  const preview = {
+    ok: record.ok !== false,
+    data: compactData(dataSource)
+  };
+  if (record.ok === false && record.error != null) preview.error = record.error;
+  if (record.duration_ms != null) preview.duration_ms = record.duration_ms;
+  if (record.trace_id != null) preview.trace_id = record.trace_id;
+  const encoded = JSON.stringify(preview);
+  return encoded.length > PREVIEW_JSON_MAX_CHARS ? encoded.slice(0, PREVIEW_JSON_MAX_CHARS) : encoded;
+};
 const DEFAULT_INSTRUCTION_BUDGET = 64 * 1024;
 const isWithinRoot = (candidate, root) => {
   const relative = path.relative(root, candidate);
@@ -24507,7 +25499,7 @@ class ConversationService {
           timeZone: promptClock.timeZone,
           contextWindowTokens: capability?.nominalContextWindowTokens ?? void 0
         });
-        const responseText = await agentOrchestrator.sendProfileMessage(
+        const responseText2 = await agentOrchestrator.sendProfileMessage(
           conversationAgentId,
           input.rawMessage,
           {
@@ -24692,7 +25684,7 @@ class ConversationService {
                     id: String(event.payload.toolCallId),
                     toolName: String(event.payload.toolName),
                     status: "error",
-                    resultPreview: JSON.stringify(event.payload.result ?? { reason }).slice(0, 800),
+                    resultPreview: buildToolResultPreview(event.payload.result ?? { reason }),
                     error: reason,
                     completedAt: nowMs()
                   }, loopScopedDenied ? currentLoopOptions() : void 0)
@@ -24786,7 +25778,7 @@ class ConversationService {
                   completedAt: nowMs()
                 };
                 if (!(isAskUserTool && result?.ok)) {
-                  toolCallPatch.resultPreview = JSON.stringify(event.payload.result ?? {}).slice(0, 800);
+                  toolCallPatch.resultPreview = buildToolResultPreview(event.payload.result ?? {});
                 }
                 const loopScopedCompleted = isLoopTool(String(event.payload.toolName));
                 commitAssistantMessage("message_patched", {
@@ -24962,7 +25954,7 @@ class ConversationService {
           }
         );
         if (!rawResponse) {
-          rawResponse = responseText;
+          rawResponse = responseText2;
         }
       } catch (error) {
         llmDiagnostic = createRequestFailedDiagnostic(routePreflight, error);
@@ -26790,6 +27782,278 @@ function registerRdxRuntimeHandlers() {
   electron.ipcMain.handle("rdx-runtime:listSnapshots", (_event, sessionId, turnId) => requestSnapshotStore.list(sessionId, turnId));
   electron.ipcMain.handle("rdx-runtime:getSnapshot", (_event, sessionId, turnId, snapshotId) => requestSnapshotStore.get(sessionId, turnId, snapshotId));
 }
+const build = (caseId, category, title, prompt, requiredInteractions, requiredEvidence) => ({ caseId, category, title, prompt, requiredInteractions, requiredEvidence });
+const GENERATIVE_UI_BENCHMARK_VERSION = "v1.0.0";
+const GENERATIVE_UI_BENCHMARK_CASES = [
+  build("website-local-clinic", "website", "Local clinic website", "Create a trustworthy responsive website for a neighborhood clinic with service navigation, doctor profiles, appointment request flow, FAQ disclosure, validation, and accessible mobile navigation. Use realistic inline data and no external assets.", ["navigate services", "submit appointment form", "open FAQ"], ["desktop and narrow layout", "validation feedback"]),
+  build("website-event-launch", "website", "Product event launch", "Design an event launch site with schedule filtering, speaker details, ticket tier comparison, countdown behavior, and a registration CTA. It must remain usable with long speaker names and at 375px width.", ["filter schedule", "open speaker", "select ticket tier"], ["responsive navigation", "interactive schedule"]),
+  build("website-learning-course", "website", "Course landing experience", "Build a course landing experience that lets learners inspect modules, preview lessons, compare plans, calculate weekly study load, and enroll through a validated form.", ["expand module", "change study hours", "submit enrollment"], ["keyboard navigation", "computed study plan"]),
+  build("website-travel-itinerary", "website", "Travel itinerary builder", "Create a three-day city itinerary builder with day tabs, activity selection, budget totals, dietary filters, and a printable summary. All data must be embedded.", ["switch day", "toggle activity", "filter dietary needs"], ["live budget total", "print-friendly structure"]),
+  build("dashboard-operations", "dashboard", "Operations dashboard", "Create an operations dashboard for fulfillment teams with KPI cards, date and region filters, sortable exception table, drill-down details, and clear loading/empty/error states using embedded data.", ["change region", "sort table", "open exception"], ["linked KPI updates", "narrow table behavior"]),
+  build("dashboard-energy", "dashboard", "Energy monitoring dashboard", "Build an energy monitoring dashboard with hourly consumption, renewable share, anomaly markers, building selector, cost projection, and an accessible legend. Generate charts with native SVG or Canvas.", ["select building", "toggle series", "inspect anomaly"], ["chart semantics", "computed projection"]),
+  build("dashboard-product", "dashboard", "Product analytics dashboard", "Create a product analytics dashboard showing activation funnel, cohort retention, feature adoption, and segment comparison. Filters must update every linked view and preserve readable empty states.", ["change segment", "change date range", "inspect cohort"], ["cross-filter consistency", "responsive charts"]),
+  build("simulator-pricing", "simulator", "SaaS pricing simulator", "Build a SaaS pricing simulator where users adjust seats, usage, support tier, annual billing, and discount assumptions; show monthly and annual totals, break-even guidance, and a shareable scenario summary.", ["adjust seats", "change tier", "toggle annual billing"], ["deterministic totals", "scenario summary"]),
+  build("simulator-retirement", "simulator", "Retirement scenario simulator", "Create an educational retirement scenario simulator with starting balance, contributions, years, return and inflation assumptions, deterministic projection, comparison scenarios, and clear non-advice disclosure.", ["adjust assumptions", "add comparison", "reset scenario"], ["deterministic projection", "accessible disclosure"]),
+  build("simulator-queue", "simulator", "Service queue simulator", "Build a deterministic service queue simulator with arrival rate, service rate, server count, seeded randomness, run/pause/reset controls, timeline chart, wait-time distribution, and overload explanation.", ["run simulation", "pause simulation", "change server count"], ["seeded reproducibility", "overload state"]),
+  build("tool-json-explorer", "tool", "JSON explorer", "Create an offline JSON explorer with paste input, parse errors, collapsible tree, key search, path copying, summary counts, and a sample payload button. Never execute pasted content.", ["parse JSON", "search keys", "copy path"], ["invalid JSON handling", "large tree usability"]),
+  build("tool-color-contrast", "tool", "Color contrast tool", "Build a color contrast checker with foreground/background pickers, text preview, WCAG ratio calculation, AA/AAA results, swap/reset actions, and suggested accessible alternatives.", ["change colors", "swap colors", "apply suggestion"], ["correct ratio", "non-color status"]),
+  build("tool-regex-lab", "tool", "Regex learning lab", "Create a safe regex learning lab with pattern, flags, test text, highlighted matches, capture groups, common examples, invalid-pattern errors, and guardrails against freezing on pathological input.", ["edit pattern", "toggle flags", "load example"], ["error recovery", "match details"]),
+  build("tool-kanban", "tool", "Personal kanban prototype", "Build an offline kanban prototype with three columns, add/edit/delete cards, drag or keyboard movement, filters, counts, undo for deletion, and persistence only within the running page memory.", ["add card", "move card", "undo deletion"], ["keyboard alternative", "filter counts"]),
+  build("visualization-network", "visualization", "Dependency network explorer", "Create an interactive dependency network explorer from embedded nodes and edges using native SVG. Support zoom, selection, connected-node emphasis, search, legend, and a readable details panel.", ["search node", "select node", "zoom graph"], ["SVG accessibility", "selection details"]),
+  build("visualization-budget", "visualization", "Budget flow visualization", "Build an interactive household budget flow visualization with editable categories, income allocation, Sankey-like native SVG, warnings for over-allocation, scenario comparison, and tabular fallback.", ["edit allocation", "add category", "compare scenario"], ["allocation validation", "table fallback"]),
+  build("visualization-timeline", "visualization", "Historical timeline explorer", "Create an interactive historical timeline with era zoom, category filters, event selection, long multilingual titles, keyboard navigation, and a compact mobile list alternative.", ["filter category", "select event", "change era"], ["long text handling", "mobile alternative"]),
+  build("game-memory", "game", "Accessible memory game", "Create a polished accessible memory matching game with a 4x4 board, keyboard control, move timer, restart, deterministic seeded deal, win state, and reduced-motion support.", ["flip card", "restart game", "complete match"], ["keyboard play", "win state"]),
+  build("game-logic-grid", "game", "Logic grid puzzle", "Build a small logic-grid puzzle with clues, tri-state cells, contradiction detection, hint system, reset, completion validation, and an explanation of the solved reasoning.", ["toggle cell", "request hint", "validate solution"], ["contradiction state", "completion feedback"]),
+  build("game-resource", "game", "Resource strategy prototype", "Create a five-turn resource strategy prototype where players allocate workers among food, research, and defense; show deterministic consequences, event log, undo before commit, and end-state scoring.", ["allocate worker", "commit turn", "undo allocation"], ["deterministic turn results", "final score"])
+];
+const KINDS = ["use_case", "competitor_observation", "expert_review", "blind_preference"];
+class GenerativeUiOuterLoopService {
+  constructor(rootPath = appPathService.getAppStatePaths().generativeUiEvaluationPath, canvases = generativeUiCanvasService) {
+    this.rootPath = rootPath;
+    this.canvases = canvases;
+  }
+  rootPath;
+  canvases;
+  add(sessionId, request2) {
+    const records = this.list(sessionId);
+    this.validate(sessionId, request2, records);
+    const evidence = {
+      evidenceId: crypto.randomUUID(),
+      ...request2,
+      title: request2.title.trim(),
+      source: request2.source.trim(),
+      notes: request2.notes.trim(),
+      staticReference: request2.staticReference?.trim(),
+      createdAt: Date.now()
+    };
+    records.push(evidence);
+    this.write(sessionId, records);
+    return evidence;
+  }
+  list(sessionId) {
+    const target = this.filePath(sessionId);
+    if (!fs.existsSync(target)) return [];
+    const parsed = JSON.parse(fs.readFileSync(target, "utf8"));
+    if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.records)) throw new Error("Unsupported Generative UI evaluation evidence schema.");
+    return parsed.records.sort((left, right) => right.createdAt - left.createdAt);
+  }
+  report(sessionId) {
+    const records = this.list(sessionId);
+    const metrics = this.canvases.summarize(sessionId);
+    const sessionCanvases = this.canvases.list(sessionId);
+    const canvasVersionIsClosed = (record) => {
+      const version = sessionCanvases.find((canvas) => canvas.canvasId === record.canvasId)?.versions.find((entry) => entry.versionId === record.versionId);
+      return Boolean(version && [1, 2, 3].every((level) => version.verification.some((entry) => entry.level === level && entry.passed)));
+    };
+    const validUseCases = records.filter((entry) => entry.kind === "use_case" && canvasVersionIsClosed(entry));
+    const validExperts = records.filter((entry) => entry.kind === "expert_review" && entry.score !== void 0 && entry.notes.trim()).filter((entry, index, entries) => entries.findIndex((candidate) => candidate.source.trim().toLowerCase() === entry.source.trim().toLowerCase()) === index);
+    const counts = {
+      use_case: validUseCases.length,
+      competitor_observation: records.filter((entry) => entry.kind === "competitor_observation" && entry.notes.trim()).length,
+      expert_review: validExperts.length,
+      blind_preference: records.filter((entry) => entry.kind === "blind_preference").length
+    };
+    const blinded = records.filter((entry) => entry.kind === "blind_preference" && entry.blinded && entry.canvasId && entry.versionId && entry.staticReference && entry.outcome && entry.outcome !== "tie");
+    const dynamicPreferred = blinded.filter((entry) => entry.outcome === "dynamic").length;
+    const observedPreferenceRate = blinded.length ? dynamicPreferred / blinded.length : null;
+    const benchmarkCanvases = sessionCanvases.filter((canvas) => canvas.benchmarkCaseId);
+    const successfulCaseIds = new Set(benchmarkCanvases.filter((canvas) => canvas.stopReason === "success").map((canvas) => canvas.benchmarkCaseId));
+    const categorySuccess = Object.fromEntries(["website", "dashboard", "simulator", "tool", "visualization", "game"].map((category) => [category, GENERATIVE_UI_BENCHMARK_CASES.filter((entry) => entry.category === category && successfulCaseIds.has(entry.caseId)).length]));
+    const gaps = [];
+    if (successfulCaseIds.size < GENERATIVE_UI_BENCHMARK_CASES.length) gaps.push(`Need ${GENERATIVE_UI_BENCHMARK_CASES.length - successfulCaseIds.size} more successful canonical benchmark cases.`);
+    if (counts.use_case < 5) gaps.push(`Need ${5 - counts.use_case} more documented real use cases.`);
+    if (counts.competitor_observation < 1) gaps.push("Need current competitor behavior evidence with source and date.");
+    if (counts.expert_review < 3) gaps.push(`Need ${3 - counts.expert_review} more independent expert reviews.`);
+    if (blinded.length < 20) gaps.push(`Need ${20 - blinded.length} more valid blinded preference decisions.`);
+    if (!metrics.targetStatus.generationSuccessRate) gaps.push("Generation success rate is below 85%.");
+    if (!metrics.targetStatus.loopClosureRate) gaps.push("L1/L2/L3 loop closure rate is below 90%.");
+    if (metrics.targetStatus.previewReadyLatency !== true) gaps.push("Median measured preview-ready latency is not yet proven at 2 seconds or lower.");
+    if (metrics.promptToUsableSampleCount < 1) gaps.push("Prompt-to-usable latency has no persisted L3-closed Canvas sample.");
+    if (observedPreferenceRate === null || observedPreferenceRate < 0.65) gaps.push("Blinded dynamic UI preference is not yet proven at 65% or higher.");
+    if (metrics.canvasesWithFiveEffectiveIterations < 1) gaps.push("No Canvas has a parent-linked lineage of five L1/L2/L3-closed iterations.");
+    const actions = gaps.map((gap) => `Close evidence gap: ${gap}`);
+    return {
+      generatedAt: Date.now(),
+      cadence: "weekly",
+      metrics: {
+        ...metrics,
+        dynamicUiPreferenceRate: observedPreferenceRate,
+        targetStatus: { ...metrics.targetStatus, dynamicUiPreferenceRate: observedPreferenceRate === null ? null : observedPreferenceRate >= 0.65 }
+      },
+      evidenceCounts: counts,
+      benchmark: {
+        version: GENERATIVE_UI_BENCHMARK_VERSION,
+        caseCount: GENERATIVE_UI_BENCHMARK_CASES.length,
+        attemptedCaseCount: new Set(benchmarkCanvases.map((canvas) => canvas.benchmarkCaseId)).size,
+        successfulCaseCount: successfulCaseIds.size,
+        categorySuccess
+      },
+      gaps,
+      actions,
+      decision: gaps.length === 0 ? "v1_ready" : "continue"
+    };
+  }
+  validate(sessionId, request2, records) {
+    if (!KINDS.includes(request2.kind)) throw new Error("Unknown Outer Loop evidence kind.");
+    if (!request2.title.trim() || !request2.source.trim()) throw new Error("Evidence title and source are required.");
+    if (request2.notes.length > 2e4) throw new Error("Evidence notes exceed 20,000 characters.");
+    if (request2.kind === "use_case") {
+      const canvas = request2.canvasId ? this.canvases.get(sessionId, request2.canvasId) : null;
+      const version = canvas?.versions.find((entry) => entry.versionId === request2.versionId);
+      if (!version || ![1, 2, 3].every((level) => version.verification.some((entry) => entry.level === level && entry.passed))) {
+        throw new Error("Real use case evidence requires a Canvas/version with passing Levels 1, 2, and 3.");
+      }
+    }
+    if (request2.kind === "expert_review") {
+      if (request2.score === void 0 || !request2.notes.trim()) throw new Error("Expert review evidence requires a score and review notes.");
+      if (records.some((entry) => entry.kind === "expert_review" && entry.source.trim().toLowerCase() === request2.source.trim().toLowerCase())) {
+        throw new Error("An expert review from this reviewer source is already recorded.");
+      }
+    }
+    if (request2.kind === "competitor_observation" && !request2.notes.trim()) throw new Error("Competitor observation requires dated observation notes.");
+    if (request2.kind === "blind_preference") {
+      if (!request2.blinded || !request2.candidateOrder || !["dynamic", "static", "tie"].includes(request2.outcome ?? "") || !request2.canvasId || !request2.versionId || !request2.staticReference?.trim()) {
+        throw new Error("Blind preference evidence requires blinded=true, randomized candidateOrder, a dynamic/static/tie outcome, a Canvas/version, and a static baseline reference.");
+      }
+      const canvas = this.canvases.get(sessionId, request2.canvasId);
+      const version = canvas?.versions.find((entry) => entry.versionId === request2.versionId);
+      if (!version || ![1, 2, 3].every((level) => version.verification.some((entry) => entry.level === level && entry.passed))) {
+        throw new Error("Blind preference requires a dynamic Canvas/version with passing Levels 1, 2, and 3.");
+      }
+      const duplicate = records.some((entry) => entry.kind === "blind_preference" && entry.source === request2.source.trim() && entry.canvasId === request2.canvasId && entry.versionId === request2.versionId && entry.staticReference === request2.staticReference?.trim());
+      if (duplicate) throw new Error("This blind panel decision for the same dynamic and static artifacts is already recorded.");
+    }
+    if (request2.score !== void 0 && (!Number.isFinite(request2.score) || request2.score < 0 || request2.score > 100)) throw new Error("Evidence score must be between 0 and 100.");
+  }
+  filePath(sessionId) {
+    return path.join(this.rootPath, `${sessionId.replace(/[^a-zA-Z0-9_-]/g, "-")}.json`);
+  }
+  write(sessionId, records) {
+    fs.mkdirSync(this.rootPath, { recursive: true });
+    const target = this.filePath(sessionId);
+    const temporary = `${target}.${process.pid}.tmp`;
+    fs.writeFileSync(temporary, `${JSON.stringify({ schemaVersion: 1, records }, null, 2)}
+`, "utf8");
+    fs.renameSync(temporary, target);
+  }
+}
+const generativeUiOuterLoopService = new GenerativeUiOuterLoopService();
+class GenerativeUiRuntimeContinuation {
+  constructor(canvases = generativeUiCanvasService, model2 = new LlmGenerativeUiModel()) {
+    this.canvases = canvases;
+    this.model = model2;
+    this.loop = new GenerativeUiInnerLoop(model2, model2, model2, canvases);
+  }
+  canvases;
+  model;
+  loop;
+  async observe(sessionId, canvasId, versionId, eventType, details) {
+    let canvas = this.canvases.recordObservation(sessionId, canvasId, versionId, eventType, details);
+    const version = canvas.versions.find((entry) => entry.versionId === versionId);
+    if (!version || version.runtimePolicy !== "automatic" || version.runtimeDecision !== "pending") return canvas;
+    const runtime = version.verification.find((entry) => entry.level === 3);
+    const terminalFailure = runtime?.checks.some((entry) => !entry.passed) ?? false;
+    if (!runtime || !runtime.passed && !terminalFailure) return canvas;
+    canvas = this.canvases.setRuntimeDecision(sessionId, canvasId, versionId, "processing", "Runtime reflection is in progress.");
+    try {
+      const reflected = await this.model.reflect(version.spec, version.source, version.verification, {
+        sessionId,
+        turnId: `generative-ui:${canvasId}:${version.branchId}`,
+        phase: "runtime-reflect"
+      });
+      if (runtime.passed && !reflected.shouldContinue) {
+        this.canvases.setRuntimeDecision(sessionId, canvasId, versionId, "success", reflected.reflection, reflected.usage);
+        return this.canvases.stop(sessionId, canvasId, "success");
+      }
+      const branchIterations = canvas.versions.filter((entry) => entry.branchId === version.branchId).length;
+      if (branchIterations >= 5) {
+        this.canvases.setRuntimeDecision(sessionId, canvasId, versionId, "blocked", reflected.reflection, reflected.usage);
+        return this.canvases.stop(sessionId, canvasId, "exhausted");
+      }
+      this.canvases.setRuntimeDecision(sessionId, canvasId, versionId, "continue", reflected.reflection, reflected.usage);
+      const result = await this.loop.run({
+        projectId: canvas.projectId,
+        sessionId,
+        canvasId,
+        branchId: version.branchId,
+        prompt: version.prompt,
+        checkpoint: "automatic",
+        budget: {
+          maxIterations: 5 - branchIterations,
+          maxTotalMs: 12e4,
+          maxInputTokens: 8e4,
+          maxOutputTokens: 4e4,
+          maxEstimatedCostUsd: 5,
+          maxStagnantIterations: 2
+        }
+      });
+      return result.canvas;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.canvases.setRuntimeDecision(sessionId, canvasId, versionId, "blocked", message);
+      return this.canvases.stop(sessionId, canvasId, "blocked");
+    }
+  }
+}
+const generativeUiRuntimeContinuation = new GenerativeUiRuntimeContinuation();
+const model$1 = new LlmGenerativeUiModel();
+const loop = new GenerativeUiInnerLoop(model$1, model$1, model$1);
+class GenerativeUiBenchmarkService {
+  list() {
+    return { version: GENERATIVE_UI_BENCHMARK_VERSION, cases: GENERATIVE_UI_BENCHMARK_CASES };
+  }
+  async run(projectId, sessionId, caseId) {
+    const benchmark = GENERATIVE_UI_BENCHMARK_CASES.find((entry) => entry.caseId === caseId);
+    if (!benchmark) throw new Error(`Generative UI benchmark case not found: ${caseId}`);
+    return loop.run({
+      projectId,
+      sessionId,
+      benchmarkCaseId: benchmark.caseId,
+      title: `[Benchmark] ${benchmark.title}`,
+      prompt: benchmark.prompt,
+      checkpoint: "automatic",
+      budget: {
+        maxIterations: 5,
+        maxTotalMs: 18e4,
+        maxInputTokens: 1e5,
+        maxOutputTokens: 6e4,
+        maxEstimatedCostUsd: 5,
+        maxStagnantIterations: 2
+      }
+    });
+  }
+}
+const generativeUiBenchmarkService = new GenerativeUiBenchmarkService();
+const model = new LlmGenerativeUiModel();
+const innerLoop = new GenerativeUiInnerLoop(model, model, model);
+function registerGenerativeUiHandlers() {
+  electron.ipcMain.handle("generative-ui:run", (_event, request2) => innerLoop.run(request2));
+  electron.ipcMain.handle("generative-ui:create", (_event, projectId, sessionId, title, prompt) => generativeUiCanvasService.create(projectId, sessionId, title, prompt));
+  electron.ipcMain.handle("generative-ui:list", (_event, sessionId) => generativeUiCanvasService.list(sessionId));
+  electron.ipcMain.handle("generative-ui:metrics", (_event, sessionId) => generativeUiCanvasService.summarize(sessionId));
+  electron.ipcMain.handle("generative-ui:evidenceList", (_event, sessionId) => generativeUiOuterLoopService.list(sessionId));
+  electron.ipcMain.handle("generative-ui:evidenceAdd", (_event, sessionId, request2) => generativeUiOuterLoopService.add(sessionId, request2));
+  electron.ipcMain.handle("generative-ui:outerReport", (_event, sessionId) => generativeUiOuterLoopService.report(sessionId));
+  electron.ipcMain.handle("generative-ui:benchmarkList", () => generativeUiBenchmarkService.list());
+  electron.ipcMain.handle("generative-ui:benchmarkRun", (_event, projectId, sessionId, caseId) => generativeUiBenchmarkService.run(projectId, sessionId, caseId));
+  electron.ipcMain.handle("generative-ui:get", (_event, sessionId, canvasId) => generativeUiCanvasService.get(sessionId, canvasId));
+  electron.ipcMain.handle("generative-ui:commit", (_event, sessionId, request2) => generativeUiCanvasService.commit(sessionId, request2));
+  electron.ipcMain.handle("generative-ui:createBranch", (_event, sessionId, canvasId, name, fromVersionId) => generativeUiCanvasService.createBranch(sessionId, canvasId, name, fromVersionId));
+  electron.ipcMain.handle("generative-ui:switchBranch", (_event, sessionId, canvasId, branchId) => generativeUiCanvasService.switchBranch(sessionId, canvasId, branchId));
+  electron.ipcMain.handle("generative-ui:stop", (_event, sessionId, canvasId, reason) => generativeUiCanvasService.stop(sessionId, canvasId, reason));
+  electron.ipcMain.handle("generative-ui:observe", (_event, sessionId, canvasId, versionId, eventType, details) => generativeUiRuntimeContinuation.observe(sessionId, canvasId, versionId, eventType, details));
+  electron.ipcMain.handle("generative-ui:feedback", (_event, sessionId, canvasId, versionId, value) => generativeUiCanvasService.recordFeedback(sessionId, canvasId, versionId, value));
+  electron.ipcMain.handle("generative-ui:export", (_event, sessionId, canvasId, versionId) => generativeUiCanvasService.exportVersion(sessionId, canvasId, versionId));
+  electron.ipcMain.handle("generative-ui:getPreview", (_event, sessionId, canvasId, versionId) => {
+    const canvas = generativeUiCanvasService.get(sessionId, canvasId);
+    const version = canvas?.versions.find((entry) => entry.versionId === versionId);
+    if (!version) throw new Error(`Canvas version not found: ${versionId}`);
+    return {
+      document: buildGenerativeUiSandboxDocument(version.source),
+      sandbox: GENERATIVE_UI_IFRAME_SANDBOX
+    };
+  });
+}
 const invokeHandlers = /* @__PURE__ */ new Map();
 let registryInstalled = false;
 function installIpcInvokeRegistry() {
@@ -27019,6 +28283,7 @@ function registerIPCHandlers() {
   registerSettingsLlmHandlers(context);
   registerTraceHandlers(context);
   registerRdxRuntimeHandlers();
+  registerGenerativeUiHandlers();
   registerNativeThemeBridge();
 }
 function setMainWindow(window) {

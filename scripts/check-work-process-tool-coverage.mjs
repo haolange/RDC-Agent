@@ -183,6 +183,10 @@ const FIXTURES = {
     argsPreview: '{}',
     resultPreview: toolEnvelope('capture: demo.rdc', { capturePath: 'demo.rdc' }),
   },
+  generative_ui: {
+    argsPreview: JSON.stringify({ action: 'generate', prompt: 'Build an interactive dashboard' }),
+    resultPreview: toolEnvelope('Canvas generated', { canvasId: 'canvas-demo', versionId: 'version-demo', stopReason: 'success' }),
+  },
   ask_user: {
     argsPreview: JSON.stringify({
       questions: [{

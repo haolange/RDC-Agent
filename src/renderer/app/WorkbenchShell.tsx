@@ -19,6 +19,7 @@ export interface WorkbenchShellProps {
   effectiveRightCollapsed: boolean;
   isRightRailVisible: boolean;
   isTerminalOpen: boolean;
+  isCanvasOpen: boolean;
   bothSidebarsCollapsed: boolean;
   workbenchRailMaxWidth: string;
   workbenchContentRailWidth: string;
@@ -33,6 +34,7 @@ export interface WorkbenchShellProps {
   t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   onUserMenuOpen: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onToggleTerminal: () => void;
+  onToggleCanvas: () => void;
   onStartDrag: (side: DragSide, startWidth: number) => (event: React.PointerEvent<HTMLDivElement>) => void;
 }
 
@@ -44,6 +46,7 @@ export function WorkbenchShell({
   effectiveRightCollapsed,
   isRightRailVisible,
   isTerminalOpen,
+  isCanvasOpen,
   bothSidebarsCollapsed,
   workbenchRailMaxWidth,
   workbenchContentRailWidth,
@@ -58,6 +61,7 @@ export function WorkbenchShell({
   t,
   onUserMenuOpen,
   onToggleTerminal,
+  onToggleCanvas,
   onStartDrag,
 }: WorkbenchShellProps) {
   return (
@@ -128,6 +132,12 @@ export function WorkbenchShell({
           )}
           <div className="main-floating-utilities">
             <DeviceSelector variant="utility" />
+            <button type="button" className={`main-utility-toggle ${isCanvasOpen ? 'active' : ''}`}
+              onClick={onToggleCanvas} data-testid="generative-ui-canvas-toggle" aria-label="Toggle Canvas" title="Canvas">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M8 3v18M8 9h13" />
+              </svg>
+            </button>
             <button
               type="button"
               className={`main-utility-toggle terminal-pill ${isTerminalOpen ? 'active' : ''} ${activityAlertSeverity ? `terminal-${activityAlertSeverity}` : ''}`}
