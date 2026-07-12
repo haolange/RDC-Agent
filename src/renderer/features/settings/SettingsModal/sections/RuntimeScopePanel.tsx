@@ -1,15 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { RdxRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdxRuntime';
 import { useI18n } from '../../../../i18n';
+import { ScopedResourceEditor } from './ScopedResourceEditor';
+import { contentFromForm, emptyForm, formFromContent, resourceCardMeta, type ResourceFormState } from './scopedResourceForm';
 
-const templateFor = (kind: ScopedResourceKind, id: string): string => {
-  if (kind === 'agent') return `---\nname: ${id}\ndescription: Project agent override\nenabled: true\ntools: []\nskills: []\nmcp-servers: []\n---\n\nFollow the effective RDX instructions and report evidence.`;
-  if (kind === 'skill') return `---\nname: ${id}\ndescription: Reusable scoped instructions\nallowed-tools: []\n---\n\nDescribe the skill workflow here.`;
-  if (kind === 'mcp') return JSON.stringify({ id, name: id, transport: 'stdio', command: '', args: [], enabledByDefault: true }, null, 2);
-  if (kind === 'hook') return `id: ${id}\nenabled: true\nevent: tool.before-call\ncommand: node\nargs: []\ntimeoutMs: 30000\nfailurePolicy: warn`;
-  if (kind === 'policy') return `deniedTools: []\napproval: mutation\nlimits: {}`;
-  return `id: ${id}\nenabled: true`;
-};
+const templateId = (kind: ScopedResourceKind): string => `new-${kind}`;
 
 export const RuntimeScopePanel: React.FC<{
   overview: RdxRuntimeOverview | null;
@@ -20,55 +15,196 @@ export const RuntimeScopePanel: React.FC<{
   showResourceStrip?: boolean;
 }> = ({ overview, scope, onScopeChange, kinds, onChanged, showResourceStrip = true }) => {
   const { t } = useI18n();
-  const resources = overview?.resources.filter((entry) => entry.scope === scope && kinds.includes(entry.kind)) ?? [];
   const kind = kinds[0];
-  const [editing, setEditing] = useState<ScopedResourceDocument | null>(null);
-  const [id, setId] = useState('');
-  const [content, setContent] = useState('');
-  const [message, setMessage] = useState('');
+  const resources = useMemo(
+    () => overview?.resources.filter((entry) => entry.scope === scope && kinds.includes(entry.kind)) ?? [],
+    [overview, scope, kinds],
+  );
   const canProject = Boolean(overview?.projectRoot);
-  const start = (resource?: ScopedResourceDocument) => {
-    const nextId = resource?.id ?? `new-${kind}`;
-    setEditing(resource ?? ({ id: nextId, kind, scope, sourcePath: '', sourceHash: '', effectiveStatus: 'effective', content: '', diagnostics: [] }));
-    setId(nextId); setContent(resource?.content ?? templateFor(kind, nextId)); setMessage('');
+  const addDisabled = scope === 'project' && !canProject;
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [form, setForm] = useState<ResourceFormState>(() => emptyForm(kind, templateId(kind)));
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setSelectedId(null);
+    setCreating(false);
+    setForm(emptyForm(kind, templateId(kind)));
+    setMessage('');
+  }, [scope, kind]);
+
+  const selected = resources.find((entry) => entry.id === selectedId) ?? null;
+  const editing = creating || Boolean(selected);
+
+  const openResource = (resource: ScopedResourceDocument) => {
+    setCreating(false);
+    setSelectedId(resource.id);
+    setForm(formFromContent(resource.kind, resource.id, resource.content));
+    setMessage('');
   };
+
+  const startNew = () => {
+    const nextId = templateId(kind);
+    setCreating(true);
+    setSelectedId(null);
+    setForm(emptyForm(kind, nextId));
+    setMessage('');
+  };
+
+  const patchForm = (patch: Partial<ResourceFormState>) => setForm((current) => ({ ...current, ...patch }));
+
   const save = async () => {
-    const request = { kind, scope, id, content, ...(overview?.projectRoot ? { projectRoot: overview.projectRoot } : {}) };
-    const validation = await window.electronAPI.rdxRuntime.validateResource(request);
-    if (!validation.valid) { setMessage(validation.diagnostics.join('\n')); return; }
-    onChanged?.(await window.electronAPI.rdxRuntime.upsertResource(request));
-    setEditing(null); setMessage(t('settings.scopeSaved'));
+    setBusy(true);
+    setMessage('');
+    try {
+      const request = {
+        kind,
+        scope,
+        id: form.id,
+        content: contentFromForm(kind, form),
+        ...(overview?.projectRoot ? { projectRoot: overview.projectRoot } : {}),
+      };
+      const validation = await window.electronAPI.rdxRuntime.validateResource(request);
+      if (!validation.valid) {
+        setMessage(validation.diagnostics.join('\n'));
+        return;
+      }
+      const next = await window.electronAPI.rdxRuntime.upsertResource(request);
+      onChanged?.(next);
+      setCreating(false);
+      setSelectedId(safeIdPreview(form.id));
+      const saved = next.resources.find((entry) => entry.scope === scope && entry.kind === kind && entry.id === safeIdPreview(form.id));
+      if (saved) setForm(formFromContent(saved.kind, saved.id, saved.content));
+      setMessage(t('settings.scopeSaved'));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
   };
+
   const remove = async () => {
-    if (!editing || !window.confirm(t('settings.scopeDeleteConfirm', { id: editing.id }))) return;
-    onChanged?.(await window.electronAPI.rdxRuntime.deleteResource(kind, scope, editing.id, overview?.projectRoot));
-    setEditing(null);
+    if (!selected || !window.confirm(t('settings.scopeDeleteConfirm', { id: selected.id }))) return;
+    setBusy(true);
+    try {
+      onChanged?.(await window.electronAPI.rdxRuntime.deleteResource(kind, scope, selected.id, overview?.projectRoot));
+      setSelectedId(null);
+      setCreating(false);
+      setForm(emptyForm(kind, templateId(kind)));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
   };
+
+  const importResource = async () => {
+    setBusy(true);
+    setMessage('');
+    try {
+      const paths = await window.electronAPI.selectFiles();
+      const filePath = paths?.[0];
+      if (!filePath) return;
+      const result = await window.electronAPI.rdxRuntime.importResource({
+        kind,
+        scope,
+        filePath,
+        ...(overview?.projectRoot ? { projectRoot: overview.projectRoot } : {}),
+      });
+      onChanged?.(result.overview);
+      const imported = result.overview.resources.find((entry) => entry.scope === scope && entry.kind === kind && entry.id === result.id);
+      if (imported) openResource(imported);
+      setMessage(t('settings.scopeImported'));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const cancelEdit = () => {
+    setCreating(false);
+    if (selected) setForm(formFromContent(selected.kind, selected.id, selected.content));
+    else {
+      setSelectedId(null);
+      setForm(emptyForm(kind, templateId(kind)));
+    }
+    setMessage('');
+  };
+
   return (
     <section className="settings-runtime-scope" data-testid="settings-runtime-scope">
       <div className="settings-runtime-scope-head">
-        <div className="settings-runtime-kicker">RDX Runtime</div>
-        <div className="settings-runtime-scope-switch" role="group" aria-label="Resource scope">
-          <button type="button" className={`button button-ghost ${scope === 'user' ? 'active' : ''}`} onClick={() => onScopeChange('user')}>{t('settings.scopeUser')}</button>
-          <button type="button" className={`button button-ghost ${scope === 'project' ? 'active' : ''}`} disabled={!canProject} onClick={() => onScopeChange('project')}>{t('settings.scopeProject')}</button>
-          <button type="button" className="button button-secondary" disabled={scope === 'project' && !canProject} onClick={() => start()}>{t('settings.scopeAdd', { kind })}</button>
+        <div className="settings-runtime-scope-switch settings-inline-pills" role="group" aria-label={t('settings.resourceScope')}>
+          <button type="button" className={`user-menu-pill ${scope === 'user' ? 'active' : ''}`} onClick={() => onScopeChange('user')}>{t('settings.scopeUser')}</button>
+          <button type="button" className={`user-menu-pill ${scope === 'project' ? 'active' : ''}`} disabled={!canProject} onClick={() => onScopeChange('project')}>{t('settings.scopeProject')}</button>
         </div>
       </div>
+
       {showResourceStrip ? (
-        <div className="settings-runtime-resource-strip">
-          {resources.length ? resources.map((resource) => (
-            <button type="button" className={`settings-runtime-resource status-${resource.effectiveStatus}`} key={`${resource.kind}:${resource.id}`} onClick={() => start(resource)}>
-              <span>{resource.id}</span>
-            </button>
-          )) : <div className="settings-empty">{t('settings.scopeEmpty', { kind })}</div>}
+        <div className="settings-runtime-scope-body settings-runtime-scope-body--split">
+          <div className="settings-manifest-layout settings-runtime-manifest-layout">
+            <div className="settings-manifest-list-column">
+              <div className="settings-manifest-toolbar settings-manifest-list-toolbar">
+                <div className="settings-manifest-actions">
+                  <button type="button" className="button button-secondary" disabled={addDisabled || busy} onClick={() => void importResource()}>
+                    {t('settings.scopeImport')}
+                  </button>
+                  <button type="button" className="button button-secondary" disabled={addDisabled || busy} onClick={startNew}>
+                    {t('settings.scopeAdd', { kind })}
+                  </button>
+                </div>
+              </div>
+              <div className="settings-manifest-list" aria-label={t('settings.resourceScope')}>
+                {resources.length ? resources.map((resource) => {
+                  const meta = resourceCardMeta(resource.kind, resource.content);
+                  const active = !creating && resource.id === selectedId;
+                  return (
+                    <button
+                      type="button"
+                      key={`${resource.kind}:${resource.id}`}
+                      className={`settings-manifest-card ${active ? 'active' : ''} status-${resource.effectiveStatus}`}
+                      onClick={() => openResource(resource)}
+                    >
+                      <span>
+                        <strong>{resource.id}</strong>
+                        {meta ? <small>{meta}</small> : null}
+                      </span>
+                    </button>
+                  );
+                }) : (
+                  <div className="settings-empty settings-empty-dashed settings-runtime-list-empty">
+                    {t('settings.scopeEmpty', { kind })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {editing ? (
+              <ScopedResourceEditor
+                kind={kind}
+                form={form}
+                idLocked={Boolean(selected?.sourcePath) && !creating}
+                busy={busy}
+                onChange={patchForm}
+                onSave={() => void save()}
+                onDelete={selected && !creating ? () => void remove() : undefined}
+                onCancel={cancelEdit}
+              />
+            ) : (
+              <div className="settings-runtime-editor-placeholder settings-empty-dashed">
+                {t('settings.scopeSelectOrCreate', { kind })}
+              </div>
+            )}
+          </div>
+          {message ? <div className="settings-runtime-result">{message}</div> : null}
         </div>
       ) : null}
-      {editing && <div className="settings-runtime-editor">
-        <input value={id} disabled={Boolean(editing.sourcePath)} onChange={(event) => setId(event.target.value)} aria-label="Resource id" />
-        <textarea value={content} onChange={(event) => setContent(event.target.value)} aria-label="Resource content" />
-        <div className="settings-runtime-actions"><button type="button" className="button button-primary" onClick={() => void save()}>{t('settings.scopeSave')}</button>{editing.sourcePath && <button type="button" className="button button-danger" onClick={() => void remove()}>{t('settings.delete')}</button>}<button type="button" className="button button-ghost" onClick={() => setEditing(null)}>{t('settings.cancel')}</button></div>
-      </div>}
-      {message && <div className="settings-runtime-result">{message}</div>}
     </section>
   );
 };
+
+const safeIdPreview = (value: string): string =>
+  value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || value;

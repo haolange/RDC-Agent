@@ -234,6 +234,13 @@ export interface ScopedResourceWriteRequest {
   projectRoot?: string;
 }
 
+export interface ScopedResourceImportRequest {
+  kind: ScopedResourceKind;
+  scope: 'user' | 'project';
+  filePath: string;
+  projectRoot?: string;
+}
+
 export interface RestrictivePolicy {
   deniedTools?: string[];
   approval?: 'none' | 'destructive' | 'mutation' | 'all';

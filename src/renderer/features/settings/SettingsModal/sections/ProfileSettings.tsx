@@ -1,5 +1,6 @@
 import React from 'react';
 import type { AppSettings } from '@shared/types/settings';
+import { Button } from '../../../../ui/Button';
 import { ProfileAvatar } from '../../../../ui/ProfileAvatar';
 import type { useI18n } from '../../../../i18n';
 
@@ -22,10 +23,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
 }) => (
   <div className="settings-section settings-profile-section">
     <div className="settings-section-header">
-      <div>
-        <div className="settings-section-title">{t('settings.profile')}</div>
-        <div className="settings-section-subtitle">{t('settings.profileHint')}</div>
-      </div>
+      <div className="settings-section-title">{t('settings.profile')}</div>
     </div>
 
     <div className="settings-profile-row">
@@ -47,12 +45,12 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
           />
         </label>
         <div className="settings-profile-actions">
-          <button type="button" className="button button-secondary" onClick={() => void onAvatarSelect()}>
+          <Button variant="secondary" size="sm" onClick={() => void onAvatarSelect()}>
             {t('settings.uploadAvatar')}
-          </button>
-          <button type="button" className="button button-primary" onClick={() => void onSave()}>
+          </Button>
+          <Button variant="primary" size="sm" onClick={() => void onSave()}>
             {t('settings.save')}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

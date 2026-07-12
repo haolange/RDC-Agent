@@ -33,6 +33,8 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const setTheme = useAppSettingsStore((state) => state.setTheme);
   const setLanguage = useAppSettingsStore((state) => state.setLanguage);
   const setFontScale = useAppSettingsStore((state) => state.setFontScale);
+  const setComposerMarkdown = useAppSettingsStore((state) => state.setComposerMarkdown);
+  const setUsePointerCursors = useAppSettingsStore((state) => state.setUsePointerCursors);
   const updateProfile = useAppSettingsStore((state) => state.updateProfile);
   const patchSettings = useAppSettingsStore((state) => state.patchSettings);
   const reloadSettings = useAppSettingsStore((state) => state.reloadSettings);
@@ -156,6 +158,8 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     setTheme,
     setLanguage,
     setFontScale,
+    setComposerMarkdown,
+    setUsePointerCursors,
     ...actions,
     ...providerConnection,
   };

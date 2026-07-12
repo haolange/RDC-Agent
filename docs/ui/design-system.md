@@ -782,12 +782,11 @@
 
 **消息区**:
 - 背景: bg-0
-- 消息气泡:
-  - 用户: 渐变背景（右对齐），圆角（左下小圆角）
-  - Agent: bg-2背景，边框（左对齐），圆角（右下小圆角）
-- 头像: 36x36px，用户灰色，Agent渐变
+- 内容轨: 与 composer 同宽（`--chat-transcript-width`）
+- 用户消息: raised bubble（`--token-surface-raised`），右对齐，`fit-content`，圆角（左下小圆角）
+- Assistant 最终答案与 Work Process: full-bleed 散文，横跨内容轨全宽，无 bg/边框 bubble chrome
+- 工具调用: Work Process 内嵌统一单披露 tool 卡片
 - 时间戳: 10px，muted颜色
-- 工具调用: 内嵌卡片，显示工具名和执行状态
 
 **输入区**:
 - 背景: bg-1

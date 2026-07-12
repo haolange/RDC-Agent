@@ -117,6 +117,45 @@ export class RdxRuntimeService {
     return this.readDocument(request.kind, request.scope, id, sourcePath);
   }
 
+  importFromFile(request: { kind: ScopedResourceKind; scope: 'user' | 'project'; filePath: string; projectRoot?: string }): ScopedResourceDocument {
+    const filePath = path.resolve(request.filePath);
+    if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+      throw new Error('Import source file was not found.');
+    }
+    const basename = path.basename(filePath);
+    const lower = basename.toLowerCase();
+    const allowed = (() => {
+      if (request.kind === 'skill') return lower.endsWith('.md');
+      if (request.kind === 'mcp') return lower.endsWith('.json');
+      if (request.kind === 'hook' || request.kind === 'policy') return lower.endsWith('.yml') || lower.endsWith('.yaml');
+      if (request.kind === 'agent') return lower.endsWith('.agent.md') || lower.endsWith('.md');
+      return false;
+    })();
+    if (!allowed) throw new Error(`Unsupported file type for ${request.kind} import.`);
+    const content = fs.readFileSync(filePath, 'utf8');
+    let id = path.basename(filePath, path.extname(filePath));
+    if (request.kind === 'skill' && lower === 'skill.md') id = path.basename(path.dirname(filePath));
+    if (request.kind === 'agent' && lower.endsWith('.agent.md')) id = basename.slice(0, -'.agent.md'.length);
+    try {
+      if (request.kind === 'mcp') {
+        const parsed = JSON.parse(content) as { id?: string };
+        if (parsed.id) id = String(parsed.id);
+      } else if (request.kind === 'hook' || request.kind === 'policy') {
+        const parsed = YAML.parse(content) as { id?: string };
+        if (parsed?.id) id = String(parsed.id);
+      }
+    } catch {
+      // keep filename-derived id
+    }
+    return this.upsert({
+      kind: request.kind,
+      scope: request.scope,
+      id,
+      content,
+      ...(request.projectRoot ? { projectRoot: request.projectRoot } : {}),
+    });
+  }
+
   delete(kind: ScopedResourceKind, scope: 'user' | 'project', idValue: string, projectRoot?: string): void {
     const id = safeId(idValue);
     if (kind === 'hook' && scope === 'project') this.hooks.revokeProjectHook(this.requireProject(projectRoot), id);

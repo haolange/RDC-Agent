@@ -60,6 +60,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     setTheme,
     setLanguage,
     setFontScale,
+    setComposerMarkdown,
+    setUsePointerCursors,
     connectionProvider,
     openProviderConnection,
     updateConnectionDraft,
@@ -89,26 +91,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
   if (!open) return null;
 
-  const subtitle = (() => {
-    switch (activeSection) {
-      case 'general':
-        return t('settings.generalSubtitle');
-      case 'workspace':
-        return t('settings.workspaceSubtitle');
-      case 'models':
-        return t('settings.modelsSubtitle');
-      case 'skills':
-      case 'agents':
-        return '';
-      case 'tools':
-        return '';
-      case 'hooks':
-        return t('settings.hooksSubtitle');
-      default:
-        return '';
-    }
-  })();
-
   return createPortal(
     <>
       <div className="settings-modal-backdrop" onClick={onClose}>
@@ -118,7 +100,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
           role="dialog"
           aria-modal="true"
           aria-labelledby="settings-modal-title"
-          aria-describedby={subtitle ? 'settings-modal-subtitle' : undefined}
           onClick={(event) => event.stopPropagation()}
         >
           <div className="settings-center-sidebar">
@@ -149,15 +130,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
           <div className="settings-center-content">
             <div className="settings-modal-header">
-              <div className="settings-modal-heading">
-                <div className="settings-modal-title" id="settings-modal-title">
-                  {sections.find((section) => section.id === activeSection)?.label}
-                </div>
-                {subtitle ? (
-                  <div className="settings-modal-subtitle" id="settings-modal-subtitle">
-                    {subtitle}
-                  </div>
-                ) : null}
+              <div className="settings-modal-title" id="settings-modal-title">
+                {sections.find((section) => section.id === activeSection)?.label}
               </div>
               <button type="button" className="settings-modal-close" onClick={onClose} aria-label={t('settings.close')}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -178,6 +152,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                   onThemeChange={setTheme}
                   onLanguageChange={setLanguage}
                   onFontScaleChange={setFontScale}
+                  onComposerMarkdownChange={setComposerMarkdown}
+                  onUsePointerCursorsChange={setUsePointerCursors}
                   globalInstructionsDraft={globalInstructionsDraft}
                   onGlobalInstructionsDraftChange={setGlobalInstructionsDraft}
                   onSavePersonalization={handleSavePersonalization}

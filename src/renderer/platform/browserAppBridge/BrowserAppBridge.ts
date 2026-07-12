@@ -85,6 +85,7 @@ class BrowserAppBridgeClient {
       getOverview: (projectRoot) => this.invoke('rdx-runtime:overview', projectRoot),
       validateResource: (request) => this.invoke('rdx-runtime:validate', request),
       upsertResource: (request) => this.invoke('rdx-runtime:upsert', request),
+      importResource: (request) => this.invoke('rdx-runtime:import', request),
       deleteResource: (kind, scope, id, projectRoot) => this.invoke('rdx-runtime:delete', kind, scope, id, projectRoot),
       revealResource: (sourcePath) => this.invoke('rdx-runtime:reveal', sourcePath),
       trustHook: (projectRoot, hookId) => this.invoke('rdx-runtime:trustHook', projectRoot, hookId),

@@ -59,7 +59,6 @@ export const PersonalizationSettings: React.FC<PersonalizationSettingsProps> = (
     <section className="settings-page settings-page-personalization">
       <div className="settings-browser-page-head">
         <h2>{t('settings.personalization')}</h2>
-        <p>{t('settings.personalizationSubtitle')}</p>
       </div>
       {block}
     </section>
