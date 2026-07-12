@@ -20,6 +20,7 @@ import { useTerminalStore } from '../stores/terminalStore';
 import { useI18n } from '../i18n';
 import { isOpenedCaptureOwnedBySession } from '../features/debugger/ControlPanel/SessionContextPanel/sessionContextOwnership';
 import type { ResolvedTheme } from '@shared/types/settings';
+import { GenerativeUiCanvas } from '../features/generative-ui/GenerativeUiCanvas';
 
 const App: React.FC = () => {
   const { t } = useI18n();
@@ -30,6 +31,7 @@ const App: React.FC = () => {
   const [userMenuAnchor, setUserMenuAnchor] = useState<DOMRect | null>(null);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [runtimeTestMode, setRuntimeTestMode] = useState<boolean | null>(null);
+  const [isCanvasOpen, setIsCanvasOpen] = useState(false);
 
   const currentProject = useProjectStore((state) => state.currentProject);
   const currentSession = useProjectStore((state) => state.currentSession);
@@ -172,6 +174,7 @@ const App: React.FC = () => {
           effectiveRightCollapsed={layout.effectiveRightCollapsed}
           isRightRailVisible={layout.isRightRailVisible}
           isTerminalOpen={isTerminalOpen}
+          isCanvasOpen={isCanvasOpen}
           bothSidebarsCollapsed={layout.bothSidebarsCollapsed}
           workbenchRailMaxWidth={layout.workbenchRailMaxWidth}
           workbenchContentRailWidth={layout.workbenchContentRailWidth}
@@ -181,11 +184,12 @@ const App: React.FC = () => {
           avatarPath={avatarPath}
           composer={composer}
           hasOpenedCaptureForCurrentProject={hasOpenedCaptureForCurrentProject}
-          showMainPromptBar={Boolean(currentProject)}
-          mainPage={<DebuggerPage mode={currentMode} />}
+          showMainPromptBar={Boolean(currentProject) && !isCanvasOpen}
+          mainPage={isCanvasOpen ? <GenerativeUiCanvas /> : <DebuggerPage mode={currentMode} />}
           t={t}
           onUserMenuOpen={(event) => setUserMenuAnchor(event.currentTarget.getBoundingClientRect())}
           onToggleTerminal={() => toggleTerminalOpen()}
+          onToggleCanvas={() => setIsCanvasOpen((open) => !open)}
           onStartDrag={layout.startDragging}
         />
 

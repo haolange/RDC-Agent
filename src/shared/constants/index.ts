@@ -15,6 +15,7 @@ export {
   diagnoseManifestToolTokens,
   expandCanonicalToolToken,
 } from './agentToolTokens';
+export { GENERATIVE_UI_BENCHMARK_CASES, GENERATIVE_UI_BENCHMARK_VERSION } from './generativeUiBenchmark';
 export type {
   BuiltinAgentToolId,
   ToolTokenDiagnostic,

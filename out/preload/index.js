@@ -250,6 +250,26 @@ const createRdxRuntimeApi = () => ({
   listRequestSnapshots: (sessionId, turnId) => electron.ipcRenderer.invoke("rdx-runtime:listSnapshots", sessionId, turnId),
   getRequestSnapshot: (sessionId, turnId, snapshotId) => electron.ipcRenderer.invoke("rdx-runtime:getSnapshot", sessionId, turnId, snapshotId)
 });
+const createGenerativeUiApi = () => ({
+  run: (request) => electron.ipcRenderer.invoke("generative-ui:run", request),
+  create: (projectId, sessionId, title, prompt) => electron.ipcRenderer.invoke("generative-ui:create", projectId, sessionId, title, prompt),
+  list: (sessionId) => electron.ipcRenderer.invoke("generative-ui:list", sessionId),
+  metrics: (sessionId) => electron.ipcRenderer.invoke("generative-ui:metrics", sessionId),
+  evidenceList: (sessionId) => electron.ipcRenderer.invoke("generative-ui:evidenceList", sessionId),
+  evidenceAdd: (sessionId, request) => electron.ipcRenderer.invoke("generative-ui:evidenceAdd", sessionId, request),
+  outerReport: (sessionId) => electron.ipcRenderer.invoke("generative-ui:outerReport", sessionId),
+  benchmarkList: () => electron.ipcRenderer.invoke("generative-ui:benchmarkList"),
+  benchmarkRun: (projectId, sessionId, caseId) => electron.ipcRenderer.invoke("generative-ui:benchmarkRun", projectId, sessionId, caseId),
+  get: (sessionId, canvasId) => electron.ipcRenderer.invoke("generative-ui:get", sessionId, canvasId),
+  commit: (sessionId, request) => electron.ipcRenderer.invoke("generative-ui:commit", sessionId, request),
+  createBranch: (sessionId, canvasId, name, fromVersionId) => electron.ipcRenderer.invoke("generative-ui:createBranch", sessionId, canvasId, name, fromVersionId),
+  switchBranch: (sessionId, canvasId, branchId) => electron.ipcRenderer.invoke("generative-ui:switchBranch", sessionId, canvasId, branchId),
+  stop: (sessionId, canvasId, reason) => electron.ipcRenderer.invoke("generative-ui:stop", sessionId, canvasId, reason),
+  getPreview: (sessionId, canvasId, versionId) => electron.ipcRenderer.invoke("generative-ui:getPreview", sessionId, canvasId, versionId),
+  observe: (sessionId, canvasId, versionId, eventType, details) => electron.ipcRenderer.invoke("generative-ui:observe", sessionId, canvasId, versionId, eventType, details),
+  feedback: (sessionId, canvasId, versionId, value) => electron.ipcRenderer.invoke("generative-ui:feedback", sessionId, canvasId, versionId, value),
+  export: (sessionId, canvasId, versionId) => electron.ipcRenderer.invoke("generative-ui:export", sessionId, canvasId, versionId)
+});
 const dialogApi = createDialogApi();
 const electronAPI = {
   platform: process.platform,
@@ -268,6 +288,7 @@ const electronAPI = {
   agent: createAgentApi(),
   memory: createMemoryApi(),
   rdxRuntime: createRdxRuntimeApi(),
+  generativeUi: createGenerativeUiApi(),
   tool: createToolApi(),
   mcp: createMcpApi(),
   evidence: createEvidenceApi(),

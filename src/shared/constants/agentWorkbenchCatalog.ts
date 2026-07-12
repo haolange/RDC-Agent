@@ -438,6 +438,15 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     icon: 'monitor-dot',
     approvalRequired: false,
   },
+  {
+    id: 'generative_ui',
+    label: 'Generative UI Canvas',
+    permission: 'mutation',
+    inputSchema: { type: 'object', required: ['action'], properties: { action: { type: 'string' } } },
+    resultSummary: 'Generates, refines, inspects, exports, evaluates, or simulates a persistent interactive Canvas.',
+    icon: 'sparkles',
+    approvalRequired: false,
+  },
 ];
 
 export const AGENT_WORKBENCH_COMMAND_CATALOG: AgentWorkbenchCommandDeclaration[] = [

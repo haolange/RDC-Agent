@@ -34,6 +34,24 @@ Renderer code must not create fake reasoning stages. Runtime events project into
 
 Historical `workTrace` entries that do not match the current canonical schema are discarded at storage read boundaries (`workTrace: null`). Runtime code and visible UI use only the canonical contract; no legacy normalization or migration shims are applied.
 
+## Generative UI and Canvas
+
+Generative UI is a first-class workbench capability, not a renderer-only template feature. A request runs through `Planner -> Generator -> sandbox Renderer -> Observer/Verifier -> Reflector -> loop control`. Planner output is a structured UI Spec; Generator output is self-contained HTML/CSS/JavaScript. The model route is the configured `edit` agent route and generated source must not bypass provider, permission, or request-accounting boundaries.
+
+Because the renderer runs in the Canvas process boundary, automatic execution is a persisted split-phase loop rather than a long-held IPC request. L1/L2 completion writes a version with a pending runtime decision; L3 renderer evidence resumes the runtime-aware Reflector and either closes the Canvas or commits the next version on the same branch. Human-checkpoint versions record the same L3 evidence without autonomously continuing.
+
+Canvas is application-owned session state below `state/canvases`. Each Canvas retains the original prompt, immutable version records, branch heads, UI Specs, source, verification results, reflections, usage/cost timing, runtime observations, and explicit user feedback. Source edits create a new version; they do not mutate historical versions. Canvas data is not a scoped resource and must not be written into `~/.rdx` or project source directories.
+
+Every Generative UI model phase uses the canonical request-accounting chain. `LlmGenerativeUiModel` creates a phase-specific `PromptPlan`, builds a redacted `RequestEnvelopeSnapshot`, persists it under the Canvas session/branch turn, then invokes the provider adapter and completes the snapshot with token usage. Image assets use provider-native multimodal content blocks; request snapshots redact binary bytes and Canvas versions retain only source/hash/scope/precedence/redaction references. Canvas version selection exposes parent-relative source and Spec changes so multi-round refinement remains reviewable rather than an opaque numbered history.
+
+Generated UI executes only in an iframe with opaque origin and `sandbox="allow-scripts"`. Its CSP denies network connections, forms, base URL changes, browser storage, and parent-frame access. A bounded observer reports ready, runtime error, unhandled rejection, and interaction events over an observer-owned `MessageChannel`; generated source cannot reuse that port, and ready/interaction evidence accepts only browser-trusted DOM events. Generated code cannot grant itself additional authority or spoof Level 3 through ordinary `parent.postMessage`. Level 1 fail-closes on malformed HTML/CSS/JavaScript, embedded script/style fields, remote URLs/imports, network/storage APIs, and parent-frame access. Level 2 requires exact Spec component IDs, per-declared-interaction handlers, resolvable data bindings, responsive/viewport-safe CSS, a semantic root, image alt text, and accessible form-control names. Level 3 is real sandbox runtime evidence plus explicit human or evaluation feedback. Canvas `success` is rejected at the persistence boundary unless the active branch head has passing L1, L2, and L3 evidence.
+
+Loop termination is explicit: `success`, `blocked`, `exhausted`, or `no_op`. Iteration count, wall time, token usage, estimated cost, and stagnant attempts are bounded. Human checkpoints may pause after generation or verification. A completed version may be exported as one standalone HTML file; export never weakens the in-product sandbox policy.
+
+Evaluation metrics are derived from persisted evidence: generation success, full loop closure including a real renderer-ready observation, dynamic UI preference, median per-iteration processing time, median initial-prompt-to-first-usable time, measured preview-ready latency, five-effective-iteration Canvas completion, and runtime error count. Prompt-to-usable is measured from `Canvas.createdAt` to the first version whose L3 becomes passing and stores that timestamp as `usableAt`; it is not approximated by summing model and verifier stage durations. A five-iteration Canvas requires one parent-linked lineage of five versions whose L1/L2/L3 results all pass; merely storing five versions does not qualify. Preview-ready latency is the sandbox document's measured navigation-to-`DOMContentLoaded` duration (`performance.now()`), reported with the first `ready` event, and targets a median of at most 2 seconds. Missing preference or latency evidence remains unknown rather than being counted as success.
+
+The project-level Outer Loop is a separate application-owned evidence stream below `state/generative-ui-evaluation`. It records real use cases, dated competitor observations, independent expert reviews, and randomized-order blind preference decisions with explicit provenance. Every valid blind decision must bind a real session Canvas/version to an explicit static-baseline artifact reference; an identical panel/dynamic/static tuple cannot be counted twice. A weekly structured report may declare `v1_ready` only when the product thresholds and minimum evidence sample sizes are all satisfied; missing evidence produces concrete gaps and keeps the decision at `continue`. Ordinary Canvas feedback is useful interaction evidence but is not silently promoted into a blinded preference result.
+
 ## Provider Account Boundary
 
 Account providers are login products, not API-key shortcuts. Super Grok Account is the xAI account-OAuth provider: it uses xAI OIDC metadata, browser OAuth by default, and device-code flow for headless or remote environments. xAI (Grok) remains the separate API-key provider for console keys. The Super Grok OAuth Client ID field accepts only an xAI-issued public OAuth client id; users must not paste xAI API keys into that field.
@@ -140,7 +158,7 @@ Providers that officially expose multiple wire protocols must offer an explicit 
 
 ## Tool and Command Catalog
 
-Tools must be declared with name, permission level, input schema, result summary, UI icon, and approval requirement. The canonical builtin catalog is the 36 ids in `BUILTIN_AGENT_TOOL_IDS` (`src/shared/constants/agentToolTokens.ts`):
+Tools must be declared with name, permission level, input schema, result summary, UI icon, and approval requirement. The canonical builtin catalog is the 37 ids in `BUILTIN_AGENT_TOOL_IDS` (`src/shared/constants/agentToolTokens.ts`):
 
 - file and search: `read_file`, `glob`, `grep` (`search_codebase` has been removed; use `glob`/`grep`);
 - web: `web_fetch`, `web_search`;
@@ -234,6 +252,7 @@ Code changes should run:
 - `npm run check:work-process` and `npm run check:work-process-tool-coverage` when Work Process projection, tool catalog labels, or transcript UI changes;
 - `npm run check:reasoning-delivery` when provider thinking delivery or reasoning artifact projection changes;
 - `npm run check:settings-agents`;
+- `npm run check:generative-ui` when Canvas, sandbox, Inner Loop, Outer Loop, or Generative UI tools change;
 - `npm run build` when entry, runtime, renderer, or packaging behavior changes.
 
 UI and workflow changes must be verified in the real browser session that connects to the real main process bridge. Browser verification should cover at least Settings > Agents, Settings > Skills and Tools, Project/Session sidebars, Ask/Plan/Edit profile behavior, Work Process rendering, dark/light themes, narrow viewport, long paths, Chinese filenames, and long tool output.

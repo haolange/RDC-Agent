@@ -56,6 +56,7 @@ import type {
   TraceSessionResult,
 } from './trace';
 import type { HookEvent, RdxRuntimeOverview, RequestEnvelopeSnapshot, ScopedResourceKind, ScopedResourceWriteRequest } from './rdxRuntime';
+import type { AddGenerativeUiOuterEvidenceRequest, CommitGenerativeUiVersionRequest, GenerativeUiBenchmarkCase, GenerativeUiCanvas, GenerativeUiEvaluationSummary, GenerativeUiLoopRequest, GenerativeUiLoopResult, GenerativeUiOuterEvidence, GenerativeUiOuterLoopReport, GenerativeUiRuntimeEventDetails, GenerativeUiRuntimeEventType, GenerativeUiStopReason } from './generativeUi';
 
 /** Memory 面板列表项摘要（对应 MemoryRecord 的精简视图）。 */
 export interface MemorySummary {
@@ -198,6 +199,27 @@ export interface ElectronAPI {
     testHook: (event: HookEvent, projectRoot?: string, hookId?: string) => Promise<unknown>;
     listRequestSnapshots: (sessionId: string, turnId?: string) => Promise<RequestEnvelopeSnapshot[]>;
     getRequestSnapshot: (sessionId: string, turnId: string, snapshotId: string) => Promise<RequestEnvelopeSnapshot | null>;
+  };
+
+  generativeUi: {
+    run: (request: GenerativeUiLoopRequest) => Promise<GenerativeUiLoopResult>;
+    create: (projectId: string, sessionId: string, title: string, prompt: string) => Promise<GenerativeUiCanvas>;
+    list: (sessionId: string) => Promise<GenerativeUiCanvas[]>;
+    metrics: (sessionId?: string) => Promise<GenerativeUiEvaluationSummary>;
+    evidenceList: (sessionId: string) => Promise<GenerativeUiOuterEvidence[]>;
+    evidenceAdd: (sessionId: string, request: AddGenerativeUiOuterEvidenceRequest) => Promise<GenerativeUiOuterEvidence>;
+    outerReport: (sessionId: string) => Promise<GenerativeUiOuterLoopReport>;
+    benchmarkList: () => Promise<{ version: string; cases: GenerativeUiBenchmarkCase[] }>;
+    benchmarkRun: (projectId: string, sessionId: string, caseId: string) => Promise<GenerativeUiLoopResult>;
+    get: (sessionId: string, canvasId: string) => Promise<GenerativeUiCanvas | null>;
+    commit: (sessionId: string, request: CommitGenerativeUiVersionRequest) => Promise<GenerativeUiCanvas>;
+    createBranch: (sessionId: string, canvasId: string, name: string, fromVersionId: string | null) => Promise<GenerativeUiCanvas>;
+    switchBranch: (sessionId: string, canvasId: string, branchId: string) => Promise<GenerativeUiCanvas>;
+    stop: (sessionId: string, canvasId: string, reason: GenerativeUiStopReason) => Promise<GenerativeUiCanvas>;
+    getPreview: (sessionId: string, canvasId: string, versionId: string) => Promise<{ document: string; sandbox: 'allow-scripts' }>;
+    observe: (sessionId: string, canvasId: string, versionId: string, eventType: GenerativeUiRuntimeEventType, details?: GenerativeUiRuntimeEventDetails) => Promise<GenerativeUiCanvas>;
+    feedback: (sessionId: string, canvasId: string, versionId: string, value: { rating: 1 | 2 | 3 | 4 | 5; usable: boolean; preferredOverStatic?: boolean; comment?: string }) => Promise<GenerativeUiCanvas>;
+    export: (sessionId: string, canvasId: string, versionId: string) => Promise<{ filePath: string; fileName: string }>;
   };
 
   command: {

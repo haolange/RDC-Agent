@@ -118,6 +118,7 @@ import {
 import { debuggerLlmService } from '../../settings/DebuggerLlmService';
 import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
 import { isToolAllowedForAgent, normalizeToolName, resolveAgentToolAllowlist } from './DebuggerRuntimePolicy';
+import { createGenerativeUiAgentTool } from '../../generative-ui/GenerativeUiAgentTool';
 
 interface AgentTurnContext {
   runId?: string;
@@ -1288,6 +1289,7 @@ export class AgentOrchestrator {
       this.createSkillsCatalogTool(),
       this.createSkillReadTool(agentId),
       this.createMcpCatalogTool(),
+      createGenerativeUiAgentTool(),
       ...this.createSubagentTools(agentId, sessionId),
     ];
   }

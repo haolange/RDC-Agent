@@ -20,6 +20,7 @@ import { createEvidenceApi, createMcpApi, createToolApi } from './api/toolEviden
 import { createWorkflowApi } from './api/workflow';
 import { createTraceApi } from './api/trace';
 import { createRdxRuntimeApi } from './api/rdxRuntime';
+import { createGenerativeUiApi } from './api/generativeUi';
 
 const dialogApi = createDialogApi();
 
@@ -43,6 +44,7 @@ const electronAPI = {
   agent: createAgentApi(),
   memory: createMemoryApi(),
   rdxRuntime: createRdxRuntimeApi(),
+  generativeUi: createGenerativeUiApi(),
   tool: createToolApi(),
   mcp: createMcpApi(),
   evidence: createEvidenceApi(),

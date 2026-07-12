@@ -3,7 +3,7 @@
  * Single source of truth for seed manifests, allowlist expansion, and Settings diagnostics.
  */
 
-/** All builtin AgentTool ids after search_codebase removal (36). */
+/** All builtin AgentTool ids after search_codebase removal (37). */
 export const BUILTIN_AGENT_TOOL_IDS = [
   'bash',
   'read_file',
@@ -41,6 +41,7 @@ export const BUILTIN_AGENT_TOOL_IDS = [
   'subagent',
   'rdx_context',
   'tool_search',
+  'generative_ui',
 ] as const;
 
 export type BuiltinAgentToolId = (typeof BUILTIN_AGENT_TOOL_IDS)[number];
@@ -73,6 +74,7 @@ export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
   rdxContext: ['rdx_context'],
   rdx: ['rdx_context'],
   subagent: ['subagent'],
+  generativeUi: ['generative_ui'],
 };
 
 /** Tokens intentionally rejected (removed or renamed). No silent fallback. */

@@ -19,6 +19,7 @@ export interface WorkProcessToolDisplay {
 }
 
 export const WORK_PROCESS_TOOL_DISPLAY_CATALOG: Record<string, WorkProcessToolDisplay> = {
+  generative_ui: { icon: 'spark', groupKind: 'runtime', category: 'Generative UI', groupTitle: 'Canvas', groupUnit: 'Canvas', completeVerb: '已更新 Canvas', runningVerb: '正在生成 Canvas', mutation: true },
   read_file: { icon: 'file', groupKind: 'explore', category: '文件读取', groupTitle: '探索', groupUnit: '文件', completeVerb: '已读取', runningVerb: '正在读取' },
   glob: { icon: 'search', groupKind: 'explore', category: '文件列举', groupTitle: '探索', groupUnit: '文件', completeVerb: '已列出', runningVerb: '正在列出' },
   grep: { icon: 'search', groupKind: 'search', category: '代码搜索', groupTitle: '搜索', groupUnit: '查询', completeVerb: '已搜索代码', runningVerb: '正在搜索代码' },

@@ -97,6 +97,26 @@ export type {
 export type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from './device';
 export type { ActionEvent, EventStatus, EventType } from './evidence';
 export type { ArtifactRecord, HarnessTask, RunCapsule, VerificationResult } from './harness';
+export type {
+  CommitGenerativeUiVersionRequest,
+  GenerativeUiBranch,
+  GenerativeUiCanvas,
+  GenerativeUiIterationMetrics,
+  GenerativeUiObservation,
+  GenerativeUiFeedback,
+  GenerativeUiEvaluationSummary,
+  GenerativeUiRuntimeEventType,
+  GenerativeUiRuntimeEventDetails,
+  GenerativeUiLoopBudget,
+  GenerativeUiLoopRequest,
+  GenerativeUiLoopResult,
+  GenerativeUiSource,
+  GenerativeUiSpec,
+  GenerativeUiStopReason,
+  GenerativeUiVerificationLevel,
+  GenerativeUiVerificationResult,
+  GenerativeUiVersion,
+} from './generativeUi';
 export type { LLMConfig, LLMMessage, LLMRequest, LLMResponse, LLMStreamEvent } from './llm';
 export type {
   ConversationTurnControls,

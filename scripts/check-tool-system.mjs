@@ -39,8 +39,8 @@ function main() {
   const { WORK_PROCESS_TOOL_DISPLAY_CATALOG } = require('../src/renderer/features/debugger/AgentChat/workProcessToolCatalog.ts');
 
   assert(
-    BUILTIN_AGENT_TOOL_IDS.length === 36,
-    `BUILTIN_AGENT_TOOL_IDS.length must be 36, got ${BUILTIN_AGENT_TOOL_IDS.length}`,
+    BUILTIN_AGENT_TOOL_IDS.length === 37,
+    `BUILTIN_AGENT_TOOL_IDS.length must be 37, got ${BUILTIN_AGENT_TOOL_IDS.length}`,
   );
 
   const builtinSet = new Set(BUILTIN_AGENT_TOOL_IDS);
