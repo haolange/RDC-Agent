@@ -235,6 +235,7 @@ export interface ProviderPreset {
   category: LlmProviderCategory;
   catalogOwnership: LlmProviderCatalogOwnership;
   authModes: ProviderPresetAuthMode[];
+  authModeAvailability?: Partial<Record<ProviderPresetAuthMode, ProviderAvailability>>;
   baseUrlEditable?: boolean;
   accountLoginConfigured?: boolean;
   capabilities?: LlmProviderCapability[];

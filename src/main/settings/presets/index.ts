@@ -57,6 +57,9 @@ import p54 from './lm-studio';
 import p55 from './nvidia-nim';
 import p56 from './github-models';
 import p57 from './ollama-cloud';
+import p58 from './minimax-account';
+import p59 from './opencode-go';
+import p60 from './cline';
 
 export const PROVIDER_PRESETS = [
   p0,
@@ -117,4 +120,7 @@ export const PROVIDER_PRESETS = [
   p55,
   p56,
   p57,
+  p58,
+  p59,
+  p60,
 ] satisfies ProviderPreset[];

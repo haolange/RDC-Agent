@@ -23,11 +23,15 @@ import { settingsService } from '../settings/SettingsService';
 import { providerAccountAuthService } from './ProviderAccountAuthService';
 import { extractDiscoveredModelId, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 import { parseDeclarativeCatalog, resolveDeclarativeDiscoveryUrl } from './DeclarativeCatalogDiscovery';
+import type { CatalogModelContribution } from './EffectiveCatalogService';
+import { refreshEffectiveCatalogDiscovery } from './EffectiveModelResolver';
+import { parseClineCatalog, parseOpenCodeGoCatalog } from './LiveProviderCatalogParsers';
 
 const REQUEST_TIMEOUT_MS = 20000;
 
 interface ModelDiscoveryResult {
   models: LlmProviderModel[];
+  contributions?: CatalogModelContribution[];
   discoveryDiagnostic?: LlmProviderConnectionResult['discoveryDiagnostic'];
 }
 
@@ -35,6 +39,7 @@ function resolveDiscoveryStrategy(
   protocol: LlmProviderEntry['protocol'],
   catalogStrategy: LlmProviderModelDiscoveryStrategy | null | undefined,
 ): LlmProviderModelDiscoveryStrategy | null {
+  if (catalogStrategy?.endsWith('-catalog')) return catalogStrategy;
   if (protocol === 'OpenAICompatibleChatCompletions' || protocol === 'OpenAIResponses' || protocol === 'OpenRouterChatCompletions') {
     return 'openai-compatible';
   }
@@ -355,6 +360,9 @@ export class ProviderConnectionService {
       const { models } = discovery;
       const nextSettings = settingsService.saveProviderConnection(provider.id, apiKey, models, baseUrl, provider.protocol);
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
+      if (nextProvider) {
+        await refreshEffectiveCatalogDiscovery(nextProvider, models, discovery.contributions);
+      }
       return {
         success: true,
         provider: nextProvider,
@@ -388,6 +396,9 @@ export class ProviderConnectionService {
       const { models } = discovery;
       const nextSettings = settingsService.saveProviderConnection(provider.id, '', models, '', provider.protocol);
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
+      if (nextProvider) {
+        await refreshEffectiveCatalogDiscovery(nextProvider, models, discovery.contributions);
+      }
       return {
         success: true,
         provider: nextProvider,
@@ -507,6 +518,16 @@ export class ProviderConnectionService {
     const candidateModelIds = catalogOwnership === 'app-managed'
       ? managedModels.map((model) => model.id)
       : provider.recommendedModels;
+    if (strategy === 'opencode-go-catalog' || strategy === 'cline-catalog') {
+      const payload = await getJson(appendPath(baseUrl, '/models'), {
+        method: 'GET',
+        headers: this.createHeaders(provider, apiKey),
+      });
+      const parsed = strategy === 'opencode-go-catalog'
+        ? parseOpenCodeGoCatalog(payload)
+        : parseClineCatalog(payload);
+      return { models: requireModels(parsed.models), contributions: parsed.contributions };
+    }
     if (definition.discovery?.kind === 'json-catalog') {
       const url = resolveDeclarativeDiscoveryUrl(definition.discovery, baseUrl);
       const payload = await getJson(url, {

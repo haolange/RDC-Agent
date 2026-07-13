@@ -178,7 +178,7 @@ function loadProviderCatalog(runtimeEntries) {
 }
 
 async function main() {
-  assert(providerPresets.length === 58, `Provider registry must load 46 migrated and 12 data-only presets, found ${providerPresets.length}.`);
+  assert(providerPresets.length === 61, `Provider registry must load 46 migrated, 12 data-only, and 3 live-verification presets, found ${providerPresets.length}.`);
   const presetIds = providerPresets.map((preset) => preset.id);
   assert(new Set(presetIds).size === presetIds.length, 'Provider preset ids must be unique.');
   const presetFiles = fs.readdirSync(path.join(process.cwd(), 'src/main/settings/presets'))
@@ -264,7 +264,7 @@ async function main() {
   assert(ids.length >= 40, `Builtin provider catalog should expose at least 40 providers, found ${ids.length}.`);
   assert(runtimeEntries.length === ids.length, 'Runtime provider entries should mirror the builtin catalog.');
   assert(catalogEntries.length === ids.length, 'Provider catalog DTO entries should mirror the builtin catalog.');
-  for (const id of ['openai', 'anthropic', 'bedrock', 'vertex', 'ollama', 'chatgpt-account', 'claude-account', 'grok-account', 'xai']) {
+  for (const id of ['openai', 'anthropic', 'bedrock', 'vertex', 'ollama', 'chatgpt-account', 'claude-account', 'grok-account', 'minimax-account', 'opencode-go', 'cline', 'xai']) {
     assert(ids.includes(id), `Builtin provider is missing: ${id}`);
   }
 
@@ -276,9 +276,12 @@ async function main() {
   assert(grokAccount?.accountLoginConfigured === true, 'grok-account must expose a configured account login path.');
   assert(grokAccount?.label === 'Super Grok Account', 'grok-account must be labeled Super Grok Account in OAuth UI.');
   assert(grokAccount?.unavailableReason === undefined, 'grok-account must not be marked unavailable.');
-  for (const modelId of ['grok-4.5', 'grok-4.3', 'grok-code-fast-1']) {
-    assert(grokAccount?.recommendedModels.includes(modelId), `grok-account recommended models must include ${modelId}.`);
-  }
+  assert(grokAccount?.recommendedModels.length === 0, 'grok-account must not retain a static recommended model table.');
+  assert(grokAccount?.catalogOwnership === 'user-managed', 'grok-account must be owned by its dynamic account catalog.');
+  const cline = definitionById.get('cline');
+  assert(cline?.authMode === 'api-key' && cline?.authModeOptions?.includes('account'), 'Cline must expose API key and account auth modes.');
+  const openRouter = definitionById.get('openrouter');
+  assert(openRouter?.authModeOptions?.includes('account'), 'OpenRouter must expose its PKCE account option alongside API key auth.');
   const xai = definitionById.get('xai');
   assert(xai?.recommendedModels.includes('grok-code-fast-1'), 'xAI API-key provider must include grok-code-fast-1.');
 
@@ -402,11 +405,16 @@ async function main() {
       'exchangeGrokCode',
       'pollGrokDevice',
       'SUPER_GROK_OAUTH_REDIRECT_URI',
-      'getProviderSeedModels',
+      'parseGrokAccountCatalog',
+      'https://api.x.ai/v1/models',
     ],
     'ProviderAccountAuthService Super Grok OAuth flow',
   );
-  assert(!providerAccountAuthService.includes('GROK_API_BASE_URL'), 'Super Grok account models must come from the app-managed catalog, not /models discovery.');
+  assert(!providerAccountAuthService.includes('GROK_API_BASE_URL'), 'Super Grok account discovery must not use a static legacy base constant.');
+  const liveOAuthContracts = read('src/main/settings/LiveProviderOAuthContracts.ts');
+  assertSourceContains(liveOAuthContracts, ['MINIMAX_REFERENCE', '/oauth/code', '/oauth/token', 'OPENROUTER_AUTHORIZE_URL', 'OPENROUTER_EXCHANGE_URL'], 'live provider OAuth contracts');
+  const liveCatalogParsers = read('src/main/settings/LiveProviderCatalogParsers.ts');
+  assertSourceContains(liveCatalogParsers, ['parseOpenCodeGoCatalog', 'parseClineCatalog', 'parseGrokAccountCatalog'], 'live provider catalog parsers');
   assert(!providerAccountAuthService.includes('GROK_AUTH_DEVICE_ENDPOINT'), 'Super Grok OAuth device endpoint must come from xAI OIDC metadata.');
   assert(!providerAccountAuthService.includes('GROK_AUTH_TOKEN_ENDPOINT'), 'Super Grok OAuth token endpoint must come from xAI OIDC metadata.');
   assert(!providerAccountAuthService.includes("'Grok OAuth") && !providerAccountAuthService.includes("'Grok OAuth requires"), 'ProviderAccountAuthService must use Super Grok OAuth visible wording.');

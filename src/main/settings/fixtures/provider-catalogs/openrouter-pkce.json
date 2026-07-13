@@ -1,0 +1,4 @@
+{
+  "callback_url": "http://127.0.0.1:1457/oauth/openrouter/callback",
+  "exchange": { "key": "sk-or-fixture", "user_id": "fixture-user" }
+}
