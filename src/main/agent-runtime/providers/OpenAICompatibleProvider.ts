@@ -23,6 +23,7 @@ import type {
   StreamOptions,
   ToolDefinition,
 } from '../core/types';
+import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import { composeAbortSignals, ensureOk, normalizeError, parseSSE, ProviderHttpError } from './internal/http';
 import { applyOpenAiCompatibleReasoning } from './reasoningWire';
@@ -141,7 +142,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
         throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for OpenAI-compatible provider');
       }
 
-      const body = this.buildRequestBody(model, context, options);
+      const body = applyRequestPlanBody(this.buildRequestBody(model, context, options), options.requestPlan);
       const url = `${baseUrl}/chat/completions`;
 
       const response = await fetch(url, {
@@ -150,6 +151,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
           ...this.defaultHeaders,
+          ...requestPlanHeaders(options.requestPlan),
         },
         body: JSON.stringify(body),
         signal: composed.signal,

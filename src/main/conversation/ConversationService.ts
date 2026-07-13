@@ -56,10 +56,7 @@ import { agentManifestService } from '../settings/AgentManifestService';
 import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService';
 import { scopedInstructionResolver } from '../runtime/ScopedInstructionResolver';
 import { appPathService } from '../runtime/AppPathService';
-import {
-  resolveModelCapability,
-  resolveTurnControls,
-} from '../settings/ModelCapabilityResolver';
+import { planEffectiveModelRequest, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
@@ -920,11 +917,22 @@ export class ConversationService {
     const settings = settingsService.getAll();
     const route = settings.llm.agentRoutes.find((entry) => entry.agentId === conversationAgentId);
     const capability = route?.providerId && route.modelId
-      ? resolveModelCapability(route.providerId, route.modelId, settings)
+      ? resolveEffectiveModel(route.providerId, route.modelId, settings)
       : null;
-    const turnControls = capability
-      ? resolveTurnControls(capability, input.requestTurnControls, input.context.session?.turnControls)
-      : undefined;
+    const planning = route?.providerId && route.modelId
+      ? planEffectiveModelRequest({
+          providerId: route.providerId,
+          modelId: route.modelId,
+          settings,
+          controls: {
+            ...(input.context.session?.turnControls ?? {}),
+            ...(input.requestTurnControls ?? {}),
+          },
+          requestedTemperature: 0.35,
+        })
+      : null;
+    if (planning && !planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
+    const turnControls = planning?.ok ? planning.controls : undefined;
     if (sessionId && turnControls) {
       storageAdapter.updateSession(sessionId, { turnControls });
     }
@@ -1221,11 +1229,11 @@ export class ConversationService {
           tools: allowedToolNames,
           workDir: projectRootPath ?? '',
           routeCapability: routePreflight.routeCapability,
-          modelCapability: capability ?? undefined,
+          effectiveModel: capability ?? undefined,
           permissionSettings: runtimeSettings.agentRuntime.permissions,
           currentDate: promptClock.currentDate,
           timeZone: promptClock.timeZone,
-          contextWindowTokens: capability?.nominalContextWindowTokens ?? undefined,
+          contextWindowTokens: planning?.ok ? planning.plan.contextBudgetTokens : undefined,
         });
         const visibleTurnIds = sessionId
           ? Array.from(new Set(resolveVisibleConversationMessages(

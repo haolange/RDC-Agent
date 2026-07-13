@@ -96,23 +96,6 @@ export interface ModelCapabilityProfile {
   structuredOutput?: boolean;
 }
 
-export interface ResolvedModelCapability {
-  providerId: string;
-  modelId: string;
-  catalogSource: 'managed-catalog' | 'conservative-default';
-  nominalContextWindowTokens: number | null;
-  defaultContextWindowTokens: number;
-  maxContextWindowTokens: number | null;
-  reasoningControl: ReasoningControl;
-  maxContextAvailable: boolean;
-  fastVariantModelId: string | null;
-  fastModelAvailable: boolean;
-  fixedTemperature: number | null;
-  toolCalling: boolean;
-  visionInput: boolean;
-  structuredOutput: boolean;
-}
-
 export interface ResolvedReasoningSelection {
   selection: ReasoningSelection;
   control: ReasoningControl;
@@ -258,18 +241,4 @@ export function coerceReasoningSelectionCandidate(
     return 'extra';
   }
   return clampReasoningSelection(value, control);
-}
-
-export function resolveActiveContextWindowTokens(
-  capability: Pick<ResolvedModelCapability, 'defaultContextWindowTokens' | 'maxContextAvailable' | 'maxContextWindowTokens'>,
-  turnControls: Pick<ConversationTurnControls, 'maxContextMode'>,
-): number {
-  if (
-    turnControls.maxContextMode
-    && capability.maxContextAvailable
-    && capability.maxContextWindowTokens !== null
-  ) {
-    return capability.maxContextWindowTokens;
-  }
-  return capability.defaultContextWindowTokens;
 }

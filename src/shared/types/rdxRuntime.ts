@@ -169,6 +169,7 @@ export interface RequestEnvelopeSnapshot {
   turnId?: string;
   callIndex: number;
   route: { providerId: string; modelId: string; protocol: string };
+  requestPlan: import('./providerCapability').RequestPlan;
   promptPlan: PromptPlan;
   messages: unknown[];
   tools: unknown[];

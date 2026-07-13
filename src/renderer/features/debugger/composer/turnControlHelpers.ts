@@ -1,7 +1,7 @@
 import type {
   ConversationTurnControls,
-  ResolvedModelCapability,
 } from '@shared/types/modelCapability';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   buildInitialTurnControls,
   sanitizeTurnControls,
@@ -45,7 +45,7 @@ export function resolveTurnControlsForCapabilityChange(input: {
   nextCapabilityKey: string;
   sessionChanged: boolean;
   sessionControlsChanged: boolean;
-  capability: ResolvedModelCapability | null;
+  capability: EffectiveModel | null;
   sessionControls: SessionTurnControlsInput;
   currentControls: ConversationTurnControls;
   rememberedControls: ConversationTurnControls | undefined;

@@ -1,5 +1,6 @@
 import { generateEventId } from '@shared/utils/id';
 import type { PromptPlan, RequestEnvelopeSnapshot } from '@shared/types/rdxRuntime';
+import type { RequestPlan } from '@shared/types/providerCapability';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 
 const SECRET_KEY = /(?:api[-_]?key|authorization|password|secret|access[-_]?token|refresh[-_]?token)/i;
@@ -11,6 +12,7 @@ export interface RequestEnvelopeInput {
   turnId?: string;
   callIndex: number;
   route: { providerId: string; modelId: string; protocol: string };
+  requestPlan: RequestPlan;
   messages: unknown[];
   tools: unknown[];
   controls: Record<string, unknown>;
@@ -61,6 +63,7 @@ export class RequestEnvelopeBuilder {
       turnId: input.turnId,
       callIndex: input.callIndex,
       route: input.route,
+      requestPlan: sanitize(input.requestPlan, 'requestPlan', new WeakSet()) as unknown as RequestPlan,
       promptPlan: input.promptPlan,
       messages: sanitize(input.messages, 'messages', new WeakSet()) as unknown[],
       tools: sanitize(input.tools, 'tools', new WeakSet()) as unknown[],

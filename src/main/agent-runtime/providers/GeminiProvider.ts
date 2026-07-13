@@ -24,6 +24,7 @@ import type {
   StreamOptions,
   ToolDefinition,
 } from '../core/types';
+import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
@@ -140,7 +141,7 @@ export class GeminiProvider implements ProviderStrategy {
         throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for Gemini provider');
       }
 
-      const body = this.buildRequestBody(context, options);
+      const body = applyRequestPlanBody(this.buildRequestBody(context, options), options.requestPlan);
       const versionedBase = baseUrl.includes('/v1beta') || baseUrl.includes('/v1')
         ? baseUrl
         : `${baseUrl}/v1beta`;
@@ -151,6 +152,7 @@ export class GeminiProvider implements ProviderStrategy {
         headers: {
           'Content-Type': 'application/json',
           ...this.defaultHeaders,
+          ...requestPlanHeaders(options.requestPlan),
         },
         body: JSON.stringify(body),
         signal: composed.signal,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ConversationTurnControls, ResolvedModelCapability } from '@shared/types/modelCapability';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 import { buildInitialTurnControls } from './turnControlsUtils';
 import {
   buildSessionTurnControlsKey,
@@ -8,34 +9,31 @@ import {
   shouldResyncTurnControls,
 } from './turnControlHelpers';
 
-const limitedLevelsCapability: ResolvedModelCapability = {
+const limitedLevelsCapability: EffectiveModel = {
   providerId: 'deepseek',
   modelId: 'deepseek-v4-flash',
-  catalogSource: 'managed-catalog',
-  nominalContextWindowTokens: 128_000,
-  defaultContextWindowTokens: 128_000,
-  maxContextWindowTokens: null,
-  reasoningControl: {
+  label: 'DeepSeek', aliases: [],
+  route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://example.test', source: 'preset' },
+  availability: 'available',
+  contextTiers: [{ id: 'default', label: 'Default', maxPromptTokens: 128_000, activation: { kind: 'implicit' }, entitlement: 'granted' }],
+  defaultBudgetTokens: 128_000,
+  reasoning: {
     kind: 'levels',
     supportsOff: true,
     levels: ['high', 'max'],
     defaultSelection: 'high',
     wireProfile: { kind: 'none' },
   },
-  maxContextAvailable: false,
-  fastVariantModelId: null,
-  fastModelAvailable: false,
-  fixedTemperature: null,
-  toolCalling: true,
-  visionInput: false,
-  structuredOutput: true,
+  fast: { kind: 'unsupported' },
+  toolCalling: { state: 'supported' }, visionInput: { state: 'unsupported' }, structuredOutput: { state: 'supported' },
+  provenance: [],
 };
 
-const noMaxCapability: ResolvedModelCapability = {
+const noMaxCapability: EffectiveModel = {
   ...limitedLevelsCapability,
   providerId: 'openai',
   modelId: 'gpt-5.5',
-  reasoningControl: {
+  reasoning: {
     kind: 'levels',
     supportsOff: true,
     levels: ['low', 'medium', 'high', 'extra'],

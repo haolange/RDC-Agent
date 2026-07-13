@@ -3,14 +3,13 @@ import type { ActionEvent } from '@shared/types/evidence';
 import type { LLMMessage, LLMRequest, LLMResponse } from '@shared/types/llm';
 import type { ContextUsageBreakdownEntry, ContextUsageBreakdownId, RunContextUsageSummary } from '@shared/types/session';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
-import { resolveActiveContextWindowTokens } from '@shared/types/modelCapability';
 import type { Blocker, WorkflowStage } from '@shared/types/workflow';
 import { BLOCKER_CODES } from '@shared/constants/blockers';
 import type { LlmProviderProtocol, LlmProviderEntry, LlmProviderId } from '@shared/types/settings';
 import { llmAdapter } from '../settings/LLMAdapter';
 import { providerAccountAuthService } from '../settings/ProviderAccountAuthService';
 import { settingsService } from '../settings/SettingsService';
-import { resolveModelCapability } from '../settings/ModelCapabilityResolver';
+import { planEffectiveModelRequest } from '../settings/EffectiveModelResolver';
 import { resolveCompatibleAgentRoute } from './LlmRouteCompatibility';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { storageAdapter } from '../sessions/StorageAdapter';
@@ -329,12 +328,13 @@ export class DebuggerLlmService {
   private toContextUsageSummary(key: string, summary: RunLlmExecutionSummary): RunContextUsageSummary {
     const settings = settingsService.getAll();
     const turnControls = this.resolveSessionTurnControls(key, summary);
-    const capability = resolveModelCapability(summary.providerId, summary.modelId, settings);
-    const contextWindowTokens = resolveActiveContextWindowTokens(capability, turnControls ?? {
-      reasoningLevel: capability.reasoningControl.defaultSelection,
-      maxContextMode: false,
-      fastModel: false,
+    const planning = planEffectiveModelRequest({
+      providerId: summary.providerId,
+      modelId: summary.modelId,
+      settings,
+      controls: turnControls ?? undefined,
     });
+    const contextWindowTokens = planning.ok ? planning.plan.contextBudgetTokens : 256_000;
     const totalTokens = summary.totalInputTokens + summary.totalOutputTokens;
     const occupiedTokens = summary.lastOccupiedTokens ?? 0;
     const cacheReadTokens = positiveTokenOrOmit(summary.totalCacheReadTokens);

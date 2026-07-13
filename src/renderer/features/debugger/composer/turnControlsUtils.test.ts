@@ -1,31 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import type { ResolvedModelCapability } from '@shared/types/modelCapability';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   buildInitialTurnControls,
   sanitizeTurnControls,
 } from './turnControlsUtils';
 
-const levelsCapability: ResolvedModelCapability = {
+const levelsCapability: EffectiveModel = {
   providerId: 'openai',
   modelId: 'gpt-5.5',
-  catalogSource: 'managed-catalog',
-  nominalContextWindowTokens: 1_050_000,
-  defaultContextWindowTokens: 256_000,
-  maxContextWindowTokens: 1_050_000,
-  reasoningControl: {
+  label: 'GPT-5.5', aliases: [],
+  route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test', source: 'preset' },
+  availability: 'available',
+  contextTiers: [
+    { id: 'default', label: 'Default', maxPromptTokens: 256_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
+    { id: 'max', label: 'Max', maxPromptTokens: 1_050_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
+  ],
+  defaultBudgetTokens: 256_000,
+  reasoning: {
     kind: 'levels',
     supportsOff: true,
     levels: ['low', 'medium', 'high', 'extra'],
     defaultSelection: 'medium',
     wireProfile: { kind: 'none' },
   },
-  maxContextAvailable: true,
-  fastVariantModelId: 'gpt-5.5-fast',
-  fastModelAvailable: true,
-  fixedTemperature: null,
-  toolCalling: true,
-  visionInput: true,
-  structuredOutput: true,
+  fast: { kind: 'model-variant', modelId: 'gpt-5.5-fast', entitlement: 'granted' },
+  toolCalling: { state: 'supported' }, visionInput: { state: 'supported' }, structuredOutput: { state: 'supported' },
+  provenance: [],
 };
 
 describe('turnControlsUtils', () => {
@@ -48,10 +48,8 @@ describe('turnControlsUtils', () => {
       fastModel: true,
     }, {
       ...levelsCapability,
-      maxContextAvailable: false,
-      fastModelAvailable: false,
-      maxContextWindowTokens: null,
-      fastVariantModelId: null,
+      contextTiers: levelsCapability.contextTiers.slice(0, 1),
+      fast: { kind: 'unsupported' },
     })).toEqual({
       reasoningLevel: 'medium',
       maxContextMode: false,
@@ -76,7 +74,7 @@ describe('turnControlsUtils', () => {
       fastModel: false,
     }, {
       ...levelsCapability,
-      reasoningControl: {
+      reasoning: {
         kind: 'toggle',
         supportsOff: true,
         levels: [],

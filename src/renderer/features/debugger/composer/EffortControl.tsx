@@ -16,9 +16,8 @@ import {
   resolveSelectedLevel,
 } from './effortControlParts';
 import { EffortControlPopup } from './EffortControlPopup';
-import { formatTokenCount } from './turnControlsUtils';
+import { formatTokenCount, hasSelectableFastMode, hasSelectableMaxTier, maxContextTokens } from './turnControlsUtils';
 import { useMaxVisualController } from './useMaxVisualController';
-
 export const EffortControl: React.FC<{
   agentId: string;
   currentSession: SessionRecord | null;
@@ -37,7 +36,7 @@ export const EffortControl: React.FC<{
   const popupShiftRef = useRef(0);
   const suppressClickRef = useRef(false);
   const isDragging = dragRatio !== null;
-  const reasoningControl = capability?.reasoningControl ?? null;
+  const reasoningControl = capability?.reasoning ?? null;
   const capabilityKey = capability
     ? `${capability.providerId}:${capability.modelId}`
     : 'pending';
@@ -95,8 +94,11 @@ export const EffortControl: React.FC<{
 
   const effortLabel = t(EFFORT_LABEL_KEYS[selectedLevel]);
   const tooltipLabel = t(EFFORT_LABEL_KEYS[displayLevel]);
-  const maxContextBadgeLabel = capability?.maxContextWindowTokens
-    ? formatTokenCount(capability.maxContextWindowTokens)
+  const maxTokens = maxContextTokens(capability);
+  const maxAvailable = hasSelectableMaxTier(capability);
+  const fastAvailable = hasSelectableFastMode(capability);
+  const maxContextBadgeLabel = maxTokens
+    ? formatTokenCount(maxTokens)
     : t('composer.effort.maxContextBadge');
   const pillPresentation = buildEffortPillPresentation({
     reasoningLabel: effortLabel,
@@ -107,15 +109,14 @@ export const EffortControl: React.FC<{
     fastModelLabel: t('composer.effort.fastModel'),
     fastModelBadgeLabel: t('composer.effort.fastMultiplier'),
   });
-  const maxContextStatus = capability?.maxContextAvailable
+  const maxContextStatus = maxAvailable
     ? (turnControls.maxContextMode ? maxContextBadgeLabel : t('composer.effort.stateOff'))
     : t('composer.effort.unavailable');
-  const fastModelStatus = capability?.fastModelAvailable
+  const fastModelStatus = fastAvailable
     ? (turnControls.fastModel ? t('composer.effort.fastMultiplier') : t('composer.effort.standardMultiplier'))
     : t('composer.effort.unavailable');
 
   const closeMenu = useCallback(() => setOpen(false), []);
-
   useEffect(() => {
     if (!open) return undefined;
     const onPointer = (event: PointerEvent) => {
@@ -279,8 +280,8 @@ export const EffortControl: React.FC<{
           tooltipLabel={tooltipLabel}
           maxContextStatus={maxContextStatus}
           fastModelStatus={fastModelStatus}
-          maxContextAvailable={Boolean(capability?.maxContextAvailable)}
-          fastModelAvailable={Boolean(capability?.fastModelAvailable)}
+          maxContextAvailable={maxAvailable}
+          fastModelAvailable={fastAvailable}
           maxContextMode={turnControls.maxContextMode}
           fastModel={turnControls.fastModel}
           t={t}

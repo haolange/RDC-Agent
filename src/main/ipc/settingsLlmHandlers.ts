@@ -11,11 +11,20 @@ import { agentManifestService } from '../settings/AgentManifestService';
 import { llmAdapter } from '../settings/LLMAdapter';
 import { providerConnectionService } from '../settings/ProviderConnectionService';
 import { settingsService } from '../settings/SettingsService';
-import { resolveModelCapability } from '../settings/ModelCapabilityResolver';
+import { resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
+import { effectiveCatalogService } from '../settings/EffectiveCatalogService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
 export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void {
+  effectiveCatalogService.subscribe((snapshot) => {
+    context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);
+  });
+
+  const broadcastCatalog = (providerId: string): void => {
+    const snapshot = resolveEffectiveCatalog(providerId, settingsService.getAll());
+    if (snapshot) context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);
+  };
   ipcMain.handle('llm:configure', async (_event, config: unknown) => {
     llmAdapter.configure(config as any);
     return;
@@ -37,6 +46,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const result = await providerConnectionService.connectProvider(request);
     if (result.success) {
       context.applyCurrentLlmConfig();
+      broadcastCatalog(request.providerId);
     }
     return result;
   });
@@ -45,6 +55,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const result = await providerConnectionService.refreshProviderModels(providerId);
     if (result.success) {
       context.applyCurrentLlmConfig();
+      broadcastCatalog(providerId);
     }
     return result;
   });
@@ -53,6 +64,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const result = providerConnectionService.disconnectProvider(providerId);
     if (result.success) {
       context.applyCurrentLlmConfig();
+      broadcastCatalog(providerId);
     }
     return result;
   });
@@ -73,6 +85,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const result = await providerConnectionService.finishProviderAccountLogin(request);
     if (result.connected) {
       context.applyCurrentLlmConfig();
+      broadcastCatalog(request.providerId);
     }
     return result;
   });
@@ -80,6 +93,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   ipcMain.handle('llm:logoutProviderAccount', async (_event, providerId: LlmProviderId) => {
     const result = providerConnectionService.logoutProviderAccount(providerId);
     context.applyCurrentLlmConfig();
+    broadcastCatalog(providerId);
     return result;
   });
 
@@ -104,13 +118,17 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return settingsService.getProviderCatalog();
   });
 
-  ipcMain.handle('settings:getModelCapability', async (_event, agentId: string) => {
+  ipcMain.handle('settings:getEffectiveModel', async (_event, agentId: string) => {
     const settings = settingsService.getAll();
     const route = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
     if (!route?.providerId || !route.modelId) {
       return null;
     }
-    return resolveModelCapability(route.providerId, route.modelId, settings);
+    return resolveEffectiveModel(route.providerId, route.modelId, settings);
+  });
+
+  ipcMain.handle('settings:getEffectiveCatalog', async (_event, providerId: string) => {
+    return resolveEffectiveCatalog(providerId, settingsService.getAll());
   });
 
   ipcMain.handle('settings:getProviderSecret', async (_event, providerId: string) => {
@@ -129,6 +147,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     await storageAdapter.initializeWorkspace();
     await context.initializeIpcState();
     context.applyCurrentLlmConfig();
+    for (const provider of nextSettings.llm.providers) broadcastCatalog(provider.id);
     return nextSettings;
   });
 }

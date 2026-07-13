@@ -2,8 +2,8 @@ import type {
   ConversationTurnControls,
   ReasoningControl,
   ReasoningSelection,
-  ResolvedModelCapability,
 } from '@shared/types/modelCapability';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   clampReasoningSelection,
   coerceReasoningSelectionCandidate,
@@ -46,9 +46,9 @@ export function formatTokenCount(value: number): string {
 
 export function sanitizeTurnControls(
   controls: TurnControlsInput,
-  capability: ResolvedModelCapability | null,
+  capability: EffectiveModel | null,
 ): ConversationTurnControls {
-  const reasoningControl = capability?.reasoningControl ?? {
+  const reasoningControl = capability?.reasoning ?? {
     kind: 'none',
     supportsOff: true,
     levels: [],
@@ -61,13 +61,33 @@ export function sanitizeTurnControls(
 
   return {
     reasoningLevel,
-    maxContextMode: normalized.maxContextMode && Boolean(capability?.maxContextAvailable),
-    fastModel: normalized.fastModel && Boolean(capability?.fastModelAvailable),
+    maxContextMode: normalized.maxContextMode && hasSelectableMaxTier(capability),
+    fastModel: normalized.fastModel && hasSelectableFastMode(capability),
   };
 }
 
+export function hasSelectableMaxTier(capability: EffectiveModel | null): boolean {
+  if (!capability) return false;
+  return capability.contextTiers.filter((tier) => tier.entitlement !== 'denied').length >= 2;
+}
+
+export function maxContextTokens(capability: EffectiveModel | null): number | undefined {
+  return capability?.contextTiers
+    .filter((tier) => tier.entitlement !== 'denied')
+    .reduce<number | undefined>((max, tier) => (
+      typeof tier.maxPromptTokens === 'number' ? Math.max(max ?? 0, tier.maxPromptTokens) : max
+    ), undefined);
+}
+
+export function hasSelectableFastMode(capability: EffectiveModel | null): boolean {
+  return Boolean(capability
+    && capability.fast.kind !== 'unsupported'
+    && capability.fast.kind !== 'unknown'
+    && capability.fast.entitlement !== 'denied');
+}
+
 export function buildInitialTurnControls(
-  capability: ResolvedModelCapability | null,
+  capability: EffectiveModel | null,
   sessionControls?: TurnControlsInput | null,
 ): ConversationTurnControls {
   if (sessionControls) {
@@ -75,7 +95,7 @@ export function buildInitialTurnControls(
   }
   if (capability) {
     return {
-      reasoningLevel: capability.reasoningControl.defaultSelection,
+      reasoningLevel: capability.reasoning.defaultSelection,
       maxContextMode: false,
       fastModel: false,
     };

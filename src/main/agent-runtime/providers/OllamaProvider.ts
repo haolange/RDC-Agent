@@ -23,6 +23,7 @@ import type {
   StreamOptions,
   ToolDefinition,
 } from '../core/types';
+import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
@@ -123,12 +124,13 @@ export class OllamaProvider implements ProviderStrategy {
     try {
       builder.start();
 
-      const body = this.buildRequestBody(model, context, options);
+      const body = applyRequestPlanBody(this.buildRequestBody(model, context, options), options.requestPlan);
       const url = `${baseUrl}/api/chat`;
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         ...this.defaultHeaders,
+        ...requestPlanHeaders(options.requestPlan),
       };
       if (apiKey) headers.Authorization = `Bearer ${apiKey}`;
 
