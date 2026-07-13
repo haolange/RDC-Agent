@@ -36,7 +36,7 @@ Historical `workTrace` entries that do not match the current canonical schema ar
 
 ## Provider Account Boundary
 
-Account providers are login products, not API-key shortcuts. Super Grok Account is the xAI account-OAuth provider: it uses xAI OIDC metadata, browser OAuth by default, and device-code flow for headless or remote environments. xAI (Grok) remains the separate API-key provider for console keys. The Super Grok OAuth Client ID field accepts only an xAI-issued public OAuth client id; users must not paste xAI API keys into that field.
+Account providers are login products, not API-key shortcuts. Super Grok Account is the xAI account-OAuth provider: RDC-Agent uses the xAI public native-client registration, Authorization Code + PKCE, and an ephemeral `http://127.0.0.1:<port>/callback` loopback; browser OAuth is the default and device code is the headless fallback. RDC-Agent obtains and refreshes its own token set. It must not import `~/.grok/auth.json`, proxy the Grok CLI session, or share a rotating refresh token with another client. xAI (Grok) remains the separate API-key provider for console keys, and normal users are never asked to paste a public OAuth client id.
 
 ## Profiles
 
@@ -121,9 +121,11 @@ Every model call follows one provider-neutral pipeline:
 
 ```text
 Scoped Runtime Resolution
+  -> EffectiveCatalogService (account + model + protocol snapshot)
   -> PromptPlanBuilder
   -> Context and Message Transformation
   -> RequestEnvelopeBuilder
+  -> RequestPlanner (closed RequestPlan)
   -> Provider Adapter
   -> Provider Wire Request
 ```
@@ -136,7 +138,7 @@ Provider continuation artifacts replay only when `providerId + modelId + protoco
 
 Edit-and-resend and branch switching are lifecycle transactions. They first stop and await the active turn's scheduler, provider abort, human/tool cleanup, terminal conversation persistence, journal append or error publication, and active-turn cleanup. A rewrite then atomically commits one concrete branch containing the new user anchor and root turn before it starts exactly one resend. Journal entries retain the branch, turn, and message identity captured at turn start; sibling entries remain append-only and a late old turn must never infer ownership from the current active leaf. Legacy per-Agent thread files are neither read nor written by runtime or migration.
 
-`RequestEnvelopeBuilder` combines the plan, transformed messages, tool schemas, controls, route, and reasoning contract. Provider adapters only translate that envelope into provider wire shapes. Each call persists a sanitized provider-neutral snapshot under application session state. Snapshots retain provenance, route, protocol mapping, messages, tools, resources, and reported or explicitly estimated token usage, while credentials, capture binaries, protected continuation payloads, and opaque reasoning plaintext are removed and represented only by safe metadata or hashes.
+`RequestEnvelopeBuilder` combines the prompt plan, transformed messages, tool schemas, controls, effective route, and reasoning contract. `RequestPlanner` compiles those controls and the selected `EffectiveModel` into the required closed `RequestPlan`; every adapter call carries that plan. Provider adapters only translate the envelope and plan into provider wire shapes and must not re-resolve model capability. Each call persists a sanitized provider-neutral snapshot under application session state. Snapshots retain provenance, route, protocol mapping, messages, tools, resources, and reported or explicitly estimated token usage, while credentials, capture binaries, protected continuation payloads, and opaque reasoning plaintext are removed and represented only by safe metadata or hashes.
 
 ## Provider Reasoning Contract
 
@@ -234,6 +236,8 @@ Provider catalog ownership is explicit. For app-managed providers RDC-Agent lock
 Context tiers describe provider limits, activation, billing, and entitlement; client budgets are independent policy. The active prompt budget is the smaller of the client budget and the selected tier's known prompt cap. A missing provider cap stays unknown and must not be converted into a claimed 256K limit. `Max context` means the highest tier currently available to the active account, not a numeric `>= 1M` test: two granted tiers expose the selector, while a higher unknown entitlement is shown as unverified until a real user request yields conclusive evidence. Fast mode follows the same account-aware contract and may compile to a request patch, model variant, or client tier. Auto-compaction remains 80% of the active RequestPlan budget.
 
 `ProviderPreset` is an in-repository, schema-versioned, JSON-serializable declaration of provider lifecycle, authentication modes, routes, discovery, seed models, and overlays. Presets contain no executable functions or credentials. Adapter code is reserved for a new wire protocol, OAuth/device/refresh flow, request signing, non-standard catalog parsing, or subprocess/ACP integration. `RequestPlanner` compiles tier activation, Fast mode, reasoning wire shape, temperature, and context budget into a closed `RequestPlan`; provider adapters translate that plan into wire requests and do not re-resolve capability.
+
+Provider lifecycle is a truthful admission contract, not a progress label. A provider is `stable` and available only when its configured authentication mode, route, discovery path, request translation, and deterministic contract fixtures are complete. A provider whose upstream login or catalog contract cannot be verified is unavailable with one shared reason in Settings and Runtime; it must not register a guessed flow, expose a dead control, or remain as a user-visible half implementation.
 
 Context usage metering is hybrid and honest: window occupancy and This run In/Out/Total come from provider-reported usage (optional cache read/write and reasoning totals render only when reported—no fake zeros), while the category breakdown (`system_prompt`, `memory_files`, `skills`, `system_tools`, `mcp_tools`, `mcp_tools_deferred`, `subagent_definitions`, `summarized_conversation`, `conversation`, `free`) is a chars/4 estimate scaled to the provider-reported prompt occupancy. `memory_files` covers the RDX.md scoped-instruction chain. `mcp_tools_deferred` counts not-yet-activated MCP schemas only; it never joins the scaling sum, the stacked bar, or free-space math. The detail legend always lists every category (zeros shown muted); only the stacked bar omits zero-width segments. The latest `RunContextUsageSummary` snapshot persists to `<sessionDir>/usage.json` (subagent-isolated sessions excluded) and is read back stale after restart or memory miss, with no migration path.
 
