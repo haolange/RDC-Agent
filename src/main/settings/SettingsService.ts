@@ -1424,6 +1424,57 @@ export class SettingsService {
     });
   }
 
+  rotateProviderAccountCredential(
+    providerId: LlmProviderId,
+    secretPayload: string,
+    accountSummary: Pick<LlmProviderEntry, 'accountLabel' | 'planLabel' | 'oauthExpiresAt' | 'oauthRefreshAvailable'> = {},
+  ): AppSettings {
+    const current = this.getAll();
+    const provider = current.llm.providers.find((entry) => entry.id === providerId);
+    if (!provider || !isBuiltinProviderId(provider.id) || provider.authMode !== 'account') {
+      throw new Error(`Unknown account provider: ${providerId}`);
+    }
+    const activeAccountId = extractOAuthBundleAccountId(secretPayload)
+      ?? provider.activeAccountId
+      ?? createLocalAccountId();
+    const nextSecretRef = getProviderAccountSecretRef(provider.id, activeAccountId, 'oauth');
+    if (provider.activeAccountId && provider.activeAccountId !== activeAccountId) {
+      secretStorageService.moveSecret(
+        getProviderAccountSecretRef(provider.id, provider.activeAccountId, 'oauth'),
+        nextSecretRef,
+        current.paths.userRdxRoot,
+      );
+    }
+    secretStorageService.setSecret(nextSecretRef, secretPayload, current.paths.userRdxRoot);
+    const nextProvider: LlmProviderEntry = {
+      ...provider,
+      activeAccountId,
+      hasStoredSecret: true,
+      accountLabel: accountSummary.accountLabel,
+      planLabel: accountSummary.planLabel,
+      oauthExpiresAt: accountSummary.oauthExpiresAt,
+      oauthRefreshAvailable: accountSummary.oauthRefreshAvailable,
+    };
+    return this.setAll({
+      llm: {
+        providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
+        agentRoutes: current.llm.agentRoutes,
+      },
+    });
+  }
+
+  markProviderAccountRefreshFailure(providerId: LlmProviderId, message: string): AppSettings {
+    const current = this.getAll();
+    return this.setAll({
+      llm: {
+        providers: current.llm.providers.map((provider) => provider.id === providerId
+          ? { ...provider, enabled: false, status: 'failed', isConfigured: false, lastError: message }
+          : provider),
+        agentRoutes: current.llm.agentRoutes,
+      },
+    });
+  }
+
   disconnectProvider(providerId: LlmProviderId): AppSettings {
     const current = this.getAll();
     const provider = current.llm.providers.find((entry) => entry.id === providerId);

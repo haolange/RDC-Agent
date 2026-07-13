@@ -36,7 +36,13 @@ export class SecretStorageService {
   private writeSecretMap(secretMap: SecretMap, workspaceRoot?: string): void {
     const filePath = this.getSecretFilePath(workspaceRoot);
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(secretMap, null, 2), 'utf8');
+    const temporaryPath = `${filePath}.${process.pid}.tmp`;
+    try {
+      fs.writeFileSync(temporaryPath, JSON.stringify(secretMap, null, 2), 'utf8');
+      fs.renameSync(temporaryPath, filePath);
+    } finally {
+      if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+    }
   }
 
   createProviderSecretRef(providerId: string): string {

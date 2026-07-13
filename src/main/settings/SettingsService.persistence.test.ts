@@ -204,6 +204,34 @@ describe('SettingsService provider persistence', () => {
     expect(service.getProviderOAuthSecret('chatgpt-account', workspaceRoot)).toBe(bundle);
   });
 
+  it('atomically rotates account tokens without replacing the current model catalog', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const { secretStorageService } = await import('./SecretStorageService');
+    const { getManagedProviderModels } = await import('@shared/constants/modelCapabilityCatalog');
+    const service = new SettingsService();
+    const settings = service.initialize();
+    const models = getManagedProviderModels('chatgpt-account').slice(0, 2);
+    service.saveProviderAccountConnection(
+      'chatgpt-account',
+      JSON.stringify({ providerId: 'chatgpt-account', accountId: 'acct-rotate', accessToken: 'old', refreshToken: 'refresh-old' }),
+      models,
+    );
+    const modelIdsBeforeRotation = service.getAll().llm.providers
+      .find((entry) => entry.id === 'chatgpt-account')?.models.map((model) => model.id);
+
+    service.rotateProviderAccountCredential(
+      'chatgpt-account',
+      JSON.stringify({ providerId: 'chatgpt-account', accountId: 'acct-rotate', accessToken: 'new', refreshToken: 'refresh-new' }),
+      { oauthExpiresAt: '2026-07-13T01:00:00.000Z', oauthRefreshAvailable: true },
+    );
+
+    const provider = service.getAll().llm.providers.find((entry) => entry.id === 'chatgpt-account');
+    const secretRef = secretStorageService.createProviderAccountSecretRef('chatgpt-account', 'acct-rotate', 'oauth');
+    expect(provider?.models.map((model) => model.id)).toEqual(modelIdsBeforeRotation);
+    expect(JSON.parse(secretStorageService.getSecret(secretRef, settings.paths.userRdxRoot)) as { refreshToken: string })
+      .toMatchObject({ refreshToken: 'refresh-new' });
+  });
+
   it('preserves only the verified Volc Coding Plan model subset after saving and reloading', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();

@@ -14,6 +14,8 @@ import type {
   ToolCall,
 } from '@shared/types/llm';
 import { COPILOT_WIRE_HEADERS } from './CopilotWire';
+import { providerAccountAuthService } from './ProviderAccountAuthService';
+import { settingsService } from './SettingsService';
 import {
   applyGeminiReasoning,
   applyOpenAiCompatibleReasoning,
@@ -24,6 +26,13 @@ import {
 const describeUnsupportedProtocol = (providerId: string, protocol: unknown): string => {
   const value = typeof protocol === 'string' && protocol.trim() ? protocol.trim() : 'missing';
   return `Provider ${providerId} uses unsupported protocol "${value}".`;
+};
+
+const isUnauthorizedProviderError = (error: unknown): boolean => {
+  const status = error && typeof error === 'object' ? (error as { status?: unknown }).status : undefined;
+  if (status === 401) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /(?:HTTP|API error:)\s*401\b|\b401\s*[-:]/i.test(message);
 };
 
 const toContentBlocks = (
@@ -395,12 +404,17 @@ abstract class BaseStreamingProvider implements LLMProvider {
   abstract chat(request: LLMRequest): Promise<LLMResponse>;
 
   async streamChat(request: LLMRequest, onChunk: StreamCallback): Promise<LLMResponse> {
+    let emittedContent = false;
+    const guardedOnChunk: StreamCallback = (chunk) => {
+      if (chunk.type === 'text-delta' || chunk.type === 'tool-call-delta') emittedContent = true;
+      onChunk(chunk);
+    };
     try {
-      const response = await this.performStreamingChat(request, onChunk);
+      const response = await this.performStreamingChat(request, guardedOnChunk);
       onChunk({ type: 'done' });
       return response;
     } catch (error) {
-      if (request.signal?.aborted) {
+      if (request.signal?.aborted || emittedContent) {
         throw error;
       }
 
@@ -1311,7 +1325,16 @@ export class LLMAdapter {
       throw new Error(`Provider not configured: ${resolvedProviderId}`);
     }
 
-    return runtimeProvider.provider.chat(request);
+    try {
+      return await runtimeProvider.provider.chat(request);
+    } catch (error) {
+      if (runtimeProvider.config.authMode !== 'account' || !isUnauthorizedProviderError(error)) throw error;
+      await providerAccountAuthService.forceRefreshRuntimeCredentials(resolvedProviderId);
+      this.configure(settingsService.getLlmConfig());
+      const refreshed = this.providers.get(resolvedProviderId);
+      if (!refreshed) throw error;
+      return refreshed.provider.chat(request);
+    }
   }
 
   async streamChat(request: LLMRequest, onChunk: StreamCallback, providerId?: string): Promise<LLMResponse> {
@@ -1333,7 +1356,23 @@ export class LLMAdapter {
       throw new Error(`Provider not configured: ${resolvedProviderId}`);
     }
 
-    return runtimeProvider.provider.streamChat(request, onChunk);
+    let emittedContent = false;
+    const guardedOnChunk: StreamCallback = (chunk) => {
+      if (chunk.type === 'text-delta' || chunk.type === 'tool-call-delta') emittedContent = true;
+      onChunk(chunk);
+    };
+    try {
+      return await runtimeProvider.provider.streamChat(request, guardedOnChunk);
+    } catch (error) {
+      if (runtimeProvider.config.authMode !== 'account' || emittedContent || !isUnauthorizedProviderError(error)) {
+        throw error;
+      }
+      await providerAccountAuthService.forceRefreshRuntimeCredentials(resolvedProviderId);
+      this.configure(settingsService.getLlmConfig());
+      const refreshed = this.providers.get(resolvedProviderId);
+      if (!refreshed) throw error;
+      return refreshed.provider.streamChat(request, guardedOnChunk);
+    }
   }
 
   async testConnection(providerId: string): Promise<{ success: boolean; error?: string }> {
