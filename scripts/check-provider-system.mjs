@@ -415,6 +415,10 @@ async function main() {
   assertSourceContains(liveOAuthContracts, ['MINIMAX_REFERENCE', '/oauth/code', '/oauth/token', 'OPENROUTER_AUTHORIZE_URL', 'OPENROUTER_EXCHANGE_URL'], 'live provider OAuth contracts');
   const liveCatalogParsers = read('src/main/settings/LiveProviderCatalogParsers.ts');
   assertSourceContains(liveCatalogParsers, ['parseOpenCodeGoCatalog', 'parseClineCatalog', 'parseGrokAccountCatalog'], 'live provider catalog parsers');
+  const capabilityContractTest = read('src/main/settings/ProviderCapabilityContract.test.ts');
+  assertSourceContains(capabilityContractTest, ['effective-model-contract.json', 'fixtures/provider-catalogs'], 'final provider capability fixture contract');
+  const effectiveCatalogTest = read('src/main/settings/EffectiveCatalogService.test.ts');
+  assertSourceContains(effectiveCatalogTest, ['2 ** layers.length', 'mask=${mask}', 'last present leaf provenance'], 'six-layer deterministic combination tests');
   assert(!providerAccountAuthService.includes('GROK_AUTH_DEVICE_ENDPOINT'), 'Super Grok OAuth device endpoint must come from xAI OIDC metadata.');
   assert(!providerAccountAuthService.includes('GROK_AUTH_TOKEN_ENDPOINT'), 'Super Grok OAuth token endpoint must come from xAI OIDC metadata.');
   assert(!providerAccountAuthService.includes("'Grok OAuth") && !providerAccountAuthService.includes("'Grok OAuth requires"), 'ProviderAccountAuthService must use Super Grok OAuth visible wording.');
