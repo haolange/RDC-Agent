@@ -41,7 +41,7 @@ describe('protocol switch control clamping', () => {
 
   it('preserves model-fixed routes, follows proven aliases, and rejects missing routes with recommendations', () => {
     const fixed = model('canonical', {
-      aliases: ['legacy'],
+      aliases: ['previous-model'],
       route: { protocol: 'AnthropicMessages', baseUrl: 'https://fixed.example/v1', source: 'model' },
     });
     const recommended = model('recommended', {
@@ -52,7 +52,7 @@ describe('protocol switch control clamping', () => {
       stale: false, refreshing: false, models: [fixed, recommended], generatedAt: '2026-07-13T00:00:00.000Z',
     };
     const aliasSettings = {
-      llm: { providers: [], agentRoutes: [{ agentId: 'debugger', providerId: 'dual-provider', modelId: 'legacy' }] },
+      llm: { providers: [], agentRoutes: [{ agentId: 'debugger', providerId: 'dual-provider', modelId: 'previous-model' }] },
     } as unknown as AppSettings;
     expect(resolveProtocolRouteModels(aliasSettings, snapshot, 'dual-provider')).toEqual([fixed]);
     expect(resolveProtocolRouteModels(aliasSettings, snapshot, 'dual-provider')[0].route.protocol).toBe('AnthropicMessages');

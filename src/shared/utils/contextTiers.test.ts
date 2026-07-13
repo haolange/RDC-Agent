@@ -59,7 +59,7 @@ describe('resolveContextTierChoices', () => {
   it('does not expose a lower granted tier when the default tier is already highest', () => {
     const choices = resolveContextTierChoices({ contextTiers: [
       tier('default', 1_000_000, 'granted'),
-      tier('legacy', 200_000, 'granted'),
+      tier('earlier', 200_000, 'granted'),
     ] });
     expect(choices.baseTier?.id).toBe('default');
     expect(choices.maxTier).toBeUndefined();

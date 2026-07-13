@@ -19,8 +19,8 @@ import type {
   LlmProviderEntry,
   LlmProviderId,
   LlmProviderModel,
-  LlmProviderModelDiscoveryStrategy,
 } from '@shared/types/settings';
+import type { ProviderPreset } from '@shared/types/providerCapability';
 import { settingsService } from '../settings/SettingsService';
 import { providerAccountAuthService } from './ProviderAccountAuthService';
 import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
@@ -50,11 +50,25 @@ interface ModelDiscoveryResult {
   discoveryDiagnostic?: LlmProviderConnectionResult['discoveryDiagnostic'];
 }
 
+type ProviderDiscoveryStrategy =
+  | 'openai-compatible'
+  | 'anthropic-candidate-validation'
+  | 'google-ai-studio'
+  | 'azure-openai'
+  | 'ollama-tags'
+  | 'opencode-go-catalog'
+  | 'cline-catalog';
+
 function resolveDiscoveryStrategy(
   protocol: LlmProviderEntry['protocol'],
-  catalogStrategy: LlmProviderModelDiscoveryStrategy | null | undefined,
-): LlmProviderModelDiscoveryStrategy | null {
-  if (catalogStrategy?.endsWith('-catalog')) return catalogStrategy;
+  discovery: ProviderPreset['discovery'],
+): ProviderDiscoveryStrategy | null {
+  if (!discovery) return null;
+  const parserId = discovery.kind === 'custom-parser' ? discovery.parserId : undefined;
+  if (parserId === 'opencode-go-catalog' || parserId === 'cline-catalog') return parserId;
+  if (parserId === 'google-ai-studio' || parserId === 'azure-openai' || parserId === 'ollama-tags') return parserId;
+  if (parserId === 'anthropic' || parserId === 'anthropic-candidate-validation') return 'anthropic-candidate-validation';
+  if (parserId === 'openai-compatible') return 'openai-compatible';
   if (protocol === 'OpenAICompatibleChatCompletions' || protocol === 'OpenAIResponses' || protocol === 'OpenRouterChatCompletions') {
     return 'openai-compatible';
   }
@@ -62,9 +76,9 @@ function resolveDiscoveryStrategy(
     return 'anthropic-candidate-validation';
   }
   if (protocol === 'OllamaOpenAICompatibleChatCompletions') {
-    return catalogStrategy === 'ollama-tags' ? 'ollama-tags' : 'openai-compatible';
+    return 'ollama-tags';
   }
-  return catalogStrategy ?? null;
+  return null;
 }
 
 export function normalizeDiscoveredModels(
@@ -294,7 +308,7 @@ const appendQueryParam = (url: string, key: string, value: string): string => {
   return `${url}${separator}${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
 };
 
-const parseModelsPayload = (strategy: LlmProviderModelDiscoveryStrategy, payload: unknown): LlmProviderModel[] => {
+const parseModelsPayload = (strategy: ProviderDiscoveryStrategy, payload: unknown): LlmProviderModel[] => {
   if (!payload || typeof payload !== 'object') {
     return [];
   }
@@ -627,19 +641,12 @@ export class ProviderConnectionService {
       throw new ProviderConnectionError('请输入 API Key');
     }
 
-    const strategy = resolveDiscoveryStrategy(provider.protocol, provider.modelDiscovery);
+    const strategy = resolveDiscoveryStrategy(provider.protocol, definition.discovery);
     if (!strategy) {
       if (catalogOwnership === 'app-managed') {
         return { models: managedModels };
       }
       throw new ProviderConnectionError('Provider 缺少模型发现配置');
-    }
-    if (strategy === 'static') {
-      return {
-        models: catalogOwnership === 'app-managed'
-          ? managedModels
-          : toStaticModels(provider.recommendedModels),
-      };
     }
     const baseUrl = (
       baseUrlDraft

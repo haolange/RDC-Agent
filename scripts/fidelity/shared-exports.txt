@@ -131,7 +131,6 @@ charsToTokens
 clampReasoningSelection
 CLIResult
 CodePreview
-coerceReasoningSelectionCandidate
 CommandApi
 CommandContext
 CommandDefinition
@@ -206,7 +205,6 @@ createReasoningControl
 CreateRunResponse
 DebugSessionStartRequest
 DEFAULT_ASK_USER_PROMPT
-DEFAULT_CONTEXT_WINDOW_TOKENS
 DEFAULT_MODEL_ROUTING
 DEFAULT_TOKEN_TTL_SECONDS
 DeviceApi
@@ -310,7 +308,6 @@ LlmProviderEntry
 LlmProviderId
 LlmProviderModel
 LlmProviderModelAvailability
-LlmProviderModelDiscoveryStrategy
 LlmProviderProtocol
 LlmProviderProtocolDescriptor
 LlmSettings
@@ -336,9 +333,6 @@ MODE_CAPABILITIES
 ModeCapabilities
 ModeConfig
 ModeIconKey
-ModelCapabilityProfile
-ModelCapabilitySource
-ModelCapabilitySourceKind
 ModelProviderBackendKind
 ModelProviderCapabilityMatrix
 ModelTurnEvent

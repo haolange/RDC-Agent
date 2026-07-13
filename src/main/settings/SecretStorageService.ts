@@ -61,7 +61,7 @@ export class SecretStorageService {
     return `provider-${sanitizeToken(providerId)}-account-${sanitizeToken(accountId)}-${kind}`;
   }
 
-  moveSecret(sourceRef: string, targetRef: string, workspaceRoot?: string): boolean {
+  copySecret(sourceRef: string, targetRef: string, workspaceRoot?: string): boolean {
     if (!sourceRef || !targetRef || sourceRef === targetRef) {
       return false;
     }
@@ -72,9 +72,8 @@ export class SecretStorageService {
     }
     if (!secretMap[targetRef]) {
       secretMap[targetRef] = source;
+      this.writeSecretMap(secretMap, workspaceRoot);
     }
-    delete secretMap[sourceRef];
-    this.writeSecretMap(secretMap, workspaceRoot);
     return true;
   }
 
@@ -142,6 +141,10 @@ export class SecretStorageService {
 
   hasSecret(secretRef?: string, workspaceRoot?: string): boolean {
     return Boolean(secretRef && this.getSecret(secretRef, workspaceRoot));
+  }
+
+  hasSecretRecord(secretRef?: string, workspaceRoot?: string): boolean {
+    return Boolean(secretRef && this.readSecretMap(workspaceRoot)[secretRef]);
   }
 }
 

@@ -17,7 +17,6 @@ import type {
   AssistantMessage,
   ImageContent,
   Message,
-  Model,
   ProviderReasoningArtifact,
   TextContent,
   ToolCall,
@@ -25,10 +24,6 @@ import type {
   UserMessage,
 } from '../core/types';
 import { charsToTokens } from '@shared/utils/tokens';
-import {
-  CONTEXT_COMPACTION_RATIO,
-  DEFAULT_CONTEXT_WINDOW_TOKENS,
-} from '@shared/types/modelCapability';
 import { TokenizerService } from '../core/TokenizerService';
 
 /** 上下文压缩配置。 */
@@ -39,8 +34,8 @@ export interface ContextManagerConfig {
   maxMessages?: number;
   /** 保留最近的工具结果数量。默认 3。 */
   keepRecentToolResults?: number;
-  /** 上下文最大 token 估计值；未设置时由 model.contextWindow * CONTEXT_COMPACTION_RATIO 决定。 */
-  contextTokenLimit?: number;
+  /** RequestPlan context budget after applying the canonical 80% compaction threshold. */
+  contextTokenLimit: number;
   /** 真实 tokenizer 服务（用于精确计数）。 */
   tokenizer?: TokenizerService;
   /** 当前模型 ID（用于选择正确的编码器）。 */
@@ -50,7 +45,6 @@ export interface ContextManagerConfig {
 const DEFAULT_TOOL_RESULT_BUDGET = 200 * 1024;
 const DEFAULT_MAX_MESSAGES = 50;
 const DEFAULT_KEEP_RECENT_TOOL_RESULTS = 3;
-const DEFAULT_CONTEXT_LIMIT = Math.floor(DEFAULT_CONTEXT_WINDOW_TOKENS * CONTEXT_COMPACTION_RATIO);
 const SNIP_HEAD = 3;
 const TOOL_RESULT_TRUNCATE_HEAD = 2000;
 
@@ -72,7 +66,11 @@ export interface CompressResult {
 
 /** 上下文管理器。 */
 export class ContextManager {
-  constructor(private config: ContextManagerConfig = {}) {}
+  constructor(private config: ContextManagerConfig) {
+    if (!Number.isFinite(config.contextTokenLimit) || config.contextTokenLimit <= 0) {
+      throw new Error('ContextManager requires a positive RequestPlan context budget.');
+    }
+  }
 
   /**
    * 默认的 convertToLlm 实现：保留三种标准消息。
@@ -98,9 +96,8 @@ export class ContextManager {
    */
   async compress(
     messages: AgentMessage[],
-    model?: Model,
   ): Promise<CompressResult> {
-    const tokenLimit = this.resolveTokenLimit(model);
+    const tokenLimit = this.config.contextTokenLimit;
     const beforeCount = messages.length;
     const beforeTokens = this.estimateTokens(messages);
     const stages: string[] = [];
@@ -361,16 +358,6 @@ export class ContextManager {
   // =====================================================================
   // 辅助
   // =====================================================================
-
-  private resolveTokenLimit(model?: Model): number {
-    if (this.config.contextTokenLimit !== undefined) {
-      return this.config.contextTokenLimit;
-    }
-    if (model && model.contextWindow > 0) {
-      return Math.floor(model.contextWindow * CONTEXT_COMPACTION_RATIO);
-    }
-    return DEFAULT_CONTEXT_LIMIT;
-  }
 
   private estimateMessageChars(msg: AgentMessage): number {
     if (msg.role === 'user') {

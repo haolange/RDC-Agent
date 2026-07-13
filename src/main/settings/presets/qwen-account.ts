@@ -12,7 +12,7 @@ const preset: ProviderPreset = {
   authModes: ['oauth'],
   authModeAvailability: { oauth: { state: 'unavailable', reason: 'No public contract.' } },
   accountLoginConfigured: false,
-  capabilities: ['chat', 'tool-calling', 'model-discovery'],
+  capabilities: ['chat', 'tool-calling'],
   routes: [{ protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://portal.qwen.ai/v1', default: true }],
   userSelectableRoute: false,
   discovery: null,

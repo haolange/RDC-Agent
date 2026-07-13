@@ -14,7 +14,7 @@ export interface LLMToolCallDelta {
   argumentsText?: string;
 }
 
-/** Legacy-free stream event contract shared with renderer projections. */
+/** Canonical stream event contract shared with renderer projections. */
 export type LLMStreamEvent =
   | { type: 'text-delta'; text: string }
   | { type: 'tool-call-delta'; toolCall: LLMToolCallDelta }

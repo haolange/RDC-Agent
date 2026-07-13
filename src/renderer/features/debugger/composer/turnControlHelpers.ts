@@ -21,7 +21,6 @@ export function buildSessionTurnControlsKey(sessionControls: SessionTurnControls
   }
   return JSON.stringify({
     reasoningLevel: sessionControls.reasoningLevel ?? null,
-    effort: sessionControls.effort ?? null,
     maxContextMode: sessionControls.maxContextMode === true,
     fastModel: sessionControls.fastModel === true,
   });

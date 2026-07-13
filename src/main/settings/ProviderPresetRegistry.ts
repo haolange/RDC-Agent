@@ -6,7 +6,6 @@ import type {
   LlmProviderCatalogOwnership,
   LlmProviderEntry,
   LlmProviderModel,
-  LlmProviderModelDiscoveryStrategy,
   LlmProviderProtocol,
 } from '@shared/types/settings';
 import { PROVIDER_PRESETS } from './presets';
@@ -101,18 +100,6 @@ export function getProviderPresetAuthModeAvailability(
 
 function toAuthModeOptions(preset: ProviderPreset): LlmProviderAuthMode[] {
   return [...new Set(preset.authModes.map(mapPresetAuthMode))];
-}
-
-function toLegacyDiscovery(preset: ProviderPreset): LlmProviderModelDiscoveryStrategy | null {
-  if (!preset.discovery) return null;
-  if (preset.discovery.kind === 'custom-parser') {
-    return preset.discovery.parserId as LlmProviderModelDiscoveryStrategy;
-  }
-  const protocol = defaultRoute(preset)?.protocol;
-  if (protocol === 'GoogleGemini') return 'google-ai-studio';
-  if (protocol === 'AnthropicMessages') return 'anthropic-candidate-validation';
-  if (protocol === 'OllamaOpenAICompatibleChatCompletions') return 'ollama-tags';
-  return 'openai-compatible';
 }
 
 function toProviderModel(seed: SeedModelDefinition): LlmProviderModel {
@@ -222,7 +209,6 @@ export function createProviderEntryFromPreset(id: BuiltinLlmProviderId): LlmProv
     providerAvailability: { ...preset.availability },
     category: preset.category,
     catalogOwnership: preset.catalogOwnership,
-    modelDiscovery: toLegacyDiscovery(preset),
     label: preset.label,
     enabled: false,
     apiKey: '',

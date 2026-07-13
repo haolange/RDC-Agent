@@ -69,7 +69,6 @@ const CATALOG_RUNTIME_FIELDS = [
   'status',
   'isConfigured',
   'models',
-  'modelDiscovery',
   'baseUrl',
 ];
 
@@ -196,6 +195,25 @@ async function main() {
   }
 
   const legacyBuiltinDefinitionToken = `BUILTIN_LLM_PROVIDER_${'DEFINITIONS'}`;
+  const removedResolvedCapabilityToken = `ResolvedModel${'Capability'}`;
+  const removedResolverToken = `ModelCapability${'Resolver'}`;
+  const removedFastVariantToken = `fastVariant${'ModelId'}`;
+  const removedDefaultWindowToken = `DEFAULT_CONTEXT_${'WINDOW_TOKENS'}`;
+  const removedDiscoveryProjectionToken = `model${'Discovery'}`;
+  for (const sourcePath of listSourceFiles('src')) {
+    assertSourceDoesNotContain(
+      fs.readFileSync(sourcePath, 'utf8'),
+      [
+        legacyBuiltinDefinitionToken,
+        removedResolvedCapabilityToken,
+        removedResolverToken,
+        removedFastVariantToken,
+        removedDefaultWindowToken,
+        removedDiscoveryProjectionToken,
+      ],
+      path.relative(process.cwd(), sourcePath),
+    );
+  }
   const sharedLlmSource = read('src/shared/constants/llm.ts');
   assertSourceDoesNotContain(
     sharedLlmSource,
@@ -335,8 +353,8 @@ async function main() {
     if (PLAN_PROVIDER_ID_PATTERN.test(definition.id)) {
       assert(definition.category === 'coding-token-plan', `${definition.id} plan provider must use coding-token-plan category.`);
     }
-    if (definition.modelDiscovery === 'static') {
-      assert(!definition.capabilities.includes('model-discovery'), `${definition.id} static discovery must not claim model-discovery.`);
+    if (definition.capabilities.includes('model-discovery')) {
+      assert(presetById.get(definition.id)?.discovery, `${definition.id} must declare its discovery contract in the preset.`);
     }
     if (definition.protocolEditable) {
       assert(Array.isArray(definition.protocolOptions) && definition.protocolOptions.length > 1, `${definition.id} protocolEditable providers must declare protocolOptions.`);
@@ -503,6 +521,39 @@ async function main() {
   );
   assertSourceContains(read('src/main/settings/ProviderQuota.ts'), ['recordTransientQuota', 'response.status !== 429'], 'transient quota policy');
   assert(!read('src/main/agent-runtime/core/types.ts').includes('ProviderCapabilities'), 'Runtime must not retain a second boolean capability matrix.');
+  const runtimeCoreTypes = read('src/main/agent-runtime/core/types.ts');
+  assert(
+    /requestPlan:\s*RequestPlan;/u.test(runtimeCoreTypes)
+      && !/requestPlan\?:\s*RequestPlan/u.test(runtimeCoreTypes),
+    'Every provider stream must require a closed RequestPlan.',
+  );
+  assertSourceContains(
+    read('src/main/agent-runtime/agent/AgentLoop.ts'),
+    ['provider.stream(config.model, llmContext, streamOptions)'],
+    'AgentLoop RequestPlan forwarding',
+  );
+  for (const adapter of [
+    'AnthropicProvider.ts',
+    'GeminiProvider.ts',
+    'OllamaProvider.ts',
+    'OpenAICompatibleProvider.ts',
+    'OpenAIResponsesProvider.ts',
+  ]) {
+    const source = read(`src/main/agent-runtime/providers/${adapter}`);
+    assertSourceContains(
+      source,
+      ['options.requestPlan', 'applyRequestPlanBody', 'requestPlanHeaders'],
+      `${adapter} RequestPlan wire path`,
+    );
+  }
+  const contextManager = read('src/main/agent-runtime/agent/ContextManager.ts');
+  assertSourceDoesNotContain(contextManager, ['256_000', '256000', 'model.contextWindow'], 'ContextManager');
+  assertSourceContains(contextManager, ['RequestPlan context budget'], 'ContextManager fail-closed budget policy');
+  assertSourceDoesNotContain(
+    read('src/shared/types/modelCapability.ts'),
+    ["value === 'auto'", "value === 'extHigh'"],
+    'canonical reasoning selection contract',
+  );
   const configuredRuntimeProvider = read('src/main/agent-runtime/providers/ConfiguredRuntimeProvider.ts');
   assertSourceContains(
     configuredRuntimeProvider,
@@ -601,6 +652,12 @@ async function main() {
   );
   assertSourceContains(settingsTypes, ['authAccountIds?:', 'hasStoredSecretByAuthMode?:', 'authModeAvailability?:'], 'multi-auth provider settings contract');
   assertSourceContains(read('src/main/settings/SettingsService.ts'), ['authAccountIds', 'hasStoredSecretByAuthMode', 'disconnectProvider('], 'multi-auth credential isolation');
+  assertSourceContains(
+    read('src/main/settings/SettingsService.ts'),
+    ['SETTINGS_SCHEMA_VERSION = 2', 'copySecret(', 'deleteSecretsAfterCommit', 'schemaVersion: SETTINGS_SCHEMA_VERSION'],
+    'versioned account-keyed credential migration',
+  );
+  assertSourceDoesNotContain(read('src/main/settings/SecretStorageService.ts'), ['moveSecret('], 'credential transaction API');
   assertSourceContains(read('src/renderer/features/settings/SettingsModal/sections/ProviderConnectDialog.tsx'), ['ProviderAuthModeField'], 'provider auth-mode Settings UI');
 
   console.log('[provider-system] OK');

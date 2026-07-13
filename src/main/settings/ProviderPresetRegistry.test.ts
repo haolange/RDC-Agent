@@ -8,7 +8,7 @@ import {
 } from './ProviderPresetRegistry';
 
 describe('ProviderPresetRegistry', () => {
-  it('loads exactly one serializable schema-v1 preset for every legacy builtin', () => {
+  it('loads exactly one serializable schema-v1 preset for every migrated builtin', () => {
     const presets = listProviderPresets();
     expect(presets).toHaveLength(61);
     expect(new Set(presets.map((preset) => preset.id)).size).toBe(61);
