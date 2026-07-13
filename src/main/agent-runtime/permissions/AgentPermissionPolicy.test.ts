@@ -1,3 +1,5 @@
+import * as os from 'os';
+import * as path from 'path';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { AgentPermissionMode } from '@shared/types/settings';
 import type { AgentTool } from '../agent/AgentTool';
@@ -18,6 +20,11 @@ const { mockSettings } = vi.hoisted(() => ({
     },
   },
 }));
+
+const fixtureRoot = path.join(os.tmpdir(), 'rdc-agent-permission-tests');
+const workspaceRoot = path.join(fixtureRoot, 'workspace');
+const externalRoot = path.join(fixtureRoot, 'external');
+const readableRoot = path.join(fixtureRoot, 'shared');
 
 vi.mock('../../settings/SettingsService', () => ({
   settingsService: {
@@ -74,8 +81,8 @@ describe('AgentPermissionPolicyService external reads', () => {
   it('allows full-access reads outside the project root without asking', () => {
     const decision = service.evaluate({
       tool: readFileTool,
-      toolCall: makeReadFileToolCall('D:\\OtherProject\\src\\main.ts'),
-      projectRootPath: 'D:\\Projects\\Demo',
+      toolCall: makeReadFileToolCall(path.join(externalRoot, 'src', 'main.ts')),
+      projectRootPath: workspaceRoot,
     });
 
     expect(decision.action).toBe('allow');
@@ -87,8 +94,8 @@ describe('AgentPermissionPolicyService external reads', () => {
 
     const decision = service.evaluate({
       tool: readFileTool,
-      toolCall: makeReadFileToolCall('D:\\OtherProject\\src\\main.ts'),
-      projectRootPath: 'D:\\Projects\\Demo',
+      toolCall: makeReadFileToolCall(path.join(externalRoot, 'src', 'main.ts')),
+      projectRootPath: workspaceRoot,
     });
 
     expect(decision.action).toBe('ask_user');
@@ -100,8 +107,8 @@ describe('AgentPermissionPolicyService external reads', () => {
 
     const decision = service.evaluate({
       tool: readFileTool,
-      toolCall: makeReadFileToolCall('D:\\OtherProject\\src\\main.ts'),
-      projectRootPath: 'D:\\Projects\\Demo',
+      toolCall: makeReadFileToolCall(path.join(externalRoot, 'src', 'main.ts')),
+      projectRootPath: workspaceRoot,
     });
 
     expect(decision.action).toBe('auto_review');
@@ -110,16 +117,16 @@ describe('AgentPermissionPolicyService external reads', () => {
 
   it('allows custom-mode reads inside configured readableRoots', () => {
     mockSettings.agentRuntime.permissions.mode = 'custom';
-    mockSettings.agentRuntime.permissions.readableRoots = ['D:\\Shared'];
+    mockSettings.agentRuntime.permissions.readableRoots = [readableRoot];
 
     const decision = service.evaluate({
       tool: readFileTool,
-      toolCall: makeReadFileToolCall('D:\\Shared\\notes.txt'),
-      projectRootPath: 'D:\\Projects\\Demo',
+      toolCall: makeReadFileToolCall(path.join(readableRoot, 'notes.txt')),
+      projectRootPath: workspaceRoot,
     });
 
     expect(decision.action).toBe('allow');
-    expect(decision.temporaryPathRoots.some((root) => root.includes('Shared'))).toBe(true);
+    expect(decision.temporaryPathRoots).toContain(path.join(readableRoot, 'notes.txt'));
   });
 });
 
