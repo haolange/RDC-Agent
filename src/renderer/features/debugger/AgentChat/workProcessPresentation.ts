@@ -970,8 +970,10 @@ const extractSkillDescription = (contentText: string): string => {
 const sanitizeContentText = (value: string): string => {
   if (!value) return '';
   return value
+    // eslint-disable-next-line no-control-regex -- Tool output sanitization intentionally removes NUL bytes.
     .replace(/\u0000/g, '')
     .replace(/\uFFFD/g, '')
+    // eslint-disable-next-line no-control-regex -- Tool output sanitization intentionally removes unsafe C0 controls.
     .replace(/[\u0001-\u0008\u000B\u000C\u000E-\u001F]/g, '');
 };
 
