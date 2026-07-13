@@ -11,7 +11,7 @@ jobs:
           version: 11.7.0
       - uses: actions/setup-node@v4
         with:
-          node-version: '22.12.0'
+          node-version: '22.13.0'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
@@ -32,7 +32,7 @@ jobs:
           version: 11.7.0
       - uses: actions/setup-node@v4
         with:
-          node-version: '22.12.0'
+          node-version: '22.13.0'
           cache: pnpm
       - name: Prepare through Windows wrapper
         if: runner.os == 'Windows'

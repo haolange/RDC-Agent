@@ -47,7 +47,7 @@
 
 ## 开发与验证
 
-需要 Node.js `>=22.12.0`（与 Electron 42 的 runtime contract 一致）。仓库统一使用 pnpm `11.7.0`；源码启动器会按 `pnpm-lock.yaml` 自动同步依赖。
+需要 Node.js `>=22.13.0`（同时满足 Electron 42 与 pnpm 11.7 runtime contract）。仓库统一使用 pnpm `11.7.0`；源码启动器会按 `pnpm-lock.yaml` 自动同步依赖。
 
 ```bash
 pnpm run dev

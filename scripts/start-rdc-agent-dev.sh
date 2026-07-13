@@ -10,5 +10,5 @@ do
   [ -n "$NODE_EXE" ] && break
   [ -x "$candidate" ] && NODE_EXE=$candidate
 done
-[ -n "$NODE_EXE" ] || { echo '[RDC-Agent] Node.js >=22.12.0 is missing.' >&2; exit 1; }
+[ -n "$NODE_EXE" ] || { echo '[RDC-Agent] Node.js >=22.13.0 is missing.' >&2; exit 1; }
 exec "$NODE_EXE" "$ROOT/scripts/launch-rdc-agent.mjs" --mode desktop-dev "$@"
