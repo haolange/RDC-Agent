@@ -27,7 +27,7 @@ export const useProviderConnectionActions = (
     if (!connectionDraft) return;
     updateConnectionDraft({ busy: 'testing', error: '', discoveryDiagnostic: null });
     try {
-      if (connectionProvider?.authMode === 'account') {
+      if (connectionDraft.authMode === 'account') {
         const result = await window.electronAPI.llm.refreshProviderModels(connectionDraft.providerId);
         if (!result.success) {
           updateConnectionDraft({ busy: 'idle', error: result.error ?? t('settings.providerTestFailed') });
@@ -40,6 +40,7 @@ export const useProviderConnectionActions = (
           testedApiKey: connectionDraft.apiKey,
           testedBaseUrl: connectionDraft.baseUrl,
           testedProtocol: connectionDraft.protocol,
+          testedAuthMode: connectionDraft.authMode,
           models: result.models,
         });
         await refreshLocalSettings(connectionDraft.providerId);
@@ -47,6 +48,7 @@ export const useProviderConnectionActions = (
       }
       const request = {
         providerId: connectionDraft.providerId,
+        authMode: connectionDraft.authMode,
         apiKey: connectionDraft.usingStoredSecret ? '' : connectionDraft.apiKey,
         baseUrl: connectionDraft.baseUrl,
         protocol: connectionDraft.protocol,
@@ -63,6 +65,7 @@ export const useProviderConnectionActions = (
         testedApiKey: connectionDraft.apiKey,
         testedBaseUrl: connectionDraft.baseUrl,
         testedProtocol: connectionDraft.protocol,
+        testedAuthMode: connectionDraft.authMode,
         models: result.models,
       });
     } catch (error) {
@@ -77,8 +80,8 @@ export const useProviderConnectionActions = (
     if (!connectionDraft) return;
     updateConnectionDraft({ busy: 'saving', error: '', discoveryDiagnostic: null });
     try {
-      if (connectionProvider?.authMode === 'account') {
-        if (connectionProvider.isConfigured && !connectionDraft.accountStatus?.requiresCodeInput) {
+      if (connectionDraft.authMode === 'account') {
+        if (connectionProvider?.isConfigured && !connectionDraft.accountStatus?.requiresCodeInput) {
           setConnectionDraft(null);
           return;
         }
@@ -89,7 +92,9 @@ export const useProviderConnectionActions = (
           })
           : await window.electronAPI.llm.startProviderAccountLogin({
             providerId: connectionDraft.providerId,
+            authMode: connectionDraft.authMode,
             accountLoginMode: connectionDraft.accountLoginMode,
+            accountRegion: connectionDraft.accountRegion,
           });
         if (!status.connected && status.state !== 'pending') {
           updateConnectionDraft({ busy: 'idle', error: '', accountStatus: status });
@@ -105,6 +110,7 @@ export const useProviderConnectionActions = (
       }
       const request = {
         providerId: connectionDraft.providerId,
+        authMode: connectionDraft.authMode,
         apiKey: connectionDraft.usingStoredSecret ? '' : connectionDraft.apiKey,
         baseUrl: connectionDraft.baseUrl,
         protocol: connectionDraft.protocol,
@@ -130,7 +136,9 @@ export const useProviderConnectionActions = (
     try {
       const status = await window.electronAPI.llm.startProviderAccountLogin({
         providerId: connectionDraft.providerId,
+        authMode: connectionDraft.authMode,
         accountLoginMode,
+        accountRegion: connectionDraft.accountRegion,
       });
       updateConnectionDraft({
         busy: 'idle',

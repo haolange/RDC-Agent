@@ -1,1 +1,1 @@
-{"data":[{"id":"deepseek-ai/DeepSeek-V3.1","name":"DeepSeek V3.1","input_modalities":["text"],"context_length":163840},{"id":"BAAI/bge-reranker","input_modalities":["text"]}]}
+{"data":[{"id":"Qwen/Qwen3-32B-TEE","context_length":40960,"max_output_length":40960,"input_modalities":["text"],"output_modalities":["text"],"supported_features":["json_mode","tools","structured_outputs","reasoning"],"confidential_compute":true},{"id":"BAAI/bge-reranker","input_modalities":["text"],"output_modalities":["rerank"]}]}

@@ -10,7 +10,9 @@ import {
 } from '../utils';
 import { ProviderAccountOAuthPanel } from './ProviderAccountOAuthPanel';
 import { ProviderApiKeyFields } from './ProviderApiKeyFields';
+import { ProviderAuthModeField } from './ProviderAuthModeField';
 import { ProviderConnectModelRow } from './ProviderConnectModelRow';
+import { ProviderConnectActions } from './ProviderConnectActions';
 import { ProviderProtocolField } from './ProviderProtocolField';
 type Translate = ReturnType<typeof useI18n>['t'];
 interface ProviderConnectDialogProps {
@@ -47,18 +49,6 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   onStartAccountLogin,
   t,
 }) => {
-  const accountRequiresCode = Boolean(connectionProvider.authMode === 'account'
-    && connectionDraft.accountStatus?.requiresCodeInput);
-  const accountSaveBlocked = Boolean(connectionProvider.authMode === 'account'
-    && !connectionAccountConnected
-    && (!accountRequiresCode || !connectionDraft.authCode.trim()));
-  const accountTestBlocked = Boolean(connectionProvider.authMode === 'account'
-    && !connectionAccountConnected);
-  const commonActionBlocked = connectionDraft.busy !== 'idle'
-    || connectionNeedsApiKey
-    || connectionNeedsBaseUrl
-    || connectionDevicePending;
-  const noSupportedModels = connectionProvider.catalogOwnership === 'app-managed' && connectionHasFreshTest && connectionDraft.models.length === 0;
   const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
   const catalogModelCount = Math.max(
     connectionDraft.models.length,
@@ -113,6 +103,27 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         </button>
       </div>
 
+      <ProviderAuthModeField
+        provider={connectionProvider}
+        value={connectionDraft.authMode}
+        disabled={connectionDraft.busy !== 'idle' || connectionDevicePending}
+        onChange={(authMode) => onUpdateConnectionDraft({
+          authMode,
+          usingStoredSecret: authMode === 'api-key'
+            && connectionProvider.hasStoredSecretByAuthMode?.['api-key'] === true,
+          accountStatus: undefined,
+          authCode: '',
+          error: '',
+          discoveryDiagnostic: null,
+          testedApiKey: '',
+          testedBaseUrl: '',
+          testedProtocol: connectionDraft.protocol,
+          testedAuthMode: authMode,
+          models: [],
+        })}
+        t={t}
+      />
+
       {showProtocolField && (
         <ProviderProtocolField
           value={connectionDraft.protocol}
@@ -134,6 +145,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             testedApiKey: '',
             testedBaseUrl: '',
             testedProtocol: protocol,
+            testedAuthMode: connectionDraft.authMode,
             models: [],
           })}
           t={t}
@@ -262,36 +274,19 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         </div>
       </div>
 
-      <div className="settings-actions settings-provider-connect-actions">
-        <button type="button" className="button button-secondary" onClick={onClose}>
-          {t('settings.cancel')}
-        </button>
-        <button type="button"
-          className="button button-secondary"
-          data-testid="settings-provider-connect-test"
-          onClick={() => void onTest()}
-          disabled={commonActionBlocked || accountTestBlocked}
-        >
-          {connectionDraft.busy === 'testing' ? t('settings.testing') : t('settings.test')}
-        </button>
-        <button
-          type="button"
-          className="button button-primary"
-          data-testid="settings-provider-connect-save"
-          onClick={() => void onSave()}
-          disabled={commonActionBlocked || accountSaveBlocked || noSupportedModels}
-        >
-          {connectionDraft.busy === 'saving'
-            ? t('settings.saving')
-            : connectionProvider.authMode === 'account'
-              ? connectionProvider.isConfigured
-                ? t('settings.save')
-                : t('settings.connect')
-              : connectionHasFreshTest
-                ? t('settings.save')
-                : t('settings.connect')}
-        </button>
-      </div>
+      <ProviderConnectActions
+        draft={connectionDraft}
+        provider={connectionProvider}
+        accountConnected={connectionAccountConnected}
+        devicePending={connectionDevicePending}
+        needsApiKey={connectionNeedsApiKey}
+        needsBaseUrl={connectionNeedsBaseUrl}
+        hasFreshTest={connectionHasFreshTest}
+        onClose={onClose}
+        onTest={onTest}
+        onSave={onSave}
+        t={t}
+      />
     </div>
   </div>
   );

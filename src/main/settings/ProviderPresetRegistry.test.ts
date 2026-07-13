@@ -38,4 +38,25 @@ describe('ProviderPresetRegistry', () => {
     expect(getProviderPreset('gemini-account')).toMatchObject({ status: 'beta', availability: { state: 'unavailable' } });
     expect(createProviderEntryFromPreset('azure-openai')).toMatchObject({ status: 'unavailable', isConfigured: false });
   });
+
+  it('projects multi-auth availability without collapsing account and API credentials', () => {
+    expect(createProviderEntryFromPreset('openrouter')).toMatchObject({
+      authMode: 'api-key',
+      authModeOptions: ['api-key', 'account'],
+      authModeAvailability: {
+        'api-key': { state: 'unknown' },
+        account: { state: 'unknown' },
+      },
+      lifecycleStatus: 'stable',
+    });
+    expect(createProviderEntryFromPreset('cline').authModeAvailability?.account).toMatchObject({
+      state: 'unavailable',
+    });
+    expect(getProviderPreset('opencode-go')).toMatchObject({
+      status: 'beta', availability: { state: 'unknown' },
+    });
+    expect(getProviderPreset('grok-account')).toMatchObject({
+      status: 'beta', availability: { state: 'unknown' },
+    });
+  });
 });

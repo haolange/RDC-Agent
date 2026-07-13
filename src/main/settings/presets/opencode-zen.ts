@@ -12,9 +12,9 @@ const preset: ProviderPreset = {
   authModes: ['api-key'],
   capabilities: ['chat', 'tool-calling', 'reasoning', 'model-discovery'],
   routes: [
-    { protocol: 'OpenAIResponses', baseUrl: 'https://opencode.ai/zen/v1', default: true },
+    { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://opencode.ai/zen/v1', default: true },
+    { protocol: 'OpenAIResponses', baseUrl: 'https://opencode.ai/zen/v1' },
     { protocol: 'AnthropicMessages', baseUrl: 'https://opencode.ai/zen/v1' },
-    { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://opencode.ai/zen/v1' },
   ],
   userSelectableRoute: false,
   discovery: {
@@ -22,7 +22,19 @@ const preset: ProviderPreset = {
     url: 'https://opencode.ai/zen/v1/models',
     collectionPath: 'data',
     mapping: { id: 'id', label: 'name', contextWindow: 'limit.context', modality: 'modalities.input' },
-    admission: { allowedModalities: ['text', 'image'] },
+    admission: { allowedModalities: ['text', 'image'], denyPatterns: ['gemini-*'] },
+    routeRules: [
+      {
+        allowPatterns: ['gpt-*'], protocol: 'OpenAIResponses', baseUrl: 'https://opencode.ai/zen/v1',
+      },
+      {
+        allowPatterns: ['claude-*', 'qwen3.*'], protocol: 'AnthropicMessages', baseUrl: 'https://opencode.ai/zen/v1',
+      },
+      {
+        allowPatterns: ['*'], protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://opencode.ai/zen/v1',
+      },
+    ],
+    modelSet: 'authoritative',
   },
   seedModels: [
     {
@@ -53,12 +65,12 @@ const preset: ProviderPreset = {
     },
     {
       modelId: 'qwen3.6-plus', label: 'Qwen3.6 Plus', aliases: [],
-      route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://opencode.ai/zen/v1', source: 'model' },
+      route: { protocol: 'AnthropicMessages', baseUrl: 'https://opencode.ai/zen/v1', source: 'model' },
       availability: 'available',
       contextTiers: [{ id: 'default', label: 'Default', activation: { kind: 'implicit' }, entitlement: 'unknown' }],
       defaultBudgetTokens: 256_000,
       fast: { kind: 'unsupported' },
-      reasoning: { kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on', wireProfile: { kind: 'openai-compatible', on: 'medium', onMode: 'enable-thinking-true', offMode: 'enable-thinking-false' } },
+      reasoning: { kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on', wireProfile: { kind: 'anthropic', on: 'high', onMode: 'adaptive', offMode: 'disabled' } },
       toolCalling: { state: 'supported' }, visionInput: { state: 'unknown' }, structuredOutput: { state: 'unknown' },
     },
   ],

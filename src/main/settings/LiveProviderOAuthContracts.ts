@@ -69,6 +69,16 @@ export interface MiniMaxOAuthTokens {
   expiresAt?: string;
 }
 
+/** MiniMax returns `expired_in` as either a unix-ms timestamp or a TTL in seconds. */
+export function resolveMiniMaxExpiry(value: unknown, nowMs = Date.now()): string {
+  const raw = typeof value === 'string' ? Number(value) : value;
+  if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) {
+    return new Date(nowMs + 15 * 60 * 1000).toISOString();
+  }
+  const expiresAtMs = raw > nowMs / 2 ? raw : nowMs + Math.max(1, raw) * 1000;
+  return new Date(expiresAtMs).toISOString();
+}
+
 export async function refreshMiniMaxOAuth(
   current: MiniMaxOAuthTokens,
   exchange: (request: ReturnType<typeof buildMiniMaxRefresh>) => Promise<unknown>,
@@ -84,18 +94,24 @@ export async function refreshMiniMaxOAuth(
     refresh: async () => {
       const payload = await exchange(buildMiniMaxRefresh(current.region, current.refreshToken));
       if (!payload || typeof payload !== 'object') throw new Error('MiniMax OAuth refresh returned an invalid payload.');
-      const record = payload as { access_token?: unknown; refresh_token?: unknown; expires_in?: unknown; error?: unknown };
+      const record = payload as {
+        access_token?: unknown;
+        refresh_token?: unknown;
+        expired_in?: unknown;
+        expires_in?: unknown;
+        status?: unknown;
+        error?: unknown;
+      };
       if (typeof record.access_token !== 'string' || !record.access_token) {
         const error = new Error('MiniMax OAuth refresh did not return an access token.') as Error & { code?: string };
         if (typeof record.error === 'string') error.code = record.error;
         throw error;
       }
-      const ttl = typeof record.expires_in === 'number' && record.expires_in > 0 ? record.expires_in : 900;
       return {
         ...current,
         accessToken: record.access_token,
         refreshToken: typeof record.refresh_token === 'string' && record.refresh_token ? record.refresh_token : current.refreshToken,
-        expiresAt: new Date(Date.now() + ttl * 1000).toISOString(),
+        expiresAt: resolveMiniMaxExpiry(record.expired_in ?? record.expires_in),
       };
     },
     commit,

@@ -11,6 +11,7 @@ import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from './Dis
 export interface ParsedLiveCatalog {
   models: LlmProviderModel[];
   contributions: CatalogModelContribution[];
+  entitlementContributions?: CatalogModelContribution[];
 }
 
 function records(payload: unknown): Record<string, unknown>[] {
@@ -67,7 +68,7 @@ function contextTokens(value: Record<string, unknown>): number | undefined {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
-function asResult(contributions: CatalogModelContribution[]): ParsedLiveCatalog {
+function mergeContributions(contributions: CatalogModelContribution[]): CatalogModelContribution[] {
   const byId = new Map<string, CatalogModelContribution>();
   for (const contribution of contributions) {
     const previous = byId.get(contribution.modelId);
@@ -79,9 +80,18 @@ function asResult(contributions: CatalogModelContribution[]): ParsedLiveCatalog 
         }
       : contribution);
   }
-  const sorted = [...byId.values()].sort((left, right) => left.modelId.localeCompare(right.modelId));
+  return [...byId.values()].sort((left, right) => left.modelId.localeCompare(right.modelId));
+}
+
+function asResult(
+  contributions: CatalogModelContribution[],
+  entitlementContributions: CatalogModelContribution[] = [],
+): ParsedLiveCatalog {
+  const sorted = mergeContributions(contributions);
+  const entitlements = mergeContributions(entitlementContributions);
   return {
     contributions: sorted,
+    ...(entitlements.length > 0 ? { entitlementContributions: entitlements } : {}),
     models: sorted.map((model) => ({
       id: model.modelId,
       label: model.label ?? model.modelId,
@@ -92,20 +102,10 @@ function asResult(contributions: CatalogModelContribution[]): ParsedLiveCatalog 
 }
 
 export function mergeParsedLiveCatalogs(...catalogs: ParsedLiveCatalog[]): ParsedLiveCatalog {
-  const byId = new Map<string, CatalogModelContribution>();
-  for (const catalog of catalogs) {
-    for (const contribution of catalog.contributions) {
-      const previous = byId.get(contribution.modelId);
-      byId.set(contribution.modelId, previous
-        ? {
-            ...previous,
-            ...contribution,
-            aliases: [...new Set([...(previous.aliases ?? []), ...(contribution.aliases ?? [])])],
-          }
-        : contribution);
-    }
-  }
-  return asResult([...byId.values()]);
+  return asResult(
+    catalogs.flatMap((catalog) => catalog.contributions),
+    catalogs.flatMap((catalog) => catalog.entitlementContributions ?? []),
+  );
 }
 
 const REASONING_LEVEL_MAP: Record<string, NamedReasoningLevel | undefined> = {
@@ -278,10 +278,12 @@ function hasClinePass(value: Record<string, unknown>): boolean {
 
 /** ClinePass is entitlement evidence only when the catalog says so explicitly. */
 export function parseClineCatalog(payload: unknown): ParsedLiveCatalog {
-  const contributions = records(payload).flatMap((value): CatalogModelContribution[] => {
+  const contributions: CatalogModelContribution[] = [];
+  const entitlementContributions: CatalogModelContribution[] = [];
+  for (const value of records(payload)) {
     const identity = liveIdentity(value);
-    if (!identity) return [];
-    return [{
+    if (!identity) continue;
+    contributions.push({
       modelId: identity.id,
       ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
       label: text(value.label) ?? text(value.name) ?? identity.id,
@@ -289,14 +291,65 @@ export function parseClineCatalog(payload: unknown): ParsedLiveCatalog {
       route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://api.cline.bot/api/v1', source: 'preset' },
       contextTiers: [{
         id: 'default',
-        label: hasClinePass(value) ? 'ClinePass' : 'Default',
+        label: 'Default',
         maxPromptTokens: contextTokens(value),
         activation: { kind: 'implicit' },
-        entitlement: hasClinePass(value) ? 'granted' : 'unknown',
+        entitlement: 'unknown',
       }],
+    });
+    if (hasClinePass(value)) {
+      entitlementContributions.push({
+        modelId: identity.id,
+        contextTiers: [{ id: 'default', label: 'ClinePass', entitlement: 'granted' }],
+      });
+    }
+  }
+  return asResult(contributions, entitlementContributions);
+}
+
+/** Parse the models visible to the API key minted by OpenRouter PKCE. */
+export function parseOpenRouterAccountCatalog(payload: unknown): ParsedLiveCatalog {
+  return asResult(records(payload).flatMap((value): CatalogModelContribution[] => {
+    const identity = liveIdentity(value);
+    if (!identity) return [];
+    const supportedParameters = Array.isArray(value.supported_parameters)
+      ? value.supported_parameters.map((entry) => text(entry)?.toLowerCase()).filter(Boolean)
+      : [];
+    const inputModalities = Array.isArray(record(value.architecture).input_modalities)
+      ? (record(value.architecture).input_modalities as unknown[])
+        .map((entry) => text(entry)?.toLowerCase())
+        .filter(Boolean)
+      : [];
+    const contextWindow = contextTokens(value);
+    return [{
+      modelId: identity.id,
+      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
+      label: text(value.name) ?? identity.id,
+      availability: 'available',
+      route: {
+        protocol: 'OpenRouterChatCompletions',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        source: 'preset',
+      },
+      contextTiers: [{
+        id: 'default',
+        label: 'OpenRouter catalog limit',
+        ...(contextWindow ? { maxPromptTokens: contextWindow } : {}),
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
+      }],
+      ...(contextWindow ? { defaultBudgetTokens: contextWindow } : {}),
+      fast: { kind: 'unsupported' },
+      toolCalling: supportedParameters.includes('tools') ? { state: 'supported' } : { state: 'unknown' },
+      visionInput: inputModalities.length === 0
+        ? { state: 'unknown' }
+        : capabilityState(inputModalities.includes('image')),
+      structuredOutput: supportedParameters.includes('response_format')
+        || supportedParameters.includes('structured_outputs')
+        ? { state: 'supported' }
+        : { state: 'unknown' },
     }];
-  });
-  return asResult(contributions);
+  }));
 }
 
 /** Grok account models are accepted only from the live account catalog. */

@@ -100,6 +100,13 @@ export type LlmProviderProtocol =
  * - `environment` : Resolved from ambient environment / cloud credential chain (AWS, GCP).
  */
 export type LlmProviderAuthMode = 'api-key' | 'local' | 'account' | 'environment';
+export type LlmProviderLifecycleStatus = 'stable' | 'beta' | 'deprecated' | 'sunset';
+export type LlmProviderAvailabilityState = 'available' | 'unavailable' | 'unknown';
+
+export interface LlmProviderAvailability {
+  state: LlmProviderAvailabilityState;
+  reason?: string;
+}
 
 /**
  * User-visible product category. Categories describe provider source and
@@ -260,9 +267,16 @@ export interface LlmProviderEntry {
   id: LlmProviderId;
   /** Stable local account key. It rotates when the credential identity changes. */
   activeAccountId?: string;
+  /** Account identities retained per auth surface; `activeAccountId` projects the selected mode. */
+  authAccountIds?: Partial<Record<LlmProviderAuthMode, string>>;
   protocol: LlmProviderProtocol;
   authMode: LlmProviderAuthMode;
   authModeOptions?: LlmProviderAuthMode[];
+  authModeAvailability?: Partial<Record<LlmProviderAuthMode, LlmProviderAvailability>>;
+  hasStoredSecretByAuthMode?: Partial<Record<LlmProviderAuthMode, boolean>>;
+  configuredAuthMode?: LlmProviderAuthMode;
+  lifecycleStatus: LlmProviderLifecycleStatus;
+  providerAvailability: LlmProviderAvailability;
   category: LlmProviderCategory;
   catalogOwnership: LlmProviderCatalogOwnership;
   modelDiscovery: LlmProviderModelDiscoveryStrategy | null;
@@ -311,6 +325,9 @@ export interface LlmProviderCatalogEntry {
   protocol: LlmProviderProtocol;
   authMode: LlmProviderAuthMode;
   authModeOptions?: LlmProviderAuthMode[];
+  authModeAvailability?: Partial<Record<LlmProviderAuthMode, LlmProviderAvailability>>;
+  lifecycleStatus: LlmProviderLifecycleStatus;
+  providerAvailability: LlmProviderAvailability;
   category: LlmProviderCategory;
   catalogOwnership: LlmProviderCatalogOwnership;
   label: string;
@@ -394,6 +411,7 @@ export type AppSettingsPatch = Partial<{
 
 export interface LlmProviderDraftRequest {
   providerId: LlmProviderId;
+  authMode?: LlmProviderAuthMode;
   apiKey?: string;
   baseUrl?: string;
   protocol?: LlmProviderProtocol;
@@ -401,7 +419,9 @@ export interface LlmProviderDraftRequest {
 
 export interface LlmProviderAccountLoginStartRequest {
   providerId: LlmProviderId;
+  authMode?: LlmProviderAuthMode;
   accountLoginMode?: LlmProviderAccountLoginMode;
+  accountRegion?: LlmProviderAccountRegion;
 }
 
 export interface LlmProviderAccountLoginFinishRequest {
@@ -425,6 +445,7 @@ export interface LlmProviderConnectionResult {
 }
 
 export type LlmProviderAccountLoginMode = 'browser' | 'device';
+export type LlmProviderAccountRegion = 'global' | 'cn';
 
 export interface LlmProviderAccountDiagnostic {
   stage: 'configuration' | 'metadata' | 'authorization' | 'callback' | 'token' | 'models' | 'refresh' | 'revoke';

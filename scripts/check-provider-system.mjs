@@ -269,6 +269,7 @@ async function main() {
   }
 
   const definitionById = new Map(providerDefinitions.map((definition) => [definition.id, definition]));
+  const presetById = new Map(providerPresets.map((preset) => [preset.id, preset]));
   const grokAccount = definitionById.get('grok-account');
   assert(grokAccount?.authMode === 'account', 'grok-account must be an account provider.');
   assert(grokAccount?.category === 'login-authorization', 'grok-account must stay in login authorization.');
@@ -282,6 +283,13 @@ async function main() {
   assert(cline?.authMode === 'api-key' && cline?.authModeOptions?.includes('account'), 'Cline must expose API key and account auth modes.');
   const openRouter = definitionById.get('openrouter');
   assert(openRouter?.authModeOptions?.includes('account'), 'OpenRouter must expose its PKCE account option alongside API key auth.');
+  assert(openRouter?.accountLoginConfigured === true, 'OpenRouter PKCE must be reachable through the account login service.');
+  assert(openRouter?.authModeAvailability?.['api-key']?.state !== 'unavailable', 'OpenRouter API key mode must remain independently available.');
+  assert(openRouter?.authModeAvailability?.account?.state !== 'unavailable', 'OpenRouter PKCE account mode must remain independently available.');
+  assert(cline?.authModeAvailability?.account?.state === 'unavailable', 'Cline OAuth must remain unavailable until its public contract is verified.');
+  const minimaxAccount = definitionById.get('minimax-account');
+  assert(minimaxAccount?.status === 'unavailable', 'MiniMax OAuth must remain unavailable before live verification.');
+  assert(minimaxAccount?.accountLoginConfigured === false, 'MiniMax OAuth flow must not be reachable before live verification.');
   const xai = definitionById.get('xai');
   assert(xai?.recommendedModels.includes('grok-code-fast-1'), 'xAI API-key provider must include grok-code-fast-1.');
 
@@ -413,6 +421,13 @@ async function main() {
     'ProviderAccountAuthService Super Grok OAuth flow',
   );
   assert(!providerAccountAuthService.includes('oauthClientId'), 'Super Grok login must not require a user-supplied OAuth client id.');
+  assertSourceContains(
+    providerAccountAuthService,
+    ['openrouter', 'startOpenRouterLogin', 'buildOpenRouterAuthorizationUrl', 'buildOpenRouterExchange', 'minimax-account', 'startMiniMaxLogin'],
+    'OpenRouter and MiniMax account flows',
+  );
+  assert(!providerAccountAuthService.includes('.grok/auth.json'), 'RDC-Agent must not import Grok Builder private credentials.');
+  assert(!providerAccountAuthService.includes('AppData\\Local\\Grok'), 'RDC-Agent must not couple to Grok Builder user-data paths.');
   const liveOAuthContracts = read('src/main/settings/LiveProviderOAuthContracts.ts');
   assertSourceContains(liveOAuthContracts, ['MINIMAX_REFERENCE', '/oauth/code', '/oauth/token', 'OPENROUTER_AUTHORIZE_URL', 'OPENROUTER_EXCHANGE_URL'], 'live provider OAuth contracts');
   const liveCatalogParsers = read('src/main/settings/LiveProviderCatalogParsers.ts');
@@ -424,6 +439,34 @@ async function main() {
     'parseGrokBuilderCatalog',
     'parseGrokAccountCatalog',
   ], 'live provider catalog parsers');
+  assertSourceContains(
+    read('src/main/settings/DeclarativeCatalogDiscovery.ts'),
+    ['routeRules', 'contextWindowKind', 'toolCalling', 'visionInput', 'structuredOutput'],
+    'declarative discovery capability projection',
+  );
+  for (const providerId of [
+    'longcat', 'opencode-zen', 'together-ai', 'fireworks-ai', 'novita-ai', 'synthetic',
+    'chutes', 'nvidia-nim', 'github-models', 'ollama-cloud',
+  ]) {
+    const preset = presetById.get(providerId);
+    assert(preset?.discovery?.kind === 'json-catalog', `${providerId} must use declarative JSON discovery.`);
+    assert(preset.discovery.modelSet === 'authoritative', `${providerId} discovery must admit its current live catalog instead of validating a static seed allowlist.`);
+  }
+  const longcat = presetById.get('longcat');
+  assert(longcat?.routes[0]?.protocol === 'OpenAICompatibleChatCompletions', 'LongCat must use its documented Chat Completions route, not Responses.');
+  assert(longcat?.discovery?.kind === 'json-catalog' && longcat.discovery.url === 'https://api.longcat.chat/v1/models', 'LongCat must use the documented unified model catalog endpoint.');
+  const zen = presetById.get('opencode-zen');
+  assert(zen?.discovery?.kind === 'json-catalog' && zen.discovery.routeRules?.length === 3, 'OpenCode Zen must project model-level Responses, Messages, and Chat routes.');
+  const fireworks = presetById.get('fireworks-ai');
+  assert(
+    fireworks?.discovery?.kind === 'json-catalog'
+      && fireworks.discovery.url?.includes('/v1/accounts/fireworks/models?filter=supports_serverless'),
+    'Fireworks discovery must use the documented serverless management catalog, not inference /models.',
+  );
+  const githubModels = presetById.get('github-models');
+  assert(githubModels?.routes[0]?.headers?.['X-GitHub-Api-Version'] === '2026-03-10', 'GitHub Models must use the current versioned API header.');
+  assert(githubModels?.discovery?.kind === 'json-catalog' && githubModels.discovery.mapping.contextWindow === 'limits.max_input_tokens', 'GitHub Models must project current catalog limit fields.');
+  assert(presetById.get('together-ai')?.discovery?.kind === 'json-catalog' && presetById.get('together-ai').discovery.collectionPath === '$', 'Together model discovery must parse its documented bare array response.');
   const capabilityContractTest = read('src/main/settings/ProviderCapabilityContract.test.ts');
   assertSourceContains(capabilityContractTest, ['effective-model-contract.json', 'fixtures/provider-catalogs'], 'final provider capability fixture contract');
   const requestPlanner = read('src/main/settings/RequestPlanner.ts');
@@ -556,6 +599,9 @@ async function main() {
     !/updateConnectionDraft\(\{\s*busy:\s*'testing',\s*error:\s*'',\s*models:\s*\[\]\s*\}\)/.test(connectionActions),
     'provider Test must not clear models to [] at start (dialog shrink)',
   );
+  assertSourceContains(settingsTypes, ['authAccountIds?:', 'hasStoredSecretByAuthMode?:', 'authModeAvailability?:'], 'multi-auth provider settings contract');
+  assertSourceContains(read('src/main/settings/SettingsService.ts'), ['authAccountIds', 'hasStoredSecretByAuthMode', 'disconnectProvider('], 'multi-auth credential isolation');
+  assertSourceContains(read('src/renderer/features/settings/SettingsModal/sections/ProviderConnectDialog.tsx'), ['ProviderAuthModeField'], 'provider auth-mode Settings UI');
 
   console.log('[provider-system] OK');
 }

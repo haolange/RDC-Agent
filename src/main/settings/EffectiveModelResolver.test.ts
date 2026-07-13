@@ -99,6 +99,51 @@ describe('surface-specific effective model seeds', () => {
     ]);
   });
 
+  it('keeps discovered capability leaves when user-managed labels and selection are projected', () => {
+    const configured = {
+      ...provider('custom-provider', 'OpenAICompatibleChatCompletions'),
+      catalogOwnership: 'user-managed' as const,
+      models: [{ id: 'custom-model', label: 'My custom label', enabled: true }],
+    };
+    const request = buildEffectiveCatalogRequest(configured);
+    request.discovery = {
+      source: 'discovery',
+      observedAt: '2026-07-13T00:00:00.000Z',
+      models: [{
+        modelId: 'custom-model',
+        contextTiers: [{
+          id: 'default', label: 'Default', maxPromptTokens: 131_072,
+          activation: { kind: 'implicit' }, entitlement: 'granted',
+        }],
+        toolCalling: { state: 'supported' },
+      }],
+    };
+
+    expect(mergeEffectiveCatalog(request)[0]).toMatchObject({
+      label: 'My custom label',
+      contextTiers: [{ maxPromptTokens: 131_072 }],
+      toolCalling: { state: 'supported' },
+    });
+  });
+
+  it('applies selection state to authoritative app-managed models that are absent from the seed', () => {
+    const configured = {
+      ...provider('opencode-zen', 'OpenAICompatibleChatCompletions'),
+      models: [{ id: 'minimax-m3', label: 'MiniMax M3', enabled: false }],
+    };
+    const request = buildEffectiveCatalogRequest(configured);
+    request.discovery = {
+      source: 'discovery',
+      observedAt: '2026-07-13T00:00:00.000Z',
+      models: [{ modelId: 'minimax-m3', availability: 'available' }],
+    };
+
+    expect(mergeEffectiveCatalog(request).find((model) => model.modelId === 'minimax-m3')).toMatchObject({
+      availability: 'available',
+      enabled: false,
+    });
+  });
+
   it('projects provider runtime unavailability into every EffectiveModel', () => {
     const configured = {
       ...provider('azure-openai', 'AzureOpenAIChatCompletions'),
@@ -153,7 +198,10 @@ describe('surface-specific effective model seeds', () => {
     })).toMatchObject({
       ok: true,
       plan: { effectiveModelId: 'model-current' },
-      warnings: ['Canonical model alias remap: model-old -> model-current.'],
+      warnings: [
+        'Context tier Default is unverified',
+        'Canonical model alias remap: model-old -> model-current.',
+      ],
     });
     expect(resolveEffectiveModelSelection('custom-provider', 'missing-model', settings)).toMatchObject({
       model: null,

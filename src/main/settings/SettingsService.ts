@@ -14,6 +14,8 @@ import type {
   FontScale,
   LayoutPreferences,
   LlmAgentRoute,
+  LlmProviderAuthMode,
+  LlmProviderAvailability,
   LlmProviderConnectionStatus,
   LlmProviderEntry,
   LlmProviderId,
@@ -46,6 +48,7 @@ import {
   createProviderEntryFromPreset,
   createProviderEntriesFromPresets,
   getProviderPresetCatalogOwnership,
+  getProviderPresetAuthModeAvailability,
   getProviderPresetProtocolBaseUrls,
   getProviderPresetProtocolOptions,
   getProviderSeedModels,
@@ -405,6 +408,43 @@ function getProviderAccountSecretRef(
       : secretStorageService.createProviderSecretRef(providerId);
 }
 
+function resolveProviderAuthMode(
+  provider: Partial<LlmProviderEntry>,
+  fallback: LlmProviderEntry,
+): LlmProviderAuthMode {
+  const options = fallback.authModeOptions ?? [fallback.authMode];
+  return typeof provider.authMode === 'string' && options.includes(provider.authMode)
+    ? provider.authMode
+    : fallback.authMode;
+}
+
+function sanitizeAuthAccountIds(
+  provider: Partial<LlmProviderEntry>,
+  selectedMode: LlmProviderAuthMode,
+): Partial<Record<LlmProviderAuthMode, string>> {
+  const result: Partial<Record<LlmProviderAuthMode, string>> = {};
+  if (provider.authAccountIds && typeof provider.authAccountIds === 'object') {
+    for (const mode of ['api-key', 'account', 'local', 'environment'] as const) {
+      const accountId = provider.authAccountIds[mode];
+      if (typeof accountId === 'string' && accountId.trim()) result[mode] = accountId.trim();
+    }
+  }
+  if (!result[selectedMode] && typeof provider.activeAccountId === 'string' && provider.activeAccountId.trim()) {
+    result[selectedMode] = provider.activeAccountId.trim();
+  }
+  return result;
+}
+
+function resolveSelectedAuthAvailability(
+  providerId: string,
+  mode: LlmProviderAuthMode,
+  fallback: LlmProviderEntry,
+): LlmProviderAvailability {
+  return getProviderPresetAuthModeAvailability(providerId)[mode]
+    ?? fallback.authModeAvailability?.[mode]
+    ?? fallback.providerAvailability;
+}
+
 function resolveAccountRuntimeCredential(
   provider: Pick<LlmProviderEntry, 'id' | 'activeAccountId'>,
   workspaceRoot: string,
@@ -423,6 +463,7 @@ function resolveAccountRuntimeCredential(
       apiKey?: string;
       copilotToken?: string;
       copilotApiBaseUrl?: string;
+      inferenceBaseUrl?: string;
       accountId?: string;
     };
     if (providerId === 'github-copilot') {
@@ -442,6 +483,21 @@ function resolveAccountRuntimeCredential(
       return {
         apiKey: bundle.accessToken ?? bundle.apiKey ?? '',
         baseUrl: 'https://cli-chat-proxy.grok.com/v1',
+        accountId: bundle.accountId,
+      };
+    }
+    if (providerId === 'openrouter') {
+      return {
+        apiKey: bundle.apiKey ?? bundle.accessToken ?? '',
+        baseUrl: 'https://openrouter.ai/api/v1',
+        accountId: bundle.accountId,
+      };
+    }
+    if (providerId === 'minimax-account') {
+      return {
+        apiKey: bundle.accessToken ?? bundle.apiKey ?? '',
+        baseUrl: bundle.inferenceBaseUrl ?? 'https://api.minimax.io/anthropic',
+        accountId: bundle.accountId,
       };
     }
     if (providerId === 'gemini-account') {
@@ -459,6 +515,7 @@ function resolveAccountRuntimeCredential(
     return {
       apiKey: bundle.accessToken ?? '',
       baseUrl: 'https://api.anthropic.com/v1',
+      accountId: bundle.accountId,
     };
   } catch {
     return { apiKey: '' };
@@ -683,9 +740,9 @@ function sanitizeUserProvider(
 
   const builtinFallback = createProviderEntryFromPreset(rawId);
   const definition = builtinFallback;
-  const activeAccountId = typeof provider.activeAccountId === 'string' && provider.activeAccountId.trim()
-    ? provider.activeAccountId.trim()
-    : undefined;
+  const authMode = resolveProviderAuthMode(provider, builtinFallback);
+  const authAccountIds = sanitizeAuthAccountIds(provider, authMode);
+  const activeAccountId = authAccountIds[authMode];
   const incomingSecretRef = typeof provider.secretRef === 'string' && provider.secretRef.trim()
     ? provider.secretRef.trim()
     : undefined;
@@ -693,19 +750,45 @@ function sanitizeUserProvider(
   const protocol = normalizeProviderProtocol({ ...provider, id: rawId });
   const catalogOwnership = getProviderPresetCatalogOwnership(rawId);
   const models = resolveProviderModels(rawId, provider.models ?? []);
-  const oauthSecretRef = getProviderAccountSecretRef(rawId, activeAccountId, 'oauth');
-  const resolvedSecret = builtinFallback.authMode === 'api-key'
-    ? getResolvedProviderSecret(rawId, secretRef, workspaceRoot)
-    : builtinFallback.authMode === 'account'
-      ? secretStorageService.getSecret(oauthSecretRef, workspaceRoot)
-      : '';
+  const apiKeySecret = getResolvedProviderSecret(rawId, secretRef, workspaceRoot);
+  const oauthSecret = secretStorageService.getSecret(
+    getProviderAccountSecretRef(rawId, authAccountIds.account, 'oauth'),
+    workspaceRoot,
+  );
   const preservePersistedCredentialState = options.credentialPolicy === 'persisted';
-  const hasPersistedSecret = preservePersistedCredentialState && provider.hasStoredSecret === true;
-  const hasStoredSecret = builtinFallback.hasStoredSecret || Boolean(resolvedSecret) || hasPersistedSecret;
-  const canUseProvider = builtinFallback.status !== 'unavailable' && (builtinFallback.authMode === 'local' || builtinFallback.authMode === 'environment'
-    ? true
-    : Boolean(resolvedSecret) || hasPersistedSecret);
-  const status = pickProviderStatus(provider, builtinFallback, canUseProvider, models);
+  const hasStoredSecretByAuthMode = Object.fromEntries(
+    (builtinFallback.authModeOptions ?? [builtinFallback.authMode]).map((mode) => {
+      const persisted = preservePersistedCredentialState && (
+        provider.hasStoredSecretByAuthMode?.[mode] === true
+        || (mode === authMode && provider.hasStoredSecret === true)
+      );
+      const present = mode === 'local' || mode === 'environment'
+        ? true
+        : mode === 'api-key'
+          ? Boolean(apiKeySecret) || persisted
+          : Boolean(oauthSecret) || persisted;
+      return [mode, present];
+    }),
+  ) as Partial<Record<LlmProviderAuthMode, boolean>>;
+  const hasStoredSecret = hasStoredSecretByAuthMode[authMode] === true;
+  const selectedAvailability = resolveSelectedAuthAvailability(rawId, authMode, builtinFallback);
+  const canUseProvider = selectedAvailability.state !== 'unavailable' && hasStoredSecret;
+  const configuredAuthMode = (builtinFallback.authModeOptions ?? [builtinFallback.authMode]).includes(provider.configuredAuthMode as LlmProviderAuthMode)
+    ? provider.configuredAuthMode
+    : provider.status === 'verified' || provider.isConfigured === true
+      ? authMode
+      : undefined;
+  const status = pickProviderStatus(
+    configuredAuthMode && configuredAuthMode !== authMode
+      ? { ...provider, status: 'unconfigured', isConfigured: false }
+      : provider,
+    {
+      ...builtinFallback,
+      status: selectedAvailability.state === 'unavailable' ? 'unavailable' : 'unconfigured',
+    },
+    canUseProvider,
+    models,
+  );
   const hasEnabledModels = models.some((model) => model.enabled !== false);
   const enabled = status === 'verified' && hasEnabledModels;
   const label = builtinFallback.label;
@@ -715,9 +798,16 @@ function sanitizeUserProvider(
   return {
     id: rawId,
     activeAccountId,
+    authAccountIds,
     protocol,
-    authMode: builtinFallback.authMode,
-    category: normalizeProviderCategory({ ...provider, id: rawId, authMode: builtinFallback.authMode }),
+    authMode,
+    authModeOptions: builtinFallback.authModeOptions,
+    authModeAvailability: builtinFallback.authModeAvailability,
+    hasStoredSecretByAuthMode,
+    configuredAuthMode,
+    lifecycleStatus: builtinFallback.lifecycleStatus,
+    providerAvailability: { ...builtinFallback.providerAvailability },
+    category: normalizeProviderCategory({ ...provider, id: rawId, authMode }),
     catalogOwnership,
     modelDiscovery: builtinFallback.modelDiscovery,
     label,
@@ -753,7 +843,7 @@ function sanitizeUserProvider(
     planLabel: typeof provider.planLabel === 'string' ? provider.planLabel : undefined,
     oauthExpiresAt: typeof provider.oauthExpiresAt === 'string' ? provider.oauthExpiresAt : undefined,
     oauthRefreshAvailable: typeof provider.oauthRefreshAvailable === 'boolean' ? provider.oauthRefreshAvailable : undefined,
-    unavailableReason: definition?.unavailableReason,
+    unavailableReason: selectedAvailability.state === 'unavailable' ? selectedAvailability.reason : undefined,
     isConfigured: status === 'verified' && hasEnabledModels && enabled,
     capabilities: definition?.capabilities ? [...definition.capabilities] : undefined,
   };
@@ -793,24 +883,30 @@ function hydrateProviderSecrets(
   workspaceRoot: string,
 ): LlmProviderEntry[] {
   return providers.map((provider) => {
-    const resolvedSecret = provider.authMode === 'api-key'
-      ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot)
-      : provider.authMode === 'account'
-        ? secretStorageService.getSecret(
-            getProviderAccountSecretRef(provider.id, provider.activeAccountId, 'oauth'),
-            workspaceRoot,
-          )
-        : '';
-    const hasStoredSecret = provider.authMode === 'local' || provider.authMode === 'environment' || Boolean(resolvedSecret);
-    const canUseProvider = provider.authMode === 'local' || provider.authMode === 'environment'
-      ? true
-      : provider.authMode === 'api-key'
-        ? Boolean(resolvedSecret)
-        : Boolean(resolvedSecret);
+    const apiKeySecret = getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
+    const oauthSecret = secretStorageService.getSecret(
+      getProviderAccountSecretRef(provider.id, provider.authAccountIds?.account, 'oauth'),
+      workspaceRoot,
+    );
+    const hasStoredSecretByAuthMode = Object.fromEntries(
+      (provider.authModeOptions ?? [provider.authMode]).map((mode) => [
+        mode,
+        mode === 'local' || mode === 'environment'
+          ? true
+          : mode === 'api-key'
+            ? Boolean(apiKeySecret)
+            : Boolean(oauthSecret),
+      ]),
+    ) as Partial<Record<LlmProviderAuthMode, boolean>>;
+    const hasStoredSecret = hasStoredSecretByAuthMode[provider.authMode] === true;
+    const canUseProvider = hasStoredSecret && provider.authModeAvailability?.[provider.authMode]?.state !== 'unavailable';
     const hasEnabledModels = provider.models.some((model) => model.enabled !== false);
     const status = provider.status === 'unavailable'
       ? 'unavailable'
-      : provider.status === 'verified' && canUseProvider && hasEnabledModels
+      : provider.status === 'verified'
+        && provider.configuredAuthMode === provider.authMode
+        && canUseProvider
+        && hasEnabledModels
         ? 'verified'
         : provider.status === 'failed'
           ? 'failed'
@@ -823,6 +919,7 @@ function hydrateProviderSecrets(
       // Keep plaintext secrets out of settings:get payloads.
       apiKey: '',
       hasStoredSecret,
+      hasStoredSecretByAuthMode,
       enabled: isConfigured,
       status,
       isConfigured,
@@ -911,9 +1008,8 @@ export class SettingsService {
       }
 
       const builtin = createProviderEntryFromPreset(rawId);
-      let activeAccountId = typeof entry.activeAccountId === 'string' && entry.activeAccountId.trim()
-        ? entry.activeAccountId.trim()
-        : undefined;
+      const authMode = resolveProviderAuthMode(entry, builtin);
+      const authAccountIds = sanitizeAuthAccountIds(entry, authMode);
       const legacyApiKeyRef = secretStorageService.createProviderSecretRef(rawId);
       const legacyOAuthRef = secretStorageService.createProviderOAuthSecretRef(rawId);
       const incomingSecretRef = typeof entry.secretRef === 'string' && entry.secretRef.trim()
@@ -925,20 +1021,26 @@ export class SettingsService {
         fixes.push(`Migrated plaintext secret for ${rawId}`);
       }
 
-      if (builtin.authMode === 'account') {
+      if (builtin.authModeOptions?.includes('account')) {
         const legacyBundle = secretStorageService.getSecret(legacyOAuthRef, workspaceRoot);
-        activeAccountId = activeAccountId ?? extractOAuthBundleAccountId(legacyBundle) ?? (legacyBundle ? createLocalAccountId() : undefined);
-        if (activeAccountId) {
-          const accountRef = getProviderAccountSecretRef(rawId, activeAccountId, 'oauth');
+        authAccountIds.account = authAccountIds.account
+          ?? (authMode === 'account' ? entry.activeAccountId : undefined)
+          ?? extractOAuthBundleAccountId(legacyBundle)
+          ?? (legacyBundle ? createLocalAccountId() : undefined);
+        if (authAccountIds.account) {
+          const accountRef = getProviderAccountSecretRef(rawId, authAccountIds.account, 'oauth');
           if (secretStorageService.moveSecret(legacyOAuthRef, accountRef, workspaceRoot)) {
             fixes.push(`Migrated OAuth secret to account key for ${rawId}`);
           }
         }
-      } else if (builtin.authMode === 'api-key') {
+      }
+      if (builtin.authModeOptions?.includes('api-key')) {
         const existingSecret = secretStorageService.getSecret(secretRef, workspaceRoot);
-        activeAccountId = activeAccountId ?? (existingSecret ? createLocalAccountId() : undefined);
-        if (activeAccountId) {
-          const accountRef = getProviderAccountSecretRef(rawId, activeAccountId, 'api-key');
+        authAccountIds['api-key'] = authAccountIds['api-key']
+          ?? (authMode === 'api-key' ? entry.activeAccountId : undefined)
+          ?? (existingSecret ? createLocalAccountId() : undefined);
+        if (authAccountIds['api-key']) {
+          const accountRef = getProviderAccountSecretRef(rawId, authAccountIds['api-key'], 'api-key');
           if (secretStorageService.moveSecret(secretRef, accountRef, workspaceRoot)) {
             fixes.push(`Migrated API key secret to account key for ${rawId}`);
           }
@@ -946,7 +1048,13 @@ export class SettingsService {
         }
       }
 
-      const sanitized = sanitizeUserProvider({ ...entry, activeAccountId, secretRef }, workspaceRoot, {
+      const sanitized = sanitizeUserProvider({
+        ...entry,
+        authMode,
+        activeAccountId: authAccountIds[authMode],
+        authAccountIds,
+        secretRef,
+      }, workspaceRoot, {
         credentialPolicy: 'persisted',
       });
       if (!sanitized) {
@@ -1149,7 +1257,7 @@ export class SettingsService {
       workspaceRoot,
     );
     const provider = persisted.llm.providers.find((entry) => entry.id === providerId);
-    if (!provider || provider.authMode !== 'api-key') {
+    if (!provider || !provider.authModeOptions?.includes('api-key')) {
       return '';
     }
 
@@ -1160,7 +1268,7 @@ export class SettingsService {
     this.ensureInitialized();
     const provider = this.getAll().llm.providers.find((entry) => entry.id === providerId);
     return secretStorageService.getSecret(
-      getProviderAccountSecretRef(providerId, provider?.activeAccountId, 'oauth'),
+      getProviderAccountSecretRef(providerId, provider?.authAccountIds?.account, 'oauth'),
       workspaceRoot,
     );
   }
@@ -1180,27 +1288,32 @@ export class SettingsService {
     const hasProviderPatch = Boolean(patch.llm?.providers);
     const providerCredentialPolicy: ProviderCredentialPolicy = hasProviderPatch ? 'runtime' : 'persisted';
     const providerDrafts = (patch.llm?.providers ?? currentPersisted.llm?.providers ?? []).map((provider) => {
-      let activeAccountId = provider.activeAccountId;
-      let secretRef = provider.secretRef || getProviderAccountSecretRef(provider.id, activeAccountId, 'api-key');
+      const authAccountIds = { ...(provider.authAccountIds ?? {}) };
+      if (provider.activeAccountId && !authAccountIds[provider.authMode]) {
+        authAccountIds[provider.authMode] = provider.activeAccountId;
+      }
+      let secretRef = provider.secretRef
+        || getProviderAccountSecretRef(provider.id, authAccountIds['api-key'], 'api-key');
       const apiKey = provider.apiKey?.trim() ?? '';
       if (provider.authMode === 'api-key' && apiKey) {
         const previousSecret = getResolvedProviderSecret(provider.id, secretRef, nextPaths.userRdxRoot);
-        if (!activeAccountId || previousSecret !== apiKey) {
+        if (!authAccountIds['api-key'] || previousSecret !== apiKey) {
           const previousRef = secretRef;
-          activeAccountId = createLocalAccountId();
-          secretRef = getProviderAccountSecretRef(provider.id, activeAccountId, 'api-key');
+          authAccountIds['api-key'] = createLocalAccountId();
+          secretRef = getProviderAccountSecretRef(provider.id, authAccountIds['api-key'], 'api-key');
           if (previousRef !== secretRef) {
             secretStorageService.moveSecret(previousRef, secretRef, nextPaths.userRdxRoot);
           }
         }
         secretStorageService.setSecret(secretRef, apiKey, nextPaths.userRdxRoot);
-      } else if (provider.authMode === 'api-key' && !provider.hasStoredSecret) {
+      } else if (provider.authMode === 'api-key' && provider.hasStoredSecretByAuthMode?.['api-key'] !== true && !provider.hasStoredSecret) {
         secretStorageService.deleteSecret(secretRef, nextPaths.userRdxRoot);
-        activeAccountId = undefined;
+        delete authAccountIds['api-key'];
       }
       return sanitizeUserProvider({
         ...provider,
-        activeAccountId,
+        activeAccountId: authAccountIds[provider.authMode],
+        authAccountIds,
         secretRef,
       }, nextPaths.userRdxRoot, { credentialPolicy: providerCredentialPolicy });
     }).filter((provider): provider is LlmProviderEntry => provider !== null);
@@ -1316,6 +1429,7 @@ export class SettingsService {
     models: LlmProviderModel[],
     baseUrl = '',
     protocolDraft?: unknown,
+    authModeDraft?: LlmProviderAuthMode,
   ): AppSettings {
     const current = this.getAll();
     const provider = current.llm.providers.find((entry) => entry.id === providerId);
@@ -1323,6 +1437,16 @@ export class SettingsService {
       throw new Error(`Unknown provider: ${providerId}`);
     }
 
+    const authMode = authModeDraft && provider.authModeOptions?.includes(authModeDraft)
+      ? authModeDraft
+      : provider.authMode;
+    if (authMode === 'account') {
+      throw new Error(`Provider ${providerId} account mode must use its login flow.`);
+    }
+    const authAvailability = resolveSelectedAuthAvailability(provider.id, authMode, createProviderEntryFromPreset(provider.id));
+    if (authAvailability.state === 'unavailable') {
+      throw new Error(authAvailability.reason ?? `Provider ${providerId} ${authMode} authentication is unavailable.`);
+    }
     const discoveredModels = resolveProviderModels(provider.id, models);
     if (discoveredModels.length === 0) {
       throw new Error('该 Provider 暂未返回可用模型');
@@ -1337,12 +1461,21 @@ export class SettingsService {
       : (protocolDefault || provider.baseUrl);
     const nextProvider: LlmProviderEntry = {
       ...provider,
+      authMode,
+      activeAccountId: provider.authAccountIds?.[authMode],
       apiKey: apiKey.trim(),
       protocol,
       enabled: hasEnabledModels,
-      hasStoredSecret: provider.authMode === 'api-key'
-        ? Boolean(apiKey.trim() || provider.hasStoredSecret)
-        : provider.authMode === 'local' || provider.authMode === 'environment' || provider.hasStoredSecret,
+      hasStoredSecret: authMode === 'api-key'
+        ? Boolean(apiKey.trim() || provider.hasStoredSecretByAuthMode?.['api-key'])
+        : authMode === 'local' || authMode === 'environment',
+      hasStoredSecretByAuthMode: {
+        ...(provider.hasStoredSecretByAuthMode ?? {}),
+        [authMode]: authMode === 'api-key'
+          ? Boolean(apiKey.trim() || provider.hasStoredSecretByAuthMode?.['api-key'])
+          : true,
+      },
+      configuredAuthMode: authMode,
       baseUrl: nextBaseUrl,
       protocolOptions: getProviderPresetProtocolOptions(provider.id),
       protocolBaseUrls: getProviderPresetProtocolBaseUrls(provider.id),
@@ -1351,6 +1484,11 @@ export class SettingsService {
       lastTestedAt: timestamp,
       lastModelRefreshAt: timestamp,
       lastError: undefined,
+      accountLabel: undefined,
+      planLabel: undefined,
+      oauthExpiresAt: undefined,
+      oauthRefreshAvailable: undefined,
+      unavailableReason: undefined,
       isConfigured: hasEnabledModels,
     };
 
@@ -1370,7 +1508,7 @@ export class SettingsService {
   ): AppSettings {
     const current = this.getAll();
     const provider = current.llm.providers.find((entry) => entry.id === providerId);
-    if (!provider || !isBuiltinProviderId(provider.id) || provider.authMode !== 'account') {
+    if (!provider || !isBuiltinProviderId(provider.id) || !provider.authModeOptions?.includes('account')) {
       throw new Error(`Unknown account provider: ${providerId}`);
     }
 
@@ -1382,12 +1520,12 @@ export class SettingsService {
     const hasEnabledModels = discoveredModels.some((model) => model.enabled !== false);
 
     const activeAccountId = extractOAuthBundleAccountId(secretPayload)
-      ?? provider.activeAccountId
+      ?? provider.authAccountIds?.account
       ?? createLocalAccountId();
     const nextSecretRef = getProviderAccountSecretRef(provider.id, activeAccountId, 'oauth');
-    if (provider.activeAccountId && provider.activeAccountId !== activeAccountId) {
+    if (provider.authAccountIds?.account && provider.authAccountIds.account !== activeAccountId) {
       secretStorageService.moveSecret(
-        getProviderAccountSecretRef(provider.id, provider.activeAccountId, 'oauth'),
+        getProviderAccountSecretRef(provider.id, provider.authAccountIds.account, 'oauth'),
         nextSecretRef,
         current.paths.userRdxRoot,
       );
@@ -1397,9 +1535,13 @@ export class SettingsService {
     const timestamp = nowIso();
     const nextProvider: LlmProviderEntry = {
       ...provider,
+      authMode: 'account',
       activeAccountId,
+      authAccountIds: { ...(provider.authAccountIds ?? {}), account: activeAccountId },
       enabled: hasEnabledModels,
       hasStoredSecret: true,
+      hasStoredSecretByAuthMode: { ...(provider.hasStoredSecretByAuthMode ?? {}), account: true },
+      configuredAuthMode: 'account',
       models: discoveredModels.map((model) => ({ ...model })),
       status: 'verified',
       lastTestedAt: timestamp,
@@ -1409,6 +1551,7 @@ export class SettingsService {
       planLabel: accountSummary.planLabel,
       oauthExpiresAt: accountSummary.oauthExpiresAt,
       oauthRefreshAvailable: accountSummary.oauthRefreshAvailable,
+      unavailableReason: undefined,
       isConfigured: hasEnabledModels,
     };
 
@@ -1427,16 +1570,16 @@ export class SettingsService {
   ): AppSettings {
     const current = this.getAll();
     const provider = current.llm.providers.find((entry) => entry.id === providerId);
-    if (!provider || !isBuiltinProviderId(provider.id) || provider.authMode !== 'account') {
+    if (!provider || !isBuiltinProviderId(provider.id) || !provider.authModeOptions?.includes('account')) {
       throw new Error(`Unknown account provider: ${providerId}`);
     }
     const activeAccountId = extractOAuthBundleAccountId(secretPayload)
-      ?? provider.activeAccountId
+      ?? provider.authAccountIds?.account
       ?? createLocalAccountId();
     const nextSecretRef = getProviderAccountSecretRef(provider.id, activeAccountId, 'oauth');
-    if (provider.activeAccountId && provider.activeAccountId !== activeAccountId) {
+    if (provider.authAccountIds?.account && provider.authAccountIds.account !== activeAccountId) {
       secretStorageService.moveSecret(
-        getProviderAccountSecretRef(provider.id, provider.activeAccountId, 'oauth'),
+        getProviderAccountSecretRef(provider.id, provider.authAccountIds.account, 'oauth'),
         nextSecretRef,
         current.paths.userRdxRoot,
       );
@@ -1444,8 +1587,12 @@ export class SettingsService {
     secretStorageService.setSecret(nextSecretRef, secretPayload, current.paths.userRdxRoot);
     const nextProvider: LlmProviderEntry = {
       ...provider,
+      authMode: 'account',
       activeAccountId,
+      authAccountIds: { ...(provider.authAccountIds ?? {}), account: activeAccountId },
       hasStoredSecret: true,
+      hasStoredSecretByAuthMode: { ...(provider.hasStoredSecretByAuthMode ?? {}), account: true },
+      configuredAuthMode: 'account',
       accountLabel: accountSummary.accountLabel,
       planLabel: accountSummary.planLabel,
       oauthExpiresAt: accountSummary.oauthExpiresAt,
@@ -1471,36 +1618,61 @@ export class SettingsService {
     });
   }
 
-  disconnectProvider(providerId: LlmProviderId): AppSettings {
+  disconnectProvider(providerId: LlmProviderId, authModeDraft?: LlmProviderAuthMode): AppSettings {
     const current = this.getAll();
     const provider = current.llm.providers.find((entry) => entry.id === providerId);
     if (!provider || !isBuiltinProviderId(provider.id)) {
       throw new Error(`Unknown provider: ${providerId}`);
     }
 
-    if (provider.authMode === 'api-key') {
+    const authMode = authModeDraft && provider.authModeOptions?.includes(authModeDraft)
+      ? authModeDraft
+      : provider.authMode;
+    const authAccountIds = { ...(provider.authAccountIds ?? {}) };
+    const hasStoredSecretByAuthMode = { ...(provider.hasStoredSecretByAuthMode ?? {}) };
+    if (authMode === 'api-key') {
       secretStorageService.deleteSecret(provider.secretRef, current.paths.userRdxRoot);
-    } else if (provider.authMode === 'account') {
+      delete authAccountIds['api-key'];
+      hasStoredSecretByAuthMode['api-key'] = false;
+    } else if (authMode === 'account') {
       secretStorageService.deleteSecret(
-        getProviderAccountSecretRef(provider.id, provider.activeAccountId, 'oauth'),
+        getProviderAccountSecretRef(provider.id, authAccountIds.account, 'oauth'),
         current.paths.userRdxRoot,
       );
+      delete authAccountIds.account;
+      hasStoredSecretByAuthMode.account = false;
+    }
+
+    if (authMode !== provider.authMode) {
+      return this.setAll({
+        llm: {
+          providers: current.llm.providers.map((entry) => entry.id === providerId
+            ? { ...provider, authAccountIds, hasStoredSecretByAuthMode }
+            : entry),
+          agentRoutes: current.llm.agentRoutes,
+        },
+      });
     }
 
     const fallback = createProviderEntryFromPreset(provider.id);
+    const selectedAvailability = resolveSelectedAuthAvailability(provider.id, provider.authMode, fallback);
     const nextProvider: LlmProviderEntry = {
       ...provider,
       activeAccountId: undefined,
+      authAccountIds,
       apiKey: '',
-      hasStoredSecret: fallback.hasStoredSecret,
+      hasStoredSecret: hasStoredSecretByAuthMode[provider.authMode] === true,
+      hasStoredSecretByAuthMode,
+      configuredAuthMode: undefined,
       models: fallback.models,
       enabled: false,
-      status: fallback.status,
+      status: selectedAvailability.state === 'unavailable' ? 'unavailable' : 'unconfigured',
       lastError: undefined,
       accountLabel: undefined,
       planLabel: undefined,
       oauthExpiresAt: undefined,
       oauthRefreshAvailable: undefined,
+      unavailableReason: selectedAvailability.state === 'unavailable' ? selectedAvailability.reason : undefined,
       isConfigured: false,
     };
 

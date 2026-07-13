@@ -233,6 +233,42 @@ describe('EffectiveCatalogService', () => {
     expect(accountB.models[0].label).toBe('Account B');
   });
 
+  it('persists entitlement separately and isolates it by account and protocol', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:00.000Z') });
+    await service.refreshDiscovery(request(), async () => ({
+      models: [{
+        modelId: 'model-a',
+        contextTiers: [{ id: 'default', entitlement: 'unknown' }],
+      }],
+      entitlement: {
+        detail: 'ClinePass model group',
+        models: [{
+          modelId: 'model-a',
+          contextTiers: [{ id: 'default', label: 'ClinePass', entitlement: 'granted' }],
+        }],
+      },
+    }));
+
+    const reloaded = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:01.000Z') });
+    const accountA = reloaded.getSnapshot(request()).models[0];
+    expect(accountA.contextTiers[0]).toMatchObject({ label: 'ClinePass', entitlement: 'granted' });
+    expect(accountA.provenance).toContainEqual(expect.objectContaining({
+      field: 'contextTiers.default.entitlement',
+      source: 'entitlement',
+      detail: 'ClinePass model group',
+    }));
+    const accountB = reloaded.getSnapshot(request({ accountId: 'account-b' })).models[0];
+    expect(accountB.contextTiers[0].label).toBe('Default');
+    expect(accountB.provenance).not.toContainEqual(expect.objectContaining({ source: 'entitlement' }));
+    const otherProtocol = reloaded.getSnapshot(request({ protocol: 'AnthropicMessages' })).models[0];
+    expect(otherProtocol.contextTiers[0].label).toBe('Default');
+    expect(otherProtocol.provenance).not.toContainEqual(expect.objectContaining({ source: 'entitlement' }));
+
+    reloaded.invalidateDiscovery({ providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol });
+    expect(reloaded.getSnapshot(request()).models[0].contextTiers[0].label).toBe('Default');
+  });
+
   it('persists account-scoped observed evidence', async () => {
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
     const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-02T00:00:00.000Z') });

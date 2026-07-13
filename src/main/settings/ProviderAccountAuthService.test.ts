@@ -1,4 +1,6 @@
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SUPER_GROK_OAUTH_REDIRECT_URI } from '@shared/constants/llm';
 import { ProviderAccountAuthService } from './ProviderAccountAuthService';
@@ -8,12 +10,20 @@ const GROK_PUBLIC_CLIENT_ID = 'b1a00492-073a-47ea-816f-4c329264a828';
 const mocks = vi.hoisted(() => ({
   savedConnections: [] as Array<{ providerId: string; secretPayload: string; models: unknown[]; accountSummary: unknown }>,
   disconnectedProviders: [] as string[],
+  disconnectedAuthModes: [] as Array<string | undefined>,
   oauthSecret: '',
   provider: {
     id: 'grok-account',
     isConfigured: false,
     status: 'unconfigured',
     models: [] as unknown[],
+  } as {
+    id: string;
+    authMode?: string;
+    authModeAvailability?: { account?: { state: string; reason?: string } };
+    isConfigured: boolean;
+    status: string;
+    models: unknown[];
   },
 }));
 
@@ -35,6 +45,7 @@ vi.mock('./SettingsService', () => ({
       mocks.savedConnections.push({ providerId, secretPayload, models, accountSummary });
       mocks.provider = {
         ...mocks.provider,
+        authMode: 'account',
         isConfigured: true,
         status: 'verified',
         models,
@@ -43,8 +54,9 @@ vi.mock('./SettingsService', () => ({
     },
     rotateProviderAccountCredential: () => ({}),
     markProviderAccountRefreshFailure: () => ({}),
-    disconnectProvider: (providerId: string) => {
+    disconnectProvider: (providerId: string, authMode?: string) => {
       mocks.disconnectedProviders.push(providerId);
+      mocks.disconnectedAuthModes.push(authMode);
       mocks.provider = {
         ...mocks.provider,
         isConfigured: false,
@@ -78,6 +90,10 @@ const jsonResponse = (payload: unknown, ok = true, status = ok ? 200 : 400): Res
   text: async () => JSON.stringify(payload),
 } as Response);
 
+const fixture = (name: string): Record<string, unknown> => JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, 'fixtures/provider-catalogs', name), 'utf8'),
+) as Record<string, unknown>;
+
 const mockFetchJson = (...payloads: Array<unknown | { payload: unknown; ok?: boolean; status?: number }>) => {
   const fetchMock = vi.fn();
   for (const item of payloads) {
@@ -106,6 +122,7 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
     process.env.RDC_AGENT_TEST_MODE = '1';
     mocks.savedConnections.length = 0;
     mocks.disconnectedProviders.length = 0;
+    mocks.disconnectedAuthModes.length = 0;
     mocks.oauthSecret = '';
     mocks.provider = {
       id: 'grok-account',
@@ -447,6 +464,106 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
     ));
     const revokeBody = new URLSearchParams(fetchMock.mock.calls[1][1].body as string);
     expect(revokeBody.get('client_id')).toBe(GROK_PUBLIC_CLIENT_ID);
+  });
+
+  it('completes OpenRouter PKCE on a dynamic localhost callback and preserves account-scoped logout', async () => {
+    const service = new ProviderAccountAuthService();
+    const data = fixture('openrouter-pkce.json');
+    mocks.provider = {
+      id: 'openrouter',
+      authMode: 'api-key',
+      authModeAvailability: { account: { state: 'unknown' } },
+      isConfigured: false,
+      status: 'unconfigured',
+      models: [],
+    };
+    const fetchMock = mockFetchJson(data.exchange, data.models);
+
+    const pending = await service.startLogin({ providerId: 'openrouter', authMode: 'account' });
+    expect(pending).toMatchObject({ state: 'pending', authorizationMode: 'browser' });
+    expect(pending.redirectUri).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/oauth\/openrouter\/callback\//u);
+    const authUrl = new URL(pending.authUrl ?? '');
+    expect(authUrl.origin).toBe('https://openrouter.ai');
+    expect(authUrl.searchParams.get('callback_url')).toBe(pending.redirectUri);
+    expect(authUrl.searchParams.get('code_challenge_method')).toBe('S256');
+
+    const callback = await httpGetText(`${pending.redirectUri}?code=fixture-code`);
+    expect(callback).toMatchObject({ statusCode: 200 });
+    expect(service.status('openrouter')).toMatchObject({ state: 'connected', connected: true });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'https://openrouter.ai/api/v1/auth/keys',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://openrouter.ai/api/v1/models',
+      expect.objectContaining({ method: 'GET' }),
+    );
+    const saved = mocks.savedConnections.at(-1);
+    expect(saved?.providerId).toBe('openrouter');
+    expect(JSON.parse(saved?.secretPayload ?? '{}')).toMatchObject({
+      providerId: 'openrouter', apiKey: 'sk-or-fixture', accountId: 'fixture-user',
+    });
+    expect(saved?.models).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'anthropic/claude-sonnet-4.6' }),
+    ]));
+
+    service.logout('openrouter');
+    expect(mocks.disconnectedProviders.at(-1)).toBe('openrouter');
+    expect(mocks.disconnectedAuthModes.at(-1)).toBe('account');
+  });
+
+  it('implements the pinned MiniMax CN device flow with regional Anthropic routing', async () => {
+    const service = new ProviderAccountAuthService();
+    const data = fixture('minimax-oauth.json') as {
+      authorization: Record<string, unknown>;
+      token: Record<string, unknown>;
+    };
+    mocks.provider = {
+      id: 'minimax-account',
+      authMode: 'account',
+      authModeAvailability: { account: { state: 'unavailable', reason: 'TODO(live-verify)' } },
+      isConfigured: false,
+      status: 'unavailable',
+      models: [],
+    };
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(async (_url: string, init: RequestInit) => {
+        const state = new URLSearchParams(String(init.body)).get('state');
+        return jsonResponse({ ...data.authorization, state });
+      })
+      .mockResolvedValueOnce(jsonResponse(data.token));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const pending = await service.startLogin({ providerId: 'minimax-account', accountRegion: 'cn' });
+    expect(pending).toMatchObject({ state: 'pending', authorizationMode: 'device', available: false });
+    expect(pending.verificationUri).toBe(data.authorization.verification_uri);
+    expect(pending.userCode).toBe(data.authorization.user_code);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'https://api.minimaxi.com/oauth/code',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    await vi.waitFor(() => expect(mocks.savedConnections.some((entry) => entry.providerId === 'minimax-account')).toBe(true));
+    const saved = mocks.savedConnections.find((entry) => entry.providerId === 'minimax-account');
+    const bundle = JSON.parse(saved?.secretPayload ?? '{}') as Record<string, unknown>;
+    expect(bundle).toMatchObject({
+      providerId: 'minimax-account',
+      region: 'cn',
+      accessToken: 'fixture-access',
+      refreshToken: 'fixture-refresh',
+      inferenceBaseUrl: 'https://api.minimaxi.com/anthropic',
+    });
+    expect(saved?.models).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'MiniMax-M2.7' }),
+      expect.objectContaining({ id: 'MiniMax-M2.7-highspeed' }),
+    ]));
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      'https://api.minimaxi.com/oauth/token',
+      expect.objectContaining({ method: 'POST' }),
+    );
   });
 
   it('loads the live ChatGPT Codex catalog and excludes Web-only Pro surfaces', async () => {

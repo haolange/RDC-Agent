@@ -32,8 +32,10 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
 }) => {
   const status = connectionDraft.accountStatus;
   const isSuperGrok = connectionProvider.id === 'grok-account';
+  const isOpenRouter = connectionProvider.id === 'openrouter';
+  const isMiniMax = connectionProvider.id === 'minimax-account';
   const diagnostic = status?.diagnostic;
-  const selectedMode = isSuperGrok ? connectionDraft.accountLoginMode : 'device';
+  const selectedMode = isSuperGrok ? connectionDraft.accountLoginMode : isOpenRouter ? 'browser' : 'device';
   const redirectUri = status?.redirectUri ?? (isSuperGrok && selectedMode === 'browser' ? SUPER_GROK_OAUTH_REDIRECT_URI : '');
   const noticeText = connectionAccountConnected
     ? t('settings.oauthConnectedHint')
@@ -58,8 +60,8 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
                 type="button"
                 className={
                   mode === selectedMode
-                    ? 'settings-provider-oauth-mode-button active'
-                    : 'settings-provider-oauth-mode-button'
+                    ? 'button button-secondary settings-provider-oauth-mode-button active'
+                    : 'button button-secondary settings-provider-oauth-mode-button'
                 }
                 data-testid={`settings-provider-oauth-mode-${mode}`}
                 onClick={() => onUpdateConnectionDraft({
@@ -92,6 +94,27 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
             )}
           </div>
         </>
+      )}
+
+      {isMiniMax && !connectionAccountConnected && (
+        <div className="settings-provider-oauth-mode" role="group" aria-label={t('settings.oauthRegion')}>
+          {(['global', 'cn'] as const).map((region) => (
+            <button
+              key={region}
+              type="button"
+              className={`button button-secondary settings-provider-oauth-mode-button${connectionDraft.accountRegion === region ? ' active' : ''}`}
+              data-testid={`settings-provider-oauth-region-${region}`}
+              onClick={() => onUpdateConnectionDraft({
+                accountRegion: region,
+                accountStatus: undefined,
+                error: '',
+              })}
+              disabled={connectionDraft.busy !== 'idle' || connectionDevicePending}
+            >
+              {region === 'global' ? t('settings.oauthRegionGlobal') : t('settings.oauthRegionChina')}
+            </button>
+          ))}
+        </div>
       )}
 
       {connectionAccountConnected && (status?.accountLabel || status?.planLabel) && (

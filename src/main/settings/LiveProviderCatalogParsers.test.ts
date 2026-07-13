@@ -9,6 +9,7 @@ import {
   parseGrokAccountCatalog,
   parseGrokBuilderCatalog,
   parseOpenCodeGoCatalog,
+  parseOpenRouterAccountCatalog,
 } from './LiveProviderCatalogParsers';
 
 function fixture(name: string): unknown {
@@ -28,8 +29,27 @@ describe('live-verification provider catalog parsers', () => {
 
   it('uses explicit ClinePass groups as entitlement evidence', () => {
     const parsed = parseClineCatalog(fixture('cline.json'));
-    expect(parsed.contributions.find((model) => model.modelId.includes('claude'))?.contextTiers?.[0].entitlement).toBe('granted');
+    expect(parsed.contributions.find((model) => model.modelId.includes('claude'))?.contextTiers?.[0].entitlement).toBe('unknown');
     expect(parsed.contributions.find((model) => model.modelId.includes('gpt'))?.contextTiers?.[0].entitlement).toBe('unknown');
+    expect(parsed.entitlementContributions).toEqual([expect.objectContaining({
+      modelId: 'anthropic/claude-sonnet-4.6',
+      contextTiers: [{ id: 'default', label: 'ClinePass', entitlement: 'granted' }],
+    })]);
+  });
+
+  it('projects OpenRouter PKCE catalog metadata onto the OpenRouter route', () => {
+    const source = fixture('openrouter-pkce.json') as { models: unknown };
+    const parsed = parseOpenRouterAccountCatalog(source.models);
+    expect(parsed.contributions).toEqual([
+      expect.objectContaining({
+        modelId: 'anthropic/claude-sonnet-4.6',
+        route: { protocol: 'OpenRouterChatCompletions', baseUrl: 'https://openrouter.ai/api/v1', source: 'preset' },
+        contextTiers: [expect.objectContaining({ maxPromptTokens: 1_000_000 })],
+        toolCalling: { state: 'supported' },
+        visionInput: { state: 'supported' },
+        structuredOutput: { state: 'supported' },
+      }),
+    ]);
   });
 
   it('parses the account-specific ChatGPT Codex catalog without web Pro variants', () => {
