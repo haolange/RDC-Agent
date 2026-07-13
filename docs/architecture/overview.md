@@ -34,4 +34,4 @@ The RDX CLI command is not hardcoded or bundled. System-installed CLI commands, 
 
 ## Verification
 
-Use `npm run typecheck` for static validation. For renderer or IPC changes, also run `npm run check:architecture`, `npm run check:fidelity`, and `npm run check:shared-exports`. For shell/window/local invocation boundaries, build first and then run the relevant smoke test.
+Use `pnpm run typecheck` for static validation. For renderer or IPC changes, also run `pnpm run check:architecture`, `pnpm run check:fidelity`, and `pnpm run check:shared-exports`. For shell/window/local invocation boundaries, build first and then run the relevant smoke test.

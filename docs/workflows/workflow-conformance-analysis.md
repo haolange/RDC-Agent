@@ -16,6 +16,6 @@
 
 ## 与测试的关系
 
-- `npm run typecheck` 用于守住类型与契约一致性。
-- `npm run build` 用于守住构建入口与资源路径。
+- `pnpm run typecheck` 用于守住类型与契约一致性。
+- `pnpm run build` 用于守住构建入口与资源路径。
 - 关键 E2E 用于验证工作台入口、主链行为和 UI 保真。

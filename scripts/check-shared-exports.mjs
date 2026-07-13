@@ -11,7 +11,7 @@ const readSet = (filePath) => new Set(
 );
 
 if (!fs.existsSync(baselinePath)) {
-  console.error('[shared-exports] Missing baseline. Run: npm run fidelity:extract');
+  console.error('[shared-exports] Missing baseline. Run: pnpm run fidelity:extract');
   process.exit(1);
 }
 

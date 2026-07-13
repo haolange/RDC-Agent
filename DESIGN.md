@@ -255,18 +255,18 @@ Legacy or deprecated compatibility is not retained. Cutover uses verified one-ti
 
 Code changes should run:
 
-- `npm run typecheck`;
-- `npm run check:architecture`;
-- `npm run check:fidelity`;
-- `npm run check:shared-exports`;
-- `npm run check:agent-runtime`;
-- `npm run check:provider-system`;
-- `npm run check:tool-system`;
-- `npm run check:work-process` and `npm run check:work-process-tool-coverage` when Work Process projection, tool catalog labels, or transcript UI changes;
-- `npm run check:reasoning-delivery` when provider thinking delivery or reasoning artifact projection changes;
-- `npm run check:settings-agents`;
-- `npm run build` when entry, runtime, renderer, or packaging behavior changes.
+- `pnpm run typecheck`;
+- `pnpm run check:architecture`;
+- `pnpm run check:fidelity`;
+- `pnpm run check:shared-exports`;
+- `pnpm run check:agent-runtime`;
+- `pnpm run check:provider-system`;
+- `pnpm run check:tool-system`;
+- `pnpm run check:work-process` and `pnpm run check:work-process-tool-coverage` when Work Process projection, tool catalog labels, or transcript UI changes;
+- `pnpm run check:reasoning-delivery` when provider thinking delivery or reasoning artifact projection changes;
+- `pnpm run check:settings-agents`;
+- `pnpm run build` when entry, runtime, renderer, or packaging behavior changes.
 
 UI and workflow changes must be verified in the real browser session that connects to the real main process bridge. Browser verification should cover at least Settings > Agents, Settings > Skills and Tools, Project/Session sidebars, Ask/Plan/Edit profile behavior, Work Process rendering, dark/light themes, narrow viewport, long paths, Chinese filenames, and long tool output.
 
-The headless browser-session process and the visible Electron desktop are parallel surfaces over the same canonical runtime state. Headless mode must not own Electron's visible desktop single-instance lock; its localhost bridge port is its singleton boundary. This guarantees that `scripts/start-rdc-agent.cmd` and `scripts/start-rdc-agent-dev.cmd` always open or focus a real visible app even while Browser Use QA is running.
+The headless browser-session process and the visible Electron desktop are parallel surfaces over the same canonical runtime state. Headless mode must not own Electron's visible desktop single-instance lock; its localhost bridge port is its singleton boundary. All `pnpm run start:*`, Windows `.cmd`, and macOS/Linux `.sh` entrypoints share `scripts/launch-rdc-agent.mjs`; visible desktop launchers must always open or focus a real app even while Browser Use QA is running.

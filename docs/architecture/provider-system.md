@@ -162,11 +162,11 @@ Agent Loop 不通过 Settings 层 `LLMAdapterProvider` 发起 agent turn。它�
 
 最小门禁：
 
-- `npm run check:provider-system`
-- `npm run check:agent-runtime`
-- `npm run check:settings-agents`
-- `npm run check:shared-exports`
-- `npm run typecheck`
+- `pnpm run check:provider-system`
+- `pnpm run check:agent-runtime`
+- `pnpm run check:settings-agents`
+- `pnpm run check:shared-exports`
+- `pnpm run typecheck`
 
 涉及 renderer category 输出、Settings modal 或浏览器 endpoint 时，还要启动真实 browser-app session，确认 `settings:getProviderCatalog` 与 `/api/settings/providers/catalog` 返回一致、无 secrets，Settings Provider Catalog 不再渲染旧 category，Settings > Providers 中 app-managed provider 显示只读 capability，`third-party-compatible` / `local` 显示用户自管说明。
 
