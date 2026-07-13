@@ -110,7 +110,7 @@ import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigServ
 import { llmAdapter } from '../../settings/LLMAdapter';
 import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
 import { settingsService } from '../../settings/SettingsService';
-import { planEffectiveModelRequest, resolveEffectiveModel } from '../../settings/EffectiveModelResolver';
+import { planEffectiveModelRequest, recordEffectivePlanSuccess, resolveEffectiveModel } from '../../settings/EffectiveModelResolver';
 import { debuggerLlmService } from '../../settings/DebuggerLlmService';
 import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
 import { isToolAllowedForAgent, normalizeToolName, resolveAgentToolAllowlist } from './DebuggerRuntimePolicy';
@@ -829,6 +829,7 @@ export class AgentOrchestrator {
     const reasoningContract = resolveAgentRouteCapability(
       routeProvider,
       modelId,
+      resolveEffectiveModel(providerId, modelId, settingsService.getAll()),
     ).reasoningContract;
 
     const contextManager = new ContextManager({
@@ -889,6 +890,9 @@ export class AgentOrchestrator {
       } : undefined,
       onResponse: promptPlan ? (requestId, message) => {
         if (!requestId) return;
+        if (streamOptions?.requestPlan) {
+          recordEffectivePlanSuccess(providerId, modelId, settingsService.getAll(), streamOptions.requestPlan);
+        }
         requestSnapshotStore.complete(requestId, sessionId ?? undefined, turnSignature || undefined, {
           inputTokens: message.usage.inputTokens,
           outputTokens: message.usage.outputTokens,
@@ -1966,7 +1970,8 @@ export class AgentOrchestrator {
       throw new Error('RequestPlan is required for every provider request.');
     }
     const routeProvider = settingsService.getAll().llm.providers.find((entry) => entry.id === input.providerId);
-    const routeCapability = resolveAgentRouteCapability(routeProvider, input.modelId);
+    const effectiveModel = resolveEffectiveModel(input.providerId, input.modelId, settingsService.getAll());
+    const routeCapability = resolveAgentRouteCapability(routeProvider, input.modelId, effectiveModel);
     const mcpConnectionErrors = await this.ensureMcpConnections(input.agentId, input.projectRootPath);
     const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
     const slotKey = this.agentSlotKey(input.sessionId, input.agentId);
@@ -2270,7 +2275,7 @@ export class AgentOrchestrator {
     }
 
     const provider = runtimeSettings.llm.providers.find((entry) => entry.id === input.providerId);
-    const routeCapability = resolveAgentRouteCapability(provider, input.modelId);
+    const routeCapability = resolveAgentRouteCapability(provider, input.modelId, input.capability);
     const activePaths = [input.projectRootPath].filter((value): value is string => Boolean(value));
     const scopedInstructions = input.projectRootPath
       ? scopedInstructionResolver.resolveForPaths({

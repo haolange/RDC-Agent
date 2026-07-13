@@ -13,6 +13,7 @@ import type {
   EffectiveCatalogSnapshot,
   EffectiveModel,
   ModelRoute,
+  RequestPlan,
   RequestPlanningResult,
 } from '@shared/types/providerCapability';
 import type {
@@ -59,23 +60,14 @@ function seedModel(
   const contextTiers: CatalogModelContribution['contextTiers'] = [{
     id: 'default',
     label: 'Default',
-    maxPromptTokens: nominal && nominal < 1_000_000 ? nominal : defaultBudgetTokens,
+    ...(nominal ? { maxPromptTokens: nominal } : {}),
     activation: { kind: 'implicit' },
     entitlement: 'granted',
   }];
-  if (nominal && nominal >= 1_000_000) {
-    contextTiers.push({
-      id: 'max',
-      label: 'Max',
-      maxPromptTokens: nominal,
-      activation: { kind: 'implicit' },
-      entitlement: 'granted',
-    });
-  }
   const providerModel = provider.models.find((model) => model.id === modelId);
-  const fastVariantModelId = profile?.fastVariantModelId;
-  const fastEnabled = Boolean(fastVariantModelId && provider.models.some(
-    (model) => model.id === fastVariantModelId && model.enabled !== false,
+  const fastModelId = profile?.fast?.modelId;
+  const fastEnabled = Boolean(fastModelId && provider.models.some(
+    (model) => model.id === fastModelId && model.enabled !== false,
   ));
 
   return {
@@ -93,17 +85,23 @@ function seedModel(
     unavailableReason: providerModel?.availabilityReason,
     contextTiers,
     defaultBudgetTokens,
-    fast: fastVariantModelId
+    fast: fastModelId
       ? {
           kind: 'model-variant',
-          modelId: fastVariantModelId,
+          modelId: fastModelId,
           entitlement: fastEnabled ? 'granted' : 'denied',
         }
       : { kind: 'unsupported' },
     reasoning: createReasoningControl(profile?.reasoningControl ?? CONSERVATIVE_REASONING),
-    toolCalling: profile?.toolCalling ? { state: 'supported' } : { state: 'unsupported' },
-    visionInput: profile?.visionInput ? { state: 'supported' } : { state: 'unsupported' },
-    structuredOutput: profile?.structuredOutput ? { state: 'supported' } : { state: 'unsupported' },
+    toolCalling: profile?.toolCalling === true
+      ? { state: 'supported' }
+      : profile?.toolCalling === false ? { state: 'unsupported' } : { state: 'unknown' },
+    visionInput: profile?.visionInput === true
+      ? { state: 'supported' }
+      : profile?.visionInput === false ? { state: 'unsupported' } : { state: 'unknown' },
+    structuredOutput: profile?.structuredOutput === true
+      ? { state: 'supported' }
+      : profile?.structuredOutput === false ? { state: 'unsupported' } : { state: 'unknown' },
     fixedTemperature: profile?.fixedTemperature,
   };
 }
@@ -200,4 +198,26 @@ export function planEffectiveModelRequest(input: {
     clientBudgetTokens: input.clientBudgetTokens,
     requestedTemperature: input.requestedTemperature,
   });
+}
+
+export function recordEffectivePlanSuccess(
+  providerId: string,
+  modelId: string,
+  settings: AppSettings,
+  plan: RequestPlan,
+): void {
+  const provider = settings.llm.providers.find((entry) => entry.id === providerId);
+  const model = resolveEffectiveModel(providerId, modelId, settings);
+  const activeTier = model?.contextTiers.find((tier) => tier.id === plan.activeTierId);
+  if (!provider || !model || activeTier?.entitlement !== 'unknown') return;
+  effectiveCatalogService.recordObserved({
+    providerId,
+    accountId: provider.activeAccountId ?? `anonymous:${providerId}`,
+    protocol: plan.route.protocol,
+  }, [{
+    modelId,
+    contextTiers: model.contextTiers.map((tier) => (
+      tier.id === activeTier.id ? { ...tier, entitlement: 'granted' as const } : tier
+    )),
+  }], `Successful request activated context tier ${activeTier.id}`);
 }

@@ -55,8 +55,8 @@ describe('managed provider model catalog', () => {
       defaultSelection: 'on',
       supportsOff: true,
     });
-    expect(entry?.profile.fastVariantModelId).toBe('kimi-for-coding-highspeed');
-    expect(fast?.profile.fastVariantModelId).toBeUndefined();
+    expect(entry?.profile.fast?.modelId).toBe('kimi-for-coding-highspeed');
+    expect(fast?.profile.fast).toBeUndefined();
     expect(fast?.profile.fixedTemperature).toBe(1);
   });
 
@@ -88,16 +88,16 @@ describe('managed provider model catalog', () => {
     const pro = lookupManagedModelCatalogEntry('volcengine-coding-plan', 'doubao-seed-2.0-pro');
     const code = lookupManagedModelCatalogEntry('volcengine-coding-plan', 'doubao-seed-2.0-code');
     const lite = lookupManagedModelCatalogEntry('volcengine-coding-plan', 'doubao-seed-2.0-lite');
-    expect(pro?.profile.fastVariantModelId).toBe('doubao-seed-2.0-lite');
-    expect(code?.profile.fastVariantModelId).toBe('doubao-seed-2.0-lite');
-    expect(lite?.profile.fastVariantModelId).toBeUndefined();
+    expect(pro?.profile.fast?.modelId).toBe('doubao-seed-2.0-lite');
+    expect(code?.profile.fast?.modelId).toBe('doubao-seed-2.0-lite');
+    expect(lite?.profile.fast).toBeUndefined();
     expect(pro?.profile.reasoningControl).toMatchObject({
       kind: 'levels',
       supportsOff: true,
       levels: ['minimal', 'low', 'medium', 'high'],
       defaultSelection: 'medium',
     });
-    expect(lookupManagedModelCatalogEntry('volcengine-coding-plan', 'kimi-k2.7-code')?.profile.fastVariantModelId)
+    expect(lookupManagedModelCatalogEntry('volcengine-coding-plan', 'kimi-k2.7-code')?.profile.fast?.modelId)
       .toBe('kimi-k2.7-code-highspeed');
     expect(lookupManagedModelCatalogEntry('volcengine-coding-plan', 'deepseek-v4-pro')?.profile.reasoningControl).toMatchObject({
       kind: 'levels',

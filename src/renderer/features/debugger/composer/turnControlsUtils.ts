@@ -79,11 +79,24 @@ export function maxContextTokens(capability: EffectiveModel | null): number | un
     ), undefined);
 }
 
+export function isMaxTierUnverified(capability: EffectiveModel | null): boolean {
+  if (!capability) return false;
+  const usable = capability.contextTiers.filter((tier) => tier.entitlement !== 'denied');
+  return usable.length >= 2 && usable[usable.length - 1]?.entitlement === 'unknown';
+}
+
 export function hasSelectableFastMode(capability: EffectiveModel | null): boolean {
   return Boolean(capability
     && capability.fast.kind !== 'unsupported'
     && capability.fast.kind !== 'unknown'
     && capability.fast.entitlement !== 'denied');
+}
+
+export function isFastModeUnverified(capability: EffectiveModel | null): boolean {
+  return Boolean(capability
+    && capability.fast.kind !== 'unsupported'
+    && capability.fast.kind !== 'unknown'
+    && capability.fast.entitlement === 'unknown');
 }
 
 export function buildInitialTurnControls(

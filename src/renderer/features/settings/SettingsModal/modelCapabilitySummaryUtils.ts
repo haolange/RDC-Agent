@@ -74,7 +74,7 @@ export function formatFastCapability(
   profile: ModelCapabilityProfile | null,
   t: Translate,
 ): string {
-  return profile?.fastVariantModelId || t('settings.providers.capability.notAvailable');
+  return profile?.fast?.modelId || t('settings.providers.capability.notAvailable');
 }
 
 export function formatBooleanCapability(value: boolean | undefined, t: Translate): string {
@@ -100,7 +100,7 @@ export function buildCapabilityChips(
     {
       label: t('settings.providers.capability.fastMode'),
       value: formatFastCapability(profile, t),
-      tone: profile?.fastVariantModelId ? 'positive' : 'muted',
+      tone: profile?.fast?.modelId ? 'positive' : 'muted',
     },
     {
       label: t('settings.providers.capability.toolCalling'),

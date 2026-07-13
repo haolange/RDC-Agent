@@ -11,6 +11,7 @@ import type {
   StreamOptions,
 } from '../core/types';
 import { settingsService } from '../../settings/SettingsService';
+import { resolveEffectiveModel } from '../../settings/EffectiveModelResolver';
 import { AnthropicProvider } from './AnthropicProvider';
 import { GeminiProvider } from './GeminiProvider';
 import { OllamaProvider } from './OllamaProvider';
@@ -93,23 +94,30 @@ function toRuntimeApi(protocol: LlmProviderProtocol): Model['api'] {
   }
 }
 
-function createProviderStrategy(provider: ConfiguredProvider, protocol: LlmProviderProtocol): ProviderStrategy {
+function createProviderStrategy(
+  provider: ConfiguredProvider,
+  protocol: LlmProviderProtocol,
+  capabilities: ProviderCapabilities,
+): ProviderStrategy {
   switch (protocol) {
     case 'AnthropicMessages':
       return new AnthropicProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
         headers: provider.id === 'kimi-coding-plan' ? { 'User-Agent': 'RDC-Agent' } : undefined,
+        capabilities,
       });
     case 'GoogleGemini':
       return new GeminiProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
+        capabilities,
       });
     case 'OllamaOpenAICompatibleChatCompletions':
       return new OllamaProvider({
         apiKey: provider.apiKey || undefined,
         baseUrl: normalizeLocalBaseUrl(provider.baseUrl),
+        capabilities,
       });
     case 'OpenRouterChatCompletions':
       return new OpenAICompatibleProvider({
@@ -119,17 +127,20 @@ function createProviderStrategy(provider: ConfiguredProvider, protocol: LlmProvi
           'HTTP-Referer': 'https://rdcagent.local',
           'X-Title': 'RDC-Agent',
         },
+        capabilities,
       });
     case 'OpenAICompatibleChatCompletions':
       return new OpenAICompatibleProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
+        capabilities,
       });
     case 'OpenAIResponses':
       return new OpenAIResponsesProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
         accountId: provider.accountId,
+        capabilities,
       });
     case 'AzureOpenAIChatCompletions':
     case 'AwsBedrock':
@@ -157,8 +168,8 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
     return {
       streaming: true,
       nativeToolCalling: true,
-      structuredOutput: true,
-      vision: true,
+      structuredOutput: false,
+      vision: false,
       reasoning: true,
       parallelToolCalls: true,
     };
@@ -197,6 +208,19 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
       ? normalizeLocalBaseUrl(plannedBaseUrl)
       : plannedBaseUrl;
     const effectiveModelId = requestPlan?.effectiveModelId ?? decoded.modelId;
+    const effectiveModel = resolveEffectiveModel(decoded.providerId, decoded.modelId, settingsService.getAll());
+    if (!effectiveModel) {
+      return missingProviderStream(new Error(`No EffectiveModel is available for ${decoded.providerId}/${decoded.modelId}.`));
+    }
+    const toolCalling = effectiveModel.toolCalling.state !== 'unsupported';
+    const capabilities: ProviderCapabilities = {
+      streaming: true,
+      nativeToolCalling: toolCalling,
+      structuredOutput: effectiveModel.structuredOutput.state === 'supported',
+      vision: effectiveModel.visionInput.state === 'supported',
+      reasoning: effectiveModel.reasoning.kind !== 'none',
+      parallelToolCalls: toolCalling,
+    };
     const runtimeModel: Model = {
       ...model,
       id: effectiveModelId,
@@ -207,7 +231,7 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
 
     let strategy: ProviderStrategy;
     try {
-      strategy = createProviderStrategy({ ...provider, baseUrl: runtimeBaseUrl }, protocol);
+      strategy = createProviderStrategy({ ...provider, baseUrl: runtimeBaseUrl }, protocol, capabilities);
     } catch (error) {
       return missingProviderStream(error instanceof Error ? error : new Error(String(error)));
     }

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   buildInitialTurnControls,
+  hasSelectableMaxTier,
+  isMaxTierUnverified,
   sanitizeTurnControls,
 } from './turnControlsUtils';
 
@@ -104,5 +106,22 @@ describe('turnControlsUtils', () => {
       maxContextMode: true,
       fastModel: true,
     });
+  });
+
+  it('shows a higher unknown tier as unverified and excludes denied tiers', () => {
+    const unknownTier = {
+      ...levelsCapability,
+      contextTiers: levelsCapability.contextTiers.map((tier, index) => (
+        index === 1 ? { ...tier, entitlement: 'unknown' as const } : tier
+      )),
+    };
+    expect(hasSelectableMaxTier(unknownTier)).toBe(true);
+    expect(isMaxTierUnverified(unknownTier)).toBe(true);
+    expect(hasSelectableMaxTier({
+      ...unknownTier,
+      contextTiers: unknownTier.contextTiers.map((tier, index) => (
+        index === 1 ? { ...tier, entitlement: 'denied' as const } : tier
+      )),
+    })).toBe(false);
   });
 });
