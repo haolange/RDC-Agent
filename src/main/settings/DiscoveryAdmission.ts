@@ -29,6 +29,10 @@ export interface DiscoveredModelIdentity {
   aliases: string[];
 }
 
+export function normalizeDiscoveredModelMatchKey(modelId: string): string {
+  return modelId.trim().toLowerCase().replace(/[._\-\s]+/gu, '');
+}
+
 function readString(record: Record<string, unknown>, ...keys: string[]): string | undefined {
   for (const key of keys) {
     const value = record[key];

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
-import type { ProviderCatalogCategory, ProviderConnectionDraft } from '../types';
+import type { ProviderConnectionDraft } from '../types';
+import { updateProviderModelPreference } from '../providerModelProjection';
 import {
-  getProviderCategoryLabel,
+  getProviderCategoryTranslation,
   getProviderProtocolOptions,
   providerSupportsProtocolSelection,
   resolveConnectionBaseUrlForProtocol,
@@ -11,7 +12,7 @@ import {
 import { ProviderAccountOAuthPanel } from './ProviderAccountOAuthPanel';
 import { ProviderApiKeyFields } from './ProviderApiKeyFields';
 import { ProviderAuthModeField } from './ProviderAuthModeField';
-import { ProviderConnectModelRow } from './ProviderConnectModelRow';
+import { ProviderConnectModelList } from './ProviderConnectModelList';
 import { ProviderConnectActions } from './ProviderConnectActions';
 import { ProviderProtocolField } from './ProviderProtocolField';
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -19,7 +20,6 @@ interface ProviderConnectDialogProps {
   connectionDraft: ProviderConnectionDraft;
   connectionProvider: LlmProviderEntry;
   getResolvedProviderLabel: (provider: Pick<LlmProviderEntry, 'label'>) => string;
-  providerCatalogCategories: ProviderCatalogCategory[];
   connectionAccountConnected: boolean;
   connectionDevicePending: boolean;
   connectionNeedsApiKey: boolean;
@@ -36,7 +36,6 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   connectionDraft,
   connectionProvider,
   getResolvedProviderLabel,
-  providerCatalogCategories,
   connectionAccountConnected,
   connectionDevicePending,
   connectionNeedsApiKey,
@@ -50,14 +49,14 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   t,
 }) => {
   const [expandedModelId, setExpandedModelId] = useState<string | null>(null);
+  const [effectiveModelCount, setEffectiveModelCount] = useState(0);
   const catalogModelCount = Math.max(
+    effectiveModelCount,
     connectionDraft.models.length,
     connectionProvider.models?.length ?? 0,
     connectionProvider.recommendedModels?.length ?? 0,
   );
   const modelListSize = catalogModelCount >= 24 ? 'long' : catalogModelCount >= 8 ? 'medium' : 'short';
-  const allModelsUnavailable = connectionDraft.models.length > 0
-    && connectionDraft.models.every((model) => model.enabled === false);
   const showProtocolField = connectionProvider.authMode !== 'account';
   const showProtocolSelector = showProtocolField && providerSupportsProtocolSelection(connectionProvider);
   const protocolOptions = showProtocolField ? getProviderProtocolOptions(connectionProvider) : [];
@@ -67,7 +66,12 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   };
   const handleModelChange = (modelId: string, patch: Partial<LlmProviderModel>) => {
     onUpdateConnectionDraft({
-      models: connectionDraft.models.map((model) => model.id === modelId ? { ...model, ...patch } : model),
+      models: updateProviderModelPreference(
+        connectionProvider.catalogOwnership,
+        connectionDraft.models,
+        modelId,
+        patch,
+      ),
     });
   };
 
@@ -91,7 +95,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
     >
       <div className="settings-provider-connect-header">
         <div>
-          <div className="settings-provider-connect-kicker">{getProviderCategoryLabel(connectionProvider, providerCatalogCategories)}</div>
+          <div className="settings-provider-connect-kicker">{t(getProviderCategoryTranslation(connectionProvider.category).label)}</div>
           <div className="settings-provider-connect-title" id="settings-provider-connect-title">
             {getResolvedProviderLabel(connectionProvider)}
           </div>
@@ -240,45 +244,16 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         </div>
       )}
 
-      {!connectionDraft.error && allModelsUnavailable && (
-        <div className="settings-provider-notice" data-testid="settings-provider-connect-unavailable-hint">
-          {t('settings.providers.allModelsUnavailableHint')}
-        </div>
-      )}
-
-      <div className="settings-model-section settings-provider-connect-models" data-testid="settings-provider-connect-models">
-        <div className="settings-model-section-header">
-          <span>{connectionProvider.catalogOwnership === 'app-managed'
-            ? t('settings.providers.capability.appManagedModels')
-            : t('settings.providers.capability.userManagedModels')}</span>
-          <span className="settings-help-text">
-            {t('settings.providerModelCount', { count: connectionDraft.models.length })}
-          </span>
-        </div>
-        {connectionProvider.catalogOwnership === 'user-managed' ? (
-          <div className="settings-provider-notice" data-testid="settings-provider-user-managed-models">
-            {t('settings.providers.capability.userManagedProviderHint')}
-          </div>
-        ) : (
-          <div className="settings-provider-notice" data-testid="settings-provider-app-managed-models">
-            {t('settings.providers.capability.appManagedProviderHint')}
-          </div>
-        )}
-        <div className="settings-model-list" data-empty-label={t('settings.testBeforeSaveHint')}>
-          {connectionDraft.models.map((model) => (
-            <ProviderConnectModelRow
-              key={model.id}
-              provider={connectionProvider}
-              model={model}
-              expanded={expandedModelId === model.id}
-              disabled={connectionDraft.busy !== 'idle'}
-              onToggleExpanded={handleToggleModelCapability}
-              onModelChange={handleModelChange}
-              t={t}
-            />
-          ))}
-        </div>
-      </div>
+      <ProviderConnectModelList
+        provider={connectionProvider}
+        models={connectionDraft.models}
+        expandedModelId={expandedModelId}
+        disabled={connectionDraft.busy !== 'idle'}
+        onToggleExpanded={handleToggleModelCapability}
+        onModelChange={handleModelChange}
+        onModelCountChange={setEffectiveModelCount}
+        t={t}
+      />
 
       <ProviderConnectActions
         draft={connectionDraft}

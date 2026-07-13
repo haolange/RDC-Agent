@@ -2,6 +2,7 @@ import type { ContextTier, EntitlementState } from '@shared/types/providerCapabi
 import type { LlmProviderModel } from '@shared/types/settings';
 import type { CatalogModelContribution } from './EffectiveCatalogService';
 import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
+import { normalizeCopilotDiscoveryModels } from './ProviderDiscoveryNormalizer';
 
 export interface CopilotCatalogParseResult {
   models: LlmProviderModel[];
@@ -121,5 +122,11 @@ export function parseCopilotModelCatalog(payload: unknown): CopilotCatalogParseR
       billingByModel[id] = entry.billing;
     }
   }
-  return { models, contributions, billingByModel };
+  const normalizedContributions = normalizeCopilotDiscoveryModels(contributions);
+  const visibleIds = new Set(normalizedContributions.map((model) => model.modelId));
+  return {
+    models: models.filter((model) => visibleIds.has(model.id)),
+    contributions: normalizedContributions,
+    billingByModel,
+  };
 }

@@ -14,6 +14,7 @@ import { settingsService } from '../settings/SettingsService';
 import { resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
 import { effectiveCatalogService } from '../settings/EffectiveCatalogService';
 import { providerCapabilityProbeService } from '../settings/ProviderCapabilityProbeService';
+import { normalizeProviderDiscoveryLayer } from '../settings/ProviderDiscoveryNormalizer';
 import { reprojectProviderProtocolChange } from '../settings/ProviderProtocolSwitchService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
@@ -21,6 +22,9 @@ import type { WorkbenchIpcContext } from './workbenchContext';
 export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void {
   effectiveCatalogService.setDiscoveryLoaderResolver((request) => (
     providerConnectionService.createEffectiveCatalogDiscoveryLoader(request)
+  ));
+  effectiveCatalogService.setDiscoveryLayerNormalizer((request, layer) => (
+    normalizeProviderDiscoveryLayer(request.providerId, layer)
   ));
   effectiveCatalogService.subscribe((snapshot) => {
     context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);

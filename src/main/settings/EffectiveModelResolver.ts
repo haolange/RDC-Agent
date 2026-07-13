@@ -16,6 +16,7 @@ import type { ConversationTurnControls, ReasoningControl } from '@shared/types/m
 import type { AppSettings, LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import { planModelRequest } from './RequestPlanner';
 import { parseCopilotBillingTiers } from './CopilotBilling';
+import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 import { settingsService } from './SettingsService';
 import { projectProtocolOverlays, resolveModelRoutePrecedence } from './ProviderRouteProjection';
 import {
@@ -174,11 +175,11 @@ export function completeDiscoveryContributions(
 ): CatalogModelContribution[] {
   if (provider.catalogOwnership !== 'app-managed') return contributions;
   const discoveredKeys = new Set(contributions.flatMap((model) => (
-    [model.modelId, ...(model.aliases ?? [])].map((value) => value.trim().toLowerCase()).filter(Boolean)
+    [model.modelId, ...(model.aliases ?? [])].map(normalizeDiscoveredModelMatchKey).filter(Boolean)
   )));
   const completed = [...contributions];
   for (const seed of getProviderSeedModelDefinitions(provider.id)) {
-    const seedKeys = [seed.modelId, ...(seed.aliases ?? [])].map((value) => value.trim().toLowerCase());
+    const seedKeys = [seed.modelId, ...(seed.aliases ?? [])].map(normalizeDiscoveredModelMatchKey);
     if (seedKeys.some((value) => discoveredKeys.has(value))) continue;
     completed.push({
       modelId: seed.modelId,

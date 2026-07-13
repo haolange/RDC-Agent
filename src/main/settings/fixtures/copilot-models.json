@@ -33,6 +33,28 @@
       }
     },
     {
+      "id": "claude-opus-4.8",
+      "name": "Claude Opus 4.8",
+      "model_picker_enabled": true,
+      "supported_endpoints": ["/chat/completions"],
+      "capabilities": {
+        "type": "chat",
+        "limits": { "max_prompt_tokens": 272000 },
+        "supports": { "tool_calls": true, "vision": true }
+      }
+    },
+    {
+      "id": "claude-opus-4.8-fast",
+      "name": "Claude Opus 4.8 (fast mode)",
+      "model_picker_enabled": true,
+      "supported_endpoints": ["/chat/completions"],
+      "capabilities": {
+        "type": "chat",
+        "limits": { "max_prompt_tokens": 272000 },
+        "supports": { "tool_calls": true, "vision": true }
+      }
+    },
+    {
       "id": "text-embedding-internal",
       "model_picker_enabled": false,
       "capabilities": { "type": "embeddings" }

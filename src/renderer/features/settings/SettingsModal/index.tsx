@@ -231,7 +231,6 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
           connectionDraft={connectionDraft}
           connectionProvider={connectionProvider}
           getResolvedProviderLabel={getResolvedProviderLabel}
-          providerCatalogCategories={providerCatalogCategories}
           connectionAccountConnected={connectionAccountConnected}
           connectionDevicePending={connectionDevicePending}
           connectionNeedsApiKey={connectionNeedsApiKey}

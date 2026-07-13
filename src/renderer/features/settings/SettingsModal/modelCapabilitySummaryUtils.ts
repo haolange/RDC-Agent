@@ -16,6 +16,7 @@ import type { LlmProviderEntry } from '@shared/types/settings';
 import { contextTierPromptCap, resolveContextTierChoices } from '@shared/utils/contextTiers';
 import { formatTokenCount } from '@shared/utils/tokens';
 import type { useI18n } from '../../../i18n';
+import { getProviderProtocolLabel } from './utils';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -174,8 +175,8 @@ export function buildCapabilityChips(model: EffectiveModel | null, t: Translate)
     {
       label: t('settings.providers.capability.route'),
       value: model ? (model.route.source === 'model'
-        ? t('settings.providers.capability.modelRoute', { protocol: model.route.protocol })
-        : model.route.protocol) : t('settings.providers.capability.unknown'),
+        ? t('settings.providers.capability.modelRoute', { protocol: getProviderProtocolLabel(model.route.protocol) })
+        : getProviderProtocolLabel(model.route.protocol)) : t('settings.providers.capability.unknown'),
       tone: model?.route.source === 'model' ? 'positive' : 'default',
     },
     { label: t('settings.providers.capability.context'), value: context, tone: context === t('settings.providers.capability.unknown') ? 'warning' : 'positive' },

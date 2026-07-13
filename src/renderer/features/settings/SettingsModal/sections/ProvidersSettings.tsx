@@ -5,7 +5,7 @@ import type { ProviderCatalogCategory } from '../types';
 import {
   getEnabledModels,
   getModelSummary,
-  getProviderCategoryLabel,
+  getProviderCategoryTranslation,
   getProviderProtocolLabel,
   getProviderStatusLabel,
 } from '../utils';
@@ -175,7 +175,7 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
     ...providerCatalogCategories,
     ...uncategorizedGroups.map((group) => ({
       id: group,
-      label: getProviderCategoryLabel({ category: group }),
+      label: group,
       description: '',
     })),
   ].filter((category) => category.id !== 'login-authorization')
@@ -198,8 +198,8 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
         {catalogSections.map(({ category, providers }) => (
           <React.Fragment key={category.id}>
             {renderProviderGroup(
-              category.label,
-              category.description || t('settings.addProviderHint'),
+              t(getProviderCategoryTranslation(category.id).label),
+              t(getProviderCategoryTranslation(category.id).description),
               providers,
               `settings-provider-group-${category.id}`,
               'add',

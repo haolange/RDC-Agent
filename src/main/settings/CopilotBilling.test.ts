@@ -8,7 +8,7 @@ const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'cop
 describe('Copilot billing catalog', () => {
   it('parses account-specific default and long-context prompt caps', () => {
     const catalog = parseCopilotModelCatalog(fixture);
-    expect(catalog.models.map((model) => model.id)).toEqual(['gpt-5.5', 'gpt-5-mini']);
+    expect(catalog.models.map((model) => model.id)).toEqual(['gpt-5.5', 'gpt-5-mini', 'claude-opus-4.8']);
     expect(catalog.contributions[0]).toMatchObject({
       modelId: 'gpt-5.5',
       defaultBudgetTokens: 272_000,
@@ -16,7 +16,14 @@ describe('Copilot billing catalog', () => {
       toolCalling: { state: 'supported' },
       visionInput: { state: 'supported' },
       structuredOutput: { state: 'supported' },
+      fast: { kind: 'unsupported' },
     });
+    expect(catalog.contributions.find((model) => model.modelId === 'claude-opus-4.8')?.fast).toEqual({
+      kind: 'model-variant',
+      modelId: 'claude-opus-4.8-fast',
+      entitlement: 'granted',
+    });
+    expect(catalog.contributions.some((model) => model.modelId === 'claude-opus-4.8-fast')).toBe(false);
     expect(parseCopilotBillingTiers(catalog.billingByModel['gpt-5.5'])).toEqual([
       { id: 'default', label: 'Default', maxPromptTokens: 272_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
       { id: 'long_context', label: 'Long context', maxPromptTokens: 922_000, activation: { kind: 'implicit' }, entitlement: 'unknown' },
