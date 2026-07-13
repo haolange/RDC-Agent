@@ -18,7 +18,7 @@ const t = (key: string, params?: Record<string, string | number>): string => {
 
 function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
   return {
-    providerId: 'provider-a', modelId: 'model-a', label: 'Model A', aliases: [],
+    providerId: 'provider-a', modelId: 'model-a', label: 'Model A', aliases: [], enabled: true,
     route: { protocol: 'AnthropicMessages', source: 'preset' }, availability: 'available',
     contextTiers: [{ id: 'default', label: 'Default', maxPromptTokens: 262_144, activation: { kind: 'implicit' }, entitlement: 'granted' }],
     fast: { kind: 'model-variant', modelId: 'model-a-fast', entitlement: 'granted' },

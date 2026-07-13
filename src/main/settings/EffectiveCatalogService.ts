@@ -26,6 +26,7 @@ export interface CatalogModelContribution {
   vendorId?: string;
   label?: string;
   aliases?: string[];
+  enabled?: boolean;
   route?: Partial<ModelRoute>;
   availability?: EffectiveModel['availability'];
   unavailableReason?: string;
@@ -128,6 +129,7 @@ function createConservativeModel(
     modelId,
     label: modelId,
     aliases: [],
+    enabled: true,
     route: cloneJson(fallbackRoute),
     availability: 'unknown',
     contextTiers: [{
@@ -147,6 +149,7 @@ function createConservativeModel(
       evidence('modelId'),
       evidence('label'),
       evidence('aliases'),
+      evidence('enabled'),
       evidence('route.protocol'),
       evidence('route.source'),
       evidence('availability'),
@@ -242,6 +245,7 @@ function sanitizeUserContribution(
     ...layer,
     models: layer.models.map((model) => ({
       modelId: model.modelId,
+      enabled: model.enabled,
       defaultBudgetTokens: model.defaultBudgetTokens,
       reasoning: model.reasoning?.defaultSelection
         ? { defaultSelection: model.reasoning.defaultSelection }

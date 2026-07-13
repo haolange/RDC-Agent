@@ -340,7 +340,6 @@ export class AgentManifestService {
   routesFromDefinitions(
     currentRoutes: LlmAgentRoute[],
     definitions: AgentManifestDraft[],
-    providers: LlmProviderEntry[],
   ): LlmAgentRoute[] {
     const routeMap = new Map(currentRoutes.map((route) => [route.agentId, route]));
     const routeAgentIds = new Set<string>(AGENT_ROLES);
@@ -358,18 +357,8 @@ export class AgentManifestService {
         });
         continue;
       }
-      const provider = providers.find((entry) => entry.id === model.providerId);
-      const modelEnabled = provider?.enabled
-        && provider.isConfigured
-        && provider.models.some((entry) => entry.id === model.modelId && entry.enabled !== false);
-      if (!modelEnabled) {
-        routeMap.set(definition.id, {
-          agentId: definition.id,
-          providerId: '',
-          modelId: '',
-        });
-        continue;
-      }
+      // Preserve the explicit canonical route. EffectiveCatalog is the only
+      // authority that may accept or reject the model at execution time.
       routeMap.set(definition.id, {
         agentId: definition.id,
         providerId: model.providerId,

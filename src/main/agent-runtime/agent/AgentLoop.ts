@@ -49,7 +49,7 @@ export interface AgentLoopConfig {
     signal?: AbortSignal,
   ) => Promise<TransformContextResult>;
   /** LLM 调用选项（temperature/maxTokens 等）。 */
-  streamOptions?: StreamOptions;
+  streamOptions: StreamOptions;
   /** 获取动态 API Key（支持 OAuth token 刷新）。 */
   getApiKey?: (provider: string) => Promise<string | undefined>;
   /** 最大工具执行轮数（防止无限循环）。 */
@@ -408,9 +408,7 @@ async function streamAssistantResponseWithRecovery(
           case 'escalate_tokens': {
             beginRecovery(lengthAction);
             recovery.markEscalated();
-            if (config.streamOptions) {
-              config.streamOptions.maxTokens = lengthAction.newMaxTokens;
-            }
+            config.streamOptions.maxTokens = lengthAction.newMaxTokens;
             continue;
           }
           case 'continue_prompt': {
@@ -456,9 +454,7 @@ async function streamAssistantResponseWithRecovery(
         case 'escalate_tokens': {
           beginRecovery(action);
           recovery.markEscalated();
-          if (config.streamOptions) {
-            config.streamOptions.maxTokens = action.newMaxTokens;
-          }
+          config.streamOptions.maxTokens = action.newMaxTokens;
           continue;
         }
         case 'reactive_compact': {
@@ -537,11 +533,11 @@ async function streamAssistantResponse(
   const dynamicKey = config.getApiKey
     ? await config.getApiKey(config.model.provider)
     : undefined;
-  const apiKey = dynamicKey ?? config.streamOptions?.apiKey;
+  const apiKey = dynamicKey ?? config.streamOptions.apiKey;
 
   // 5. 合并 stream options，传入 abort 信号
   const streamOptions: StreamOptions = {
-    ...(config.streamOptions ?? {}),
+    ...config.streamOptions,
     apiKey,
     signal: stream.signal,
   };

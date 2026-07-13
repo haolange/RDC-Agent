@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ReasoningControl } from '@shared/types/modelCapability';
+import type { RequestPlan } from '@shared/types/providerCapability';
 import { __testing as anthropicTesting } from './AnthropicProvider';
 import { __testing as geminiTesting } from './GeminiProvider';
 import { __testing as ollamaTesting } from './OllamaProvider';
@@ -20,6 +21,17 @@ const openAiLevels = {
     levels: { low: 'low', medium: 'medium', high: 'high', extra: 'xhigh' },
   },
 } satisfies ReasoningControl;
+
+const requestPlan: RequestPlan = {
+  providerId: 'openai',
+  effectiveModelId: 'gpt-5.5',
+  route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test', source: 'preset' },
+  headers: {},
+  bodyPatch: {},
+  contextBudgetTokens: 128_000,
+  activeTierId: 'default',
+  reasoningWire: { selection: 'off', control: openAiLevels },
+};
 
 const model = (api: Model['api']): Model => ({
   id: 'test-model',
@@ -49,7 +61,7 @@ describe('provider reasoning artifact replay policy', () => {
     const offResponsesBody = openAIResponsesTesting.buildRequestBody(
       { ...model('openai-responses'), id: 'gpt-5.5', provider: 'openai' },
       baseContext,
-      { reasoning: { selection: 'off', control: reasoningControl }, reasoningVisibility: 'summary-events' },
+      { requestPlan, reasoning: { selection: 'off', control: reasoningControl }, reasoningVisibility: 'summary-events' },
     );
     expect(offResponsesBody.reasoning).toBeUndefined();
     expect(offResponsesBody.include).toBeUndefined();
@@ -57,7 +69,7 @@ describe('provider reasoning artifact replay policy', () => {
     const levelResponsesBody = openAIResponsesTesting.buildRequestBody(
       { ...model('openai-responses'), id: 'gpt-5.5', provider: 'openai' },
       baseContext,
-      { reasoning: { selection: 'extra', control: reasoningControl }, reasoningVisibility: 'summary-events' },
+      { requestPlan, reasoning: { selection: 'extra', control: reasoningControl }, reasoningVisibility: 'summary-events' },
     );
     expect(levelResponsesBody.reasoning).toMatchObject({ effort: 'xhigh', summary: 'auto' });
     expect(levelResponsesBody.include).toEqual(['reasoning.encrypted_content']);
@@ -107,7 +119,7 @@ describe('provider reasoning artifact replay policy', () => {
     const requestBody = openAIResponsesTesting.buildRequestBody(
       { ...model('openai-responses'), id: 'gpt-5.5', provider: 'openai' },
       baseContext,
-      { reasoning: { selection: 'medium', control: reasoningControl }, reasoningVisibility: 'summary-events' },
+      { requestPlan, reasoning: { selection: 'medium', control: reasoningControl }, reasoningVisibility: 'summary-events' },
     );
     expect(requestBody.reasoning).toMatchObject({ summary: 'auto' });
     expect(requestBody.include).toEqual(['reasoning.encrypted_content']);

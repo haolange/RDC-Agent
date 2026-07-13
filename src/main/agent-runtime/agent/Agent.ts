@@ -68,7 +68,7 @@ export interface AgentOptions {
   /** 动态 API key 获取（支持 OAuth token 刷新）。 */
   getApiKey?: (provider: string) => Promise<string | undefined>;
   /** Provider stream 调用选项。 */
-  streamOptions?: StreamOptions;
+  streamOptions: StreamOptions;
   /** 最大工具执行轮数（防御性上限）。 */
   maxTurns?: number;
   /** 错误恢复管理器（可选）。用于 LLM 错误的自动重试/模型切换/压缩。 */
@@ -282,7 +282,7 @@ export class Agent {
       streamOptions: opts.streamOptions,
       getApiKey: opts.getApiKey,
       maxTurns: opts.maxTurns,
-      signal: opts.streamOptions?.signal,
+      signal: opts.streamOptions.signal,
       errorRecovery: opts.errorRecovery,
       onRequest: opts.onRequest,
       onResponse: opts.onResponse,

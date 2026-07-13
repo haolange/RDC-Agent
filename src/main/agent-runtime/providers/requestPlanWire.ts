@@ -27,13 +27,12 @@ function mergeJson(target: Record<string, unknown>, patch: JsonObject): void {
 
 export function applyRequestPlanBody(
   body: Record<string, unknown>,
-  requestPlan: RequestPlan | undefined,
+  requestPlan: RequestPlan,
 ): Record<string, unknown> {
-  if (requestPlan) mergeJson(body, requestPlan.bodyPatch);
+  mergeJson(body, requestPlan.bodyPatch);
   return body;
 }
 
-export function requestPlanHeaders(requestPlan: RequestPlan | undefined): Record<string, string> {
-  if (!requestPlan) return {};
+export function requestPlanHeaders(requestPlan: RequestPlan): Record<string, string> {
   return Object.fromEntries(Object.entries(requestPlan.headers).filter(([key]) => !SECRET_HEADER.test(key)));
 }

@@ -110,9 +110,6 @@ class BrowserAppBridgeClient {
       getEvents: (eventType) => this.invoke('evidence:getEvents', eventType),
     },
     llm: {
-      configure: (config) => this.invoke('llm:configure', config),
-      testConnection: (provider) => this.invoke('llm:testConnection', provider),
-      getAvailableModels: (provider) => this.invoke('llm:getAvailableModels', provider),
       testProviderDraft: (request) => this.invoke('llm:testProviderDraft', request),
       connectProvider: (request) => this.invoke('llm:connectProvider', request),
       refreshProviderModels: (providerId) => this.invoke('llm:refreshProviderModels', providerId),

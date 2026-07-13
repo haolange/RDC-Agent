@@ -9,7 +9,6 @@ import { replayDeviceService } from '../captures/ReplayDeviceService';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 import { debuggerRuntime } from '../workflow/debugger/DebuggerRuntime';
 import { runExecutionService } from '../workflow/debugger/RunExecutionService';
-import { llmAdapter } from '../settings/LLMAdapter';
 import { settingsService } from '../settings/SettingsService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
@@ -96,7 +95,6 @@ function broadcastRunStatusChanged(payload: {
 
 function applyCurrentLlmConfig(): void {
   const llmConfig = settingsService.getLlmConfig();
-  llmAdapter.configure(llmConfig);
   agentOrchestrator.applyLlmConfig(llmConfig);
 }
 

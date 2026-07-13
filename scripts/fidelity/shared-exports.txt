@@ -139,8 +139,6 @@ CommandExecuteRequest
 CommandListResult
 CommandResult
 CommandUiAction
-ContentBlock
-ContentBlockType
 CONTEXT_COMPACTION_RATIO
 ContextApi
 ContextImportance
@@ -292,8 +290,6 @@ LlmAgentRoute
 LLMAgentRouteConfig
 LlmApi
 LLMConfig
-LLMMessage
-LLMProvider
 LlmProviderAccountDiagnostic
 LlmProviderAccountLoginFinishRequest
 LlmProviderAccountLoginMode
@@ -317,8 +313,6 @@ LlmProviderModelAvailability
 LlmProviderModelDiscoveryStrategy
 LlmProviderProtocol
 LlmProviderProtocolDescriptor
-LLMRequest
-LLMResponse
 LlmSettings
 LLMStreamEvent
 LLMToolCallDelta
@@ -487,7 +481,6 @@ splitCanonicalAgentModelId
 STAGE_DISPLAY_NAMES
 STAGE_GROUPS
 STAGE_PHASES
-StreamCallback
 stringifyYaml
 SubAgentNode
 SUPER_GROK_OAUTH_CALLBACK_PORT

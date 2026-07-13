@@ -8,7 +8,6 @@ import type {
 } from '@shared/types/settings';
 import { appPathService } from '../runtime/AppPathService';
 import { agentManifestService } from '../settings/AgentManifestService';
-import { llmAdapter } from '../settings/LLMAdapter';
 import { providerConnectionService } from '../settings/ProviderConnectionService';
 import { settingsService } from '../settings/SettingsService';
 import { resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
@@ -29,19 +28,6 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const snapshot = resolveEffectiveCatalog(providerId, settingsService.getAll());
     if (snapshot) context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);
   };
-  ipcMain.handle('llm:configure', async (_event, config: unknown) => {
-    llmAdapter.configure(config as any);
-    return;
-  });
-
-  ipcMain.handle('llm:testConnection', async (_event, provider: string) => {
-    return llmAdapter.testConnection(provider);
-  });
-
-  ipcMain.handle('llm:getAvailableModels', async (_event, provider: string) => {
-    return llmAdapter.getAvailableModels(provider);
-  });
-
   ipcMain.handle('llm:testProviderDraft', async (_event, request: LlmProviderDraftRequest) => {
     return providerConnectionService.testProviderDraft(request);
   });

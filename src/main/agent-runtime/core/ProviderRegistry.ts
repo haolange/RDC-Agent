@@ -38,7 +38,7 @@ export interface ProviderStrategy {
   stream(
     model: Model,
     context: Context,
-    options?: StreamOptions,
+    options: StreamOptions,
   ): EventStream<AssistantMessageEvent, AssistantMessage>;
 
   /** 获取 Provider 能力矩阵。 */
@@ -85,7 +85,7 @@ export class ProviderRegistry {
   stream(
     model: Model,
     context: Context,
-    options?: StreamOptions,
+    options: StreamOptions,
   ): EventStream<AssistantMessageEvent, AssistantMessage> {
     const strategy = this.providers.get(model.api);
     if (!strategy) {

@@ -2,11 +2,6 @@ import { ipcRenderer } from 'electron';
 import type { LlmApi, SettingsApi } from '@shared/types/electron-api';
 
 export const createLlmApi = (): LlmApi => ({
-  configure: (config): ReturnType<LlmApi['configure']> => ipcRenderer.invoke('llm:configure', config),
-  testConnection: (provider): ReturnType<LlmApi['testConnection']> =>
-    ipcRenderer.invoke('llm:testConnection', provider),
-  getAvailableModels: (provider): ReturnType<LlmApi['getAvailableModels']> =>
-    ipcRenderer.invoke('llm:getAvailableModels', provider),
   testProviderDraft: (request): ReturnType<LlmApi['testProviderDraft']> =>
     ipcRenderer.invoke('llm:testProviderDraft', request),
   connectProvider: (request): ReturnType<LlmApi['connectProvider']> =>

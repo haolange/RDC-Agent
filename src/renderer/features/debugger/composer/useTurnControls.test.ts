@@ -12,7 +12,7 @@ import {
 const limitedLevelsCapability: EffectiveModel = {
   providerId: 'deepseek',
   modelId: 'deepseek-v4-flash',
-  label: 'DeepSeek', aliases: [],
+  label: 'DeepSeek', aliases: [], enabled: true,
   route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://example.test', source: 'preset' },
   availability: 'available',
   contextTiers: [{ id: 'default', label: 'Default', maxPromptTokens: 128_000, activation: { kind: 'implicit' }, entitlement: 'granted' }],
