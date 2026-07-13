@@ -57,7 +57,6 @@ import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService
 import { scopedInstructionResolver } from '../runtime/ScopedInstructionResolver';
 import { appPathService } from '../runtime/AppPathService';
 import { planEffectiveModelRequest, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
-import { resolveProviderModelAvailability } from '../settings/LlmRouteCompatibility';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
@@ -365,8 +364,8 @@ function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?: AgentR
     };
   }
 
-  const modelResolution = resolveProviderModelAvailability(provider, route.modelId);
-  if (!modelResolution.modelId) {
+  const effectiveModel = resolveEffectiveModel(route.providerId, route.modelId, settings);
+  if (!effectiveModel) {
     return {
       ok: false,
       diagnostic: createConversationDiagnostic({
@@ -376,25 +375,11 @@ function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?: AgentR
         userMessage: `当前 ${label} 链路的模型不可用：${route.providerId}/${route.modelId}。请在 Settings 中刷新模型列表或重新选择 route。`,
         providerId: route.providerId,
         modelId: route.modelId,
-        technicalMessage: modelResolution.unavailable?.message,
+        technicalMessage: `MODEL_UNAVAILABLE: ${route.providerId}/${route.modelId} is absent, disabled, or unavailable in the effective catalog.`,
       }),
     };
   }
-  const effectiveModelId = modelResolution.modelId;
-  const model = provider.models.find((entry) => entry.id === effectiveModelId);
-  if (!model?.enabled) {
-    return {
-      ok: false,
-      diagnostic: createConversationDiagnostic({
-        agentId,
-        code: 'CONVERSATION_LLM_ROUTE_MISSING',
-        severity: 'warning',
-        userMessage: `当前 ${label} 链路的模型不可用：${route.providerId}/${route.modelId}。请在 Settings 中刷新模型列表或重新选择 route。`,
-        providerId: route.providerId,
-        modelId: route.modelId,
-      }),
-    };
-  }
+  const effectiveModelId = effectiveModel.modelId;
 
   return {
     ok: true,
@@ -405,7 +390,7 @@ function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?: AgentR
     routeCapability: resolveAgentRouteCapability(
       provider,
       effectiveModelId,
-      resolveEffectiveModel(route.providerId, effectiveModelId, settings),
+      effectiveModel,
     ),
   };
 }

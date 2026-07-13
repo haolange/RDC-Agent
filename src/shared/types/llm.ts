@@ -1,52 +1,7 @@
-/**
- * LLM Types - LLM集成相关类型定义
- */
-
 import type { AgentRole } from './agent';
-import type { ResolvedReasoningSelection } from './modelCapability';
 import type { LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
 
-// 内容块类型
-export type ContentBlockType = 'text' | 'image' | 'tool_use' | 'tool_result';
-
-// 内容块
-export interface ContentBlock {
-  type: ContentBlockType;
-  text?: string;
-  source?: {
-    type: string;
-    media_type: string;
-    data: string;
-  };
-  tool_use_id?: string;
-  name?: string;
-  input?: Record<string, unknown>;
-  content?: string;
-}
-
-// LLM消息
-export interface LLMMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string | ContentBlock[];
-  name?: string;
-}
-
-// 工具定义
-export interface ToolDefinition {
-  name: string;
-  description: string;
-  input_schema: {
-    type: 'object';
-    properties: Record<string, {
-      type: string;
-      description: string;
-      enum?: string[];
-    }>;
-    required?: string[];
-  };
-}
-
-// 工具调用
+/** Provider-neutral tool call projection used by shared runtime events. */
 export interface ToolCall {
   id: string;
   name: string;
@@ -59,63 +14,14 @@ export interface LLMToolCallDelta {
   argumentsText?: string;
 }
 
-// LLM请求
-export interface LLMRequest {
-  messages: LLMMessage[];
-  model?: string;
-  maxTokens?: number;
-  temperature?: number;
-  topP?: number;
-  reasoning?: ResolvedReasoningSelection;
-  tools?: ToolDefinition[];
-  responseFormat?: 'json_object';
-  stream?: boolean;
-  signal?: AbortSignal;
-}
-
-// LLM响应
-export interface LLMResponse {
-  id: string;
-  model: string;
-  content: string | ContentBlock[];
-  toolCalls?: ToolCall[];
-  usage: {
-    inputTokens: number;
-    outputTokens: number;
-  };
-  stopReason: 'end_turn' | 'tool_use' | 'max_tokens';
-}
-
+/** Legacy-free stream event contract shared with renderer projections. */
 export type LLMStreamEvent =
-  | {
-      type: 'text-delta';
-      text: string;
-    }
-  | {
-      type: 'tool-call-delta';
-      toolCall: LLMToolCallDelta;
-    }
-  | {
-      type: 'done';
-    }
-  | {
-      type: 'error';
-      error: string;
-    };
+  | { type: 'text-delta'; text: string }
+  | { type: 'tool-call-delta'; toolCall: LLMToolCallDelta }
+  | { type: 'done' }
+  | { type: 'error'; error: string };
 
-// LLM Provider接口
-export interface LLMProvider {
-  name: string;
-  chat(request: LLMRequest): Promise<LLMResponse>;
-  streamChat(
-    request: LLMRequest,
-    onChunk: (chunk: LLMStreamEvent) => void
-  ): Promise<LLMResponse>;
-  isAvailable(): Promise<boolean>;
-  getModels(): string[];
-}
-
-// LLM配置
+/** Runtime credentials and transport metadata. Model capability never lives here. */
 export interface LLMProviderConfig {
   id: LlmProviderId;
   protocol: LlmProviderProtocol;
@@ -125,7 +31,6 @@ export interface LLMProviderConfig {
   apiKey: string;
   baseUrl?: string;
   accountId?: string;
-  models: string[];
   docsUrl?: string;
 }
 
@@ -135,10 +40,8 @@ export interface LLMAgentRouteConfig {
   modelId: string;
 }
 
+/** Runtime provider credentials plus user-selected agent routes. */
 export interface LLMConfig {
   providers: LLMProviderConfig[];
   agentRoutes: LLMAgentRouteConfig[];
 }
-
-// 流式响应回调
-export type StreamCallback = (chunk: LLMStreamEvent) => void;

@@ -367,7 +367,7 @@ export interface StreamOptions {
   /** 覆盖 Provider 默认 baseUrl。 */
   baseUrl?: string;
   /** Closed, secret-free wire contract compiled by RequestPlanner. */
-  requestPlan?: RequestPlan;
+  requestPlan: RequestPlan;
 }
 
 // =====================================================================

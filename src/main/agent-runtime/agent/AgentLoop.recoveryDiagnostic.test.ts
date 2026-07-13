@@ -11,6 +11,7 @@ import type {
   Model,
   StreamOptions,
 } from '../core/types';
+import type { RequestPlan } from '@shared/types/providerCapability';
 
 const TEST_MODEL: Model = {
   id: 'test-model',
@@ -21,6 +22,30 @@ const TEST_MODEL: Model = {
   maxTokens: 4096,
   reasoning: false,
   vision: false,
+};
+
+const TEST_REQUEST_PLAN: RequestPlan = {
+  providerId: 'test',
+  effectiveModelId: TEST_MODEL.id,
+  route: {
+    protocol: 'OpenAICompatibleChatCompletions',
+    baseUrl: 'https://example.test',
+    source: 'preset',
+  },
+  headers: {},
+  bodyPatch: {},
+  contextBudgetTokens: TEST_MODEL.contextWindow,
+  activeTierId: 'default',
+  reasoningWire: {
+    selection: 'off',
+    control: {
+      kind: 'none',
+      supportsOff: true,
+      levels: [],
+      defaultSelection: 'off',
+      wireProfile: { kind: 'none' },
+    },
+  },
 };
 
 function makeAssistantMessage(text: string): AssistantMessage {
@@ -93,7 +118,7 @@ describe('AgentLoop recovery diagnostics', () => {
       convertToLlm: (messages) => messages as Message[],
       errorRecovery: recovery,
       maxTurns: 1,
-      streamOptions: { maxTokens: 256 } satisfies StreamOptions,
+      streamOptions: { maxTokens: 256, requestPlan: TEST_REQUEST_PLAN } satisfies StreamOptions,
     }, provider);
 
     for await (const event of stream) {
@@ -144,6 +169,7 @@ describe('AgentLoop recovery diagnostics', () => {
       convertToLlm: (messages) => messages as Message[],
       errorRecovery: new ErrorRecovery({ primaryModel: TEST_MODEL }),
       maxTurns: 1,
+      streamOptions: { requestPlan: TEST_REQUEST_PLAN },
     }, provider);
 
     for await (const event of stream) {

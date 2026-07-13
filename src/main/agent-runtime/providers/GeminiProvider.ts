@@ -109,7 +109,7 @@ export class GeminiProvider implements ProviderStrategy {
   stream(
     model: Model,
     context: Context,
-    options: StreamOptions = {},
+    options: StreamOptions,
   ): EventStream<AssistantMessageEvent, AssistantMessage> {
     const stream = new EventStream<AssistantMessageEvent, AssistantMessage>(
       (event) => event.type === 'done',

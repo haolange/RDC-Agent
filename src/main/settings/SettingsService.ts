@@ -58,7 +58,6 @@ import { executionProfileService } from './ExecutionProfileService';
 import { providerCatalogService } from './ProviderCatalogService';
 import { normalizeProviderCategory, normalizeProviderProtocol } from './providerCatalogNormalize';
 import { secretStorageService } from './SecretStorageService';
-import { resolveProviderModelAvailability } from './LlmRouteCompatibility';
 
 type PersistedLlmProviderEntry = Partial<LlmProviderEntry>;
 
@@ -827,7 +826,6 @@ function hydrateProviderSecrets(
 
 function normalizeUserRoutes(
   routes: unknown,
-  providers: LlmProviderEntry[],
 ): LlmAgentRoute[] {
   const routeMap = new Map<string, LlmAgentRoute>(
     createEmptyAgentRoutes().map((route) => [route.agentId, route]),
@@ -845,15 +843,8 @@ function normalizeUserRoutes(
       continue;
     }
 
-    const provider = providers.find((entry) => entry.id === incoming.providerId);
-    if (provider) {
-      const resolution = resolveProviderModelAvailability(provider, incoming.modelId);
-      if (resolution.modelId && resolution.modelId !== incoming.modelId) {
-        routeMap.set(agentId, { ...incoming, modelId: resolution.modelId });
-      }
-    }
-    // Otherwise preserve the explicit route. Runtime reports MODEL_UNAVAILABLE
-    // with same-provider recommendations instead of clearing/substituting it.
+    // Preserve the explicit route. EffectiveCatalog resolves proven aliases and reports
+    // MODEL_UNAVAILABLE without mutating user settings or silently substituting a model.
   }
 
   return Array.from(routeMap.values());
@@ -967,7 +958,7 @@ export class SettingsService {
     const catalogProviders = normalizeUserProviders(nextProviders, workspaceRoot, {
       credentialPolicy: 'persisted',
     });
-    const normalizedRoutes = normalizeUserRoutes(rawRoutes, catalogProviders);
+    const normalizedRoutes = normalizeUserRoutes(rawRoutes);
     const nextRoutes = normalizedRoutes;
     const incomingRoutes = Array.isArray(rawRoutes) ? rawRoutes.map((entry) => {
       if (entry && typeof entry === 'object') {
@@ -1047,7 +1038,7 @@ export class SettingsService {
       ...provider,
       apiKey: '',
     }));
-    const nextRoutes = normalizeUserRoutes(candidate.llm?.agentRoutes, nextProviders);
+    const nextRoutes = normalizeUserRoutes(candidate.llm?.agentRoutes);
 
     return {
       appearance: {
@@ -1115,7 +1106,7 @@ export class SettingsService {
       agentRuntime: normalized.agentRuntime,
       llm: {
         providers: hydratedProviders,
-        agentRoutes: normalizeUserRoutes(normalized.llm?.agentRoutes ?? createEmptyAgentRoutes(), hydratedProviders),
+        agentRoutes: normalizeUserRoutes(normalized.llm?.agentRoutes ?? createEmptyAgentRoutes()),
       },
       agents: agentManifestService.getSettings(paths, hydratedProviders, normalized.llm?.agentRoutes ?? createEmptyAgentRoutes()),
       resourceCatalog,
@@ -1210,7 +1201,7 @@ export class SettingsService {
     const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.userRdxRoot, {
       credentialPolicy: providerCredentialPolicy,
     });
-    const currentRoutes = normalizeUserRoutes(patch.llm?.agentRoutes ?? currentPersisted.llm?.agentRoutes ?? [], nextProviders);
+    const currentRoutes = normalizeUserRoutes(patch.llm?.agentRoutes ?? currentPersisted.llm?.agentRoutes ?? []);
     if (patch.agents?.definitions) {
       agentManifestService.save(
         nextPaths,
@@ -1221,7 +1212,7 @@ export class SettingsService {
       agentManifestService.save(nextPaths, [], patch.agents.globalInstructions);
     }
     const manifestRoutes = patch.agents?.definitions
-      ? agentManifestService.routesFromDefinitions(currentRoutes, patch.agents.definitions, nextProviders)
+      ? agentManifestService.routesFromDefinitions(currentRoutes, patch.agents.definitions)
       : currentRoutes;
 
     const nextPersisted: PersistedSettingsPayload = {
@@ -1302,7 +1293,7 @@ export class SettingsService {
       },
       llm: {
         providers: nextProviders.map((provider) => ({ ...provider, apiKey: '' })),
-        agentRoutes: normalizeUserRoutes(manifestRoutes, nextProviders),
+        agentRoutes: normalizeUserRoutes(manifestRoutes),
       },
     };
 
@@ -1536,11 +1527,9 @@ export class SettingsService {
           baseUrl: accountCredential.baseUrl ?? provider.baseUrl,
           accountId: accountCredential.accountId,
           authMode: provider.authMode,
-          models: provider.models.filter((model) => model.enabled).map((model) => model.id),
           docsUrl: provider.docsUrl,
         };
-      })
-      .filter((provider) => provider.models.length > 0);
+      });
 
     return {
       providers,

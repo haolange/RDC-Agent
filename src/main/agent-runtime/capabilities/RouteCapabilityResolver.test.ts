@@ -18,6 +18,7 @@ function model(patch: Partial<EffectiveModel> = {}): EffectiveModel {
     modelId: 'model-a',
     label: 'Model A',
     aliases: [],
+    enabled: true,
     route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://example.test', source: 'preset' },
     availability: 'available',
     contextTiers: [{ id: 'default', label: 'Default', activation: { kind: 'implicit' }, entitlement: 'granted' }],

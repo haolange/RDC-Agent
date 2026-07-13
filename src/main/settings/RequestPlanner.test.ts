@@ -8,6 +8,7 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
     modelId: 'model-a',
     label: 'Model A',
     aliases: [],
+    enabled: true,
     route: {
       protocol: 'OpenAIResponses',
       baseUrl: 'https://example.test/v1',

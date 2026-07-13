@@ -5,7 +5,6 @@ require('./register-ts-source.cjs');
 
 const { AGENT_ROLES } = require('../src/shared/constants/agents.ts');
 const { createProviderEntryFromPreset } = require('../src/main/settings/ProviderPresetRegistry.ts');
-const { resolveCompatibleAgentRoute } = require('../src/main/settings/LlmRouteCompatibility.ts');
 const { resolveAgentRouteStatus } = require('../src/renderer/features/settings/SettingsModal/agentRouteStatus.ts');
 const {
   canonicalAgentModelId,
@@ -128,17 +127,6 @@ function main() {
   };
   const unavailable = resolveAgentRouteStatus(route('debugger', 'ollama', 'llama3'), [unavailableProvider]);
   assert(unavailable.issue === 'settings.routeReasonProviderUnavailable', 'Disabled provider should be reported as unavailable.');
-
-  const copilot = configuredProvider('github-copilot', ['gpt-4.1', 'gpt-5.4']);
-  const copilotRoutes = [
-    route('debugger', 'github-copilot', 'gpt-4.1'),
-    route('ask', 'github-copilot', 'gpt-5.4'),
-  ];
-  const remapped = resolveCompatibleAgentRoute(copilotRoutes, [copilot], 'ask');
-  assert(remapped.provider?.id === 'github-copilot', 'Copilot route should resolve provider.');
-  assert(remapped.requestedModelId === 'gpt-5.4', 'Copilot remap should preserve requested model.');
-  assert(remapped.route?.modelId === 'gpt-4.1', 'Copilot unsupported model should remap to a supported chat completions model.');
-  assert(Boolean(remapped.remapReason), 'Copilot remap should include a diagnostic reason.');
 
   assert(
     canonicalAgentModelId('deepseek', 'deepseek-chat') === 'deepseek:deepseek-chat',
@@ -297,7 +285,7 @@ function main() {
     assert(customDefinition.tools.includes('read') && customDefinition.tools.includes('search'), 'Custom profile should preserve declared tools.');
     assert(customDefinition.handoffs.some((handoff) => handoff.agent === 'edit'), 'Custom profile should preserve handoff definitions.');
 
-    const routeSettings = manifestService.routesFromDefinitions(validRoutes, manifestSettings.definitions, [ollama]);
+    const routeSettings = manifestService.routesFromDefinitions(validRoutes, manifestSettings.definitions);
     const customRoute = routeSettings.find((entry) => entry.agentId === customAgentId);
     assert(customRoute?.providerId === 'ollama' && customRoute.modelId === 'llama3', 'Custom manifest model should derive a valid route.');
     for (const agentId of AGENT_ROLES) {
@@ -321,9 +309,12 @@ function main() {
         id: 'custom-invalid-route-agent',
         models: [canonicalAgentModelId('ollama', 'missing-model')],
       }),
-    ], [ollama]);
+    ]);
     const invalidRoute = invalidRouteSettings.find((entry) => entry.agentId === 'custom-invalid-route-agent');
-    assert(invalidRoute?.providerId === '' && invalidRoute.modelId === '', 'Invalid custom route should fail closed without dropping agent id.');
+    assert(
+      invalidRoute?.providerId === 'ollama' && invalidRoute.modelId === 'missing-model',
+      'Manifest save must preserve an explicit route; EffectiveCatalog rejects unavailable models at execution time.',
+    );
 
     const importPath = path.join(tempRoot, 'custom-imported-agent.agent.md');
     writeCustomManifest(importPath, {

@@ -1,13 +1,13 @@
 import type { AgentRole } from '@shared/types/agent';
 import { isTopLevelAgentId } from '@shared/types/agent';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
-import type { AppSettings, RuntimeResourceCatalog, LlmAgentRoute, LlmProviderEntry, SettingsDiagnostic } from '@shared/types/settings';
+import type { AppSettings, RuntimeResourceCatalog, LlmAgentRoute, SettingsDiagnostic } from '@shared/types/settings';
 import type { EffectiveAgentRuntimeConfig } from '@shared/types/profile';
 import type { WorkflowStage } from '@shared/types/workflow';
 import { STAGE_PHASES } from '@shared/constants/stages';
 import { AGENT_CATEGORIES, AGENT_WRITE_SCOPES } from '@shared/constants/agents';
 import { agentRuntimeConfigService } from './AgentRuntimeConfigService';
-import { resolveCompatibleAgentRoute } from './LlmRouteCompatibility';
+import { resolveEffectiveModel } from './EffectiveModelResolver';
 
 const profileForAgent = (settings: AppSettings, agentId: AgentRole): AgentManifestDefinition | undefined =>
   settings.agents.definitions.find((definition) => definition.id === agentId && definition.enabled);
@@ -32,7 +32,7 @@ export class ExecutionProfileService {
     agentId: AgentRole,
   ): EffectiveAgentRuntimeConfig {
     const profile = profileForAgent(settings, agentId);
-    const route = this.resolveAgentRoute(settings.llm.agentRoutes, settings.llm.providers, agentId);
+    const route = this.resolveAgentRoute(settings, agentId);
     return {
       agentId,
       systemPrompt: profile?.instructions ?? `You are ${agentId}.`,
@@ -62,15 +62,15 @@ export class ExecutionProfileService {
   }
 
   private resolveAgentRoute(
-    routes: LlmAgentRoute[],
-    providers: LlmProviderEntry[],
+    settings: AppSettings,
     agentId: AgentRole,
   ): LlmAgentRoute | null {
-    const resolution = resolveCompatibleAgentRoute(routes, providers, agentId);
-    if (!resolution.route || !resolution.provider || resolution.unavailable) return null;
-    return resolution.provider.models.some((model) => model.enabled && model.id === resolution.route?.modelId)
-      ? resolution.route
-      : null;
+    const route = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId) ?? null;
+    if (!route?.providerId || !route.modelId) return null;
+    const provider = settings.llm.providers.find((entry) => entry.id === route.providerId);
+    if (!provider?.enabled || !provider.isConfigured || provider.status !== 'verified') return null;
+    const model = resolveEffectiveModel(route.providerId, route.modelId, settings);
+    return model ? { ...route, modelId: model.modelId } : null;
   }
 }
 

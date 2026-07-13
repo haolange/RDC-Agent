@@ -32,14 +32,14 @@ interface EncodedAgentModel {
 export function encodeAgentModel(
   providerId: string,
   modelId: string,
-  options?: { contextWindow?: number },
+  options: { contextWindow: number },
 ): Model {
   return {
     id: `${providerId}::${modelId}`,
     name: modelId,
     provider: providerId,
     api: CONFIGURED_PROVIDER_API,
-    contextWindow: options?.contextWindow ?? 256_000,
+    contextWindow: options.contextWindow,
     maxTokens: 4096,
     reasoning: false,
     vision: false,
@@ -59,13 +59,6 @@ function decodeAgentModel(model: Model): EncodedAgentModel {
     providerId: model.provider,
     modelId: model.id,
   };
-}
-
-function requireProviderProtocol(provider: ConfiguredProvider): LlmProviderProtocol {
-  if (!provider.protocol) {
-    throw new Error(`Provider ${provider.id} has no configured protocol.`);
-  }
-  return provider.protocol;
 }
 
 function normalizeLocalBaseUrl(baseUrl: string | undefined): string | undefined {
@@ -180,11 +173,11 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
   stream(
     model: Model,
     context: Context,
-    options: StreamOptions = {},
+    options: StreamOptions,
   ): EventStream<AssistantMessageEvent, AssistantMessage> {
     const decoded = decodeAgentModel(model);
     const requestPlan = options.requestPlan;
-    if (requestPlan && requestPlan.providerId !== decoded.providerId) {
+    if (requestPlan.providerId !== decoded.providerId) {
       return missingProviderStream(new Error(
         `RequestPlan provider ${requestPlan.providerId} does not match ${decoded.providerId}.`,
       ));
@@ -194,18 +187,8 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
     if (!provider) {
       return missingProviderStream(new Error(`No verified configured provider is available for ${decoded.providerId}.`));
     }
-    if (!provider.models.includes(decoded.modelId)) {
-      return missingProviderStream(new Error(`Model ${decoded.providerId}/${decoded.modelId} is not enabled for agent runtime.`));
-    }
-
-    let protocol: LlmProviderProtocol;
-    try {
-      protocol = requestPlan?.route.protocol ?? requireProviderProtocol(provider);
-    } catch (error) {
-      return missingProviderStream(error instanceof Error ? error : new Error(String(error)));
-    }
-
-    const effectiveModelId = requestPlan?.effectiveModelId ?? decoded.modelId;
+    const protocol = requestPlan.route.protocol;
+    const effectiveModelId = requestPlan.effectiveModelId;
     const effectiveModel = resolveEffectiveModel(decoded.providerId, decoded.modelId, settingsService.getAll());
     if (!effectiveModel) {
       return missingProviderStream(new Error(`No EffectiveModel is available for ${decoded.providerId}/${decoded.modelId}.`));
@@ -231,8 +214,8 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
       const latest = settingsService.getLlmConfig().providers.find((entry) => entry.id === decoded.providerId);
       if (!latest) return missingProviderStream(new Error(`Provider ${decoded.providerId} became unavailable.`));
       const latestBaseUrl = protocol === 'OllamaOpenAICompatibleChatCompletions'
-        ? normalizeLocalBaseUrl(requestPlan?.route.baseUrl ?? latest.baseUrl)
-        : requestPlan?.route.baseUrl ?? latest.baseUrl;
+        ? normalizeLocalBaseUrl(requestPlan.route.baseUrl ?? latest.baseUrl)
+        : requestPlan.route.baseUrl ?? latest.baseUrl;
       try {
         const strategy = createProviderStrategy({ ...latest, baseUrl: latestBaseUrl }, protocol, capabilities);
         return strategy.stream(runtimeModel, context, {

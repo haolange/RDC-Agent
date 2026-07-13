@@ -10,7 +10,7 @@ import {
 const levelsCapability: EffectiveModel = {
   providerId: 'openai',
   modelId: 'gpt-5.5',
-  label: 'GPT-5.5', aliases: [],
+  label: 'GPT-5.5', aliases: [], enabled: true,
   route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test', source: 'preset' },
   availability: 'available',
   contextTiers: [

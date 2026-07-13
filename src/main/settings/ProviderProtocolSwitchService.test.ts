@@ -10,7 +10,7 @@ import { clampControlsForProtocolModels } from './ProviderProtocolSwitchService'
 
 function model(id: string, patch: Partial<EffectiveModel>): EffectiveModel {
   return {
-    providerId: 'dual-provider', modelId: id, label: id, aliases: [],
+    providerId: 'dual-provider', modelId: id, label: id, aliases: [], enabled: true,
     route: { protocol: 'AnthropicMessages', baseUrl: 'https://example.test', source: 'user' },
     availability: 'available',
     contextTiers: [{ id: 'default', label: 'Default', maxPromptTokens: 200_000, activation: { kind: 'implicit' }, entitlement: 'granted' }],

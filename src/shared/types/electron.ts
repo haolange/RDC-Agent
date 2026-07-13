@@ -18,7 +18,6 @@ import type {
   ConversationTurnResult,
 } from './conversation';
 import type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from './device';
-import type { LLMConfig } from './llm';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from './providerCapability';
 import type { RuntimeLogEntry, RuntimeLogScope } from './runtimeLog';
 import type {
@@ -229,12 +228,6 @@ export interface ElectronAPI {
   };
 
   llm: {
-    configure: (config: LLMConfig) => Promise<void>;
-    testConnection: (provider: string) => Promise<{
-      success: boolean;
-      error?: string;
-    }>;
-    getAvailableModels: (provider: string) => Promise<string[]>;
     testProviderDraft: (request: LlmProviderDraftRequest) => Promise<LlmProviderConnectionResult>;
     connectProvider: (request: LlmProviderDraftRequest) => Promise<LlmProviderConnectionResult>;
     refreshProviderModels: (providerId: LlmProviderId) => Promise<LlmProviderConnectionResult>;

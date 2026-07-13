@@ -17,7 +17,6 @@ import { planModelRequest } from './RequestPlanner';
 import { parseCopilotBillingTiers } from './CopilotBilling';
 import { settingsService } from './SettingsService';
 import { projectProtocolOverlays, resolveModelRoutePrecedence } from './ProviderRouteProjection';
-import { resolveProviderModelAvailability } from './LlmRouteCompatibility';
 import {
   getProviderPreset,
   getProviderSeedModelDefinitions,
@@ -62,6 +61,7 @@ export function buildSeedModelContribution(
     modelId,
     label: modelId,
     aliases: [],
+    enabled: true,
     route: routeFor(provider),
     availability: 'unknown',
     contextTiers: [{
@@ -85,6 +85,7 @@ export function buildSeedModelContribution(
     modelId: base.modelId,
     label: seed?.label ?? modelId,
     aliases: [...(seed?.aliases ?? [])],
+    enabled: seed?.enabled ?? true,
   };
 }
 
@@ -132,20 +133,28 @@ function seedContribution(provider: LlmProviderEntry, requestedModelId?: string)
 }
 
 function userContribution(provider: LlmProviderEntry): CatalogLayerContribution | undefined {
-  if (provider.catalogOwnership !== 'user-managed') {
-    return undefined;
-  }
+  const appManagedIds = new Set(getProviderSeedModelDefinitions(provider.id).map((model) => model.modelId));
+  const configuredModels = provider.catalogOwnership === 'app-managed'
+    ? provider.models.filter((model) => appManagedIds.has(model.id))
+    : provider.models;
+  if (configuredModels.length === 0) return undefined;
   return {
     source: 'user',
     observedAt: provider.lastModelRefreshAt ?? provider.lastTestedAt ?? '2026-07-13T00:00:00.000Z',
-    detail: 'User-managed provider model definition',
-    models: provider.models.map((model) => ({
-      ...buildSeedModelContribution(provider, model.id),
-      label: model.label,
-      availability: model.availability
-        ?? (model.enabled === false ? 'unavailable' : 'available'),
-      unavailableReason: model.availabilityReason,
-    })),
+    detail: provider.catalogOwnership === 'user-managed'
+      ? 'User-managed provider model definition'
+      : 'User model selection state',
+    models: configuredModels.map((model) => (
+      provider.catalogOwnership === 'user-managed'
+        ? {
+            ...buildSeedModelContribution(provider, model.id),
+            label: model.label,
+            enabled: model.enabled !== false,
+            availability: model.availability ?? 'available',
+            unavailableReason: model.availabilityReason,
+          }
+        : { modelId: model.id, enabled: model.enabled !== false }
+    )),
   };
 }
 
@@ -213,16 +222,14 @@ export function resolveEffectiveModel(
 ): EffectiveModel | null {
   const provider = settings.llm.providers.find((entry) => entry.id === providerId);
   if (!provider) return null;
-  const availability = resolveProviderModelAvailability(provider, modelId);
-  if (!availability.modelId) return null;
-  const effectiveModelId = availability.modelId;
-  const snapshot = resolveEffectiveCatalog(providerId, settings, effectiveModelId);
+  const snapshot = resolveEffectiveCatalog(providerId, settings, modelId);
   if (!snapshot) {
     return null;
   }
-  return snapshot.models.find((model) => model.modelId === effectiveModelId)
-    ?? snapshot.models.find((model) => model.aliases.includes(effectiveModelId))
+  const model = snapshot.models.find((entry) => entry.modelId === modelId)
+    ?? snapshot.models.find((entry) => entry.aliases.includes(modelId))
     ?? null;
+  return model?.enabled !== false && model?.availability !== 'unavailable' ? model : null;
 }
 
 export function planEffectiveModelRequest(input: {
@@ -235,10 +242,6 @@ export function planEffectiveModelRequest(input: {
 }): RequestPlanningResult {
   const model = resolveEffectiveModel(input.providerId, input.modelId, input.settings);
   if (!model) {
-    const provider = input.settings.llm.providers.find((entry) => entry.id === input.providerId);
-    const unavailable = provider
-      ? resolveProviderModelAvailability(provider, input.modelId).unavailable
-      : undefined;
     const controls: ConversationTurnControls = {
       reasoningLevel: 'off',
       maxContextMode: false,
@@ -247,7 +250,7 @@ export function planEffectiveModelRequest(input: {
     return {
       ok: false,
       code: 'MODEL_UNAVAILABLE',
-      message: unavailable?.message ?? `Unknown model ${input.providerId}/${input.modelId}`,
+      message: `MODEL_UNAVAILABLE: ${input.providerId}/${input.modelId} is not enabled or available in the effective catalog.`,
       controls,
     };
   }

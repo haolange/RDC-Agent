@@ -109,6 +109,8 @@ export interface EffectiveModel {
   modelId: string;
   label: string;
   aliases: string[];
+  /** User selection state; capability availability remains provider/account evidence. */
+  enabled: boolean;
   route: ModelRoute;
   availability: EffectiveAvailability;
   unavailableReason?: string;
@@ -208,8 +210,8 @@ export type DiscoveryStrategy =
 
 export type SeedModelDefinition = Omit<
   EffectiveModel,
-  'providerId' | 'vendorId' | 'provenance' | 'quota'
->;
+  'providerId' | 'vendorId' | 'provenance' | 'quota' | 'enabled'
+> & { enabled?: boolean };
 
 export interface ProviderPresetRoute {
   protocol: LlmProviderProtocol;

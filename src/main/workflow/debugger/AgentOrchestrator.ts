@@ -107,7 +107,6 @@ import { getRdxRuntimeContext } from '../../sessions/RdxRuntimeContextRegistry';
 import { executionProfileService } from '../../settings/ExecutionProfileService';
 import { agentManifestService } from '../../settings/AgentManifestService';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
-import { llmAdapter } from '../../settings/LLMAdapter';
 import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
 import { settingsService } from '../../settings/SettingsService';
 import { planEffectiveModelRequest, recordEffectivePlanSuccess, resolveEffectiveModel } from '../../settings/EffectiveModelResolver';
@@ -393,7 +392,11 @@ export class AgentOrchestrator {
         toolAllowlist,
         contextWindowTokens: activeContextWindow,
         capability,
+        systemPrompt: config.systemPrompt,
       });
+      if (!stub && !promptPlan) {
+        throw new Error(`PROMPT_PLAN_UNAVAILABLE: ${agentId}`);
+      }
       const systemPrompt = promptPlan?.systemPrompt
         ?? this.systemPromptForAgent(agentId, config.systemPrompt);
       const responseText = stub
@@ -420,7 +423,7 @@ export class AgentOrchestrator {
           },
           projectRootPath: context?.projectRootPath ?? null,
           projectId: context?.projectId ?? null,
-          promptPlan: promptPlan ?? undefined,
+          promptPlan: promptPlan!,
           contextWindow: activeContextWindow,
           contextTokenLimit,
         });
@@ -491,8 +494,21 @@ export class AgentOrchestrator {
         requestedTemperature: config.temperature,
       });
       if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
+      const capability = resolveEffectiveModel(routeProviderId, routeModelId, settings);
+      if (!capability) throw new Error(`MODEL_UNAVAILABLE: ${routeProviderId}/${routeModelId}`);
       const activeContextWindow = planning.plan.contextBudgetTokens;
       const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
+      const promptPlan = options?.promptPlan ?? this.buildPromptPlanForAgentTurn({
+        agentId,
+        projectRootPath: options?.projectRootPath ?? null,
+        providerId: routeProviderId,
+        modelId: routeModelId,
+        toolAllowlist,
+        contextWindowTokens: activeContextWindow,
+        capability,
+        systemPrompt: config.systemPrompt,
+      });
+      if (!promptPlan) throw new Error(`PROMPT_PLAN_UNAVAILABLE: ${agentId}`);
       const contextRoute: SessionContextRoute = {
         providerId: routeProviderId,
         modelId: planning.plan.effectiveModelId,
@@ -508,7 +524,7 @@ export class AgentOrchestrator {
       const responseText = await this.runAgentTurn({
         agentId,
         content,
-        systemPrompt: this.systemPromptForAgent(agentId, config.systemPrompt),
+        systemPrompt: promptPlan.systemPrompt,
         providerId: routeProviderId,
         modelId: routeModelId,
         maxTokens: config.maxTokens,
@@ -527,7 +543,7 @@ export class AgentOrchestrator {
         },
         projectRootPath: options?.projectRootPath ?? null,
         projectId: options?.projectId ?? null,
-        promptPlan: options?.promptPlan,
+        promptPlan,
         contextWindow: activeContextWindow,
         contextTokenLimit,
         initialMessages: materialized.messages,
@@ -788,9 +804,9 @@ export class AgentOrchestrator {
     providerId: string,
     modelId: string,
     systemPrompt: string,
+    streamOptions: StreamOptions,
     tools: ToolDefinition[] = [],
     toolExecutor = this.createToolExecutor(agentId, [], undefined),
-    streamOptions?: StreamOptions,
     turnSignature = '',
     sessionId?: string | null,
     contextWindow?: number,
@@ -801,10 +817,14 @@ export class AgentOrchestrator {
     /** 用于 slot cache key；默认与注入 tools 相同。应传入全部可用工具以稳定复用。 */
     signatureTools?: ToolDefinition[],
   ): AgentSlot {
+    if (!promptPlan) {
+      throw new Error('PromptPlan is required before creating an agent runtime slot.');
+    }
     const slotKey = this.agentSlotKey(sessionId, agentId);
     const toolSignature = this.createToolSignature(signatureTools ?? tools);
+    const activeContextWindow = contextWindow ?? streamOptions.requestPlan.contextBudgetTokens;
     const resolvedContextTokenLimit = contextTokenLimit
-      ?? Math.floor((contextWindow ?? 256_000) * CONTEXT_COMPACTION_RATIO);
+      ?? Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
     const existing = this.agentSlots.get(slotKey);
     if (
       existing
@@ -824,7 +844,7 @@ export class AgentOrchestrator {
 
     // Every turn starts from the active branch materialized by the canonical
     // session journal. The in-memory slot is only an execution cache.
-    const agentModel = encodeAgentModel(providerId, modelId, { contextWindow });
+    const agentModel = encodeAgentModel(providerId, modelId, { contextWindow: activeContextWindow });
     const routeProvider = settingsService.getAll().llm.providers.find((provider) => provider.id === providerId);
     const reasoningContract = resolveAgentRouteCapability(
       routeProvider,
@@ -858,10 +878,7 @@ export class AgentOrchestrator {
       transformContext: (messages) => contextManager.compress(messages, agentModel),
       // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
       errorRecovery,
-      onRequest: promptPlan ? ({ model, context: requestContext, streamOptions: requestOptions }) => {
-        if (!requestOptions.requestPlan) {
-          throw new Error('RequestPlan is required before building a request envelope.');
-        }
+      onRequest: ({ model, context: requestContext, streamOptions: requestOptions }) => {
         const callIndex = requestSnapshotStore.nextCallIndex(sessionId ?? undefined, turnSignature || undefined);
         const snapshot = requestEnvelopeBuilder.build({
           promptPlan,
@@ -887,12 +904,10 @@ export class AgentOrchestrator {
         });
         requestSnapshotStore.write(snapshot);
         return snapshot.id;
-      } : undefined,
-      onResponse: promptPlan ? (requestId, message) => {
+      },
+      onResponse: (requestId, message) => {
         if (!requestId) return;
-        if (streamOptions?.requestPlan) {
-          recordEffectivePlanSuccess(providerId, modelId, settingsService.getAll(), streamOptions.requestPlan);
-        }
+        recordEffectivePlanSuccess(providerId, modelId, settingsService.getAll(), streamOptions.requestPlan);
         requestSnapshotStore.complete(requestId, sessionId ?? undefined, turnSignature || undefined, {
           inputTokens: message.usage.inputTokens,
           outputTokens: message.usage.outputTokens,
@@ -907,7 +922,7 @@ export class AgentOrchestrator {
             : {}),
           estimated: false,
         });
-      } : undefined,
+      },
     });
 
     const slot: AgentSlot = {
@@ -1954,7 +1969,7 @@ export class AgentOrchestrator {
     projectRootPath?: string | null;
     projectId?: string | null;
     /** Ask 路径由 ConversationService 传入的 prompt 分段字符数，用于细化 breakdown。 */
-    promptPlan?: PromptPlan;
+    promptPlan: PromptPlan;
     contextWindow?: number;
     contextTokenLimit?: number;
     initialMessages?: Message[];
@@ -2053,9 +2068,9 @@ export class AgentOrchestrator {
       input.providerId,
       input.modelId,
       input.systemPrompt,
+      streamOptions,
       activeToolDefinitions,
       toolExecutor,
-      streamOptions,
       input.turnId ?? '',
       input.sessionId,
       input.contextWindow,
@@ -2260,6 +2275,7 @@ export class AgentOrchestrator {
     toolAllowlist: string[];
     contextWindowTokens: number;
     capability: EffectiveModel;
+    systemPrompt?: string;
   }): PromptPlan | null {
     const runtimeSettings = settingsService.getAll();
     const definition = agentManifestService.getEffectiveProfiles(
@@ -2273,6 +2289,9 @@ export class AgentOrchestrator {
     if (!definition) {
       return null;
     }
+    const activeDefinition = input.systemPrompt
+      ? { ...definition, instructions: input.systemPrompt }
+      : definition;
 
     const provider = runtimeSettings.llm.providers.find((entry) => entry.id === input.providerId);
     const routeCapability = resolveAgentRouteCapability(provider, input.modelId, input.capability);
@@ -2284,12 +2303,12 @@ export class AgentOrchestrator {
           activePaths,
         })
       : { sources: [], totalBytes: 0, diagnostics: [] };
-    const preloadedSkills = definition.skills
+    const preloadedSkills = activeDefinition.skills
       .map((skillId) => agentRuntimeConfigService.loadSkill(skillId, input.projectRootPath ?? undefined))
       .filter((skill): skill is NonNullable<typeof skill> => skill !== null);
     const promptClock = resolvePromptClock();
     return promptPlanBuilder.build({
-      profile: definition,
+      profile: activeDefinition,
       scopedInstructions,
       preloadedSkills,
       skillCatalog: agentRuntimeConfigService.listSkillMetadata(input.projectRootPath ?? undefined),
@@ -2312,7 +2331,6 @@ export class AgentOrchestrator {
 
     await providerAccountAuthService.ensureRuntimeCredentials(providerId);
     const llmConfig = settingsService.getLlmConfig();
-    llmAdapter.configure(llmConfig);
     this.applyLlmConfig(llmConfig);
   }
 
