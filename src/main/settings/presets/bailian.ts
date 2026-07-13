@@ -19,8 +19,7 @@ const preset: ProviderPreset = {
     "chat",
     "tool-calling",
     "reasoning",
-    "prompt-cache",
-    "model-discovery"
+    "prompt-cache"
   ],
   "routes": [
     {

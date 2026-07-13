@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { ReasoningControl } from '@shared/types/modelCapability';
-import { applyAnthropicReasoning, buildOpenAiResponsesReasoning } from './reasoningWire';
+import {
+  applyAnthropicReasoning,
+  applyGeminiReasoning,
+  applyMoonshotReasoning,
+  applyOpenAiCompatibleReasoning,
+  buildOpenAiResponsesReasoning,
+} from './reasoningWire';
 
 const openAi56 = {
   kind: 'levels',
@@ -90,5 +96,57 @@ describe('applyAnthropicReasoning', () => {
 
     expect(body.thinking).toMatchObject({ type: 'enabled' });
     expect(body.output_config).toEqual({ effort: 'max' });
+  });
+});
+
+describe('remaining reasoning wire profiles', () => {
+  it('compiles OpenAI-compatible on/off activations and effort', () => {
+    const control = {
+      kind: 'levels', supportsOff: true, levels: ['high'], defaultSelection: 'high',
+      wireProfile: {
+        kind: 'openai-compatible', on: 'high', levels: { high: 'high' },
+        onMode: 'enable-thinking-true', offMode: 'enable-thinking-false',
+      },
+    } satisfies ReasoningControl;
+    const enabled: Record<string, unknown> = {};
+    applyOpenAiCompatibleReasoning(enabled, { selection: 'high', control });
+    expect(enabled).toEqual({ enable_thinking: true, reasoning_effort: 'high' });
+    const disabled: Record<string, unknown> = {};
+    applyOpenAiCompatibleReasoning(disabled, { selection: 'off', control });
+    expect(disabled).toEqual({ enable_thinking: false });
+  });
+
+  it('compiles Gemini thinking-level and thinking-budget profiles', () => {
+    const levelControl = {
+      kind: 'levels', supportsOff: false, levels: ['high'], defaultSelection: 'high',
+      wireProfile: { kind: 'gemini-thinking-level', on: 'high', levels: { high: 'high' } },
+    } satisfies ReasoningControl;
+    const levelConfig: Record<string, unknown> = {};
+    applyGeminiReasoning(levelConfig, { selection: 'high', control: levelControl });
+    expect(levelConfig).toEqual({ thinkingConfig: { thinkingLevel: 'high' } });
+
+    const budgetControl = {
+      kind: 'levels', supportsOff: true, levels: ['medium'], defaultSelection: 'medium',
+      wireProfile: { kind: 'gemini-thinking-budget', on: 'medium', levels: { medium: 8192 }, offBudget: 0 },
+    } satisfies ReasoningControl;
+    const enabledBudget: Record<string, unknown> = {};
+    applyGeminiReasoning(enabledBudget, { selection: 'medium', control: budgetControl });
+    expect(enabledBudget).toEqual({ thinkingConfig: { thinkingBudget: 8192 } });
+    const disabledBudget: Record<string, unknown> = {};
+    applyGeminiReasoning(disabledBudget, { selection: 'off', control: budgetControl });
+    expect(disabledBudget).toEqual({ thinkingConfig: { thinkingBudget: 0 } });
+  });
+
+  it('compiles Moonshot thinking on and off explicitly', () => {
+    const control = {
+      kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on',
+      wireProfile: { kind: 'moonshot-thinking', onMode: 'enabled', offMode: 'disabled' },
+    } satisfies ReasoningControl;
+    const enabled: Record<string, unknown> = {};
+    applyMoonshotReasoning(enabled, { selection: 'on', control });
+    expect(enabled).toEqual({ thinking: { type: 'enabled' } });
+    const disabled: Record<string, unknown> = {};
+    applyMoonshotReasoning(disabled, { selection: 'off', control });
+    expect(disabled).toEqual({ thinking: { type: 'disabled' } });
   });
 });

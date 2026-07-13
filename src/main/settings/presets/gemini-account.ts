@@ -12,7 +12,7 @@ const preset: ProviderPreset = {
   authModes: ['oauth'],
   authModeAvailability: { oauth: { state: 'unavailable', reason: 'No public contract.' } },
   accountLoginConfigured: false,
-  capabilities: ['chat', 'tool-calling', 'reasoning', 'vision-input', 'model-discovery'],
+  capabilities: ['chat', 'tool-calling', 'reasoning', 'vision-input'],
   routes: [{ protocol: 'GoogleGemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', default: true }],
   userSelectableRoute: false,
   discovery: null,

@@ -8,7 +8,8 @@ vi.mock('electron', () => ({
   safeStorage: { isEncryptionAvailable: () => false, decryptString: () => '', encryptString: (value: string) => Buffer.from(value) },
 }));
 
-import { buildSeedModelContribution } from './EffectiveModelResolver';
+import { mergeEffectiveCatalog } from './EffectiveCatalogService';
+import { buildEffectiveCatalogRequest } from './EffectiveModelResolver';
 
 interface FrozenEffectiveModel {
   providerId: string;
@@ -29,18 +30,20 @@ describe('final provider capability contracts', () => {
   it('matches the frozen representative EffectiveModel fixture directly', () => {
     const expected = JSON.parse(readFileSync(resolve(__dirname, 'fixtures/effective-model-contract.json'), 'utf8')) as FrozenEffectiveModel[];
     const actual = expected.map((entry) => {
-      const model = buildSeedModelContribution(provider(entry.providerId, entry.protocol), entry.modelId);
-      const defaultTier = model.contextTiers?.[0];
-      const maxTier = model.contextTiers?.[1];
+      const models = mergeEffectiveCatalog(buildEffectiveCatalogRequest(provider(entry.providerId, entry.protocol)));
+      const model = models.find((candidate) => candidate.modelId === entry.modelId);
+      expect(model).toBeDefined();
+      const defaultTier = model?.contextTiers[0];
+      const maxTier = model?.contextTiers[1];
       return {
         providerId: entry.providerId,
         modelId: entry.modelId,
-        protocol: model.route?.protocol,
-        defaultBudgetTokens: model.defaultBudgetTokens,
+        protocol: model?.route.protocol,
+        defaultBudgetTokens: model?.defaultBudgetTokens,
         defaultMaxPromptTokens: defaultTier?.maxPromptTokens ?? null,
         maxMaxPromptTokens: maxTier?.maxPromptTokens ?? null,
         maxActivation: maxTier?.activation?.kind ?? null,
-        fastKind: model.fast?.kind,
+        fastKind: model?.fast.kind,
       };
     });
     expect(actual).toEqual(expected);

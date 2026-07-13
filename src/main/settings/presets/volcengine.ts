@@ -17,8 +17,7 @@ const preset: ProviderPreset = {
   ],
   "capabilities": [
     "chat",
-    "tool-calling",
-    "model-discovery"
+    "tool-calling"
   ],
   "routes": [
     {
@@ -427,4 +426,3 @@ const preset: ProviderPreset = {
 };
 
 export default preset;
-

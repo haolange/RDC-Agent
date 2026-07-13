@@ -265,6 +265,14 @@ describe('EffectiveCatalogService', () => {
     expect(otherProtocol.contextTiers[0].label).toBe('Default');
     expect(otherProtocol.provenance).not.toContainEqual(expect.objectContaining({ source: 'entitlement' }));
 
+    await reloaded.refreshDiscovery(request(), async () => ({
+      models: [{ modelId: 'model-a', contextTiers: [{ id: 'default', entitlement: 'unknown' }] }],
+    }));
+    const replaced = reloaded.getSnapshot(request()).models[0];
+    expect(replaced.contextTiers[0].label).toBe('Default');
+    expect(replaced.provenance.filter((entry) => entry.field === 'contextTiers.default.entitlement').at(-1)?.source)
+      .toBe('discovery');
+
     reloaded.invalidateDiscovery({ providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol });
     expect(reloaded.getSnapshot(request()).models[0].contextTiers[0].label).toBe('Default');
   });
@@ -285,6 +293,30 @@ describe('EffectiveCatalogService', () => {
       source: 'observed',
       detail: 'real request',
     }));
+  });
+
+  it('uses the latest matching observed evidence and never leaks protocol-specific evidence', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    let nowMs = Date.parse('2026-01-02T00:00:00.000Z');
+    const service = new EffectiveCatalogService({ statePath, now: () => new Date(nowMs) });
+    service.recordObserved(
+      { providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol },
+      [{ modelId: 'model-a', toolCalling: { state: 'supported' } }],
+      'first result',
+    );
+    nowMs += 1000;
+    service.recordObserved(
+      { providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol },
+      [{ modelId: 'model-a', toolCalling: { state: 'unsupported', reason: 'latest rejection' } }],
+      'latest result',
+    );
+
+    const matching = service.getSnapshot(request()).models[0];
+    expect(matching.toolCalling).toEqual({ state: 'unsupported', reason: 'latest rejection' });
+    expect(matching.provenance.filter((entry) => entry.field === 'toolCalling.state').at(-1))
+      .toMatchObject({ source: 'observed', detail: 'latest result' });
+    expect(service.getSnapshot(request({ protocol: 'AnthropicMessages' })).models[0].toolCalling)
+      .toEqual({ state: 'supported' });
   });
 
   it('publishes observed and quota changes to the latest account/protocol snapshot', async () => {

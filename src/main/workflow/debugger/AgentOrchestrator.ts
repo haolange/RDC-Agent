@@ -875,7 +875,7 @@ export class AgentOrchestrator {
       streamOptions,
       maxTurns: this.resolveMaxTurns(agentId),
       // transformContext：长对话接近窗口上限时自动压缩历史。
-      transformContext: (messages) => contextManager.compress(messages, agentModel),
+      transformContext: (messages) => contextManager.compress(messages),
       // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
       errorRecovery,
       onRequest: ({ model, context: requestContext, streamOptions: requestOptions }) => {

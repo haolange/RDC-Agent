@@ -76,32 +76,11 @@ export interface ConversationTurnControls {
   fastModel: boolean;
 }
 
-export type ModelCapabilitySourceKind = 'official' | 'observed' | 'conservative';
-
-export interface ModelCapabilitySource {
-  kind: ModelCapabilitySourceKind;
-  updatedAt: string;
-  urls: string[];
-  note?: string;
-}
-
-export interface ModelCapabilityProfile {
-  nominalContextWindowTokens?: number;
-  reasoningControl?: ReasoningControl;
-  fast?: { modelId: string };
-  /** When set, provider requests must use this temperature (e.g. kimi-for-coding allows only 1). */
-  fixedTemperature?: number;
-  toolCalling?: boolean;
-  visionInput?: boolean;
-  structuredOutput?: boolean;
-}
-
 export interface ResolvedReasoningSelection {
   selection: ReasoningSelection;
   control: ReasoningControl;
 }
 
-export const DEFAULT_CONTEXT_WINDOW_TOKENS = 256_000;
 export const CONTEXT_COMPACTION_RATIO = 0.8;
 
 export function isNamedReasoningLevel(value: unknown): value is NamedReasoningLevel {
@@ -227,17 +206,4 @@ export function clampReasoningSelection(
     }
   }
   return best;
-}
-
-export function coerceReasoningSelectionCandidate(
-  value: unknown,
-  control: ReasoningControl | null | undefined,
-): ReasoningSelection | undefined {
-  if (value === 'auto') {
-    return control ? resolveOnSelection(control) : undefined;
-  }
-  if (value === 'extHigh') {
-    return 'extra';
-  }
-  return clampReasoningSelection(value, control);
 }

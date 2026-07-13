@@ -141,20 +141,6 @@ export type LlmProviderCapability =
   | 'video-generation';
 export type LlmProviderConnectionStatus = 'unconfigured' | 'verified' | 'failed' | 'unavailable';
 export type LlmProviderModelAvailability = 'available' | 'unavailable' | 'unknown';
-export type LlmProviderModelDiscoveryStrategy =
-  | 'openai-compatible'
-  | 'anthropic'
-  | 'anthropic-candidate-validation'
-  | 'google-ai-studio'
-  | 'azure-openai'
-  | 'ollama-tags'
-  | 'account-catalog'
-  | 'grok-account-catalog'
-  | 'opencode-go-catalog'
-  | 'cline-catalog'
-  | 'minimax-account-catalog'
-  | 'static';
-
 export interface SidebarLayoutPreference {
   collapsed: boolean;
   width: number;
@@ -279,7 +265,6 @@ export interface LlmProviderEntry {
   providerAvailability: LlmProviderAvailability;
   category: LlmProviderCategory;
   catalogOwnership: LlmProviderCatalogOwnership;
-  modelDiscovery: LlmProviderModelDiscoveryStrategy | null;
   label: string;
   enabled: boolean;
   apiKey: string;

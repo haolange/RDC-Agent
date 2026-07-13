@@ -100,8 +100,6 @@ export type { ArtifactRecord, HarnessTask, RunCapsule, VerificationResult } from
 export type { LLMConfig, LLMStreamEvent, ToolCall } from './llm';
 export type {
   ConversationTurnControls,
-  ModelCapabilitySource,
-  ModelCapabilityProfile,
   NamedReasoningLevel,
   ReasoningControl,
   ReasoningSelection,
@@ -197,7 +195,6 @@ export type {
   LlmProviderEntry,
   LlmProviderId,
   LlmProviderModel,
-  LlmProviderModelDiscoveryStrategy,
   LlmProviderProtocol,
   LlmProviderProtocolDescriptor,
   ResolvedTheme,

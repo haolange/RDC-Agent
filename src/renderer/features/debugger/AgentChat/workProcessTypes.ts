@@ -95,7 +95,7 @@ export type WorkProcessRow =
     bodyText?: string;
     /** Optional short result sample shown under bodyText while collapsed (search family). */
     bodyLines?: string[];
-    /** Content-layer preview shape (legacy; family drives the card template). */
+    /** Content-layer preview shape; family drives the card template. */
     previewKind?: 'shell' | 'skill' | 'file' | 'web' | 'generic';
     /** Shell command for the two-pane terminal header (`$ cmd`). */
     commandText?: string;

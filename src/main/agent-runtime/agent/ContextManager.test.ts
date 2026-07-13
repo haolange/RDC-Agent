@@ -32,10 +32,21 @@ function toolResult(toolCallId: string, toolName: string, text: string): ToolRes
   };
 }
 
+function createContextManager(
+  config: Partial<ConstructorParameters<typeof ContextManager>[0]> = {},
+): ContextManager {
+  return new ContextManager({ contextTokenLimit: 64_000, ...config });
+}
+
 describe('ContextManager', () => {
+  it('fails closed when compression has no RequestPlan-derived budget', async () => {
+    expect(() => new ContextManager({ contextTokenLimit: 0 }))
+      .toThrow('RequestPlan context budget');
+  });
+
   describe('convertToLlm', () => {
     it('应保留 user/assistant/toolResult 消息', () => {
-      const cm = new ContextManager();
+      const cm = createContextManager();
       const msgs: AgentMessage[] = [
         user('hello'),
         assistant('hi'),
@@ -49,7 +60,7 @@ describe('ContextManager', () => {
     });
 
     it('应过滤掉自定义消息', () => {
-      const cm = new ContextManager();
+      const cm = createContextManager();
       const custom: AgentMessage = {
         role: 'custom' as AgentMessage['role'],
       } as AgentMessage;
@@ -63,14 +74,14 @@ describe('ContextManager', () => {
 
   describe('estimateTokens', () => {
     it('应基于 4 字符 ≈ 1 token 估算', () => {
-      const cm = new ContextManager();
+      const cm = createContextManager();
       const msgs: AgentMessage[] = [user('hello world!')]; // 12 chars
       const tokens = cm.estimateTokens(msgs);
       expect(tokens).toBe(Math.ceil(12 / 4)); // 3
     });
 
     it('应累加多条消息的 token', () => {
-      const cm = new ContextManager();
+      const cm = createContextManager();
       const msgs: AgentMessage[] = [
         user('aaaa'), // 4 chars = 1 token
         assistant('bbbbbbbb'), // 8 chars = 2 tokens
@@ -82,7 +93,7 @@ describe('ContextManager', () => {
 
   describe('compress — 工具结果预算', () => {
     it('工具结果总大小在预算内时不应修改', async () => {
-      const cm = new ContextManager({ toolResultBudget: 1000 });
+      const cm = createContextManager({ toolResultBudget: 1000 });
       const msgs: AgentMessage[] = [
         user('hi'),
         toolResult('tc1', 'read', 'short output'),
@@ -96,7 +107,7 @@ describe('ContextManager', () => {
     });
 
     it('工具结果超出预算时应截断', async () => {
-      const cm = new ContextManager({ toolResultBudget: 100 });
+      const cm = createContextManager({ toolResultBudget: 100 });
       const longText = 'x'.repeat(5000);
       const msgs: AgentMessage[] = [
         user('hi'),
@@ -113,7 +124,7 @@ describe('ContextManager', () => {
 
   describe('compress — snip', () => {
     it('消息数超出 maxMessages 时应 snip 中间部分', async () => {
-      const cm = new ContextManager({ maxMessages: 5 });
+      const cm = createContextManager({ maxMessages: 5 });
       const msgs: AgentMessage[] = [];
       for (let i = 0; i < 20; i++) {
         msgs.push(user(`msg ${i}`));
@@ -128,7 +139,7 @@ describe('ContextManager', () => {
     });
 
     it('消息数未超 maxMessages 时不应 snip', async () => {
-      const cm = new ContextManager({ maxMessages: 100 });
+      const cm = createContextManager({ maxMessages: 100 });
       const msgs: AgentMessage[] = [];
       for (let i = 0; i < 10; i++) {
         msgs.push(user(`msg ${i}`));
@@ -141,7 +152,7 @@ describe('ContextManager', () => {
 
   describe('compress — micro', () => {
     it('早期工具结果应被 compacted', async () => {
-      const cm = new ContextManager({
+      const cm = createContextManager({
         keepRecentToolResults: 1,
         maxMessages: 100,
         toolResultBudget: 100000,
@@ -171,7 +182,7 @@ describe('ContextManager', () => {
 
   describe('compress — full', () => {
     it('所有压缩级别都过一遍后应产生摘要', async () => {
-      const cm = new ContextManager({
+      const cm = createContextManager({
         contextTokenLimit: 1, // 极低限制确保进入 full compact
         toolResultBudget: 10,
         maxMessages: 2,

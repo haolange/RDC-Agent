@@ -59,13 +59,13 @@ describe('turnControlsUtils', () => {
     });
   });
 
-  it('maps legacy extHigh and auto values through the shared normalization path', () => {
+  it('rejects noncanonical reasoning values instead of translating removed aliases', () => {
     expect(sanitizeTurnControls({
-      effort: 'extHigh',
+      reasoningLevel: 'noncanonical',
       maxContextMode: false,
       fastModel: false,
     }, levelsCapability)).toEqual({
-      reasoningLevel: 'extra',
+      reasoningLevel: 'medium',
       maxContextMode: false,
       fastModel: false,
     });
@@ -80,11 +80,11 @@ describe('turnControlsUtils', () => {
         kind: 'toggle',
         supportsOff: true,
         levels: [],
-        defaultSelection: 'on',
+        defaultSelection: 'off',
         wireProfile: { kind: 'none' },
       },
     })).toEqual({
-      reasoningLevel: 'on',
+      reasoningLevel: 'off',
       maxContextMode: false,
       fastModel: false,
     });

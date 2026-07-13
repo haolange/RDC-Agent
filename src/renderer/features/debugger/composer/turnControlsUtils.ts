@@ -16,7 +16,6 @@ export const DEFAULT_TURN_CONTROLS: ConversationTurnControls = {
 
 type TurnControlsInput = Partial<Omit<ConversationTurnControls, 'reasoningLevel'>> & {
   reasoningLevel?: unknown;
-  effort?: unknown;
 };
 
 export function formatTokenCount(value: number): string {
@@ -36,10 +35,7 @@ export function sanitizeTurnControls(
   capability: EffectiveModel | null,
 ): ConversationTurnControls {
   if (!capability) return DEFAULT_TURN_CONTROLS;
-  return evaluateModelControls(capability, {
-    ...controls,
-    reasoningLevel: controls.reasoningLevel ?? controls.effort,
-  }).controls;
+  return evaluateModelControls(capability, controls).controls;
 }
 
 export function hasSelectableMaxTier(capability: EffectiveModel | null): boolean {

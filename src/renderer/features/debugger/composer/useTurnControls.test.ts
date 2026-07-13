@@ -77,12 +77,12 @@ describe('useTurnControls sync guards', () => {
     });
   });
 
-  it('tracks legacy effort values in the persisted session fingerprint', () => {
+  it('tracks only canonical reasoning values in the persisted session fingerprint', () => {
     expect(buildSessionTurnControlsKey({
-      effort: 'extHigh',
+      reasoningLevel: 'max',
       maxContextMode: true,
       fastModel: false,
-    })).toContain('"effort":"extHigh"');
+    })).toBe('{"reasoningLevel":"max","maxContextMode":true,"fastModel":false}');
   });
 
   it('detects pending capability keys', () => {

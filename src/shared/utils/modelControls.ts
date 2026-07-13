@@ -1,5 +1,5 @@
 import type { ConversationTurnControls } from '../types/modelCapability';
-import { coerceReasoningSelectionCandidate } from '../types/modelCapability';
+import { clampReasoningSelection } from '../types/modelCapability';
 import type {
   CapabilityConstraintSelector,
   EffectiveModel,
@@ -27,7 +27,7 @@ function clampToCapabilities(
 ): ConversationTurnControls {
   const choices = resolveContextTierChoices(model);
   return {
-    reasoningLevel: coerceReasoningSelectionCandidate(input.reasoningLevel, model.reasoning)
+    reasoningLevel: clampReasoningSelection(input.reasoningLevel, model.reasoning)
       ?? model.reasoning.defaultSelection,
     maxContextMode: input.maxContextMode === true && Boolean(choices.maxTier),
     fastModel: input.fastModel === true && isFastModeSelectable(model),
@@ -67,7 +67,7 @@ export function evaluateModelControls(
       }
       const { control, value } = constraint.action;
       if (control === 'reasoningLevel' && typeof value === 'string') {
-        controls.reasoningLevel = coerceReasoningSelectionCandidate(value, model.reasoning)
+        controls.reasoningLevel = clampReasoningSelection(value, model.reasoning)
           ?? model.reasoning.defaultSelection;
       } else if (control === 'fastModel' && typeof value === 'boolean') {
         controls.fastModel = value;

@@ -70,7 +70,6 @@ export {
 } from './stages';
 export {
   CONTEXT_COMPACTION_RATIO,
-  DEFAULT_CONTEXT_WINDOW_TOKENS,
   NAMED_REASONING_LEVELS,
   REASONING_SELECTIONS,
   isReasoningSelection,

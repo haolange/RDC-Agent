@@ -171,6 +171,31 @@ describe('SettingsService provider persistence', () => {
     expect(runtime.llm.providers.find((entry) => entry.id === 'deepseek')?.isConfigured).toBe(true);
   });
 
+  it('migrates an encrypted secret record even when safeStorage is temporarily unavailable', async () => {
+    const { settingsPath, workspaceRoot } = await createVerifiedPersistedSettings();
+    const { secretStorageService } = await import('./SecretStorageService');
+    electronMock.encryptionAvailable = true;
+    const sourceRef = secretStorageService.createProviderSecretRef('deepseek');
+    secretStorageService.setSecret(sourceRef, 'sk-encrypted', workspaceRoot);
+    electronMock.encryptionAvailable = false;
+
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    const runtime = service.initialize();
+    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+      schemaVersion?: number;
+      llm: { providers: Array<{ id: string; activeAccountId?: string; secretRef?: string }> };
+    };
+    const provider = persisted.llm.providers.find((entry) => entry.id === 'deepseek');
+
+    expect(persisted.schemaVersion).toBe(2);
+    expect(provider?.activeAccountId).toMatch(/^account-/);
+    expect(provider?.secretRef).toContain('-account-');
+    expect(secretStorageService.hasSecretRecord(sourceRef, workspaceRoot)).toBe(false);
+    expect(secretStorageService.hasSecretRecord(provider?.secretRef, workspaceRoot)).toBe(true);
+    expect(runtime.llm.providers.find((entry) => entry.id === 'deepseek')?.isConfigured).toBe(false);
+  });
+
   it('migrates an OAuth bundle using its upstream account id', async () => {
     const { createProviderEntryFromPreset } = await import('./ProviderPresetRegistry');
     const { secretStorageService } = await import('./SecretStorageService');
@@ -188,8 +213,8 @@ describe('SettingsService provider persistence', () => {
       llm: { providers: [provider], agentRoutes: [] },
     }), 'utf8');
     const bundle = JSON.stringify({ accessToken: 'oauth-token', accountId: 'acct-upstream' });
-    const legacyRef = secretStorageService.createProviderOAuthSecretRef('chatgpt-account');
-    secretStorageService.setSecret(legacyRef, bundle, workspaceRoot);
+    const unkeyedRef = secretStorageService.createProviderOAuthSecretRef('chatgpt-account');
+    secretStorageService.setSecret(unkeyedRef, bundle, workspaceRoot);
 
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
@@ -200,8 +225,53 @@ describe('SettingsService provider persistence', () => {
 
     expect(persisted.llm.providers.find((entry) => entry.id === 'chatgpt-account')?.activeAccountId)
       .toBe('acct-upstream');
-    expect(secretStorageService.getSecret(legacyRef, workspaceRoot)).toBe('');
+    expect(secretStorageService.getSecret(unkeyedRef, workspaceRoot)).toBe('');
     expect(service.getProviderOAuthSecret('chatgpt-account', workspaceRoot)).toBe(bundle);
+  });
+
+  it('never reactivates an unkeyed credential after the canonical schema marker is committed', async () => {
+    const { createProviderEntryFromPreset } = await import('./ProviderPresetRegistry');
+    const { secretStorageService } = await import('./SecretStorageService');
+    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const settingsPath = path.join(workspaceRoot, 'config.json');
+    const provider = {
+      ...createProviderEntryFromPreset('chatgpt-account'),
+      enabled: true,
+      hasStoredSecret: true,
+      isConfigured: true,
+      status: 'verified' as const,
+    };
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    fs.writeFileSync(settingsPath, JSON.stringify({
+      schemaVersion: 2,
+      llm: { providers: [provider], agentRoutes: [] },
+    }), 'utf8');
+    const unkeyedRef = secretStorageService.createProviderOAuthSecretRef('chatgpt-account');
+    secretStorageService.setSecret(unkeyedRef, JSON.stringify({ accessToken: 'unkeyed' }), workspaceRoot);
+
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    const runtime = service.initialize();
+
+    expect(runtime.llm.providers.find((entry) => entry.id === 'chatgpt-account')).toMatchObject({
+      activeAccountId: undefined,
+      hasStoredSecret: false,
+      isConfigured: false,
+    });
+    expect(service.getProviderOAuthSecret('chatgpt-account', workspaceRoot)).toBe('');
+    expect(secretStorageService.hasSecret(unkeyedRef, workspaceRoot)).toBe(true);
+  });
+
+  it('stages account-keyed secrets without deleting the source before settings commit', async () => {
+    const { secretStorageService } = await import('./SecretStorageService');
+    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const sourceRef = secretStorageService.createProviderSecretRef('deepseek');
+    const targetRef = secretStorageService.createProviderAccountSecretRef('deepseek', 'account-staged', 'api-key');
+    secretStorageService.setSecret(sourceRef, 'sk-staged', workspaceRoot);
+
+    expect(secretStorageService.copySecret(sourceRef, targetRef, workspaceRoot)).toBe(true);
+    expect(secretStorageService.hasSecret(sourceRef, workspaceRoot)).toBe(true);
+    expect(secretStorageService.hasSecret(targetRef, workspaceRoot)).toBe(true);
   });
 
   it('atomically rotates account tokens without replacing the current model catalog', async () => {

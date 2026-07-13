@@ -65,6 +65,7 @@ import { secretStorageService } from './SecretStorageService';
 type PersistedLlmProviderEntry = Partial<LlmProviderEntry>;
 
 interface PersistedSettingsPayload {
+  schemaVersion?: number;
   appearance?: Partial<UiPreferences>;
   layout?: Partial<LayoutPreferences>;
   profile?: Partial<ProfileSettings>;
@@ -86,6 +87,7 @@ interface HardRebuildResult {
   changed: boolean;
   fixes: string[];
   warnings: string[];
+  secretRefsToDelete: string[];
 }
 
 interface NormalizedPersistedSettings {
@@ -100,10 +102,12 @@ interface NormalizedPersistedSettings {
   };
 }
 
-type ProviderCredentialPolicy = 'runtime' | 'persisted';
+const SETTINGS_SCHEMA_VERSION = 2;
+
+type ProviderCredentialView = 'runtime' | 'storage-metadata';
 
 interface ProviderSanitizeOptions {
-  credentialPolicy?: ProviderCredentialPolicy;
+  credentialView?: ProviderCredentialView;
 }
 
 const LEFT_DEFAULTS = {
@@ -400,12 +404,10 @@ function getProviderAccountSecretRef(
   providerId: string,
   accountId: string | undefined,
   kind: 'api-key' | 'oauth',
-): string {
+): string | undefined {
   return accountId
     ? secretStorageService.createProviderAccountSecretRef(providerId, accountId, kind)
-    : kind === 'oauth'
-      ? secretStorageService.createProviderOAuthSecretRef(providerId)
-      : secretStorageService.createProviderSecretRef(providerId);
+    : undefined;
 }
 
 function resolveProviderAuthMode(
@@ -637,6 +639,7 @@ function createEmptyAgentRoutes(): LlmAgentRoute[] {
 
 function createDefaultPersistedSettings(): PersistedSettingsPayload {
   return {
+    schemaVersion: SETTINGS_SCHEMA_VERSION,
     appearance: DEFAULT_APPEARANCE,
     layout: DEFAULT_LAYOUT,
     profile: DEFAULT_PROFILE,
@@ -743,10 +746,7 @@ function sanitizeUserProvider(
   const authMode = resolveProviderAuthMode(provider, builtinFallback);
   const authAccountIds = sanitizeAuthAccountIds(provider, authMode);
   const activeAccountId = authAccountIds[authMode];
-  const incomingSecretRef = typeof provider.secretRef === 'string' && provider.secretRef.trim()
-    ? provider.secretRef.trim()
-    : undefined;
-  const secretRef = incomingSecretRef || secretStorageService.createProviderSecretRef(rawId);
+  const secretRef = getProviderAccountSecretRef(rawId, authAccountIds['api-key'], 'api-key');
   const protocol = normalizeProviderProtocol({ ...provider, id: rawId });
   const catalogOwnership = getProviderPresetCatalogOwnership(rawId);
   const models = resolveProviderModels(rawId, provider.models ?? []);
@@ -755,10 +755,10 @@ function sanitizeUserProvider(
     getProviderAccountSecretRef(rawId, authAccountIds.account, 'oauth'),
     workspaceRoot,
   );
-  const preservePersistedCredentialState = options.credentialPolicy === 'persisted';
+  const preserveStorageMetadata = options.credentialView === 'storage-metadata';
   const hasStoredSecretByAuthMode = Object.fromEntries(
     (builtinFallback.authModeOptions ?? [builtinFallback.authMode]).map((mode) => {
-      const persisted = preservePersistedCredentialState && (
+      const persisted = preserveStorageMetadata && (
         provider.hasStoredSecretByAuthMode?.[mode] === true
         || (mode === authMode && provider.hasStoredSecret === true)
       );
@@ -809,7 +809,6 @@ function sanitizeUserProvider(
     providerAvailability: { ...builtinFallback.providerAvailability },
     category: normalizeProviderCategory({ ...provider, id: rawId, authMode }),
     catalogOwnership,
-    modelDiscovery: builtinFallback.modelDiscovery,
     label,
     enabled,
     apiKey: '',
@@ -980,8 +979,10 @@ export class SettingsService {
   ): HardRebuildResult {
     const fallback = createDefaultPersistedSettings();
     const candidate = raw ?? fallback;
+    const requiresCredentialMigration = candidate.schemaVersion !== SETTINGS_SCHEMA_VERSION;
     const fixes: string[] = [];
     const warnings: string[] = [];
+    const secretRefsToDelete = new Set<string>();
     const persistedRawProviders = Array.isArray(candidate.llm?.providers) ? candidate.llm?.providers : [];
     const persistedRawRoutes = Array.isArray(candidate.llm?.agentRoutes) ? candidate.llm?.agentRoutes : [];
 
@@ -1010,38 +1011,49 @@ export class SettingsService {
       const builtin = createProviderEntryFromPreset(rawId);
       const authMode = resolveProviderAuthMode(entry, builtin);
       const authAccountIds = sanitizeAuthAccountIds(entry, authMode);
-      const legacyApiKeyRef = secretStorageService.createProviderSecretRef(rawId);
-      const legacyOAuthRef = secretStorageService.createProviderOAuthSecretRef(rawId);
+      const unkeyedApiKeyRef = secretStorageService.createProviderSecretRef(rawId);
+      const unkeyedOAuthRef = secretStorageService.createProviderOAuthSecretRef(rawId);
       const incomingSecretRef = typeof entry.secretRef === 'string' && entry.secretRef.trim()
         ? entry.secretRef.trim()
         : undefined;
-      let secretRef = incomingSecretRef || legacyApiKeyRef;
-      if (entry.apiKey?.trim()) {
+      let secretRef = incomingSecretRef || unkeyedApiKeyRef;
+      if (requiresCredentialMigration && entry.apiKey?.trim()) {
         secretStorageService.setSecret(secretRef, entry.apiKey.trim(), workspaceRoot);
         fixes.push(`Migrated plaintext secret for ${rawId}`);
       }
 
-      if (builtin.authModeOptions?.includes('account')) {
-        const legacyBundle = secretStorageService.getSecret(legacyOAuthRef, workspaceRoot);
+      if (requiresCredentialMigration && builtin.authModeOptions?.includes('account')) {
+        const unkeyedBundle = secretStorageService.getSecret(unkeyedOAuthRef, workspaceRoot);
+        const hasUnkeyedBundle = secretStorageService.hasSecretRecord(unkeyedOAuthRef, workspaceRoot);
         authAccountIds.account = authAccountIds.account
           ?? (authMode === 'account' ? entry.activeAccountId : undefined)
-          ?? extractOAuthBundleAccountId(legacyBundle)
-          ?? (legacyBundle ? createLocalAccountId() : undefined);
+          ?? extractOAuthBundleAccountId(unkeyedBundle)
+          ?? (hasUnkeyedBundle ? createLocalAccountId() : undefined);
         if (authAccountIds.account) {
-          const accountRef = getProviderAccountSecretRef(rawId, authAccountIds.account, 'oauth');
-          if (secretStorageService.moveSecret(legacyOAuthRef, accountRef, workspaceRoot)) {
+          const accountRef = secretStorageService.createProviderAccountSecretRef(
+            rawId,
+            authAccountIds.account,
+            'oauth',
+          );
+          if (secretStorageService.copySecret(unkeyedOAuthRef, accountRef, workspaceRoot)) {
+            secretRefsToDelete.add(unkeyedOAuthRef);
             fixes.push(`Migrated OAuth secret to account key for ${rawId}`);
           }
         }
       }
-      if (builtin.authModeOptions?.includes('api-key')) {
-        const existingSecret = secretStorageService.getSecret(secretRef, workspaceRoot);
+      if (requiresCredentialMigration && builtin.authModeOptions?.includes('api-key')) {
+        const hasExistingSecret = secretStorageService.hasSecretRecord(secretRef, workspaceRoot);
         authAccountIds['api-key'] = authAccountIds['api-key']
           ?? (authMode === 'api-key' ? entry.activeAccountId : undefined)
-          ?? (existingSecret ? createLocalAccountId() : undefined);
+          ?? (hasExistingSecret ? createLocalAccountId() : undefined);
         if (authAccountIds['api-key']) {
-          const accountRef = getProviderAccountSecretRef(rawId, authAccountIds['api-key'], 'api-key');
-          if (secretStorageService.moveSecret(secretRef, accountRef, workspaceRoot)) {
+          const accountRef = secretStorageService.createProviderAccountSecretRef(
+            rawId,
+            authAccountIds['api-key'],
+            'api-key',
+          );
+          if (secretStorageService.copySecret(secretRef, accountRef, workspaceRoot)) {
+            secretRefsToDelete.add(secretRef);
             fixes.push(`Migrated API key secret to account key for ${rawId}`);
           }
           secretRef = accountRef;
@@ -1054,9 +1066,7 @@ export class SettingsService {
         activeAccountId: authAccountIds[authMode],
         authAccountIds,
         secretRef,
-      }, workspaceRoot, {
-        credentialPolicy: 'persisted',
-      });
+      }, workspaceRoot, { credentialView: 'storage-metadata' });
       if (!sanitized) {
         fixes.push(`Removed non-catalog provider ${rawId}`);
         continue;
@@ -1070,7 +1080,7 @@ export class SettingsService {
     }
 
     const catalogProviders = normalizeUserProviders(nextProviders, workspaceRoot, {
-      credentialPolicy: 'persisted',
+      credentialView: 'storage-metadata',
     });
     const normalizedRoutes = normalizeUserRoutes(rawRoutes);
     const nextRoutes = normalizedRoutes;
@@ -1100,6 +1110,7 @@ export class SettingsService {
     }
 
     const nextSettings: PersistedSettingsPayload = {
+      schemaVersion: SETTINGS_SCHEMA_VERSION,
       appearance: {
         theme: pickEnum(candidate.appearance?.theme, VALID_THEMES, fallback.appearance?.theme ?? 'dark'),
         language: pickEnum(candidate.appearance?.language, VALID_LANGUAGES, fallback.appearance?.language ?? 'zh-CN'),
@@ -1138,6 +1149,7 @@ export class SettingsService {
       changed: JSON.stringify(candidate) !== JSON.stringify(nextSettings),
       fixes,
       warnings,
+      secretRefsToDelete: [...secretRefsToDelete],
     };
   }
 
@@ -1190,11 +1202,12 @@ export class SettingsService {
   }
 
   private persistHardRebuild(
-    _paths: AppRuntimePaths,
+    paths: AppRuntimePaths,
     _previous: PersistedSettingsPayload | null,
     result: HardRebuildResult,
   ): void {
     this.writeSettings(result.settings);
+    this.deleteSecretsAfterCommit(result.secretRefsToDelete, paths.userRdxRoot);
   }
 
   private toRuntimeSettings(
@@ -1237,7 +1250,19 @@ export class SettingsService {
   private writeSettings(settings: PersistedSettingsPayload): void {
     const filePath = appPathService.getRuntimePaths().settingsPath;
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf8');
+    const temporaryPath = `${filePath}.${process.pid}.tmp`;
+    try {
+      fs.writeFileSync(temporaryPath, JSON.stringify(settings, null, 2), 'utf8');
+      fs.renameSync(temporaryPath, filePath);
+    } finally {
+      if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+    }
+  }
+
+  private deleteSecretsAfterCommit(secretRefs: Iterable<string>, workspaceRoot: string): void {
+    for (const secretRef of new Set(secretRefs)) {
+      secretStorageService.deleteSecret(secretRef, workspaceRoot);
+    }
   }
 
   getAll(runtimePaths?: Partial<AppRuntimePaths>): AppSettings {
@@ -1282,11 +1307,12 @@ export class SettingsService {
     const currentPersisted = this.normalizePersistedSettings(
       readJsonFile<PersistedSettingsPayload>(nextPaths.settingsPath) ?? createDefaultPersistedSettings(),
       nextPaths.userRdxRoot,
-      { credentialPolicy: 'persisted' },
+      { credentialView: 'storage-metadata' },
     );
 
     const hasProviderPatch = Boolean(patch.llm?.providers);
-    const providerCredentialPolicy: ProviderCredentialPolicy = hasProviderPatch ? 'runtime' : 'persisted';
+    const providerCredentialView: ProviderCredentialView = hasProviderPatch ? 'runtime' : 'storage-metadata';
+    const secretRefsToDelete = new Set<string>();
     const providerDrafts = (patch.llm?.providers ?? currentPersisted.llm?.providers ?? []).map((provider) => {
       const authAccountIds = { ...(provider.authAccountIds ?? {}) };
       if (provider.activeAccountId && !authAccountIds[provider.authMode]) {
@@ -1301,13 +1327,13 @@ export class SettingsService {
           const previousRef = secretRef;
           authAccountIds['api-key'] = createLocalAccountId();
           secretRef = getProviderAccountSecretRef(provider.id, authAccountIds['api-key'], 'api-key');
-          if (previousRef !== secretRef) {
-            secretStorageService.moveSecret(previousRef, secretRef, nextPaths.userRdxRoot);
+          if (previousRef && previousRef !== secretRef) {
+            secretRefsToDelete.add(previousRef);
           }
         }
         secretStorageService.setSecret(secretRef, apiKey, nextPaths.userRdxRoot);
       } else if (provider.authMode === 'api-key' && provider.hasStoredSecretByAuthMode?.['api-key'] !== true && !provider.hasStoredSecret) {
-        secretStorageService.deleteSecret(secretRef, nextPaths.userRdxRoot);
+        if (secretRef) secretRefsToDelete.add(secretRef);
         delete authAccountIds['api-key'];
       }
       return sanitizeUserProvider({
@@ -1315,10 +1341,10 @@ export class SettingsService {
         activeAccountId: authAccountIds[provider.authMode],
         authAccountIds,
         secretRef,
-      }, nextPaths.userRdxRoot, { credentialPolicy: providerCredentialPolicy });
+      }, nextPaths.userRdxRoot, { credentialView: providerCredentialView });
     }).filter((provider): provider is LlmProviderEntry => provider !== null);
     const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.userRdxRoot, {
-      credentialPolicy: providerCredentialPolicy,
+      credentialView: providerCredentialView,
     });
     const currentRoutes = normalizeUserRoutes(patch.llm?.agentRoutes ?? currentPersisted.llm?.agentRoutes ?? []);
     if (patch.agents?.definitions) {
@@ -1335,6 +1361,7 @@ export class SettingsService {
       : currentRoutes;
 
     const nextPersisted: PersistedSettingsPayload = {
+      schemaVersion: SETTINGS_SCHEMA_VERSION,
       appearance: {
         theme: pickEnum(
           patch.appearance?.theme ?? currentPersisted.appearance?.theme,
@@ -1417,6 +1444,7 @@ export class SettingsService {
     };
 
     this.writeSettings(nextPersisted);
+    this.deleteSecretsAfterCommit(secretRefsToDelete, nextPaths.userRdxRoot);
     return this.getAll({
       ...nextPaths,
       ...(runtimePaths ?? {}),
@@ -1523,13 +1551,9 @@ export class SettingsService {
       ?? provider.authAccountIds?.account
       ?? createLocalAccountId();
     const nextSecretRef = getProviderAccountSecretRef(provider.id, activeAccountId, 'oauth');
-    if (provider.authAccountIds?.account && provider.authAccountIds.account !== activeAccountId) {
-      secretStorageService.moveSecret(
-        getProviderAccountSecretRef(provider.id, provider.authAccountIds.account, 'oauth'),
-        nextSecretRef,
-        current.paths.userRdxRoot,
-      );
-    }
+    const previousSecretRef = provider.authAccountIds?.account && provider.authAccountIds.account !== activeAccountId
+      ? getProviderAccountSecretRef(provider.id, provider.authAccountIds.account, 'oauth')
+      : undefined;
     secretStorageService.setSecret(nextSecretRef, secretPayload, current.paths.userRdxRoot);
 
     const timestamp = nowIso();
@@ -1555,12 +1579,14 @@ export class SettingsService {
       isConfigured: hasEnabledModels,
     };
 
-    return this.setAll({
+    const nextSettings = this.setAll({
       llm: {
         providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
         agentRoutes: current.llm.agentRoutes,
       },
     });
+    this.deleteSecretsAfterCommit(previousSecretRef ? [previousSecretRef] : [], current.paths.userRdxRoot);
+    return nextSettings;
   }
 
   rotateProviderAccountCredential(
@@ -1577,13 +1603,9 @@ export class SettingsService {
       ?? provider.authAccountIds?.account
       ?? createLocalAccountId();
     const nextSecretRef = getProviderAccountSecretRef(provider.id, activeAccountId, 'oauth');
-    if (provider.authAccountIds?.account && provider.authAccountIds.account !== activeAccountId) {
-      secretStorageService.moveSecret(
-        getProviderAccountSecretRef(provider.id, provider.authAccountIds.account, 'oauth'),
-        nextSecretRef,
-        current.paths.userRdxRoot,
-      );
-    }
+    const previousSecretRef = provider.authAccountIds?.account && provider.authAccountIds.account !== activeAccountId
+      ? getProviderAccountSecretRef(provider.id, provider.authAccountIds.account, 'oauth')
+      : undefined;
     secretStorageService.setSecret(nextSecretRef, secretPayload, current.paths.userRdxRoot);
     const nextProvider: LlmProviderEntry = {
       ...provider,
@@ -1598,12 +1620,14 @@ export class SettingsService {
       oauthExpiresAt: accountSummary.oauthExpiresAt,
       oauthRefreshAvailable: accountSummary.oauthRefreshAvailable,
     };
-    return this.setAll({
+    const nextSettings = this.setAll({
       llm: {
         providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
         agentRoutes: current.llm.agentRoutes,
       },
     });
+    this.deleteSecretsAfterCommit(previousSecretRef ? [previousSecretRef] : [], current.paths.userRdxRoot);
+    return nextSettings;
   }
 
   markProviderAccountRefreshFailure(providerId: LlmProviderId, message: string): AppSettings {
@@ -1628,23 +1652,23 @@ export class SettingsService {
     const authMode = authModeDraft && provider.authModeOptions?.includes(authModeDraft)
       ? authModeDraft
       : provider.authMode;
+    const secretRefToDelete = authMode === 'api-key'
+      ? provider.secretRef
+      : authMode === 'account'
+        ? getProviderAccountSecretRef(provider.id, provider.authAccountIds?.account, 'oauth')
+        : undefined;
     const authAccountIds = { ...(provider.authAccountIds ?? {}) };
     const hasStoredSecretByAuthMode = { ...(provider.hasStoredSecretByAuthMode ?? {}) };
     if (authMode === 'api-key') {
-      secretStorageService.deleteSecret(provider.secretRef, current.paths.userRdxRoot);
       delete authAccountIds['api-key'];
       hasStoredSecretByAuthMode['api-key'] = false;
     } else if (authMode === 'account') {
-      secretStorageService.deleteSecret(
-        getProviderAccountSecretRef(provider.id, authAccountIds.account, 'oauth'),
-        current.paths.userRdxRoot,
-      );
       delete authAccountIds.account;
       hasStoredSecretByAuthMode.account = false;
     }
 
     if (authMode !== provider.authMode) {
-      return this.setAll({
+      const nextSettings = this.setAll({
         llm: {
           providers: current.llm.providers.map((entry) => entry.id === providerId
             ? { ...provider, authAccountIds, hasStoredSecretByAuthMode }
@@ -1652,6 +1676,8 @@ export class SettingsService {
           agentRoutes: current.llm.agentRoutes,
         },
       });
+      this.deleteSecretsAfterCommit(secretRefToDelete ? [secretRefToDelete] : [], current.paths.userRdxRoot);
+      return nextSettings;
     }
 
     const fallback = createProviderEntryFromPreset(provider.id);
@@ -1676,12 +1702,14 @@ export class SettingsService {
       isConfigured: false,
     };
 
-    return this.setAll({
+    const nextSettings = this.setAll({
       llm: {
         providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
         agentRoutes: current.llm.agentRoutes,
       },
     });
+    this.deleteSecretsAfterCommit(secretRefToDelete ? [secretRefToDelete] : [], current.paths.userRdxRoot);
+    return nextSettings;
   }
 
   getLlmConfig(): LLMConfig {
