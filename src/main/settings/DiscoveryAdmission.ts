@@ -14,9 +14,19 @@ const DEFAULT_DENY_PATTERNS = [
   '*computer-use*',
 ];
 
+const NON_AGENT_MODALITIES = new Set([
+  'audio', 'embedding', 'embeddings', 'image', 'moderation', 'rerank', 'reranker',
+  'speech', 'transcription', 'tts',
+]);
+
 export interface DiscoveryAdmissionDecision {
   accepted: boolean;
   reason?: 'missing-id' | 'allowlist' | 'deny-pattern' | 'modality' | 'unproven-alias';
+}
+
+export interface DiscoveredModelIdentity {
+  id: string;
+  aliases: string[];
 }
 
 function readString(record: Record<string, unknown>, ...keys: string[]): string | undefined {
@@ -45,6 +55,20 @@ export function extractDiscoveredModelId(value: unknown): string {
   return readString(value as Record<string, unknown>, 'id', 'name') ?? '';
 }
 
+export function extractDiscoveredModelIdentity(value: unknown): DiscoveredModelIdentity {
+  const discoveredId = extractDiscoveredModelId(value);
+  if (!discoveredId || !value || typeof value !== 'object' || Array.isArray(value)) {
+    return { id: discoveredId, aliases: [] };
+  }
+  const record = value as Record<string, unknown>;
+  const recordKind = readString(record, 'type', 'kind', 'object')?.toLowerCase();
+  const isAlias = record.is_alias === true || record.isAlias === true || recordKind === 'alias';
+  const canonicalId = readString(record, 'canonical_id', 'canonicalId', 'target', 'target_id', 'targetId');
+  return isAlias && canonicalId
+    ? { id: canonicalId, aliases: discoveredId === canonicalId ? [] : [discoveredId] }
+    : { id: discoveredId, aliases: [] };
+}
+
 export function evaluateDiscoveryAdmission(
   value: unknown,
   admission: DiscoveryAdmission = {},
@@ -64,6 +88,20 @@ export function evaluateDiscoveryAdmission(
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     const record = value as Record<string, unknown>;
     const modality = readString(record, 'modality')?.toLowerCase();
+    const capabilities = record.capabilities && typeof record.capabilities === 'object' && !Array.isArray(record.capabilities)
+      ? record.capabilities as Record<string, unknown>
+      : {};
+    const declaredKinds = [
+      modality,
+      readString(record, 'type', 'kind')?.toLowerCase(),
+      readString(capabilities, 'type', 'modality')?.toLowerCase(),
+      ...(Array.isArray(record.output_modalities)
+        ? record.output_modalities.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.toLowerCase())
+        : []),
+    ].filter((entry): entry is string => Boolean(entry));
+    if (declaredKinds.some((entry) => NON_AGENT_MODALITIES.has(entry))) {
+      return { accepted: false, reason: 'modality' };
+    }
     const allowedModalities = admission.allowedModalities?.map((entry) => entry.toLowerCase());
     if (modality && allowedModalities?.length && !allowedModalities.includes(modality)) {
       return { accepted: false, reason: 'modality' };

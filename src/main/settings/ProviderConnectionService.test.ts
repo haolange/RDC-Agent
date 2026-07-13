@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { LlmProviderModel } from '@shared/types/settings';
 import {
   mergeManagedModelAvailability,
+  normalizeDiscoveredModels,
   normalizeCodingPlanModelMatchKey,
   selectSupportedCodingPlanModels,
   resolveCodingPlanModelsUrl,
@@ -67,6 +68,19 @@ describe('coding-plan Anthropic discovery routing', () => {
 });
 
 describe('mergeManagedModelAvailability', () => {
+  it('collapses proven discovery aliases into one canonical model row', () => {
+    expect(normalizeDiscoveredModels([
+      { id: 'vendor-2026-07' },
+      { id: 'vendor-latest', type: 'alias', canonical_id: 'vendor-2026-07' },
+      { id: 'vendor-floating', type: 'alias' },
+    ])).toEqual([{
+      id: 'vendor-2026-07',
+      label: 'vendor-2026-07',
+      enabled: true,
+      aliases: ['vendor-latest'],
+    }]);
+  });
+
   it('keeps app-managed catalog rows and disables models missing from the endpoint', () => {
     const models = mergeManagedModelAvailability(
       managed('kimi-for-coding', 'catalog-only-model'),

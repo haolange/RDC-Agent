@@ -7,6 +7,7 @@ import { effectiveCatalogService } from './EffectiveCatalogService';
 import type {
   EffectiveCatalogSnapshot,
   EffectiveModel,
+  ModelRouteRecommendation,
   ModelRoute,
   RequestPlan,
   RequestPlanningResult,
@@ -118,10 +119,8 @@ function seedContribution(provider: LlmProviderEntry, requestedModelId?: string)
       ids.add(entry.modelId);
     }
   }
-  if (requestedModelId) {
-    const canonical = provider.catalogOwnership === 'app-managed'
-      ? lookupProviderSeedModel(provider.id, requestedModelId)?.modelId
-      : requestedModelId;
+  if (requestedModelId && provider.catalogOwnership === 'app-managed') {
+    const canonical = lookupProviderSeedModel(provider.id, requestedModelId)?.modelId;
     if (canonical) ids.add(canonical);
   }
   return {
@@ -149,6 +148,7 @@ function userContribution(provider: LlmProviderEntry): CatalogLayerContribution 
         ? {
             ...buildSeedModelContribution(provider, model.id),
             label: model.label,
+            aliases: [...(model.aliases ?? [])],
             enabled: model.enabled !== false,
             availability: model.availability ?? 'available',
             unavailableReason: model.availabilityReason,
@@ -162,9 +162,31 @@ export function toDiscoveryModelContributions(models: LlmProviderModel[]): Catal
   return models.map((model) => ({
     modelId: model.id,
     label: model.label,
+    aliases: model.aliases,
     availability: model.availability ?? 'available',
     unavailableReason: model.availabilityReason,
   }));
+}
+
+export function completeDiscoveryContributions(
+  provider: LlmProviderEntry,
+  contributions: CatalogModelContribution[],
+): CatalogModelContribution[] {
+  if (provider.catalogOwnership !== 'app-managed') return contributions;
+  const discoveredKeys = new Set(contributions.flatMap((model) => (
+    [model.modelId, ...(model.aliases ?? [])].map((value) => value.trim().toLowerCase()).filter(Boolean)
+  )));
+  const completed = [...contributions];
+  for (const seed of getProviderSeedModelDefinitions(provider.id)) {
+    const seedKeys = [seed.modelId, ...(seed.aliases ?? [])].map((value) => value.trim().toLowerCase());
+    if (seedKeys.some((value) => discoveredKeys.has(value))) continue;
+    completed.push({
+      modelId: seed.modelId,
+      availability: 'unavailable',
+      unavailableReason: 'This model was not returned by the latest successful provider discovery.',
+    });
+  }
+  return completed;
 }
 
 export function resolveEffectiveCatalog(
@@ -217,11 +239,15 @@ export function refreshEffectiveCatalogDiscovery(
   contributions?: CatalogModelContribution[],
 ): Promise<EffectiveCatalogSnapshot> {
   const request = buildEffectiveCatalogRequest(provider);
+  const discovered = completeDiscoveryContributions(
+    provider,
+    contributions ?? toDiscoveryModelContributions(models),
+  );
   return effectiveCatalogService.refreshDiscovery(request, async () => ({
     source: 'discovery',
     observedAt: new Date().toISOString(),
     protocol: provider.protocol,
-    models: contributions ?? toDiscoveryModelContributions(models),
+    models: discovered,
   }));
 }
 
@@ -230,16 +256,59 @@ export function resolveEffectiveModel(
   modelId: string,
   settings: AppSettings,
 ): EffectiveModel | null {
+  return resolveEffectiveModelSelection(providerId, modelId, settings).model;
+}
+
+export interface EffectiveModelSelection {
+  requestedModelId: string;
+  model: EffectiveModel | null;
+  remappedFrom?: string;
+  recommendations: ModelRouteRecommendation[];
+}
+
+export function selectEffectiveModelFromSnapshot(
+  snapshot: EffectiveCatalogSnapshot,
+  modelId: string,
+  recommendedModelIds: readonly string[] = [],
+): EffectiveModelSelection {
+  const isUsable = (entry: EffectiveModel): boolean => entry.enabled !== false && entry.availability !== 'unavailable';
+  const exact = snapshot.models.find((entry) => entry.modelId === modelId && isUsable(entry));
+  const alias = exact ? undefined : snapshot.models.find((entry) => entry.aliases.includes(modelId) && isUsable(entry));
+  const model = exact ?? alias ?? null;
+  const recommendedOrder = new Map(recommendedModelIds.map((id, index) => [id, index]));
+  const recommendations = snapshot.models
+    .filter((entry) => entry.enabled !== false && entry.availability === 'available' && entry.modelId !== model?.modelId)
+    .sort((left, right) => (
+      (recommendedOrder.get(left.modelId) ?? Number.MAX_SAFE_INTEGER)
+      - (recommendedOrder.get(right.modelId) ?? Number.MAX_SAFE_INTEGER)
+      || left.label.localeCompare(right.label)
+    ))
+    .slice(0, 3)
+    .map((entry) => ({ providerId: snapshot.providerId, modelId: entry.modelId, label: entry.label }));
+  return {
+    requestedModelId: modelId,
+    model,
+    ...(alias ? { remappedFrom: modelId } : {}),
+    recommendations,
+  };
+}
+
+export function resolveEffectiveModelSelection(
+  providerId: string,
+  modelId: string,
+  settings: AppSettings,
+): EffectiveModelSelection {
   const provider = settings.llm.providers.find((entry) => entry.id === providerId);
-  if (!provider) return null;
+  if (!provider) return { requestedModelId: modelId, model: null, recommendations: [] };
   const snapshot = resolveEffectiveCatalog(providerId, settings, modelId);
   if (!snapshot) {
-    return null;
+    return { requestedModelId: modelId, model: null, recommendations: [] };
   }
-  const model = snapshot.models.find((entry) => entry.modelId === modelId)
-    ?? snapshot.models.find((entry) => entry.aliases.includes(modelId))
-    ?? null;
-  return model?.enabled !== false && model?.availability !== 'unavailable' ? model : null;
+  return selectEffectiveModelFromSnapshot(
+    snapshot,
+    modelId,
+    getProviderPreset(providerId)?.recommendedModels,
+  );
 }
 
 export function planEffectiveModelRequest(input: {
@@ -250,26 +319,36 @@ export function planEffectiveModelRequest(input: {
   clientBudgetTokens?: number;
   requestedTemperature?: number;
 }): RequestPlanningResult {
-  const model = resolveEffectiveModel(input.providerId, input.modelId, input.settings);
-  if (!model) {
+  const selection = resolveEffectiveModelSelection(input.providerId, input.modelId, input.settings);
+  if (!selection.model) {
     const controls: ConversationTurnControls = {
       reasoningLevel: 'off',
       maxContextMode: false,
       fastModel: false,
     };
+    const recommendationText = selection.recommendations.map((entry) => entry.modelId).join(', ');
     return {
       ok: false,
       code: 'MODEL_UNAVAILABLE',
-      message: `MODEL_UNAVAILABLE: ${input.providerId}/${input.modelId} is not enabled or available in the effective catalog.`,
+      message: `MODEL_UNAVAILABLE: ${input.providerId}/${input.modelId} is not enabled or available in the effective catalog.${recommendationText ? ` Same-provider recommendations: ${recommendationText}.` : ''}`,
       controls,
+      recommendations: selection.recommendations,
     };
   }
-  return planModelRequest({
-    model,
+  const result = planModelRequest({
+    model: selection.model,
     controls: input.controls,
     clientBudgetTokens: input.clientBudgetTokens,
     requestedTemperature: input.requestedTemperature,
   });
+  if (!result.ok || !selection.remappedFrom) return result;
+  return {
+    ...result,
+    warnings: [
+      ...result.warnings,
+      `Canonical model alias remap: ${selection.remappedFrom} -> ${selection.model.modelId}.`,
+    ],
+  };
 }
 
 export function recordEffectivePlanSuccess(

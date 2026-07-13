@@ -73,6 +73,7 @@ function toProviderModel(seed: SeedModelDefinition): LlmProviderModel {
     id: seed.modelId,
     label: seed.label,
     enabled: seed.availability !== 'unavailable',
+    ...(seed.aliases.length > 0 ? { aliases: [...seed.aliases] } : {}),
     availability: seed.availability,
     availabilityReason: seed.unavailableReason,
   };

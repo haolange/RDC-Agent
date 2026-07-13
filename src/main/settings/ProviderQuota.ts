@@ -12,6 +12,18 @@ const RESET_HEADERS = [
 ];
 
 function parseResetValue(value: string, nowMs: number, header: string): number | undefined {
+  const duration = value.trim().match(/^(\d+(?:\.\d+)?)\s*(ms|s|m|h)$/i);
+  if (duration) {
+    const amount = Number(duration[1]);
+    const multiplier = duration[2].toLowerCase() === 'ms'
+      ? 1
+      : duration[2].toLowerCase() === 's'
+        ? 1_000
+        : duration[2].toLowerCase() === 'm'
+          ? 60_000
+          : 3_600_000;
+    return nowMs + amount * multiplier;
+  }
   const numeric = Number(value);
   if (Number.isFinite(numeric) && numeric >= 0) {
     if (header.endsWith('-after')) return nowMs + numeric * 1_000;

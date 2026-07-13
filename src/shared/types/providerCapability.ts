@@ -157,6 +157,12 @@ export type RequestPlanningErrorCode =
   | 'PLAN_CONFLICT'
   | 'CONSTRAINT_REJECTED';
 
+export interface ModelRouteRecommendation {
+  providerId: string;
+  modelId: string;
+  label: string;
+}
+
 export type RequestPlanningResult =
   | {
       ok: true;
@@ -169,6 +175,7 @@ export type RequestPlanningResult =
       code: RequestPlanningErrorCode;
       message: string;
       controls: ConversationTurnControls;
+      recommendations?: ModelRouteRecommendation[];
     };
 
 export type ProviderLifecycleStatus = 'stable' | 'beta' | 'deprecated' | 'sunset';

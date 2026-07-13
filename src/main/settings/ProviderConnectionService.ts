@@ -21,7 +21,7 @@ import type {
 } from '@shared/types/settings';
 import { settingsService } from '../settings/SettingsService';
 import { providerAccountAuthService } from './ProviderAccountAuthService';
-import { extractDiscoveredModelId, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
+import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 import { parseDeclarativeCatalog, resolveDeclarativeDiscoveryUrl } from './DeclarativeCatalogDiscovery';
 import type {
   CatalogModelContribution,
@@ -29,6 +29,7 @@ import type {
   EffectiveCatalogRequest,
 } from './EffectiveCatalogService';
 import {
+  completeDiscoveryContributions,
   refreshEffectiveCatalogDiscovery,
   toDiscoveryModelContributions,
 } from './EffectiveModelResolver';
@@ -65,18 +66,19 @@ export function normalizeDiscoveredModels(
 ): LlmProviderModel[] {
   const models = new Map<string, LlmProviderModel>();
   for (const value of values) {
-    const id = extractDiscoveredModelId(value);
-    if (!isAdmittedDiscoveredModel(value) || isDeprecatedModel(id) || !filterModelId(id) || models.has(id)) {
+    const identity = extractDiscoveredModelIdentity(value);
+    const id = identity.id;
+    if (!isAdmittedDiscoveredModel(value) || isDeprecatedModel(id) || !filterModelId(id)) {
       continue;
     }
     const label = value && typeof value === 'object' && typeof (value as { display_name?: unknown }).display_name === 'string'
       ? ((value as { display_name: string }).display_name.trim() || id)
       : id;
-    models.set(id, {
-      id,
-      label,
-      enabled: true,
-    });
+    const existing = models.get(id);
+    const aliases = [...new Set([...(existing?.aliases ?? []), ...identity.aliases])];
+    models.set(id, existing
+      ? { ...existing, ...(aliases.length > 0 ? { aliases } : {}) }
+      : { id, label, enabled: true, ...(aliases.length > 0 ? { aliases } : {}) });
   }
   return Array.from(models.values()).sort((left, right) => left.id.localeCompare(right.id));
 }
@@ -362,7 +364,10 @@ export class ProviderConnectionService {
         : await this.discoverModels(provider, '', '');
       return {
         protocol: provider.protocol,
-        models: discovery.contributions ?? toDiscoveryModelContributions(discovery.models),
+        models: completeDiscoveryContributions(
+          provider,
+          discovery.contributions ?? toDiscoveryModelContributions(discovery.models),
+        ),
       };
     };
   }
@@ -579,6 +584,7 @@ export class ProviderConnectionService {
         id: model.id,
         label: model.label,
         enabled: true,
+        aliases: model.aliases,
       })));
       return {
         models: catalogOwnership === 'app-managed'

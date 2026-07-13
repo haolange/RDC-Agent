@@ -57,6 +57,7 @@ export interface ConversationMessageDiagnostic {
   modelId?: string;
   adapterId?: string;
   technicalMessage?: string;
+  recommendations?: Array<{ providerId: string; modelId: string; label: string }>;
 }
 
 export interface ConversationToolCall {

@@ -523,10 +523,16 @@ function sanitizeModels(models: unknown): LlmProviderModel[] {
       ? candidate.availability
       : undefined;
 
+    const aliases = Array.isArray(candidate.aliases)
+      ? [...new Set(candidate.aliases.filter((value): value is string => (
+          typeof value === 'string' && Boolean(value.trim()) && value.trim() !== modelId
+        )).map((value) => value.trim()))]
+      : [];
     modelMap.set(modelId, {
       id: modelId,
       label: typeof candidate.label === 'string' && candidate.label.trim() ? candidate.label.trim() : modelId,
       enabled: candidate.enabled !== false,
+      ...(aliases.length > 0 ? { aliases } : {}),
       availability,
       availabilityReason: typeof candidate.availabilityReason === 'string' && candidate.availabilityReason.trim()
         ? candidate.availabilityReason.trim()

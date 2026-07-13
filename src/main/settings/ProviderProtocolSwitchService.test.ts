@@ -1,12 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { EffectiveModel } from '@shared/types/providerCapability';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 
 vi.mock('electron', () => ({
   app: { getPath: () => process.cwd(), getAppPath: () => process.cwd() },
   safeStorage: { isEncryptionAvailable: () => false, decryptString: () => '', encryptString: (value: string) => Buffer.from(value) },
 }));
 
-import { clampControlsForProtocolModels } from './ProviderProtocolSwitchService';
+import { clampControlsForProtocolModels, resolveProtocolRouteModels } from './ProviderProtocolSwitchService';
+import type { AppSettings } from '@shared/types/settings';
 
 function model(id: string, patch: Partial<EffectiveModel>): EffectiveModel {
   return {
@@ -36,5 +37,30 @@ describe('protocol switch control clamping', () => {
       }), model('b', {})],
     );
     expect(controls).toEqual({ reasoningLevel: 'off', maxContextMode: false, fastModel: false });
+  });
+
+  it('preserves model-fixed routes, follows proven aliases, and rejects missing routes with recommendations', () => {
+    const fixed = model('canonical', {
+      aliases: ['legacy'],
+      route: { protocol: 'AnthropicMessages', baseUrl: 'https://fixed.example/v1', source: 'model' },
+    });
+    const recommended = model('recommended', {
+      route: { protocol: 'OpenAIResponses', baseUrl: 'https://default.example/v1', source: 'preset' },
+    });
+    const snapshot: EffectiveCatalogSnapshot = {
+      providerId: 'dual-provider', accountId: 'account', protocol: 'OpenAIResponses',
+      stale: false, refreshing: false, models: [fixed, recommended], generatedAt: '2026-07-13T00:00:00.000Z',
+    };
+    const aliasSettings = {
+      llm: { providers: [], agentRoutes: [{ agentId: 'debugger', providerId: 'dual-provider', modelId: 'legacy' }] },
+    } as unknown as AppSettings;
+    expect(resolveProtocolRouteModels(aliasSettings, snapshot, 'dual-provider')).toEqual([fixed]);
+    expect(resolveProtocolRouteModels(aliasSettings, snapshot, 'dual-provider')[0].route.protocol).toBe('AnthropicMessages');
+
+    const missingSettings = {
+      llm: { providers: [], agentRoutes: [{ agentId: 'debugger', providerId: 'dual-provider', modelId: 'gone' }] },
+    } as unknown as AppSettings;
+    expect(() => resolveProtocolRouteModels(missingSettings, snapshot, 'dual-provider'))
+      .toThrow(/MODEL_UNAVAILABLE.*recommended/u);
   });
 });
