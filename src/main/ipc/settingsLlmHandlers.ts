@@ -13,6 +13,7 @@ import { providerConnectionService } from '../settings/ProviderConnectionService
 import { settingsService } from '../settings/SettingsService';
 import { resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
 import { effectiveCatalogService } from '../settings/EffectiveCatalogService';
+import { reprojectProviderProtocolChange } from '../settings/ProviderProtocolSwitchService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
@@ -43,9 +44,26 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   });
 
   ipcMain.handle('llm:connectProvider', async (_event, request: LlmProviderDraftRequest) => {
+    const previousProvider = settingsService.getAll().llm.providers.find((entry) => entry.id === request.providerId);
     const result = await providerConnectionService.connectProvider(request);
     if (result.success) {
       context.applyCurrentLlmConfig();
+      if (previousProvider && result.provider && previousProvider.protocol !== result.provider.protocol) {
+        try {
+          await reprojectProviderProtocolChange({
+            providerId: request.providerId,
+            previousProtocol: previousProvider.protocol,
+            settings: settingsService.getAll(),
+            discoveredModels: result.models,
+          });
+        } catch (error) {
+          return {
+            ...result,
+            success: false,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }
       broadcastCatalog(request.providerId);
     }
     return result;
@@ -143,10 +161,21 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   });
 
   ipcMain.handle('settings:set', async (_event, settings: unknown) => {
+    const previousSettings = settingsService.getAll();
     const nextSettings = settingsService.setAll(settings as AppSettingsPatch, appPathService.getRuntimePaths());
     await storageAdapter.initializeWorkspace();
     await context.initializeIpcState();
     context.applyCurrentLlmConfig();
+    for (const provider of nextSettings.llm.providers) {
+      const previous = previousSettings.llm.providers.find((entry) => entry.id === provider.id);
+      if (previous && previous.protocol !== provider.protocol) {
+        await reprojectProviderProtocolChange({
+          providerId: provider.id,
+          previousProtocol: previous.protocol,
+          settings: nextSettings,
+        });
+      }
+    }
     for (const provider of nextSettings.llm.providers) broadcastCatalog(provider.id);
     return nextSettings;
   });

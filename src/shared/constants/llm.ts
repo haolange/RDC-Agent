@@ -14,6 +14,7 @@ import type {
 import {
   getManagedProviderModels,
 } from './modelCapabilityCatalog';
+import type { ProviderCapabilityOverlay } from '@shared/types/providerCapability';
 
 export const SUPER_GROK_OAUTH_CALLBACK_PORT = 1456;
 export const SUPER_GROK_OAUTH_REDIRECT_URI = `http://localhost:${SUPER_GROK_OAUTH_CALLBACK_PORT}/oauth/grok/callback`;
@@ -37,6 +38,7 @@ export interface BuiltinProviderDefinition {
   capabilities?: LlmProviderCapability[];
   accountLoginConfigured?: boolean;
   unavailableReason?: string;
+  capabilityOverlays?: ProviderCapabilityOverlay[];
 }
 
 export const LLM_PROVIDER_CATEGORY_DEFINITIONS: LlmProviderCategoryDescriptor[] = [
