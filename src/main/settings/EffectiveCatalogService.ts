@@ -76,6 +76,12 @@ interface EffectiveCatalogServiceOptions {
   discoveryTtlMs?: number;
 }
 
+interface TransientQuotaEntry {
+  quota: NonNullable<EffectiveModel['quota']>;
+  observedAt: string;
+  protocol?: LlmProviderProtocol;
+}
+
 export type DiscoveryLoader = () => Promise<Omit<CatalogLayerContribution, 'source' | 'observedAt' | 'expiresAt'>>;
 export type EffectiveCatalogListener = (snapshot: EffectiveCatalogSnapshot) => void;
 
@@ -314,6 +320,7 @@ export class EffectiveCatalogService {
   private readonly refreshes = new Map<string, Promise<EffectiveCatalogSnapshot>>();
   private readonly listeners = new Set<EffectiveCatalogListener>();
   private readonly lastErrors = new Map<string, string>();
+  private readonly transientQuota = new Map<string, TransientQuotaEntry>();
 
   constructor(options: EffectiveCatalogServiceOptions = {}) {
     this.statePath = options.statePath
@@ -353,12 +360,39 @@ export class EffectiveCatalogService {
       discovery: cachedDiscovery,
       observed: persistedObserved,
     };
+    const mergedModels = mergeEffectiveCatalog(mergedRequest);
+    const now = this.now();
+    const models = mergedModels.map((model) => {
+      const quotaKey = `${request.providerId}\u0000${request.accountId}\u0000${model.modelId}`;
+      const entry = this.transientQuota.get(quotaKey);
+      if (!entry) return model;
+      const expiry = entry.quota.exhaustedUntil ? Date.parse(entry.quota.exhaustedUntil) : Number.POSITIVE_INFINITY;
+      if (expiry <= now.getTime()) {
+        this.transientQuota.delete(quotaKey);
+        return model;
+      }
+      return {
+        ...model,
+        quota: cloneJson(entry.quota),
+        provenance: [
+          ...model.provenance,
+          {
+            field: 'quota',
+            source: 'observed' as const,
+            observedAt: entry.observedAt,
+            expiresAt: entry.quota.exhaustedUntil,
+            protocol: entry.protocol,
+            detail: entry.quota.note,
+          },
+        ],
+      };
+    });
     const snapshot: EffectiveCatalogSnapshot = {
       providerId: request.providerId,
       accountId: request.accountId,
       protocol: request.protocol,
-      models: mergeEffectiveCatalog(mergedRequest),
-      generatedAt: this.now().toISOString(),
+      models,
+      generatedAt: now.toISOString(),
       stale,
       refreshing: this.refreshes.has(key),
       lastRefreshError: this.lastErrors.get(key),
@@ -413,6 +447,18 @@ export class EffectiveCatalogService {
     };
     this.state.observed[key] = [...(this.state.observed[key] ?? []), next];
     this.persistState();
+  }
+
+  recordTransientQuota(
+    request: Pick<EffectiveCatalogRequest, 'providerId' | 'accountId' | 'protocol'>,
+    modelId: string,
+    quota: NonNullable<EffectiveModel['quota']>,
+  ): void {
+    this.transientQuota.set(`${request.providerId}\u0000${request.accountId}\u0000${modelId}`, {
+      quota: cloneJson(quota),
+      observedAt: this.now().toISOString(),
+      protocol: request.protocol,
+    });
   }
 
   private readState(): PersistedCatalogState {

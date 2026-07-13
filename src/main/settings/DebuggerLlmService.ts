@@ -526,6 +526,14 @@ export class DebuggerLlmService {
       ));
     }
 
+    if (resolution.unavailable) {
+      throw new DebuggerLlmBlockerError(makeBlocker(
+        BLOCKER_CODES.BLOCKED_LLM_MODEL_MISSING.code,
+        resolution.unavailable.message,
+        [`agent:${agentId}`, `provider:${resolution.unavailable.providerId}`, `model:${resolution.unavailable.modelId}`],
+      ));
+    }
+
     const model = provider.models.find((entry) => entry.enabled && entry.id === route.modelId);
     if (!model) {
       throw new DebuggerLlmBlockerError(makeBlocker(

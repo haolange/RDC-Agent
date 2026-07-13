@@ -204,4 +204,25 @@ describe('EffectiveCatalogService', () => {
     expect(service.getSnapshot(request()).models[0].label).toBe('Seed label');
     expect(service.getSnapshot(request({ protocol: 'AnthropicMessages' })).models[0].label).toBe('Messages route');
   });
+
+  it('keeps 429 quota evidence transient and never downgrades capabilities', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    let nowMs = Date.parse('2026-07-13T00:00:00.000Z');
+    const service = new EffectiveCatalogService({ statePath, now: () => new Date(nowMs) });
+    service.recordTransientQuota(
+      { providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol },
+      'model-a',
+      { exhaustedUntil: '2026-07-13T00:01:00.000Z', note: 'HTTP 429' },
+    );
+
+    const throttled = service.getSnapshot(request()).models[0];
+    expect(throttled.quota).toEqual({ exhaustedUntil: '2026-07-13T00:01:00.000Z', note: 'HTTP 429' });
+    expect(throttled.toolCalling).toEqual({ state: 'supported' });
+
+    const reloaded = new EffectiveCatalogService({ statePath, now: () => new Date(nowMs) });
+    expect(reloaded.getSnapshot(request()).models[0].quota).toBeUndefined();
+
+    nowMs += 61_000;
+    expect(service.getSnapshot(request()).models[0].quota).toBeUndefined();
+  });
 });

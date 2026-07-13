@@ -32,6 +32,7 @@ import { parseCopilotBillingTiers } from './CopilotBilling';
 import { settingsService } from './SettingsService';
 import { getBuiltinProviderDefinition } from '@shared/constants/llm';
 import { projectProtocolOverlays, resolveModelRoutePrecedence } from './ProviderRouteProjection';
+import { resolveProviderModelAvailability } from './LlmRouteCompatibility';
 
 const MODERN_ANTHROPIC_MODELS = new Set(['claude-fable-5', 'claude-sonnet-5', 'claude-opus-4-8']);
 const COPILOT_SEED_PROMPT_TOKENS = 272_000;
@@ -176,7 +177,10 @@ function seedContribution(provider: LlmProviderEntry, requestedModelId?: string)
     }
   }
   if (requestedModelId) {
-    ids.add(requestedModelId);
+    const canonical = provider.catalogOwnership === 'app-managed'
+      ? lookupManagedModelCatalogEntry(provider.id, requestedModelId)?.id
+      : requestedModelId;
+    if (canonical) ids.add(canonical);
   }
   return {
     source: 'seed',
@@ -255,12 +259,17 @@ export function resolveEffectiveModel(
   modelId: string,
   settings: AppSettings,
 ): EffectiveModel | null {
-  const snapshot = resolveEffectiveCatalog(providerId, settings, modelId);
+  const provider = settings.llm.providers.find((entry) => entry.id === providerId);
+  if (!provider) return null;
+  const availability = resolveProviderModelAvailability(provider, modelId);
+  if (!availability.modelId) return null;
+  const effectiveModelId = availability.modelId;
+  const snapshot = resolveEffectiveCatalog(providerId, settings, effectiveModelId);
   if (!snapshot) {
     return null;
   }
-  return snapshot.models.find((model) => model.modelId === modelId)
-    ?? snapshot.models.find((model) => model.aliases.includes(modelId))
+  return snapshot.models.find((model) => model.modelId === effectiveModelId)
+    ?? snapshot.models.find((model) => model.aliases.includes(effectiveModelId))
     ?? null;
 }
 
@@ -274,6 +283,10 @@ export function planEffectiveModelRequest(input: {
 }): RequestPlanningResult {
   const model = resolveEffectiveModel(input.providerId, input.modelId, input.settings);
   if (!model) {
+    const provider = input.settings.llm.providers.find((entry) => entry.id === input.providerId);
+    const unavailable = provider
+      ? resolveProviderModelAvailability(provider, input.modelId).unavailable
+      : undefined;
     const controls: ConversationTurnControls = {
       reasoningLevel: 'off',
       maxContextMode: false,
@@ -282,7 +295,7 @@ export function planEffectiveModelRequest(input: {
     return {
       ok: false,
       code: 'MODEL_UNAVAILABLE',
-      message: `Unknown model ${input.providerId}/${input.modelId}`,
+      message: unavailable?.message ?? `Unknown model ${input.providerId}/${input.modelId}`,
       controls,
     };
   }

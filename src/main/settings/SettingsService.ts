@@ -59,6 +59,7 @@ import { executionProfileService } from './ExecutionProfileService';
 import { providerCatalogService } from './ProviderCatalogService';
 import { normalizeProviderCategory, normalizeProviderProtocol } from './providerCatalogNormalize';
 import { secretStorageService } from './SecretStorageService';
+import { resolveProviderModelAvailability } from './LlmRouteCompatibility';
 
 type PersistedLlmProviderEntry = Partial<LlmProviderEntry>;
 
@@ -846,16 +847,14 @@ function normalizeUserRoutes(
     }
 
     const provider = providers.find((entry) => entry.id === incoming.providerId);
-    const isValid = Boolean(provider
-      && provider.isConfigured
-      && provider.models.some((model) => model.id === incoming.modelId && model.enabled !== false));
-    // Volc discovery deliberately persists only the verified subset. Preserve
-    // a filtered route id so Settings can identify the exact invalid choice;
-    // every other provider keeps the established sanitize behavior.
-    const preserveFilteredVolcRoute = provider?.id === 'volcengine-coding-plan';
-    if (!isValid && !preserveFilteredVolcRoute) {
-      routeMap.set(agentId, { agentId, providerId: '', modelId: '' });
+    if (provider) {
+      const resolution = resolveProviderModelAvailability(provider, incoming.modelId);
+      if (resolution.modelId && resolution.modelId !== incoming.modelId) {
+        routeMap.set(agentId, { ...incoming, modelId: resolution.modelId });
+      }
     }
+    // Otherwise preserve the explicit route. Runtime reports MODEL_UNAVAILABLE
+    // with same-provider recommendations instead of clearing/substituting it.
   }
 
   return Array.from(routeMap.values());

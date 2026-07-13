@@ -1,21 +1,28 @@
+import { lookupManagedModelCatalogEntry } from '@shared/constants/modelCapabilityCatalog';
 import type { AgentRole } from '@shared/types/agent';
 import type { LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
 
-const COPILOT_CHAT_COMPLETIONS_FALLBACK_MODELS = [
-  'gemini-3-flash-preview',
-  'gemini-3.5-flash',
-  'gpt-4.1',
-  'gpt-4o',
-  'claude-sonnet-4-6',
-  'claude-sonnet-4-5',
-  'gpt-5-mini',
-];
+export interface ModelUnavailableDetail {
+  code: 'MODEL_UNAVAILABLE';
+  providerId: string;
+  modelId: string;
+  recommendedModelIds: string[];
+  message: string;
+}
+
+export interface ProviderModelAvailabilityResolution {
+  modelId: string | null;
+  requestedModelId: string;
+  remapReason?: string;
+  unavailable?: ModelUnavailableDetail;
+}
 
 export interface CompatibleRouteResolution {
   route: LlmAgentRoute | null;
   provider: LlmProviderEntry | null;
   requestedModelId?: string;
   remapReason?: string;
+  unavailable?: ModelUnavailableDetail;
 }
 
 export function isCopilotChatCompletionsUnsupportedModel(modelId: string): boolean {
@@ -28,25 +35,53 @@ function isEnabledModel(provider: LlmProviderEntry, modelId: string): boolean {
   return provider.models.some((model) => model.enabled !== false && model.id === modelId);
 }
 
-function resolveCopilotFallbackModel(
-  routes: LlmAgentRoute[],
-  provider: LlmProviderEntry,
-  agentId: AgentRole,
-): string | null {
-  const debuggerRoute = routes.find((entry) => entry.agentId === 'debugger');
-  const candidates = [
-    ...(agentId !== 'debugger' && debuggerRoute?.providerId === provider.id ? [debuggerRoute.modelId] : []),
-    ...COPILOT_CHAT_COMPLETIONS_FALLBACK_MODELS,
-    ...provider.models.map((model) => model.id),
-  ];
+function isRouteCompatible(provider: LlmProviderEntry, modelId: string): boolean {
+  return provider.id !== 'github-copilot' || !isCopilotChatCompletionsUnsupportedModel(modelId);
+}
 
-  for (const modelId of candidates) {
-    if (modelId && !isCopilotChatCompletionsUnsupportedModel(modelId) && isEnabledModel(provider, modelId)) {
-      return modelId;
-    }
+function recommendedModels(provider: LlmProviderEntry, requestedModelId: string): string[] {
+  const candidates = [...provider.recommendedModels, ...provider.models.map((model) => model.id)];
+  return [...new Set(candidates)].filter((modelId) => (
+    modelId !== requestedModelId
+    && isEnabledModel(provider, modelId)
+    && isRouteCompatible(provider, modelId)
+  )).slice(0, 5);
+}
+
+export function resolveProviderModelAvailability(
+  provider: LlmProviderEntry,
+  requestedModelId: string,
+): ProviderModelAvailabilityResolution {
+  if (isEnabledModel(provider, requestedModelId) && isRouteCompatible(provider, requestedModelId)) {
+    return { modelId: requestedModelId, requestedModelId };
   }
 
-  return null;
+  const canonical = lookupManagedModelCatalogEntry(provider.id, requestedModelId);
+  if (canonical && canonical.id !== requestedModelId
+    && isEnabledModel(provider, canonical.id)
+    && isRouteCompatible(provider, canonical.id)) {
+    return {
+      modelId: canonical.id,
+      requestedModelId,
+      remapReason: `${requestedModelId} is a catalog alias; using canonical model ${canonical.id}.`,
+    };
+  }
+
+  const recommendedModelIds = recommendedModels(provider, requestedModelId);
+  const recommendation = recommendedModelIds.length > 0
+    ? ` Available alternatives: ${recommendedModelIds.join(', ')}.`
+    : '';
+  return {
+    modelId: null,
+    requestedModelId,
+    unavailable: {
+      code: 'MODEL_UNAVAILABLE',
+      providerId: provider.id,
+      modelId: requestedModelId,
+      recommendedModelIds,
+      message: `MODEL_UNAVAILABLE: ${provider.id}/${requestedModelId} is no longer available.${recommendation}`,
+    },
+  };
 }
 
 export function resolveCompatibleAgentRoute(
@@ -64,26 +99,17 @@ export function resolveCompatibleAgentRoute(
     return { route, provider };
   }
 
-  if (!isEnabledModel(provider, route.modelId)) {
+  const resolution = resolveProviderModelAvailability(provider, route.modelId);
+  if (!resolution.modelId) {
+    return { route, provider, requestedModelId: route.modelId, unavailable: resolution.unavailable };
+  }
+  if (resolution.modelId === route.modelId) {
     return { route, provider };
   }
-
-  if (provider.id !== 'github-copilot' || !isCopilotChatCompletionsUnsupportedModel(route.modelId)) {
-    return { route, provider };
-  }
-
-  const fallbackModelId = resolveCopilotFallbackModel(routes, provider, agentId);
-  if (!fallbackModelId) {
-    return { route, provider };
-  }
-
   return {
-    route: {
-      ...route,
-      modelId: fallbackModelId,
-    },
+    route: { ...route, modelId: resolution.modelId },
     provider,
     requestedModelId: route.modelId,
-    remapReason: `${route.modelId} is not available on GitHub Copilot chat completions; using ${fallbackModelId}.`,
+    remapReason: resolution.remapReason,
   };
 }

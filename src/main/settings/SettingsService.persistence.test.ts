@@ -241,7 +241,7 @@ describe('SettingsService provider persistence', () => {
     });
   });
 
-  it('keeps the established sanitize behavior for invalid non-Volc routes', async () => {
+  it('preserves invalid routes so model removal requires explicit reselection', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
     service.initialize();
@@ -251,7 +251,7 @@ describe('SettingsService provider persistence', () => {
       },
     });
     expect(service.getAll().llm.agentRoutes).toContainEqual({
-      agentId: 'ask', providerId: '', modelId: '',
+      agentId: 'ask', providerId: 'missing-provider', modelId: 'missing-model',
     });
   });
 });

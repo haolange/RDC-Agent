@@ -14,6 +14,7 @@ import { getBuiltinProviderDefinition, SUPER_GROK_OAUTH_CALLBACK_PORT, SUPER_GRO
 import { getManagedProviderModels } from '@shared/constants/modelCapabilityCatalog';
 import { COPILOT_EDITOR_HEADERS, COPILOT_WIRE_HEADERS } from './CopilotWire';
 import { parseCopilotModelCatalog } from './CopilotBilling';
+import { isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 import { settingsService } from './SettingsService';
 
 const REQUEST_TIMEOUT_MS = 20000;
@@ -358,19 +359,7 @@ const createAccountCatalogModels = (providerId: AccountProviderId): LlmProviderM
 };
 
 const isAgentRoutableAccountModel = (modelId: string): boolean => {
-  const normalized = modelId.toLowerCase();
-  return !(
-    normalized.includes('embedding')
-    || normalized.includes('moderation')
-    || normalized.includes('rerank')
-    || normalized.includes('whisper')
-    || normalized.includes('tts')
-    || normalized.includes('dall-e')
-    || normalized.includes('image')
-    || normalized.includes('audio')
-    || normalized.includes('realtime')
-    || normalized.includes('transcribe')
-  );
+  return isAdmittedDiscoveredModel(modelId);
 };
 
 const parseProviderError = (error: unknown): string => {

@@ -24,6 +24,7 @@ import type {
   ToolDefinition,
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
+import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import { composeAbortSignals, ensureOk, normalizeError, parseSSE, ProviderHttpError } from './internal/http';
 import { applyOpenAiCompatibleReasoning } from './reasoningWire';
@@ -157,6 +158,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
         signal: composed.signal,
       });
 
+      recordQuotaFromResponse(options.requestPlan, response);
       await ensureOk(response, PROVIDER_API);
 
       let finishReason: string | null = null;

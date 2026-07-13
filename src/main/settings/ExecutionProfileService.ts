@@ -67,7 +67,7 @@ export class ExecutionProfileService {
     agentId: AgentRole,
   ): LlmAgentRoute | null {
     const resolution = resolveCompatibleAgentRoute(routes, providers, agentId);
-    if (!resolution.route || !resolution.provider) return null;
+    if (!resolution.route || !resolution.provider || resolution.unavailable) return null;
     return resolution.provider.models.some((model) => model.enabled && model.id === resolution.route?.modelId)
       ? resolution.route
       : null;

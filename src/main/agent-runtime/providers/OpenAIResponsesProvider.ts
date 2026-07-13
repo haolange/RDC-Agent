@@ -13,6 +13,7 @@ import type {
   ToolDefinition,
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
+import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
@@ -134,6 +135,7 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
         signal: composed.signal,
       });
 
+      recordQuotaFromResponse(options.requestPlan, response);
       await ensureOk(response, PROVIDER_API);
 
       const toolSlotsByItemId = new Map<string, number>();
