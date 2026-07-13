@@ -15,7 +15,7 @@
 - `architecture/overview.md`
 - `architecture/data-flow.md`
 - `architecture/module-map.md`
-- `architecture/provider-system.md`
+- `architecture/provider-architecture.md`
 - `architecture/agent-runtime-kernel.md`
 - `architecture/agentic-trace-protocol.md`
 - `architecture/spec-driven-development.md`
