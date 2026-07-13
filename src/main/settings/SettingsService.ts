@@ -441,7 +441,7 @@ function resolveAccountRuntimeCredential(
     if (providerId === 'grok-account') {
       return {
         apiKey: bundle.accessToken ?? bundle.apiKey ?? '',
-        baseUrl: 'https://api.x.ai/v1',
+        baseUrl: 'https://cli-chat-proxy.grok.com/v1',
       };
     }
     if (providerId === 'gemini-account') {

@@ -16,13 +16,6 @@ interface ProviderAccountOAuthPanelProps {
   t: Translate;
 }
 
-const sourceLabelKey = (source?: string): Parameters<Translate>[0] => {
-  if (source === 'manual') return 'settings.oauthClientIdSourceManual';
-  if (source === 'env') return 'settings.oauthClientIdSourceEnv';
-  if (source === 'stored') return 'settings.oauthClientIdSourceStored';
-  return 'settings.oauthClientIdSourceMissing';
-};
-
 const copyText = (value?: string) => {
   if (!value) return;
   void navigator.clipboard?.writeText(value);
@@ -42,7 +35,6 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
   const diagnostic = status?.diagnostic;
   const selectedMode = isSuperGrok ? connectionDraft.accountLoginMode : 'device';
   const redirectUri = status?.redirectUri ?? (isSuperGrok && selectedMode === 'browser' ? SUPER_GROK_OAUTH_REDIRECT_URI : '');
-  const clientIdSource = status?.clientIdSource ?? (connectionDraft.oauthClientId.trim() ? 'manual' : undefined);
   const noticeText = connectionAccountConnected
     ? t('settings.oauthConnectedHint')
     : connectionDevicePending
@@ -83,26 +75,7 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
             ))}
           </div>
 
-          <label className="settings-field">
-            <span className="settings-field-label">{t('settings.oauthClientId')}</span>
-            <input
-              className="input"
-              data-testid="settings-provider-oauth-client-id"
-              value={connectionDraft.oauthClientId}
-              placeholder={t('settings.oauthClientIdPlaceholder')}
-              disabled={connectionDraft.busy !== 'idle' || connectionDevicePending}
-              onChange={(event) => onUpdateConnectionDraft({
-                oauthClientId: event.target.value,
-                error: '',
-                accountStatus: status?.requiresClientId ? undefined : status,
-              })}
-            />
-            <span className="settings-help-text">{t('settings.oauthClientIdHint')}</span>
-          </label>
-
-          <div className="settings-provider-oauth-detail-grid" data-testid="settings-provider-oauth-client-source">
-            <span>{t('settings.oauthClientIdSource')}</span>
-            <strong>{t(sourceLabelKey(clientIdSource))}</strong>
+          <div className="settings-provider-oauth-detail-grid" data-testid="settings-provider-oauth-details">
             {redirectUri && (
               <>
                 <span>{t('settings.oauthRedirectUri')}</span>

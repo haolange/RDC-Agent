@@ -1,0 +1,6 @@
+{
+  "data": [
+    { "id": "claude-opus-4-8", "display_name": "Claude Opus 4.8" },
+    { "id": "claude-sonnet-5", "display_name": "Claude Sonnet 5" }
+  ]
+}

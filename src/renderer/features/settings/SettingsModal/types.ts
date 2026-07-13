@@ -28,7 +28,6 @@ export interface ProviderConnectionDraft {
   accountStatus?: LlmProviderAccountStatus;
   accountLoginMode: LlmProviderAccountLoginMode;
   authCode: string;
-  oauthClientId: string;
 }
 
 export type ProviderProtocol = LlmProviderProtocol;

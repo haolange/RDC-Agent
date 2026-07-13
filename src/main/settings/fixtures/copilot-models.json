@@ -3,6 +3,13 @@
     {
       "id": "gpt-5.5",
       "name": "GPT-5.5",
+      "model_picker_enabled": true,
+      "supported_endpoints": ["/chat/completions", "/responses"],
+      "capabilities": {
+        "type": "chat",
+        "limits": { "max_prompt_tokens": 272000, "max_context_window_tokens": 400000, "max_output_tokens": 128000 },
+        "supports": { "tool_calls": true, "vision": true, "structured_outputs": true }
+      },
       "billing": {
         "token_prices": {
           "default": { "context_max": 272000, "entitled": true },
@@ -12,11 +19,23 @@
     },
     {
       "id": "gpt-5-mini",
+      "model_picker_enabled": true,
+      "supported_endpoints": ["/chat/completions"],
+      "capabilities": {
+        "type": "chat",
+        "limits": { "max_prompt_tokens": 128000, "max_context_window_tokens": 192000, "max_output_tokens": 64000 },
+        "supports": { "tool_calls": true, "vision": true }
+      },
       "billing": {
         "token_prices": {
           "default": { "context_max": "272000" }
         }
       }
+    },
+    {
+      "id": "text-embedding-internal",
+      "model_picker_enabled": false,
+      "capabilities": { "type": "embeddings" }
     }
   ]
 }

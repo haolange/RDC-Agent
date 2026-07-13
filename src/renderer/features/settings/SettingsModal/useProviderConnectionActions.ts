@@ -89,7 +89,6 @@ export const useProviderConnectionActions = (
           })
           : await window.electronAPI.llm.startProviderAccountLogin({
             providerId: connectionDraft.providerId,
-            oauthClientId: connectionDraft.oauthClientId,
             accountLoginMode: connectionDraft.accountLoginMode,
           });
         if (!status.connected && status.state !== 'pending') {
@@ -131,7 +130,6 @@ export const useProviderConnectionActions = (
     try {
       const status = await window.electronAPI.llm.startProviderAccountLogin({
         providerId: connectionDraft.providerId,
-        oauthClientId: connectionDraft.oauthClientId,
         accountLoginMode,
       });
       updateConnectionDraft({
