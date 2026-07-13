@@ -907,6 +907,13 @@ const englishTranslations = {
   'memory.namePlaceholder': 'name (kebab-case)',
   'memory.descriptionPlaceholder': 'description',
   'memory.contentPlaceholder': 'content (markdown)',
+  'settings.providerAuthMode': 'Authentication',
+  'settings.providerAuthEnvironment': 'Environment credentials',
+  'settings.providerAuthUnverified': 'This authentication path has not been live-verified yet.',
+  'settings.providerAuthUnavailable': 'This authentication path is unavailable.',
+  'settings.oauthRegion': 'Account region',
+  'settings.oauthRegionGlobal': 'Global',
+  'settings.oauthRegionChina': 'China',
 } satisfies Record<string, string>;
 
 export type TranslationKey = keyof typeof englishTranslations;
@@ -1746,6 +1753,13 @@ const zhCnOverrides: Partial<Record<TranslationKey, string>> = {
   'memory.namePlaceholder': '名称（kebab-case）',
   'memory.descriptionPlaceholder': '描述',
   'memory.contentPlaceholder': '内容（markdown）',
+  'settings.providerAuthMode': '认证方式',
+  'settings.providerAuthEnvironment': '环境凭据',
+  'settings.providerAuthUnverified': '该认证通道尚待真实账号验证。',
+  'settings.providerAuthUnavailable': '该认证通道当前不可用。',
+  'settings.oauthRegion': '账号区域',
+  'settings.oauthRegionGlobal': '全球',
+  'settings.oauthRegionChina': '中国大陆',
 };
 
 const terminalZhOverrides: Partial<Record<TranslationKey, string>> = {

@@ -68,8 +68,9 @@ export interface EffectiveCatalogRequest {
 }
 
 interface PersistedCatalogState {
-  schemaVersion: 1;
+  schemaVersion: 2;
   discoveries: Record<string, CatalogLayerContribution>;
+  entitlements: Record<string, CatalogLayerContribution>;
   observed: Record<string, CatalogLayerContribution[]>;
 }
 
@@ -85,13 +86,20 @@ interface TransientQuotaEntry {
   protocol?: LlmProviderProtocol;
 }
 
-export type DiscoveryLoader = () => Promise<Omit<CatalogLayerContribution, 'source' | 'observedAt' | 'expiresAt'>>;
+type LoadedCatalogLayer = Omit<CatalogLayerContribution, 'source' | 'observedAt' | 'expiresAt'>;
+
+export interface DiscoveryLoadResult extends LoadedCatalogLayer {
+  entitlement?: LoadedCatalogLayer;
+}
+
+export type DiscoveryLoader = () => Promise<DiscoveryLoadResult>;
 export type DiscoveryLoaderResolver = (request: EffectiveCatalogRequest) => DiscoveryLoader | undefined;
 export type EffectiveCatalogListener = (snapshot: EffectiveCatalogSnapshot) => void;
 
 const EMPTY_STATE: PersistedCatalogState = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   discoveries: {},
+  entitlements: {},
   observed: {},
 };
 
@@ -351,7 +359,7 @@ export class EffectiveCatalogService {
 
   constructor(options: EffectiveCatalogServiceOptions = {}) {
     this.statePath = options.statePath
-      ?? path.join(appPathService.getRuntimePaths().appStateRoot, 'provider-catalog', 'catalog-v1.json');
+      ?? path.join(appPathService.getRuntimePaths().appStateRoot, 'provider-catalog', 'catalog-v2.json');
     this.now = options.now ?? (() => new Date());
     this.discoveryTtlMs = options.discoveryTtlMs ?? DISCOVERY_TTL_MS;
     this.state = this.readState();
@@ -369,9 +377,14 @@ export class EffectiveCatalogService {
   invalidateDiscovery(input: { providerId: string; accountId: string; protocol?: LlmProviderProtocol }): void {
     const exactKey = input.protocol ? cacheKey(input.providerId, input.accountId, input.protocol) : null;
     const prefix = `${input.providerId}\u0000${input.accountId}\u0000`;
-    for (const key of Object.keys(this.state.discoveries)) {
+    const cachedKeys = new Set([
+      ...Object.keys(this.state.discoveries),
+      ...Object.keys(this.state.entitlements),
+    ]);
+    for (const key of cachedKeys) {
       if (key === exactKey || (!exactKey && key.startsWith(prefix))) {
         delete this.state.discoveries[key];
+        delete this.state.entitlements[key];
         this.lastErrors.delete(key);
       }
     }
@@ -394,6 +407,7 @@ export class EffectiveCatalogService {
   private createSnapshot(request: EffectiveCatalogRequest): EffectiveCatalogSnapshot {
     const key = cacheKey(request.providerId, request.accountId, request.protocol);
     const cachedDiscovery = request.discovery ?? this.state.discoveries[key];
+    const cachedEntitlement = request.entitlement ?? this.state.entitlements[key];
     const persistedObserved = request.observed ?? this.state.observed[evidenceKey(request.providerId, request.accountId)];
     const stale = cachedDiscovery?.expiresAt
       ? Date.parse(cachedDiscovery.expiresAt) <= this.now().getTime()
@@ -401,6 +415,7 @@ export class EffectiveCatalogService {
     const mergedRequest: EffectiveCatalogRequest = {
       ...request,
       discovery: cachedDiscovery,
+      entitlement: cachedEntitlement,
       observed: persistedObserved,
     };
     const mergedModels = mergeEffectiveCatalog(mergedRequest);
@@ -453,12 +468,24 @@ export class EffectiveCatalogService {
       try {
         const loaded = await loader();
         const observedAt = this.now();
+        const expiresAt = new Date(observedAt.getTime() + this.discoveryTtlMs).toISOString();
+        const { entitlement, ...discovery } = loaded;
         this.state.discoveries[key] = {
-          ...loaded,
+          ...discovery,
           source: 'discovery',
           observedAt: observedAt.toISOString(),
-          expiresAt: new Date(observedAt.getTime() + this.discoveryTtlMs).toISOString(),
+          expiresAt,
         };
+        if (entitlement?.models.length) {
+          this.state.entitlements[key] = {
+            ...entitlement,
+            source: 'entitlement',
+            observedAt: observedAt.toISOString(),
+            expiresAt,
+          };
+        } else {
+          delete this.state.entitlements[key];
+        }
         this.lastErrors.delete(key);
         this.persistState();
       } catch (error) {
@@ -540,7 +567,12 @@ export class EffectiveCatalogService {
         return cloneJson(EMPTY_STATE);
       }
       const parsed = JSON.parse(fs.readFileSync(this.statePath, 'utf8')) as Partial<PersistedCatalogState>;
-      if (parsed.schemaVersion !== 1 || !isObject(parsed.discoveries) || !isObject(parsed.observed)) {
+      if (
+        parsed.schemaVersion !== 2
+        || !isObject(parsed.discoveries)
+        || !isObject(parsed.entitlements)
+        || !isObject(parsed.observed)
+      ) {
         return cloneJson(EMPTY_STATE);
       }
       return parsed as PersistedCatalogState;

@@ -5,6 +5,7 @@ import type {
   LlmProviderAccountDiagnostic,
   LlmProviderAccountLoginFinishRequest,
   LlmProviderAccountLoginMode,
+  LlmProviderAccountRegion,
   LlmProviderAccountLoginStartRequest,
   LlmProviderAccountStatus,
   LlmProviderId,
@@ -24,8 +25,21 @@ import {
   parseClaudeAccountCatalog,
   parseGrokAccountCatalog,
   parseGrokBuilderCatalog,
+  parseOpenRouterAccountCatalog,
 } from './LiveProviderCatalogParsers';
 import type { CatalogModelContribution } from './EffectiveCatalogService';
+import {
+  buildMiniMaxAuthorizationRequest,
+  buildMiniMaxRefresh,
+  buildMiniMaxTokenPoll,
+  buildOpenRouterAuthorizationUrl,
+  buildOpenRouterExchange,
+  createPkcePair,
+  miniMaxRegionContract,
+  parseOpenRouterExchange,
+  resolveMiniMaxExpiry,
+  type MiniMaxRegion,
+} from './LiveProviderOAuthContracts';
 
 const REQUEST_TIMEOUT_MS = 20000;
 const CHATGPT_CALLBACK_PORT = 1455;
@@ -43,7 +57,9 @@ type AccountProviderId =
   | 'claude-account'
   | 'chatgpt-account'
   | 'github-copilot'
-  | 'grok-account';
+  | 'grok-account'
+  | 'minimax-account'
+  | 'openrouter';
 
 interface OAuthFlowState {
   providerId: AccountProviderId;
@@ -61,6 +77,7 @@ interface OAuthFlowState {
   redirectUri?: string;
   tokenEndpoint?: string;
   userinfoEndpoint?: string;
+  region?: MiniMaxRegion;
   expiresAt: number;
   server?: Server;
   error?: string;
@@ -83,11 +100,15 @@ interface OAuthSecretBundle {
   expiresAt?: string;
   accountLabel?: string;
   planLabel?: string;
+  region?: MiniMaxRegion;
+  inferenceBaseUrl?: string;
+  resourceUrl?: string;
 }
 
 export interface AccountCatalogDiscovery {
   models: LlmProviderModel[];
   contributions?: CatalogModelContribution[];
+  entitlementContributions?: CatalogModelContribution[];
 }
 
 type AccountCatalogPublisher = (
@@ -107,13 +128,13 @@ interface GrokOAuthMetadata {
   tokenEndpointAuthMethodsSupported: string[];
 }
 
-const pendingFlows = new Map<string, OAuthFlowState>();
-
 const isAccountProviderId = (providerId: LlmProviderId): providerId is AccountProviderId =>
   providerId === 'claude-account'
   || providerId === 'chatgpt-account'
   || providerId === 'github-copilot'
-  || providerId === 'grok-account';
+  || providerId === 'grok-account'
+  || providerId === 'minimax-account'
+  || providerId === 'openrouter';
 
 const isTestMode = (): boolean => process.env.RDC_AGENT_TEST_MODE === '1';
 
@@ -420,8 +441,24 @@ const fetchOAuthJson = async (url: string, init: RequestInit): Promise<unknown> 
 
 const createFormBody = (params: Record<string, string>): string => new URLSearchParams(params).toString();
 
+function pendingAuthorizationMessage(
+  providerId: LlmProviderId,
+  mode: LlmProviderAccountLoginMode | undefined,
+): string {
+  if (providerId === 'github-copilot') return 'Waiting for GitHub authorization.';
+  if (providerId === 'grok-account') {
+    return mode === 'device'
+      ? 'Waiting for Super Grok device-code authorization.'
+      : 'Waiting for Super Grok browser authorization.';
+  }
+  if (providerId === 'minimax-account') return 'Waiting for MiniMax account authorization.';
+  if (providerId === 'openrouter') return 'Waiting for OpenRouter browser authorization.';
+  return 'Waiting for authorization.';
+}
+
 export class ProviderAccountAuthService {
   private catalogPublisher?: AccountCatalogPublisher;
+  private readonly pendingFlows = new Map<string, OAuthFlowState>();
 
   setCatalogPublisher(publisher?: AccountCatalogPublisher): void {
     this.catalogPublisher = publisher;
@@ -443,6 +480,12 @@ export class ProviderAccountAuthService {
     }
     if (providerId === 'grok-account') {
       return this.startGrokLogin(request.accountLoginMode);
+    }
+    if (providerId === 'minimax-account') {
+      return this.startMiniMaxLogin(request.accountRegion);
+    }
+    if (providerId === 'openrouter') {
+      return this.startOpenRouterLogin();
     }
     return this.status(providerId, 'Provider does not support account login.', 'failed');
   }
@@ -473,6 +516,14 @@ export class ProviderAccountAuthService {
         const bundle = flow.authorizationMode === 'browser'
           ? await this.exchangeGrokCode(flow, request.code?.trim() ?? '')
           : await this.pollGrokDevice(flow);
+        return await this.persistAccount(request.providerId, bundle);
+      }
+      if (request.providerId === 'minimax-account') {
+        const bundle = await this.pollMiniMaxDevice(flow);
+        return await this.persistAccount(request.providerId, bundle);
+      }
+      if (request.providerId === 'openrouter') {
+        const bundle = await this.exchangeOpenRouterCode(flow, request.code?.trim() ?? '');
         return await this.persistAccount(request.providerId, bundle);
       }
       return this.status(request.providerId, 'Provider does not support account login.', 'failed');
@@ -565,22 +616,21 @@ export class ProviderAccountAuthService {
     const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
     const isAccount = isAccountProviderId(providerId);
     const flow = isAccount ? this.findFlow(providerId) : null;
-    const connected = Boolean(provider?.isConfigured && provider.status === 'verified');
-    const grokBundle = providerId === 'grok-account' ? this.readBundle('grok-account') : null;
+    const connected = Boolean(
+      provider?.isConfigured
+      && provider.status === 'verified'
+      && (providerId !== 'openrouter' || provider.authMode === 'account'),
+    );
+    const accountBundle = isAccount ? this.readBundle(providerId) : null;
+    const available = isAccount && provider?.authModeAvailability?.account?.state !== 'unavailable';
     const state: LlmProviderAccountStatus['state'] = forcedState
-      ?? (connected ? 'connected' : flow?.error ? 'failed' : flow ? 'pending' : isAccount ? 'signed-out' : 'unavailable');
-    const pendingMessage = providerId === 'github-copilot'
-      ? 'Waiting for GitHub authorization.'
-      : providerId === 'grok-account'
-        ? flow?.authorizationMode === 'device'
-          ? 'Waiting for Super Grok device-code authorization.'
-          : 'Waiting for Super Grok browser authorization.'
-        : 'Waiting for authorization.';
+      ?? (flow?.error ? 'failed' : flow ? 'pending' : connected ? 'connected' : isAccount ? 'signed-out' : 'unavailable');
+    const pendingMessage = pendingAuthorizationMessage(providerId, flow?.authorizationMode);
     const activeDiagnostic = diagnostic ?? flow?.diagnostic;
     return {
       providerId,
       state,
-      available: isAccount,
+      available,
       connected,
       message: message ?? flow?.error ?? (connected ? 'Connected' : flow ? pendingMessage : 'Not connected'),
       error: forcedState === 'failed' ? message : flow?.error,
@@ -592,10 +642,10 @@ export class ProviderAccountAuthService {
       verificationUri: flow?.verificationUri,
       userCode: flow?.userCode,
       requiresCodeInput: flow?.providerId === 'claude-account',
-      authorizationMode: flow?.authorizationMode ?? grokBundle?.authorizationMode,
+      authorizationMode: flow?.authorizationMode ?? accountBundle?.authorizationMode,
       diagnostic: activeDiagnostic,
-      requestedScopes: flow?.requestedScopes ?? activeDiagnostic?.requestedScopes ?? grokBundle?.requestedScopes,
-      redirectUri: flow?.redirectUri ?? activeDiagnostic?.redirectUri ?? grokBundle?.redirectUri,
+      requestedScopes: flow?.requestedScopes ?? activeDiagnostic?.requestedScopes ?? accountBundle?.requestedScopes,
+      redirectUri: flow?.redirectUri ?? activeDiagnostic?.redirectUri ?? accountBundle?.redirectUri,
       models: provider?.models ?? [],
     };
   }
@@ -607,7 +657,7 @@ export class ProviderAccountAuthService {
       if (bundle) {
         void this.revokeGrokBundle(bundle);
       }
-      settingsService.disconnectProvider(providerId);
+      settingsService.disconnectProvider(providerId, 'account');
     }
     return this.status(providerId);
   }
@@ -711,6 +761,84 @@ export class ProviderAccountAuthService {
     return mode === 'device'
       ? this.startGrokDeviceLogin(GROK_OAUTH_CLIENT_ID)
       : this.startGrokBrowserLogin(GROK_OAUTH_CLIENT_ID);
+  }
+
+  private async startMiniMaxLogin(
+    accountRegion?: LlmProviderAccountRegion,
+  ): Promise<LlmProviderAccountStatus> {
+    const region: MiniMaxRegion = accountRegion === 'cn' ? 'cn' : 'global';
+    const { verifier, challenge } = createPkcePair();
+    const state = randomUUID();
+    const authorization = buildMiniMaxAuthorizationRequest(region, challenge, state);
+    try {
+      const payload = await fetchOAuthJson(authorization.url, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'x-request-id': randomUUID(),
+        },
+        body: authorization.body.toString(),
+      }) as {
+        user_code?: string;
+        verification_uri?: string;
+        expired_in?: number | string;
+        interval?: number | string;
+        state?: string;
+      };
+      if (!payload.user_code || !payload.verification_uri || payload.expired_in === undefined) {
+        throw new Error('MiniMax OAuth authorization response is incomplete.');
+      }
+      if (payload.state !== state) {
+        throw new Error('MiniMax OAuth state mismatch.');
+      }
+      const intervalMs = Number(payload.interval ?? 2000);
+      const flow: OAuthFlowState = {
+        providerId: 'minimax-account',
+        flowId: randomUUID(),
+        state,
+        codeVerifier: verifier,
+        verificationUri: payload.verification_uri,
+        authUrl: payload.verification_uri,
+        userCode: payload.user_code,
+        intervalSeconds: Math.max(2, Number.isFinite(intervalMs) ? intervalMs / 1000 : 2),
+        authorizationMode: 'device',
+        requestedScopes: 'group_id profile model.completion',
+        region,
+        expiresAt: Date.parse(resolveMiniMaxExpiry(payload.expired_in)),
+      };
+      this.setFlow(flow);
+      void this.openExternal(flow.authUrl);
+      void this.pollMiniMaxDevice(flow)
+        .then((bundle) => this.persistAccount('minimax-account', bundle))
+        .catch((error) => {
+          flow.error = parseProviderError(error);
+        });
+      return this.status(flow.providerId);
+    } catch (error) {
+      return this.status('minimax-account', parseProviderError(error), 'failed');
+    }
+  }
+
+  private async startOpenRouterLogin(): Promise<LlmProviderAccountStatus> {
+    const { verifier, challenge } = createPkcePair();
+    const flow: OAuthFlowState = {
+      providerId: 'openrouter',
+      flowId: randomUUID(),
+      state: randomUUID(),
+      codeVerifier: verifier,
+      authorizationMode: 'browser',
+      expiresAt: Date.now() + 10 * 60 * 1000,
+    };
+    this.setFlow(flow);
+    try {
+      await this.startOpenRouterCallbackServer(flow, challenge);
+      void this.openExternal(flow.authUrl);
+      return this.status(flow.providerId);
+    } catch (error) {
+      this.clearFlows(flow.providerId);
+      return this.status(flow.providerId, parseProviderError(error), 'failed');
+    }
   }
 
   private async startGrokBrowserLogin(clientId: string): Promise<LlmProviderAccountStatus> {
@@ -939,6 +1067,79 @@ export class ProviderAccountAuthService {
         accountLabel: 'GitHub Copilot',
       };
     }
+  }
+
+  private async pollMiniMaxDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle> {
+    if (!flow.userCode || !flow.codeVerifier || !flow.region) {
+      throw new Error('MiniMax OAuth flow is missing its user code, verifier, or region.');
+    }
+    let delayBeforePoll = !isTestMode();
+    for (;;) {
+      if (Date.now() > flow.expiresAt) {
+        throw new Error('MiniMax OAuth authorization expired.');
+      }
+      if (delayBeforePoll) await wait((flow.intervalSeconds ?? 2) * 1000);
+      delayBeforePoll = true;
+      const request = buildMiniMaxTokenPoll(flow.region, flow.userCode, flow.codeVerifier);
+      const payload = await fetchOAuthJson(request.url, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: request.body.toString(),
+      }) as {
+        status?: string;
+        access_token?: string;
+        refresh_token?: string;
+        expired_in?: number | string;
+        expires_in?: number | string;
+        resource_url?: string;
+        notification_message?: string;
+        base_resp?: { status_msg?: string };
+      };
+      if (payload.status === 'error') {
+        throw new Error(payload.base_resp?.status_msg || 'MiniMax OAuth authorization was denied.');
+      }
+      if (payload.status !== 'success') continue;
+      if (!payload.access_token || !payload.refresh_token) {
+        throw new Error('MiniMax OAuth token response is incomplete.');
+      }
+      return {
+        providerId: 'minimax-account',
+        accessToken: payload.access_token,
+        apiKey: payload.access_token,
+        refreshToken: payload.refresh_token,
+        region: flow.region,
+        inferenceBaseUrl: miniMaxRegionContract(flow.region).inferenceBaseUrl,
+        resourceUrl: payload.resource_url,
+        requestedScopes: flow.requestedScopes,
+        authorizationMode: 'device',
+        accountId: `minimax-${randomUUID()}`,
+        expiresAt: resolveMiniMaxExpiry(payload.expired_in ?? payload.expires_in),
+        accountLabel: `MiniMax Account (${flow.region === 'cn' ? 'CN' : 'Global'})`,
+        planLabel: payload.notification_message ?? 'MiniMax OAuth',
+      };
+    }
+  }
+
+  private async exchangeOpenRouterCode(flow: OAuthFlowState, code: string): Promise<OAuthSecretBundle> {
+    if (!code || !flow.codeVerifier) {
+      throw new Error('OpenRouter authorization code is required.');
+    }
+    const request = buildOpenRouterExchange(code, flow.codeVerifier);
+    const payload = await fetchJson(request.url, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(request.body),
+    });
+    const exchange = parseOpenRouterExchange(payload);
+    return {
+      providerId: 'openrouter',
+      apiKey: exchange.apiKey,
+      accountId: exchange.userId ?? `openrouter-${randomUUID()}`,
+      authorizationMode: 'browser',
+      redirectUri: flow.redirectUri,
+      accountLabel: exchange.userId ? `OpenRouter ${exchange.userId}` : 'OpenRouter Account',
+      planLabel: 'OAuth PKCE',
+    };
   }
 
   private async exchangeGrokCode(flow: OAuthFlowState, code: string): Promise<OAuthSecretBundle> {
@@ -1186,6 +1387,38 @@ export class ProviderAccountAuthService {
       };
     }
 
+    if (bundle.providerId === 'minimax-account') {
+      if (!bundle.refreshToken || !bundle.region) return bundle;
+      const request = buildMiniMaxRefresh(bundle.region, bundle.refreshToken);
+      const payload = await fetchOAuthJson(request.url, {
+        method: 'POST',
+        headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: request.body.toString(),
+      }) as {
+        status?: string;
+        access_token?: string;
+        refresh_token?: string;
+        expired_in?: number | string;
+        expires_in?: number | string;
+        error?: string;
+        base_resp?: { status_msg?: string };
+      };
+      if (payload.status !== 'success' || !payload.access_token) {
+        const error = new Error(
+          payload.base_resp?.status_msg || payload.error || 'MiniMax OAuth refresh did not return success.',
+        ) as Error & { code?: string };
+        error.code = payload.error;
+        throw error;
+      }
+      return {
+        ...bundle,
+        accessToken: payload.access_token,
+        apiKey: payload.access_token,
+        refreshToken: payload.refresh_token ?? bundle.refreshToken,
+        expiresAt: resolveMiniMaxExpiry(payload.expired_in ?? payload.expires_in),
+      };
+    }
+
     if (!bundle.refreshToken) {
       return bundle;
     }
@@ -1328,6 +1561,37 @@ export class ProviderAccountAuthService {
       }
       return parsed;
     }
+    if (bundle.providerId === 'openrouter') {
+      if (!bundle.apiKey) throw new Error('OpenRouter OAuth API key is missing.');
+      const payload = await fetchJson('https://openrouter.ai/api/v1/models', {
+        method: 'GET',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${bundle.apiKey}` },
+      });
+      const parsed = parseOpenRouterAccountCatalog(payload);
+      if (parsed.models.length === 0) {
+        throw new Error('OpenRouter OAuth catalog returned no agent-routable models.');
+      }
+      return parsed;
+    }
+    if (bundle.providerId === 'minimax-account') {
+      const models = createAccountCatalogModels(bundle.providerId);
+      if (models.length === 0 || !bundle.inferenceBaseUrl) {
+        throw new Error('MiniMax OAuth is missing its verified seed catalog or regional inference route.');
+      }
+      return {
+        models,
+        contributions: models.map((model) => ({
+          modelId: model.id,
+          label: model.label,
+          availability: 'available',
+          route: {
+            protocol: 'AnthropicMessages',
+            baseUrl: bundle.inferenceBaseUrl,
+            source: 'model',
+          },
+        })),
+      };
+    }
     const models = createAccountCatalogModels(bundle.providerId);
     if (models.length === 0) {
       throw new Error(`Account provider ${bundle.providerId} is missing an app-managed model catalog.`);
@@ -1375,7 +1639,7 @@ export class ProviderAccountAuthService {
   }
 
   private findFlow(providerId: AccountProviderId, flowId?: string): OAuthFlowState | null {
-    for (const flow of pendingFlows.values()) {
+    for (const flow of this.pendingFlows.values()) {
       if (flow.providerId === providerId && (!flowId || flow.flowId === flowId) && Date.now() <= flow.expiresAt) {
         return flow;
       }
@@ -1385,14 +1649,14 @@ export class ProviderAccountAuthService {
 
   private setFlow(flow: OAuthFlowState): void {
     this.clearFlows(flow.providerId);
-    pendingFlows.set(flow.flowId, flow);
+    this.pendingFlows.set(flow.flowId, flow);
   }
 
   private clearFlows(providerId: AccountProviderId): void {
-    for (const [flowId, flow] of pendingFlows.entries()) {
+    for (const [flowId, flow] of this.pendingFlows.entries()) {
       if (flow.providerId === providerId) {
         this.closeFlowServer(flow);
-        pendingFlows.delete(flowId);
+        this.pendingFlows.delete(flowId);
       }
     }
   }
@@ -1406,6 +1670,70 @@ export class ProviderAccountAuthService {
     if (server.listening) {
       server.close();
     }
+  }
+
+  private startOpenRouterCallbackServer(flow: OAuthFlowState, challenge: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const callbackPath = `/oauth/openrouter/callback/${flow.flowId}`;
+      const server = createServer((request, response) => {
+        const baseUrl = flow.redirectUri ?? 'http://127.0.0.1';
+        const url = new URL(request.url ?? '/', baseUrl);
+        if (url.pathname !== callbackPath) {
+          response.writeHead(404, { 'Content-Type': 'text/plain' });
+          response.end('Not found.');
+          return;
+        }
+        const providerError = url.searchParams.get('error');
+        const code = url.searchParams.get('code') ?? '';
+        if (providerError || !code) {
+          flow.error = providerError
+            ? `OpenRouter authorization failed: ${providerError}`
+            : 'OpenRouter callback did not include an authorization code.';
+          response.writeHead(400, { 'Content-Type': 'text/plain' });
+          response.end(flow.error);
+          this.closeFlowServer(flow);
+          return;
+        }
+        void this.finishLogin({ providerId: flow.providerId, flowId: flow.flowId, code })
+          .then((status) => {
+            if (!status.connected) {
+              response.writeHead(500, { 'Content-Type': 'text/plain' });
+              response.end(status.error ?? status.message ?? 'OpenRouter sign-in failed.');
+              return;
+            }
+            response.writeHead(200, { 'Content-Type': 'text/html' });
+            response.end('<html><body>RDC Agent OpenRouter sign-in complete. You can return to the app.</body></html>');
+          })
+          .catch((error) => {
+            flow.error = parseProviderError(error);
+            response.writeHead(500, { 'Content-Type': 'text/plain' });
+            response.end(flow.error);
+          })
+          .finally(() => this.closeFlowServer(flow));
+      });
+      flow.server = server;
+      server.on('error', (error) => {
+        flow.error = parseProviderError(error);
+        this.closeFlowServer(flow);
+        this.pendingFlows.delete(flow.flowId);
+        if (!settled) {
+          settled = true;
+          reject(error);
+        }
+      });
+      server.listen(0, '127.0.0.1', () => {
+        const address = server.address();
+        if (!address || typeof address === 'string') {
+          reject(new Error('OpenRouter callback server did not expose a loopback port.'));
+          return;
+        }
+        flow.redirectUri = `http://127.0.0.1:${address.port}${callbackPath}`;
+        flow.authUrl = buildOpenRouterAuthorizationUrl(flow.redirectUri, challenge);
+        settled = true;
+        resolve();
+      });
+    });
   }
 
   private startGrokCallbackServer(flow: OAuthFlowState): Promise<void> {
@@ -1488,7 +1816,7 @@ export class ProviderAccountAuthService {
         flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
         flow.diagnostic = diagnostic;
         this.closeFlowServer(flow);
-        pendingFlows.delete(flow.flowId);
+        this.pendingFlows.delete(flow.flowId);
         if (!settled) {
           settled = true;
           reject(error);
@@ -1529,7 +1857,7 @@ export class ProviderAccountAuthService {
       server.on('error', (error) => {
         flow.error = parseProviderError(error);
         this.closeFlowServer(flow);
-        pendingFlows.delete(flow.flowId);
+        this.pendingFlows.delete(flow.flowId);
         if (!settled) {
           settled = true;
           reject(error);

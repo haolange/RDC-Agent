@@ -12,22 +12,23 @@ const preset: ProviderPreset = {
   authModes: ['api-key'],
   capabilities: ['chat', 'tool-calling', 'reasoning', 'model-discovery'],
   routes: [
-    { protocol: 'OpenAIResponses', baseUrl: 'https://api.longcat.chat/openai/v1', default: true },
+    { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://api.longcat.chat/openai/v1', default: true },
     { protocol: 'AnthropicMessages', baseUrl: 'https://api.longcat.chat/anthropic/v1' },
   ],
   userSelectableRoute: true,
   discovery: {
     kind: 'json-catalog',
-    url: 'https://api.longcat.chat/openai/v1/models',
+    url: 'https://api.longcat.chat/v1/models',
     collectionPath: 'data',
     mapping: { id: 'id' },
     admission: { allowPatterns: ['LongCat-*'], allowedModalities: ['text'] },
+    modelSet: 'authoritative',
   },
   seedModels: [{
     modelId: 'LongCat-2.0',
     label: 'LongCat 2.0',
     aliases: [],
-    route: { protocol: 'OpenAIResponses', baseUrl: 'https://api.longcat.chat/openai/v1', source: 'preset' },
+    route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://api.longcat.chat/openai/v1', source: 'preset' },
     availability: 'available',
     contextTiers: [{
       id: 'default', label: 'Default', maxPromptTokens: 1_048_576, maxOutputTokens: 131_072,
@@ -36,8 +37,10 @@ const preset: ProviderPreset = {
     defaultBudgetTokens: 256_000,
     fast: { kind: 'unsupported' },
     reasoning: {
-      kind: 'levels', supportsOff: true, levels: ['low', 'medium', 'high'], defaultSelection: 'high',
-      wireProfile: { kind: 'openai-responses', on: 'high', levels: { low: 'low', medium: 'medium', high: 'high' } },
+      kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on',
+      wireProfile: {
+        kind: 'openai-compatible', on: 'high', onMode: 'thinking-enabled', offMode: 'thinking-disabled',
+      },
     },
     toolCalling: { state: 'supported' },
     visionInput: { state: 'unsupported' },

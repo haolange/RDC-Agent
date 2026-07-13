@@ -1,1 +1,1 @@
-{"object":"list","data":[{"id":"accounts/fireworks/models/deepseek-v4-pro","display_name":"DeepSeek V4 Pro","type":"chat","context_length":1048576},{"id":"accounts/fireworks/models/nomic-embed","type":"embedding"}]}
+{"models":[{"name":"accounts/fireworks/models/deepseek-v4-pro","displayName":"DeepSeek V4 Pro","contextLength":1048576,"supportsServerless":true,"supportsTools":true,"supportsImageInput":false},{"name":"accounts/fireworks/models/nomic-embed","displayName":"Nomic Embed","supportsServerless":true}]}

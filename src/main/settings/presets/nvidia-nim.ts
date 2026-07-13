@@ -6,7 +6,7 @@ const preset: ProviderPreset = {
   authModes: ['api-key'], capabilities: ['chat', 'tool-calling', 'model-discovery'],
   routes: [{ protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://integrate.api.nvidia.com/v1', default: true }],
   userSelectableRoute: false,
-  discovery: { kind: 'json-catalog', path: '/models', collectionPath: 'data', mapping: { id: 'id', label: 'id', modality: 'type' }, admission: { denyPatterns: ['*embed*', '*rerank*', '*guard*', '*safety*'] } },
+  discovery: { kind: 'json-catalog', path: '/models', collectionPath: 'data', mapping: { id: 'id', label: 'id' }, admission: { denyPatterns: ['*embed*', '*rerank*', '*guard*', '*safety*', '*flux*', '*stable-diffusion*', '*retriever*'] }, modelSet: 'authoritative' },
   seedModels: [], overlays: [], recommendedModels: ['deepseek-ai/deepseek-v4-pro', 'nvidia/nemotron-3-super-120b-a12b'],
   docsUrl: 'https://docs.api.nvidia.com/nim/reference/llm-apis',
 };

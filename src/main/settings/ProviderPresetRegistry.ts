@@ -2,6 +2,7 @@ import type { SeedModelDefinition, ProviderPreset } from '@shared/types/provider
 import type {
   BuiltinLlmProviderId,
   LlmProviderAuthMode,
+  LlmProviderAvailability,
   LlmProviderCatalogOwnership,
   LlmProviderEntry,
   LlmProviderModel,
@@ -48,12 +49,58 @@ function toAuthMode(preset: ProviderPreset): LlmProviderAuthMode {
   return 'api-key';
 }
 
+function mapPresetAuthMode(mode: ProviderPreset['authModes'][number]): LlmProviderAuthMode {
+  if (mode === 'oauth' || mode === 'device') return 'account';
+  if (mode === 'environment' || mode === 'local') return mode;
+  return 'api-key';
+}
+
+function combineAvailability(
+  provider: ProviderPreset['availability'],
+  mode: ProviderPreset['availability'],
+): LlmProviderAvailability {
+  const states = [provider.state, mode.state];
+  const state = states.includes('unavailable')
+    ? 'unavailable'
+    : states.includes('unknown')
+      ? 'unknown'
+      : 'available';
+  const reason = [provider.reason, mode.reason]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .join(' ');
+  return { state, ...(reason ? { reason } : {}) };
+}
+
+export function getProviderPresetAuthModeAvailability(
+  id: string,
+): Partial<Record<LlmProviderAuthMode, LlmProviderAvailability>> {
+  const preset = presetById.get(id);
+  if (!preset) return {};
+  const grouped = new Map<LlmProviderAuthMode, ProviderPreset['authModes']>();
+  for (const rawMode of preset.authModes) {
+    const mode = mapPresetAuthMode(rawMode);
+    grouped.set(mode, [...(grouped.get(mode) ?? []), rawMode]);
+  }
+  return Object.fromEntries([...grouped.entries()].map(([mode, rawModes]) => {
+    const rawAvailability = rawModes.map((rawMode) => preset.authModeAvailability?.[rawMode] ?? preset.availability);
+    const modeAvailability = rawAvailability.some((entry) => entry.state === 'available')
+      ? { state: 'available' as const }
+      : rawAvailability.some((entry) => entry.state === 'unknown')
+        ? {
+            state: 'unknown' as const,
+            reason: rawAvailability.find((entry) => entry.state === 'unknown')?.reason,
+          }
+        : {
+            state: 'unavailable' as const,
+            reason: rawAvailability.map((entry) => entry.reason).filter(Boolean).join(' '),
+          };
+    return [mode, combineAvailability(preset.availability, modeAvailability)];
+  }));
+}
+
 function toAuthModeOptions(preset: ProviderPreset): LlmProviderAuthMode[] {
-  return [...new Set(preset.authModes.map((mode) => {
-    if (mode === 'oauth' || mode === 'device') return 'account';
-    if (mode === 'environment' || mode === 'local') return mode;
-    return 'api-key';
-  }))];
+  return [...new Set(preset.authModes.map(mapPresetAuthMode))];
 }
 
 function toLegacyDiscovery(preset: ProviderPreset): LlmProviderModelDiscoveryStrategy | null {
@@ -160,19 +207,26 @@ export function createProviderEntryFromPreset(id: BuiltinLlmProviderId): LlmProv
   if (!preset || !route) throw new Error(`Unknown builtin provider: ${id}`);
   const models = preset.catalogOwnership === 'app-managed' ? preset.seedModels.map(toProviderModel) : [];
   const authMode = toAuthMode(preset);
-  const unavailableReason = preset.availability.state === 'unavailable' ? preset.availability.reason : undefined;
+  const authModeAvailability = getProviderPresetAuthModeAvailability(id);
+  const selectedAvailability = authModeAvailability[authMode] ?? preset.availability;
+  const unavailableReason = selectedAvailability.state === 'unavailable' ? selectedAvailability.reason : undefined;
+  const credentialless = authMode === 'local' || authMode === 'environment';
   return {
     id,
     protocol: route.protocol,
     authMode,
     authModeOptions: toAuthModeOptions(preset),
+    authModeAvailability,
+    hasStoredSecretByAuthMode: credentialless ? { [authMode]: true } : {},
+    lifecycleStatus: preset.status,
+    providerAvailability: { ...preset.availability },
     category: preset.category,
     catalogOwnership: preset.catalogOwnership,
     modelDiscovery: toLegacyDiscovery(preset),
     label: preset.label,
     enabled: false,
     apiKey: '',
-    hasStoredSecret: !unavailableReason && (authMode === 'local' || authMode === 'environment'),
+    hasStoredSecret: !unavailableReason && credentialless,
     baseUrl: route.baseUrl,
     baseUrlEditable: preset.baseUrlEditable,
     protocolEditable: preset.userSelectableRoute,

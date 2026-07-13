@@ -1,4 +1,15 @@
 {
   "callback_url": "http://127.0.0.1:1457/oauth/openrouter/callback",
-  "exchange": { "key": "sk-or-fixture", "user_id": "fixture-user" }
+  "exchange": { "key": "sk-or-fixture", "user_id": "fixture-user" },
+  "models": {
+    "data": [
+      {
+        "id": "anthropic/claude-sonnet-4.6",
+        "name": "Claude Sonnet 4.6",
+        "context_length": 1000000,
+        "architecture": { "input_modalities": ["text", "image"] },
+        "supported_parameters": ["tools", "response_format"]
+      }
+    ]
+  }
 }

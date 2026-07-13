@@ -269,6 +269,50 @@ describe('SettingsService provider persistence', () => {
     });
   });
 
+  it('switches OpenRouter auth modes without deleting the inactive credential', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const { secretStorageService } = await import('./SecretStorageService');
+    const service = new SettingsService();
+    const initialized = service.initialize();
+    const models = [{ id: 'anthropic/claude-sonnet-4.6', label: 'Claude Sonnet 4.6', enabled: true }];
+
+    service.saveProviderConnection(
+      'openrouter', 'sk-or-api-key', models, 'https://openrouter.ai/api/v1',
+      'OpenRouterChatCompletions', 'api-key',
+    );
+    const apiProvider = service.getAll().llm.providers.find((entry) => entry.id === 'openrouter');
+    const apiSecretRef = apiProvider?.secretRef;
+    expect(apiProvider).toMatchObject({
+      authMode: 'api-key', configuredAuthMode: 'api-key',
+      hasStoredSecretByAuthMode: { 'api-key': true, account: false },
+    });
+
+    service.saveProviderAccountConnection(
+      'openrouter',
+      JSON.stringify({ providerId: 'openrouter', accountId: 'or-user', apiKey: 'sk-or-oauth' }),
+      models,
+    );
+    const accountProvider = service.getAll().llm.providers.find((entry) => entry.id === 'openrouter');
+    expect(accountProvider).toMatchObject({
+      authMode: 'account', configuredAuthMode: 'account', activeAccountId: 'or-user',
+      hasStoredSecretByAuthMode: { 'api-key': true, account: true },
+      secretRef: apiSecretRef,
+    });
+    expect(service.getProviderSecret('openrouter')).toBe('sk-or-api-key');
+
+    service.disconnectProvider('openrouter', 'account');
+    expect(service.getProviderOAuthSecret('openrouter')).toBe('');
+    expect(secretStorageService.getSecret(apiSecretRef, initialized.paths.userRdxRoot)).toBe('sk-or-api-key');
+    service.saveProviderConnection(
+      'openrouter', '', models, 'https://openrouter.ai/api/v1',
+      'OpenRouterChatCompletions', 'api-key',
+    );
+    expect(service.getAll().llm.providers.find((entry) => entry.id === 'openrouter')).toMatchObject({
+      authMode: 'api-key', configuredAuthMode: 'api-key', isConfigured: true,
+      hasStoredSecretByAuthMode: { 'api-key': true, account: false },
+    });
+  });
+
   it('preserves invalid routes so model removal requires explicit reselection', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();

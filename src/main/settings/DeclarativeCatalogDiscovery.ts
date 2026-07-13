@@ -1,9 +1,13 @@
 import { isAdmittedDiscoveredModel } from './DiscoveryAdmission';
+import type { CatalogModelContribution } from './EffectiveCatalogService';
 import type {
+  CapabilityState,
+  DiscoveryCapabilityMapping,
   DiscoveryStrategy,
   ModelRoute,
 } from '@shared/types/providerCapability';
 import type { LlmProviderProtocol } from '@shared/types/settings';
+import { isLlmProviderProtocol } from '@shared/constants/llm';
 
 type JsonCatalogDiscovery = Exclude<DiscoveryStrategy, null | { kind: 'custom-parser'; parserId: string }>;
 
@@ -12,9 +16,14 @@ export interface DeclarativeDiscoveredModel {
   label: string;
   aliases: string[];
   contextWindow?: number;
+  contextWindowKind: 'prompt' | 'total';
   maxOutputTokens?: number;
   protocol?: LlmProviderProtocol;
+  route?: Omit<ModelRoute, 'source'>;
   modality?: string | string[];
+  toolCalling?: CapabilityState;
+  visionInput?: CapabilityState;
+  structuredOutput?: CapabilityState;
 }
 
 function readPath(value: unknown, path: string | undefined): unknown {
@@ -46,6 +55,37 @@ function globMatches(value: string, pattern: string): boolean {
   return new RegExp(`^${escaped}$`, 'iu').test(value);
 }
 
+function capabilityState(value: unknown, mapping: DiscoveryCapabilityMapping | undefined): CapabilityState | undefined {
+  if (!mapping || value === undefined || value === null) return undefined;
+  if (mapping.includes !== undefined) {
+    if (!Array.isArray(value)) return { state: 'unknown' };
+    return { state: value.includes(mapping.includes) ? 'supported' : 'unsupported' };
+  }
+  if (mapping.equals !== undefined) {
+    return { state: Object.is(value, mapping.equals) ? 'supported' : 'unsupported' };
+  }
+  if (typeof value === 'boolean') {
+    return { state: value ? 'supported' : 'unsupported' };
+  }
+  return { state: 'unknown' };
+}
+
+function resolveRouteRule(
+  modelId: string,
+  discovery: JsonCatalogDiscovery,
+): Omit<ModelRoute, 'source'> | undefined {
+  const rule = discovery.routeRules?.find((candidate) => (
+    candidate.allowPatterns.some((pattern) => globMatches(modelId, pattern))
+  ));
+  return rule
+    ? {
+        protocol: rule.protocol,
+        baseUrl: rule.baseUrl,
+        headers: rule.headers ? { ...rule.headers } : undefined,
+      }
+    : undefined;
+}
+
 function admittedByPreset(model: DeclarativeDiscoveredModel, discovery: JsonCatalogDiscovery): boolean {
   const admission = discovery.admission;
   if (!admission) return true;
@@ -55,6 +95,7 @@ function admittedByPreset(model: DeclarativeDiscoveredModel, discovery: JsonCata
     const modalities = Array.isArray(model.modality) ? model.modality : model.modality ? [model.modality] : [];
     if (modalities.length > 0 && !modalities.some((value) => admission.allowedModalities?.includes(value))) return false;
   }
+  if (admission.requireContextWindow && model.contextWindow === undefined) return false;
   return true;
 }
 
@@ -75,16 +116,31 @@ export function parseDeclarativeCatalog(
     const id = toString(readPath(value, discovery.mapping.id));
     if (!id) continue;
     const protocolValue = toString(readPath(value, discovery.mapping.protocol));
-    const protocol = protocolValue as LlmProviderProtocol | undefined;
+    const protocol = isLlmProviderProtocol(protocolValue) ? protocolValue : undefined;
+    const routeRule = resolveRouteRule(id, discovery);
     const modalityValue = readPath(value, discovery.mapping.modality);
     const model: DeclarativeDiscoveredModel = {
       id,
       label: toString(readPath(value, discovery.mapping.label)) ?? id,
       aliases: toStringArray(readPath(value, discovery.mapping.aliases)),
       contextWindow: toPositiveNumber(readPath(value, discovery.mapping.contextWindow)),
+      contextWindowKind: discovery.mapping.contextWindowKind ?? 'total',
       maxOutputTokens: toPositiveNumber(readPath(value, discovery.mapping.maxOutputTokens)),
-      protocol,
+      protocol: routeRule?.protocol ?? protocol,
+      route: routeRule ?? (protocol ? { protocol } : undefined),
       modality: Array.isArray(modalityValue) ? toStringArray(modalityValue) : toString(modalityValue),
+      toolCalling: capabilityState(
+        readPath(value, discovery.mapping.toolCalling?.path),
+        discovery.mapping.toolCalling,
+      ),
+      visionInput: capabilityState(
+        readPath(value, discovery.mapping.visionInput?.path),
+        discovery.mapping.visionInput,
+      ),
+      structuredOutput: capabilityState(
+        readPath(value, discovery.mapping.structuredOutput?.path),
+        discovery.mapping.structuredOutput,
+      ),
     };
     if (!isAdmittedDiscoveredModel(value) || !admittedByPreset(model, discovery) || models.has(id)) continue;
     models.set(id, model);
@@ -98,7 +154,44 @@ export function discoveredModelRoute(
 ): ModelRoute {
   return {
     ...fallback,
-    protocol: model.protocol ?? fallback.protocol,
-    source: model.protocol ? 'model' : 'preset',
+    ...(model.route ?? {}),
+    protocol: model.route?.protocol ?? model.protocol ?? fallback.protocol,
+    source: model.route || model.protocol ? 'model' : 'preset',
   };
+}
+
+export function toDeclarativeCatalogContributions(
+  models: DeclarativeDiscoveredModel[],
+  fallbackRoute: Omit<ModelRoute, 'source'>,
+): CatalogModelContribution[] {
+  return models.map((model) => ({
+    modelId: model.id,
+    label: model.label,
+    aliases: model.aliases,
+    availability: 'available',
+    route: discoveredModelRoute(model, fallbackRoute),
+    ...(model.contextWindow !== undefined
+      ? {
+          contextTiers: [{
+            id: 'default',
+            label: 'Default',
+            ...(model.contextWindowKind === 'prompt'
+              ? { maxPromptTokens: model.contextWindow }
+              : { maxTotalTokens: model.contextWindow }),
+            maxOutputTokens: model.maxOutputTokens,
+            activation: { kind: 'implicit' as const },
+            entitlement: 'granted' as const,
+          }],
+          defaultBudgetTokens: Math.min(256_000, Math.max(
+            1,
+            model.contextWindowKind === 'prompt'
+              ? model.contextWindow
+              : model.contextWindow - (model.maxOutputTokens ?? 0),
+          )),
+        }
+      : {}),
+    toolCalling: model.toolCalling,
+    visionInput: model.visionInput,
+    structuredOutput: model.structuredOutput,
+  }));
 }

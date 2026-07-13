@@ -12,6 +12,7 @@ import {
   miniMaxRegionContract,
   parseOpenRouterExchange,
   refreshMiniMaxOAuth,
+  resolveMiniMaxExpiry,
 } from './LiveProviderOAuthContracts';
 
 function fixture(name: string): Record<string, unknown> {
@@ -38,7 +39,7 @@ describe('live-verification OAuth contracts', () => {
     const exchange = async () => {
       exchanges += 1;
       await Promise.resolve();
-      return { access_token: 'new', refresh_token: 'rotated', expires_in: 900 };
+      return { status: 'success', access_token: 'new', refresh_token: 'rotated', expired_in: 900 };
     };
     const commits: string[] = [];
     const [left, right] = await Promise.all([
@@ -48,6 +49,8 @@ describe('live-verification OAuth contracts', () => {
     expect(exchanges).toBe(1);
     expect(commits).toEqual(['rotated']);
     expect(left).toEqual(right);
+    expect(Date.parse(left.expiresAt ?? '')).toBeGreaterThan(Date.now());
+    expect(resolveMiniMaxExpiry(1893456000000)).toBe('2030-01-01T00:00:00.000Z');
   });
 
   it('builds OpenRouter localhost PKCE and stores the exchange as an API key', () => {

@@ -132,10 +132,7 @@ function seedContribution(provider: LlmProviderEntry, requestedModelId?: string)
 }
 
 function userContribution(provider: LlmProviderEntry): CatalogLayerContribution | undefined {
-  const appManagedIds = new Set(getProviderSeedModelDefinitions(provider.id).map((model) => model.modelId));
-  const configuredModels = provider.catalogOwnership === 'app-managed'
-    ? provider.models.filter((model) => appManagedIds.has(model.id))
-    : provider.models;
+  const configuredModels = provider.models;
   if (configuredModels.length === 0) return undefined;
   return {
     source: 'user',
@@ -143,18 +140,15 @@ function userContribution(provider: LlmProviderEntry): CatalogLayerContribution 
     detail: provider.catalogOwnership === 'user-managed'
       ? 'User-managed provider model definition'
       : 'User model selection state',
-    models: configuredModels.map((model) => (
-      provider.catalogOwnership === 'user-managed'
-        ? {
-            ...buildSeedModelContribution(provider, model.id),
-            label: model.label,
-            aliases: [...(model.aliases ?? [])],
-            enabled: model.enabled !== false,
-            availability: model.availability ?? 'available',
-            unavailableReason: model.availabilityReason,
-          }
-        : { modelId: model.id, enabled: model.enabled !== false }
-    )),
+    models: configuredModels.map((model) => ({
+      modelId: model.id,
+      label: model.label,
+      aliases: [...(model.aliases ?? [])],
+      enabled: model.enabled !== false,
+      availability: model.availability
+        ?? (provider.catalogOwnership === 'user-managed' ? 'available' : undefined),
+      unavailableReason: model.availabilityReason,
+    })),
   };
 }
 
@@ -237,6 +231,7 @@ export function refreshEffectiveCatalogDiscovery(
   provider: LlmProviderEntry,
   models: LlmProviderModel[],
   contributions?: CatalogModelContribution[],
+  entitlementContributions?: CatalogModelContribution[],
 ): Promise<EffectiveCatalogSnapshot> {
   const request = buildEffectiveCatalogRequest(provider);
   const discovered = completeDiscoveryContributions(
@@ -244,10 +239,17 @@ export function refreshEffectiveCatalogDiscovery(
     contributions ?? toDiscoveryModelContributions(models),
   );
   return effectiveCatalogService.refreshDiscovery(request, async () => ({
-    source: 'discovery',
-    observedAt: new Date().toISOString(),
     protocol: provider.protocol,
     models: discovered,
+    ...(entitlementContributions?.length
+      ? {
+          entitlement: {
+            protocol: provider.protocol,
+            detail: 'Account catalog entitlement groups',
+            models: entitlementContributions,
+          },
+        }
+      : {}),
   }));
 }
 

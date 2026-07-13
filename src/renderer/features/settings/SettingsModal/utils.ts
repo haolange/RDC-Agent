@@ -14,6 +14,13 @@ export const joinPath = (root: string, ...segments: string[]): string => {
 
 export const cloneProvider = (provider: LlmProviderEntry): LlmProviderEntry => ({
   ...provider,
+  authModeOptions: provider.authModeOptions ? [...provider.authModeOptions] : undefined,
+  authModeAvailability: provider.authModeAvailability
+    ? Object.fromEntries(Object.entries(provider.authModeAvailability).map(([mode, availability]) => [mode, { ...availability }]))
+    : undefined,
+  authAccountIds: provider.authAccountIds ? { ...provider.authAccountIds } : undefined,
+  hasStoredSecretByAuthMode: provider.hasStoredSecretByAuthMode ? { ...provider.hasStoredSecretByAuthMode } : undefined,
+  providerAvailability: { ...provider.providerAvailability },
   protocolOptions: provider.protocolOptions ? [...provider.protocolOptions] : undefined,
   protocolBaseUrls: provider.protocolBaseUrls ? { ...provider.protocolBaseUrls } : undefined,
   models: provider.models.map((model) => ({ ...model })),

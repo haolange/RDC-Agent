@@ -6,9 +6,9 @@ const preset: ProviderPreset = {
   authModes: ['api-key'], capabilities: ['chat', 'tool-calling', 'model-discovery'],
   routes: [{ protocol: 'OllamaOpenAICompatibleChatCompletions', baseUrl: 'https://ollama.com', default: true }],
   userSelectableRoute: false,
-  discovery: { kind: 'json-catalog', url: 'https://ollama.com/api/tags', collectionPath: 'models', mapping: { id: 'name', label: 'name' }, admission: { denyPatterns: ['*embed*'] } },
-  seedModels: [], overlays: [], recommendedModels: ['gpt-oss:120b-cloud', 'deepseek-v3.1:671b-cloud'],
-  docsUrl: 'https://docs.ollama.com/api/introduction',
+  discovery: { kind: 'json-catalog', url: 'https://ollama.com/api/tags', collectionPath: 'models', mapping: { id: 'name', label: 'name' }, admission: { denyPatterns: ['*embed*'] }, modelSet: 'authoritative' },
+  seedModels: [], overlays: [], recommendedModels: ['deepseek-v4-flash', 'minimax-m3', 'qwen3.5:397b'],
+  docsUrl: 'https://docs.ollama.com/cloud',
 };
 
 export default preset;

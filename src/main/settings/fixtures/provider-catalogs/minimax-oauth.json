@@ -1,4 +1,15 @@
 {
-  "authorization": { "user_code": "ABCD-EFGH", "expired_in": 1893456000000, "interval": 2000 },
-  "token": { "access_token": "fixture-access", "refresh_token": "fixture-refresh", "expires_in": 900 }
+  "authorization": {
+    "user_code": "ABCD-EFGH",
+    "verification_uri": "https://api.minimax.io/oauth/verify",
+    "expired_in": 1893456000000,
+    "interval": 2000
+  },
+  "token": {
+    "status": "success",
+    "access_token": "fixture-access",
+    "refresh_token": "fixture-refresh",
+    "expired_in": 900,
+    "resource_url": "https://api.minimax.io/anthropic"
+  }
 }

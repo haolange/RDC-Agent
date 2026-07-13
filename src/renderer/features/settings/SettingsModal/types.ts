@@ -1,6 +1,8 @@
 import type {
   LlmProviderAccountLoginMode,
+  LlmProviderAccountRegion,
   LlmProviderAccountStatus,
+  LlmProviderAuthMode,
   LlmProviderCatalogResponse,
   LlmProviderConnectionResult,
   LlmProviderModel,
@@ -13,6 +15,7 @@ export type ProviderConnectionBusyState = 'idle' | 'testing' | 'saving';
 
 export interface ProviderConnectionDraft {
   providerId: string;
+  authMode: LlmProviderAuthMode;
   protocol: ProviderProtocol;
   apiKey: string;
   baseUrl: string;
@@ -24,9 +27,11 @@ export interface ProviderConnectionDraft {
   testedApiKey: string;
   testedBaseUrl: string;
   testedProtocol: ProviderProtocol;
+  testedAuthMode: LlmProviderAuthMode;
   models: LlmProviderModel[];
   accountStatus?: LlmProviderAccountStatus;
   accountLoginMode: LlmProviderAccountLoginMode;
+  accountRegion: LlmProviderAccountRegion;
   authCode: string;
 }
 

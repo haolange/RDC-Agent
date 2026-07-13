@@ -8,6 +8,7 @@ import type {
   LlmProviderCapability,
   LlmProviderCatalogOwnership,
   LlmProviderCategory,
+  LlmProviderLifecycleStatus,
   LlmProviderProtocol,
 } from './settings';
 
@@ -178,7 +179,7 @@ export type RequestPlanningResult =
       recommendations?: ModelRouteRecommendation[];
     };
 
-export type ProviderLifecycleStatus = 'stable' | 'beta' | 'deprecated' | 'sunset';
+export type ProviderLifecycleStatus = LlmProviderLifecycleStatus;
 export type ProviderPresetAuthMode = 'api-key' | 'oauth' | 'device' | 'environment' | 'local';
 
 export interface ProviderAvailability {
@@ -191,15 +192,33 @@ export interface DiscoveryFieldMapping {
   label?: string;
   aliases?: string;
   contextWindow?: string;
+  contextWindowKind?: 'prompt' | 'total';
   maxOutputTokens?: string;
   protocol?: string;
   modality?: string;
+  toolCalling?: DiscoveryCapabilityMapping;
+  visionInput?: DiscoveryCapabilityMapping;
+  structuredOutput?: DiscoveryCapabilityMapping;
+}
+
+export interface DiscoveryCapabilityMapping {
+  path: string;
+  equals?: JsonPrimitive;
+  includes?: JsonPrimitive;
+}
+
+export interface DiscoveryRouteRule {
+  allowPatterns: string[];
+  protocol: LlmProviderProtocol;
+  baseUrl?: string;
+  headers?: Record<string, string>;
 }
 
 export interface DiscoveryAdmission {
   allowPatterns?: string[];
   denyPatterns?: string[];
   allowedModalities?: string[];
+  requireContextWindow?: boolean;
 }
 
 export type DiscoveryStrategy =
@@ -212,6 +231,8 @@ export type DiscoveryStrategy =
       collectionPath: string;
       mapping: DiscoveryFieldMapping;
       admission?: DiscoveryAdmission;
+      routeRules?: DiscoveryRouteRule[];
+      modelSet?: 'authoritative' | 'seed-validation';
     }
   | { kind: 'custom-parser'; parserId: string }
   | null;

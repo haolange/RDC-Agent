@@ -1,5 +1,6 @@
 import {
   getProviderPreset,
+  getProviderPresetAuthModeAvailability,
   getProviderPresetCatalogOwnership,
   getProviderSeedModelDefinitions,
   getProviderSeedModels,
@@ -12,6 +13,7 @@ import type {
   LlmProviderAccountLoginFinishRequest,
   LlmProviderAccountLoginStartRequest,
   LlmProviderAccountStatus,
+  LlmProviderAuthMode,
   LlmProviderConnectionResult,
   LlmProviderDraftRequest,
   LlmProviderEntry,
@@ -22,7 +24,11 @@ import type {
 import { settingsService } from '../settings/SettingsService';
 import { providerAccountAuthService } from './ProviderAccountAuthService';
 import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
-import { parseDeclarativeCatalog, resolveDeclarativeDiscoveryUrl } from './DeclarativeCatalogDiscovery';
+import {
+  parseDeclarativeCatalog,
+  resolveDeclarativeDiscoveryUrl,
+  toDeclarativeCatalogContributions,
+} from './DeclarativeCatalogDiscovery';
 import type {
   CatalogModelContribution,
   DiscoveryLoader,
@@ -40,6 +46,7 @@ const REQUEST_TIMEOUT_MS = 20000;
 interface ModelDiscoveryResult {
   models: LlmProviderModel[];
   contributions?: CatalogModelContribution[];
+  entitlementContributions?: CatalogModelContribution[];
   discoveryDiagnostic?: LlmProviderConnectionResult['discoveryDiagnostic'];
 }
 
@@ -342,7 +349,12 @@ export class ProviderConnectionService {
     providerAccountAuthService.setCatalogPublisher(async (providerId, discovery) => {
       const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
       if (provider) {
-        await refreshEffectiveCatalogDiscovery(provider, discovery.models, discovery.contributions);
+        await refreshEffectiveCatalogDiscovery(
+          provider,
+          discovery.models,
+          discovery.contributions,
+          discovery.entitlementContributions,
+        );
       }
     });
   }
@@ -368,13 +380,25 @@ export class ProviderConnectionService {
           provider,
           discovery.contributions ?? toDiscoveryModelContributions(discovery.models),
         ),
+        ...(discovery.entitlementContributions?.length
+          ? {
+              entitlement: {
+                protocol: provider.protocol,
+                detail: 'Account catalog entitlement groups',
+                models: discovery.entitlementContributions,
+              },
+            }
+          : {}),
       };
     };
   }
 
   async testProviderDraft(request: LlmProviderDraftRequest): Promise<LlmProviderConnectionResult> {
     try {
-      const provider = this.resolveProviderProtocol(this.getProvider(request.providerId), request.protocol);
+      const provider = this.resolveProviderProtocol(
+        this.resolveProviderAuthMode(this.getProvider(request.providerId), request.authMode),
+        request.protocol,
+      );
       const discovery = await this.discoverModels(
         provider,
         request.apiKey?.trim() ?? '',
@@ -396,15 +420,30 @@ export class ProviderConnectionService {
 
   async connectProvider(request: LlmProviderDraftRequest): Promise<LlmProviderConnectionResult> {
     try {
-      const provider = this.resolveProviderProtocol(this.getProvider(request.providerId), request.protocol);
+      const provider = this.resolveProviderProtocol(
+        this.resolveProviderAuthMode(this.getProvider(request.providerId), request.authMode),
+        request.protocol,
+      );
       const apiKey = request.apiKey?.trim() ?? '';
       const baseUrl = request.baseUrl?.trim() ?? '';
       const discovery = await this.discoverModels(provider, apiKey, baseUrl);
       const { models } = discovery;
-      const nextSettings = settingsService.saveProviderConnection(provider.id, apiKey, models, baseUrl, provider.protocol);
+      const nextSettings = settingsService.saveProviderConnection(
+        provider.id,
+        apiKey,
+        models,
+        baseUrl,
+        provider.protocol,
+        provider.authMode,
+      );
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
       if (nextProvider) {
-        await refreshEffectiveCatalogDiscovery(nextProvider, models, discovery.contributions);
+        await refreshEffectiveCatalogDiscovery(
+          nextProvider,
+          models,
+          discovery.contributions,
+          discovery.entitlementContributions,
+        );
       }
       return {
         success: true,
@@ -437,10 +476,22 @@ export class ProviderConnectionService {
       }
       const discovery = await this.discoverModels(provider, '', '');
       const { models } = discovery;
-      const nextSettings = settingsService.saveProviderConnection(provider.id, '', models, '', provider.protocol);
+      const nextSettings = settingsService.saveProviderConnection(
+        provider.id,
+        '',
+        models,
+        '',
+        provider.protocol,
+        provider.authMode,
+      );
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
       if (nextProvider) {
-        await refreshEffectiveCatalogDiscovery(nextProvider, models, discovery.contributions);
+        await refreshEffectiveCatalogDiscovery(
+          nextProvider,
+          models,
+          discovery.contributions,
+          discovery.entitlementContributions,
+        );
       }
       return {
         success: true,
@@ -475,7 +526,27 @@ export class ProviderConnectionService {
   }
 
   startProviderAccountLogin(request: LlmProviderAccountLoginStartRequest): Promise<LlmProviderAccountStatus> {
-    return providerAccountAuthService.startLogin(request);
+    const provider = this.resolveProviderAuthMode(this.getProvider(request.providerId), request.authMode ?? 'account');
+    const availability = provider.authModeAvailability?.account;
+    if (provider.authMode !== 'account' || !provider.authModeOptions?.includes('account')) {
+      return Promise.resolve({
+        providerId: request.providerId,
+        state: 'unavailable',
+        available: false,
+        connected: false,
+        error: 'Provider does not support account login.',
+      });
+    }
+    if (availability?.state === 'unavailable' || !provider.accountLoginConfigured) {
+      return Promise.resolve({
+        providerId: request.providerId,
+        state: 'unavailable',
+        available: false,
+        connected: false,
+        error: availability?.reason ?? 'Provider account login is not configured.',
+      });
+    }
+    return providerAccountAuthService.startLogin({ ...request, authMode: 'account' });
   }
 
   finishProviderAccountLogin(request: LlmProviderAccountLoginFinishRequest): Promise<LlmProviderAccountStatus> {
@@ -511,6 +582,27 @@ export class ProviderConnectionService {
       provider.baseUrl,
     );
     return { ...provider, protocol, baseUrl: nextBaseUrl || provider.baseUrl };
+  }
+
+  private resolveProviderAuthMode(
+    provider: LlmProviderEntry,
+    authModeDraft: LlmProviderAuthMode | undefined,
+  ): LlmProviderEntry {
+    const authMode = authModeDraft ?? provider.authMode;
+    const options = provider.authModeOptions ?? [provider.authMode];
+    if (!options.includes(authMode)) {
+      throw new ProviderConnectionError(`Provider ${provider.id} does not support ${authMode} authentication.`);
+    }
+    const availability = getProviderPresetAuthModeAvailability(provider.id)[authMode]
+      ?? provider.authModeAvailability?.[authMode]
+      ?? provider.providerAvailability;
+    return {
+      ...provider,
+      authMode,
+      activeAccountId: provider.authAccountIds?.[authMode],
+      hasStoredSecret: provider.hasStoredSecretByAuthMode?.[authMode] === true,
+      unavailableReason: availability.state === 'unavailable' ? availability.reason : undefined,
+    };
   }
 
   private async discoverModels(provider: LlmProviderEntry, apiKeyDraft: string, baseUrlDraft: string): Promise<ModelDiscoveryResult> {
@@ -569,7 +661,11 @@ export class ProviderConnectionService {
       const parsed = strategy === 'opencode-go-catalog'
         ? parseOpenCodeGoCatalog(payload)
         : parseClineCatalog(payload);
-      return { models: requireModels(parsed.models), contributions: parsed.contributions };
+      return {
+        models: requireModels(parsed.models),
+        contributions: parsed.contributions,
+        entitlementContributions: parsed.entitlementContributions,
+      };
     }
     if (definition.discovery?.kind === 'json-catalog') {
       const url = resolveDeclarativeDiscoveryUrl(definition.discovery, baseUrl);
@@ -580,18 +676,26 @@ export class ProviderConnectionService {
           ...definition.discovery.headers,
         },
       });
-      const discoveredModels = requireModels(parseDeclarativeCatalog(definition.discovery, payload).map((model) => ({
+      const parsedModels = parseDeclarativeCatalog(definition.discovery, payload);
+      const discoveredModels = requireModels(parsedModels.map((model) => ({
         id: model.id,
         label: model.label,
         enabled: true,
         aliases: model.aliases,
       })));
+      const fallbackRoute = {
+        protocol: provider.protocol,
+        baseUrl,
+      };
+      const contributions = toDeclarativeCatalogContributions(parsedModels, fallbackRoute);
+      const authoritative = definition.discovery.modelSet === 'authoritative';
       return {
-        models: catalogOwnership === 'app-managed'
+        models: catalogOwnership === 'app-managed' && !authoritative
           ? mergeManagedModelAvailability(managedModels, discoveredModels, {
             aliasesByModelId: buildManagedAliasIndex(provider.id),
           })
           : discoveredModels,
+        contributions,
       };
     }
     if (

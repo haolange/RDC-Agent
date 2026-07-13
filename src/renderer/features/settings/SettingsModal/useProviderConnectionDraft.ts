@@ -2,7 +2,8 @@ import { useEffect, useMemo, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettings, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../i18n';
 import type { ProviderConnectionDraft } from './types';
-import { cloneProvider, cloneRoute, getEnabledModels } from './utils';
+import { createProviderConnectionDraft, projectConnectionProvider } from './providerConnectionState';
+import { cloneProvider, cloneRoute } from './utils';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -31,10 +32,10 @@ export const useProviderConnectionDraft = ({
   reloadSettings,
   t,
 }: UseProviderConnectionDraftOptions) => {
-  const connectionProvider = useMemo(
-    () => providerDrafts.find((provider) => provider.id === connectionDraft?.providerId) ?? null,
-    [connectionDraft?.providerId, providerDrafts],
-  );
+  const connectionProvider = useMemo(() => {
+    const provider = providerDrafts.find((entry) => entry.id === connectionDraft?.providerId) ?? null;
+    return projectConnectionProvider(provider, connectionDraft);
+  }, [connectionDraft, providerDrafts]);
 
   const refreshLocalSettings = async (preferredProviderId?: string) => {
     const nextSettings = await reloadSettings();
@@ -119,36 +120,7 @@ export const useProviderConnectionDraft = ({
   ]);
 
   const openProviderConnection = (provider: LlmProviderEntry) => {
-    const models = getEnabledModels(provider);
-    setConnectionDraft({
-      providerId: provider.id,
-      protocol: provider.protocol,
-      apiKey: '',
-      baseUrl: provider.baseUrl ?? '',
-      showApiKey: false,
-      usingStoredSecret: provider.authMode === 'api-key' && provider.hasStoredSecret,
-      busy: 'idle',
-      error: '',
-      discoveryDiagnostic: null,
-      testedApiKey: '',
-      testedBaseUrl: '',
-      testedProtocol: provider.protocol,
-      models,
-      accountStatus: provider.authMode === 'account' && provider.isConfigured
-        ? {
-          providerId: provider.id,
-          state: 'connected',
-          available: true,
-          connected: true,
-          accountLabel: provider.accountLabel,
-          planLabel: provider.planLabel,
-          expiresAt: provider.oauthExpiresAt,
-          models,
-        }
-        : undefined,
-      accountLoginMode: provider.id === 'grok-account' ? 'browser' : 'device',
-      authCode: '',
-    });
+    setConnectionDraft(createProviderConnectionDraft(provider));
   };
 
   const updateConnectionDraft = (patch: Partial<ProviderConnectionDraft>) => {
@@ -167,7 +139,8 @@ export const useProviderConnectionDraft = ({
     && connectionDraft.models.length > 0
     && connectionDraft.testedApiKey === connectionDraft.apiKey
     && connectionDraft.testedBaseUrl === connectionDraft.baseUrl
-    && connectionDraft.testedProtocol === connectionDraft.protocol,
+    && connectionDraft.testedProtocol === connectionDraft.protocol
+    && connectionDraft.testedAuthMode === connectionDraft.authMode,
   );
   const connectionAccountConnected = Boolean(
     connectionDraft
