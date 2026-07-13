@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const REQUIRED_NODE = [22, 12, 0];
+const REQUIRED_NODE = [22, 13, 0];
 const REQUIRED_PNPM = '11.7.0';
 const VALID_MODES = new Set(['desktop', 'desktop-dev', 'browser', 'browser-dev', 'prepare-only']);
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));

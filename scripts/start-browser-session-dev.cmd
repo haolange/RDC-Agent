@@ -11,7 +11,7 @@ if not errorlevel 1 (
 
 if not exist "%NODE_EXE%" if "%NODE_EXE%"=="node" goto run
 if not exist "%NODE_EXE%" (
-  echo [RDC-Agent] Node.js ^>=22.12.0 is missing. Install Node.js or run from a Codex environment with its bundled runtime.
+  echo [RDC-Agent] Node.js ^>=22.13.0 is missing. Install Node.js or run from a Codex environment with its bundled runtime.
   exit /b 1
 )
 
