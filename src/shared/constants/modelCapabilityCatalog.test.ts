@@ -135,6 +135,12 @@ describe('managed provider model catalog', () => {
     });
   });
 
+  it('keeps the Copilot Opus fast target out of the user-selectable catalog', () => {
+    expect(lookupManagedModelCatalogEntry('github-copilot', 'claude-opus-4-8')?.profile.fast?.modelId)
+      .toBe('claude-opus-4-8-fast');
+    expect(lookupManagedModelCatalogEntry('github-copilot', 'claude-opus-4-8-fast')).toBeNull();
+  });
+
   it('captures multi-level and always-on variants without legacy fields', () => {
     expect(lookupManagedModelCatalogEntry('openai', 'gpt-5.6-sol')?.profile.reasoningControl).toMatchObject({
       kind: 'levels',

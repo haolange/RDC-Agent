@@ -12,7 +12,8 @@ import type {
 } from '@shared/types/settings';
 import { getBuiltinProviderDefinition, SUPER_GROK_OAUTH_CALLBACK_PORT, SUPER_GROK_OAUTH_REDIRECT_URI } from '@shared/constants/llm';
 import { getManagedProviderModels } from '@shared/constants/modelCapabilityCatalog';
-import { COPILOT_EDITOR_HEADERS } from './CopilotWire';
+import { COPILOT_EDITOR_HEADERS, COPILOT_WIRE_HEADERS } from './CopilotWire';
+import { parseCopilotModelCatalog } from './CopilotBilling';
 import { settingsService } from './SettingsService';
 
 const REQUEST_TIMEOUT_MS = 20000;
@@ -66,6 +67,7 @@ interface OAuthSecretBundle {
   apiKey?: string;
   copilotToken?: string;
   copilotApiBaseUrl?: string;
+  copilotModelBilling?: Record<string, unknown>;
   idToken?: string;
   clientId?: string;
   authorizationMode?: LlmProviderAccountLoginMode;
@@ -1295,6 +1297,30 @@ export class ProviderAccountAuthService {
   }
 
   private async discoverModels(bundle: OAuthSecretBundle): Promise<LlmProviderModel[]> {
+    if (bundle.providerId === 'github-copilot' && bundle.copilotToken) {
+      try {
+        const baseUrl = (bundle.copilotApiBaseUrl ?? 'https://api.githubcopilot.com').replace(/\/+$/, '');
+        const payload = await fetchJson(`${baseUrl}/models`, {
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+            Authorization: `Bearer ${bundle.copilotToken}`,
+            ...COPILOT_WIRE_HEADERS,
+          },
+        });
+        const parsed = parseCopilotModelCatalog(payload);
+        const models = parsed.models.filter((model) => isAgentRoutableAccountModel(model.id));
+        if (models.length > 0) {
+          bundle.copilotModelBilling = Object.fromEntries(
+            Object.entries(parsed.billingByModel).filter(([modelId]) => models.some((model) => model.id === modelId)),
+          );
+          return models;
+        }
+      } catch {
+        // Account login remains usable with the conservative bundled seed.
+      }
+      delete bundle.copilotModelBilling;
+    }
     const models = createAccountCatalogModels(bundle.providerId);
     if (models.length === 0) {
       throw new Error(`Account provider ${bundle.providerId} is missing an app-managed model catalog.`);
