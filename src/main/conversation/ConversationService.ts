@@ -56,7 +56,11 @@ import { agentManifestService } from '../settings/AgentManifestService';
 import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService';
 import { scopedInstructionResolver } from '../runtime/ScopedInstructionResolver';
 import { appPathService } from '../runtime/AppPathService';
-import { planEffectiveModelRequest, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
+import {
+  planEffectiveModelRequest,
+  resolveEffectiveModel,
+  resolveEffectiveModelSelection,
+} from '../settings/EffectiveModelResolver';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
@@ -273,6 +277,7 @@ interface AgentRoutePreflightOk {
   providerId: string;
   modelId: string;
   routeCapability: AgentRouteCapability;
+  aliasRemap?: { from: string; to: string };
 }
 
 interface AgentRoutePreflightBlocked {
@@ -299,6 +304,7 @@ function createConversationDiagnostic(input: {
   modelId?: string;
   adapterId?: string;
   technicalMessage?: string;
+  recommendations?: ConversationMessageDiagnostic['recommendations'];
 }): ConversationMessageDiagnostic {
   return {
     code: input.code,
@@ -309,6 +315,7 @@ function createConversationDiagnostic(input: {
     modelId: input.modelId,
     adapterId: input.adapterId,
     technicalMessage: input.technicalMessage,
+    recommendations: input.recommendations,
   };
 }
 
@@ -364,18 +371,21 @@ function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?: AgentR
     };
   }
 
-  const effectiveModel = resolveEffectiveModel(route.providerId, route.modelId, settings);
+  const selection = resolveEffectiveModelSelection(route.providerId, route.modelId, settings);
+  const effectiveModel = selection.model;
   if (!effectiveModel) {
+    const recommendationText = selection.recommendations.map((entry) => entry.modelId).join(', ');
     return {
       ok: false,
       diagnostic: createConversationDiagnostic({
         agentId,
         code: 'CONVERSATION_LLM_ROUTE_MISSING',
         severity: 'warning',
-        userMessage: `当前 ${label} 链路的模型不可用：${route.providerId}/${route.modelId}。请在 Settings 中刷新模型列表或重新选择 route。`,
+        userMessage: `当前 ${label} 路由的模型不可用：${route.providerId}/${route.modelId}。请在 Settings 中刷新模型目录或显式选择同一 provider 的其它模型。`,
         providerId: route.providerId,
         modelId: route.modelId,
-        technicalMessage: `MODEL_UNAVAILABLE: ${route.providerId}/${route.modelId} is absent, disabled, or unavailable in the effective catalog.`,
+        technicalMessage: `MODEL_UNAVAILABLE: ${route.providerId}/${route.modelId} is absent, disabled, or unavailable in the effective catalog.${recommendationText ? ` Recommendations: ${recommendationText}.` : ''}`,
+        recommendations: selection.recommendations,
       }),
     };
   }
@@ -392,6 +402,9 @@ function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?: AgentR
       effectiveModelId,
       effectiveModel,
     ),
+    ...(selection.remappedFrom
+      ? { aliasRemap: { from: selection.remappedFrom, to: effectiveModelId } }
+      : {}),
   };
 }
 
@@ -1173,6 +1186,20 @@ export class ConversationService {
         currentLoopOutputPhase = undefined;
       }
     };
+
+    if (routePreflight.ok && routePreflight.aliasRemap) {
+      runtimeLogService.log({
+        scope: sessionId ? 'session' : 'app',
+        namespace: 'llm',
+        severity: 'info',
+        title: 'Canonical model alias remap',
+        summary: `${routePreflight.providerId}/${routePreflight.aliasRemap.from} -> ${routePreflight.aliasRemap.to}`,
+        sessionId,
+        projectId: input.context.projectId,
+        runId: isActiveRun(input.context.currentRun) ? input.context.currentRun.runId : null,
+        raw: routePreflight.aliasRemap,
+      });
+    }
 
     if (!routePreflight.ok) {
       llmDiagnostic = routePreflight.diagnostic;

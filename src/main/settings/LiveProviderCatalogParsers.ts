@@ -6,6 +6,7 @@ import type {
   ReasoningControl,
 } from '@shared/types/modelCapability';
 import type { LlmProviderModel } from '@shared/types/settings';
+import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 
 export interface ParsedLiveCatalog {
   models: LlmProviderModel[];
@@ -49,6 +50,17 @@ function modelId(value: Record<string, unknown>): string | undefined {
   return text(value.id) ?? text(value.model) ?? text(value.name);
 }
 
+function liveIdentity(
+  value: Record<string, unknown>,
+  explicitId = modelId(value),
+): { id: string; aliases: string[] } | null {
+  if (!explicitId) return null;
+  const candidate = { ...value, id: explicitId };
+  if (!isAdmittedDiscoveredModel(candidate)) return null;
+  const identity = extractDiscoveredModelIdentity(candidate);
+  return identity.id ? identity : null;
+}
+
 function contextTokens(value: Record<string, unknown>): number | undefined {
   const raw = value.context_window ?? value.contextWindow ?? value.context_length;
   const parsed = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN;
@@ -56,10 +68,26 @@ function contextTokens(value: Record<string, unknown>): number | undefined {
 }
 
 function asResult(contributions: CatalogModelContribution[]): ParsedLiveCatalog {
-  const sorted = [...contributions].sort((left, right) => left.modelId.localeCompare(right.modelId));
+  const byId = new Map<string, CatalogModelContribution>();
+  for (const contribution of contributions) {
+    const previous = byId.get(contribution.modelId);
+    byId.set(contribution.modelId, previous
+      ? {
+          ...previous,
+          ...contribution,
+          aliases: [...new Set([...(previous.aliases ?? []), ...(contribution.aliases ?? [])])],
+        }
+      : contribution);
+  }
+  const sorted = [...byId.values()].sort((left, right) => left.modelId.localeCompare(right.modelId));
   return {
     contributions: sorted,
-    models: sorted.map((model) => ({ id: model.modelId, label: model.label ?? model.modelId, enabled: true })),
+    models: sorted.map((model) => ({
+      id: model.modelId,
+      label: model.label ?? model.modelId,
+      enabled: true,
+      ...(model.aliases?.length ? { aliases: [...model.aliases] } : {}),
+    })),
   };
 }
 
@@ -67,7 +95,14 @@ export function mergeParsedLiveCatalogs(...catalogs: ParsedLiveCatalog[]): Parse
   const byId = new Map<string, CatalogModelContribution>();
   for (const catalog of catalogs) {
     for (const contribution of catalog.contributions) {
-      byId.set(contribution.modelId, contribution);
+      const previous = byId.get(contribution.modelId);
+      byId.set(contribution.modelId, previous
+        ? {
+            ...previous,
+            ...contribution,
+            aliases: [...new Set([...(previous.aliases ?? []), ...(contribution.aliases ?? [])])],
+          }
+        : contribution);
     }
   }
   return asResult([...byId.values()]);
@@ -138,8 +173,10 @@ export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog 
   return asResult(values.flatMap((candidate): CatalogModelContribution[] => {
     const value = record(candidate);
     const id = text(value.slug) ?? text(value.id);
+    const identity = liveIdentity(value, id);
     if (
       !id
+      || !identity
       || value.supported_in_api === false
       || (text(value.visibility) && text(value.visibility) !== 'list')
       || /(?:^|-)pro$/i.test(id)
@@ -167,7 +204,8 @@ export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog 
       ? value.input_modalities.map((entry) => text(entry)?.toLowerCase()).filter(Boolean)
       : [];
     return [{
-      modelId: id,
+      modelId: identity.id,
+      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
       label: text(value.display_name) ?? text(value.name) ?? id,
       availability: 'available',
       route: { protocol: 'OpenAIResponses', baseUrl: 'https://chatgpt.com/backend-api/codex', source: 'model' },
@@ -187,11 +225,12 @@ export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog 
 /** The Anthropic model endpoint is authoritative for account-visible ids, not for undocumented limits. */
 export function parseClaudeAccountCatalog(payload: unknown): ParsedLiveCatalog {
   return asResult(records(payload).flatMap((value): CatalogModelContribution[] => {
-    const id = modelId(value);
-    if (!id) return [];
+    const identity = liveIdentity(value);
+    if (!identity) return [];
     return [{
-      modelId: id,
-      label: text(value.display_name) ?? text(value.label) ?? id,
+      modelId: identity.id,
+      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
+      label: text(value.display_name) ?? text(value.label) ?? identity.id,
       availability: 'available',
       route: { protocol: 'AnthropicMessages', baseUrl: 'https://api.anthropic.com/v1', source: 'model' },
     }];
@@ -210,12 +249,13 @@ function opencodeProtocol(value: Record<string, unknown>): 'AnthropicMessages' |
 /** Parse OpenCode Go's account catalog without collapsing its per-model API surface. */
 export function parseOpenCodeGoCatalog(payload: unknown): ParsedLiveCatalog {
   const contributions = records(payload).flatMap((value): CatalogModelContribution[] => {
-    const id = modelId(value);
-    if (!id) return [];
+    const identity = liveIdentity(value);
+    if (!identity) return [];
     const protocol = opencodeProtocol(value);
     return [{
-      modelId: id,
-      label: text(value.label) ?? text(value.name) ?? id,
+      modelId: identity.id,
+      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
+      label: text(value.label) ?? text(value.name) ?? identity.id,
       availability: 'available',
       route: { protocol, baseUrl: 'https://opencode.ai/zen/go/v1', source: 'model' },
       contextTiers: [{
@@ -239,11 +279,12 @@ function hasClinePass(value: Record<string, unknown>): boolean {
 /** ClinePass is entitlement evidence only when the catalog says so explicitly. */
 export function parseClineCatalog(payload: unknown): ParsedLiveCatalog {
   const contributions = records(payload).flatMap((value): CatalogModelContribution[] => {
-    const id = modelId(value);
-    if (!id) return [];
+    const identity = liveIdentity(value);
+    if (!identity) return [];
     return [{
-      modelId: id,
-      label: text(value.label) ?? text(value.name) ?? id,
+      modelId: identity.id,
+      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
+      label: text(value.label) ?? text(value.name) ?? identity.id,
       availability: 'available',
       route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://api.cline.bot/api/v1', source: 'preset' },
       contextTiers: [{
@@ -261,11 +302,12 @@ export function parseClineCatalog(payload: unknown): ParsedLiveCatalog {
 /** Grok account models are accepted only from the live account catalog. */
 export function parseGrokAccountCatalog(payload: unknown): ParsedLiveCatalog {
   return asResult(records(payload).flatMap((value): CatalogModelContribution[] => {
-    const id = modelId(value);
-    if (!id) return [];
+    const identity = liveIdentity(value);
+    if (!identity) return [];
     return [{
-      modelId: id,
-      label: text(value.label) ?? id,
+      modelId: identity.id,
+      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
+      label: text(value.label) ?? identity.id,
       availability: 'available',
       route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://api.x.ai/v1', source: 'model' },
       contextTiers: [{
@@ -288,13 +330,14 @@ export function parseGrokBuilderCatalog(payload: unknown): ParsedLiveCatalog {
     const wrapper = record(candidate);
     const info = record(wrapper.info);
     const value = Object.keys(info).length > 0 ? info : wrapper;
-    const id = modelId(value);
-    if (!id || value.hidden === true || value.supported_in_api === false) return [];
+    const identity = liveIdentity(value);
+    if (!identity || value.hidden === true || value.supported_in_api === false) return [];
     const contextWindow = contextTokens(value);
     const supportsReasoning = value.supports_reasoning_effort === true;
     return [{
-      modelId: id,
-      label: text(value.name) ?? text(value.label) ?? id,
+      modelId: identity.id,
+      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
+      label: text(value.name) ?? text(value.label) ?? identity.id,
       availability: 'available',
       route: {
         protocol: text(value.api_backend)?.toLowerCase() === 'responses'

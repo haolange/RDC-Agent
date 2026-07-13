@@ -3,7 +3,11 @@ import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/pro
 import type { AppSettings, LlmProviderId, LlmProviderModel, LlmProviderProtocol } from '@shared/types/settings';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { effectiveCatalogService } from './EffectiveCatalogService';
-import { refreshEffectiveCatalogDiscovery } from './EffectiveModelResolver';
+import {
+  refreshEffectiveCatalogDiscovery,
+  selectEffectiveModelFromSnapshot,
+} from './EffectiveModelResolver';
+import { getProviderPreset } from './ProviderPresetRegistry';
 import { planModelRequest } from './RequestPlanner';
 
 export class ProtocolProjectionError extends Error {
@@ -25,30 +29,48 @@ export function clampControlsForProtocolModels(
   return next;
 }
 
+export function resolveProtocolRouteModels(
+  settings: AppSettings,
+  snapshot: EffectiveCatalogSnapshot,
+  providerId: string,
+): EffectiveModel[] {
+  const recommended = getProviderPreset(providerId)?.recommendedModels ?? [];
+  const selections = settings.llm.agentRoutes
+    .filter((route) => route.providerId === providerId)
+    .map((route) => selectEffectiveModelFromSnapshot(snapshot, route.modelId, recommended));
+  const missing = selections.filter((selection) => !selection.model);
+  if (missing.length > 0) {
+    const detail = missing.map((selection) => {
+      const recommendations = selection.recommendations.map((entry) => entry.modelId).join(', ');
+      return `${providerId}/${selection.requestedModelId}${recommendations ? ` (recommended: ${recommendations})` : ''}`;
+    }).join('; ');
+    throw new ProtocolProjectionError(`MODEL_UNAVAILABLE after protocol reprojection: ${detail}.`);
+  }
+  return [...new Map(selections.map((selection) => [
+    selection.model!.modelId,
+    selection.model!,
+  ])).values()];
+}
+
 export async function reprojectProviderProtocolChange(input: {
   providerId: LlmProviderId;
   previousProtocol: LlmProviderProtocol;
   settings: AppSettings;
   discoveredModels?: LlmProviderModel[];
+  snapshot?: EffectiveCatalogSnapshot;
 }): Promise<EffectiveCatalogSnapshot> {
   const provider = input.settings.llm.providers.find((entry) => entry.id === input.providerId);
   if (!provider) throw new ProtocolProjectionError(`Provider ${input.providerId} no longer exists.`);
-  if (!input.discoveredModels) {
+  if (!input.snapshot && !input.discoveredModels) {
     throw new ProtocolProjectionError('Protocol changes require successful discovery through the provider connection flow.');
   }
   const accountId = provider.activeAccountId ?? `anonymous:${provider.id}`;
   effectiveCatalogService.invalidateDiscovery({ providerId: provider.id, accountId, protocol: input.previousProtocol });
-  effectiveCatalogService.invalidateDiscovery({ providerId: provider.id, accountId, protocol: provider.protocol });
-  const snapshot = await refreshEffectiveCatalogDiscovery(provider, input.discoveredModels);
-
-  const routedModels = input.settings.llm.agentRoutes
-    .filter((route) => route.providerId === provider.id)
-    .map((route) => snapshot.models.find((model) => model.modelId === route.modelId || model.aliases.includes(route.modelId)))
-    .filter((model): model is EffectiveModel => Boolean(model));
-  const expectedRoutes = input.settings.llm.agentRoutes.filter((route) => route.providerId === provider.id).length;
-  if (routedModels.length !== expectedRoutes) {
-    throw new ProtocolProjectionError(`One or more ${provider.id} routes disappeared after switching to ${provider.protocol}.`);
+  const snapshot = input.snapshot ?? await refreshEffectiveCatalogDiscovery(provider, input.discoveredModels!);
+  if (snapshot.providerId !== provider.id || snapshot.accountId !== accountId || snapshot.protocol !== provider.protocol) {
+    throw new ProtocolProjectionError('Protocol reprojection received a catalog snapshot for a different provider, account, or protocol.');
   }
+  const routedModels = resolveProtocolRouteModels(input.settings, snapshot, provider.id);
 
   for (const project of storageAdapter.listProjects()) {
     for (const session of storageAdapter.listSessions(project.projectId)) {

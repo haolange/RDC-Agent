@@ -435,6 +435,30 @@ async function main() {
   assertSourceContains(requestPlanner, ['resolveContextTierChoices', 'evaluateModelControls'], 'RequestPlanner shared capability policy');
   assertSourceContains(rendererTurnControls, ['resolveContextTierChoices', 'evaluateModelControls'], 'renderer shared capability policy');
   assertSourceContains(modelControlPolicy, ['CONSTRAINT_CYCLE', 'isFastModeSelectable'], 'shared model-control evaluator');
+  const effectiveModelResolver = read('src/main/settings/EffectiveModelResolver.ts');
+  assertSourceContains(
+    effectiveModelResolver,
+    ['completeDiscoveryContributions', 'resolveEffectiveModelSelection', 'selectEffectiveModelFromSnapshot', 'Same-provider recommendations'],
+    'model disappearance and remap policy',
+  );
+  const discoveryAdmission = read('src/main/settings/DiscoveryAdmission.ts');
+  assertSourceContains(
+    discoveryAdmission,
+    ['NON_AGENT_MODALITIES', 'extractDiscoveredModelIdentity', 'unproven-alias'],
+    'discovery admission policy',
+  );
+  const protocolSwitch = read('src/main/settings/ProviderProtocolSwitchService.ts');
+  assertSourceContains(
+    protocolSwitch,
+    ['resolveProtocolRouteModels', 'invalidateDiscovery', 'clampControlsForProtocolModels', 'MODEL_UNAVAILABLE after protocol reprojection'],
+    'protocol reprojection service',
+  );
+  assertSourceContains(
+    read('src/main/settings/ProviderProtocolSwitchIntegration.test.ts'),
+    ['invalidates the old protocol cache', 'preserves fixed model routes', 'clamps persisted turn controls'],
+    'protocol reprojection integration test',
+  );
+  assertSourceContains(read('src/main/settings/ProviderQuota.ts'), ['recordTransientQuota', 'response.status !== 429'], 'transient quota policy');
   assert(!read('src/main/agent-runtime/core/types.ts').includes('ProviderCapabilities'), 'Runtime must not retain a second boolean capability matrix.');
   const configuredRuntimeProvider = read('src/main/agent-runtime/providers/ConfiguredRuntimeProvider.ts');
   assertSourceContains(

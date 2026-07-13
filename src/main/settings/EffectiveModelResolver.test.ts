@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { LlmProviderEntry } from '@shared/types/settings';
+import type { AppSettings } from '@shared/types/settings';
 
 vi.mock('electron', () => ({
   app: { getPath: () => process.cwd(), getAppPath: () => process.cwd() },
@@ -10,7 +11,13 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { buildEffectiveCatalogRequest, buildSeedModelContribution } from './EffectiveModelResolver';
+import {
+  buildEffectiveCatalogRequest,
+  buildSeedModelContribution,
+  completeDiscoveryContributions,
+  planEffectiveModelRequest,
+  resolveEffectiveModelSelection,
+} from './EffectiveModelResolver';
 import { mergeEffectiveCatalog } from './EffectiveCatalogService';
 
 function provider(id: string, protocol: LlmProviderEntry['protocol']): LlmProviderEntry {
@@ -106,6 +113,54 @@ describe('surface-specific effective model seeds', () => {
     expect(mergeEffectiveCatalog(request).find((model) => model.modelId === 'gpt-5.5')).toMatchObject({
       availability: 'unavailable',
       unavailableReason: 'Azure adapter is not implemented.',
+    });
+  });
+
+  it('tombstones app-managed seed models missing from a successful live discovery', () => {
+    const completed = completeDiscoveryContributions(
+      provider('chatgpt-account', 'OpenAIResponses'),
+      [{ modelId: 'gpt-5.4', aliases: ['gpt-5.4-current'], availability: 'available' }],
+    );
+    expect(completed).toContainEqual(expect.objectContaining({
+      modelId: 'gpt-5.4',
+      availability: 'available',
+    }));
+    expect(completed).toContainEqual({
+      modelId: 'gpt-5.5',
+      availability: 'unavailable',
+      unavailableReason: 'This model was not returned by the latest successful provider discovery.',
+    });
+  });
+
+  it('auto-follows only proven aliases and otherwise returns explicit same-provider recommendations', () => {
+    const customProvider = {
+      ...provider('custom-provider', 'OpenAICompatibleChatCompletions'),
+      catalogOwnership: 'user-managed' as const,
+      models: [
+        { id: 'model-current', label: 'Current', aliases: ['model-old'], enabled: true, availability: 'available' as const },
+        { id: 'model-next', label: 'Next', enabled: true, availability: 'available' as const },
+      ],
+    };
+    const settings = { llm: { providers: [customProvider], agentRoutes: [] } } as unknown as AppSettings;
+
+    expect(resolveEffectiveModelSelection('custom-provider', 'model-old', settings)).toMatchObject({
+      requestedModelId: 'model-old',
+      remappedFrom: 'model-old',
+      model: { modelId: 'model-current' },
+    });
+    expect(planEffectiveModelRequest({
+      providerId: 'custom-provider', modelId: 'model-old', settings,
+    })).toMatchObject({
+      ok: true,
+      plan: { effectiveModelId: 'model-current' },
+      warnings: ['Canonical model alias remap: model-old -> model-current.'],
+    });
+    expect(resolveEffectiveModelSelection('custom-provider', 'missing-model', settings)).toMatchObject({
+      model: null,
+      recommendations: [
+        { providerId: 'custom-provider', modelId: 'model-current', label: 'Current' },
+        { providerId: 'custom-provider', modelId: 'model-next', label: 'Next' },
+      ],
     });
   });
 });

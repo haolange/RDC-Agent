@@ -39,11 +39,13 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       context.applyCurrentLlmConfig();
       if (previousProvider && result.provider && previousProvider.protocol !== result.provider.protocol) {
         try {
+          const snapshot = resolveEffectiveCatalog(request.providerId, settingsService.getAll());
+          if (!snapshot) throw new Error('Protocol change produced no EffectiveCatalog snapshot.');
           await reprojectProviderProtocolChange({
             providerId: request.providerId,
             previousProtocol: previousProvider.protocol,
             settings: settingsService.getAll(),
-            discoveredModels: result.models,
+            snapshot,
           });
         } catch (error) {
           return {
@@ -158,14 +160,24 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     for (const provider of nextSettings.llm.providers) {
       const previous = previousSettings.llm.providers.find((entry) => entry.id === provider.id);
       if (previous && previous.protocol !== provider.protocol) {
+        const discovery = await providerConnectionService.refreshProviderModels(provider.id);
+        if (!discovery.success) {
+          throw new Error(
+            `Protocol change to ${provider.protocol} was saved, but reprojection discovery failed: ${discovery.error ?? 'unknown error'}`,
+          );
+        }
+        const snapshot = resolveEffectiveCatalog(provider.id, settingsService.getAll());
+        if (!snapshot) throw new Error('Protocol change produced no EffectiveCatalog snapshot.');
         await reprojectProviderProtocolChange({
           providerId: provider.id,
           previousProtocol: previous.protocol,
-          settings: nextSettings,
+          settings: settingsService.getAll(),
+          snapshot,
         });
       }
     }
-    for (const provider of nextSettings.llm.providers) broadcastCatalog(provider.id);
-    return nextSettings;
+    const settledSettings = settingsService.getAll();
+    for (const provider of settledSettings.llm.providers) broadcastCatalog(provider.id);
+    return settledSettings;
   });
 }

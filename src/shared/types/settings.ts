@@ -250,6 +250,8 @@ export interface LlmProviderModel {
   id: string;
   label: string;
   enabled: boolean;
+  /** Proven alternate ids that resolve to this canonical model id. */
+  aliases?: string[];
   availability?: LlmProviderModelAvailability;
   availabilityReason?: string;
 }

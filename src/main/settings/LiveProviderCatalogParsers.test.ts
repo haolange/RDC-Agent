@@ -69,4 +69,20 @@ describe('live-verification provider catalog parsers', () => {
       toolCalling: { state: 'supported' },
     });
   });
+
+  it('filters non-agent modalities and canonicalizes proven aliases in live account catalogs', () => {
+    const parsed = parseGrokAccountCatalog({ data: [
+      { id: 'grok-4.3', context_window: 1_000_000 },
+      { id: 'grok-latest', type: 'alias', canonical_id: 'grok-4.3', context_window: 1_000_000 },
+      { id: 'grok-image-1', modality: 'image' },
+      { id: 'grok-floating', type: 'alias' },
+    ] });
+    expect(parsed.models).toEqual([{
+      id: 'grok-4.3',
+      label: 'grok-4.3',
+      enabled: true,
+      aliases: ['grok-latest'],
+    }]);
+    expect(parsed.contributions[0].aliases).toEqual(['grok-latest']);
+  });
 });

@@ -1,7 +1,7 @@
 import type { ContextTier, EntitlementState } from '@shared/types/providerCapability';
 import type { LlmProviderModel } from '@shared/types/settings';
 import type { CatalogModelContribution } from './EffectiveCatalogService';
-import { isAdmittedDiscoveredModel } from './DiscoveryAdmission';
+import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 
 export interface CopilotCatalogParseResult {
   models: LlmProviderModel[];
@@ -60,14 +60,17 @@ export function parseCopilotModelCatalog(payload: unknown): CopilotCatalogParseR
   const seen = new Set<string>();
   for (const item of collection) {
     const entry = record(item);
-    const id = typeof entry.id === 'string' ? entry.id.trim() : '';
+    const discoveredId = typeof entry.id === 'string' ? entry.id.trim() : '';
+    const identity = extractDiscoveredModelIdentity(entry);
+    const id = identity.id;
     const capabilities = record(entry.capabilities);
     const capabilityType = typeof capabilities.type === 'string' ? capabilities.type.toLowerCase() : '';
     const supportedEndpoints = Array.isArray(entry.supported_endpoints)
       ? entry.supported_endpoints.filter((value): value is string => typeof value === 'string')
       : [];
     if (
-      !id
+      !discoveredId
+      || !id
       || seen.has(id)
       || entry.model_picker_enabled === false
       || (capabilityType && capabilityType !== 'chat')
@@ -82,6 +85,7 @@ export function parseCopilotModelCatalog(payload: unknown): CopilotCatalogParseR
       id,
       label,
       enabled: true,
+      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
       availability: 'available',
     });
     const limits = record(capabilities.limits);
@@ -89,6 +93,7 @@ export function parseCopilotModelCatalog(payload: unknown): CopilotCatalogParseR
     const maxPromptTokens = positiveInteger(limits.max_prompt_tokens);
     contributions.push({
       modelId: id,
+      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
       label,
       availability: 'available',
       ...(maxPromptTokens
