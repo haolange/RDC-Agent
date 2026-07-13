@@ -19,7 +19,6 @@ import type {
   Context,
   Message,
   Model,
-  ProviderCapabilities,
   StopReason,
   StreamOptions,
   ToolDefinition,
@@ -77,7 +76,6 @@ export interface GeminiProviderOptions {
   baseUrl?: string;
   apiKey?: string;
   headers?: Record<string, string>;
-  capabilities?: Partial<ProviderCapabilities>;
 }
 
 export class GeminiProvider implements ProviderStrategy {
@@ -85,25 +83,11 @@ export class GeminiProvider implements ProviderStrategy {
   private readonly defaultBaseUrl: string;
   private readonly defaultApiKey: string | undefined;
   private readonly defaultHeaders: Record<string, string>;
-  private readonly capabilities: ProviderCapabilities;
 
   constructor(options: GeminiProviderOptions = {}) {
     this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
     this.defaultApiKey = options.apiKey;
     this.defaultHeaders = { ...(options.headers ?? {}) };
-    this.capabilities = {
-      streaming: true,
-      nativeToolCalling: true,
-      structuredOutput: true,
-      vision: true,
-      reasoning: true,
-      parallelToolCalls: true,
-      ...(options.capabilities ?? {}),
-    };
-  }
-
-  getCapabilities(): ProviderCapabilities {
-    return { ...this.capabilities };
   }
 
   stream(

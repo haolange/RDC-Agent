@@ -61,6 +61,29 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
     });
   });
 
+  it('uses EffectiveModel instead of the provider static capability list', () => {
+    expect(resolveAgentRouteCapability(
+      { ...provider, capabilities: ['chat'] },
+      'model-a',
+      model({ toolCalling: { state: 'supported' } }),
+    )).toMatchObject({
+      toolCallingMode: 'native-structured',
+      toolCallingUnverified: false,
+    });
+  });
+
+  it('fails closed for an unavailable EffectiveModel', () => {
+    expect(resolveAgentRouteCapability(provider, 'model-a', model({
+      availability: 'unavailable',
+      unavailableReason: 'adapter unavailable',
+    }))).toMatchObject({
+      toolCallingMode: 'disabled',
+      supportsStreaming: false,
+      visionInputMode: 'disabled',
+      structuredOutputMode: 'prompt-fallback',
+    });
+  });
+
   it.each([
     ['unknown', 'native-structured', true, 'disabled', 'prompt-fallback'],
     ['supported', 'native-structured', false, 'native', 'native'],

@@ -10,6 +10,7 @@ const plan: RequestPlan = {
   bodyPatch: { thinking: { type: 'enabled', budget_tokens: 4096 } },
   contextBudgetTokens: 1_000_000,
   activeTierId: 'max',
+  fastMode: false,
   reasoningWire: {
     selection: 'high',
     control: { kind: 'levels', supportsOff: true, levels: ['high'], defaultSelection: 'high', wireProfile: { kind: 'none' } },

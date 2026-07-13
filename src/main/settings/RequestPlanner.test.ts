@@ -62,6 +62,7 @@ describe('planModelRequest', () => {
         bodyPatch: {},
         contextBudgetTokens: 128_000,
         activeTierId: 'default',
+        fastMode: false,
         reasoningWire: {
           selection: 'low',
           control: model().reasoning,
@@ -97,6 +98,64 @@ describe('planModelRequest', () => {
         headers: { 'anthropic-beta': 'context-1m' },
         contextBudgetTokens: 1_000_000,
       },
+    });
+  });
+
+  it('selects the highest granted Max tier instead of a higher unknown tier', () => {
+    const result = planModelRequest({
+      model: model({
+        contextTiers: [
+          ...model().contextTiers,
+          {
+            id: 'long',
+            label: '922K',
+            maxPromptTokens: 922_000,
+            activation: { kind: 'implicit' },
+            entitlement: 'granted',
+          },
+          {
+            id: 'experimental',
+            label: '1.5M',
+            maxPromptTokens: 1_500_000,
+            activation: { kind: 'implicit' },
+            entitlement: 'unknown',
+          },
+        ],
+      }),
+      controls: { maxContextMode: true },
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      warnings: [],
+      plan: { activeTierId: 'long', contextBudgetTokens: 922_000 },
+    });
+  });
+
+  it('does not infer Max from a single 1M tier or replace its client budget', () => {
+    const result = planModelRequest({
+      model: model({
+        contextTiers: [{
+          id: 'default',
+          label: 'Default',
+          maxPromptTokens: 1_050_000,
+          activation: { kind: 'implicit' },
+          entitlement: 'granted',
+        }],
+        defaultBudgetTokens: 272_000,
+      }),
+      controls: { maxContextMode: true },
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      controls: { maxContextMode: false },
+      plan: { activeTierId: 'default', contextBudgetTokens: 272_000 },
+    });
+  });
+
+  it('fails closed when EffectiveModel has no positive default budget', () => {
+    expect(planModelRequest({ model: model({ defaultBudgetTokens: 0 }) })).toMatchObject({
+      ok: false,
+      code: 'NO_USABLE_CONTEXT_TIER',
     });
   });
 

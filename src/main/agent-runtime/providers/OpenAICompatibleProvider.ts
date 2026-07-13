@@ -18,7 +18,6 @@ import type {
   Context,
   Message,
   Model,
-  ProviderCapabilities,
   StopReason,
   StreamOptions,
   ToolDefinition,
@@ -75,8 +74,6 @@ export interface OpenAICompatibleProviderOptions {
   apiKey?: string;
   /** 附加请求头（例如 OpenRouter 的 HTTP-Referer / X-Title）。 */
   headers?: Record<string, string>;
-  /** 用于覆盖能力矩阵；默认使用通用值。 */
-  capabilities?: Partial<ProviderCapabilities>;
 }
 
 export class OpenAICompatibleProvider implements ProviderStrategy {
@@ -84,25 +81,11 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
   private readonly defaultBaseUrl: string;
   private readonly defaultApiKey: string | undefined;
   private readonly defaultHeaders: Record<string, string>;
-  private readonly capabilities: ProviderCapabilities;
 
   constructor(options: OpenAICompatibleProviderOptions = {}) {
     this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
     this.defaultApiKey = options.apiKey;
     this.defaultHeaders = { ...(options.headers ?? {}) };
-    this.capabilities = {
-      streaming: true,
-      nativeToolCalling: true,
-      structuredOutput: true,
-      vision: true,
-      reasoning: false,
-      parallelToolCalls: true,
-      ...(options.capabilities ?? {}),
-    };
-  }
-
-  getCapabilities(): ProviderCapabilities {
-    return { ...this.capabilities };
   }
 
   stream(

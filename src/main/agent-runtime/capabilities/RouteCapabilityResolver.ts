@@ -1,6 +1,6 @@
 import type { AgentRouteCapability, ReasoningDelivery, ReasoningVisibility, ToolCallingMode } from '@shared/types/agentRuntime';
 import type { ProviderReasoningContract } from '@shared/types/rdxRuntime';
-import type { LlmProviderCapability, LlmProviderEntry, LlmProviderId, LlmProviderProtocol } from '@shared/types/settings';
+import type { LlmProviderEntry, LlmProviderId, LlmProviderProtocol } from '@shared/types/settings';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 
 const NATIVE_TOOL_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages', 'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'OpenRouterChatCompletions', 'GoogleGemini', 'OllamaOpenAICompatibleChatCompletions']);
@@ -41,14 +41,17 @@ const RAW_REASONING_EVIDENCE: Record<string, string> = {
   'xiaomi-mimo-token-plan': 'https://mimo.mi.com/docs/en-US/quick-start/usage-guide/text-generation/deep-thinking',
 };
 
-const hasCapability = (provider: LlmProviderEntry | undefined, capability: LlmProviderCapability): boolean => Boolean(provider?.capabilities?.includes(capability));
-
-export function resolveProviderReasoningContract(provider: LlmProviderEntry | undefined, modelId: string): ProviderReasoningContract {
-  if (!provider || !hasCapability(provider, 'reasoning')) return { semantic: 'none', source: 'provider-capability', displayLabel: 'None' };
-  if (provider.protocol === 'OpenAIResponses' && OPENAI_NATIVE_IDS.has(provider.id)) {
+export function resolveProviderReasoningContract(
+  provider: LlmProviderEntry | undefined,
+  model: EffectiveModel | null | undefined,
+): ProviderReasoningContract {
+  if (!provider || !model || model.reasoning.kind === 'none') {
+    return { semantic: 'none', source: 'effective-model', displayLabel: 'None' };
+  }
+  if (model.route.protocol === 'OpenAIResponses' && OPENAI_NATIVE_IDS.has(provider.id)) {
     return { semantic: 'summary', source: 'openai-responses-summary', evidence: 'https://platform.openai.com/docs/api-reference/responses-streaming/response/reasoning_summary_part/added', displayLabel: 'Reasoning summary' };
   }
-  if (provider.protocol === 'AnthropicMessages' && ANTHROPIC_NATIVE_IDS.has(provider.id)) {
+  if (model.route.protocol === 'AnthropicMessages' && ANTHROPIC_NATIVE_IDS.has(provider.id)) {
     return { semantic: 'summary', source: 'anthropic-thinking-display-summarized', evidence: 'https://platform.claude.com/docs/en/build-with-claude/extended-thinking', displayLabel: 'Reasoning summary' };
   }
   // Compatible Anthropic routes must never inherit native Anthropic summary semantics.
@@ -60,7 +63,7 @@ export function resolveProviderReasoningContract(provider: LlmProviderEntry | un
       displayLabel: 'Raw reasoning',
     };
   }
-  return { semantic: 'unknown', source: `${provider.id}/${modelId}:unverified-provider-semantics`, displayLabel: 'Provider reasoning' };
+  return { semantic: 'unknown', source: `${provider.id}/${model.modelId}:unverified-provider-semantics`, displayLabel: 'Provider reasoning' };
 }
 
 export function reasoningContractToDelivery(contract: ProviderReasoningContract): ReasoningDelivery {
@@ -91,13 +94,20 @@ export function resolveAgentRouteCapability(
   effectiveModel?: EffectiveModel | null,
 ): AgentRouteCapability {
   const providerId = provider?.id ?? '';
-  if (!provider || !provider.enabled || !provider.isConfigured || provider.status !== 'verified' || !hasCapability(provider, 'chat') || !provider.protocol) return disabledCapability(providerId, modelId);
-  const supportsStreaming = STREAMING_PROTOCOLS.has(provider.protocol);
+  if (
+    !provider
+    || !provider.enabled
+    || !provider.isConfigured
+    || provider.status !== 'verified'
+    || !effectiveModel?.enabled
+    || effectiveModel.availability === 'unavailable'
+  ) return disabledCapability(providerId, modelId);
+  const supportsStreaming = STREAMING_PROTOCOLS.has(effectiveModel.route.protocol);
   let toolCallingMode: ToolCallingMode = 'text-only';
-  const toolState = effectiveModel?.toolCalling.state ?? 'unknown';
-  if (toolState !== 'unsupported' && hasCapability(provider, 'tool-calling') && NATIVE_TOOL_PROTOCOLS.has(provider.protocol)) toolCallingMode = 'native-structured';
+  const toolState = effectiveModel.toolCalling.state;
+  if (toolState !== 'unsupported' && NATIVE_TOOL_PROTOCOLS.has(effectiveModel.route.protocol)) toolCallingMode = 'native-structured';
   else if (!supportsStreaming) toolCallingMode = 'disabled';
-  const reasoningContract = resolveProviderReasoningContract(provider, modelId);
+  const reasoningContract = resolveProviderReasoningContract(provider, effectiveModel);
   const reasoningDelivery = reasoningContractToDelivery(reasoningContract);
   return {
     providerId: provider.id,
@@ -109,8 +119,8 @@ export function resolveAgentRouteCapability(
     supportsStreaming,
     supportsToolResults: toolCallingMode === 'native-structured',
     toolCallingUnverified: toolCallingMode === 'native-structured' && toolState === 'unknown',
-    visionInputMode: effectiveModel?.visionInput.state === 'supported' ? 'native' : 'disabled',
-    structuredOutputMode: effectiveModel?.structuredOutput.state === 'supported' ? 'native' : 'prompt-fallback',
+    visionInputMode: effectiveModel.visionInput.state === 'supported' ? 'native' : 'disabled',
+    structuredOutputMode: effectiveModel.structuredOutput.state === 'supported' ? 'native' : 'prompt-fallback',
   };
 }
 

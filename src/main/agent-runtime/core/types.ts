@@ -249,15 +249,6 @@ export interface Model {
 }
 
 /** Provider 的能力声明。 */
-export interface ProviderCapabilities {
-  streaming: boolean;
-  nativeToolCalling: boolean;
-  structuredOutput: boolean;
-  vision: boolean;
-  reasoning: boolean;
-  parallelToolCalls: boolean;
-}
-
 // =====================================================================
 // 流式事件（AssistantMessageEvent）
 // =====================================================================

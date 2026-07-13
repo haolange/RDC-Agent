@@ -115,7 +115,7 @@ export interface EffectiveModel {
   availability: EffectiveAvailability;
   unavailableReason?: string;
   contextTiers: ContextTier[];
-  defaultBudgetTokens?: number;
+  defaultBudgetTokens: number;
   fast: FastCapability;
   reasoning: ReasoningControl;
   toolCalling: CapabilityState;
@@ -146,6 +146,7 @@ export interface RequestPlan {
   bodyPatch: JsonObject;
   contextBudgetTokens: number;
   activeTierId: string;
+  fastMode: boolean;
   reasoningWire: ResolvedReasoningSelection;
   temperature?: number;
 }

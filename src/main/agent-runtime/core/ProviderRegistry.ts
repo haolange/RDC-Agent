@@ -13,7 +13,6 @@ import type {
   AssistantMessageEvent,
   Context,
   Model,
-  ProviderCapabilities,
   StreamOptions,
 } from './types';
 
@@ -41,8 +40,6 @@ export interface ProviderStrategy {
     options: StreamOptions,
   ): EventStream<AssistantMessageEvent, AssistantMessage>;
 
-  /** 获取 Provider 能力矩阵。 */
-  getCapabilities(): ProviderCapabilities;
 }
 
 /**
