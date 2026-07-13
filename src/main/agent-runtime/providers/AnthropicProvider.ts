@@ -15,6 +15,7 @@ import type {
   ToolDefinition,
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
+import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
 import type { ReasoningVisibility } from '@shared/types/agentRuntime';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
@@ -174,6 +175,7 @@ export class AnthropicProvider implements ProviderStrategy {
         signal: composed.signal,
       });
 
+      recordQuotaFromResponse(options.requestPlan, response);
       await ensureOk(response, PROVIDER_API);
 
       const thinkingArtifactsByIndex = new Map<number, ProviderReasoningArtifact>();

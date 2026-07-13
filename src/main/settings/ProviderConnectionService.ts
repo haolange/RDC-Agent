@@ -23,6 +23,7 @@ import type {
 } from '@shared/types/settings';
 import { settingsService } from '../settings/SettingsService';
 import { providerAccountAuthService } from './ProviderAccountAuthService';
+import { extractDiscoveredModelId, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 
 const REQUEST_TIMEOUT_MS = 20000;
 
@@ -53,14 +54,8 @@ export function normalizeDiscoveredModels(
 ): LlmProviderModel[] {
   const models = new Map<string, LlmProviderModel>();
   for (const value of values) {
-    const id = typeof value === 'string'
-      ? value.trim()
-      : value && typeof value === 'object' && typeof (value as { id?: unknown }).id === 'string'
-        ? (value as { id: string }).id.trim()
-        : value && typeof value === 'object' && typeof (value as { name?: unknown }).name === 'string'
-          ? (value as { name: string }).name.trim()
-          : '';
-    if (!id || isDeprecatedModel(id) || !filterModelId(id) || models.has(id)) {
+    const id = extractDiscoveredModelId(value);
+    if (!isAdmittedDiscoveredModel(value) || isDeprecatedModel(id) || !filterModelId(id) || models.has(id)) {
       continue;
     }
     const label = value && typeof value === 'object' && typeof (value as { display_name?: unknown }).display_name === 'string'
@@ -100,22 +95,7 @@ const isDeprecatedModel = (modelId: string): boolean => {
   );
 };
 
-const isAgentRoutableOpenAiModel = (modelId: string): boolean => {
-  const normalized = modelId.toLowerCase();
-  return !(
-    normalized.includes('embedding')
-    || normalized.includes('moderation')
-    || normalized.includes('rerank')
-    || normalized.includes('whisper')
-    || normalized.includes('tts')
-    || normalized.includes('dall-e')
-    || normalized.includes('image')
-    || normalized.includes('audio')
-    || normalized.includes('realtime')
-    || normalized.includes('transcribe')
-    || normalized.includes('computer-use')
-  );
-};
+const isAgentRoutableOpenAiModel = (modelId: string): boolean => isAdmittedDiscoveredModel(modelId);
 
 const requireModels = (models: LlmProviderModel[]): LlmProviderModel[] => {
   if (models.length === 0) {

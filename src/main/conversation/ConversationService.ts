@@ -57,6 +57,7 @@ import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService
 import { scopedInstructionResolver } from '../runtime/ScopedInstructionResolver';
 import { appPathService } from '../runtime/AppPathService';
 import { planEffectiveModelRequest, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
+import { resolveProviderModelAvailability } from '../settings/LlmRouteCompatibility';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
@@ -364,7 +365,23 @@ function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?: AgentR
     };
   }
 
-  const model = provider.models.find((entry) => entry.id === route.modelId);
+  const modelResolution = resolveProviderModelAvailability(provider, route.modelId);
+  if (!modelResolution.modelId) {
+    return {
+      ok: false,
+      diagnostic: createConversationDiagnostic({
+        agentId,
+        code: 'CONVERSATION_LLM_ROUTE_MISSING',
+        severity: 'warning',
+        userMessage: `当前 ${label} 链路的模型不可用：${route.providerId}/${route.modelId}。请在 Settings 中刷新模型列表或重新选择 route。`,
+        providerId: route.providerId,
+        modelId: route.modelId,
+        technicalMessage: modelResolution.unavailable?.message,
+      }),
+    };
+  }
+  const effectiveModelId = modelResolution.modelId;
+  const model = provider.models.find((entry) => entry.id === effectiveModelId);
   if (!model?.enabled) {
     return {
       ok: false,
@@ -384,11 +401,11 @@ function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?: AgentR
     agentId,
     routeAgentId,
     providerId: route.providerId,
-    modelId: route.modelId,
+    modelId: effectiveModelId,
     routeCapability: resolveAgentRouteCapability(
       provider,
-      route.modelId,
-      resolveEffectiveModel(route.providerId, route.modelId, settings),
+      effectiveModelId,
+      resolveEffectiveModel(route.providerId, effectiveModelId, settings),
     ),
   };
 }

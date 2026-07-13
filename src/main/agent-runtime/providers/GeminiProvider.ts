@@ -25,6 +25,7 @@ import type {
   ToolDefinition,
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
+import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
@@ -158,6 +159,7 @@ export class GeminiProvider implements ProviderStrategy {
         signal: composed.signal,
       });
 
+      recordQuotaFromResponse(options.requestPlan, response);
       await ensureOk(response, PROVIDER_API);
 
       const TEXT_INDEX = 0;
