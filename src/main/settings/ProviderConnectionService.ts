@@ -22,6 +22,7 @@ import type {
 import { settingsService } from '../settings/SettingsService';
 import { providerAccountAuthService } from './ProviderAccountAuthService';
 import { extractDiscoveredModelId, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
+import { parseDeclarativeCatalog, resolveDeclarativeDiscoveryUrl } from './DeclarativeCatalogDiscovery';
 
 const REQUEST_TIMEOUT_MS = 20000;
 
@@ -506,6 +507,28 @@ export class ProviderConnectionService {
     const candidateModelIds = catalogOwnership === 'app-managed'
       ? managedModels.map((model) => model.id)
       : provider.recommendedModels;
+    if (definition.discovery?.kind === 'json-catalog') {
+      const url = resolveDeclarativeDiscoveryUrl(definition.discovery, baseUrl);
+      const payload = await getJson(url, {
+        method: definition.discovery.method ?? 'GET',
+        headers: {
+          ...this.createHeaders(provider, apiKey),
+          ...definition.discovery.headers,
+        },
+      });
+      const discoveredModels = requireModels(parseDeclarativeCatalog(definition.discovery, payload).map((model) => ({
+        id: model.id,
+        label: model.label,
+        enabled: true,
+      })));
+      return {
+        models: catalogOwnership === 'app-managed'
+          ? mergeManagedModelAvailability(managedModels, discoveredModels, {
+            aliasesByModelId: buildManagedAliasIndex(provider.id),
+          })
+          : discoveredModels,
+      };
+    }
     if (
       provider.id === 'kimi-coding-plan'
       || provider.id === 'volcengine-coding-plan'

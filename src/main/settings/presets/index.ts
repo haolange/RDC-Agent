@@ -45,6 +45,18 @@ import p42 from './vercel-ai-gateway';
 import p43 from './huggingface';
 import p44 from './manifest';
 import p45 from './ollama';
+import p46 from './iflow';
+import p47 from './longcat';
+import p48 from './opencode-zen';
+import p49 from './together-ai';
+import p50 from './fireworks-ai';
+import p51 from './novita-ai';
+import p52 from './synthetic';
+import p53 from './chutes';
+import p54 from './lm-studio';
+import p55 from './nvidia-nim';
+import p56 from './github-models';
+import p57 from './ollama-cloud';
 
 export const PROVIDER_PRESETS = [
   p0,
@@ -93,5 +105,16 @@ export const PROVIDER_PRESETS = [
   p43,
   p44,
   p45,
+  p46,
+  p47,
+  p48,
+  p49,
+  p50,
+  p51,
+  p52,
+  p53,
+  p54,
+  p55,
+  p56,
+  p57,
 ] satisfies ProviderPreset[];
-

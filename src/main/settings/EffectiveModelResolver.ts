@@ -46,6 +46,7 @@ function routeFor(provider: LlmProviderEntry, modelRoute?: ModelRoute): ModelRou
     presetRoute: {
       protocol: presetRoute?.protocol ?? provider.protocol,
       baseUrl: presetRoute?.baseUrl ?? provider.baseUrl,
+      headers: presetRoute?.headers,
     },
   });
 }

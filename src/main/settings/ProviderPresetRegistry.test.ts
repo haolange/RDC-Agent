@@ -10,8 +10,8 @@ import {
 describe('ProviderPresetRegistry', () => {
   it('loads exactly one serializable schema-v1 preset for every legacy builtin', () => {
     const presets = listProviderPresets();
-    expect(presets).toHaveLength(46);
-    expect(new Set(presets.map((preset) => preset.id)).size).toBe(46);
+    expect(presets).toHaveLength(58);
+    expect(new Set(presets.map((preset) => preset.id)).size).toBe(58);
     expect(presets.every((preset) => preset.schemaVersion === 1)).toBe(true);
     expect(() => JSON.stringify(presets)).not.toThrow();
   });

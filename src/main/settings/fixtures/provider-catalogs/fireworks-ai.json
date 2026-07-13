@@ -1,0 +1,1 @@
+{"object":"list","data":[{"id":"accounts/fireworks/models/deepseek-v4-pro","display_name":"DeepSeek V4 Pro","type":"chat","context_length":1048576},{"id":"accounts/fireworks/models/nomic-embed","type":"embedding"}]}

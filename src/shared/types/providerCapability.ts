@@ -198,6 +198,7 @@ export type DiscoveryStrategy =
       method?: 'GET' | 'POST';
       url?: string;
       path?: string;
+      headers?: Record<string, string>;
       collectionPath: string;
       mapping: DiscoveryFieldMapping;
       admission?: DiscoveryAdmission;
@@ -213,6 +214,7 @@ export type SeedModelDefinition = Omit<
 export interface ProviderPresetRoute {
   protocol: LlmProviderProtocol;
   baseUrl: string;
+  headers?: Record<string, string>;
   default?: boolean;
 }
 
