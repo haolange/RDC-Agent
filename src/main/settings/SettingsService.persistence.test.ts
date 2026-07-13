@@ -151,6 +151,59 @@ describe('SettingsService provider persistence', () => {
     });
   });
 
+  it('migrates an existing API key to an account-keyed secret without losing it', async () => {
+    const { settingsPath, workspaceRoot } = await createVerifiedPersistedSettings();
+    const { secretStorageService } = await import('./SecretStorageService');
+    secretStorageService.setSecret('provider-deepseek-api-key', 'sk-migrated', workspaceRoot);
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+
+    const runtime = service.initialize();
+    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+      llm: { providers: Array<{ id: string; activeAccountId?: string; secretRef?: string }> };
+    };
+    const provider = persisted.llm.providers.find((entry) => entry.id === 'deepseek');
+
+    expect(provider?.activeAccountId).toMatch(/^account-/);
+    expect(provider?.secretRef).toContain('-account-');
+    expect(secretStorageService.getSecret('provider-deepseek-api-key', workspaceRoot)).toBe('');
+    expect(secretStorageService.getSecret(provider?.secretRef, workspaceRoot)).toBe('sk-migrated');
+    expect(runtime.llm.providers.find((entry) => entry.id === 'deepseek')?.isConfigured).toBe(true);
+  });
+
+  it('migrates an OAuth bundle using its upstream account id', async () => {
+    const { createBuiltinProviderEntry } = await import('@shared/constants/llm');
+    const { secretStorageService } = await import('./SecretStorageService');
+    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const settingsPath = path.join(workspaceRoot, 'config.json');
+    const provider = {
+      ...createBuiltinProviderEntry('chatgpt-account'),
+      enabled: true,
+      hasStoredSecret: true,
+      isConfigured: true,
+      status: 'verified' as const,
+    };
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    fs.writeFileSync(settingsPath, JSON.stringify({
+      llm: { providers: [provider], agentRoutes: [] },
+    }), 'utf8');
+    const bundle = JSON.stringify({ accessToken: 'oauth-token', accountId: 'acct-upstream' });
+    const legacyRef = secretStorageService.createProviderOAuthSecretRef('chatgpt-account');
+    secretStorageService.setSecret(legacyRef, bundle, workspaceRoot);
+
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    service.initialize();
+    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+      llm: { providers: Array<{ id: string; activeAccountId?: string }> };
+    };
+
+    expect(persisted.llm.providers.find((entry) => entry.id === 'chatgpt-account')?.activeAccountId)
+      .toBe('acct-upstream');
+    expect(secretStorageService.getSecret(legacyRef, workspaceRoot)).toBe('');
+    expect(service.getProviderOAuthSecret('chatgpt-account', workspaceRoot)).toBe(bundle);
+  });
+
   it('preserves only the verified Volc Coding Plan model subset after saving and reloading', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();

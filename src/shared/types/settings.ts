@@ -237,6 +237,8 @@ export interface LlmProviderModel {
 
 export interface LlmProviderEntry {
   id: LlmProviderId;
+  /** Stable local account key. It rotates when the credential identity changes. */
+  activeAccountId?: string;
   protocol: LlmProviderProtocol;
   authMode: LlmProviderAuthMode;
   category: LlmProviderCategory;

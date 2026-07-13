@@ -47,6 +47,31 @@ export class SecretStorageService {
     return `provider-${sanitizeToken(providerId)}-oauth`;
   }
 
+  createProviderAccountSecretRef(
+    providerId: string,
+    accountId: string,
+    kind: 'api-key' | 'oauth',
+  ): string {
+    return `provider-${sanitizeToken(providerId)}-account-${sanitizeToken(accountId)}-${kind}`;
+  }
+
+  moveSecret(sourceRef: string, targetRef: string, workspaceRoot?: string): boolean {
+    if (!sourceRef || !targetRef || sourceRef === targetRef) {
+      return false;
+    }
+    const secretMap = this.readSecretMap(workspaceRoot);
+    const source = secretMap[sourceRef];
+    if (!source) {
+      return false;
+    }
+    if (!secretMap[targetRef]) {
+      secretMap[targetRef] = source;
+    }
+    delete secretMap[sourceRef];
+    this.writeSecretMap(secretMap, workspaceRoot);
+    return true;
+  }
+
   getSecret(secretRef: string | undefined, workspaceRoot?: string): string {
     if (!secretRef) {
       return '';

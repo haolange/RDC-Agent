@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import type {
   AppLanguage,
   AppRuntimePaths,
@@ -377,8 +378,43 @@ function getResolvedProviderSecret(providerId: string, secretRef: string | undef
   return isVendorSecretUsable(providerId, secret) ? secret : '';
 }
 
-function resolveAccountRuntimeCredential(providerId: string, workspaceRoot: string): { apiKey: string; baseUrl?: string; accountId?: string } {
-  const raw = secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(providerId), workspaceRoot);
+function createLocalAccountId(): string {
+  return `account-${randomUUID()}`;
+}
+
+function extractOAuthBundleAccountId(raw: string): string | undefined {
+  if (!raw) {
+    return undefined;
+  }
+  try {
+    const accountId = (JSON.parse(raw) as { accountId?: unknown }).accountId;
+    return typeof accountId === 'string' && accountId.trim() ? accountId.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function getProviderAccountSecretRef(
+  providerId: string,
+  accountId: string | undefined,
+  kind: 'api-key' | 'oauth',
+): string {
+  return accountId
+    ? secretStorageService.createProviderAccountSecretRef(providerId, accountId, kind)
+    : kind === 'oauth'
+      ? secretStorageService.createProviderOAuthSecretRef(providerId)
+      : secretStorageService.createProviderSecretRef(providerId);
+}
+
+function resolveAccountRuntimeCredential(
+  provider: Pick<LlmProviderEntry, 'id' | 'activeAccountId'>,
+  workspaceRoot: string,
+): { apiKey: string; baseUrl?: string; accountId?: string } {
+  const providerId = provider.id;
+  const raw = secretStorageService.getSecret(
+    getProviderAccountSecretRef(providerId, provider.activeAccountId, 'oauth'),
+    workspaceRoot,
+  );
   if (!raw) {
     return { apiKey: '' };
   }
@@ -642,6 +678,9 @@ function sanitizeUserProvider(
 
   const builtinFallback = createBuiltinProviderEntry(rawId);
   const definition = getBuiltinProviderDefinition(rawId);
+  const activeAccountId = typeof provider.activeAccountId === 'string' && provider.activeAccountId.trim()
+    ? provider.activeAccountId.trim()
+    : undefined;
   const incomingSecretRef = typeof provider.secretRef === 'string' && provider.secretRef.trim()
     ? provider.secretRef.trim()
     : undefined;
@@ -649,7 +688,7 @@ function sanitizeUserProvider(
   const protocol = normalizeProviderProtocol({ ...provider, id: rawId });
   const catalogOwnership = getBuiltinProviderCatalogOwnership(rawId);
   const models = resolveProviderModels(rawId, provider.models ?? []);
-  const oauthSecretRef = secretStorageService.createProviderOAuthSecretRef(rawId);
+  const oauthSecretRef = getProviderAccountSecretRef(rawId, activeAccountId, 'oauth');
   const resolvedSecret = builtinFallback.authMode === 'api-key'
     ? getResolvedProviderSecret(rawId, secretRef, workspaceRoot)
     : builtinFallback.authMode === 'account'
@@ -670,6 +709,7 @@ function sanitizeUserProvider(
 
   return {
     id: rawId,
+    activeAccountId,
     protocol,
     authMode: builtinFallback.authMode,
     category: normalizeProviderCategory({ ...provider, id: rawId, authMode: builtinFallback.authMode }),
@@ -751,7 +791,10 @@ function hydrateProviderSecrets(
     const resolvedSecret = provider.authMode === 'api-key'
       ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot)
       : provider.authMode === 'account'
-        ? secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(provider.id), workspaceRoot)
+        ? secretStorageService.getSecret(
+            getProviderAccountSecretRef(provider.id, provider.activeAccountId, 'oauth'),
+            workspaceRoot,
+          )
         : '';
     const hasStoredSecret = provider.authMode === 'local' || provider.authMode === 'environment' || Boolean(resolvedSecret);
     const canUseProvider = provider.authMode === 'local' || provider.authMode === 'environment'
@@ -867,18 +910,48 @@ export class SettingsService {
         fixes.push('Removed provider with empty id');
         continue;
       }
+      if (!isBuiltinProviderId(rawId)) {
+        fixes.push(`Removed non-catalog provider ${rawId}`);
+        continue;
+      }
 
-      const canonicalSecretRef = secretStorageService.createProviderSecretRef(rawId);
+      const builtin = createBuiltinProviderEntry(rawId);
+      let activeAccountId = typeof entry.activeAccountId === 'string' && entry.activeAccountId.trim()
+        ? entry.activeAccountId.trim()
+        : undefined;
+      const legacyApiKeyRef = secretStorageService.createProviderSecretRef(rawId);
+      const legacyOAuthRef = secretStorageService.createProviderOAuthSecretRef(rawId);
       const incomingSecretRef = typeof entry.secretRef === 'string' && entry.secretRef.trim()
         ? entry.secretRef.trim()
         : undefined;
-      const secretRef = incomingSecretRef || canonicalSecretRef;
+      let secretRef = incomingSecretRef || legacyApiKeyRef;
       if (entry.apiKey?.trim()) {
         secretStorageService.setSecret(secretRef, entry.apiKey.trim(), workspaceRoot);
         fixes.push(`Migrated plaintext secret for ${rawId}`);
       }
 
-      const sanitized = sanitizeUserProvider({ ...entry, secretRef }, workspaceRoot, {
+      if (builtin.authMode === 'account') {
+        const legacyBundle = secretStorageService.getSecret(legacyOAuthRef, workspaceRoot);
+        activeAccountId = activeAccountId ?? extractOAuthBundleAccountId(legacyBundle) ?? (legacyBundle ? createLocalAccountId() : undefined);
+        if (activeAccountId) {
+          const accountRef = getProviderAccountSecretRef(rawId, activeAccountId, 'oauth');
+          if (secretStorageService.moveSecret(legacyOAuthRef, accountRef, workspaceRoot)) {
+            fixes.push(`Migrated OAuth secret to account key for ${rawId}`);
+          }
+        }
+      } else if (builtin.authMode === 'api-key') {
+        const existingSecret = secretStorageService.getSecret(secretRef, workspaceRoot);
+        activeAccountId = activeAccountId ?? (existingSecret ? createLocalAccountId() : undefined);
+        if (activeAccountId) {
+          const accountRef = getProviderAccountSecretRef(rawId, activeAccountId, 'api-key');
+          if (secretStorageService.moveSecret(secretRef, accountRef, workspaceRoot)) {
+            fixes.push(`Migrated API key secret to account key for ${rawId}`);
+          }
+          secretRef = accountRef;
+        }
+      }
+
+      const sanitized = sanitizeUserProvider({ ...entry, activeAccountId, secretRef }, workspaceRoot, {
         credentialPolicy: 'persisted',
       });
       if (!sanitized) {
@@ -1090,7 +1163,11 @@ export class SettingsService {
 
   getProviderOAuthSecret(providerId: string, workspaceRoot = appPathService.getUserRdxRoot()): string {
     this.ensureInitialized();
-    return secretStorageService.getSecret(secretStorageService.createProviderOAuthSecretRef(providerId), workspaceRoot);
+    const provider = this.getAll().llm.providers.find((entry) => entry.id === providerId);
+    return secretStorageService.getSecret(
+      getProviderAccountSecretRef(providerId, provider?.activeAccountId, 'oauth'),
+      workspaceRoot,
+    );
   }
 
   setAll(patch: AppSettingsPatch, runtimePaths?: Partial<AppRuntimePaths>): AppSettings {
@@ -1108,15 +1185,27 @@ export class SettingsService {
     const hasProviderPatch = Boolean(patch.llm?.providers);
     const providerCredentialPolicy: ProviderCredentialPolicy = hasProviderPatch ? 'runtime' : 'persisted';
     const providerDrafts = (patch.llm?.providers ?? currentPersisted.llm?.providers ?? []).map((provider) => {
-      const secretRef = provider.secretRef || secretStorageService.createProviderSecretRef(provider.id);
+      let activeAccountId = provider.activeAccountId;
+      let secretRef = provider.secretRef || getProviderAccountSecretRef(provider.id, activeAccountId, 'api-key');
       const apiKey = provider.apiKey?.trim() ?? '';
       if (provider.authMode === 'api-key' && apiKey) {
+        const previousSecret = getResolvedProviderSecret(provider.id, secretRef, nextPaths.userRdxRoot);
+        if (!activeAccountId || previousSecret !== apiKey) {
+          const previousRef = secretRef;
+          activeAccountId = createLocalAccountId();
+          secretRef = getProviderAccountSecretRef(provider.id, activeAccountId, 'api-key');
+          if (previousRef !== secretRef) {
+            secretStorageService.moveSecret(previousRef, secretRef, nextPaths.userRdxRoot);
+          }
+        }
         secretStorageService.setSecret(secretRef, apiKey, nextPaths.userRdxRoot);
       } else if (provider.authMode === 'api-key' && !provider.hasStoredSecret) {
         secretStorageService.deleteSecret(secretRef, nextPaths.userRdxRoot);
+        activeAccountId = undefined;
       }
       return sanitizeUserProvider({
         ...provider,
+        activeAccountId,
         secretRef,
       }, nextPaths.userRdxRoot, { credentialPolicy: providerCredentialPolicy });
     }).filter((provider): provider is LlmProviderEntry => provider !== null);
@@ -1297,15 +1386,23 @@ export class SettingsService {
 
     const hasEnabledModels = discoveredModels.some((model) => model.enabled !== false);
 
-    secretStorageService.setSecret(
-      secretStorageService.createProviderOAuthSecretRef(provider.id),
-      secretPayload,
-      current.paths.userRdxRoot,
-    );
+    const activeAccountId = extractOAuthBundleAccountId(secretPayload)
+      ?? provider.activeAccountId
+      ?? createLocalAccountId();
+    const nextSecretRef = getProviderAccountSecretRef(provider.id, activeAccountId, 'oauth');
+    if (provider.activeAccountId && provider.activeAccountId !== activeAccountId) {
+      secretStorageService.moveSecret(
+        getProviderAccountSecretRef(provider.id, provider.activeAccountId, 'oauth'),
+        nextSecretRef,
+        current.paths.userRdxRoot,
+      );
+    }
+    secretStorageService.setSecret(nextSecretRef, secretPayload, current.paths.userRdxRoot);
 
     const timestamp = nowIso();
     const nextProvider: LlmProviderEntry = {
       ...provider,
+      activeAccountId,
       enabled: hasEnabledModels,
       hasStoredSecret: true,
       models: discoveredModels.map((model) => ({ ...model })),
@@ -1338,12 +1435,16 @@ export class SettingsService {
     if (provider.authMode === 'api-key') {
       secretStorageService.deleteSecret(provider.secretRef, current.paths.userRdxRoot);
     } else if (provider.authMode === 'account') {
-      secretStorageService.deleteSecret(secretStorageService.createProviderOAuthSecretRef(provider.id), current.paths.userRdxRoot);
+      secretStorageService.deleteSecret(
+        getProviderAccountSecretRef(provider.id, provider.activeAccountId, 'oauth'),
+        current.paths.userRdxRoot,
+      );
     }
 
     const fallback = createBuiltinProviderEntry(provider.id);
     const nextProvider: LlmProviderEntry = {
       ...provider,
+      activeAccountId: undefined,
       apiKey: '',
       hasStoredSecret: fallback.hasStoredSecret,
       models: fallback.models,
@@ -1371,7 +1472,7 @@ export class SettingsService {
       .filter((provider) => provider.enabled && provider.isConfigured && provider.status === 'verified')
       .map((provider) => {
         const accountCredential = provider.authMode === 'account'
-          ? resolveAccountRuntimeCredential(provider.id, settings.paths.userRdxRoot)
+          ? resolveAccountRuntimeCredential(provider, settings.paths.userRdxRoot)
           : { apiKey: '', baseUrl: undefined };
         return {
           id: provider.id,
