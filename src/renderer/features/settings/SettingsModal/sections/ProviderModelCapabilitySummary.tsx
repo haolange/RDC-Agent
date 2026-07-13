@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import type { EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
+import React, { useState } from 'react';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import { getReasoningSelectionOrder, type ReasoningSelection } from '@shared/types/modelCapability';
 import type {
   LlmModelCapabilityProbeMode,
@@ -14,9 +14,7 @@ import {
   buildCapabilityChips,
   buildCapabilityEvidenceSummary,
   buildContextTierRows,
-  findEffectiveCapabilityModel,
   getReasoningLabelKey,
-  snapshotMatchesProvider,
 } from '../modelCapabilitySummaryUtils';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -24,6 +22,10 @@ type Translate = ReturnType<typeof useI18n>['t'];
 interface ProviderModelCapabilitySummaryProps {
   provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured'>;
   model: LlmProviderModel;
+  effectiveModel: EffectiveModel | null;
+  snapshot: EffectiveCatalogSnapshot | null;
+  loading: boolean;
+  loadFailed: boolean;
   onModelChange: (patch: Partial<LlmProviderModel>) => void;
   t: Translate;
 }
@@ -31,43 +33,15 @@ interface ProviderModelCapabilitySummaryProps {
 export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySummaryProps> = ({
   provider,
   model,
+  effectiveModel,
+  snapshot,
+  loading,
+  loadFailed,
   onModelChange,
   t,
 }) => {
-  const [snapshot, setSnapshot] = useState<EffectiveCatalogSnapshot | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadFailed, setLoadFailed] = useState(false);
   const [probeMode, setProbeMode] = useState<LlmModelCapabilityProbeMode | null>(null);
   const [probeResult, setProbeResult] = useState<LlmModelCapabilityProbeResult | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setLoadFailed(false);
-    const load = async () => {
-      try {
-        const next = await getElectronApi()?.settings.getEffectiveCatalog(provider.id) ?? null;
-        if (!cancelled) {
-          setSnapshot(next && snapshotMatchesProvider(next, provider) ? next : null);
-          setLoadFailed(false);
-        }
-      } catch {
-        if (!cancelled) setLoadFailed(true);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void load();
-    const unsubscribe = getElectronApi()?.events.onEffectiveCatalogChanged((next) => {
-      if (!cancelled && snapshotMatchesProvider(next, provider)) {
-        setSnapshot(next);
-        setLoading(false);
-        setLoadFailed(false);
-      }
-    });
-    return () => { cancelled = true; unsubscribe?.(); };
-  }, [provider.activeAccountId, provider.id, provider.protocol]);
-
-  const effectiveModel = useMemo(() => findEffectiveCapabilityModel(snapshot, model.id), [snapshot, model.id]);
   const chips = buildCapabilityChips(effectiveModel, t);
   const tiers = buildContextTierRows(effectiveModel, t);
   const reasoningOptions = getReasoningSelectionOrder(effectiveModel?.reasoning);

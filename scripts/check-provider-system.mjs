@@ -682,6 +682,28 @@ async function main() {
     !modelRow.includes('settings-model-row-meta'),
     'unavailable model rows must not inline long availability meta next to the model id',
   );
+  const modelList = read('src/renderer/features/settings/SettingsModal/sections/ProviderConnectModelList.tsx');
+  const modelProjection = read('src/renderer/features/settings/SettingsModal/providerModelProjection.ts');
+  assertSourceContains(
+    modelList,
+    ['getEffectiveCatalog(provider.id)', 'onEffectiveCatalogChanged', 'projectProviderModels'],
+    'Settings effective model catalog projection',
+  );
+  assertSourceContains(
+    modelProjection,
+    ["catalogOwnership !== 'app-managed'", 'snapshot.models.map', 'defaultReasoningSelection', 'defaultBudgetTokens'],
+    'Settings app-managed model projection',
+  );
+  assertSourceContains(
+    read('src/main/ipc/settingsLlmHandlers.ts'),
+    ['setDiscoveryLayerNormalizer', 'normalizeProviderDiscoveryLayer'],
+    'provider discovery normalization registration',
+  );
+  assertSourceContains(
+    read('src/main/settings/ProviderDiscoveryNormalizer.ts'),
+    ["providerId !== 'github-copilot'", "kind: 'model-variant'", "kind: 'unsupported'"],
+    'Copilot fast-variant discovery normalization',
+  );
 
   const connectionActions = read('src/renderer/features/settings/SettingsModal/useProviderConnectionActions.ts');
   assert(

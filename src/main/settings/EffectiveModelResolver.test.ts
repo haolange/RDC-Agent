@@ -213,6 +213,17 @@ describe('surface-specific effective model seeds', () => {
     });
   });
 
+  it('does not tombstone punctuation-equivalent account model ids', () => {
+    const completed = completeDiscoveryContributions(
+      provider('github-copilot', 'OpenAICompatibleChatCompletions'),
+      [{ modelId: 'claude-opus-4.8', availability: 'available' }],
+    );
+    expect(completed).not.toContainEqual(expect.objectContaining({
+      modelId: 'claude-opus-4-8',
+      availability: 'unavailable',
+    }));
+  });
+
   it('auto-follows only proven aliases and otherwise returns explicit same-provider recommendations', () => {
     const customProvider = {
       ...provider('custom-provider', 'OpenAICompatibleChatCompletions'),

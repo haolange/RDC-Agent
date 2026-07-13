@@ -1,7 +1,12 @@
 import type { TranslationKey } from '../../../i18n';
 import { LLM_PROVIDER_PROTOCOL_DEFINITIONS } from '@shared/constants/llm';
-import type { LlmAgentRoute, LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
-import type { ProviderCatalogCategory, ProviderProtocol } from './types';
+import type {
+  LlmAgentRoute,
+  LlmProviderCategory,
+  LlmProviderEntry,
+  LlmProviderModel,
+} from '@shared/types/settings';
+import type { ProviderProtocol } from './types';
 
 export const STORED_SECRET_MASK = '************************';
 
@@ -38,10 +43,44 @@ export const getProviderDisplayLabel = (
   fallbackLabel: string,
 ): string => provider.label.trim() || fallbackLabel;
 
-export const getProviderCategoryLabel = (
-  provider: Pick<LlmProviderEntry, 'category'>,
-  categories: ProviderCatalogCategory[] = [],
-): string => categories.find((category) => category.id === provider.category)?.label ?? provider.category;
+const PROVIDER_CATEGORY_TRANSLATIONS = {
+  'login-authorization': {
+    label: 'settings.providerCategory.loginAuthorization.label',
+    description: 'settings.providerCategory.loginAuthorization.description',
+  },
+  'official-direct': {
+    label: 'settings.providerCategory.officialDirect.label',
+    description: 'settings.providerCategory.officialDirect.description',
+  },
+  'cloud-platform': {
+    label: 'settings.providerCategory.cloudPlatform.label',
+    description: 'settings.providerCategory.cloudPlatform.description',
+  },
+  'official-compatible': {
+    label: 'settings.providerCategory.officialCompatible.label',
+    description: 'settings.providerCategory.officialCompatible.description',
+  },
+  'coding-token-plan': {
+    label: 'settings.providerCategory.codingTokenPlan.label',
+    description: 'settings.providerCategory.codingTokenPlan.description',
+  },
+  'third-party-compatible': {
+    label: 'settings.providerCategory.thirdPartyCompatible.label',
+    description: 'settings.providerCategory.thirdPartyCompatible.description',
+  },
+  local: {
+    label: 'settings.providerCategory.local.label',
+    description: 'settings.providerCategory.local.description',
+  },
+  image: {
+    label: 'settings.providerCategory.image.label',
+    description: 'settings.providerCategory.image.description',
+  },
+} as const satisfies Record<LlmProviderCategory, { label: TranslationKey; description: TranslationKey }>;
+
+export const getProviderCategoryTranslation = (category: LlmProviderCategory) => (
+  PROVIDER_CATEGORY_TRANSLATIONS[category]
+);
 
 export const getProviderProtocolLabel = (protocol: ProviderProtocol): string => {
   const definition = LLM_PROVIDER_PROTOCOL_DEFINITIONS.find((entry) => entry.id === protocol);

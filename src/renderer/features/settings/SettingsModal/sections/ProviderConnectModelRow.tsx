@@ -1,4 +1,5 @@
 import React from 'react';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import { Switch } from '../../../../ui/Switch';
@@ -9,6 +10,10 @@ type Translate = ReturnType<typeof useI18n>['t'];
 interface ProviderConnectModelRowProps {
   provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured'>;
   model: LlmProviderModel;
+  effectiveModel: EffectiveModel | null;
+  snapshot: EffectiveCatalogSnapshot | null;
+  loading: boolean;
+  loadFailed: boolean;
   expanded: boolean;
   disabled?: boolean;
   onToggleExpanded: (modelId: string) => void;
@@ -19,18 +24,25 @@ interface ProviderConnectModelRowProps {
 export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = ({
   provider,
   model,
+  effectiveModel,
+  snapshot,
+  loading,
+  loadFailed,
   expanded,
   disabled = false,
   onToggleExpanded,
   onModelChange,
   t,
 }) => {
-  const isUnavailable = model.availability === 'unavailable';
-  const isUnverified = model.availability === 'unknown';
+  const availability = effectiveModel?.availability ?? model.availability ?? 'unknown';
+  const isUnavailable = availability === 'unavailable';
+  const isUnverified = availability === 'unknown';
   const statusLabel = isUnavailable
     ? t('settings.providers.modelUnavailable')
     : !model.enabled
       ? t('settings.providers.modelDisabled')
+      : loading
+        ? t('settings.providers.modelLoading')
       : isUnverified
         ? t('settings.providers.modelUnverified')
         : t('settings.providers.modelAvailable');
@@ -85,6 +97,10 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
         <ProviderModelCapabilitySummary
           provider={provider}
           model={model}
+          effectiveModel={effectiveModel}
+          snapshot={snapshot}
+          loading={loading}
+          loadFailed={loadFailed}
           onModelChange={(patch) => onModelChange(model.id, patch)}
           t={t}
         />

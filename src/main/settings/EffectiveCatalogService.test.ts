@@ -122,6 +122,43 @@ describe('EffectiveCatalogService', () => {
     ]));
   });
 
+  it('rekeys punctuation-equivalent live ids while preserving the seed id as a proven alias', async () => {
+    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const [model] = mergeEffectiveCatalog(request({
+      seed: {
+        source: 'seed',
+        observedAt: '2026-01-01T00:00:00.000Z',
+        models: [{
+          modelId: 'claude-opus-4-8',
+          label: 'Seed Opus',
+          availability: 'available',
+          fast: { kind: 'unsupported' },
+        }],
+      },
+      discovery: {
+        source: 'discovery',
+        observedAt: '2026-01-02T00:00:00.000Z',
+        models: [
+          { modelId: 'claude-opus-4.8', label: 'Live Opus', availability: 'available' },
+          {
+            modelId: 'claude-opus-4-8',
+            availability: 'unavailable',
+            unavailableReason: 'This model was not returned by the latest successful provider discovery.',
+          },
+        ],
+      },
+    }));
+
+    expect(model).toMatchObject({
+      modelId: 'claude-opus-4.8',
+      label: 'Live Opus',
+      aliases: ['claude-opus-4-8'],
+      availability: 'available',
+      fast: { kind: 'unsupported' },
+    });
+    expect(model.provenance).toContainEqual(expect.objectContaining({ field: 'modelId', source: 'discovery' }));
+  });
+
   it('merges every deterministic optional-layer combination with last present leaf provenance', async () => {
     const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
     const layers = [

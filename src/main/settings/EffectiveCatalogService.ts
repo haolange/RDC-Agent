@@ -17,6 +17,7 @@ import type {
 } from '@shared/types/settings';
 import type { ReasoningControl } from '@shared/types/modelCapability';
 import { appPathService } from '../runtime/AppPathService';
+import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 
 export const DISCOVERY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -94,6 +95,10 @@ export interface DiscoveryLoadResult extends LoadedCatalogLayer {
 
 export type DiscoveryLoader = () => Promise<DiscoveryLoadResult>;
 export type DiscoveryLoaderResolver = (request: EffectiveCatalogRequest) => DiscoveryLoader | undefined;
+export type DiscoveryLayerNormalizer = (
+  request: EffectiveCatalogRequest,
+  layer: CatalogLayerContribution,
+) => CatalogLayerContribution;
 export type EffectiveCatalogListener = (snapshot: EffectiveCatalogSnapshot) => void;
 
 const EMPTY_STATE: PersistedCatalogState = {
@@ -273,9 +278,40 @@ function applyLayer(
     return;
   }
   for (const patch of layer.models) {
-    const model = models.get(patch.modelId)
+    const direct = models.get(patch.modelId);
+    const matched = direct ? [patch.modelId, direct] as const : [...models.entries()].find(([, candidate]) => (
+      candidate.aliases.includes(patch.modelId)
+      || (patch.aliases ?? []).includes(candidate.modelId)
+      || (
+        layer.source === 'discovery'
+        && request.catalogOwnership === 'app-managed'
+        && normalizeDiscoveredModelMatchKey(candidate.modelId) === normalizeDiscoveredModelMatchKey(patch.modelId)
+      )
+    ));
+    const matchedKey = matched?.[0];
+    const model = matched?.[1]
       ?? createConservativeModel(request.providerId, patch.modelId, request.fallbackRoute, layer.observedAt);
-    const { contextTiers, modelId: _modelId, ...ordinaryPatch } = patch;
+    const rekeyFromDiscovery = layer.source === 'discovery'
+      && matchedKey !== undefined
+      && matchedKey !== patch.modelId;
+    const { aliases, contextTiers, modelId: _modelId, ...ordinaryFields } = patch;
+    const ordinaryPatch = rekeyFromDiscovery
+      ? ordinaryFields
+      : { ...ordinaryFields, ...(aliases !== undefined ? { aliases } : {}) };
+    if (rekeyFromDiscovery) {
+      const previousId = model.modelId;
+      model.modelId = patch.modelId;
+      model.aliases = [...new Set([
+        previousId,
+        ...model.aliases,
+        ...(aliases ?? []),
+      ])].filter((alias) => alias !== patch.modelId);
+      model.provenance.push(
+        evidenceFor(layer, 'modelId'),
+        evidenceFor(layer, 'aliases'),
+      );
+      models.delete(matchedKey);
+    }
     mergeObjectLeaves(
       model as unknown as Record<string, unknown>,
       ordinaryPatch as unknown as Record<string, unknown>,
@@ -289,8 +325,25 @@ function applyLayer(
     if (patch.availability === 'available') {
       delete model.unavailableReason;
     }
-    models.set(patch.modelId, model);
+    models.set(rekeyFromDiscovery || !matchedKey ? patch.modelId : matchedKey, model);
   }
+}
+
+function suppressAliasedDiscoveryTombstones(
+  layer: CatalogLayerContribution | undefined,
+): CatalogLayerContribution | undefined {
+  if (!layer || layer.source !== 'discovery') return layer;
+  const liveKeys = new Set(layer.models
+    .filter((model) => model.availability !== 'unavailable')
+    .map((model) => normalizeDiscoveredModelMatchKey(model.modelId)));
+  return {
+    ...layer,
+    models: layer.models.filter((model) => !(
+      model.availability === 'unavailable'
+      && model.unavailableReason === 'This model was not returned by the latest successful provider discovery.'
+      && liveKeys.has(normalizeDiscoveredModelMatchKey(model.modelId))
+    )),
+  };
 }
 
 export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): EffectiveModel[] {
@@ -303,7 +356,7 @@ export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): Effecti
       : [];
   for (const layer of [
     request.seed,
-    request.discovery,
+    suppressAliasedDiscoveryTombstones(request.discovery),
     request.overlay,
     request.entitlement,
     ...observedLayers,
@@ -356,6 +409,7 @@ export class EffectiveCatalogService {
   private readonly transientQuota = new Map<string, TransientQuotaEntry>();
   private readonly latestRequests = new Map<string, EffectiveCatalogRequest>();
   private discoveryLoaderResolver?: DiscoveryLoaderResolver;
+  private discoveryLayerNormalizer?: DiscoveryLayerNormalizer;
 
   constructor(options: EffectiveCatalogServiceOptions = {}) {
     this.statePath = options.statePath
@@ -372,6 +426,10 @@ export class EffectiveCatalogService {
 
   setDiscoveryLoaderResolver(resolver?: DiscoveryLoaderResolver): void {
     this.discoveryLoaderResolver = resolver;
+  }
+
+  setDiscoveryLayerNormalizer(normalizer?: DiscoveryLayerNormalizer): void {
+    this.discoveryLayerNormalizer = normalizer;
   }
 
   invalidateDiscovery(input: { providerId: string; accountId: string; protocol?: LlmProviderProtocol }): void {
@@ -406,7 +464,10 @@ export class EffectiveCatalogService {
 
   private createSnapshot(request: EffectiveCatalogRequest): EffectiveCatalogSnapshot {
     const key = cacheKey(request.providerId, request.accountId, request.protocol);
-    const cachedDiscovery = request.discovery ?? this.state.discoveries[key];
+    const rawDiscovery = request.discovery ?? this.state.discoveries[key];
+    const cachedDiscovery = rawDiscovery
+      ? this.discoveryLayerNormalizer?.(request, rawDiscovery) ?? rawDiscovery
+      : undefined;
     const cachedEntitlement = request.entitlement ?? this.state.entitlements[key];
     const persistedObserved = request.observed ?? this.state.observed[evidenceKey(request.providerId, request.accountId)];
     const stale = cachedDiscovery?.expiresAt
@@ -470,12 +531,14 @@ export class EffectiveCatalogService {
         const observedAt = this.now();
         const expiresAt = new Date(observedAt.getTime() + this.discoveryTtlMs).toISOString();
         const { entitlement, ...discovery } = loaded;
-        this.state.discoveries[key] = {
+        const loadedDiscovery: CatalogLayerContribution = {
           ...discovery,
           source: 'discovery',
           observedAt: observedAt.toISOString(),
           expiresAt,
         };
+        this.state.discoveries[key] = this.discoveryLayerNormalizer?.(request, loadedDiscovery)
+          ?? loadedDiscovery;
         if (entitlement?.models.length) {
           this.state.entitlements[key] = {
             ...entitlement,
