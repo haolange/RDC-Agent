@@ -399,7 +399,6 @@ export interface LlmProviderDraftRequest {
 
 export interface LlmProviderAccountLoginStartRequest {
   providerId: LlmProviderId;
-  oauthClientId?: string;
   accountLoginMode?: LlmProviderAccountLoginMode;
 }
 
@@ -450,8 +449,6 @@ export interface LlmProviderAccountStatus {
   verificationUri?: string;
   userCode?: string;
   requiresCodeInput?: boolean;
-  requiresClientId?: boolean;
-  clientIdSource?: 'manual' | 'env' | 'stored';
   authorizationMode?: LlmProviderAccountLoginMode;
   diagnostic?: LlmProviderAccountDiagnostic;
   requestedScopes?: string;

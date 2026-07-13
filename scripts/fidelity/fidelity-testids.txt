@@ -107,8 +107,7 @@ settings-provider-model-capability-badge-${model.id}
 settings-provider-model-capability-panel-${model.id}
 settings-provider-model-capability-toggle-${model.id}
 settings-provider-model-row-${model.id}
-settings-provider-oauth-client-id
-settings-provider-oauth-client-source
+settings-provider-oauth-details
 settings-provider-oauth-code
 settings-provider-oauth-device-card
 settings-provider-oauth-device-code

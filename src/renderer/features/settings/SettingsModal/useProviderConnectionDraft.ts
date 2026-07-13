@@ -148,7 +148,6 @@ export const useProviderConnectionDraft = ({
         : undefined,
       accountLoginMode: provider.id === 'grok-account' ? 'browser' : 'device',
       authCode: '',
-      oauthClientId: '',
     });
   };
 

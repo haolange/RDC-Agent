@@ -272,12 +272,12 @@ async function main() {
   const grokAccount = definitionById.get('grok-account');
   assert(grokAccount?.authMode === 'account', 'grok-account must be an account provider.');
   assert(grokAccount?.category === 'login-authorization', 'grok-account must stay in login authorization.');
-  assert(grokAccount?.protocol === 'OpenAICompatibleChatCompletions', 'grok-account must use the OpenAI-compatible chat adapter.');
+  assert(grokAccount?.protocol === 'OpenAIResponses', 'grok-account must default to the Grok Build Responses surface.');
   assert(grokAccount?.accountLoginConfigured === true, 'grok-account must expose a configured account login path.');
   assert(grokAccount?.label === 'Super Grok Account', 'grok-account must be labeled Super Grok Account in OAuth UI.');
   assert(grokAccount?.unavailableReason === undefined, 'grok-account must not be marked unavailable.');
   assert(grokAccount?.recommendedModels.length === 0, 'grok-account must not retain a static recommended model table.');
-  assert(grokAccount?.catalogOwnership === 'user-managed', 'grok-account must be owned by its dynamic account catalog.');
+  assert(grokAccount?.catalogOwnership === 'app-managed', 'grok-account must be owned by its dynamic account catalog.');
   const cline = definitionById.get('cline');
   assert(cline?.authMode === 'api-key' && cline?.authModeOptions?.includes('account'), 'Cline must expose API key and account auth modes.');
   const openRouter = definitionById.get('openrouter');
@@ -398,23 +398,32 @@ async function main() {
       'code_challenge_methods_supported',
       'token_endpoint_auth_methods_supported',
       'fetchGrokOAuthMetadata',
-      'resolveGrokOAuthClientId',
+      'GROK_OAUTH_CLIENT_ID',
       'startGrokBrowserLogin',
       'startGrokDeviceLogin',
       'startGrokCallbackServer',
       'exchangeGrokCode',
       'pollGrokDevice',
       'SUPER_GROK_OAUTH_REDIRECT_URI',
+      'parseGrokBuilderCatalog',
       'parseGrokAccountCatalog',
-      'https://api.x.ai/v1/models',
+      'GROK_BUILD_API_BASE_URL',
+      'XAI_API_BASE_URL',
     ],
     'ProviderAccountAuthService Super Grok OAuth flow',
   );
-  assert(!providerAccountAuthService.includes('GROK_API_BASE_URL'), 'Super Grok account discovery must not use a static legacy base constant.');
+  assert(!providerAccountAuthService.includes('oauthClientId'), 'Super Grok login must not require a user-supplied OAuth client id.');
   const liveOAuthContracts = read('src/main/settings/LiveProviderOAuthContracts.ts');
   assertSourceContains(liveOAuthContracts, ['MINIMAX_REFERENCE', '/oauth/code', '/oauth/token', 'OPENROUTER_AUTHORIZE_URL', 'OPENROUTER_EXCHANGE_URL'], 'live provider OAuth contracts');
   const liveCatalogParsers = read('src/main/settings/LiveProviderCatalogParsers.ts');
-  assertSourceContains(liveCatalogParsers, ['parseOpenCodeGoCatalog', 'parseClineCatalog', 'parseGrokAccountCatalog'], 'live provider catalog parsers');
+  assertSourceContains(liveCatalogParsers, [
+    'parseOpenCodeGoCatalog',
+    'parseClineCatalog',
+    'parseChatGptAccountCatalog',
+    'parseClaudeAccountCatalog',
+    'parseGrokBuilderCatalog',
+    'parseGrokAccountCatalog',
+  ], 'live provider catalog parsers');
   const capabilityContractTest = read('src/main/settings/ProviderCapabilityContract.test.ts');
   assertSourceContains(capabilityContractTest, ['effective-model-contract.json', 'fixtures/provider-catalogs'], 'final provider capability fixture contract');
   const requestPlanner = read('src/main/settings/RequestPlanner.ts');
@@ -427,6 +436,19 @@ async function main() {
   assertSourceContains(rendererTurnControls, ['resolveContextTierChoices', 'evaluateModelControls'], 'renderer shared capability policy');
   assertSourceContains(modelControlPolicy, ['CONSTRAINT_CYCLE', 'isFastModeSelectable'], 'shared model-control evaluator');
   assert(!read('src/main/agent-runtime/core/types.ts').includes('ProviderCapabilities'), 'Runtime must not retain a second boolean capability matrix.');
+  const configuredRuntimeProvider = read('src/main/agent-runtime/providers/ConfiguredRuntimeProvider.ts');
+  assertSourceContains(
+    configuredRuntimeProvider,
+    ['COPILOT_WIRE_HEADERS', 'CLAUDE_ACCOUNT_WIRE_HEADERS', "provider.id === 'github-copilot'", "provider.id === 'claude-account'"],
+    'account provider runtime wire headers',
+  );
+  assertSourceContains(
+    read('src/main/agent-runtime/providers/AnthropicProvider.ts'),
+    ['mergeAnthropicRequestHeaders', "name.toLowerCase() !== 'anthropic-beta'"],
+    'Anthropic beta header composition',
+  );
+  const providerAccountPanel = read('src/renderer/features/settings/SettingsModal/sections/ProviderAccountOAuthPanel.tsx');
+  assertSourceDoesNotContain(providerAccountPanel, ['oauthClientId', 'requiresClientId', 'clientIdSource'], 'Super Grok account panel');
   for (const sourcePath of listSourceFiles('src/main/agent-runtime/providers')) {
     assertSourceDoesNotContain(fs.readFileSync(sourcePath, 'utf8'), ['getCapabilities()'], path.relative(process.cwd(), sourcePath));
   }

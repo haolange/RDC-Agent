@@ -1,8 +1,11 @@
 import type { ContextTier, EntitlementState } from '@shared/types/providerCapability';
 import type { LlmProviderModel } from '@shared/types/settings';
+import type { CatalogModelContribution } from './EffectiveCatalogService';
+import { isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 
 export interface CopilotCatalogParseResult {
   models: LlmProviderModel[];
+  contributions: CatalogModelContribution[];
   billingByModel: Record<string, unknown>;
 }
 
@@ -53,21 +56,65 @@ export function parseCopilotModelCatalog(payload: unknown): CopilotCatalogParseR
   const collection = Array.isArray(record(payload).data) ? record(payload).data as unknown[] : [];
   const billingByModel: Record<string, unknown> = {};
   const models: LlmProviderModel[] = [];
+  const contributions: CatalogModelContribution[] = [];
   const seen = new Set<string>();
   for (const item of collection) {
     const entry = record(item);
     const id = typeof entry.id === 'string' ? entry.id.trim() : '';
-    if (!id || seen.has(id)) continue;
+    const capabilities = record(entry.capabilities);
+    const capabilityType = typeof capabilities.type === 'string' ? capabilities.type.toLowerCase() : '';
+    const supportedEndpoints = Array.isArray(entry.supported_endpoints)
+      ? entry.supported_endpoints.filter((value): value is string => typeof value === 'string')
+      : [];
+    if (
+      !id
+      || seen.has(id)
+      || entry.model_picker_enabled === false
+      || (capabilityType && capabilityType !== 'chat')
+      || (supportedEndpoints.length > 0 && !supportedEndpoints.some((endpoint) => (
+        endpoint.includes('/chat/completions') || endpoint.includes('/responses') || endpoint.includes('/v1/messages')
+      )))
+      || !isAdmittedDiscoveredModel(entry)
+    ) continue;
     seen.add(id);
+    const label = typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim() : id;
     models.push({
       id,
-      label: typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim() : id,
+      label,
       enabled: true,
       availability: 'available',
+    });
+    const limits = record(capabilities.limits);
+    const supports = record(capabilities.supports);
+    const maxPromptTokens = positiveInteger(limits.max_prompt_tokens);
+    contributions.push({
+      modelId: id,
+      label,
+      availability: 'available',
+      ...(maxPromptTokens
+        ? {
+            contextTiers: [{
+              id: 'default', label: 'Default', maxPromptTokens,
+              activation: { kind: 'implicit' }, entitlement: 'granted',
+            }],
+            defaultBudgetTokens: maxPromptTokens,
+          }
+        : {}),
+      toolCalling: supports.tool_calls === true
+        ? { state: 'supported' }
+        : supports.tool_calls === false ? { state: 'unsupported' } : { state: 'unknown' },
+      visionInput: supports.vision === true
+        ? { state: 'supported' }
+        : supports.vision === false ? { state: 'unsupported' } : { state: 'unknown' },
+      structuredOutput: supports.structured_outputs === true || supports.response_format === true
+        ? { state: 'supported' }
+        : supports.structured_outputs === false || supports.response_format === false
+          ? { state: 'unsupported' }
+          : { state: 'unknown' },
     });
     if (entry.billing && parseCopilotBillingTiers(entry.billing).length > 0) {
       billingByModel[id] = entry.billing;
     }
   }
-  return { models, billingByModel };
+  return { models, contributions, billingByModel };
 }

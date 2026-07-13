@@ -56,6 +56,19 @@ const assistant = (content: AssistantMessage['content']): AssistantMessage => ({
 });
 
 describe('provider reasoning artifact replay policy', () => {
+  it('preserves Claude Account identity betas when a context tier adds another beta', () => {
+    expect(anthropicTesting.mergeAnthropicRequestHeaders(
+      {
+        'anthropic-beta': 'claude-code-20250219,oauth-2025-04-20',
+        'User-Agent': 'claude-cli/2.1.119 (external, cli)',
+      },
+      { 'Anthropic-Beta': 'context-1m-2025-08-07,oauth-2025-04-20' },
+    )).toEqual({
+      'anthropic-beta': 'claude-code-20250219,oauth-2025-04-20,context-1m-2025-08-07',
+      'User-Agent': 'claude-cli/2.1.119 (external, cli)',
+    });
+  });
+
   it('maps Off and named reasoning controls to OpenAI Responses payloads', () => {
     const reasoningControl = openAiLevels;
 

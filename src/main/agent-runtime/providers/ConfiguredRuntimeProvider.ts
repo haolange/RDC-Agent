@@ -12,6 +12,8 @@ import type {
 import { settingsService } from '../../settings/SettingsService';
 import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
 import { resolveEffectiveModel } from '../../settings/EffectiveModelResolver';
+import { CLAUDE_ACCOUNT_WIRE_HEADERS } from '../../settings/ClaudeWire';
+import { COPILOT_WIRE_HEADERS } from '../../settings/CopilotWire';
 import { AnthropicProvider } from './AnthropicProvider';
 import { GeminiProvider } from './GeminiProvider';
 import { OllamaProvider } from './OllamaProvider';
@@ -92,12 +94,19 @@ function createProviderStrategy(
   provider: ConfiguredProvider,
   protocol: LlmProviderProtocol,
 ): ProviderStrategy {
+  const accountHeaders = provider.id === 'github-copilot'
+    ? COPILOT_WIRE_HEADERS
+    : provider.id === 'claude-account'
+      ? CLAUDE_ACCOUNT_WIRE_HEADERS
+      : undefined;
   switch (protocol) {
     case 'AnthropicMessages':
       return new AnthropicProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
-        headers: provider.id === 'kimi-coding-plan' ? { 'User-Agent': 'RDC-Agent' } : undefined,
+        headers: provider.id === 'kimi-coding-plan'
+          ? { 'User-Agent': 'RDC-Agent' }
+          : accountHeaders,
       });
     case 'GoogleGemini':
       return new GeminiProvider({
@@ -122,12 +131,14 @@ function createProviderStrategy(
       return new OpenAICompatibleProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
+        headers: accountHeaders,
       });
     case 'OpenAIResponses':
       return new OpenAIResponsesProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
         accountId: provider.accountId,
+        headers: accountHeaders,
       });
     case 'AzureOpenAIChatCompletions':
     case 'AwsBedrock':

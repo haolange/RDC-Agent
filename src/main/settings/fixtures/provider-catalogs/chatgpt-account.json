@@ -1,0 +1,54 @@
+{
+  "models": [
+    {
+      "slug": "gpt-5.6-sol",
+      "display_name": "GPT-5.6 Sol",
+      "visibility": "list",
+      "supported_in_api": true,
+      "input_modalities": ["text", "image"],
+      "context_window": 372000,
+      "max_context_window": 372000,
+      "default_reasoning_level": "low",
+      "supported_reasoning_levels": [
+        { "effort": "low" },
+        { "effort": "medium" },
+        { "effort": "high" },
+        { "effort": "xhigh" },
+        { "effort": "max" },
+        { "effort": "ultra" }
+      ]
+    },
+    {
+      "slug": "gpt-5.4",
+      "display_name": "GPT-5.4",
+      "visibility": "list",
+      "supported_in_api": true,
+      "input_modalities": ["text", "image"],
+      "context_window": 272000,
+      "max_context_window": 1000000,
+      "default_reasoning_level": "medium",
+      "supported_reasoning_levels": [
+        { "effort": "low" },
+        { "effort": "medium" },
+        { "effort": "high" },
+        { "effort": "xhigh" }
+      ]
+    },
+    {
+      "slug": "gpt-5.6-sol-pro",
+      "display_name": "GPT-5.6 Sol Pro",
+      "visibility": "list",
+      "supported_in_api": true,
+      "context_window": 372000,
+      "max_context_window": 372000
+    },
+    {
+      "slug": "codex-auto-review",
+      "display_name": "Codex Auto Review",
+      "visibility": "hidden",
+      "supported_in_api": true,
+      "context_window": 272000,
+      "max_context_window": 1000000
+    }
+  ]
+}

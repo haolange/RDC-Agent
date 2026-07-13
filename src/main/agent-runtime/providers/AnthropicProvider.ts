@@ -145,6 +145,10 @@ export class AnthropicProvider implements ProviderStrategy {
 
       const body = applyRequestPlanBody(this.buildRequestBody(model, context, options), options.requestPlan);
       const url = `${baseUrl}/messages`;
+      const plannedHeaders = mergeAnthropicRequestHeaders(
+        this.defaultHeaders,
+        requestPlanHeaders(options.requestPlan),
+      );
 
       const response = await fetch(url, {
         method: 'POST',
@@ -152,8 +156,7 @@ export class AnthropicProvider implements ProviderStrategy {
           'Content-Type': 'application/json',
           'x-api-key': apiKey,
           'anthropic-version': this.anthropicVersion,
-          ...this.defaultHeaders,
-          ...requestPlanHeaders(options.requestPlan),
+          ...plannedHeaders,
         },
         body: JSON.stringify(body),
         signal: composed.signal,
@@ -549,4 +552,25 @@ function mapStopReason(reason: string | null | undefined): StopReason {
   }
 }
 
-export const __testing = { mapStopReason, toAnthropicMessages };
+function mergeAnthropicRequestHeaders(
+  defaultHeaders: Readonly<Record<string, string>>,
+  planHeaders: Readonly<Record<string, string>>,
+): Record<string, string> {
+  const merged = { ...defaultHeaders, ...planHeaders };
+  const betaValues: string[] = [];
+  for (const headers of [defaultHeaders, planHeaders]) {
+    for (const [name, value] of Object.entries(headers)) {
+      if (name.toLowerCase() !== 'anthropic-beta') continue;
+      for (const beta of value.split(',').map((entry) => entry.trim()).filter(Boolean)) {
+        if (!betaValues.includes(beta)) betaValues.push(beta);
+      }
+    }
+  }
+  for (const name of Object.keys(merged)) {
+    if (name.toLowerCase() === 'anthropic-beta') delete merged[name];
+  }
+  if (betaValues.length > 0) merged['anthropic-beta'] = betaValues.join(',');
+  return merged;
+}
+
+export const __testing = { mapStopReason, mergeAnthropicRequestHeaders, toAnthropicMessages };

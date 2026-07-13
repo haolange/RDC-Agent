@@ -1,0 +1,32 @@
+{
+  "models": {
+    "grok-4.5": {
+      "info": {
+        "id": "grok-4.5",
+        "name": "Grok 4.5",
+        "api_backend": "responses",
+        "context_window": 500000,
+        "hidden": false,
+        "supported_in_api": true,
+        "reasoning_effort": "high",
+        "supports_reasoning_effort": true,
+        "reasoning_efforts": [
+          { "id": "high", "value": "high", "default": true },
+          { "id": "medium", "value": "medium", "default": false },
+          { "id": "low", "value": "low", "default": false }
+        ]
+      }
+    },
+    "grok-composer-2.5-fast": {
+      "info": {
+        "id": "grok-composer-2.5-fast",
+        "name": "Composer 2.5",
+        "api_backend": "responses",
+        "context_window": 200000,
+        "hidden": false,
+        "supported_in_api": true,
+        "supports_reasoning_effort": false
+      }
+    }
+  }
+}

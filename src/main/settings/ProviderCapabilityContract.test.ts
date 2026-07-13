@@ -49,10 +49,10 @@ describe('final provider capability contracts', () => {
   it('keeps every provider fixture in an exercised fixture family', () => {
     const names = readdirSync(resolve(__dirname, 'fixtures/provider-catalogs')).sort();
     expect(names).toEqual([
-      'chutes.json', 'cline.json', 'fireworks-ai.json', 'github-models.json', 'grok-account.json',
-      'lm-studio.json', 'longcat.json', 'minimax-oauth.json', 'novita-ai.json', 'nvidia-nim.json',
-      'ollama-cloud.json', 'opencode-go.json', 'opencode-zen.json', 'openrouter-pkce.json', 'synthetic.json',
-      'together-ai.json',
+      'chatgpt-account.json', 'chutes.json', 'claude-account.json', 'cline.json', 'fireworks-ai.json',
+      'github-models.json', 'grok-account.json', 'grok-builder.json', 'lm-studio.json', 'longcat.json',
+      'minimax-oauth.json', 'novita-ai.json', 'nvidia-nim.json', 'ollama-cloud.json', 'opencode-go.json',
+      'opencode-zen.json', 'openrouter-pkce.json', 'synthetic.json', 'together-ai.json',
     ]);
   });
 });
