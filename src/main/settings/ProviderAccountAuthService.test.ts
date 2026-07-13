@@ -161,6 +161,8 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
 
   it('exchanges Super Grok browser authorization code and persists account models', async () => {
     const service = new ProviderAccountAuthService();
+    const publishCatalog = vi.fn(async () => undefined);
+    service.setCatalogPublisher(publishCatalog);
     const fetchMock = mockFetchJson(
       grokMetadata,
       {
@@ -211,6 +213,14 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
     expect(bundle.accountLabel).toBe('operator@example.com');
     expect(bundle.planLabel).toBe('Super Grok OAuth');
     expect(mocks.savedConnections[0].models).toEqual([{ id: 'grok-code-fast-1', label: 'grok-code-fast-1', enabled: true }]);
+    expect(publishCatalog).toHaveBeenCalledWith('grok-account', expect.objectContaining({
+      models: [{ id: 'grok-code-fast-1', label: 'grok-code-fast-1', enabled: true }],
+      contributions: [expect.objectContaining({
+        modelId: 'grok-code-fast-1',
+        availability: 'available',
+        route: expect.objectContaining({ protocol: 'OpenAICompatibleChatCompletions' }),
+      })],
+    }));
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
       'https://api.x.ai/v1/models',

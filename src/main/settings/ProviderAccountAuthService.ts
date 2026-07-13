@@ -18,6 +18,7 @@ import { settingsService } from './SettingsService';
 import { oauthRefreshManager } from './OAuthRefreshManager';
 import { getProviderSeedModels } from './ProviderPresetRegistry';
 import { parseGrokAccountCatalog } from './LiveProviderCatalogParsers';
+import type { CatalogModelContribution } from './EffectiveCatalogService';
 
 const REQUEST_TIMEOUT_MS = 20000;
 const CHATGPT_CALLBACK_PORT = 1455;
@@ -79,6 +80,16 @@ interface OAuthSecretBundle {
   accountLabel?: string;
   planLabel?: string;
 }
+
+export interface AccountCatalogDiscovery {
+  models: LlmProviderModel[];
+  contributions?: CatalogModelContribution[];
+}
+
+type AccountCatalogPublisher = (
+  providerId: AccountProviderId,
+  discovery: AccountCatalogDiscovery,
+) => Promise<void>;
 
 interface GrokOAuthMetadata {
   authorizationEndpoint: string;
@@ -421,6 +432,12 @@ const fetchOAuthJson = async (url: string, init: RequestInit): Promise<unknown> 
 const createFormBody = (params: Record<string, string>): string => new URLSearchParams(params).toString();
 
 export class ProviderAccountAuthService {
+  private catalogPublisher?: AccountCatalogPublisher;
+
+  setCatalogPublisher(publisher?: AccountCatalogPublisher): void {
+    this.catalogPublisher = publisher;
+  }
+
   async startLogin(request: LlmProviderAccountLoginStartRequest): Promise<LlmProviderAccountStatus> {
     const providerId = request.providerId;
     if (!isAccountProviderId(providerId)) {
@@ -497,21 +514,11 @@ export class ProviderAccountAuthService {
     }
     try {
       const activeBundle = await this.refreshBundleIfNeeded(bundle);
-      const models = await this.discoverModels(activeBundle);
-      if (models.length === 0) {
+      const discovery = await this.discoverCatalog(activeBundle);
+      if (discovery.models.length === 0) {
         throw new Error('Account provider returned no usable models.');
       }
-      settingsService.saveProviderAccountConnection(
-        providerId,
-        JSON.stringify(activeBundle),
-        models,
-        {
-          accountLabel: activeBundle.accountLabel,
-          planLabel: activeBundle.planLabel,
-          oauthExpiresAt: activeBundle.expiresAt,
-          oauthRefreshAvailable: canRefreshBundle(activeBundle),
-        },
-      );
+      await this.saveAccountDiscovery(providerId, activeBundle, discovery, true);
       return this.status(providerId);
     } catch (error) {
       return this.status(providerId, parseProviderError(error), 'failed');
@@ -535,18 +542,22 @@ export class ProviderAccountAuthService {
       return;
     }
 
-    const models = await this.discoverModels(activeBundle);
-    settingsService.saveProviderAccountConnection(
-      providerId,
-      JSON.stringify(activeBundle),
-      models,
-      {
-        accountLabel: activeBundle.accountLabel,
-        planLabel: activeBundle.planLabel,
-        oauthExpiresAt: activeBundle.expiresAt,
-        oauthRefreshAvailable: canRefreshBundle(activeBundle),
-      },
-    );
+    const discovery = await this.discoverCatalog(activeBundle);
+    await this.saveAccountDiscovery(providerId, activeBundle, discovery, true);
+  }
+
+  async loadEffectiveCatalog(providerId: LlmProviderId): Promise<AccountCatalogDiscovery> {
+    if (!isAccountProviderId(providerId)) {
+      throw new Error('Provider does not support account catalog discovery.');
+    }
+    const bundle = this.readBundle(providerId);
+    if (!bundle) {
+      throw new Error('Account is not connected.');
+    }
+    const activeBundle = await this.refreshBundleIfNeeded(bundle);
+    const discovery = await this.discoverCatalog(activeBundle);
+    await this.saveAccountDiscovery(providerId, activeBundle, discovery, false);
+    return discovery;
   }
 
   async forceRefreshRuntimeCredentials(providerId: LlmProviderId): Promise<void> {
@@ -1098,14 +1109,25 @@ export class ProviderAccountAuthService {
   }
 
   private async persistAccount(providerId: AccountProviderId, bundle: OAuthSecretBundle): Promise<LlmProviderAccountStatus> {
-    const models = await this.discoverModels(bundle);
-    if (models.length === 0) {
+    const discovery = await this.discoverCatalog(bundle);
+    if (discovery.models.length === 0) {
       throw new Error('Account provider returned no usable models.');
     }
+    await this.saveAccountDiscovery(providerId, bundle, discovery, true);
+    this.clearFlows(providerId);
+    return this.status(providerId);
+  }
+
+  private async saveAccountDiscovery(
+    providerId: AccountProviderId,
+    bundle: OAuthSecretBundle,
+    discovery: AccountCatalogDiscovery,
+    publish: boolean,
+  ): Promise<void> {
     settingsService.saveProviderAccountConnection(
       providerId,
       JSON.stringify(bundle),
-      models,
+      discovery.models,
       {
         accountLabel: bundle.accountLabel,
         planLabel: bundle.planLabel,
@@ -1113,8 +1135,9 @@ export class ProviderAccountAuthService {
         oauthRefreshAvailable: canRefreshBundle(bundle),
       },
     );
-    this.clearFlows(providerId);
-    return this.status(providerId);
+    if (publish && this.catalogPublisher) {
+      await this.catalogPublisher(providerId, discovery);
+    }
   }
 
   private async refreshBundleIfNeeded(bundle: OAuthSecretBundle, force = false): Promise<OAuthSecretBundle> {
@@ -1250,7 +1273,7 @@ export class ProviderAccountAuthService {
     };
   }
 
-  private async discoverModels(bundle: OAuthSecretBundle): Promise<LlmProviderModel[]> {
+  private async discoverCatalog(bundle: OAuthSecretBundle): Promise<AccountCatalogDiscovery> {
     if (bundle.providerId === 'github-copilot' && bundle.copilotToken) {
       try {
         const baseUrl = (bundle.copilotApiBaseUrl ?? 'https://api.githubcopilot.com').replace(/\/+$/, '');
@@ -1268,7 +1291,7 @@ export class ProviderAccountAuthService {
           bundle.copilotModelBilling = Object.fromEntries(
             Object.entries(parsed.billingByModel).filter(([modelId]) => models.some((model) => model.id === modelId)),
           );
-          return models;
+          return { models };
         }
       } catch {
         // Account login remains usable with the conservative bundled seed.
@@ -1286,13 +1309,13 @@ export class ProviderAccountAuthService {
       if (parsed.models.length === 0) {
         throw new Error('Super Grok account catalog returned no agent-routable models.');
       }
-      return parsed.models;
+      return parsed;
     }
     const models = createAccountCatalogModels(bundle.providerId);
     if (models.length === 0) {
       throw new Error(`Account provider ${bundle.providerId} is missing an app-managed model catalog.`);
     }
-    return models;
+    return { models };
   }
 
   private async revokeGrokBundle(bundle: OAuthSecretBundle): Promise<void> {

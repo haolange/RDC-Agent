@@ -80,20 +80,11 @@ export function buildSeedModelContribution(
   const base: CatalogModelContribution = seed
     ? { ...seed, route: routeFor(provider, seed.route) }
     : conservative;
-  const providerModel = provider.models.find((model) => model.id === base.modelId);
   return {
     ...base,
     modelId: base.modelId,
-    label: seed?.label ?? providerModel?.label ?? modelId,
+    label: seed?.label ?? modelId,
     aliases: [...(seed?.aliases ?? [])],
-    availability: providerModel?.availability === 'unavailable'
-      ? 'unavailable'
-      : providerModel?.enabled === false
-        ? 'unavailable'
-        : providerModel
-          ? 'available'
-          : base.availability,
-    unavailableReason: providerModel?.availabilityReason,
   };
 }
 
@@ -120,7 +111,7 @@ function copilotEntitlementContribution(provider: LlmProviderEntry): CatalogLaye
 }
 
 function seedContribution(provider: LlmProviderEntry, requestedModelId?: string): CatalogLayerContribution {
-  const ids = new Set(provider.models.map((model) => model.id));
+  const ids = new Set<string>();
   if (provider.catalogOwnership === 'app-managed') {
     for (const entry of getProviderSeedModelDefinitions(provider.id)) {
       ids.add(entry.modelId);
@@ -148,8 +139,23 @@ function userContribution(provider: LlmProviderEntry): CatalogLayerContribution 
     source: 'user',
     observedAt: provider.lastModelRefreshAt ?? provider.lastTestedAt ?? '2026-07-13T00:00:00.000Z',
     detail: 'User-managed provider model definition',
-    models: provider.models.map((model) => buildSeedModelContribution(provider, model.id)),
+    models: provider.models.map((model) => ({
+      ...buildSeedModelContribution(provider, model.id),
+      label: model.label,
+      availability: model.availability
+        ?? (model.enabled === false ? 'unavailable' : 'available'),
+      unavailableReason: model.availabilityReason,
+    })),
   };
+}
+
+export function toDiscoveryModelContributions(models: LlmProviderModel[]): CatalogModelContribution[] {
+  return models.map((model) => ({
+    modelId: model.id,
+    label: model.label,
+    availability: model.availability ?? 'available',
+    unavailableReason: model.availabilityReason,
+  }));
 }
 
 export function resolveEffectiveCatalog(
@@ -196,12 +202,7 @@ export function refreshEffectiveCatalogDiscovery(
     source: 'discovery',
     observedAt: new Date().toISOString(),
     protocol: provider.protocol,
-    models: contributions ?? models.map((model) => ({
-      modelId: model.id,
-      label: model.label,
-      availability: model.availability,
-      unavailableReason: model.availabilityReason,
-    })),
+    models: contributions ?? toDiscoveryModelContributions(models),
   }));
 }
 

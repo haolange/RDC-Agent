@@ -23,8 +23,15 @@ import { settingsService } from '../settings/SettingsService';
 import { providerAccountAuthService } from './ProviderAccountAuthService';
 import { extractDiscoveredModelId, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 import { parseDeclarativeCatalog, resolveDeclarativeDiscoveryUrl } from './DeclarativeCatalogDiscovery';
-import type { CatalogModelContribution } from './EffectiveCatalogService';
-import { refreshEffectiveCatalogDiscovery } from './EffectiveModelResolver';
+import type {
+  CatalogModelContribution,
+  DiscoveryLoader,
+  EffectiveCatalogRequest,
+} from './EffectiveCatalogService';
+import {
+  refreshEffectiveCatalogDiscovery,
+  toDiscoveryModelContributions,
+} from './EffectiveModelResolver';
 import { parseClineCatalog, parseOpenCodeGoCatalog } from './LiveProviderCatalogParsers';
 
 const REQUEST_TIMEOUT_MS = 20000;
@@ -329,6 +336,37 @@ const createTinyOpenAiProbeBody = (modelId: string): string => JSON.stringify({
 });
 
 export class ProviderConnectionService {
+  constructor() {
+    providerAccountAuthService.setCatalogPublisher(async (providerId, discovery) => {
+      const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+      if (provider) {
+        await refreshEffectiveCatalogDiscovery(provider, discovery.models, discovery.contributions);
+      }
+    });
+  }
+
+  createEffectiveCatalogDiscoveryLoader(request: EffectiveCatalogRequest): DiscoveryLoader | undefined {
+    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === request.providerId);
+    const accountId = provider?.activeAccountId ?? (provider ? `anonymous:${provider.id}` : '');
+    if (
+      !provider
+      || !provider.isConfigured
+      || provider.protocol !== request.protocol
+      || accountId !== request.accountId
+    ) {
+      return undefined;
+    }
+    return async () => {
+      const discovery = provider.authMode === 'account'
+        ? await providerAccountAuthService.loadEffectiveCatalog(provider.id)
+        : await this.discoverModels(provider, '', '');
+      return {
+        protocol: provider.protocol,
+        models: discovery.contributions ?? toDiscoveryModelContributions(discovery.models),
+      };
+    };
+  }
+
   async testProviderDraft(request: LlmProviderDraftRequest): Promise<LlmProviderConnectionResult> {
     try {
       const provider = this.resolveProviderProtocol(this.getProvider(request.providerId), request.protocol);

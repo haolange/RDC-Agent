@@ -10,7 +10,7 @@ vi.mock('electron', () => ({
   },
 }));
 
-import { buildSeedModelContribution } from './EffectiveModelResolver';
+import { buildEffectiveCatalogRequest, buildSeedModelContribution } from './EffectiveModelResolver';
 
 function provider(id: string, protocol: LlmProviderEntry['protocol']): LlmProviderEntry {
   return {
@@ -56,5 +56,38 @@ describe('surface-specific effective model seeds', () => {
       provider('github-copilot', 'OpenAICompatibleChatCompletions'),
       'claude-opus-4-8',
     ).fast).toEqual({ kind: 'model-variant', modelId: 'claude-opus-4-8-fast', entitlement: 'granted' });
+  });
+
+  it('keeps app-managed settings state out of the bundled seed layer', () => {
+    const configured = provider('chatgpt-account', 'OpenAIResponses');
+    configured.models = [{
+      id: 'gpt-5.5',
+      label: 'Persisted label',
+      enabled: false,
+      availability: 'unavailable',
+      availabilityReason: 'User disabled the model',
+    }];
+
+    const model = buildSeedModelContribution(configured, 'gpt-5.5');
+    expect(model.label).toBe('gpt-5.5');
+    expect(model.availability).toBe('available');
+    expect(model.unavailableReason).toBeUndefined();
+  });
+
+  it('projects user-managed model definitions only through the user layer', () => {
+    const configured = {
+      ...provider('custom-provider', 'OpenAICompatibleChatCompletions'),
+      catalogOwnership: 'user-managed' as const,
+      baseUrl: 'https://custom.example/v1',
+      protocolEditable: true,
+      lastModelRefreshAt: '2026-07-13T00:00:00.000Z',
+      models: [{ id: 'custom-model', label: 'Custom model', enabled: true }],
+    };
+
+    const request = buildEffectiveCatalogRequest(configured);
+    expect(request.seed.models).toEqual([]);
+    expect(request.user?.models).toEqual([
+      expect.objectContaining({ modelId: 'custom-model', label: 'Custom model', availability: 'available' }),
+    ]);
   });
 });
