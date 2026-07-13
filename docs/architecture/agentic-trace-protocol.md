@@ -54,4 +54,4 @@ Renderer presentation is built from `AgentRunView`, `TraceRightPanel`, and rende
 
 ## Verification
 
-Use `npm run check:fidelity` for `trace-*` anchors, `npm run typecheck` for shared contracts, and browser-session smoke for renderer projection changes.
+Use `pnpm run check:fidelity` for `trace-*` anchors, `pnpm run typecheck` for shared contracts, and browser-session smoke for renderer projection changes.

@@ -11,7 +11,7 @@ const checkDir = path.join(fidelityDir, '.check-tmp');
 const readSet = (filePath) => {
   if (!fs.existsSync(filePath)) {
     console.error(`[fidelity] Missing baseline file: ${path.relative(repoRoot, filePath)}`);
-    console.error('[fidelity] Run: npm run fidelity:extract');
+    console.error('[fidelity] Run: pnpm run fidelity:extract');
     process.exit(1);
   }
   return new Set(

@@ -1,31 +1,20 @@
 @echo off
 setlocal
-
 cd /d "%~dp0\.."
 
-if not exist "package.json" (
-  echo [RDC-Agent] package.json not found. Run this script from the repository scripts directory.
+where node >nul 2>nul
+if not errorlevel 1 (
+  set "NODE_EXE=node"
+) else (
+  set "NODE_EXE=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
+)
+
+if not exist "%NODE_EXE%" if "%NODE_EXE%"=="node" goto run
+if not exist "%NODE_EXE%" (
+  echo [RDC-Agent] Node.js ^>=22.12.0 is missing. Install Node.js or run from a Codex environment with its bundled runtime.
   exit /b 1
 )
 
-if not exist "node_modules\electron\dist\electron.exe" (
-  echo [RDC-Agent] Electron runtime is missing. Run npm install first.
-  exit /b 1
-)
-
-if not exist "node_modules\.bin\electron-vite.cmd" (
-  echo [RDC-Agent] Build tool is missing. Run npm install first.
-  exit /b 1
-)
-
-echo [RDC-Agent] Building current application sources...
-call "node_modules\.bin\electron-vite.cmd" build
-if errorlevel 1 exit /b %ERRORLEVEL%
-
-echo [RDC-Agent] Starting visible Electron React WebUI from build output...
-echo [RDC-Agent] The same main process will also print the /app browser session URL.
-set "RDC_AGENT_HEADLESS=0"
-set "RDC_AGENT_TEST_MODE=0"
-set "NODE_ENV=production"
-call "node_modules\electron\dist\electron.exe" "out\main\index.js"
+:run
+call "%NODE_EXE%" "%CD%\scripts\launch-rdc-agent.mjs" --mode desktop %*
 exit /b %ERRORLEVEL%

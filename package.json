@@ -3,8 +3,12 @@
   "version": "1.0.0",
   "description": "RenderDoc Debug Agent - Vertical Framework",
   "main": "out/main/index.js",
+  "packageManager": "pnpm@11.7.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "node scripts/launch-rdc-agent.mjs --mode desktop-dev",
     "dev:renderer": "vite --config vite.renderer.config.ts",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
@@ -31,10 +35,11 @@
     "check:skills": "vitest run src/main/settings/AgentRuntimeConfigService.test.ts",
     "check:hooks": "vitest run src/main/hooks/HookEngine.test.ts src/main/runtime/RdxRuntimeService.test.ts",
     "check:memory-policy": "vitest run src/main/agent-runtime/memory/MemoryStore.test.ts",
-    "start:human": "scripts\\start-rdc-agent.cmd",
-    "start:human:dev": "scripts\\start-rdc-agent-dev.cmd",
-    "start:agent-browser": "scripts\\start-browser-session.cmd",
-    "start:agent-browser:dev": "scripts\\start-browser-session-dev.cmd",
+    "start:human": "node scripts/launch-rdc-agent.mjs --mode desktop",
+    "start:human:dev": "node scripts/launch-rdc-agent.mjs --mode desktop-dev",
+    "start:agent-browser": "node scripts/launch-rdc-agent.mjs --mode browser",
+    "start:agent-browser:dev": "node scripts/launch-rdc-agent.mjs --mode browser-dev",
+    "start:prepare": "node scripts/launch-rdc-agent.mjs --mode prepare-only",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

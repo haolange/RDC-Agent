@@ -56,12 +56,12 @@ Do not add call-site constants for commands, catalog paths, or environment varia
 
 | Change type | Required verification |
 | --- | --- |
-| Shared type or settings schema | `npm run typecheck`, `npm run check:shared-exports` |
-| Renderer structure or anchors | `npm run typecheck`, `npm run check:architecture`, `npm run check:fidelity` |
-| Main IPC or invocation boundary | `npm run typecheck`, `npm run build`, shell smoke when available |
-| RDX CLI catalog/tooling config | `npm run typecheck`, catalog/runtime summary smoke |
-| Settings Agents routing | `npm run check:settings-agents` |
-| Product browser flow with real local inputs | `npm run start:agent-browser`, then inspect `/app` in the Codex in-app browser with real project and `.rdc` inputs |
+| Shared type or settings schema | `pnpm run typecheck`, `pnpm run check:shared-exports` |
+| Renderer structure or anchors | `pnpm run typecheck`, `pnpm run check:architecture`, `pnpm run check:fidelity` |
+| Main IPC or invocation boundary | `pnpm run typecheck`, `pnpm run build`, shell smoke when available |
+| RDX CLI catalog/tooling config | `pnpm run typecheck`, catalog/runtime summary smoke |
+| Settings Agents routing | `pnpm run check:settings-agents` |
+| Product browser flow with real local inputs | `pnpm run start:agent-browser`, then inspect `/app` in the Codex in-app browser with real project and `.rdc` inputs |
 | Documentation only | Path and terminology scan |
 
 ## Cleanup Rules

@@ -1,23 +1,20 @@
 @echo off
 setlocal
-
 cd /d "%~dp0\.."
 
-if not exist "package.json" (
-  echo [RDC-Agent] package.json not found. Run this script from the repository scripts directory.
+where node >nul 2>nul
+if not errorlevel 1 (
+  set "NODE_EXE=node"
+) else (
+  set "NODE_EXE=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
+)
+
+if not exist "%NODE_EXE%" if "%NODE_EXE%"=="node" goto run
+if not exist "%NODE_EXE%" (
+  echo [RDC-Agent] Node.js ^>=22.12.0 is missing. Install Node.js or run from a Codex environment with its bundled runtime.
   exit /b 1
 )
 
-echo [RDC-Agent] Synchronizing dependencies...
-call npm install
-if errorlevel 1 exit /b %ERRORLEVEL%
-
-if not exist "node_modules\electron\dist\electron.exe" (
-  echo [RDC-Agent] Installing Electron runtime...
-  call node node_modules\electron\install.js
-  if errorlevel 1 exit /b %ERRORLEVEL%
-)
-
-set RDC_AGENT_REBUILD_SETTINGS_ONLY=1
-call npm run dev
+:run
+call "%NODE_EXE%" "%CD%\scripts\launch-rdc-agent.mjs" --mode desktop-dev --rebuild-settings-only %*
 exit /b %ERRORLEVEL%

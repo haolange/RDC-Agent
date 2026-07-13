@@ -60,8 +60,8 @@ const FIXTURES = {
     }),
   },
   bash: {
-    argsPreview: JSON.stringify({ command: 'npm run typecheck' }),
-    resultPreview: toolEnvelope('OK', { command: 'npm run typecheck', exitCode: 0, durationMs: 120, truncated: false, cwd: '.' }),
+    argsPreview: JSON.stringify({ command: 'pnpm run typecheck' }),
+    resultPreview: toolEnvelope('OK', { command: 'pnpm run typecheck', exitCode: 0, durationMs: 120, truncated: false, cwd: '.' }),
   },
   write_file: {
     argsPreview: JSON.stringify({ path: 'notes.md', content: 'hello' }),

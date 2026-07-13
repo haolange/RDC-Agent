@@ -28,7 +28,7 @@ General agent tools are mediated by `AgentPermissionPolicy` before execution. Th
 
 ## Deferred MCP Tool Loading
 
-`native-structured` 路由按两级注入工具 schema：builtin/workbench 工具全量注入；`mcp__*` 工具默认 deferred——保留在执行器 `toolMap` 中可执行，但不进入 provider tools 列表，发现入口为 `mcp` catalog 工具与 `tool_search`。激活途径有二：`tool_search` 结果命中 `mcp__*`（结果文本已含完整 schema），或模型直接调用未注入的 `mcp__*`（fail-open 执行并顺带激活）。激活集按 `session::agent` + 全量工具签名保存在 orchestrator（`partitionDeferredMcpTools`，`src/main/workflow/debugger/mcpDeferredTools.ts`），激活后经 `Agent.setTools` 原地更新共享 tools 引用，同 turn 内下一次 LLM 调用即携带新 schema；全量工具集合变化时激活集重置。`RequestEnvelopeSnapshot.tools` 始终反映实际发送集。契约由 `npm run check:tool-system` 静态校验。
+`native-structured` 路由按两级注入工具 schema：builtin/workbench 工具全量注入；`mcp__*` 工具默认 deferred——保留在执行器 `toolMap` 中可执行，但不进入 provider tools 列表，发现入口为 `mcp` catalog 工具与 `tool_search`。激活途径有二：`tool_search` 结果命中 `mcp__*`（结果文本已含完整 schema），或模型直接调用未注入的 `mcp__*`（fail-open 执行并顺带激活）。激活集按 `session::agent` + 全量工具签名保存在 orchestrator（`partitionDeferredMcpTools`，`src/main/workflow/debugger/mcpDeferredTools.ts`），激活后经 `Agent.setTools` 原地更新共享 tools 引用，同 turn 内下一次 LLM 调用即携带新 schema；全量工具集合变化时激活集重置。`RequestEnvelopeSnapshot.tools` 始终反映实际发送集。契约由 `pnpm run check:tool-system` 静态校验。
 
 ## Provider Event Normalization
 
@@ -66,8 +66,8 @@ After at least one visible process section exists, a later answer-only `llm_turn
 
 ## Validation
 
-- Static contract: `npm run typecheck`
-- Agent runtime contract: `npm run check:agent-runtime`
-- Work Process contract: `npm run check:work-process` and `npm run check:work-process-tool-coverage`
+- Static contract: `pnpm run typecheck`
+- Agent runtime contract: `pnpm run check:agent-runtime`
+- Work Process contract: `pnpm run check:work-process` and `pnpm run check:work-process-tool-coverage`
 - Architecture/fidelity/shared export checks after renderer or shared-contract changes
 - Shell smoke after window, preload, IPC, workspace permission, or RDX CLI invocation boundary changes

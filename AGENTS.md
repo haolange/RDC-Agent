@@ -125,18 +125,18 @@
 ## 验证建议
 
 - 开始实现前先写明本次验证方式；实现后按该方式验证并报告结果。无法运行的验证，必须说明原因和剩余风险。
-- 代码改动后执行 `npm run typecheck`。
-- renderer 结构或 UI 锚点改动后执行 `npm run check:architecture`、`npm run check:fidelity`、`npm run check:shared-exports`。
-- Work Process 投影、工具行文案/图标或 transcript UI 改动后执行 `npm run check:work-process`、`npm run check:work-process-tool-coverage`。
+- 代码改动后执行 `pnpm run typecheck`。
+- renderer 结构或 UI 锚点改动后执行 `pnpm run check:architecture`、`pnpm run check:fidelity`、`pnpm run check:shared-exports`。
+- Work Process 投影、工具行文案/图标或 transcript UI 改动后执行 `pnpm run check:work-process`、`pnpm run check:work-process-tool-coverage`。
 - Work Process UI 验收必须覆盖：运行中顶层「工作中 / Working」与 Active Signal 文本能量扫光、完成后「工作过程 / Work process」+ meta、loop thinking 完成态「已思考 · {duration} / Thought for」+ 前置 quiet icon、commentary 散文（markdown，不进 thinking 槽）、统一单披露 tool 卡片（header icon+动词 + **结果优先** 族 body：有结果时显示计数/路径样本等，运行中才回退 pattern/path/`$ cmd`；展开为族内容层 + 样式化 Raw 面板；默认不展开 Raw；无 verb/target 双轨 toggle、无 `toolGroup` 双层壳）或 ≥3 聚合摘要行、同 loop 连续 tool 外距 `--space-3`（thinking/commentary → 首个 tool 入场呼吸更大）、file/search/shell/git/web/generic 族模板一致、安静 loop 级轨道点、web_search/fetch source pills、无 Reply 边界行（收束 thinking 归入普通折叠）、Request Inspector 不出现在消息流也不在右侧默认会话/Trace 面板、真实事件驱动的逐条出现与短 CSS 入场（禁止假 stagger）、**assistant full-bleed**（最终答案与 Work Process 含 tool 卡片横跨 transcript rail 全宽并与 composer 对齐；仅用户 prompt 使用 raised bubble、fit-content、右对齐）、**MessageMarkdown**（commentary 与最终答案：GFM、代码块 language+复制、KaTeX、Mermaid fail-closed；thinking/CoT 保持纯文本）、**Appearance 默认关**：`composerMarkdown`（composer Write/Preview + 高亮，开启后已发送用户气泡也走 Markdown）、`usePointerCursors`（`html[data-pointer-cursors='true']` 手型光标）。
-- provider thinking 投递或 reasoning artifact 投影改动后执行 `npm run check:reasoning-delivery`。
+- provider thinking 投递或 reasoning artifact 投影改动后执行 `pnpm run check:reasoning-delivery`。
 - scoped resource、project instruction、prompt snapshot、skill、hook 或 memory policy 改动后，必须执行相应专项 contract check；缺少时应在同一改动中补齐。
-- 入口、构建或窗口逻辑改动后，再补 `npm run build` 或等价打包检查。
-- 浏览器真实会话使用 `npm run start:agent-browser` 或 `scripts/start-browser-session.cmd`，然后用 Codex 内置浏览器打开主进程输出的 `/app`。
-- 人类开发入口使用 `scripts/start-rdc-agent-dev.cmd`；人类构建产物入口使用 `scripts/start-rdc-agent.cmd`；发布模式直接双击 exe / app 包。
-- Provider 体系契约验证使用 `npm run check:provider-system`。
-- Builtin 工具目录、manifest token 展开与 `REJECTED_TOOL_TOKENS` 契约验证使用 `npm run check:tool-system`。
-- Settings Agents 路由契约验证使用 `npm run check:settings-agents`。
+- 入口、构建或窗口逻辑改动后，再补 `pnpm run build` 或等价打包检查。
+- 浏览器真实会话使用 `pnpm run start:agent-browser`；Windows 也可用 `scripts/start-browser-session.cmd`，macOS/Linux 使用对应 `.sh`，然后用 Codex 内置浏览器打开主进程输出的 `/app`。
+- 人类开发入口使用 `pnpm run start:human:dev`，构建产物入口使用 `pnpm run start:human`；平台包装器只转发到共享 launcher，发布模式直接双击 exe / app 包。
+- Provider 体系契约验证使用 `pnpm run check:provider-system`。
+- Builtin 工具目录、manifest token 展开与 `REJECTED_TOOL_TOKENS` 契约验证使用 `pnpm run check:tool-system`。
+- Settings Agents 路由契约验证使用 `pnpm run check:settings-agents`。
 - 产品级本地验收通过真实浏览器会话完成，并指向真实 project 和 `.rdc`；RDX/RenderDoc 失败必须 fail-closed 并显示诊断。
 - 涉及工作台交互、页面结构、样式引用或共享契约的改动后，至少补一次关键 E2E smoke 或等价人工回归，确认主界面、关键面板和主要交互未退化。
 - 仅文档改动时，检查术语、路径和描述是否与当前仓库结构一致。

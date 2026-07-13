@@ -527,12 +527,12 @@ const bashEnvelopePresentation = buildWorkProcessPresentation({
           id: 'tool-bash-envelope',
           toolName: 'bash',
           status: 'complete',
-          argsPreview: JSON.stringify({ command: 'npm run typecheck' }),
+          argsPreview: JSON.stringify({ command: 'pnpm run typecheck' }),
           resultPreview: JSON.stringify({
             ok: true,
             data: {
               content: [{ type: 'text', text: 'Found 0 errors.' }],
-              details: { command: 'npm run typecheck', exitCode: 0 },
+              details: { command: 'pnpm run typecheck', exitCode: 0 },
             },
             duration_ms: 90,
             trace_id: 'tool-bash-envelope',
@@ -548,7 +548,7 @@ const bashEnvelopePresentation = buildWorkProcessPresentation({
 });
 const bashEnvelopeRow = flattenRows(bashEnvelopePresentation.rows).find((row) => row.type === 'tool' && row.toolName === 'bash');
 assert(bashEnvelopeRow?.previewKind === 'shell', 'bash should project shell preview kind');
-assert(bashEnvelopeRow?.commandText === 'npm run typecheck', 'bash should expose commandText for the terminal header');
+assert(bashEnvelopeRow?.commandText === 'pnpm run typecheck', 'bash should expose commandText for the terminal header');
 assert(bashEnvelopeRow.previewLines.some((line) => line.includes('Found 0 errors.')), 'bash preview should keep stdout content layer');
 assert(!bashEnvelopeRow.previewLines.join('\n').includes('trace_id'), 'bash preview must not include envelope trace_id');
 assert(!bashEnvelopeRow.previewLines.join('\n').includes('duration_ms'), 'bash preview must not include envelope duration_ms');

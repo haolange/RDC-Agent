@@ -47,32 +47,35 @@
 
 ## 开发与验证
 
+需要 Node.js `>=22.12.0`（与 Electron 42 的 runtime contract 一致）。仓库统一使用 pnpm `11.7.0`；源码启动器会按 `pnpm-lock.yaml` 自动同步依赖。
+
 ```bash
-npm install
-npm run dev
+pnpm run dev
 ```
 
 真实浏览器会话：
 
 ```bash
-npm run start:agent-browser
+pnpm run start:agent-browser
 ```
 
 主验证命令：
 
 ```bash
-npm run typecheck
-npm test -- --run
-npm run check:architecture
-npm run check:fidelity
-npm run check:shared-exports
-npm run check:provider-system
-npm run check:settings-agents
-npm run check:reasoning-delivery
-npm run check:work-process
-npm run check:work-process-tool-coverage
-npm run build
+pnpm run typecheck
+pnpm test
+pnpm run check:architecture
+pnpm run check:fidelity
+pnpm run check:shared-exports
+pnpm run check:provider-system
+pnpm run check:settings-agents
+pnpm run check:reasoning-delivery
+pnpm run check:work-process
+pnpm run check:work-process-tool-coverage
+pnpm run build
 ```
+
+Windows 可直接运行 `scripts/start-rdc-agent.cmd`；macOS/Linux 使用 `sh scripts/start-rdc-agent.sh`。对应的 `*-dev` 与 `start-browser-session*` 包装器都进入同一个跨平台 launcher。追加 `--prepare-only` 可只完成依赖同步、Electron 运行时检查和构建。
 
 ## 文档入口
 
