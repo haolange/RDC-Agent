@@ -113,6 +113,12 @@ export class PromptPlanBuilder {
         `Agent id: ${input.profile.id}`,
         `Model route: ${input.routeCapability.providerId}/${input.routeCapability.modelId}`,
         `Tool calling: ${input.routeCapability.toolCallingMode}`,
+        `Tool calling evidence: ${input.routeCapability.toolCallingUnverified ? 'unverified (fail-open)' : 'verified'}`,
+        `Vision input: ${input.routeCapability.visionInputMode}`,
+        `Structured output: ${input.routeCapability.structuredOutputMode}`,
+        ...(input.routeCapability.structuredOutputMode === 'prompt-fallback'
+          ? ['When a structured response is requested, follow the requested schema in the prompt; no native structured-output contract is available.']
+          : []),
         `Project root: ${input.workDir || '(none)'}`,
         `Permission mode: ${permission.mode}`,
         `Additional readable roots: ${permission.readableRoots.join(', ') || '(none)'}`,

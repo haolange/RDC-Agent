@@ -385,7 +385,11 @@ function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?: AgentR
     routeAgentId,
     providerId: route.providerId,
     modelId: route.modelId,
-    routeCapability: resolveAgentRouteCapability(provider, route.modelId),
+    routeCapability: resolveAgentRouteCapability(
+      provider,
+      route.modelId,
+      resolveEffectiveModel(route.providerId, route.modelId, settings),
+    ),
   };
 }
 

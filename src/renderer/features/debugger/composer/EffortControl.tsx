@@ -16,7 +16,7 @@ import {
   resolveSelectedLevel,
 } from './effortControlParts';
 import { EffortControlPopup } from './EffortControlPopup';
-import { formatTokenCount, hasSelectableFastMode, hasSelectableMaxTier, maxContextTokens } from './turnControlsUtils';
+import { formatTokenCount, hasSelectableFastMode, hasSelectableMaxTier, isFastModeUnverified, isMaxTierUnverified, maxContextTokens } from './turnControlsUtils';
 import { useMaxVisualController } from './useMaxVisualController';
 export const EffortControl: React.FC<{
   agentId: string;
@@ -96,7 +96,9 @@ export const EffortControl: React.FC<{
   const tooltipLabel = t(EFFORT_LABEL_KEYS[displayLevel]);
   const maxTokens = maxContextTokens(capability);
   const maxAvailable = hasSelectableMaxTier(capability);
+  const maxUnverified = isMaxTierUnverified(capability);
   const fastAvailable = hasSelectableFastMode(capability);
+  const fastUnverified = isFastModeUnverified(capability);
   const maxContextBadgeLabel = maxTokens
     ? formatTokenCount(maxTokens)
     : t('composer.effort.maxContextBadge');
@@ -109,12 +111,8 @@ export const EffortControl: React.FC<{
     fastModelLabel: t('composer.effort.fastModel'),
     fastModelBadgeLabel: t('composer.effort.fastMultiplier'),
   });
-  const maxContextStatus = maxAvailable
-    ? (turnControls.maxContextMode ? maxContextBadgeLabel : t('composer.effort.stateOff'))
-    : t('composer.effort.unavailable');
-  const fastModelStatus = fastAvailable
-    ? (turnControls.fastModel ? t('composer.effort.fastMultiplier') : t('composer.effort.standardMultiplier'))
-    : t('composer.effort.unavailable');
+  const maxContextStatus = !maxAvailable ? t('composer.effort.unavailable') : maxUnverified ? t('composer.effort.maxContextUnknown') : turnControls.maxContextMode ? maxContextBadgeLabel : t('composer.effort.stateOff');
+  const fastModelStatus = !fastAvailable ? t('composer.effort.unavailable') : fastUnverified ? t('composer.effort.fastUnknown') : turnControls.fastModel ? t('composer.effort.fastMultiplier') : t('composer.effort.standardMultiplier');
 
   const closeMenu = useCallback(() => setOpen(false), []);
   useEffect(() => {

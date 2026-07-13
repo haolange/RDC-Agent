@@ -36,6 +36,10 @@ export interface AgentRouteCapability {
   reasoningContract: ProviderReasoningContract;
   supportsStreaming: boolean;
   supportsToolResults: boolean;
+  /** True when tool use is fail-open because catalog evidence is not yet conclusive. */
+  toolCallingUnverified: boolean;
+  visionInputMode: 'native' | 'disabled';
+  structuredOutputMode: 'native' | 'prompt-fallback';
 }
 
 export type AgentEventType =

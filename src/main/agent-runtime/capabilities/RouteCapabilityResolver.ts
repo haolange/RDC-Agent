@@ -1,6 +1,7 @@
 import type { AgentRouteCapability, ReasoningDelivery, ReasoningVisibility, ToolCallingMode } from '@shared/types/agentRuntime';
 import type { ProviderReasoningContract } from '@shared/types/rdxRuntime';
 import type { LlmProviderCapability, LlmProviderEntry, LlmProviderId, LlmProviderProtocol } from '@shared/types/settings';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 
 const NATIVE_TOOL_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages', 'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'OpenRouterChatCompletions', 'GoogleGemini', 'OllamaOpenAICompatibleChatCompletions']);
 const STREAMING_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages', 'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'OpenRouterChatCompletions', 'GoogleGemini', 'OllamaOpenAICompatibleChatCompletions']);
@@ -82,21 +83,39 @@ export function reasoningContractToStreamVisibility(contract: ProviderReasoningC
   return 'none';
 }
 
-const disabledCapability = (providerId: LlmProviderId, modelId: string): AgentRouteCapability => ({ providerId, modelId, toolCallingMode: 'disabled', reasoningVisibility: 'none', reasoningDelivery: 'none', reasoningContract: { semantic: 'none', source: 'route-disabled', displayLabel: 'None' }, supportsStreaming: false, supportsToolResults: false });
+const disabledCapability = (providerId: LlmProviderId, modelId: string): AgentRouteCapability => ({ providerId, modelId, toolCallingMode: 'disabled', reasoningVisibility: 'none', reasoningDelivery: 'none', reasoningContract: { semantic: 'none', source: 'route-disabled', displayLabel: 'None' }, supportsStreaming: false, supportsToolResults: false, toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'prompt-fallback' });
 
-export function resolveAgentRouteCapability(provider: LlmProviderEntry | undefined, modelId: string): AgentRouteCapability {
+export function resolveAgentRouteCapability(
+  provider: LlmProviderEntry | undefined,
+  modelId: string,
+  effectiveModel?: EffectiveModel | null,
+): AgentRouteCapability {
   const providerId = provider?.id ?? '';
   if (!provider || !provider.enabled || !provider.isConfigured || provider.status !== 'verified' || !hasCapability(provider, 'chat') || !provider.protocol) return disabledCapability(providerId, modelId);
   const supportsStreaming = STREAMING_PROTOCOLS.has(provider.protocol);
   let toolCallingMode: ToolCallingMode = 'text-only';
-  if (hasCapability(provider, 'tool-calling') && NATIVE_TOOL_PROTOCOLS.has(provider.protocol)) toolCallingMode = 'native-structured';
+  const toolState = effectiveModel?.toolCalling.state ?? 'unknown';
+  if (toolState !== 'unsupported' && hasCapability(provider, 'tool-calling') && NATIVE_TOOL_PROTOCOLS.has(provider.protocol)) toolCallingMode = 'native-structured';
   else if (!supportsStreaming) toolCallingMode = 'disabled';
   const reasoningContract = resolveProviderReasoningContract(provider, modelId);
   const reasoningDelivery = reasoningContractToDelivery(reasoningContract);
-  return { providerId: provider.id, modelId, toolCallingMode, reasoningVisibility: reasoningContractToStreamVisibility(reasoningContract), reasoningDelivery, reasoningContract, supportsStreaming, supportsToolResults: toolCallingMode === 'native-structured' };
+  return {
+    providerId: provider.id,
+    modelId,
+    toolCallingMode,
+    reasoningVisibility: reasoningContractToStreamVisibility(reasoningContract),
+    reasoningDelivery,
+    reasoningContract,
+    supportsStreaming,
+    supportsToolResults: toolCallingMode === 'native-structured',
+    toolCallingUnverified: toolCallingMode === 'native-structured' && toolState === 'unknown',
+    visionInputMode: effectiveModel?.visionInput.state === 'supported' ? 'native' : 'disabled',
+    structuredOutputMode: effectiveModel?.structuredOutput.state === 'supported' ? 'native' : 'prompt-fallback',
+  };
 }
 
 export function describeRouteCapabilityDiagnostic(capability: AgentRouteCapability, availableToolCount: number): string | null {
+  if (availableToolCount > 0 && capability.toolCallingUnverified) return `Current route ${capability.providerId}/${capability.modelId} is using unverified tool calling support. The request is allowed and marked for runtime evidence.`;
   if (availableToolCount <= 0 || capability.toolCallingMode === 'native-structured') return null;
   if (capability.toolCallingMode === 'disabled') return `Current route ${capability.providerId}/${capability.modelId} is not available for structured agent tools. Tools were not registered and no textual tool calls will be executed.`;
   return `Current route ${capability.providerId}/${capability.modelId} is text-only for agent tools. Tools were not registered and textual tool calls will not be executed.`;

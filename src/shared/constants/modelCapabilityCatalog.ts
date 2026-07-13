@@ -358,7 +358,7 @@ const KIMI_CODING_SOURCE: ModelCapabilitySource = {
     'https://www.kimi.com/code/docs/en/kimi-code/whats-new.html',
     'https://www.kimi.com/code/docs/en/kimi-code-cli/configuration/config-files.html',
   ],
-  note: 'Kimi Coding Plan exposes Standard kimi-for-coding and HighSpeed kimi-for-coding-highspeed (same ability; HighSpeed needs Allegretto+). Fast mode switches via fastVariantModelId. Thinking remains a binary product switch; the coding-model upgrade only takes effect when thinking is on.',
+  note: 'Kimi Coding Plan exposes Standard kimi-for-coding and HighSpeed kimi-for-coding-highspeed (same ability; HighSpeed needs Allegretto+). Fast mode selects the declared model variant. Thinking remains a binary product switch; the coding-model upgrade only takes effect when thinking is on.',
 };
 
 const GROQ_SOURCE: ModelCapabilitySource = {
@@ -708,7 +708,7 @@ const copilotModels = [
   model('claude-sonnet-5', multimodal(1_000_000, anthropicFiveLevelsDefaultHigh), COPILOT_SOURCE),
   model('claude-opus-4-8', {
     ...multimodal(1_000_000, anthropicFiveLevelsDefaultHigh),
-    fastVariantModelId: 'claude-opus-4-8-fast',
+    fast: { modelId: 'claude-opus-4-8-fast' },
   }, COPILOT_SOURCE),
   model('claude-opus-4-8-fast', multimodal(1_000_000, anthropicFiveLevelsDefaultHigh), COPILOT_SOURCE),
   model('gemini-3.1-pro-preview', multimodal(1_048_576, gemini31Levels), COPILOT_SOURCE),
@@ -742,7 +742,7 @@ const deepSeekModels = [
 const kimiApiModels = [
   model('kimi-k2.7-code', {
     ...multimodal(262_144, moonshotAlwaysOn),
-    fastVariantModelId: 'kimi-k2.7-code-highspeed',
+    fast: { modelId: 'kimi-k2.7-code-highspeed' },
   }, KIMI_SOURCE),
   model('kimi-k2.7-code-highspeed', multimodal(262_144, moonshotAlwaysOn), KIMI_SOURCE),
   model('kimi-k2.6', multimodal(262_144, moonshotToggleDefaultOn), KIMI_SOURCE),
@@ -753,7 +753,7 @@ const kimiCodingPlanModels = [
   model('kimi-for-coding', {
     ...textOnly(262_144, kimiCodingPlanToggleDefaultOn),
     fixedTemperature: 1,
-    fastVariantModelId: 'kimi-for-coding-highspeed',
+    fast: { modelId: 'kimi-for-coding-highspeed' },
   }, KIMI_CODING_SOURCE),
   model('kimi-for-coding-highspeed', {
     ...textOnly(262_144, kimiCodingPlanToggleDefaultOn),
@@ -906,11 +906,11 @@ export const MANAGED_PROVIDER_MODEL_CATALOG: Partial<Record<BuiltinLlmProviderId
   'volcengine-coding-plan': [
     model('doubao-seed-2.0-code', {
       ...textOnly(131_072, doubaoSeed20LevelsDefaultMedium),
-      fastVariantModelId: 'doubao-seed-2.0-lite',
+      fast: { modelId: 'doubao-seed-2.0-lite' },
     }, VOLCENGINE_SOURCE),
     model('doubao-seed-2.0-pro', {
       ...textOnly(131_072, doubaoSeed20LevelsDefaultMedium),
-      fastVariantModelId: 'doubao-seed-2.0-lite',
+      fast: { modelId: 'doubao-seed-2.0-lite' },
     }, VOLCENGINE_SOURCE),
     model('doubao-seed-2.0-lite', textOnly(131_072, doubaoSeed20LevelsDefaultMedium), VOLCENGINE_SOURCE, {
       aliases: ['doubao-seed-2.0-mini', 'doubao-seed-2-0-mini'],
@@ -926,7 +926,7 @@ export const MANAGED_PROVIDER_MODEL_CATALOG: Partial<Record<BuiltinLlmProviderId
     }),
     model('kimi-k2.7-code', {
       ...textOnly(262_144, anthropicToggleDefaultOn),
-      fastVariantModelId: 'kimi-k2.7-code-highspeed',
+      fast: { modelId: 'kimi-k2.7-code-highspeed' },
     }, KIMI_SOURCE),
     model('kimi-k2.7-code-highspeed', textOnly(262_144, anthropicToggleDefaultOn), KIMI_SOURCE),
     model('kimi-k2.6', textOnly(262_144, anthropicToggleDefaultOn), KIMI_SOURCE),

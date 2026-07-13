@@ -370,6 +370,7 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     recommendedModels: ['gpt-4.1', 'gpt-5-mini'],
     docsUrl: 'https://learn.microsoft.com/azure/ai-services/openai/',
     capabilities: CAPS_AZURE_OPENAI,
+    unavailableReason: 'Azure OpenAI runtime authentication and deployment routing are not implemented.',
   },
   {
     id: 'bedrock',
@@ -381,6 +382,7 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     recommendedModels: ANTHROPIC_ALIAS_MODELS,
     docsUrl: 'https://docs.anthropic.com/en/docs/claude-code/amazon-bedrock',
     capabilities: CAPS_STATIC_CLOUD,
+    unavailableReason: 'Amazon Bedrock runtime authentication and request signing are not implemented.',
   },
   {
     id: 'vertex',
@@ -392,6 +394,7 @@ export const BUILTIN_LLM_PROVIDER_DEFINITIONS: BuiltinProviderDefinition[] = [
     recommendedModels: ANTHROPIC_ALIAS_MODELS,
     docsUrl: 'https://docs.anthropic.com/en/docs/claude-code/google-vertex-ai',
     capabilities: CAPS_STATIC_CLOUD,
+    unavailableReason: 'Google Vertex AI runtime authentication and regional routing are not implemented.',
   },
   {
     id: 'deepseek',

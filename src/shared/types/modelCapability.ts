@@ -88,7 +88,7 @@ export interface ModelCapabilitySource {
 export interface ModelCapabilityProfile {
   nominalContextWindowTokens?: number;
   reasoningControl?: ReasoningControl;
-  fastVariantModelId?: string;
+  fast?: { modelId: string };
   /** When set, provider requests must use this temperature (e.g. kimi-for-coding allows only 1). */
   fixedTemperature?: number;
   toolCalling?: boolean;
@@ -102,7 +102,6 @@ export interface ResolvedReasoningSelection {
 }
 
 export const DEFAULT_CONTEXT_WINDOW_TOKENS = 256_000;
-export const MAX_CONTEXT_MODE_MIN_TOKENS = 1_000_000;
 export const CONTEXT_COMPACTION_RATIO = 0.8;
 
 export function isNamedReasoningLevel(value: unknown): value is NamedReasoningLevel {
