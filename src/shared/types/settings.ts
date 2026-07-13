@@ -67,7 +67,10 @@ export type BuiltinLlmProviderId =
   | 'lm-studio'
   | 'nvidia-nim'
   | 'github-models'
-  | 'ollama-cloud';
+  | 'ollama-cloud'
+  | 'minimax-account'
+  | 'opencode-go'
+  | 'cline';
 export type LlmProviderId = BuiltinLlmProviderId | (string & {});
 
 /**
@@ -139,6 +142,10 @@ export type LlmProviderModelDiscoveryStrategy =
   | 'azure-openai'
   | 'ollama-tags'
   | 'account-catalog'
+  | 'grok-account-catalog'
+  | 'opencode-go-catalog'
+  | 'cline-catalog'
+  | 'minimax-account-catalog'
   | 'static';
 
 export interface SidebarLayoutPreference {
@@ -253,6 +260,7 @@ export interface LlmProviderEntry {
   activeAccountId?: string;
   protocol: LlmProviderProtocol;
   authMode: LlmProviderAuthMode;
+  authModeOptions?: LlmProviderAuthMode[];
   category: LlmProviderCategory;
   catalogOwnership: LlmProviderCatalogOwnership;
   modelDiscovery: LlmProviderModelDiscoveryStrategy | null;
@@ -300,6 +308,7 @@ export interface LlmProviderCatalogEntry {
   id: LlmProviderId;
   protocol: LlmProviderProtocol;
   authMode: LlmProviderAuthMode;
+  authModeOptions?: LlmProviderAuthMode[];
   category: LlmProviderCategory;
   catalogOwnership: LlmProviderCatalogOwnership;
   label: string;

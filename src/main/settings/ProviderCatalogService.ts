@@ -12,6 +12,7 @@ function toCatalogEntry(provider: ReturnType<typeof createProviderEntryFromPrese
     id: provider.id,
     protocol: provider.protocol,
     authMode: provider.authMode,
+    authModeOptions: provider.authModeOptions,
     category: provider.category,
     catalogOwnership: provider.catalogOwnership,
     label: provider.label,

@@ -1,0 +1,6 @@
+{
+  "data": [
+    { "id": "grok-4.5", "label": "Grok 4.5", "context_window": 256000 },
+    { "id": "grok-4.3", "context_window": 1000000 }
+  ]
+}

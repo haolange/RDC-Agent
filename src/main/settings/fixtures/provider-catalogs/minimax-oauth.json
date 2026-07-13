@@ -1,0 +1,4 @@
+{
+  "authorization": { "user_code": "ABCD-EFGH", "expired_in": 1893456000000, "interval": 2000 },
+  "token": { "access_token": "fixture-access", "refresh_token": "fixture-refresh", "expires_in": 900 }
+}

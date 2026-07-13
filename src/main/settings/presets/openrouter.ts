@@ -12,8 +12,14 @@ const preset: ProviderPreset = {
   "category": "third-party-compatible",
   "catalogOwnership": "user-managed",
   "authModes": [
-    "api-key"
+    "api-key",
+    "oauth"
   ],
+  "authModeAvailability": {
+    "api-key": { "state": "available" },
+    "oauth": { "state": "unknown", "reason": "TODO(live-verify): verify localhost PKCE and local credential removal." }
+  },
+  "accountLoginConfigured": true,
   "capabilities": [
     "chat",
     "model-discovery"
@@ -41,4 +47,3 @@ const preset: ProviderPreset = {
 };
 
 export default preset;
-

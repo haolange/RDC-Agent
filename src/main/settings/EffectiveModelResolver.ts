@@ -189,13 +189,14 @@ export function buildEffectiveCatalogRequest(
 export function refreshEffectiveCatalogDiscovery(
   provider: LlmProviderEntry,
   models: LlmProviderModel[],
+  contributions?: CatalogModelContribution[],
 ): Promise<EffectiveCatalogSnapshot> {
   const request = buildEffectiveCatalogRequest(provider);
   return effectiveCatalogService.refreshDiscovery(request, async () => ({
     source: 'discovery',
     observedAt: new Date().toISOString(),
     protocol: provider.protocol,
-    models: models.map((model) => ({
+    models: contributions ?? models.map((model) => ({
       modelId: model.id,
       label: model.label,
       availability: model.availability,

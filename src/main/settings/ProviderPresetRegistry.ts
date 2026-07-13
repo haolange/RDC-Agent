@@ -48,6 +48,14 @@ function toAuthMode(preset: ProviderPreset): LlmProviderAuthMode {
   return 'api-key';
 }
 
+function toAuthModeOptions(preset: ProviderPreset): LlmProviderAuthMode[] {
+  return [...new Set(preset.authModes.map((mode) => {
+    if (mode === 'oauth' || mode === 'device') return 'account';
+    if (mode === 'environment' || mode === 'local') return mode;
+    return 'api-key';
+  }))];
+}
+
 function toLegacyDiscovery(preset: ProviderPreset): LlmProviderModelDiscoveryStrategy | null {
   if (!preset.discovery) return null;
   if (preset.discovery.kind === 'custom-parser') {
@@ -156,6 +164,7 @@ export function createProviderEntryFromPreset(id: BuiltinLlmProviderId): LlmProv
     id,
     protocol: route.protocol,
     authMode,
+    authModeOptions: toAuthModeOptions(preset),
     category: preset.category,
     catalogOwnership: preset.catalogOwnership,
     modelDiscovery: toLegacyDiscovery(preset),

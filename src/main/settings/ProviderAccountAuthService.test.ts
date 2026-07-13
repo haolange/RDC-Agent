@@ -1,7 +1,6 @@
 import http from 'node:http';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SUPER_GROK_OAUTH_REDIRECT_URI } from '@shared/constants/llm';
-import { getProviderSeedModels } from './ProviderPresetRegistry';
 import { ProviderAccountAuthService } from './ProviderAccountAuthService';
 
 const mocks = vi.hoisted(() => ({
@@ -211,7 +210,12 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
     expect(bundle.redirectUri).toBe(SUPER_GROK_OAUTH_REDIRECT_URI);
     expect(bundle.accountLabel).toBe('operator@example.com');
     expect(bundle.planLabel).toBe('Super Grok OAuth');
-    expect(mocks.savedConnections[0].models).toEqual(getProviderSeedModels('grok-account'));
+    expect(mocks.savedConnections[0].models).toEqual([{ id: 'grok-code-fast-1', label: 'grok-code-fast-1', enabled: true }]);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      'https://api.x.ai/v1/models',
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer access-1' }) }),
+    );
   });
 
   it('fails closed on Super Grok callback state mismatch without persisting tokens', async () => {

@@ -16,7 +16,8 @@ import { parseCopilotModelCatalog } from './CopilotBilling';
 import { isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 import { settingsService } from './SettingsService';
 import { oauthRefreshManager } from './OAuthRefreshManager';
-import { getProviderPreset, getProviderSeedModels } from './ProviderPresetRegistry';
+import { getProviderSeedModels } from './ProviderPresetRegistry';
+import { parseGrokAccountCatalog } from './LiveProviderCatalogParsers';
 
 const REQUEST_TIMEOUT_MS = 20000;
 const CHATGPT_CALLBACK_PORT = 1455;
@@ -35,9 +36,7 @@ type AccountProviderId =
   | 'claude-account'
   | 'chatgpt-account'
   | 'github-copilot'
-  | 'grok-account'
-  | 'gemini-account'
-  | 'qwen-account';
+  | 'grok-account';
 
 interface OAuthFlowState {
   providerId: AccountProviderId;
@@ -99,12 +98,7 @@ const isAccountProviderId = (providerId: LlmProviderId): providerId is AccountPr
   providerId === 'claude-account'
   || providerId === 'chatgpt-account'
   || providerId === 'github-copilot'
-  || providerId === 'grok-account'
-  || providerId === 'gemini-account'
-  || providerId === 'qwen-account';
-
-const isUnimplementedAccountProviderId = (providerId: AccountProviderId): boolean =>
-  providerId === 'gemini-account' || providerId === 'qwen-account';
+  || providerId === 'grok-account';
 
 const resolveGrokOAuthClientId = (draft?: string): { clientId?: string; source?: 'manual' | 'env' } => {
   const cleanDraft = draft?.trim();
@@ -444,7 +438,7 @@ export class ProviderAccountAuthService {
     if (providerId === 'grok-account') {
       return this.startGrokLogin(request.oauthClientId, request.accountLoginMode);
     }
-    return this.startUnimplementedAccountLogin(providerId);
+    return this.status(providerId, 'Provider does not support account login.', 'failed');
   }
 
   async finishLogin(request: LlmProviderAccountLoginFinishRequest): Promise<LlmProviderAccountStatus> {
@@ -463,10 +457,6 @@ export class ProviderAccountAuthService {
       }
       if (request.providerId === 'chatgpt-account') {
         const bundle = await this.exchangeChatGptCode(flow, request.code?.trim() ?? '');
-        return await this.persistAccount(request.providerId, bundle);
-      }
-      if (isUnimplementedAccountProviderId(request.providerId)) {
-        const bundle = this.exchangeUnimplementedAccountCode(flow, request.code?.trim() ?? '');
         return await this.persistAccount(request.providerId, bundle);
       }
       if (request.providerId === 'github-copilot') {
@@ -607,7 +597,7 @@ export class ProviderAccountAuthService {
       authUrl: flow?.authUrl,
       verificationUri: flow?.verificationUri,
       userCode: flow?.userCode,
-      requiresCodeInput: Boolean(flow?.providerId === 'claude-account' || (flow && isUnimplementedAccountProviderId(flow.providerId))),
+      requiresCodeInput: flow?.providerId === 'claude-account',
       requiresClientId: providerId === 'grok-account' && !connected && !grokClientIdSource,
       clientIdSource: grokClientIdSource,
       authorizationMode: flow?.authorizationMode ?? grokBundle?.authorizationMode,
@@ -842,25 +832,6 @@ export class ProviderAccountAuthService {
       const diagnostic = resolveGrokOAuthDiagnostic(error, 'device', scope);
       return this.status('grok-account', renderGrokOAuthDiagnosticMessage(diagnostic), 'failed', diagnostic);
     }
-  }
-
-  private startUnimplementedAccountLogin(providerId: AccountProviderId): LlmProviderAccountStatus {
-    const definition = getProviderPreset(providerId);
-    const flow: OAuthFlowState = {
-      providerId,
-      flowId: randomUUID(),
-      state: randomUUID(),
-      authUrl: definition?.docsUrl,
-      expiresAt: Date.now() + 10 * 60 * 1000,
-    };
-    this.setFlow(flow);
-    void this.openExternal(flow.authUrl);
-    return this.status(
-      flow.providerId,
-      isTestMode()
-        ? 'Test-only account authorization flow started.'
-        : 'Live account OAuth is not configured for this provider; automated test-mode verification is the only available path.',
-    );
   }
 
   private async exchangeClaudeCode(flow: OAuthFlowState, code: string): Promise<OAuthSecretBundle> {
@@ -1126,27 +1097,6 @@ export class ProviderAccountAuthService {
     }
   }
 
-  private exchangeUnimplementedAccountCode(flow: OAuthFlowState, code: string): OAuthSecretBundle {
-    if (!isUnimplementedAccountProviderId(flow.providerId)) {
-      throw new Error('Provider is not an unimplemented account adapter.');
-    }
-    if (!isTestMode()) {
-      const definition = getProviderPreset(flow.providerId);
-      throw new Error(definition?.availability.reason ?? 'Live account OAuth is not configured for this provider.');
-    }
-    if (!code) {
-      throw new Error('Authorization code is required.');
-    }
-    return {
-      providerId: flow.providerId,
-      accessToken: `test-${flow.providerId}-${flow.state}`,
-      apiKey: `test-${flow.providerId}-${flow.state}`,
-      expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
-      accountLabel: getProviderPreset(flow.providerId)?.label ?? flow.providerId,
-      planLabel: 'Test account',
-    };
-  }
-
   private async persistAccount(providerId: AccountProviderId, bundle: OAuthSecretBundle): Promise<LlmProviderAccountStatus> {
     const models = await this.discoverModels(bundle);
     if (models.length === 0) {
@@ -1246,10 +1196,6 @@ export class ProviderAccountAuthService {
       };
     }
 
-    if (isUnimplementedAccountProviderId(bundle.providerId)) {
-      return bundle;
-    }
-
     if (!bundle.refreshToken) {
       return bundle;
     }
@@ -1328,6 +1274,19 @@ export class ProviderAccountAuthService {
         // Account login remains usable with the conservative bundled seed.
       }
       delete bundle.copilotModelBilling;
+    }
+    if (bundle.providerId === 'grok-account') {
+      const token = bundle.accessToken ?? bundle.apiKey;
+      if (!token) throw new Error('Super Grok OAuth token is missing.');
+      const payload = await fetchJson('https://api.x.ai/v1/models', {
+        method: 'GET',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+      });
+      const parsed = parseGrokAccountCatalog(payload);
+      if (parsed.models.length === 0) {
+        throw new Error('Super Grok account catalog returned no agent-routable models.');
+      }
+      return parsed.models;
     }
     const models = createAccountCatalogModels(bundle.providerId);
     if (models.length === 0) {
