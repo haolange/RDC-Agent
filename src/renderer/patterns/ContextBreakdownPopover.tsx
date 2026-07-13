@@ -1,7 +1,7 @@
 import React from 'react';
 import type { RunContextUsageSummary } from '@shared/types/session';
 import { useI18n } from '../i18n';
-import { formatTokenCount } from '../features/debugger/composer/turnControlsUtils';
+import { formatTokenCount } from '@shared/utils/tokens';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { ContextBreakdownLegend } from './ContextBreakdownLegend';
 import {

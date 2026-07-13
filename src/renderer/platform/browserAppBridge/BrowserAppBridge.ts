@@ -111,6 +111,7 @@ class BrowserAppBridgeClient {
     },
     llm: {
       testProviderDraft: (request) => this.invoke('llm:testProviderDraft', request),
+      testModelCapability: (request) => this.invoke('llm:testModelCapability', request),
       connectProvider: (request) => this.invoke('llm:connectProvider', request),
       refreshProviderModels: (providerId) => this.invoke('llm:refreshProviderModels', providerId),
       disconnectProvider: (providerId) => this.invoke('llm:disconnectProvider', providerId),

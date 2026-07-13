@@ -95,7 +95,6 @@ export function buildEffortPillPresentation(input: {
 
 interface EffortModeSwitchRowProps {
   label: string;
-  status: string;
   available: boolean;
   active: boolean;
   onToggle: () => void;
@@ -107,14 +106,12 @@ function EffortModeSwitchRowBody(props: EffortModeSwitchRowProps) {
       <div className="composer-effort-toggle-copy">
         <span className="composer-effort-toggle-label">{props.label}</span>
       </div>
-      <span className={`composer-effort-toggle-status ${props.active ? 'is-active' : ''} ${props.available ? '' : 'is-disabled'}`}>
-        {props.status}
-      </span>
       <button
         type="button"
         role="switch"
         className={`composer-effort-toggle ${props.active ? 'active' : ''}`}
         aria-checked={props.active}
+        aria-label={props.label}
         disabled={!props.available}
         onClick={props.onToggle}
       />

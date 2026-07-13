@@ -1,57 +1,259 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
-import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
+import { getReasoningSelectionOrder, type ReasoningSelection } from '@shared/types/modelCapability';
+import type {
+  LlmModelCapabilityProbeMode,
+  LlmModelCapabilityProbeResult,
+  LlmProviderEntry,
+  LlmProviderModel,
+} from '@shared/types/settings';
+import { resolveContextTierChoices } from '@shared/utils/contextTiers';
 import type { useI18n } from '../../../../i18n';
 import { getElectronApi } from '../../../../platform/getElectronApi';
-import { buildCapabilityChips, findEffectiveCapabilityModel } from '../modelCapabilitySummaryUtils';
+import {
+  buildCapabilityChips,
+  buildCapabilityEvidenceSummary,
+  buildContextTierRows,
+  findEffectiveCapabilityModel,
+  getReasoningLabelKey,
+  snapshotMatchesProvider,
+} from '../modelCapabilitySummaryUtils';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
 interface ProviderModelCapabilitySummaryProps {
-  provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership'>;
+  provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured'>;
   model: LlmProviderModel;
+  onModelChange: (patch: Partial<LlmProviderModel>) => void;
   t: Translate;
 }
 
-export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySummaryProps> = ({ provider, model, t }) => {
+export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySummaryProps> = ({
+  provider,
+  model,
+  onModelChange,
+  t,
+}) => {
   const [snapshot, setSnapshot] = useState<EffectiveCatalogSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [probeMode, setProbeMode] = useState<LlmModelCapabilityProbeMode | null>(null);
+  const [probeResult, setProbeResult] = useState<LlmModelCapabilityProbeResult | null>(null);
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
+    setLoadFailed(false);
     const load = async () => {
-      const next = await getElectronApi()?.settings.getEffectiveCatalog(provider.id) ?? null;
-      if (!cancelled) setSnapshot(next);
+      try {
+        const next = await getElectronApi()?.settings.getEffectiveCatalog(provider.id) ?? null;
+        if (!cancelled) {
+          setSnapshot(next && snapshotMatchesProvider(next, provider) ? next : null);
+          setLoadFailed(false);
+        }
+      } catch {
+        if (!cancelled) setLoadFailed(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
     void load();
     const unsubscribe = getElectronApi()?.events.onEffectiveCatalogChanged((next) => {
-      if (next.providerId === provider.id && !cancelled) setSnapshot(next);
+      if (!cancelled && snapshotMatchesProvider(next, provider)) {
+        setSnapshot(next);
+        setLoading(false);
+        setLoadFailed(false);
+      }
     });
     return () => { cancelled = true; unsubscribe?.(); };
-  }, [provider.id]);
+  }, [provider.activeAccountId, provider.id, provider.protocol]);
 
   const effectiveModel = useMemo(() => findEffectiveCapabilityModel(snapshot, model.id), [snapshot, model.id]);
   const chips = buildCapabilityChips(effectiveModel, t);
-  const evidence = effectiveModel?.provenance.at(-1);
+  const tiers = buildContextTierRows(effectiveModel, t);
+  const reasoningOptions = getReasoningSelectionOrder(effectiveModel?.reasoning);
+  const defaultReasoning = effectiveModel?.reasoning.defaultSelection ?? 'off';
+  const contextChoices = effectiveModel ? resolveContextTierChoices(effectiveModel) : null;
+  const probeModes: LlmModelCapabilityProbeMode[] = effectiveModel ? [
+    'default',
+    ...(contextChoices?.maxTier ? ['max-context' as const] : []),
+    ...(effectiveModel.fast.kind !== 'unknown'
+      && effectiveModel.fast.kind !== 'unsupported'
+      && effectiveModel.fast.entitlement !== 'denied' ? ['fast' as const] : []),
+  ] : [];
+  const updateBudget = (raw: string) => {
+    if (!raw.trim()) {
+      onModelChange({ defaultBudgetTokens: undefined });
+      return;
+    }
+    const parsed = Number(raw);
+    onModelChange({
+      defaultBudgetTokens: Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined,
+    });
+  };
+  const runProbe = async (mode: LlmModelCapabilityProbeMode) => {
+    setProbeMode(mode);
+    setProbeResult(null);
+    try {
+      const result = await getElectronApi()!.llm.testModelCapability({
+        providerId: provider.id,
+        modelId: model.id,
+        mode,
+      });
+      setProbeResult(result);
+    } catch (error) {
+      setProbeResult({
+        success: false,
+        status: 'failed',
+        requestSent: false,
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setProbeMode(null);
+    }
+  };
+  const probeStatus = probeResult
+    ? t(`settings.providers.capability.probeStatus.${probeResult.status}`)
+    : '';
 
   return (
     <div className="settings-model-capability-panel" data-testid={`settings-provider-model-capability-panel-${model.id}`}>
-      <div className="settings-model-capability-grid">
-        {chips.map((chip) => (
-          <div key={chip.label} className="settings-model-capability-chip" data-tone={chip.tone ?? 'default'}>
-            <span className="settings-model-capability-chip-label">{chip.label}</span>
-            <span className="settings-model-capability-chip-value">{chip.value}</span>
+      {loading ? (
+        <div className="settings-model-capability-note">{t('settings.providers.capability.loading')}</div>
+      ) : loadFailed ? (
+        <div className="settings-model-capability-note settings-model-capability-note--error">
+          {t('settings.providers.capability.loadFailed')}
+        </div>
+      ) : effectiveModel ? (
+        <>
+          <div className="settings-model-capability-grid">
+            {chips.map((chip) => (
+              <div key={chip.label} className="settings-model-capability-chip" data-tone={chip.tone ?? 'default'}>
+                <span className="settings-model-capability-chip-label">{chip.label}</span>
+                <span className="settings-model-capability-chip-value">{chip.value}</span>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
-      <div className="settings-model-capability-source">
-        {evidence
-          ? t('settings.providers.capability.source', { kind: evidence.source, date: evidence.observedAt.slice(0, 10) })
-          : t('settings.providers.capability.conservativeDefault')}
-      </div>
-      {effectiveModel?.unavailableReason ? (
-        <div className="settings-model-capability-note">{effectiveModel.unavailableReason}</div>
-      ) : provider.catalogOwnership === 'user-managed' && !effectiveModel ? (
-        <div className="settings-model-capability-note">{t('settings.providers.capability.userManagedDetail')}</div>
-      ) : null}
+
+          <div className="settings-model-capability-tiers" data-testid={`settings-provider-model-tiers-${model.id}`}>
+            <span className="settings-model-capability-section-label">{t('settings.providers.capability.contextTiers')}</span>
+            {tiers.map((tier) => (
+              <div key={tier.id} className="settings-model-capability-tier" data-tone={tier.tone ?? 'default'}>
+                <span className="settings-model-capability-tier-main">
+                  <strong>{tier.label}</strong>
+                  <span>{tier.limit}</span>
+                </span>
+                <span className="settings-model-capability-tier-meta">
+                  {[tier.entitlement, tier.activation, tier.cost].filter(Boolean).join(' · ')}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="settings-model-preferences" data-testid={`settings-provider-model-preferences-${model.id}`}>
+            <div className="settings-model-preferences-heading">
+              <span className="settings-model-capability-section-label">{t('settings.providers.capability.preferences')}</span>
+              <span className="settings-help-text">{t('settings.providers.capability.preferencesHint')}</span>
+            </div>
+            <div className="settings-model-preferences-grid">
+              <label className="settings-field">
+                <span className="settings-field-label">{t('settings.providers.capability.defaultReasoning')}</span>
+                <select
+                  className="input"
+                  value={model.defaultReasoningSelection ?? ''}
+                  disabled={reasoningOptions.length <= 1}
+                  onChange={(event) => onModelChange({
+                    defaultReasoningSelection: event.target.value
+                      ? event.target.value as ReasoningSelection
+                      : undefined,
+                  })}
+                >
+                  <option value="">
+                    {t('settings.providers.capability.providerDefault', { value: t(getReasoningLabelKey(defaultReasoning)) })}
+                  </option>
+                  {reasoningOptions.map((selection) => (
+                    <option key={selection} value={selection}>{t(getReasoningLabelKey(selection))}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="settings-field">
+                <span className="settings-field-label">{t('settings.providers.capability.clientBudget')}</span>
+                <input
+                  className="input"
+                  type="number"
+                  min={1}
+                  step={1000}
+                  value={model.defaultBudgetTokens ?? ''}
+                  placeholder={String(effectiveModel.defaultBudgetTokens)}
+                  onChange={(event) => updateBudget(event.target.value)}
+                />
+                <span className="settings-help-text">
+                  {t('settings.providers.capability.clientBudgetHint', { value: effectiveModel.defaultBudgetTokens })}
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className="settings-model-capability-probe" data-testid={`settings-provider-model-probe-${model.id}`}>
+            <div className="settings-model-preferences-heading">
+              <span className="settings-model-capability-section-label">{t('settings.providers.capability.probe')}</span>
+              <span className="settings-help-text">{t('settings.providers.capability.probeHint')}</span>
+            </div>
+            <div className="settings-model-capability-probe-actions">
+              {probeModes.map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className="button button-secondary button-sm"
+                  disabled={!provider.isConfigured || !model.enabled || probeMode !== null}
+                  onClick={() => void runProbe(mode)}
+                >
+                  {probeMode === mode
+                    ? t('settings.providers.capability.probing')
+                    : t(`settings.providers.capability.probeMode.${mode}`)}
+                </button>
+              ))}
+            </div>
+            {!provider.isConfigured ? (
+              <span className="settings-help-text">{t('settings.providers.capability.probeRequiresConnection')}</span>
+            ) : null}
+            {probeResult ? (
+              <div
+                className={`settings-model-capability-probe-result settings-model-capability-probe-result--${probeResult.status}`}
+                role="status"
+              >
+                <strong>{probeStatus}</strong>
+                {probeResult.detail ? <span>{probeResult.detail}</span> : null}
+              </div>
+            ) : null}
+          </div>
+
+          <div className="settings-model-capability-source">{buildCapabilityEvidenceSummary(effectiveModel, t)}</div>
+          {snapshot?.refreshing ? <div className="settings-model-capability-note">{t('settings.providers.capability.refreshing')}</div> : null}
+          {snapshot?.stale ? <div className="settings-model-capability-note">{t('settings.providers.capability.stale')}</div> : null}
+          {snapshot?.lastRefreshError ? (
+            <div className="settings-model-capability-note settings-model-capability-note--warning">
+              {t('settings.providers.capability.refreshFailed', { error: snapshot.lastRefreshError })}
+            </div>
+          ) : null}
+          {effectiveModel.quota ? (
+            <div className="settings-model-capability-note settings-model-capability-note--warning">
+              {t('settings.providers.capability.quota', {
+                time: effectiveModel.quota.exhaustedUntil ?? t('settings.providers.capability.unknown'),
+                note: effectiveModel.quota.note ?? '',
+              })}
+            </div>
+          ) : null}
+          {effectiveModel.unavailableReason ? (
+            <div className="settings-model-capability-note settings-model-capability-note--error">{effectiveModel.unavailableReason}</div>
+          ) : null}
+        </>
+      ) : (
+        <div className="settings-model-capability-note">
+          {provider.catalogOwnership === 'user-managed'
+            ? t('settings.providers.capability.userManagedDetail')
+            : t('settings.providers.capability.modelMissing')}
+        </div>
+      )}
     </div>
   );
 };

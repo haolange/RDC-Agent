@@ -1,6 +1,5 @@
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { ProviderConnectionDraft } from './types';
-import { getEnabledModels } from './utils';
 
 export function projectConnectionProvider(
   provider: LlmProviderEntry | null,
@@ -27,7 +26,7 @@ export function projectConnectionProvider(
 }
 
 export function createProviderConnectionDraft(provider: LlmProviderEntry): ProviderConnectionDraft {
-  const models = getEnabledModels(provider);
+  const models = provider.models.map((model) => ({ ...model }));
   return {
     providerId: provider.id,
     authMode: provider.authMode,

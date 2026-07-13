@@ -1,7 +1,7 @@
 import React from 'react';
 import type { ContextUsageBreakdownEntry } from '@shared/types/session';
 import { useI18n } from '../i18n';
-import { formatTokenCount } from '../features/debugger/composer/turnControlsUtils';
+import { formatTokenCount } from '@shared/utils/tokens';
 import {
   CONTEXT_BREAKDOWN_GROUPS,
   COUNT_SUFFIX_KEYS,

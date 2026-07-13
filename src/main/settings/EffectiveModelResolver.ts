@@ -134,6 +134,7 @@ function seedContribution(provider: LlmProviderEntry, requestedModelId?: string)
 function userContribution(provider: LlmProviderEntry): CatalogLayerContribution | undefined {
   const configuredModels = provider.models;
   if (configuredModels.length === 0) return undefined;
+  const userManaged = provider.catalogOwnership === 'user-managed';
   return {
     source: 'user',
     observedAt: provider.lastModelRefreshAt ?? provider.lastTestedAt ?? '2026-07-13T00:00:00.000Z',
@@ -142,12 +143,17 @@ function userContribution(provider: LlmProviderEntry): CatalogLayerContribution 
       : 'User model selection state',
     models: configuredModels.map((model) => ({
       modelId: model.id,
-      label: model.label,
-      aliases: [...(model.aliases ?? [])],
       enabled: model.enabled !== false,
-      availability: model.availability
-        ?? (provider.catalogOwnership === 'user-managed' ? 'available' : undefined),
-      unavailableReason: model.availabilityReason,
+      defaultBudgetTokens: model.defaultBudgetTokens,
+      reasoning: model.defaultReasoningSelection
+        ? { defaultSelection: model.defaultReasoningSelection }
+        : undefined,
+      ...(userManaged ? {
+        label: model.label,
+        aliases: [...(model.aliases ?? [])],
+        availability: model.availability ?? 'available',
+        unavailableReason: model.availabilityReason,
+      } : {}),
     })),
   };
 }
