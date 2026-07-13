@@ -63,6 +63,14 @@ ProviderPreset seed
 
 多认证 provider 使用 `authModes` 与 `authModeAvailability`：例如 Cline 同时声明 API key 与 OAuth，但在没有稳定公开 OAuth 契约时只开放 API key 子模式。UI 首版仍只操作 active account；account-keyed schema 已允许后续账号切换而不改变 runtime 真相模型。
 
+当前 registry 共加载 61 个 builtin preset。数量不是 capability 完整性的依据：每个 provider 是否可用，仍由所选认证模式、adapter、discovery 和 fixture 的闭环决定；缺少稳定公开契约的条目必须 truthful unavailable。
+
+### Settings 目录投影与用户偏好
+
+Settings 对 app-managed provider 始终投影当前 `EffectiveCatalogSnapshot.models` 的完整目录；持久化的 `provider.models` 只保存 D2 允许的模型偏好（enabled、默认 reasoning、客户端 budget），不能决定目录成员、label、availability、route 或服务端 tier。每个连接对话框只建立一次快照读取和一次更新订阅，目录刷新后前端按同一 `(providerId, accountId, protocol)` 真相重投影。
+
+账号目录把旧模型 id 收敛为 canonical id 时，偏好更新按 canonical id 与 aliases 合并、重键，不生成重复行。user-managed provider 则继续以用户保存的模型定义为目录，并在存在 EffectiveModel 时叠加能力状态。Settings、Composer 和 Runtime 因而看到相同的模型可用性、Max/Fast、route 与 unavailable reason。
+
 ## 六层字段级合并
 
 合并顺序从低到高固定如下：
@@ -77,6 +85,12 @@ ProviderPreset seed
 合并是 leaf-level，不是整对象替换。每个最终 leaf 记录 winning source、观测时间、可选过期时间、协议和说明。app-managed provider 的 user 层只能改 enabled/default reasoning/client budget 等白名单字段，不能改 route、服务端 tier 或 entitlement；user-managed provider 可改 endpoint、protocol 和模型定义。
 
 Observed 历史保存在 app state，按时间采用最新确定性证据。Discovery 使用 24 小时 TTL、stale-while-revalidate、single-flight refresh 和 last-known-good；刷新失败只把快照标 stale 并记录错误，不清空 LKG。缓存与 evidence 不写入项目 `.rdx`、Settings 导出或 session truth。
+
+### 账号身份、凭据与持久化事务
+
+Settings schema v2 用 `activeAccountId + authAccountIds[authMode]` 关联账号；secret ref 同时按 `(providerId, accountId, credential kind)` 分区。OAuth 优先采用上游返回的稳定 account id，缺失时生成 opaque 本地 id；API key 内容变化会轮换 account id，使旧账号的 discovery/evidence 不会污染新凭据。
+
+凭据迁移、OAuth 登录和 refresh token 旋转遵守“先写新 secret → 提交 Settings → 再删除旧 secret”的顺序。提交失败时旧引用仍可恢复；成功后不保留旧 secret ref、旧字段双写或 provider 级共享 token。UI 当前只操作 active account，但缓存、evidence、刷新锁和 secret storage 已全部 account-keyed。
 
 ## Max、Fast 与 unknown
 
@@ -97,6 +111,12 @@ Fast 由 `FastCapability` 声明 activation 和 entitlement。未知 activation 
 
 Azure OpenAI、AWS Bedrock 和 Vertex 在没有本库 adapter 时统一标记 unavailable，Settings 和 Runtime 展示同一 reason。
 
+## 显式 capability 探测
+
+Settings 的模型能力测试只在用户明确点击后运行，不做后台试探。请求沿唯一生产链 `PromptPlan -> RequestEnvelope -> RequestPlan -> provider adapter` 发送，工具列表为空、输出上限为 1 token，并记录脱敏 request snapshot；认证秘密仍不进入 plan 或 snapshot。探测支持 default、Max context 和 Fast 三种模式，先经过同一 constraint evaluator，不能绕过 Planner 强行拼 wire 字段。
+
+只有确定性结果写入 observed evidence：成功可确认实际采用的 tier/Fast；HTTP 400/403 可拒绝本次明确激活的 tier 或 Fast；404 可标记模型 unavailable。HTTP 429 只更新瞬态 quota，不降级 capability。未知且 implicit 的长上下文档位不能用极短请求证实，必须返回 inconclusive，并留到真正跨越默认阈值的用户请求产生证据。
+
 ## Route 与协议切换
 
 route 优先级固定为：模型级固定 route > 用户协议 enum > preset 默认 route。模型固定 route 时 Settings 锁定协议选择。Overlay 必须以 `(modelId, protocol)` 为键。
@@ -114,6 +134,12 @@ Discovery admission 会过滤 embedding、rerank、图像、音频和无证据 a
 1. 若存在 canonical alias，自动跟随 alias；
 2. 否则返回同 provider 推荐模型供用户选择；
 3. 当前请求返回 `MODEL_UNAVAILABLE`，禁止静默替换。
+
+### Copilot 动态目录归一化
+
+Copilot context tier 只解析账号目录的 `billing.token_prices.default.context_max` 与 `billing.token_prices.long_context.context_max`；两档 activation 都是 implicit，缺少 entitlement 字段时保持 unknown。若账号响应没有 billing，只使用保守的单档 seed，绝不根据 GPT 版本或“1M”名称补档。
+
+目录归一化把同一模型的标点差异 id 收敛为 provider 返回的 canonical id，并把旧 id 留作 alias；`*-fast` 目录项折叠进基础模型的 `FastCapability(kind: model-variant)`，不再作为第二个可选模型。没有 Fast variant 或目录证据的 Copilot 模型明确为 unsupported，避免把静态 seed、陈旧 tombstone 或重复 id 投影给用户。
 
 ## Adapter / preset 边界白名单
 
@@ -153,6 +179,8 @@ OpenRouter PKCE 按公开契约生成 S256 challenge、打开 localhost callback
 
 Gemini Account 和 Qwen Account 只有 `beta + unavailable` 空 preset 骨架，不注册测试 flow、伪 token 或静态账号模型表。
 
+Grok Account 使用 RDC-Agent 自己的 browser Authorization Code + PKCE 或 device flow，并保存自己的 token set。它不得读取、复制或迁移 Grok Builder/Grok CLI 的 `~/.grok/auth.json`、AppData 私有会话或 refresh token；共享旋转 token 会造成两个客户端相互踢下线。Browser OAuth 可以自然复用用户默认浏览器里已有的 xAI 登录 cookie，但这只是上游网页登录复用，不是凭据导入。Builder/Web 可见模型只作为 surface 对照证据，RDC-Agent 的可选模型必须来自本账号 catalog。
+
 ## Fixture 与验证门禁
 
 外部行为一律使用固定 fixture；单元测试不得真实登录或发送推理。至少覆盖：
@@ -190,15 +218,15 @@ Gemini Account 和 Qwen Account 只有 `beta + unavailable` 空 preset 骨架，
 
 ### 4. GitHub Copilot default / long_context
 
-步骤：登录 Copilot；保存 `/models` 原始脱敏 fixture；检查 `billing.token_prices.default.context_max` 与 `long_context.context_max`；分别选择默认档和 Max 发起一次明确允许的请求。
+步骤：在 Settings > Providers 登录 Copilot；保存 `/models` 原始脱敏 fixture；检查 `billing.token_prices.default.context_max` 与 `long_context.context_max`；确认同模型标点 alias 与 `*-fast` variant 已合并；分别选择默认档和 Max 发起一次明确允许的请求。
 
-预期：默认档按账号值（例如 272K），long_context 按账号值（例如 922K），激活为 implicit；缺 entitlement 时 UI 显示未验证，不硬推 1M；只有目录/实测确认后变为 granted/denied。
+预期：默认档按账号值（例如 272K），long_context 按账号值（例如 922K），激活为 implicit；缺 entitlement 时 UI 显示未验证，不硬推 1M；Fast variant 只显示为基础模型开关，不出现重复模型；只有目录/实测确认后变为 granted/denied。
 
 ### 5. Grok account surface
 
-步骤：完成 Super Grok browser/device OAuth；记录 `/v1/models` 脱敏目录；与当前 Web 和 Builder 可见模型对照；刷新、重新登录并模拟目录移除。
+步骤：在 Settings > Providers 打开 Super Grok Account，优先选择 browser login；允许默认浏览器复用已有 xAI 网页登录，或改用 device code；记录 `/v1/models` 脱敏目录；与当前 Web 和 Builder 可见模型对照；刷新、重新登录并模拟目录移除。全程不得读取或导入 `~/.grok/auth.json`、AppData 私有会话或 Builder refresh token。
 
-预期：RDC-Agent 只显示账号 API 实际返回的目录，不回落 `grok-4.5/4.3` 静态表；Web/Builder 差异只作为 surface evidence，不按模型名补齐；空目录显式失败。
+预期：普通浏览器 cookie 可减少重复登录，但 RDC-Agent 生成并持有独立 token set；Builder 保持登录且不会因 RDC-Agent refresh 被挤下线。RDC-Agent 只显示账号 API 实际返回的目录，不回落 `grok-4.5/4.3` 静态表；Web/Builder 差异只作为 surface evidence，不按模型名补齐；空目录显式失败。
 
 ### 6. Claude Account / Anthropic API 1M
 
@@ -217,6 +245,8 @@ Gemini Account 和 Qwen Account 只有 `beta + unavailable` 空 preset 骨架，
 步骤：在测试账号记录现有模型，随后使用提供“已移除模型”的 fixture 或等待真实下架；保持旧会话 route 并刷新目录；分别测试有 canonical alias 与无 alias 两种情况。
 
 预期：有 alias 时显式跟随 canonical model；无 alias 时返回 `MODEL_UNAVAILABLE` 和同 provider 推荐项，当前请求不自动换模型；会话历史 route 和原模型 id 仍可审计。
+
+每项验证完成后都应：导出脱敏 fixture、确认 Settings 与 Composer 投影一致、注销本次测试账号或撤销测试 key、恢复测试前的 agent route，并确认 `~/.rdx` 中没有明文 secret、PKCE verifier、authorization code 或临时回调状态。
 
 ## 外部契约来源
 
