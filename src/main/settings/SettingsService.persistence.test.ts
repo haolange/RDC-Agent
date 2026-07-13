@@ -56,11 +56,11 @@ describe('SettingsService provider persistence', () => {
     settingsPath: string;
     workspaceRoot: string;
   }> {
-    const { createBuiltinProviderEntry } = await import('@shared/constants/llm');
+    const { createProviderEntryFromPreset } = await import('./ProviderPresetRegistry');
     const workspaceRoot = path.join(userDataRoot, '.rdx');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     const provider = {
-      ...createBuiltinProviderEntry('deepseek'),
+      ...createProviderEntryFromPreset('deepseek'),
       enabled: true,
       hasStoredSecret: true,
       isConfigured: true,
@@ -172,12 +172,12 @@ describe('SettingsService provider persistence', () => {
   });
 
   it('migrates an OAuth bundle using its upstream account id', async () => {
-    const { createBuiltinProviderEntry } = await import('@shared/constants/llm');
+    const { createProviderEntryFromPreset } = await import('./ProviderPresetRegistry');
     const { secretStorageService } = await import('./SecretStorageService');
     const workspaceRoot = path.join(userDataRoot, '.rdx');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     const provider = {
-      ...createBuiltinProviderEntry('chatgpt-account'),
+      ...createProviderEntryFromPreset('chatgpt-account'),
       enabled: true,
       hasStoredSecret: true,
       isConfigured: true,
@@ -207,10 +207,10 @@ describe('SettingsService provider persistence', () => {
   it('atomically rotates account tokens without replacing the current model catalog', async () => {
     const { SettingsService } = await import('./SettingsService');
     const { secretStorageService } = await import('./SecretStorageService');
-    const { getManagedProviderModels } = await import('@shared/constants/modelCapabilityCatalog');
+    const { getProviderSeedModels } = await import('./ProviderPresetRegistry');
     const service = new SettingsService();
     const settings = service.initialize();
-    const models = getManagedProviderModels('chatgpt-account').slice(0, 2);
+    const models = getProviderSeedModels('chatgpt-account').slice(0, 2);
     service.saveProviderAccountConnection(
       'chatgpt-account',
       JSON.stringify({ providerId: 'chatgpt-account', accountId: 'acct-rotate', accessToken: 'old', refreshToken: 'refresh-old' }),

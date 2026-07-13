@@ -9,7 +9,7 @@ const {
   reasoningDeliveryToStreamVisibility,
 } = require('../src/main/agent-runtime/capabilities/RouteCapabilityResolver.ts');
 
-const { createBuiltinProviderEntry } = require('../src/shared/constants/llm.ts');
+const { createProviderEntryFromPreset } = require('../src/main/settings/ProviderPresetRegistry.ts');
 
 const fail = (message) => {
   console.error(`[reasoning-delivery] ${message}`);
@@ -21,7 +21,7 @@ const assert = (condition, message) => {
 };
 
 function configuredProvider(id, protocolOverride) {
-  const provider = createBuiltinProviderEntry(id);
+  const provider = createProviderEntryFromPreset(id);
   return {
     ...provider,
     protocol: protocolOverride ?? provider.protocol,

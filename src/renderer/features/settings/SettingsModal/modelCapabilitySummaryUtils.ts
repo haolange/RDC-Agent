@@ -1,9 +1,5 @@
-import {
-  lookupManagedModelCatalogEntry,
-  type ManagedModelCatalogEntry,
-} from '@shared/constants/modelCapabilityCatalog';
-import type { ModelCapabilityProfile, ReasoningSelection } from '@shared/types/modelCapability';
-import type { LlmProviderCatalogOwnership } from '@shared/types/settings';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
+import type { ReasoningControl, ReasoningSelection } from '@shared/types/modelCapability';
 import type { useI18n } from '../../../i18n';
 import { buildDisplaySelections } from '../../debugger/composer/effortControlParts';
 import { formatTokenCount } from '../../debugger/composer/turnControlsUtils';
@@ -11,15 +7,9 @@ import { formatTokenCount } from '../../debugger/composer/turnControlsUtils';
 type Translate = ReturnType<typeof useI18n>['t'];
 
 const REASONING_LABEL_KEYS = {
-  off: 'composer.effort.levelOff',
-  on: 'composer.effort.levelOn',
-  minimal: 'composer.effort.levelMinimal',
-  low: 'composer.effort.levelLow',
-  medium: 'composer.effort.levelMedium',
-  high: 'composer.effort.levelHigh',
-  extra: 'composer.effort.levelExtra',
-  max: 'composer.effort.levelMax',
-  ultra: 'composer.effort.levelUltra',
+  off: 'composer.effort.levelOff', on: 'composer.effort.levelOn', minimal: 'composer.effort.levelMinimal',
+  low: 'composer.effort.levelLow', medium: 'composer.effort.levelMedium', high: 'composer.effort.levelHigh',
+  extra: 'composer.effort.levelExtra', max: 'composer.effort.levelMax', ultra: 'composer.effort.levelUltra',
 } as const satisfies Record<ReasoningSelection, Parameters<Translate>[0]>;
 
 export interface CapabilityChip {
@@ -32,90 +22,58 @@ export function getReasoningLabelKey(level: ReasoningSelection): typeof REASONIN
   return REASONING_LABEL_KEYS[level];
 }
 
-export function findManagedCapabilityEntry(
-  providerId: string,
-  catalogOwnership: LlmProviderCatalogOwnership,
+export function findEffectiveCapabilityModel(
+  snapshot: EffectiveCatalogSnapshot | null,
   modelId: string,
-): ManagedModelCatalogEntry | null {
-  if (catalogOwnership !== 'app-managed') {
-    return null;
-  }
-  return lookupManagedModelCatalogEntry(providerId, modelId);
+): EffectiveModel | null {
+  return snapshot?.models.find((model) => model.modelId === modelId || model.aliases.includes(modelId)) ?? null;
 }
 
-export function formatContextCapability(
-  profile: ModelCapabilityProfile | null,
-  t: Translate,
-): string {
-  return profile?.nominalContextWindowTokens
-    ? formatTokenCount(profile.nominalContextWindowTokens)
-    : t('settings.providers.capability.unknown');
+export function formatContextCapability(model: EffectiveModel | null, t: Translate): string {
+  const maximum = Math.max(0, ...model?.contextTiers.map((tier) => (
+    tier.maxPromptTokens ?? tier.maxTotalTokens ?? 0
+  )) ?? []);
+  return maximum > 0 ? formatTokenCount(maximum) : t('settings.providers.capability.unknown');
 }
 
-export function formatReasoningCapability(
-  profile: ModelCapabilityProfile | null,
-  t: Translate,
-): string {
-  const control = profile?.reasoningControl ?? null;
-  if (!control) {
-    return t('settings.providers.capability.notAvailable');
-  }
+export function formatReasoningCapabilityValue(control: ReasoningControl | null, t: Translate): string {
+  if (!control) return t('settings.providers.capability.notAvailable');
   const levels = buildDisplaySelections(control);
-  if (levels.length === 0 || (levels.length === 1 && levels[0] === 'off' && control?.kind === 'none')) {
+  if (levels.length === 0 || (levels.length === 1 && levels[0] === 'off' && control.kind === 'none')) {
     return t('settings.providers.capability.notAvailable');
   }
   const base = levels.map((level) => t(REASONING_LABEL_KEYS[level])).join(', ');
-  return control?.kind === 'always-on'
-    ? t('settings.providers.capability.lockedValue', { value: base })
-    : base;
+  return control.kind === 'always-on' ? t('settings.providers.capability.lockedValue', { value: base }) : base;
 }
 
-export function formatFastCapability(
-  profile: ModelCapabilityProfile | null,
-  t: Translate,
-): string {
-  return profile?.fast?.modelId || t('settings.providers.capability.notAvailable');
+export function formatReasoningCapability(model: EffectiveModel | null, t: Translate): string {
+  return formatReasoningCapabilityValue(model?.reasoning ?? null, t);
 }
 
-export function formatBooleanCapability(value: boolean | undefined, t: Translate): string {
-  return value ? t('settings.providers.capability.supported') : t('settings.providers.capability.notAvailable');
+export function formatFastCapability(model: EffectiveModel | null, t: Translate): string {
+  if (!model || model.fast.kind === 'unsupported' || model.fast.kind === 'unknown') {
+    return t('settings.providers.capability.notAvailable');
+  }
+  if (model.fast.kind === 'model-variant') return model.fast.modelId;
+  return model.fast.label ?? model.fast.kind;
 }
 
-export function buildCapabilityChips(
-  entry: ManagedModelCatalogEntry | null,
-  t: Translate,
-): CapabilityChip[] {
-  const profile = entry?.profile ?? null;
+export function formatCapabilityState(model: EffectiveModel | null, field: 'toolCalling' | 'visionInput' | 'structuredOutput', t: Translate): string {
+  return model?.[field].state === 'supported'
+    ? t('settings.providers.capability.supported')
+    : t('settings.providers.capability.notAvailable');
+}
+
+export function buildCapabilityChips(model: EffectiveModel | null, t: Translate): CapabilityChip[] {
+  const context = formatContextCapability(model, t);
+  const reasoning = formatReasoningCapability(model, t);
+  const fast = formatFastCapability(model, t);
   return [
-    {
-      label: t('settings.providers.capability.context'),
-      value: formatContextCapability(profile, t),
-      tone: profile?.nominalContextWindowTokens ? 'positive' : 'muted',
-    },
-    {
-      label: t('settings.providers.capability.reasoning'),
-      value: formatReasoningCapability(profile, t),
-      tone: profile?.reasoningControl && profile.reasoningControl.kind !== 'none' ? 'positive' : 'muted',
-    },
-    {
-      label: t('settings.providers.capability.fastMode'),
-      value: formatFastCapability(profile, t),
-      tone: profile?.fast?.modelId ? 'positive' : 'muted',
-    },
-    {
-      label: t('settings.providers.capability.toolCalling'),
-      value: formatBooleanCapability(profile?.toolCalling, t),
-      tone: profile?.toolCalling ? 'positive' : 'muted',
-    },
-    {
-      label: t('settings.providers.capability.visionInput'),
-      value: formatBooleanCapability(profile?.visionInput, t),
-      tone: profile?.visionInput ? 'positive' : 'muted',
-    },
-    {
-      label: t('settings.providers.capability.structuredOutput'),
-      value: formatBooleanCapability(profile?.structuredOutput, t),
-      tone: profile?.structuredOutput ? 'positive' : 'muted',
-    },
+    { label: t('settings.providers.capability.context'), value: context, tone: context !== t('settings.providers.capability.unknown') ? 'positive' : 'muted' },
+    { label: t('settings.providers.capability.reasoning'), value: reasoning, tone: model?.reasoning.kind !== 'none' ? 'positive' : 'muted' },
+    { label: t('settings.providers.capability.fastMode'), value: fast, tone: model && model.fast.kind !== 'unknown' && model.fast.kind !== 'unsupported' ? 'positive' : 'muted' },
+    { label: t('settings.providers.capability.toolCalling'), value: formatCapabilityState(model, 'toolCalling', t), tone: model?.toolCalling.state === 'supported' ? 'positive' : 'muted' },
+    { label: t('settings.providers.capability.visionInput'), value: formatCapabilityState(model, 'visionInput', t), tone: model?.visionInput.state === 'supported' ? 'positive' : 'muted' },
+    { label: t('settings.providers.capability.structuredOutput'), value: formatCapabilityState(model, 'structuredOutput', t), tone: model?.structuredOutput.state === 'supported' ? 'positive' : 'muted' },
   ];
 }

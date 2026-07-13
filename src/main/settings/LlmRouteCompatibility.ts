@@ -1,6 +1,6 @@
-import { lookupManagedModelCatalogEntry } from '@shared/constants/modelCapabilityCatalog';
 import type { AgentRole } from '@shared/types/agent';
 import type { LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
+import { lookupProviderSeedModel } from './ProviderPresetRegistry';
 
 export interface ModelUnavailableDetail {
   code: 'MODEL_UNAVAILABLE';
@@ -56,14 +56,14 @@ export function resolveProviderModelAvailability(
     return { modelId: requestedModelId, requestedModelId };
   }
 
-  const canonical = lookupManagedModelCatalogEntry(provider.id, requestedModelId);
-  if (canonical && canonical.id !== requestedModelId
-    && isEnabledModel(provider, canonical.id)
-    && isRouteCompatible(provider, canonical.id)) {
+  const canonical = lookupProviderSeedModel(provider.id, requestedModelId);
+  if (canonical && canonical.modelId !== requestedModelId
+    && isEnabledModel(provider, canonical.modelId)
+    && isRouteCompatible(provider, canonical.modelId)) {
     return {
-      modelId: canonical.id,
+      modelId: canonical.modelId,
       requestedModelId,
-      remapReason: `${requestedModelId} is a catalog alias; using canonical model ${canonical.id}.`,
+      remapReason: `${requestedModelId} is a catalog alias; using canonical model ${canonical.modelId}.`,
     };
   }
 

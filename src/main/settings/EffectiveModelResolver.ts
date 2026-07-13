@@ -1,15 +1,9 @@
-import {
-  getManagedProviderModelCatalog,
-  lookupManagedModelCatalogEntry,
-} from '@shared/constants/modelCapabilityCatalog';
 import type {
   CatalogLayerContribution,
   CatalogModelContribution,
   EffectiveCatalogRequest,
 } from './EffectiveCatalogService';
-import {
-  effectiveCatalogService,
-} from './EffectiveCatalogService';
+import { effectiveCatalogService } from './EffectiveCatalogService';
 import type {
   EffectiveCatalogSnapshot,
   EffectiveModel,
@@ -17,27 +11,18 @@ import type {
   RequestPlan,
   RequestPlanningResult,
 } from '@shared/types/providerCapability';
-import type {
-  ConversationTurnControls,
-  ReasoningControl,
-} from '@shared/types/modelCapability';
-import { createReasoningControl } from '@shared/types/modelCapability';
-import type {
-  AppSettings,
-  LlmProviderEntry,
-  LlmProviderModel,
-} from '@shared/types/settings';
+import type { ConversationTurnControls, ReasoningControl } from '@shared/types/modelCapability';
+import type { AppSettings, LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import { planModelRequest } from './RequestPlanner';
 import { parseCopilotBillingTiers } from './CopilotBilling';
 import { settingsService } from './SettingsService';
-import { getBuiltinProviderDefinition } from '@shared/constants/llm';
 import { projectProtocolOverlays, resolveModelRoutePrecedence } from './ProviderRouteProjection';
 import { resolveProviderModelAvailability } from './LlmRouteCompatibility';
-
-const MODERN_ANTHROPIC_MODELS = new Set(['claude-fable-5', 'claude-sonnet-5', 'claude-opus-4-8']);
-const COPILOT_SEED_PROMPT_TOKENS = 272_000;
-const ANTHROPIC_DEFAULT_PROMPT_TOKENS = 200_000;
-const ANTHROPIC_MAX_PROMPT_TOKENS = 1_000_000;
+import {
+  getProviderPreset,
+  getProviderSeedModelDefinitions,
+  lookupProviderSeedModel,
+} from './ProviderPresetRegistry';
 
 const CONSERVATIVE_REASONING: ReasoningControl = {
   kind: 'none',
@@ -49,16 +34,18 @@ const CONSERVATIVE_REASONING: ReasoningControl = {
 };
 
 function routeFor(provider: LlmProviderEntry, modelRoute?: ModelRoute): ModelRoute {
-  const definition = getBuiltinProviderDefinition(provider.id);
-  const presetProtocol = definition?.protocol ?? provider.protocol;
+  const preset = getProviderPreset(provider.id);
+  const presetRoute = preset?.routes.find((route) => route.protocol === provider.protocol)
+    ?? preset?.routes.find((route) => route.default)
+    ?? preset?.routes[0];
   return resolveModelRoutePrecedence({
-    modelRoute,
+    modelRoute: modelRoute?.source === 'model' ? modelRoute : undefined,
     userRoute: provider.protocolEditable
       ? { protocol: provider.protocol, baseUrl: provider.baseUrl }
       : undefined,
     presetRoute: {
-      protocol: presetProtocol,
-      baseUrl: definition?.protocolBaseUrls?.[presetProtocol] ?? definition?.baseUrl ?? provider.baseUrl,
+      protocol: presetRoute?.protocol ?? provider.protocol,
+      baseUrl: presetRoute?.baseUrl ?? provider.baseUrl,
     },
   });
 }
@@ -67,86 +54,48 @@ export function buildSeedModelContribution(
   provider: LlmProviderEntry,
   modelId: string,
 ): CatalogModelContribution {
-  const entry = provider.catalogOwnership === 'app-managed'
-    ? lookupManagedModelCatalogEntry(provider.id, modelId)
+  const seed = provider.catalogOwnership === 'app-managed'
+    ? lookupProviderSeedModel(provider.id, modelId)
     : null;
-  const profile = entry?.profile;
-  const nominal = typeof profile?.nominalContextWindowTokens === 'number'
-    && profile.nominalContextWindowTokens > 0
-    ? profile.nominalContextWindowTokens
-    : undefined;
-  let contextTiers: NonNullable<CatalogModelContribution['contextTiers']>;
-  if (provider.id === 'chatgpt-account') {
-    contextTiers = [{ id: 'default', label: 'Codex service limit', activation: { kind: 'implicit' }, entitlement: 'granted' }];
-  } else if (provider.id === 'github-copilot') {
-    contextTiers = [{ id: 'default', label: 'Default', maxPromptTokens: Math.min(nominal ?? COPILOT_SEED_PROMPT_TOKENS, COPILOT_SEED_PROMPT_TOKENS), activation: { kind: 'implicit' }, entitlement: 'granted' }];
-  } else if ((provider.id === 'claude-account' || provider.id === 'anthropic') && MODERN_ANTHROPIC_MODELS.has(modelId)) {
-    contextTiers = [
-      { id: 'default', label: 'Default', maxPromptTokens: ANTHROPIC_DEFAULT_PROMPT_TOKENS, activation: { kind: 'implicit' }, entitlement: 'granted' },
-      {
-        id: 'max',
-        label: '1M context',
-        maxPromptTokens: ANTHROPIC_MAX_PROMPT_TOKENS,
-        activation: provider.id === 'claude-account'
-          ? { kind: 'header', headers: { 'anthropic-beta': 'context-1m-2025-08-07' } }
-          : { kind: 'implicit' },
-        entitlement: provider.id === 'claude-account' ? 'unknown' : 'granted',
-      },
-    ];
-  } else {
-    contextTiers = [{
+  const conservative: CatalogModelContribution = {
+    modelId,
+    label: modelId,
+    aliases: [],
+    route: routeFor(provider),
+    availability: 'unknown',
+    contextTiers: [{
       id: 'default',
       label: 'Default',
-      ...(nominal ? { maxPromptTokens: nominal } : {}),
       activation: { kind: 'implicit' },
       entitlement: 'granted',
-    }];
-  }
-  const defaultTierCap = contextTiers[0]?.maxPromptTokens;
-  const defaultBudgetTokens = Math.min(256_000, defaultTierCap ?? 256_000);
-  const providerModel = provider.models.find((model) => model.id === modelId);
-  const fastModelId = profile?.fast?.modelId;
-  const fastEnabled = Boolean(fastModelId && (provider.id === 'github-copilot' || provider.models.some(
-    (model) => model.id === fastModelId && model.enabled !== false,
-  )));
-
+    }],
+    defaultBudgetTokens: 256_000,
+    fast: { kind: 'unsupported' },
+    reasoning: CONSERVATIVE_REASONING,
+    toolCalling: { state: 'unknown' },
+    visionInput: { state: 'unknown' },
+    structuredOutput: { state: 'unknown' },
+  };
+  const base: CatalogModelContribution = seed
+    ? { ...seed, route: routeFor(provider, seed.route) }
+    : conservative;
+  const providerModel = provider.models.find((model) => model.id === base.modelId);
   return {
-    modelId,
-    label: entry?.label ?? providerModel?.label ?? modelId,
-    aliases: [...(entry?.aliases ?? [])],
-    route: routeFor(provider, entry?.route),
+    ...base,
+    modelId: base.modelId,
+    label: seed?.label ?? providerModel?.label ?? modelId,
+    aliases: [...(seed?.aliases ?? [])],
     availability: providerModel?.availability === 'unavailable'
       ? 'unavailable'
       : providerModel?.enabled === false
         ? 'unavailable'
         : providerModel
           ? 'available'
-          : 'unknown',
+          : base.availability,
     unavailableReason: providerModel?.availabilityReason,
-    contextTiers,
-    defaultBudgetTokens,
-    fast: provider.id === 'chatgpt-account'
-      ? { kind: 'request-param', patch: { service_tier: 'priority' }, entitlement: 'granted', label: 'Fast' }
-      : fastModelId
-      ? {
-          kind: 'model-variant',
-          modelId: fastModelId,
-          entitlement: fastEnabled ? 'granted' : 'denied',
-        }
-      : { kind: 'unsupported' },
-    reasoning: createReasoningControl(profile?.reasoningControl ?? CONSERVATIVE_REASONING),
-    toolCalling: profile?.toolCalling === true
-      ? { state: 'supported' }
-      : profile?.toolCalling === false ? { state: 'unsupported' } : { state: 'unknown' },
-    visionInput: profile?.visionInput === true
-      ? { state: 'supported' }
-      : profile?.visionInput === false ? { state: 'unsupported' } : { state: 'unknown' },
-    structuredOutput: profile?.structuredOutput === true
-      ? { state: 'supported' }
-      : profile?.structuredOutput === false ? { state: 'unsupported' } : { state: 'unknown' },
-    fixedTemperature: profile?.fixedTemperature,
   };
 }
+
 
 function copilotEntitlementContribution(provider: LlmProviderEntry): CatalogLayerContribution | undefined {
   if (provider.id !== 'github-copilot') return undefined;
@@ -172,20 +121,20 @@ function copilotEntitlementContribution(provider: LlmProviderEntry): CatalogLaye
 function seedContribution(provider: LlmProviderEntry, requestedModelId?: string): CatalogLayerContribution {
   const ids = new Set(provider.models.map((model) => model.id));
   if (provider.catalogOwnership === 'app-managed') {
-    for (const entry of getManagedProviderModelCatalog(provider.id)) {
-      ids.add(entry.id);
+    for (const entry of getProviderSeedModelDefinitions(provider.id)) {
+      ids.add(entry.modelId);
     }
   }
   if (requestedModelId) {
     const canonical = provider.catalogOwnership === 'app-managed'
-      ? lookupManagedModelCatalogEntry(provider.id, requestedModelId)?.id
+      ? lookupProviderSeedModel(provider.id, requestedModelId)?.modelId
       : requestedModelId;
     if (canonical) ids.add(canonical);
   }
   return {
     source: 'seed',
     observedAt: '2026-07-13T00:00:00.000Z',
-    detail: 'Bundled legacy seed pending preset migration',
+    detail: 'Provider preset seed',
     models: [...ids].map((modelId) => buildSeedModelContribution(provider, modelId)),
   };
 }
@@ -218,7 +167,7 @@ export function buildEffectiveCatalogRequest(
   provider: LlmProviderEntry,
   requestedModelId?: string,
 ): EffectiveCatalogRequest {
-  const definition = getBuiltinProviderDefinition(provider.id);
+  const preset = getProviderPreset(provider.id);
   return {
     providerId: provider.id,
     accountId: provider.activeAccountId ?? `anonymous:${provider.id}`,
@@ -227,9 +176,9 @@ export function buildEffectiveCatalogRequest(
     fallbackRoute: routeFor(provider),
     seed: seedContribution(provider, requestedModelId),
     overlay: projectProtocolOverlays(
-      definition?.capabilityOverlays ?? [],
+      preset?.overlays ?? [],
       provider.protocol,
-      definition ? '2026-07-13T00:00:00.000Z' : new Date().toISOString(),
+      preset ? '2026-07-13T00:00:00.000Z' : new Date().toISOString(),
     ),
     entitlement: copilotEntitlementContribution(provider),
     user: userContribution(provider),

@@ -1,5 +1,5 @@
 import type { TranslationKey } from '../../../i18n';
-import { LLM_PROVIDER_PROTOCOL_DEFINITIONS, resolveBaseUrlForProtocolChange } from '@shared/constants/llm';
+import { LLM_PROVIDER_PROTOCOL_DEFINITIONS } from '@shared/constants/llm';
 import type { LlmAgentRoute, LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import type { ProviderCatalogCategory, ProviderProtocol } from './types';
 
@@ -55,14 +55,14 @@ export const providerShowsResponsesHint = (protocol: ProviderProtocol): boolean 
   protocol === 'OpenAIResponses';
 
 export const resolveConnectionBaseUrlForProtocol = (
-  provider: Pick<LlmProviderEntry, 'id' | 'protocol' | 'baseUrl'>,
+  provider: Pick<LlmProviderEntry, 'protocol' | 'baseUrl' | 'protocolBaseUrls'>,
   nextProtocol: ProviderProtocol,
-): string => resolveBaseUrlForProtocolChange(
-  provider.id,
-  provider.protocol,
-  nextProtocol,
-  provider.baseUrl,
-);
+): string => {
+  const previousDefault = provider.protocolBaseUrls?.[provider.protocol]?.replace(/\/+$/, '') ?? '';
+  const nextDefault = provider.protocolBaseUrls?.[nextProtocol]?.replace(/\/+$/, '') ?? '';
+  const current = (provider.baseUrl ?? '').trim().replace(/\/+$/, '');
+  return !current || current === previousDefault ? nextDefault || current : provider.baseUrl?.trim() ?? current;
+};
 
 export const getProviderStatusLabel = (provider: Pick<LlmProviderEntry, 'status' | 'isConfigured'>): TranslationKey => {
   if (provider.status === 'verified' && provider.isConfigured) return 'settings.providerConnected';

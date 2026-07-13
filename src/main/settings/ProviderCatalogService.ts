@@ -1,10 +1,5 @@
-import {
-  BUILTIN_LLM_PROVIDER_DEFINITIONS,
-  getBuiltinProviderCatalogOwnership,
-  LLM_PROVIDER_CATEGORY_DEFINITIONS,
-  LLM_PROVIDER_PROTOCOL_DEFINITIONS,
-} from '@shared/constants/llm';
-import { getManagedProviderModelIds } from '@shared/constants/modelCapabilityCatalog';
+import { LLM_PROVIDER_CATEGORY_DEFINITIONS, LLM_PROVIDER_PROTOCOL_DEFINITIONS } from '@shared/constants/llm';
+import { createProviderEntryFromPreset, listProviderPresets } from './ProviderPresetRegistry';
 import type {
   LlmProviderCatalogEntry,
   LlmProviderCatalogResponse,
@@ -12,23 +7,19 @@ import type {
 
 const categoryRank = new Map(LLM_PROVIDER_CATEGORY_DEFINITIONS.map((entry, index) => [entry.id, index]));
 
-function toCatalogEntry(provider: typeof BUILTIN_LLM_PROVIDER_DEFINITIONS[number]): LlmProviderCatalogEntry {
-  const catalogOwnership = getBuiltinProviderCatalogOwnership(provider.id);
-  const managedModelIds = catalogOwnership === 'app-managed'
-    ? getManagedProviderModelIds(provider.id)
-    : [];
+function toCatalogEntry(provider: ReturnType<typeof createProviderEntryFromPreset>): LlmProviderCatalogEntry {
   return {
     id: provider.id,
     protocol: provider.protocol,
     authMode: provider.authMode,
     category: provider.category,
-    catalogOwnership,
+    catalogOwnership: provider.catalogOwnership,
     label: provider.label,
     baseUrlEditable: provider.baseUrlEditable,
     protocolEditable: provider.protocolEditable,
     protocolOptions: provider.protocolOptions ? [...provider.protocolOptions] : undefined,
     protocolBaseUrls: provider.protocolBaseUrls ? { ...provider.protocolBaseUrls } : undefined,
-    recommendedModels: managedModelIds.length > 0 ? managedModelIds : [...provider.recommendedModels],
+    recommendedModels: [...provider.recommendedModels],
     docsUrl: provider.docsUrl,
     accountLoginConfigured: provider.accountLoginConfigured,
     unavailableReason: provider.unavailableReason,
@@ -48,7 +39,10 @@ function compareProvider(left: LlmProviderCatalogEntry, right: LlmProviderCatalo
 
 export class ProviderCatalogService {
   getProviderCatalog(): LlmProviderCatalogResponse {
-    const catalogProviders = BUILTIN_LLM_PROVIDER_DEFINITIONS.map(toCatalogEntry).sort(compareProvider);
+    const catalogProviders = listProviderPresets()
+      .map((preset) => createProviderEntryFromPreset(preset.id as Parameters<typeof createProviderEntryFromPreset>[0]))
+      .map(toCatalogEntry)
+      .sort(compareProvider);
 
     return {
       categories: LLM_PROVIDER_CATEGORY_DEFINITIONS.map((category) => ({ ...category })),

@@ -1,10 +1,5 @@
-import {
-  BUILTIN_LLM_PROVIDER_DEFINITIONS,
-  LLM_PROVIDER_CATEGORY_DEFINITIONS,
-  getBuiltinProviderDefinition,
-  getBuiltinProviderProtocolOptions,
-  isLlmProviderProtocol,
-} from '@shared/constants/llm';
+import { LLM_PROVIDER_CATEGORY_DEFINITIONS, isLlmProviderProtocol } from '@shared/constants/llm';
+import { getProviderPreset, getProviderPresetProtocolOptions } from './ProviderPresetRegistry';
 import type {
   LlmProviderAuthMode,
   LlmProviderCategory,
@@ -25,7 +20,7 @@ export function normalizeProviderCategory(
   },
 ): LlmProviderCategory {
   const id = typeof provider.id === 'string' ? provider.id.trim() : '';
-  const builtin = id ? BUILTIN_LLM_PROVIDER_DEFINITIONS.find((definition) => definition.id === id) : null;
+  const builtin = id ? getProviderPreset(id) : null;
   if (builtin) {
     return builtin.category;
   }
@@ -57,13 +52,13 @@ export function normalizeProviderProtocol(
   },
 ): LlmProviderProtocol {
   const id = typeof provider.id === 'string' ? provider.id.trim() : '';
-  const builtin = id ? getBuiltinProviderDefinition(id) : null;
+  const builtin = id ? getProviderPreset(id) : null;
   if (builtin) {
-    const options = getBuiltinProviderProtocolOptions(id);
-    if (builtin.protocolEditable && isLlmProviderProtocol(provider.protocol) && options.includes(provider.protocol)) {
+    const options = getProviderPresetProtocolOptions(id);
+    if (builtin.userSelectableRoute && isLlmProviderProtocol(provider.protocol) && options.includes(provider.protocol)) {
       return provider.protocol;
     }
-    return builtin.protocol;
+    return builtin.routes.find((route) => route.default)?.protocol ?? builtin.routes[0].protocol;
   }
 
   if (isLlmProviderProtocol(provider.protocol)) {

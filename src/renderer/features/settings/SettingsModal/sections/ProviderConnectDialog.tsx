@@ -123,9 +123,9 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             protocol,
             baseUrl: resolveConnectionBaseUrlForProtocol(
               {
-                id: connectionProvider.id,
                 protocol: connectionDraft.protocol,
                 baseUrl: connectionDraft.baseUrl,
+                protocolBaseUrls: connectionProvider.protocolBaseUrls,
               },
               protocol,
             ),

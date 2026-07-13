@@ -1,15 +1,13 @@
 import {
-  getBuiltinProviderCatalogOwnership,
-  getBuiltinProviderDefinition,
+  getProviderPreset,
+  getProviderPresetCatalogOwnership,
+  getProviderSeedModelDefinitions,
+  getProviderSeedModels,
   isBuiltinProviderId,
   resolveBaseUrlForProtocolChange,
-  resolveBuiltinProviderProtocol,
-  resolveBuiltinProtocolBaseUrl,
-} from '@shared/constants/llm';
-import {
-  getManagedProviderModelCatalog,
-  getManagedProviderModels,
-} from '@shared/constants/modelCapabilityCatalog';
+  resolveProviderPresetBaseUrl,
+  resolveProviderPresetProtocol,
+} from './ProviderPresetRegistry';
 import type {
   LlmProviderAccountLoginFinishRequest,
   LlmProviderAccountLoginStartRequest,
@@ -109,7 +107,7 @@ const toStaticModels = (modelIds: string[]): LlmProviderModel[] => requireModels
 );
 
 const requireManagedModels = (providerId: string): LlmProviderModel[] => {
-  const models = getManagedProviderModels(providerId);
+  const models = getProviderSeedModels(providerId);
   if (models.length === 0) {
     throw new ProviderConnectionError('Provider is missing an app-managed model catalog.');
   }
@@ -212,8 +210,8 @@ export const selectSupportedCodingPlanModels = (
 
 const buildManagedAliasIndex = (providerId: string): Map<string, readonly string[]> => {
   const map = new Map<string, readonly string[]>();
-  for (const entry of getManagedProviderModelCatalog(providerId)) {
-    map.set(entry.id, entry.aliases ?? []);
+  for (const entry of getProviderSeedModelDefinitions(providerId)) {
+    map.set(entry.modelId, entry.aliases ?? []);
   }
   return map;
 };
@@ -446,7 +444,7 @@ export class ProviderConnectionService {
   }
 
   private resolveProviderProtocol(provider: LlmProviderEntry, protocolDraft: unknown): LlmProviderEntry {
-    const protocol = resolveBuiltinProviderProtocol(provider.id, protocolDraft ?? provider.protocol);
+    const protocol = resolveProviderPresetProtocol(provider.id, protocolDraft ?? provider.protocol);
     if (!protocol) {
       throw new ProviderConnectionError(`Provider ${provider.id} is not in the built-in catalog.`);
     }
@@ -464,8 +462,8 @@ export class ProviderConnectionService {
     if (provider.authMode === 'account') {
       throw new ProviderConnectionError('Account providers must be tested through the account login flow.');
     }
-    const definition = getBuiltinProviderDefinition(provider.id);
-    const catalogOwnership = getBuiltinProviderCatalogOwnership(provider.id);
+    const definition = getProviderPreset(provider.id);
+    const catalogOwnership = getProviderPresetCatalogOwnership(provider.id);
     const managedModels = catalogOwnership === 'app-managed'
       ? requireManagedModels(provider.id)
       : [];
@@ -482,7 +480,7 @@ export class ProviderConnectionService {
       throw new ProviderConnectionError('请输入 API Key');
     }
 
-    const strategy = resolveDiscoveryStrategy(provider.protocol, definition.modelDiscovery);
+    const strategy = resolveDiscoveryStrategy(provider.protocol, provider.modelDiscovery);
     if (!strategy) {
       if (catalogOwnership === 'app-managed') {
         return { models: managedModels };
@@ -493,14 +491,13 @@ export class ProviderConnectionService {
       return {
         models: catalogOwnership === 'app-managed'
           ? managedModels
-          : toStaticModels(definition.recommendedModels),
+          : toStaticModels(provider.recommendedModels),
       };
     }
     const baseUrl = (
       baseUrlDraft
       || provider.baseUrl
-      || resolveBuiltinProtocolBaseUrl(provider.id, provider.protocol)
-      || definition.baseUrl
+      || resolveProviderPresetBaseUrl(provider.id, provider.protocol)
       || ''
     ).trim().replace(/\/+$/, '');
     if (!baseUrl) {
@@ -508,7 +505,7 @@ export class ProviderConnectionService {
     }
     const candidateModelIds = catalogOwnership === 'app-managed'
       ? managedModels.map((model) => model.id)
-      : definition.recommendedModels;
+      : provider.recommendedModels;
     if (
       provider.id === 'kimi-coding-plan'
       || provider.id === 'volcengine-coding-plan'

@@ -4,7 +4,7 @@ const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
 
 const { AGENT_ROLES } = require('../src/shared/constants/agents.ts');
-const { createBuiltinProviderEntry } = require('../src/shared/constants/llm.ts');
+const { createProviderEntryFromPreset } = require('../src/main/settings/ProviderPresetRegistry.ts');
 const { resolveCompatibleAgentRoute } = require('../src/main/settings/LlmRouteCompatibility.ts');
 const { resolveAgentRouteStatus } = require('../src/renderer/features/settings/SettingsModal/agentRouteStatus.ts');
 const {
@@ -23,7 +23,7 @@ function assert(condition, message) {
 }
 
 function configuredProvider(id, modelIds) {
-  const provider = createBuiltinProviderEntry(id);
+  const provider = createProviderEntryFromPreset(id);
   return {
     ...provider,
     enabled: true,

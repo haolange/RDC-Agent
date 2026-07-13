@@ -50,13 +50,12 @@ export {
   TERMINAL_MIN_HEIGHT,
 } from './layout';
 export {
-  BUILTIN_LLM_PROVIDER_DEFINITIONS,
-  createBuiltinProviderEntries,
-  createBuiltinProviderEntry,
-  getBuiltinProviderCatalogOwnership,
-  getBuiltinProviderDefinition,
+  LLM_PROVIDER_CATEGORY_DEFINITIONS,
+  LLM_PROVIDER_PROTOCOL_DEFINITIONS,
+  SUPER_GROK_OAUTH_CALLBACK_PORT,
+  SUPER_GROK_OAUTH_REDIRECT_URI,
   getProviderCatalogOwnership,
-  isBuiltinProviderId,
+  isLlmProviderProtocol,
 } from './llm';
 export { MODE_CAPABILITIES, assignDefaultCaptureRoles } from './modes';
 export {
@@ -69,14 +68,6 @@ export {
   STAGE_PHASES,
   normalizeWorkflowStage,
 } from './stages';
-export {
-  MANAGED_PROVIDER_MODEL_CATALOG,
-  getManagedProviderModelCatalog,
-  getManagedProviderModelIds,
-  getManagedProviderModels,
-  lookupManagedModelCapabilityProfile,
-  lookupManagedModelCatalogEntry,
-} from './modelCapabilityCatalog';
 export {
   CONTEXT_COMPACTION_RATIO,
   DEFAULT_CONTEXT_WINDOW_TOKENS,

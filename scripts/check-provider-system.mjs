@@ -5,11 +5,12 @@ import path from 'node:path';
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
 
-const llmConstants = require('../src/shared/constants/llm.ts');
 const {
-  BUILTIN_LLM_PROVIDER_DEFINITIONS,
-  createBuiltinProviderEntries,
-} = llmConstants;
+  createProviderEntriesFromPresets,
+  listProviderPresets,
+} = require('../src/main/settings/ProviderPresetRegistry.ts');
+const providerPresets = listProviderPresets();
+const providerDefinitions = createProviderEntriesFromPresets();
 const {
   MediaRuntimeService,
 } = require('../src/main/settings/MediaRuntimeService.ts');
@@ -86,6 +87,27 @@ function read(relativePath) {
   return fs.readFileSync(path.join(process.cwd(), relativePath), 'utf8');
 }
 
+function listSourceFiles(relativeDirectory) {
+  const root = path.join(process.cwd(), relativeDirectory);
+  return fs.readdirSync(root, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && /\.(?:ts|tsx)$/u.test(entry.name))
+    .map((entry) => path.join(entry.parentPath ?? entry.path, entry.name));
+}
+
+function assertJsonSerializable(value, label, seen = new Set()) {
+  assert(value !== undefined, `${label} must not contain undefined.`);
+  assert(!['function', 'symbol', 'bigint'].includes(typeof value), `${label} must be JSON-serializable.`);
+  if (!value || typeof value !== 'object') return;
+  assert(!seen.has(value), `${label} must not contain cycles.`);
+  seen.add(value);
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertJsonSerializable(entry, `${label}[${index}]`, seen));
+  } else {
+    Object.entries(value).forEach(([key, entry]) => assertJsonSerializable(entry, `${label}.${key}`, seen));
+  }
+  seen.delete(value);
+}
+
 function extractStringUnion(source, typeName) {
   const match = new RegExp(`export\\s+type\\s+${typeName}\\s*=([\\s\\S]*?);`, 'm').exec(source);
   assert(match, `src/shared/types/settings.ts must export ${typeName}.`);
@@ -148,22 +170,49 @@ function assertSourceContains(source, requiredTokens, label) {
 }
 
 function loadProviderCatalog(runtimeEntries) {
-  if (typeof llmConstants.createBuiltinProviderCatalogEntries === 'function') {
-    return {
-      providers: llmConstants.createBuiltinProviderCatalogEntries(),
-      categories: [],
-      protocols: [],
-    };
-  }
-
   const servicePath = path.join(process.cwd(), 'src/main/settings/ProviderCatalogService.ts');
-  assert(fs.existsSync(servicePath), 'ProviderCatalogService.ts or createBuiltinProviderCatalogEntries() must provide catalog DTOs.');
+  assert(fs.existsSync(servicePath), 'ProviderCatalogService.ts or the preset registry must provide catalog DTOs.');
   const { providerCatalogService } = require('../src/main/settings/ProviderCatalogService.ts');
   assert(providerCatalogService?.getProviderCatalog, 'ProviderCatalogService must expose getProviderCatalog().');
   return providerCatalogService.getProviderCatalog(runtimeEntries);
 }
 
 async function main() {
+  assert(providerPresets.length === 46, `Preset migration must load all 46 existing providers, found ${providerPresets.length}.`);
+  const presetIds = providerPresets.map((preset) => preset.id);
+  assert(new Set(presetIds).size === presetIds.length, 'Provider preset ids must be unique.');
+  const presetFiles = fs.readdirSync(path.join(process.cwd(), 'src/main/settings/presets'))
+    .filter((name) => name.endsWith('.ts') && name !== 'index.ts')
+    .map((name) => name.slice(0, -3))
+    .sort();
+  assert(
+    JSON.stringify(presetFiles) === JSON.stringify([...presetIds].sort()),
+    'Provider presets must use exactly one provider-id-named file per registered provider.',
+  );
+  for (const preset of providerPresets) {
+    assert(preset.schemaVersion === 1, `${preset.id} must use ProviderPreset schemaVersion 1.`);
+    assertJsonSerializable(preset, `preset.${preset.id}`);
+    assert(JSON.parse(JSON.stringify(preset)).id === preset.id, `${preset.id} must survive a JSON round trip.`);
+  }
+
+  const legacyBuiltinDefinitionToken = `BUILTIN_LLM_PROVIDER_${'DEFINITIONS'}`;
+  const sharedLlmSource = read('src/shared/constants/llm.ts');
+  assertSourceDoesNotContain(
+    sharedLlmSource,
+    [legacyBuiltinDefinitionToken, 'recommendedModels:', "id: 'openai'", "id: 'anthropic'"],
+    'shared llm constants',
+  );
+  assert(!fs.existsSync(path.join(process.cwd(), 'src/shared/constants/modelCapabilityCatalog.ts')), 'The legacy static model capability catalog must be deleted.');
+  const forbiddenRuntimeCatalogImports = ['ProviderPresetRegistry', '/presets', 'modelCapabilityCatalog'];
+  for (const sourcePath of listSourceFiles('src/main/agent-runtime')) {
+    assertSourceDoesNotContain(fs.readFileSync(sourcePath, 'utf8'), forbiddenRuntimeCatalogImports, path.relative(process.cwd(), sourcePath));
+  }
+  for (const sourcePath of listSourceFiles('src/renderer')) {
+    assertSourceDoesNotContain(fs.readFileSync(sourcePath, 'utf8'), ['ProviderPresetRegistry', '/presets', 'modelCapabilityCatalog'], path.relative(process.cwd(), sourcePath));
+  }
+  assertSourceContains(read('src/main/settings/SettingsService.ts'), ['createProviderEntriesFromPresets', 'getProviderSeedModels'], 'SettingsService preset loading');
+  assertSourceContains(read('src/main/settings/EffectiveModelResolver.ts'), ['getProviderSeedModelDefinitions', 'lookupProviderSeedModel'], 'EffectiveModelResolver preset loading');
+
   const settingsTypes = read('src/shared/types/settings.ts');
   const connectionServiceSource = read('src/main/settings/ProviderConnectionService.ts');
   const providerConnectDialog = read('src/renderer/features/settings/SettingsModal/sections/ProviderConnectDialog.tsx');
@@ -206,8 +255,8 @@ async function main() {
   assert(catalogResponse.includes('protocols:'), 'LlmProviderCatalogResponse must include protocol descriptors.');
   assert(catalogResponse.includes('providers:'), 'LlmProviderCatalogResponse must include provider catalog entries.');
 
-  const ids = BUILTIN_LLM_PROVIDER_DEFINITIONS.map((definition) => definition.id);
-  const runtimeEntries = createBuiltinProviderEntries();
+  const ids = providerDefinitions.map((definition) => definition.id);
+  const runtimeEntries = createProviderEntriesFromPresets();
   const catalog = loadProviderCatalog(runtimeEntries);
   const catalogEntries = Array.isArray(catalog) ? catalog : catalog.providers;
   assert(Array.isArray(catalogEntries), 'Provider catalog must return provider entries.');
@@ -219,7 +268,7 @@ async function main() {
     assert(ids.includes(id), `Builtin provider is missing: ${id}`);
   }
 
-  const definitionById = new Map(BUILTIN_LLM_PROVIDER_DEFINITIONS.map((definition) => [definition.id, definition]));
+  const definitionById = new Map(providerDefinitions.map((definition) => [definition.id, definition]));
   const grokAccount = definitionById.get('grok-account');
   assert(grokAccount?.authMode === 'account', 'grok-account must be an account provider.');
   assert(grokAccount?.category === 'login-authorization', 'grok-account must stay in login authorization.');
@@ -248,7 +297,7 @@ async function main() {
   const planEntryIds = ids.filter((id) => PLAN_PROVIDER_ID_PATTERN.test(id));
   assert(planEntryIds.length > 0, 'Provider catalog must keep coding/token plan providers as explicit entries.');
 
-  for (const definition of BUILTIN_LLM_PROVIDER_DEFINITIONS) {
+  for (const definition of providerDefinitions) {
     assert(typeof definition.category === 'string', `${definition.id} must declare category.`);
     assertIncludes(categories, definition.category, `${definition.id}.category`);
     assert(!LEGACY_UI_CATEGORIES.includes(definition.category), `${definition.id}.category must not use legacy or unsplit category ${definition.category}.`);
@@ -353,7 +402,7 @@ async function main() {
       'exchangeGrokCode',
       'pollGrokDevice',
       'SUPER_GROK_OAUTH_REDIRECT_URI',
-      'getManagedProviderModels',
+      'getProviderSeedModels',
     ],
     'ProviderAccountAuthService Super Grok OAuth flow',
   );
