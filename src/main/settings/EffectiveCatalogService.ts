@@ -9,6 +9,7 @@ import type {
   EffectiveModel,
   FastCapability,
   ModelRoute,
+  ProviderAvailability,
 } from '@shared/types/providerCapability';
 import type {
   LlmProviderCatalogOwnership,
@@ -63,6 +64,7 @@ export interface EffectiveCatalogRequest {
   entitlement?: CatalogLayerContribution;
   observed?: CatalogLayerContribution | CatalogLayerContribution[];
   user?: CatalogLayerContribution;
+  providerAvailability?: ProviderAvailability & { observedAt: string };
 }
 
 interface PersistedCatalogState {
@@ -301,12 +303,30 @@ export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): Effecti
   ]) {
     applyLayer(models, request, layer);
   }
-  return [...models.values()].map((model) => ({
-    ...model,
-    aliases: [...model.aliases],
-    contextTiers: model.contextTiers.map((tier) => cloneJson(tier)),
-    provenance: model.provenance.map((evidence) => ({ ...evidence })),
-  }));
+  return [...models.values()].map((model) => {
+    const projected = {
+      ...model,
+      aliases: [...model.aliases],
+      contextTiers: model.contextTiers.map((tier) => cloneJson(tier)),
+      provenance: model.provenance.map((evidence) => ({ ...evidence })),
+    };
+    if (request.providerAvailability?.state === 'unavailable') {
+      projected.availability = 'unavailable';
+      projected.unavailableReason = request.providerAvailability.reason ?? 'Provider runtime is unavailable.';
+      projected.provenance.push({
+        field: 'availability',
+        source: 'seed',
+        observedAt: request.providerAvailability.observedAt,
+        detail: 'Provider runtime availability gate',
+      }, {
+        field: 'unavailableReason',
+        source: 'seed',
+        observedAt: request.providerAvailability.observedAt,
+        detail: 'Provider runtime availability gate',
+      });
+    }
+    return projected;
+  });
 }
 
 function cacheKey(providerId: string, accountId: string, protocol?: LlmProviderProtocol): string {

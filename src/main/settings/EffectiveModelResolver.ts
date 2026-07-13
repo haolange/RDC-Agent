@@ -184,20 +184,30 @@ export function buildEffectiveCatalogRequest(
   requestedModelId?: string,
 ): EffectiveCatalogRequest {
   const preset = getProviderPreset(provider.id);
+  const seed = seedContribution(provider, requestedModelId);
+  const observedAt = '2026-07-13T00:00:00.000Z';
+  const overlay = projectProtocolOverlays(
+    preset?.overlays ?? [],
+    provider.protocol,
+    preset ? observedAt : new Date().toISOString(),
+  );
   return {
     providerId: provider.id,
     accountId: provider.activeAccountId ?? `anonymous:${provider.id}`,
     protocol: provider.protocol,
     catalogOwnership: provider.catalogOwnership,
     fallbackRoute: routeFor(provider),
-    seed: seedContribution(provider, requestedModelId),
-    overlay: projectProtocolOverlays(
-      preset?.overlays ?? [],
-      provider.protocol,
-      preset ? '2026-07-13T00:00:00.000Z' : new Date().toISOString(),
-    ),
+    seed,
+    overlay,
     entitlement: copilotEntitlementContribution(provider),
     user: userContribution(provider),
+    providerAvailability: provider.status === 'unavailable'
+      ? {
+          state: 'unavailable',
+          reason: provider.unavailableReason ?? 'Provider runtime is unavailable.',
+          observedAt,
+        }
+      : undefined,
   };
 }
 
@@ -271,15 +281,32 @@ export function recordEffectivePlanSuccess(
   const provider = settings.llm.providers.find((entry) => entry.id === providerId);
   const model = resolveEffectiveModel(providerId, modelId, settings);
   const activeTier = model?.contextTiers.find((tier) => tier.id === plan.activeTierId);
-  if (!provider || !model || activeTier?.entitlement !== 'unknown') return;
+  if (!provider || !model) return;
+  const grantsTier = activeTier?.entitlement === 'unknown';
+  const grantsFast = plan.fastMode
+    && model.fast.kind !== 'unsupported'
+    && model.fast.kind !== 'unknown'
+    && model.fast.entitlement === 'unknown';
+  if (!grantsTier && !grantsFast) return;
+  const activated = [
+    grantsTier && activeTier ? `context tier ${activeTier.id}` : '',
+    grantsFast ? 'Fast mode' : '',
+  ].filter(Boolean);
   effectiveCatalogService.recordObserved({
     providerId,
     accountId: provider.activeAccountId ?? `anonymous:${providerId}`,
     protocol: plan.route.protocol,
   }, [{
-    modelId,
-    contextTiers: model.contextTiers.map((tier) => (
-      tier.id === activeTier.id ? { ...tier, entitlement: 'granted' as const } : tier
-    )),
-  }], `Successful request activated context tier ${activeTier.id}`);
+    modelId: model.modelId,
+    ...(grantsTier && activeTier
+      ? {
+          contextTiers: model.contextTiers.map((tier) => (
+            tier.id === activeTier.id ? { ...tier, entitlement: 'granted' as const } : tier
+          )),
+        }
+      : {}),
+    ...(grantsFast && model.fast.kind !== 'unsupported' && model.fast.kind !== 'unknown'
+      ? { fast: { ...model.fast, entitlement: 'granted' as const } }
+      : {}),
+  }], `Successful request activated ${activated.join(' and ')}`);
 }

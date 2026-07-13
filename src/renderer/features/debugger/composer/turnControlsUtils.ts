@@ -1,13 +1,12 @@
 import type {
   ConversationTurnControls,
-  ReasoningControl,
-  ReasoningSelection,
 } from '@shared/types/modelCapability';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
-  clampReasoningSelection,
-  coerceReasoningSelectionCandidate,
-} from '@shared/types/modelCapability';
+  contextTierPromptCap,
+  resolveContextTierChoices,
+} from '@shared/utils/contextTiers';
+import { evaluateModelControls, isFastModeSelectable } from '@shared/utils/modelControls';
 
 export const DEFAULT_TURN_CONTROLS: ConversationTurnControls = {
   reasoningLevel: 'off',
@@ -19,18 +18,6 @@ type TurnControlsInput = Partial<Omit<ConversationTurnControls, 'reasoningLevel'
   reasoningLevel?: unknown;
   effort?: unknown;
 };
-
-function normalizeTurnControls(
-  controls: TurnControlsInput,
-  reasoningControl: ReasoningControl,
-): ConversationTurnControls {
-  return {
-    reasoningLevel: coerceReasoningSelectionCandidate(controls.reasoningLevel ?? controls.effort, reasoningControl)
-      ?? reasoningControl.defaultSelection,
-    maxContextMode: controls.maxContextMode === true,
-    fastModel: controls.fastModel === true,
-  };
-}
 
 export function formatTokenCount(value: number): string {
   if (value >= 1_000_000) {
@@ -48,48 +35,29 @@ export function sanitizeTurnControls(
   controls: TurnControlsInput,
   capability: EffectiveModel | null,
 ): ConversationTurnControls {
-  const reasoningControl = capability?.reasoning ?? {
-    kind: 'none',
-    supportsOff: true,
-    levels: [],
-    defaultSelection: 'off' as ReasoningSelection,
-    wireProfile: { kind: 'none' as const },
-  };
-  const normalized = normalizeTurnControls(controls, reasoningControl);
-  const reasoningLevel = clampReasoningSelection(normalized.reasoningLevel, reasoningControl)
-    ?? reasoningControl.defaultSelection;
-
-  return {
-    reasoningLevel,
-    maxContextMode: normalized.maxContextMode && hasSelectableMaxTier(capability),
-    fastModel: normalized.fastModel && hasSelectableFastMode(capability),
-  };
+  if (!capability) return DEFAULT_TURN_CONTROLS;
+  return evaluateModelControls(capability, {
+    ...controls,
+    reasoningLevel: controls.reasoningLevel ?? controls.effort,
+  }).controls;
 }
 
 export function hasSelectableMaxTier(capability: EffectiveModel | null): boolean {
-  if (!capability) return false;
-  return capability.contextTiers.filter((tier) => tier.entitlement !== 'denied').length >= 2;
+  return Boolean(capability && resolveContextTierChoices(capability).maxTier);
 }
 
 export function maxContextTokens(capability: EffectiveModel | null): number | undefined {
-  return capability?.contextTiers
-    .filter((tier) => tier.entitlement !== 'denied')
-    .reduce<number | undefined>((max, tier) => (
-      typeof tier.maxPromptTokens === 'number' ? Math.max(max ?? 0, tier.maxPromptTokens) : max
-    ), undefined);
+  if (!capability) return undefined;
+  const tier = resolveContextTierChoices(capability).maxTier;
+  return tier ? contextTierPromptCap(tier) : undefined;
 }
 
 export function isMaxTierUnverified(capability: EffectiveModel | null): boolean {
-  if (!capability) return false;
-  const usable = capability.contextTiers.filter((tier) => tier.entitlement !== 'denied');
-  return usable.length >= 2 && usable[usable.length - 1]?.entitlement === 'unknown';
+  return Boolean(capability && resolveContextTierChoices(capability).maxTierUnverified);
 }
 
 export function hasSelectableFastMode(capability: EffectiveModel | null): boolean {
-  return Boolean(capability
-    && capability.fast.kind !== 'unsupported'
-    && capability.fast.kind !== 'unknown'
-    && capability.fast.entitlement !== 'denied');
+  return Boolean(capability && isFastModeSelectable(capability));
 }
 
 export function isFastModeUnverified(capability: EffectiveModel | null): boolean {

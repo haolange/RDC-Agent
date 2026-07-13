@@ -417,6 +417,19 @@ async function main() {
   assertSourceContains(liveCatalogParsers, ['parseOpenCodeGoCatalog', 'parseClineCatalog', 'parseGrokAccountCatalog'], 'live provider catalog parsers');
   const capabilityContractTest = read('src/main/settings/ProviderCapabilityContract.test.ts');
   assertSourceContains(capabilityContractTest, ['effective-model-contract.json', 'fixtures/provider-catalogs'], 'final provider capability fixture contract');
+  const requestPlanner = read('src/main/settings/RequestPlanner.ts');
+  const contextTierPolicy = read('src/shared/utils/contextTiers.ts');
+  const modelControlPolicy = read('src/shared/utils/modelControls.ts');
+  const rendererTurnControls = read('src/renderer/features/debugger/composer/turnControlsUtils.ts');
+  assert(!requestPlanner.includes('256_000') && !requestPlanner.includes('256000'), 'RequestPlanner must never invent a fixed 256K budget.');
+  assert(!contextTierPolicy.includes('1_000_000') && !contextTierPolicy.includes('1000000'), 'Max selection must not use a 1M token threshold.');
+  assertSourceContains(requestPlanner, ['resolveContextTierChoices', 'evaluateModelControls'], 'RequestPlanner shared capability policy');
+  assertSourceContains(rendererTurnControls, ['resolveContextTierChoices', 'evaluateModelControls'], 'renderer shared capability policy');
+  assertSourceContains(modelControlPolicy, ['CONSTRAINT_CYCLE', 'isFastModeSelectable'], 'shared model-control evaluator');
+  assert(!read('src/main/agent-runtime/core/types.ts').includes('ProviderCapabilities'), 'Runtime must not retain a second boolean capability matrix.');
+  for (const sourcePath of listSourceFiles('src/main/agent-runtime/providers')) {
+    assertSourceDoesNotContain(fs.readFileSync(sourcePath, 'utf8'), ['getCapabilities()'], path.relative(process.cwd(), sourcePath));
+  }
   const effectiveCatalogTest = read('src/main/settings/EffectiveCatalogService.test.ts');
   assertSourceContains(effectiveCatalogTest, ['2 ** layers.length', 'mask=${mask}', 'last present leaf provenance'], 'six-layer deterministic combination tests');
   assert(!providerAccountAuthService.includes('GROK_AUTH_DEVICE_ENDPOINT'), 'Super Grok OAuth device endpoint must come from xAI OIDC metadata.');

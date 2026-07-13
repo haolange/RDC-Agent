@@ -36,6 +36,7 @@ const TEST_REQUEST_PLAN: RequestPlan = {
   bodyPatch: {},
   contextBudgetTokens: TEST_MODEL.contextWindow,
   activeTierId: 'default',
+  fastMode: false,
   reasoningWire: {
     selection: 'off',
     control: {
@@ -82,14 +83,6 @@ describe('AgentLoop recovery diagnostics', () => {
     let attempts = 0;
     const provider: ProviderStrategy = {
       api: 'openai-completions',
-      getCapabilities: () => ({
-        streaming: true,
-        nativeToolCalling: true,
-        structuredOutput: false,
-        vision: false,
-        reasoning: false,
-        parallelToolCalls: false,
-      }),
       stream: () => {
         attempts += 1;
         if (attempts === 1) {
@@ -144,14 +137,6 @@ describe('AgentLoop recovery diagnostics', () => {
   it('does not emit recovery diagnostics when the first provider call succeeds', async () => {
     const provider: ProviderStrategy = {
       api: 'openai-completions',
-      getCapabilities: () => ({
-        streaming: true,
-        nativeToolCalling: true,
-        structuredOutput: false,
-        vision: false,
-        reasoning: false,
-        parallelToolCalls: false,
-      }),
       stream: () => makeProviderStream(async () => makeAssistantMessage('ok')),
     };
 

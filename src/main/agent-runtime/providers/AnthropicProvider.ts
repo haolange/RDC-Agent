@@ -6,7 +6,6 @@ import type {
   Context,
   Message,
   Model,
-  ProviderCapabilities,
   ProviderReasoningArtifact,
   StopReason,
   StreamOptions,
@@ -92,7 +91,6 @@ export interface AnthropicProviderOptions {
   apiKey?: string;
   anthropicVersion?: string;
   headers?: Record<string, string>;
-  capabilities?: Partial<ProviderCapabilities>;
 }
 
 export class AnthropicProvider implements ProviderStrategy {
@@ -101,26 +99,12 @@ export class AnthropicProvider implements ProviderStrategy {
   private readonly defaultApiKey: string | undefined;
   private readonly anthropicVersion: string;
   private readonly defaultHeaders: Record<string, string>;
-  private readonly capabilities: ProviderCapabilities;
 
   constructor(options: AnthropicProviderOptions = {}) {
     this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
     this.defaultApiKey = options.apiKey;
     this.anthropicVersion = options.anthropicVersion ?? DEFAULT_ANTHROPIC_VERSION;
     this.defaultHeaders = { ...(options.headers ?? {}) };
-    this.capabilities = {
-      streaming: true,
-      nativeToolCalling: true,
-      structuredOutput: false,
-      vision: true,
-      reasoning: true,
-      parallelToolCalls: true,
-      ...(options.capabilities ?? {}),
-    };
-  }
-
-  getCapabilities(): ProviderCapabilities {
-    return { ...this.capabilities };
   }
 
   stream(

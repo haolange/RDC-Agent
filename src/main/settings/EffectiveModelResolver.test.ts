@@ -11,6 +11,7 @@ vi.mock('electron', () => ({
 }));
 
 import { buildEffectiveCatalogRequest, buildSeedModelContribution } from './EffectiveModelResolver';
+import { mergeEffectiveCatalog } from './EffectiveCatalogService';
 
 function provider(id: string, protocol: LlmProviderEntry['protocol']): LlmProviderEntry {
   return {
@@ -89,5 +90,22 @@ describe('surface-specific effective model seeds', () => {
     expect(request.user?.models).toEqual([
       expect.objectContaining({ modelId: 'custom-model', label: 'Custom model', availability: 'available' }),
     ]);
+  });
+
+  it('projects provider runtime unavailability into every EffectiveModel', () => {
+    const configured = {
+      ...provider('azure-openai', 'AzureOpenAIChatCompletions'),
+      status: 'unavailable' as const,
+      unavailableReason: 'Azure adapter is not implemented.',
+    };
+    const request = buildEffectiveCatalogRequest(configured);
+    expect(request.providerAvailability).toMatchObject({
+      state: 'unavailable',
+      reason: 'Azure adapter is not implemented.',
+    });
+    expect(mergeEffectiveCatalog(request).find((model) => model.modelId === 'gpt-5.5')).toMatchObject({
+      availability: 'unavailable',
+      unavailableReason: 'Azure adapter is not implemented.',
+    });
   });
 });

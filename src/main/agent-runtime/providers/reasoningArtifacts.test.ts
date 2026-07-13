@@ -30,6 +30,7 @@ const requestPlan: RequestPlan = {
   bodyPatch: {},
   contextBudgetTokens: 128_000,
   activeTierId: 'default',
+  fastMode: false,
   reasoningWire: { selection: 'off', control: openAiLevels },
 };
 

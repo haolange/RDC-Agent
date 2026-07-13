@@ -21,6 +21,7 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
     providerId: 'provider-a', modelId: 'model-a', label: 'Model A', aliases: [], enabled: true,
     route: { protocol: 'AnthropicMessages', source: 'preset' }, availability: 'available',
     contextTiers: [{ id: 'default', label: 'Default', maxPromptTokens: 262_144, activation: { kind: 'implicit' }, entitlement: 'granted' }],
+    defaultBudgetTokens: 262_144,
     fast: { kind: 'model-variant', modelId: 'model-a-fast', entitlement: 'granted' },
     reasoning: { kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on', wireProfile: { kind: 'anthropic', on: 'high', onMode: 'enabled', offMode: 'disabled' } },
     toolCalling: { state: 'supported' }, visionInput: { state: 'unknown' }, structuredOutput: { state: 'unknown' },

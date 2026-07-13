@@ -7,7 +7,6 @@ import type {
   AssistantMessageEvent,
   Context,
   Model,
-  ProviderCapabilities,
   StreamOptions,
 } from '../core/types';
 import { settingsService } from '../../settings/SettingsService';
@@ -92,7 +91,6 @@ function toRuntimeApi(protocol: LlmProviderProtocol): Model['api'] {
 function createProviderStrategy(
   provider: ConfiguredProvider,
   protocol: LlmProviderProtocol,
-  capabilities: ProviderCapabilities,
 ): ProviderStrategy {
   switch (protocol) {
     case 'AnthropicMessages':
@@ -100,19 +98,16 @@ function createProviderStrategy(
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
         headers: provider.id === 'kimi-coding-plan' ? { 'User-Agent': 'RDC-Agent' } : undefined,
-        capabilities,
       });
     case 'GoogleGemini':
       return new GeminiProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
-        capabilities,
       });
     case 'OllamaOpenAICompatibleChatCompletions':
       return new OllamaProvider({
         apiKey: provider.apiKey || undefined,
         baseUrl: normalizeLocalBaseUrl(provider.baseUrl),
-        capabilities,
       });
     case 'OpenRouterChatCompletions':
       return new OpenAICompatibleProvider({
@@ -122,20 +117,17 @@ function createProviderStrategy(
           'HTTP-Referer': 'https://rdcagent.local',
           'X-Title': 'RDC-Agent',
         },
-        capabilities,
       });
     case 'OpenAICompatibleChatCompletions':
       return new OpenAICompatibleProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
-        capabilities,
       });
     case 'OpenAIResponses':
       return new OpenAIResponsesProvider({
         apiKey: provider.apiKey,
         baseUrl: provider.baseUrl,
         accountId: provider.accountId,
-        capabilities,
       });
     case 'AzureOpenAIChatCompletions':
     case 'AwsBedrock':
@@ -158,17 +150,6 @@ function missingProviderStream(error: Error): EventStream<AssistantMessageEvent,
 
 export class ConfiguredRuntimeProvider implements ProviderStrategy {
   readonly api = CONFIGURED_PROVIDER_API;
-
-  getCapabilities(): ProviderCapabilities {
-    return {
-      streaming: true,
-      nativeToolCalling: true,
-      structuredOutput: false,
-      vision: false,
-      reasoning: true,
-      parallelToolCalls: true,
-    };
-  }
 
   stream(
     model: Model,
@@ -193,15 +174,6 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
     if (!effectiveModel) {
       return missingProviderStream(new Error(`No EffectiveModel is available for ${decoded.providerId}/${decoded.modelId}.`));
     }
-    const toolCalling = effectiveModel.toolCalling.state !== 'unsupported';
-    const capabilities: ProviderCapabilities = {
-      streaming: true,
-      nativeToolCalling: toolCalling,
-      structuredOutput: effectiveModel.structuredOutput.state === 'supported',
-      vision: effectiveModel.visionInput.state === 'supported',
-      reasoning: effectiveModel.reasoning.kind !== 'none',
-      parallelToolCalls: toolCalling,
-    };
     const runtimeModel: Model = {
       ...model,
       id: effectiveModelId,
@@ -217,7 +189,7 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
         ? normalizeLocalBaseUrl(requestPlan.route.baseUrl ?? latest.baseUrl)
         : requestPlan.route.baseUrl ?? latest.baseUrl;
       try {
-        const strategy = createProviderStrategy({ ...latest, baseUrl: latestBaseUrl }, protocol, capabilities);
+        const strategy = createProviderStrategy({ ...latest, baseUrl: latestBaseUrl }, protocol);
         return strategy.stream(runtimeModel, context, {
           ...options,
           apiKey: latest.apiKey,

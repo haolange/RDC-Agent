@@ -35,6 +35,27 @@ function configuredProvider(id, modelIds) {
   };
 }
 
+function effectiveModel(provider, modelId, overrides = {}) {
+  return {
+    providerId: provider.id,
+    modelId,
+    label: modelId,
+    aliases: [],
+    enabled: true,
+    route: { protocol: provider.protocol, baseUrl: provider.baseUrl, source: 'preset' },
+    availability: 'available',
+    contextTiers: [{ id: 'default', label: 'Default', activation: { kind: 'implicit' }, entitlement: 'granted' }],
+    defaultBudgetTokens: 128000,
+    fast: { kind: 'unsupported' },
+    reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+    toolCalling: { state: 'supported' },
+    visionInput: { state: 'unknown' },
+    structuredOutput: { state: 'unknown' },
+    provenance: [],
+    ...overrides,
+  };
+}
+
 function extractStringLiterals(source) {
   return Array.from(source.matchAll(/'([^']+)'/g), (match) => match[1]);
 }
@@ -72,25 +93,23 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
     describeRouteCapabilityDiagnostic,
   } = require('../src/main/agent-runtime/capabilities/RouteCapabilityResolver.ts');
 
-  const kimiCapability = resolveAgentRouteCapability(
-    configuredProvider('kimi-coding-plan', ['kimi-for-coding']),
-    'kimi-for-coding',
-  );
+  const kimi = configuredProvider('kimi-coding-plan', ['kimi-for-coding']);
+  const kimiCapability = resolveAgentRouteCapability(kimi, 'kimi-for-coding', effectiveModel(kimi, 'kimi-for-coding'));
   assert(kimiCapability.toolCallingMode === 'native-structured', 'kimi-coding-plan must resolve to native structured tool calling.');
   assert(kimiCapability.supportsToolResults === true, 'native structured routes must support tool results.');
 
-  const grokCapability = resolveAgentRouteCapability(
-    configuredProvider('grok-account', ['grok-code-fast-1']),
-    'grok-code-fast-1',
-  );
+  const grok = configuredProvider('grok-account', ['grok-code-fast-1']);
+  const grokCapability = resolveAgentRouteCapability(grok, 'grok-code-fast-1', effectiveModel(grok, 'grok-code-fast-1', {
+    toolCalling: { state: 'unknown' },
+  }));
   assert(grokCapability.toolCallingMode === 'native-structured', 'grok-account must resolve to native structured tool calling.');
   assert(grokCapability.supportsToolResults === true, 'grok-account native structured routes must support tool results.');
 
-  const openRouterCapability = resolveAgentRouteCapability(
-    configuredProvider('openrouter', ['anthropic/claude-haiku-latest']),
-    'anthropic/claude-haiku-latest',
-  );
-  assert(openRouterCapability.toolCallingMode === 'text-only', 'openrouter must stay text-only until its capability declares tool-calling.');
+  const openRouter = configuredProvider('openrouter', ['anthropic/claude-haiku-latest']);
+  const openRouterCapability = resolveAgentRouteCapability(openRouter, 'anthropic/claude-haiku-latest', effectiveModel(openRouter, 'anthropic/claude-haiku-latest', {
+    toolCalling: { state: 'unsupported' },
+  }));
+  assert(openRouterCapability.toolCallingMode === 'text-only', 'an explicitly unsupported EffectiveModel must stay text-only.');
   assert(
     describeRouteCapabilityDiagnostic(openRouterCapability, 2)?.includes('text-only'),
     'text-only routes with tools should emit a capability diagnostic.',

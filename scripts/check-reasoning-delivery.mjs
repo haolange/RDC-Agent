@@ -29,13 +29,33 @@ function configuredProvider(id, protocolOverride) {
     hasStoredSecret: true,
     isConfigured: true,
     status: 'verified',
-    capabilities: [...(provider.capabilities ?? []), 'reasoning', 'chat', 'tool-calling'],
     models: [{
       id: 'test-model',
       label: 'test-model',
       enabled: true,
       contextWindowTokens: null,
     }],
+  };
+}
+
+function effectiveModel(provider, modelId, overrides = {}) {
+  return {
+    providerId: provider.id,
+    modelId,
+    label: modelId,
+    aliases: [],
+    enabled: true,
+    route: { protocol: provider.protocol, baseUrl: provider.baseUrl, source: 'preset' },
+    availability: 'available',
+    contextTiers: [{ id: 'default', label: 'Default', activation: { kind: 'implicit' }, entitlement: 'granted' }],
+    defaultBudgetTokens: 128000,
+    fast: { kind: 'unsupported' },
+    reasoning: { kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on', wireProfile: { kind: 'none' } },
+    toolCalling: { state: 'supported' },
+    visionInput: { state: 'unknown' },
+    structuredOutput: { state: 'unknown' },
+    provenance: [],
+    ...overrides,
   };
 }
 
@@ -46,33 +66,34 @@ const ollama = configuredProvider('ollama', 'OllamaOpenAICompatibleChatCompletio
 const deepseek = configuredProvider('deepseek', 'OpenAICompatibleChatCompletions');
 const kimi = configuredProvider('kimi-coding-plan', 'AnthropicMessages');
 
-const anthropicCap = resolveAgentRouteCapability(anthropic, 'test-model');
+const anthropicCap = resolveAgentRouteCapability(anthropic, 'test-model', effectiveModel(anthropic, 'test-model'));
 assert(anthropicCap.reasoningDelivery === 'summary-only', 'Anthropic must use summary-only delivery');
 assert(anthropicCap.reasoningContract.semantic === 'summary', 'Native Anthropic summarized display must be explicit');
 assert(reasoningDeliveryToStreamVisibility(anthropicCap.reasoningDelivery) === 'summary-events', 'summary-only must map to summary-events stream visibility');
 
-const responsesCap = resolveAgentRouteCapability(openaiResponses, 'test-model');
+const responsesCap = resolveAgentRouteCapability(openaiResponses, 'test-model', effectiveModel(openaiResponses, 'test-model'));
 assert(responsesCap.reasoningDelivery === 'summary-only', 'OpenAI Responses must use summary-only delivery');
 assert(responsesCap.reasoningContract.semantic === 'summary', 'Native OpenAI Responses summary events must be explicit');
 
-const geminiCap = resolveAgentRouteCapability(gemini, 'test-model');
+const geminiCap = resolveAgentRouteCapability(gemini, 'test-model', effectiveModel(gemini, 'test-model'));
 assert(geminiCap.reasoningDelivery === 'stream-full', 'Gemini must use stream-full delivery');
 assert(geminiCap.reasoningContract.semantic === 'unknown', 'Gemini display semantics must remain unknown without model-specific evidence');
 
-const ollamaCap = resolveAgentRouteCapability(ollama, 'test-model');
+const ollamaCap = resolveAgentRouteCapability(ollama, 'test-model', effectiveModel(ollama, 'test-model'));
 assert(ollamaCap.reasoningDelivery === 'stream-full', 'Ollama must use stream-full delivery');
 assert(ollamaCap.reasoningContract.semantic === 'unknown', 'Ollama-compatible reasoning must not be inferred as raw');
 
-assert(resolveAgentRouteCapability(deepseek, 'deepseek-reasoner').reasoningContract.semantic === 'raw', 'Direct DeepSeek reasoning_content is documented raw reasoning');
-assert(resolveAgentRouteCapability(kimi, 'kimi-for-coding').reasoningContract.semantic === 'raw', 'Kimi Coding Plan must be raw, never Anthropic summary');
-assert(resolveAgentRouteCapability(configuredProvider('moonshot', 'AnthropicMessages'), 'kimi-k2.5').reasoningContract.semantic === 'raw', 'Moonshot compatible Anthropic must be raw');
-assert(resolveAgentRouteCapability(configuredProvider('deepseek', 'AnthropicMessages'), 'deepseek-v4-pro').reasoningContract.semantic === 'raw', 'DeepSeek Anthropic route must stay raw');
+assert(resolveAgentRouteCapability(deepseek, 'deepseek-reasoner', effectiveModel(deepseek, 'deepseek-reasoner')).reasoningContract.semantic === 'raw', 'Direct DeepSeek reasoning_content is documented raw reasoning');
+assert(resolveAgentRouteCapability(kimi, 'kimi-for-coding', effectiveModel(kimi, 'kimi-for-coding')).reasoningContract.semantic === 'raw', 'Kimi Coding Plan must be raw, never Anthropic summary');
+const moonshotAnthropic = configuredProvider('moonshot', 'AnthropicMessages');
+assert(resolveAgentRouteCapability(moonshotAnthropic, 'kimi-k2.5', effectiveModel(moonshotAnthropic, 'kimi-k2.5')).reasoningContract.semantic === 'raw', 'Moonshot compatible Anthropic must be raw');
+const deepseekAnthropic = configuredProvider('deepseek', 'AnthropicMessages');
+assert(resolveAgentRouteCapability(deepseekAnthropic, 'deepseek-v4-pro', effectiveModel(deepseekAnthropic, 'deepseek-v4-pro')).reasoningContract.semantic === 'raw', 'DeepSeek Anthropic route must stay raw');
 
-const noReasoningProvider = {
-  ...configuredProvider('openai', 'OpenAICompatibleChatCompletions'),
-  capabilities: ['chat', 'tool-calling'],
-};
-assert(resolveProviderReasoningContract(noReasoningProvider, 'test-model').semantic === 'none', 'providers without reasoning capability must be none');
+const noReasoningProvider = configuredProvider('openai', 'OpenAICompatibleChatCompletions');
+assert(resolveProviderReasoningContract(noReasoningProvider, effectiveModel(noReasoningProvider, 'test-model', {
+  reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+})).semantic === 'none', 'models without reasoning capability must be none');
 
 const fs = require('node:fs');
 const openaiCompatibleSource = fs.readFileSync('src/main/agent-runtime/providers/OpenAICompatibleProvider.ts', 'utf8');

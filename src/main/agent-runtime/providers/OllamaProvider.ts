@@ -18,7 +18,6 @@ import type {
   Context,
   Message,
   Model,
-  ProviderCapabilities,
   StopReason,
   StreamOptions,
   ToolDefinition,
@@ -64,7 +63,6 @@ export interface OllamaProviderOptions {
   /** Ollama 默认无需 apiKey，但允许在反代场景下注入 Bearer。 */
   apiKey?: string;
   headers?: Record<string, string>;
-  capabilities?: Partial<ProviderCapabilities>;
 }
 
 export class OllamaProvider implements ProviderStrategy {
@@ -72,25 +70,11 @@ export class OllamaProvider implements ProviderStrategy {
   private readonly defaultBaseUrl: string;
   private readonly defaultApiKey: string | undefined;
   private readonly defaultHeaders: Record<string, string>;
-  private readonly capabilities: ProviderCapabilities;
 
   constructor(options: OllamaProviderOptions = {}) {
     this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
     this.defaultApiKey = options.apiKey;
     this.defaultHeaders = { ...(options.headers ?? {}) };
-    this.capabilities = {
-      streaming: true,
-      nativeToolCalling: true,
-      structuredOutput: true,
-      vision: false,
-      reasoning: false,
-      parallelToolCalls: false,
-      ...(options.capabilities ?? {}),
-    };
-  }
-
-  getCapabilities(): ProviderCapabilities {
-    return { ...this.capabilities };
   }
 
   stream(
