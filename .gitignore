@@ -27,8 +27,8 @@ build/
 .vs/
 
 # Runtime local app data and scratch directories
-tmp/
-browser-session-tmp/
+/tmp/
+/browser-session-tmp/
 
 # Python local environment
 .venv
@@ -43,16 +43,16 @@ test-results/
 playwright-report/
 
 # Runtime workspace and local app data
-workspace/
-logs/
-settings.json
-migration-orphans/
-migration-reports/
-profiles/
-policies/
-secrets/
+/workspace/
+/logs/
+/settings.json
+/migration-orphans/
+/migration-reports/
+/profiles/
+/policies/
+/secrets/
 /projects/
-knowledge/
+/knowledge/
 
 # OS junk
 .DS_Store

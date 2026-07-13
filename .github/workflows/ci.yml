@@ -1,5 +1,16 @@
 name: CI
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -14,6 +25,7 @@ jobs:
           node-version: '22.13.0'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm run check:repository-hygiene
       - run: pnpm run typecheck
       - run: pnpm run lint
       - run: pnpm test
@@ -25,6 +37,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -38,7 +52,32 @@ jobs:
         if: runner.os == 'Windows'
         shell: cmd
         run: scripts\start-rdc-agent.cmd --prepare-only
+      - name: Verify conditional Windows prepare
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $output = (& scripts\start-rdc-agent.cmd --prepare-only 2>&1) -join "`n"
+          $output
+          if ($output -notmatch 'Dependencies are current; skipping pnpm install') { throw 'Second prepare did not skip dependency install.' }
+          if ($output -notmatch 'Build outputs are current; skipping build') { throw 'Second prepare did not skip build.' }
+          $expected = [IO.Path]::GetFullPath((Join-Path $HOME '.cache\rdc-agent\pnpm-store'))
+          $actual = [IO.Path]::GetFullPath((pnpm store path))
+          if (-not $actual.StartsWith($expected, [StringComparison]::OrdinalIgnoreCase)) { throw "Unexpected pnpm store: $actual" }
       - name: Prepare through POSIX wrapper
         if: runner.os != 'Windows'
         shell: bash
         run: sh scripts/start-rdc-agent.sh --prepare-only
+      - name: Verify conditional POSIX prepare
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          output=$(sh scripts/start-rdc-agent.sh --prepare-only 2>&1)
+          printf '%s\n' "$output"
+          grep -F 'Dependencies are current; skipping pnpm install.' <<<"$output"
+          grep -F 'Build outputs are current; skipping build.' <<<"$output"
+          case "$(pnpm store path)" in
+            "$HOME/.cache/rdc-agent/pnpm-store"/*) ;;
+            *) echo "Unexpected pnpm store: $(pnpm store path)" >&2; exit 1 ;;
+          esac
+      - name: Build unpacked release
+        run: pnpm run pack

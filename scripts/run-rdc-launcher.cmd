@@ -1,0 +1,28 @@
+@echo off
+setlocal
+cd /d "%~dp0\.."
+
+if defined RDC_AGENT_NODE (
+  set "NODE_EXE=%RDC_AGENT_NODE%"
+  if not exist "%RDC_AGENT_NODE%" (
+    echo [RDC-Agent] RDC_AGENT_NODE does not exist: %RDC_AGENT_NODE%
+    exit /b 1
+  )
+) else (
+  where node >nul 2>nul
+  if not errorlevel 1 (
+    set "NODE_EXE=node"
+  ) else (
+    set "NODE_EXE=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe"
+  )
+)
+
+if not exist "%NODE_EXE%" if "%NODE_EXE%"=="node" goto run
+if not exist "%NODE_EXE%" (
+  echo [RDC-Agent] Node.js ^>=22.13.0 is missing. Install Node.js, set RDC_AGENT_NODE, or run from Codex with its bundled runtime.
+  exit /b 1
+)
+
+:run
+call "%NODE_EXE%" "%CD%\scripts\launch-rdc-agent.mjs" %*
+exit /b %ERRORLEVEL%

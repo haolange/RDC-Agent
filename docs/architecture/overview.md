@@ -35,3 +35,5 @@ The RDX CLI command is not hardcoded or bundled. System-installed CLI commands, 
 ## Verification
 
 Use `pnpm run typecheck` for static validation. For renderer or IPC changes, also run `pnpm run check:architecture`, `pnpm run check:fidelity`, and `pnpm run check:shared-exports`. For shell/window/local invocation boundaries, build first and then run the relevant smoke test.
+
+Source development uses pnpm `11.7.0` with a per-user store under `~/.cache/rdc-agent`; every human/browser and production/development source entry reaches the shared launcher. Dependency and build fingerprints avoid repeated preparation while preserving a `--force-prepare` recovery path. Packaged applications contain compiled runtime inputs only and never depend on the source package manager or launcher.

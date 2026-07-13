@@ -42,8 +42,8 @@ const DEFAULT_ROUTINE_COMMAND_PREFIXES = [
   'git log',
   'rg',
   'node scripts/check-',
-  'npm run check:',
-  'npm run typecheck',
+  'pnpm run check:',
+  'pnpm run typecheck',
 ];
 const DANGEROUS_COMMAND_PATTERNS = [
   /\brm\b/i,

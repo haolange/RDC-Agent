@@ -5,7 +5,7 @@ export default defineConfig({
   retries: 1,
   use: { headless: true, viewport: { width: 1400, height: 900 }, video: 'retain-on-failure' },
   webServer: {
-    command: 'npm run dev:renderer',
+    command: 'pnpm run dev:renderer',
     port: 5173,
     reuseExistingServer: true,
   },

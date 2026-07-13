@@ -1,3 +1,6 @@
+storeDir: ~/.cache/rdc-agent/pnpm-store
+preferOffline: true
+
 allowBuilds:
   '@swc/core': true
   electron-winstaller: true
