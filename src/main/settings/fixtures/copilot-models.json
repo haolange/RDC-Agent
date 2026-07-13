@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "id": "gpt-5.5",
+      "name": "GPT-5.5",
+      "billing": {
+        "token_prices": {
+          "default": { "context_max": 272000, "entitled": true },
+          "long_context": { "context_max": 922000 }
+        }
+      }
+    },
+    {
+      "id": "gpt-5-mini",
+      "billing": {
+        "token_prices": {
+          "default": { "context_max": "272000" }
+        }
+      }
+    }
+  ]
+}

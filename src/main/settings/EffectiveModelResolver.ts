@@ -26,6 +26,13 @@ import type {
   LlmProviderEntry,
 } from '@shared/types/settings';
 import { planModelRequest } from './RequestPlanner';
+import { parseCopilotBillingTiers } from './CopilotBilling';
+import { settingsService } from './SettingsService';
+
+const MODERN_ANTHROPIC_MODELS = new Set(['claude-fable-5', 'claude-sonnet-5', 'claude-opus-4-8']);
+const COPILOT_SEED_PROMPT_TOKENS = 272_000;
+const ANTHROPIC_DEFAULT_PROMPT_TOKENS = 200_000;
+const ANTHROPIC_MAX_PROMPT_TOKENS = 1_000_000;
 
 const CONSERVATIVE_REASONING: ReasoningControl = {
   kind: 'none',
@@ -44,7 +51,7 @@ function routeFor(provider: LlmProviderEntry): ModelRoute {
   };
 }
 
-function seedModel(
+export function buildSeedModelContribution(
   provider: LlmProviderEntry,
   modelId: string,
 ): CatalogModelContribution {
@@ -56,19 +63,40 @@ function seedModel(
     && profile.nominalContextWindowTokens > 0
     ? profile.nominalContextWindowTokens
     : undefined;
-  const defaultBudgetTokens = nominal ? Math.min(256_000, nominal) : 256_000;
-  const contextTiers: CatalogModelContribution['contextTiers'] = [{
-    id: 'default',
-    label: 'Default',
-    ...(nominal ? { maxPromptTokens: nominal } : {}),
-    activation: { kind: 'implicit' },
-    entitlement: 'granted',
-  }];
+  let contextTiers: NonNullable<CatalogModelContribution['contextTiers']>;
+  if (provider.id === 'chatgpt-account') {
+    contextTiers = [{ id: 'default', label: 'Codex service limit', activation: { kind: 'implicit' }, entitlement: 'granted' }];
+  } else if (provider.id === 'github-copilot') {
+    contextTiers = [{ id: 'default', label: 'Default', maxPromptTokens: Math.min(nominal ?? COPILOT_SEED_PROMPT_TOKENS, COPILOT_SEED_PROMPT_TOKENS), activation: { kind: 'implicit' }, entitlement: 'granted' }];
+  } else if ((provider.id === 'claude-account' || provider.id === 'anthropic') && MODERN_ANTHROPIC_MODELS.has(modelId)) {
+    contextTiers = [
+      { id: 'default', label: 'Default', maxPromptTokens: ANTHROPIC_DEFAULT_PROMPT_TOKENS, activation: { kind: 'implicit' }, entitlement: 'granted' },
+      {
+        id: 'max',
+        label: '1M context',
+        maxPromptTokens: ANTHROPIC_MAX_PROMPT_TOKENS,
+        activation: provider.id === 'claude-account'
+          ? { kind: 'header', headers: { 'anthropic-beta': 'context-1m-2025-08-07' } }
+          : { kind: 'implicit' },
+        entitlement: provider.id === 'claude-account' ? 'unknown' : 'granted',
+      },
+    ];
+  } else {
+    contextTiers = [{
+      id: 'default',
+      label: 'Default',
+      ...(nominal ? { maxPromptTokens: nominal } : {}),
+      activation: { kind: 'implicit' },
+      entitlement: 'granted',
+    }];
+  }
+  const defaultTierCap = contextTiers[0]?.maxPromptTokens;
+  const defaultBudgetTokens = Math.min(256_000, defaultTierCap ?? 256_000);
   const providerModel = provider.models.find((model) => model.id === modelId);
   const fastModelId = profile?.fast?.modelId;
-  const fastEnabled = Boolean(fastModelId && provider.models.some(
+  const fastEnabled = Boolean(fastModelId && (provider.id === 'github-copilot' || provider.models.some(
     (model) => model.id === fastModelId && model.enabled !== false,
-  ));
+  )));
 
   return {
     modelId,
@@ -85,7 +113,9 @@ function seedModel(
     unavailableReason: providerModel?.availabilityReason,
     contextTiers,
     defaultBudgetTokens,
-    fast: fastModelId
+    fast: provider.id === 'chatgpt-account'
+      ? { kind: 'request-param', patch: { service_tier: 'priority' }, entitlement: 'granted', label: 'Fast' }
+      : fastModelId
       ? {
           kind: 'model-variant',
           modelId: fastModelId,
@@ -106,6 +136,27 @@ function seedModel(
   };
 }
 
+function copilotEntitlementContribution(provider: LlmProviderEntry): CatalogLayerContribution | undefined {
+  if (provider.id !== 'github-copilot') return undefined;
+  try {
+    const raw = settingsService.getProviderOAuthSecret(provider.id);
+    const bundle = JSON.parse(raw) as { copilotModelBilling?: Record<string, unknown> };
+    const models = Object.entries(bundle.copilotModelBilling ?? {}).flatMap(([modelId, billing]) => {
+      const contextTiers = parseCopilotBillingTiers(billing);
+      return contextTiers.length > 0 ? [{ modelId, contextTiers }] : [];
+    });
+    if (models.length === 0) return undefined;
+    return {
+      source: 'entitlement',
+      observedAt: provider.lastModelRefreshAt ?? provider.lastTestedAt ?? '2026-07-13T00:00:00.000Z',
+      detail: 'GitHub Copilot account billing context tiers',
+      models,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 function seedContribution(provider: LlmProviderEntry, requestedModelId?: string): CatalogLayerContribution {
   const ids = new Set(provider.models.map((model) => model.id));
   if (provider.catalogOwnership === 'app-managed') {
@@ -120,7 +171,7 @@ function seedContribution(provider: LlmProviderEntry, requestedModelId?: string)
     source: 'seed',
     observedAt: '2026-07-13T00:00:00.000Z',
     detail: 'Bundled legacy seed pending preset migration',
-    models: [...ids].map((modelId) => seedModel(provider, modelId)),
+    models: [...ids].map((modelId) => buildSeedModelContribution(provider, modelId)),
   };
 }
 
@@ -132,7 +183,7 @@ function userContribution(provider: LlmProviderEntry): CatalogLayerContribution 
     source: 'user',
     observedAt: provider.lastModelRefreshAt ?? provider.lastTestedAt ?? '2026-07-13T00:00:00.000Z',
     detail: 'User-managed provider model definition',
-    models: provider.models.map((model) => seedModel(provider, model.id)),
+    models: provider.models.map((model) => buildSeedModelContribution(provider, model.id)),
   };
 }
 
@@ -152,6 +203,7 @@ export function resolveEffectiveCatalog(
     catalogOwnership: provider.catalogOwnership,
     fallbackRoute: routeFor(provider),
     seed: seedContribution(provider, requestedModelId),
+    entitlement: copilotEntitlementContribution(provider),
     user: userContribution(provider),
   });
 }

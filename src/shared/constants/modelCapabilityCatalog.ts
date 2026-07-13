@@ -710,7 +710,6 @@ const copilotModels = [
     ...multimodal(1_000_000, anthropicFiveLevelsDefaultHigh),
     fast: { modelId: 'claude-opus-4-8-fast' },
   }, COPILOT_SOURCE),
-  model('claude-opus-4-8-fast', multimodal(1_000_000, anthropicFiveLevelsDefaultHigh), COPILOT_SOURCE),
   model('gemini-3.1-pro-preview', multimodal(1_048_576, gemini31Levels), COPILOT_SOURCE),
   model('gemini-3.5-flash', multimodal(1_048_576, gemini35Levels), COPILOT_SOURCE),
 ];
