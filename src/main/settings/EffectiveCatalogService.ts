@@ -83,6 +83,7 @@ interface TransientQuotaEntry {
 }
 
 export type DiscoveryLoader = () => Promise<Omit<CatalogLayerContribution, 'source' | 'observedAt' | 'expiresAt'>>;
+export type DiscoveryLoaderResolver = (request: EffectiveCatalogRequest) => DiscoveryLoader | undefined;
 export type EffectiveCatalogListener = (snapshot: EffectiveCatalogSnapshot) => void;
 
 const EMPTY_STATE: PersistedCatalogState = {
@@ -321,6 +322,8 @@ export class EffectiveCatalogService {
   private readonly listeners = new Set<EffectiveCatalogListener>();
   private readonly lastErrors = new Map<string, string>();
   private readonly transientQuota = new Map<string, TransientQuotaEntry>();
+  private readonly latestRequests = new Map<string, EffectiveCatalogRequest>();
+  private discoveryLoaderResolver?: DiscoveryLoaderResolver;
 
   constructor(options: EffectiveCatalogServiceOptions = {}) {
     this.statePath = options.statePath
@@ -335,6 +338,10 @@ export class EffectiveCatalogService {
     return () => this.listeners.delete(listener);
   }
 
+  setDiscoveryLoaderResolver(resolver?: DiscoveryLoaderResolver): void {
+    this.discoveryLoaderResolver = resolver;
+  }
+
   invalidateDiscovery(input: { providerId: string; accountId: string; protocol?: LlmProviderProtocol }): void {
     const exactKey = input.protocol ? cacheKey(input.providerId, input.accountId, input.protocol) : null;
     const prefix = `${input.providerId}\u0000${input.accountId}\u0000`;
@@ -346,9 +353,21 @@ export class EffectiveCatalogService {
     }
     if (exactKey) this.lastErrors.delete(exactKey);
     this.persistState();
+    this.emitLatestSnapshots(input);
   }
 
   getSnapshot(request: EffectiveCatalogRequest, loader?: DiscoveryLoader): EffectiveCatalogSnapshot {
+    const key = cacheKey(request.providerId, request.accountId, request.protocol);
+    this.latestRequests.set(key, cloneJson(request));
+    const snapshot = this.createSnapshot(request);
+    const activeLoader = loader ?? this.discoveryLoaderResolver?.(request);
+    if ((!this.resolveDiscovery(request) || snapshot.stale) && activeLoader) {
+      void this.refreshDiscovery(request, activeLoader);
+    }
+    return snapshot;
+  }
+
+  private createSnapshot(request: EffectiveCatalogRequest): EffectiveCatalogSnapshot {
     const key = cacheKey(request.providerId, request.accountId, request.protocol);
     const cachedDiscovery = request.discovery ?? this.state.discoveries[key];
     const persistedObserved = request.observed ?? this.state.observed[evidenceKey(request.providerId, request.accountId)];
@@ -363,7 +382,7 @@ export class EffectiveCatalogService {
     const mergedModels = mergeEffectiveCatalog(mergedRequest);
     const now = this.now();
     const models = mergedModels.map((model) => {
-      const quotaKey = `${request.providerId}\u0000${request.accountId}\u0000${model.modelId}`;
+      const quotaKey = this.quotaKey(request, model.modelId);
       const entry = this.transientQuota.get(quotaKey);
       if (!entry) return model;
       const expiry = entry.quota.exhaustedUntil ? Date.parse(entry.quota.exhaustedUntil) : Number.POSITIVE_INFINITY;
@@ -397,9 +416,6 @@ export class EffectiveCatalogService {
       refreshing: this.refreshes.has(key),
       lastRefreshError: this.lastErrors.get(key),
     };
-    if ((!cachedDiscovery || stale) && loader) {
-      void this.refreshDiscovery(request, loader);
-    }
     return snapshot;
   }
 
@@ -426,10 +442,8 @@ export class EffectiveCatalogService {
       } finally {
         this.refreshes.delete(key);
       }
-      const snapshot = this.getSnapshot(request);
-      for (const listener of this.listeners) {
-        listener(snapshot);
-      }
+      const snapshot = this.createSnapshot(request);
+      this.emit(snapshot);
       return snapshot;
     })();
     this.refreshes.set(key, refresh);
@@ -447,6 +461,7 @@ export class EffectiveCatalogService {
     };
     this.state.observed[key] = [...(this.state.observed[key] ?? []), next];
     this.persistState();
+    this.emitLatestSnapshots(request);
   }
 
   recordTransientQuota(
@@ -454,11 +469,45 @@ export class EffectiveCatalogService {
     modelId: string,
     quota: NonNullable<EffectiveModel['quota']>,
   ): void {
-    this.transientQuota.set(`${request.providerId}\u0000${request.accountId}\u0000${modelId}`, {
+    this.transientQuota.set(this.quotaKey(request, modelId), {
       quota: cloneJson(quota),
       observedAt: this.now().toISOString(),
       protocol: request.protocol,
     });
+    this.emitLatestSnapshots(request);
+  }
+
+  private resolveDiscovery(request: EffectiveCatalogRequest): CatalogLayerContribution | undefined {
+    return request.discovery ?? this.state.discoveries[cacheKey(request.providerId, request.accountId, request.protocol)];
+  }
+
+  private quotaKey(
+    request: Pick<EffectiveCatalogRequest, 'providerId' | 'accountId' | 'protocol'>,
+    modelId: string,
+  ): string {
+    return `${cacheKey(request.providerId, request.accountId, request.protocol)}\u0000${modelId}`;
+  }
+
+  private emitLatestSnapshots(
+    input: Pick<EffectiveCatalogRequest, 'providerId' | 'accountId' | 'protocol'>,
+  ): void {
+    const exactKey = input.protocol ? cacheKey(input.providerId, input.accountId, input.protocol) : null;
+    const prefix = `${input.providerId}\u0000${input.accountId}\u0000`;
+    for (const [key, request] of this.latestRequests.entries()) {
+      if (key === exactKey || (!exactKey && key.startsWith(prefix))) {
+        this.emit(this.createSnapshot(request));
+      }
+    }
+  }
+
+  private emit(snapshot: EffectiveCatalogSnapshot): void {
+    for (const listener of this.listeners) {
+      try {
+        listener(snapshot);
+      } catch {
+        // A renderer subscription must not break catalog persistence or other listeners.
+      }
+    }
   }
 
   private readState(): PersistedCatalogState {

@@ -199,6 +199,26 @@ describe('EffectiveCatalogService', () => {
     await vi.waitFor(() => expect(service.getSnapshot(request()).models[0].label).toBe('Fresh'));
   });
 
+  it('uses the configured production loader for cold and stale SWR reads', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    let nowMs = Date.parse('2026-01-01T00:00:00.000Z');
+    const service = new EffectiveCatalogService({ statePath, now: () => new Date(nowMs), discoveryTtlMs: 1000 });
+    const labels = ['Cold discovery', 'SWR discovery'];
+    const loader = vi.fn(async () => ({
+      models: [{ modelId: 'model-a', label: labels.shift() ?? 'Unexpected' }],
+    }));
+    service.setDiscoveryLoaderResolver(() => loader);
+
+    expect(service.getSnapshot(request()).models[0].label).toBe('Seed label');
+    await vi.waitFor(() => expect(service.getSnapshot(request()).models[0].label).toBe('Cold discovery'));
+    expect(loader).toHaveBeenCalledTimes(1);
+
+    nowMs += 2000;
+    expect(service.getSnapshot(request()).models[0].label).toBe('Cold discovery');
+    await vi.waitFor(() => expect(service.getSnapshot(request()).models[0].label).toBe('SWR discovery'));
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
   it('retains last-known-good after refresh failure and isolates account caches', async () => {
     const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
     const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:00.000Z') });
@@ -229,6 +249,30 @@ describe('EffectiveCatalogService', () => {
       source: 'observed',
       detail: 'real request',
     }));
+  });
+
+  it('publishes observed and quota changes to the latest account/protocol snapshot', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-07-13T00:00:00.000Z') });
+    const snapshots: Array<ReturnType<typeof service.getSnapshot>> = [];
+    service.subscribe((snapshot) => snapshots.push(snapshot));
+    service.getSnapshot(request());
+
+    service.recordObserved(
+      { providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol },
+      [{ modelId: 'model-a', visionInput: { state: 'unsupported', reason: 'request rejected' } }],
+    );
+    expect(snapshots.at(-1)?.models[0].visionInput).toMatchObject({ state: 'unsupported' });
+
+    service.recordTransientQuota(
+      { providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol },
+      'model-a',
+      { exhaustedUntil: '2026-07-13T00:01:00.000Z', note: 'HTTP 429' },
+    );
+    expect(snapshots.at(-1)?.models[0].quota?.note).toBe('HTTP 429');
+
+    const otherProtocol = service.getSnapshot(request({ protocol: 'AnthropicMessages' }));
+    expect(otherProtocol.models[0].quota).toBeUndefined();
   });
 
   it('invalidates discovery by provider, account, and protocol', async () => {

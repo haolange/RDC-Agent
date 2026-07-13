@@ -18,6 +18,9 @@ import { storageAdapter } from '../sessions/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
 export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void {
+  effectiveCatalogService.setDiscoveryLoaderResolver((request) => (
+    providerConnectionService.createEffectiveCatalogDiscoveryLoader(request)
+  ));
   effectiveCatalogService.subscribe((snapshot) => {
     context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);
   });
