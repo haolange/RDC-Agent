@@ -122,6 +122,44 @@ describe('EffectiveCatalogService', () => {
     ]));
   });
 
+  it('merges every deterministic optional-layer combination with last present leaf provenance', async () => {
+    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const layers = [
+      ['discovery', 'discovery'],
+      ['overlay', 'overlay'],
+      ['entitlement', 'entitlement'],
+      ['observed', 'observed'],
+      ['user', 'user'],
+    ] as const;
+    for (let mask = 0; mask < 2 ** layers.length; mask += 1) {
+      const overrides: Partial<EffectiveCatalogRequest> = {};
+      let expectedLabel = 'Seed label';
+      let expectedSource = 'seed';
+      layers.forEach(([field, source], index) => {
+        if ((mask & (1 << index)) === 0) return;
+        overrides[field] = {
+          source,
+          observedAt: `2026-02-0${index + 1}T00:00:00.000Z`,
+          models: [{ modelId: 'model-a', label: `${source}-${mask}`, ...(source === 'user' ? { defaultBudgetTokens: 64_000 + mask } : {}) }],
+        } as never;
+        if (source !== 'user') {
+          expectedLabel = `${source}-${mask}`;
+          expectedSource = source;
+        }
+      });
+      const [model] = mergeEffectiveCatalog(request(overrides));
+      expect(model.label, `mask=${mask}`).toBe(expectedLabel);
+      expect(model.provenance.filter((entry) => entry.field === 'label').at(-1), `mask=${mask}`).toMatchObject({
+        source: expectedSource,
+      });
+      expect(model.route.baseUrl, `mask=${mask}`).toBe(route.baseUrl);
+      if ((mask & (1 << 4)) !== 0) {
+        expect(model.defaultBudgetTokens, `mask=${mask}`).toBe(64_000 + mask);
+        expect(model.provenance).toContainEqual(expect.objectContaining({ field: 'defaultBudgetTokens', source: 'user' }));
+      }
+    }
+  });
+
   it('allows full user-managed overrides', async () => {
     const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
     const [model] = mergeEffectiveCatalog(request({

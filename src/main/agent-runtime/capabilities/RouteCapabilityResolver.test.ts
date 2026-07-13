@@ -59,4 +59,19 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
       structuredOutputMode: 'native',
     });
   });
+
+  it.each([
+    ['unknown', 'native-structured', true, 'disabled', 'prompt-fallback'],
+    ['supported', 'native-structured', false, 'native', 'native'],
+    ['unsupported', 'text-only', false, 'disabled', 'prompt-fallback'],
+  ] as const)('applies the shared unknown policy table for %s', (state, tools, unverified, vision, structured) => {
+    expect(resolveAgentRouteCapability(provider, 'model-a', model({
+      toolCalling: { state }, visionInput: { state }, structuredOutput: { state },
+    }))).toMatchObject({
+      toolCallingMode: tools,
+      toolCallingUnverified: unverified,
+      visionInputMode: vision,
+      structuredOutputMode: structured,
+    });
+  });
 });

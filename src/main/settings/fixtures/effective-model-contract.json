@@ -1,0 +1,52 @@
+[
+  {
+    "providerId": "chatgpt-account",
+    "modelId": "gpt-5.5",
+    "protocol": "OpenAIResponses",
+    "defaultBudgetTokens": 256000,
+    "defaultMaxPromptTokens": null,
+    "maxMaxPromptTokens": null,
+    "maxActivation": null,
+    "fastKind": "request-param"
+  },
+  {
+    "providerId": "claude-account",
+    "modelId": "claude-sonnet-5",
+    "protocol": "AnthropicMessages",
+    "defaultBudgetTokens": 200000,
+    "defaultMaxPromptTokens": 200000,
+    "maxMaxPromptTokens": 1000000,
+    "maxActivation": "header",
+    "fastKind": "unsupported"
+  },
+  {
+    "providerId": "anthropic",
+    "modelId": "claude-sonnet-5",
+    "protocol": "AnthropicMessages",
+    "defaultBudgetTokens": 200000,
+    "defaultMaxPromptTokens": 200000,
+    "maxMaxPromptTokens": 1000000,
+    "maxActivation": "implicit",
+    "fastKind": "unsupported"
+  },
+  {
+    "providerId": "github-copilot",
+    "modelId": "gpt-5.5",
+    "protocol": "OpenAICompatibleChatCompletions",
+    "defaultBudgetTokens": 256000,
+    "defaultMaxPromptTokens": 272000,
+    "maxMaxPromptTokens": null,
+    "maxActivation": null,
+    "fastKind": "unsupported"
+  },
+  {
+    "providerId": "github-copilot",
+    "modelId": "claude-opus-4-8",
+    "protocol": "OpenAICompatibleChatCompletions",
+    "defaultBudgetTokens": 256000,
+    "defaultMaxPromptTokens": 272000,
+    "maxMaxPromptTokens": null,
+    "maxActivation": null,
+    "fastKind": "model-variant"
+  }
+]
