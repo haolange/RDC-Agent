@@ -1,0 +1,1 @@
+{"object":"list","data":[{"id":"openai/gpt-oss-120b","display_name":"GPT OSS 120B","type":"chat","context_length":131072},{"id":"BAAI/bge-large-en-v1.5","type":"embedding"}]}

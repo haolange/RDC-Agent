@@ -1,0 +1,1 @@
+[{"id":"syn:large:text","name":"GLM 5.2","input_modalities":["text"],"context_length":196608},{"id":"hf:embed/model","name":"Embedding","input_modalities":["embedding"]}]

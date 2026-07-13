@@ -55,7 +55,19 @@ export type BuiltinLlmProviderId =
   | 'github-copilot'
   | 'grok-account'
   | 'gemini-account'
-  | 'qwen-account';
+  | 'qwen-account'
+  | 'iflow'
+  | 'longcat'
+  | 'opencode-zen'
+  | 'together-ai'
+  | 'fireworks-ai'
+  | 'novita-ai'
+  | 'synthetic'
+  | 'chutes'
+  | 'lm-studio'
+  | 'nvidia-nim'
+  | 'github-models'
+  | 'ollama-cloud';
 export type LlmProviderId = BuiltinLlmProviderId | (string & {});
 
 /**

@@ -178,7 +178,7 @@ function loadProviderCatalog(runtimeEntries) {
 }
 
 async function main() {
-  assert(providerPresets.length === 46, `Preset migration must load all 46 existing providers, found ${providerPresets.length}.`);
+  assert(providerPresets.length === 58, `Provider registry must load 46 migrated and 12 data-only presets, found ${providerPresets.length}.`);
   const presetIds = providerPresets.map((preset) => preset.id);
   assert(new Set(presetIds).size === presetIds.length, 'Provider preset ids must be unique.');
   const presetFiles = fs.readdirSync(path.join(process.cwd(), 'src/main/settings/presets'))
