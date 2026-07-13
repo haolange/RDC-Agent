@@ -4,6 +4,8 @@ import type { LlmApi, SettingsApi } from '@shared/types/electron-api';
 export const createLlmApi = (): LlmApi => ({
   testProviderDraft: (request): ReturnType<LlmApi['testProviderDraft']> =>
     ipcRenderer.invoke('llm:testProviderDraft', request),
+  testModelCapability: (request): ReturnType<LlmApi['testModelCapability']> =>
+    ipcRenderer.invoke('llm:testModelCapability', request),
   connectProvider: (request): ReturnType<LlmApi['connectProvider']> =>
     ipcRenderer.invoke('llm:connectProvider', request),
   refreshProviderModels: (providerId): ReturnType<LlmApi['refreshProviderModels']> =>

@@ -33,6 +33,12 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
   onOpenProviderConnection,
   t,
 }) => {
+  const shouldCollapseAsUpcoming = (provider: LlmProviderEntry) => !provider.isConfigured
+    && provider.providerAvailability.state === 'unavailable';
+  const visibleAccountProviders = accountProviders.filter((provider) => !shouldCollapseAsUpcoming(provider));
+  const visibleProviderCatalog = providerCatalog.filter((provider) => !shouldCollapseAsUpcoming(provider));
+  const upcomingProviders = [...accountProviders, ...providerCatalog]
+    .filter(shouldCollapseAsUpcoming);
   const renderProviderRow = (provider: LlmProviderEntry, mode: 'account' | 'connected' | 'add') => {
     const models = getEnabledModels(provider);
     const connected = provider.isConfigured && provider.status === 'verified';
@@ -161,7 +167,7 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
 
   const categoryIds = new Set(providerCatalogCategories.map((category) => category.id));
   const uncategorizedGroups = Array.from(new Set(
-    providerCatalog
+    visibleProviderCatalog
       .map((provider) => provider.category)
       .filter((group) => !categoryIds.has(group)),
   ));
@@ -172,17 +178,19 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
       label: getProviderCategoryLabel({ category: group }),
       description: '',
     })),
-  ].filter((category) => category.id !== 'login-authorization').map((category) => ({
-    category,
-    providers: providerCatalog.filter((provider) => provider.category === category.id),
-  }));
+  ].filter((category) => category.id !== 'login-authorization')
+    .map((category) => ({
+      category,
+      providers: visibleProviderCatalog.filter((provider) => provider.category === category.id),
+    }))
+    .filter(({ providers }) => providers.length > 0);
 
   return (
     <>
       {renderProviderGroup(
         t('settings.oauthAccounts'),
         '',
-        accountProviders,
+        visibleAccountProviders,
         'settings-oauth-accounts',
         'account',
       )}
@@ -199,6 +207,20 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
           </React.Fragment>
         ))}
       </div>
+      {upcomingProviders.length > 0 ? (
+        <details className="settings-provider-upcoming" data-testid="settings-provider-upcoming">
+          <summary className="settings-provider-upcoming-summary">
+            <span>{t('settings.providers.upcoming')}</span>
+            <span>{t('settings.providerModelCount', { count: upcomingProviders.length })}</span>
+          </summary>
+          <div className="settings-provider-upcoming-body">
+            <div className="settings-section-subtitle">{t('settings.providers.upcomingHint')}</div>
+            <div className="settings-provider-row-list">
+              {upcomingProviders.map((provider) => renderProviderRow(provider, 'add'))}
+            </div>
+          </div>
+        </details>
+      ) : null}
     </>
   );
 };

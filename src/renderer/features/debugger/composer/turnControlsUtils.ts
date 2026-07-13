@@ -18,18 +18,6 @@ type TurnControlsInput = Partial<Omit<ConversationTurnControls, 'reasoningLevel'
   reasoningLevel?: unknown;
 };
 
-export function formatTokenCount(value: number): string {
-  if (value >= 1_000_000) {
-    const millions = value / 1_000_000;
-    return Number.isInteger(millions) ? `${millions}M` : `${millions.toFixed(1)}M`;
-  }
-  if (value >= 1_000) {
-    const thousands = value / 1_000;
-    return Number.isInteger(thousands) ? `${thousands}k` : `${thousands.toFixed(1)}k`;
-  }
-  return `${value}`;
-}
-
 export function sanitizeTurnControls(
   controls: TurnControlsInput,
   capability: EffectiveModel | null,
@@ -54,13 +42,6 @@ export function isMaxTierUnverified(capability: EffectiveModel | null): boolean 
 
 export function hasSelectableFastMode(capability: EffectiveModel | null): boolean {
   return Boolean(capability && isFastModeSelectable(capability));
-}
-
-export function isFastModeUnverified(capability: EffectiveModel | null): boolean {
-  return Boolean(capability
-    && capability.fast.kind !== 'unsupported'
-    && capability.fast.kind !== 'unknown'
-    && capability.fast.entitlement === 'unknown');
 }
 
 export function buildInitialTurnControls(

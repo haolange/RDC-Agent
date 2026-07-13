@@ -449,6 +449,7 @@ export class ProviderConnectionService {
         baseUrl,
         provider.protocol,
         provider.authMode,
+        request.modelPreferences,
       );
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
       if (nextProvider) {

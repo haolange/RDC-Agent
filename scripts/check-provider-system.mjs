@@ -580,20 +580,58 @@ async function main() {
   assert(!providerAccountAuthService.includes('mockable'), 'ProviderAccountAuthService must not keep mockable account terminology.');
 
   const settingsIpc = read('src/main/ipc/settingsLlmHandlers.ts');
-  assertSourceContains(settingsIpc, ['settings:getProviderCatalog', 'settingsService.getProviderCatalog', 'LlmProviderAccountLoginStartRequest'], 'settings IPC handlers');
+  assertSourceContains(settingsIpc, [
+    'settings:getProviderCatalog',
+    'settingsService.getProviderCatalog',
+    'LlmProviderAccountLoginStartRequest',
+    "llm:testModelCapability",
+    'providerCapabilityProbeService.test',
+  ], 'settings IPC handlers');
+
+  const capabilityProbeRuntime = read('src/main/settings/ProviderCapabilityProbeRuntime.ts');
+  assertSourceContains(capabilityProbeRuntime, [
+    'requestEnvelopeBuilder.build',
+    'configuredRuntimeProvider.stream',
+    'requestPlan: input.plan',
+    'tools: []',
+    'maxTokens: 1',
+  ], 'explicit model capability probe canonical runtime path');
+  assertSourceDoesNotContain(
+    capabilityProbeRuntime,
+    ['fetch(', 'axios', 'got('],
+    'explicit model capability probe raw network bypass',
+  );
+  const capabilityProbeService = read('src/main/settings/ProviderCapabilityProbeService.ts');
+  assertSourceContains(capabilityProbeService, [
+    "request.mode === 'max-context'",
+    "activation.kind === 'implicit'",
+    "status === 404",
+    "status === 400 || status === 403",
+    'effectiveCatalogService.recordObserved',
+  ], 'explicit model capability evidence policy');
 
   const ipcChannels = read('src/main/ipc/channels.ts');
   assert(ipcChannels.includes("'settings:getProviderCatalog'"), 'IPC channel domain must list settings:getProviderCatalog.');
 
   const preloadSettings = read('src/preload/api/settings.ts');
-  assertSourceContains(preloadSettings, ['getProviderCatalog', "ipcRenderer.invoke('settings:getProviderCatalog')"], 'preload SettingsApi');
+  assertSourceContains(preloadSettings, [
+    'getProviderCatalog',
+    "ipcRenderer.invoke('settings:getProviderCatalog')",
+    'testModelCapability',
+    "ipcRenderer.invoke('llm:testModelCapability'",
+  ], 'preload SettingsApi');
 
   const electronApiTypes = read('src/shared/types/electron.ts');
   assert(electronApiTypes.includes('getProviderCatalog'), 'ElectronAPI.settings must type getProviderCatalog().');
   assert(electronApiTypes.includes('LlmProviderAccountLoginStartRequest'), 'ElectronAPI.llm must type provider account login start requests.');
 
   const browserBridge = read('src/renderer/platform/browserAppBridge/BrowserAppBridge.ts');
-  assertSourceContains(browserBridge, ['getProviderCatalog', "this.invoke('settings:getProviderCatalog')"], 'browser app bridge settings API');
+  assertSourceContains(browserBridge, [
+    'getProviderCatalog',
+    "this.invoke('settings:getProviderCatalog')",
+    'testModelCapability',
+    "this.invoke('llm:testModelCapability'",
+  ], 'browser app bridge settings API');
 
   const browserBridgeServer = read('src/main/browserAppBridge/BrowserAppBridgeServer.ts');
   assertSourceContains(browserBridgeServer, ['/api/settings/providers/catalog', 'settings:getProviderCatalog'], 'browser app HTTP provider catalog endpoint');

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import type { LlmProviderEntry } from '@shared/types/settings';
+import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import type { ProviderCatalogCategory, ProviderConnectionDraft } from '../types';
 import {
@@ -64,6 +64,11 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
 
   const handleToggleModelCapability = (modelId: string) => {
     setExpandedModelId((current) => (current === modelId ? null : modelId));
+  };
+  const handleModelChange = (modelId: string, patch: Partial<LlmProviderModel>) => {
+    onUpdateConnectionDraft({
+      models: connectionDraft.models.map((model) => model.id === modelId ? { ...model, ...patch } : model),
+    });
   };
 
   return (
@@ -268,6 +273,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
               expanded={expandedModelId === model.id}
               disabled={connectionDraft.busy !== 'idle'}
               onToggleExpanded={handleToggleModelCapability}
+              onModelChange={handleModelChange}
               t={t}
             />
           ))}

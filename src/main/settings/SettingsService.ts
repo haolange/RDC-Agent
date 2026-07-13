@@ -20,6 +20,7 @@ import type {
   LlmProviderEntry,
   LlmProviderId,
   LlmProviderModel,
+  LlmProviderModelPreference,
   ProfileSettings,
   RdxActionId,
   RdxActionSettingsMap,
@@ -29,6 +30,7 @@ import type {
   ToolingSettings,
   UiPreferences,
 } from '@shared/types/settings';
+import { isReasoningSelection } from '@shared/types/modelCapability';
 import type { LLMConfig, LLMProviderConfig } from '@shared/types/llm';
 import { DEFAULT_MODEL_ROUTING, isSafeAgentProfileId } from '@shared/types/agent';
 import {
@@ -591,6 +593,14 @@ function sanitizeModels(models: unknown): LlmProviderModel[] {
       id: modelId,
       label: typeof candidate.label === 'string' && candidate.label.trim() ? candidate.label.trim() : modelId,
       enabled: candidate.enabled !== false,
+      defaultReasoningSelection: isReasoningSelection(candidate.defaultReasoningSelection)
+        ? candidate.defaultReasoningSelection
+        : undefined,
+      defaultBudgetTokens: typeof candidate.defaultBudgetTokens === 'number'
+        && Number.isSafeInteger(candidate.defaultBudgetTokens)
+        && candidate.defaultBudgetTokens > 0
+        ? candidate.defaultBudgetTokens
+        : undefined,
       ...(aliases.length > 0 ? { aliases } : {}),
       availability,
       availabilityReason: typeof candidate.availabilityReason === 'string' && candidate.availabilityReason.trim()
@@ -610,9 +620,35 @@ function applyModelEnabledState(
   return catalogModels.map((model) => ({
     ...model,
     enabled: persistedById.get(model.id)?.enabled ?? true,
+    defaultReasoningSelection: persistedById.get(model.id)?.defaultReasoningSelection,
+    defaultBudgetTokens: persistedById.get(model.id)?.defaultBudgetTokens,
     availability: persistedById.get(model.id)?.availability ?? model.availability,
     availabilityReason: persistedById.get(model.id)?.availabilityReason,
   }));
+}
+
+function applyModelPreferences(
+  models: LlmProviderModel[],
+  preferences: readonly LlmProviderModelPreference[] | undefined,
+): LlmProviderModel[] {
+  if (!preferences?.length) return models;
+  const byId = new Map(preferences.map((preference) => [preference.id, preference]));
+  return models.map((model) => {
+    const preference = byId.get(model.id);
+    if (!preference) return model;
+    return {
+      ...model,
+      enabled: preference.enabled,
+      defaultReasoningSelection: isReasoningSelection(preference.defaultReasoningSelection)
+        ? preference.defaultReasoningSelection
+        : undefined,
+      defaultBudgetTokens: typeof preference.defaultBudgetTokens === 'number'
+        && Number.isSafeInteger(preference.defaultBudgetTokens)
+        && preference.defaultBudgetTokens > 0
+        ? preference.defaultBudgetTokens
+        : undefined,
+    };
+  });
 }
 
 function resolveProviderModels(providerId: string, persistedModels: unknown): LlmProviderModel[] {
@@ -1458,6 +1494,7 @@ export class SettingsService {
     baseUrl = '',
     protocolDraft?: unknown,
     authModeDraft?: LlmProviderAuthMode,
+    modelPreferences?: LlmProviderModelPreference[],
   ): AppSettings {
     const current = this.getAll();
     const provider = current.llm.providers.find((entry) => entry.id === providerId);
@@ -1475,7 +1512,10 @@ export class SettingsService {
     if (authAvailability.state === 'unavailable') {
       throw new Error(authAvailability.reason ?? `Provider ${providerId} ${authMode} authentication is unavailable.`);
     }
-    const discoveredModels = resolveProviderModels(provider.id, models);
+    const discoveredModels = applyModelPreferences(
+      resolveProviderModels(provider.id, models),
+      modelPreferences ?? provider.models,
+    );
     if (discoveredModels.length === 0) {
       throw new Error('该 Provider 暂未返回可用模型');
     }
@@ -1540,7 +1580,7 @@ export class SettingsService {
       throw new Error(`Unknown account provider: ${providerId}`);
     }
 
-    const discoveredModels = resolveProviderModels(provider.id, models);
+    const discoveredModels = applyModelPreferences(resolveProviderModels(provider.id, models), provider.models);
     if (discoveredModels.length === 0) {
       throw new Error('Provider returned no usable models');
     }

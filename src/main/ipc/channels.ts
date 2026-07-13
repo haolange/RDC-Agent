@@ -72,6 +72,7 @@ export const IPC_HANDLER_DOMAINS = {
     'settings:importAgentManifest',
     'settings:set',
     'llm:testProviderDraft',
+    'llm:testModelCapability',
     'llm:connectProvider',
     'llm:refreshProviderModels',
     'llm:disconnectProvider',

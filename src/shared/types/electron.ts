@@ -30,6 +30,8 @@ import type {
   LlmProviderConnectionResult,
   LlmProviderDraftRequest,
   LlmProviderId,
+  LlmModelCapabilityProbeRequest,
+  LlmModelCapabilityProbeResult,
   ResolvedTheme,
 } from './settings';
 import type {
@@ -229,6 +231,7 @@ export interface ElectronAPI {
 
   llm: {
     testProviderDraft: (request: LlmProviderDraftRequest) => Promise<LlmProviderConnectionResult>;
+    testModelCapability: (request: LlmModelCapabilityProbeRequest) => Promise<LlmModelCapabilityProbeResult>;
     connectProvider: (request: LlmProviderDraftRequest) => Promise<LlmProviderConnectionResult>;
     refreshProviderModels: (providerId: LlmProviderId) => Promise<LlmProviderConnectionResult>;
     disconnectProvider: (providerId: LlmProviderId) => Promise<LlmProviderConnectionResult>;

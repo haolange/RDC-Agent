@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReasoningSelection } from '@shared/types/modelCapability';
+import { formatTokenCount } from '@shared/utils/tokens';
 import { useI18n } from '../../../i18n';
 import { useTurnControls } from './useTurnControls';
 import type { SessionRecord } from '@shared/types/session';
@@ -16,7 +17,7 @@ import {
   resolveSelectedLevel,
 } from './effortControlParts';
 import { EffortControlPopup } from './EffortControlPopup';
-import { formatTokenCount, hasSelectableFastMode, hasSelectableMaxTier, isFastModeUnverified, isMaxTierUnverified, maxContextTokens } from './turnControlsUtils';
+import { hasSelectableFastMode, hasSelectableMaxTier, maxContextTokens } from './turnControlsUtils';
 import { useMaxVisualController } from './useMaxVisualController';
 export const EffortControl: React.FC<{
   agentId: string;
@@ -96,9 +97,7 @@ export const EffortControl: React.FC<{
   const tooltipLabel = t(EFFORT_LABEL_KEYS[displayLevel]);
   const maxTokens = maxContextTokens(capability);
   const maxAvailable = hasSelectableMaxTier(capability);
-  const maxUnverified = isMaxTierUnverified(capability);
   const fastAvailable = hasSelectableFastMode(capability);
-  const fastUnverified = isFastModeUnverified(capability);
   const maxContextBadgeLabel = maxTokens
     ? formatTokenCount(maxTokens)
     : t('composer.effort.maxContextBadge');
@@ -111,8 +110,6 @@ export const EffortControl: React.FC<{
     fastModelLabel: t('composer.effort.fastModel'),
     fastModelBadgeLabel: t('composer.effort.fastMultiplier'),
   });
-  const maxContextStatus = !maxAvailable ? t('composer.effort.unavailable') : maxUnverified ? t('composer.effort.maxContextUnknown') : turnControls.maxContextMode ? maxContextBadgeLabel : t('composer.effort.stateOff');
-  const fastModelStatus = !fastAvailable ? t('composer.effort.unavailable') : fastUnverified ? t('composer.effort.fastUnknown') : turnControls.fastModel ? t('composer.effort.fastMultiplier') : t('composer.effort.standardMultiplier');
 
   const closeMenu = useCallback(() => setOpen(false), []);
   useEffect(() => {
@@ -276,8 +273,6 @@ export const EffortControl: React.FC<{
           thumbStyle={thumbStyle}
           thumbEdgeClass={thumbEdgeClass}
           tooltipLabel={tooltipLabel}
-          maxContextStatus={maxContextStatus}
-          fastModelStatus={fastModelStatus}
           maxContextAvailable={maxAvailable}
           fastModelAvailable={fastAvailable}
           maxContextMode={turnControls.maxContextMode}

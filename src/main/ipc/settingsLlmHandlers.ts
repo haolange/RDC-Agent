@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import type {
   AppSettingsPatch,
+  LlmModelCapabilityProbeRequest,
   LlmProviderAccountLoginStartRequest,
   LlmProviderAccountLoginFinishRequest,
   LlmProviderDraftRequest,
@@ -12,6 +13,7 @@ import { providerConnectionService } from '../settings/ProviderConnectionService
 import { settingsService } from '../settings/SettingsService';
 import { resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
 import { effectiveCatalogService } from '../settings/EffectiveCatalogService';
+import { providerCapabilityProbeService } from '../settings/ProviderCapabilityProbeService';
 import { reprojectProviderProtocolChange } from '../settings/ProviderProtocolSwitchService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
@@ -30,6 +32,10 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   };
   ipcMain.handle('llm:testProviderDraft', async (_event, request: LlmProviderDraftRequest) => {
     return providerConnectionService.testProviderDraft(request);
+  });
+
+  ipcMain.handle('llm:testModelCapability', async (_event, request: LlmModelCapabilityProbeRequest) => {
+    return providerCapabilityProbeService.test(request);
   });
 
   ipcMain.handle('llm:connectProvider', async (_event, request: LlmProviderDraftRequest) => {

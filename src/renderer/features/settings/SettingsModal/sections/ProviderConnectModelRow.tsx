@@ -1,16 +1,18 @@
 import React from 'react';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { Switch } from '../../../../ui/Switch';
 import { ProviderModelCapabilitySummary } from './ProviderModelCapabilitySummary';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
 interface ProviderConnectModelRowProps {
-  provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership'>;
+  provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured'>;
   model: LlmProviderModel;
   expanded: boolean;
   disabled?: boolean;
   onToggleExpanded: (modelId: string) => void;
+  onModelChange: (modelId: string, patch: Partial<LlmProviderModel>) => void;
   t: Translate;
 }
 
@@ -20,19 +22,25 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
   expanded,
   disabled = false,
   onToggleExpanded,
+  onModelChange,
   t,
 }) => {
-  const isUnavailable = model.enabled === false;
+  const isUnavailable = model.availability === 'unavailable';
+  const isUnverified = model.availability === 'unknown';
   const statusLabel = isUnavailable
     ? t('settings.providers.modelUnavailable')
-    : t('settings.providers.modelAvailable');
+    : !model.enabled
+      ? t('settings.providers.modelDisabled')
+      : isUnverified
+        ? t('settings.providers.modelUnverified')
+        : t('settings.providers.modelAvailable');
   const statusTitle = isUnavailable
     ? (model.availabilityReason || t('settings.providers.modelUnavailableReason'))
     : undefined;
 
   return (
     <div
-      className={`settings-model-row${expanded ? ' settings-model-row--expanded' : ''}${isUnavailable ? ' settings-model-row--disabled' : ''}`}
+      className={`settings-model-row${expanded ? ' settings-model-row--expanded' : ''}${isUnavailable || !model.enabled ? ' settings-model-row--disabled' : ''}${isUnverified ? ' settings-model-row--unverified' : ''}`}
       data-testid={`settings-provider-model-row-${model.id}`}
       aria-disabled={isUnavailable}
     >
@@ -44,6 +52,12 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
             ? t('settings.providers.capability.appManagedBadge')
             : t('settings.providers.capability.userManagedBadge')}
         </span>
+        <Switch
+          checked={model.enabled}
+          disabled={disabled || isUnavailable}
+          onCheckedChange={(enabled) => onModelChange(model.id, { enabled })}
+          aria-label={t('settings.providers.capability.modelEnabled', { model: model.label })}
+        />
         <button
           type="button"
           className="button button-ghost button-sm settings-model-capability-toggle"
@@ -71,6 +85,7 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
         <ProviderModelCapabilitySummary
           provider={provider}
           model={model}
+          onModelChange={(patch) => onModelChange(model.id, patch)}
           t={t}
         />
       ) : null}

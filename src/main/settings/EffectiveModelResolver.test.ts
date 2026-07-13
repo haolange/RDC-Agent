@@ -144,6 +144,42 @@ describe('surface-specific effective model seeds', () => {
     });
   });
 
+  it('limits the app-managed user layer to D2 model preferences', () => {
+    const configured = {
+      ...provider('chatgpt-account', 'OpenAIResponses'),
+      models: [{
+        id: 'gpt-5.5',
+        label: 'Stale local label',
+        aliases: ['stale-alias'],
+        enabled: false,
+        availability: 'unavailable' as const,
+        availabilityReason: 'Stale local availability',
+        defaultReasoningSelection: 'high' as const,
+        defaultBudgetTokens: 120_000,
+      }],
+    };
+    const request = buildEffectiveCatalogRequest(configured);
+    request.discovery = {
+      source: 'discovery',
+      observedAt: '2026-07-13T00:00:00.000Z',
+      models: [{
+        modelId: 'gpt-5.5',
+        label: 'Live catalog label',
+        aliases: ['live-alias'],
+        availability: 'available',
+      }],
+    };
+
+    expect(mergeEffectiveCatalog(request).find((model) => model.modelId === 'gpt-5.5')).toMatchObject({
+      label: 'Live catalog label',
+      aliases: ['live-alias'],
+      availability: 'available',
+      enabled: false,
+      defaultBudgetTokens: 120_000,
+      reasoning: { defaultSelection: 'high' },
+    });
+  });
+
   it('projects provider runtime unavailability into every EffectiveModel', () => {
     const configured = {
       ...provider('azure-openai', 'AzureOpenAIChatCompletions'),

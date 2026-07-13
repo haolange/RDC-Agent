@@ -4,6 +4,7 @@ import type {
   AgentRuntimeMcpDescriptor,
   AgentRuntimeSkillDescriptor,
 } from './agentRuntime';
+import type { ReasoningSelection } from './modelCapability';
 
 export type AppTheme = 'dark' | 'light' | 'system';
 export type ResolvedTheme = 'dark' | 'light';
@@ -239,10 +240,18 @@ export interface AppRuntimePaths {
   secretsPath: string;
 }
 
-export interface LlmProviderModel {
+export interface LlmProviderModelPreference {
   id: string;
-  label: string;
+  /** User-owned admission switch; provider availability remains separate. */
   enabled: boolean;
+  /** Optional user override. Missing means the effective catalog default wins. */
+  defaultReasoningSelection?: ReasoningSelection;
+  /** Optional client-side prompt budget. It never changes a provider context tier. */
+  defaultBudgetTokens?: number;
+}
+
+export interface LlmProviderModel extends LlmProviderModelPreference {
+  label: string;
   /** Proven alternate ids that resolve to this canonical model id. */
   aliases?: string[];
   availability?: LlmProviderModelAvailability;
@@ -400,6 +409,8 @@ export interface LlmProviderDraftRequest {
   apiKey?: string;
   baseUrl?: string;
   protocol?: LlmProviderProtocol;
+  /** User-owned fields only; discovery remains authoritative for identity and availability. */
+  modelPreferences?: LlmProviderModelPreference[];
 }
 
 export interface LlmProviderAccountLoginStartRequest {
@@ -427,6 +438,21 @@ export interface LlmProviderConnectionResult {
     filteredModelCount: number;
   };
   error?: string;
+}
+
+export type LlmModelCapabilityProbeMode = 'default' | 'max-context' | 'fast';
+
+export interface LlmModelCapabilityProbeRequest {
+  providerId: LlmProviderId;
+  modelId: string;
+  mode: LlmModelCapabilityProbeMode;
+}
+
+export interface LlmModelCapabilityProbeResult {
+  success: boolean;
+  status: 'verified' | 'inconclusive' | 'denied' | 'failed';
+  requestSent: boolean;
+  detail?: string;
 }
 
 export type LlmProviderAccountLoginMode = 'browser' | 'device';

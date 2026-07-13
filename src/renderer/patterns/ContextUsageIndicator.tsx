@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { RunContextUsageSummary } from '@shared/types/session';
 import { ContextBreakdownPopover } from './ContextBreakdownPopover';
-import { formatTokenCount } from '../features/debugger/composer/turnControlsUtils';
+import { formatTokenCount } from '@shared/utils/tokens';
 
 export const ContextUsageIndicator: React.FC<{
   usage: RunContextUsageSummary | null;

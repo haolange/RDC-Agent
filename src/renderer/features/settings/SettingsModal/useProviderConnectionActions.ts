@@ -20,8 +20,29 @@ export const useProviderConnectionActions = (
   t: Translate,
 ) => {
   const { connectionProvider, refreshLocalSettings, updateConnectionDraft } = draftApi;
-  void providerDrafts;
-  void patchSettings;
+
+  const modelPreferences = () => connectionDraft?.models.map((model) => ({
+    id: model.id,
+    enabled: model.enabled,
+    defaultReasoningSelection: model.defaultReasoningSelection,
+    defaultBudgetTokens: model.defaultBudgetTokens,
+  })) ?? [];
+
+  const saveModelPreferences = async (): Promise<void> => {
+    if (!connectionDraft) return;
+    await patchSettings({
+      llm: {
+        providers: providerDrafts.map((provider) => provider.id !== connectionDraft.providerId
+          ? provider
+          : {
+              ...provider,
+              models: connectionDraft.models.map((model) => ({ ...model })),
+            }),
+      },
+    });
+    await refreshLocalSettings(connectionDraft.providerId);
+    setConnectionDraft(null);
+  };
 
   const handleTestProviderDraft = async () => {
     if (!connectionDraft) return;
@@ -82,7 +103,7 @@ export const useProviderConnectionActions = (
     try {
       if (connectionDraft.authMode === 'account') {
         if (connectionProvider?.isConfigured && !connectionDraft.accountStatus?.requiresCodeInput) {
-          setConnectionDraft(null);
+          await saveModelPreferences();
           return;
         }
         const status = connectionDraft.accountStatus?.requiresCodeInput
@@ -108,12 +129,23 @@ export const useProviderConnectionActions = (
         updateConnectionDraft({ busy: 'idle', error: '', accountStatus: status });
         return;
       }
+      const storedProvider = providerDrafts.find((provider) => provider.id === connectionDraft.providerId);
+      const connectionDefinitionChanged = !storedProvider
+        || storedProvider.configuredAuthMode !== connectionDraft.authMode
+        || storedProvider.protocol !== connectionDraft.protocol
+        || (storedProvider.baseUrl ?? '').replace(/\/+$/, '') !== connectionDraft.baseUrl.trim().replace(/\/+$/, '')
+        || (!connectionDraft.usingStoredSecret && Boolean(connectionDraft.apiKey.trim()));
+      if (connectionProvider?.isConfigured && !connectionDefinitionChanged) {
+        await saveModelPreferences();
+        return;
+      }
       const request = {
         providerId: connectionDraft.providerId,
         authMode: connectionDraft.authMode,
         apiKey: connectionDraft.usingStoredSecret ? '' : connectionDraft.apiKey,
         baseUrl: connectionDraft.baseUrl,
         protocol: connectionDraft.protocol,
+        modelPreferences: modelPreferences(),
       } as Parameters<typeof window.electronAPI.llm.connectProvider>[0] & { protocol?: typeof connectionDraft.protocol };
       const result = await window.electronAPI.llm.connectProvider(request);
       if (!result.success) {

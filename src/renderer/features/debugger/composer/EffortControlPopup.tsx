@@ -28,8 +28,6 @@ export const EffortControlPopup: React.FC<{
   thumbStyle: React.CSSProperties;
   thumbEdgeClass: string;
   tooltipLabel: string;
-  maxContextStatus: string;
-  fastModelStatus: string;
   maxContextAvailable: boolean;
   fastModelAvailable: boolean;
   maxContextMode: boolean;
@@ -60,8 +58,6 @@ export const EffortControlPopup: React.FC<{
   thumbStyle,
   thumbEdgeClass,
   tooltipLabel,
-  maxContextStatus,
-  fastModelStatus,
   maxContextAvailable,
   fastModelAvailable,
   maxContextMode,
@@ -137,7 +133,6 @@ export const EffortControlPopup: React.FC<{
 
     <EffortMaxContextSwitchRow
       label={t('composer.effort.maxContext')}
-      status={maxContextStatus}
       available={maxContextAvailable}
       active={maxContextMode}
       onToggle={onToggleMaxContext}
@@ -145,7 +140,6 @@ export const EffortControlPopup: React.FC<{
 
     <EffortFastModeSwitchRow
       label={t('composer.effort.fastModel')}
-      status={fastModelStatus}
       available={fastModelAvailable}
       active={fastModel}
       onToggle={onToggleFastModel}

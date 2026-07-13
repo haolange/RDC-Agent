@@ -136,7 +136,6 @@ composer-effort-toggle
 composer-effort-toggle-copy
 composer-effort-toggle-label
 composer-effort-toggle-row
-composer-effort-toggle-status
 composer-footer-bar
 composer-input-row
 composer-markdown-editor

@@ -318,6 +318,40 @@ describe('SettingsService provider persistence', () => {
       ?.models.map((model) => model.id)).toEqual(['doubao-seed-2.0-code', 'glm-4.7']);
   });
 
+  it('persists user-owned model preferences and preserves them across discovery refresh', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const { getProviderSeedModels } = await import('./ProviderPresetRegistry');
+    const service = new SettingsService();
+    service.initialize();
+    const discovered = getProviderSeedModels('deepseek');
+    const target = discovered[0];
+    expect(target).toBeDefined();
+
+    service.saveProviderConnection(
+      'deepseek', 'test-key', discovered, '', undefined, undefined,
+      [{
+        id: target!.id,
+        enabled: false,
+        defaultReasoningSelection: 'high',
+        defaultBudgetTokens: 180_000,
+      }],
+    );
+    expect(service.getAll().llm.providers.find((provider) => provider.id === 'deepseek')
+      ?.models.find((model) => model.id === target!.id)).toMatchObject({
+        enabled: false,
+        defaultReasoningSelection: 'high',
+        defaultBudgetTokens: 180_000,
+      });
+
+    service.saveProviderConnection('deepseek', '', discovered);
+    expect(service.getAll().llm.providers.find((provider) => provider.id === 'deepseek')
+      ?.models.find((model) => model.id === target!.id)).toMatchObject({
+        enabled: false,
+        defaultReasoningSelection: 'high',
+        defaultBudgetTokens: 180_000,
+      });
+  });
+
   it('preserves an invalid Volc route id so Settings can require an explicit reselection', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
