@@ -347,6 +347,7 @@ export type AgentEvent =
 
 import type { ReasoningVisibility } from '@shared/types/agentRuntime';
 import type { ResolvedReasoningSelection } from '@shared/types/modelCapability';
+import type { RequestPlan } from '@shared/types/providerCapability';
 
 /** 调用 Provider 流式生成时的可选参数。 */
 export interface StreamOptions {
@@ -365,6 +366,8 @@ export interface StreamOptions {
   apiKey?: string;
   /** 覆盖 Provider 默认 baseUrl。 */
   baseUrl?: string;
+  /** Closed, secret-free wire contract compiled by RequestPlanner. */
+  requestPlan?: RequestPlan;
 }
 
 // =====================================================================

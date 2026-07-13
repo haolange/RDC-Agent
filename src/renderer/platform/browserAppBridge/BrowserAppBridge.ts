@@ -1,5 +1,5 @@
 import type { ElectronAPI } from '@shared/types/electron';
-import type { ResolvedModelCapability } from '@shared/types/modelCapability';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import type { AppSettings, LlmProviderCatalogResponse } from '@shared/types/settings';
 
 const BRIDGE_MARKER = '__RDC_AGENT_BROWSER_APP_BRIDGE__';
@@ -125,7 +125,8 @@ class BrowserAppBridgeClient {
     settings: {
       get: () => this.invoke<AppSettings>('settings:get'),
       getProviderCatalog: () => this.invoke('settings:getProviderCatalog') as Promise<LlmProviderCatalogResponse>,
-      getModelCapability: (agentId) => this.invoke('settings:getModelCapability', agentId) as Promise<ResolvedModelCapability | null>,
+      getEffectiveModel: (agentId) => this.invoke('settings:getEffectiveModel', agentId) as Promise<EffectiveModel | null>,
+      getEffectiveCatalog: (providerId) => this.invoke('settings:getEffectiveCatalog', providerId) as Promise<EffectiveCatalogSnapshot | null>,
       getProviderSecret: (providerId) => this.invoke('settings:getProviderSecret', providerId),
       importAgentManifest: (filePath) => this.invoke('settings:importAgentManifest', filePath),
       set: (settings) => this.invoke('settings:set', settings),
@@ -201,6 +202,7 @@ class BrowserAppBridgeClient {
       onRunStatusChanged: (callback) => this.subscribe('workflow:runStatusChanged', callback as EventCallback),
       onRunUsageChanged: (callback) => this.subscribe('workflow:runUsageChanged', callback as EventCallback),
       onTraceProjectionChanged: (callback) => this.subscribe('trace:projectionChanged', callback as EventCallback),
+      onEffectiveCatalogChanged: (callback) => this.subscribe('llm:effectiveCatalogChanged', callback as EventCallback),
       onAgentMessage: (callback) => this.subscribe('agent:message', callback as EventCallback),
       onAgentStatusChanged: (callback) => this.subscribe('agent:statusChanged', callback as EventCallback),
       onToolExecutionComplete: (callback) => this.subscribe('tool:executionComplete', callback as EventCallback),

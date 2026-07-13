@@ -18,6 +18,8 @@ export const createEventSubscriptionApi = (): EventSubscriptionApi => ({
     registerTrackedListener('trace:projectionChanged', (payload) =>
       callback(payload as { sessionId: string; presentation: AgentRunPresentation }),
     ),
+  onEffectiveCatalogChanged: (callback): (() => void) =>
+    registerTrackedListener('llm:effectiveCatalogChanged', (snapshot) => callback(snapshot as Parameters<typeof callback>[0])),
   onAgentMessage: (callback): (() => void) => registerTrackedListener('agent:message', (msg) => callback(msg)),
   onAgentStatusChanged: (callback): (() => void) =>
     registerTrackedListener('agent:statusChanged', (state) => (callback as (value: unknown) => void)(state)),

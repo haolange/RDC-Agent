@@ -1,6 +1,5 @@
 import type { LLMProviderConfig } from '@shared/types/llm';
 import type { LlmProviderProtocol } from '@shared/types/settings';
-import { DEFAULT_CONTEXT_WINDOW_TOKENS } from '@shared/types/modelCapability';
 import { EventStream } from '../core/EventStream';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import type {
@@ -37,7 +36,7 @@ export function encodeAgentModel(
     name: modelId,
     provider: providerId,
     api: CONFIGURED_PROVIDER_API,
-    contextWindow: options?.contextWindow ?? DEFAULT_CONTEXT_WINDOW_TOKENS,
+    contextWindow: options?.contextWindow ?? 256_000,
     maxTokens: 4096,
     reasoning: false,
     vision: false,
@@ -171,6 +170,12 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
     options: StreamOptions = {},
   ): EventStream<AssistantMessageEvent, AssistantMessage> {
     const decoded = decodeAgentModel(model);
+    const requestPlan = options.requestPlan;
+    if (requestPlan && requestPlan.providerId !== decoded.providerId) {
+      return missingProviderStream(new Error(
+        `RequestPlan provider ${requestPlan.providerId} does not match ${decoded.providerId}.`,
+      ));
+    }
     const llmConfig = settingsService.getLlmConfig();
     const provider = llmConfig.providers.find((entry: ConfiguredProvider) => entry.id === decoded.providerId);
     if (!provider) {
@@ -182,25 +187,27 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
 
     let protocol: LlmProviderProtocol;
     try {
-      protocol = requireProviderProtocol(provider);
+      protocol = requestPlan?.route.protocol ?? requireProviderProtocol(provider);
     } catch (error) {
       return missingProviderStream(error instanceof Error ? error : new Error(String(error)));
     }
 
+    const plannedBaseUrl = requestPlan?.route.baseUrl ?? provider.baseUrl;
     const runtimeBaseUrl = protocol === 'OllamaOpenAICompatibleChatCompletions'
-      ? normalizeLocalBaseUrl(provider.baseUrl)
-      : provider.baseUrl;
+      ? normalizeLocalBaseUrl(plannedBaseUrl)
+      : plannedBaseUrl;
+    const effectiveModelId = requestPlan?.effectiveModelId ?? decoded.modelId;
     const runtimeModel: Model = {
       ...model,
-      id: decoded.modelId,
-      name: decoded.modelId,
+      id: effectiveModelId,
+      name: effectiveModelId,
       provider: decoded.providerId,
       api: toRuntimeApi(protocol),
     };
 
     let strategy: ProviderStrategy;
     try {
-      strategy = createProviderStrategy(provider, protocol);
+      strategy = createProviderStrategy({ ...provider, baseUrl: runtimeBaseUrl }, protocol);
     } catch (error) {
       return missingProviderStream(error instanceof Error ? error : new Error(String(error)));
     }
@@ -208,6 +215,7 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
       ...options,
       apiKey: provider.apiKey,
       baseUrl: runtimeBaseUrl,
+      requestPlan,
     });
   }
 }

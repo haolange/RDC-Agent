@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef } from 'react';
 import { create } from 'zustand';
 import type {
   ConversationTurnControls,
-  ResolvedModelCapability,
 } from '@shared/types/modelCapability';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 import type { SessionRecord } from '@shared/types/session';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { getElectronApi } from '../../../platform/getElectronApi';
@@ -21,12 +21,12 @@ import {
 
 interface TurnControlsState {
   turnControls: ConversationTurnControls;
-  capability: ResolvedModelCapability | null;
+  capability: EffectiveModel | null;
   controlsByCapabilityKey: Record<string, ConversationTurnControls>;
   setTurnControls: (
     next: ConversationTurnControls | ((prev: ConversationTurnControls) => ConversationTurnControls),
   ) => void;
-  setCapability: (capability: ResolvedModelCapability | null) => void;
+  setCapability: (capability: EffectiveModel | null) => void;
   rememberControls: (capabilityKey: string, controls: ConversationTurnControls) => void;
   clearRememberedControls: () => void;
 }
@@ -76,7 +76,7 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
       }
 
       try {
-        const resolved = await electronAPI.settings.getModelCapability(agentId);
+        const resolved = await electronAPI.settings.getEffectiveModel(agentId);
         if (cancelled) {
           return;
         }
@@ -89,13 +89,19 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
     };
 
     void loadCapability();
+    const electronAPI = getElectronApi();
+    const unsubscribe = electronAPI?.events.onEffectiveCatalogChanged((snapshot) => {
+      const current = useTurnControlsStore.getState().capability;
+      if (current?.providerId === snapshot.providerId) void loadCapability();
+    });
     return () => {
       cancelled = true;
+      unsubscribe?.();
     };
   }, [agentId, llmSettings, settingsHydrated, setCapability]);
 
   const capabilityKey = capability
-    ? `${agentId}:${capability.providerId}:${capability.modelId}`
+    ? `${agentId}:${capability.providerId}:${capability.modelId}:${capability.route.protocol}`
     : `${agentId}:pending`;
   const sessionControlsKey = buildSessionTurnControlsKey(sessionControls);
 

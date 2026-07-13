@@ -444,7 +444,6 @@ RequestBranch
 RequestBranchGroup
 RequestBranchStatus
 RequestEnvelopeSnapshot
-resolveActiveContextWindowTokens
 resolveAgentDisplay
 resolveBaseUrlForProtocolChange
 resolveBuiltinProtocolBaseUrl
@@ -452,7 +451,6 @@ resolveBuiltinProviderProtocol
 resolveConversationLoopOutputPhase
 ResolveConversationLoopOutputPhaseInput
 resolveConversationReasoningState
-ResolvedModelCapability
 ResolvedReasoningSelection
 ResolvedResource
 ResolvedTheme

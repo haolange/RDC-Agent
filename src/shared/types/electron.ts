@@ -19,7 +19,7 @@ import type {
 } from './conversation';
 import type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from './device';
 import type { LLMConfig } from './llm';
-import type { ResolvedModelCapability } from './modelCapability';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from './providerCapability';
 import type { RuntimeLogEntry, RuntimeLogScope } from './runtimeLog';
 import type {
   AppSettings,
@@ -248,7 +248,8 @@ export interface ElectronAPI {
   settings: {
     get: () => Promise<AppSettings>;
     getProviderCatalog: () => Promise<LlmProviderCatalogResponse>;
-    getModelCapability: (agentId: string) => Promise<ResolvedModelCapability | null>;
+    getEffectiveModel: (agentId: string) => Promise<EffectiveModel | null>;
+    getEffectiveCatalog: (providerId: string) => Promise<EffectiveCatalogSnapshot | null>;
     getProviderSecret: (providerId: string) => Promise<string>;
     importAgentManifest: (filePath: string) => Promise<AppSettings>;
     set: (settings: AppSettingsPatch) => Promise<AppSettings>;
@@ -407,6 +408,7 @@ export interface ElectronAPI {
     onRunStatusChanged: (callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; lastStage?: string; stopReason?: string }) => void) => () => void;
     onRunUsageChanged: (callback: (summary: RunContextUsageSummary) => void) => () => void;
     onTraceProjectionChanged: (callback: (payload: { sessionId: string; presentation: AgentRunPresentation }) => void) => () => void;
+    onEffectiveCatalogChanged: (callback: (snapshot: EffectiveCatalogSnapshot) => void) => () => void;
     onAgentMessage: (callback: (msg: unknown) => void) => () => void;
     onAgentStatusChanged: (callback: (state: AgentState) => void) => () => void;
     onToolExecutionComplete: (callback: (trace: unknown) => void) => () => void;

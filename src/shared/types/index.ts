@@ -105,7 +105,6 @@ export type {
   NamedReasoningLevel,
   ReasoningControl,
   ReasoningSelection,
-  ResolvedModelCapability,
   ResolvedReasoningSelection,
 } from './modelCapability';
 export type {

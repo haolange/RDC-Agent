@@ -14,6 +14,7 @@ import type {
   ThinkingArtifactVisibility,
   ToolDefinition,
 } from '../core/types';
+import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import type { ReasoningVisibility } from '@shared/types/agentRuntime';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
@@ -157,7 +158,7 @@ export class AnthropicProvider implements ProviderStrategy {
         throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for Anthropic provider');
       }
 
-      const body = this.buildRequestBody(model, context, options);
+      const body = applyRequestPlanBody(this.buildRequestBody(model, context, options), options.requestPlan);
       const url = `${baseUrl}/messages`;
 
       const response = await fetch(url, {
@@ -167,6 +168,7 @@ export class AnthropicProvider implements ProviderStrategy {
           'x-api-key': apiKey,
           'anthropic-version': this.anthropicVersion,
           ...this.defaultHeaders,
+          ...requestPlanHeaders(options.requestPlan),
         },
         body: JSON.stringify(body),
         signal: composed.signal,

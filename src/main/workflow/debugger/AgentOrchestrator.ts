@@ -44,13 +44,10 @@ import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import type { LLMConfig } from '@shared/types/llm';
 import type {
   ConversationTurnControls,
-  ResolvedModelCapability,
   ResolvedReasoningSelection,
 } from '@shared/types/modelCapability';
-import {
-  CONTEXT_COMPACTION_RATIO,
-  resolveActiveContextWindowTokens,
-} from '@shared/types/modelCapability';
+import { CONTEXT_COMPACTION_RATIO } from '@shared/types/modelCapability';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { AppMode, ContextUsageBreakdownEntry } from '@shared/types/session';
 import type { LlmProviderId } from '@shared/types/settings';
 import type { WorkflowStage } from '@shared/types/workflow';
@@ -113,13 +110,7 @@ import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigServ
 import { llmAdapter } from '../../settings/LLMAdapter';
 import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
 import { settingsService } from '../../settings/SettingsService';
-import {
-  resolveEffectiveModelId,
-  resolveEffectiveTemperature,
-  resolveModelCapability,
-  resolveReasoningSelection,
-  resolveTurnControls,
-} from '../../settings/ModelCapabilityResolver';
+import { planEffectiveModelRequest, resolveEffectiveModel } from '../../settings/EffectiveModelResolver';
 import { debuggerLlmService } from '../../settings/DebuggerLlmService';
 import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
 import { isToolAllowedForAgent, normalizeToolName, resolveAgentToolAllowlist } from './DebuggerRuntimePolicy';
@@ -144,6 +135,7 @@ interface AgentTurnOptions {
   onEvent?: (event: SharedAgentEvent) => void;
   reasoning?: ResolvedReasoningSelection;
   turnControls?: ConversationTurnControls;
+  requestPlan?: RequestPlan;
 }
 
 interface AgentProfileTurnOptions extends AgentTurnOptions {
@@ -374,24 +366,30 @@ export class AgentOrchestrator {
 
       const stub = this.createTestModeStub(agentId, content);
       const settings = settingsService.getAll();
-      const capability = resolveModelCapability(config.modelProvider, config.modelName, settings);
       const sessionRecord = context?.sessionId ? storageAdapter.readSession(context.sessionId) : null;
-      const turnControls = resolveTurnControls(
-        capability,
-        options?.turnControls,
-        sessionRecord?.turnControls,
-      );
-      const effectiveModelId = resolveEffectiveModelId(capability, turnControls);
-      const activeContextWindow = resolveActiveContextWindowTokens(capability, turnControls);
+      const planning = planEffectiveModelRequest({
+        providerId: config.modelProvider,
+        modelId: config.modelName,
+        settings,
+        controls: {
+          ...(sessionRecord?.turnControls ?? {}),
+          ...(options?.turnControls ?? {}),
+          ...(options?.reasoning ? { reasoningLevel: options.reasoning.selection } : {}),
+        },
+        requestedTemperature: config.temperature,
+      });
+      if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
+      const capability = resolveEffectiveModel(config.modelProvider, config.modelName, settings);
+      if (!capability) throw new Error(`MODEL_UNAVAILABLE: ${config.modelProvider}/${config.modelName}`);
+      const activeContextWindow = planning.plan.contextBudgetTokens;
       const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
-      const reasoning = options?.reasoning ?? resolveReasoningSelection(capability, turnControls);
       const toolAllowlist = resolveAgentToolAllowlist(agentId, context?.stageId);
       // Debug 路径与 Composer/Ask 对齐：经 PromptPlanBuilder 拆分 system/memory_files/skills。
       const promptPlan = this.buildPromptPlanForAgentTurn({
         agentId,
         projectRootPath: context?.projectRootPath ?? null,
         providerId: config.modelProvider,
-        modelId: effectiveModelId,
+        modelId: config.modelName,
         toolAllowlist,
         contextWindowTokens: activeContextWindow,
         capability,
@@ -405,9 +403,9 @@ export class AgentOrchestrator {
           content,
           systemPrompt,
           providerId: config.modelProvider,
-          modelId: effectiveModelId,
+          modelId: config.modelName,
           maxTokens: config.maxTokens,
-          temperature: config.temperature,
+          temperature: planning.plan.temperature,
           mode: this.modeForAgent(agentId),
           stage: context?.stageId,
           runId: context?.runId,
@@ -416,7 +414,9 @@ export class AgentOrchestrator {
           toolAllowlist,
           options: {
             ...options,
-            reasoning,
+            reasoning: planning.plan.reasoningWire,
+            turnControls: planning.controls,
+            requestPlan: planning.plan,
           },
           projectRootPath: context?.projectRootPath ?? null,
           projectId: context?.projectId ?? null,
@@ -478,18 +478,26 @@ export class AgentOrchestrator {
       const toolAllowlist = resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== 'report' ? options.stage : undefined);
       const routeProviderId = config.modelProvider;
       const routeModelId = config.modelName;
-      const capability = resolveModelCapability(routeProviderId, routeModelId, settings);
-      const turnControls = resolveTurnControls(
-        capability,
-        options?.turnControls,
-        options?.sessionId ? storageAdapter.readSession(options.sessionId)?.turnControls : undefined,
-      );
-      const effectiveModelId = resolveEffectiveModelId(capability, turnControls);
-      const activeContextWindow = resolveActiveContextWindowTokens(capability, turnControls);
+      const sessionControls = options?.sessionId ? storageAdapter.readSession(options.sessionId)?.turnControls : undefined;
+      const planning = planEffectiveModelRequest({
+        providerId: routeProviderId,
+        modelId: routeModelId,
+        settings,
+        controls: {
+          ...(sessionControls ?? {}),
+          ...(options?.turnControls ?? {}),
+          ...(options?.reasoning ? { reasoningLevel: options.reasoning.selection } : {}),
+        },
+        requestedTemperature: config.temperature,
+      });
+      if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
+      const activeContextWindow = planning.plan.contextBudgetTokens;
       const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
-      const reasoning = options?.reasoning ?? resolveReasoningSelection(capability, turnControls);
-      const protocol = settings.llm.providers.find((provider) => provider.id === routeProviderId)?.protocol ?? 'unknown';
-      const contextRoute: SessionContextRoute = { providerId: routeProviderId, modelId: effectiveModelId, protocol };
+      const contextRoute: SessionContextRoute = {
+        providerId: routeProviderId,
+        modelId: planning.plan.effectiveModelId,
+        protocol: planning.plan.route.protocol,
+      };
       const journalSessionId = options?.sessionId && !options.sessionId.includes('::subagent::')
         ? options.sessionId
         : null;
@@ -502,9 +510,9 @@ export class AgentOrchestrator {
         content,
         systemPrompt: this.systemPromptForAgent(agentId, config.systemPrompt),
         providerId: routeProviderId,
-        modelId: effectiveModelId,
+        modelId: routeModelId,
         maxTokens: config.maxTokens,
-        temperature: config.temperature,
+        temperature: planning.plan.temperature,
         mode: this.modeForAgent(agentId),
         stage: options?.stage ?? 'investigate',
         runId: undefined,
@@ -513,7 +521,9 @@ export class AgentOrchestrator {
         toolAllowlist,
         options: {
           ...options,
-          reasoning,
+          reasoning: planning.plan.reasoningWire,
+          turnControls: planning.controls,
+          requestPlan: planning.plan,
         },
         projectRootPath: options?.projectRootPath ?? null,
         projectId: options?.projectId ?? null,
@@ -848,13 +858,21 @@ export class AgentOrchestrator {
       // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
       errorRecovery,
       onRequest: promptPlan ? ({ model, context: requestContext, streamOptions: requestOptions }) => {
+        if (!requestOptions.requestPlan) {
+          throw new Error('RequestPlan is required before building a request envelope.');
+        }
         const callIndex = requestSnapshotStore.nextCallIndex(sessionId ?? undefined, turnSignature || undefined);
         const snapshot = requestEnvelopeBuilder.build({
           promptPlan,
           sessionId: sessionId ?? undefined,
           turnId: turnSignature || undefined,
           callIndex,
-          route: { providerId, modelId, protocol: routeProvider?.protocol ?? model.api },
+          route: {
+            providerId,
+            modelId: requestOptions.requestPlan.effectiveModelId,
+            protocol: requestOptions.requestPlan.route.protocol ?? routeProvider?.protocol ?? model.api,
+          },
+          requestPlan: requestOptions.requestPlan,
           messages: requestContext.messages,
           tools: requestContext.tools ?? [],
           controls: {
@@ -1943,10 +1961,12 @@ export class AgentOrchestrator {
       throw new Error('No provider/model route is configured for this agent.');
     }
 
-    const settings = settingsService.getAll();
-    const routeProvider = settings.llm.providers.find((entry) => entry.id === input.providerId);
+    const requestPlan = input.options?.requestPlan;
+    if (!requestPlan) {
+      throw new Error('RequestPlan is required for every provider request.');
+    }
+    const routeProvider = settingsService.getAll().llm.providers.find((entry) => entry.id === input.providerId);
     const routeCapability = resolveAgentRouteCapability(routeProvider, input.modelId);
-    const modelCapability = resolveModelCapability(input.providerId, input.modelId, settings);
     const mcpConnectionErrors = await this.ensureMcpConnections(input.agentId, input.projectRootPath);
     const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
     const slotKey = this.agentSlotKey(input.sessionId, input.agentId);
@@ -2000,10 +2020,11 @@ export class AgentOrchestrator {
     });
     const streamOptions: StreamOptions = {
       maxTokens: input.maxTokens,
-      temperature: resolveEffectiveTemperature(modelCapability, input.temperature),
-      reasoning: input.options?.reasoning,
-      reasoningVisibility: input.options?.reasoning?.selection === 'off' ? 'none' : routeCapability.reasoningVisibility,
+      temperature: requestPlan.temperature,
+      reasoning: requestPlan.reasoningWire,
+      reasoningVisibility: requestPlan.reasoningWire.selection === 'off' ? 'none' : routeCapability.reasoningVisibility,
       signal: input.options?.signal,
+      requestPlan,
     };
     const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
     if (mcpConnectionErrors.length > 0) {
@@ -2233,7 +2254,7 @@ export class AgentOrchestrator {
     modelId: string;
     toolAllowlist: string[];
     contextWindowTokens: number;
-    capability: ResolvedModelCapability;
+    capability: EffectiveModel;
   }): PromptPlan | null {
     const runtimeSettings = settingsService.getAll();
     const definition = agentManifestService.getEffectiveProfiles(
@@ -2270,11 +2291,11 @@ export class AgentOrchestrator {
       tools: input.toolAllowlist.map((toolName) => normalizeToolName(toolName)),
       workDir: input.projectRootPath ?? '',
       routeCapability,
-      modelCapability: input.capability ?? undefined,
+      effectiveModel: input.capability,
       permissionSettings: runtimeSettings.agentRuntime.permissions,
       currentDate: promptClock.currentDate,
       timeZone: promptClock.timeZone,
-      contextWindowTokens: input.capability?.nominalContextWindowTokens ?? input.contextWindowTokens,
+      contextWindowTokens: input.contextWindowTokens,
     });
   }
 

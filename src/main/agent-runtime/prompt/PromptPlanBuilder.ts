@@ -3,7 +3,7 @@ import path from 'path';
 import { app } from 'electron';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { ResolvedModelCapability } from '@shared/types/modelCapability';
+import type { EffectiveModel } from '@shared/types/providerCapability';
 import type { AgentPermissionSettings } from '@shared/types/settings';
 import type { PromptPlan, PromptSegment, ScopedInstructionResolution, SkillLoadResult, SkillMetadata } from '@shared/types/rdxRuntime';
 import { charsToTokens } from '@shared/utils/tokens';
@@ -20,7 +20,7 @@ export interface PromptPlanInput {
   tools: string[];
   workDir: string;
   routeCapability: AgentRouteCapability;
-  modelCapability?: ResolvedModelCapability;
+  effectiveModel?: EffectiveModel;
   permissionSettings: AgentPermissionSettings;
   currentDate: string;
   timeZone: string;

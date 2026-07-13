@@ -12,6 +12,7 @@ import type {
   StreamOptions,
   ToolDefinition,
 } from '../core/types';
+import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
@@ -128,8 +129,8 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
 
       const response = await fetch(createResponsesUrl(baseUrl), {
         method: 'POST',
-        headers: this.createHeaders(apiKey),
-        body: JSON.stringify(buildRequestBody(model, context, options)),
+        headers: { ...this.createHeaders(apiKey), ...requestPlanHeaders(options.requestPlan) },
+        body: JSON.stringify(applyRequestPlanBody(buildRequestBody(model, context, options), options.requestPlan)),
         signal: composed.signal,
       });
 
