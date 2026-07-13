@@ -16,6 +16,7 @@ import { COPILOT_EDITOR_HEADERS, COPILOT_WIRE_HEADERS } from './CopilotWire';
 import { parseCopilotModelCatalog } from './CopilotBilling';
 import { isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 import { settingsService } from './SettingsService';
+import { oauthRefreshManager } from './OAuthRefreshManager';
 
 const REQUEST_TIMEOUT_MS = 20000;
 const CHATGPT_CALLBACK_PORT = 1455;
@@ -372,14 +373,6 @@ const parseProviderError = (error: unknown): string => {
   return 'Provider connection failed.';
 };
 
-const isExpiringSoon = (expiresAt?: string): boolean => {
-  if (!expiresAt) {
-    return false;
-  }
-  const timestamp = new Date(expiresAt).getTime();
-  return Number.isFinite(timestamp) && timestamp <= Date.now() + 60_000;
-};
-
 const wait = (milliseconds: number): Promise<void> =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
@@ -564,6 +557,13 @@ export class ProviderAccountAuthService {
         oauthRefreshAvailable: canRefreshBundle(activeBundle),
       },
     );
+  }
+
+  async forceRefreshRuntimeCredentials(providerId: LlmProviderId): Promise<void> {
+    if (!isAccountProviderId(providerId)) return;
+    const bundle = this.readBundle(providerId);
+    if (!bundle) throw new Error('Account is not connected.');
+    await this.refreshBundleIfNeeded(bundle, true);
   }
 
   status(
@@ -1167,11 +1167,30 @@ export class ProviderAccountAuthService {
     return this.status(providerId);
   }
 
-  private async refreshBundleIfNeeded(bundle: OAuthSecretBundle): Promise<OAuthSecretBundle> {
-    if (bundle.providerId !== 'github-copilot' && !isExpiringSoon(bundle.expiresAt)) {
-      return bundle;
-    }
+  private async refreshBundleIfNeeded(bundle: OAuthSecretBundle, force = false): Promise<OAuthSecretBundle> {
+    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === bundle.providerId);
+    const accountId = provider?.activeAccountId ?? bundle.accountId ?? `anonymous:${bundle.providerId}`;
+    return oauthRefreshManager.refresh({
+      key: { providerId: bundle.providerId, accountId },
+      current: bundle,
+      expiresAt: bundle.expiresAt,
+      force: force || (bundle.providerId === 'github-copilot' && !bundle.copilotToken),
+      refresh: () => this.performBundleRefresh(bundle),
+      commit: (refreshed) => {
+        settingsService.rotateProviderAccountCredential(bundle.providerId, JSON.stringify(refreshed), {
+          accountLabel: refreshed.accountLabel,
+          planLabel: refreshed.planLabel,
+          oauthExpiresAt: refreshed.expiresAt,
+          oauthRefreshAvailable: canRefreshBundle(refreshed),
+        });
+      },
+      onInvalidGrant: (error) => {
+        settingsService.markProviderAccountRefreshFailure(bundle.providerId, error.message);
+      },
+    });
+  }
 
+  private async performBundleRefresh(bundle: OAuthSecretBundle): Promise<OAuthSecretBundle> {
     if (bundle.providerId === 'github-copilot') {
       if (!bundle.accessToken) {
         return bundle;

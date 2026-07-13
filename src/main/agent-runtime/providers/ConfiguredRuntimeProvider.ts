@@ -11,12 +11,14 @@ import type {
   StreamOptions,
 } from '../core/types';
 import { settingsService } from '../../settings/SettingsService';
+import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
 import { resolveEffectiveModel } from '../../settings/EffectiveModelResolver';
 import { AnthropicProvider } from './AnthropicProvider';
 import { GeminiProvider } from './GeminiProvider';
 import { OllamaProvider } from './OllamaProvider';
 import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
 import { OpenAIResponsesProvider } from './OpenAIResponsesProvider';
+import { streamWithUnauthorizedRefresh } from './AccountStreamRetry';
 
 const CONFIGURED_PROVIDER_API = 'rdc-agent-configured-provider';
 
@@ -203,10 +205,6 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
       return missingProviderStream(error instanceof Error ? error : new Error(String(error)));
     }
 
-    const plannedBaseUrl = requestPlan?.route.baseUrl ?? provider.baseUrl;
-    const runtimeBaseUrl = protocol === 'OllamaOpenAICompatibleChatCompletions'
-      ? normalizeLocalBaseUrl(plannedBaseUrl)
-      : plannedBaseUrl;
     const effectiveModelId = requestPlan?.effectiveModelId ?? decoded.modelId;
     const effectiveModel = resolveEffectiveModel(decoded.providerId, decoded.modelId, settingsService.getAll());
     if (!effectiveModel) {
@@ -229,17 +227,29 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
       api: toRuntimeApi(protocol),
     };
 
-    let strategy: ProviderStrategy;
-    try {
-      strategy = createProviderStrategy({ ...provider, baseUrl: runtimeBaseUrl }, protocol, capabilities);
-    } catch (error) {
-      return missingProviderStream(error instanceof Error ? error : new Error(String(error)));
-    }
-    return strategy.stream(runtimeModel, context, {
-      ...options,
-      apiKey: provider.apiKey,
-      baseUrl: runtimeBaseUrl,
-      requestPlan,
+    const createAttempt = (): EventStream<AssistantMessageEvent, AssistantMessage> => {
+      const latest = settingsService.getLlmConfig().providers.find((entry) => entry.id === decoded.providerId);
+      if (!latest) return missingProviderStream(new Error(`Provider ${decoded.providerId} became unavailable.`));
+      const latestBaseUrl = protocol === 'OllamaOpenAICompatibleChatCompletions'
+        ? normalizeLocalBaseUrl(requestPlan?.route.baseUrl ?? latest.baseUrl)
+        : requestPlan?.route.baseUrl ?? latest.baseUrl;
+      try {
+        const strategy = createProviderStrategy({ ...latest, baseUrl: latestBaseUrl }, protocol, capabilities);
+        return strategy.stream(runtimeModel, context, {
+          ...options,
+          apiKey: latest.apiKey,
+          baseUrl: latestBaseUrl,
+          requestPlan,
+        });
+      } catch (error) {
+        return missingProviderStream(error instanceof Error ? error : new Error(String(error)));
+      }
+    };
+
+    if (provider.authMode !== 'account') return createAttempt();
+    return streamWithUnauthorizedRefresh({
+      createAttempt,
+      refresh: () => providerAccountAuthService.forceRefreshRuntimeCredentials(decoded.providerId),
     });
   }
 }

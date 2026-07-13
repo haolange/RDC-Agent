@@ -40,6 +40,8 @@ vi.mock('./SettingsService', () => ({
       };
       return {};
     },
+    rotateProviderAccountCredential: () => ({}),
+    markProviderAccountRefreshFailure: () => ({}),
     disconnectProvider: (providerId: string) => {
       mocks.disconnectedProviders.push(providerId);
       mocks.provider = {
