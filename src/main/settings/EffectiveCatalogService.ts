@@ -328,6 +328,19 @@ export class EffectiveCatalogService {
     return () => this.listeners.delete(listener);
   }
 
+  invalidateDiscovery(input: { providerId: string; accountId: string; protocol?: LlmProviderProtocol }): void {
+    const exactKey = input.protocol ? cacheKey(input.providerId, input.accountId, input.protocol) : null;
+    const prefix = `${input.providerId}\u0000${input.accountId}\u0000`;
+    for (const key of Object.keys(this.state.discoveries)) {
+      if (key === exactKey || (!exactKey && key.startsWith(prefix))) {
+        delete this.state.discoveries[key];
+        this.lastErrors.delete(key);
+      }
+    }
+    if (exactKey) this.lastErrors.delete(exactKey);
+    this.persistState();
+  }
+
   getSnapshot(request: EffectiveCatalogRequest, loader?: DiscoveryLoader): EffectiveCatalogSnapshot {
     const key = cacheKey(request.providerId, request.accountId, request.protocol);
     const cachedDiscovery = request.discovery ?? this.state.discoveries[key];

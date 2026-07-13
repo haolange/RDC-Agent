@@ -12,11 +12,13 @@ import type {
   BuiltinLlmProviderId,
   LlmProviderModel,
 } from '../types/settings';
+import type { ModelRoute } from '../types/providerCapability';
 
 export interface ManagedModelCatalogEntry {
   id: string;
   label?: string;
   aliases?: string[];
+  route?: ModelRoute;
   profile: ModelCapabilityProfile;
   source: ModelCapabilitySource;
 }
@@ -524,7 +526,7 @@ const model = (
   id: string,
   profile: ModelCapabilityProfile,
   source: ModelCapabilitySource,
-  options: Pick<ManagedModelCatalogEntry, 'label' | 'aliases'> = {},
+  options: Pick<ManagedModelCatalogEntry, 'label' | 'aliases' | 'route'> = {},
 ): ManagedModelCatalogEntry => ({
   id,
   ...options,

@@ -5,6 +5,7 @@ import {
 import type {
   CatalogLayerContribution,
   CatalogModelContribution,
+  EffectiveCatalogRequest,
 } from './EffectiveCatalogService';
 import {
   effectiveCatalogService,
@@ -24,10 +25,13 @@ import { createReasoningControl } from '@shared/types/modelCapability';
 import type {
   AppSettings,
   LlmProviderEntry,
+  LlmProviderModel,
 } from '@shared/types/settings';
 import { planModelRequest } from './RequestPlanner';
 import { parseCopilotBillingTiers } from './CopilotBilling';
 import { settingsService } from './SettingsService';
+import { getBuiltinProviderDefinition } from '@shared/constants/llm';
+import { projectProtocolOverlays, resolveModelRoutePrecedence } from './ProviderRouteProjection';
 
 const MODERN_ANTHROPIC_MODELS = new Set(['claude-fable-5', 'claude-sonnet-5', 'claude-opus-4-8']);
 const COPILOT_SEED_PROMPT_TOKENS = 272_000;
@@ -43,12 +47,19 @@ const CONSERVATIVE_REASONING: ReasoningControl = {
   wireProfile: { kind: 'none' },
 };
 
-function routeFor(provider: LlmProviderEntry): ModelRoute {
-  return {
-    protocol: provider.protocol,
-    baseUrl: provider.baseUrl,
-    source: provider.protocolEditable ? 'user' : 'preset',
-  };
+function routeFor(provider: LlmProviderEntry, modelRoute?: ModelRoute): ModelRoute {
+  const definition = getBuiltinProviderDefinition(provider.id);
+  const presetProtocol = definition?.protocol ?? provider.protocol;
+  return resolveModelRoutePrecedence({
+    modelRoute,
+    userRoute: provider.protocolEditable
+      ? { protocol: provider.protocol, baseUrl: provider.baseUrl }
+      : undefined,
+    presetRoute: {
+      protocol: presetProtocol,
+      baseUrl: definition?.protocolBaseUrls?.[presetProtocol] ?? definition?.baseUrl ?? provider.baseUrl,
+    },
+  });
 }
 
 export function buildSeedModelContribution(
@@ -102,7 +113,7 @@ export function buildSeedModelContribution(
     modelId,
     label: entry?.label ?? providerModel?.label ?? modelId,
     aliases: [...(entry?.aliases ?? [])],
-    route: routeFor(provider),
+    route: routeFor(provider, entry?.route),
     availability: providerModel?.availability === 'unavailable'
       ? 'unavailable'
       : providerModel?.enabled === false
@@ -196,16 +207,47 @@ export function resolveEffectiveCatalog(
   if (!provider) {
     return null;
   }
-  return effectiveCatalogService.getSnapshot({
-    providerId,
-    accountId: provider.activeAccountId ?? `anonymous:${providerId}`,
+  return effectiveCatalogService.getSnapshot(buildEffectiveCatalogRequest(provider, requestedModelId));
+}
+
+export function buildEffectiveCatalogRequest(
+  provider: LlmProviderEntry,
+  requestedModelId?: string,
+): EffectiveCatalogRequest {
+  const definition = getBuiltinProviderDefinition(provider.id);
+  return {
+    providerId: provider.id,
+    accountId: provider.activeAccountId ?? `anonymous:${provider.id}`,
     protocol: provider.protocol,
     catalogOwnership: provider.catalogOwnership,
     fallbackRoute: routeFor(provider),
     seed: seedContribution(provider, requestedModelId),
+    overlay: projectProtocolOverlays(
+      definition?.capabilityOverlays ?? [],
+      provider.protocol,
+      definition ? '2026-07-13T00:00:00.000Z' : new Date().toISOString(),
+    ),
     entitlement: copilotEntitlementContribution(provider),
     user: userContribution(provider),
-  });
+  };
+}
+
+export function refreshEffectiveCatalogDiscovery(
+  provider: LlmProviderEntry,
+  models: LlmProviderModel[],
+): Promise<EffectiveCatalogSnapshot> {
+  const request = buildEffectiveCatalogRequest(provider);
+  return effectiveCatalogService.refreshDiscovery(request, async () => ({
+    source: 'discovery',
+    observedAt: new Date().toISOString(),
+    protocol: provider.protocol,
+    models: models.map((model) => ({
+      modelId: model.id,
+      label: model.label,
+      availability: model.availability,
+      unavailableReason: model.availabilityReason,
+    })),
+  }));
 }
 
 export function resolveEffectiveModel(

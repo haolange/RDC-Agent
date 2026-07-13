@@ -192,4 +192,16 @@ describe('EffectiveCatalogService', () => {
       detail: 'real request',
     }));
   });
+
+  it('invalidates discovery by provider, account, and protocol', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    const service = new EffectiveCatalogService({ statePath });
+    await service.refreshDiscovery(request(), async () => ({ models: [{ modelId: 'model-a', label: 'Chat route' }] }));
+    await service.refreshDiscovery(request({ protocol: 'AnthropicMessages' }), async () => ({ models: [{ modelId: 'model-a', label: 'Messages route' }] }));
+
+    service.invalidateDiscovery({ providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol });
+
+    expect(service.getSnapshot(request()).models[0].label).toBe('Seed label');
+    expect(service.getSnapshot(request({ protocol: 'AnthropicMessages' })).models[0].label).toBe('Messages route');
+  });
 });
