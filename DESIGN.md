@@ -251,10 +251,17 @@ Every new component must cover rest, hover, active, focus, disabled, and relevan
 
 Legacy or deprecated compatibility is not retained. Cutover uses verified one-time operational staging and leaves no fallback, duplicate active schema, old-named wrapper, or user-visible dual path. A versioned, idempotent persisted-data migrator is allowed only when existing user sessions cannot be staged centrally: it must read the canonical source data rather than deprecated runtime state, commit its marker only after complete success, resume partial writes safely, and permanently leave the old path inactive. Removed terms and pseudo-stage ids are guarded by architecture checks.
 
+## Source Development and Release Boundary
+
+The source checkout has one package-manager contract: Node.js `>=22.13.0`, pnpm `11.7.0`, `pnpm-lock.yaml`, and the per-user store `~/.cache/rdc-agent/pnpm-store`. Source launchers may create ignored `node_modules/`, `out/`, and prepare-state files. They conditionally prepare dependencies and build outputs from stable fingerprints; `--force-prepare` is the explicit recovery path. No npm/Yarn fallback, root-drive package store, or launcher path that bypasses the shared environment contract is retained.
+
+Packaged applications contain compiled output, runtime dependencies, and distributable resources only. They do not invoke or include pnpm, lockfiles, source launchers, prepare state, or development caches. End users launch the platform package directly.
+
 ## Verification Gate
 
 Code changes should run:
 
+- `pnpm run check:repository-hygiene` for dependency, entrypoint, repository-output, or packaging changes;
 - `pnpm run typecheck`;
 - `pnpm run check:architecture`;
 - `pnpm run check:fidelity`;
@@ -269,4 +276,4 @@ Code changes should run:
 
 UI and workflow changes must be verified in the real browser session that connects to the real main process bridge. Browser verification should cover at least Settings > Agents, Settings > Skills and Tools, Project/Session sidebars, Ask/Plan/Edit profile behavior, Work Process rendering, dark/light themes, narrow viewport, long paths, Chinese filenames, and long tool output.
 
-The headless browser-session process and the visible Electron desktop are parallel surfaces over the same canonical runtime state. Headless mode must not own Electron's visible desktop single-instance lock; its localhost bridge port is its singleton boundary. All `pnpm run start:*`, Windows `.cmd`, and macOS/Linux `.sh` entrypoints share `scripts/launch-rdc-agent.mjs`; visible desktop launchers must always open or focus a real app even while Browser Use QA is running.
+The headless browser-session process and the visible Electron desktop are parallel surfaces over the same canonical runtime state. Headless mode must not own Electron's visible desktop single-instance lock; its localhost bridge port is its singleton boundary. All `pnpm run start:*`, Windows `.cmd`, and macOS/Linux `.sh` entrypoints share `scripts/launch-rdc-agent.mjs`; their platform wrappers only locate Node and forward arguments. Visible desktop launchers must always open or focus a real app even while Browser Use QA is running.

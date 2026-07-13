@@ -52,10 +52,10 @@ Plan 的 seed manifest 不包含 `bash`、`write`、`edit` 或 `rdxContext`；�
 
 相关改动后至少运行：
 
-- `npm run check:provider-system`
-- `npm run check:agent-runtime`
-- `npm run check:settings-agents`
-- `npm run check:shared-exports`
-- `npm run typecheck`
+- `pnpm run check:provider-system`
+- `pnpm run check:agent-runtime`
+- `pnpm run check:settings-agents`
+- `pnpm run check:shared-exports`
+- `pnpm run typecheck`
 
 涉及 browser-app endpoint 或 Settings UI 时，再用真实 browser-app session 检查 `settings:getProviderCatalog`、`/api/settings/providers/catalog`、Settings Provider Catalog 分组和 secret-free DTO。

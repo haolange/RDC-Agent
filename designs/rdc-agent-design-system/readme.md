@@ -80,10 +80,10 @@ Via React `<Button>` component:
 
 The target component library is **shadcn/ui** (Radix UI + Tailwind CSS). Migration steps:
 
-1. `npm install tailwindcss @tailwindcss/vite class-variance-authority clsx tailwind-merge`
-2. `npx shadcn@latest init` — choose Vite, React, TypeScript
+1. `pnpm add -D tailwindcss @tailwindcss/vite class-variance-authority clsx tailwind-merge`
+2. `pnpm dlx shadcn@latest init` — choose Vite, React, TypeScript
 3. Map these CSS variables to shadcn/ui's CSS variable names (they use `--background`, `--foreground` etc.)
-4. Use `npx shadcn@latest add button input select` etc. for components
+4. Use `pnpm dlx shadcn@latest add button input select` etc. for components
 5. Keep the existing design-system.css token layer; override shadcn variables to point at our tokens
 
 Until migration, use the existing `.button / .input / .card` class system with semantic tokens.

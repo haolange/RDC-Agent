@@ -2,24 +2,25 @@
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
   "appId": "com.rdc-agent.app",
   "productName": "RdcAgent",
-  "copyright": "Copyright © 2024",
+  "copyright": "Copyright © 2024 RDC-Agent Contributors",
   "directories": {
     "output": "release",
-    "buildResources": "build"
+    "buildResources": "resources"
   },
   "files": [
-    "dist/**/*",
+    "out/**/*",
     "resources/agent-runtime/**/*",
     "resources/knowledge/**/*"
   ],
   "win": {
+    "executableName": "RdcAgent",
     "target": [
       {
         "target": "nsis",
         "arch": ["x64"]
       }
     ],
-    "icon": "src/resources/icons/icon.ico",
+    "icon": "resources/icons/icon.ico",
     "artifactName": "${productName}-${version}-${arch}-setup.${ext}"
   },
   "nsis": {
@@ -35,7 +36,7 @@
         "arch": ["x64", "arm64"]
       }
     ],
-    "icon": "src/resources/icons/icon.icns",
+    "icon": "resources/icons/icon.icns",
     "artifactName": "${productName}-${version}-${arch}.${ext}"
   },
   "linux": {
@@ -45,7 +46,7 @@
         "arch": ["x64"]
       }
     ],
-    "icon": "src/resources/icons/icon.png",
+    "icon": "resources/icons/icon.png",
     "artifactName": "${productName}-${version}-${arch}.${ext}"
   }
 }

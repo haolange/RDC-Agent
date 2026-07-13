@@ -12,7 +12,7 @@ export const testCommand: CommandDefinition = {
   async execute(_args) {
     return {
       success: true,
-      message: 'Test runner: Use `npm test` to run unit tests, or `npm run typecheck` for type checking.',
+      message: 'Test runner: Use `pnpm test` to run unit tests, or `pnpm run typecheck` for type checking.',
     };
   },
 };

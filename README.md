@@ -47,7 +47,7 @@
 
 ## 开发与验证
 
-需要 Node.js `>=22.13.0`（同时满足 Electron 42 与 pnpm 11.7 runtime contract）。仓库统一使用 pnpm `11.7.0`；源码启动器会按 `pnpm-lock.yaml` 自动同步依赖。
+需要 Node.js `>=22.13.0`（同时满足 Electron 42 与 pnpm 11.7 runtime contract）。仓库统一使用 pnpm `11.7.0`；源码启动器会按 `pnpm-lock.yaml` 条件式同步依赖。pnpm store 固定在每用户的 `~/.cache/rdc-agent/pnpm-store`，不会写入项目所在磁盘的根目录。
 
 ```bash
 pnpm run dev
@@ -72,10 +72,13 @@ pnpm run check:settings-agents
 pnpm run check:reasoning-delivery
 pnpm run check:work-process
 pnpm run check:work-process-tool-coverage
+pnpm run check:repository-hygiene
 pnpm run build
 ```
 
-Windows 可直接运行 `scripts/start-rdc-agent.cmd`；macOS/Linux 使用 `sh scripts/start-rdc-agent.sh`。对应的 `*-dev` 与 `start-browser-session*` 包装器都进入同一个跨平台 launcher。追加 `--prepare-only` 可只完成依赖同步、Electron 运行时检查和构建。
+Windows 可直接运行 `scripts/start-rdc-agent.cmd`；macOS/Linux 使用 `sh scripts/start-rdc-agent.sh`。对应的 `*-dev` 与 `start-browser-session*` 包装器都进入同一个跨平台 launcher。追加 `--prepare-only` 可完成条件式依赖同步、Electron 运行时检查和构建；`--force-prepare` 用于强制恢复依赖与构建。非标准 Node 安装可通过绝对路径环境变量 `RDC_AGENT_NODE` 指定。
+
+这些入口只服务于源码开发。`pnpm run pack` / `pnpm run dist` 生成的发布包包含应用运行依赖，但不包含 pnpm、lockfile、源码 launcher 或开发缓存；最终用户直接运行 exe、app、AppImage 或安装包。
 
 ## 文档入口
 

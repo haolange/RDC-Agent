@@ -107,6 +107,8 @@
 ## 产物与命名治理
 
 - 不要把构建输出、测试输出、日志、workspace 本地数据、缓存文件或临时调试文件提交到源码目录或根目录。
+- 源码依赖统一使用 `pnpm@11.7.0`；`pnpm-workspace.yaml` 将 store 固定到 `~/.cache/rdc-agent/pnpm-store`。不得新增 npm/Yarn lockfile、npm fallback、盘符根目录 store 或第二套启动路径。
+- `node_modules/`、`out/`、`release/` 和 launcher prepare state 只属于源码开发/构建期；发布包不得包含 pnpm、lockfile、源码 launcher 或开发缓存。
 - 不要在仓库根目录留下临时脚本、一次性测试文件、零字节垃圾文件或含义不明的实验文件名。
 - 新增目录、脚本和文档时，命名应表达稳定职责，不使用临时性、讨论式或个人化命名。
 - 不允许提交 mojibake/乱码文案。若终端显示异常，先用文件搜索或十六进制/编辑器确认真实字节，再决定是否修复。
@@ -128,14 +130,16 @@
 
 - 开始实现前先写明本次验证方式；实现后按该方式验证并报告结果。无法运行的验证，必须说明原因和剩余风险。
 - 代码改动后执行 `pnpm run typecheck`。
+- 依赖、入口、构建、发布配置或仓库目录治理改动后执行 `pnpm run check:repository-hygiene`。
 - renderer 结构或 UI 锚点改动后执行 `pnpm run check:architecture`、`pnpm run check:fidelity`、`pnpm run check:shared-exports`。
 - Work Process 投影、工具行文案/图标或 transcript UI 改动后执行 `pnpm run check:work-process`、`pnpm run check:work-process-tool-coverage`。
 - Work Process UI 验收必须覆盖：运行中顶层「工作中 / Working」与 Active Signal 文本能量扫光、完成后「工作过程 / Work process」+ meta、loop thinking 完成态「已思考 · {duration} / Thought for」+ 前置 quiet icon、commentary 散文（markdown，不进 thinking 槽）、统一单披露 tool 卡片（header icon+动词 + **结果优先** 族 body：有结果时显示计数/路径样本等，运行中才回退 pattern/path/`$ cmd`；展开为族内容层 + 样式化 Raw 面板；默认不展开 Raw；无 verb/target 双轨 toggle、无 `toolGroup` 双层壳）或 ≥3 聚合摘要行、同 loop 连续 tool 外距 `--space-3`（thinking/commentary → 首个 tool 入场呼吸更大）、file/search/shell/git/web/generic 族模板一致、安静 loop 级轨道点、web_search/fetch source pills、无 Reply 边界行（收束 thinking 归入普通折叠）、Request Inspector 不出现在消息流也不在右侧默认会话/Trace 面板、真实事件驱动的逐条出现与短 CSS 入场（禁止假 stagger）、**assistant full-bleed**（最终答案与 Work Process 含 tool 卡片横跨 transcript rail 全宽并与 composer 对齐；仅用户 prompt 使用 raised bubble、fit-content、右对齐）、**MessageMarkdown**（commentary 与最终答案：GFM、代码块 language+复制、KaTeX、Mermaid fail-closed；thinking/CoT 保持纯文本）、**Appearance 默认关**：`composerMarkdown`（composer Write/Preview + 高亮，开启后已发送用户气泡也走 Markdown）、`usePointerCursors`（`html[data-pointer-cursors='true']` 手型光标）。
 - provider thinking 投递或 reasoning artifact 投影改动后执行 `pnpm run check:reasoning-delivery`。
 - scoped resource、project instruction、prompt snapshot、skill、hook 或 memory policy 改动后，必须执行相应专项 contract check；缺少时应在同一改动中补齐。
 - 入口、构建或窗口逻辑改动后，再补 `pnpm run build` 或等价打包检查。
+- 发布配置改动后执行 `pnpm run pack`，并确认 unpacked 产物不包含开发期包管理器、lockfile、launcher 和缓存状态。
 - 浏览器真实会话使用 `pnpm run start:agent-browser`；Windows 也可用 `scripts/start-browser-session.cmd`，macOS/Linux 使用对应 `.sh`，然后用 Codex 内置浏览器打开主进程输出的 `/app`。
-- 人类开发入口使用 `pnpm run start:human:dev`，构建产物入口使用 `pnpm run start:human`；平台包装器只转发到共享 launcher，发布模式直接双击 exe / app 包。
+- 人类开发入口使用 `pnpm run start:human:dev`，源码构建入口使用 `pnpm run start:human`；平台包装器只转发到共享 launcher，依赖与 build 由指纹条件式准备，发布模式直接双击 exe / app 包。
 - Provider 体系契约验证使用 `pnpm run check:provider-system`。
 - Builtin 工具目录、manifest token 展开与 `REJECTED_TOOL_TOKENS` 契约验证使用 `pnpm run check:tool-system`。
 - Settings Agents 路由契约验证使用 `pnpm run check:settings-agents`。

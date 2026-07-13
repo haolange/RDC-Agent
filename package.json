@@ -2,6 +2,7 @@
   "name": "rdc-agent",
   "version": "1.0.0",
   "description": "RenderDoc Debug Agent - Vertical Framework",
+  "author": "RDC-Agent Contributors",
   "main": "out/main/index.js",
   "packageManager": "pnpm@11.7.0",
   "engines": {
@@ -11,8 +12,7 @@
     "dev": "node scripts/launch-rdc-agent.mjs --mode desktop-dev",
     "dev:renderer": "vite --config vite.renderer.config.ts",
     "build": "electron-vite build",
-    "preview": "electron-vite preview",
-    "start": "electron-vite preview",
+    "start": "node scripts/launch-rdc-agent.mjs --mode desktop",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "check:architecture": "node scripts/check-architecture.mjs",
@@ -29,6 +29,7 @@
     "check:tool-system": "node scripts/check-tool-system.mjs",
     "check:provider-system": "node scripts/check-provider-system.mjs",
     "check:settings-agents": "node scripts/check-settings-agents.mjs",
+    "check:repository-hygiene": "node scripts/check-repository-hygiene.mjs",
     "check:scoped-resources": "vitest run src/main/runtime/ScopedResourceResolver.test.ts src/main/runtime/RdxRuntimeService.test.ts",
     "check:project-instructions": "vitest run src/main/runtime/ScopedInstructionResolver.test.ts",
     "check:prompt-plan-snapshot": "vitest run src/main/agent-runtime/prompt/PromptPlanBuilder.test.ts src/main/agent-runtime/prompt/RequestEnvelopeBuilder.test.ts",
@@ -73,7 +74,6 @@
     "postcss": "8.5.15"
   },
   "devDependencies": {
-    "@electron/rebuild": "^4.0.3",
     "@swc/core": "^1.15.33",
     "@types/node": "^24.12.4",
     "@types/react": "^18.2.0",
@@ -94,29 +94,5 @@
     "typescript": "^5.3.0",
     "vite": "^7.3.3",
     "vitest": "^4.1.8"
-  },
-  "build": {
-    "appId": "com.rdc-agent.app",
-    "productName": "RdcAgent",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "out/**/*",
-      "resources/agent-runtime/**/*",
-      "resources/knowledge/**/*"
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "src/resources/icons/icon.ico"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "src/resources/icons/icon.icns"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "src/resources/icons/icon.png"
-    }
   }
 }
