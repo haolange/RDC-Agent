@@ -18,8 +18,8 @@ function assert(condition, message) {
 }
 
 function configuredProvider(id, modelIds) {
-  const { createBuiltinProviderEntry } = require('../src/shared/constants/llm.ts');
-  const provider = createBuiltinProviderEntry(id);
+  const { createProviderEntryFromPreset } = require('../src/main/settings/ProviderPresetRegistry.ts');
+  const provider = createProviderEntryFromPreset(id);
   return {
     ...provider,
     enabled: true,

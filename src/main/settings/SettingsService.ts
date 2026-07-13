@@ -43,16 +43,15 @@ import {
   TERMINAL_MIN_HEIGHT,
 } from '@shared/constants/layout';
 import {
-  createBuiltinProviderEntry,
-  createBuiltinProviderEntries,
-  getBuiltinProviderDefinition,
-  getBuiltinProviderCatalogOwnership,
-  getBuiltinProviderProtocolBaseUrls,
-  getBuiltinProviderProtocolOptions,
+  createProviderEntryFromPreset,
+  createProviderEntriesFromPresets,
+  getProviderPresetCatalogOwnership,
+  getProviderPresetProtocolBaseUrls,
+  getProviderPresetProtocolOptions,
+  getProviderSeedModels,
   isBuiltinProviderId,
-  resolveBuiltinProtocolBaseUrl,
-} from '@shared/constants/llm';
-import { getManagedProviderModels } from '@shared/constants/modelCapabilityCatalog';
+  resolveProviderPresetBaseUrl as resolveBuiltinProtocolBaseUrl,
+} from './ProviderPresetRegistry';
 import { appPathService } from '../runtime/AppPathService';
 import { agentManifestService } from './AgentManifestService';
 import { executionProfileService } from './ExecutionProfileService';
@@ -554,7 +553,7 @@ function applyModelEnabledState(
 
 function resolveProviderModels(providerId: string, persistedModels: unknown): LlmProviderModel[] {
   const sanitized = sanitizeModels(persistedModels);
-  if (getBuiltinProviderCatalogOwnership(providerId) !== 'app-managed') {
+  if (getProviderPresetCatalogOwnership(providerId) !== 'app-managed') {
     return sanitized;
   }
   // Volc Coding Plan discovery is account-specific. Once a verified subset has
@@ -562,7 +561,7 @@ function resolveProviderModels(providerId: string, persistedModels: unknown): Ll
   if (providerId === 'volcengine-coding-plan' && sanitized.length > 0) {
     return sanitized;
   }
-  const catalogModels = getManagedProviderModels(providerId);
+  const catalogModels = getProviderSeedModels(providerId);
   return catalogModels.length > 0 ? applyModelEnabledState(catalogModels, sanitized) : sanitized;
 }
 
@@ -677,8 +676,8 @@ function sanitizeUserProvider(
     return null;
   }
 
-  const builtinFallback = createBuiltinProviderEntry(rawId);
-  const definition = getBuiltinProviderDefinition(rawId);
+  const builtinFallback = createProviderEntryFromPreset(rawId);
+  const definition = builtinFallback;
   const activeAccountId = typeof provider.activeAccountId === 'string' && provider.activeAccountId.trim()
     ? provider.activeAccountId.trim()
     : undefined;
@@ -687,7 +686,7 @@ function sanitizeUserProvider(
     : undefined;
   const secretRef = incomingSecretRef || secretStorageService.createProviderSecretRef(rawId);
   const protocol = normalizeProviderProtocol({ ...provider, id: rawId });
-  const catalogOwnership = getBuiltinProviderCatalogOwnership(rawId);
+  const catalogOwnership = getProviderPresetCatalogOwnership(rawId);
   const models = resolveProviderModels(rawId, provider.models ?? []);
   const oauthSecretRef = getProviderAccountSecretRef(rawId, activeAccountId, 'oauth');
   const resolvedSecret = builtinFallback.authMode === 'api-key'
@@ -735,8 +734,8 @@ function sanitizeUserProvider(
     })(),
     baseUrlEditable: definition?.baseUrlEditable,
     protocolEditable: definition?.protocolEditable,
-    protocolOptions: getBuiltinProviderProtocolOptions(rawId),
-    protocolBaseUrls: getBuiltinProviderProtocolBaseUrls(rawId),
+    protocolOptions: getProviderPresetProtocolOptions(rawId),
+    protocolBaseUrls: getProviderPresetProtocolBaseUrls(rawId),
     models,
     recommendedModels,
     docsUrl,
@@ -775,7 +774,7 @@ function normalizeUserProviders(
     persistedProviders.set(provider.id, provider);
   }
 
-  return createBuiltinProviderEntries()
+  return createProviderEntriesFromPresets()
     .map((catalogProvider) => sanitizeUserProvider(
       persistedProviders.get(catalogProvider.id) ?? catalogProvider,
       workspaceRoot,
@@ -914,7 +913,7 @@ export class SettingsService {
         continue;
       }
 
-      const builtin = createBuiltinProviderEntry(rawId);
+      const builtin = createProviderEntryFromPreset(rawId);
       let activeAccountId = typeof entry.activeAccountId === 'string' && entry.activeAccountId.trim()
         ? entry.activeAccountId.trim()
         : undefined;
@@ -1348,8 +1347,8 @@ export class SettingsService {
         ? Boolean(apiKey.trim() || provider.hasStoredSecret)
         : provider.authMode === 'local' || provider.authMode === 'environment' || provider.hasStoredSecret,
       baseUrl: nextBaseUrl,
-      protocolOptions: getBuiltinProviderProtocolOptions(provider.id),
-      protocolBaseUrls: getBuiltinProviderProtocolBaseUrls(provider.id),
+      protocolOptions: getProviderPresetProtocolOptions(provider.id),
+      protocolBaseUrls: getProviderPresetProtocolBaseUrls(provider.id),
       models: discoveredModels.map((model) => ({ ...model })),
       status: 'verified',
       lastTestedAt: timestamp,
@@ -1491,7 +1490,7 @@ export class SettingsService {
       );
     }
 
-    const fallback = createBuiltinProviderEntry(provider.id);
+    const fallback = createProviderEntryFromPreset(provider.id);
     const nextProvider: LlmProviderEntry = {
       ...provider,
       activeAccountId: undefined,

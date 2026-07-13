@@ -1,66 +1,52 @@
 import { describe, expect, it } from 'vitest';
-import {
-  buildCapabilityChips,
-  findManagedCapabilityEntry,
-  formatContextCapability,
-  formatReasoningCapability,
-  formatFastCapability,
-} from './modelCapabilitySummaryUtils';
+import type { EffectiveModel } from '@shared/types/providerCapability';
+import { buildCapabilityChips, formatContextCapability, formatFastCapability, formatReasoningCapability } from './modelCapabilitySummaryUtils';
 
 const t = (key: string, params?: Record<string, string | number>): string => {
-  if (key === 'settings.providers.capability.unknown') return 'Unknown';
-  if (key === 'settings.providers.capability.notAvailable') return 'None';
-  if (key === 'settings.providers.capability.context') return 'Context';
-  if (key === 'settings.providers.capability.reasoning') return 'Reasoning';
-  if (key === 'settings.providers.capability.fastMode') return 'Fast';
-  if (key === 'settings.providers.capability.toolCalling') return 'Tools';
-  if (key === 'settings.providers.capability.visionInput') return 'Vision';
-  if (key === 'settings.providers.capability.structuredOutput') return 'Structured';
-  if (key === 'settings.providers.capability.supported') return 'Supported';
+  const labels: Record<string, string> = {
+    'settings.providers.capability.unknown': 'Unknown', 'settings.providers.capability.notAvailable': 'None',
+    'settings.providers.capability.context': 'Context', 'settings.providers.capability.reasoning': 'Reasoning',
+    'settings.providers.capability.fastMode': 'Fast', 'settings.providers.capability.toolCalling': 'Tools',
+    'settings.providers.capability.visionInput': 'Vision', 'settings.providers.capability.structuredOutput': 'Structured',
+    'settings.providers.capability.supported': 'Supported', 'composer.effort.levelOff': 'Off',
+    'composer.effort.levelOn': 'On', 'composer.effort.levelLow': 'Low', 'composer.effort.levelMedium': 'Medium',
+    'composer.effort.levelHigh': 'High', 'composer.effort.levelExtra': 'Extra', 'composer.effort.levelMax': 'Max',
+  };
   if (key === 'settings.providers.capability.lockedValue') return `${params?.value} (Locked)`;
-  if (key === 'composer.effort.levelOff') return 'Off';
-  if (key === 'composer.effort.levelOn') return 'On';
-  if (key === 'composer.effort.levelMinimal') return 'Minimal';
-  if (key === 'composer.effort.levelLow') return 'Low';
-  if (key === 'composer.effort.levelMedium') return 'Medium';
-  if (key === 'composer.effort.levelHigh') return 'High';
-  if (key === 'composer.effort.levelExtra') return 'Extra';
-  if (key === 'composer.effort.levelMax') return 'Max';
-  return params ? `${key}:${JSON.stringify(params)}` : key;
+  return labels[key] ?? key;
 };
 
+function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
+  return {
+    providerId: 'provider-a', modelId: 'model-a', label: 'Model A', aliases: [],
+    route: { protocol: 'AnthropicMessages', source: 'preset' }, availability: 'available',
+    contextTiers: [{ id: 'default', label: 'Default', maxPromptTokens: 262_144, activation: { kind: 'implicit' }, entitlement: 'granted' }],
+    fast: { kind: 'model-variant', modelId: 'model-a-fast', entitlement: 'granted' },
+    reasoning: { kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on', wireProfile: { kind: 'anthropic', on: 'high', onMode: 'enabled', offMode: 'disabled' } },
+    toolCalling: { state: 'supported' }, visionInput: { state: 'unknown' }, structuredOutput: { state: 'unknown' },
+    provenance: [], ...overrides,
+  };
+}
+
 describe('modelCapabilitySummaryUtils', () => {
-  it('finds provider-aware managed catalog entries', () => {
-    const entry = findManagedCapabilityEntry('anthropic', 'app-managed', 'claude-sonnet-5');
-
-    expect(entry?.id).toBe('claude-sonnet-5');
-    expect(entry?.profile.nominalContextWindowTokens).toBe(1_000_000);
+  it('formats the EffectiveModel rather than a renderer static catalog', () => {
+    const chips = buildCapabilityChips(model(), t);
+    expect(chips).toContainEqual(expect.objectContaining({ label: 'Context', value: '262.1k' }));
+    expect(chips).toContainEqual(expect.objectContaining({ label: 'Reasoning', value: 'Off, On' }));
+    expect(chips).toContainEqual(expect.objectContaining({ label: 'Fast', value: 'model-a-fast' }));
+    expect(chips).toContainEqual(expect.objectContaining({ label: 'Tools', value: 'Supported' }));
   });
 
-  it('does not leak app-managed capabilities into user-managed providers', () => {
-    const entry = findManagedCapabilityEntry('openrouter', 'user-managed', 'claude-sonnet-5');
-
-    expect(entry).toBeNull();
+  it('formats locked and multi-level reasoning from effective controls', () => {
+    expect(formatReasoningCapability(model({
+      reasoning: { kind: 'always-on', supportsOff: false, levels: [], defaultSelection: 'on', lockedSelection: 'on', wireProfile: { kind: 'anthropic', on: 'high', onMode: 'enabled' } },
+    }), t)).toBe('On (Locked)');
+    expect(formatReasoningCapability(model({
+      reasoning: { kind: 'levels', supportsOff: true, levels: ['low', 'medium', 'high', 'extra'], defaultSelection: 'medium', wireProfile: { kind: 'openai-responses', on: 'medium', levels: { low: 'low', medium: 'medium', high: 'high', extra: 'xhigh' } } },
+    }), t)).toBe('Off, Low, Medium, High, Extra');
   });
 
-  it('formats toggle, locked, and multi-level summaries from the unified capability truth', () => {
-    const kimiEntry = findManagedCapabilityEntry('kimi-coding-plan', 'app-managed', 'kimi-for-coding');
-    expect(kimiEntry).not.toBeNull();
-
-    const kimiChips = buildCapabilityChips(kimiEntry, t);
-    expect(kimiChips).toContainEqual(expect.objectContaining({ label: 'Context', value: '262.1k' }));
-    expect(kimiChips).toContainEqual(expect.objectContaining({ label: 'Reasoning', value: 'Off, On' }));
-    expect(kimiChips).toContainEqual(expect.objectContaining({ label: 'Fast', value: 'kimi-for-coding-highspeed' }));
-    expect(kimiChips).toContainEqual(expect.objectContaining({ label: 'Tools', value: 'Supported' }));
-
-    const minimaxEntry = findManagedCapabilityEntry('minimax-cn', 'app-managed', 'MiniMax-M2.7');
-    expect(formatReasoningCapability(minimaxEntry?.profile ?? null, t)).toBe('On (Locked)');
-
-    const openaiEntry = findManagedCapabilityEntry('openai', 'app-managed', 'gpt-5.5');
-    expect(formatReasoningCapability(openaiEntry?.profile ?? null, t)).toBe('Off, Low, Medium, High, Extra');
-  });
-
-  it('formats conservative default values without override semantics', () => {
+  it('formats conservative default values without static fallback', () => {
     expect(formatContextCapability(null, t)).toBe('Unknown');
     expect(formatReasoningCapability(null, t)).toBe('None');
     expect(formatFastCapability(null, t)).toBe('None');

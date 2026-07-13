@@ -5,6 +5,7 @@ import type {
   ResolvedReasoningSelection,
 } from './modelCapability';
 import type {
+  LlmProviderCapability,
   LlmProviderCatalogOwnership,
   LlmProviderCategory,
   LlmProviderProtocol,
@@ -232,6 +233,9 @@ export interface ProviderPreset {
   category: LlmProviderCategory;
   catalogOwnership: LlmProviderCatalogOwnership;
   authModes: ProviderPresetAuthMode[];
+  baseUrlEditable?: boolean;
+  accountLoginConfigured?: boolean;
+  capabilities?: LlmProviderCapability[];
   routes: ProviderPresetRoute[];
   userSelectableRoute: boolean;
   discovery: DiscoveryStrategy;

@@ -115,11 +115,9 @@ BranchNavigatorViewModel
 buildToolResultPreview
 BUILTIN_AGENT_TOOL_ID_SET
 BUILTIN_AGENT_TOOL_IDS
-BUILTIN_LLM_PROVIDER_DEFINITIONS
 BuiltinAgentMode
 BuiltinAgentToolId
 BuiltinLlmProviderId
-BuiltinProviderDefinition
 CANONICAL_TOOL_TOKEN_EXPANSIONS
 canonicalAgentModelId
 CanonicalAgentModelId
@@ -130,9 +128,7 @@ CaptureDescriptor
 CaptureInfo
 CaptureRole
 charsToTokens
-CHATGPT_ACCOUNT_MODELS
 clampReasoningSelection
-CLAUDE_ACCOUNT_MODELS
 CLIResult
 CodePreview
 coerceReasoningSelectionCandidate
@@ -208,8 +204,6 @@ ConversationWorkBlockKind
 ConversationWorkBlockStatus
 ConversationWorkTrace
 countJsonl
-createBuiltinProviderEntries
-createBuiltinProviderEntry
 createReasoningControl
 CreateRunResponse
 DebugSessionStartRequest
@@ -247,7 +241,6 @@ FindingSeverity
 FontScale
 formatAskUserAnswersForToolResult
 GateResult
-GEMINI_ACCOUNT_MODELS
 GeminiWireThinkingLevel
 generateCaptureId
 generateCaseId
@@ -262,18 +255,9 @@ generateTokenId
 getAgentModeConfig
 getBlockersByCategory
 getBlockersBySeverity
-getBuiltinProviderCatalogOwnership
-getBuiltinProviderDefinition
-getBuiltinProviderProtocolBaseUrls
-getBuiltinProviderProtocolOptions
-getManagedProviderModelCatalog
-getManagedProviderModelIds
-getManagedProviderModels
 getProviderCatalogOwnership
 getReasoningSelectionOrder
 GetRunEventsResponse
-GITHUB_COPILOT_ACCOUNT_MODELS
-GROK_ACCOUNT_MODELS
 HarnessSchemaVersion
 HarnessStatus
 HarnessTask
@@ -290,7 +274,6 @@ index.ts::*
 IntakeContext
 INVESTIGATOR_AGENTS
 isAgentIconPreset
-isBuiltinProviderId
 isLlmProviderProtocol
 isNamedReasoningLevel
 isReasoningSelection
@@ -340,11 +323,7 @@ LlmSettings
 LLMStreamEvent
 LLMToolCallDelta
 LogPreview
-lookupManagedModelCapabilityProfile
-lookupManagedModelCatalogEntry
 MAIN_STAGES
-MANAGED_PROVIDER_MODEL_CATALOG
-ManagedModelCatalogEntry
 McpApi
 MCPConnectionInfo
 MCPConnectionStatus
@@ -408,7 +387,6 @@ PromptSegment
 PromptSegmentKind
 ProviderReasoningArtifact
 ProviderReasoningContract
-QWEN_ACCOUNT_MODELS
 RawAuditRef
 RawChannelSubscriptionApi
 RdxActionId
@@ -444,9 +422,6 @@ RequestBranchGroup
 RequestBranchStatus
 RequestEnvelopeSnapshot
 resolveAgentDisplay
-resolveBaseUrlForProtocolChange
-resolveBuiltinProtocolBaseUrl
-resolveBuiltinProviderProtocol
 resolveConversationLoopOutputPhase
 ResolveConversationLoopOutputPhaseInput
 resolveConversationReasoningState

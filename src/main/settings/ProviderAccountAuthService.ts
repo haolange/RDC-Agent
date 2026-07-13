@@ -10,13 +10,13 @@ import type {
   LlmProviderId,
   LlmProviderModel,
 } from '@shared/types/settings';
-import { getBuiltinProviderDefinition, SUPER_GROK_OAUTH_CALLBACK_PORT, SUPER_GROK_OAUTH_REDIRECT_URI } from '@shared/constants/llm';
-import { getManagedProviderModels } from '@shared/constants/modelCapabilityCatalog';
+import { SUPER_GROK_OAUTH_CALLBACK_PORT, SUPER_GROK_OAUTH_REDIRECT_URI } from '@shared/constants/llm';
 import { COPILOT_EDITOR_HEADERS, COPILOT_WIRE_HEADERS } from './CopilotWire';
 import { parseCopilotModelCatalog } from './CopilotBilling';
 import { isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 import { settingsService } from './SettingsService';
 import { oauthRefreshManager } from './OAuthRefreshManager';
+import { getProviderPreset, getProviderSeedModels } from './ProviderPresetRegistry';
 
 const REQUEST_TIMEOUT_MS = 20000;
 const CHATGPT_CALLBACK_PORT = 1455;
@@ -349,7 +349,7 @@ const extractChatGptAccountId = (idToken?: string): string | undefined => {
 
 const createAccountCatalogModels = (providerId: AccountProviderId): LlmProviderModel[] => {
   const seen = new Set<string>();
-  return getManagedProviderModels(providerId)
+  return getProviderSeedModels(providerId)
     .filter((model) => {
       if (!model.id || seen.has(model.id) || !isAgentRoutableAccountModel(model.id)) {
         return false;
@@ -845,7 +845,7 @@ export class ProviderAccountAuthService {
   }
 
   private startUnimplementedAccountLogin(providerId: AccountProviderId): LlmProviderAccountStatus {
-    const definition = getBuiltinProviderDefinition(providerId);
+    const definition = getProviderPreset(providerId);
     const flow: OAuthFlowState = {
       providerId,
       flowId: randomUUID(),
@@ -1131,8 +1131,8 @@ export class ProviderAccountAuthService {
       throw new Error('Provider is not an unimplemented account adapter.');
     }
     if (!isTestMode()) {
-      const definition = getBuiltinProviderDefinition(flow.providerId);
-      throw new Error(definition?.unavailableReason ?? 'Live account OAuth is not configured for this provider.');
+      const definition = getProviderPreset(flow.providerId);
+      throw new Error(definition?.availability.reason ?? 'Live account OAuth is not configured for this provider.');
     }
     if (!code) {
       throw new Error('Authorization code is required.');
@@ -1142,7 +1142,7 @@ export class ProviderAccountAuthService {
       accessToken: `test-${flow.providerId}-${flow.state}`,
       apiKey: `test-${flow.providerId}-${flow.state}`,
       expiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
-      accountLabel: getBuiltinProviderDefinition(flow.providerId)?.label ?? flow.providerId,
+      accountLabel: getProviderPreset(flow.providerId)?.label ?? flow.providerId,
       planLabel: 'Test account',
     };
   }
