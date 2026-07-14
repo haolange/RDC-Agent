@@ -63,7 +63,7 @@ const preset: ProviderPreset = {
           "low",
           "medium",
           "high",
-          "extra",
+          "xhigh",
           "max"
         ],
         "defaultSelection": "high",
@@ -74,7 +74,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max"
           },
           "onMode": "adaptive"
@@ -122,7 +122,7 @@ const preset: ProviderPreset = {
           "low",
           "medium",
           "high",
-          "extra",
+          "xhigh",
           "max"
         ],
         "defaultSelection": "high",
@@ -133,7 +133,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max"
           },
           "onMode": "adaptive",
@@ -182,7 +182,7 @@ const preset: ProviderPreset = {
           "low",
           "medium",
           "high",
-          "extra",
+          "xhigh",
           "max"
         ],
         "defaultSelection": "high",
@@ -193,7 +193,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max"
           },
           "onMode": "adaptive",

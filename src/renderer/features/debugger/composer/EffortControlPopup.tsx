@@ -4,7 +4,7 @@ import type { TranslationKey } from '../../../i18n';
 import {
   EFFORT_LABEL_KEYS,
   EffortFastModeSwitchRow,
-  EffortMaxContextSwitchRow,
+  EffortOneMillionContextSwitchRow,
   getStopPosition,
 } from './effortControlParts';
 import type { MaxVisualPhase } from './maxVisual';
@@ -14,6 +14,8 @@ export const EffortControlPopup: React.FC<{
   popupRef: React.RefObject<HTMLDivElement>;
   popupStyle: React.CSSProperties;
   trackRef: React.RefObject<HTMLDivElement>;
+  reasoningUnverified: boolean;
+  reasoningStateLabel: string;
   hasAdjustableReasoning: boolean;
   displayLevel: ReasoningSelection;
   displayLevels: ReasoningSelection[];
@@ -28,9 +30,10 @@ export const EffortControlPopup: React.FC<{
   thumbStyle: React.CSSProperties;
   thumbEdgeClass: string;
   tooltipLabel: string;
-  maxContextAvailable: boolean;
+  oneMillionContextAvailable: boolean;
+  oneMillionContextUnverified: boolean;
   fastModelAvailable: boolean;
-  maxContextMode: boolean;
+  oneMillionContextMode: boolean;
   fastModel: boolean;
   t: (key: TranslationKey) => string;
   onTrackPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
@@ -38,12 +41,14 @@ export const EffortControlPopup: React.FC<{
   onTrackPointerUp: (event: React.PointerEvent<HTMLDivElement>) => void;
   onTrackClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   onThumbKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
-  onToggleMaxContext: () => void;
+  onToggleOneMillionContext: () => void;
   onToggleFastModel: () => void;
 }> = ({
   popupRef,
   popupStyle,
   trackRef,
+  reasoningUnverified,
+  reasoningStateLabel,
   hasAdjustableReasoning,
   displayLevel,
   displayLevels,
@@ -58,9 +63,10 @@ export const EffortControlPopup: React.FC<{
   thumbStyle,
   thumbEdgeClass,
   tooltipLabel,
-  maxContextAvailable,
+  oneMillionContextAvailable,
+  oneMillionContextUnverified,
   fastModelAvailable,
-  maxContextMode,
+  oneMillionContextMode,
   fastModel,
   t,
   onTrackPointerDown,
@@ -68,11 +74,17 @@ export const EffortControlPopup: React.FC<{
   onTrackPointerUp,
   onTrackClick,
   onThumbKeyDown,
-  onToggleMaxContext,
+  onToggleOneMillionContext,
   onToggleFastModel,
 }) => (
   <div ref={popupRef} className="composer-effort-popup" data-testid="composer-effort-popup" role="dialog" aria-label={t('composer.effort.popupTitle')} style={popupStyle}>
-    <div className={`composer-effort-slider-section ${hasAdjustableReasoning ? '' : 'is-disabled'}`}>
+    {reasoningUnverified ? (
+      <div className="composer-effort-reasoning-state" data-testid="composer-effort-reasoning-unverified" role="status">
+        <span>{t('composer.effort.reasoning')}</span>
+        <strong>{reasoningStateLabel}</strong>
+      </div>
+    ) : (
+      <div className={`composer-effort-slider-section ${hasAdjustableReasoning ? '' : 'is-disabled'}`}>
       <div
         ref={trackRef}
         className={`composer-effort-slider is-level-${displayLevel}${hasAdjustableReasoning ? '' : ' is-disabled'}${isDragging ? ' is-dragging' : ''}${showMaxTrack ? ' is-max-visual' : ''} is-max-phase-${maxPhase}`}
@@ -127,15 +139,17 @@ export const EffortControlPopup: React.FC<{
         <span>{t('composer.effort.faster')}</span>
         <span>{t('composer.effort.smarter')}</span>
       </div>
-    </div>
+      </div>
+    )}
 
     <div className="composer-effort-popup-divider" aria-hidden="true" />
 
-    <EffortMaxContextSwitchRow
-      label={t('composer.effort.maxContext')}
-      available={maxContextAvailable}
-      active={maxContextMode}
-      onToggle={onToggleMaxContext}
+    <EffortOneMillionContextSwitchRow
+      label={t('composer.effort.oneMillionContext')}
+      statusLabel={oneMillionContextUnverified ? t('composer.effort.unverified') : undefined}
+      available={oneMillionContextAvailable}
+      active={oneMillionContextMode}
+      onToggle={onToggleOneMillionContext}
     />
 
     <EffortFastModeSwitchRow

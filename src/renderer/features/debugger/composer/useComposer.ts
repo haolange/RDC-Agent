@@ -11,6 +11,9 @@ import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useComposerAttachments } from './useComposerAttachments';
 import { useComposerSend } from './useComposerSend';
 import { useScopedPromptDraft } from './useScopedPromptDraft';
+import { toConversationMode } from './composerSendHelpers';
+import { useNextRequestContextPreview } from './useNextRequestContextPreview';
+import { buildComposerPresentation } from './composerPresentation';
 
 export function useComposer(options: {
   showNotice: (message: string) => void;
@@ -63,6 +66,16 @@ export function useComposer(options: {
     toggleLeftSidebar,
   });
   const selectedAgent = userInvocableAgents.find((agent) => agent.id === selectedAgentId) ?? userInvocableAgents[0];
+  const nextRequestContext = useNextRequestContextPreview({
+    project: currentProject,
+    session: currentSession,
+    currentRun,
+    replayDeviceId: selectedDeviceEntry?.id ?? null,
+    mode: toConversationMode(currentMode),
+    agentId: selectedAgentId,
+    draft: promptValue,
+    attachments: attachments.pendingAttachments,
+  });
   const currentModeConfig: ModeConfig = AGENT_MODES.find((mode) => mode.id === currentMode) ?? {
     id: selectedAgent?.id ?? currentMode,
     label: selectedAgent?.name ?? currentMode,
@@ -96,31 +109,14 @@ export function useComposer(options: {
 
   const hasMessageContent = Boolean(promptValue.trim());
   const hasPendingAttachments = attachments.pendingAttachments.length > 0;
-  const promptPlaceholder = currentMode === 'ask'
-    ? (language === 'zh-CN'
-      ? '向 Ask 描述问题、目标或需要打开的 .rdc Capture'
-      : 'Ask about the issue, goal, or .rdc capture to open')
-    : (language === 'zh-CN'
-      ? `向 ${currentModeLabel} 描述目标、异常或验证需求`
-      : `Describe the goal, anomaly, or verification request for ${currentModeLabel}`);
-  const attachButtonLabel = !currentProject
-    ? (language === 'zh-CN'
-      ? '选择项目后可附加图片、文件或 .rdc Capture'
-      : 'Select a project before attaching images, files, or .rdc captures')
-    : (language === 'zh-CN'
-      ? '附加图片、文件或 .rdc Capture'
-      : 'Attach images, files, or .rdc captures');
-  const sendButtonLabel = language === 'zh-CN' ? '发送' : 'Send';
-  const startButtonLabel = language === 'zh-CN' ? '开始' : 'Start';
-  const stopButtonLabel = hasActiveDebugRun
-    ? (language === 'zh-CN' ? '停止当前调试' : 'Stop current debug run')
-    : (language === 'zh-CN' ? '停止当前请求' : 'Stop current request');
-  const primaryButtonLabel = send.isComposerBusy ? stopButtonLabel : (currentMode === 'ask' || hasActiveDebugRun ? sendButtonLabel : startButtonLabel);
-  const primaryButtonDescription = send.isComposerBusy
-    ? stopButtonLabel
-    : language === 'zh-CN'
-      ? `${primaryButtonLabel} ${currentModeLabel} 消息`
-      : `${primaryButtonLabel} ${currentModeLabel} message`;
+  const presentation = buildComposerPresentation({
+    language,
+    currentMode,
+    currentModeLabel,
+    hasProject: Boolean(currentProject),
+    hasActiveDebugRun,
+    isComposerBusy: send.isComposerBusy,
+  });
   const primaryButtonDisabled = send.isComposerBusy
     ? currentRun?.status === 'stopping' && !hasActiveConversationTurn && !send.isPromptSending
     : (!hasMessageContent && !hasPendingAttachments);
@@ -181,12 +177,14 @@ export function useComposer(options: {
     setSelectedAgentId,
     lastKnownUsage,
     usageStale,
+    nextRequestContextProjection: nextRequestContext.projection,
+    nextRequestContextPending: nextRequestContext.pending,
     hasActiveDebugRun,
     isComposerBusy: send.isComposerBusy,
-    promptPlaceholder,
-    attachButtonLabel,
+    promptPlaceholder: presentation.promptPlaceholder,
+    attachButtonLabel: presentation.attachButtonLabel,
     primaryButtonDisabled,
-    primaryButtonDescription,
+    primaryButtonDescription: presentation.primaryButtonDescription,
     handlePrimaryStop: send.handlePrimaryStop,
     handleAttachmentSelect: attachments.handleAttachmentSelect,
     handlePendingAttachmentRemove: attachments.handlePendingAttachmentRemove,

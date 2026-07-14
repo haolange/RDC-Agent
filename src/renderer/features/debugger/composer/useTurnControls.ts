@@ -6,7 +6,6 @@ import type {
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import type { SessionRecord } from '@shared/types/session';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
-import { getElectronApi } from '../../../platform/getElectronApi';
 import {
   buildInitialTurnControls,
   sanitizeTurnControls,
@@ -18,6 +17,7 @@ import {
   shouldResyncTurnControls,
   type TurnControlsSyncFingerprint,
 } from './turnControlHelpers';
+import { useEffectiveModelCapability } from './useEffectiveModelCapability';
 
 interface TurnControlsState {
   turnControls: ConversationTurnControls;
@@ -55,50 +55,17 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const setCapability = useTurnControlsStore((state) => state.setCapability);
   const rememberControls = useTurnControlsStore((state) => state.rememberControls);
   const clearRememberedControls = useTurnControlsStore((state) => state.clearRememberedControls);
-  const llmSettings = useAppSettingsStore((state) => state.settings.llm);
+  const routeFingerprint = useAppSettingsStore((state) => {
+    const route = state.settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
+    return route ? `${route.providerId}:${route.modelId}` : '';
+  });
   const settingsHydrated = useAppSettingsStore((state) => state.hydrated);
   const sessionId = currentSession?.sessionId ?? null;
   const sessionControls = currentSession?.turnControls ?? null;
   const lastSessionIdRef = useRef<string | null>(null);
   const lastCapabilityKeyRef = useRef<string | null>(null);
   const lastSessionControlsKeyRef = useRef<string>('none');
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadCapability = async () => {
-      const electronAPI = getElectronApi();
-      if (!electronAPI || !agentId) {
-        if (!cancelled) {
-          setCapability(null);
-        }
-        return;
-      }
-
-      try {
-        const resolved = await electronAPI.settings.getEffectiveModel(agentId);
-        if (cancelled) {
-          return;
-        }
-        setCapability(resolved);
-      } catch {
-        if (!cancelled) {
-          setCapability(null);
-        }
-      }
-    };
-
-    void loadCapability();
-    const electronAPI = getElectronApi();
-    const unsubscribe = electronAPI?.events.onEffectiveCatalogChanged((snapshot) => {
-      const current = useTurnControlsStore.getState().capability;
-      if (current?.providerId === snapshot.providerId) void loadCapability();
-    });
-    return () => {
-      cancelled = true;
-      unsubscribe?.();
-    };
-  }, [agentId, llmSettings, settingsHydrated, setCapability]);
+  useEffectiveModelCapability(agentId, routeFingerprint, settingsHydrated, setCapability);
 
   const capabilityKey = capability
     ? `${agentId}:${capability.providerId}:${capability.modelId}:${capability.route.protocol}`

@@ -62,6 +62,8 @@ describe('planModelRequest', () => {
         headers: {},
         bodyPatch: {},
         contextBudgetTokens: 128_000,
+        contextMode: 'normal',
+        contextWindowTokens: 256_000,
         activeTierId: 'default',
         fastMode: false,
         reasoningWire: {
@@ -93,16 +95,18 @@ describe('planModelRequest', () => {
     expect(result).toMatchObject({
       ok: true,
       controls: { maxContextMode: true, reasoningLevel: 'high' },
-      warnings: ['Context tier 1M is unverified'],
+      warnings: ['1M context entitlement is unverified'],
       plan: {
         activeTierId: 'long',
         headers: { 'anthropic-beta': 'context-1m' },
         contextBudgetTokens: 1_000_000,
+        contextMode: 'one-million',
+        contextWindowTokens: 1_000_000,
       },
     });
   });
 
-  it('compiles Copilot default and account-specific long_context tiers without a 1M inference', () => {
+  it('recognizes Copilot 922K prompt plus 128K output as a 1M-class window', () => {
     const result = planModelRequest({
       model: model({
         providerId: 'github-copilot',
@@ -113,7 +117,7 @@ describe('planModelRequest', () => {
             activation: { kind: 'implicit' }, entitlement: 'granted',
           },
           {
-            id: 'long_context', label: 'Long context', maxPromptTokens: 922_000,
+            id: 'long_context', label: 'Long context', maxPromptTokens: 922_000, maxOutputTokens: 128_000,
             activation: { kind: 'implicit' }, entitlement: 'unknown',
           },
         ],
@@ -123,27 +127,29 @@ describe('planModelRequest', () => {
     });
     expect(result).toMatchObject({
       ok: true,
-      warnings: ['Context tier Long context is unverified'],
+      warnings: ['1M context entitlement is unverified'],
       plan: {
         providerId: 'github-copilot',
         effectiveModelId: 'gpt-5.4',
         activeTierId: 'long_context',
         contextBudgetTokens: 922_000,
+        contextMode: 'one-million',
+        contextWindowTokens: 1_050_000,
         headers: {},
         bodyPatch: {},
       },
     });
   });
 
-  it('selects the highest granted Max tier instead of a higher unknown tier', () => {
+  it('selects a granted 1M tier instead of a larger unknown tier', () => {
     const result = planModelRequest({
       model: model({
         contextTiers: [
           ...model().contextTiers,
           {
             id: 'long',
-            label: '922K',
-            maxPromptTokens: 922_000,
+            label: '1M',
+            maxPromptTokens: 1_000_000,
             activation: { kind: 'implicit' },
             entitlement: 'granted',
           },
@@ -161,11 +167,16 @@ describe('planModelRequest', () => {
     expect(result).toMatchObject({
       ok: true,
       warnings: [],
-      plan: { activeTierId: 'long', contextBudgetTokens: 922_000 },
+      plan: {
+        activeTierId: 'long',
+        contextBudgetTokens: 1_000_000,
+        contextMode: 'one-million',
+        contextWindowTokens: 1_000_000,
+      },
     });
   });
 
-  it('does not infer Max from a single 1M tier or replace its client budget', () => {
+  it('lets a single 1M-class tier serve normal and explicit 1M budgets', () => {
     const result = planModelRequest({
       model: model({
         contextTiers: [{
@@ -181,8 +192,25 @@ describe('planModelRequest', () => {
     });
     expect(result).toMatchObject({
       ok: true,
-      controls: { maxContextMode: false },
-      plan: { activeTierId: 'default', contextBudgetTokens: 272_000 },
+      controls: { maxContextMode: true },
+      plan: {
+        activeTierId: 'default',
+        contextBudgetTokens: 1_000_000,
+        contextMode: 'one-million',
+        contextWindowTokens: 1_050_000,
+      },
+    });
+    expect(planModelRequest({
+      model: model({
+        contextTiers: [{
+          id: 'default', label: 'Default', maxPromptTokens: 1_050_000,
+          activation: { kind: 'implicit' }, entitlement: 'granted',
+        }],
+        defaultBudgetTokens: 272_000,
+      }),
+    })).toMatchObject({
+      ok: true,
+      plan: { contextBudgetTokens: 272_000, contextMode: 'normal', contextWindowTokens: 1_050_000 },
     });
   });
 
@@ -215,6 +243,40 @@ describe('planModelRequest', () => {
     });
   });
 
+  it('switches a reasoning model-variant family without emitting a reasoning wire parameter', () => {
+    const reasoning: ReasoningControl = {
+      kind: 'toggle',
+      supportsOff: true,
+      levels: [],
+      defaultSelection: 'off',
+      modelVariants: {
+        offModelId: 'grok-4.20-0309-non-reasoning',
+        onModelId: 'grok-4.20-0309-reasoning',
+      },
+      wireProfile: {
+        kind: 'openai-compatible',
+        on: 'high',
+        onMode: 'enable-thinking-true',
+        offMode: 'enable-thinking-false',
+      },
+    };
+    const result = planModelRequest({
+      model: model({ modelId: 'grok-4.20-0309-non-reasoning', reasoning }),
+      controls: { reasoningLevel: 'on' },
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      plan: {
+        effectiveModelId: 'grok-4.20-0309-reasoning',
+        bodyPatch: {},
+        reasoningWire: {
+          selection: 'on',
+          control: { modelVariants: reasoning.modelVariants, wireProfile: { kind: 'none' } },
+        },
+      },
+    });
+  });
+
   it.each(([
     ['none', { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } }, 'off'],
     ['openai-responses', { kind: 'levels', supportsOff: true, levels: ['high'], defaultSelection: 'high', wireProfile: { kind: 'openai-responses', on: 'high', levels: { high: 'high' } } }, 'high'],
@@ -242,6 +304,7 @@ describe('planModelRequest', () => {
           {
             id: 'long',
             label: 'Long',
+            maxTotalTokens: 1_000_000,
             activation: { kind: 'body', patch: { context: { tier: 'long' } } },
             entitlement: 'granted',
           },
@@ -264,6 +327,7 @@ describe('planModelRequest', () => {
           {
             id: 'long',
             label: 'Long',
+            maxTotalTokens: 1_000_000,
             activation: { kind: 'body', patch: { mode: 'long' } },
             entitlement: 'granted',
           },
@@ -317,6 +381,10 @@ describe('planModelRequest', () => {
     expect(planModelRequest({
       model: model({ availability: 'unavailable', unavailableReason: 'coming soon' }),
     })).toMatchObject({ ok: false, code: 'MODEL_UNAVAILABLE', message: 'coming soon' });
+
+    expect(planModelRequest({
+      model: model({ availability: 'unknown' }),
+    })).toMatchObject({ ok: false, code: 'MODEL_UNAVAILABLE', message: 'model-a is not yet verified' });
 
     expect(planModelRequest({
       model: model({ contextTiers: model().contextTiers.map((tier) => ({ ...tier, entitlement: 'denied' })) }),

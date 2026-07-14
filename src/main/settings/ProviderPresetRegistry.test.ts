@@ -30,8 +30,37 @@ describe('ProviderPresetRegistry', () => {
       .toMatchObject({ kind: 'model-variant', modelId: 'kimi-for-coding-highspeed' });
     expect(lookupProviderSeedModel('claude-account', 'claude-sonnet-5')?.contextTiers[1])
       .toMatchObject({ maxPromptTokens: 1_000_000, activation: { kind: 'header' }, entitlement: 'unknown' });
-    expect(lookupProviderSeedModel('anthropic', 'claude-sonnet-5')?.contextTiers[1])
-      .toMatchObject({ maxPromptTokens: 1_000_000, activation: { kind: 'implicit' }, entitlement: 'granted' });
+    expect(lookupProviderSeedModel('anthropic', 'claude-sonnet-5')).toMatchObject({
+      contextTiers: [{
+        maxPromptTokens: 872_000,
+        maxOutputTokens: 128_000,
+        maxTotalTokens: 1_000_000,
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
+      }],
+      defaultBudgetTokens: 256_000,
+      reasoning: { supportsOff: true, levels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+    });
+    expect(lookupProviderSeedModel('glm-global', 'glm-5')).toMatchObject({
+      contextTiers: [{ maxTotalTokens: 200_000, maxOutputTokens: 128_000 }],
+      reasoning: { kind: 'toggle', supportsOff: true },
+    });
+    expect(lookupProviderSeedModel('deepseek', 'deepseek-v4-pro')).toMatchObject({
+      contextTiers: [{ maxPromptTokens: 1_000_000 }],
+      reasoning: { kind: 'levels', supportsOff: true, levels: ['high', 'max'] },
+      fast: { kind: 'unsupported' },
+    });
+    expect(getProviderPreset('github-copilot')?.overlays).toContainEqual(expect.objectContaining({
+      modelId: 'gemini-3.1-pro-preview',
+      patch: expect.objectContaining({ contextTiers: [expect.objectContaining({
+        maxPromptTokens: 922_000,
+        maxOutputTokens: 128_000,
+        maxTotalTokens: 1_050_000,
+        entitlement: 'unknown',
+      })] }),
+    }));
+    expect(getProviderPreset('github-copilot')?.overlays.some((overlay) => overlay.modelId === 'gemini-3.5-flash')).toBe(false);
+    expect(getProviderPreset('github-copilot')).toMatchObject({ seedModels: [], recommendedModels: [] });
   });
 
   it('keeps unavailable lifecycle state separate from connection status', () => {
@@ -56,7 +85,7 @@ describe('ProviderPresetRegistry', () => {
       status: 'beta', availability: { state: 'unknown' },
     });
     expect(getProviderPreset('grok-account')).toMatchObject({
-      status: 'beta', availability: { state: 'unknown' },
+      status: 'beta', availability: { state: 'available' }, seedModels: [], recommendedModels: [],
     });
   });
 });

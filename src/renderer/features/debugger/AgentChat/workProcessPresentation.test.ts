@@ -389,7 +389,8 @@ describe('buildWorkProcessPresentation', () => {
     }
   });
 
-  it('aggregates three or more consecutive tools into one toolAggregate row', () => {
+  it('aggregates eight consecutive tools into one toolAggregate row', () => {
+    const toolCallIds = Array.from({ length: 8 }, (_, index) => `tool-read-${index}`);
     const presentation = buildWorkProcessPresentation({
       status: 'complete',
       updatedAt: now,
@@ -399,12 +400,16 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { status: 'complete', toolCallIds: ['tool-read-a', 'tool-read-b', 'tool-glob'] },
-          toolCalls: [
-            { id: 'tool-read-a', toolName: 'read_file', status: 'complete', argsPreview: JSON.stringify({ path: 'INDEX.md' }), resultPreview: JSON.stringify({ content: 'index' }), startedAt: now, completedAt: now + 10 },
-            { id: 'tool-read-b', toolName: 'read_file', status: 'complete', argsPreview: JSON.stringify({ path: 'VERIFICATION.md' }), resultPreview: JSON.stringify({ content: 'verify' }), startedAt: now + 11, completedAt: now + 20 },
-            { id: 'tool-glob', toolName: 'glob', status: 'complete', argsPreview: JSON.stringify({ pattern: 'docs/**/*.md' }), resultPreview: JSON.stringify({ matches: ['docs/a.md'] }), startedAt: now + 21, completedAt: now + 30 },
-          ],
+          result: { status: 'complete', toolCallIds },
+          toolCalls: toolCallIds.map((id, index) => ({
+            id,
+            toolName: 'read_file',
+            status: 'complete',
+            argsPreview: JSON.stringify({ path: `docs/${index}.md` }),
+            resultPreview: JSON.stringify({ content: `document ${index}` }),
+            startedAt: now + index * 10,
+            completedAt: now + index * 10 + 5,
+          })),
           startedAt: now,
           completedAt: now + 30,
         },
@@ -415,11 +420,12 @@ describe('buildWorkProcessPresentation', () => {
     const visibleSteps = section?.type === 'section' ? section.visibleSteps : [];
     expect(visibleSteps).toHaveLength(1);
     expect(visibleSteps[0]?.type).toBe('toolAggregate');
-    expect(visibleSteps[0]?.type === 'toolAggregate' ? visibleSteps[0].children : []).toHaveLength(3);
-    expect(section?.type === 'section' ? section.steps : []).toHaveLength(3);
+    expect(visibleSteps[0]?.type === 'toolAggregate' ? visibleSteps[0].children : []).toHaveLength(8);
+    expect(section?.type === 'section' ? section.steps : []).toHaveLength(8);
   });
 
-  it('keeps two or fewer tools flat without aggregation', () => {
+  it('keeps seven consecutive tools flat without aggregation', () => {
+    const toolCallIds = Array.from({ length: 7 }, (_, index) => `tool-flat-${index}`);
     const presentation = buildWorkProcessPresentation({
       status: 'complete',
       updatedAt: now,
@@ -429,11 +435,16 @@ describe('buildWorkProcessPresentation', () => {
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { status: 'complete', toolCallIds: ['a', 'b'] },
-          toolCalls: [
-            { id: 'a', toolName: 'glob', status: 'complete', argsPreview: JSON.stringify({ pattern: '*' }), resultPreview: '{}', startedAt: now, completedAt: now + 5 },
-            { id: 'b', toolName: 'read_file', status: 'complete', argsPreview: JSON.stringify({ path: 'a.md' }), resultPreview: '{}', startedAt: now + 6, completedAt: now + 10 },
-          ],
+          result: { status: 'complete', toolCallIds },
+          toolCalls: toolCallIds.map((id, index) => ({
+            id,
+            toolName: 'read_file',
+            status: 'complete',
+            argsPreview: JSON.stringify({ path: `${index}.md` }),
+            resultPreview: '{}',
+            startedAt: now + index * 10,
+            completedAt: now + index * 10 + 5,
+          })),
           startedAt: now,
           completedAt: now + 10,
         },
@@ -442,7 +453,52 @@ describe('buildWorkProcessPresentation', () => {
 
     const section = presentation.rows.find((row) => row.type === 'section');
     const visibleSteps = section?.type === 'section' ? section.visibleSteps : [];
-    expect(visibleSteps.map((row) => row.type)).toEqual(['tool', 'tool']);
+    expect(visibleSteps.map((row) => row.type)).toEqual(Array(7).fill('tool'));
+  });
+
+  it('preserves info, warning, and error diagnostic severity in Work Process rows', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'error',
+      updatedAt: now,
+      blocks: [
+        {
+          id: 'diagnostic-info',
+          kind: 'diagnostic',
+          title: 'Catalog evidence refreshed',
+          status: 'complete',
+          diagnosticSeverity: 'info',
+          toolCalls: [],
+          startedAt: now,
+          completedAt: now + 1,
+        },
+        {
+          id: 'diagnostic-warning',
+          kind: 'diagnostic',
+          title: 'Structured tools are unsupported',
+          status: 'complete',
+          diagnosticSeverity: 'warning',
+          toolCalls: [],
+          startedAt: now + 2,
+          completedAt: now + 3,
+        },
+        {
+          id: 'diagnostic-error',
+          kind: 'diagnostic',
+          title: 'Route is unavailable',
+          status: 'error',
+          diagnosticSeverity: 'error',
+          toolCalls: [],
+          startedAt: now + 4,
+          completedAt: now + 5,
+        },
+      ],
+    });
+
+    expect(presentation.rows.filter((row) => row.type === 'diagnostic')).toEqual([
+      expect.objectContaining({ id: 'diagnostic-info', severity: 'info' }),
+      expect.objectContaining({ id: 'diagnostic-warning', severity: 'warning' }),
+      expect.objectContaining({ id: 'diagnostic-error', severity: 'error' }),
+    ]);
   });
 
   it('exposes a human-readable diagnosticCaption for failed tools without JSON envelope', () => {

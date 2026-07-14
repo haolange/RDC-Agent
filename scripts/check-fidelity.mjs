@@ -67,6 +67,74 @@ if (missingClasses.length > 0 || missingTestIds.length > 0) {
 const addedClasses = [...currentClasses].filter((item) => !baselineClasses.has(item)).length;
 const addedTestIds = [...currentTestIds].filter((item) => !baselineTestIds.has(item)).length;
 
+const appShellCss = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/styles/global/app-shell.css'),
+  'utf8',
+);
+const settingsModalCss = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/SettingsModal.css'),
+  'utf8',
+);
+const designSystemCss = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/styles/design-system.css'),
+  'utf8',
+);
+const contextUsageIndicator = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/patterns/ContextUsageIndicator.tsx'),
+  'utf8',
+);
+const contextBreakdownPopover = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/patterns/ContextBreakdownPopover.tsx'),
+  'utf8',
+);
+
+const requireCssContract = (condition, message) => {
+  if (condition) return;
+  console.error(`[fidelity] ${message}`);
+  process.exit(1);
+};
+
+const cssBlock = (source, selector) => {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return source.match(new RegExp(`${escaped}\\s*\\{([\\s\\S]*?)\\}`))?.[1] ?? '';
+};
+
+const zIndexValue = (token) => {
+  const match = designSystemCss.match(new RegExp(`--z-${token}:\\s*(\\d+);`));
+  return Number(match?.[1] ?? Number.NaN);
+};
+
+requireCssContract(
+  cssBlock(appShellCss, '.main-input-bar').includes('z-index: var(--z-sticky);'),
+  'Composer must use --z-sticky so Settings can cover the complete input surface.',
+);
+requireCssContract(
+  cssBlock(settingsModalCss, '.settings-modal-backdrop').includes('z-index: var(--z-modal-backdrop);'),
+  'Settings backdrop must use --z-modal-backdrop.',
+);
+requireCssContract(
+  cssBlock(settingsModalCss, '.settings-center').includes('z-index: var(--z-modal);'),
+  'Settings surface must use --z-modal inside its backdrop stacking context.',
+);
+
+const zOrder = ['sticky', 'modal-backdrop', 'modal', 'tooltip', 'notification'].map(zIndexValue);
+requireCssContract(
+  zOrder.every(Number.isFinite) && zOrder.every((value, index) => index === 0 || zOrder[index - 1] < value),
+  'Global stacking contract must remain composer < modal backdrop < modal < tooltip < notification.',
+);
+requireCssContract(
+  contextUsageIndicator.includes("t('contextBreakdown.estimatedBadge')")
+    && contextUsageIndicator.includes("t('contextBreakdown.lastBadge')")
+    && contextUsageIndicator.includes("projection?.status === 'blocked'"),
+  'Composer context ring must prioritize the next-request estimate and expose blocked projections.',
+);
+requireCssContract(
+  contextBreakdownPopover.includes("t('contextBreakdown.estimatedNext')")
+    && contextBreakdownPopover.includes("t('contextBreakdown.lastActual')")
+    && contextBreakdownPopover.includes('estimated.willCompact'),
+  'Context popover must separate Estimated from Last actual and disclose next-send compaction.',
+);
+
 console.log(
   `[fidelity] OK (baseline: ${baselineClasses.size} classes, ${baselineTestIds.size} testids; `
   + `added: +${addedClasses} classes, +${addedTestIds} testids allowed)`,

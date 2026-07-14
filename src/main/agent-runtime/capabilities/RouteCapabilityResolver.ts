@@ -1,4 +1,5 @@
 import type { AgentRouteCapability, ReasoningDelivery, ReasoningVisibility, ToolCallingMode } from '@shared/types/agentRuntime';
+import type { ConversationDiagnosticSeverity } from '@shared/types/conversation';
 import type { ProviderReasoningContract } from '@shared/types/rdxRuntime';
 import type { LlmProviderEntry, LlmProviderId, LlmProviderProtocol } from '@shared/types/settings';
 import type { EffectiveModel } from '@shared/types/providerCapability';
@@ -7,6 +8,20 @@ const NATIVE_TOOL_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages',
 const STREAMING_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages', 'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'OpenRouterChatCompletions', 'GoogleGemini', 'OllamaOpenAICompatibleChatCompletions']);
 const OPENAI_NATIVE_IDS = new Set(['openai', 'openai-eu', 'openai-us', 'chatgpt-account']);
 const ANTHROPIC_NATIVE_IDS = new Set(['anthropic', 'claude-account']);
+
+export interface RouteCapabilityDiagnostic {
+  code:
+    | 'route_tool_calling_unverified'
+    | 'route_tool_calling_unsupported'
+    | 'route_tool_calling_disabled';
+  severity: ConversationDiagnosticSeverity;
+  message: string;
+  surface: 'runtime-log' | 'work-process';
+}
+
+export interface StructuredToolCallingEvidenceGate {
+  recorded: boolean;
+}
 
 /** App-managed vendors with documented readable CoT (not Anthropic summary). */
 const RAW_REASONING_PROVIDER_IDS = new Set([
@@ -124,9 +139,43 @@ export function resolveAgentRouteCapability(
   };
 }
 
-export function describeRouteCapabilityDiagnostic(capability: AgentRouteCapability, availableToolCount: number): string | null {
-  if (availableToolCount > 0 && capability.toolCallingUnverified) return `Current route ${capability.providerId}/${capability.modelId} is using unverified tool calling support. The request is allowed and marked for runtime evidence.`;
+export function describeRouteCapabilityDiagnostic(
+  capability: AgentRouteCapability,
+  availableToolCount: number,
+): RouteCapabilityDiagnostic | null {
+  if (availableToolCount > 0 && capability.toolCallingUnverified) {
+    return {
+      code: 'route_tool_calling_unverified',
+      severity: 'info',
+      message: `Current route ${capability.providerId}/${capability.modelId} has unverified native tool calling support. Tools remain enabled until structured runtime evidence confirms support.`,
+      surface: 'runtime-log',
+    };
+  }
   if (availableToolCount <= 0 || capability.toolCallingMode === 'native-structured') return null;
-  if (capability.toolCallingMode === 'disabled') return `Current route ${capability.providerId}/${capability.modelId} is not available for structured agent tools. Tools were not registered and no textual tool calls will be executed.`;
-  return `Current route ${capability.providerId}/${capability.modelId} is text-only for agent tools. Tools were not registered and textual tool calls will not be executed.`;
+  if (capability.toolCallingMode === 'disabled') {
+    return {
+      code: 'route_tool_calling_disabled',
+      severity: 'error',
+      message: `Current route ${capability.providerId}/${capability.modelId} is unavailable for structured agent tools. Tools were not registered and textual tool calls will not be executed.`,
+      surface: 'work-process',
+    };
+  }
+  return {
+    code: 'route_tool_calling_unsupported',
+    severity: 'warning',
+    message: `Current route ${capability.providerId}/${capability.modelId} explicitly does not support structured agent tools. Tools were not registered and textual tool calls will not be executed.`,
+    surface: 'work-process',
+  };
+}
+
+export function claimStructuredToolCallingEvidence(
+  eventType: string,
+  capability: AgentRouteCapability,
+  gate: StructuredToolCallingEvidenceGate,
+): boolean {
+  if (eventType !== 'toolcall_end' || !capability.toolCallingUnverified || gate.recorded) {
+    return false;
+  }
+  gate.recorded = true;
+  return true;
 }

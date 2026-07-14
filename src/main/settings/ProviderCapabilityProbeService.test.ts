@@ -51,19 +51,22 @@ function plan(
   request: LlmModelCapabilityProbeRequest,
   effectiveModel: EffectiveModel,
 ): Extract<RequestPlanningResult, { ok: true }> {
-  const maxTier = effectiveModel.contextTiers.at(-1)!;
+  const oneMillionTier = effectiveModel.contextTiers.at(-1)!;
   const requestPlan: RequestPlan = {
     providerId: request.providerId,
     effectiveModelId: request.modelId,
     route: effectiveModel.route,
-    headers: request.mode === 'max-context' && maxTier.activation.kind === 'header'
-      ? maxTier.activation.headers
+    headers: request.mode === 'one-million-context' && oneMillionTier.activation.kind === 'header'
+      ? oneMillionTier.activation.headers
       : {},
     bodyPatch: {},
-    contextBudgetTokens: request.mode === 'max-context'
-      ? (maxTier.maxPromptTokens ?? effectiveModel.defaultBudgetTokens)
+    contextBudgetTokens: request.mode === 'one-million-context'
+      ? Math.min(1_000_000, oneMillionTier.maxPromptTokens ?? effectiveModel.defaultBudgetTokens)
       : effectiveModel.defaultBudgetTokens,
-    activeTierId: request.mode === 'max-context' ? maxTier.id : effectiveModel.contextTiers[0].id,
+    contextMode: request.mode === 'one-million-context' ? 'one-million' : 'normal',
+    contextWindowTokens: oneMillionTier.maxTotalTokens
+      ?? (oneMillionTier.maxPromptTokens ?? effectiveModel.defaultBudgetTokens) + (oneMillionTier.maxOutputTokens ?? 0),
+    activeTierId: request.mode === 'one-million-context' ? oneMillionTier.id : effectiveModel.contextTiers[0].id,
     fastMode: request.mode === 'fast',
     reasoningWire: { selection: 'off', control: effectiveModel.reasoning },
   };
@@ -72,7 +75,7 @@ function plan(
     plan: requestPlan,
     controls: {
       reasoningLevel: 'off',
-      maxContextMode: request.mode === 'max-context',
+      maxContextMode: request.mode === 'one-million-context',
       fastModel: request.mode === 'fast',
     },
     warnings: [],
@@ -107,22 +110,22 @@ describe('ProviderCapabilityProbeService', () => {
     expect(fixture.recordSuccess).toHaveBeenCalledOnce();
   });
 
-  it('keeps an implicit unknown Max tier inconclusive without sending a fake proof request', async () => {
+  it('keeps an implicit unknown 1M tier inconclusive without sending a fake proof request', async () => {
     const fixture = dependencies(model({
       contextTiers: [
         ...model().contextTiers,
-        { id: 'long', label: '922K', maxPromptTokens: 922_000, activation: { kind: 'implicit' }, entitlement: 'unknown' },
+        { id: 'long', label: '1M', maxPromptTokens: 922_000, maxOutputTokens: 128_000, activation: { kind: 'implicit' }, entitlement: 'unknown' },
       ],
     }));
     const service = new ProviderCapabilityProbeService(fixture.value);
 
-    await expect(service.test({ providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' })).resolves.toMatchObject({
+    await expect(service.test({ providerId: 'provider-a', modelId: 'model-a', mode: 'one-million-context' })).resolves.toMatchObject({
       success: false, status: 'inconclusive', requestSent: false,
     });
     expect(fixture.execute).not.toHaveBeenCalled();
   });
 
-  it('sends and records an explicit header-activated unknown Max tier probe', async () => {
+  it('sends and records an explicit header-activated unknown 1M tier probe', async () => {
     const fixture = dependencies(model({
       contextTiers: [
         ...model().contextTiers,
@@ -134,7 +137,7 @@ describe('ProviderCapabilityProbeService', () => {
     }));
     const service = new ProviderCapabilityProbeService(fixture.value);
 
-    await expect(service.test({ providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' })).resolves.toMatchObject({
+    await expect(service.test({ providerId: 'provider-a', modelId: 'model-a', mode: 'one-million-context' })).resolves.toMatchObject({
       success: true, status: 'verified', requestSent: true,
     });
     expect(fixture.execute).toHaveBeenCalledOnce();

@@ -13,12 +13,12 @@ const usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
 const openAiLevels = {
   kind: 'levels',
   supportsOff: true,
-  levels: ['low', 'medium', 'high', 'extra'],
+  levels: ['low', 'medium', 'high', 'xhigh'],
   defaultSelection: 'medium',
   wireProfile: {
     kind: 'openai-responses',
     on: 'medium',
-    levels: { low: 'low', medium: 'medium', high: 'high', extra: 'xhigh' },
+    levels: { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh' },
   },
 } satisfies ReasoningControl;
 
@@ -29,6 +29,8 @@ const requestPlan: RequestPlan = {
   headers: {},
   bodyPatch: {},
   contextBudgetTokens: 128_000,
+  contextMode: 'normal',
+  contextWindowTokens: 128_000,
   activeTierId: 'default',
   fastMode: false,
   reasoningWire: { selection: 'off', control: openAiLevels },
@@ -83,7 +85,7 @@ describe('provider reasoning artifact replay policy', () => {
     const levelResponsesBody = openAIResponsesTesting.buildRequestBody(
       { ...model('openai-responses'), id: 'gpt-5.5', provider: 'openai' },
       baseContext,
-      { requestPlan, reasoning: { selection: 'extra', control: reasoningControl }, reasoningVisibility: 'summary-events' },
+      { requestPlan, reasoning: { selection: 'xhigh', control: reasoningControl }, reasoningVisibility: 'summary-events' },
     );
     expect(levelResponsesBody.reasoning).toMatchObject({ effort: 'xhigh', summary: 'auto' });
     expect(levelResponsesBody.include).toEqual(['reasoning.encrypted_content']);

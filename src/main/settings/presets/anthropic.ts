@@ -76,7 +76,7 @@ const preset: ProviderPreset = {
           "low",
           "medium",
           "high",
-          "extra",
+          "xhigh",
           "max"
         ],
         "defaultSelection": "high",
@@ -87,7 +87,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max"
           },
           "onMode": "adaptive"
@@ -116,24 +116,17 @@ const preset: ProviderPreset = {
       "contextTiers": [
         {
           "id": "default",
-          "label": "Default",
-          "maxPromptTokens": 200000,
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "granted"
-        },
-        {
-          "id": "max",
-          "label": "1M context",
-          "maxPromptTokens": 1000000,
+          "label": "1M window",
+          "maxPromptTokens": 872000,
+          "maxOutputTokens": 128000,
+          "maxTotalTokens": 1000000,
           "activation": {
             "kind": "implicit"
           },
           "entitlement": "granted"
         }
       ],
-      "defaultBudgetTokens": 200000,
+      "defaultBudgetTokens": 256000,
       "fast": {
         "kind": "unsupported"
       },
@@ -144,7 +137,7 @@ const preset: ProviderPreset = {
           "low",
           "medium",
           "high",
-          "extra",
+          "xhigh",
           "max"
         ],
         "defaultSelection": "high",
@@ -155,7 +148,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max"
           },
           "onMode": "adaptive",
@@ -213,7 +206,7 @@ const preset: ProviderPreset = {
           "low",
           "medium",
           "high",
-          "extra",
+          "xhigh",
           "max"
         ],
         "defaultSelection": "high",
@@ -224,7 +217,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max"
           },
           "onMode": "adaptive",

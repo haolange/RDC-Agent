@@ -113,8 +113,7 @@ const REASONING_LEVEL_MAP: Record<string, NamedReasoningLevel | undefined> = {
   low: 'low',
   medium: 'medium',
   high: 'high',
-  xhigh: 'extra',
-  extra: 'extra',
+  xhigh: 'xhigh',
   max: 'max',
   ultra: 'ultra',
 };
@@ -124,7 +123,7 @@ const OPENAI_EFFORT_MAP: Record<NamedReasoningLevel, OpenAiWireEffort> = {
   low: 'low',
   medium: 'medium',
   high: 'high',
-  extra: 'xhigh',
+  xhigh: 'xhigh',
   max: 'max',
   ultra: 'ultra',
 };
@@ -139,30 +138,51 @@ function reasoningLevels(values: unknown): NamedReasoningLevel[] {
   return [...new Set(normalized)];
 }
 
-function openAiReasoning(
+export function parseOpenAiReasoningControl(
   values: unknown,
   defaultValue: unknown,
   protocol: 'openai-responses' | 'openai-compatible' = 'openai-responses',
 ): ReasoningControl {
   const levels = reasoningLevels(values);
+  const declaredValues = Array.isArray(values)
+    ? values.map((value) => (
+        typeof value === 'string'
+          ? value
+          : text(record(value).effort) ?? text(record(value).id) ?? text(record(value).value) ?? ''
+      ).toLowerCase())
+    : [];
+  const supportsOff = declaredValues.includes('off') || declaredValues.includes('none');
   if (levels.length === 0) {
+    const kind = Array.isArray(values) ? 'none' : 'unknown';
     return {
-      kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off',
-      lockedSelection: 'off', wireProfile: { kind: 'none' },
+      kind,
+      supportsOff: kind === 'none',
+      levels: [],
+      defaultSelection: 'off',
+      ...(kind === 'none' ? { lockedSelection: 'off' as const } : {}),
+      wireProfile: { kind: 'none' },
     };
   }
   const requestedDefault = text(defaultValue)?.toLowerCase();
   const mappedDefault = requestedDefault ? REASONING_LEVEL_MAP[requestedDefault] : undefined;
-  const defaultSelection = mappedDefault && levels.includes(mappedDefault) ? mappedDefault : levels[0];
+  const defaultSelection = supportsOff && (requestedDefault === 'off' || requestedDefault === 'none')
+    ? 'off' as const
+    : mappedDefault && levels.includes(mappedDefault) ? mappedDefault : levels[0];
+  const onSelection = defaultSelection === 'off' ? levels[0] : defaultSelection;
   const wireLevels = Object.fromEntries(levels.map((level) => [level, OPENAI_EFFORT_MAP[level]]));
   return {
     kind: 'levels',
-    supportsOff: false,
+    supportsOff,
     levels,
     defaultSelection,
     wireProfile: protocol === 'openai-responses'
-      ? { kind: 'openai-responses', on: defaultSelection, levels: wireLevels }
-      : { kind: 'openai-compatible', on: defaultSelection, levels: wireLevels },
+      ? { kind: 'openai-responses', on: onSelection, levels: wireLevels }
+      : {
+          kind: 'openai-compatible',
+          on: onSelection,
+          levels: wireLevels,
+          ...(supportsOff ? { offMode: 'reasoning-none' as const } : {}),
+        },
   };
 }
 
@@ -212,7 +232,7 @@ export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog 
       contextTiers,
       ...(contextWindow ? { defaultBudgetTokens: contextWindow } : {}),
       fast: { kind: 'request-param', patch: { service_tier: 'priority' }, entitlement: 'granted', label: 'Fast' },
-      reasoning: openAiReasoning(value.supported_reasoning_levels, value.default_reasoning_level),
+      reasoning: parseOpenAiReasoningControl(value.supported_reasoning_levels, value.default_reasoning_level),
       toolCalling: { state: 'supported' },
       visionInput: inputModalities.length === 0
         ? { state: 'unknown' }
@@ -354,9 +374,11 @@ export function parseOpenRouterAccountCatalog(payload: unknown): ParsedLiveCatal
 
 /** Grok account models are accepted only from the live account catalog. */
 export function parseGrokAccountCatalog(payload: unknown): ParsedLiveCatalog {
-  return asResult(records(payload).flatMap((value): CatalogModelContribution[] => {
+  const contributions = records(payload).flatMap((value): CatalogModelContribution[] => {
     const identity = liveIdentity(value);
     if (!identity) return [];
+    const isGrok420Reasoning = identity.id === 'grok-4.20-0309-reasoning';
+    const isGrok420NonReasoning = identity.id === 'grok-4.20-0309-non-reasoning';
     return [{
       modelId: identity.id,
       ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
@@ -369,11 +391,49 @@ export function parseGrokAccountCatalog(payload: unknown): ParsedLiveCatalog {
       }],
       ...(contextTokens(value) ? { defaultBudgetTokens: contextTokens(value) } : {}),
       fast: { kind: 'unsupported' },
+      ...(isGrok420Reasoning ? {
+        reasoning: {
+          kind: 'always-on' as const,
+          supportsOff: false,
+          levels: [],
+          defaultSelection: 'on' as const,
+          lockedSelection: 'on' as const,
+          wireProfile: { kind: 'none' as const },
+        },
+      } : isGrok420NonReasoning ? {
+        reasoning: {
+          kind: 'none' as const,
+          supportsOff: true,
+          levels: [],
+          defaultSelection: 'off' as const,
+          lockedSelection: 'off' as const,
+          wireProfile: { kind: 'none' as const },
+        },
+      } : {}),
       toolCalling: capabilityState(record(value.capabilities).tool_calls),
       visionInput: capabilityState(record(value.capabilities).vision),
       structuredOutput: capabilityState(record(value.capabilities).structured_output),
     }];
-  }));
+  });
+  const offId = 'grok-4.20-0309-non-reasoning';
+  const onId = 'grok-4.20-0309-reasoning';
+  const off = contributions.find((model) => model.modelId === offId);
+  const on = contributions.find((model) => model.modelId === onId);
+  if (!off || !on) return asResult(contributions);
+  return asResult(contributions
+    .filter((model) => model.modelId !== onId)
+    .map((model) => model.modelId !== offId ? model : {
+      ...model,
+      label: 'Grok 4.20',
+      reasoning: {
+        kind: 'toggle',
+        supportsOff: true,
+        levels: [],
+        defaultSelection: 'on',
+        modelVariants: { offModelId: offId, onModelId: onId },
+        wireProfile: { kind: 'none' },
+      },
+    }));
 }
 
 /** Parse the Grok Build subscription catalog returned by cli-chat-proxy. */
@@ -390,7 +450,9 @@ export function parseGrokBuilderCatalog(payload: unknown): ParsedLiveCatalog {
     return [{
       modelId: identity.id,
       ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
-      label: text(value.name) ?? text(value.label) ?? identity.id,
+      label: identity.id === 'grok-composer-2.5-fast'
+        ? 'Composer 2.5'
+        : text(value.name) ?? text(value.label) ?? identity.id,
       availability: 'available',
       route: {
         protocol: text(value.api_backend)?.toLowerCase() === 'responses'
@@ -406,8 +468,8 @@ export function parseGrokBuilderCatalog(payload: unknown): ParsedLiveCatalog {
       ...(contextWindow ? { defaultBudgetTokens: contextWindow } : {}),
       fast: { kind: 'unsupported' },
       reasoning: supportsReasoning
-        ? openAiReasoning(value.reasoning_efforts, value.reasoning_effort)
-        : openAiReasoning([], undefined),
+        ? parseOpenAiReasoningControl(value.reasoning_efforts, value.reasoning_effort)
+        : parseOpenAiReasoningControl([], undefined),
       toolCalling: { state: 'supported' },
       visionInput: { state: 'unknown' },
       structuredOutput: { state: 'unknown' },

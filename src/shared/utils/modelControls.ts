@@ -29,7 +29,7 @@ function clampToCapabilities(
   return {
     reasoningLevel: clampReasoningSelection(input.reasoningLevel, model.reasoning)
       ?? model.reasoning.defaultSelection,
-    maxContextMode: input.maxContextMode === true && Boolean(choices.maxTier),
+    maxContextMode: input.maxContextMode === true && Boolean(choices.oneMillionTier),
     fastModel: input.fastModel === true && isFastModeSelectable(model),
   };
 }
@@ -56,7 +56,7 @@ export function evaluateModelControls(
   for (let pass = 0; pass <= constraints.length; pass += 1) {
     const before = JSON.stringify(controls);
     const choices = resolveContextTierChoices(model);
-    const tier = controls.maxContextMode ? choices.maxTier : choices.baseTier;
+    const tier = controls.maxContextMode ? choices.oneMillionTier : choices.normalTier;
     for (const constraint of constraints) {
       if (!selectorMatches(constraint.when, controls, tier?.id)) continue;
       if (constraint.action.kind === 'reject') {

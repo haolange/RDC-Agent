@@ -3,11 +3,21 @@ import type { LlmProviderModel } from '@shared/types/settings';
 import type { CatalogModelContribution } from './EffectiveCatalogService';
 import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 import { normalizeCopilotDiscoveryModels } from './ProviderDiscoveryNormalizer';
+import { parseOpenAiReasoningControl } from './LiveProviderCatalogParsers';
+
+export interface CopilotModelCapabilityMetadata {
+  limits: {
+    maxPromptTokens?: number;
+    maxOutputTokens?: number;
+    maxTotalTokens?: number;
+  };
+  tokenPrices: Record<string, unknown>;
+}
 
 export interface CopilotCatalogParseResult {
   models: LlmProviderModel[];
   contributions: CatalogModelContribution[];
-  billingByModel: Record<string, unknown>;
+  billingByModel: Record<string, CopilotModelCapabilityMetadata>;
 }
 
 function record(value: unknown): Record<string, unknown> {
@@ -36,18 +46,29 @@ function entitlement(value: unknown): EntitlementState {
 }
 
 export function parseCopilotBillingTiers(billing: unknown): ContextTier[] {
-  const tokenPrices = record(record(billing).token_prices);
+  const metadata = record(billing);
+  const limits = record(metadata.limits);
+  const tokenPrices = record(metadata.tokenPrices);
+  const maxOutputTokens = positiveInteger(limits.maxOutputTokens);
+  const liveMaxTotalTokens = positiveInteger(limits.maxTotalTokens);
+  const liveMaxPromptTokens = positiveInteger(limits.maxPromptTokens);
   const tiers: ContextTier[] = [];
   for (const [id, label] of [['default', 'Default'], ['long_context', 'Long context']] as const) {
     const price = record(tokenPrices[id]);
-    const contextMax = positiveInteger(price.context_max);
+    const contextMax = positiveInteger(price.context_max)
+      ?? (id === 'default' ? liveMaxPromptTokens : undefined);
     if (!contextMax) continue;
+    const maxTotalTokens = id === 'long_context'
+      ? Math.max(liveMaxTotalTokens ?? 0, contextMax + (maxOutputTokens ?? 0)) || undefined
+      : liveMaxTotalTokens ?? (maxOutputTokens ? contextMax + maxOutputTokens : undefined);
     tiers.push({
       id,
       label,
       maxPromptTokens: contextMax,
+      ...(maxOutputTokens ? { maxOutputTokens } : {}),
+      ...(maxTotalTokens ? { maxTotalTokens } : {}),
       activation: { kind: 'implicit' },
-      entitlement: entitlement(price),
+      entitlement: Object.keys(price).length > 0 ? entitlement(price) : 'granted',
     });
   }
   return tiers;
@@ -55,7 +76,7 @@ export function parseCopilotBillingTiers(billing: unknown): ContextTier[] {
 
 export function parseCopilotModelCatalog(payload: unknown): CopilotCatalogParseResult {
   const collection = Array.isArray(record(payload).data) ? record(payload).data as unknown[] : [];
-  const billingByModel: Record<string, unknown> = {};
+  const billingByModel: Record<string, CopilotModelCapabilityMetadata> = {};
   const models: LlmProviderModel[] = [];
   const contributions: CatalogModelContribution[] = [];
   const seen = new Set<string>();
@@ -92,6 +113,16 @@ export function parseCopilotModelCatalog(payload: unknown): CopilotCatalogParseR
     const limits = record(capabilities.limits);
     const supports = record(capabilities.supports);
     const maxPromptTokens = positiveInteger(limits.max_prompt_tokens);
+    const maxOutputTokens = positiveInteger(limits.max_output_tokens);
+    const maxTotalTokens = positiveInteger(limits.max_context_window_tokens)
+      ?? positiveInteger(limits.max_context_window)
+      ?? positiveInteger(limits.max_total_tokens);
+    const reasoningEfforts = entry.supported_reasoning_efforts
+      ?? capabilities.supported_reasoning_efforts
+      ?? supports.reasoning_efforts;
+    const defaultReasoningEffort = entry.default_reasoning_effort
+      ?? capabilities.default_reasoning_effort
+      ?? supports.default_reasoning_effort;
     contributions.push({
       modelId: id,
       ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
@@ -101,11 +132,18 @@ export function parseCopilotModelCatalog(payload: unknown): CopilotCatalogParseR
         ? {
             contextTiers: [{
               id: 'default', label: 'Default', maxPromptTokens,
+              ...(maxOutputTokens ? { maxOutputTokens } : {}),
+              ...(maxTotalTokens ? { maxTotalTokens } : {}),
               activation: { kind: 'implicit' }, entitlement: 'granted',
             }],
             defaultBudgetTokens: maxPromptTokens,
           }
         : {}),
+      reasoning: parseOpenAiReasoningControl(
+        reasoningEfforts,
+        defaultReasoningEffort,
+        'openai-compatible',
+      ),
       toolCalling: supports.tool_calls === true
         ? { state: 'supported' }
         : supports.tool_calls === false ? { state: 'unsupported' } : { state: 'unknown' },
@@ -118,9 +156,15 @@ export function parseCopilotModelCatalog(payload: unknown): CopilotCatalogParseR
           ? { state: 'unsupported' }
           : { state: 'unknown' },
     });
-    if (entry.billing && parseCopilotBillingTiers(entry.billing).length > 0) {
-      billingByModel[id] = entry.billing;
-    }
+    const metadata: CopilotModelCapabilityMetadata = {
+      limits: {
+        ...(maxPromptTokens ? { maxPromptTokens } : {}),
+        ...(maxOutputTokens ? { maxOutputTokens } : {}),
+        ...(maxTotalTokens ? { maxTotalTokens } : {}),
+      },
+      tokenPrices: record(record(entry.billing).token_prices),
+    };
+    if (parseCopilotBillingTiers(metadata).length > 0) billingByModel[id] = metadata;
   }
   const normalizedContributions = normalizeCopilotDiscoveryModels(contributions);
   const visibleIds = new Set(normalizedContributions.map((model) => model.modelId));

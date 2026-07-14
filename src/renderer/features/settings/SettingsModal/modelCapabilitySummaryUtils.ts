@@ -13,7 +13,7 @@ import {
   type ReasoningSelection,
 } from '@shared/types/modelCapability';
 import type { LlmProviderEntry } from '@shared/types/settings';
-import { contextTierPromptCap, resolveContextTierChoices } from '@shared/utils/contextTiers';
+import { contextTierWindowTokens, resolveContextTierChoices } from '@shared/utils/contextTiers';
 import { formatTokenCount } from '@shared/utils/tokens';
 import type { useI18n } from '../../../i18n';
 import { getProviderProtocolLabel } from './utils';
@@ -23,7 +23,7 @@ type Translate = ReturnType<typeof useI18n>['t'];
 const REASONING_LABEL_KEYS = {
   off: 'composer.effort.levelOff', on: 'composer.effort.levelOn', minimal: 'composer.effort.levelMinimal',
   low: 'composer.effort.levelLow', medium: 'composer.effort.levelMedium', high: 'composer.effort.levelHigh',
-  extra: 'composer.effort.levelExtra', max: 'composer.effort.levelMax', ultra: 'composer.effort.levelUltra',
+  xhigh: 'composer.effort.levelXHigh', max: 'composer.effort.levelMax', ultra: 'composer.effort.levelUltra',
 } as const satisfies Record<ReasoningSelection, Parameters<Translate>[0]>;
 
 const EVIDENCE_LABEL_KEYS = {
@@ -72,7 +72,7 @@ export function findEffectiveCapabilityModel(
 }
 
 function formatTierLimit(tier: ContextTier | undefined, t: Translate): string {
-  const cap = tier ? contextTierPromptCap(tier) : undefined;
+  const cap = tier ? contextTierWindowTokens(tier) : undefined;
   return cap ? formatTokenCount(cap) : t('settings.providers.capability.unknown');
 }
 
@@ -95,12 +95,17 @@ function formatActivation(activation: TierActivation, t: Translate): string {
 export function formatContextCapability(model: EffectiveModel | null, t: Translate): string {
   if (!model) return t('settings.providers.capability.unknown');
   const choices = resolveContextTierChoices(model);
-  const base = formatTierLimit(choices.baseTier, t);
-  if (!choices.maxTier) return base;
-  const maximum = formatTierLimit(choices.maxTier, t);
-  return choices.maxTierUnverified
-    ? t('settings.providers.capability.contextRangeUnverified', { base, maximum })
-    : t('settings.providers.capability.contextRange', { base, maximum });
+  const normal = formatTierLimit(choices.normalTier, t);
+  if (!choices.oneMillionTier) return normal;
+  if (choices.oneMillionTier.id === choices.normalTier?.id) {
+    return choices.oneMillionUnverified
+      ? t('settings.providers.capability.contextOneMillionUnverified', { window: normal })
+      : t('settings.providers.capability.contextOneMillion', { window: normal });
+  }
+  const oneMillion = formatTierLimit(choices.oneMillionTier, t);
+  return choices.oneMillionUnverified
+    ? t('settings.providers.capability.contextRangeUnverified', { base: normal, maximum: oneMillion })
+    : t('settings.providers.capability.contextRange', { base: normal, maximum: oneMillion });
 }
 
 export function buildContextTierRows(model: EffectiveModel | null, t: Translate): ContextTierRow[] {
@@ -108,8 +113,8 @@ export function buildContextTierRows(model: EffectiveModel | null, t: Translate)
   const choices = resolveContextTierChoices(model);
   return model.contextTiers.map((tier) => ({
     id: tier.id,
-    label: tier.id === choices.maxTier?.id
-      ? t('settings.providers.capability.maxTierLabel', { label: tier.label })
+    label: tier.id === choices.oneMillionTier?.id
+      ? t('settings.providers.capability.oneMillionTierLabel', { label: tier.label })
       : tier.label,
     limit: formatTierLimit(tier, t),
     entitlement: formatEntitlement(tier.entitlement, t),
@@ -123,6 +128,7 @@ export function buildContextTierRows(model: EffectiveModel | null, t: Translate)
 
 export function formatReasoningCapabilityValue(control: ReasoningControl | null, t: Translate): string {
   if (!control) return t('settings.providers.capability.unknown');
+  if (control.kind === 'unknown') return t('settings.providers.capability.unverified');
   const levels = getReasoningSelectionOrder(control);
   if (levels.length === 0 || (levels.length === 1 && levels[0] === 'off' && control.kind === 'none')) {
     return t('settings.providers.capability.unsupported');
@@ -163,6 +169,16 @@ function stateTone(state: CapabilityState | undefined): CapabilityChip['tone'] {
   return state.state === 'supported' ? 'positive' : 'negative';
 }
 
+function formatToolCallingState(state: CapabilityState | undefined, t: Translate): string {
+  if (!state || state.state === 'unknown') return t('settings.providers.capability.unverified');
+  return formatCapabilityState(state, t);
+}
+
+function toolCallingTone(state: CapabilityState | undefined): CapabilityChip['tone'] {
+  if (!state || state.state === 'unknown') return 'default';
+  return stateTone(state);
+}
+
 export function buildCapabilityChips(model: EffectiveModel | null, t: Translate): CapabilityChip[] {
   const context = formatContextCapability(model, t);
   const fast = formatFastCapability(model, t);
@@ -180,9 +196,17 @@ export function buildCapabilityChips(model: EffectiveModel | null, t: Translate)
       tone: model?.route.source === 'model' ? 'positive' : 'default',
     },
     { label: t('settings.providers.capability.context'), value: context, tone: context === t('settings.providers.capability.unknown') ? 'warning' : 'positive' },
-    { label: t('settings.providers.capability.reasoning'), value: formatReasoningCapability(model, t), tone: model?.reasoning.kind === 'none' ? 'negative' : model ? 'positive' : 'warning' },
+    {
+      label: t('settings.providers.capability.reasoning'),
+      value: formatReasoningCapability(model, t),
+      tone: model?.reasoning.kind === 'unknown'
+        ? 'default'
+        : model?.reasoning.kind === 'none'
+          ? 'negative'
+          : model ? 'positive' : 'warning',
+    },
     { label: t('settings.providers.capability.fastMode'), value: fast, tone: fastTone },
-    { label: t('settings.providers.capability.toolCalling'), value: formatCapabilityState(model?.toolCalling, t), tone: stateTone(model?.toolCalling) },
+    { label: t('settings.providers.capability.toolCalling'), value: formatToolCallingState(model?.toolCalling, t), tone: toolCallingTone(model?.toolCalling) },
     { label: t('settings.providers.capability.visionInput'), value: formatCapabilityState(model?.visionInput, t), tone: stateTone(model?.visionInput) },
     { label: t('settings.providers.capability.structuredOutput'), value: formatCapabilityState(model?.structuredOutput, t), tone: stateTone(model?.structuredOutput) },
   ];

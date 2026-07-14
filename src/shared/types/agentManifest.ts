@@ -47,7 +47,8 @@ export interface AgentModelOption {
   modelId: string;
   modelLabel: string;
   configured: boolean;
-  status: 'ready' | 'provider-unavailable' | 'model-disabled' | 'missing';
+  status: 'ready' | 'provider-unavailable' | 'model-disabled' | 'model-unavailable' | 'model-unverified' | 'missing';
+  disabledReason?: string;
 }
 
 export interface AgentManifestSettings {
@@ -55,4 +56,16 @@ export interface AgentManifestSettings {
   definitions: AgentManifestDefinition[];
   modelOptions: AgentModelOption[];
   globalInstructions: string;
+}
+
+export interface AgentDefinitionSaveRequest {
+  draft: AgentManifestDraft;
+  clientRevision: number;
+}
+
+export interface AgentDefinitionSaveResult {
+  clientRevision: number;
+  applied: boolean;
+  definition: AgentManifestDefinition | null;
+  route: import('./settings').LlmAgentRoute | null;
 }

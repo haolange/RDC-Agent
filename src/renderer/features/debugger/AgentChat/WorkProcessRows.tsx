@@ -30,7 +30,7 @@ export const SummaryRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'summar
 
 export const DiagnosticRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'diagnostic' }> }> = ({ row }) => (
   <li
-    className={`work-process-step is-appear work-process-diagnostic status-${row.status} kind-diagnostic`}
+    className={`work-process-step is-appear work-process-diagnostic status-${row.status} severity-${row.severity} kind-diagnostic`}
     data-testid="work-process-block"
   >
     <WorkProcessRailIcon variant="step" status={row.status} />

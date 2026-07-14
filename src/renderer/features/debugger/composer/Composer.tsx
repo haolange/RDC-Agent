@@ -31,7 +31,7 @@ function getAgentCapability(agentId: string, definitions: AgentManifestDefinitio
 export const Composer: React.FC<ComposerProps> = ({
   composer,
 }) => {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const composerMarkdown = useAppSettingsStore((state) => state.settings.appearance.composerMarkdown);
   const activeAgentId = useConversationStore((state) => {
     const activeMsg = state.conversationMessages.find(
@@ -66,6 +66,8 @@ export const Composer: React.FC<ComposerProps> = ({
     setSelectedAgentId,
     lastKnownUsage,
     usageStale,
+    nextRequestContextProjection,
+    nextRequestContextPending,
     hasActiveDebugRun,
     isComposerBusy,
     promptPlaceholder,
@@ -244,7 +246,12 @@ export const Composer: React.FC<ComposerProps> = ({
             currentSession={currentSession}
             disabled={isComposerBusy}
           />
-          <ContextUsageIndicator usage={lastKnownUsage} stale={usageStale && !hasActiveDebugRun} language={language} />
+          <ContextUsageIndicator
+            usage={lastKnownUsage}
+            projection={nextRequestContextProjection}
+            pending={nextRequestContextPending}
+            stale={usageStale && !hasActiveDebugRun}
+          />
           <button
             type="button"
             className={`chat-send-button primary ${isComposerBusy ? 'is-stop' : ''}`}

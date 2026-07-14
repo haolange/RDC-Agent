@@ -3,9 +3,8 @@ import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useI18n } from '../../../i18n';
 import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 import type { ProviderCatalogSnapshot } from './types';
-import { resolveAgentRouteStatus } from './agentRouteStatus';
 import { createSettingsModalActions } from './settingsModalActions';
-import { useAgentManifestAutosave } from './useAgentManifestAutosave';
+import { rollbackAgentManifestDrafts, useAgentManifestAutosave } from './useAgentManifestAutosave';
 import { useProviderConnection } from './useProviderConnection';
 import { useSettingsModalState } from './useSettingsModalState';
 import {
@@ -37,6 +36,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const setUsePointerCursors = useAppSettingsStore((state) => state.setUsePointerCursors);
   const updateProfile = useAppSettingsStore((state) => state.updateProfile);
   const patchSettings = useAppSettingsStore((state) => state.patchSettings);
+  const saveAgentDefinition = useAppSettingsStore((state) => state.saveAgentDefinition);
   const reloadSettings = useAppSettingsStore((state) => state.reloadSettings);
 
   const modalState = useSettingsModalState(open, settings);
@@ -92,24 +92,6 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     () => sortProvidersByLabel(modalState.providerDrafts.filter((provider) => provider.enabled && provider.isConfigured && getEnabledModels(provider).length === 0)),
     [modalState.providerDrafts],
   );
-  const invalidAgentRoutes = useMemo(
-    () => modalState.agentManifestDrafts.filter((agent) => !agent.delete && agent.enabled).map((agent) => {
-      const route = modalState.agentRouteDrafts.find((entry) => entry.agentId === agent.id);
-      const routeStatus = resolveAgentRouteStatus(route, modalState.providerDrafts);
-      return routeStatus.issue ? { agentId: agent.id, label: agent.name || agent.id, issue: routeStatus.issue } : null;
-    }).filter((entry): entry is NonNullable<typeof entry> => entry !== null),
-    [modalState.agentManifestDrafts, modalState.agentRouteDrafts, modalState.providerDrafts],
-  );
-  const invalidAgentRouteMessage = useMemo(() => {
-    if (invalidAgentRoutes.length === 0) return '';
-    return t('settings.agentRouteInvalidSummary', {
-      count: invalidAgentRoutes.length,
-      routes: invalidAgentRoutes
-        .map((entry) => `${entry.label}: ${t(entry.issue)}`)
-        .join('; '),
-    });
-  }, [invalidAgentRoutes, t]);
-
   const getResolvedProviderLabel = (provider: Pick<LlmProviderEntry, 'label'>) =>
     getProviderDisplayLabel(provider, t('settings.unnamedProvider'));
 
@@ -126,11 +108,9 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const actions = createSettingsModalActions({
     modalState,
     providerConnection,
-    invalidAgentRoutes,
-    invalidAgentRouteMessage,
     updateProfile,
     patchSettings,
-    reloadSettings,
+    saveAgentDefinition,
     t,
   });
   useAgentManifestAutosave({
@@ -138,8 +118,17 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     settings,
     agentManifestDrafts: modalState.agentManifestDrafts,
     onSave: actions.handleSaveAgentManifests,
+    onRollback: (failedDrafts, savedDrafts) => {
+      modalState.setAgentManifestDrafts((current) => rollbackAgentManifestDrafts(
+        current,
+        failedDrafts,
+        savedDrafts,
+      ));
+    },
     onSaveStateChange: modalState.setAgentManifestSaveState,
     onSaveMessageChange: modalState.setAgentManifestSaveMessage,
+    savedMessage: t('settings.agentManifestSaved'),
+    failedMessage: t('settings.agentManifestSaveFailed'),
   });
 
   return {
@@ -152,8 +141,6 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     providerCatalog,
     providerCatalogCategories: providerCatalogSnapshot.categories,
     configuredProvidersWithoutEnabledModels,
-    invalidAgentRoutes,
-    invalidAgentRouteMessage,
     getResolvedProviderLabel,
     setTheme,
     setLanguage,

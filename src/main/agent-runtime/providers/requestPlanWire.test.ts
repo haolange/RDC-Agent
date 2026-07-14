@@ -9,6 +9,8 @@ const plan: RequestPlan = {
   headers: { 'anthropic-beta': 'context-1m', authorization: 'must-not-pass' },
   bodyPatch: { thinking: { type: 'enabled', budget_tokens: 4096 } },
   contextBudgetTokens: 1_000_000,
+  contextMode: 'one-million',
+  contextWindowTokens: 1_000_000,
   activeTierId: 'max',
   fastMode: false,
   reasoningWire: {

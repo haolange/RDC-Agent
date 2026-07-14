@@ -7,7 +7,14 @@ const DEFAULT_DENY_PATTERNS = [
   '*whisper*',
   '*tts*',
   '*dall-e*',
-  '*image*',
+  '*image-gen*',
+  '*image-generation*',
+  'gpt-image*',
+  'imagen*',
+  '*stable-diffusion*',
+  'flux-*',
+  '*imagine*',
+  '*video*',
   '*audio*',
   '*realtime*',
   '*transcribe*',
@@ -16,7 +23,7 @@ const DEFAULT_DENY_PATTERNS = [
 
 const NON_AGENT_MODALITIES = new Set([
   'audio', 'embedding', 'embeddings', 'image', 'moderation', 'rerank', 'reranker',
-  'speech', 'transcription', 'tts',
+  'music', 'speech', 'transcription', 'tts', 'video',
 ]);
 
 export interface DiscoveryAdmissionDecision {

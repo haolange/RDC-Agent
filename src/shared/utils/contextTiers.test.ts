@@ -1,67 +1,75 @@
 import { describe, expect, it } from 'vitest';
 import type { ContextTier } from '../types/providerCapability';
-import { resolveContextTierChoices } from './contextTiers';
+import {
+  contextTierPromptCap,
+  contextTierWindowTokens,
+  resolveContextTierChoices,
+} from './contextTiers';
 
 const tier = (
   id: string,
-  maxPromptTokens: number | undefined,
+  limits: Pick<ContextTier, 'maxPromptTokens' | 'maxOutputTokens' | 'maxTotalTokens'>,
   entitlement: ContextTier['entitlement'],
 ): ContextTier => ({
   id,
   label: id,
-  ...(maxPromptTokens ? { maxPromptTokens } : {}),
+  ...limits,
   activation: { kind: 'implicit' },
   entitlement,
 });
 
 describe('resolveContextTierChoices', () => {
-  it('selects the highest granted tier before an even higher unknown tier', () => {
-    const choices = resolveContextTierChoices({ contextTiers: [
-      tier('default', 272_000, 'granted'),
-      tier('long', 922_000, 'granted'),
-      tier('experimental', 1_500_000, 'unknown'),
-    ] });
-    expect(choices.baseTier?.id).toBe('default');
-    expect(choices.maxTier?.id).toBe('long');
-    expect(choices.maxTierUnverified).toBe(false);
+  it('keeps prompt cap and complete window as separate contracts', () => {
+    const copilot = tier('long', { maxPromptTokens: 922_000, maxOutputTokens: 128_000 }, 'granted');
+    expect(contextTierPromptCap(copilot)).toBe(922_000);
+    expect(contextTierWindowTokens(copilot)).toBe(1_050_000);
+
+    const total = tier('total', { maxTotalTokens: 1_000_000, maxOutputTokens: 64_000 }, 'granted');
+    expect(contextTierPromptCap(total)).toBe(936_000);
+    expect(contextTierWindowTokens(total)).toBe(1_000_000);
+
+    const bounded = tier('bounded', {
+      maxPromptTokens: 200_000,
+      maxOutputTokens: 128_000,
+      maxTotalTokens: 200_000,
+    }, 'granted');
+    expect(contextTierPromptCap(bounded)).toBe(72_000);
+    expect(contextTierWindowTokens(bounded)).toBe(200_000);
   });
 
-  it('exposes one strictly higher unknown tier as unverified', () => {
+  it('lets one 1M-class tier serve normal and 1M modes', () => {
     const choices = resolveContextTierChoices({ contextTiers: [
-      tier('default', 200_000, 'granted'),
-      tier('long', 1_000_000, 'unknown'),
+      tier('default', { maxPromptTokens: 922_000, maxOutputTokens: 128_000 }, 'granted'),
     ] });
-    expect(choices.maxTier?.id).toBe('long');
-    expect(choices.maxTierUnverified).toBe(true);
+    expect(choices.normalTier?.id).toBe('default');
+    expect(choices.oneMillionTier?.id).toBe('default');
+    expect(choices.oneMillionUnverified).toBe(false);
   });
 
-  it('hides denied, lower, and unrankable unknown alternatives', () => {
+  it('uses an eligible long tier and keeps unknown entitlement explicit', () => {
+    const choices = resolveContextTierChoices({ contextTiers: [
+      tier('default', { maxTotalTokens: 200_000 }, 'granted'),
+      tier('long', { maxPromptTokens: 922_000, maxOutputTokens: 128_000 }, 'unknown'),
+    ] });
+    expect(choices.normalTier?.id).toBe('default');
+    expect(choices.oneMillionTier?.id).toBe('long');
+    expect(choices.oneMillionUnverified).toBe(true);
+  });
+
+  it('does not expose denied or sub-1M tiers as 1M', () => {
     for (const candidate of [
-      tier('denied', 1_000_000, 'denied'),
-      tier('lower', 100_000, 'unknown'),
-      tier('unranked', undefined, 'unknown'),
+      tier('denied', { maxTotalTokens: 1_000_000 }, 'denied'),
+      tier('grok-4.5', { maxTotalTokens: 500_000 }, 'granted'),
+      tier('glm-5', { maxPromptTokens: 200_000 }, 'unknown'),
     ]) {
-      expect(resolveContextTierChoices({ contextTiers: [
-        tier('default', 200_000, 'granted'),
-        candidate,
-      ] }).maxTier).toBeUndefined();
+      expect(resolveContextTierChoices({ contextTiers: [candidate] }).oneMillionTier).toBeUndefined();
     }
   });
 
-  it('never turns a single large tier into Max mode', () => {
-    const choices = resolveContextTierChoices({
-      contextTiers: [tier('default', 1_050_000, 'granted')],
-    });
-    expect(choices.baseTier?.id).toBe('default');
-    expect(choices.maxTier).toBeUndefined();
-  });
-
-  it('does not expose a lower granted tier when the default tier is already highest', () => {
+  it('keeps future windows capped to the same explicit 1M product mode', () => {
     const choices = resolveContextTierChoices({ contextTiers: [
-      tier('default', 1_000_000, 'granted'),
-      tier('earlier', 200_000, 'granted'),
+      tier('future', { maxTotalTokens: 2_000_000, maxOutputTokens: 128_000 }, 'granted'),
     ] });
-    expect(choices.baseTier?.id).toBe('default');
-    expect(choices.maxTier).toBeUndefined();
+    expect(choices.oneMillionTier?.id).toBe('future');
   });
 });

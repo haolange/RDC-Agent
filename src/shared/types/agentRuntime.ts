@@ -12,6 +12,7 @@ import type { ProviderReasoningContract } from './rdxRuntime';
 import type {
   ConversationAskUserAnswer,
   ConversationAskUserQuestion,
+  ConversationDiagnosticSeverity,
   ConversationLoopStopReason,
 } from './conversation';
 import type { AppMode, ExecutableAppMode } from './session';
@@ -144,7 +145,7 @@ export interface AgentApprovalEventPayload extends AgentEventBasePayload {
 
 export interface AgentDiagnosticPayload extends AgentEventBasePayload {
   code: string;
-  severity: 'info' | 'warning' | 'error';
+  severity: ConversationDiagnosticSeverity;
   message: string;
   technicalMessage?: string;
   /** Recovery diagnostics: started while retrying, completed after success. */

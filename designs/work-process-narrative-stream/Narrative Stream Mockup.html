@@ -438,7 +438,7 @@
       </div>
 
       <ol class="stream">
-        <!-- 轮 1：thinking + 标题 prose + ≤2 tool 平铺 -->
+        <!-- 轮 1：thinking + 标题 prose + ≤7 tool 平铺 -->
         <li class="loop has-prose first-line-caption">
           <span class="loop-dot"></span>
           <div class="loop-body">
@@ -466,7 +466,7 @@
           </div>
         </li>
 
-        <!-- 轮 2：无 thinking，标题 prose，≥3 聚合 -->
+        <!-- 轮 2：无 thinking，标题 prose，第 8 个连续 tool 起聚合 -->
         <li class="loop has-prose">
           <span class="loop-dot"></span>
           <div class="loop-body">
@@ -477,15 +477,18 @@
             <details class="tool-agg">
               <summary>
                 <span class="tw"></span>
-                <span>创建 3 个文件，运行 1 条命令，读取 1 个文件</span>
+                <span>创建 4 个文件，编辑 1 个文件，运行 1 条命令，读取 2 个文件</span>
                 <span class="tool-inline-meta">4.8s</span>
               </summary>
               <ul class="tools tool-agg-body">
                 <li class="tool-row"><span class="tool-verb">Created</span><span class="tool-target">BitVec.cs</span><span class="tool-inline-meta"><span class="diff-add">+410</span></span></li>
                 <li class="tool-row"><span class="tool-verb">Created</span><span class="tool-target">BitVecOps.cs</span><span class="tool-inline-meta"><span class="diff-add">+188</span></span></li>
                 <li class="tool-row"><span class="tool-verb">Created</span><span class="tool-target">BitVec.Tests.cs</span><span class="tool-inline-meta"><span class="diff-add">+96</span></span></li>
+                <li class="tool-row"><span class="tool-verb">Created</span><span class="tool-target">BitVec.Format.cs</span><span class="tool-inline-meta"><span class="diff-add">+74</span></span></li>
+                <li class="tool-row"><span class="tool-verb">Edited</span><span class="tool-target">Silicate.Common.csproj</span></li>
                 <li class="tool-row"><span class="tool-verb">Ran</span><span class="tool-target">dotnet test Silicate.Common.Tests</span><span class="tool-inline-meta">2.1s</span></li>
                 <li class="tool-row"><span class="tool-verb">Read</span><span class="tool-target">docs/architecture/bitvec.md</span></li>
+                <li class="tool-row"><span class="tool-verb">Read</span><span class="tool-target">Directory.Build.props</span></li>
               </ul>
             </details>
           </div>
@@ -697,26 +700,31 @@
         </li>
       </ol>
 
-      <div class="scene-label">D · tool 混合：≤2 平铺 / ≥3 聚合</div>
+      <div class="scene-label">D · tool 混合：≤7 平铺 / 第 8 个起聚合</div>
       <ol class="stream">
         <li class="loop has-prose">
           <span class="loop-dot"></span>
           <div class="loop-body">
-            <div class="prose"><p>≤2 平铺：</p></div>
+            <div class="prose"><p>≤7 平铺：</p></div>
             <ul class="tools">
               <li class="tool-row"><span class="tool-verb">Read</span><span class="tool-target">foo.ts</span></li>
               <li class="tool-row"><span class="tool-verb">Read</span><span class="tool-target">bar.ts</span></li>
+              <li class="tool-row"><span class="tool-verb">Read</span><span class="tool-target">baz.ts</span></li>
+              <li class="tool-row"><span class="tool-verb">Read</span><span class="tool-target">qux.ts</span></li>
+              <li class="tool-row"><span class="tool-verb">Read</span><span class="tool-target">alpha.ts</span></li>
+              <li class="tool-row"><span class="tool-verb">Read</span><span class="tool-target">beta.ts</span></li>
+              <li class="tool-row"><span class="tool-verb">Read</span><span class="tool-target">gamma.ts</span></li>
             </ul>
           </div>
         </li>
         <li class="loop has-prose">
           <span class="loop-dot"></span>
           <div class="loop-body">
-            <div class="prose"><p>≥3 聚合（展开态）：</p></div>
+            <div class="prose"><p>第 8 个连续 tool 起聚合（展开态）：</p></div>
             <details class="tool-agg" open>
               <summary>
                 <span class="tw"></span>
-                <span>创建 2 个文件，编辑 1 个文件，运行 1 条命令</span>
+                <span>读取 4 个文件，创建 2 个文件，编辑 1 个文件，运行 1 条命令</span>
                 <span class="tool-inline-meta">3.0s</span>
               </summary>
               <ul class="tools tool-agg-body">
@@ -724,6 +732,10 @@
                 <li class="tool-row"><span class="tool-verb">Created</span><span class="tool-target">b.ts</span></li>
                 <li class="tool-row"><span class="tool-verb">Edited</span><span class="tool-target">index.ts</span></li>
                 <li class="tool-row"><span class="tool-verb">Ran</span><span class="tool-target">pnpm test</span></li>
+                <li class="tool-row"><span class="tool-verb">Read</span><span class="tool-target">package.json</span></li>
+                <li class="tool-row"><span class="tool-verb">Read</span><span class="tool-target">tsconfig.json</span></li>
+                <li class="tool-row"><span class="tool-verb">Read</span><span class="tool-target">vitest.config.ts</span></li>
+                <li class="tool-row"><span class="tool-verb">Read</span><span class="tool-target">README.md</span></li>
               </ul>
             </details>
           </div>

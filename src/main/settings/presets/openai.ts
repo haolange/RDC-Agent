@@ -68,7 +68,7 @@ const preset: ProviderPreset = {
           "low",
           "medium",
           "high",
-          "extra",
+          "xhigh",
           "max"
         ],
         "defaultSelection": "medium",
@@ -80,7 +80,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max",
             "ultra": "ultra"
           }
@@ -128,7 +128,7 @@ const preset: ProviderPreset = {
           "low",
           "medium",
           "high",
-          "extra",
+          "xhigh",
           "max"
         ],
         "defaultSelection": "medium",
@@ -140,7 +140,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max",
             "ultra": "ultra"
           }
@@ -188,7 +188,7 @@ const preset: ProviderPreset = {
           "low",
           "medium",
           "high",
-          "extra",
+          "xhigh",
           "max"
         ],
         "defaultSelection": "medium",
@@ -200,7 +200,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max",
             "ultra": "ultra"
           }
@@ -248,7 +248,7 @@ const preset: ProviderPreset = {
           "low",
           "medium",
           "high",
-          "extra"
+          "xhigh"
         ],
         "defaultSelection": "medium",
         "wireProfile": {
@@ -259,7 +259,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max",
             "ultra": "ultra"
           }
@@ -307,7 +307,7 @@ const preset: ProviderPreset = {
           "low",
           "medium",
           "high",
-          "extra"
+          "xhigh"
         ],
         "defaultSelection": "off",
         "wireProfile": {
@@ -318,7 +318,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max",
             "ultra": "ultra"
           }
@@ -366,7 +366,7 @@ const preset: ProviderPreset = {
           "low",
           "medium",
           "high",
-          "extra"
+          "xhigh"
         ],
         "defaultSelection": "off",
         "wireProfile": {
@@ -377,7 +377,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max",
             "ultra": "ultra"
           }
@@ -425,7 +425,7 @@ const preset: ProviderPreset = {
           "low",
           "medium",
           "high",
-          "extra"
+          "xhigh"
         ],
         "defaultSelection": "off",
         "wireProfile": {
@@ -436,7 +436,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max",
             "ultra": "ultra"
           }
@@ -484,7 +484,7 @@ const preset: ProviderPreset = {
           "low",
           "medium",
           "high",
-          "extra"
+          "xhigh"
         ],
         "defaultSelection": "medium",
         "wireProfile": {
@@ -495,7 +495,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max",
             "ultra": "ultra"
           },
@@ -544,7 +544,7 @@ const preset: ProviderPreset = {
           "low",
           "medium",
           "high",
-          "extra"
+          "xhigh"
         ],
         "defaultSelection": "medium",
         "wireProfile": {
@@ -555,7 +555,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max",
             "ultra": "ultra"
           },

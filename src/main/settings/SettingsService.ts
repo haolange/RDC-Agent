@@ -31,6 +31,11 @@ import type {
   UiPreferences,
 } from '@shared/types/settings';
 import { isReasoningSelection } from '@shared/types/modelCapability';
+import type {
+  AgentDefinitionSaveRequest,
+  AgentDefinitionSaveResult,
+  AgentManifestDraft,
+} from '@shared/types/agentManifest';
 import type { LLMConfig, LLMProviderConfig } from '@shared/types/llm';
 import { DEFAULT_MODEL_ROUTING, isSafeAgentProfileId } from '@shared/types/agent';
 import {
@@ -63,6 +68,7 @@ import { executionProfileService } from './ExecutionProfileService';
 import { providerCatalogService } from './ProviderCatalogService';
 import { normalizeProviderCategory, normalizeProviderProtocol } from './providerCatalogNormalize';
 import { secretStorageService } from './SecretStorageService';
+import { isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 
 type PersistedLlmProviderEntry = Partial<LlmProviderEntry>;
 
@@ -656,13 +662,18 @@ function resolveProviderModels(providerId: string, persistedModels: unknown): Ll
   if (getProviderPresetCatalogOwnership(providerId) !== 'app-managed') {
     return sanitized;
   }
+  const admittedDynamicModels = sanitized.filter((model) => (
+    isAdmittedDiscoveredModel({ id: model.id })
+  ));
   // Volc Coding Plan discovery is account-specific. Once a verified subset has
   // been persisted, do not re-expand it to the entire application catalog.
-  if (providerId === 'volcengine-coding-plan' && sanitized.length > 0) {
-    return sanitized;
+  if (providerId === 'volcengine-coding-plan' && admittedDynamicModels.length > 0) {
+    return admittedDynamicModels;
   }
   const catalogModels = getProviderSeedModels(providerId);
-  return catalogModels.length > 0 ? applyModelEnabledState(catalogModels, sanitized) : sanitized;
+  return catalogModels.length > 0
+    ? applyModelEnabledState(catalogModels, sanitized)
+    : admittedDynamicModels;
 }
 
 function createEmptyAgentRoutes(): LlmAgentRoute[] {
@@ -785,7 +796,6 @@ function sanitizeUserProvider(
   const secretRef = getProviderAccountSecretRef(rawId, authAccountIds['api-key'], 'api-key');
   const protocol = normalizeProviderProtocol({ ...provider, id: rawId });
   const catalogOwnership = getProviderPresetCatalogOwnership(rawId);
-  const models = resolveProviderModels(rawId, provider.models ?? []);
   const apiKeySecret = getResolvedProviderSecret(rawId, secretRef, workspaceRoot);
   const oauthSecret = secretStorageService.getSecret(
     getProviderAccountSecretRef(rawId, authAccountIds.account, 'oauth'),
@@ -807,6 +817,16 @@ function sanitizeUserProvider(
     }),
   ) as Partial<Record<LlmProviderAuthMode, boolean>>;
   const hasStoredSecret = hasStoredSecretByAuthMode[authMode] === true;
+  const persistedModels = resolveProviderModels(rawId, provider.models ?? []);
+  const requiresAccountCatalogCredential = catalogOwnership === 'app-managed'
+    && builtinFallback.authMode === 'account'
+    && builtinFallback.models.length === 0;
+  // A dynamic account catalog is evidence owned by the connected identity. Once
+  // that credential is gone, retaining its last catalog would present stale
+  // models as currently discoverable even though the provider is unconfigured.
+  const models = requiresAccountCatalogCredential && hasStoredSecretByAuthMode.account !== true
+    ? []
+    : persistedModels;
   const selectedAvailability = resolveSelectedAuthAvailability(rawId, authMode, builtinFallback);
   const canUseProvider = selectedAvailability.state !== 'unavailable' && hasStoredSecret;
   const configuredAuthMode = (builtinFallback.authModeOptions ?? [builtinFallback.authMode]).includes(provider.configuredAuthMode as LlmProviderAuthMode)
@@ -990,6 +1010,7 @@ function normalizeUserRoutes(
 
 export class SettingsService {
   private initialized = false;
+  private readonly agentDefinitionRevisions = new Map<string, number>();
 
   initialize(): AppSettings {
     const runtimePaths = appPathService.initializeRuntime();
@@ -1485,6 +1506,85 @@ export class SettingsService {
       ...nextPaths,
       ...(runtimePaths ?? {}),
     });
+  }
+
+  saveAgentDefinition(request: AgentDefinitionSaveRequest): AgentDefinitionSaveResult {
+    this.ensureInitialized();
+    const agentId = request.draft.id.trim();
+    if (!isSafeAgentProfileId(agentId)) {
+      throw new Error(`Invalid agent profile id: ${agentId || '<empty>'}`);
+    }
+    if (!Number.isSafeInteger(request.clientRevision) || request.clientRevision < 1) {
+      throw new Error('clientRevision must be a positive safe integer.');
+    }
+
+    const paths = appPathService.getRuntimePaths();
+    const currentPersisted = this.normalizePersistedSettings(
+      readJsonFile<PersistedSettingsPayload>(paths.settingsPath) ?? createDefaultPersistedSettings(),
+      paths.userRdxRoot,
+      { credentialView: 'storage-metadata' },
+    );
+    const currentRoutes = normalizeUserRoutes(currentPersisted.llm.agentRoutes);
+    const currentDefinitions = agentManifestService.getSettings(
+      paths,
+      currentPersisted.llm.providers,
+      currentRoutes,
+    ).definitions;
+    const currentDefinition = currentDefinitions.find((definition) => (
+      definition.id === agentId || definition.fileName === request.draft.fileName
+    )) ?? null;
+    const latestRevision = this.agentDefinitionRevisions.get(agentId) ?? 0;
+    if (request.clientRevision <= latestRevision) {
+      return {
+        clientRevision: request.clientRevision,
+        applied: false,
+        definition: currentDefinition,
+        route: currentRoutes.find((route) => route.agentId === agentId) ?? null,
+      };
+    }
+
+    let definition: AgentDefinitionSaveResult['definition'] = null;
+    try {
+      definition = agentManifestService.saveDefinition(paths, request.draft);
+      const route = definition ? agentManifestService.routeFromDefinition(definition) : null;
+      const replacedAgentIds = new Set([agentId, currentDefinition?.id].filter(Boolean));
+      const nextRoutes = normalizeUserRoutes([
+        ...currentRoutes.filter((entry) => !replacedAgentIds.has(entry.agentId)),
+        ...(route ? [route] : []),
+      ]);
+      this.writeSettings({
+        ...currentPersisted,
+        schemaVersion: SETTINGS_SCHEMA_VERSION,
+        llm: {
+          providers: currentPersisted.llm.providers,
+          agentRoutes: nextRoutes,
+        },
+      });
+      this.agentDefinitionRevisions.set(agentId, request.clientRevision);
+      return {
+        clientRevision: request.clientRevision,
+        applied: true,
+        definition,
+        route,
+      };
+    } catch (error) {
+      try {
+        agentManifestService.saveDefinition(paths, { ...request.draft, delete: true });
+        if (currentDefinition) {
+          const {
+            filePath: _filePath,
+            builtin: _builtin,
+            updatedAt: _updatedAt,
+            ...previousDraft
+          } = currentDefinition;
+          agentManifestService.saveDefinition(paths, previousDraft as AgentManifestDraft);
+        }
+      } catch {
+        // Preserve the original transaction failure; repository/runtime checks
+        // will surface any rollback failure through the missing manifest.
+      }
+      throw error;
+    }
   }
 
   saveProviderConnection(

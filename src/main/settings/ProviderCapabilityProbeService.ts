@@ -68,7 +68,7 @@ export function buildProbeFailurePatch(
       unavailableReason: 'Explicit model probe returned HTTP 404.',
     };
   }
-  if (request.mode === 'max-context' && (status === 400 || status === 403)) {
+  if (request.mode === 'one-million-context' && (status === 400 || status === 403)) {
     return { modelId: target.model.modelId, contextTiers: [{ id: plan.activeTierId, entitlement: 'denied' }] };
   }
   if (request.mode === 'fast' && (status === 400 || status === 403)
@@ -133,11 +133,11 @@ export class ProviderCapabilityProbeService {
       return { success: false, status: 'failed', requestSent: false, detail: 'Model is not configured and available.' };
     }
     const choices = resolveContextTierChoices(target.model);
-    if (request.mode === 'max-context') {
-      if (!choices.maxTier) {
-        return { success: false, status: 'denied', requestSent: false, detail: 'No selectable Max tier.' };
+    if (request.mode === 'one-million-context') {
+      if (!choices.oneMillionTier) {
+        return { success: false, status: 'denied', requestSent: false, detail: 'No selectable 1M context mode.' };
       }
-      if (choices.maxTier.entitlement === 'unknown' && choices.maxTier.activation.kind === 'implicit') {
+      if (choices.oneMillionTier.entitlement === 'unknown' && choices.oneMillionTier.activation.kind === 'implicit') {
         return {
           success: false,
           status: 'inconclusive',
@@ -155,14 +155,14 @@ export class ProviderCapabilityProbeService {
 
     const controls = {
       reasoningLevel: target.model.reasoning.supportsOff ? 'off' : target.model.reasoning.defaultSelection,
-      maxContextMode: request.mode === 'max-context',
+      maxContextMode: request.mode === 'one-million-context',
       fastModel: request.mode === 'fast',
     };
     const planning = this.dependencies.plan(request, controls);
     if (!planning.ok) {
       return { success: false, status: 'failed', requestSent: false, detail: planning.message };
     }
-    if ((request.mode === 'max-context' && !planning.controls.maxContextMode)
+    if ((request.mode === 'one-million-context' && !planning.controls.maxContextMode)
       || (request.mode === 'fast' && !planning.controls.fastModel)) {
       return { success: false, status: 'denied', requestSent: false, detail: 'The active model constraints rejected this mode.' };
     }

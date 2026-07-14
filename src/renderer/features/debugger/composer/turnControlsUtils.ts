@@ -3,7 +3,7 @@ import type {
 } from '@shared/types/modelCapability';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
-  contextTierPromptCap,
+  ONE_MILLION_CONTEXT_TOKENS,
   resolveContextTierChoices,
 } from '@shared/utils/contextTiers';
 import { evaluateModelControls, isFastModeSelectable } from '@shared/utils/modelControls';
@@ -26,18 +26,16 @@ export function sanitizeTurnControls(
   return evaluateModelControls(capability, controls).controls;
 }
 
-export function hasSelectableMaxTier(capability: EffectiveModel | null): boolean {
-  return Boolean(capability && resolveContextTierChoices(capability).maxTier);
+export function hasSelectableOneMillionContext(capability: EffectiveModel | null): boolean {
+  return Boolean(capability && resolveContextTierChoices(capability).oneMillionTier);
 }
 
-export function maxContextTokens(capability: EffectiveModel | null): number | undefined {
-  if (!capability) return undefined;
-  const tier = resolveContextTierChoices(capability).maxTier;
-  return tier ? contextTierPromptCap(tier) : undefined;
+export function oneMillionContextTokens(capability: EffectiveModel | null): number | undefined {
+  return hasSelectableOneMillionContext(capability) ? ONE_MILLION_CONTEXT_TOKENS : undefined;
 }
 
-export function isMaxTierUnverified(capability: EffectiveModel | null): boolean {
-  return Boolean(capability && resolveContextTierChoices(capability).maxTierUnverified);
+export function isOneMillionContextUnverified(capability: EffectiveModel | null): boolean {
+  return Boolean(capability && resolveContextTierChoices(capability).oneMillionUnverified);
 }
 
 export function hasSelectableFastMode(capability: EffectiveModel | null): boolean {

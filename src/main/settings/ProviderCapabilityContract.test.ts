@@ -10,15 +10,16 @@ vi.mock('electron', () => ({
 
 import { mergeEffectiveCatalog } from './EffectiveCatalogService';
 import { buildEffectiveCatalogRequest } from './EffectiveModelResolver';
+import { resolveContextTierChoices } from '@shared/utils/contextTiers';
 
 interface FrozenEffectiveModel {
   providerId: string;
   modelId: string;
   protocol: LlmProviderProtocol;
   defaultBudgetTokens: number;
-  defaultMaxPromptTokens: number | null;
-  maxMaxPromptTokens: number | null;
-  maxActivation: string | null;
+  normalPromptCapTokens: number | null;
+  oneMillionPromptCapTokens: number | null;
+  oneMillionActivation: string | null;
   fastKind: string;
 }
 
@@ -33,16 +34,16 @@ describe('final provider capability contracts', () => {
       const models = mergeEffectiveCatalog(buildEffectiveCatalogRequest(provider(entry.providerId, entry.protocol)));
       const model = models.find((candidate) => candidate.modelId === entry.modelId);
       expect(model).toBeDefined();
-      const defaultTier = model?.contextTiers[0];
-      const maxTier = model?.contextTiers[1];
+      if (!model) throw new Error(`Missing frozen model ${entry.providerId}/${entry.modelId}.`);
+      const choices = resolveContextTierChoices(model);
       return {
         providerId: entry.providerId,
         modelId: entry.modelId,
         protocol: model?.route.protocol,
         defaultBudgetTokens: model?.defaultBudgetTokens,
-        defaultMaxPromptTokens: defaultTier?.maxPromptTokens ?? null,
-        maxMaxPromptTokens: maxTier?.maxPromptTokens ?? null,
-        maxActivation: maxTier?.activation?.kind ?? null,
+        normalPromptCapTokens: choices.normalTier?.maxPromptTokens ?? null,
+        oneMillionPromptCapTokens: choices.oneMillionTier?.maxPromptTokens ?? null,
+        oneMillionActivation: choices.oneMillionTier?.activation?.kind ?? null,
         fastKind: model?.fast.kind,
       };
     });

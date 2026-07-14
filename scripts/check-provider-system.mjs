@@ -297,6 +297,9 @@ async function main() {
   assert(grokAccount?.unavailableReason === undefined, 'grok-account must not be marked unavailable.');
   assert(grokAccount?.recommendedModels.length === 0, 'grok-account must not retain a static recommended model table.');
   assert(grokAccount?.catalogOwnership === 'app-managed', 'grok-account must be owned by its dynamic account catalog.');
+  const githubCopilotPreset = presetById.get('github-copilot');
+  assert(githubCopilotPreset?.seedModels.length === 0, 'GitHub Copilot must admit models only from the current account live catalog.');
+  assert(githubCopilotPreset?.recommendedModels.length === 0, 'GitHub Copilot must not recommend models absent from the current account live catalog.');
   const cline = definitionById.get('cline');
   assert(cline?.authMode === 'api-key' && cline?.authModeOptions?.includes('account'), 'Cline must expose API key and account auth modes.');
   const openRouter = definitionById.get('openrouter');
@@ -427,9 +430,9 @@ async function main() {
       'GROK_OAUTH_CLIENT_ID',
       'startGrokBrowserLogin',
       'startGrokDeviceLogin',
-      'startGrokCallbackServer',
       'exchangeGrokCode',
       'pollGrokDevice',
+      'requiresCodeInput',
       'SUPER_GROK_OAUTH_REDIRECT_URI',
       'parseGrokBuilderCatalog',
       'parseGrokAccountCatalog',
@@ -438,6 +441,7 @@ async function main() {
     ],
     'ProviderAccountAuthService Super Grok OAuth flow',
   );
+  assert(!providerAccountAuthService.includes('startGrokCallbackServer'), 'Super Grok browser login must use the xAI one-time code completion flow, not a localhost callback server.');
   assert(!providerAccountAuthService.includes('oauthClientId'), 'Super Grok login must not require a user-supplied OAuth client id.');
   assertSourceContains(
     providerAccountAuthService,
@@ -492,7 +496,8 @@ async function main() {
   const modelControlPolicy = read('src/shared/utils/modelControls.ts');
   const rendererTurnControls = read('src/renderer/features/debugger/composer/turnControlsUtils.ts');
   assert(!requestPlanner.includes('256_000') && !requestPlanner.includes('256000'), 'RequestPlanner must never invent a fixed 256K budget.');
-  assert(!contextTierPolicy.includes('1_000_000') && !contextTierPolicy.includes('1000000'), 'Max selection must not use a 1M token threshold.');
+  assert(contextTierPolicy.includes('ONE_MILLION_CONTEXT_TOKENS = 1_000_000'), '1M eligibility must use one explicit full-window threshold.');
+  assert(contextTierPolicy.includes('contextTierWindowTokens(tier)'), '1M eligibility must inspect the complete context window.');
   assertSourceContains(requestPlanner, ['resolveContextTierChoices', 'evaluateModelControls'], 'RequestPlanner shared capability policy');
   assertSourceContains(rendererTurnControls, ['resolveContextTierChoices', 'evaluateModelControls'], 'renderer shared capability policy');
   assertSourceContains(modelControlPolicy, ['CONSTRAINT_CYCLE', 'isFastModeSelectable'], 'shared model-control evaluator');
@@ -505,7 +510,7 @@ async function main() {
   const discoveryAdmission = read('src/main/settings/DiscoveryAdmission.ts');
   assertSourceContains(
     discoveryAdmission,
-    ['NON_AGENT_MODALITIES', 'extractDiscoveredModelIdentity', 'unproven-alias'],
+    ['NON_AGENT_MODALITIES', 'output_modalities', 'extractDiscoveredModelIdentity', 'unproven-alias'],
     'discovery admission policy',
   );
   const protocolSwitch = read('src/main/settings/ProviderProtocolSwitchService.ts');
@@ -603,7 +608,7 @@ async function main() {
   );
   const capabilityProbeService = read('src/main/settings/ProviderCapabilityProbeService.ts');
   assertSourceContains(capabilityProbeService, [
-    "request.mode === 'max-context'",
+    "request.mode === 'one-million-context'",
     "activation.kind === 'implicit'",
     "status === 404",
     "status === 400 || status === 403",

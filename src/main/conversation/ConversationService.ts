@@ -15,6 +15,7 @@ import type {
   ConversationToolCall,
   ConversationWorkBlock,
   ConversationWorkTrace,
+  NextRequestContextPreviewRequest,
   ConversationSendRequest,
   ConversationStreamEvent,
   ConversationTurnResult,
@@ -28,6 +29,8 @@ import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import type { AgentRole } from '@shared/types/agent';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
+import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { PromptPlan } from '@shared/types/rdxRuntime';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type {
   AppMode,
@@ -36,6 +39,7 @@ import type {
   RunSummary,
   SessionAttachmentRecord,
   SessionRecord,
+  NextRequestContextProjection,
 } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import { isTopLevelAgentId } from '@shared/types/agent';
@@ -90,6 +94,10 @@ import {
   type ConversationLoopContinuationState,
 } from '@shared/conversation/loopOutputPhase';
 import { beginAssistantContentLoopIfPending } from './ConversationLoopRuntimeState';
+import {
+  materializeAgentUserInput,
+  resolvePendingAttachmentDescriptors,
+} from './ConversationAttachmentMaterializer';
 
 interface ConversationBranchTurnContext {
   branchId: string;
@@ -149,6 +157,12 @@ interface ConversationContextInput extends ConversationSendRequest {
   fallbackRunId?: string | null;
 }
 
+interface NextRequestContextInput extends NextRequestContextPreviewRequest {
+  fallbackProjectId?: string | null;
+  fallbackSessionId?: string | null;
+  fallbackRunId?: string | null;
+}
+
 interface ConversationRewriteContextInput extends ConversationRewriteFromMessageRequest {
   fallbackProjectId?: string | null;
   fallbackSessionId?: string | null;
@@ -163,6 +177,13 @@ interface ResolvedConversationContext {
   openedCapture: OpenedCaptureState | null;
   openedCapturePath: string | null;
   replayDevice: ReplayDeviceEntry | null;
+}
+
+interface PreparedConversationPrompt {
+  projectRootPath: string | null;
+  allowedToolNames: string[];
+  promptPlan: PromptPlan;
+  visibleTurnIds: string[];
 }
 
 interface ActiveConversationTurn {
@@ -756,6 +777,190 @@ export class ConversationService {
     };
   }
 
+  private prepareConversationPrompt(input: {
+    context: ResolvedConversationContext;
+    agentId: AgentRole;
+    routePreflight: AgentRoutePreflightOk;
+    requestPlan: RequestPlan;
+    effectiveModel: EffectiveModel | null;
+    attachmentPaths: string[];
+    excludeTurnId?: string;
+  }): PreparedConversationPrompt {
+    const projectRootPath = input.context.projectId
+      ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null
+      : null;
+    const runtimeSettings = settingsService.getAll();
+    const definition = agentManifestService.getEffectiveProfiles(
+      runtimeSettings.paths,
+      runtimeSettings.llm.providers,
+      runtimeSettings.llm.agentRoutes,
+      projectRootPath ?? undefined,
+    ).find((profile) => profile.id === input.agentId && profile.enabled)
+      ?? resolveEnabledAgentDefinition(input.agentId);
+    if (!definition) {
+      throw new Error(`AGENT_PROFILE_UNAVAILABLE: ${input.agentId}`);
+    }
+
+    const allowedToolNames = resolveAgentToolAllowlist(input.agentId, 'investigate')
+      .map((toolName) => normalizeToolName(toolName));
+    const activePaths = [
+      projectRootPath,
+      input.context.openedCapturePath,
+      ...input.attachmentPaths,
+    ].filter((value): value is string => Boolean(value));
+    const scopedInstructions = projectRootPath
+      ? scopedInstructionResolver.resolveForPaths({
+          userInstructionsPath: appPathService.getUserRdxPaths().instructionsPath,
+          projectRoot: projectRootPath,
+          activePaths,
+        })
+      : { sources: [], totalBytes: 0, diagnostics: [] };
+    const preloadedSkills = definition.skills
+      .map((skillId) => agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined))
+      .filter((skill): skill is NonNullable<typeof skill> => skill !== null);
+    const promptClock = resolvePromptClock();
+    const promptPlan = promptPlanBuilder.build({
+      profile: definition,
+      scopedInstructions,
+      preloadedSkills,
+      skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? undefined),
+      tools: allowedToolNames,
+      workDir: projectRootPath ?? '',
+      routeCapability: input.routePreflight.routeCapability,
+      effectiveModel: input.effectiveModel ?? undefined,
+      permissionSettings: runtimeSettings.agentRuntime.permissions,
+      currentDate: promptClock.currentDate,
+      timeZone: promptClock.timeZone,
+      contextWindowTokens: input.requestPlan.contextWindowTokens,
+    });
+
+    const sessionId = input.context.session?.sessionId ?? null;
+    let visibleTurnIds: string[] = [];
+    if (sessionId) {
+      const history = storageAdapter.readConversationHistory(sessionId);
+      const currentBranchState = storageAdapter.readConversationBranchState(sessionId);
+      const { branchState } = repairConversationBranchState(history, currentBranchState);
+      visibleTurnIds = Array.from(new Set(
+        resolveVisibleConversationMessages(history, branchState)
+          .filter((message) => message.turnId !== input.excludeTurnId)
+          .map((message) => message.turnId),
+      ));
+    }
+
+    return { projectRootPath, allowedToolNames, promptPlan, visibleTurnIds };
+  }
+
+  async previewNextRequestContext(
+    input: NextRequestContextInput,
+  ): Promise<NextRequestContextProjection> {
+    let route: NextRequestContextProjection['route'] = null;
+    let requestPlan: RequestPlan | null = null;
+    const blocked = (code: string, message: string): NextRequestContextProjection => ({
+      clientRevision: input.clientRevision,
+      status: 'blocked',
+      route,
+      contextMode: requestPlan?.contextMode ?? null,
+      estimatedInputTokens: 0,
+      uncompactedInputTokens: 0,
+      promptBudgetTokens: requestPlan?.contextBudgetTokens ?? 0,
+      contextWindowTokens: requestPlan?.contextWindowTokens ?? 0,
+      usagePercent: 0,
+      breakdown: [],
+      willCompact: false,
+      filteredArtifactCount: 0,
+      blockingReason: { code, message },
+      estimatedAt: nowMs(),
+    });
+
+    if (!Number.isSafeInteger(input.clientRevision) || input.clientRevision <= 0) {
+      return blocked('INVALID_PREVIEW_REVISION', 'The context preview revision must be a positive integer.');
+    }
+
+    try {
+      const context = await this.resolveContext(input);
+      const pendingHandoff = context.session
+        ? this.pendingHandoffs.get(context.session.sessionId)
+        : undefined;
+      const agentId = pendingHandoff && resolveEnabledAgentDefinition(pendingHandoff.toProfile)
+        ? pendingHandoff.toProfile
+        : resolveConversationAgentId(input.mode, input.agentId);
+      const effectiveMessage = pendingHandoff
+        ? `${pendingHandoff.prompt}\n\n---\n用户消息：${input.message}`
+        : input.message;
+      const routePreflight = resolveAgentRoutePreflight(agentId);
+      if (!routePreflight.ok) {
+        return blocked(routePreflight.diagnostic.code, routePreflight.diagnostic.userMessage);
+      }
+
+      const settings = settingsService.getAll();
+      const effectiveModel = resolveEffectiveModel(
+        routePreflight.providerId,
+        routePreflight.modelId,
+        settings,
+      );
+      if (!effectiveModel) {
+        return blocked(
+          'MODEL_UNAVAILABLE',
+          `The selected model is not available: ${routePreflight.providerId}/${routePreflight.modelId}.`,
+        );
+      }
+      const planning = planEffectiveModelRequest({
+        providerId: routePreflight.providerId,
+        modelId: routePreflight.modelId,
+        settings,
+        controls: {
+          ...(context.session?.turnControls ?? {}),
+          ...(input.turnControls ?? {}),
+        },
+        requestedTemperature: 0.35,
+      });
+      if (!planning.ok) return blocked(planning.code, planning.message);
+      requestPlan = planning.plan;
+      route = {
+        providerId: planning.plan.providerId,
+        modelId: planning.plan.effectiveModelId,
+        protocol: planning.plan.route.protocol,
+      };
+
+      const attachments = await resolvePendingAttachmentDescriptors(input.attachments ?? []);
+      const userInput = await materializeAgentUserInput(
+        effectiveMessage,
+        attachments,
+        routePreflight.routeCapability.visionInputMode,
+        false,
+      );
+      const prepared = this.prepareConversationPrompt({
+        context,
+        agentId,
+        routePreflight,
+        requestPlan: planning.plan,
+        effectiveModel,
+        attachmentPaths: attachments.map((attachment) => attachment.filePath),
+      });
+      return await agentOrchestrator.previewNextRequestContext({
+        clientRevision: input.clientRevision,
+        agentId,
+        content: userInput.content,
+        imageTokenAdjustment: userInput.imageTokenAdjustment,
+        providerId: routePreflight.providerId,
+        modelId: routePreflight.modelId,
+        routeCapability: routePreflight.routeCapability,
+        requestPlan: planning.plan,
+        turnControls: planning.controls,
+        promptPlan: prepared.promptPlan,
+        toolAllowlist: prepared.allowedToolNames,
+        projectRootPath: prepared.projectRootPath,
+        sessionId: context.session?.sessionId ?? null,
+        visibleTurnIds: prepared.visibleTurnIds,
+      });
+    } catch (error) {
+      const technicalMessage = redactTechnicalMessage(error);
+      const code = technicalMessage.match(/^([A-Z][A-Z0-9_]+):/)?.[1]
+        ?? 'CONTEXT_PREVIEW_FAILED';
+      return blocked(code, technicalMessage);
+    }
+  }
+
   private async startProfileTurn(
     context: ResolvedConversationContext,
     requestedMode: AppMode,
@@ -799,12 +1004,18 @@ export class ConversationService {
     const branchId = branchContext?.branchId
       ?? branchState?.activeLeafBranchId
       ?? ROOT_BRANCH_ID;
+    if (pendingAttachments.length > 0 && !workingSession) {
+      throw new Error('ATTACHMENT_SESSION_REQUIRED: select or create a project session before attaching files.');
+    }
     const importedAttachments = workingSession
       ? storageAdapter.importSessionAttachments(
           workingSession.sessionId,
           pendingAttachments.map((entry) => entry.sourcePath),
         )
       : [];
+    if (importedAttachments.length !== pendingAttachments.length) {
+      throw new Error('ATTACHMENT_IMPORT_FAILED: one or more selected attachments could not be imported.');
+    }
     const userMessage = makeConversationMessage('user', rawMessage, {
       turnId,
       sessionId: workingSession?.sessionId ?? null,
@@ -1216,6 +1427,7 @@ export class ConversationService {
         ...withWorkTrace(upsertWorkBlock(assistantMessage.workTrace, 'runtime-route-diagnostic', {
           kind: 'diagnostic',
           status: llmDiagnostic.severity === 'error' ? 'error' : 'complete',
+          diagnosticSeverity: llmDiagnostic.severity,
           title: 'Model route diagnostic',
           stage: 'preflight',
           summary: [llmDiagnostic.userMessage, llmDiagnostic.technicalMessage].filter(Boolean).join('\n'),
@@ -1224,56 +1436,24 @@ export class ConversationService {
       });
     } else {
       try {
-        const projectRootPath = input.context.projectId
-          ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null
-          : null;
-        const runtimeSettings = settingsService.getAll();
-        const definition = agentManifestService.getEffectiveProfiles(
-          runtimeSettings.paths,
-          runtimeSettings.llm.providers,
-          runtimeSettings.llm.agentRoutes,
-          projectRootPath ?? undefined,
-        ).find((profile) => profile.id === conversationAgentId && profile.enabled)
-          ?? resolveEnabledAgentDefinition(conversationAgentId);
-        if (!definition) throw new Error(`No effective agent profile is configured for ${conversationAgentId}.`);
-        const allowedToolNames = resolveAgentToolAllowlist(conversationAgentId, 'investigate')
-          .map((toolName) => normalizeToolName(toolName));
-        const activePaths = [
-          projectRootPath,
-          input.context.openedCapturePath,
-          ...input.importedAttachments.map((attachment) => attachment.filePath),
-        ].filter((value): value is string => Boolean(value));
-        const scopedInstructions = projectRootPath
-          ? scopedInstructionResolver.resolveForPaths({
-              userInstructionsPath: appPathService.getUserRdxPaths().instructionsPath,
-              projectRoot: projectRootPath,
-              activePaths,
-            })
-          : { sources: [], totalBytes: 0, diagnostics: [] };
-        const preloadedSkills = definition.skills
-          .map((skillId) => agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined))
-          .filter((skill): skill is NonNullable<typeof skill> => skill !== null);
-        const promptClock = resolvePromptClock();
-        const promptPlan = promptPlanBuilder.build({
-          profile: definition,
-          scopedInstructions,
-          preloadedSkills,
-          skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? undefined),
-          tools: allowedToolNames,
-          workDir: projectRootPath ?? '',
-          routeCapability: routePreflight.routeCapability,
-          effectiveModel: capability ?? undefined,
-          permissionSettings: runtimeSettings.agentRuntime.permissions,
-          currentDate: promptClock.currentDate,
-          timeZone: promptClock.timeZone,
-          contextWindowTokens: planning?.ok ? planning.plan.contextBudgetTokens : undefined,
+        if (!planning?.ok || !capability) {
+          throw new Error(`MODEL_UNAVAILABLE: ${routePreflight.providerId}/${routePreflight.modelId}`);
+        }
+        const prepared = this.prepareConversationPrompt({
+          context: input.context,
+          agentId: conversationAgentId,
+          routePreflight,
+          requestPlan: planning.plan,
+          effectiveModel: capability,
+          attachmentPaths: input.importedAttachments.map((attachment) => attachment.filePath),
+          excludeTurnId: assistantMessage.turnId,
         });
-        const visibleTurnIds = sessionId
-          ? Array.from(new Set(resolveVisibleConversationMessages(
-              storageAdapter.readConversationHistory(sessionId),
-              this.readRepairedBranchState(sessionId, storageAdapter.readConversationHistory(sessionId)),
-            ).filter((message) => message.turnId !== assistantMessage.turnId).map((message) => message.turnId)))
-          : [];
+        const userInput = await materializeAgentUserInput(
+          input.rawMessage,
+          input.importedAttachments,
+          routePreflight.routeCapability.visionInputMode,
+          true,
+        );
         const responseText = await agentOrchestrator.sendProfileMessage(
           conversationAgentId,
           input.rawMessage,
@@ -1281,15 +1461,17 @@ export class ConversationService {
             sessionId: input.context.session?.sessionId,
             turnId: assistantMessage.turnId,
             stage: 'investigate',
-            projectRootPath,
+            projectRootPath: prepared.projectRootPath,
             projectId: input.context.projectId,
-            systemPrompt: promptPlan.systemPrompt,
-            promptPlan,
+            systemPrompt: prepared.promptPlan.systemPrompt,
+            promptPlan: prepared.promptPlan,
             maxTokens: 1200,
             temperature: 0.35,
             signal: abortController.signal,
             turnControls,
-            visibleTurnIds,
+            requestPlan: planning.plan,
+            userContent: userInput.content,
+            visibleTurnIds: prepared.visibleTurnIds,
             activeBranchId: assistantMessage.branchId ?? input.userMessage.branchId ?? ROOT_BRANCH_ID,
             onTerminalContext: (result) => {
               terminalContext.value = {
@@ -1448,6 +1630,9 @@ export class ConversationService {
                   workTrace: upsertWorkBlock(assistantMessage.workTrace, `runtime-diagnostic-${payload.code ?? 'runtime'}`, {
                     kind: 'diagnostic',
                     status: blockStatus,
+                    diagnosticSeverity: payload.severity === 'error' || payload.severity === 'warning'
+                      ? payload.severity
+                      : 'info',
                     title: isRecovery ? '错误恢复' : 'Runtime diagnostic',
                     summary,
                     completedAt: blockStatus === 'running' ? undefined : nowMs(),
@@ -1461,6 +1646,7 @@ export class ConversationService {
                 if (payload.toolCall?.id && payload.toolCall.name) {
                   const loopScoped = isLoopTool(String(payload.toolCall.name));
                   if (loopScoped) {
+                    beginAssistantContentLoop();
                     loopHasTools = true;
                     markLoopCommentary();
                     // Tool loops keep commentary in Work Process; clear bubble flash.
@@ -1496,6 +1682,7 @@ export class ConversationService {
               if (event.type === 'tool.started') {
                 const loopScoped = isLoopTool(String(event.payload.toolName));
                 if (loopScoped) {
+                  beginAssistantContentLoop();
                   loopHasTools = true;
                   markLoopCommentary();
                 }

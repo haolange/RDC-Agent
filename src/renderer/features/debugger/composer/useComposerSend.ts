@@ -1,4 +1,4 @@
-import { useCallback, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import type { AgentMode } from '@shared/types/layout';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import { useConversationStore } from '../../../stores/conversationStore';
@@ -10,6 +10,10 @@ import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
 import { sendComposerConversationTurn } from './composerSendFlow';
 import { useComposerStop } from './useComposerStop';
 import { executeSlashCommand } from './slashCommandExecutor';
+import {
+  isConcurrentModelSwitchCommand,
+  shouldClearSubmittedPrompt,
+} from './composerCommandConcurrency';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -40,6 +44,8 @@ export function useComposerSend(options: {
     setPromptValue, pendingAttachments, setPendingAttachments,
   } = options;
   const [isPromptSending, setIsPromptSending] = useState(false);
+  const promptValueRef = useRef(promptValue);
+  promptValueRef.current = promptValue;
 
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
   const setSessions = useProjectStore((state) => state.setSessions);
@@ -57,7 +63,8 @@ export function useComposerSend(options: {
 
   const handlePromptSend = useCallback(async () => {
     const trimmed = promptValue.trim();
-    if ((!trimmed && pendingAttachments.length === 0) || isComposerBusy) {
+    const concurrentModelSwitch = isConcurrentModelSwitchCommand(trimmed);
+    if ((!trimmed && pendingAttachments.length === 0) || (isComposerBusy && !concurrentModelSwitch)) {
       return;
     }
 
@@ -66,7 +73,7 @@ export function useComposerSend(options: {
 
     // === 斜杠命令拦截 ===
     if (trimmed.startsWith('/')) {
-      setIsPromptSending(true);
+      if (!concurrentModelSwitch) setIsPromptSending(true);
       try {
         const handled = await executeSlashCommand(trimmed, {
           currentSession,
@@ -80,11 +87,11 @@ export function useComposerSend(options: {
           showNotice,
         });
         if (handled) {
-          setPromptValue('');
+          if (shouldClearSubmittedPrompt(promptValueRef.current, trimmed)) setPromptValue('');
           return;
         }
       } finally {
-        setIsPromptSending(false);
+        if (!concurrentModelSwitch) setIsPromptSending(false);
       }
     }
 

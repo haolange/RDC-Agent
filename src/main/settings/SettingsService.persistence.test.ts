@@ -262,6 +262,54 @@ describe('SettingsService provider persistence', () => {
     expect(secretStorageService.hasSecret(unkeyedRef, workspaceRoot)).toBe(true);
   });
 
+  it('removes a stale dynamic Super Grok catalog when no account credential exists', async () => {
+    const { createProviderEntryFromPreset } = await import('./ProviderPresetRegistry');
+    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const settingsPath = path.join(workspaceRoot, 'config.json');
+    const provider = {
+      ...createProviderEntryFromPreset('grok-account'),
+      models: [{ id: 'grok-4.5', label: 'Grok 4.5', enabled: true }],
+      hasStoredSecret: false,
+      hasStoredSecretByAuthMode: { account: false },
+      status: 'unconfigured' as const,
+      isConfigured: false,
+    };
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    fs.writeFileSync(settingsPath, JSON.stringify({
+      schemaVersion: 2,
+      llm: { providers: [provider], agentRoutes: [] },
+    }), 'utf8');
+
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    const runtime = service.initialize();
+    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+      llm: { providers: Array<{ id: string; models: unknown[] }> };
+    };
+
+    expect(runtime.llm.providers.find((entry) => entry.id === 'grok-account')?.models).toEqual([]);
+    expect(persisted.llm.providers.find((entry) => entry.id === 'grok-account')?.models).toEqual([]);
+  });
+
+  it('retains a live Super Grok catalog while its account credential is connected', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    service.initialize();
+    service.saveProviderAccountConnection(
+      'grok-account',
+      JSON.stringify({ providerId: 'grok-account', accountId: 'grok-user', accessToken: 'oauth-token' }),
+      [
+        { id: 'grok-composer-2.5-fast', label: 'Composer 2.5', enabled: true },
+        { id: 'grok-imagine-video-1.5', label: 'Grok Imagine Video', enabled: true },
+      ],
+    );
+
+    expect(service.getAll().llm.providers.find((entry) => entry.id === 'grok-account')).toMatchObject({
+      isConfigured: true,
+      models: [{ id: 'grok-composer-2.5-fast', label: 'Composer 2.5', enabled: true }],
+    });
+  });
+
   it('stages account-keyed secrets without deleting the source before settings commit', async () => {
     const { secretStorageService } = await import('./SecretStorageService');
     const workspaceRoot = path.join(userDataRoot, '.rdx');
@@ -429,5 +477,41 @@ describe('SettingsService provider persistence', () => {
     expect(service.getAll().llm.agentRoutes).toContainEqual({
       agentId: 'ask', providerId: 'missing-provider', modelId: 'missing-model',
     });
+  });
+
+  it('saves one agent definition without a full settings rewrite and rejects stale revisions', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    const initialized = service.initialize();
+    const ask = initialized.agents.definitions.find((definition) => definition.id === 'ask');
+    expect(ask).toBeDefined();
+    const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
+
+    const first = service.saveAgentDefinition({
+      draft: { ...draft, models: ['deepseek:model-a'] },
+      clientRevision: 100,
+    });
+    expect(first).toMatchObject({
+      applied: true,
+      clientRevision: 100,
+      route: { agentId: 'ask', providerId: 'deepseek', modelId: 'model-a' },
+    });
+
+    const newest = service.saveAgentDefinition({
+      draft: { ...draft, models: ['deepseek:model-c'] },
+      clientRevision: 300,
+    });
+    const stale = service.saveAgentDefinition({
+      draft: { ...draft, models: ['deepseek:model-b'] },
+      clientRevision: 200,
+    });
+    expect(newest.applied).toBe(true);
+    expect(stale.applied).toBe(false);
+    expect(service.getAll().llm.agentRoutes).toContainEqual({
+      agentId: 'ask', providerId: 'deepseek', modelId: 'model-c',
+    });
+    const saved = service.getAll().agents.definitions.find((definition) => definition.id === 'ask');
+    expect(saved?.models).toEqual(['deepseek:model-c']);
+    expect(fs.readdirSync(initialized.paths.agentsPath).some((entry) => entry.endsWith('.tmp'))).toBe(false);
   });
 });

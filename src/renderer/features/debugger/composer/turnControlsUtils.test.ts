@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   buildInitialTurnControls,
-  hasSelectableMaxTier,
-  isMaxTierUnverified,
+  hasSelectableOneMillionContext,
+  isOneMillionContextUnverified,
   sanitizeTurnControls,
 } from './turnControlsUtils';
 
@@ -21,7 +21,7 @@ const levelsCapability: EffectiveModel = {
   reasoning: {
     kind: 'levels',
     supportsOff: true,
-    levels: ['low', 'medium', 'high', 'extra'],
+    levels: ['low', 'medium', 'high', 'xhigh'],
     defaultSelection: 'medium',
     wireProfile: { kind: 'none' },
   },
@@ -37,13 +37,13 @@ describe('turnControlsUtils', () => {
       maxContextMode: true,
       fastModel: true,
     }, levelsCapability)).toEqual({
-      reasoningLevel: 'extra',
+      reasoningLevel: 'xhigh',
       maxContextMode: true,
       fastModel: true,
     });
   });
 
-  it('disables unavailable fast and max-context toggles when capability is absent', () => {
+  it('disables unavailable fast and 1M toggles when capability is absent', () => {
     expect(sanitizeTurnControls({
       reasoningLevel: 'medium',
       maxContextMode: true,
@@ -115,9 +115,9 @@ describe('turnControlsUtils', () => {
         index === 1 ? { ...tier, entitlement: 'unknown' as const } : tier
       )),
     };
-    expect(hasSelectableMaxTier(unknownTier)).toBe(true);
-    expect(isMaxTierUnverified(unknownTier)).toBe(true);
-    expect(hasSelectableMaxTier({
+    expect(hasSelectableOneMillionContext(unknownTier)).toBe(true);
+    expect(isOneMillionContextUnverified(unknownTier)).toBe(true);
+    expect(hasSelectableOneMillionContext({
       ...unknownTier,
       contextTiers: unknownTier.contextTiers.map((tier, index) => (
         index === 1 ? { ...tier, entitlement: 'denied' as const } : tier

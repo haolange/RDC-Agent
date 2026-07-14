@@ -36,7 +36,7 @@ const noMaxCapability: EffectiveModel = {
   reasoning: {
     kind: 'levels',
     supportsOff: true,
-    levels: ['low', 'medium', 'high', 'extra'],
+    levels: ['low', 'medium', 'high', 'xhigh'],
     defaultSelection: 'medium',
     wireProfile: { kind: 'none' },
   },
@@ -121,7 +121,7 @@ describe('useTurnControls sync guards', () => {
       capability: limitedLevelsCapability,
       sessionControls: { reasoningLevel: 'off', maxContextMode: false, fastModel: false },
       currentControls: {
-        reasoningLevel: 'extra',
+        reasoningLevel: 'xhigh',
         maxContextMode: false,
         fastModel: false,
       },
@@ -157,7 +157,7 @@ describe('useTurnControls sync guards', () => {
       currentControls: maxControls,
       rememberedControls: maxControls,
     })).toEqual({
-      reasoningLevel: 'extra',
+      reasoningLevel: 'xhigh',
       maxContextMode: false,
       fastModel: false,
     });

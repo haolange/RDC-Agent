@@ -3,6 +3,7 @@ import type {
   WorkflowState,
 } from './workflow';
 import type { AgentConfig, AgentRole, AgentState } from './agent';
+import type { AgentDefinitionSaveRequest, AgentDefinitionSaveResult } from './agentManifest';
 import type { ActionEvent, EventType } from './evidence';
 import type {
   ConversationCancelActiveTurnRequest,
@@ -12,6 +13,7 @@ import type {
   ConversationAnswerToolApprovalRequest,
   ConversationAnswerToolApprovalResult,
   ConversationMessage,
+  NextRequestContextPreviewRequest,
   ConversationRewriteFromMessageRequest,
   ConversationSendRequest,
   ConversationStreamEvent,
@@ -42,6 +44,7 @@ import type {
   ProjectInputRecord,
   ProjectRecord,
   RunContextUsageSummary,
+  NextRequestContextProjection,
   RunSummary,
   SessionAttachmentRecord,
   SessionOutputRecord,
@@ -115,6 +118,7 @@ export interface ElectronAPI {
 
   conversation: {
     sendMessage: (request: ConversationSendRequest) => Promise<ConversationTurnResult>;
+    previewNextRequestContext: (request: NextRequestContextPreviewRequest) => Promise<NextRequestContextProjection>;
     rewriteFromMessage: (request: ConversationRewriteFromMessageRequest) => Promise<ConversationTurnResult>;
     cancelActiveTurn: (request?: ConversationCancelActiveTurnRequest) => Promise<ConversationCancelActiveTurnResult>;
     answerUserInput: (request: ConversationAnswerUserInputRequest) => Promise<ConversationAnswerUserInputResult>;
@@ -248,6 +252,7 @@ export interface ElectronAPI {
     getEffectiveCatalog: (providerId: string) => Promise<EffectiveCatalogSnapshot | null>;
     getProviderSecret: (providerId: string) => Promise<string>;
     importAgentManifest: (filePath: string) => Promise<AppSettings>;
+    saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
     set: (settings: AppSettingsPatch) => Promise<AppSettings>;
   };
 

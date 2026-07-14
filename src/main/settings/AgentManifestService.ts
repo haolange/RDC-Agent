@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { randomUUID } from 'crypto';
 import YAML from 'yaml';
 import type { AgentId } from '@shared/types/agent';
 import { isSafeAgentProfileId } from '@shared/types/agent';
@@ -11,6 +12,7 @@ import type {
   AgentModelOption,
 } from '@shared/types/agentManifest';
 import type { AppRuntimePaths, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
+import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import type { EffectiveAgentProfile, ScopedResourceCandidate } from '@shared/types/rdxRuntime';
 import { AGENT_DESCRIPTIONS, AGENT_DISPLAY_NAMES, AGENT_MODE_MAP, AGENT_ROLES, isAgentIconPreset } from '@shared/constants/agents';
 import { canonicalAgentModelId, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
@@ -221,6 +223,7 @@ export class AgentManifestService {
     paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
     providers: LlmProviderEntry[],
     routes: LlmAgentRoute[],
+    catalogs: EffectiveCatalogSnapshot[] = [],
   ): AgentManifestSettings {
     this.ensureSeedManifests(paths, routes);
     const directoryPath = this.getAgentsDirectory(paths);
@@ -237,7 +240,7 @@ export class AgentManifestService {
     return {
       directoryPath,
       definitions,
-      modelOptions: this.getModelOptions(providers),
+      modelOptions: this.getModelOptions(providers, definitions, routes, catalogs),
       globalInstructions: this.readGlobalInstructions(paths),
     };
   }
@@ -294,28 +297,58 @@ export class AgentManifestService {
     const directory = this.getAgentsDirectory(paths);
     fs.mkdirSync(directory, { recursive: true });
     for (const draft of drafts) {
-      const agentId = draft.id || toSlug(draft.name);
-      if (!isSafeAgentProfileId(agentId)) {
-        throw new Error(`Invalid agent profile id: ${agentId}`);
-      }
-      const fileName = safeFileNameForDraft(draft);
-      const filePath = path.join(directory, fileName);
-      if (draft.delete) {
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
-        continue;
-      }
-      fs.writeFileSync(filePath, serializeAgentMarkdown({
-        ...draft,
-        id: agentId,
-        fileName,
-      }), 'utf8');
+      this.saveDefinition(paths, draft);
     }
 
     if (typeof globalInstructions === 'string') {
       fs.writeFileSync(this.getGlobalInstructionsPath(paths), globalInstructions.trim(), 'utf8');
     }
+  }
+
+  saveDefinition(
+    paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
+    draft: AgentManifestDraft,
+  ): AgentManifestDefinition | null {
+    const directory = this.getAgentsDirectory(paths);
+    fs.mkdirSync(directory, { recursive: true });
+    const agentId = draft.id || toSlug(draft.name);
+    if (!isSafeAgentProfileId(agentId)) {
+      throw new Error(`Invalid agent profile id: ${agentId}`);
+    }
+    const fileName = safeFileNameForDraft(draft);
+    const filePath = path.join(directory, fileName);
+    if (draft.delete) {
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      return null;
+    }
+
+    const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
+    try {
+      fs.writeFileSync(temporaryPath, serializeAgentMarkdown({
+        ...draft,
+        id: agentId,
+        fileName,
+      }), 'utf8');
+      fs.renameSync(temporaryPath, filePath);
+    } finally {
+      if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+    }
+
+    const previousFileName = draft.fileName?.endsWith('.agent.md')
+      ? path.basename(draft.fileName)
+      : fileName;
+    const previousPath = path.join(directory, previousFileName);
+    if (previousPath !== filePath && fs.existsSync(previousPath)) {
+      fs.rmSync(previousPath, { force: true });
+    }
+    return parseAgentMarkdown(filePath, agentId);
+  }
+
+  routeFromDefinition(definition: Pick<AgentManifestDraft, 'id' | 'models'>): LlmAgentRoute {
+    const model = definition.models.map(splitCanonicalAgentModelId).find((entry) => entry !== null);
+    return model
+      ? { agentId: definition.id, providerId: model.providerId, modelId: model.modelId }
+      : { agentId: definition.id, providerId: '', modelId: '' };
   }
 
   importFile(paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>, sourcePath: string): AgentManifestDefinition {
@@ -348,22 +381,9 @@ export class AgentManifestService {
         continue;
       }
       routeAgentIds.add(definition.id);
-      const model = definition.models.map(splitCanonicalAgentModelId).find((entry) => entry !== null);
-      if (!model) {
-        routeMap.set(definition.id, {
-          agentId: definition.id,
-          providerId: '',
-          modelId: '',
-        });
-        continue;
-      }
       // Preserve the explicit canonical route. EffectiveCatalog is the only
       // authority that may accept or reject the model at execution time.
-      routeMap.set(definition.id, {
-        agentId: definition.id,
-        providerId: model.providerId,
-        modelId: model.modelId,
-      });
+      routeMap.set(definition.id, this.routeFromDefinition(definition));
     }
     return Array.from(routeAgentIds).map((agentId) => routeMap.get(agentId) ?? {
       agentId,
@@ -372,20 +392,132 @@ export class AgentManifestService {
     });
   }
 
-  private getModelOptions(providers: LlmProviderEntry[]): AgentModelOption[] {
-    return providers.flatMap((provider) => provider.models.map((model) => ({
-      canonicalId: canonicalAgentModelId(provider.id, model.id),
-      providerId: provider.id,
-      providerLabel: provider.label,
-      modelId: model.id,
-      modelLabel: model.label || model.id,
-      configured: provider.enabled && provider.isConfigured && model.enabled !== false,
-      status: !provider.enabled || !provider.isConfigured
+  projectEffectiveModelOptions(
+    settings: AgentManifestSettings,
+    providers: LlmProviderEntry[],
+    routes: LlmAgentRoute[],
+    catalogs: EffectiveCatalogSnapshot[],
+  ): AgentManifestSettings {
+    return {
+      ...settings,
+      modelOptions: this.getModelOptions(providers, settings.definitions, routes, catalogs),
+    };
+  }
+
+  private getModelOptions(
+    providers: LlmProviderEntry[],
+    definitions: Array<Pick<AgentManifestDefinition, 'models'>>,
+    routes: LlmAgentRoute[],
+    catalogs: EffectiveCatalogSnapshot[],
+  ): AgentModelOption[] {
+    const referenced = new Set([
+      ...definitions.flatMap((definition) => definition.models),
+      ...routes.map((route) => canonicalAgentModelId(route.providerId, route.modelId)).filter(Boolean),
+    ]);
+    const options: AgentModelOption[] = [];
+    const seen = new Set<string>();
+    const addOption = (option: AgentModelOption): void => {
+      if (!option.canonicalId || seen.has(option.canonicalId)) return;
+      seen.add(option.canonicalId);
+      options.push(option);
+    };
+    const providerUnavailableReason = (provider: LlmProviderEntry): string | undefined => (
+      provider.unavailableReason
+      ?? (!provider.enabled ? 'Provider is disabled.' : !provider.isConfigured ? 'Provider is not connected.' : undefined)
+    );
+    const fromEffectiveModel = (provider: LlmProviderEntry, model: EffectiveModel): AgentModelOption => {
+      const canonicalId = canonicalAgentModelId(provider.id, model.modelId);
+      const providerUnavailable = !provider.enabled || !provider.isConfigured;
+      const modelDisabled = model.enabled === false;
+      const status: AgentModelOption['status'] = providerUnavailable
         ? 'provider-unavailable'
-        : model.enabled === false
+        : modelDisabled
           ? 'model-disabled'
-          : 'ready',
-    })));
+          : model.availability === 'available'
+            ? 'ready'
+            : model.availability === 'unavailable'
+              ? 'model-unavailable'
+              : 'model-unverified';
+      const disabledReason = status === 'provider-unavailable'
+        ? providerUnavailableReason(provider)
+        : status === 'model-disabled'
+          ? 'Model is disabled.'
+          : status === 'model-unavailable'
+            ? model.unavailableReason ?? 'Model is unavailable for this account and route.'
+            : status === 'model-unverified'
+              ? 'Model availability has not been verified for this account and route.'
+              : undefined;
+      return {
+        canonicalId,
+        providerId: provider.id,
+        providerLabel: provider.label || provider.id,
+        modelId: model.modelId,
+        modelLabel: model.label || model.modelId,
+        configured: status === 'ready',
+        status,
+        ...(disabledReason ? { disabledReason } : {}),
+      };
+    };
+
+    for (const provider of providers) {
+      if (provider.catalogOwnership === 'app-managed') {
+        const snapshot = catalogs.find((catalog) => (
+          catalog.providerId === provider.id
+          && catalog.accountId === (provider.activeAccountId ?? `anonymous:${provider.id}`)
+          && catalog.protocol === provider.protocol
+        ));
+        for (const model of snapshot?.models ?? []) {
+          const canonicalId = canonicalAgentModelId(provider.id, model.modelId);
+          if (model.availability === 'available' || referenced.has(canonicalId)) {
+            addOption(fromEffectiveModel(provider, model));
+          }
+        }
+        continue;
+      }
+      for (const model of provider.models) {
+        const canonicalId = canonicalAgentModelId(provider.id, model.id);
+        const providerUnavailable = !provider.enabled || !provider.isConfigured;
+        const disabled = model.enabled === false;
+        const status: AgentModelOption['status'] = providerUnavailable
+          ? 'provider-unavailable'
+          : disabled ? 'model-disabled' : 'ready';
+        addOption({
+          canonicalId,
+          providerId: provider.id,
+          providerLabel: provider.label || provider.id,
+          modelId: model.id,
+          modelLabel: model.label || model.id,
+          configured: status === 'ready',
+          status,
+          ...(status === 'provider-unavailable'
+            ? { disabledReason: providerUnavailableReason(provider) }
+            : status === 'model-disabled' ? { disabledReason: 'Model is disabled.' } : {}),
+        });
+      }
+    }
+
+    for (const canonicalId of referenced) {
+      if (seen.has(canonicalId)) continue;
+      const parsed = splitCanonicalAgentModelId(canonicalId);
+      if (!parsed) continue;
+      const provider = providers.find((entry) => entry.id === parsed.providerId);
+      addOption({
+        canonicalId,
+        providerId: parsed.providerId,
+        providerLabel: provider?.label || parsed.providerId,
+        modelId: parsed.modelId,
+        modelLabel: parsed.modelId,
+        configured: false,
+        status: 'missing',
+        disabledReason: 'This model is not present in the current account catalog.',
+      });
+    }
+
+    return options.sort((left, right) => (
+      left.providerLabel.localeCompare(right.providerLabel)
+      || Number(right.configured) - Number(left.configured)
+      || left.modelLabel.localeCompare(right.modelLabel)
+    ));
   }
 
   private readGlobalInstructions(paths: Pick<AppRuntimePaths, 'instructionsPath'>): string {

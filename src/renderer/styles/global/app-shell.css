@@ -374,7 +374,7 @@
 .main-input-bar {
   --workbench-content-rail-gutter: 16px;
   position: relative;
-  z-index: var(--z-popover);
+  z-index: var(--z-sticky);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -633,6 +633,37 @@
   font-size: var(--text-xs);
   font-weight: var(--font-semibold);
   letter-spacing: -0.02em;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.composer-usage-value-label {
+  color: var(--token-text-placeholder);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  letter-spacing: 0;
+  transform: scale(0.8);
+  transform-origin: center;
+}
+
+.composer-usage-value-number {
+  color: var(--token-text-body);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.composer-usage-indicator.is-pending .composer-usage-ring-progress {
+  opacity: 0.55;
+}
+
+.composer-usage-indicator.is-blocked {
+  border-color: color-mix(in srgb, var(--token-status-error) 42%, var(--token-border-default));
+}
+
+.composer-usage-indicator.is-blocked .composer-usage-ring-progress,
+.composer-usage-indicator.is-blocked .composer-usage-value-number {
+  color: var(--token-status-error);
+  stroke: var(--token-status-error);
 }
 
 /* composer-usage-tooltip 已移除，改为 title attribute hover */
@@ -735,6 +766,30 @@
   pointer-events: none;
 }
 
+.context-breakdown-status {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin: 0 var(--space-5) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--token-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-muted);
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+}
+
+.context-breakdown-status.is-pending {
+  color: var(--token-status-info);
+}
+
+.context-breakdown-status.is-blocked {
+  align-items: flex-start;
+  flex-direction: column;
+  border-color: color-mix(in srgb, var(--token-status-error) 36%, var(--token-border-muted));
+  color: var(--token-status-error);
+}
+
 /* Hero: % Full · occupied/window · full-width bar */
 .context-breakdown-hero {
   display: flex;
@@ -779,6 +834,18 @@
   white-space: nowrap;
 }
 
+.context-breakdown-projection-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  color: var(--token-text-placeholder);
+  font-size: var(--text-sm);
+}
+
+.context-breakdown-projection-meta .is-warning {
+  color: var(--token-status-warning);
+}
+
 /* Stacked bar — thicker Cursor-style track */
 .context-breakdown-bar {
   display: flex;
@@ -799,6 +866,14 @@
 
 /* This run — quiet caption under hero, no boxed panel */
 .context-breakdown-run-totals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+.context-breakdown-last-actual {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;

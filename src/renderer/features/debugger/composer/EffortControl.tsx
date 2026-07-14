@@ -10,15 +10,20 @@ import {
   ChevronIcon,
   clampSliderRatio,
   EFFORT_LABEL_KEYS,
-  findAdjacentSupportedLevel,
   getStopPosition,
   ReasoningLevelIcon,
   resolveNearestSnapLevel,
   resolveSelectedLevel,
 } from './effortControlParts';
 import { EffortControlPopup } from './EffortControlPopup';
-import { hasSelectableFastMode, hasSelectableMaxTier, maxContextTokens } from './turnControlsUtils';
+import {
+  hasSelectableFastMode,
+  hasSelectableOneMillionContext,
+  isOneMillionContextUnverified,
+  oneMillionContextTokens,
+} from './turnControlsUtils';
 import { useMaxVisualController } from './useMaxVisualController';
+import { createEffortSliderHandlers } from './effortSliderHandlers';
 export const EffortControl: React.FC<{
   agentId: string;
   currentSession: SessionRecord | null;
@@ -47,6 +52,7 @@ export const EffortControl: React.FC<{
     [reasoningControl],
   );
   const displayLevelsKey = displayLevels.join('|');
+  const reasoningUnverified = !reasoningControl || reasoningControl.kind === 'unknown';
   const hasAdjustableReasoning = displayLevels.length > 1 && reasoningControl?.kind !== 'always-on';
 
   const selectedLevel = resolveSelectedLevel(
@@ -93,19 +99,24 @@ export const EffortControl: React.FC<{
     resetMaxVisual();
   }, [capabilityKey, displayLevelsKey, resetMaxVisual]);
 
-  const effortLabel = t(EFFORT_LABEL_KEYS[selectedLevel]);
-  const tooltipLabel = t(EFFORT_LABEL_KEYS[displayLevel]);
-  const maxTokens = maxContextTokens(capability);
-  const maxAvailable = hasSelectableMaxTier(capability);
+  const effortLabel = reasoningUnverified
+    ? t('composer.effort.providerManaged')
+    : t(EFFORT_LABEL_KEYS[selectedLevel]);
+  const tooltipLabel = reasoningUnverified
+    ? t('composer.effort.unverified')
+    : t(EFFORT_LABEL_KEYS[displayLevel]);
+  const oneMillionTokens = oneMillionContextTokens(capability);
+  const oneMillionAvailable = hasSelectableOneMillionContext(capability);
+  const oneMillionUnverified = isOneMillionContextUnverified(capability);
   const fastAvailable = hasSelectableFastMode(capability);
-  const maxContextBadgeLabel = maxTokens
-    ? formatTokenCount(maxTokens)
-    : t('composer.effort.maxContextBadge');
+  const oneMillionContextBadgeLabel = oneMillionTokens
+    ? formatTokenCount(oneMillionTokens)
+    : t('composer.effort.oneMillionContextBadge');
   const pillPresentation = buildEffortPillPresentation({
     reasoningLabel: effortLabel,
-    maxContextMode: turnControls.maxContextMode,
-    maxContextLabel: t('composer.effort.maxContext'),
-    maxContextBadgeLabel,
+    oneMillionContextMode: turnControls.maxContextMode,
+    oneMillionContextLabel: t('composer.effort.oneMillionContext'),
+    oneMillionContextBadgeLabel,
     fastModel: turnControls.fastModel,
     fastModelLabel: t('composer.effort.fastModel'),
     fastModelBadgeLabel: t('composer.effort.fastMultiplier'),
@@ -159,67 +170,23 @@ export const EffortControl: React.FC<{
     applyCommittedLevelVisual(level);
   }, [applyCommittedLevelVisual, displayLevels, updateTurnControls]);
 
-  const getRatioFromClientX = (clientX: number): number => {
-    const track = trackRef.current;
-    if (!track) return 0;
-    const rect = track.getBoundingClientRect();
-    return clampSliderRatio((clientX - rect.left) / rect.width);
-  };
-
-  const resolveLevelFromClientX = (clientX: number): ReasoningSelection => {
-    const track = trackRef.current;
-    if (!track) return displayLevels[0] ?? 'off';
-    const rect = track.getBoundingClientRect();
-    return resolveNearestSnapLevel((clientX - rect.left) / rect.width, displayLevels);
-  };
-
-  const handleTrackPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!hasAdjustableReasoning) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const ratio = getRatioFromClientX(event.clientX);
-    dragActiveRef.current = true;
-    setSnapLevel(null);
-    setDragRatio(ratio);
-  };
-
-  const handleTrackPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragActiveRef.current || !hasAdjustableReasoning) return;
-    setDragRatio(getRatioFromClientX(event.clientX));
-  };
-
-  const handleTrackPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!dragActiveRef.current) return;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    commitEffort(resolveLevelFromClientX(event.clientX));
-    dragActiveRef.current = false;
-    setDragRatio(null);
-    suppressClickRef.current = true;
-  };
-
-  const handleTrackClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!hasAdjustableReasoning) return;
-    if (suppressClickRef.current) {
-      suppressClickRef.current = false;
-      return;
-    }
-    commitEffort(resolveLevelFromClientX(event.clientX));
-  };
-
-  const handleThumbKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!hasAdjustableReasoning) return;
-    if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
-      event.preventDefault();
-      const next = findAdjacentSupportedLevel(displayLevel, -1, displayLevels);
-      if (next) commitEffort(next);
-    }
-    if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
-      event.preventDefault();
-      const next = findAdjacentSupportedLevel(displayLevel, 1, displayLevels);
-      if (next) commitEffort(next);
-    }
-  };
+  const {
+    handleTrackPointerDown,
+    handleTrackPointerMove,
+    handleTrackPointerUp,
+    handleTrackClick,
+    handleThumbKeyDown,
+  } = createEffortSliderHandlers({
+    trackRef,
+    dragActiveRef,
+    suppressClickRef,
+    hasAdjustableReasoning,
+    displayLevel,
+    displayLevels,
+    setSnapLevel,
+    setDragRatio,
+    commitEffort,
+  });
 
   const popupStyle = { '--composer-effort-popup-shift-x': `${popupShift}px` } as React.CSSProperties;
   const thumbStyle = { left: `${thumbPercent}%` } as React.CSSProperties;
@@ -259,6 +226,8 @@ export const EffortControl: React.FC<{
           popupRef={popupRef}
           popupStyle={popupStyle}
           trackRef={trackRef}
+          reasoningUnverified={reasoningUnverified}
+          reasoningStateLabel={t('composer.effort.providerManaged')}
           hasAdjustableReasoning={hasAdjustableReasoning}
           displayLevel={displayLevel}
           displayLevels={displayLevels}
@@ -273,9 +242,10 @@ export const EffortControl: React.FC<{
           thumbStyle={thumbStyle}
           thumbEdgeClass={thumbEdgeClass}
           tooltipLabel={tooltipLabel}
-          maxContextAvailable={maxAvailable}
+          oneMillionContextAvailable={oneMillionAvailable}
+          oneMillionContextUnverified={oneMillionUnverified}
           fastModelAvailable={fastAvailable}
-          maxContextMode={turnControls.maxContextMode}
+          oneMillionContextMode={turnControls.maxContextMode}
           fastModel={turnControls.fastModel}
           t={t}
           onTrackPointerDown={handleTrackPointerDown}
@@ -283,7 +253,7 @@ export const EffortControl: React.FC<{
           onTrackPointerUp={handleTrackPointerUp}
           onTrackClick={handleTrackClick}
           onThumbKeyDown={handleThumbKeyDown}
-          onToggleMaxContext={() => updateTurnControls({ maxContextMode: !turnControls.maxContextMode })}
+          onToggleOneMillionContext={() => updateTurnControls({ maxContextMode: !turnControls.maxContextMode })}
           onToggleFastModel={() => updateTurnControls({ fastModel: !turnControls.fastModel })}
         />
       ) : null}

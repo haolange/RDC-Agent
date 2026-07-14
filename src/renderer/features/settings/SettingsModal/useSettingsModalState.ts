@@ -23,8 +23,6 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
   const [globalInstructionsDraft, setGlobalInstructionsDraft] = useState(settings.agents.globalInstructions);
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(settings.llm.providers[0]?.id ?? null);
   const [connectionDraft, setConnectionDraft] = useState<ProviderConnectionDraft | null>(null);
-  const [agentRouteSaveState, setAgentRouteSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [agentRouteSaveMessage, setAgentRouteSaveMessage] = useState('');
   const [agentManifestSaveState, setAgentManifestSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [agentManifestSaveMessage, setAgentManifestSaveMessage] = useState('');
   const wasOpenRef = useRef(false);
@@ -48,8 +46,6 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setGlobalInstructionsDraft(settings.agents.globalInstructions);
     setSelectedProviderId(providers[0]?.id ?? null);
     setConnectionDraft(null);
-    setAgentRouteSaveState('idle');
-    setAgentRouteSaveMessage('');
     setAgentManifestSaveState('idle');
     setAgentManifestSaveMessage('');
   }, [open, settings]);
@@ -75,10 +71,6 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setSelectedProviderId,
     connectionDraft,
     setConnectionDraft,
-    agentRouteSaveState,
-    setAgentRouteSaveState,
-    agentRouteSaveMessage,
-    setAgentRouteSaveMessage,
     agentManifestSaveState,
     setAgentManifestSaveState,
     agentManifestSaveMessage,

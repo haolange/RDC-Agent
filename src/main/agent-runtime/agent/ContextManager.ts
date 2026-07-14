@@ -48,6 +48,11 @@ const DEFAULT_KEEP_RECENT_TOOL_RESULTS = 3;
 const SNIP_HEAD = 3;
 const TOOL_RESULT_TRUNCATE_HEAD = 2000;
 
+export const estimateImageTokensFromBase64Length = (base64Length: number): number => {
+  const byteLength = Math.max(0, Math.floor(base64Length * 0.75));
+  return Math.max(256, Math.ceil(byteLength / 1024));
+};
+
 /**
  * 各级压缩写入的占位符前缀，唯一来源。
  * 写入点（snip / micro / full）与读取点（classifyMessages）共享，避免字符串漂移。
@@ -388,7 +393,7 @@ export class ContextManager {
       if (block.type === 'text') {
         total += block.text.length;
       } else if (block.type === 'image') {
-        total += block.data.length;
+        total += estimateImageTokensFromBase64Length(block.data.length) * 4;
       }
     }
     return total;
@@ -431,7 +436,7 @@ export class ContextManager {
       if (block.type === 'text') {
         total += block.text.length;
       } else if (block.type === 'image') {
-        total += block.data.length;
+        total += estimateImageTokensFromBase64Length(block.data.length) * 4;
       }
     }
     return total;

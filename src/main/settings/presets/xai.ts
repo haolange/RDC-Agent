@@ -78,7 +78,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max",
             "ultra": "ultra"
           },
@@ -137,7 +137,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max",
             "ultra": "ultra"
           },
@@ -192,7 +192,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max",
             "ultra": "ultra"
           },
@@ -247,7 +247,7 @@ const preset: ProviderPreset = {
             "low": "low",
             "medium": "medium",
             "high": "high",
-            "extra": "xhigh",
+            "xhigh": "xhigh",
             "max": "max",
             "ultra": "ultra"
           },

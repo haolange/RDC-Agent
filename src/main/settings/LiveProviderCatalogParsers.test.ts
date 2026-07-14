@@ -59,7 +59,7 @@ describe('live-verification provider catalog parsers', () => {
       defaultBudgetTokens: 372_000,
       contextTiers: [{ id: 'default', maxPromptTokens: 372_000 }],
       fast: { kind: 'request-param', entitlement: 'granted' },
-      reasoning: { levels: ['low', 'medium', 'high', 'extra', 'max', 'ultra'] },
+      reasoning: { levels: ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] },
     });
     expect(parsed.contributions.find((model) => model.modelId === 'gpt-5.4')?.contextTiers).toEqual([
       expect.objectContaining({ id: 'default', maxPromptTokens: 272_000, entitlement: 'granted' }),
@@ -84,6 +84,16 @@ describe('live-verification provider catalog parsers', () => {
       contextTiers: [{ entitlement: 'granted' }],
       reasoning: { levels: ['high', 'medium', 'low'] },
     });
+    expect(parsed.models.find((model) => model.id === 'grok-composer-2.5-fast')).toEqual({
+      id: 'grok-composer-2.5-fast',
+      label: 'Composer 2.5',
+      enabled: true,
+    });
+    expect(parsed.contributions.find((model) => model.modelId === 'grok-composer-2.5-fast')).toMatchObject({
+      route: { protocol: 'OpenAIResponses', baseUrl: 'https://cli-chat-proxy.grok.com/v1', source: 'model' },
+      defaultBudgetTokens: 200_000,
+      contextTiers: [{ id: 'default', maxPromptTokens: 200_000, entitlement: 'granted' }],
+    });
     expect(parsed.contributions.find((model) => model.modelId === 'grok-4.3')).toMatchObject({
       route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://api.x.ai/v1' },
       toolCalling: { state: 'supported' },
@@ -95,6 +105,7 @@ describe('live-verification provider catalog parsers', () => {
       { id: 'grok-4.3', context_window: 1_000_000 },
       { id: 'grok-latest', type: 'alias', canonical_id: 'grok-4.3', context_window: 1_000_000 },
       { id: 'grok-image-1', modality: 'image' },
+      { id: 'grok-imagine-video-1.5', output_modalities: ['video'] },
       { id: 'grok-floating', type: 'alias' },
     ] });
     expect(parsed.models).toEqual([{
@@ -104,5 +115,37 @@ describe('live-verification provider catalog parsers', () => {
       aliases: ['grok-latest'],
     }]);
     expect(parsed.contributions[0].aliases).toEqual(['grok-latest']);
+  });
+
+  it('collapses the live Grok 4.20 pair into one Off/On model-variant control', () => {
+    const parsed = parseGrokAccountCatalog({ data: [
+      { id: 'grok-4.20-0309-non-reasoning', context_window: 1_000_000 },
+      { id: 'grok-4.20-0309-reasoning', context_window: 1_000_000 },
+    ] });
+    expect(parsed.models).toEqual([{
+      id: 'grok-4.20-0309-non-reasoning',
+      label: 'Grok 4.20',
+      enabled: true,
+    }]);
+    expect(parsed.contributions[0].reasoning).toEqual({
+      kind: 'toggle',
+      supportsOff: true,
+      levels: [],
+      defaultSelection: 'on',
+      modelVariants: {
+        offModelId: 'grok-4.20-0309-non-reasoning',
+        onModelId: 'grok-4.20-0309-reasoning',
+      },
+      wireProfile: { kind: 'none' },
+    });
+  });
+
+  it('keeps a lone Grok 4.20 variant locked to the state actually returned live', () => {
+    expect(parseGrokAccountCatalog({ data: [
+      { id: 'grok-4.20-0309-non-reasoning', context_window: 1_000_000 },
+    ] }).contributions[0].reasoning).toMatchObject({ kind: 'none', lockedSelection: 'off' });
+    expect(parseGrokAccountCatalog({ data: [
+      { id: 'grok-4.20-0309-reasoning', context_window: 1_000_000 },
+    ] }).contributions[0].reasoning).toMatchObject({ kind: 'always-on', lockedSelection: 'on' });
   });
 });

@@ -17,7 +17,7 @@ import type {
 } from '@shared/types/settings';
 import type { ReasoningControl } from '@shared/types/modelCapability';
 import { appPathService } from '../runtime/AppPathService';
-import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
+import { isAdmittedDiscoveredModel, normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 
 export const DISCOVERY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -118,11 +118,10 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function createUnknownReasoning(): ReasoningControl {
   return {
-    kind: 'none',
-    supportsOff: true,
+    kind: 'unknown',
+    supportsOff: false,
     levels: [],
     defaultSelection: 'off',
-    lockedSelection: 'off',
     wireProfile: { kind: 'none' },
   };
 }
@@ -178,7 +177,6 @@ function createConservativeModel(
       evidence('reasoning.supportsOff'),
       evidence('reasoning.levels'),
       evidence('reasoning.defaultSelection'),
-      evidence('reasoning.lockedSelection'),
       evidence('reasoning.wireProfile.kind'),
       evidence('toolCalling.state'),
       evidence('visionInput.state'),
@@ -214,6 +212,11 @@ function mergeObjectLeaves(
     }
     const field = prefix ? `${prefix}.${key}` : key;
     if (isObject(value)) {
+      if (typeof value.kind === 'string') {
+        target[key] = cloneJson(value);
+        recordObjectLeafEvidence(value, field, layer, provenance);
+        continue;
+      }
       const nextTarget = isObject(target[key]) ? target[key] as Record<string, unknown> : {};
       target[key] = nextTarget;
       mergeObjectLeaves(nextTarget, value, field, layer, provenance);
@@ -221,6 +224,23 @@ function mergeObjectLeaves(
     }
     target[key] = cloneJson(value);
     provenance.push(evidenceFor(layer, field));
+  }
+}
+
+function recordObjectLeafEvidence(
+  value: Record<string, unknown>,
+  prefix: string,
+  layer: CatalogLayerContribution,
+  provenance: CapabilityEvidence[],
+): void {
+  for (const [key, child] of Object.entries(value)) {
+    if (child === undefined) continue;
+    const field = `${prefix}.${key}`;
+    if (isObject(child)) {
+      recordObjectLeafEvidence(child, field, layer, provenance);
+    } else {
+      provenance.push(evidenceFor(layer, field));
+    }
   }
 }
 
@@ -274,7 +294,11 @@ function applyLayer(
   request: EffectiveCatalogRequest,
   layer: CatalogLayerContribution | undefined,
 ): void {
-  if (!layer || (layer.protocol && layer.protocol !== request.protocol)) {
+  if (!layer) {
+    return;
+  }
+  const protocolDiffersFromCatalog = Boolean(layer.protocol && layer.protocol !== request.protocol);
+  if (protocolDiffersFromCatalog && layer.source !== 'observed') {
     return;
   }
   for (const patch of layer.models) {
@@ -289,6 +313,18 @@ function applyLayer(
       )
     ));
     const matchedKey = matched?.[0];
+    if (!matched && layer.source === 'user' && request.catalogOwnership === 'app-managed') {
+      // Persisted app-managed rows are preferences only. They may update a model
+      // admitted by seed/discovery, but must never manufacture catalog members.
+      continue;
+    }
+    if (
+      protocolDiffersFromCatalog
+      && layer.protocol
+      && matched?.[1].route.protocol !== layer.protocol
+    ) {
+      continue;
+    }
     const model = matched?.[1]
       ?? createConservativeModel(request.providerId, patch.modelId, request.fallbackRoute, layer.observedAt);
     const rekeyFromDiscovery = layer.source === 'discovery'
@@ -346,9 +382,66 @@ function suppressAliasedDiscoveryTombstones(
   };
 }
 
+function enforceDiscoveryAdmission(
+  layer: CatalogLayerContribution | undefined,
+): CatalogLayerContribution | undefined {
+  if (!layer) return undefined;
+  return {
+    ...layer,
+    models: layer.models.filter((model) => isAdmittedDiscoveredModel({ id: model.modelId })),
+  };
+}
+
+function sanitizePersistedCatalogState(
+  state: PersistedCatalogState,
+): { state: PersistedCatalogState; changed: boolean } {
+  let changed = false;
+  const sanitizeRecord = (
+    layers: Record<string, CatalogLayerContribution>,
+  ): Record<string, CatalogLayerContribution> => Object.fromEntries(
+    Object.entries(layers).map(([key, layer]) => {
+      const sanitized = enforceDiscoveryAdmission(layer) ?? layer;
+      changed ||= sanitized.models.length !== layer.models.length;
+      return [key, sanitized];
+    }),
+  );
+  const sanitizeObserved = (
+    layers: Record<string, CatalogLayerContribution[]>,
+  ): Record<string, CatalogLayerContribution[]> => Object.fromEntries(
+    Object.entries(layers).map(([key, entries]) => [key, entries.map((layer) => {
+      const sanitized = enforceDiscoveryAdmission(layer) ?? layer;
+      changed ||= sanitized.models.length !== layer.models.length;
+      return sanitized;
+    })]),
+  );
+  return {
+    state: {
+      ...state,
+      discoveries: sanitizeRecord(state.discoveries),
+      entitlements: sanitizeRecord(state.entitlements),
+      observed: sanitizeObserved(state.observed),
+    },
+    changed,
+  };
+}
+
+function gateOverlayToLiveExactModels(
+  overlay: CatalogLayerContribution | undefined,
+  discovery: CatalogLayerContribution | undefined,
+): CatalogLayerContribution | undefined {
+  if (!overlay || !discovery) return undefined;
+  const liveModelIds = new Set(discovery.models
+    .filter((model) => model.availability !== 'unavailable')
+    .map((model) => model.modelId));
+  const models = overlay.models.filter((model) => liveModelIds.has(model.modelId));
+  return models.length > 0 ? { ...overlay, models } : undefined;
+}
+
 export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): EffectiveModel[] {
   const models = new Map<string, EffectiveModel>();
   const user = sanitizeUserContribution(request.user, request.catalogOwnership);
+  const discovery = suppressAliasedDiscoveryTombstones(enforceDiscoveryAdmission(request.discovery));
+  const overlay = gateOverlayToLiveExactModels(request.overlay, discovery);
   const observedLayers = Array.isArray(request.observed)
     ? request.observed
     : request.observed
@@ -356,8 +449,8 @@ export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): Effecti
       : [];
   for (const layer of [
     request.seed,
-    suppressAliasedDiscoveryTombstones(request.discovery),
-    request.overlay,
+    discovery,
+    overlay,
     request.entitlement,
     ...observedLayers,
     user,
@@ -416,7 +509,9 @@ export class EffectiveCatalogService {
       ?? path.join(appPathService.getRuntimePaths().appStateRoot, 'provider-catalog', 'catalog-v2.json');
     this.now = options.now ?? (() => new Date());
     this.discoveryTtlMs = options.discoveryTtlMs ?? DISCOVERY_TTL_MS;
-    this.state = this.readState();
+    const persisted = sanitizePersistedCatalogState(this.readState());
+    this.state = persisted.state;
+    if (persisted.changed) this.persistState();
   }
 
   subscribe(listener: EffectiveCatalogListener): () => void {
@@ -537,8 +632,9 @@ export class EffectiveCatalogService {
           observedAt: observedAt.toISOString(),
           expiresAt,
         };
-        this.state.discoveries[key] = this.discoveryLayerNormalizer?.(request, loadedDiscovery)
-          ?? loadedDiscovery;
+        this.state.discoveries[key] = enforceDiscoveryAdmission(
+          this.discoveryLayerNormalizer?.(request, loadedDiscovery) ?? loadedDiscovery,
+        ) ?? loadedDiscovery;
         if (entitlement?.models.length) {
           this.state.entitlements[key] = {
             ...entitlement,
@@ -575,7 +671,7 @@ export class EffectiveCatalogService {
     };
     this.state.observed[key] = [...(this.state.observed[key] ?? []), next];
     this.persistState();
-    this.emitLatestSnapshots(request);
+    this.emitLatestSnapshots({ providerId: request.providerId, accountId: request.accountId });
   }
 
   recordTransientQuota(

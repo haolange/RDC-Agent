@@ -1,6 +1,6 @@
 import type { WorkProcessRow, WorkProcessRowStatus, WorkProcessToolGroupKind } from './workProcessTypes';
 
-const TOOL_AGGREGATE_THRESHOLD = 3;
+const TOOL_AGGREGATE_THRESHOLD = 8;
 
 type ToolRow = Extract<WorkProcessRow, { type: 'tool' }>;
 
@@ -101,7 +101,7 @@ export function buildToolAggregateSummary(tools: ToolRow[]): string {
 }
 
 /**
- * Hybrid tool disclosure: ≤2 tools stay flat; ≥3 consecutive tools become one aggregate row.
+ * Hybrid tool disclosure: ≤7 tools stay flat; ≥8 consecutive tools become one aggregate row.
  * Non-tool rows (userInput / approval / …) flush any pending tools and pass through.
  */
 export function aggregateSectionSteps(steps: WorkProcessRow[]): WorkProcessRow[] {

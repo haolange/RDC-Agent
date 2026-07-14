@@ -2,7 +2,7 @@
  * ContextManager 单元测试。
  */
 import { describe, it, expect } from 'vitest';
-import { ContextManager } from './ContextManager';
+import { ContextManager, estimateImageTokensFromBase64Length } from './ContextManager';
 import type { AgentMessage, ToolResultMessage, AssistantMessage, UserMessage } from '../core/types';
 
 function user(text: string): UserMessage {
@@ -78,6 +78,17 @@ describe('ContextManager', () => {
       const msgs: AgentMessage[] = [user('hello world!')]; // 12 chars
       const tokens = cm.estimateTokens(msgs);
       expect(tokens).toBe(Math.ceil(12 / 4)); // 3
+    });
+
+    it('estimates image blocks by decoded bytes instead of base64 character count', () => {
+      const base64Length = 4 * 1024 * 1024;
+      expect(estimateImageTokensFromBase64Length(base64Length)).toBe(3072);
+      const cm = createContextManager();
+      expect(cm.estimateTokens([{
+        role: 'user',
+        content: [{ type: 'image', data: 'a'.repeat(base64Length), mimeType: 'image/png' }],
+        timestamp: Date.now(),
+      }])).toBe(3072);
     });
 
     it('应累加多条消息的 token', () => {
