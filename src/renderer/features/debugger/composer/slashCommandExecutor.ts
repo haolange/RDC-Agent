@@ -1,10 +1,12 @@
-import type { AgentRole } from '@shared/types/agent';
 import type { CommandUiAction } from '@shared/types/command';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { AgentMode } from '@shared/types/layout';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
-import type { AgentPermissionMode, AppTheme, LlmAgentRoute } from '@shared/types/settings';
-import { useAppSettingsStore } from '../../../stores/appSettingsStore';
+import type { AgentPermissionMode, AppTheme } from '@shared/types/settings';
+import {
+  nextAgentDefinitionClientRevision,
+  useAppSettingsStore,
+} from '../../../stores/appSettingsStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 
@@ -76,23 +78,30 @@ async function loadSession(sessionId: string, context: SlashCommandContext): Pro
 async function switchModel(modelId: string, context: SlashCommandContext): Promise<void> {
   const appSettingsStore = useAppSettingsStore.getState();
   const settings = appSettingsStore.settings;
-  const provider = settings.llm.providers.find((entry) =>
-    entry.enabled
-    && entry.isConfigured
-    && entry.models.some((model) => model.enabled && model.id === modelId),
-  );
-  if (!provider) {
+  const matches = settings.agents.modelOptions.filter((option) => (
+    option.status === 'ready'
+    && (option.canonicalId === modelId || option.modelId === modelId)
+  ));
+  if (matches.length !== 1) {
+    if (matches.length > 1) {
+      context.showNotice(`Model id is ambiguous; use provider:model: ${modelId}`);
+      return;
+    }
     context.showNotice(`Model is not configured or enabled: ${modelId}`);
     context.openSettings('models');
     return;
   }
 
-  const agentId = context.selectedAgentId as AgentRole;
-  const nextRoute: LlmAgentRoute = { agentId, providerId: provider.id, modelId };
-  const nextRoutes = settings.llm.agentRoutes
-    .filter((route) => route.agentId !== agentId)
-    .concat(nextRoute);
-  await appSettingsStore.patchSettings({ llm: { agentRoutes: nextRoutes } });
+  const definition = settings.agents.definitions.find((entry) => entry.id === context.selectedAgentId);
+  if (!definition) {
+    context.showNotice(`Agent definition not found: ${context.selectedAgentId}`);
+    return;
+  }
+  const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = definition;
+  await appSettingsStore.saveAgentDefinition({
+    draft: { ...draft, models: [matches[0].canonicalId] },
+    clientRevision: nextAgentDefinitionClientRevision(),
+  });
 }
 
 async function handleUiAction(action: CommandUiAction, context: SlashCommandContext): Promise<void> {

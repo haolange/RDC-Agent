@@ -1,8 +1,11 @@
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import {
   buildDisplaySelections,
   buildEffortPillPresentation,
   clampSliderRatio,
+  EffortOneMillionContextSwitchRow,
   findAdjacentSupportedLevel,
   getStopPosition,
   resolveReasoningIconVariant,
@@ -23,10 +26,10 @@ describe('effortControlParts', () => {
     expect(buildDisplaySelections({
       kind: 'levels',
       supportsOff: true,
-      levels: ['low', 'medium', 'high', 'extra'],
+      levels: ['low', 'medium', 'high', 'xhigh'],
       defaultSelection: 'medium',
       wireProfile: { kind: 'none' },
-    })).toEqual(['off', 'low', 'medium', 'high', 'extra']);
+    })).toEqual(['off', 'low', 'medium', 'high', 'xhigh']);
 
     expect(buildDisplaySelections({
       kind: 'toggle',
@@ -53,29 +56,43 @@ describe('effortControlParts', () => {
     expect(resolveReasoningIconVariant('medium')).toBe('medium');
     expect(resolveReasoningIconVariant('on')).toBe('medium');
     expect(resolveReasoningIconVariant('high')).toBe('high');
-    expect(resolveReasoningIconVariant('extra')).toBe('extra');
+    expect(resolveReasoningIconVariant('xhigh')).toBe('xhigh');
     expect(resolveReasoningIconVariant('max')).toBe('max');
     expect(resolveReasoningIconVariant('ultra')).toBe('max-plus');
   });
 
-  it('keeps reasoning, max context, and fast mode as separate pill states', () => {
+  it('keeps reasoning, 1M context, and fast mode as separate pill states', () => {
     const presentation = buildEffortPillPresentation({
       reasoningLabel: 'Max',
-      maxContextMode: true,
-      maxContextLabel: 'Max context',
-      maxContextBadgeLabel: '1M',
+      oneMillionContextMode: true,
+      oneMillionContextLabel: '1M context',
+      oneMillionContextBadgeLabel: '1M',
       fastModel: true,
       fastModelLabel: 'Fast mode',
       fastModelBadgeLabel: '2x',
     });
 
     expect(presentation.label).toBe('Max');
-    expect(presentation.title).toBe('Max | Max context | Fast mode');
+    expect(presentation.title).toBe('Max | 1M context | Fast mode');
     expect(presentation.badges).toEqual([
-      { mode: 'max-context', label: '1M', title: 'Max context' },
+      { mode: 'one-million-context', label: '1M', title: '1M context' },
       { mode: 'fast', label: '2x', title: 'Fast mode' },
     ]);
-    expect(presentation.label).not.toContain('Max context');
+    expect(presentation.label).not.toContain('1M context');
+  });
+
+  it('projects unverified 1M entitlement visibly and into the switch accessible name', () => {
+    const markup = renderToStaticMarkup(React.createElement(EffortOneMillionContextSwitchRow, {
+      label: '1M context',
+      statusLabel: 'Unverified',
+      available: true,
+      active: false,
+      onToggle: () => undefined,
+    }));
+
+    expect(markup).toContain('composer-effort-toggle-status');
+    expect(markup).toContain('Unverified');
+    expect(markup).toContain('aria-label="1M context · Unverified"');
   });
 
   it('calculates stop positions and clamps drag ratios', () => {
@@ -87,12 +104,12 @@ describe('effortControlParts', () => {
   });
 
   it('snaps to the nearest visible level and moves across adjacent stops', () => {
-    const supported = ['off', 'low', 'medium', 'high', 'extra'] as const;
+    const supported = ['off', 'low', 'medium', 'high', 'xhigh'] as const;
 
     expect(resolveNearestSnapLevel(0, [...supported])).toBe('off');
     expect(resolveNearestSnapLevel(0.24, [...supported])).toBe('low');
     expect(resolveNearestSnapLevel(0.76, [...supported])).toBe('high');
-    expect(resolveNearestSnapLevel(1, [...supported])).toBe('extra');
+    expect(resolveNearestSnapLevel(1, [...supported])).toBe('xhigh');
 
     expect(findAdjacentSupportedLevel('medium', -1, [...supported])).toBe('low');
     expect(findAdjacentSupportedLevel('medium', 1, [...supported])).toBe('high');

@@ -180,4 +180,48 @@ describe('SessionContextJournal canonicalization', () => {
       providerId: 'openai', modelId: 'gpt-5', protocol: 'OpenAIResponses',
     })).toThrow('Session context journal is incomplete');
   });
+
+  it('replays ordinary messages and paired tool facts across providers while dropping native reasoning', () => {
+    const journal = new SessionContextJournal();
+    vi.spyOn(storageAdapter, 'readSessionContextMigrationVersion').mockReturnValue(1);
+    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([{
+      schemaVersion: 1,
+      turnId: 'turn-1',
+      userMessageId: 'user-1',
+      assistantMessageId: 'assistant-1',
+      branchId: 'branch-root',
+      agentId: 'ask',
+      route: { providerId: 'openai', modelId: 'gpt-5', protocol: 'OpenAIResponses' },
+      controls: { reasoningLevel: 'high', maxContextMode: false, fastModel: false },
+      status: 'complete',
+      messages: [{ role: 'user', content: 'inspect the capture', timestamp: 1 }, {
+        ...assistant(),
+        content: [
+          ...assistant().content,
+          { type: 'text', text: 'Found one suspicious event.' },
+          { type: 'toolCall', id: 'tool-1', name: 'read_file', arguments: { path: 'capture.rdc' } },
+        ],
+      }, {
+        role: 'toolResult',
+        toolCallId: 'tool-1',
+        toolName: 'read_file',
+        content: [{ type: 'text', text: 'event facts' }],
+        isError: false,
+        timestamp: 2,
+      }],
+      createdAt: 1,
+      completedAt: 2,
+    }]);
+
+    const result = journal.materialize('session-1', ['turn-1'], {
+      providerId: 'anthropic', modelId: 'claude-sonnet-5', protocol: 'AnthropicMessages',
+    });
+    expect(result.filteredArtifactCount).toBe(1);
+    expect(result.messages.map((message) => message.role)).toEqual(['user', 'assistant', 'toolResult']);
+    expect((result.messages[1] as AssistantMessage).content).toEqual([
+      { type: 'text', text: 'Found one suspicious event.' },
+      { type: 'toolCall', id: 'tool-1', name: 'read_file', arguments: { path: 'capture.rdc' } },
+    ]);
+    expect(result.messages[2]).toMatchObject({ toolCallId: 'tool-1', isError: false });
+  });
 });

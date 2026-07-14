@@ -111,7 +111,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   }));
   assert(openRouterCapability.toolCallingMode === 'text-only', 'an explicitly unsupported EffectiveModel must stay text-only.');
   assert(
-    describeRouteCapabilityDiagnostic(openRouterCapability, 2)?.includes('text-only'),
+    describeRouteCapabilityDiagnostic(openRouterCapability, 2)?.code === 'route_tool_calling_unsupported',
     'text-only routes with tools should emit a capability diagnostic.',
   );
 
@@ -158,7 +158,8 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(!orchestrator.includes('llmAdapterProvider'), 'AgentOrchestrator must not use the settings LLMAdapterProvider.');
   assert(orchestrator.includes('resolveAgentRouteCapability'), 'AgentOrchestrator must gate tools by route capability.');
   assert(orchestrator.includes('activeToolDefinitions'), 'AgentOrchestrator must register only effective tool schemas.');
-  assert(orchestrator.includes('route_tool_calling_unsupported'), 'AgentOrchestrator must emit route capability diagnostics.');
+  assert(orchestrator.includes('describeRouteCapabilityDiagnostic'), 'AgentOrchestrator must consume structured route capability diagnostics.');
+  assert(orchestrator.includes('recordObservedToolCallingSupport'), 'AgentOrchestrator must persist successful structured tool evidence.');
   assert(orchestrator.includes('textual_tool_call_not_executed'), 'AgentOrchestrator must normalize textual tool call diagnostics.');
   assert(orchestrator.includes('empty_response_without_tool_call'), 'AgentOrchestrator must normalize empty response diagnostics.');
   assert(orchestrator.includes('agentPermissionPolicyService.evaluate'), 'AgentOrchestrator must mediate tools through AgentPermissionPolicy.');
@@ -168,6 +169,12 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(orchestrator.includes('PromptPlan is required before creating an agent runtime slot.'), 'Agent runtime slots must require PromptPlan.');
   assert(orchestrator.includes('requestEnvelopeBuilder.build'), 'Agent runtime requests must create RequestEnvelope snapshots.');
   assert(!orchestrator.includes('onRequest: promptPlan ?'), 'RequestEnvelope creation must not be optional on provider calls.');
+
+  const routeCapabilityResolver = read('src/main/agent-runtime/capabilities/RouteCapabilityResolver.ts');
+  assert(routeCapabilityResolver.includes('route_tool_calling_unverified'), 'Unknown native tool support must use the unverified diagnostic code.');
+  assert(routeCapabilityResolver.includes('route_tool_calling_unsupported'), 'Explicit unsupported tool support must use the unsupported diagnostic code.');
+  assert(routeCapabilityResolver.includes('route_tool_calling_disabled'), 'Unavailable routes must use the disabled diagnostic code.');
+  assert(routeCapabilityResolver.includes("surface: 'runtime-log'"), 'Unverified native tool support must remain runtime-log only.');
 
   assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/LLMAdapterProvider.ts')), 'Legacy LLMAdapterProvider must be removed from agent runtime.');
   assert(!fs.existsSync(path.join(repoRoot, 'src/main/settings/LLMAdapter.ts')), 'Settings-owned legacy LLMAdapter must be removed.');
@@ -201,10 +208,23 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(conversationService.includes('routeCapability: routePreflight.routeCapability'), 'ConversationService must pass route capability into PromptPlanBuilder.');
   assert(conversationService.includes('permissionSettings: runtimeSettings.agentRuntime.permissions'), 'ConversationService must pass runtime permission settings into PromptPlanBuilder.');
   assert(conversationService.includes('answerToolApproval'), 'ConversationService must expose tool approval resume.');
+  for (const token of ['previewNextRequestContext', 'prepareConversationPrompt', 'materializeAgentUserInput', 'requestPlan: planning.plan']) {
+    assert(conversationService.includes(token), `Conversation next-request preview path must include ${token}.`);
+  }
+
+  const contextJournal = read('src/main/conversation/SessionContextJournal.ts');
+  for (const token of ['filteredArtifactCount', "replayPolicy === 'provider-artifact'", "replayPolicy === 'openai-reasoning-content'"]) {
+    assert(contextJournal.includes(token), `Session context route-private artifact filtering must include ${token}.`);
+  }
+  const conversationIpc = read('src/main/ipc/conversationHandlers.ts');
+  assert(conversationIpc.includes('conversation:previewNextRequestContext'), 'Main IPC must expose the read-only next-request context preview.');
 
   const settingsService = read('src/main/settings/SettingsService.ts');
   assert(settingsService.includes('capabilities: definition?.capabilities'), 'Settings normalization must hydrate builtin provider capabilities.');
   assert(settingsService.includes('agentRuntime'), 'Settings must persist agent runtime permission controls.');
+  for (const token of ['saveAgentDefinition(request:', 'agentDefinitionRevisions', 'clientRevision <= latestRevision', 'agentManifestService.routeFromDefinition']) {
+    assert(settingsService.includes(token), `Scoped agent-definition save path must include ${token}.`);
+  }
 
   const bridge = read('src/main/agent-runtime/AgentEventBridge.ts');
   assert(bridge.includes('buildDiagnosticAgentEvent'), 'AgentEventBridge must expose normalized diagnostic event construction.');

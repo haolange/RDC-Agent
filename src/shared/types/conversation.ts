@@ -13,6 +13,8 @@ export type ConversationMessageStatus = 'draft' | 'streaming' | 'complete' | 'er
 
 export type ConversationWorkBlockStatus = 'pending' | 'running' | 'complete' | 'error';
 
+export type ConversationDiagnosticSeverity = 'info' | 'warning' | 'error';
+
 export type ConversationWorkBlockKind =
   | 'reasoning'
   | 'llm_turn'
@@ -103,6 +105,8 @@ export interface ConversationWorkBlock {
   status: ConversationWorkBlockStatus;
   /** Non-loop summary text; LLM turn output lives in result and never contains provider thinking text. */
   summary?: string;
+  /** Diagnostic blocks only: preserves runtime severity through storage and renderer projection. */
+  diagnosticSeverity?: ConversationDiagnosticSeverity;
   thinking?: ThinkingArtifact;
   thinkingStatus?: ConversationThinkingStatus;
   /** llm_turn only: how provider reasoning was delivered for this loop. */
@@ -181,6 +185,10 @@ export interface ConversationSendRequest {
   message: string;
   attachments?: ConversationAttachmentInput[];
   turnControls?: ConversationTurnControls;
+}
+
+export interface NextRequestContextPreviewRequest extends ConversationSendRequest {
+  clientRevision: number;
 }
 
 export interface ConversationRewriteFromMessageRequest extends ConversationSendRequest {

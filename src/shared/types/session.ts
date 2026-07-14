@@ -207,6 +207,24 @@ export interface RunContextUsageSummary {
   reasoningTokens?: number;
 }
 
+export interface NextRequestContextProjection {
+  clientRevision: number;
+  requestEnvelopeId?: string;
+  status: 'ready' | 'blocked';
+  route: { providerId: string; modelId: string; protocol: string } | null;
+  contextMode: 'normal' | 'one-million' | null;
+  estimatedInputTokens: number;
+  uncompactedInputTokens: number;
+  promptBudgetTokens: number;
+  contextWindowTokens: number;
+  usagePercent: number;
+  breakdown: ContextUsageBreakdownEntry[];
+  willCompact: boolean;
+  filteredArtifactCount: number;
+  blockingReason?: { code: string; message: string };
+  estimatedAt: number;
+}
+
 export interface HumanPreviewSnapshot {
   status: 'unavailable' | 'closed' | 'opening' | 'open' | 'error';
   sessionId?: string;

@@ -35,8 +35,8 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
         label: providerOptions[0]?.providerLabel || providerId,
         options: providerOptions,
       }))
-      .filter((group) => group.options.some((option) => option.configured));
-  }, [options]);
+      .filter((group) => group.options.some((option) => option.configured || option.canonicalId === value));
+  }, [options, value]);
   const selected = options.find((option) => option.canonicalId === value);
   const missingSelection = useMemo<AgentModelOption | null>(() => {
     if (!value || selected) {
@@ -225,7 +225,9 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
             >
               <span>{option.modelLabel}</span>
               <small>
-                {option.configured ? option.canonicalId : `${option.canonicalId} / ${t('settings.modelUnavailable')}`}
+                {option.configured
+                  ? option.canonicalId
+                  : `${option.canonicalId} / ${option.disabledReason ?? t('settings.modelUnavailable')}`}
               </small>
             </button>
           ))}

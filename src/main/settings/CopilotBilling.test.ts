@@ -12,7 +12,14 @@ describe('Copilot billing catalog', () => {
     expect(catalog.contributions[0]).toMatchObject({
       modelId: 'gpt-5.5',
       defaultBudgetTokens: 272_000,
-      contextTiers: [{ maxPromptTokens: 272_000 }],
+      contextTiers: [{ maxPromptTokens: 272_000, maxOutputTokens: 128_000, maxTotalTokens: 400_000 }],
+      reasoning: {
+        kind: 'levels',
+        supportsOff: true,
+        levels: ['low', 'medium', 'high', 'xhigh'],
+        defaultSelection: 'high',
+        wireProfile: expect.objectContaining({ kind: 'openai-compatible', offMode: 'reasoning-none' }),
+      },
       toolCalling: { state: 'supported' },
       visionInput: { state: 'supported' },
       structuredOutput: { state: 'supported' },
@@ -25,15 +32,15 @@ describe('Copilot billing catalog', () => {
     });
     expect(catalog.contributions.some((model) => model.modelId === 'claude-opus-4.8-fast')).toBe(false);
     expect(parseCopilotBillingTiers(catalog.billingByModel['gpt-5.5'])).toEqual([
-      { id: 'default', label: 'Default', maxPromptTokens: 272_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
-      { id: 'long_context', label: 'Long context', maxPromptTokens: 922_000, activation: { kind: 'implicit' }, entitlement: 'unknown' },
+      { id: 'default', label: 'Default', maxPromptTokens: 272_000, maxOutputTokens: 128_000, maxTotalTokens: 400_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
+      { id: 'long_context', label: 'Long context', maxPromptTokens: 922_000, maxOutputTokens: 128_000, maxTotalTokens: 1_050_000, activation: { kind: 'implicit' }, entitlement: 'unknown' },
     ]);
   });
 
   it('keeps a conservative single tier when no long-context billing row exists', () => {
     const catalog = parseCopilotModelCatalog(fixture);
     expect(parseCopilotBillingTiers(catalog.billingByModel['gpt-5-mini'])).toEqual([
-      { id: 'default', label: 'Default', maxPromptTokens: 272_000, activation: { kind: 'implicit' }, entitlement: 'unknown' },
+      { id: 'default', label: 'Default', maxPromptTokens: 272_000, maxOutputTokens: 64_000, maxTotalTokens: 336_000, activation: { kind: 'implicit' }, entitlement: 'unknown' },
     ]);
   });
 });

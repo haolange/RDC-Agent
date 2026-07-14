@@ -368,6 +368,7 @@ export class ProviderConnectionService {
           discovery.models,
           discovery.contributions,
           discovery.entitlementContributions,
+          discovery.detail,
         );
       }
     });
@@ -390,6 +391,7 @@ export class ProviderConnectionService {
         : await this.discoverModels(provider, '', '');
       return {
         protocol: provider.protocol,
+        ...('detail' in discovery && discovery.detail ? { detail: discovery.detail } : {}),
         models: completeDiscoveryContributions(
           provider,
           discovery.contributions ?? toDiscoveryModelContributions(discovery.models),

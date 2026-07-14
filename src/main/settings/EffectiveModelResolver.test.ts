@@ -16,9 +16,10 @@ import {
   buildSeedModelContribution,
   completeDiscoveryContributions,
   planEffectiveModelRequest,
+  recordObservedToolCallingSupport,
   resolveEffectiveModelSelection,
 } from './EffectiveModelResolver';
-import { mergeEffectiveCatalog } from './EffectiveCatalogService';
+import { effectiveCatalogService, mergeEffectiveCatalog } from './EffectiveCatalogService';
 
 function provider(id: string, protocol: LlmProviderEntry['protocol']): LlmProviderEntry {
   return {
@@ -47,23 +48,21 @@ describe('surface-specific effective model seeds', () => {
     });
   });
 
-  it('uses an implicit granted 1M tier for direct Anthropic modern models', () => {
+  it('uses one 1M-class tier for direct Anthropic Sonnet 5', () => {
     const model = buildSeedModelContribution(provider('anthropic', 'AnthropicMessages'), 'claude-sonnet-5');
-    expect(model.contextTiers?.[1]).toMatchObject({
-      id: 'max', maxPromptTokens: 1_000_000, activation: { kind: 'implicit' }, entitlement: 'granted',
-    });
+    expect(model.contextTiers).toEqual([expect.objectContaining({
+      id: 'default', maxPromptTokens: 872_000, maxOutputTokens: 128_000, maxTotalTokens: 1_000_000,
+      activation: { kind: 'implicit' }, entitlement: 'granted',
+    })]);
+    expect(model.defaultBudgetTokens).toBe(256_000);
   });
 
-  it('falls back to one conservative Copilot tier without account billing', () => {
-    const model = buildSeedModelContribution(provider('github-copilot', 'OpenAICompatibleChatCompletions'), 'gpt-5.5');
-    expect(model.contextTiers).toEqual([
-      { id: 'default', label: 'Default', maxPromptTokens: 272_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
-    ]);
-    expect(model.fast).toEqual({ kind: 'unsupported' });
-    expect(buildSeedModelContribution(
+  it('keeps the Copilot catalog empty until the current account returns live models', () => {
+    const request = buildEffectiveCatalogRequest(
       provider('github-copilot', 'OpenAICompatibleChatCompletions'),
-      'claude-opus-4-8',
-    ).fast).toEqual({ kind: 'model-variant', modelId: 'claude-opus-4-8-fast', entitlement: 'granted' });
+    );
+    expect(request.seed.models).toEqual([]);
+    expect(mergeEffectiveCatalog(request)).toEqual([]);
   });
 
   it('keeps app-managed settings state out of the bundled seed layer', () => {
@@ -78,7 +77,7 @@ describe('surface-specific effective model seeds', () => {
 
     const model = buildSeedModelContribution(configured, 'gpt-5.5');
     expect(model.label).toBe('gpt-5.5');
-    expect(model.availability).toBe('available');
+    expect(model.availability).toBe('unknown');
     expect(model.unavailableReason).toBeUndefined();
   });
 
@@ -257,5 +256,32 @@ describe('surface-specific effective model seeds', () => {
         { providerId: 'custom-provider', modelId: 'model-next', label: 'Next' },
       ],
     });
+  });
+
+  it('writes supported observed evidence against the canonical account and request protocol', () => {
+    const configured = {
+      ...provider('custom-provider', 'OpenAICompatibleChatCompletions'),
+      activeAccountId: 'account-a',
+      catalogOwnership: 'user-managed' as const,
+      models: [{ id: 'model-a', label: 'Model A', enabled: true }],
+    };
+    const settings = { llm: { providers: [configured], agentRoutes: [] } } as unknown as AppSettings;
+    const recordObserved = vi.spyOn(effectiveCatalogService, 'recordObserved').mockImplementation(() => undefined);
+
+    expect(recordObservedToolCallingSupport(
+      'custom-provider',
+      'model-a',
+      settings,
+      'OpenAICompatibleChatCompletions',
+    )).toBe(true);
+    expect(recordObserved).toHaveBeenCalledWith({
+      providerId: 'custom-provider',
+      accountId: 'account-a',
+      protocol: 'OpenAICompatibleChatCompletions',
+    }, [{
+      modelId: 'model-a',
+      toolCalling: { state: 'supported' },
+    }], expect.stringContaining('Structured tool call'));
+    recordObserved.mockRestore();
   });
 });

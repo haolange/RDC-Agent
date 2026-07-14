@@ -10,7 +10,16 @@ import type {
   ProfileSettings,
   ResolvedTheme,
 } from '@shared/types/settings';
+import type { AgentDefinitionSaveRequest, AgentDefinitionSaveResult } from '@shared/types/agentManifest';
 import { DEFAULT_SETTINGS } from './defaultAppSettings';
+import {
+  beginAgentDefinitionSave,
+  isLatestAgentDefinitionRevision,
+  rollbackAgentDefinitionSave,
+  settleAgentDefinitionSave,
+} from './agentDefinitionSettings';
+
+export { nextAgentDefinitionClientRevision } from './agentDefinitionSettings';
 
 const upsertProvider = (providers: LlmProviderEntry[], provider: LlmProviderEntry): LlmProviderEntry[] => {
   const exists = providers.some((entry) => entry.id === provider.id);
@@ -26,6 +35,7 @@ interface AppSettingsState {
   hydrate: (settings: AppSettings, systemTheme: ResolvedTheme) => void;
   setSystemTheme: (systemTheme: ResolvedTheme) => void;
   patchSettings: (patch: AppSettingsPatch) => Promise<AppSettings>;
+  saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
   reloadSettings: () => Promise<AppSettings>;
   setTheme: (theme: AppTheme) => Promise<void>;
   setLanguage: (language: AppLanguage) => Promise<void>;
@@ -49,6 +59,28 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
     const nextSettings = await window.electronAPI.settings.set(patch);
     set({ settings: nextSettings, hydrated: true });
     return nextSettings;
+  },
+  saveAgentDefinition: async (request) => {
+    const agentId = request.draft.id;
+    const optimistic = beginAgentDefinitionSave(get().settings, request);
+    set({ settings: optimistic.settings });
+
+    try {
+      const result = await window.electronAPI.settings.saveAgentDefinition(request);
+      if (!isLatestAgentDefinitionRevision(agentId, request.clientRevision)) return result;
+      set((state) => ({
+        settings: settleAgentDefinitionSave(state.settings, agentId, result),
+        hydrated: true,
+      }));
+      return result;
+    } catch (error) {
+      if (isLatestAgentDefinitionRevision(agentId, request.clientRevision)) {
+        set((state) => ({
+          settings: rollbackAgentDefinitionSave(state.settings, agentId, optimistic.rollback),
+        }));
+      }
+      throw error;
+    }
   },
   reloadSettings: async () => {
     const nextSettings = await window.electronAPI.settings.get();

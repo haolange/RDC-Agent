@@ -170,6 +170,7 @@ export type {
   ContextSnapshot,
   ContextUsageBreakdownEntry,
   ContextUsageBreakdownId,
+  NextRequestContextProjection,
   DebugSessionStartRequest,
   OpenedCaptureState,
   ProjectInputRecord,

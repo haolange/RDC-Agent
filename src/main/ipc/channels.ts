@@ -15,6 +15,7 @@ export const IPC_HANDLER_DOMAINS = {
   ],
   conversation: [
     'conversation:sendMessage',
+    'conversation:previewNextRequestContext',
     'conversation:rewriteFromMessage',
     'conversation:getHistory',
     'conversation:switchBranch',
@@ -70,6 +71,7 @@ export const IPC_HANDLER_DOMAINS = {
     'settings:getEffectiveCatalog',
     'settings:getProviderSecret',
     'settings:importAgentManifest',
+    'settings:saveAgentDefinition',
     'settings:set',
     'llm:testProviderDraft',
     'llm:testModelCapability',

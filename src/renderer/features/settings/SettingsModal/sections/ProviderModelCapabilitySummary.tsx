@@ -44,12 +44,13 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
   const [probeResult, setProbeResult] = useState<LlmModelCapabilityProbeResult | null>(null);
   const chips = buildCapabilityChips(effectiveModel, t);
   const tiers = buildContextTierRows(effectiveModel, t);
-  const reasoningOptions = getReasoningSelectionOrder(effectiveModel?.reasoning);
+  const reasoningUnverified = effectiveModel?.reasoning.kind === 'unknown';
+  const reasoningOptions = reasoningUnverified ? [] : getReasoningSelectionOrder(effectiveModel?.reasoning);
   const defaultReasoning = effectiveModel?.reasoning.defaultSelection ?? 'off';
   const contextChoices = effectiveModel ? resolveContextTierChoices(effectiveModel) : null;
   const probeModes: LlmModelCapabilityProbeMode[] = effectiveModel ? [
     'default',
-    ...(contextChoices?.maxTier ? ['max-context' as const] : []),
+    ...(contextChoices?.oneMillionTier ? ['one-million-context' as const] : []),
     ...(effectiveModel.fast.kind !== 'unknown'
       && effectiveModel.fast.kind !== 'unsupported'
       && effectiveModel.fast.entitlement !== 'denied' ? ['fast' as const] : []),
@@ -107,6 +108,11 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
               </div>
             ))}
           </div>
+          {effectiveModel.toolCalling.state === 'unknown' ? (
+            <div className="settings-model-capability-note" data-testid="settings-provider-tool-calling-unverified">
+              {t('settings.providers.capability.toolCallingUnverifiedHint')}
+            </div>
+          ) : null}
 
           <div className="settings-model-capability-tiers" data-testid={`settings-provider-model-tiers-${model.id}`}>
             <span className="settings-model-capability-section-label">{t('settings.providers.capability.contextTiers')}</span>
@@ -133,7 +139,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
                 <span className="settings-field-label">{t('settings.providers.capability.defaultReasoning')}</span>
                 <select
                   className="input"
-                  value={model.defaultReasoningSelection ?? ''}
+                  value={reasoningUnverified ? '' : model.defaultReasoningSelection ?? ''}
                   disabled={reasoningOptions.length <= 1}
                   onChange={(event) => onModelChange({
                     defaultReasoningSelection: event.target.value
@@ -142,7 +148,9 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
                   })}
                 >
                   <option value="">
-                    {t('settings.providers.capability.providerDefault', { value: t(getReasoningLabelKey(defaultReasoning)) })}
+                    {reasoningUnverified
+                      ? t('settings.providers.capability.unverified')
+                      : t('settings.providers.capability.providerDefault', { value: t(getReasoningLabelKey(defaultReasoning)) })}
                   </option>
                   {reasoningOptions.map((selection) => (
                     <option key={selection} value={selection}>{t(getReasoningLabelKey(selection))}</option>

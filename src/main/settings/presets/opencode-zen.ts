@@ -45,8 +45,8 @@ const preset: ProviderPreset = {
       defaultBudgetTokens: 256_000,
       fast: { kind: 'unsupported' },
       reasoning: {
-        kind: 'levels', supportsOff: true, levels: ['low', 'medium', 'high', 'extra'], defaultSelection: 'medium',
-        wireProfile: { kind: 'openai-responses', on: 'medium', levels: { low: 'low', medium: 'medium', high: 'high', extra: 'xhigh' } },
+        kind: 'levels', supportsOff: true, levels: ['low', 'medium', 'high', 'xhigh'], defaultSelection: 'medium',
+        wireProfile: { kind: 'openai-responses', on: 'medium', levels: { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh' } },
       },
       toolCalling: { state: 'supported' }, visionInput: { state: 'supported' }, structuredOutput: { state: 'unknown' },
     },
@@ -58,8 +58,8 @@ const preset: ProviderPreset = {
       defaultBudgetTokens: 200_000,
       fast: { kind: 'unsupported' },
       reasoning: {
-        kind: 'levels', supportsOff: true, levels: ['low', 'medium', 'high', 'extra', 'max'], defaultSelection: 'high',
-        wireProfile: { kind: 'anthropic', on: 'high', levels: { low: 'low', medium: 'medium', high: 'high', extra: 'xhigh', max: 'max' }, onMode: 'adaptive', offMode: 'disabled' },
+        kind: 'levels', supportsOff: true, levels: ['low', 'medium', 'high', 'xhigh', 'max'], defaultSelection: 'high',
+        wireProfile: { kind: 'anthropic', on: 'high', levels: { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' }, onMode: 'adaptive', offMode: 'disabled' },
       },
       toolCalling: { state: 'supported' }, visionInput: { state: 'supported' }, structuredOutput: { state: 'unknown' },
     },

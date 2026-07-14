@@ -1,7 +1,35 @@
 import { describe, expect, it } from 'vitest';
-import { finalizeTrace, upsertRuntimeToolApproval, upsertRuntimeToolCall } from './ConversationWorkTrace';
+import {
+  finalizeTrace,
+  sanitizeStoredWorkTrace,
+  upsertRuntimeToolApproval,
+  upsertRuntimeToolCall,
+} from './ConversationWorkTrace';
 
 describe('ConversationService work trace tool approvals', () => {
+  it('preserves diagnostic severity only on diagnostic blocks', () => {
+    const diagnosticTrace = {
+      status: 'complete' as const,
+      updatedAt: 100,
+      blocks: [{
+        id: 'route-warning',
+        kind: 'diagnostic' as const,
+        title: 'Tool calling unsupported',
+        status: 'complete' as const,
+        diagnosticSeverity: 'warning' as const,
+        toolCalls: [],
+        startedAt: 90,
+        completedAt: 100,
+      }],
+    };
+
+    expect(sanitizeStoredWorkTrace(diagnosticTrace)?.blocks[0].diagnosticSeverity).toBe('warning');
+    expect(sanitizeStoredWorkTrace({
+      ...diagnosticTrace,
+      blocks: [{ ...diagnosticTrace.blocks[0], kind: 'reasoning' as const }],
+    })).toBeNull();
+  });
+
   it('nests approval.requested and approval.answered under the matching tool call', () => {
     let trace = upsertRuntimeToolCall(undefined, {
       id: 'tool-web-search',
@@ -128,5 +156,34 @@ describe('ConversationService work trace tool approvals', () => {
       completedAt: 200,
       approval: { status: 'approved', answer: 'Approved once' },
     });
+  });
+
+  it('updates a tool call by id instead of duplicating it when the active loop advances', () => {
+    let trace = upsertRuntimeToolCall(undefined, {
+      id: 'tool-read-file',
+      toolName: 'read_file',
+      status: 'pending',
+      argsPreview: JSON.stringify({ path: 'package.json' }),
+      startedAt: 100,
+    }, { loopId: 'runtime-loop-1' });
+
+    trace = upsertRuntimeToolCall(trace, {
+      id: 'tool-read-file',
+      toolName: 'read_file',
+      status: 'complete',
+      resultPreview: JSON.stringify({ ok: true, lines: 20 }),
+      completedAt: 200,
+    }, { loopId: 'runtime-loop-2' });
+
+    expect(trace.blocks).toHaveLength(1);
+    expect(trace.blocks[0]).toMatchObject({ id: 'runtime-loop-1', status: 'complete' });
+    expect(trace.blocks[0].toolCalls).toEqual([
+      expect.objectContaining({
+        id: 'tool-read-file',
+        status: 'complete',
+        resultPreview: JSON.stringify({ ok: true, lines: 20 }),
+        completedAt: 200,
+      }),
+    ]);
   });
 });

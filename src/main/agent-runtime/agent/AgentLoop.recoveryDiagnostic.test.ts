@@ -34,7 +34,9 @@ const TEST_REQUEST_PLAN: RequestPlan = {
   },
   headers: {},
   bodyPatch: {},
-  contextBudgetTokens: TEST_MODEL.contextWindow,
+    contextBudgetTokens: TEST_MODEL.contextWindow,
+    contextMode: 'normal',
+    contextWindowTokens: TEST_MODEL.contextWindow,
   activeTierId: 'default',
   fastMode: false,
   reasoningWire: {

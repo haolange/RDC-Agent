@@ -31,12 +31,12 @@ export const EFFORT_LABEL_KEYS = {
   low: 'composer.effort.levelLow',
   medium: 'composer.effort.levelMedium',
   high: 'composer.effort.levelHigh',
-  extra: 'composer.effort.levelExtra',
+  xhigh: 'composer.effort.levelXHigh',
   max: 'composer.effort.levelMax',
   ultra: 'composer.effort.levelUltra',
 } as const;
 
-export type EffortPillMode = 'max-context' | 'fast';
+export type EffortPillMode = 'one-million-context' | 'fast';
 
 export interface EffortPillModeBadge {
   mode: EffortPillMode;
@@ -50,7 +50,7 @@ export interface EffortPillPresentation {
   badges: EffortPillModeBadge[];
 }
 
-export type ReasoningIconVariant = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'extra' | 'max' | 'max-plus';
+export type ReasoningIconVariant = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'max-plus';
 
 export function resolveReasoningIconVariant(level: ReasoningSelection): ReasoningIconVariant {
   if (level === 'on') {
@@ -64,19 +64,19 @@ export function resolveReasoningIconVariant(level: ReasoningSelection): Reasonin
 
 export function buildEffortPillPresentation(input: {
   reasoningLabel: string;
-  maxContextMode: boolean;
-  maxContextLabel: string;
-  maxContextBadgeLabel: string;
+  oneMillionContextMode: boolean;
+  oneMillionContextLabel: string;
+  oneMillionContextBadgeLabel: string;
   fastModel: boolean;
   fastModelLabel: string;
   fastModelBadgeLabel: string;
 }): EffortPillPresentation {
   const badges: EffortPillModeBadge[] = [];
-  if (input.maxContextMode) {
+  if (input.oneMillionContextMode) {
     badges.push({
-      mode: 'max-context',
-      label: input.maxContextBadgeLabel,
-      title: input.maxContextLabel,
+      mode: 'one-million-context',
+      label: input.oneMillionContextBadgeLabel,
+      title: input.oneMillionContextLabel,
     });
   }
   if (input.fastModel) {
@@ -95,6 +95,7 @@ export function buildEffortPillPresentation(input: {
 
 interface EffortModeSwitchRowProps {
   label: string;
+  statusLabel?: string;
   available: boolean;
   active: boolean;
   onToggle: () => void;
@@ -105,13 +106,16 @@ function EffortModeSwitchRowBody(props: EffortModeSwitchRowProps) {
     <>
       <div className="composer-effort-toggle-copy">
         <span className="composer-effort-toggle-label">{props.label}</span>
+        {props.statusLabel ? (
+          <span className="composer-effort-toggle-status">{props.statusLabel}</span>
+        ) : null}
       </div>
       <button
         type="button"
         role="switch"
         className={`composer-effort-toggle ${props.active ? 'active' : ''}`}
         aria-checked={props.active}
-        aria-label={props.label}
+        aria-label={props.statusLabel ? `${props.label} · ${props.statusLabel}` : props.label}
         disabled={!props.available}
         onClick={props.onToggle}
       />
@@ -119,11 +123,11 @@ function EffortModeSwitchRowBody(props: EffortModeSwitchRowProps) {
   );
 }
 
-export function EffortMaxContextSwitchRow(props: EffortModeSwitchRowProps) {
+export function EffortOneMillionContextSwitchRow(props: EffortModeSwitchRowProps) {
   return (
     <div
       className={`composer-effort-toggle-row ${props.available ? '' : 'is-disabled'}`}
-      data-testid="composer-effort-max-row"
+      data-testid="composer-effort-one-million-row"
     >
       <EffortModeSwitchRowBody {...props} />
     </div>
@@ -196,7 +200,7 @@ export function ReasoningLevelIcon({ level }: { level: ReasoningSelection }) {
         </>
       ) : null}
 
-      {variant === 'extra' ? (
+      {variant === 'xhigh' ? (
         <>
           <path d="M6.2 5.7a8.7 8.7 0 0 1 11.6 0" />
           <circle cx="12" cy="12" r="3" />

@@ -1,28 +1,47 @@
 import type { ContextTier, EffectiveModel } from '../types/providerCapability';
 
 export interface ContextTierChoices {
-  baseTier?: ContextTier;
-  maxTier?: ContextTier;
-  maxTierUnverified: boolean;
+  normalTier?: ContextTier;
+  oneMillionTier?: ContextTier;
+  oneMillionUnverified: boolean;
 }
 
+export const ONE_MILLION_CONTEXT_TOKENS = 1_000_000;
+
 export function contextTierPromptCap(tier: ContextTier): number | undefined {
-  if (typeof tier.maxPromptTokens === 'number' && tier.maxPromptTokens > 0) {
-    return tier.maxPromptTokens;
-  }
+  const explicitPromptCap = typeof tier.maxPromptTokens === 'number' && tier.maxPromptTokens > 0
+    ? tier.maxPromptTokens
+    : undefined;
   if (typeof tier.maxTotalTokens === 'number' && tier.maxTotalTokens > 0) {
     const outputReserve = typeof tier.maxOutputTokens === 'number' && tier.maxOutputTokens > 0
       ? tier.maxOutputTokens
       : 0;
-    return Math.max(1, tier.maxTotalTokens - outputReserve);
+    const totalDerivedCap = Math.max(1, tier.maxTotalTokens - outputReserve);
+    return explicitPromptCap === undefined
+      ? totalDerivedCap
+      : Math.min(explicitPromptCap, totalDerivedCap);
   }
-  return undefined;
+  return explicitPromptCap;
+}
+
+/** Full context window, distinct from the prompt/input ceiling. */
+export function contextTierWindowTokens(tier: ContextTier): number | undefined {
+  if (typeof tier.maxTotalTokens === 'number' && tier.maxTotalTokens > 0) {
+    return tier.maxTotalTokens;
+  }
+  if (typeof tier.maxPromptTokens !== 'number' || tier.maxPromptTokens <= 0) {
+    return undefined;
+  }
+  const outputReserve = typeof tier.maxOutputTokens === 'number' && tier.maxOutputTokens > 0
+    ? tier.maxOutputTokens
+    : 0;
+  return tier.maxPromptTokens + outputReserve;
 }
 
 function highestTier(tiers: ContextTier[], sourceOrder: Map<string, number>): ContextTier | undefined {
   return [...tiers].sort((left, right) => {
-    const leftCap = contextTierPromptCap(left);
-    const rightCap = contextTierPromptCap(right);
+    const leftCap = contextTierWindowTokens(left);
+    const rightCap = contextTierWindowTokens(right);
     if (leftCap !== undefined && rightCap !== undefined && leftCap !== rightCap) {
       return rightCap - leftCap;
     }
@@ -33,12 +52,8 @@ function highestTier(tiers: ContextTier[], sourceOrder: Map<string, number>): Co
 }
 
 /**
- * Resolves the only two context choices exposed by the product.
- *
- * Max is a tier relationship, never a token threshold:
- * - two or more granted tiers select the highest granted alternative;
- * - one granted tier may expose a strictly larger unknown tier as unverified;
- * - denied tiers and unrankable unknown tiers are never selectable.
+ * Resolves normal and explicit 1M modes. A single tier can serve both modes;
+ * eligibility is based on the complete window, not only the input ceiling.
  */
 export function resolveContextTierChoices(
   model: Pick<EffectiveModel, 'contextTiers'>,
@@ -47,30 +62,27 @@ export function resolveContextTierChoices(
   const sourceOrder = new Map(model.contextTiers.map((tier, index) => [tier.id, index]));
   const granted = usable.filter((tier) => tier.entitlement === 'granted');
   const unknown = usable.filter((tier) => tier.entitlement === 'unknown');
-  const baseTier = granted.find((tier) => tier.id === 'default')
+  const normalTier = granted.find((tier) => tier.id === 'default')
     ?? granted[0]
     ?? unknown.find((tier) => tier.id === 'default')
     ?? unknown[0];
 
-  if (!baseTier) return { maxTierUnverified: false };
+  if (!normalTier) return { oneMillionUnverified: false };
 
-  if (granted.length >= 2) {
-    const highestGranted = highestTier(granted, sourceOrder);
-    const maxTier = highestGranted?.id === baseTier.id ? undefined : highestGranted;
-    return { baseTier, maxTier, maxTierUnverified: false };
-  }
+  const eligible = usable.filter((tier) => {
+    const window = contextTierWindowTokens(tier);
+    return window !== undefined && window >= ONE_MILLION_CONTEXT_TOKENS;
+  });
+  const grantedEligible = eligible.filter((tier) => tier.entitlement === 'granted');
+  const unknownEligible = eligible.filter((tier) => tier.entitlement === 'unknown');
+  const oneMillionTier = normalTier.entitlement === 'granted' && grantedEligible.includes(normalTier)
+    ? normalTier
+    : highestTier(grantedEligible, sourceOrder)
+      ?? (unknownEligible.includes(normalTier) ? normalTier : highestTier(unknownEligible, sourceOrder));
 
-  if (granted.length === 1) {
-    const baseCap = contextTierPromptCap(baseTier);
-    const higherUnknown = baseCap === undefined
-      ? []
-      : unknown.filter((tier) => {
-          const cap = contextTierPromptCap(tier);
-          return cap !== undefined && cap > baseCap;
-        });
-    const maxTier = highestTier(higherUnknown, sourceOrder);
-    return { baseTier, maxTier, maxTierUnverified: Boolean(maxTier) };
-  }
-
-  return { baseTier, maxTierUnverified: false };
+  return {
+    normalTier,
+    oneMillionTier,
+    oneMillionUnverified: oneMillionTier?.entitlement === 'unknown',
+  };
 }

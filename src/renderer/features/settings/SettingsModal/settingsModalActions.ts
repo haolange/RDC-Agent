@@ -1,10 +1,15 @@
 import type {
   AppSettings,
   AppSettingsPatch,
-  LlmAgentRoute,
   LlmProviderEntry,
 } from '@shared/types/settings';
-import type { TranslationKey, useI18n } from '../../../i18n';
+import type {
+  AgentDefinitionSaveRequest,
+  AgentDefinitionSaveResult,
+  AgentManifestDraft,
+} from '@shared/types/agentManifest';
+import type { useI18n } from '../../../i18n';
+import { nextAgentDefinitionClientRevision } from '../../../stores/appSettingsStore';
 import type { useProviderConnection } from './useProviderConnection';
 import type { useSettingsModalState } from './useSettingsModalState';
 import { cloneRoute, getErrorMessage } from './utils';
@@ -16,22 +21,23 @@ type ProviderConnection = ReturnType<typeof useProviderConnection>;
 interface SettingsModalActionsOptions {
   modalState: ModalState;
   providerConnection: ProviderConnection;
-  invalidAgentRoutes: Array<{ agentId: LlmAgentRoute['agentId']; issue: TranslationKey }>;
-  invalidAgentRouteMessage: string;
   updateProfile: (profile: Partial<AppSettings['profile']>) => Promise<void>;
   patchSettings: (patch: AppSettingsPatch) => Promise<AppSettings>;
-  reloadSettings: () => Promise<AppSettings>;
+  saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
   t: Translate;
+}
+
+export interface AgentManifestSaveBatch {
+  drafts: AgentManifestDraft[];
+  clientRevision: number;
 }
 
 export function createSettingsModalActions({
   modalState,
   providerConnection,
-  invalidAgentRoutes,
-  invalidAgentRouteMessage,
   updateProfile,
   patchSettings,
-  reloadSettings,
+  saveAgentDefinition,
   t,
 }: SettingsModalActionsOptions) {
   const handleAvatarSelect = async () => {
@@ -92,68 +98,26 @@ export function createSettingsModalActions({
     }
   };
 
-  const handleRouteChange = (agentId: LlmAgentRoute['agentId'], patch: Partial<LlmAgentRoute>) => {
-    modalState.setAgentRouteSaveState('idle');
-    modalState.setAgentRouteSaveMessage('');
-    modalState.setAgentRouteDrafts((current) => {
-      if (!current.some((route) => route.agentId === agentId)) {
-        return [...current, { agentId, providerId: '', modelId: '', ...patch }];
-      }
-      return current.map((route) => (
-        route.agentId === agentId ? { ...route, ...patch } : route
-      ));
-    });
-  };
+  const handleSaveAgentManifests = async (
+    batch?: AgentManifestSaveBatch,
+  ): Promise<AgentDefinitionSaveResult[] | null> => {
+    const request = batch ?? {
+      drafts: modalState.agentManifestDrafts,
+      clientRevision: nextAgentDefinitionClientRevision(),
+    };
+    const saveBatch = () => Promise.all(request.drafts.map((draft) => saveAgentDefinition({
+      draft,
+      clientRevision: request.clientRevision,
+    })));
+    if (batch) return saveBatch();
 
-  const handleSaveAgentRoutes = async () => {
-    if (invalidAgentRoutes.length > 0) {
-      modalState.setAgentRouteSaveState('error');
-      modalState.setAgentRouteSaveMessage(invalidAgentRouteMessage);
-      return;
-    }
-
-    modalState.setAgentRouteSaveState('saving');
-    modalState.setAgentRouteSaveMessage('');
-    try {
-      const agentIds = Array.from(new Set(
-        modalState.agentManifestDrafts
-          .filter((agent) => !agent.delete)
-          .map((agent) => agent.id.trim())
-          .filter(Boolean),
-      ));
-      await patchSettings({
-        llm: {
-          agentRoutes: agentIds.map((agentId) => {
-            const route = modalState.agentRouteDrafts.find((entry) => entry.agentId === agentId);
-            return route ?? { agentId, providerId: '', modelId: '' };
-          }),
-        },
-      });
-      const nextSettings = await reloadSettings();
-      modalState.setAgentRouteDrafts(nextSettings.llm.agentRoutes.map(cloneRoute));
-      modalState.setAgentRouteSaveState('saved');
-      modalState.setAgentRouteSaveMessage(t('settings.agentRouteSaved'));
-    } catch (error) {
-      modalState.setAgentRouteSaveState('error');
-      modalState.setAgentRouteSaveMessage(getErrorMessage(error, t('settings.agentRouteSaveFailed')));
-    }
-  };
-
-  const handleSaveAgentManifests = async (): Promise<AppSettings | null> => {
     modalState.setAgentManifestSaveState('saving');
     modalState.setAgentManifestSaveMessage('');
     try {
-      await patchSettings({
-        agents: {
-          definitions: modalState.agentManifestDrafts,
-        },
-      });
-      const nextSettings = await reloadSettings();
-      modalState.setAgentManifestDrafts(nextSettings.agents.definitions.map((definition) => ({ ...definition })));
-      modalState.setAgentRouteDrafts(nextSettings.llm.agentRoutes.map(cloneRoute));
+      const results = await saveBatch();
       modalState.setAgentManifestSaveState('saved');
       modalState.setAgentManifestSaveMessage(t('settings.agentManifestSaved'));
-      return nextSettings;
+      return results;
     } catch (error) {
       modalState.setAgentManifestSaveState('error');
       modalState.setAgentManifestSaveMessage(getErrorMessage(error, t('settings.agentManifestSaveFailed')));
@@ -208,8 +172,6 @@ export function createSettingsModalActions({
     handleAccountSave,
     handleRefreshProviderModels,
     handleDisconnectProvider,
-    handleRouteChange,
-    handleSaveAgentRoutes,
     handleSaveAgentManifests,
     handleImportAgentManifest,
     handleSaveToolsConfig,

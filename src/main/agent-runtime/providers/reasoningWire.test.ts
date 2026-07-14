@@ -11,12 +11,12 @@ import {
 const openAi56 = {
   kind: 'levels',
   supportsOff: true,
-  levels: ['low', 'medium', 'high', 'extra', 'max'],
+  levels: ['low', 'medium', 'high', 'xhigh', 'max'],
   defaultSelection: 'medium',
   wireProfile: {
     kind: 'openai-responses',
     on: 'medium',
-    levels: { low: 'low', medium: 'medium', high: 'high', extra: 'xhigh', max: 'max' },
+    levels: { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh', max: 'max' },
   },
 } satisfies ReasoningControl;
 const kimiToggle = { kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on', wireProfile: { kind: 'anthropic', on: 'high', onMode: 'enabled', onBudgetTokens: 4096, offMode: 'disabled' } } satisfies ReasoningControl;
@@ -24,11 +24,11 @@ const glmToggle = { kind: 'toggle', supportsOff: true, levels: [], defaultSelect
 const deepSeekLevels = { kind: 'levels', supportsOff: true, levels: ['high', 'max'], defaultSelection: 'high', wireProfile: { kind: 'anthropic', on: 'high', levels: { high: 'high', max: 'max' }, onMode: 'enabled', offMode: 'disabled' } } satisfies ReasoningControl;
 
 describe('buildOpenAiResponsesReasoning', () => {
-  it('maps GPT-5.6 product extra/max to wire xhigh/max', () => {
+  it('maps GPT-5.6 xhigh/max to the same canonical wire values', () => {
     const reasoningControl = openAi56;
 
     expect(buildOpenAiResponsesReasoning({
-      selection: 'extra',
+      selection: 'xhigh',
       control: reasoningControl,
     }).reasoning).toMatchObject({ effort: 'xhigh' });
 

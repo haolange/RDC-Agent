@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import type { LlmProviderEntry } from '@shared/types/settings';
-import { resolveAgentRouteCapability } from './RouteCapabilityResolver';
+import {
+  claimStructuredToolCallingEvidence,
+  describeRouteCapabilityDiagnostic,
+  resolveAgentRouteCapability,
+} from './RouteCapabilityResolver';
 
 const provider = {
   id: 'test-provider',
@@ -35,9 +39,16 @@ function model(patch: Partial<EffectiveModel> = {}): EffectiveModel {
 
 describe('resolveAgentRouteCapability effective-state policy', () => {
   it('fails open for unknown tools but marks the route unverified', () => {
-    expect(resolveAgentRouteCapability(provider, 'model-a', model())).toMatchObject({
+    const capability = resolveAgentRouteCapability(provider, 'model-a', model());
+    expect(capability).toMatchObject({
       toolCallingMode: 'native-structured',
       toolCallingUnverified: true,
+    });
+    expect(describeRouteCapabilityDiagnostic(capability, 3)).toEqual({
+      code: 'route_tool_calling_unverified',
+      severity: 'info',
+      message: expect.stringContaining('Tools remain enabled'),
+      surface: 'runtime-log',
     });
   });
 
@@ -73,15 +84,46 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
   });
 
   it('fails closed for an unavailable EffectiveModel', () => {
-    expect(resolveAgentRouteCapability(provider, 'model-a', model({
+    const capability = resolveAgentRouteCapability(provider, 'model-a', model({
       availability: 'unavailable',
       unavailableReason: 'adapter unavailable',
-    }))).toMatchObject({
+    }));
+    expect(capability).toMatchObject({
       toolCallingMode: 'disabled',
       supportsStreaming: false,
       visionInputMode: 'disabled',
       structuredOutputMode: 'prompt-fallback',
     });
+    expect(describeRouteCapabilityDiagnostic(capability, 3)).toMatchObject({
+      code: 'route_tool_calling_disabled',
+      severity: 'error',
+      surface: 'work-process',
+    });
+  });
+
+  it('reports explicit tool-call rejection as a warning without registering tools', () => {
+    const capability = resolveAgentRouteCapability(provider, 'model-a', model({
+      toolCalling: { state: 'unsupported' },
+    }));
+    expect(describeRouteCapabilityDiagnostic(capability, 3)).toMatchObject({
+      code: 'route_tool_calling_unsupported',
+      severity: 'warning',
+      surface: 'work-process',
+    });
+  });
+
+  it('claims observed evidence only once for a structured adapter tool-call end event', () => {
+    const capability = resolveAgentRouteCapability(provider, 'model-a', model());
+    const gate = { recorded: false };
+    expect(claimStructuredToolCallingEvidence('text_delta', capability, gate)).toBe(false);
+    expect(claimStructuredToolCallingEvidence('toolcall_end', capability, gate)).toBe(true);
+    expect(claimStructuredToolCallingEvidence('toolcall_end', capability, gate)).toBe(false);
+    expect(gate.recorded).toBe(true);
+  });
+
+  it('does not treat text-only tool-shaped output as capability evidence', () => {
+    const capability = resolveAgentRouteCapability(provider, 'model-a', model());
+    expect(claimStructuredToolCallingEvidence('message_end', capability, { recorded: false })).toBe(false);
   });
 
   it.each([

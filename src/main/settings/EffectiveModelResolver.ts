@@ -13,7 +13,12 @@ import type {
   RequestPlanningResult,
 } from '@shared/types/providerCapability';
 import type { ConversationTurnControls, ReasoningControl } from '@shared/types/modelCapability';
-import type { AppSettings, LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
+import type {
+  AppSettings,
+  LlmProviderEntry,
+  LlmProviderModel,
+  LlmProviderProtocol,
+} from '@shared/types/settings';
 import { planModelRequest } from './RequestPlanner';
 import { parseCopilotBillingTiers } from './CopilotBilling';
 import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
@@ -26,11 +31,10 @@ import {
 } from './ProviderPresetRegistry';
 
 const CONSERVATIVE_REASONING: ReasoningControl = {
-  kind: 'none',
-  supportsOff: true,
+  kind: 'unknown',
+  supportsOff: false,
   levels: [],
   defaultSelection: 'off',
-  lockedSelection: 'off',
   wireProfile: { kind: 'none' },
 };
 
@@ -88,6 +92,8 @@ export function buildSeedModelContribution(
     label: seed?.label ?? modelId,
     aliases: [...(seed?.aliases ?? [])],
     enabled: seed?.enabled ?? true,
+    availability: seed?.availability === 'unavailable' ? 'unavailable' : 'unknown',
+    unavailableReason: seed?.availability === 'unavailable' ? seed.unavailableReason : undefined,
   };
 }
 
@@ -239,6 +245,7 @@ export function refreshEffectiveCatalogDiscovery(
   models: LlmProviderModel[],
   contributions?: CatalogModelContribution[],
   entitlementContributions?: CatalogModelContribution[],
+  detail?: string,
 ): Promise<EffectiveCatalogSnapshot> {
   const request = buildEffectiveCatalogRequest(provider);
   const discovered = completeDiscoveryContributions(
@@ -247,6 +254,7 @@ export function refreshEffectiveCatalogDiscovery(
   );
   return effectiveCatalogService.refreshDiscovery(request, async () => ({
     protocol: provider.protocol,
+    detail,
     models: discovered,
     ...(entitlementContributions?.length
       ? {
@@ -280,7 +288,7 @@ export function selectEffectiveModelFromSnapshot(
   modelId: string,
   recommendedModelIds: readonly string[] = [],
 ): EffectiveModelSelection {
-  const isUsable = (entry: EffectiveModel): boolean => entry.enabled !== false && entry.availability !== 'unavailable';
+  const isUsable = (entry: EffectiveModel): boolean => entry.enabled !== false && entry.availability === 'available';
   const exact = snapshot.models.find((entry) => entry.modelId === modelId && isUsable(entry));
   const alias = exact ? undefined : snapshot.models.find((entry) => entry.aliases.includes(modelId) && isUsable(entry));
   const model = exact ?? alias ?? null;
@@ -370,7 +378,8 @@ export function recordEffectivePlanSuccess(
   const model = resolveEffectiveModel(providerId, modelId, settings);
   const activeTier = model?.contextTiers.find((tier) => tier.id === plan.activeTierId);
   if (!provider || !model) return;
-  const grantsTier = activeTier?.entitlement === 'unknown';
+  const grantsTier = activeTier?.entitlement === 'unknown'
+    && activeTier.activation.kind !== 'implicit';
   const grantsFast = plan.fastMode
     && model.fast.kind !== 'unsupported'
     && model.fast.kind !== 'unknown'
@@ -397,4 +406,24 @@ export function recordEffectivePlanSuccess(
       ? { fast: { ...model.fast, entitlement: 'granted' as const } }
       : {}),
   }], `Successful request activated ${activated.join(' and ')}`);
+}
+
+export function recordObservedToolCallingSupport(
+  providerId: string,
+  modelId: string,
+  settings: AppSettings,
+  protocol: LlmProviderProtocol,
+): boolean {
+  const provider = settings.llm.providers.find((entry) => entry.id === providerId);
+  const model = resolveEffectiveModel(providerId, modelId, settings);
+  if (!provider || !model || model.toolCalling.state !== 'unknown') return false;
+  effectiveCatalogService.recordObserved({
+    providerId,
+    accountId: provider.activeAccountId ?? `anonymous:${providerId}`,
+    protocol,
+  }, [{
+    modelId: model.modelId,
+    toolCalling: { state: 'supported' },
+  }], 'Structured tool call completed through the active provider adapter.');
+  return true;
 }

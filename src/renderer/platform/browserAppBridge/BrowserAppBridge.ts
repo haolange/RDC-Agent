@@ -46,6 +46,7 @@ class BrowserAppBridgeClient {
     },
     conversation: {
       sendMessage: (request) => this.invoke('conversation:sendMessage', request),
+      previewNextRequestContext: (request) => this.invoke('conversation:previewNextRequestContext', request),
       rewriteFromMessage: (request) => this.invoke('conversation:rewriteFromMessage', request),
       cancelActiveTurn: (request) => this.invoke('conversation:cancelActiveTurn', request),
       answerUserInput: (request) => this.invoke('conversation:answerUserInput', request),
@@ -127,6 +128,7 @@ class BrowserAppBridgeClient {
       getEffectiveCatalog: (providerId) => this.invoke('settings:getEffectiveCatalog', providerId) as Promise<EffectiveCatalogSnapshot | null>,
       getProviderSecret: (providerId) => this.invoke('settings:getProviderSecret', providerId),
       importAgentManifest: (filePath) => this.invoke('settings:importAgentManifest', filePath),
+      saveAgentDefinition: (request) => this.invoke('settings:saveAgentDefinition', request),
       set: (settings) => this.invoke('settings:set', settings),
     },
     project: {

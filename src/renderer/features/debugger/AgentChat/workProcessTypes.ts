@@ -2,6 +2,7 @@ import type {
   ConversationLoopOutputPhase,
   ConversationLoopStopReason,
   ConversationReasoningState,
+  ConversationDiagnosticSeverity,
   ConversationWorkBlock,
 } from '@shared/types/conversation';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
@@ -141,6 +142,7 @@ export type WorkProcessRow =
     type: 'diagnostic';
     id: string;
     status: WorkProcessRowStatus;
+    severity: ConversationDiagnosticSeverity;
     message: string;
     detailLines: string[];
     duration: string;

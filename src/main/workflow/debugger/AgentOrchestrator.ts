@@ -36,6 +36,7 @@ import {
 } from '@shared/constants/agents';
 import type {
   AgentEvent as SharedAgentEvent,
+  AgentRouteCapability,
   AgentAssistantDeltaPayload,
   AgentRuntimeMcpDescriptor,
   AgentSubagentEventPayload,
@@ -48,7 +49,7 @@ import type {
 } from '@shared/types/modelCapability';
 import { CONTEXT_COMPACTION_RATIO } from '@shared/types/modelCapability';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { AppMode, ContextUsageBreakdownEntry } from '@shared/types/session';
+import type { AppMode, ContextUsageBreakdownEntry, NextRequestContextProjection } from '@shared/types/session';
 import type { LlmProviderId } from '@shared/types/settings';
 import type { WorkflowStage } from '@shared/types/workflow';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
@@ -84,6 +85,7 @@ import {
 } from '../../agent-runtime/providers/ConfiguredRuntimeProvider';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
 import {
+  claimStructuredToolCallingEvidence,
   describeRouteCapabilityDiagnostic,
   resolveAgentRouteCapability,
 } from '../../agent-runtime/capabilities/RouteCapabilityResolver';
@@ -109,7 +111,12 @@ import { agentManifestService } from '../../settings/AgentManifestService';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
 import { settingsService } from '../../settings/SettingsService';
-import { planEffectiveModelRequest, recordEffectivePlanSuccess, resolveEffectiveModel } from '../../settings/EffectiveModelResolver';
+import {
+  planEffectiveModelRequest,
+  recordEffectivePlanSuccess,
+  recordObservedToolCallingSupport,
+  resolveEffectiveModel,
+} from '../../settings/EffectiveModelResolver';
 import { debuggerLlmService } from '../../settings/DebuggerLlmService';
 import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
 import { isToolAllowedForAgent, normalizeToolName, resolveAgentToolAllowlist } from './DebuggerRuntimePolicy';
@@ -135,6 +142,7 @@ interface AgentTurnOptions {
   reasoning?: ResolvedReasoningSelection;
   turnControls?: ConversationTurnControls;
   requestPlan?: RequestPlan;
+  userContent?: UserMessage['content'];
 }
 
 interface AgentProfileTurnOptions extends AgentTurnOptions {
@@ -380,8 +388,10 @@ export class AgentOrchestrator {
       if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
       const capability = resolveEffectiveModel(config.modelProvider, config.modelName, settings);
       if (!capability) throw new Error(`MODEL_UNAVAILABLE: ${config.modelProvider}/${config.modelName}`);
-      const activeContextWindow = planning.plan.contextBudgetTokens;
-      const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
+      const activeContextWindow = planning.plan.contextWindowTokens;
+      const contextTokenLimit = Math.floor(
+        planning.plan.contextBudgetTokens * CONTEXT_COMPACTION_RATIO,
+      );
       const toolAllowlist = resolveAgentToolAllowlist(agentId, context?.stageId);
       // Debug 路径与 Composer/Ask 对齐：经 PromptPlanBuilder 拆分 system/memory_files/skills。
       const promptPlan = this.buildPromptPlanForAgentTurn({
@@ -443,6 +453,164 @@ export class AgentOrchestrator {
     }
   }
 
+  async previewNextRequestContext(input: {
+    clientRevision: number;
+    agentId: AgentRole;
+    content: UserMessage['content'];
+    imageTokenAdjustment: number;
+    providerId: string;
+    modelId: string;
+    routeCapability: AgentRouteCapability;
+    requestPlan: RequestPlan;
+    turnControls: ConversationTurnControls;
+    promptPlan: PromptPlan;
+    toolAllowlist: string[];
+    projectRootPath: string | null;
+    sessionId: string | null;
+    visibleTurnIds: string[];
+  }): Promise<NextRequestContextProjection> {
+    const contextRoute: SessionContextRoute = {
+      providerId: input.providerId,
+      modelId: input.requestPlan.effectiveModelId,
+      protocol: input.requestPlan.route.protocol,
+    };
+    const materialized = input.sessionId
+      ? sessionContextJournal.materialize(input.sessionId, input.visibleTurnIds, contextRoute)
+      : { messages: [], selectedTurnCount: 0, filteredArtifactCount: 0, migrated: false };
+    const runtimeTools = this.resolveRuntimeTools(
+      input.agentId,
+      input.toolAllowlist,
+      'investigate',
+      input.sessionId,
+    );
+    const slotKey = this.agentSlotKey(input.sessionId, input.agentId);
+    const toolSignature = this.createToolSignature(runtimeTools.definitions);
+    const activation = this.activatedMcpBySlotKey.get(slotKey);
+    const activatedMcpTools = activation?.toolSignature === toolSignature
+      ? activation.names
+      : new Set<string>();
+    const { injected, deferredMcp } = partitionDeferredMcpTools(
+      runtimeTools.definitions,
+      activatedMcpTools,
+    );
+    const activeToolDefinitions = input.routeCapability.toolCallingMode === 'native-structured'
+      ? injected
+      : [];
+    const toolTokens = charsToTokens(JSON.stringify(activeToolDefinitions).length);
+    const fixedTokens = input.promptPlan.totalTokenEstimate + toolTokens;
+    const compactionThreshold = Math.floor(
+      input.requestPlan.contextBudgetTokens * CONTEXT_COMPACTION_RATIO,
+    );
+    const messageBudget = compactionThreshold - fixedTokens - input.imageTokenAdjustment;
+    const blocked = (code: string, message: string): NextRequestContextProjection => ({
+      clientRevision: input.clientRevision,
+      status: 'blocked',
+      route: contextRoute,
+      contextMode: input.requestPlan.contextMode,
+      estimatedInputTokens: fixedTokens,
+      uncompactedInputTokens: fixedTokens,
+      promptBudgetTokens: input.requestPlan.contextBudgetTokens,
+      contextWindowTokens: input.requestPlan.contextWindowTokens,
+      usagePercent: 0,
+      breakdown: [],
+      willCompact: false,
+      filteredArtifactCount: materialized.filteredArtifactCount,
+      blockingReason: { code, message },
+      estimatedAt: nowMs(),
+    });
+    if (messageBudget <= 0) {
+      return blocked(
+        'PROMPT_OVERHEAD_EXCEEDS_BUDGET',
+        'System prompt, skills, and tool schemas exceed the selected model prompt budget.',
+      );
+    }
+
+    const userMessage: UserMessage = { role: 'user', content: input.content, timestamp: nowMs() };
+    const messages = [...materialized.messages, userMessage];
+    const contextManager = new ContextManager({
+      modelId: input.modelId,
+      contextTokenLimit: messageBudget,
+      toolResultBudget: 200 * 1024,
+      keepRecentToolResults: 3,
+    });
+    const beforeConversationTokens = contextManager.estimateTokens(messages) + input.imageTokenAdjustment;
+    const compacted = await contextManager.compress(messages);
+    const afterConversationTokens = contextManager.estimateTokens(compacted.messages) + input.imageTokenAdjustment;
+    const uncompactedInputTokens = fixedTokens + beforeConversationTokens;
+    const estimatedInputTokens = fixedTokens + afterConversationTokens;
+    const willCompact = Boolean(compacted.summary) || JSON.stringify(compacted.messages) !== JSON.stringify(messages);
+    if (estimatedInputTokens > input.requestPlan.contextBudgetTokens) {
+      return {
+        ...blocked(
+          'CONTEXT_CANNOT_FIT',
+          'The next request cannot fit after compaction. Remove attachments or select a larger context mode.',
+        ),
+        estimatedInputTokens,
+        uncompactedInputTokens,
+        willCompact,
+      };
+    }
+
+    const isMcp = (definition: ToolDefinition) => isMcpPrefixedToolName(definition.name);
+    const isSubagent = (definition: ToolDefinition) => definition.name === 'subagent';
+    const mcpDefinitions = activeToolDefinitions.filter(isMcp);
+    const subagentDefinitions = activeToolDefinitions.filter(isSubagent);
+    const systemDefinitions = activeToolDefinitions.filter((definition) => !isMcp(definition) && !isSubagent(definition));
+    const classified = contextManager.classifyMessages(compacted.messages);
+    const metrics = input.promptPlan.metrics;
+    const breakdown: ContextUsageBreakdownEntry[] = [
+      { id: 'system_prompt', tokens: charsToTokens(metrics.systemPrompt) },
+      ...(metrics.scopedInstructions > 0
+        ? [{ id: 'memory_files' as const, tokens: charsToTokens(metrics.scopedInstructions) }]
+        : []),
+      ...(metrics.skills > 0
+        ? [{ id: 'skills' as const, tokens: charsToTokens(metrics.skills) }]
+        : []),
+      { id: 'system_tools', tokens: charsToTokens(JSON.stringify(systemDefinitions).length), count: systemDefinitions.length },
+      ...(mcpDefinitions.length > 0
+        ? [{ id: 'mcp_tools' as const, tokens: charsToTokens(JSON.stringify(mcpDefinitions).length), count: mcpDefinitions.length }]
+        : []),
+      ...(deferredMcp.length > 0
+        ? [{ id: 'mcp_tools_deferred' as const, tokens: charsToTokens(JSON.stringify(deferredMcp).length), count: deferredMcp.length }]
+        : []),
+      ...(subagentDefinitions.length > 0
+        ? [{ id: 'subagent_definitions' as const, tokens: charsToTokens(JSON.stringify(subagentDefinitions).length), count: subagentDefinitions.length }]
+        : []),
+      ...(classified.summaryTokens > 0
+        ? [{ id: 'summarized_conversation' as const, tokens: classified.summaryTokens }]
+        : []),
+      { id: 'conversation', tokens: classified.conversationTokens + input.imageTokenAdjustment, count: classified.conversationCount },
+      { id: 'free', tokens: Math.max(0, input.requestPlan.contextBudgetTokens - estimatedInputTokens) },
+    ];
+    const envelope = requestEnvelopeBuilder.build({
+      promptPlan: input.promptPlan,
+      sessionId: input.sessionId ?? undefined,
+      callIndex: 0,
+      route: contextRoute,
+      requestPlan: input.requestPlan,
+      messages: compacted.messages,
+      tools: activeToolDefinitions,
+      controls: { ...input.turnControls },
+      reasoning: input.routeCapability.reasoningContract,
+    });
+    return {
+      clientRevision: input.clientRevision,
+      requestEnvelopeId: envelope.id,
+      status: 'ready',
+      route: contextRoute,
+      contextMode: input.requestPlan.contextMode,
+      estimatedInputTokens,
+      uncompactedInputTokens,
+      promptBudgetTokens: input.requestPlan.contextBudgetTokens,
+      contextWindowTokens: input.requestPlan.contextWindowTokens,
+      usagePercent: Math.min(100, Math.round((estimatedInputTokens / input.requestPlan.contextBudgetTokens) * 100)),
+      breakdown,
+      willCompact,
+      filteredArtifactCount: materialized.filteredArtifactCount,
+      estimatedAt: nowMs(),
+    };
+  }
+
   async sendProfileMessage(
     agentId: AgentRole,
     content: string,
@@ -457,16 +625,18 @@ export class AgentOrchestrator {
       let routeMap = new Map(settings.llm.agentRoutes.map((route) => [route.agentId, route]));
       const routeAgentId = options?.routeAgentId ?? agentId;
       let route = routeMap.get(routeAgentId);
-      if (route?.providerId) {
-        await this.refreshAccountRuntimeCredentials(route.providerId);
+      const frozenRequestPlan = options?.requestPlan;
+      const credentialProviderId = frozenRequestPlan?.providerId ?? route?.providerId;
+      if (credentialProviderId) {
+        await this.refreshAccountRuntimeCredentials(credentialProviderId);
         settings = settingsService.getAll();
         routeMap = new Map(settings.llm.agentRoutes.map((entry) => [entry.agentId, entry]));
         route = routeMap.get(routeAgentId);
       }
       const config: AgentConfig = {
         ...fallbackConfig,
-        modelProvider: route?.providerId || fallbackConfig.modelProvider,
-        modelName: route?.modelId || fallbackConfig.modelName,
+        modelProvider: frozenRequestPlan?.providerId ?? route?.providerId ?? fallbackConfig.modelProvider,
+        modelName: frozenRequestPlan?.effectiveModelId ?? route?.modelId ?? fallbackConfig.modelName,
         systemPrompt: options?.systemPrompt || fallbackConfig.systemPrompt,
         temperature: options?.temperature ?? fallbackConfig.temperature,
         maxTokens: options?.maxTokens ?? fallbackConfig.maxTokens,
@@ -482,22 +652,35 @@ export class AgentOrchestrator {
       const routeProviderId = config.modelProvider;
       const routeModelId = config.modelName;
       const sessionControls = options?.sessionId ? storageAdapter.readSession(options.sessionId)?.turnControls : undefined;
-      const planning = planEffectiveModelRequest({
-        providerId: routeProviderId,
-        modelId: routeModelId,
-        settings,
-        controls: {
-          ...(sessionControls ?? {}),
-          ...(options?.turnControls ?? {}),
-          ...(options?.reasoning ? { reasoningLevel: options.reasoning.selection } : {}),
-        },
-        requestedTemperature: config.temperature,
-      });
+      const planning = frozenRequestPlan
+        ? {
+            ok: true as const,
+            plan: frozenRequestPlan,
+            controls: options?.turnControls ?? {
+              reasoningLevel: frozenRequestPlan.reasoningWire.selection,
+              maxContextMode: frozenRequestPlan.contextMode === 'one-million',
+              fastModel: frozenRequestPlan.fastMode,
+            },
+            warnings: [],
+          }
+        : planEffectiveModelRequest({
+            providerId: routeProviderId,
+            modelId: routeModelId,
+            settings,
+            controls: {
+              ...(sessionControls ?? {}),
+              ...(options?.turnControls ?? {}),
+              ...(options?.reasoning ? { reasoningLevel: options.reasoning.selection } : {}),
+            },
+            requestedTemperature: config.temperature,
+          });
       if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
       const capability = resolveEffectiveModel(routeProviderId, routeModelId, settings);
       if (!capability) throw new Error(`MODEL_UNAVAILABLE: ${routeProviderId}/${routeModelId}`);
-      const activeContextWindow = planning.plan.contextBudgetTokens;
-      const contextTokenLimit = Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
+      const activeContextWindow = planning.plan.contextWindowTokens;
+      const contextTokenLimit = Math.floor(
+        planning.plan.contextBudgetTokens * CONTEXT_COMPACTION_RATIO,
+      );
       const promptPlan = options?.promptPlan ?? this.buildPromptPlanForAgentTurn({
         agentId,
         projectRootPath: options?.projectRootPath ?? null,
@@ -822,9 +1005,14 @@ export class AgentOrchestrator {
     }
     const slotKey = this.agentSlotKey(sessionId, agentId);
     const toolSignature = this.createToolSignature(signatureTools ?? tools);
-    const activeContextWindow = contextWindow ?? streamOptions.requestPlan.contextBudgetTokens;
-    const resolvedContextTokenLimit = contextTokenLimit
+    const activeContextWindow = contextWindow ?? streamOptions.requestPlan.contextWindowTokens;
+    const requestCompactionThreshold = contextTokenLimit
       ?? Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
+    const fixedPromptTokens = promptPlan.totalTokenEstimate + charsToTokens(JSON.stringify(tools).length);
+    const resolvedContextTokenLimit = requestCompactionThreshold - fixedPromptTokens;
+    if (resolvedContextTokenLimit <= 0) {
+      throw new Error('PROMPT_OVERHEAD_EXCEEDS_BUDGET: system prompt and tool schemas leave no conversation budget.');
+    }
     const existing = this.agentSlots.get(slotKey);
     if (
       existing
@@ -2056,12 +2244,32 @@ export class AgentOrchestrator {
       }));
     }
     if (routeDiagnostic) {
-      input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
-        code: 'route_tool_calling_unsupported',
-        severity: routeCapability.toolCallingMode === 'disabled' ? 'error' : 'warning',
-        message: routeDiagnostic,
-        technicalMessage: JSON.stringify(routeCapability),
-      }));
+      if (routeDiagnostic.surface === 'runtime-log') {
+        runtimeLogService.log({
+          scope: input.sessionId ? 'session' : 'app',
+          namespace: 'agent',
+          severity: routeDiagnostic.severity,
+          title: 'Model route capability',
+          summary: routeDiagnostic.message,
+          sessionId: input.sessionId,
+          projectId: input.projectId,
+          runId: input.runId,
+          raw: {
+            code: routeDiagnostic.code,
+            surface: routeDiagnostic.surface,
+            providerId: input.providerId,
+            modelId: effectiveModel?.modelId ?? input.modelId,
+            protocol: requestPlan.route.protocol,
+          },
+        });
+      } else {
+        input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
+          code: routeDiagnostic.code,
+          severity: routeDiagnostic.severity,
+          message: routeDiagnostic.message,
+          technicalMessage: JSON.stringify(routeCapability),
+        }));
+      }
     }
     const slot = this.getOrCreateAgentSlot(
       input.agentId,
@@ -2083,12 +2291,13 @@ export class AgentOrchestrator {
 
     const userMessage: UserMessage = {
       role: 'user',
-      content: input.content,
+      content: input.options?.userContent ?? input.content,
       timestamp: nowMs(),
     };
 
     let responseText = '';
     let sawStructuredToolCall = false;
+    const structuredToolCallingEvidenceGate = { recorded: false };
     const unsubscribe = slot.agent.subscribe((event: CoreAgentEvent) => {
       if (event.type === 'message_update') {
         const ev = event.assistantMessageEvent;
@@ -2097,6 +2306,36 @@ export class AgentOrchestrator {
         }
         if (ev.type === 'toolcall_end') {
           sawStructuredToolCall = true;
+          if (claimStructuredToolCallingEvidence(
+            ev.type,
+            routeCapability,
+            structuredToolCallingEvidenceGate,
+          )) {
+            try {
+              recordObservedToolCallingSupport(
+                input.providerId,
+                effectiveModel?.modelId ?? input.modelId,
+                settingsService.getAll(),
+                requestPlan.route.protocol,
+              );
+            } catch (error) {
+              runtimeLogService.log({
+                scope: input.sessionId ? 'session' : 'app',
+                namespace: 'agent',
+                severity: 'warning',
+                title: 'Tool capability evidence was not persisted',
+                summary: error instanceof Error ? error.message : String(error),
+                sessionId: input.sessionId,
+                projectId: input.projectId,
+                runId: input.runId,
+                raw: {
+                  providerId: input.providerId,
+                  modelId: effectiveModel?.modelId ?? input.modelId,
+                  protocol: requestPlan.route.protocol,
+                },
+              });
+            }
+          }
         }
       }
       if (event.type === 'message_end' && event.message.role === 'assistant') {

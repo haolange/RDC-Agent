@@ -20,7 +20,7 @@ const t = (key: string, params?: Record<string, string | number>): string => {
     'settings.providers.capability.visionInput': 'Vision', 'settings.providers.capability.structuredOutput': 'Structured',
     'settings.providers.capability.supported': 'Supported', 'composer.effort.levelOff': 'Off',
     'composer.effort.levelOn': 'On', 'composer.effort.levelLow': 'Low', 'composer.effort.levelMedium': 'Medium',
-    'composer.effort.levelHigh': 'High', 'composer.effort.levelExtra': 'Extra', 'composer.effort.levelMax': 'Max',
+    'composer.effort.levelHigh': 'High', 'composer.effort.levelXHigh': 'XHigh', 'composer.effort.levelMax': 'Max',
     'settings.providers.capability.activationImplicit': 'Implicit',
     'settings.providers.capability.activationHeader': 'Header',
     'settings.providers.capability.activationRequest': 'Request parameter',
@@ -32,7 +32,9 @@ const t = (key: string, params?: Record<string, string | number>): string => {
   if (key === 'settings.providers.capability.activationWithEntitlement') return `${params?.activation} · ${params?.entitlement}`;
   if (key === 'settings.providers.capability.contextRange') return `${params?.base} -> ${params?.maximum}`;
   if (key === 'settings.providers.capability.contextRangeUnverified') return `${params?.base} -> ${params?.maximum} (Unverified)`;
-  if (key === 'settings.providers.capability.maxTierLabel') return `${params?.label} · Max`;
+  if (key === 'settings.providers.capability.contextOneMillion') return `${params?.window} · 1M`;
+  if (key === 'settings.providers.capability.contextOneMillionUnverified') return `${params?.window} · 1M (Unverified)`;
+  if (key === 'settings.providers.capability.oneMillionTierLabel') return `${params?.label} · 1M`;
   if (key === 'settings.providers.capability.sources') return `${params?.sources} @ ${params?.date}`;
   return labels[key] ?? key;
 };
@@ -64,8 +66,8 @@ describe('modelCapabilitySummaryUtils', () => {
       reasoning: { kind: 'always-on', supportsOff: false, levels: [], defaultSelection: 'on', lockedSelection: 'on', wireProfile: { kind: 'anthropic', on: 'high', onMode: 'enabled' } },
     }), t)).toBe('On (Locked)');
     expect(formatReasoningCapability(model({
-      reasoning: { kind: 'levels', supportsOff: true, levels: ['low', 'medium', 'high', 'extra'], defaultSelection: 'medium', wireProfile: { kind: 'openai-responses', on: 'medium', levels: { low: 'low', medium: 'medium', high: 'high', extra: 'xhigh' } } },
-    }), t)).toBe('Off, Low, Medium, High, Extra');
+      reasoning: { kind: 'levels', supportsOff: true, levels: ['low', 'medium', 'high', 'xhigh'], defaultSelection: 'medium', wireProfile: { kind: 'openai-responses', on: 'medium', levels: { low: 'low', medium: 'medium', high: 'high', xhigh: 'xhigh' } } },
+    }), t)).toBe('Off, Low, Medium, High, XHigh');
   });
 
   it('formats conservative default values without static fallback', () => {
@@ -74,18 +76,47 @@ describe('modelCapabilitySummaryUtils', () => {
     expect(formatFastCapability(null, t)).toBe('Unknown');
   });
 
-  it('keeps tier entitlement and activation explicit without a 1M heuristic', () => {
+  it('presents unknown native tool support as neutral unverified capability', () => {
+    expect(buildCapabilityChips(model({ toolCalling: { state: 'unknown' } }), t)).toContainEqual({
+      label: 'Tools',
+      value: 'Unverified',
+      tone: 'default',
+    });
+  });
+
+  it('presents unknown reasoning as neutral unverified rather than a disabled Off state', () => {
+    expect(formatReasoningCapability(model({
+      reasoning: {
+        kind: 'unknown',
+        supportsOff: false,
+        levels: [],
+        defaultSelection: 'off',
+        wireProfile: { kind: 'none' },
+      },
+    }), t)).toBe('Unverified');
+    expect(buildCapabilityChips(model({
+      reasoning: {
+        kind: 'unknown',
+        supportsOff: false,
+        levels: [],
+        defaultSelection: 'off',
+        wireProfile: { kind: 'none' },
+      },
+    }), t)).toContainEqual({ label: 'Reasoning', value: 'Unverified', tone: 'default' });
+  });
+
+  it('uses the complete window for 1M eligibility and keeps entitlement explicit', () => {
     const effective = model({
       contextTiers: [
         { id: 'default', label: 'Default', maxPromptTokens: 272_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
-        { id: 'long', label: 'Long', maxPromptTokens: 922_000, activation: { kind: 'header', headers: { 'x-beta': 'long' } }, entitlement: 'unknown' },
+        { id: 'long', label: 'Long', maxPromptTokens: 922_000, maxOutputTokens: 128_000, activation: { kind: 'header', headers: { 'x-beta': 'long' } }, entitlement: 'unknown' },
       ],
       fast: { kind: 'request-param', patch: { service_tier: 'priority' }, entitlement: 'unknown' },
     });
-    expect(formatContextCapability(effective, t)).toBe('272k -> 922k (Unverified)');
+    expect(formatContextCapability(effective, t)).toBe('272k -> 1.1M (Unverified)');
     expect(formatFastCapability(effective, t)).toBe('Request parameter · Unverified');
     expect(buildContextTierRows(effective, t)).toContainEqual(expect.objectContaining({
-      id: 'long', label: 'Long · Max', limit: '922k', entitlement: 'Unverified', activation: 'Header', tone: 'warning',
+      id: 'long', label: 'Long · 1M', limit: '1.1M', entitlement: 'Unverified', activation: 'Header', tone: 'warning',
     }));
   });
 

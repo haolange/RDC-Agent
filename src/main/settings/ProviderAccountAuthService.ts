@@ -11,7 +11,7 @@ import type {
   LlmProviderId,
   LlmProviderModel,
 } from '@shared/types/settings';
-import { SUPER_GROK_OAUTH_CALLBACK_PORT, SUPER_GROK_OAUTH_REDIRECT_URI } from '@shared/constants/llm';
+import { SUPER_GROK_OAUTH_REDIRECT_URI } from '@shared/constants/llm';
 import { COPILOT_EDITOR_HEADERS, COPILOT_WIRE_HEADERS } from './CopilotWire';
 import { CLAUDE_ACCOUNT_WIRE_HEADERS } from './ClaudeWire';
 import { parseCopilotModelCatalog } from './CopilotBilling';
@@ -28,6 +28,7 @@ import {
   parseOpenRouterAccountCatalog,
 } from './LiveProviderCatalogParsers';
 import type { CatalogModelContribution } from './EffectiveCatalogService';
+import { runtimeLogService } from '../runtime/RuntimeLogService';
 import {
   buildMiniMaxAuthorizationRequest,
   buildMiniMaxRefresh,
@@ -109,6 +110,7 @@ export interface AccountCatalogDiscovery {
   models: LlmProviderModel[];
   contributions?: CatalogModelContribution[];
   entitlementContributions?: CatalogModelContribution[];
+  detail?: string;
 }
 
 type AccountCatalogPublisher = (
@@ -137,6 +139,7 @@ const isAccountProviderId = (providerId: LlmProviderId): providerId is AccountPr
   || providerId === 'openrouter';
 
 const isTestMode = (): boolean => process.env.RDC_AGENT_TEST_MODE === '1';
+const shouldOpenSystemBrowser = (): boolean => !isTestMode() && process.env.RDC_AGENT_HEADLESS !== '1';
 
 const base64Url = (buffer: Buffer): string =>
   buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -240,7 +243,7 @@ const readOAuthError = (payload: unknown): { error?: string; detail?: string } =
 const SUPER_GROK_OAUTH_CHECKLIST = [
   'Use a SuperGrok or X Premium Plus account with Grok Build access.',
   'Allow the requested Grok Build and API scopes in the browser.',
-  'Keep 127.0.0.1:56121 available until the browser callback completes.',
+  'Copy the one-time code shown by xAI back into RDC Agent before it expires.',
 ];
 
 const createGrokOAuthDiagnostic = (
@@ -449,7 +452,7 @@ function pendingAuthorizationMessage(
   if (providerId === 'grok-account') {
     return mode === 'device'
       ? 'Waiting for Super Grok device-code authorization.'
-      : 'Waiting for Super Grok browser authorization.';
+      : 'xAI is displaying a one-time code. Paste it into RDC Agent to finish connecting.';
   }
   if (providerId === 'minimax-account') return 'Waiting for MiniMax account authorization.';
   if (providerId === 'openrouter') return 'Waiting for OpenRouter browser authorization.';
@@ -459,6 +462,7 @@ function pendingAuthorizationMessage(
 export class ProviderAccountAuthService {
   private catalogPublisher?: AccountCatalogPublisher;
   private readonly pendingFlows = new Map<string, OAuthFlowState>();
+  private lastGrokCatalogSourceDiagnostic?: string;
 
   setCatalogPublisher(publisher?: AccountCatalogPublisher): void {
     this.catalogPublisher = publisher;
@@ -641,7 +645,8 @@ export class ProviderAccountAuthService {
       authUrl: flow?.authUrl,
       verificationUri: flow?.verificationUri,
       userCode: flow?.userCode,
-      requiresCodeInput: flow?.providerId === 'claude-account',
+      requiresCodeInput: flow?.providerId === 'claude-account'
+        || (flow?.providerId === 'grok-account' && flow.authorizationMode === 'browser'),
       authorizationMode: flow?.authorizationMode ?? accountBundle?.authorizationMode,
       diagnostic: activeDiagnostic,
       requestedScopes: flow?.requestedScopes ?? activeDiagnostic?.requestedScopes ?? accountBundle?.requestedScopes,
@@ -871,11 +876,11 @@ export class ProviderAccountAuthService {
         state: flow.state,
       });
       this.setFlow(flow);
-      await this.startGrokCallbackServer(flow);
       void this.openExternal(flow.authUrl);
       return this.status(flow.providerId);
     } catch (error) {
       const diagnostic = resolveGrokOAuthDiagnostic(error, 'browser', scope, SUPER_GROK_OAUTH_REDIRECT_URI);
+      this.clearFlows('grok-account');
       return this.status('grok-account', renderGrokOAuthDiagnosticMessage(diagnostic), 'failed', diagnostic);
     }
   }
@@ -1144,7 +1149,7 @@ export class ProviderAccountAuthService {
 
   private async exchangeGrokCode(flow: OAuthFlowState, code: string): Promise<OAuthSecretBundle> {
     if (!code || !flow.codeVerifier || !flow.clientId || !flow.redirectUri) {
-      throw new Error('Super Grok browser authorization callback is missing code, PKCE verifier, client id, or redirect URI.');
+      throw new Error('Super Grok browser authorization requires the one-time code shown by xAI and an active PKCE login flow.');
     }
     const tokenEndpoint = flow.tokenEndpoint ?? (await fetchGrokOAuthMetadata()).tokenEndpoint;
     const payload = await fetchOAuthJson(tokenEndpoint, {
@@ -1547,19 +1552,48 @@ export class ProviderAccountAuthService {
       const token = bundle.accessToken ?? bundle.apiKey;
       if (!token) throw new Error('Super Grok OAuth token is missing.');
       const headers = { Accept: 'application/json', Authorization: `Bearer ${token}` };
-      const [builder, api] = await Promise.all([
-        fetchJson(`${GROK_BUILD_API_BASE_URL}/models`, { method: 'GET', headers })
-          .then(parseGrokBuilderCatalog)
-          .catch(() => ({ models: [], contributions: [] })),
-        fetchJson(`${XAI_API_BASE_URL}/models`, { method: 'GET', headers })
-          .then(parseGrokAccountCatalog)
-          .catch(() => ({ models: [], contributions: [] })),
+      const [builderResult, apiResult] = await Promise.allSettled([
+        fetchJson(`${GROK_BUILD_API_BASE_URL}/models`, { method: 'GET', headers }).then(parseGrokBuilderCatalog),
+        fetchJson(`${XAI_API_BASE_URL}/models`, { method: 'GET', headers }).then(parseGrokAccountCatalog),
       ]);
+      const builder = builderResult.status === 'fulfilled'
+        ? builderResult.value
+        : { models: [], contributions: [] };
+      const api = apiResult.status === 'fulfilled'
+        ? apiResult.value
+        : { models: [], contributions: [] };
       const parsed = mergeParsedLiveCatalogs(api, builder);
-      if (parsed.models.length === 0) {
-        throw new Error('Super Grok Builder and API catalogs returned no agent-routable models.');
+      const sourceDetail = [
+        builderResult.status === 'rejected'
+          ? `Builder unavailable (${parseProviderError(builderResult.reason)})`
+          : `Builder returned ${builder.models.length} agent-routable model(s)`,
+        apiResult.status === 'rejected'
+          ? `xAI API unavailable (${parseProviderError(apiResult.reason)})`
+          : `xAI API returned ${api.models.length} agent-routable model(s)`,
+      ].join('; ');
+      const partialCatalog = builderResult.status === 'rejected'
+        || apiResult.status === 'rejected'
+        || builder.models.length === 0
+        || api.models.length === 0;
+      if (partialCatalog && sourceDetail !== this.lastGrokCatalogSourceDiagnostic) {
+        runtimeLogService.log({
+          scope: 'app',
+          namespace: 'llm',
+          severity: parsed.models.length > 0 ? 'warning' : 'error',
+          title: 'Super Grok catalog source incomplete',
+          summary: parsed.models.length > 0
+            ? 'Using the models returned by the available live catalog surface.'
+            : 'Neither live catalog surface returned an agent-routable model.',
+          detail: sourceDetail,
+        });
+        this.lastGrokCatalogSourceDiagnostic = sourceDetail;
+      } else if (!partialCatalog) {
+        this.lastGrokCatalogSourceDiagnostic = undefined;
       }
-      return parsed;
+      if (parsed.models.length === 0) {
+        throw new Error(`Super Grok Builder and API catalogs returned no agent-routable models. ${sourceDetail}`);
+      }
+      return { ...parsed, detail: sourceDetail };
     }
     if (bundle.providerId === 'openrouter') {
       if (!bundle.apiKey) throw new Error('OpenRouter OAuth API key is missing.');
@@ -1736,99 +1770,6 @@ export class ProviderAccountAuthService {
     });
   }
 
-  private startGrokCallbackServer(flow: OAuthFlowState): Promise<void> {
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      const server = createServer((request, response) => {
-        const url = new URL(request.url ?? '/', `http://127.0.0.1:${SUPER_GROK_OAUTH_CALLBACK_PORT}`);
-        if (url.pathname !== '/callback') {
-          response.writeHead(404, { 'Content-Type': 'text/plain' });
-          response.end('Not found.');
-          return;
-        }
-
-        const failCallback = (diagnostic: LlmProviderAccountDiagnostic, statusCode = 400) => {
-          flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
-          flow.diagnostic = diagnostic;
-          response.writeHead(statusCode, { 'Content-Type': 'text/plain' });
-          response.end(flow.error);
-          this.closeFlowServer(flow);
-        };
-
-        if (url.searchParams.get('state') !== flow.state) {
-          failCallback(createGrokOAuthDiagnostic(
-            'callback',
-            'Super Grok OAuth browser callback failed because the returned state did not match the active login flow.',
-            { requestedScopes: flow.requestedScopes, redirectUri: flow.redirectUri },
-          ));
-          return;
-        }
-
-        const providerError = url.searchParams.get('error') ?? '';
-        if (providerError) {
-          failCallback(createGrokOAuthDiagnostic(
-            'callback',
-            'Super Grok OAuth browser callback was rejected by xAI.',
-            {
-              providerError,
-              detail: url.searchParams.get('error_description') ?? undefined,
-              requestedScopes: flow.requestedScopes,
-              redirectUri: flow.redirectUri,
-            },
-          ));
-          return;
-        }
-
-        const code = url.searchParams.get('code') ?? '';
-        if (!code) {
-          failCallback(createGrokOAuthDiagnostic(
-            'callback',
-            'Super Grok OAuth browser callback did not include an authorization code.',
-            { requestedScopes: flow.requestedScopes, redirectUri: flow.redirectUri },
-          ));
-          return;
-        }
-
-        void this.finishLogin({ providerId: flow.providerId, flowId: flow.flowId, code })
-          .then((status) => {
-            if (!status.connected) {
-              response.writeHead(500, { 'Content-Type': 'text/plain' });
-              response.end(status.error ?? status.message ?? 'Super Grok OAuth failed.');
-              return;
-            }
-            response.writeHead(200, { 'Content-Type': 'text/html' });
-            response.end('<html><body>RDC Agent Super Grok sign-in complete. You can return to the app.</body></html>');
-          })
-          .catch((error) => {
-            const diagnostic = resolveGrokOAuthDiagnostic(error, 'browser', flow.requestedScopes, flow.redirectUri);
-            flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
-            flow.diagnostic = diagnostic;
-            response.writeHead(500, { 'Content-Type': 'text/plain' });
-            response.end(flow.error);
-          })
-          .finally(() => {
-            this.closeFlowServer(flow);
-          });
-      });
-      flow.server = server;
-      server.on('error', (error) => {
-        const diagnostic = resolveGrokOAuthDiagnostic(error, 'browser', flow.requestedScopes, flow.redirectUri);
-        flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
-        flow.diagnostic = diagnostic;
-        this.closeFlowServer(flow);
-        this.pendingFlows.delete(flow.flowId);
-        if (!settled) {
-          settled = true;
-          reject(error);
-        }
-      });
-      server.listen(SUPER_GROK_OAUTH_CALLBACK_PORT, '127.0.0.1', () => {
-        settled = true;
-        resolve();
-      });
-    });
-  }
-
   private startChatGptCallbackServer(flow: OAuthFlowState): Promise<void> {
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -1871,7 +1812,7 @@ export class ProviderAccountAuthService {
   }
 
   private async openExternal(url?: string): Promise<void> {
-    if (!url || isTestMode()) {
+    if (!url || !shouldOpenSystemBrowser()) {
       return;
     }
     await shell.openExternal(url);

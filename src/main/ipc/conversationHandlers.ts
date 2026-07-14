@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import type {
   ConversationAnswerToolApprovalRequest,
   ConversationAnswerUserInputRequest,
+  NextRequestContextPreviewRequest,
   ConversationRewriteFromMessageRequest,
   ConversationSendRequest,
 } from '@shared/types/conversation';
@@ -33,6 +34,18 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
 
     return result;
   });
+
+  ipcMain.handle(
+    'conversation:previewNextRequestContext',
+    async (_event, request: NextRequestContextPreviewRequest) => (
+      conversationService.previewNextRequestContext({
+        ...request,
+        fallbackProjectId: state.currentProjectId,
+        fallbackSessionId: state.currentSessionId,
+        fallbackRunId: state.currentRunId,
+      })
+    ),
+  );
 
   ipcMain.handle('conversation:rewriteFromMessage', async (_event, request: ConversationRewriteFromMessageRequest) => {
     const result = await conversationService.rewriteFromMessage({

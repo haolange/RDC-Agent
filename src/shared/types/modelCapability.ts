@@ -1,10 +1,10 @@
-export type NamedReasoningLevel = 'minimal' | 'low' | 'medium' | 'high' | 'extra' | 'max' | 'ultra';
+export type NamedReasoningLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
 export const NAMED_REASONING_LEVELS: readonly NamedReasoningLevel[] = [
   'minimal',
   'low',
   'medium',
   'high',
-  'extra',
+  'xhigh',
   'max',
   'ultra',
 ];
@@ -16,7 +16,7 @@ export const REASONING_SELECTIONS: readonly ReasoningSelection[] = [
   ...NAMED_REASONING_LEVELS,
 ];
 
-export type ReasoningControlKind = 'none' | 'toggle' | 'levels' | 'always-on';
+export type ReasoningControlKind = 'unknown' | 'none' | 'toggle' | 'levels' | 'always-on';
 
 export type OpenAiWireEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
 export type AnthropicWireEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
@@ -68,6 +68,10 @@ export interface ReasoningControl {
   defaultSelection: ReasoningSelection;
   lockedSelection?: ReasoningSelection;
   wireProfile: ReasoningWireProfile;
+  modelVariants?: {
+    offModelId: string;
+    onModelId: string;
+  };
 }
 
 export interface ConversationTurnControls {
@@ -96,6 +100,7 @@ export function createReasoningControl(control: ReasoningControl): ReasoningCont
     ...control,
     levels: [...control.levels],
     wireProfile: cloneReasoningWireProfile(control.wireProfile),
+    modelVariants: control.modelVariants ? { ...control.modelVariants } : undefined,
   };
 }
 
@@ -144,6 +149,7 @@ export function getReasoningSelectionOrder(control: ReasoningControl | null | un
       return [control.lockedSelection ?? 'on'];
     case 'levels':
       return control.supportsOff ? ['off', ...control.levels] : [...control.levels];
+    case 'unknown':
     case 'none':
     default:
       return ['off'];

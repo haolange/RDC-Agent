@@ -51,14 +51,16 @@ const preset: ProviderPreset = {
         {
           "id": "default",
           "label": "Default",
-          "maxPromptTokens": 131072,
+          "maxPromptTokens": 200000,
+          "maxOutputTokens": 128000,
+          "maxTotalTokens": 200000,
           "activation": {
             "kind": "implicit"
           },
           "entitlement": "granted"
         }
       ],
-      "defaultBudgetTokens": 131072,
+      "defaultBudgetTokens": 72000,
       "fast": {
         "kind": "unsupported"
       },
@@ -238,4 +240,3 @@ const preset: ProviderPreset = {
 };
 
 export default preset;
-

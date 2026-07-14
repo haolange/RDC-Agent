@@ -242,7 +242,10 @@ export function upsertRuntimeToolCall(
   const nextTrace = cloneTrace(trace);
   const blockMeta = getRuntimeToolBlockMeta(patch.toolName, options?.loopId);
   const blockId = blockMeta.id;
-  let block = nextTrace.blocks.find((entry) => entry.id === blockId);
+  const existingBlock = nextTrace.blocks.find((entry) => (
+    entry.toolCalls.some((toolCall) => toolCall.id === patch.id)
+  ));
+  let block = existingBlock ?? nextTrace.blocks.find((entry) => entry.id === blockId);
   if (!block) {
     block = createWorkBlock(blockId, blockMeta.title, blockMeta.stage, blockMeta.kind);
     block.status = 'running';
@@ -539,6 +542,10 @@ export function sanitizeStoredWorkTrace(
     if (typeof block.id !== 'string' || !block.id.trim()) return null;
     if (!['pending', 'running', 'complete', 'error'].includes(block.status)) return null;
     if (!Array.isArray(block.toolCalls)) return null;
+    if (block.diagnosticSeverity !== undefined) {
+      if (block.kind !== 'diagnostic') return null;
+      if (!['info', 'warning', 'error'].includes(block.diagnosticSeverity)) return null;
+    }
     if ('detail' in block && (block as { detail?: unknown }).detail !== undefined) return null;
     if ('thinkingPresentation' in block) return null;
     if (block.kind === 'llm_turn' && block.result && !Array.isArray(block.result.toolCallIds)) return null;

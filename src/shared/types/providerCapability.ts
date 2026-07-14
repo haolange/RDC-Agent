@@ -145,7 +145,11 @@ export interface RequestPlan {
   route: ModelRoute;
   headers: Record<string, string>;
   bodyPatch: JsonObject;
+  /** Prompt/input budget after applying the selected context mode. */
   contextBudgetTokens: number;
+  contextMode: 'normal' | 'one-million';
+  /** Complete provider context window, including the output reserve. */
+  contextWindowTokens: number;
   activeTierId: string;
   fastMode: boolean;
   reasoningWire: ResolvedReasoningSelection;

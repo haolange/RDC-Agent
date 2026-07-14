@@ -440,7 +440,7 @@ export interface LlmProviderConnectionResult {
   error?: string;
 }
 
-export type LlmModelCapabilityProbeMode = 'default' | 'max-context' | 'fast';
+export type LlmModelCapabilityProbeMode = 'default' | 'one-million-context' | 'fast';
 
 export interface LlmModelCapabilityProbeRequest {
   providerId: LlmProviderId;

@@ -1,5 +1,6 @@
 import { ipcMain } from 'electron';
 import type {
+  AppSettings,
   AppSettingsPatch,
   LlmModelCapabilityProbeRequest,
   LlmProviderAccountLoginStartRequest,
@@ -7,6 +8,7 @@ import type {
   LlmProviderDraftRequest,
   LlmProviderId,
 } from '@shared/types/settings';
+import type { AgentDefinitionSaveRequest } from '@shared/types/agentManifest';
 import { appPathService } from '../runtime/AppPathService';
 import { agentManifestService } from '../settings/AgentManifestService';
 import { providerConnectionService } from '../settings/ProviderConnectionService';
@@ -29,6 +31,23 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   effectiveCatalogService.subscribe((snapshot) => {
     context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);
   });
+
+  const withEffectiveAgentModelOptions = (settings: AppSettings): AppSettings => {
+    const catalogs = settings.llm.providers.flatMap((provider) => {
+      if (provider.catalogOwnership !== 'app-managed') return [];
+      const snapshot = resolveEffectiveCatalog(provider.id, settings);
+      return snapshot ? [snapshot] : [];
+    });
+    return {
+      ...settings,
+      agents: agentManifestService.projectEffectiveModelOptions(
+        settings.agents,
+        settings.llm.providers,
+        settings.llm.agentRoutes,
+        catalogs,
+      ),
+    };
+  };
 
   const broadcastCatalog = (providerId: string): void => {
     const snapshot = resolveEffectiveCatalog(providerId, settingsService.getAll());
@@ -118,7 +137,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
 
   ipcMain.handle('settings:get', async () => {
     const paths = appPathService.getRuntimePaths();
-    return settingsService.getAll({
+    return withEffectiveAgentModelOptions(settingsService.getAll({
       userRdxRoot: paths.userRdxRoot,
       settingsPath: paths.settingsPath,
       instructionsPath: paths.instructionsPath,
@@ -130,7 +149,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       knowledgePath: paths.knowledgePath,
       policiesPath: paths.policiesPath,
       secretsPath: paths.secretsPath,
-    });
+    }));
   });
 
   ipcMain.handle('settings:getProviderCatalog', async () => {
@@ -158,7 +177,11 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   ipcMain.handle('settings:importAgentManifest', async (_event, filePath: string) => {
     const paths = appPathService.getRuntimePaths();
     agentManifestService.importFile(paths, filePath);
-    return settingsService.getAll(paths);
+    return withEffectiveAgentModelOptions(settingsService.getAll(paths));
+  });
+
+  ipcMain.handle('settings:saveAgentDefinition', async (_event, request: AgentDefinitionSaveRequest) => {
+    return settingsService.saveAgentDefinition(request);
   });
 
   ipcMain.handle('settings:set', async (_event, settings: unknown) => {
@@ -188,6 +211,6 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     }
     const settledSettings = settingsService.getAll();
     for (const provider of settledSettings.llm.providers) broadcastCatalog(provider.id);
-    return settledSettings;
+    return withEffectiveAgentModelOptions(settledSettings);
   });
 }

@@ -122,6 +122,155 @@ describe('EffectiveCatalogService', () => {
     ]));
   });
 
+  it('replaces discriminated capability unions atomically across kinds', async () => {
+    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const [model] = mergeEffectiveCatalog(request({
+      discovery: {
+        source: 'discovery',
+        observedAt: '2026-01-02T00:00:00.000Z',
+        models: [{
+          modelId: 'model-a',
+          reasoning: {
+            kind: 'levels',
+            supportsOff: true,
+            levels: ['high', 'max'],
+            defaultSelection: 'high',
+            wireProfile: {
+              kind: 'anthropic',
+              on: 'high',
+              levels: { high: 'high', max: 'max' },
+              onMode: 'enabled',
+              offMode: 'disabled',
+            },
+          },
+          fast: {
+            kind: 'request-param',
+            entitlement: 'granted',
+            patch: { service_tier: 'priority' },
+          },
+          contextTiers: [{
+            id: 'default',
+            activation: { kind: 'header', headers: { 'x-context': 'large' } },
+          }],
+        }],
+      },
+    }));
+
+    expect(model.reasoning).toEqual(expect.objectContaining({
+      kind: 'levels',
+      levels: ['high', 'max'],
+      defaultSelection: 'high',
+    }));
+    expect(model.reasoning).not.toHaveProperty('lockedSelection');
+    expect(model.reasoning.wireProfile).toEqual(expect.objectContaining({ kind: 'anthropic' }));
+    expect(model.fast).toEqual({
+      kind: 'request-param',
+      entitlement: 'granted',
+      patch: { service_tier: 'priority' },
+    });
+    expect(model.contextTiers[0].activation).toEqual({
+      kind: 'header',
+      headers: { 'x-context': 'large' },
+    });
+  });
+
+  it('applies official overlays only to exact live-discovered model ids', async () => {
+    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const [model] = mergeEffectiveCatalog(request({
+      discovery: {
+        source: 'discovery',
+        observedAt: '2026-01-02T00:00:00.000Z',
+        models: [{ modelId: 'model-a', label: 'Live model' }],
+      },
+      overlay: {
+        source: 'overlay',
+        observedAt: '2026-01-03T00:00:00.000Z',
+        models: [
+          { modelId: 'model-a', fixedTemperature: 0.25 },
+          { modelId: 'model-not-live', label: 'Must not be created', fixedTemperature: 1 },
+        ],
+      },
+    }));
+    expect(model.fixedTemperature).toBe(0.25);
+    expect(mergeEffectiveCatalog(request({
+      overlay: {
+        source: 'overlay',
+        observedAt: '2026-01-03T00:00:00.000Z',
+        models: [{ modelId: 'model-not-live', fixedTemperature: 1 }],
+      },
+    })).map((entry) => entry.modelId)).toEqual(['model-a']);
+  });
+
+  it('does not let persisted app-managed preferences create models absent from the live catalog', async () => {
+    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const models = mergeEffectiveCatalog(request({
+      seed: {
+        source: 'seed',
+        observedAt: '2026-01-01T00:00:00.000Z',
+        models: [],
+      },
+      discovery: {
+        source: 'discovery',
+        observedAt: '2026-01-02T00:00:00.000Z',
+        models: [{ modelId: 'live-model', label: 'Live model', availability: 'available' }],
+      },
+      user: {
+        source: 'user',
+        observedAt: '2026-01-03T00:00:00.000Z',
+        models: [
+          { modelId: 'live-model', defaultBudgetTokens: 128_000 },
+          { modelId: 'claude-not-returned', defaultBudgetTokens: 256_000 },
+        ],
+      },
+    }));
+
+    expect(models).toHaveLength(1);
+    expect(models[0]).toMatchObject({ modelId: 'live-model', defaultBudgetTokens: 128_000 });
+  });
+
+  it('removes historical media-output entries from discovery and persisted catalog state', async () => {
+    const { EffectiveCatalogService, mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const cleanModels = mergeEffectiveCatalog(request({
+      seed: { source: 'seed', observedAt: '2026-01-01T00:00:00.000Z', models: [] },
+      discovery: {
+        source: 'discovery',
+        observedAt: '2026-01-02T00:00:00.000Z',
+        models: [
+          { modelId: 'grok-4.5', availability: 'available' },
+          { modelId: 'grok-imagine-video-1.5', availability: 'available' },
+        ],
+      },
+      user: {
+        source: 'user',
+        observedAt: '2026-01-03T00:00:00.000Z',
+        models: [{ modelId: 'grok-imagine-video-1.5', enabled: true }],
+      },
+    }));
+    expect(cleanModels.map((model) => model.modelId)).toEqual(['grok-4.5']);
+
+    fs.mkdirSync(path.dirname(statePath), { recursive: true });
+    fs.writeFileSync(statePath, JSON.stringify({
+      schemaVersion: 2,
+      discoveries: {
+        historical: {
+          source: 'discovery',
+          observedAt: '2026-01-02T00:00:00.000Z',
+          models: [
+            { modelId: 'grok-4.5' },
+            { modelId: 'grok-imagine-video' },
+          ],
+        },
+      },
+      entitlements: {},
+      observed: {},
+    }), 'utf8');
+    new EffectiveCatalogService({ statePath });
+    const persisted = JSON.parse(fs.readFileSync(statePath, 'utf8')) as {
+      discoveries: Record<string, { models: Array<{ modelId: string }> }>;
+    };
+    expect(persisted.discoveries.historical.models.map((model) => model.modelId)).toEqual(['grok-4.5']);
+  });
+
   it('rekeys punctuation-equivalent live ids while preserving the seed id as a proven alias', async () => {
     const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
     const [model] = mergeEffectiveCatalog(request({
@@ -179,7 +328,7 @@ describe('EffectiveCatalogService', () => {
           observedAt: `2026-02-0${index + 1}T00:00:00.000Z`,
           models: [{ modelId: 'model-a', label: `${source}-${mask}`, ...(source === 'user' ? { defaultBudgetTokens: 64_000 + mask } : {}) }],
         } as never;
-        if (source !== 'user') {
+        if (source !== 'user' && (source !== 'overlay' || (mask & 1) !== 0)) {
           expectedLabel = `${source}-${mask}`;
           expectedSource = source;
         }
@@ -352,8 +501,75 @@ describe('EffectiveCatalogService', () => {
     expect(matching.toolCalling).toEqual({ state: 'unsupported', reason: 'latest rejection' });
     expect(matching.provenance.filter((entry) => entry.field === 'toolCalling.state').at(-1))
       .toMatchObject({ source: 'observed', detail: 'latest result' });
-    expect(service.getSnapshot(request({ protocol: 'AnthropicMessages' })).models[0].toolCalling)
+    expect(service.getSnapshot(request({
+      protocol: 'AnthropicMessages',
+      fallbackRoute: {
+        protocol: 'AnthropicMessages',
+        baseUrl: 'https://example.test/messages',
+        source: 'preset',
+      },
+    })).models[0].toolCalling)
       .toEqual({ state: 'supported' });
+  });
+
+  it('projects route-protocol evidence into the provider catalog snapshot and broadcasts it', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-07-13T00:00:00.000Z') });
+    const catalogRequest = request({
+      protocol: 'OpenAIResponses',
+      seed: {
+        source: 'seed',
+        observedAt: '2026-01-01T00:00:00.000Z',
+        models: [{
+          modelId: 'model-chat',
+          label: 'Chat-routed model',
+          availability: 'available',
+          route: {
+            protocol: 'OpenAICompatibleChatCompletions',
+            baseUrl: 'https://example.test/v1',
+            source: 'model',
+          },
+          toolCalling: { state: 'unknown' },
+        }, {
+          modelId: 'model-responses',
+          label: 'Responses-routed model',
+          availability: 'available',
+          route: {
+            protocol: 'OpenAIResponses',
+            baseUrl: 'https://example.test/v1/responses',
+            source: 'model',
+          },
+          toolCalling: { state: 'unknown' },
+        }],
+      },
+    });
+    const snapshots: Array<ReturnType<typeof service.getSnapshot>> = [];
+    service.subscribe((snapshot) => snapshots.push(snapshot));
+    service.getSnapshot(catalogRequest);
+
+    service.recordObserved(
+      {
+        providerId: 'provider-a',
+        accountId: 'account-a',
+        protocol: 'OpenAICompatibleChatCompletions',
+      },
+      [{ modelId: 'model-chat', toolCalling: { state: 'supported' } }],
+      'structured adapter event',
+    );
+
+    const latest = snapshots.at(-1);
+    expect(latest?.protocol).toBe('OpenAIResponses');
+    expect(latest?.models.find((model) => model.modelId === 'model-chat')?.toolCalling)
+      .toEqual({ state: 'supported' });
+    expect(latest?.models.find((model) => model.modelId === 'model-responses')?.toolCalling)
+      .toEqual({ state: 'unknown' });
+    expect(latest?.models.find((model) => model.modelId === 'model-chat')?.provenance)
+      .toContainEqual(expect.objectContaining({
+        field: 'toolCalling.state',
+        source: 'observed',
+        protocol: 'OpenAICompatibleChatCompletions',
+        detail: 'structured adapter event',
+      }));
   });
 
   it('publishes observed and quota changes to the latest account/protocol snapshot', async () => {

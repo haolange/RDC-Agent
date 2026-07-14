@@ -5,7 +5,6 @@ require('./register-ts-source.cjs');
 
 const { AGENT_ROLES } = require('../src/shared/constants/agents.ts');
 const { createProviderEntryFromPreset } = require('../src/main/settings/ProviderPresetRegistry.ts');
-const { resolveAgentRouteStatus } = require('../src/renderer/features/settings/SettingsModal/agentRouteStatus.ts');
 const {
   canonicalAgentModelId,
   splitCanonicalAgentModelId,
@@ -109,24 +108,6 @@ function main() {
   const ollama = configuredProvider('ollama', ['llama3']);
   const validRoutes = AGENT_ROLES.map((agentId) => route(agentId, 'ollama', 'llama3'));
   const customAgentId = 'custom-browser-use-agent';
-
-  for (const agentRoute of validRoutes) {
-    const status = resolveAgentRouteStatus(agentRoute, [ollama]);
-    assert(status.issue === null, `${agentRoute.agentId} valid route should not report an issue.`);
-    assert(status.provider?.id === 'ollama', `${agentRoute.agentId} should resolve the configured provider.`);
-    assert(status.availableModels.length === 1, `${agentRoute.agentId} should expose enabled models.`);
-  }
-
-  const invalidModel = resolveAgentRouteStatus(route('debugger', 'ollama', 'missing-model'), [ollama]);
-  assert(invalidModel.issue === 'settings.routeReasonModelInvalid', 'Missing model should be reported as an invalid route.');
-
-  const unavailableProvider = {
-    ...ollama,
-    enabled: false,
-    isConfigured: false,
-  };
-  const unavailable = resolveAgentRouteStatus(route('debugger', 'ollama', 'llama3'), [unavailableProvider]);
-  assert(unavailable.issue === 'settings.routeReasonProviderUnavailable', 'Disabled provider should be reported as unavailable.');
 
   assert(
     canonicalAgentModelId('deepseek', 'deepseek-chat') === 'deepseek:deepseek-chat',
@@ -238,11 +219,17 @@ function main() {
 
   const useSettingsModal = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/useSettingsModal.ts'), 'utf8');
   assert(!useSettingsModal.includes('AGENT_ROLES'), 'Settings route validation should derive agents from manifest drafts.');
-  assert(useSettingsModal.includes('agentManifestDrafts.filter'), 'Settings route validation should inspect manifest drafts.');
+  assert(useSettingsModal.includes('useAgentManifestAutosave'), 'Settings should persist manifest drafts through the scoped autosave path.');
+  assert(useSettingsModal.includes('saveAgentDefinition'), 'Settings should use the scoped Agent definition save service.');
+
+  const agentManifestAutosave = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/useAgentManifestAutosave.ts'), 'utf8');
+  assert(agentManifestAutosave.includes('getChangedAgentManifestDrafts'), 'Agent autosave should write only changed manifest drafts.');
+  assert(agentManifestAutosave.includes('latestRevisionRef'), 'Agent autosave should reject stale save completions by revision.');
 
   const settingsModalActions = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/settingsModalActions.ts'), 'utf8');
   assert(!settingsModalActions.includes('AGENT_ROLES'), 'Settings route save should not be limited to built-in Agent roles.');
   assert(settingsModalActions.includes('agentManifestDrafts'), 'Settings route save should include custom manifest drafts.');
+  assert(settingsModalActions.includes('saveAgentDefinition'), 'Settings route save should not rebuild the whole settings/workspace state.');
 
   const agentManifestServiceSource = fs.readFileSync(path.join(repoRoot, 'src/main/settings/AgentManifestService.ts'), 'utf8');
   assert(!agentManifestServiceSource.includes('Only top-level agent manifests'), 'Agent manifest import should not reject safe custom profiles.');

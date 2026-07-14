@@ -1015,10 +1015,22 @@
 
 .work-process-diagnostic-message {
   width: 100%;
-  color: var(--token-status-error);
+  color: var(--token-text-body);
   font-size: var(--text-sm);
   line-height: 1.65;
   overflow-wrap: anywhere;
+}
+
+.work-process-diagnostic.severity-info .work-process-diagnostic-message {
+  color: var(--token-status-info);
+}
+
+.work-process-diagnostic.severity-warning .work-process-diagnostic-message {
+  color: var(--token-status-warning);
+}
+
+.work-process-diagnostic.severity-error .work-process-diagnostic-message {
+  color: var(--token-status-error);
 }
 
 .work-process-icon {

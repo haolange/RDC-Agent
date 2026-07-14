@@ -15,6 +15,8 @@ import {
 } from '@shared/types/modelCapability';
 import {
   contextTierPromptCap,
+  contextTierWindowTokens,
+  ONE_MILLION_CONTEXT_TOKENS,
   resolveContextTierChoices,
 } from '@shared/utils/contextTiers';
 import { evaluateModelControls } from '@shared/utils/modelControls';
@@ -79,15 +81,19 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
   const { model } = input;
   const evaluated = evaluateModelControls(model, input.controls);
   const controls = evaluated.controls;
-  if (model.availability === 'unavailable') {
-    return planningError('MODEL_UNAVAILABLE', model.unavailableReason ?? `${model.modelId} is unavailable`, controls);
+  if (model.availability !== 'available') {
+    return planningError(
+      'MODEL_UNAVAILABLE',
+      model.unavailableReason ?? `${model.modelId} is ${model.availability === 'unknown' ? 'not yet verified' : 'unavailable'}`,
+      controls,
+    );
   }
   if (evaluated.error) {
     return planningError('CONSTRAINT_REJECTED', evaluated.error.message, controls);
   }
 
   const tierChoices = resolveContextTierChoices(model);
-  let activeTier = controls.maxContextMode ? tierChoices.maxTier : tierChoices.baseTier;
+  let activeTier = controls.maxContextMode ? tierChoices.oneMillionTier : tierChoices.normalTier;
   if (!activeTier) {
     return planningError('NO_USABLE_CONTEXT_TIER', `${model.modelId} has no usable context tier`, controls);
   }
@@ -119,7 +125,9 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
   }
 
   if (activeTier.entitlement === 'unknown') {
-    warnings.push(`Context tier ${activeTier.label} is unverified`);
+    warnings.push(controls.maxContextMode
+      ? '1M context entitlement is unverified'
+      : `Context tier ${activeTier.label} is unverified`);
   }
   if (activeTier.activation.kind === 'header') {
     const conflict = mergeHeaders(headers, activeTier.activation.headers);
@@ -139,6 +147,16 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
   }
 
   const tierCap = contextTierPromptCap(activeTier);
+  const contextWindowTokens = contextTierWindowTokens(activeTier)
+    ?? tierCap
+    ?? model.defaultBudgetTokens;
+  if (!contextWindowTokens) {
+    return planningError(
+      'NO_USABLE_CONTEXT_TIER',
+      `${model.modelId} has no known complete context window`,
+      controls,
+    );
+  }
   if (!Number.isFinite(model.defaultBudgetTokens) || model.defaultBudgetTokens <= 0) {
     return planningError(
       'NO_USABLE_CONTEXT_TIER',
@@ -147,15 +165,26 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
     );
   }
   const defaultBudget = model.defaultBudgetTokens;
-  const requestedBudget = typeof input.clientBudgetTokens === 'number' && input.clientBudgetTokens > 0
-    ? input.clientBudgetTokens
-    : controls.maxContextMode
-      ? tierCap ?? defaultBudget
+  const requestedBudget = controls.maxContextMode
+    ? ONE_MILLION_CONTEXT_TOKENS
+    : typeof input.clientBudgetTokens === 'number' && input.clientBudgetTokens > 0
+      ? input.clientBudgetTokens
       : defaultBudget;
   const contextBudgetTokens = tierCap ? Math.min(requestedBudget, tierCap) : requestedBudget;
   const reasoningSelection = clampReasoningSelection(controls.reasoningLevel, model.reasoning)
     ?? model.reasoning.defaultSelection;
   controls.reasoningLevel = reasoningSelection;
+  const reasoningControl = createReasoningControl(model.reasoning);
+  if (model.reasoning.modelVariants) {
+    const reasoningModelId = reasoningSelection === 'off'
+      ? model.reasoning.modelVariants.offModelId
+      : model.reasoning.modelVariants.onModelId;
+    if (effectiveModelId !== model.modelId && effectiveModelId !== reasoningModelId) {
+      return planningError('PLAN_CONFLICT', 'Reasoning and another control select different model variants', controls);
+    }
+    effectiveModelId = reasoningModelId;
+    reasoningControl.wireProfile = { kind: 'none' };
+  }
 
   const plan: RequestPlan = {
     providerId: model.providerId,
@@ -167,11 +196,13 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
     headers,
     bodyPatch,
     contextBudgetTokens,
+    contextMode: controls.maxContextMode ? 'one-million' : 'normal',
+    contextWindowTokens,
     activeTierId: activeTier.id,
     fastMode: controls.fastModel,
     reasoningWire: {
       selection: reasoningSelection,
-      control: createReasoningControl(model.reasoning),
+      control: reasoningControl,
     },
     temperature: typeof model.fixedTemperature === 'number'
       ? model.fixedTemperature

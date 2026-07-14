@@ -598,6 +598,7 @@ const createDiagnosticRow = (block: ConversationWorkBlock): WorkProcessRow => ({
   type: 'diagnostic',
   id: block.id,
   status: block.status === 'error' ? 'error' : block.status,
+  severity: block.diagnosticSeverity ?? (block.status === 'error' ? 'error' : 'info'),
   message: getMeaningfulBlockSummary(block) || block.title || 'Runtime diagnostic',
   detailLines: [],
   duration: formatDurationMs(block.startedAt, block.completedAt),

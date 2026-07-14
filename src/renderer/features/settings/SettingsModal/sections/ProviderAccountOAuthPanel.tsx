@@ -2,6 +2,7 @@ import React from 'react';
 import { SUPER_GROK_OAUTH_REDIRECT_URI } from '@shared/constants/llm';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { Button } from '../../../../ui/Button';
 import type { ProviderConnectionDraft } from '../types';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -35,7 +36,13 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
   const isOpenRouter = connectionProvider.id === 'openrouter';
   const isMiniMax = connectionProvider.id === 'minimax-account';
   const diagnostic = status?.diagnostic;
-  const selectedMode = isSuperGrok ? connectionDraft.accountLoginMode : isOpenRouter ? 'browser' : 'device';
+  const selectedMode = isSuperGrok
+    ? connectionDraft.accountLoginMode === 'device' ? 'device' : 'browser'
+    : isOpenRouter ? 'browser' : 'device';
+  const isAuthorizationPending = connectionDevicePending || connectionDraft.busy !== 'idle';
+  const isBrowserCodePending = isSuperGrok
+    && selectedMode === 'browser'
+    && status?.requiresCodeInput === true;
   const redirectUri = status?.redirectUri ?? (isSuperGrok && selectedMode === 'browser' ? SUPER_GROK_OAUTH_REDIRECT_URI : '');
   const noticeText = connectionAccountConnected
     ? t('settings.oauthConnectedHint')
@@ -55,14 +62,11 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
         <>
           <div className="settings-provider-oauth-mode" role="group" aria-label={t('settings.oauthMode')}>
             {(['browser', 'device'] as const).map((mode) => (
-              <button
+              <Button
                 key={mode}
-                type="button"
-                className={
-                  mode === selectedMode
-                    ? 'button button-secondary settings-provider-oauth-mode-button active'
-                    : 'button button-secondary settings-provider-oauth-mode-button'
-                }
+                variant="secondary"
+                size="sm"
+                className={`settings-provider-oauth-mode-button${mode === selectedMode ? ' active' : ''}`}
                 data-testid={`settings-provider-oauth-mode-${mode}`}
                 onClick={() => onUpdateConnectionDraft({
                   accountLoginMode: mode,
@@ -73,36 +77,47 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
                 disabled={connectionDraft.busy !== 'idle' || connectionDevicePending}
               >
                 {mode === 'browser' ? t('settings.oauthBrowserLogin') : t('settings.oauthDeviceCodeLogin')}
-              </button>
+              </Button>
             ))}
           </div>
+          <p className="settings-provider-oauth-mode-hint">
+            {t(selectedMode === 'browser'
+              ? 'settings.oauthBrowserCodeHint'
+              : 'settings.oauthDeviceCodeHint')}
+          </p>
 
-          <div className="settings-provider-oauth-detail-grid" data-testid="settings-provider-oauth-details">
-            {redirectUri && (
-              <>
-                <span>{t('settings.oauthRedirectUri')}</span>
-                <code className="settings-provider-oauth-value">{redirectUri}</code>
-              </>
-            )}
-            {(status?.requestedScopes || diagnostic?.requestedScopes) && (
-              <>
-                <span>{t('settings.oauthRequestedScopes')}</span>
-                <code className="settings-provider-oauth-value">
-                  {status?.requestedScopes ?? diagnostic?.requestedScopes}
-                </code>
-              </>
-            )}
-          </div>
+          {(redirectUri || status?.requestedScopes || diagnostic?.requestedScopes) && (
+            <details className="settings-provider-oauth-technical" data-testid="settings-provider-oauth-details">
+              <summary>{t('settings.oauthTechnicalDetails')}</summary>
+              <div className="settings-provider-oauth-detail-grid">
+                {redirectUri && (
+                  <>
+                    <span>{t('settings.oauthRedirectUri')}</span>
+                    <code className="settings-provider-oauth-value">{redirectUri}</code>
+                  </>
+                )}
+                {(status?.requestedScopes || diagnostic?.requestedScopes) && (
+                  <>
+                    <span>{t('settings.oauthRequestedScopes')}</span>
+                    <code className="settings-provider-oauth-value">
+                      {status?.requestedScopes ?? diagnostic?.requestedScopes}
+                    </code>
+                  </>
+                )}
+              </div>
+            </details>
+          )}
         </>
       )}
 
       {isMiniMax && !connectionAccountConnected && (
         <div className="settings-provider-oauth-mode" role="group" aria-label={t('settings.oauthRegion')}>
           {(['global', 'cn'] as const).map((region) => (
-            <button
+            <Button
               key={region}
-              type="button"
-              className={`button button-secondary settings-provider-oauth-mode-button${connectionDraft.accountRegion === region ? ' active' : ''}`}
+              variant="secondary"
+              size="sm"
+              className={`settings-provider-oauth-mode-button${connectionDraft.accountRegion === region ? ' active' : ''}`}
               data-testid={`settings-provider-oauth-region-${region}`}
               onClick={() => onUpdateConnectionDraft({
                 accountRegion: region,
@@ -112,7 +127,7 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
               disabled={connectionDraft.busy !== 'idle' || connectionDevicePending}
             >
               {region === 'global' ? t('settings.oauthRegionGlobal') : t('settings.oauthRegionChina')}
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -127,18 +142,21 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
 
       {!connectionAccountConnected && (
         <div className="settings-provider-oauth-actions">
-          <button
-            type="button"
-            className="button button-secondary"
-            data-testid="settings-provider-oauth-start"
-            onClick={() => void onStartAccountLogin(selectedMode)}
-            disabled={connectionDraft.busy !== 'idle' || connectionDevicePending}
-          >
-            {selectedMode === 'browser' ? t('settings.oauthStartBrowser') : t('settings.oauthStartDevice')}
-          </button>
+          {!isBrowserCodePending && (
+            <Button
+              variant="primary"
+              data-testid="settings-provider-oauth-start"
+              onClick={() => void onStartAccountLogin(selectedMode)}
+              disabled={connectionDraft.busy !== 'idle' || connectionDevicePending}
+            >
+              {isAuthorizationPending
+                ? t(selectedMode === 'browser' ? 'settings.oauthWaitingBrowser' : 'settings.oauthWaitingDevice')
+                : t(selectedMode === 'browser' ? 'settings.oauthStartBrowser' : 'settings.oauthStartDevice')}
+            </Button>
+          )}
           {status?.authUrl && (
             <a className="settings-link" href={status.authUrl} target="_blank" rel="noreferrer">
-              {t('settings.openAuthPage')}
+              {t(isBrowserCodePending ? 'settings.reopenAuthPage' : 'settings.openAuthPage')}
             </a>
           )}
         </div>
@@ -149,25 +167,29 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
           <span>{status.verificationUri}</span>
           <strong data-testid="settings-provider-oauth-device-code">{status.userCode}</strong>
           <div className="settings-provider-oauth-code-actions">
-            <button type="button" className="button button-ghost" onClick={() => copyText(status.userCode)}>
+            <Button variant="ghost" size="sm" onClick={() => copyText(status.userCode)}>
               {t('settings.copyCode')}
-            </button>
-            <button type="button" className="button button-ghost" onClick={() => copyText(status.verificationUri)}>
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => copyText(status.verificationUri)}>
               {t('settings.copyLink')}
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {!connectionAccountConnected && status?.requiresCodeInput && (
-        <label className="settings-field">
+        <label className="settings-field settings-provider-oauth-manual-code">
           <span className="settings-field-label">{t('settings.oauthCode')}</span>
           <input
             className="input"
             data-testid="settings-provider-oauth-code"
+            autoComplete="one-time-code"
+            spellCheck={false}
+            placeholder={t('settings.oauthCodePlaceholder')}
             value={connectionDraft.authCode}
             onChange={(event) => onUpdateConnectionDraft({ authCode: event.target.value, error: '' })}
           />
+          {isSuperGrok && <span className="settings-help-text">{t('settings.oauthCodeSubmitHint')}</span>}
         </label>
       )}
 
