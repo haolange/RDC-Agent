@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 2,
+  "id": "moonshotai",
+  "identityIds": [
+    "moonshotai"
+  ],
+  "profileId": "multi-protocol",
+  "adapterIds": [
+    "openai-compatible",
+    "anthropic-messages"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "moonshotai",
+  "label": "Moonshot AI",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "moonshot-ai",
+  "endpointClass": "first-party",
+  "endpointOwnership": "service-operator",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "models.dev:moonshotai:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "moonshotai",
+      "surface": "moonshotai"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:moonshotai:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "MOONSHOT_API_KEY",
+        "label": "Moonshot Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "MOONSHOT_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "MOONSHOT_API_KEY",
+    "endpointTemplate": "https://api.moonshot.ai/v1"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.moonshot.ai/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    },
+    {
+      "id": "AnthropicMessages",
+      "protocol": "AnthropicMessages",
+      "adapterId": "anthropic-messages",
+      "baseUrl": "https://api.moonshot.ai/anthropic/v1",
+      "protocolOwner": "anthropic"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://platform.moonshot.ai/docs/api/chat"
+}

@@ -18,8 +18,8 @@ function assert(condition, message) {
 }
 
 function configuredProvider(id, modelIds) {
-  const { createProviderEntryFromPreset } = require('../src/main/settings/ProviderPresetRegistry.ts');
-  const provider = createProviderEntryFromPreset(id);
+  const { createProviderEntryFromCatalog } = require('../src/main/provider-catalog/ProviderCatalogRegistry.ts');
+  const provider = createProviderEntryFromCatalog(id);
   return {
     ...provider,
     enabled: true,
@@ -42,12 +42,15 @@ function effectiveModel(provider, modelId, overrides = {}) {
     label: modelId,
     aliases: [],
     enabled: true,
-    route: { protocol: provider.protocol, baseUrl: provider.baseUrl, source: 'preset' },
+    route: { protocol: provider.protocol, baseUrl: provider.baseUrl, source: 'catalog' },
     availability: 'available',
     contextTiers: [{ id: 'default', label: 'Default', activation: { kind: 'implicit' }, entitlement: 'granted' }],
     defaultBudgetTokens: 128000,
-    fast: { kind: 'unsupported' },
-    reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+    controls: {
+      fast: { state: 'unsupported', fixedValue: false },
+      context1m: { state: 'unsupported', fixedValue: false },
+      reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+    },
     toolCalling: { state: 'supported' },
     visionInput: { state: 'unknown' },
     structuredOutput: { state: 'unknown' },
@@ -177,15 +180,23 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(routeCapabilityResolver.includes("surface: 'runtime-log'"), 'Unverified native tool support must remain runtime-log only.');
 
   assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/LLMAdapterProvider.ts')), 'Legacy LLMAdapterProvider must be removed from agent runtime.');
+  assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/cli/StandaloneCli.ts')), 'The unshipped mock StandaloneCli must not return as a second runtime path.');
   assert(!fs.existsSync(path.join(repoRoot, 'src/main/settings/LLMAdapter.ts')), 'Settings-owned legacy LLMAdapter must be removed.');
 
   const configuredProviderSource = read('src/main/agent-runtime/providers/ConfiguredRuntimeProvider.ts');
-  assert(configuredProviderSource.includes('settingsService.getLlmConfig()'), 'Configured runtime provider must hydrate Settings provider credentials.');
+  assert(!configuredProviderSource.includes('settingsService'), 'Configured runtime provider must not re-read mutable Settings during a turn.');
+  assert(configuredProviderSource.includes('providerRuntimeCredentialService.get'), 'Configured runtime provider must consume an opaque credential lease.');
+  assert(configuredProviderSource.includes('providerRuntimeCredentialService.refresh'), 'Account 401 retry must refresh the same credential lease.');
   assert(configuredProviderSource.includes('AnthropicProvider'), 'Configured runtime provider must map Anthropic-style routes.');
   assert(configuredProviderSource.includes('OpenAICompatibleProvider'), 'Configured runtime provider must map OpenAI-compatible routes.');
   assert(configuredProviderSource.includes('const effectiveModelId = requestPlan.effectiveModelId'), 'Configured runtime provider must send the RequestPlan model id.');
   assert(configuredProviderSource.includes('const protocol = requestPlan.route.protocol'), 'Configured runtime provider must route only through RequestPlan.');
   assert(!configuredProviderSource.includes('provider.models'), 'Configured runtime provider must not gate requests with a static model list.');
+
+  const credentialService = read('src/main/settings/ProviderRuntimeCredentialService.ts');
+  for (const token of ['async freeze(', 'async refresh(', 'connectionHeaders', 'awsBedrockCredentials', 'release(']) {
+    assert(credentialService.includes(token), `Frozen credential service must include ${token}.`);
+  }
 
   const promptPlanBuilder = read('src/main/agent-runtime/prompt/PromptPlanBuilder.ts');
   const requestEnvelopeBuilder = read('src/main/agent-runtime/prompt/RequestEnvelopeBuilder.ts');
@@ -208,16 +219,20 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(conversationService.includes('routeCapability: routePreflight.routeCapability'), 'ConversationService must pass route capability into PromptPlanBuilder.');
   assert(conversationService.includes('permissionSettings: runtimeSettings.agentRuntime.permissions'), 'ConversationService must pass runtime permission settings into PromptPlanBuilder.');
   assert(conversationService.includes('answerToolApproval'), 'ConversationService must expose tool approval resume.');
-  for (const token of ['previewNextRequestContext', 'prepareConversationPrompt', 'materializeAgentUserInput', 'requestPlan: planning.plan']) {
-    assert(conversationService.includes(token), `Conversation next-request preview path must include ${token}.`);
+  for (const token of ['prepareTurnContext', 'prepareConversationPrompt', 'materializeAgentUserInput', 'preparedTurn', 'requestId']) {
+    assert(conversationService.includes(token), `Conversation preflight path must include ${token}.`);
   }
+  assert(conversationService.includes('releaseProviderRuntimeCredentials'), 'Every conversation terminal path must release the opaque credential lease.');
+  assert(!conversationService.includes('previewNextRequestContext'), 'ConversationService must not restore draft-time context preview work.');
 
   const contextJournal = read('src/main/conversation/SessionContextJournal.ts');
   for (const token of ['filteredArtifactCount', "replayPolicy === 'provider-artifact'", "replayPolicy === 'openai-reasoning-content'"]) {
     assert(contextJournal.includes(token), `Session context route-private artifact filtering must include ${token}.`);
   }
   const conversationIpc = read('src/main/ipc/conversationHandlers.ts');
-  assert(conversationIpc.includes('conversation:previewNextRequestContext'), 'Main IPC must expose the read-only next-request context preview.');
+  assert(conversationIpc.includes("status: 'accepted'"), 'Main IPC must return a structured accepted send result after commit.');
+  assert(conversationIpc.includes("status: 'rejected'"), 'Main IPC must return a structured rejected preflight result without persistence.');
+  assert(!conversationIpc.includes('conversation:previewNextRequestContext'), 'Main IPC must not expose draft-time context preview.');
 
   const settingsService = read('src/main/settings/SettingsService.ts');
   assert(settingsService.includes('capabilities: definition?.capabilities'), 'Settings normalization must hydrate builtin provider capabilities.');

@@ -17,6 +17,7 @@ export interface DeclarativeDiscoveredModel {
   aliases: string[];
   contextWindow?: number;
   contextWindowKind: 'prompt' | 'total';
+  contextWindowAuthority: 'account-effective' | 'model-catalog';
   maxOutputTokens?: number;
   protocol?: LlmProviderProtocol;
   route?: Omit<ModelRoute, 'source'>;
@@ -86,7 +87,7 @@ function resolveRouteRule(
     : undefined;
 }
 
-function admittedByPreset(model: DeclarativeDiscoveredModel, discovery: JsonCatalogDiscovery): boolean {
+function admittedByCatalog(model: DeclarativeDiscoveredModel, discovery: JsonCatalogDiscovery): boolean {
   const admission = discovery.admission;
   if (!admission) return true;
   if (admission.allowPatterns?.length && !admission.allowPatterns.some((pattern) => globMatches(model.id, pattern))) return false;
@@ -96,6 +97,17 @@ function admittedByPreset(model: DeclarativeDiscoveredModel, discovery: JsonCata
     if (modalities.length > 0 && !modalities.some((value) => admission.allowedModalities?.includes(value))) return false;
   }
   if (admission.requireContextWindow && model.contextWindow === undefined) return false;
+  return true;
+}
+
+function rawAdmissionPredicates(value: unknown, discovery: JsonCatalogDiscovery): boolean {
+  for (const predicate of discovery.admission?.predicates ?? []) {
+    const actual = readPath(value, predicate.path);
+    if (predicate.equals !== undefined && !Object.is(actual, predicate.equals)) return false;
+    if (predicate.includes !== undefined) {
+      if (!Array.isArray(actual) || !actual.some((entry) => Object.is(entry, predicate.includes))) return false;
+    }
+  }
   return true;
 }
 
@@ -125,6 +137,7 @@ export function parseDeclarativeCatalog(
       aliases: toStringArray(readPath(value, discovery.mapping.aliases)),
       contextWindow: toPositiveNumber(readPath(value, discovery.mapping.contextWindow)),
       contextWindowKind: discovery.mapping.contextWindowKind ?? 'total',
+      contextWindowAuthority: discovery.mapping.contextWindowAuthority ?? 'account-effective',
       maxOutputTokens: toPositiveNumber(readPath(value, discovery.mapping.maxOutputTokens)),
       protocol: routeRule?.protocol ?? protocol,
       route: routeRule ?? (protocol ? { protocol } : undefined),
@@ -142,7 +155,11 @@ export function parseDeclarativeCatalog(
         discovery.mapping.structuredOutput,
       ),
     };
-    if (!isAdmittedDiscoveredModel(value) || !admittedByPreset(model, discovery) || models.has(id)) continue;
+    const admittedIdentity = { ...value, id };
+    if (!isAdmittedDiscoveredModel(admittedIdentity)
+      || !rawAdmissionPredicates(value, discovery)
+      || !admittedByCatalog(model, discovery)
+      || models.has(id)) continue;
     models.set(id, model);
   }
   return [...models.values()].sort((left, right) => left.id.localeCompare(right.id));
@@ -156,7 +173,7 @@ export function discoveredModelRoute(
     ...fallback,
     ...(model.route ?? {}),
     protocol: model.route?.protocol ?? model.protocol ?? fallback.protocol,
-    source: model.route || model.protocol ? 'model' : 'preset',
+    source: model.route || model.protocol ? 'model' : 'catalog',
   };
 }
 
@@ -180,7 +197,7 @@ export function toDeclarativeCatalogContributions(
               : { maxTotalTokens: model.contextWindow }),
             maxOutputTokens: model.maxOutputTokens,
             activation: { kind: 'implicit' as const },
-            entitlement: 'granted' as const,
+            entitlement: model.contextWindowAuthority === 'model-catalog' ? 'unknown' : 'granted',
           }],
           defaultBudgetTokens: Math.min(256_000, Math.max(
             1,
@@ -188,6 +205,31 @@ export function toDeclarativeCatalogContributions(
               ? model.contextWindow
               : model.contextWindow - (model.maxOutputTokens ?? 0),
           )),
+          controls: {
+            ...(model.contextWindowAuthority === 'model-catalog'
+              ? {
+                  context1m: {
+                    state: 'unknown' as const,
+                    defaultValue: false,
+                    reason: 'The live catalog reports a model maximum; account entitlement is not verified.'
+                  },
+                }
+              : model.contextWindow >= 1_000_000
+              ? {
+                  context1m: {
+                    state: 'fixed' as const,
+                    fixedValue: true,
+                    tierId: 'default',
+                  },
+                }
+              : {
+                  context1m: {
+                    state: 'unsupported' as const,
+                    fixedValue: false,
+                    reason: 'The live provider catalog reports a context window below 1M.',
+                  },
+                }),
+          },
         }
       : {}),
     toolCalling: model.toolCalling,

@@ -2,7 +2,12 @@ import { useEffect, useMemo, type Dispatch, type SetStateAction } from 'react';
 import type { AppSettings, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../i18n';
 import type { ProviderConnectionDraft } from './types';
-import { createProviderConnectionDraft, projectConnectionProvider } from './providerConnectionState';
+import {
+  createProviderConnectionDraft,
+  getConnectionDraftSignature,
+  isConnectionDraftComplete,
+  projectConnectionProvider,
+} from './providerConnectionState';
 import { cloneProvider, cloneRoute } from './utils';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -127,20 +132,21 @@ export const useProviderConnectionDraft = ({
     setConnectionDraft((current) => current ? { ...current, ...patch } : current);
   };
 
-  const connectionNeedsApiKey = Boolean(
+  const connectionNeedsCredentials = Boolean(
     connectionDraft
     && connectionProvider?.authMode === 'api-key'
-    && !connectionProvider.hasStoredSecret
-    && !connectionDraft.apiKey.trim(),
+    && !isConnectionDraftComplete(connectionProvider, connectionDraft),
   );
-  const connectionNeedsBaseUrl = Boolean(connectionDraft && connectionProvider?.baseUrlEditable && !connectionDraft.baseUrl.trim());
+  const connectionNeedsBaseUrl = Boolean(
+    connectionDraft
+    && connectionProvider?.baseUrlEditable
+    && !connectionProvider.connectionSchema?.endpointTemplate
+    && !connectionDraft.baseUrl.trim(),
+  );
   const connectionHasFreshTest = Boolean(
     connectionDraft
     && connectionDraft.models.length > 0
-    && connectionDraft.testedApiKey === connectionDraft.apiKey
-    && connectionDraft.testedBaseUrl === connectionDraft.baseUrl
-    && connectionDraft.testedProtocol === connectionDraft.protocol
-    && connectionDraft.testedAuthMode === connectionDraft.authMode,
+    && connectionDraft.testedConnectionSignature === getConnectionDraftSignature(connectionDraft),
   );
   const connectionAccountConnected = Boolean(
     connectionDraft
@@ -160,7 +166,7 @@ export const useProviderConnectionDraft = ({
     refreshLocalSettings,
     openProviderConnection,
     updateConnectionDraft,
-    connectionNeedsApiKey,
+    connectionNeedsCredentials,
     connectionNeedsBaseUrl,
     connectionHasFreshTest,
     connectionAccountConnected,

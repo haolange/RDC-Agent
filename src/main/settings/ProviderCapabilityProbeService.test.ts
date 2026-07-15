@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { EffectiveModel, RequestPlan, RequestPlanningResult } from '@shared/types/providerCapability';
+import { providerAdapterIdForProtocol } from '@shared/provider-catalog/implementationRegistry';
 import type { LlmModelCapabilityProbeRequest, LlmProviderEntry } from '@shared/types/settings';
 import {
   buildProbeFailurePatch,
@@ -15,17 +16,21 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
     label: 'Model A',
     aliases: [],
     enabled: true,
-    route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test/v1', source: 'preset' },
+    route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test/v1', source: 'catalog' },
     availability: 'available',
+    presencePolicy: 'maintained',
     contextTiers: [{
       id: 'default', label: 'Default', maxPromptTokens: 272_000,
       activation: { kind: 'implicit' }, entitlement: 'granted',
     }],
     defaultBudgetTokens: 272_000,
-    fast: { kind: 'unsupported' },
-    reasoning: {
-      kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', lockedSelection: 'off',
-      wireProfile: { kind: 'none' },
+    controls: {
+      fast: { state: 'unsupported', fixedValue: false },
+      context1m: { state: 'unsupported', fixedValue: false },
+      reasoning: {
+        kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', lockedSelection: 'off',
+        wireProfile: { kind: 'none' },
+      },
     },
     toolCalling: { state: 'supported' },
     visionInput: { state: 'unknown' },
@@ -54,7 +59,12 @@ function plan(
   const oneMillionTier = effectiveModel.contextTiers.at(-1)!;
   const requestPlan: RequestPlan = {
     providerId: request.providerId,
+    adapterId: providerAdapterIdForProtocol(effectiveModel.route.protocol),
+    catalogRevision: effectiveModel.catalogRevision ?? 'test-catalog',
+    routeRevision: effectiveModel.routeRevision ?? 'test-route',
+    selectedModelId: request.modelId,
     effectiveModelId: request.modelId,
+    appliedBindingIds: [],
     route: effectiveModel.route,
     headers: request.mode === 'one-million-context' && oneMillionTier.activation.kind === 'header'
       ? oneMillionTier.activation.headers
@@ -68,7 +78,7 @@ function plan(
       ?? (oneMillionTier.maxPromptTokens ?? effectiveModel.defaultBudgetTokens) + (oneMillionTier.maxOutputTokens ?? 0),
     activeTierId: request.mode === 'one-million-context' ? oneMillionTier.id : effectiveModel.contextTiers[0].id,
     fastMode: request.mode === 'fast',
-    reasoningWire: { selection: 'off', control: effectiveModel.reasoning },
+    reasoningWire: { selection: 'off', control: effectiveModel.controls.reasoning },
   };
   return {
     ok: true,
@@ -116,6 +126,10 @@ describe('ProviderCapabilityProbeService', () => {
         ...model().contextTiers,
         { id: 'long', label: '1M', maxPromptTokens: 922_000, maxOutputTokens: 128_000, activation: { kind: 'implicit' }, entitlement: 'unknown' },
       ],
+      controls: {
+        ...model().controls,
+        context1m: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'long' },
+      },
     }));
     const service = new ProviderCapabilityProbeService(fixture.value);
 
@@ -134,6 +148,10 @@ describe('ProviderCapabilityProbeService', () => {
           activation: { kind: 'header', headers: { 'anthropic-beta': 'context-1m' } }, entitlement: 'unknown',
         },
       ],
+      controls: {
+        ...model().controls,
+        context1m: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'long' },
+      },
     }));
     const service = new ProviderCapabilityProbeService(fixture.value);
 
@@ -145,7 +163,16 @@ describe('ProviderCapabilityProbeService', () => {
   });
 
   it('records a deterministic Fast denial for HTTP 403', async () => {
-    const effectiveModel = model({ fast: { kind: 'request-param', patch: { service_tier: 'priority' }, entitlement: 'unknown' } });
+    const effectiveModel = model({
+      controls: {
+        ...model().controls,
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'unknown' },
+      },
+      executionBindings: [{
+        id: 'fast:priority', when: { fast: true },
+        actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }], entitlement: 'unknown',
+      }],
+    });
     const fixture = dependencies(effectiveModel);
     fixture.execute.mockRejectedValue(Object.assign(new Error('HTTP 403'), { status: 403 }));
     fixture.recordFailure.mockReturnValue(true);
@@ -157,12 +184,21 @@ describe('ProviderCapabilityProbeService', () => {
     });
     expect(fixture.recordFailure).toHaveBeenCalledWith(request, fixture.resolved, expect.any(Object), 403);
     expect(buildProbeFailurePatch(request, fixture.resolved, plan(request, effectiveModel).plan, 403)).toMatchObject({
-      modelId: 'model-a', fast: { entitlement: 'denied' },
+      modelId: 'model-a', controls: { fast: { entitlement: 'denied' } },
     });
   });
 
   it('does not downgrade capability evidence for a transient HTTP 429', async () => {
-    const effectiveModel = model({ fast: { kind: 'request-param', patch: { service_tier: 'priority' }, entitlement: 'unknown' } });
+    const effectiveModel = model({
+      controls: {
+        ...model().controls,
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'unknown' },
+      },
+      executionBindings: [{
+        id: 'fast:priority', when: { fast: true },
+        actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }], entitlement: 'unknown',
+      }],
+    });
     const fixture = dependencies(effectiveModel);
     fixture.execute.mockRejectedValue(Object.assign(new Error('HTTP 429'), { status: 429 }));
     const service = new ProviderCapabilityProbeService(fixture.value);

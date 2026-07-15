@@ -1,0 +1,389 @@
+{
+  "schemaVersion": 2,
+  "id": "minimax-cn",
+  "identityIds": [
+    "minimax-cn"
+  ],
+  "profileId": "multi-protocol",
+  "adapterIds": [
+    "anthropic-messages",
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "anthropic-candidate-validation",
+  "vendorId": "minimax",
+  "label": "MiniMax (CN)",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "minimax",
+  "endpointClass": "first-party",
+  "endpointOwnership": "service-operator",
+  "catalogOwnership": "app-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:minimax-cn:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "RDC-Agent-Provider-Model-Catalog.md@2026-07-14",
+      "refreshedAt": "2026-07-15T13:04:00+08:00",
+      "surface": "minimax-cn",
+      "observedAt": "2026-07-14",
+      "accountScope": "api-surface",
+      "surfaceBuild": "RDC-Agent 1.0.0",
+      "plan": "API key"
+    },
+    {
+      "id": "models.dev:minimax-cn:1",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "minimax-cn",
+      "surface": "minimax-cn"
+    },
+    {
+      "id": "opencode:minimax-cn:571e7b8",
+      "sourceKind": "opencode",
+      "sourceRevision": "571e7b852f82415faf65466e1536357a048bdf5a",
+      "refreshedAt": "2026-07-15",
+      "surface": "minimax-cn"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:minimax-cn:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "reasoning",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "AnthropicMessages",
+      "protocol": "AnthropicMessages",
+      "adapterId": "anthropic-messages",
+      "baseUrl": "https://api.minimaxi.com/anthropic/v1",
+      "default": true,
+      "protocolOwner": "anthropic"
+    },
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.minimaxi.com/v1",
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "candidate-validation",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "anthropic-candidate-validation"
+    }
+  },
+  "models": [
+    {
+      "modelId": "MiniMax-M2.7",
+      "label": "MiniMax-M2.7",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 204800,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 204800,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.minimaxi.com/anthropic/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://api.minimaxi.com/anthropic/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "minimax",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.minimaxi.com/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "minimax",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted",
+          "label": "Highspeed"
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "always-on",
+          "supportsOff": false,
+          "levels": [],
+          "defaultSelection": "on",
+          "lockedSelection": "on",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "high",
+            "onMode": "enabled"
+          }
+        }
+      },
+      "factSourceId": "opencode:minimax-cn:571e7b8",
+      "executionBindings": [
+        {
+          "id": "fast:MiniMax-M2.7-highspeed",
+          "when": {
+            "fast": true
+          },
+          "actions": [
+            {
+              "kind": "model-switch",
+              "targetModelId": "MiniMax-M2.7-highspeed"
+            }
+          ],
+          "entitlement": "granted"
+        }
+      ],
+      "fieldFactSourceIds": {
+        "route": "rdc-agent:minimax-cn:0",
+        "routeOptions": "rdc-agent:minimax-cn:0",
+        "controls": "rdc-agent:minimax-cn:0",
+        "executionBindings": "rdc-agent:minimax-cn:0"
+      }
+    },
+    {
+      "modelId": "MiniMax-M2.7-highspeed",
+      "label": "MiniMax-M2.7 Highspeed",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 204800,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 204800,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "internal",
+        "relatedPrimaryModelIds": [
+          "MiniMax-M2.7"
+        ]
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.minimaxi.com/anthropic/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://api.minimaxi.com/anthropic/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "minimax",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.minimaxi.com/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "minimax",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "always-on",
+          "supportsOff": false,
+          "levels": [],
+          "defaultSelection": "on",
+          "lockedSelection": "on",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "high",
+            "onMode": "enabled"
+          }
+        }
+      },
+      "factSourceId": "opencode:minimax-cn:571e7b8",
+      "fieldFactSourceIds": {
+        "route": "rdc-agent:minimax-cn:0",
+        "routeOptions": "rdc-agent:minimax-cn:0",
+        "selection": "rdc-agent:minimax-cn:0",
+        "controls": "rdc-agent:minimax-cn:0"
+      }
+    }
+  ],
+  "protocolOverrides": [
+    {
+      "modelId": "MiniMax-M2.7",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "always-on",
+            "supportsOff": false,
+            "levels": [],
+            "defaultSelection": "on",
+            "lockedSelection": "on",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "high",
+              "onMode": "enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:minimax-cn:0"
+    },
+    {
+      "modelId": "MiniMax-M2.7",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "always-on",
+            "supportsOff": false,
+            "levels": [],
+            "defaultSelection": "on",
+            "lockedSelection": "on",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "high",
+              "onMode": "thinking-enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:minimax-cn:0"
+    },
+    {
+      "modelId": "MiniMax-M2.7-highspeed",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "always-on",
+            "supportsOff": false,
+            "levels": [],
+            "defaultSelection": "on",
+            "lockedSelection": "on",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "high",
+              "onMode": "enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:minimax-cn:0"
+    },
+    {
+      "modelId": "MiniMax-M2.7-highspeed",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "always-on",
+            "supportsOff": false,
+            "levels": [],
+            "defaultSelection": "on",
+            "lockedSelection": "on",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "high",
+              "onMode": "thinking-enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:minimax-cn:0"
+    }
+  ],
+  "recommendedModels": [
+    "MiniMax-M2.7"
+  ],
+  "docsUrl": "https://platform.minimaxi.com/"
+}

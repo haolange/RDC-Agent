@@ -1,0 +1,354 @@
+{
+  "schemaVersion": 2,
+  "id": "deepseek",
+  "identityIds": [
+    "deepseek"
+  ],
+  "profileId": "multi-protocol",
+  "adapterIds": [
+    "anthropic-messages",
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "json-catalog",
+  "vendorId": "deepseek",
+  "label": "DeepSeek",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "deepseek",
+  "endpointClass": "first-party",
+  "endpointOwnership": "service-operator",
+  "catalogOwnership": "app-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:deepseek:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "RDC-Agent-Provider-Model-Catalog.md@2026-07-14",
+      "observedAt": "2026-07-14",
+      "refreshedAt": "2026-07-15T13:04:00+08:00",
+      "surface": "deepseek",
+      "accountScope": "observed-configuration",
+      "surfaceBuild": "RDC-Agent 1.0.0",
+      "plan": "unrecorded"
+    },
+    {
+      "id": "models.dev:deepseek:1",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "deepseek",
+      "surface": "deepseek"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:deepseek:0",
+  "connectionSchema": {
+    "fields": [
+      {
+      "id": "apiKey",
+        "label": "DeepSeek API Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "DEEPSEEK_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+    ,"endpointTemplate": "https://api.deepseek.com"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "reasoning",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "AnthropicMessages",
+      "protocol": "AnthropicMessages",
+      "adapterId": "anthropic-messages",
+      "baseUrl": "https://api.deepseek.com/anthropic/v1",
+      "protocolOwner": "anthropic"
+    },
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.deepseek.com",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "candidate-validation",
+    "strategy": {
+      "kind": "json-catalog",
+      "url": "https://api.deepseek.com/models",
+      "collectionPath": "data",
+      "mapping": {
+        "id": "id",
+        "label": "id"
+      },
+      "admission": {
+        "allowPatterns": [
+          "deepseek-v4-pro",
+          "deepseek-v4-flash"
+        ]
+      }
+    }
+  },
+  "models": [
+    {
+      "modelId": "deepseek-v4-pro",
+      "label": "deepseek-v4-pro",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxTotalTokens": 1000000,
+          "maxOutputTokens": 384000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 616000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.deepseek.com",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://api.deepseek.com/anthropic/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "deepseek",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.deepseek.com",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "deepseek",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "high",
+            "max"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "high",
+            "levels": {
+              "high": "high",
+              "max": "max"
+            },
+            "onMode": "enabled",
+            "offMode": "disabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:deepseek:0"
+    },
+    {
+      "modelId": "deepseek-v4-flash",
+      "label": "deepseek-v4-flash",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxTotalTokens": 1000000,
+          "maxOutputTokens": 384000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 616000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.deepseek.com",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://api.deepseek.com/anthropic/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "deepseek",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.deepseek.com",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "deepseek",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "high",
+            "max"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "high",
+            "levels": {
+              "high": "high",
+              "max": "max"
+            },
+            "onMode": "enabled",
+            "offMode": "disabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:deepseek:0"
+    }
+  ],
+  "protocolOverrides": [
+    {
+      "modelId": "deepseek-v4-pro",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "high",
+              "max"
+            ],
+            "defaultSelection": "high",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "high",
+              "levels": {
+                "high": "high",
+                "max": "max"
+              },
+              "onMode": "thinking-enabled",
+              "offMode": "thinking-disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:deepseek:0"
+    },
+    {
+      "modelId": "deepseek-v4-flash",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "high",
+              "max"
+            ],
+            "defaultSelection": "high",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "high",
+              "levels": {
+                "high": "high",
+                "max": "max"
+              },
+              "onMode": "thinking-enabled",
+              "offMode": "thinking-disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:deepseek:0"
+    }
+  ],
+  "recommendedModels": [
+    "deepseek-v4-pro",
+    "deepseek-v4-flash"
+  ],
+  "docsUrl": "https://api-docs.deepseek.com/quick_start/pricing"
+}

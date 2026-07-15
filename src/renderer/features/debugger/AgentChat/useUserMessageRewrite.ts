@@ -10,6 +10,8 @@ import {
   syncE2EConversationState,
 } from '../composer/composerSendHelpers';
 import { useTurnControlsStore } from '../composer/useTurnControls';
+import { createConversationRequestId } from '../composer/composerSendFlow';
+import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 
 export function isRewriteTurnStillCurrent(turnId: string, activeLeafBranchId?: string | null): boolean {
   const state = useConversationStore.getState();
@@ -47,7 +49,12 @@ export function useUserMessageRewrite(message: ConversationMessage) {
     const previousBranchState = useConversationStore.getState().branchState;
 
     try {
+      const routeAgentId = pairedAssistant?.agentId ?? null;
+      const agentCommit = routeAgentId
+        ? await useAppSettingsStore.getState().flushAgentDefinitionSaves(routeAgentId)
+        : null;
       const result = await electronAPI.conversation.rewriteFromMessage({
+        requestId: createConversationRequestId(),
         messageId: message.id,
         projectId: message.projectId ?? currentProject?.projectId ?? null,
         sessionId: message.sessionId,
@@ -63,6 +70,11 @@ export function useUserMessageRewrite(message: ConversationMessage) {
           size: attachment.size,
         })) ?? [],
         turnControls: { ...useTurnControlsStore.getState().turnControls },
+        configurationCommit: routeAgentId ? {
+          agentId: routeAgentId,
+          agentCommitHash: agentCommit?.commitHash,
+          providerId: agentCommit?.route?.providerId,
+        } : undefined,
       });
 
       await applyConversationTurnResult({

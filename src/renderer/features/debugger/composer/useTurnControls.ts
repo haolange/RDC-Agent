@@ -57,7 +57,19 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const clearRememberedControls = useTurnControlsStore((state) => state.clearRememberedControls);
   const routeFingerprint = useAppSettingsStore((state) => {
     const route = state.settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
-    return route ? `${route.providerId}:${route.modelId}` : '';
+    const provider = route
+      ? state.settings.llm.providers.find((entry) => entry.id === route.providerId)
+      : null;
+    const preference = provider?.models.find((entry) => entry.id === route?.modelId);
+    return route && provider
+      ? [
+          route.providerId,
+          route.modelId,
+          provider.activeAccountId ?? `anonymous:${provider.id}`,
+          provider.protocol,
+          preference?.preferredRouteOptionId ?? '',
+        ].join('\u001f')
+      : '';
   });
   const settingsHydrated = useAppSettingsStore((state) => state.hydrated);
   const sessionId = currentSession?.sessionId ?? null;
@@ -68,7 +80,7 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   useEffectiveModelCapability(agentId, routeFingerprint, settingsHydrated, setCapability);
 
   const capabilityKey = capability
-    ? `${agentId}:${capability.providerId}:${capability.modelId}:${capability.route.protocol}`
+    ? `${agentId}:${capability.providerId}:${capability.modelId}:${capability.route.protocol}:${capability.catalogRevision ?? 'missing-catalog'}:${capability.routeRevision ?? 'missing-route'}`
     : `${agentId}:pending`;
   const sessionControlsKey = buildSessionTurnControlsKey(sessionControls);
 

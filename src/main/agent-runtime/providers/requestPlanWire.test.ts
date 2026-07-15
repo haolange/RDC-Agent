@@ -4,9 +4,20 @@ import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 
 const plan: RequestPlan = {
   providerId: 'anthropic',
+  adapterId: 'anthropic-messages',
+  catalogRevision: 'test-catalog',
+  routeRevision: 'test-route',
+  selectedModelId: 'claude-test',
   effectiveModelId: 'claude-test',
-  route: { protocol: 'AnthropicMessages', baseUrl: 'https://example.test', source: 'preset' },
-  headers: { 'anthropic-beta': 'context-1m', authorization: 'must-not-pass' },
+  appliedBindingIds: [],
+  route: { protocol: 'AnthropicMessages', baseUrl: 'https://example.test', source: 'catalog' },
+  headers: {
+    'anthropic-beta': 'context-1m',
+    authorization: 'must-not-pass',
+    'x-goog-api-key': 'must-not-pass',
+    'x-amz-security-token': 'must-not-pass',
+    cookie: 'must-not-pass',
+  },
   bodyPatch: { thinking: { type: 'enabled', budget_tokens: 4096 } },
   contextBudgetTokens: 1_000_000,
   contextMode: 'one-million',

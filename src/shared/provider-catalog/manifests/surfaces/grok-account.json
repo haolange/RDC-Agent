@@ -1,0 +1,480 @@
+{
+  "schemaVersion": 2,
+  "id": "grok-account",
+  "identityIds": [],
+  "profileId": "multi-protocol",
+  "adapterIds": [
+    "openai-compatible",
+    "openai-responses"
+  ],
+  "authSchemaId": "oauth-account",
+  "discoveryPolicyId": "grok-account-catalog",
+  "vendorId": "xai",
+  "label": "Super Grok Account",
+  "status": "beta",
+  "availability": {
+    "state": "available"
+  },
+  "category": "login-authorization",
+  "surfaceKind": "account",
+  "serviceOperator": "xai",
+  "endpointClass": "account-surface",
+  "endpointOwnership": "service-operator",
+  "catalogOwnership": "app-managed",
+  "factSources": [
+    {
+      "id": "user-observation:grok-account:2026-07-14",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "RDC-Agent-Provider-Model-Catalog.md@2026-07-14",
+      "observedAt": "2026-07-14",
+      "refreshedAt": "2026-07-15T13:04:00+08:00",
+      "surface": "grok-account",
+      "accountScope": "observed-account",
+      "surfaceBuild": "control panel build unrecorded",
+      "plan": "Super Grok"
+    }
+  ],
+  "defaultFactSourceId": "user-observation:grok-account:2026-07-14",
+  "authModes": [
+    "oauth"
+  ],
+  "accountLoginConfigured": true,
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "vision-input",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAIResponses",
+      "protocol": "OpenAIResponses",
+      "adapterId": "openai-responses",
+      "baseUrl": "https://cli-chat-proxy.grok.com/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    },
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://cli-chat-proxy.grok.com/v1",
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "entitlement-overlay",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "grok-account-catalog"
+    }
+  },
+  "models": [
+    {
+      "modelId": "grok-4.20-0309-non-reasoning",
+      "label": "grok-4.20-0309-non-reasoning",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Native 1M window",
+          "maxPromptTokens": 1000000,
+          "maxTotalTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://cli-chat-proxy.grok.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "granted",
+          "tierId": "default"
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultSelection": "off",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "user-observation:grok-account:2026-07-14"
+    },
+    {
+      "modelId": "grok-4.20-0309-reasoning",
+      "label": "grok-4.20-0309-reasoning",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Native 1M window",
+          "maxPromptTokens": 1000000,
+          "maxTotalTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://cli-chat-proxy.grok.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "granted",
+          "tierId": "default"
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultSelection": "off",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "user-observation:grok-account:2026-07-14"
+    },
+    {
+      "modelId": "grok-4.20-multi-agent-0309",
+      "label": "grok-4.20-multi-agent-0309",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Native 1M window",
+          "maxPromptTokens": 1000000,
+          "maxTotalTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://cli-chat-proxy.grok.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "granted",
+          "tierId": "default"
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultSelection": "off",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "user-observation:grok-account:2026-07-14"
+    },
+    {
+      "modelId": "grok-4.3",
+      "label": "grok-4.3",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 500000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        },
+        {
+          "id": "one-million",
+          "label": "Native 1M window",
+          "maxPromptTokens": 1000000,
+          "maxTotalTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 500000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://cli-chat-proxy.grok.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted",
+          "tierId": "one-million"
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultSelection": "off",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "user-observation:grok-account:2026-07-14"
+    },
+    {
+      "modelId": "grok-4.5",
+      "label": "grok-4.5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 500000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 500000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://cli-chat-proxy.grok.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:grok-account:2026-07-14"
+    },
+    {
+      "modelId": "grok-build-0.1",
+      "label": "grok-build-0.1",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://cli-chat-proxy.grok.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultSelection": "off",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "user-observation:grok-account:2026-07-14"
+    }
+  ],
+  "protocolOverrides": [
+    {
+      "modelId": "grok-4.5",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high"
+              }
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:grok-account:2026-07-14"
+    }
+  ],
+  "recommendedModels": [
+    "grok-4.20-0309-non-reasoning",
+    "grok-4.20-0309-reasoning",
+    "grok-4.20-multi-agent-0309",
+    "grok-4.3",
+    "grok-4.5",
+    "grok-build-0.1"
+  ],
+  "docsUrl": "https://grok.com/"
+}

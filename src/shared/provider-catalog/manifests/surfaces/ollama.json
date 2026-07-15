@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 2,
+  "id": "ollama",
+  "identityIds": [],
+  "profileId": "multi-protocol",
+  "adapterIds": [
+    "ollama-openai-compatible",
+    "openai-responses"
+  ],
+  "authSchemaId": "local-runtime",
+  "discoveryPolicyId": "ollama-tags",
+  "vendorId": "ollama",
+  "label": "Ollama",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "local",
+  "surfaceKind": "local",
+  "serviceOperator": "ollama",
+  "endpointClass": "local-service",
+  "endpointOwnership": "local",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:ollama:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "ollama"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:ollama:0",
+  "authModes": [
+    "local"
+  ],
+  "baseUrlEditable": true,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OllamaOpenAICompatibleChatCompletions",
+      "protocol": "OllamaOpenAICompatibleChatCompletions",
+      "adapterId": "ollama-openai-compatible",
+      "baseUrl": "http://127.0.0.1:11434/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    },
+    {
+      "id": "OpenAIResponses",
+      "protocol": "OpenAIResponses",
+      "adapterId": "openai-responses",
+      "baseUrl": "http://127.0.0.1:11434/v1",
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "ollama-tags"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "qwen2.5-coder:14b",
+    "llama3.1:8b"
+  ],
+  "docsUrl": "https://ollama.com/download"
+}

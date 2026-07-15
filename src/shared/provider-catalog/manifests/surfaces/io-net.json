@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "id": "io-net",
+  "identityIds": [
+    "io-net"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "io-net",
+  "label": "IO.NET",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "io-net",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "models.dev:io-net:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "io-net",
+      "surface": "io-net"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:io-net:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "IOINTELLIGENCE_API_KEY",
+        "label": "Iointelligence Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "IOINTELLIGENCE_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "IOINTELLIGENCE_API_KEY",
+    "endpointTemplate": "https://api.intelligence.io.solutions/api/v1"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.intelligence.io.solutions/api/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://io.net/docs/guides/intelligence/io-intelligence"
+}

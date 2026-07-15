@@ -7,10 +7,16 @@ import type {
   AppTheme,
   FontScale,
   LlmProviderEntry,
+  ProviderDefinitionCommitSnapshot,
+  ProviderDefinitionSaveResult,
   ProfileSettings,
   ResolvedTheme,
 } from '@shared/types/settings';
-import type { AgentDefinitionSaveRequest, AgentDefinitionSaveResult } from '@shared/types/agentManifest';
+import type {
+  AgentDefinitionCommitSnapshot,
+  AgentDefinitionSaveRequest,
+  AgentDefinitionSaveResult,
+} from '@shared/types/agentManifest';
 import { DEFAULT_SETTINGS } from './defaultAppSettings';
 import {
   beginAgentDefinitionSave,
@@ -18,15 +24,17 @@ import {
   rollbackAgentDefinitionSave,
   settleAgentDefinitionSave,
 } from './agentDefinitionSettings';
+import { AgentDefinitionMutationCoordinator } from './AgentDefinitionMutationCoordinator';
+import {
+  beginProviderDefinitionSave,
+  enqueueProviderDefinitionSave,
+  flushProviderDefinitionSaves,
+  isLatestProviderDefinitionRevision,
+  rollbackProviderDefinitionSave,
+  settleProviderDefinitionSave,
+} from './providerDefinitionSettings';
 
 export { nextAgentDefinitionClientRevision } from './agentDefinitionSettings';
-
-const upsertProvider = (providers: LlmProviderEntry[], provider: LlmProviderEntry): LlmProviderEntry[] => {
-  const exists = providers.some((entry) => entry.id === provider.id);
-  return exists
-    ? providers.map((entry) => entry.id === provider.id ? provider : entry)
-    : [...providers, provider];
-};
 
 interface AppSettingsState {
   settings: AppSettings;
@@ -36,6 +44,7 @@ interface AppSettingsState {
   setSystemTheme: (systemTheme: ResolvedTheme) => void;
   patchSettings: (patch: AppSettingsPatch) => Promise<AppSettings>;
   saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
+  flushAgentDefinitionSaves: (agentId: string) => Promise<AgentDefinitionCommitSnapshot | null>;
   reloadSettings: () => Promise<AppSettings>;
   setTheme: (theme: AppTheme) => Promise<void>;
   setLanguage: (language: AppLanguage) => Promise<void>;
@@ -44,10 +53,15 @@ interface AppSettingsState {
   setUsePointerCursors: (usePointerCursors: boolean) => Promise<void>;
   setContextBreakdownExpanded: (contextBreakdownExpanded: boolean) => Promise<void>;
   updateProfile: (profile: Partial<ProfileSettings>) => Promise<void>;
-  saveProvider: (provider: LlmProviderEntry) => Promise<AppSettings>;
+  saveProvider: (provider: LlmProviderEntry) => Promise<ProviderDefinitionSaveResult>;
+  flushProviderSaves: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;
   removeProvider: (providerId: string) => Promise<void>;
   setAgentPermissionMode: (mode: AgentPermissionMode) => Promise<void>;
 }
+
+const agentDefinitionMutations = new AgentDefinitionMutationCoordinator(
+  (request) => window.electronAPI.settings.saveAgentDefinition(request),
+);
 
 export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   settings: DEFAULT_SETTINGS,
@@ -66,21 +80,34 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
     set({ settings: optimistic.settings });
 
     try {
-      const result = await window.electronAPI.settings.saveAgentDefinition(request);
+      const result = await agentDefinitionMutations.enqueue(request);
       if (!isLatestAgentDefinitionRevision(agentId, request.clientRevision)) return result;
-      set((state) => ({
-        settings: settleAgentDefinitionSave(state.settings, agentId, result),
-        hydrated: true,
-      }));
+      if (result.status === 'failed') {
+        set((state) => ({
+          settings: rollbackAgentDefinitionSave(state.settings, agentId, result.lastSuccessful),
+        }));
+        return Promise.reject(new Error(result.error ?? 'Agent definition save failed.'));
+      }
+      if (result.status === 'committed') {
+        set((state) => ({
+          settings: settleAgentDefinitionSave(state.settings, agentId, result),
+          hydrated: true,
+        }));
+      }
       return result;
     } catch (error) {
       if (isLatestAgentDefinitionRevision(agentId, request.clientRevision)) {
+        const lastSuccessful = await window.electronAPI.settings.getAgentDefinitionCommit(agentId).catch(() => null);
         set((state) => ({
-          settings: rollbackAgentDefinitionSave(state.settings, agentId, optimistic.rollback),
+          settings: rollbackAgentDefinitionSave(state.settings, agentId, lastSuccessful),
         }));
       }
       throw error;
     }
+  },
+  flushAgentDefinitionSaves: async (agentId) => {
+    await agentDefinitionMutations.flush(agentId);
+    return window.electronAPI.settings.getAgentDefinitionCommit(agentId);
   },
   reloadSettings: async () => {
     const nextSettings = await window.electronAPI.settings.get();
@@ -109,11 +136,28 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
     await get().patchSettings({ profile });
   },
   saveProvider: async (provider) => {
-    return get().patchSettings({
-      llm: {
-        providers: upsertProvider(get().settings.llm.providers, provider),
-      },
-    });
+    const optimistic = beginProviderDefinitionSave(get().settings, provider);
+    set({ settings: optimistic.settings });
+    const result = await enqueueProviderDefinitionSave(provider, optimistic.clientRevision);
+    if (!isLatestProviderDefinitionRevision(provider.id, optimistic.clientRevision)) return result;
+    if (result.status === 'failed') {
+      set((state) => ({
+        settings: rollbackProviderDefinitionSave(
+          state.settings, provider.id, result.lastSuccessful, optimistic.previous,
+        ),
+      }));
+      throw new Error(result.error ?? 'Provider settings save failed.');
+    }
+    if (result.status === 'committed' && result.provider) {
+      set((state) => ({
+        settings: settleProviderDefinitionSave(state.settings, result.provider!),
+        hydrated: true,
+      }));
+    }
+    return result;
+  },
+  flushProviderSaves: async (providerId) => {
+    return flushProviderDefinitionSaves(providerId);
   },
   removeProvider: async (providerId) => {
     await get().patchSettings({

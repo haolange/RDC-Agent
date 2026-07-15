@@ -6,10 +6,14 @@ import { projectProviderModels, updateProviderModelPreference } from './provider
 function effectiveModel(modelId: string, label: string): EffectiveModel {
   return {
     providerId: 'provider-a', modelId, label, aliases: [], enabled: true,
-    route: { protocol: 'OpenAIResponses', source: 'preset' }, availability: 'available',
+    route: { protocol: 'OpenAIResponses', source: 'catalog' }, availability: 'available', presencePolicy: 'maintained',
     contextTiers: [{ id: 'default', label: 'Default', activation: { kind: 'implicit' }, entitlement: 'granted' }],
-    defaultBudgetTokens: 128_000, fast: { kind: 'unknown' },
-    reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+    defaultBudgetTokens: 128_000,
+    controls: {
+      fast: { state: 'unknown', defaultValue: false },
+      context1m: { state: 'unsupported', fixedValue: false },
+      reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+    },
     toolCalling: { state: 'unknown' }, visionInput: { state: 'unknown' }, structuredOutput: { state: 'unknown' },
     provenance: [],
   };
@@ -17,7 +21,7 @@ function effectiveModel(modelId: string, label: string): EffectiveModel {
 
 function snapshot(models: EffectiveModel[]): EffectiveCatalogSnapshot {
   return {
-    providerId: 'provider-a', accountId: 'account-a', protocol: 'OpenAIResponses', models,
+    providerId: 'provider-a', accountId: 'account-a', protocol: 'OpenAIResponses', catalogRevision: 'test-catalog', models,
     generatedAt: '2026-07-13T00:00:00.000Z', stale: false, refreshing: false,
   };
 }
@@ -27,6 +31,7 @@ describe('projectProviderModels', () => {
     const stored: LlmProviderModel[] = [{
       id: 'model-a', label: 'Stale label', enabled: false,
       defaultReasoningSelection: 'high', defaultBudgetTokens: 96_000,
+      preferredRouteOptionId: 'anthropic',
     }];
     const result = projectProviderModels('app-managed', stored, snapshot([
       effectiveModel('model-a', 'Live A'),
@@ -37,6 +42,7 @@ describe('projectProviderModels', () => {
     expect(result[0].model).toMatchObject({
       label: 'Live A', enabled: false, availability: 'available',
       defaultReasoningSelection: 'high', defaultBudgetTokens: 96_000,
+      preferredRouteOptionId: 'anthropic',
     });
     expect(result[1].model).toMatchObject({ label: 'Live B', enabled: true, availability: 'available' });
   });
@@ -55,6 +61,19 @@ describe('projectProviderModels', () => {
     expect(projectProviderModels('app-managed', stored, snapshot([]))).toEqual([{
       model: stored[0], effectiveModel: null,
     }]);
+  });
+
+  it('hides exact internal variants from the picker and removes stale persisted variant rows', () => {
+    const primary = effectiveModel('model-a', 'Model A');
+    const variant = {
+      ...effectiveModel('model-a-fast', 'Model A Fast'),
+      selection: { pickerVisibility: 'internal' as const, relatedPrimaryModelIds: ['model-a'] },
+    };
+    expect(projectProviderModels(
+      'app-managed',
+      [{ id: 'model-a-fast', label: 'Old Fast row', enabled: true }],
+      snapshot([primary, variant]),
+    ).map(({ model }) => model.id)).toEqual(['model-a']);
   });
 
   it('rekeys an app-managed preference through a proven effective alias without duplicating it', () => {

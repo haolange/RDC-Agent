@@ -76,6 +76,7 @@ export interface GeminiProviderOptions {
   baseUrl?: string;
   apiKey?: string;
   headers?: Record<string, string>;
+  surface?: 'ai-studio' | 'vertex';
 }
 
 export class GeminiProvider implements ProviderStrategy {
@@ -83,11 +84,13 @@ export class GeminiProvider implements ProviderStrategy {
   private readonly defaultBaseUrl: string;
   private readonly defaultApiKey: string | undefined;
   private readonly defaultHeaders: Record<string, string>;
+  private readonly surface: 'ai-studio' | 'vertex';
 
   constructor(options: GeminiProviderOptions = {}) {
     this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
     this.defaultApiKey = options.apiKey;
     this.defaultHeaders = { ...(options.headers ?? {}) };
+    this.surface = options.surface ?? 'ai-studio';
   }
 
   stream(
@@ -127,15 +130,13 @@ export class GeminiProvider implements ProviderStrategy {
       }
 
       const body = applyRequestPlanBody(this.buildRequestBody(context, options), options.requestPlan);
-      const versionedBase = baseUrl.includes('/v1beta') || baseUrl.includes('/v1')
-        ? baseUrl
-        : `${baseUrl}/v1beta`;
-      const url = `${versionedBase}/models/${encodeURIComponent(model.id)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
+      const url = buildGeminiStreamUrl(baseUrl, model.id, apiKey, this.surface);
 
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(this.surface === 'vertex' ? { Authorization: `Bearer ${apiKey}` } : {}),
           ...this.defaultHeaders,
           ...requestPlanHeaders(options.requestPlan),
         },
@@ -253,6 +254,22 @@ export class GeminiProvider implements ProviderStrategy {
     }
     return body;
   }
+}
+
+export function buildGeminiStreamUrl(
+  baseUrl: string,
+  modelId: string,
+  apiKey: string,
+  surface: 'ai-studio' | 'vertex' = 'ai-studio',
+): string {
+  const trimmed = baseUrl.replace(/\/+$/u, '');
+  const versionedBase = surface === 'vertex'
+    ? trimmed
+    : trimmed.includes('/v1beta') || trimmed.includes('/v1')
+      ? trimmed
+      : `${trimmed}/v1beta`;
+  const endpoint = `${versionedBase}/models/${encodeURIComponent(modelId)}:streamGenerateContent?alt=sse`;
+  return surface === 'vertex' ? endpoint : `${endpoint}&key=${encodeURIComponent(apiKey)}`;
 }
 
 // =====================================================================

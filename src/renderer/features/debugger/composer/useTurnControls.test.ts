@@ -13,18 +13,22 @@ const limitedLevelsCapability: EffectiveModel = {
   providerId: 'deepseek',
   modelId: 'deepseek-v4-flash',
   label: 'DeepSeek', aliases: [], enabled: true,
-  route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://example.test', source: 'preset' },
+  route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://example.test', source: 'catalog' },
   availability: 'available',
+  presencePolicy: 'maintained',
   contextTiers: [{ id: 'default', label: 'Default', maxPromptTokens: 128_000, activation: { kind: 'implicit' }, entitlement: 'granted' }],
   defaultBudgetTokens: 128_000,
-  reasoning: {
-    kind: 'levels',
-    supportsOff: true,
-    levels: ['high', 'max'],
-    defaultSelection: 'high',
-    wireProfile: { kind: 'none' },
+  controls: {
+    reasoning: {
+      kind: 'levels',
+      supportsOff: true,
+      levels: ['high', 'max'],
+      defaultSelection: 'high',
+      wireProfile: { kind: 'none' },
+    },
+    fast: { state: 'unsupported', fixedValue: false },
+    context1m: { state: 'unsupported', fixedValue: false },
   },
-  fast: { kind: 'unsupported' },
   toolCalling: { state: 'supported' }, visionInput: { state: 'unsupported' }, structuredOutput: { state: 'supported' },
   provenance: [],
 };
@@ -33,12 +37,15 @@ const noMaxCapability: EffectiveModel = {
   ...limitedLevelsCapability,
   providerId: 'openai',
   modelId: 'gpt-5.5',
-  reasoning: {
-    kind: 'levels',
-    supportsOff: true,
-    levels: ['low', 'medium', 'high', 'xhigh'],
-    defaultSelection: 'medium',
-    wireProfile: { kind: 'none' },
+  controls: {
+    ...limitedLevelsCapability.controls,
+    reasoning: {
+      kind: 'levels',
+      supportsOff: true,
+      levels: ['low', 'medium', 'high', 'xhigh'],
+      defaultSelection: 'medium',
+      wireProfile: { kind: 'none' },
+    },
   },
 };
 
@@ -110,6 +117,19 @@ describe('useTurnControls sync guards', () => {
       maxContextMode: false,
       fastModel: false,
     });
+  });
+
+  it('keeps the visible control state while a new route capability is pending', () => {
+    expect(resolveTurnControlsForCapabilityChange({
+      previousCapabilityKey: 'ask:openai:gpt-5.5:catalog-a:route-a',
+      nextCapabilityKey: 'ask:pending',
+      sessionChanged: false,
+      sessionControlsChanged: false,
+      capability: null,
+      sessionControls: null,
+      currentControls: maxControls,
+      rememberedControls: undefined,
+    })).toEqual(maxControls);
   });
 
   it('restores remembered controls when switching back to a model', () => {

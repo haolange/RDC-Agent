@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 2,
+  "id": "litellm",
+  "identityIds": [],
+  "profileId": "anthropic-messages",
+  "adapterIds": [
+    "anthropic-messages"
+  ],
+  "authSchemaId": "user-endpoint",
+  "discoveryPolicyId": "anthropic-candidate-validation",
+  "vendorId": "litellm",
+  "label": "LiteLLM",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "user",
+  "endpointClass": "user-endpoint",
+  "endpointOwnership": "user",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:litellm:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "litellm"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:litellm:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": true,
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "reasoning",
+    "prompt-cache",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "AnthropicMessages",
+      "protocol": "AnthropicMessages",
+      "adapterId": "anthropic-messages",
+      "baseUrl": "http://localhost:4000/v1",
+      "default": true,
+      "protocolOwner": "anthropic"
+    }
+  ],
+  "discovery": {
+    "authority": "candidate-validation",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "anthropic-candidate-validation"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "sonnet",
+    "opus",
+    "haiku"
+  ],
+  "docsUrl": "https://docs.litellm.ai/docs/"
+}

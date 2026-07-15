@@ -1,0 +1,367 @@
+{
+  "schemaVersion": 2,
+  "id": "xai",
+  "identityIds": [
+    "xai"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "xai",
+  "label": "xAI (Grok)",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "xai",
+  "endpointClass": "first-party",
+  "endpointOwnership": "service-operator",
+  "catalogOwnership": "app-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:xai:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "xai"
+    },
+    {
+      "id": "models.dev:xai:1",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "xai",
+      "surface": "xai"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:xai:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "vision-input",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.x.ai/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [
+    {
+      "modelId": "grok-4.5",
+      "label": "grok-4.5",
+      "aliases": [
+        "grok-4.5-latest",
+        "grok-build-latest"
+      ],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 500000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.x.ai/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "offMode": "reasoning-none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:xai:0"
+    },
+    {
+      "modelId": "grok-4.3",
+      "label": "grok-4.3",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.x.ai/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "low",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "offMode": "reasoning-none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:xai:0"
+    },
+    {
+      "modelId": "grok-build-0.1",
+      "label": "grok-build-0.1",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.x.ai/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "offMode": "reasoning-none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:xai:0"
+    },
+    {
+      "modelId": "grok-code-fast-1",
+      "label": "grok-code-fast-1",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.x.ai/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "offMode": "reasoning-none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:xai:0"
+    }
+  ],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "grok-4.5",
+    "grok-4.3",
+    "grok-build-0.1",
+    "grok-code-fast-1"
+  ],
+  "docsUrl": "https://docs.x.ai/"
+}

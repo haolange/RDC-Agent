@@ -26,11 +26,16 @@ const TEST_MODEL: Model = {
 
 const TEST_REQUEST_PLAN: RequestPlan = {
   providerId: 'test',
+  adapterId: 'openai-compatible',
+  catalogRevision: 'test-catalog',
+  routeRevision: 'test-route',
+  selectedModelId: TEST_MODEL.id,
   effectiveModelId: TEST_MODEL.id,
+  appliedBindingIds: [],
   route: {
     protocol: 'OpenAICompatibleChatCompletions',
     baseUrl: 'https://example.test',
-    source: 'preset',
+    source: 'catalog',
   },
   headers: {},
   bodyPatch: {},

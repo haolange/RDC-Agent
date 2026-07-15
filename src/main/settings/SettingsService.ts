@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import type {
   AppLanguage,
   AppRuntimePaths,
@@ -17,10 +17,14 @@ import type {
   LlmProviderAuthMode,
   LlmProviderAvailability,
   LlmProviderConnectionStatus,
+  LlmProviderConnectionSchema,
   LlmProviderEntry,
   LlmProviderId,
   LlmProviderModel,
   LlmProviderModelPreference,
+  ProviderDefinitionCommitSnapshot,
+  ProviderDefinitionSaveRequest,
+  ProviderDefinitionSaveResult,
   ProfileSettings,
   RdxActionId,
   RdxActionSettingsMap,
@@ -32,6 +36,7 @@ import type {
 } from '@shared/types/settings';
 import { isReasoningSelection } from '@shared/types/modelCapability';
 import type {
+  AgentDefinitionCommitSnapshot,
   AgentDefinitionSaveRequest,
   AgentDefinitionSaveResult,
   AgentManifestDraft,
@@ -52,16 +57,15 @@ import {
   TERMINAL_MIN_HEIGHT,
 } from '@shared/constants/layout';
 import {
-  createProviderEntryFromPreset,
-  createProviderEntriesFromPresets,
-  getProviderPresetCatalogOwnership,
-  getProviderPresetAuthModeAvailability,
-  getProviderPresetProtocolBaseUrls,
-  getProviderPresetProtocolOptions,
-  getProviderSeedModels,
+  createProviderEntryFromCatalog,
+  createProviderEntriesFromCatalog,
+  getProviderAuthModeAvailability,
+  getProviderCatalogOwnership,
+  getProviderDefaultBaseUrl,
+  getProviderModelSummaries,
+  getProviderCatalogModelIds,
   isBuiltinProviderId,
-  resolveProviderPresetBaseUrl as resolveBuiltinProtocolBaseUrl,
-} from './ProviderPresetRegistry';
+} from '../provider-catalog/ProviderCatalogRegistry';
 import { appPathService } from '../runtime/AppPathService';
 import { agentManifestService } from './AgentManifestService';
 import { executionProfileService } from './ExecutionProfileService';
@@ -69,8 +73,24 @@ import { providerCatalogService } from './ProviderCatalogService';
 import { normalizeProviderCategory, normalizeProviderProtocol } from './providerCatalogNormalize';
 import { secretStorageService } from './SecretStorageService';
 import { isAdmittedDiscoveredModel } from './DiscoveryAdmission';
+import { resolvePrimaryConnectionSecretFieldId } from './ProviderConnectionSchema';
 
 type PersistedLlmProviderEntry = Partial<LlmProviderEntry>;
+
+function stableSerialize(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => `${JSON.stringify(key)}:${stableSerialize(child)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+function hashProviderDefinition(provider: LlmProviderEntry): string {
+  return createHash('sha256').update(stableSerialize({ ...provider, apiKey: '' }), 'utf8').digest('hex');
+}
 
 interface PersistedSettingsPayload {
   schemaVersion?: number;
@@ -79,7 +99,6 @@ interface PersistedSettingsPayload {
   profile?: Partial<ProfileSettings>;
   llm?: {
     providers?: PersistedLlmProviderEntry[];
-    agentRoutes?: LlmAgentRoute[];
   };
   tooling?: {
     rdxCli?: Partial<RdxCliInvokerSettings>;
@@ -106,11 +125,10 @@ interface NormalizedPersistedSettings {
   agentRuntime: AgentRuntimeSettings;
   llm: {
     providers: LlmProviderEntry[];
-    agentRoutes: LlmAgentRoute[];
   };
 }
 
-const SETTINGS_SCHEMA_VERSION = 2;
+export const SETTINGS_SCHEMA_VERSION = 4;
 
 type ProviderCredentialView = 'runtime' | 'storage-metadata';
 
@@ -450,7 +468,7 @@ function resolveSelectedAuthAvailability(
   mode: LlmProviderAuthMode,
   fallback: LlmProviderEntry,
 ): LlmProviderAvailability {
-  return getProviderPresetAuthModeAvailability(providerId)[mode]
+  return getProviderAuthModeAvailability(providerId)[mode]
     ?? fallback.authModeAvailability?.[mode]
     ?? fallback.providerAvailability;
 }
@@ -473,8 +491,8 @@ function resolveAccountRuntimeCredential(
       apiKey?: string;
       copilotToken?: string;
       copilotApiBaseUrl?: string;
-      inferenceBaseUrl?: string;
       accountId?: string;
+      resourceUrl?: string;
     };
     if (providerId === 'github-copilot') {
       return {
@@ -496,30 +514,18 @@ function resolveAccountRuntimeCredential(
         accountId: bundle.accountId,
       };
     }
+    if (providerId === 'nous') {
+      return {
+        apiKey: bundle.accessToken ?? bundle.apiKey ?? '',
+        baseUrl: bundle.resourceUrl ?? 'https://inference-api.nousresearch.com/v1',
+        accountId: bundle.accountId,
+      };
+    }
     if (providerId === 'openrouter') {
       return {
         apiKey: bundle.apiKey ?? bundle.accessToken ?? '',
         baseUrl: 'https://openrouter.ai/api/v1',
         accountId: bundle.accountId,
-      };
-    }
-    if (providerId === 'minimax-account') {
-      return {
-        apiKey: bundle.accessToken ?? bundle.apiKey ?? '',
-        baseUrl: bundle.inferenceBaseUrl ?? 'https://api.minimax.io/anthropic',
-        accountId: bundle.accountId,
-      };
-    }
-    if (providerId === 'gemini-account') {
-      return {
-        apiKey: bundle.accessToken ?? bundle.apiKey ?? '',
-        baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-      };
-    }
-    if (providerId === 'qwen-account') {
-      return {
-        apiKey: bundle.accessToken ?? bundle.apiKey ?? '',
-        baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
       };
     }
     return {
@@ -607,6 +613,10 @@ function sanitizeModels(models: unknown): LlmProviderModel[] {
         && candidate.defaultBudgetTokens > 0
         ? candidate.defaultBudgetTokens
         : undefined,
+      preferredRouteOptionId: typeof candidate.preferredRouteOptionId === 'string'
+        && candidate.preferredRouteOptionId.trim()
+        ? candidate.preferredRouteOptionId.trim()
+        : undefined,
       ...(aliases.length > 0 ? { aliases } : {}),
       availability,
       availabilityReason: typeof candidate.availabilityReason === 'string' && candidate.availabilityReason.trim()
@@ -623,14 +633,19 @@ function applyModelEnabledState(
   persistedModels: LlmProviderModel[],
 ): LlmProviderModel[] {
   const persistedById = new Map(persistedModels.map((model) => [model.id, model]));
-  return catalogModels.map((model) => ({
-    ...model,
-    enabled: persistedById.get(model.id)?.enabled ?? true,
-    defaultReasoningSelection: persistedById.get(model.id)?.defaultReasoningSelection,
-    defaultBudgetTokens: persistedById.get(model.id)?.defaultBudgetTokens,
-    availability: persistedById.get(model.id)?.availability ?? model.availability,
-    availabilityReason: persistedById.get(model.id)?.availabilityReason,
-  }));
+  return catalogModels.map((model) => {
+    const persisted = persistedById.get(model.id);
+    const manifestDenied = model.availability === 'unavailable';
+    return {
+      ...model,
+      enabled: persisted?.enabled ?? true,
+      defaultReasoningSelection: persisted?.defaultReasoningSelection,
+      defaultBudgetTokens: persisted?.defaultBudgetTokens,
+      preferredRouteOptionId: persisted?.preferredRouteOptionId,
+      availability: manifestDenied ? 'unavailable' : persisted?.availability ?? model.availability,
+      availabilityReason: manifestDenied ? model.availabilityReason : persisted?.availabilityReason,
+    };
+  });
 }
 
 function applyModelPreferences(
@@ -653,27 +668,32 @@ function applyModelPreferences(
         && preference.defaultBudgetTokens > 0
         ? preference.defaultBudgetTokens
         : undefined,
+      preferredRouteOptionId: typeof preference.preferredRouteOptionId === 'string'
+        && preference.preferredRouteOptionId.trim()
+        ? preference.preferredRouteOptionId.trim()
+        : undefined,
     };
   });
 }
 
 function resolveProviderModels(providerId: string, persistedModels: unknown): LlmProviderModel[] {
   const sanitized = sanitizeModels(persistedModels);
-  if (getProviderPresetCatalogOwnership(providerId) !== 'app-managed') {
+  if (getProviderCatalogOwnership(providerId) === 'user-managed') {
     return sanitized;
   }
   const admittedDynamicModels = sanitized.filter((model) => (
     isAdmittedDiscoveredModel({ id: model.id })
   ));
-  // Volc Coding Plan discovery is account-specific. Once a verified subset has
-  // been persisted, do not re-expand it to the entire application catalog.
-  if (providerId === 'volcengine-coding-plan' && admittedDynamicModels.length > 0) {
-    return admittedDynamicModels;
-  }
-  const catalogModels = getProviderSeedModels(providerId);
-  return catalogModels.length > 0
-    ? applyModelEnabledState(catalogModels, sanitized)
-    : admittedDynamicModels;
+  const catalogModels = getProviderModelSummaries(providerId);
+  if (catalogModels.length === 0) return admittedDynamicModels;
+  const catalogKeys = new Set(getProviderCatalogModelIds(providerId));
+  return [
+    ...applyModelEnabledState(catalogModels, sanitized),
+    ...admittedDynamicModels.filter((model) => (
+      !catalogKeys.has(model.id)
+      && !(model.aliases ?? []).some((alias) => catalogKeys.has(alias))
+    )),
+  ];
 }
 
 function createEmptyAgentRoutes(): LlmAgentRoute[] {
@@ -694,7 +714,6 @@ function createDefaultPersistedSettings(): PersistedSettingsPayload {
     agentRuntime: DEFAULT_AGENT_RUNTIME,
     llm: {
       providers: [],
-      agentRoutes: createEmptyAgentRoutes(),
     },
   };
 }
@@ -777,6 +796,93 @@ function isFixtureProvider(provider: Partial<LlmProviderEntry>): boolean {
   );
 }
 
+function cloneConnectionSchema(
+  schema: LlmProviderConnectionSchema | undefined,
+): LlmProviderConnectionSchema | undefined {
+  return schema
+    ? {
+        ...schema,
+        fields: schema.fields.map((field) => ({ ...field })),
+        credentialAlternatives: schema.credentialAlternatives
+          ?.map((alternative) => ({ ...alternative, fieldIds: [...alternative.fieldIds] })),
+        headerMappings: schema.headerMappings?.map((mapping) => ({ ...mapping })),
+      }
+    : undefined;
+}
+
+function sanitizeConnectionValues(
+  schema: LlmProviderConnectionSchema | undefined,
+  values: Record<string, string> | undefined,
+): Record<string, string> {
+  const nonSecretFieldIds = new Set(
+    schema?.fields.filter((field) => field.kind !== 'secret').map((field) => field.id) ?? [],
+  );
+  return Object.fromEntries(
+    Object.entries(values ?? {}).flatMap(([fieldId, value]) => {
+      if (!nonSecretFieldIds.has(fieldId) || typeof value !== 'string' || !value.trim()) {
+        return [];
+      }
+      return [[fieldId, value.trim()]];
+    }),
+  );
+}
+
+function sanitizeConnectionSecretRefs(
+  providerId: string,
+  accountId: string | undefined,
+  schema: LlmProviderConnectionSchema | undefined,
+  refs: Record<string, string> | undefined,
+): Record<string, string> {
+  if (!accountId) {
+    return {};
+  }
+  const primarySecretFieldId = resolvePrimaryConnectionSecretFieldId(schema);
+  const secretFieldIds = new Set(
+    schema?.fields
+      .filter((field) => field.kind === 'secret' && field.id !== primarySecretFieldId)
+      .map((field) => field.id) ?? [],
+  );
+  return Object.fromEntries(
+    Object.entries(refs ?? {}).flatMap(([fieldId, secretRef]) => {
+      if (!secretFieldIds.has(fieldId) || typeof secretRef !== 'string') {
+        return [];
+      }
+      const expectedRef = secretStorageService.createProviderConnectionSecretRef(providerId, accountId, fieldId);
+      return secretRef.trim() === expectedRef ? [[fieldId, expectedRef]] : [];
+    }),
+  );
+}
+
+function isConnectionSchemaSatisfied(
+  schema: LlmProviderConnectionSchema | undefined,
+  connectionValues: Record<string, string>,
+  secretPresence: Record<string, boolean>,
+): boolean {
+  if (!schema || schema.fields.length === 0) {
+    return true;
+  }
+  const isPresent = (fieldId: string): boolean => {
+    const field = schema.fields.find((candidate) => candidate.id === fieldId);
+    return field?.kind === 'secret'
+      ? secretPresence[fieldId] === true
+      : Boolean(connectionValues[fieldId]?.trim());
+  };
+  const alternativeFieldIds = new Set(
+    schema.credentialAlternatives?.flatMap((alternative) => alternative.fieldIds) ?? [],
+  );
+  const requiredFieldsPresent = schema.fields
+    .filter((field) => field.required && !alternativeFieldIds.has(field.id))
+    .every((field) => isPresent(field.id));
+  if (!requiredFieldsPresent) {
+    return false;
+  }
+  return !schema.credentialAlternatives?.length
+    || schema.credentialAlternatives.some((alternative) => (
+      alternative.ambient === true
+      || (alternative.fieldIds.length > 0 && alternative.fieldIds.every(isPresent))
+    ));
+}
+
 function sanitizeUserProvider(
   provider: PersistedLlmProviderEntry,
   workspaceRoot = appPathService.getUserRdxRoot(),
@@ -788,20 +894,50 @@ function sanitizeUserProvider(
     return null;
   }
 
-  const builtinFallback = createProviderEntryFromPreset(rawId);
+  const builtinFallback = createProviderEntryFromCatalog(rawId);
   const definition = builtinFallback;
   const authMode = resolveProviderAuthMode(provider, builtinFallback);
   const authAccountIds = sanitizeAuthAccountIds(provider, authMode);
   const activeAccountId = authAccountIds[authMode];
+  const connectionSchema = cloneConnectionSchema(builtinFallback.connectionSchema);
+  const primarySecretFieldId = resolvePrimaryConnectionSecretFieldId(connectionSchema);
+  const connectionValues = sanitizeConnectionValues(connectionSchema, provider.connectionValues);
+  const secretRefs = sanitizeConnectionSecretRefs(
+    rawId,
+    authAccountIds['api-key'],
+    connectionSchema,
+    provider.secretRefs,
+  );
   const secretRef = getProviderAccountSecretRef(rawId, authAccountIds['api-key'], 'api-key');
   const protocol = normalizeProviderProtocol({ ...provider, id: rawId });
-  const catalogOwnership = getProviderPresetCatalogOwnership(rawId);
+  const catalogOwnership = getProviderCatalogOwnership(rawId);
   const apiKeySecret = getResolvedProviderSecret(rawId, secretRef, workspaceRoot);
   const oauthSecret = secretStorageService.getSecret(
     getProviderAccountSecretRef(rawId, authAccountIds.account, 'oauth'),
     workspaceRoot,
   );
   const preserveStorageMetadata = options.credentialView === 'storage-metadata';
+  const persistedApiKeyPresence = preserveStorageMetadata && (
+    provider.hasStoredSecretByAuthMode?.['api-key'] === true
+    || (authMode === 'api-key' && provider.hasStoredSecret === true)
+  );
+  const hasStoredConnectionSecrets = Object.fromEntries(
+    (connectionSchema?.fields ?? [])
+      .filter((field) => field.kind === 'secret')
+      .map((field) => {
+        const present = field.id === primarySecretFieldId
+          ? Boolean(apiKeySecret) || persistedApiKeyPresence
+          : Boolean(secretStorageService.getSecret(secretRefs[field.id], workspaceRoot))
+            || (preserveStorageMetadata && (
+              secretStorageService.hasSecretRecord(secretRefs[field.id], workspaceRoot)
+              || provider.hasStoredConnectionSecrets?.[field.id] === true
+            ));
+        return [field.id, present];
+      }),
+  ) as Record<string, boolean>;
+  const apiKeyCredentialPresent = connectionSchema?.fields.length
+    ? isConnectionSchemaSatisfied(connectionSchema, connectionValues, hasStoredConnectionSecrets)
+    : Boolean(apiKeySecret) || persistedApiKeyPresence;
   const hasStoredSecretByAuthMode = Object.fromEntries(
     (builtinFallback.authModeOptions ?? [builtinFallback.authMode]).map((mode) => {
       const persisted = preserveStorageMetadata && (
@@ -811,21 +947,29 @@ function sanitizeUserProvider(
       const present = mode === 'local' || mode === 'environment'
         ? true
         : mode === 'api-key'
-          ? Boolean(apiKeySecret) || persisted
+          ? apiKeyCredentialPresent
           : Boolean(oauthSecret) || persisted;
       return [mode, present];
     }),
   ) as Partial<Record<LlmProviderAuthMode, boolean>>;
   const hasStoredSecret = hasStoredSecretByAuthMode[authMode] === true;
   const persistedModels = resolveProviderModels(rawId, provider.models ?? []);
-  const requiresAccountCatalogCredential = catalogOwnership === 'app-managed'
-    && builtinFallback.authMode === 'account'
-    && builtinFallback.models.length === 0;
-  // A dynamic account catalog is evidence owned by the connected identity. Once
-  // that credential is gone, retaining its last catalog would present stale
-  // models as currently discoverable even though the provider is unconfigured.
-  const models = requiresAccountCatalogCredential && hasStoredSecretByAuthMode.account !== true
-    ? []
+  const structuralModels = getProviderModelSummaries(rawId);
+  const structuralModelsById = new Map(structuralModels.map((model) => [model.id, model]));
+  // Account discovery is scoped to the active identity. Once its credential is
+  // absent, retain only released structural rows and discard account-specific
+  // dynamic models and availability overlays.
+  const models = catalogOwnership !== 'user-managed' && (authMode !== 'account' || hasStoredSecretByAuthMode.account === true)
+    ? persistedModels
+    : authMode === 'account' && hasStoredSecretByAuthMode.account !== true
+    ? applyModelEnabledState(structuralModels, persistedModels).map((model) => {
+        const structural = structuralModelsById.get(model.id);
+        return {
+          ...model,
+          availability: structural?.availability,
+          availabilityReason: structural?.availabilityReason,
+        };
+      })
     : persistedModels;
   const selectedAvailability = resolveSelectedAuthAvailability(rawId, authMode, builtinFallback);
   const canUseProvider = selectedAvailability.state !== 'unavailable' && hasStoredSecret;
@@ -865,27 +1009,28 @@ function sanitizeUserProvider(
     providerAvailability: { ...builtinFallback.providerAvailability },
     category: normalizeProviderCategory({ ...provider, id: rawId, authMode }),
     catalogOwnership,
+    serviceOperator: builtinFallback.serviceOperator,
+    endpointClass: builtinFallback.endpointClass,
+    catalogProvenance: builtinFallback.catalogProvenance.map((entry) => ({ ...entry })),
     label,
     enabled,
     apiKey: '',
     secretRef,
+    secretRefs,
+    connectionValues,
+    hasStoredConnectionSecrets,
+    connectionSchema,
     hasStoredSecret,
     baseUrl: (() => {
-      const protocolDefault = resolveBuiltinProtocolBaseUrl(rawId, protocol);
+      const defaultBaseUrl = getProviderDefaultBaseUrl(rawId);
       if (definition?.baseUrlEditable) {
         return typeof provider.baseUrl === 'string' && provider.baseUrl.trim()
           ? provider.baseUrl.trim()
-          : protocolDefault ?? definition.baseUrl;
-      }
-      if (definition?.protocolEditable && definition.protocolBaseUrls) {
-        return protocolDefault ?? definition.baseUrl;
+          : defaultBaseUrl ?? definition.baseUrl;
       }
       return definition?.baseUrl;
     })(),
     baseUrlEditable: definition?.baseUrlEditable,
-    protocolEditable: definition?.protocolEditable,
-    protocolOptions: getProviderPresetProtocolOptions(rawId),
-    protocolBaseUrls: getProviderPresetProtocolBaseUrls(rawId),
     models,
     recommendedModels,
     docsUrl,
@@ -924,7 +1069,7 @@ function normalizeUserProviders(
     persistedProviders.set(provider.id, provider);
   }
 
-  return createProviderEntriesFromPresets()
+  return createProviderEntriesFromCatalog()
     .map((catalogProvider) => sanitizeUserProvider(
       persistedProviders.get(catalogProvider.id) ?? catalogProvider,
       workspaceRoot,
@@ -938,18 +1083,36 @@ function hydrateProviderSecrets(
   workspaceRoot: string,
 ): LlmProviderEntry[] {
   return providers.map((provider) => {
+    const primarySecretFieldId = resolvePrimaryConnectionSecretFieldId(provider.connectionSchema);
     const apiKeySecret = getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
     const oauthSecret = secretStorageService.getSecret(
       getProviderAccountSecretRef(provider.id, provider.authAccountIds?.account, 'oauth'),
       workspaceRoot,
     );
+    const hasStoredConnectionSecrets = Object.fromEntries(
+      (provider.connectionSchema?.fields ?? [])
+        .filter((field) => field.kind === 'secret')
+        .map((field) => [
+          field.id,
+          field.id === primarySecretFieldId
+            ? Boolean(apiKeySecret)
+            : Boolean(secretStorageService.getSecret(provider.secretRefs?.[field.id], workspaceRoot)),
+        ]),
+    ) as Record<string, boolean>;
+    const apiKeyCredentialPresent = provider.connectionSchema?.fields.length
+      ? isConnectionSchemaSatisfied(
+          provider.connectionSchema,
+          provider.connectionValues ?? {},
+          hasStoredConnectionSecrets,
+        )
+      : Boolean(apiKeySecret);
     const hasStoredSecretByAuthMode = Object.fromEntries(
       (provider.authModeOptions ?? [provider.authMode]).map((mode) => [
         mode,
         mode === 'local' || mode === 'environment'
           ? true
           : mode === 'api-key'
-            ? Boolean(apiKeySecret)
+            ? apiKeyCredentialPresent
             : Boolean(oauthSecret),
       ]),
     ) as Partial<Record<LlmProviderAuthMode, boolean>>;
@@ -975,6 +1138,7 @@ function hydrateProviderSecrets(
       apiKey: '',
       hasStoredSecret,
       hasStoredSecretByAuthMode,
+      hasStoredConnectionSecrets,
       enabled: isConfigured,
       status,
       isConfigured,
@@ -982,7 +1146,7 @@ function hydrateProviderSecrets(
   });
 }
 
-function normalizeUserRoutes(
+function normalizeManifestRoutes(
   routes: unknown,
 ): LlmAgentRoute[] {
   const routeMap = new Map<string, LlmAgentRoute>(
@@ -1002,7 +1166,7 @@ function normalizeUserRoutes(
     }
 
     // Preserve the explicit route. EffectiveCatalog resolves proven aliases and reports
-    // MODEL_UNAVAILABLE without mutating user settings or silently substituting a model.
+    // MODEL_UNAVAILABLE without rewriting the canonical manifest or silently substituting a model.
   }
 
   return Array.from(routeMap.values());
@@ -1011,6 +1175,11 @@ function normalizeUserRoutes(
 export class SettingsService {
   private initialized = false;
   private readonly agentDefinitionRevisions = new Map<string, number>();
+  private readonly agentDefinitionCommits = new Map<string, AgentDefinitionCommitSnapshot>();
+  private readonly agentDefinitionWriteTails = new Map<string, Promise<void>>();
+  private readonly providerDefinitionRevisions = new Map<string, number>();
+  private readonly providerDefinitionCommits = new Map<string, ProviderDefinitionCommitSnapshot>();
+  private readonly providerDefinitionWriteTails = new Map<string, Promise<void>>();
 
   initialize(): AppSettings {
     const runtimePaths = appPathService.initializeRuntime();
@@ -1036,15 +1205,11 @@ export class SettingsService {
   ): HardRebuildResult {
     const fallback = createDefaultPersistedSettings();
     const candidate = raw ?? fallback;
-    const requiresCredentialMigration = candidate.schemaVersion !== SETTINGS_SCHEMA_VERSION;
     const fixes: string[] = [];
     const warnings: string[] = [];
-    const secretRefsToDelete = new Set<string>();
     const persistedRawProviders = Array.isArray(candidate.llm?.providers) ? candidate.llm?.providers : [];
-    const persistedRawRoutes = Array.isArray(candidate.llm?.agentRoutes) ? candidate.llm?.agentRoutes : [];
 
     const rawProviders = persistedRawProviders;
-    const rawRoutes = persistedRawRoutes;
 
     const nextProviders: LlmProviderEntry[] = [];
     for (const entry of rawProviders) {
@@ -1065,57 +1230,14 @@ export class SettingsService {
         continue;
       }
 
-      const builtin = createProviderEntryFromPreset(rawId);
+      const builtin = createProviderEntryFromCatalog(rawId);
       const authMode = resolveProviderAuthMode(entry, builtin);
       const authAccountIds = sanitizeAuthAccountIds(entry, authMode);
       const unkeyedApiKeyRef = secretStorageService.createProviderSecretRef(rawId);
-      const unkeyedOAuthRef = secretStorageService.createProviderOAuthSecretRef(rawId);
       const incomingSecretRef = typeof entry.secretRef === 'string' && entry.secretRef.trim()
         ? entry.secretRef.trim()
         : undefined;
-      let secretRef = incomingSecretRef || unkeyedApiKeyRef;
-      if (requiresCredentialMigration && entry.apiKey?.trim()) {
-        secretStorageService.setSecret(secretRef, entry.apiKey.trim(), workspaceRoot);
-        fixes.push(`Migrated plaintext secret for ${rawId}`);
-      }
-
-      if (requiresCredentialMigration && builtin.authModeOptions?.includes('account')) {
-        const unkeyedBundle = secretStorageService.getSecret(unkeyedOAuthRef, workspaceRoot);
-        const hasUnkeyedBundle = secretStorageService.hasSecretRecord(unkeyedOAuthRef, workspaceRoot);
-        authAccountIds.account = authAccountIds.account
-          ?? (authMode === 'account' ? entry.activeAccountId : undefined)
-          ?? extractOAuthBundleAccountId(unkeyedBundle)
-          ?? (hasUnkeyedBundle ? createLocalAccountId() : undefined);
-        if (authAccountIds.account) {
-          const accountRef = secretStorageService.createProviderAccountSecretRef(
-            rawId,
-            authAccountIds.account,
-            'oauth',
-          );
-          if (secretStorageService.copySecret(unkeyedOAuthRef, accountRef, workspaceRoot)) {
-            secretRefsToDelete.add(unkeyedOAuthRef);
-            fixes.push(`Migrated OAuth secret to account key for ${rawId}`);
-          }
-        }
-      }
-      if (requiresCredentialMigration && builtin.authModeOptions?.includes('api-key')) {
-        const hasExistingSecret = secretStorageService.hasSecretRecord(secretRef, workspaceRoot);
-        authAccountIds['api-key'] = authAccountIds['api-key']
-          ?? (authMode === 'api-key' ? entry.activeAccountId : undefined)
-          ?? (hasExistingSecret ? createLocalAccountId() : undefined);
-        if (authAccountIds['api-key']) {
-          const accountRef = secretStorageService.createProviderAccountSecretRef(
-            rawId,
-            authAccountIds['api-key'],
-            'api-key',
-          );
-          if (secretStorageService.copySecret(secretRef, accountRef, workspaceRoot)) {
-            secretRefsToDelete.add(secretRef);
-            fixes.push(`Migrated API key secret to account key for ${rawId}`);
-          }
-          secretRef = accountRef;
-        }
-      }
+      const secretRef = incomingSecretRef || unkeyedApiKeyRef;
 
       const sanitized = sanitizeUserProvider({
         ...entry,
@@ -1139,29 +1261,6 @@ export class SettingsService {
     const catalogProviders = normalizeUserProviders(nextProviders, workspaceRoot, {
       credentialView: 'storage-metadata',
     });
-    const normalizedRoutes = normalizeUserRoutes(rawRoutes);
-    const nextRoutes = normalizedRoutes;
-    const incomingRoutes = Array.isArray(rawRoutes) ? rawRoutes.map((entry) => {
-      if (entry && typeof entry === 'object') {
-        const providerId = (entry as Partial<LlmAgentRoute>).providerId;
-        const incomingProviderId = typeof providerId === 'string' ? providerId.trim() : '';
-        const normalizedProviderId = incomingProviderId;
-        if (incomingProviderId && incomingProviderId !== normalizedProviderId) {
-          const agentId = (entry as Partial<LlmAgentRoute>).agentId;
-          fixes.push(`Renamed retired route provider id ${incomingProviderId} to ${normalizedProviderId}${typeof agentId === 'string' ? ` for ${agentId}` : ''}`);
-        }
-      }
-      return sanitizeRoute(entry);
-    }).filter((route): route is LlmAgentRoute => route !== null) : [];
-    for (const route of incomingRoutes) {
-      const normalized = nextRoutes.find((entry) => entry.agentId === route.agentId);
-      if (!normalized || normalized.providerId !== route.providerId || normalized.modelId !== route.modelId) {
-        if (route.providerId || route.modelId) {
-          fixes.push(`Cleared invalid route for ${route.agentId}`);
-        }
-      }
-    }
-
     if (!catalogProviders.some((provider) => provider.isConfigured)) {
       warnings.push('No configured provider available for Debugger mode.');
     }
@@ -1197,7 +1296,6 @@ export class SettingsService {
       agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
       llm: {
         providers: catalogProviders.map((provider) => ({ ...provider, apiKey: '' })),
-        agentRoutes: nextRoutes,
       },
     };
 
@@ -1206,7 +1304,7 @@ export class SettingsService {
       changed: JSON.stringify(candidate) !== JSON.stringify(nextSettings),
       fixes,
       warnings,
-      secretRefsToDelete: [...secretRefsToDelete],
+      secretRefsToDelete: [],
     };
   }
 
@@ -1221,8 +1319,6 @@ export class SettingsService {
       ...provider,
       apiKey: '',
     }));
-    const nextRoutes = normalizeUserRoutes(candidate.llm?.agentRoutes);
-
     return {
       appearance: {
         theme: pickEnum(candidate.appearance?.theme, VALID_THEMES, fallback.appearance?.theme ?? 'dark'),
@@ -1253,7 +1349,6 @@ export class SettingsService {
       agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
       llm: {
         providers: nextProviders,
-        agentRoutes: nextRoutes,
       },
     };
   }
@@ -1280,6 +1375,14 @@ export class SettingsService {
       availableMcpServers: [],
       diagnostics: [],
     });
+    const baseAgentSettings = agentManifestService.getSettings(
+      paths,
+      hydratedProviders,
+      createEmptyAgentRoutes(),
+    );
+    const agentRoutes = normalizeManifestRoutes(
+      agentManifestService.routesFromDefinitions(createEmptyAgentRoutes(), baseAgentSettings.definitions),
+    );
 
     const settings: AppSettings = {
       ...createDefaultRuntimeSettings(),
@@ -1290,9 +1393,14 @@ export class SettingsService {
       agentRuntime: normalized.agentRuntime,
       llm: {
         providers: hydratedProviders,
-        agentRoutes: normalizeUserRoutes(normalized.llm?.agentRoutes ?? createEmptyAgentRoutes()),
+        agentRoutes,
       },
-      agents: agentManifestService.getSettings(paths, hydratedProviders, normalized.llm?.agentRoutes ?? createEmptyAgentRoutes()),
+      agents: agentManifestService.projectEffectiveModelOptions(
+        baseAgentSettings,
+        hydratedProviders,
+        agentRoutes,
+        [],
+      ),
       resourceCatalog,
       paths: {
         ...paths,
@@ -1313,6 +1421,18 @@ export class SettingsService {
       fs.renameSync(temporaryPath, filePath);
     } finally {
       if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+    }
+  }
+
+  private async writeSettingsAsync(settings: PersistedSettingsPayload): Promise<void> {
+    const filePath = appPathService.getRuntimePaths().settingsPath;
+    await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+    const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
+    try {
+      await fs.promises.writeFile(temporaryPath, JSON.stringify(settings, null, 2), 'utf8');
+      await fs.promises.rename(temporaryPath, filePath);
+    } finally {
+      await fs.promises.rm(temporaryPath, { force: true });
     }
   }
 
@@ -1344,6 +1464,37 @@ export class SettingsService {
     }
 
     return getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
+  }
+
+  /** Main-process only. Never expose this hydrated map through settings IPC. */
+  getProviderConnectionValues(
+    providerId: string,
+    workspaceRoot = appPathService.getUserRdxRoot(),
+  ): Record<string, string> {
+    this.ensureInitialized();
+    const persisted = this.normalizePersistedSettings(
+      readJsonFile<PersistedSettingsPayload>(appPathService.getRuntimePaths().settingsPath)
+        ?? createDefaultPersistedSettings(),
+      workspaceRoot,
+    );
+    const provider = persisted.llm.providers.find((entry) => entry.id === providerId);
+    if (!provider) {
+      return {};
+    }
+
+    const values: Record<string, string> = { ...(provider.connectionValues ?? {}) };
+    for (const field of provider.connectionSchema?.fields ?? []) {
+      if (field.kind !== 'secret') {
+        continue;
+      }
+      const value = field.id === resolvePrimaryConnectionSecretFieldId(provider.connectionSchema)
+        ? getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot)
+        : secretStorageService.getSecret(provider.secretRefs?.[field.id], workspaceRoot).trim();
+      if (value) {
+        values[field.id] = value;
+      }
+    }
+    return values;
   }
 
   getProviderOAuthSecret(providerId: string, workspaceRoot = appPathService.getUserRdxRoot()): string {
@@ -1403,19 +1554,9 @@ export class SettingsService {
     const nextProviders = normalizeUserProviders(providerDrafts, nextPaths.userRdxRoot, {
       credentialView: providerCredentialView,
     });
-    const currentRoutes = normalizeUserRoutes(patch.llm?.agentRoutes ?? currentPersisted.llm?.agentRoutes ?? []);
-    if (patch.agents?.definitions) {
-      agentManifestService.save(
-        nextPaths,
-        patch.agents.definitions,
-        patch.agents.globalInstructions,
-      );
-    } else if (typeof patch.agents?.globalInstructions === 'string') {
-      agentManifestService.save(nextPaths, [], patch.agents.globalInstructions);
+    if (typeof patch.agents?.globalInstructions === 'string') {
+      agentManifestService.saveGlobalInstructions(nextPaths, patch.agents.globalInstructions);
     }
-    const manifestRoutes = patch.agents?.definitions
-      ? agentManifestService.routesFromDefinitions(currentRoutes, patch.agents.definitions)
-      : currentRoutes;
 
     const nextPersisted: PersistedSettingsPayload = {
       schemaVersion: SETTINGS_SCHEMA_VERSION,
@@ -1496,7 +1637,6 @@ export class SettingsService {
       },
       llm: {
         providers: nextProviders.map((provider) => ({ ...provider, apiKey: '' })),
-        agentRoutes: normalizeUserRoutes(manifestRoutes),
       },
     };
 
@@ -1508,83 +1648,276 @@ export class SettingsService {
     });
   }
 
-  saveAgentDefinition(request: AgentDefinitionSaveRequest): AgentDefinitionSaveResult {
+  private async withAgentDefinitionWriteLock<T>(agentId: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.agentDefinitionWriteTails.get(agentId) ?? Promise.resolve();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const tail = previous.catch(() => undefined).then(() => gate);
+    this.agentDefinitionWriteTails.set(agentId, tail);
+    await previous.catch(() => undefined);
+    try {
+      return await task();
+    } finally {
+      release();
+      if (this.agentDefinitionWriteTails.get(agentId) === tail) {
+        this.agentDefinitionWriteTails.delete(agentId);
+      }
+    }
+  }
+
+  private async readAgentDefinitionCommit(agentId: string): Promise<AgentDefinitionCommitSnapshot | null> {
+    const cached = this.agentDefinitionCommits.get(agentId);
+    const definition = await agentManifestService.readDefinition(appPathService.getRuntimePaths(), agentId);
+    if (!definition) {
+      return cached?.definition === null ? cached : null;
+    }
+    const commitHash = await agentManifestService.readCommitHash(definition.filePath);
+    if (cached?.commitHash === commitHash) {
+      const refreshed = {
+        ...cached,
+        definition,
+        route: agentManifestService.routeFromDefinition(definition),
+      };
+      this.agentDefinitionCommits.set(agentId, refreshed);
+      return refreshed;
+    }
+    const snapshot: AgentDefinitionCommitSnapshot = {
+      clientRevision: 0,
+      commitHash,
+      definition,
+      route: agentManifestService.routeFromDefinition(definition),
+    };
+    this.agentDefinitionCommits.set(agentId, snapshot);
+    return snapshot;
+  }
+
+  private saveResult(
+    request: AgentDefinitionSaveRequest,
+    status: AgentDefinitionSaveResult['status'],
+    snapshot: AgentDefinitionCommitSnapshot | null,
+    error?: string,
+  ): AgentDefinitionSaveResult {
+    return {
+      clientRevision: request.clientRevision,
+      status,
+      commitHash: snapshot?.commitHash ?? null,
+      definition: snapshot?.definition ?? null,
+      route: snapshot?.route ?? null,
+      lastSuccessful: snapshot,
+      ...(error ? { error } : {}),
+    };
+  }
+
+  private async restoreAgentDefinitionCommit(
+    paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
+    request: AgentDefinitionSaveRequest,
+    snapshot: AgentDefinitionCommitSnapshot | null,
+  ): Promise<void> {
+    if (!snapshot?.definition) {
+      await agentManifestService.saveDefinition(paths, { ...request.draft, delete: true });
+      return;
+    }
+    const {
+      filePath: _filePath,
+      builtin: _builtin,
+      updatedAt: _updatedAt,
+      ...draft
+    } = snapshot.definition;
+    await agentManifestService.saveDefinition(paths, draft as AgentManifestDraft);
+  }
+
+  async getAgentDefinitionCommit(agentIdDraft: string): Promise<AgentDefinitionCommitSnapshot | null> {
+    this.ensureInitialized();
+    const agentId = agentIdDraft.trim();
+    if (!isSafeAgentProfileId(agentId)) return null;
+    return this.readAgentDefinitionCommit(agentId);
+  }
+
+  async saveAgentDefinition(request: AgentDefinitionSaveRequest): Promise<AgentDefinitionSaveResult> {
     this.ensureInitialized();
     const agentId = request.draft.id.trim();
     if (!isSafeAgentProfileId(agentId)) {
-      throw new Error(`Invalid agent profile id: ${agentId || '<empty>'}`);
+      return this.saveResult(request, 'failed', null, `Invalid agent profile id: ${agentId || '<empty>'}`);
     }
     if (!Number.isSafeInteger(request.clientRevision) || request.clientRevision < 1) {
-      throw new Error('clientRevision must be a positive safe integer.');
+      return this.saveResult(request, 'failed', await this.readAgentDefinitionCommit(agentId), 'clientRevision must be a positive safe integer.');
     }
 
-    const paths = appPathService.getRuntimePaths();
+    const latestRevision = this.agentDefinitionRevisions.get(agentId) ?? 0;
+    if (request.clientRevision <= latestRevision) {
+      return this.saveResult(request, 'superseded', await this.readAgentDefinitionCommit(agentId));
+    }
+    this.agentDefinitionRevisions.set(agentId, request.clientRevision);
+    await Promise.resolve();
+
+    return this.withAgentDefinitionWriteLock(agentId, async () => {
+      const previous = await this.readAgentDefinitionCommit(agentId);
+      if (this.agentDefinitionRevisions.get(agentId) !== request.clientRevision) {
+        return this.saveResult(request, 'superseded', previous);
+      }
+      const paths = appPathService.getRuntimePaths();
+      try {
+        const commit = await agentManifestService.saveDefinition(paths, request.draft);
+        if (this.agentDefinitionRevisions.get(agentId) !== request.clientRevision) {
+          await this.restoreAgentDefinitionCommit(paths, request, previous);
+          return this.saveResult(request, 'superseded', previous);
+        }
+        const snapshot: AgentDefinitionCommitSnapshot = {
+          clientRevision: request.clientRevision,
+          commitHash: commit.commitHash,
+          definition: commit.definition,
+          route: commit.definition ? agentManifestService.routeFromDefinition(commit.definition) : null,
+        };
+        this.agentDefinitionCommits.set(agentId, snapshot);
+        return this.saveResult(request, 'committed', snapshot);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return this.agentDefinitionRevisions.get(agentId) === request.clientRevision
+          ? this.saveResult(request, 'failed', previous, message)
+          : this.saveResult(request, 'superseded', previous);
+      }
+    });
+  }
+
+  private async withProviderDefinitionWriteLock<T>(providerId: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.providerDefinitionWriteTails.get(providerId) ?? Promise.resolve();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const tail = previous.catch(() => undefined).then(() => gate);
+    this.providerDefinitionWriteTails.set(providerId, tail);
+    await previous.catch(() => undefined);
+    try {
+      return await task();
+    } finally {
+      release();
+      if (this.providerDefinitionWriteTails.get(providerId) === tail) {
+        this.providerDefinitionWriteTails.delete(providerId);
+      }
+    }
+  }
+
+  private providerSaveResult(
+    request: ProviderDefinitionSaveRequest,
+    status: ProviderDefinitionSaveResult['status'],
+    snapshot: ProviderDefinitionCommitSnapshot | null,
+    error?: string,
+  ): ProviderDefinitionSaveResult {
+    return {
+      clientRevision: request.clientRevision,
+      providerId: request.provider.id,
+      status,
+      commitHash: snapshot?.commitHash ?? null,
+      provider: snapshot?.provider ?? null,
+      catalogRevision: snapshot?.catalogRevision ?? null,
+      lastSuccessful: snapshot,
+      ...(error ? { error } : {}),
+    };
+  }
+
+  private async readProviderDefinitionCommit(providerId: string): Promise<ProviderDefinitionCommitSnapshot | null> {
+    const provider = this.getAll().llm.providers.find((entry) => entry.id === providerId) ?? null;
+    if (!provider) return null;
+    const hash = hashProviderDefinition(provider);
+    const cached = this.providerDefinitionCommits.get(providerId);
+    const snapshot: ProviderDefinitionCommitSnapshot = {
+      clientRevision: cached?.commitHash === hash ? cached.clientRevision : 0,
+      providerId,
+      commitHash: hash,
+      provider,
+      catalogRevision: cached?.catalogRevision ?? null,
+    };
+    this.providerDefinitionCommits.set(providerId, snapshot);
+    return snapshot;
+  }
+
+  private async persistProviderDefinition(provider: LlmProviderEntry): Promise<LlmProviderEntry> {
+    const paths = appPathService.initializeRuntime();
     const currentPersisted = this.normalizePersistedSettings(
       readJsonFile<PersistedSettingsPayload>(paths.settingsPath) ?? createDefaultPersistedSettings(),
       paths.userRdxRoot,
       { credentialView: 'storage-metadata' },
     );
-    const currentRoutes = normalizeUserRoutes(currentPersisted.llm.agentRoutes);
-    const currentDefinitions = agentManifestService.getSettings(
-      paths,
-      currentPersisted.llm.providers,
-      currentRoutes,
-    ).definitions;
-    const currentDefinition = currentDefinitions.find((definition) => (
-      definition.id === agentId || definition.fileName === request.draft.fileName
-    )) ?? null;
-    const latestRevision = this.agentDefinitionRevisions.get(agentId) ?? 0;
-    if (request.clientRevision <= latestRevision) {
-      return {
-        clientRevision: request.clientRevision,
-        applied: false,
-        definition: currentDefinition,
-        route: currentRoutes.find((route) => route.agentId === agentId) ?? null,
-      };
-    }
+    const currentProviders = currentPersisted.llm?.providers ?? [];
+    const current = currentProviders.find((entry) => entry.id === provider.id);
+    if (!current) throw new Error(`Unknown provider: ${provider.id}`);
+    const sanitized = sanitizeUserProvider({
+      ...current,
+      ...provider,
+      apiKey: '',
+      secretRef: current.secretRef,
+      secretRefs: current.secretRefs,
+      authAccountIds: current.authAccountIds,
+      activeAccountId: current.activeAccountId,
+      hasStoredSecretByAuthMode: current.hasStoredSecretByAuthMode,
+      hasStoredConnectionSecrets: current.hasStoredConnectionSecrets,
+    }, paths.userRdxRoot, { credentialView: 'storage-metadata' });
+    if (!sanitized) throw new Error(`Provider ${provider.id} could not be sanitized.`);
+    const nextProviders = normalizeUserProviders(
+      currentProviders.map((entry) => entry.id === provider.id ? sanitized : entry),
+      paths.userRdxRoot,
+      { credentialView: 'storage-metadata' },
+    );
+    await this.writeSettingsAsync({
+      ...currentPersisted,
+      schemaVersion: SETTINGS_SCHEMA_VERSION,
+      llm: { providers: nextProviders.map((entry) => ({ ...entry, apiKey: '' })) },
+    });
+    const committed = this.getAll().llm.providers.find((entry) => entry.id === provider.id);
+    if (!committed) throw new Error(`Provider ${provider.id} disappeared after commit.`);
+    return committed;
+  }
 
-    let definition: AgentDefinitionSaveResult['definition'] = null;
-    try {
-      definition = agentManifestService.saveDefinition(paths, request.draft);
-      const route = definition ? agentManifestService.routeFromDefinition(definition) : null;
-      const replacedAgentIds = new Set([agentId, currentDefinition?.id].filter(Boolean));
-      const nextRoutes = normalizeUserRoutes([
-        ...currentRoutes.filter((entry) => !replacedAgentIds.has(entry.agentId)),
-        ...(route ? [route] : []),
-      ]);
-      this.writeSettings({
-        ...currentPersisted,
-        schemaVersion: SETTINGS_SCHEMA_VERSION,
-        llm: {
-          providers: currentPersisted.llm.providers,
-          agentRoutes: nextRoutes,
-        },
-      });
-      this.agentDefinitionRevisions.set(agentId, request.clientRevision);
-      return {
-        clientRevision: request.clientRevision,
-        applied: true,
-        definition,
-        route,
-      };
-    } catch (error) {
-      try {
-        agentManifestService.saveDefinition(paths, { ...request.draft, delete: true });
-        if (currentDefinition) {
-          const {
-            filePath: _filePath,
-            builtin: _builtin,
-            updatedAt: _updatedAt,
-            ...previousDraft
-          } = currentDefinition;
-          agentManifestService.saveDefinition(paths, previousDraft as AgentManifestDraft);
-        }
-      } catch {
-        // Preserve the original transaction failure; repository/runtime checks
-        // will surface any rollback failure through the missing manifest.
-      }
-      throw error;
+  async getProviderDefinitionCommit(providerIdDraft: string): Promise<ProviderDefinitionCommitSnapshot | null> {
+    this.ensureInitialized();
+    const providerId = providerIdDraft.trim();
+    if (!providerId) return null;
+    return this.readProviderDefinitionCommit(providerId);
+  }
+
+  setProviderDefinitionCatalogRevision(providerId: string, catalogRevision: string | null): void {
+    const snapshot = this.providerDefinitionCommits.get(providerId);
+    if (snapshot) this.providerDefinitionCommits.set(providerId, { ...snapshot, catalogRevision });
+  }
+
+  async saveProviderDefinition(request: ProviderDefinitionSaveRequest): Promise<ProviderDefinitionSaveResult> {
+    this.ensureInitialized();
+    const providerId = request.provider.id.trim();
+    const previous = await this.readProviderDefinitionCommit(providerId);
+    if (!providerId || !Number.isSafeInteger(request.clientRevision) || request.clientRevision < 1) {
+      return this.providerSaveResult(request, 'failed', previous, 'clientRevision must be a positive safe integer.');
     }
+    const latestRevision = this.providerDefinitionRevisions.get(providerId) ?? 0;
+    if (request.clientRevision <= latestRevision) {
+      return this.providerSaveResult(request, 'superseded', previous);
+    }
+    this.providerDefinitionRevisions.set(providerId, request.clientRevision);
+    await Promise.resolve();
+    return this.withProviderDefinitionWriteLock(providerId, async () => {
+      if (this.providerDefinitionRevisions.get(providerId) !== request.clientRevision) {
+        return this.providerSaveResult(request, 'superseded', previous);
+      }
+      try {
+        const provider = await this.persistProviderDefinition(request.provider);
+        if (this.providerDefinitionRevisions.get(providerId) !== request.clientRevision) {
+          if (previous?.provider) await this.persistProviderDefinition(previous.provider);
+          return this.providerSaveResult(request, 'superseded', previous);
+        }
+        const snapshot: ProviderDefinitionCommitSnapshot = {
+          clientRevision: request.clientRevision,
+          providerId,
+          commitHash: hashProviderDefinition(provider),
+          provider,
+          catalogRevision: null,
+        };
+        this.providerDefinitionCommits.set(providerId, snapshot);
+        return this.providerSaveResult(request, 'committed', snapshot);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return this.providerDefinitionRevisions.get(providerId) === request.clientRevision
+          ? this.providerSaveResult(request, 'failed', previous, message)
+          : this.providerSaveResult(request, 'superseded', previous);
+      }
+    });
   }
 
   saveProviderConnection(
@@ -1595,6 +1928,7 @@ export class SettingsService {
     protocolDraft?: unknown,
     authModeDraft?: LlmProviderAuthMode,
     modelPreferences?: LlmProviderModelPreference[],
+    connectionValuesDraft?: Record<string, string>,
   ): AppSettings {
     const current = this.getAll();
     const provider = current.llm.providers.find((entry) => entry.id === providerId);
@@ -1608,7 +1942,7 @@ export class SettingsService {
     if (authMode === 'account') {
       throw new Error(`Provider ${providerId} account mode must use its login flow.`);
     }
-    const authAvailability = resolveSelectedAuthAvailability(provider.id, authMode, createProviderEntryFromPreset(provider.id));
+    const authAvailability = resolveSelectedAuthAvailability(provider.id, authMode, createProviderEntryFromCatalog(provider.id));
     if (authAvailability.state === 'unavailable') {
       throw new Error(authAvailability.reason ?? `Provider ${providerId} ${authMode} authentication is unavailable.`);
     }
@@ -1623,30 +1957,112 @@ export class SettingsService {
     const hasEnabledModels = discoveredModels.some((model) => model.enabled !== false);
     const protocol = normalizeProviderProtocol({ id: provider.id, protocol: protocolDraft ?? provider.protocol });
     const timestamp = nowIso();
-    const protocolDefault = resolveBuiltinProtocolBaseUrl(provider.id, protocol);
+    const defaultBaseUrl = getProviderDefaultBaseUrl(provider.id);
     const nextBaseUrl = provider.baseUrlEditable
-      ? (baseUrl.trim() || protocolDefault || provider.baseUrl)
-      : (protocolDefault || provider.baseUrl);
+      ? (baseUrl.trim() || defaultBaseUrl || provider.baseUrl)
+      : (defaultBaseUrl || provider.baseUrl);
+    const schema = provider.connectionSchema;
+    const primarySecretFieldId = resolvePrimaryConnectionSecretFieldId(schema) ?? 'apiKey';
+    const existingHydratedValues = this.getProviderConnectionValues(provider.id, current.paths.userRdxRoot);
+    const draftHas = (fieldId: string): boolean => (
+      Object.prototype.hasOwnProperty.call(connectionValuesDraft ?? {}, fieldId)
+    );
+    const nextConnectionValues = sanitizeConnectionValues(schema, {
+      ...(provider.connectionValues ?? {}),
+      ...Object.fromEntries(
+        (schema?.fields ?? [])
+          .filter((field) => field.kind !== 'secret' && draftHas(field.id))
+          .map((field) => [field.id, connectionValuesDraft?.[field.id] ?? '']),
+      ),
+    });
+    const plannedSecrets = Object.fromEntries(
+      (schema?.fields ?? [])
+        .filter((field) => field.kind === 'secret')
+        .map((field) => {
+          const drafted = field.id === primarySecretFieldId
+            ? apiKey.trim() || (draftHas(field.id) ? connectionValuesDraft?.[field.id]?.trim() ?? '' : '')
+            : draftHas(field.id)
+              ? connectionValuesDraft?.[field.id]?.trim() ?? ''
+              : '';
+          const retainExisting = !draftHas(field.id) && (field.id !== primarySecretFieldId || !apiKey.trim());
+          return [field.id, drafted || (retainExisting ? existingHydratedValues[field.id] ?? '' : '')];
+        }),
+    ) as Record<string, string>;
+    const plannedSecretPresence = Object.fromEntries(
+      Object.entries(plannedSecrets).map(([fieldId, value]) => [fieldId, Boolean(value)]),
+    ) as Record<string, boolean>;
+    const credentialSatisfied = schema?.fields.length
+      ? isConnectionSchemaSatisfied(schema, nextConnectionValues, plannedSecretPresence)
+      : Boolean(apiKey.trim() || provider.hasStoredSecretByAuthMode?.['api-key']);
+    if (authMode === 'api-key' && !credentialSatisfied) {
+      throw new Error('Provider connection fields are incomplete.');
+    }
+
+    const credentialChanged = (schema?.fields ?? [])
+      .filter((field) => field.kind === 'secret')
+      .some((field) => (plannedSecrets[field.id] ?? '') !== (existingHydratedValues[field.id] ?? ''));
+    const currentAccountId = provider.authAccountIds?.['api-key'];
+    const nextAccountId = credentialSatisfied
+      ? (!currentAccountId || credentialChanged ? createLocalAccountId() : currentAccountId)
+      : undefined;
+    const nextAuthAccountIds = { ...(provider.authAccountIds ?? {}) };
+    if (nextAccountId) {
+      nextAuthAccountIds['api-key'] = nextAccountId;
+    } else {
+      delete nextAuthAccountIds['api-key'];
+    }
+    const nextPrimarySecretRef = getProviderAccountSecretRef(provider.id, nextAccountId, 'api-key');
+    const nextSecretRefs: Record<string, string> = {};
+    const stagedSecretRefs = new Set<string>();
+    const retainedSecretRefs = new Set<string>();
+    const previousSecretRefs = new Set<string>([
+      ...(provider.secretRef ? [provider.secretRef] : []),
+      ...Object.values(provider.secretRefs ?? {}),
+    ]);
+
+    if (nextAccountId) {
+      for (const field of schema?.fields ?? []) {
+        if (field.kind !== 'secret' || !plannedSecrets[field.id]) {
+          continue;
+        }
+        const targetRef = field.id === primarySecretFieldId
+          ? nextPrimarySecretRef
+          : secretStorageService.createProviderConnectionSecretRef(provider.id, nextAccountId, field.id);
+        if (!targetRef) {
+          continue;
+        }
+        if (field.id !== primarySecretFieldId) {
+          nextSecretRefs[field.id] = targetRef;
+        }
+        retainedSecretRefs.add(targetRef);
+        if (credentialChanged || !secretStorageService.hasSecretRecord(targetRef, current.paths.userRdxRoot)) {
+          secretStorageService.setSecret(targetRef, plannedSecrets[field.id], current.paths.userRdxRoot);
+          stagedSecretRefs.add(targetRef);
+        }
+      }
+    }
+
     const nextProvider: LlmProviderEntry = {
       ...provider,
       authMode,
-      activeAccountId: provider.authAccountIds?.[authMode],
-      apiKey: apiKey.trim(),
+      activeAccountId: authMode === 'api-key' ? nextAccountId : provider.authAccountIds?.[authMode],
+      authAccountIds: nextAuthAccountIds,
+      apiKey: '',
+      secretRef: nextPrimarySecretRef,
+      secretRefs: nextSecretRefs,
+      connectionValues: nextConnectionValues,
+      hasStoredConnectionSecrets: plannedSecretPresence,
       protocol,
       enabled: hasEnabledModels,
       hasStoredSecret: authMode === 'api-key'
-        ? Boolean(apiKey.trim() || provider.hasStoredSecretByAuthMode?.['api-key'])
+        ? credentialSatisfied
         : authMode === 'local' || authMode === 'environment',
       hasStoredSecretByAuthMode: {
         ...(provider.hasStoredSecretByAuthMode ?? {}),
-        [authMode]: authMode === 'api-key'
-          ? Boolean(apiKey.trim() || provider.hasStoredSecretByAuthMode?.['api-key'])
-          : true,
+        [authMode]: authMode === 'api-key' ? credentialSatisfied : true,
       },
       configuredAuthMode: authMode,
       baseUrl: nextBaseUrl,
-      protocolOptions: getProviderPresetProtocolOptions(provider.id),
-      protocolBaseUrls: getProviderPresetProtocolBaseUrls(provider.id),
       models: discoveredModels.map((model) => ({ ...model })),
       status: 'verified',
       lastTestedAt: timestamp,
@@ -1660,12 +2076,24 @@ export class SettingsService {
       isConfigured: hasEnabledModels,
     };
 
-    return this.setAll({
-      llm: {
-        providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
-        agentRoutes: current.llm.agentRoutes,
-      },
-    });
+    try {
+      const nextSettings = this.setAll({
+        llm: {
+          providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
+        },
+      });
+      this.deleteSecretsAfterCommit(
+        [...previousSecretRefs].filter((secretRef) => !retainedSecretRefs.has(secretRef)),
+        current.paths.userRdxRoot,
+      );
+      return nextSettings;
+    } catch (error) {
+      this.deleteSecretsAfterCommit(
+        [...stagedSecretRefs].filter((secretRef) => !previousSecretRefs.has(secretRef)),
+        current.paths.userRdxRoot,
+      );
+      throw error;
+    }
   }
 
   saveProviderAccountConnection(
@@ -1722,7 +2150,6 @@ export class SettingsService {
     const nextSettings = this.setAll({
       llm: {
         providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
-        agentRoutes: current.llm.agentRoutes,
       },
     });
     this.deleteSecretsAfterCommit(previousSecretRef ? [previousSecretRef] : [], current.paths.userRdxRoot);
@@ -1763,7 +2190,6 @@ export class SettingsService {
     const nextSettings = this.setAll({
       llm: {
         providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
-        agentRoutes: current.llm.agentRoutes,
       },
     });
     this.deleteSecretsAfterCommit(previousSecretRef ? [previousSecretRef] : [], current.paths.userRdxRoot);
@@ -1777,7 +2203,6 @@ export class SettingsService {
         providers: current.llm.providers.map((provider) => provider.id === providerId
           ? { ...provider, enabled: false, status: 'failed', isConfigured: false, lastError: message }
           : provider),
-        agentRoutes: current.llm.agentRoutes,
       },
     });
   }
@@ -1813,14 +2238,13 @@ export class SettingsService {
           providers: current.llm.providers.map((entry) => entry.id === providerId
             ? { ...provider, authAccountIds, hasStoredSecretByAuthMode }
             : entry),
-          agentRoutes: current.llm.agentRoutes,
         },
       });
       this.deleteSecretsAfterCommit(secretRefToDelete ? [secretRefToDelete] : [], current.paths.userRdxRoot);
       return nextSettings;
     }
 
-    const fallback = createProviderEntryFromPreset(provider.id);
+    const fallback = createProviderEntryFromCatalog(provider.id);
     const selectedAvailability = resolveSelectedAuthAvailability(provider.id, provider.authMode, fallback);
     const nextProvider: LlmProviderEntry = {
       ...provider,
@@ -1845,7 +2269,6 @@ export class SettingsService {
     const nextSettings = this.setAll({
       llm: {
         providers: current.llm.providers.map((entry) => entry.id === providerId ? nextProvider : entry),
-        agentRoutes: current.llm.agentRoutes,
       },
     });
     this.deleteSecretsAfterCommit(secretRefToDelete ? [secretRefToDelete] : [], current.paths.userRdxRoot);

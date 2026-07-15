@@ -2,6 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import type { MaxVisualPhase } from './maxVisual';
 import {
   clampMaxProgress,
+  MAX_VISUAL_EVOLVE_MS,
+  MAX_VISUAL_RETREAT_MS,
   maxFieldNoise,
   prefersReducedMotion,
   resolveMaxFieldCell,
@@ -103,9 +105,7 @@ function paintField(
 
   const coverage = resolveMaxFieldCoverage(input);
   if (coverage <= 0) return;
-  const breath = input.reduced || input.phase !== 'settled'
-    ? 0
-    : Math.sin(input.timeMs / 1300) * 0.035;
+  const breath = 0;
 
   for (let col = 0; col < cols; col += 1) {
     for (let row = 0; row < ROWS; row += 1) {
@@ -139,7 +139,7 @@ export const EffortMaxField: React.FC<{
   const phaseRef = useRef(phase);
   const progressRef = useRef(progress);
   const thumbRef = useRef(thumbRatio);
-  const paintRef = useRef<(timeMs: number) => void>(() => undefined);
+  const paintRef = useRef<(timeMs: number, phase?: MaxVisualPhase, progress?: number) => void>(() => undefined);
   const fieldActive = phase !== 'idle';
 
   phaseRef.current = phase;
@@ -155,7 +155,7 @@ export const EffortMaxField: React.FC<{
 
     let colors = readFieldColors(layer);
     const reduced = prefersReducedMotion();
-    const paint = (timeMs: number) => {
+    const paint = (timeMs: number, phaseOverride?: MaxVisualPhase, progressOverride?: number) => {
       const width = Math.max(1, Math.floor(layer.clientWidth));
       const height = Math.max(1, Math.floor(layer.clientHeight));
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -169,8 +169,8 @@ export const EffortMaxField: React.FC<{
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
       paintField(ctx, width, height, {
-        phase: phaseRef.current,
-        progress: progressRef.current,
+        phase: phaseOverride ?? phaseRef.current,
+        progress: progressOverride ?? progressRef.current,
         thumbRatio: thumbRef.current,
         timeMs,
         colors,
@@ -203,14 +203,34 @@ export const EffortMaxField: React.FC<{
   }, [fieldActive, phase, progress, thumbRatio]);
 
   useEffect(() => {
-    if (phase !== 'settled' || prefersReducedMotion()) return undefined;
+    if (phase !== 'evolve' && phase !== 'retreat') return undefined;
+    const duration = phase === 'evolve' ? MAX_VISUAL_EVOLVE_MS : MAX_VISUAL_RETREAT_MS;
+    if (prefersReducedMotion() || document.hidden) {
+      paintRef.current(performance.now(), phase, 1);
+      return undefined;
+    }
     let frame = 0;
-    const tick = (now: number) => {
-      paintRef.current(now);
-      frame = window.requestAnimationFrame(tick);
+    const startedAt = performance.now();
+    const stop = () => {
+      if (!frame) return;
+      window.cancelAnimationFrame(frame);
+      frame = 0;
     };
+    const tick = (now: number) => {
+      const next = clampMaxProgress((now - startedAt) / duration);
+      paintRef.current(now, phase, next);
+      if (next < 1 && !document.hidden) frame = window.requestAnimationFrame(tick);
+      else frame = 0;
+    };
+    const onVisibilityChange = () => {
+      if (document.hidden) stop();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
     frame = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frame);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      stop();
+    };
   }, [phase]);
 
   if (!fieldActive) return null;

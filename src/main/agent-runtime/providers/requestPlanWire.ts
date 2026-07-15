@@ -1,6 +1,6 @@
 import type { JsonObject, JsonValue, RequestPlan } from '@shared/types/providerCapability';
 
-const SECRET_HEADER = /^(?:authorization|proxy-authorization|x-api-key|api-key)$/i;
+const SECRET_HEADER = /^(?:authorization|proxy-authorization|cookie|set-cookie|.*(?:api[-_]?key|access[-_]?token|refresh[-_]?token|bearer[-_]?token|security[-_]?token|client[-_]?secret|credential|password))$/i;
 
 function cloneJson(value: JsonValue): JsonValue {
   if (Array.isArray(value)) return value.map(cloneJson);

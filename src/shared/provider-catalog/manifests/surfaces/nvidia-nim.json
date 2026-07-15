@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 2,
+  "id": "nvidia-nim",
+  "identityIds": [
+    "nvidia"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "json-catalog",
+  "vendorId": "nvidia",
+  "label": "NVIDIA NIM",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "cloud-platform",
+  "surfaceKind": "cloud",
+  "serviceOperator": "nvidia",
+  "endpointClass": "cloud-hosted",
+  "endpointOwnership": "cloud-platform",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:nvidia-nim:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "nvidia-nim"
+    },
+    {
+      "id": "models.dev:nvidia:1",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "nvidia",
+      "surface": "nvidia-nim"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:nvidia-nim:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://integrate.api.nvidia.com/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "authoritative-list",
+    "strategy": {
+      "kind": "json-catalog",
+      "path": "/models",
+      "collectionPath": "data",
+      "mapping": {
+        "id": "id",
+        "label": "id"
+      },
+      "admission": {
+        "denyPatterns": [
+          "*embed*",
+          "*rerank*",
+          "*guard*",
+          "*safety*",
+          "*flux*",
+          "*stable-diffusion*",
+          "*retriever*"
+        ]
+      }
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "deepseek-ai/deepseek-v4-pro",
+    "nvidia/nemotron-3-super-120b-a12b"
+  ],
+  "docsUrl": "https://docs.api.nvidia.com/nim/reference/llm-apis"
+}

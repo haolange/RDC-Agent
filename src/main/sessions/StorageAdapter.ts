@@ -17,6 +17,7 @@ import {
 } from '@shared/utils/id';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
+import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import { sanitizeStoredWorkTrace } from '../conversation/ConversationWorkTrace';
 import type {
   Blocker,
@@ -44,12 +45,45 @@ import type {
 } from './storageTypes';
 import type { SessionContextTurnEntry } from '../conversation/SessionContextJournal';
 
+interface ConversationTurnCommitJournal {
+  schemaVersion: '1';
+  requestId: string;
+  turnId: string;
+  phase: 'prepared' | 'committing' | 'committed';
+  beforeHistory: ConversationMessage[];
+  beforeBranch: ConversationBranchState | null;
+  beforeAttachments: SessionAttachmentRecord[];
+  afterHistory?: ConversationMessage[];
+  afterBranch?: ConversationBranchState | null;
+  afterAttachments: SessionAttachmentRecord[];
+  importedPaths: string[];
+}
+
+export interface ExistingConversationTurnCommit {
+  session: SessionRecord;
+  requestId: string;
+  turnId: string;
+  attachments: SessionAttachmentRecord[];
+  beforeHistory: ConversationMessage[];
+  beforeBranch: ConversationBranchState | null;
+}
+
+export interface StagedConversationSessionCommit {
+  session: SessionRecord;
+  requestId: string;
+  turnId: string;
+  stagingPath: string;
+  finalPath: string;
+  attachments: SessionAttachmentRecord[];
+}
+
 export class StorageAdapter {
   private dataRootPath = '';
   private projectsRootPath = '';
   private globalKnowledgePath = '';
   private registryPath = '';
   private selectionPath = '';
+  private readonly turnCommitSessionIds = new Set<string>();
 
   constructor() {
     this.syncRuntimePaths();
@@ -72,6 +106,7 @@ export class StorageAdapter {
     this.ensureRegistry();
     this.ensureSelection();
     this.ensureDir(this.globalKnowledgePath);
+    this.recoverConversationTurnCommits();
   }
 
   listProjects(): ProjectRecord[] {
@@ -320,6 +355,162 @@ export class StorageAdapter {
     this.setCurrentSessionId(session.sessionId);
 
     return session;
+  }
+
+  beginStagedConversationSession(
+    projectId: string,
+    title: string,
+    sourceAttachmentPaths: string[],
+    requestId: string,
+    turnId: string,
+  ): StagedConversationSessionCommit {
+    const project = this.getProjectById(projectId);
+    if (!project) throw new Error(`Project not found: ${projectId}`);
+    const timestamp = nowMs();
+    const sessionId = `sess_${generateShortId()}`;
+    const sessionsRoot = this.ensureProjectSessionsRoot(project);
+    const finalPath = path.join(sessionsRoot, sessionId);
+    const stagingPath = path.join(
+      sessionsRoot,
+      `.turn-staging-${sanitizeToken(requestId).slice(0, 48) || generateShortId()}-${sessionId}`,
+    );
+    if (fs.existsSync(stagingPath)) fs.rmSync(stagingPath, { recursive: true, force: true });
+    this.ensureDir(path.join(stagingPath, 'attachments'));
+    this.ensureDir(path.join(stagingPath, 'timeline'));
+    this.ensureDir(path.join(stagingPath, 'runs'));
+    const session: SessionRecord = {
+      sessionId,
+      projectId,
+      title: this.normalizeSessionTitle(projectId, title),
+      goal: '',
+      sessionPath: finalPath,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    try {
+      const attachments = this.copyAttachmentsForTurn(
+        session,
+        sourceAttachmentPaths,
+        path.join(stagingPath, 'attachments'),
+        path.join(finalPath, 'attachments'),
+      );
+      return { session, requestId, turnId, stagingPath, finalPath, attachments };
+    } catch (error) {
+      fs.rmSync(stagingPath, { recursive: true, force: true });
+      throw error;
+    }
+  }
+
+  commitStagedConversationSession(
+    commit: StagedConversationSessionCommit,
+    history: ConversationMessage[],
+    branchState: ConversationBranchState | null,
+  ): SessionRecord {
+    if (!fs.existsSync(commit.stagingPath) || fs.existsSync(commit.finalPath)) {
+      throw new Error('Staged conversation session is no longer commit-ready.');
+    }
+    this.writeJsonAtomic(path.join(commit.stagingPath, 'session.json'), commit.session);
+    this.writeJsonlAtomic(path.join(commit.stagingPath, 'conversation.jsonl'), history);
+    this.writeJsonAtomic(path.join(commit.stagingPath, 'attachments.json'), commit.attachments);
+    this.writeUtf8Atomic(path.join(commit.stagingPath, 'action_chain.jsonl'), '');
+    if (branchState) {
+      this.writeJsonAtomic(path.join(commit.stagingPath, 'conversation-branches.json'), branchState);
+    }
+    fs.renameSync(commit.stagingPath, commit.finalPath);
+    this.syncSessionEvidence(commit.session.sessionId, commit.session.projectId);
+    this.touchProject(commit.session.projectId, commit.session.sessionId, commit.session.updatedAt);
+    this.setCurrentProjectId(commit.session.projectId);
+    this.setCurrentSessionId(commit.session.sessionId);
+    return commit.session;
+  }
+
+  rollbackStagedConversationSession(commit: StagedConversationSessionCommit): void {
+    if (fs.existsSync(commit.stagingPath)) fs.rmSync(commit.stagingPath, { recursive: true, force: true });
+  }
+
+  beginExistingConversationTurnCommit(
+    sessionId: string,
+    sourceAttachmentPaths: string[],
+    requestId: string,
+    turnId: string,
+  ): ExistingConversationTurnCommit {
+    if (this.turnCommitSessionIds.has(sessionId)) {
+      throw new Error(`Conversation turn commit is already active for session ${sessionId}.`);
+    }
+    this.recoverSessionTurnCommit(sessionId);
+    const session = this.readSession(sessionId);
+    if (!session) throw new Error(`Session not found: ${sessionId}`);
+    const beforeHistory = this.readConversationHistory(sessionId);
+    const beforeBranch = this.readConversationBranchState(sessionId);
+    const beforeAttachments = this.readSessionAttachments(sessionId);
+    const attachmentsDir = this.getSessionAttachmentsDir(sessionId);
+    const attachments = this.planAttachmentsForTurn(session, sourceAttachmentPaths, attachmentsDir);
+    const afterAttachments = beforeAttachments.concat(attachments);
+    const journal: ConversationTurnCommitJournal = {
+      schemaVersion: '1',
+      requestId,
+      turnId,
+      phase: 'prepared',
+      beforeHistory,
+      beforeBranch,
+      beforeAttachments,
+      afterAttachments,
+      importedPaths: attachments.map((entry) => entry.filePath),
+    };
+    this.writeJsonAtomic(this.getConversationTurnCommitJournalPath(session.sessionPath), journal);
+    this.turnCommitSessionIds.add(sessionId);
+    try {
+      for (let index = 0; index < sourceAttachmentPaths.length; index += 1) {
+        const sourcePath = path.resolve(sourceAttachmentPaths[index]!);
+        const targetPath = attachments[index]!.filePath;
+        const temporaryPath = `${targetPath}.${process.pid}.${generateShortId()}.tmp`;
+        fs.copyFileSync(sourcePath, temporaryPath);
+        fs.renameSync(temporaryPath, targetPath);
+      }
+      this.writeJsonAtomic(this.getSessionAttachmentsManifestPath(sessionId), afterAttachments);
+      return { session, requestId, turnId, attachments, beforeHistory, beforeBranch };
+    } catch (error) {
+      this.turnCommitSessionIds.delete(sessionId);
+      this.recoverSessionTurnCommit(sessionId);
+      throw error;
+    }
+  }
+
+  commitExistingConversationTurn(
+    commit: ExistingConversationTurnCommit,
+    history: ConversationMessage[],
+    branchState: ConversationBranchState | null,
+  ): void {
+    const journalPath = this.getConversationTurnCommitJournalPath(commit.session.sessionPath);
+    const journal = this.readJson<ConversationTurnCommitJournal>(journalPath);
+    if (!journal || journal.requestId !== commit.requestId || journal.turnId !== commit.turnId) {
+      throw new Error('Conversation turn commit journal is missing or belongs to another turn.');
+    }
+    const committing: ConversationTurnCommitJournal = {
+      ...journal,
+      phase: 'committing',
+      afterHistory: history,
+      afterBranch: branchState,
+    };
+    this.writeJsonAtomic(journalPath, committing);
+    try {
+      this.applyConversationTurnJournal(commit.session, committing, true);
+      this.writeJsonAtomic(journalPath, { ...committing, phase: 'committed' });
+      fs.rmSync(journalPath, { force: true });
+      this.updateSession(commit.session.sessionId, {});
+    } catch (error) {
+      throw error;
+    } finally {
+      this.turnCommitSessionIds.delete(commit.session.sessionId);
+    }
+  }
+
+  rollbackExistingConversationTurn(commit: ExistingConversationTurnCommit): void {
+    try {
+      this.recoverSessionTurnCommit(commit.session.sessionId, true);
+    } finally {
+      this.turnCommitSessionIds.delete(commit.session.sessionId);
+    }
   }
 
   readSession(sessionId: string): SessionRecord | null {
@@ -643,6 +834,11 @@ export class StorageAdapter {
     }
   }
 
+  clearConversationBranchState(sessionId: string): void {
+    const filePath = this.getConversationBranchStatePath(sessionId);
+    if (fs.existsSync(filePath)) fs.rmSync(filePath, { force: true });
+  }
+
   getSessionAttachmentsDir(sessionId: string): string {
     const location = this.findSessionLocation(sessionId);
     if (!location) {
@@ -822,6 +1018,24 @@ export class StorageAdapter {
     }
 
     return imported;
+  }
+
+  rollbackImportedSessionAttachments(
+    sessionId: string,
+    attachments: SessionAttachmentRecord[],
+  ): void {
+    if (attachments.length === 0) return;
+    const attachmentsDir = path.resolve(this.getSessionAttachmentsDir(sessionId));
+    const ids = new Set(attachments.map((entry) => entry.attachmentId));
+    for (const attachment of attachments) {
+      const resolvedPath = path.resolve(attachment.filePath);
+      if (resolvedPath.startsWith(`${attachmentsDir}${path.sep}`) && fs.existsSync(resolvedPath)) {
+        fs.unlinkSync(resolvedPath);
+      }
+    }
+    const remaining = this.readSessionAttachments(sessionId)
+      .filter((entry) => !ids.has(entry.attachmentId));
+    this.writeSessionAttachments(sessionId, remaining);
   }
 
   readSessionEvidence(sessionId: string): SessionEvidenceRecord | null {
@@ -1367,6 +1581,29 @@ export class StorageAdapter {
     fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
   }
 
+  private writeUtf8Atomic(filePath: string, content: string): void {
+    this.ensureDir(path.dirname(filePath));
+    const temporaryPath = `${filePath}.${process.pid}.${generateShortId()}.tmp`;
+    fs.writeFileSync(temporaryPath, content, 'utf-8');
+    try {
+      fs.renameSync(temporaryPath, filePath);
+    } catch (error) {
+      if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+      throw error;
+    }
+  }
+
+  private writeJsonAtomic(filePath: string, data: unknown): void {
+    this.writeUtf8Atomic(filePath, JSON.stringify(data, null, 2));
+  }
+
+  private writeJsonlAtomic(filePath: string, items: unknown[]): void {
+    const content = items.length > 0
+      ? `${items.map((item) => JSON.stringify(item)).join('\n')}\n`
+      : '';
+    this.writeUtf8Atomic(filePath, content);
+  }
+
   private deepMerge<T extends Record<string, unknown>>(base: T, patch: Record<string, unknown>): T {
     const output: Record<string, unknown> = { ...base };
 
@@ -1485,7 +1722,118 @@ export class StorageAdapter {
   }
 
   private writeSessionAttachments(sessionId: string, attachments: SessionAttachmentRecord[]): void {
-    this.writeJson(this.getSessionAttachmentsManifestPath(sessionId), attachments);
+    this.writeJsonAtomic(this.getSessionAttachmentsManifestPath(sessionId), attachments);
+  }
+
+  private getConversationTurnCommitJournalPath(sessionPath: string): string {
+    return path.join(sessionPath, 'turn-commit.json');
+  }
+
+  private planAttachmentsForTurn(
+    session: SessionRecord,
+    sourcePaths: string[],
+    logicalAttachmentsDir: string,
+  ): SessionAttachmentRecord[] {
+    const reserved = new Set<string>();
+    return sourcePaths.map((filePath) => {
+      const sourcePath = path.resolve(filePath);
+      if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
+        throw new Error(`Attachment is not a readable file: ${sourcePath}`);
+      }
+      const extension = path.extname(sourcePath);
+      const baseName = path.basename(sourcePath, extension);
+      let fileName = path.basename(sourcePath);
+      let targetPath = path.join(logicalAttachmentsDir, fileName);
+      let counter = 2;
+      while (fs.existsSync(targetPath) || reserved.has(targetPath.toLowerCase())) {
+        fileName = `${baseName}-${counter}${extension}`;
+        targetPath = path.join(logicalAttachmentsDir, fileName);
+        counter += 1;
+      }
+      reserved.add(targetPath.toLowerCase());
+      const stats = fs.statSync(sourcePath);
+      return {
+        attachmentId: `att_${generateShortId()}`,
+        sessionId: session.sessionId,
+        projectId: session.projectId,
+        kind: this.inferAttachmentKind(sourcePath),
+        fileName,
+        filePath: targetPath,
+        mimeType: this.inferMimeType(sourcePath),
+        size: stats.size,
+        createdAt: nowMs(),
+      };
+    });
+  }
+
+  private copyAttachmentsForTurn(
+    session: SessionRecord,
+    sourcePaths: string[],
+    physicalAttachmentsDir: string,
+    logicalAttachmentsDir: string,
+  ): SessionAttachmentRecord[] {
+    const planned = this.planAttachmentsForTurn(session, sourcePaths, logicalAttachmentsDir);
+    for (let index = 0; index < planned.length; index += 1) {
+      const targetPath = path.join(physicalAttachmentsDir, planned[index]!.fileName);
+      fs.copyFileSync(path.resolve(sourcePaths[index]!), targetPath);
+    }
+    return planned;
+  }
+
+  private recoverConversationTurnCommits(): void {
+    for (const project of this.readRegistry().projects) {
+      const sessionsRoot = this.ensureProjectSessionsRoot(project);
+      for (const entry of fs.readdirSync(sessionsRoot, { withFileTypes: true })) {
+        const entryPath = path.join(sessionsRoot, entry.name);
+        if (!entry.isDirectory()) continue;
+        if (entry.name.startsWith('.turn-staging-')) {
+          fs.rmSync(entryPath, { recursive: true, force: true });
+          continue;
+        }
+        const session = this.readJson<SessionRecord>(path.join(entryPath, 'session.json'));
+        if (session) this.recoverSessionTurnCommit(session.sessionId);
+      }
+    }
+  }
+
+  private recoverSessionTurnCommit(sessionId: string, forceRollback = false): void {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) return;
+    const journalPath = this.getConversationTurnCommitJournalPath(location.sessionPath);
+    const journal = this.readJson<ConversationTurnCommitJournal>(journalPath);
+    if (!journal) return;
+    const session = this.readJson<SessionRecord>(path.join(location.sessionPath, 'session.json'));
+    if (!session) return;
+    const shouldRollForward = !forceRollback
+      && (journal.phase === 'committing' || journal.phase === 'committed')
+      && Array.isArray(journal.afterHistory);
+    this.applyConversationTurnJournal(session, journal, shouldRollForward);
+    fs.rmSync(journalPath, { force: true });
+  }
+
+  private applyConversationTurnJournal(
+    session: SessionRecord,
+    journal: ConversationTurnCommitJournal,
+    useAfter: boolean,
+  ): void {
+    const history = useAfter ? journal.afterHistory : journal.beforeHistory;
+    const branch = useAfter ? journal.afterBranch : journal.beforeBranch;
+    const attachments = useAfter ? journal.afterAttachments : journal.beforeAttachments;
+    if (!history) throw new Error('Conversation turn journal does not contain a committed history snapshot.');
+    this.writeJsonlAtomic(path.join(session.sessionPath, 'conversation.jsonl'), history);
+    const branchPath = path.join(session.sessionPath, 'conversation-branches.json');
+    if (branch) this.writeJsonAtomic(branchPath, branch);
+    else if (fs.existsSync(branchPath)) fs.rmSync(branchPath, { force: true });
+    this.writeJsonAtomic(path.join(session.sessionPath, 'attachments.json'), attachments);
+    if (!useAfter) {
+      const attachmentsRoot = path.resolve(path.join(session.sessionPath, 'attachments'));
+      for (const importedPath of journal.importedPaths) {
+        const resolvedPath = path.resolve(importedPath);
+        if (resolvedPath.startsWith(`${attachmentsRoot}${path.sep}`) && fs.existsSync(resolvedPath)) {
+          fs.rmSync(resolvedPath, { force: true });
+        }
+      }
+    }
   }
 
   private resolveImportedFilePath(dirPath: string, fileName: string): string {

@@ -1,5 +1,8 @@
 import { LLM_PROVIDER_CATEGORY_DEFINITIONS, LLM_PROVIDER_PROTOCOL_DEFINITIONS } from '@shared/constants/llm';
-import { createProviderEntryFromPreset, listProviderPresets } from './ProviderPresetRegistry';
+import {
+  createProviderEntryFromCatalog,
+  listProviderSummaries,
+} from '../provider-catalog/ProviderCatalogRegistry';
 import type {
   LlmProviderCatalogEntry,
   LlmProviderCatalogResponse,
@@ -7,7 +10,7 @@ import type {
 
 const categoryRank = new Map(LLM_PROVIDER_CATEGORY_DEFINITIONS.map((entry, index) => [entry.id, index]));
 
-function toCatalogEntry(provider: ReturnType<typeof createProviderEntryFromPreset>): LlmProviderCatalogEntry {
+function toCatalogEntry(provider: ReturnType<typeof createProviderEntryFromCatalog>): LlmProviderCatalogEntry {
   return {
     id: provider.id,
     protocol: provider.protocol,
@@ -17,12 +20,21 @@ function toCatalogEntry(provider: ReturnType<typeof createProviderEntryFromPrese
     lifecycleStatus: provider.lifecycleStatus,
     providerAvailability: { ...provider.providerAvailability },
     category: provider.category,
+    serviceOperator: provider.serviceOperator,
+    endpointClass: provider.endpointClass,
     catalogOwnership: provider.catalogOwnership,
+    catalogProvenance: provider.catalogProvenance.map((entry) => ({ ...entry })),
+    connectionSchema: provider.connectionSchema
+      ? {
+          ...provider.connectionSchema,
+          fields: provider.connectionSchema.fields.map((field) => ({ ...field })),
+          credentialAlternatives: provider.connectionSchema.credentialAlternatives
+            ?.map((alternative) => ({ ...alternative, fieldIds: [...alternative.fieldIds] })),
+          headerMappings: provider.connectionSchema.headerMappings?.map((mapping) => ({ ...mapping })),
+        }
+      : undefined,
     label: provider.label,
     baseUrlEditable: provider.baseUrlEditable,
-    protocolEditable: provider.protocolEditable,
-    protocolOptions: provider.protocolOptions ? [...provider.protocolOptions] : undefined,
-    protocolBaseUrls: provider.protocolBaseUrls ? { ...provider.protocolBaseUrls } : undefined,
     recommendedModels: [...provider.recommendedModels],
     docsUrl: provider.docsUrl,
     accountLoginConfigured: provider.accountLoginConfigured,
@@ -43,8 +55,8 @@ function compareProvider(left: LlmProviderCatalogEntry, right: LlmProviderCatalo
 
 export class ProviderCatalogService {
   getProviderCatalog(): LlmProviderCatalogResponse {
-    const catalogProviders = listProviderPresets()
-      .map((preset) => createProviderEntryFromPreset(preset.id as Parameters<typeof createProviderEntryFromPreset>[0]))
+    const catalogProviders = listProviderSummaries()
+      .map((surface) => createProviderEntryFromCatalog(surface.id))
       .map(toCatalogEntry)
       .sort(compareProvider);
 

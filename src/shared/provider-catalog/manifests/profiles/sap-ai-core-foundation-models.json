@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "sap-ai-core-foundation-models",
+  "routeMechanics": [
+    {
+      "protocol": "SapAiCoreFoundationModels",
+      "adapter": "sap-ai-core-foundation-models"
+    }
+  ]
+}

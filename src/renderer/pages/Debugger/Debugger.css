@@ -726,9 +726,7 @@
 }
 
 .composer-effort-pill.is-level-max .composer-effort-pill-label,
-.composer-effort-pill.is-level-ultra .composer-effort-pill-label,
-.composer-effort-pill.is-level-max .composer-effort-pill-icon,
-.composer-effort-pill.is-level-ultra .composer-effort-pill-icon {
+.composer-effort-pill.is-level-max .composer-effort-pill-icon {
   color: var(--token-effort-fill-6);
 }
 
@@ -847,8 +845,7 @@
   --composer-effort-track-fill: var(--token-effort-fill-5);
 }
 
-.composer-effort-slider.is-level-max,
-.composer-effort-slider.is-level-ultra {
+.composer-effort-slider.is-level-max {
   --composer-effort-track-fill: var(--token-effort-fill-6);
 }
 

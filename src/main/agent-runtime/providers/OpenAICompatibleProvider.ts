@@ -27,6 +27,7 @@ import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
 import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
 import { composeAbortSignals, ensureOk, normalizeError, parseSSE, ProviderHttpError } from './internal/http';
 import { applyOpenAiCompatibleReasoning } from './reasoningWire';
+import type { ProviderRequestAuthorizer } from '../../settings/AwsBedrockCredentials';
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const PROVIDER_API = 'openai-compatible';
@@ -74,6 +75,11 @@ export interface OpenAICompatibleProviderOptions {
   apiKey?: string;
   /** 附加请求头（例如 OpenRouter 的 HTTP-Referer / X-Title）。 */
   headers?: Record<string, string>;
+  /** Some compatible surfaces (for example Azure) use a non-Bearer API-key header. */
+  authorization?: 'bearer' | 'none';
+  query?: Record<string, string>;
+  /** Body-aware authorization, used by transports such as AWS SigV4. */
+  requestAuthorizer?: ProviderRequestAuthorizer;
 }
 
 export class OpenAICompatibleProvider implements ProviderStrategy {
@@ -81,11 +87,17 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
   private readonly defaultBaseUrl: string;
   private readonly defaultApiKey: string | undefined;
   private readonly defaultHeaders: Record<string, string>;
+  private readonly authorization: 'bearer' | 'none';
+  private readonly query: Record<string, string>;
+  private readonly requestAuthorizer: ProviderRequestAuthorizer | undefined;
 
   constructor(options: OpenAICompatibleProviderOptions = {}) {
     this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
     this.defaultApiKey = options.apiKey;
     this.defaultHeaders = { ...(options.headers ?? {}) };
+    this.authorization = options.authorization ?? 'bearer';
+    this.query = { ...(options.query ?? {}) };
+    this.requestAuthorizer = options.requestAuthorizer;
   }
 
   stream(
@@ -122,22 +134,27 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
     try {
       builder.start();
 
-      if (!apiKey) {
+      if (!apiKey && !this.requestAuthorizer) {
         throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for OpenAI-compatible provider');
       }
 
       const body = applyRequestPlanBody(this.buildRequestBody(model, context, options), options.requestPlan);
-      const url = `${baseUrl}/chat/completions`;
+      const url = buildChatCompletionsUrl(baseUrl, this.query);
+      const bodyText = JSON.stringify(body);
+      const unsignedHeaders = {
+        'Content-Type': 'application/json',
+        ...(this.authorization === 'bearer' && apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        ...this.defaultHeaders,
+        ...requestPlanHeaders(options.requestPlan),
+      };
+      const headers = this.requestAuthorizer
+        ? await this.requestAuthorizer({ url, method: 'POST', headers: unsignedHeaders, body: bodyText })
+        : unsignedHeaders;
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-          ...this.defaultHeaders,
-          ...requestPlanHeaders(options.requestPlan),
-        },
-        body: JSON.stringify(body),
+        headers,
+        body: bodyText,
         signal: composed.signal,
       });
 
@@ -252,6 +269,16 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
     body.stream_options = { include_usage: true };
     return body;
   }
+}
+
+export function buildChatCompletionsUrl(baseUrl: string, query: Readonly<Record<string, string>> = {}): string {
+  const trimmed = baseUrl.replace(/\/+$/u, '');
+  const url = trimmed.endsWith('/chat/completions') ? trimmed : `${trimmed}/chat/completions`;
+  const entries = Object.entries(query).filter(([, value]) => value.trim().length > 0);
+  if (entries.length === 0) return url;
+  const result = new URL(url);
+  for (const [name, value] of entries) result.searchParams.set(name, value);
+  return result.toString();
 }
 
 // =====================================================================
@@ -380,4 +407,4 @@ function mapFinishReason(reason: string | null | undefined): StopReason {
   }
 }
 
-export const __testing = { mapFinishReason, toOpenAIMessages };
+export const __testing = { buildChatCompletionsUrl, mapFinishReason, toOpenAIMessages };

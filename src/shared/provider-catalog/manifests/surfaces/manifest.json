@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 2,
+  "id": "manifest",
+  "identityIds": [],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "manifest",
+  "label": "Manifest",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "manifest",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:manifest:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "manifest"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:manifest:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://app.manifest.build/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "gpt-4.1"
+  ],
+  "docsUrl": "https://app.manifest.build/"
+}

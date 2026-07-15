@@ -49,7 +49,11 @@ import type {
 } from '@shared/types/modelCapability';
 import { CONTEXT_COMPACTION_RATIO } from '@shared/types/modelCapability';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
-import type { AppMode, ContextUsageBreakdownEntry, NextRequestContextProjection } from '@shared/types/session';
+import type {
+  AppMode,
+  ContextUsageBreakdownEntry,
+  PreparedTurnContextSummary,
+} from '@shared/types/session';
 import type { LlmProviderId } from '@shared/types/settings';
 import type { WorkflowStage } from '@shared/types/workflow';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
@@ -60,6 +64,7 @@ import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
 import { Agent } from '../../agent-runtime/agent/Agent';
 import { ContextManager } from '../../agent-runtime/agent/ContextManager';
+import { turnPreparationWorkerPool } from '../../workers/TurnPreparationWorkerPool';
 import { promptPlanBuilder, requestEnvelopeBuilder, requestSnapshotStore, resolvePromptClock } from '../../agent-runtime/prompt';
 import { ErrorRecovery } from '../../agent-runtime/agent/ErrorRecovery';
 import { handoffController } from '../../agent-runtime/agent/HandoffController';
@@ -83,6 +88,7 @@ import {
   encodeAgentModel,
   configuredRuntimeProvider,
 } from '../../agent-runtime/providers/ConfiguredRuntimeProvider';
+import { requestPlanHeaders } from '../../agent-runtime/providers/requestPlanWire';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
 import {
   claimStructuredToolCallingEvidence,
@@ -111,6 +117,10 @@ import { agentManifestService } from '../../settings/AgentManifestService';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
 import { settingsService } from '../../settings/SettingsService';
+import { resolveGoogleVertexAccessToken } from '../../settings/GoogleApplicationCredentials';
+import { resolveAwsBedrockCredentials } from '../../settings/AwsBedrockCredentials';
+import { providerRuntimeCredentialService } from '../../settings/ProviderRuntimeCredentialService';
+import { loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
 import {
   planEffectiveModelRequest,
   recordEffectivePlanSuccess,
@@ -160,6 +170,7 @@ interface AgentProfileTurnOptions extends AgentTurnOptions {
   promptPlan?: PromptPlan;
   visibleTurnIds?: string[];
   activeBranchId?: string;
+  preparedTurn?: PreparedAgentTurnContext;
   onTerminalContext?: (result: {
     messages: Message[];
     route: SessionContextRoute;
@@ -187,6 +198,29 @@ interface AgentSlot {
 interface ResolvedRuntimeTools {
   definitions: ToolDefinition[];
   toolMap: Map<string, AgentTool>;
+}
+
+interface PreparedAgentRuntime {
+  runtimeTools: ResolvedRuntimeTools;
+  activeToolDefinitions: ToolDefinition[];
+  routeCapability: AgentRouteCapability;
+  mcpConnectionErrors: string[];
+  credentialHandle: string;
+}
+
+export interface PreparedAgentTurnContext {
+  summary: PreparedTurnContextSummary;
+  selectedModelId: string;
+  effectiveModel: EffectiveModel;
+  toolAllowlist: string[];
+  initialMessages: Message[];
+  contextDiagnostic: {
+    selectedTurnCount: number;
+    activeBranchId: string | null;
+    filteredArtifactCount: number;
+    compactionState: 'prepared' | 'not-required';
+  };
+  runtime: PreparedAgentRuntime;
 }
 
 interface ToolExecutorRuntimeContext {
@@ -353,13 +387,22 @@ export class AgentOrchestrator {
     options?: AgentTurnOptions,
   ): Promise<string> {
     const fallbackConfig = this.getOrCreateAgentConfig(agentId);
+    let ownedCredentialHandle: string | undefined;
 
     this.updateAgentStatus(agentId, 'thinking');
 
     try {
+      const stub = this.createTestModeStub(agentId, content);
       let runtimeProfile = this.resolveRuntimeProfile(agentId, context?.stageId);
-      await this.refreshAccountRuntimeCredentials(runtimeProfile.providerId);
-      runtimeProfile = this.resolveRuntimeProfile(agentId, context?.stageId);
+      if (!stub) {
+        const credentialProviderId = runtimeProfile.providerId;
+        ownedCredentialHandle = await this.refreshProviderRuntimeCredentials(credentialProviderId);
+        runtimeProfile = this.resolveRuntimeProfile(agentId, context?.stageId);
+        if (runtimeProfile.providerId !== credentialProviderId) {
+          providerRuntimeCredentialService.release(ownedCredentialHandle);
+          ownedCredentialHandle = await this.refreshProviderRuntimeCredentials(runtimeProfile.providerId);
+        }
+      }
       const config: AgentConfig = {
         ...fallbackConfig,
         systemPrompt: runtimeProfile.systemPrompt,
@@ -371,7 +414,6 @@ export class AgentOrchestrator {
 
       await this.recordMessage(agentId, 'user', content, context);
 
-      const stub = this.createTestModeStub(agentId, content);
       const settings = settingsService.getAll();
       const sessionRecord = context?.sessionId ? storageAdapter.readSession(context.sessionId) : null;
       const planning = planEffectiveModelRequest({
@@ -381,7 +423,9 @@ export class AgentOrchestrator {
         controls: {
           ...(sessionRecord?.turnControls ?? {}),
           ...(options?.turnControls ?? {}),
-          ...(options?.reasoning ? { reasoningLevel: options.reasoning.selection } : {}),
+          ...(options?.reasoning
+            ? { reasoningLevel: options.reasoning.selection === 'unknown' ? 'off' : options.reasoning.selection }
+            : {}),
         },
         requestedTemperature: config.temperature,
       });
@@ -434,6 +478,8 @@ export class AgentOrchestrator {
           projectRootPath: context?.projectRootPath ?? null,
           projectId: context?.projectId ?? null,
           promptPlan: promptPlan!,
+          effectiveModel: capability,
+          credentialHandle: ownedCredentialHandle,
           contextWindow: activeContextWindow,
           contextTokenLimit,
         });
@@ -450,16 +496,32 @@ export class AgentOrchestrator {
     } catch (error) {
       this.updateAgentStatus(agentId, 'error');
       throw error;
+    } finally {
+      providerRuntimeCredentialService.release(ownedCredentialHandle);
     }
   }
 
-  async previewNextRequestContext(input: {
-    clientRevision: number;
+  async refreshProviderRuntimeCredentials(providerId: LlmProviderId): Promise<string> {
+    const surface = await loadProviderSurface(providerId);
+    if (!surface) throw new Error(`Provider Catalog surface ${providerId} is unavailable.`);
+    await this.refreshAccountRuntimeCredentials(providerId);
+    return providerRuntimeCredentialService.freeze(providerId);
+  }
+
+  releaseProviderRuntimeCredentials(credentialHandle: string | undefined): void {
+    providerRuntimeCredentialService.release(credentialHandle);
+  }
+
+  async prepareTurnContext(input: {
+    requestId: string;
+    credentialHandle: string;
+    turnId: string;
     agentId: AgentRole;
     content: UserMessage['content'];
     imageTokenAdjustment: number;
     providerId: string;
-    modelId: string;
+    selectedModelId: string;
+    effectiveModel: EffectiveModel;
     routeCapability: AgentRouteCapability;
     requestPlan: RequestPlan;
     turnControls: ConversationTurnControls;
@@ -468,7 +530,13 @@ export class AgentOrchestrator {
     projectRootPath: string | null;
     sessionId: string | null;
     visibleTurnIds: string[];
-  }): Promise<NextRequestContextProjection> {
+    activeBranchId?: string | null;
+    signal?: AbortSignal;
+  }): Promise<PreparedAgentTurnContext> {
+    const throwIfCancelled = () => {
+      if (input.signal?.aborted) throw new Error('REQUEST_CANCELLED: request preparation was cancelled.');
+    };
+    throwIfCancelled();
     const contextRoute: SessionContextRoute = {
       providerId: input.providerId,
       modelId: input.requestPlan.effectiveModelId,
@@ -477,6 +545,9 @@ export class AgentOrchestrator {
     const materialized = input.sessionId
       ? sessionContextJournal.materialize(input.sessionId, input.visibleTurnIds, contextRoute)
       : { messages: [], selectedTurnCount: 0, filteredArtifactCount: 0, migrated: false };
+    throwIfCancelled();
+    const mcpConnectionErrors = await this.ensureMcpConnections(input.agentId, input.projectRootPath);
+    throwIfCancelled();
     const runtimeTools = this.resolveRuntimeTools(
       input.agentId,
       input.toolAllowlist,
@@ -502,53 +573,32 @@ export class AgentOrchestrator {
       input.requestPlan.contextBudgetTokens * CONTEXT_COMPACTION_RATIO,
     );
     const messageBudget = compactionThreshold - fixedTokens - input.imageTokenAdjustment;
-    const blocked = (code: string, message: string): NextRequestContextProjection => ({
-      clientRevision: input.clientRevision,
-      status: 'blocked',
-      route: contextRoute,
-      contextMode: input.requestPlan.contextMode,
-      estimatedInputTokens: fixedTokens,
-      uncompactedInputTokens: fixedTokens,
-      promptBudgetTokens: input.requestPlan.contextBudgetTokens,
-      contextWindowTokens: input.requestPlan.contextWindowTokens,
-      usagePercent: 0,
-      breakdown: [],
-      willCompact: false,
-      filteredArtifactCount: materialized.filteredArtifactCount,
-      blockingReason: { code, message },
-      estimatedAt: nowMs(),
-    });
     if (messageBudget <= 0) {
-      return blocked(
-        'PROMPT_OVERHEAD_EXCEEDS_BUDGET',
-        'System prompt, skills, and tool schemas exceed the selected model prompt budget.',
+      throw new Error(
+        'PROMPT_OVERHEAD_EXCEEDS_BUDGET: System prompt, skills, and tool schemas exceed the selected model prompt budget.',
       );
     }
 
-    const userMessage: UserMessage = { role: 'user', content: input.content, timestamp: nowMs() };
+    const userTimestamp = nowMs();
+    const userMessage: UserMessage = { role: 'user', content: input.content, timestamp: userTimestamp };
     const messages = [...materialized.messages, userMessage];
-    const contextManager = new ContextManager({
-      modelId: input.modelId,
-      contextTokenLimit: messageBudget,
-      toolResultBudget: 200 * 1024,
-      keepRecentToolResults: 3,
-    });
-    const beforeConversationTokens = contextManager.estimateTokens(messages) + input.imageTokenAdjustment;
-    const compacted = await contextManager.compress(messages);
-    const afterConversationTokens = contextManager.estimateTokens(compacted.messages) + input.imageTokenAdjustment;
+    const computation = await turnPreparationWorkerPool.run({
+      messages,
+      modelId: input.requestPlan.effectiveModelId,
+      messageBudget,
+      imageTokenAdjustment: input.imageTokenAdjustment,
+    }, input.signal);
+    throwIfCancelled();
+    const compactedMessages = computation.compactedMessages;
+    const beforeConversationTokens = computation.beforeConversationTokens;
+    const afterConversationTokens = computation.afterConversationTokens;
     const uncompactedInputTokens = fixedTokens + beforeConversationTokens;
-    const estimatedInputTokens = fixedTokens + afterConversationTokens;
-    const willCompact = Boolean(compacted.summary) || JSON.stringify(compacted.messages) !== JSON.stringify(messages);
-    if (estimatedInputTokens > input.requestPlan.contextBudgetTokens) {
-      return {
-        ...blocked(
-          'CONTEXT_CANNOT_FIT',
-          'The next request cannot fit after compaction. Remove attachments or select a larger context mode.',
-        ),
-        estimatedInputTokens,
-        uncompactedInputTokens,
-        willCompact,
-      };
+    const preparedInputTokens = fixedTokens + afterConversationTokens;
+    const compactionApplied = computation.compactionApplied;
+    if (preparedInputTokens > input.requestPlan.contextBudgetTokens) {
+      throw new Error(
+        'CONTEXT_CANNOT_FIT: The request cannot fit after compaction. Remove attachments or select a larger context mode.',
+      );
     }
 
     const isMcp = (definition: ToolDefinition) => isMcpPrefixedToolName(definition.name);
@@ -556,7 +606,7 @@ export class AgentOrchestrator {
     const mcpDefinitions = activeToolDefinitions.filter(isMcp);
     const subagentDefinitions = activeToolDefinitions.filter(isSubagent);
     const systemDefinitions = activeToolDefinitions.filter((definition) => !isMcp(definition) && !isSubagent(definition));
-    const classified = contextManager.classifyMessages(compacted.messages);
+    const classified = computation.classification;
     const metrics = input.promptPlan.metrics;
     const breakdown: ContextUsageBreakdownEntry[] = [
       { id: 'system_prompt', tokens: charsToTokens(metrics.systemPrompt) },
@@ -580,34 +630,76 @@ export class AgentOrchestrator {
         ? [{ id: 'summarized_conversation' as const, tokens: classified.summaryTokens }]
         : []),
       { id: 'conversation', tokens: classified.conversationTokens + input.imageTokenAdjustment, count: classified.conversationCount },
-      { id: 'free', tokens: Math.max(0, input.requestPlan.contextBudgetTokens - estimatedInputTokens) },
+      { id: 'free', tokens: Math.max(0, input.requestPlan.contextBudgetTokens - preparedInputTokens) },
     ];
-    const envelope = requestEnvelopeBuilder.build({
+    requestEnvelopeBuilder.build({
       promptPlan: input.promptPlan,
       sessionId: input.sessionId ?? undefined,
+      turnId: input.turnId,
       callIndex: 0,
       route: contextRoute,
       requestPlan: input.requestPlan,
-      messages: compacted.messages,
+      messages: compactedMessages,
       tools: activeToolDefinitions,
       controls: { ...input.turnControls },
       reasoning: input.routeCapability.reasoningContract,
     });
-    return {
-      clientRevision: input.clientRevision,
-      requestEnvelopeId: envelope.id,
-      status: 'ready',
-      route: contextRoute,
+    const lastPreparedMessage = compactedMessages.at(-1);
+    if (
+      lastPreparedMessage?.role !== 'user'
+      || JSON.stringify(lastPreparedMessage.content) !== JSON.stringify(input.content)
+    ) {
+      throw new Error('CONTEXT_CANNOT_FIT: preparation did not preserve the current user message.');
+    }
+    const initialMessages = compactedMessages.slice(0, -1);
+    const summary: PreparedTurnContextSummary = {
+      requestId: input.requestId,
+      turnId: input.turnId,
+      route: {
+        providerId: input.providerId,
+        adapterId: input.requestPlan.adapterId,
+        selectedModelId: input.selectedModelId,
+        effectiveModelId: input.requestPlan.effectiveModelId,
+        protocol: input.requestPlan.route.protocol,
+        catalogRevision: input.requestPlan.catalogRevision,
+        routeRevision: input.requestPlan.routeRevision,
+        bindingIds: [...input.requestPlan.appliedBindingIds],
+      },
+      wirePatch: {
+        headers: requestPlanHeaders(input.requestPlan),
+        body: structuredClone(input.requestPlan.bodyPatch),
+      },
+      controls: { ...input.turnControls },
       contextMode: input.requestPlan.contextMode,
-      estimatedInputTokens,
+      preparedInputTokens,
       uncompactedInputTokens,
       promptBudgetTokens: input.requestPlan.contextBudgetTokens,
       contextWindowTokens: input.requestPlan.contextWindowTokens,
-      usagePercent: Math.min(100, Math.round((estimatedInputTokens / input.requestPlan.contextBudgetTokens) * 100)),
+      usagePercent: Math.min(100, Math.round((preparedInputTokens / input.requestPlan.contextBudgetTokens) * 100)),
       breakdown,
-      willCompact,
+      compactionApplied,
       filteredArtifactCount: materialized.filteredArtifactCount,
-      estimatedAt: nowMs(),
+      preparedAt: nowMs(),
+    };
+    return {
+      summary,
+      selectedModelId: input.selectedModelId,
+      effectiveModel: input.effectiveModel,
+      toolAllowlist: [...input.toolAllowlist],
+      initialMessages,
+      contextDiagnostic: {
+        selectedTurnCount: materialized.selectedTurnCount,
+        activeBranchId: input.activeBranchId ?? null,
+        filteredArtifactCount: materialized.filteredArtifactCount,
+        compactionState: compactionApplied ? 'prepared' : 'not-required',
+      },
+      runtime: {
+        runtimeTools,
+        activeToolDefinitions,
+        routeCapability: input.routeCapability,
+        mcpConnectionErrors,
+        credentialHandle: input.credentialHandle,
+      },
     };
   }
 
@@ -617,18 +709,20 @@ export class AgentOrchestrator {
     options?: AgentProfileTurnOptions,
   ): Promise<string> {
     const fallbackConfig = this.getOrCreateAgentConfig(agentId);
+    let ownedCredentialHandle: string | undefined;
 
     this.updateAgentStatus(agentId, 'thinking');
 
     try {
+      const preparedTurn = options?.preparedTurn;
       let settings = settingsService.getAll();
       let routeMap = new Map(settings.llm.agentRoutes.map((route) => [route.agentId, route]));
       const routeAgentId = options?.routeAgentId ?? agentId;
       let route = routeMap.get(routeAgentId);
       const frozenRequestPlan = options?.requestPlan;
       const credentialProviderId = frozenRequestPlan?.providerId ?? route?.providerId;
-      if (credentialProviderId) {
-        await this.refreshAccountRuntimeCredentials(credentialProviderId);
+      if (credentialProviderId && !preparedTurn && process.env.RDC_AGENT_TEST_MODE !== '1') {
+        ownedCredentialHandle = await this.refreshProviderRuntimeCredentials(credentialProviderId);
         settings = settingsService.getAll();
         routeMap = new Map(settings.llm.agentRoutes.map((entry) => [entry.agentId, entry]));
         route = routeMap.get(routeAgentId);
@@ -648,7 +742,8 @@ export class AgentOrchestrator {
         return finalStub;
       }
 
-      const toolAllowlist = resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== 'report' ? options.stage : undefined);
+      const toolAllowlist = preparedTurn?.toolAllowlist
+        ?? resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== 'report' ? options.stage : undefined);
       const routeProviderId = config.modelProvider;
       const routeModelId = config.modelName;
       const sessionControls = options?.sessionId ? storageAdapter.readSession(options.sessionId)?.turnControls : undefined;
@@ -657,7 +752,9 @@ export class AgentOrchestrator {
             ok: true as const,
             plan: frozenRequestPlan,
             controls: options?.turnControls ?? {
-              reasoningLevel: frozenRequestPlan.reasoningWire.selection,
+              reasoningLevel: frozenRequestPlan.reasoningWire.selection === 'unknown'
+                ? 'off'
+                : frozenRequestPlan.reasoningWire.selection,
               maxContextMode: frozenRequestPlan.contextMode === 'one-million',
               fastModel: frozenRequestPlan.fastMode,
             },
@@ -670,12 +767,15 @@ export class AgentOrchestrator {
             controls: {
               ...(sessionControls ?? {}),
               ...(options?.turnControls ?? {}),
-              ...(options?.reasoning ? { reasoningLevel: options.reasoning.selection } : {}),
+              ...(options?.reasoning
+                ? { reasoningLevel: options.reasoning.selection === 'unknown' ? 'off' : options.reasoning.selection }
+                : {}),
             },
             requestedTemperature: config.temperature,
           });
       if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
-      const capability = resolveEffectiveModel(routeProviderId, routeModelId, settings);
+      const capability = preparedTurn?.effectiveModel
+        ?? resolveEffectiveModel(routeProviderId, routeModelId, settings);
       if (!capability) throw new Error(`MODEL_UNAVAILABLE: ${routeProviderId}/${routeModelId}`);
       const activeContextWindow = planning.plan.contextWindowTokens;
       const contextTokenLimit = Math.floor(
@@ -700,9 +800,16 @@ export class AgentOrchestrator {
       const journalSessionId = options?.sessionId && !options.sessionId.includes('::subagent::')
         ? options.sessionId
         : null;
-      const materialized = journalSessionId
-        ? sessionContextJournal.materialize(journalSessionId, options?.visibleTurnIds ?? [], contextRoute)
-        : { messages: [], selectedTurnCount: 0, filteredArtifactCount: 0, migrated: false };
+      const materialized = preparedTurn
+        ? {
+            messages: preparedTurn.initialMessages,
+            selectedTurnCount: preparedTurn.contextDiagnostic.selectedTurnCount,
+            filteredArtifactCount: preparedTurn.contextDiagnostic.filteredArtifactCount,
+            migrated: false,
+          }
+        : journalSessionId
+          ? sessionContextJournal.materialize(journalSessionId, options?.visibleTurnIds ?? [], contextRoute)
+          : { messages: [], selectedTurnCount: 0, filteredArtifactCount: 0, migrated: false };
 
       const responseText = await this.runAgentTurn({
         agentId,
@@ -727,15 +834,18 @@ export class AgentOrchestrator {
         projectRootPath: options?.projectRootPath ?? null,
         projectId: options?.projectId ?? null,
         promptPlan,
+        effectiveModel: capability,
+        credentialHandle: ownedCredentialHandle,
         contextWindow: activeContextWindow,
         contextTokenLimit,
         initialMessages: materialized.messages,
-        contextDiagnostic: {
+        contextDiagnostic: preparedTurn?.contextDiagnostic ?? {
           selectedTurnCount: materialized.selectedTurnCount,
           activeBranchId: options?.activeBranchId ?? null,
           filteredArtifactCount: materialized.filteredArtifactCount,
           compactionState: 'derived-view-only',
         },
+        preparedRuntime: preparedTurn?.runtime,
         terminalContext: options?.onTerminalContext
           ? (messages, status) => options.onTerminalContext?.({
               messages,
@@ -766,6 +876,8 @@ export class AgentOrchestrator {
     } catch (error) {
       this.updateAgentStatus(agentId, 'error');
       throw error;
+    } finally {
+      providerRuntimeCredentialService.release(ownedCredentialHandle);
     }
   }
 
@@ -999,6 +1111,7 @@ export class AgentOrchestrator {
     contextDiagnostic?: Record<string, unknown>,
     /** 用于 slot cache key；默认与注入 tools 相同。应传入全部可用工具以稳定复用。 */
     signatureTools?: ToolDefinition[],
+    routeCapabilityOverride?: AgentRouteCapability,
   ): AgentSlot {
     if (!promptPlan) {
       throw new Error('PromptPlan is required before creating an agent runtime slot.');
@@ -1034,11 +1147,11 @@ export class AgentOrchestrator {
     // session journal. The in-memory slot is only an execution cache.
     const agentModel = encodeAgentModel(providerId, modelId, { contextWindow: activeContextWindow });
     const routeProvider = settingsService.getAll().llm.providers.find((provider) => provider.id === providerId);
-    const reasoningContract = resolveAgentRouteCapability(
+    const reasoningContract = (routeCapabilityOverride ?? resolveAgentRouteCapability(
       routeProvider,
       modelId,
       resolveEffectiveModel(providerId, modelId, settingsService.getAll()),
-    ).reasoningContract;
+    )).reasoningContract;
 
     const contextManager = new ContextManager({
       modelId,
@@ -2158,10 +2271,13 @@ export class AgentOrchestrator {
     projectId?: string | null;
     /** Ask 路径由 ConversationService 传入的 prompt 分段字符数，用于细化 breakdown。 */
     promptPlan: PromptPlan;
+    effectiveModel?: EffectiveModel;
+    credentialHandle?: string;
     contextWindow?: number;
     contextTokenLimit?: number;
     initialMessages?: Message[];
     contextDiagnostic?: Record<string, unknown>;
+    preparedRuntime?: PreparedAgentRuntime;
     terminalContext?: (messages: Message[], status: 'complete' | 'stopped' | 'error') => void;
   }): Promise<string> {
     if (!input.providerId || !input.modelId) {
@@ -2172,18 +2288,21 @@ export class AgentOrchestrator {
     if (!requestPlan) {
       throw new Error('RequestPlan is required for every provider request.');
     }
-    const routeProvider = settingsService.getAll().llm.providers.find((entry) => entry.id === input.providerId);
-    const effectiveModel = resolveEffectiveModel(input.providerId, input.modelId, settingsService.getAll());
-    const routeCapability = resolveAgentRouteCapability(routeProvider, input.modelId, effectiveModel);
-    const mcpConnectionErrors = await this.ensureMcpConnections(input.agentId, input.projectRootPath);
-    const runtimeTools = this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
+    const runtimeSettings = input.effectiveModel ? null : settingsService.getAll();
+    const routeProvider = runtimeSettings?.llm.providers.find((entry) => entry.id === input.providerId);
+    const effectiveModel = input.effectiveModel
+      ?? (runtimeSettings ? resolveEffectiveModel(input.providerId, input.modelId, runtimeSettings) : null);
+    const routeCapability = input.preparedRuntime?.routeCapability
+      ?? resolveAgentRouteCapability(routeProvider, input.modelId, effectiveModel);
+    const mcpConnectionErrors = input.preparedRuntime?.mcpConnectionErrors
+      ?? await this.ensureMcpConnections(input.agentId, input.projectRootPath);
+    const runtimeTools = input.preparedRuntime?.runtimeTools
+      ?? this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
     const slotKey = this.agentSlotKey(input.sessionId, input.agentId);
     const allToolSignature = this.createToolSignature(runtimeTools.definitions);
     const activatedMcpTools = this.resolveActivatedMcpSet(slotKey, allToolSignature);
-    const { injected: injectedToolDefinitions } = partitionDeferredMcpTools(
-      runtimeTools.definitions,
-      activatedMcpTools,
-    );
+    const injectedToolDefinitions = input.preparedRuntime?.activeToolDefinitions
+      ?? partitionDeferredMcpTools(runtimeTools.definitions, activatedMcpTools).injected;
     // native-structured：非 MCP 全量注入，mcp__* 默认 deferred；其它路由不注入工具 schema。
     const activeToolDefinitions = routeCapability.toolCallingMode === 'native-structured'
       ? injectedToolDefinitions
@@ -2233,6 +2352,7 @@ export class AgentOrchestrator {
       reasoningVisibility: requestPlan.reasoningWire.selection === 'off' ? 'none' : routeCapability.reasoningVisibility,
       signal: input.options?.signal,
       requestPlan,
+      credentialHandle: input.preparedRuntime?.credentialHandle ?? input.credentialHandle,
     };
     const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
     if (mcpConnectionErrors.length > 0) {
@@ -2287,6 +2407,7 @@ export class AgentOrchestrator {
       input.initialMessages,
       input.contextDiagnostic,
       runtimeTools.definitions,
+      routeCapability,
     );
 
     const userMessage: UserMessage = {
@@ -2564,6 +2685,20 @@ export class AgentOrchestrator {
 
   private async refreshAccountRuntimeCredentials(providerId: LlmProviderId): Promise<void> {
     const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+    if (provider?.id === 'google-vertex' || provider?.id === 'google-vertex-anthropic') {
+      const values = settingsService.getProviderConnectionValues(provider.id);
+      if (!values.GOOGLE_VERTEX_ACCESS_TOKEN?.trim()) {
+        await resolveGoogleVertexAccessToken(values.GOOGLE_APPLICATION_CREDENTIALS);
+      }
+      return;
+    }
+    if (provider?.id === 'amazon-bedrock') {
+      const values = settingsService.getProviderConnectionValues(provider.id);
+      if (!values.AWS_BEARER_TOKEN_BEDROCK?.trim()) {
+        await resolveAwsBedrockCredentials(values);
+      }
+      return;
+    }
     if (provider?.authMode !== 'account') {
       return;
     }

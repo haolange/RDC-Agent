@@ -1,5 +1,5 @@
 import { LLM_PROVIDER_CATEGORY_DEFINITIONS, isLlmProviderProtocol } from '@shared/constants/llm';
-import { getProviderPreset, getProviderPresetProtocolOptions } from './ProviderPresetRegistry';
+import { getProviderSurfaceSummary } from '../provider-catalog/ProviderCatalogRegistry';
 import type {
   LlmProviderAuthMode,
   LlmProviderCategory,
@@ -20,7 +20,7 @@ export function normalizeProviderCategory(
   },
 ): LlmProviderCategory {
   const id = typeof provider.id === 'string' ? provider.id.trim() : '';
-  const builtin = id ? getProviderPreset(id) : null;
+  const builtin = id ? getProviderSurfaceSummary(id) : null;
   if (builtin) {
     return builtin.category;
   }
@@ -38,10 +38,10 @@ export function normalizeProviderCategory(
       return 'cloud-platform';
     default:
       console.warn(
-        '[SettingsService] Unable to infer provider category; defaulting to third-party-compatible.',
+        '[SettingsService] Unable to resolve provider category; defaulting to compatible-access.',
         { id: provider.id, authMode: provider.authMode, category: provider.category },
       );
-      return 'third-party-compatible';
+      return 'compatible-access';
   }
 }
 
@@ -52,12 +52,8 @@ export function normalizeProviderProtocol(
   },
 ): LlmProviderProtocol {
   const id = typeof provider.id === 'string' ? provider.id.trim() : '';
-  const builtin = id ? getProviderPreset(id) : null;
+  const builtin = id ? getProviderSurfaceSummary(id) : null;
   if (builtin) {
-    const options = getProviderPresetProtocolOptions(id);
-    if (builtin.userSelectableRoute && isLlmProviderProtocol(provider.protocol) && options.includes(provider.protocol)) {
-      return provider.protocol;
-    }
     return builtin.routes.find((route) => route.default)?.protocol ?? builtin.routes[0].protocol;
   }
 
@@ -65,9 +61,5 @@ export function normalizeProviderProtocol(
     return provider.protocol;
   }
 
-  console.warn(
-    '[SettingsService] Unable to infer provider protocol; defaulting to OpenAICompatibleChatCompletions.',
-    { id: provider.id, protocol: provider.protocol },
-  );
-  return 'OpenAICompatibleChatCompletions';
+  throw new Error(`Provider ${id || '<unknown>'} has no explicit protocol.`);
 }

@@ -36,6 +36,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const setUsePointerCursors = useAppSettingsStore((state) => state.setUsePointerCursors);
   const updateProfile = useAppSettingsStore((state) => state.updateProfile);
   const patchSettings = useAppSettingsStore((state) => state.patchSettings);
+  const saveProvider = useAppSettingsStore((state) => state.saveProvider);
   const saveAgentDefinition = useAppSettingsStore((state) => state.saveAgentDefinition);
   const reloadSettings = useAppSettingsStore((state) => state.reloadSettings);
 
@@ -72,7 +73,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     connectionDraft: modalState.connectionDraft,
     setConnectionDraft: modalState.setConnectionDraft,
     reloadSettings,
-    patchSettings,
+    saveProvider,
     t,
   });
 

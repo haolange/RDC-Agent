@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "id": "xiaomi-token-plan-ams",
+  "identityIds": [
+    "xiaomi-token-plan-ams"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "xiaomi-token-plan-ams",
+  "label": "Xiaomi Token Plan (Europe)",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "coding-token-plan",
+  "surfaceKind": "plan",
+  "serviceOperator": "xiaomi",
+  "endpointClass": "coding-plan",
+  "endpointOwnership": "service-operator",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "models.dev:xiaomi-token-plan-ams:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "xiaomi-token-plan-ams",
+      "surface": "xiaomi-token-plan-ams"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:xiaomi-token-plan-ams:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "XIAOMI_API_KEY",
+        "label": "Xiaomi Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "XIAOMI_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "XIAOMI_API_KEY",
+    "endpointTemplate": "https://token-plan-ams.xiaomimimo.com/v1"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://token-plan-ams.xiaomimimo.com/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://platform.xiaomimimo.com/#/docs"
+}

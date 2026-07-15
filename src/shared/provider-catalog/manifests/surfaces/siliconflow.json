@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 2,
+  "id": "siliconflow",
+  "identityIds": [
+    "siliconflow"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "siliconflow",
+  "label": "SiliconFlow",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "siliconflow",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:siliconflow:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "siliconflow"
+    },
+    {
+      "id": "models.dev:siliconflow:1",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "siliconflow",
+      "surface": "siliconflow"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:siliconflow:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.siliconflow.cn/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "Qwen/Qwen3-32B",
+    "deepseek-ai/DeepSeek-V3"
+  ],
+  "docsUrl": "https://siliconflow.cn/"
+}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import type { AgentManifestDraft } from '@shared/types/agentManifest';
+import type { AgentDefinitionSaveResult, AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
 import { nextAgentDefinitionClientRevision } from '../../../stores/appSettingsStore';
 import type { AgentManifestSaveBatch } from './settingsModalActions';
@@ -10,7 +10,7 @@ interface UseAgentManifestAutosaveOptions {
   open: boolean;
   settings: AppSettings;
   agentManifestDrafts: AgentManifestDraft[];
-  onSave: (batch: AgentManifestSaveBatch) => Promise<unknown>;
+  onSave: (batch: AgentManifestSaveBatch) => Promise<AgentDefinitionSaveResult[] | null>;
   onRollback: (failedDrafts: AgentManifestDraft[], savedDrafts: AgentManifestDraft[]) => void;
   onSaveStateChange: (state: SaveState) => void;
   onSaveMessageChange: (message: string) => void;
@@ -124,12 +124,14 @@ export function useAgentManifestAutosave({
     stateRef.current('saving');
     messageRef.current('');
     try {
-      await saveRef.current({ drafts, clientRevision: revision });
+      const results = await saveRef.current({ drafts, clientRevision: revision });
+      if (!results) throw new Error(failedMessage);
+      const committedDrafts = drafts.filter((_, index) => results[index]?.status === 'committed');
       if (revision >= committedRevisionRef.current) {
-        savedDraftsRef.current = commitSavedDrafts(savedDraftsRef.current, drafts);
+        savedDraftsRef.current = commitSavedDrafts(savedDraftsRef.current, committedDrafts);
         committedRevisionRef.current = revision;
       }
-      if (revision === latestRevisionRef.current) {
+      if (revision === latestRevisionRef.current && results.every((result) => result.status === 'committed')) {
         stateRef.current('saved');
         messageRef.current(savedMessage);
       }

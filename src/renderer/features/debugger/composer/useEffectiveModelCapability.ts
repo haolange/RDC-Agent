@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import { getElectronApi } from '../../../platform/getElectronApi';
 
@@ -9,10 +9,11 @@ export function useEffectiveModelCapability(
   setCapability: (capability: EffectiveModel | null) => void,
 ): void {
   const requestRevisionRef = useRef(0);
-  const routeProviderId = routeFingerprint.split(':', 1)[0] ?? '';
+  const [routeProviderId, routeModelId, routeAccountId, routeProtocol] = routeFingerprint.split('\u001f');
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let cancelled = false;
+    setCapability(null);
     const loadCapability = async () => {
       const requestRevision = requestRevisionRef.current + 1;
       requestRevisionRef.current = requestRevision;
@@ -24,7 +25,15 @@ export function useEffectiveModelCapability(
 
       try {
         const resolved = await electronAPI.settings.getEffectiveModel(agentId);
-        if (!cancelled && requestRevision === requestRevisionRef.current) setCapability(resolved);
+        const revisionMatches = Boolean(resolved?.catalogRevision && resolved?.routeRevision);
+        const routeMatches = Boolean(
+          resolved
+          && resolved.providerId === routeProviderId
+          && resolved.modelId === routeModelId,
+        );
+        if (!cancelled && requestRevision === requestRevisionRef.current) {
+          setCapability(revisionMatches && routeMatches ? resolved : null);
+        }
       } catch {
         if (!cancelled && requestRevision === requestRevisionRef.current) setCapability(null);
       }
@@ -32,11 +41,24 @@ export function useEffectiveModelCapability(
 
     void loadCapability();
     const unsubscribe = getElectronApi()?.events.onEffectiveCatalogChanged((snapshot) => {
-      if (routeProviderId === snapshot.providerId) void loadCapability();
+      if (
+        routeProviderId === snapshot.providerId
+        && routeAccountId === snapshot.accountId
+        && routeProtocol === snapshot.protocol
+      ) void loadCapability();
     });
     return () => {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [agentId, routeFingerprint, routeProviderId, settingsHydrated, setCapability]);
+  }, [
+    agentId,
+    routeFingerprint,
+    routeProviderId,
+    routeModelId,
+    routeAccountId,
+    routeProtocol,
+    settingsHydrated,
+    setCapability,
+  ]);
 }

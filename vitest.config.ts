@@ -1,7 +1,9 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
+import { providerCatalogVitePlugin } from './src/main/provider-catalog/providerCatalogVitePlugin';
 
 export default defineConfig({
+  plugins: [providerCatalogVitePlugin(__dirname)],
   test: {
     globals: true,
     environment: 'node',

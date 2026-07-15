@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 2,
+  "id": "openrouter",
+  "identityIds": [
+    "openrouter"
+  ],
+  "profileId": "multi-protocol",
+  "adapterIds": [
+    "openrouter-chat",
+    "openai-responses",
+    "anthropic-messages"
+  ],
+  "authSchemaId": "oauth-account",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "openrouter",
+  "label": "OpenRouter",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "openrouter",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:openrouter:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "openrouter"
+    },
+    {
+      "id": "models.dev:openrouter:1",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "openrouter",
+      "surface": "openrouter"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:openrouter:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key",
+    "oauth"
+  ],
+  "authModeAvailability": {
+    "api-key": {
+      "state": "available"
+    },
+    "oauth": {
+      "state": "unknown"
+    }
+  },
+  "accountLoginConfigured": true,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenRouterChatCompletions",
+      "protocol": "OpenRouterChatCompletions",
+      "adapterId": "openrouter-chat",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    },
+    {
+      "id": "OpenAIResponses",
+      "protocol": "OpenAIResponses",
+      "adapterId": "openai-responses",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "protocolOwner": "openai"
+    },
+    {
+      "id": "AnthropicMessages",
+      "protocol": "AnthropicMessages",
+      "adapterId": "anthropic-messages",
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "protocolOwner": "anthropic"
+    }
+  ],
+  "discovery": {
+    "authority": "authoritative-list",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "anthropic/claude-haiku-latest",
+    "anthropic/claude-sonnet-4.5",
+    "openai/gpt-5.2"
+  ],
+  "docsUrl": "https://openrouter.ai/keys"
+}

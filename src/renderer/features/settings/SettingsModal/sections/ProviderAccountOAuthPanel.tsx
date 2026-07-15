@@ -34,7 +34,6 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
   const status = connectionDraft.accountStatus;
   const isSuperGrok = connectionProvider.id === 'grok-account';
   const isOpenRouter = connectionProvider.id === 'openrouter';
-  const isMiniMax = connectionProvider.id === 'minimax-account';
   const diagnostic = status?.diagnostic;
   const selectedMode = isSuperGrok
     ? connectionDraft.accountLoginMode === 'device' ? 'device' : 'browser'
@@ -108,28 +107,6 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
             </details>
           )}
         </>
-      )}
-
-      {isMiniMax && !connectionAccountConnected && (
-        <div className="settings-provider-oauth-mode" role="group" aria-label={t('settings.oauthRegion')}>
-          {(['global', 'cn'] as const).map((region) => (
-            <Button
-              key={region}
-              variant="secondary"
-              size="sm"
-              className={`settings-provider-oauth-mode-button${connectionDraft.accountRegion === region ? ' active' : ''}`}
-              data-testid={`settings-provider-oauth-region-${region}`}
-              onClick={() => onUpdateConnectionDraft({
-                accountRegion: region,
-                accountStatus: undefined,
-                error: '',
-              })}
-              disabled={connectionDraft.busy !== 'idle' || connectionDevicePending}
-            >
-              {region === 'global' ? t('settings.oauthRegionGlobal') : t('settings.oauthRegionChina')}
-            </Button>
-          ))}
-        </div>
       )}
 
       {connectionAccountConnected && (status?.accountLabel || status?.planLabel) && (

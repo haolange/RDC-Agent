@@ -1,0 +1,360 @@
+{
+  "schemaVersion": 2,
+  "id": "bailian",
+  "identityIds": [],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "alibaba",
+  "label": "Alibaba Cloud Bailian",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "cloud-platform",
+  "surfaceKind": "cloud",
+  "serviceOperator": "alibaba-cloud",
+  "endpointClass": "cloud-hosted",
+  "endpointOwnership": "cloud-platform",
+  "catalogOwnership": "provider-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:bailian:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "bailian"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:bailian:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "reasoning",
+    "prompt-cache"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [
+    {
+      "modelId": "qwen-turbo",
+      "label": "qwen-turbo",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 131072,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "off",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            },
+            "onMode": "enable-thinking-true",
+            "offMode": "enable-thinking-false"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:bailian:0"
+    },
+    {
+      "modelId": "qwen-plus",
+      "label": "qwen-plus",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 131072,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "off",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            },
+            "onMode": "enable-thinking-true",
+            "offMode": "enable-thinking-false"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:bailian:0"
+    },
+    {
+      "modelId": "qwen-max",
+      "label": "qwen-max",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 131072,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "off",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            },
+            "onMode": "enable-thinking-true",
+            "offMode": "enable-thinking-false"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:bailian:0"
+    },
+    {
+      "modelId": "qwen-vl-max",
+      "label": "qwen-vl-max",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 131072,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "off",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            },
+            "onMode": "enable-thinking-true",
+            "offMode": "enable-thinking-false"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:bailian:0"
+    }
+  ],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "qwen-turbo",
+    "qwen-plus",
+    "qwen-max",
+    "qwen-vl-max"
+  ],
+  "docsUrl": "https://bailian.console.aliyun.com/"
+}

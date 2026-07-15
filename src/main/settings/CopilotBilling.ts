@@ -1,9 +1,11 @@
-import type { ContextTier, EntitlementState } from '@shared/types/providerCapability';
+import type {
+  ContextTier,
+  EntitlementState,
+  ModelRouteOption,
+} from '@shared/types/providerCapability';
 import type { LlmProviderModel } from '@shared/types/settings';
 import type { CatalogModelContribution } from './EffectiveCatalogService';
 import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
-import { normalizeCopilotDiscoveryModels } from './ProviderDiscoveryNormalizer';
-import { parseOpenAiReasoningControl } from './LiveProviderCatalogParsers';
 
 export interface CopilotModelCapabilityMetadata {
   limits: {
@@ -12,6 +14,7 @@ export interface CopilotModelCapabilityMetadata {
     maxTotalTokens?: number;
   };
   tokenPrices: Record<string, unknown>;
+  entitlement?: EntitlementState;
 }
 
 export interface CopilotCatalogParseResult {
@@ -45,6 +48,41 @@ function entitlement(value: unknown): EntitlementState {
   return 'unknown';
 }
 
+function copilotRouteOptions(endpoints: readonly string[], apiBaseUrl: string): ModelRouteOption[] {
+  const protocols = new Set<ModelRouteOption['route']['protocol']>();
+  for (const endpoint of endpoints) {
+    if (endpoint.includes('/v1/messages')) protocols.add('AnthropicMessages');
+    else if (endpoint.includes('/responses')) protocols.add('OpenAIResponses');
+    else if (endpoint.includes('/chat/completions')) protocols.add('OpenAICompatibleChatCompletions');
+  }
+  const normalizedBaseUrl = apiBaseUrl.trim().replace(/\/+$/, '');
+  return [...protocols].map((protocol) => ({
+    id: protocol,
+    route: {
+      protocol,
+      baseUrl: protocol === 'AnthropicMessages' && !normalizedBaseUrl.endsWith('/v1')
+        ? `${normalizedBaseUrl}/v1`
+        : normalizedBaseUrl,
+      source: 'model',
+    },
+    availability: 'available',
+    protocolOwner: protocol === 'AnthropicMessages' ? 'anthropic' : 'openai',
+    endpointOwner: 'github',
+    authMode: 'account',
+  }));
+}
+
+function copilotPolicyDenied(entry: Record<string, unknown>): boolean {
+  const policy = record(entry.policy);
+  const state = typeof policy.state === 'string' ? policy.state.toLowerCase() : '';
+  return entry.model_picker_enabled === false
+    || entry.entitled === false
+    || policy.allowed === false
+    || policy.enabled === false
+    || state === 'denied'
+    || state === 'disabled';
+}
+
 export function parseCopilotBillingTiers(billing: unknown): ContextTier[] {
   const metadata = record(billing);
   const limits = record(metadata.limits);
@@ -52,29 +90,41 @@ export function parseCopilotBillingTiers(billing: unknown): ContextTier[] {
   const maxOutputTokens = positiveInteger(limits.maxOutputTokens);
   const liveMaxTotalTokens = positiveInteger(limits.maxTotalTokens);
   const liveMaxPromptTokens = positiveInteger(limits.maxPromptTokens);
+  const modelEntitlement = metadata.entitlement === 'granted'
+    || metadata.entitlement === 'denied'
+    || metadata.entitlement === 'unknown'
+    ? metadata.entitlement
+    : undefined;
   const tiers: ContextTier[] = [];
   for (const [id, label] of [['default', 'Default'], ['long_context', 'Long context']] as const) {
     const price = record(tokenPrices[id]);
     const contextMax = positiveInteger(price.context_max)
       ?? (id === 'default' ? liveMaxPromptTokens : undefined);
-    if (!contextMax) continue;
+    if (!contextMax && !(id === 'default' && liveMaxTotalTokens)) continue;
     const maxTotalTokens = id === 'long_context'
-      ? Math.max(liveMaxTotalTokens ?? 0, contextMax + (maxOutputTokens ?? 0)) || undefined
-      : liveMaxTotalTokens ?? (maxOutputTokens ? contextMax + maxOutputTokens : undefined);
+      ? contextMax
+        ? Math.max(liveMaxTotalTokens ?? 0, contextMax + (maxOutputTokens ?? 0)) || undefined
+        : undefined
+      : liveMaxTotalTokens ?? (contextMax && maxOutputTokens ? contextMax + maxOutputTokens : undefined);
     tiers.push({
       id,
       label,
-      maxPromptTokens: contextMax,
+      ...(contextMax ? { maxPromptTokens: contextMax } : {}),
       ...(maxOutputTokens ? { maxOutputTokens } : {}),
       ...(maxTotalTokens ? { maxTotalTokens } : {}),
       activation: { kind: 'implicit' },
-      entitlement: Object.keys(price).length > 0 ? entitlement(price) : 'granted',
+      entitlement: modelEntitlement === 'denied'
+        ? 'denied'
+        : Object.keys(price).length > 0 ? entitlement(price) : modelEntitlement ?? 'granted',
     });
   }
   return tiers;
 }
 
-export function parseCopilotModelCatalog(payload: unknown): CopilotCatalogParseResult {
+export function parseCopilotModelCatalog(
+  payload: unknown,
+  apiBaseUrl = 'https://api.githubcopilot.com',
+): CopilotCatalogParseResult {
   const collection = Array.isArray(record(payload).data) ? record(payload).data as unknown[] : [];
   const billingByModel: Record<string, CopilotModelCapabilityMetadata> = {};
   const models: LlmProviderModel[] = [];
@@ -90,71 +140,47 @@ export function parseCopilotModelCatalog(payload: unknown): CopilotCatalogParseR
     const supportedEndpoints = Array.isArray(entry.supported_endpoints)
       ? entry.supported_endpoints.filter((value): value is string => typeof value === 'string')
       : [];
+    const supportsChatEndpoint = supportedEndpoints.length === 0 || supportedEndpoints.some((endpoint) => (
+      endpoint.includes('/chat/completions') || endpoint.includes('/responses') || endpoint.includes('/v1/messages')
+    ));
     if (
       !discoveredId
       || !id
       || seen.has(id)
-      || entry.model_picker_enabled === false
       || (capabilityType && capabilityType !== 'chat')
-      || (supportedEndpoints.length > 0 && !supportedEndpoints.some((endpoint) => (
-        endpoint.includes('/chat/completions') || endpoint.includes('/responses') || endpoint.includes('/v1/messages')
-      )))
+      || !supportsChatEndpoint
       || !isAdmittedDiscoveredModel(entry)
     ) continue;
     seen.add(id);
     const label = typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim() : id;
+    const routeOptions = copilotRouteOptions(supportedEndpoints, apiBaseUrl);
+    const deniedByAccountPolicy = copilotPolicyDenied(entry);
+    const unavailableReason = deniedByAccountPolicy
+      ? 'This model is disabled by the current Copilot account, plan, client, or organization policy.'
+      : undefined;
     models.push({
       id,
       label,
       enabled: true,
       ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
-      availability: 'available',
+      availability: deniedByAccountPolicy ? 'unavailable' : 'available',
+      ...(unavailableReason ? { availabilityReason: unavailableReason } : {}),
     });
     const limits = record(capabilities.limits);
-    const supports = record(capabilities.supports);
     const maxPromptTokens = positiveInteger(limits.max_prompt_tokens);
     const maxOutputTokens = positiveInteger(limits.max_output_tokens);
-    const maxTotalTokens = positiveInteger(limits.max_context_window_tokens)
+    const liveMaxTotalTokens = positiveInteger(limits.max_context_window_tokens)
       ?? positiveInteger(limits.max_context_window)
       ?? positiveInteger(limits.max_total_tokens);
-    const reasoningEfforts = entry.supported_reasoning_efforts
-      ?? capabilities.supported_reasoning_efforts
-      ?? supports.reasoning_efforts;
-    const defaultReasoningEffort = entry.default_reasoning_effort
-      ?? capabilities.default_reasoning_effort
-      ?? supports.default_reasoning_effort;
+    const maxTotalTokens = liveMaxTotalTokens;
+    const contextEntitlement: EntitlementState = deniedByAccountPolicy ? 'denied' : 'granted';
     contributions.push({
       modelId: id,
       ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
       label,
-      availability: 'available',
-      ...(maxPromptTokens
-        ? {
-            contextTiers: [{
-              id: 'default', label: 'Default', maxPromptTokens,
-              ...(maxOutputTokens ? { maxOutputTokens } : {}),
-              ...(maxTotalTokens ? { maxTotalTokens } : {}),
-              activation: { kind: 'implicit' }, entitlement: 'granted',
-            }],
-            defaultBudgetTokens: maxPromptTokens,
-          }
-        : {}),
-      reasoning: parseOpenAiReasoningControl(
-        reasoningEfforts,
-        defaultReasoningEffort,
-        'openai-compatible',
-      ),
-      toolCalling: supports.tool_calls === true
-        ? { state: 'supported' }
-        : supports.tool_calls === false ? { state: 'unsupported' } : { state: 'unknown' },
-      visionInput: supports.vision === true
-        ? { state: 'supported' }
-        : supports.vision === false ? { state: 'unsupported' } : { state: 'unknown' },
-      structuredOutput: supports.structured_outputs === true || supports.response_format === true
-        ? { state: 'supported' }
-        : supports.structured_outputs === false || supports.response_format === false
-          ? { state: 'unsupported' }
-          : { state: 'unknown' },
+      availability: deniedByAccountPolicy ? 'unavailable' : 'available',
+      ...(unavailableReason ? { unavailableReason } : {}),
+      ...(routeOptions.length > 0 ? { routeOptions } : {}),
     });
     const metadata: CopilotModelCapabilityMetadata = {
       limits: {
@@ -163,14 +189,13 @@ export function parseCopilotModelCatalog(payload: unknown): CopilotCatalogParseR
         ...(maxTotalTokens ? { maxTotalTokens } : {}),
       },
       tokenPrices: record(record(entry.billing).token_prices),
+      entitlement: contextEntitlement,
     };
     if (parseCopilotBillingTiers(metadata).length > 0) billingByModel[id] = metadata;
   }
-  const normalizedContributions = normalizeCopilotDiscoveryModels(contributions);
-  const visibleIds = new Set(normalizedContributions.map((model) => model.modelId));
   return {
-    models: models.filter((model) => visibleIds.has(model.id)),
-    contributions: normalizedContributions,
+    models,
+    contributions,
     billingByModel,
   };
 }

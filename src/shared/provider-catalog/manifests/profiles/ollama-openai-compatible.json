@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "ollama-openai-compatible",
+  "routeMechanics": [
+    {
+      "protocol": "OllamaOpenAICompatibleChatCompletions",
+      "adapter": "ollama-openai-compatible"
+    }
+  ]
+}

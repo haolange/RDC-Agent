@@ -16,11 +16,12 @@ import {
   buildContextTierRows,
   getReasoningLabelKey,
 } from '../modelCapabilitySummaryUtils';
+import { getProviderProtocolLabel } from '../utils';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
 interface ProviderModelCapabilitySummaryProps {
-  provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured'>;
+  provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured' | 'serviceOperator' | 'authMode'>;
   model: LlmProviderModel;
   effectiveModel: EffectiveModel | null;
   snapshot: EffectiveCatalogSnapshot | null;
@@ -44,16 +45,36 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
   const [probeResult, setProbeResult] = useState<LlmModelCapabilityProbeResult | null>(null);
   const chips = buildCapabilityChips(effectiveModel, t);
   const tiers = buildContextTierRows(effectiveModel, t);
-  const reasoningUnverified = effectiveModel?.reasoning.kind === 'unknown';
-  const reasoningOptions = reasoningUnverified ? [] : getReasoningSelectionOrder(effectiveModel?.reasoning);
-  const defaultReasoning = effectiveModel?.reasoning.defaultSelection ?? 'off';
+  const reasoningUnverified = effectiveModel?.controls.reasoning.kind === 'unknown';
+  const reasoningDefaultUnverified = reasoningUnverified
+    || effectiveModel?.controls.reasoning.defaultState === 'unknown'
+    || effectiveModel?.controls.reasoning.defaultState === 'provider-managed';
+  const reasoningOptions = reasoningUnverified ? [] : getReasoningSelectionOrder(effectiveModel?.controls.reasoning);
+  const defaultReasoning = effectiveModel?.controls.reasoning.defaultSelection ?? 'off';
+  const routeOptions = effectiveModel?.routeOptions ?? [];
+  const effectiveRouteOption = routeOptions.find((option) => option.routeRevision === effectiveModel?.routeRevision)
+    ?? routeOptions.find((option) => option.route.protocol === effectiveModel?.route.protocol);
+  const selectedRouteOptionId = model.preferredRouteOptionId
+    ?? effectiveModel?.preferredRouteOptionId
+    ?? effectiveRouteOption?.id
+    ?? routeOptions[0]?.id
+    ?? '';
+  const routeOptionMeta = (option: NonNullable<EffectiveModel['routeOptions']>[number]): string => {
+    let endpoint = option.endpointOwner ?? provider.serviceOperator;
+    if (!option.endpointOwner && option.route.baseUrl) {
+      try { endpoint = new URL(option.route.baseUrl).host; } catch { /* retain the explicit service operator */ }
+    }
+    const wireOwner = option.protocolOwner
+      ? t('settings.providers.capability.protocolOwner', { owner: option.protocolOwner })
+      : '';
+    return [wireOwner, endpoint, option.authMode ?? provider.authMode].filter(Boolean).join(' · ');
+  };
   const contextChoices = effectiveModel ? resolveContextTierChoices(effectiveModel) : null;
   const probeModes: LlmModelCapabilityProbeMode[] = effectiveModel ? [
     'default',
     ...(contextChoices?.oneMillionTier ? ['one-million-context' as const] : []),
-    ...(effectiveModel.fast.kind !== 'unknown'
-      && effectiveModel.fast.kind !== 'unsupported'
-      && effectiveModel.fast.entitlement !== 'denied' ? ['fast' as const] : []),
+    ...(effectiveModel.resolvedControls?.fast.state === 'selectable'
+      && !effectiveModel.resolvedControls.fast.disabled ? ['fast' as const] : []),
   ] : [];
   const updateBudget = (raw: string) => {
     if (!raw.trim()) {
@@ -136,10 +157,37 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
             </div>
             <div className="settings-model-preferences-grid">
               <label className="settings-field">
+                <span className="settings-field-label">{t('settings.providers.capability.route')}</span>
+                {routeOptions.length > 1 ? (
+                  <select
+                    className="input"
+                    value={selectedRouteOptionId}
+                    disabled={loading || snapshot?.refreshing}
+                    onChange={(event) => onModelChange({ preferredRouteOptionId: event.target.value || undefined })}
+                  >
+                    {routeOptions.map((option) => (
+                      <option
+                        key={option.id}
+                        value={option.id}
+                        disabled={option.availability !== 'available'}
+                      >
+                        {option.label ?? getProviderProtocolLabel(option.route.protocol)} · {routeOptionMeta(option)}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="settings-model-route-readonly">
+                    {routeOptions[0]?.label ?? getProviderProtocolLabel(effectiveModel.route.protocol)}
+                    {' · '}{routeOptions[0] ? routeOptionMeta(routeOptions[0]) : provider.serviceOperator}
+                  </span>
+                )}
+                <span className="settings-help-text">{t('settings.providers.capability.routeHint')}</span>
+              </label>
+              <label className="settings-field">
                 <span className="settings-field-label">{t('settings.providers.capability.defaultReasoning')}</span>
                 <select
                   className="input"
-                  value={reasoningUnverified ? '' : model.defaultReasoningSelection ?? ''}
+                  value={reasoningDefaultUnverified ? '' : model.defaultReasoningSelection ?? ''}
                   disabled={reasoningOptions.length <= 1}
                   onChange={(event) => onModelChange({
                     defaultReasoningSelection: event.target.value
@@ -148,7 +196,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
                   })}
                 >
                   <option value="">
-                    {reasoningUnverified
+                    {reasoningDefaultUnverified
                       ? t('settings.providers.capability.unverified')
                       : t('settings.providers.capability.providerDefault', { value: t(getReasoningLabelKey(defaultReasoning)) })}
                   </option>

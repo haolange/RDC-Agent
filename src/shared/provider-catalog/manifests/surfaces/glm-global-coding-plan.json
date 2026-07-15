@@ -1,0 +1,602 @@
+{
+  "schemaVersion": 2,
+  "id": "glm-global-coding-plan",
+  "identityIds": [
+    "zai-coding-plan"
+  ],
+  "profileId": "multi-protocol",
+  "adapterIds": [
+    "anthropic-messages",
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "anthropic-candidate-validation",
+  "vendorId": "zhipu",
+  "label": "Z.ai GLM Coding Plan (Global)",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "coding-token-plan",
+  "surfaceKind": "plan",
+  "serviceOperator": "zhipu-ai",
+  "endpointClass": "coding-plan",
+  "endpointOwnership": "service-operator",
+  "catalogOwnership": "app-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:glm-global-coding-plan:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "glm-global-coding-plan"
+    },
+    {
+      "id": "models.dev:zai-coding-plan:1",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "zai-coding-plan",
+      "surface": "glm-global-coding-plan"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:glm-global-coding-plan:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "reasoning",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "AnthropicMessages",
+      "protocol": "AnthropicMessages",
+      "adapterId": "anthropic-messages",
+      "baseUrl": "https://api.z.ai/api/anthropic/v1",
+      "default": true,
+      "protocolOwner": "anthropic"
+    },
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.z.ai/api/coding/paas/v4",
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "candidate-validation",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "anthropic-candidate-validation"
+    }
+  },
+  "models": [
+    {
+      "modelId": "glm-5",
+      "label": "glm-5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 200000,
+          "maxOutputTokens": 128000,
+          "maxTotalTokens": 200000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 72000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.z.ai/api/anthropic/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://api.z.ai/api/anthropic/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "zhipu-ai",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.z.ai/api/coding/paas/v4",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "zhipu-ai",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "high",
+            "onMode": "enabled",
+            "offMode": "disabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:glm-global-coding-plan:0"
+    },
+    {
+      "modelId": "glm-4.7",
+      "label": "glm-4.7",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 131072,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.z.ai/api/anthropic/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://api.z.ai/api/anthropic/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "zhipu-ai",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.z.ai/api/coding/paas/v4",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "zhipu-ai",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "high",
+            "onMode": "enabled",
+            "offMode": "disabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:glm-global-coding-plan:0"
+    },
+    {
+      "modelId": "glm-4.6",
+      "label": "glm-4.6",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 131072,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.z.ai/api/anthropic/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://api.z.ai/api/anthropic/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "zhipu-ai",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.z.ai/api/coding/paas/v4",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "zhipu-ai",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "high",
+            "onMode": "enabled",
+            "offMode": "disabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:glm-global-coding-plan:0"
+    },
+    {
+      "modelId": "glm-4.5",
+      "label": "glm-4.5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 131072,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.z.ai/api/anthropic/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://api.z.ai/api/anthropic/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "zhipu-ai",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.z.ai/api/coding/paas/v4",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "zhipu-ai",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "high",
+            "onMode": "enabled",
+            "offMode": "disabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:glm-global-coding-plan:0"
+    }
+  ],
+  "protocolOverrides": [
+    {
+      "modelId": "glm-5",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "toggle",
+            "supportsOff": true,
+            "levels": [],
+            "defaultSelection": "on",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "high",
+              "onMode": "enabled",
+              "offMode": "disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:glm-global-coding-plan:0"
+    },
+    {
+      "modelId": "glm-5",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "toggle",
+            "supportsOff": true,
+            "levels": [],
+            "defaultSelection": "on",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "high",
+              "onMode": "thinking-enabled",
+              "offMode": "thinking-disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:glm-global-coding-plan:0"
+    },
+    {
+      "modelId": "glm-4.7",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "toggle",
+            "supportsOff": true,
+            "levels": [],
+            "defaultSelection": "on",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "high",
+              "onMode": "enabled",
+              "offMode": "disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:glm-global-coding-plan:0"
+    },
+    {
+      "modelId": "glm-4.7",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "toggle",
+            "supportsOff": true,
+            "levels": [],
+            "defaultSelection": "on",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "high",
+              "onMode": "thinking-enabled",
+              "offMode": "thinking-disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:glm-global-coding-plan:0"
+    },
+    {
+      "modelId": "glm-4.6",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "toggle",
+            "supportsOff": true,
+            "levels": [],
+            "defaultSelection": "on",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "high",
+              "onMode": "enabled",
+              "offMode": "disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:glm-global-coding-plan:0"
+    },
+    {
+      "modelId": "glm-4.6",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "toggle",
+            "supportsOff": true,
+            "levels": [],
+            "defaultSelection": "on",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "high",
+              "onMode": "thinking-enabled",
+              "offMode": "thinking-disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:glm-global-coding-plan:0"
+    },
+    {
+      "modelId": "glm-4.5",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "toggle",
+            "supportsOff": true,
+            "levels": [],
+            "defaultSelection": "on",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "high",
+              "onMode": "enabled",
+              "offMode": "disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:glm-global-coding-plan:0"
+    },
+    {
+      "modelId": "glm-4.5",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "toggle",
+            "supportsOff": true,
+            "levels": [],
+            "defaultSelection": "on",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "high",
+              "onMode": "thinking-enabled",
+              "offMode": "thinking-disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:glm-global-coding-plan:0"
+    }
+  ],
+  "recommendedModels": [
+    "glm-5",
+    "glm-4.7",
+    "sonnet",
+    "opus",
+    "haiku"
+  ],
+  "docsUrl": "https://platform.z.ai/"
+}

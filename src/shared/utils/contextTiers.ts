@@ -1,4 +1,8 @@
-import type { ContextTier, EffectiveModel } from '../types/providerCapability';
+import type {
+  ControlDefinition,
+  ContextTier,
+  EffectiveModel,
+} from '../types/providerCapability';
 
 export interface ContextTierChoices {
   normalTier?: ContextTier;
@@ -46,7 +50,7 @@ function highestTier(tiers: ContextTier[], sourceOrder: Map<string, number>): Co
       return rightCap - leftCap;
     }
     // Tier order is authoritative when either side has no numeric ceiling.
-    // This keeps header/body/model-variant tiers usable without inventing a cap.
+    // This keeps header/body tiers usable without inventing a cap.
     return (sourceOrder.get(right.id) ?? 0) - (sourceOrder.get(left.id) ?? 0);
   })[0];
 }
@@ -56,7 +60,7 @@ function highestTier(tiers: ContextTier[], sourceOrder: Map<string, number>): Co
  * eligibility is based on the complete window, not only the input ceiling.
  */
 export function resolveContextTierChoices(
-  model: Pick<EffectiveModel, 'contextTiers'>,
+  model: Pick<EffectiveModel, 'contextTiers' | 'controls'>,
 ): ContextTierChoices {
   const usable = model.contextTiers.filter((tier) => tier.entitlement !== 'denied');
   const sourceOrder = new Map(model.contextTiers.map((tier, index) => [tier.id, index]));
@@ -69,20 +73,28 @@ export function resolveContextTierChoices(
 
   if (!normalTier) return { oneMillionUnverified: false };
 
-  const eligible = usable.filter((tier) => {
-    const window = contextTierWindowTokens(tier);
-    return window !== undefined && window >= ONE_MILLION_CONTEXT_TOKENS;
-  });
+  const contextControl = model.controls.context1m;
+  const explicitTierId = contextControl.state === 'fixed' || contextControl.state === 'selectable'
+    ? contextControl.tierId
+    : undefined;
+  const explicitTier = explicitTierId
+    ? usable.find((tier) => tier.id === explicitTierId)
+    : undefined;
+  const eligible = explicitTier ? [explicitTier] : [];
   const grantedEligible = eligible.filter((tier) => tier.entitlement === 'granted');
   const unknownEligible = eligible.filter((tier) => tier.entitlement === 'unknown');
-  const oneMillionTier = normalTier.entitlement === 'granted' && grantedEligible.includes(normalTier)
-    ? normalTier
-    : highestTier(grantedEligible, sourceOrder)
-      ?? (unknownEligible.includes(normalTier) ? normalTier : highestTier(unknownEligible, sourceOrder));
+  const oneMillionTier = highestTier(grantedEligible, sourceOrder)
+    ?? highestTier(unknownEligible, sourceOrder);
 
   return {
     normalTier,
     oneMillionTier,
     oneMillionUnverified: oneMillionTier?.entitlement === 'unknown',
   };
+}
+
+export function getOneMillionContextControl(
+  model: Pick<EffectiveModel, 'controls'>,
+): ControlDefinition {
+  return model.controls.context1m;
 }

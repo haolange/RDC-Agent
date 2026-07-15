@@ -5,7 +5,6 @@ import type {
   LlmProviderAccountDiagnostic,
   LlmProviderAccountLoginFinishRequest,
   LlmProviderAccountLoginMode,
-  LlmProviderAccountRegion,
   LlmProviderAccountLoginStartRequest,
   LlmProviderAccountStatus,
   LlmProviderId,
@@ -18,7 +17,10 @@ import { parseCopilotModelCatalog } from './CopilotBilling';
 import { isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 import { settingsService } from './SettingsService';
 import { oauthRefreshManager } from './OAuthRefreshManager';
-import { getProviderSeedModels } from './ProviderPresetRegistry';
+import {
+  getProviderModelDefinitions,
+  loadProviderSurface,
+} from '../provider-catalog/ProviderCatalogRegistry';
 import {
   mergeParsedLiveCatalogs,
   parseChatGptAccountCatalog,
@@ -30,16 +32,10 @@ import {
 import type { CatalogModelContribution } from './EffectiveCatalogService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import {
-  buildMiniMaxAuthorizationRequest,
-  buildMiniMaxRefresh,
-  buildMiniMaxTokenPoll,
   buildOpenRouterAuthorizationUrl,
   buildOpenRouterExchange,
   createPkcePair,
-  miniMaxRegionContract,
   parseOpenRouterExchange,
-  resolveMiniMaxExpiry,
-  type MiniMaxRegion,
 } from './LiveProviderOAuthContracts';
 
 const REQUEST_TIMEOUT_MS = 20000;
@@ -53,13 +49,17 @@ const GROK_OAUTH_REQUESTED_SCOPES = ['openid', 'profile', 'email', 'offline_acce
 const GROK_BUILD_API_BASE_URL = 'https://cli-chat-proxy.grok.com/v1';
 const XAI_API_BASE_URL = 'https://api.x.ai/v1';
 const CHATGPT_CATALOG_CLIENT_VERSION = '1.0.0';
+const NOUS_PORTAL_BASE_URL = 'https://portal.nousresearch.com';
+const NOUS_INFERENCE_BASE_URL = 'https://inference-api.nousresearch.com/v1';
+const NOUS_OAUTH_CLIENT_ID = 'hermes-cli';
+const NOUS_OAUTH_SCOPE = 'inference:invoke';
 
 type AccountProviderId =
   | 'claude-account'
   | 'chatgpt-account'
   | 'github-copilot'
   | 'grok-account'
-  | 'minimax-account'
+  | 'nous'
   | 'openrouter';
 
 interface OAuthFlowState {
@@ -78,7 +78,7 @@ interface OAuthFlowState {
   redirectUri?: string;
   tokenEndpoint?: string;
   userinfoEndpoint?: string;
-  region?: MiniMaxRegion;
+  resourceUrl?: string;
   expiresAt: number;
   server?: Server;
   error?: string;
@@ -101,8 +101,6 @@ interface OAuthSecretBundle {
   expiresAt?: string;
   accountLabel?: string;
   planLabel?: string;
-  region?: MiniMaxRegion;
-  inferenceBaseUrl?: string;
   resourceUrl?: string;
 }
 
@@ -135,7 +133,7 @@ const isAccountProviderId = (providerId: LlmProviderId): providerId is AccountPr
   || providerId === 'chatgpt-account'
   || providerId === 'github-copilot'
   || providerId === 'grok-account'
-  || providerId === 'minimax-account'
+  || providerId === 'nous'
   || providerId === 'openrouter';
 
 const isTestMode = (): boolean => process.env.RDC_AGENT_TEST_MODE === '1';
@@ -365,18 +363,6 @@ const extractChatGptAccountId = (idToken?: string): string | undefined => {
     ?? readString(firstOrganization.id);
 };
 
-const createAccountCatalogModels = (providerId: AccountProviderId): LlmProviderModel[] => {
-  const seen = new Set<string>();
-  return getProviderSeedModels(providerId)
-    .filter((model) => {
-      if (!model.id || seen.has(model.id) || !isAgentRoutableAccountModel(model.id)) {
-        return false;
-      }
-      seen.add(model.id);
-      return true;
-    });
-};
-
 const isAgentRoutableAccountModel = (modelId: string): boolean => {
   return isAdmittedDiscoveredModel(modelId);
 };
@@ -454,8 +440,8 @@ function pendingAuthorizationMessage(
       ? 'Waiting for Super Grok device-code authorization.'
       : 'xAI is displaying a one-time code. Paste it into RDC Agent to finish connecting.';
   }
-  if (providerId === 'minimax-account') return 'Waiting for MiniMax account authorization.';
   if (providerId === 'openrouter') return 'Waiting for OpenRouter browser authorization.';
+  if (providerId === 'nous') return 'Waiting for Nous Portal device-code authorization.';
   return 'Waiting for authorization.';
 }
 
@@ -485,8 +471,8 @@ export class ProviderAccountAuthService {
     if (providerId === 'grok-account') {
       return this.startGrokLogin(request.accountLoginMode);
     }
-    if (providerId === 'minimax-account') {
-      return this.startMiniMaxLogin(request.accountRegion);
+    if (providerId === 'nous') {
+      return this.startNousLogin();
     }
     if (providerId === 'openrouter') {
       return this.startOpenRouterLogin();
@@ -522,8 +508,8 @@ export class ProviderAccountAuthService {
           : await this.pollGrokDevice(flow);
         return await this.persistAccount(request.providerId, bundle);
       }
-      if (request.providerId === 'minimax-account') {
-        const bundle = await this.pollMiniMaxDevice(flow);
+      if (request.providerId === 'nous') {
+        const bundle = await this.pollNousDevice(flow);
         return await this.persistAccount(request.providerId, bundle);
       }
       if (request.providerId === 'openrouter') {
@@ -581,8 +567,12 @@ export class ProviderAccountAuthService {
       throw new Error('GitHub Copilot account access token is missing. Sign in again.');
     }
 
+    await loadProviderSurface(providerId);
     const activeBundle = await this.refreshBundleIfNeeded(bundle);
-    if (JSON.stringify(activeBundle) === JSON.stringify(bundle)) {
+    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
+    const refreshedAt = provider?.lastModelRefreshAt ? Date.parse(provider.lastModelRefreshAt) : Number.NaN;
+    const catalogIsFresh = Number.isFinite(refreshedAt) && Date.now() - refreshedAt < 5 * 60 * 1000;
+    if (JSON.stringify(activeBundle) === JSON.stringify(bundle) && catalogIsFresh) {
       return;
     }
 
@@ -759,6 +749,64 @@ export class ProviderAccountAuthService {
     return this.status(flow.providerId);
   }
 
+  private async startNousLogin(): Promise<LlmProviderAccountStatus> {
+    const payload = await fetchOAuthJson(`${NOUS_PORTAL_BASE_URL}/api/oauth/device/code`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: createFormBody({
+        client_id: NOUS_OAUTH_CLIENT_ID,
+        scope: NOUS_OAUTH_SCOPE,
+      }),
+    }) as {
+      device_code?: string;
+      user_code?: string;
+      verification_uri?: string;
+      verification_uri_complete?: string;
+      expires_in?: number;
+      interval?: number;
+      error?: string;
+      error_description?: string;
+    };
+    if (payload.error) {
+      throw new Error(payload.error_description ?? payload.error);
+    }
+    if (
+      !payload.device_code
+      || !payload.user_code
+      || !payload.verification_uri
+      || !payload.verification_uri_complete
+    ) {
+      throw new Error('Nous Portal did not return a complete device authorization payload.');
+    }
+    const flow: OAuthFlowState = {
+      providerId: 'nous',
+      flowId: randomUUID(),
+      state: randomUUID(),
+      deviceCode: payload.device_code,
+      userCode: payload.user_code,
+      verificationUri: payload.verification_uri,
+      authUrl: payload.verification_uri_complete,
+      intervalSeconds: payload.interval ?? 5,
+      clientId: NOUS_OAUTH_CLIENT_ID,
+      authorizationMode: 'device',
+      requestedScopes: NOUS_OAUTH_SCOPE,
+      tokenEndpoint: `${NOUS_PORTAL_BASE_URL}/api/oauth/token`,
+      resourceUrl: NOUS_INFERENCE_BASE_URL,
+      expiresAt: Date.now() + (payload.expires_in ?? 900) * 1000,
+    };
+    this.setFlow(flow);
+    void this.openExternal(flow.authUrl);
+    void this.pollNousDevice(flow)
+      .then((bundle) => this.persistAccount('nous', bundle))
+      .catch((error) => {
+        flow.error = parseProviderError(error);
+      });
+    return this.status(flow.providerId);
+  }
+
   private async startGrokLogin(
     accountLoginMode?: LlmProviderAccountLoginMode,
   ): Promise<LlmProviderAccountStatus> {
@@ -766,63 +814,6 @@ export class ProviderAccountAuthService {
     return mode === 'device'
       ? this.startGrokDeviceLogin(GROK_OAUTH_CLIENT_ID)
       : this.startGrokBrowserLogin(GROK_OAUTH_CLIENT_ID);
-  }
-
-  private async startMiniMaxLogin(
-    accountRegion?: LlmProviderAccountRegion,
-  ): Promise<LlmProviderAccountStatus> {
-    const region: MiniMaxRegion = accountRegion === 'cn' ? 'cn' : 'global';
-    const { verifier, challenge } = createPkcePair();
-    const state = randomUUID();
-    const authorization = buildMiniMaxAuthorizationRequest(region, challenge, state);
-    try {
-      const payload = await fetchOAuthJson(authorization.url, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'x-request-id': randomUUID(),
-        },
-        body: authorization.body.toString(),
-      }) as {
-        user_code?: string;
-        verification_uri?: string;
-        expired_in?: number | string;
-        interval?: number | string;
-        state?: string;
-      };
-      if (!payload.user_code || !payload.verification_uri || payload.expired_in === undefined) {
-        throw new Error('MiniMax OAuth authorization response is incomplete.');
-      }
-      if (payload.state !== state) {
-        throw new Error('MiniMax OAuth state mismatch.');
-      }
-      const intervalMs = Number(payload.interval ?? 2000);
-      const flow: OAuthFlowState = {
-        providerId: 'minimax-account',
-        flowId: randomUUID(),
-        state,
-        codeVerifier: verifier,
-        verificationUri: payload.verification_uri,
-        authUrl: payload.verification_uri,
-        userCode: payload.user_code,
-        intervalSeconds: Math.max(2, Number.isFinite(intervalMs) ? intervalMs / 1000 : 2),
-        authorizationMode: 'device',
-        requestedScopes: 'group_id profile model.completion',
-        region,
-        expiresAt: Date.parse(resolveMiniMaxExpiry(payload.expired_in)),
-      };
-      this.setFlow(flow);
-      void this.openExternal(flow.authUrl);
-      void this.pollMiniMaxDevice(flow)
-        .then((bundle) => this.persistAccount('minimax-account', bundle))
-        .catch((error) => {
-          flow.error = parseProviderError(error);
-        });
-      return this.status(flow.providerId);
-    } catch (error) {
-      return this.status('minimax-account', parseProviderError(error), 'failed');
-    }
   }
 
   private async startOpenRouterLogin(): Promise<LlmProviderAccountStatus> {
@@ -1074,53 +1065,67 @@ export class ProviderAccountAuthService {
     }
   }
 
-  private async pollMiniMaxDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle> {
-    if (!flow.userCode || !flow.codeVerifier || !flow.region) {
-      throw new Error('MiniMax OAuth flow is missing its user code, verifier, or region.');
+  private async pollNousDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle> {
+    if (!flow.deviceCode || !flow.clientId || !flow.tokenEndpoint) {
+      throw new Error('Nous Portal device authorization is missing client, device code, or token endpoint.');
     }
+    let intervalSeconds = flow.intervalSeconds ?? 5;
     let delayBeforePoll = !isTestMode();
     for (;;) {
       if (Date.now() > flow.expiresAt) {
-        throw new Error('MiniMax OAuth authorization expired.');
+        throw new Error('Nous Portal authorization code expired.');
       }
-      if (delayBeforePoll) await wait((flow.intervalSeconds ?? 2) * 1000);
+      if (delayBeforePoll) {
+        await wait(intervalSeconds * 1000);
+      }
       delayBeforePoll = true;
-      const request = buildMiniMaxTokenPoll(flow.region, flow.userCode, flow.codeVerifier);
-      const payload = await fetchOAuthJson(request.url, {
+      const payload = await fetchOAuthJson(flow.tokenEndpoint, {
         method: 'POST',
-        headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: request.body.toString(),
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: createFormBody({
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+          client_id: flow.clientId,
+          device_code: flow.deviceCode,
+        }),
       }) as {
-        status?: string;
         access_token?: string;
         refresh_token?: string;
-        expired_in?: number | string;
-        expires_in?: number | string;
-        resource_url?: string;
-        notification_message?: string;
-        base_resp?: { status_msg?: string };
+        token_type?: string;
+        scope?: string;
+        expires_in?: number;
+        inference_base_url?: string;
+        error?: string;
+        error_description?: string;
       };
-      if (payload.status === 'error') {
-        throw new Error(payload.base_resp?.status_msg || 'MiniMax OAuth authorization was denied.');
+      if (payload.error === 'authorization_pending') {
+        delete flow.error;
+        continue;
       }
-      if (payload.status !== 'success') continue;
-      if (!payload.access_token || !payload.refresh_token) {
-        throw new Error('MiniMax OAuth token response is incomplete.');
+      if (payload.error === 'slow_down') {
+        delete flow.error;
+        intervalSeconds += 1;
+        continue;
+      }
+      if (payload.error) {
+        throw new Error(payload.error_description ?? payload.error);
+      }
+      if (!payload.access_token) {
+        throw new Error('Nous Portal OAuth did not return an access token.');
       }
       return {
-        providerId: 'minimax-account',
+        providerId: 'nous',
         accessToken: payload.access_token,
         apiKey: payload.access_token,
         refreshToken: payload.refresh_token,
-        region: flow.region,
-        inferenceBaseUrl: miniMaxRegionContract(flow.region).inferenceBaseUrl,
-        resourceUrl: payload.resource_url,
-        requestedScopes: flow.requestedScopes,
         authorizationMode: 'device',
-        accountId: `minimax-${randomUUID()}`,
-        expiresAt: resolveMiniMaxExpiry(payload.expired_in ?? payload.expires_in),
-        accountLabel: `MiniMax Account (${flow.region === 'cn' ? 'CN' : 'Global'})`,
-        planLabel: payload.notification_message ?? 'MiniMax OAuth',
+        requestedScopes: payload.scope ?? flow.requestedScopes ?? NOUS_OAUTH_SCOPE,
+        resourceUrl: readString(payload.inference_base_url) ?? flow.resourceUrl ?? NOUS_INFERENCE_BASE_URL,
+        expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
+        accountLabel: 'Nous Portal',
+        planLabel: payload.scope ?? NOUS_OAUTH_SCOPE,
       };
     }
   }
@@ -1282,7 +1287,7 @@ export class ProviderAccountAuthService {
   }
 
   private async persistAccount(providerId: AccountProviderId, bundle: OAuthSecretBundle): Promise<LlmProviderAccountStatus> {
-    const discovery = await this.discoverCatalog(bundle, true);
+    const discovery = await this.discoverCatalog(bundle);
     if (discovery.models.length === 0) {
       throw new Error('Account provider returned no usable models.');
     }
@@ -1392,40 +1397,46 @@ export class ProviderAccountAuthService {
       };
     }
 
-    if (bundle.providerId === 'minimax-account') {
-      if (!bundle.refreshToken || !bundle.region) return bundle;
-      const request = buildMiniMaxRefresh(bundle.region, bundle.refreshToken);
-      const payload = await fetchOAuthJson(request.url, {
+    if (!bundle.refreshToken) {
+      return bundle;
+    }
+
+    if (bundle.providerId === 'nous') {
+      const payload = await fetchOAuthJson(`${NOUS_PORTAL_BASE_URL}/api/oauth/token`, {
         method: 'POST',
-        headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: request.body.toString(),
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'x-nous-refresh-token': bundle.refreshToken,
+        },
+        body: createFormBody({
+          grant_type: 'refresh_token',
+          client_id: NOUS_OAUTH_CLIENT_ID,
+        }),
       }) as {
-        status?: string;
         access_token?: string;
         refresh_token?: string;
-        expired_in?: number | string;
-        expires_in?: number | string;
+        scope?: string;
+        expires_in?: number;
+        inference_base_url?: string;
         error?: string;
-        base_resp?: { status_msg?: string };
+        error_description?: string;
       };
-      if (payload.status !== 'success' || !payload.access_token) {
-        const error = new Error(
-          payload.base_resp?.status_msg || payload.error || 'MiniMax OAuth refresh did not return success.',
-        ) as Error & { code?: string };
-        error.code = payload.error;
-        throw error;
+      if (payload.error) {
+        throw new Error(payload.error_description ?? payload.error);
+      }
+      if (!payload.access_token) {
+        throw new Error('Nous Portal OAuth refresh did not return an access token.');
       }
       return {
         ...bundle,
         accessToken: payload.access_token,
         apiKey: payload.access_token,
         refreshToken: payload.refresh_token ?? bundle.refreshToken,
-        expiresAt: resolveMiniMaxExpiry(payload.expired_in ?? payload.expires_in),
+        requestedScopes: payload.scope ?? bundle.requestedScopes,
+        resourceUrl: readString(payload.inference_base_url) ?? bundle.resourceUrl ?? NOUS_INFERENCE_BASE_URL,
+        expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
       };
-    }
-
-    if (!bundle.refreshToken) {
-      return bundle;
     }
 
     if (bundle.providerId === 'claude-account') {
@@ -1478,7 +1489,8 @@ export class ProviderAccountAuthService {
     };
   }
 
-  private async discoverCatalog(bundle: OAuthSecretBundle, allowSeedFallback = false): Promise<AccountCatalogDiscovery> {
+  private async discoverCatalog(bundle: OAuthSecretBundle): Promise<AccountCatalogDiscovery> {
+    await loadProviderSurface(bundle.providerId);
     if (bundle.providerId === 'github-copilot' && bundle.copilotToken) {
       try {
         const baseUrl = (bundle.copilotApiBaseUrl ?? 'https://api.githubcopilot.com').replace(/\/+$/, '');
@@ -1490,19 +1502,24 @@ export class ProviderAccountAuthService {
             ...COPILOT_WIRE_HEADERS,
           },
         });
-        const parsed = parseCopilotModelCatalog(payload);
-        const models = parsed.models.filter((model) => isAgentRoutableAccountModel(model.id));
+        const parsed = parseCopilotModelCatalog(payload, baseUrl);
+        const internalModelIds = new Set(getProviderModelDefinitions('github-copilot')
+          .filter((model) => model.selection.pickerVisibility === 'internal')
+          .map((model) => model.modelId));
+        const allModels = parsed.models.filter((model) => isAgentRoutableAccountModel(model.id));
+        const models = allModels.filter((model) => !internalModelIds.has(model.id));
         if (models.length > 0) {
+          const retainedModelIds = new Set(allModels.map((model) => model.id));
           bundle.copilotModelBilling = Object.fromEntries(
-            Object.entries(parsed.billingByModel).filter(([modelId]) => models.some((model) => model.id === modelId)),
+            Object.entries(parsed.billingByModel).filter(([modelId]) => retainedModelIds.has(modelId)),
           );
           return {
             models,
-            contributions: parsed.contributions.filter((model) => models.some((entry) => entry.id === model.modelId)),
+            contributions: parsed.contributions.filter((model) => retainedModelIds.has(model.modelId)),
           };
         }
       } catch (error) {
-        if (!allowSeedFallback) throw error;
+        throw error;
       }
       delete bundle.copilotModelBilling;
     }
@@ -1525,7 +1542,7 @@ export class ProviderAccountAuthService {
         if (parsed.models.length > 0) return parsed;
         throw new Error('ChatGPT Codex catalog returned no agent-routable models.');
       } catch (error) {
-        if (!allowSeedFallback) throw error;
+        throw error;
       }
     }
     if (bundle.providerId === 'claude-account') {
@@ -1545,7 +1562,7 @@ export class ProviderAccountAuthService {
         if (parsed.models.length > 0) return parsed;
         throw new Error('Claude Account catalog returned no agent-routable models.');
       } catch (error) {
-        if (!allowSeedFallback) throw error;
+        throw error;
       }
     }
     if (bundle.providerId === 'grok-account') {
@@ -1595,6 +1612,41 @@ export class ProviderAccountAuthService {
       }
       return { ...parsed, detail: sourceDetail };
     }
+    if (bundle.providerId === 'nous') {
+      const token = bundle.accessToken ?? bundle.apiKey;
+      if (!token) throw new Error('Nous Portal OAuth token is missing.');
+      const baseUrl = (bundle.resourceUrl ?? NOUS_INFERENCE_BASE_URL).replace(/\/+$/u, '');
+      const payload = await fetchJson(`${baseUrl}/models`, {
+        method: 'GET',
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+      });
+      const record = payload && typeof payload === 'object' && !Array.isArray(payload)
+        ? payload as Record<string, unknown>
+        : {};
+      const data = Array.isArray(record.data) ? record.data : [];
+      const seen = new Set<string>();
+      const models = data.flatMap((entry): LlmProviderModel[] => {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
+        const item = entry as Record<string, unknown>;
+        const id = readString(item.id);
+        if (
+          !id
+          || seen.has(id)
+          || id.toLowerCase().includes('hermes')
+          || !isAgentRoutableAccountModel(id)
+        ) return [];
+        seen.add(id);
+        return [{
+          id,
+          label: readString(item.name) ?? readString(item.display_name) ?? id,
+          enabled: true,
+        }];
+      });
+      if (models.length === 0) {
+        throw new Error('Nous Portal catalog returned no agent-routable models.');
+      }
+      return { models };
+    }
     if (bundle.providerId === 'openrouter') {
       if (!bundle.apiKey) throw new Error('OpenRouter OAuth API key is missing.');
       const payload = await fetchJson('https://openrouter.ai/api/v1/models', {
@@ -1607,30 +1659,7 @@ export class ProviderAccountAuthService {
       }
       return parsed;
     }
-    if (bundle.providerId === 'minimax-account') {
-      const models = createAccountCatalogModels(bundle.providerId);
-      if (models.length === 0 || !bundle.inferenceBaseUrl) {
-        throw new Error('MiniMax OAuth is missing its verified seed catalog or regional inference route.');
-      }
-      return {
-        models,
-        contributions: models.map((model) => ({
-          modelId: model.id,
-          label: model.label,
-          availability: 'available',
-          route: {
-            protocol: 'AnthropicMessages',
-            baseUrl: bundle.inferenceBaseUrl,
-            source: 'model',
-          },
-        })),
-      };
-    }
-    const models = createAccountCatalogModels(bundle.providerId);
-    if (models.length === 0) {
-      throw new Error(`Account provider ${bundle.providerId} is missing an app-managed model catalog.`);
-    }
-    return { models };
+    throw new Error(`Account provider ${bundle.providerId} has no live Catalog implementation.`);
   }
 
   private async revokeGrokBundle(bundle: OAuthSecretBundle): Promise<void> {

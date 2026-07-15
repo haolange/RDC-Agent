@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 2,
+  "id": "amazon-bedrock",
+  "identityIds": [
+    "amazon-bedrock"
+  ],
+  "profileId": "multi-protocol",
+  "adapterIds": [
+    "openai-compatible",
+    "openai-responses"
+  ],
+  "authSchemaId": "aws-bedrock",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "amazon-bedrock",
+  "label": "Amazon Bedrock",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "cloud-platform",
+  "surfaceKind": "cloud",
+  "serviceOperator": "amazon-web-services",
+  "endpointClass": "cloud-hosted",
+  "endpointOwnership": "cloud-platform",
+  "catalogOwnership": "provider-managed",
+  "factSources": [
+    {
+      "id": "models.dev:amazon-bedrock:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "amazon-bedrock",
+      "surface": "amazon-bedrock"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:amazon-bedrock:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "AWS_REGION",
+        "label": "AWS region",
+        "kind": "region",
+        "required": true,
+        "environmentVariable": "AWS_REGION"
+      },
+      {
+        "id": "AWS_BEARER_TOKEN_BEDROCK",
+        "label": "Amazon Bedrock API key",
+        "kind": "secret",
+        "required": false,
+        "environmentVariable": "AWS_BEARER_TOKEN_BEDROCK"
+      },
+      {
+        "id": "AWS_ACCESS_KEY_ID",
+        "label": "AWS access key ID",
+        "kind": "secret",
+        "required": false,
+        "environmentVariable": "AWS_ACCESS_KEY_ID"
+      },
+      {
+        "id": "AWS_SECRET_ACCESS_KEY",
+        "label": "AWS secret access key",
+        "kind": "secret",
+        "required": false,
+        "environmentVariable": "AWS_SECRET_ACCESS_KEY"
+      },
+      {
+        "id": "AWS_SESSION_TOKEN",
+        "label": "AWS session token",
+        "kind": "secret",
+        "required": false,
+        "environmentVariable": "AWS_SESSION_TOKEN"
+      },
+      {
+        "id": "AWS_PROFILE",
+        "label": "AWS profile",
+        "kind": "path",
+        "required": false,
+        "environmentVariable": "AWS_PROFILE"
+      }
+    ],
+    "primarySecretFieldId": "AWS_BEARER_TOKEN_BEDROCK",
+    "endpointTemplate": "https://bedrock-mantle.${AWS_REGION}.api.aws/v1",
+    "credentialAlternatives": [
+      {
+        "id": "bearer-token",
+        "label": "Bedrock API key",
+        "description": "Bearer authentication for the Bedrock Mantle OpenAI-compatible APIs.",
+        "fieldIds": [
+          "AWS_BEARER_TOKEN_BEDROCK"
+        ]
+      },
+      {
+        "id": "access-key",
+        "label": "AWS access key",
+        "description": "SigV4 using an access key ID, secret access key, and optional session token.",
+        "fieldIds": [
+          "AWS_ACCESS_KEY_ID",
+          "AWS_SECRET_ACCESS_KEY"
+        ]
+      },
+      {
+        "id": "profile",
+        "label": "AWS profile",
+        "description": "SigV4 using a named shared AWS profile.",
+        "fieldIds": [
+          "AWS_PROFILE"
+        ]
+      },
+      {
+        "id": "default-chain",
+        "label": "AWS default credential chain",
+        "description": "Environment, SSO/process credentials, web identity, ECS, or EC2 instance role.",
+        "fieldIds": [],
+        "ambient": true
+      }
+    ]
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": true,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://bedrock-mantle.${AWS_REGION}.api.aws/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    },
+    {
+      "id": "OpenAIResponses",
+      "protocol": "OpenAIResponses",
+      "adapterId": "openai-responses",
+      "baseUrl": "https://bedrock-mantle.${AWS_REGION}.api.aws/openai/v1",
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html"
+}

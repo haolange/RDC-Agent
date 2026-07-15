@@ -1,9 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { LlmProviderEntry } from '@shared/types/settings';
-import type { AppSettings } from '@shared/types/settings';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 
 vi.mock('electron', () => ({
-  app: { getPath: () => process.cwd(), getAppPath: () => process.cwd() },
+  app: {
+    getPath: () => process.env.TEMP ?? process.env.TMP ?? process.cwd(),
+    getAppPath: () => process.cwd(),
+  },
   safeStorage: {
     isEncryptionAvailable: () => false,
     decryptString: () => '',
@@ -12,14 +14,16 @@ vi.mock('electron', () => ({
 }));
 
 import {
+  applyDiscoveryAuthority,
+  buildCatalogModelContribution,
   buildEffectiveCatalogRequest,
-  buildSeedModelContribution,
-  completeDiscoveryContributions,
   planEffectiveModelRequest,
-  recordObservedToolCallingSupport,
+  refreshEffectiveCatalogDiscovery,
   resolveEffectiveModelSelection,
 } from './EffectiveModelResolver';
-import { effectiveCatalogService, mergeEffectiveCatalog } from './EffectiveCatalogService';
+import { mergeEffectiveCatalog } from './EffectiveCatalogService';
+import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
+import { planModelRequest } from './RequestPlanner';
 
 function provider(id: string, protocol: LlmProviderEntry['protocol']): LlmProviderEntry {
   return {
@@ -30,202 +34,244 @@ function provider(id: string, protocol: LlmProviderEntry['protocol']): LlmProvid
   } as unknown as LlmProviderEntry;
 }
 
-describe('surface-specific effective model seeds', () => {
-  it('keeps ChatGPT on the Codex surface with dynamic context and request-param Fast', () => {
-    const model = buildSeedModelContribution(provider('chatgpt-account', 'OpenAIResponses'), 'gpt-5.5');
-    expect(model.contextTiers).toEqual([
-      { id: 'default', label: 'Codex service limit', activation: { kind: 'implicit' }, entitlement: 'granted' },
+describe('EffectiveModelResolver compiled Catalog projection', () => {
+  beforeAll(async () => {
+    await Promise.all([
+      loadProviderSurface('chatgpt-account'),
+      loadProviderSurface('kimi-coding-plan'),
+      loadProviderSurface('minimax-global'),
+      loadProviderSurface('cortecs'),
+      loadProviderSurface('custom-endpoint'),
     ]);
-    expect(model.fast).toEqual({ kind: 'request-param', patch: { service_tier: 'priority' }, entitlement: 'granted', label: 'Fast' });
   });
 
-  it('uses a header-activated unknown 1M tier for Claude Account', () => {
-    const model = buildSeedModelContribution(provider('claude-account', 'AnthropicMessages'), 'claude-sonnet-5');
-    expect(model.contextTiers?.[1]).toEqual({
-      id: 'max', label: '1M context', maxPromptTokens: 1_000_000,
-      activation: { kind: 'header', headers: { 'anthropic-beta': 'context-1m-2025-08-07' } },
-      entitlement: 'unknown',
+  it('loads ChatGPT controls and execution binding from the manifest', () => {
+    const contribution = buildCatalogModelContribution(
+      provider('chatgpt-account', 'OpenAIResponses'),
+      'gpt-5.5',
+    );
+    expect(contribution).toMatchObject({
+      modelId: 'gpt-5.5',
+      presencePolicy: 'account-entitled',
+      controls: {
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
+        context1m: { state: 'unsupported', fixedValue: false },
+        reasoning: { levels: ['low', 'medium', 'high', 'xhigh'], defaultSelection: 'medium' },
+      },
+      executionBindings: [{ id: 'fast:activation' }],
     });
   });
 
-  it('uses one 1M-class tier for direct Anthropic Sonnet 5', () => {
-    const model = buildSeedModelContribution(provider('anthropic', 'AnthropicMessages'), 'claude-sonnet-5');
-    expect(model.contextTiers).toEqual([expect.objectContaining({
-      id: 'default', maxPromptTokens: 872_000, maxOutputTokens: 128_000, maxTotalTokens: 1_000_000,
-      activation: { kind: 'implicit' }, entitlement: 'granted',
-    })]);
-    expect(model.defaultBudgetTokens).toBe(256_000);
+  it('projects account-scoped structure before entitlement refresh while planning stays fail-closed', () => {
+    const chatgpt = provider('chatgpt-account', 'OpenAIResponses');
+    const settings = { llm: { providers: [chatgpt], agentRoutes: [] } } as unknown as AppSettings;
+    const selection = resolveEffectiveModelSelection('chatgpt-account', 'gpt-5.6-sol', settings);
+
+    expect(selection.model).toMatchObject({
+      modelId: 'gpt-5.6-sol',
+      availability: 'unknown',
+      controls: {
+        fast: { state: 'selectable', defaultValue: false },
+        context1m: { state: 'unsupported', fixedValue: false },
+        reasoning: {
+          levels: ['low', 'medium', 'high', 'xhigh', 'max'],
+          defaultSelection: 'medium',
+        },
+      },
+    });
+    expect(planEffectiveModelRequest({
+      providerId: 'chatgpt-account',
+      modelId: 'gpt-5.6-sol',
+      settings,
+      controls: { fastModel: true },
+    })).toMatchObject({
+      ok: false,
+      code: 'MODEL_UNAVAILABLE',
+      message: expect.stringContaining('not yet verified'),
+    });
   });
 
-  it('keeps the Copilot catalog empty until the current account returns live models', () => {
-    const request = buildEffectiveCatalogRequest(
-      provider('github-copilot', 'OpenAICompatibleChatCompletions'),
-    );
-    expect(request.seed.models).toEqual([]);
-    expect(mergeEffectiveCatalog(request)).toEqual([]);
+  it('projects model-level protocol overlays before live discovery', () => {
+    const openAiKimi = mergeEffectiveCatalog(buildEffectiveCatalogRequest(
+      provider('kimi-coding-plan', 'OpenAICompatibleChatCompletions'),
+    )).find((model) => model.modelId === 'kimi-for-coding');
+    expect(openAiKimi).toMatchObject({
+      route: { protocol: 'OpenAICompatibleChatCompletions' },
+      controls: { reasoning: { wireProfile: { kind: 'openai-compatible' } } },
+      routeOptions: [
+        { id: 'AnthropicMessages', route: { protocol: 'AnthropicMessages' } },
+        { id: 'OpenAICompatibleChatCompletions', route: { protocol: 'OpenAICompatibleChatCompletions' } },
+      ],
+    });
+    const anthropicKimi = mergeEffectiveCatalog(buildEffectiveCatalogRequest(
+      provider('kimi-coding-plan', 'AnthropicMessages'),
+    )).find((model) => model.modelId === 'kimi-for-coding');
+    expect(anthropicKimi?.controls.reasoning.wireProfile).toMatchObject({ kind: 'anthropic' });
   });
 
-  it('keeps app-managed settings state out of the bundled seed layer', () => {
-    const configured = provider('chatgpt-account', 'OpenAIResponses');
-    configured.models = [{
-      id: 'gpt-5.5',
-      label: 'Persisted label',
-      enabled: false,
+  it('keeps all maintained Kimi models when candidate validation returns only the base', () => {
+    const kimi = provider('kimi-coding-plan', 'AnthropicMessages');
+    const discovery = applyDiscoveryAuthority(kimi, [{
+      modelId: 'kimi-for-coding',
+      availability: 'available',
+    }]);
+    expect(discovery).toEqual([{ modelId: 'kimi-for-coding', availability: 'available' }]);
+    const request = buildEffectiveCatalogRequest(kimi);
+    request.discovery = { source: 'discovery', observedAt: '2026-07-15T00:00:00.000Z', models: discovery };
+    const models = mergeEffectiveCatalog(request);
+    expect(models.filter((model) => model.selection?.pickerVisibility !== 'internal').map((model) => model.modelId))
+      .toEqual(['kimi-for-coding', 'k2p7', 'k2p6', 'k2p5', 'kimi-k2-thinking']);
+    expect(models.find((model) => model.modelId === 'kimi-for-coding-highspeed')).toMatchObject({
+      selection: { pickerVisibility: 'internal' },
+      availability: 'available',
+    });
+    const base = models.find((model) => model.modelId === 'kimi-for-coding');
+    if (!base) throw new Error('Missing maintained Kimi base model');
+    expect(planModelRequest({
+      model: base,
+      catalogModels: models,
+      controls: { fastModel: true, reasoningLevel: 'on', maxContextMode: false },
+    })).toMatchObject({
+      ok: true,
+      plan: {
+        selectedModelId: 'kimi-for-coding',
+        effectiveModelId: 'kimi-for-coding-highspeed',
+        appliedBindingIds: ['fast:kimi-for-coding-highspeed'],
+      },
+    });
+  });
+
+  it('keeps the maintained MiniMax highspeed target when discovery validates only the base', () => {
+    const minimax = provider('minimax-global', 'AnthropicMessages');
+    const discovery = applyDiscoveryAuthority(minimax, [{
+      modelId: 'MiniMax-M2.7',
+      availability: 'available',
+    }]);
+    const request = buildEffectiveCatalogRequest(minimax);
+    request.discovery = { source: 'discovery', observedAt: '2026-07-15T00:00:00.000Z', models: discovery };
+    const models = mergeEffectiveCatalog(request);
+    const base = models.find((model) => model.modelId === 'MiniMax-M2.7');
+    expect(base).toBeDefined();
+    expect(models.find((model) => model.modelId === 'MiniMax-M2.7-highspeed')).toMatchObject({
+      availability: 'available',
+      selection: { pickerVisibility: 'internal' },
+    });
+    expect(planModelRequest({
+      model: base!,
+      catalogModels: models,
+      controls: { fastModel: true, reasoningLevel: 'on', maxContextMode: false },
+    })).toMatchObject({
+      ok: true,
+      plan: {
+        selectedModelId: 'MiniMax-M2.7',
+        effectiveModelId: 'MiniMax-M2.7-highspeed',
+        appliedBindingIds: ['fast:MiniMax-M2.7-highspeed'],
+      },
+    });
+  });
+
+  it('tombstones only account-entitled models absent from an authoritative list', () => {
+    const chatgpt = provider('chatgpt-account', 'OpenAIResponses');
+    const completed = applyDiscoveryAuthority(chatgpt, [{
+      modelId: 'gpt-5.4', aliases: ['gpt-5.4-current'], availability: 'available',
+    }]);
+    expect(completed).toContainEqual(expect.objectContaining({ modelId: 'gpt-5.4', availability: 'available' }));
+    expect(completed).toContainEqual({
+      modelId: 'gpt-5.5',
       availability: 'unavailable',
-      availabilityReason: 'User disabled the model',
-    }];
-
-    const model = buildSeedModelContribution(configured, 'gpt-5.5');
-    expect(model.label).toBe('gpt-5.5');
-    expect(model.availability).toBe('unknown');
-    expect(model.unavailableReason).toBeUndefined();
+      unavailableReason: 'This account-scoped model was absent from the authoritative provider catalog.',
+    });
   });
 
-  it('projects user-managed model definitions only through the user layer', () => {
+  it('keeps user-managed definitions in the user layer', () => {
     const configured = {
       ...provider('custom-provider', 'OpenAICompatibleChatCompletions'),
       catalogOwnership: 'user-managed' as const,
       baseUrl: 'https://custom.example/v1',
-      protocolEditable: true,
-      lastModelRefreshAt: '2026-07-13T00:00:00.000Z',
       models: [{ id: 'custom-model', label: 'Custom model', enabled: true }],
     };
-
     const request = buildEffectiveCatalogRequest(configured);
-    expect(request.seed.models).toEqual([]);
+    expect(request.catalog.models).toEqual([]);
     expect(request.user?.models).toEqual([
       expect.objectContaining({ modelId: 'custom-model', label: 'Custom model', availability: 'available' }),
     ]);
   });
 
-  it('keeps discovered capability leaves when user-managed labels and selection are projected', () => {
+  it('projects custom endpoint protocol options per model instead of a provider-global toggle', () => {
     const configured = {
-      ...provider('custom-provider', 'OpenAICompatibleChatCompletions'),
+      ...provider('custom-endpoint', 'OpenAICompatibleChatCompletions'),
       catalogOwnership: 'user-managed' as const,
-      models: [{ id: 'custom-model', label: 'My custom label', enabled: true }],
+      baseUrl: 'http://localhost:4312/v1',
+      models: [{ id: 'custom-model', label: 'Custom model', enabled: true }],
     };
     const request = buildEffectiveCatalogRequest(configured);
-    request.discovery = {
-      source: 'discovery',
-      observedAt: '2026-07-13T00:00:00.000Z',
-      models: [{
-        modelId: 'custom-model',
-        contextTiers: [{
-          id: 'default', label: 'Default', maxPromptTokens: 131_072,
-          activation: { kind: 'implicit' }, entitlement: 'granted',
-        }],
-        toolCalling: { state: 'supported' },
-      }],
-    };
-
-    expect(mergeEffectiveCatalog(request)[0]).toMatchObject({
-      label: 'My custom label',
-      contextTiers: [{ maxPromptTokens: 131_072 }],
-      toolCalling: { state: 'supported' },
-    });
+    expect(request.user?.models[0]?.routeOptions).toMatchObject([
+      { id: 'OpenAICompatibleChatCompletions', route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'http://localhost:4312/v1' } },
+      { id: 'OpenAIResponses', route: { protocol: 'OpenAIResponses', baseUrl: 'http://localhost:4312/v1' } },
+    ]);
   });
 
-  it('applies selection state to authoritative app-managed models that are absent from the seed', () => {
-    const configured = {
-      ...provider('opencode-zen', 'OpenAICompatibleChatCompletions'),
-      models: [{ id: 'minimax-m3', label: 'MiniMax M3', enabled: false }],
+  it('projects a surface-level service tier onto every discovered model without changing model identity', async () => {
+    const cortecs = {
+      ...provider('cortecs', 'OpenAICompatibleChatCompletions'),
+      catalogOwnership: 'provider-managed' as const,
+      baseUrl: 'https://api.cortecs.ai/v1',
     };
-    const request = buildEffectiveCatalogRequest(configured);
-    request.discovery = {
-      source: 'discovery',
-      observedAt: '2026-07-13T00:00:00.000Z',
-      models: [{ modelId: 'minimax-m3', availability: 'available' }],
-    };
-
-    expect(mergeEffectiveCatalog(request).find((model) => model.modelId === 'minimax-m3')).toMatchObject({
+    const snapshot = await refreshEffectiveCatalogDiscovery(cortecs, [{ id: 'live-model', label: 'Live model', enabled: true }], [{
+      modelId: 'live-model',
+      label: 'Live model',
       availability: 'available',
-      enabled: false,
-    });
-  });
-
-  it('limits the app-managed user layer to D2 model preferences', () => {
-    const configured = {
-      ...provider('chatgpt-account', 'OpenAIResponses'),
-      models: [{
-        id: 'gpt-5.5',
-        label: 'Stale local label',
-        aliases: ['stale-alias'],
-        enabled: false,
-        availability: 'unavailable' as const,
-        availabilityReason: 'Stale local availability',
-        defaultReasoningSelection: 'high' as const,
-        defaultBudgetTokens: 120_000,
+      contextTiers: [{
+        id: 'default',
+        label: 'Default',
+        maxTotalTokens: 128_000,
+        maxOutputTokens: 8_000,
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
       }],
-    };
-    const request = buildEffectiveCatalogRequest(configured);
-    request.discovery = {
-      source: 'discovery',
-      observedAt: '2026-07-13T00:00:00.000Z',
-      models: [{
-        modelId: 'gpt-5.5',
-        label: 'Live catalog label',
-        aliases: ['live-alias'],
-        availability: 'available',
-      }],
-    };
-
-    expect(mergeEffectiveCatalog(request).find((model) => model.modelId === 'gpt-5.5')).toMatchObject({
-      label: 'Live catalog label',
-      aliases: ['live-alias'],
-      availability: 'available',
-      enabled: false,
       defaultBudgetTokens: 120_000,
-      reasoning: { defaultSelection: 'high' },
+    }]);
+    const model = snapshot.models.find((entry) => entry.modelId === 'live-model');
+    expect(model).toMatchObject({
+      controls: { fast: { state: 'selectable', defaultValue: false } },
+      executionBindings: [{ id: 'fast:cortecs-speed' }],
+    });
+    expect(planModelRequest({
+      model: model!,
+      catalogModels: snapshot.models,
+      controls: { fastModel: true, reasoningLevel: 'off', maxContextMode: false },
+    })).toMatchObject({
+      ok: true,
+      plan: {
+        selectedModelId: 'live-model',
+        effectiveModelId: 'live-model',
+        appliedBindingIds: ['fast:cortecs-speed'],
+        bodyPatch: { preference: 'speed' },
+      },
     });
   });
 
-  it('projects provider runtime unavailability into every EffectiveModel', () => {
-    const configured = {
-      ...provider('azure-openai', 'AzureOpenAIChatCompletions'),
-      status: 'unavailable' as const,
-      unavailableReason: 'Azure adapter is not implemented.',
-    };
-    const request = buildEffectiveCatalogRequest(configured);
-    expect(request.providerAvailability).toMatchObject({
-      state: 'unavailable',
-      reason: 'Azure adapter is not implemented.',
-    });
-    expect(mergeEffectiveCatalog(request).find((model) => model.modelId === 'gpt-5.5')).toMatchObject({
-      availability: 'unavailable',
-      unavailableReason: 'Azure adapter is not implemented.',
-    });
-  });
-
-  it('tombstones app-managed seed models missing from a successful live discovery', () => {
-    const completed = completeDiscoveryContributions(
-      provider('chatgpt-account', 'OpenAIResponses'),
-      [{ modelId: 'gpt-5.4', aliases: ['gpt-5.4-current'], availability: 'available' }],
+  it('keeps an unverified model window unknown instead of inventing a 256K budget', () => {
+    const contribution = buildCatalogModelContribution(
+      provider('unknown-provider', 'OpenAICompatibleChatCompletions'),
+      'unknown-model',
     );
-    expect(completed).toContainEqual(expect.objectContaining({
-      modelId: 'gpt-5.4',
-      availability: 'available',
-    }));
-    expect(completed).toContainEqual({
-      modelId: 'gpt-5.5',
-      availability: 'unavailable',
-      unavailableReason: 'This model was not returned by the latest successful provider discovery.',
+    expect(contribution).toMatchObject({
+      availability: 'unknown',
+      defaultBudgetTokens: 0,
+      contextTiers: [{ id: 'default', entitlement: 'unknown' }],
+      controls: {
+        fast: { state: 'unknown', defaultValue: false },
+        context1m: { state: 'unknown', defaultValue: false },
+      },
     });
+    expect(contribution.contextTiers?.[0]).not.toHaveProperty('maxPromptTokens');
+    expect(contribution.contextTiers?.[0]).not.toHaveProperty('maxTotalTokens');
   });
 
-  it('does not tombstone punctuation-equivalent account model ids', () => {
-    const completed = completeDiscoveryContributions(
-      provider('github-copilot', 'OpenAICompatibleChatCompletions'),
-      [{ modelId: 'claude-opus-4.8', availability: 'available' }],
-    );
-    expect(completed).not.toContainEqual(expect.objectContaining({
-      modelId: 'claude-opus-4-8',
-      availability: 'unavailable',
-    }));
-  });
-
-  it('auto-follows only proven aliases and otherwise returns explicit same-provider recommendations', () => {
+  it('auto-follows only proven aliases and records selected/effective ids', async () => {
     const customProvider = {
-      ...provider('custom-provider', 'OpenAICompatibleChatCompletions'),
+      ...provider('custom-provider-alias-test', 'OpenAICompatibleChatCompletions'),
       catalogOwnership: 'user-managed' as const,
       models: [
         { id: 'model-current', label: 'Current', aliases: ['model-old'], enabled: true, availability: 'available' as const },
@@ -233,55 +279,26 @@ describe('surface-specific effective model seeds', () => {
       ],
     };
     const settings = { llm: { providers: [customProvider], agentRoutes: [] } } as unknown as AppSettings;
-
-    expect(resolveEffectiveModelSelection('custom-provider', 'model-old', settings)).toMatchObject({
-      requestedModelId: 'model-old',
-      remappedFrom: 'model-old',
-      model: { modelId: 'model-current' },
+    await refreshEffectiveCatalogDiscovery(customProvider, customProvider.models, [
+      {
+        modelId: 'model-current', label: 'Current', aliases: ['model-old'], availability: 'available',
+        contextTiers: [{ id: 'default', label: 'Default', maxPromptTokens: 128_000, activation: { kind: 'implicit' }, entitlement: 'granted' }],
+        defaultBudgetTokens: 128_000,
+      },
+      {
+        modelId: 'model-next', label: 'Next', availability: 'available',
+        contextTiers: [{ id: 'default', label: 'Default', maxPromptTokens: 128_000, activation: { kind: 'implicit' }, entitlement: 'granted' }],
+        defaultBudgetTokens: 128_000,
+      },
+    ]);
+    expect(resolveEffectiveModelSelection('custom-provider-alias-test', 'model-old', settings)).toMatchObject({
+      remappedFrom: 'model-old', model: { modelId: 'model-current' },
     });
     expect(planEffectiveModelRequest({
-      providerId: 'custom-provider', modelId: 'model-old', settings,
+      providerId: 'custom-provider-alias-test', modelId: 'model-old', settings,
     })).toMatchObject({
       ok: true,
-      plan: { effectiveModelId: 'model-current' },
-      warnings: [
-        'Context tier Default is unverified',
-        'Canonical model alias remap: model-old -> model-current.',
-      ],
+      plan: { selectedModelId: 'model-current', effectiveModelId: 'model-current' },
     });
-    expect(resolveEffectiveModelSelection('custom-provider', 'missing-model', settings)).toMatchObject({
-      model: null,
-      recommendations: [
-        { providerId: 'custom-provider', modelId: 'model-current', label: 'Current' },
-        { providerId: 'custom-provider', modelId: 'model-next', label: 'Next' },
-      ],
-    });
-  });
-
-  it('writes supported observed evidence against the canonical account and request protocol', () => {
-    const configured = {
-      ...provider('custom-provider', 'OpenAICompatibleChatCompletions'),
-      activeAccountId: 'account-a',
-      catalogOwnership: 'user-managed' as const,
-      models: [{ id: 'model-a', label: 'Model A', enabled: true }],
-    };
-    const settings = { llm: { providers: [configured], agentRoutes: [] } } as unknown as AppSettings;
-    const recordObserved = vi.spyOn(effectiveCatalogService, 'recordObserved').mockImplementation(() => undefined);
-
-    expect(recordObservedToolCallingSupport(
-      'custom-provider',
-      'model-a',
-      settings,
-      'OpenAICompatibleChatCompletions',
-    )).toBe(true);
-    expect(recordObserved).toHaveBeenCalledWith({
-      providerId: 'custom-provider',
-      accountId: 'account-a',
-      protocol: 'OpenAICompatibleChatCompletions',
-    }, [{
-      modelId: 'model-a',
-      toolCalling: { state: 'supported' },
-    }], expect.stringContaining('Structured tool call'));
-    recordObserved.mockRestore();
   });
 });

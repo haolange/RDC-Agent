@@ -79,8 +79,8 @@ Settings are persisted by `SettingsService`, sanitized before write, and exposed
 
 Relevant settings groups:
 
-- `settings.agents.definitions`: loaded from baseline `.agent.md` profiles such as Ask, Plan, Edit, Debugger, Analyzer, and Optimizer.
-- `settings.llm.agentRoutes`: provider/model route for each top-level agent.
+- `settings.agents.definitions`: loaded from effective `.agent.md` profiles such as Ask, Plan, Edit, Debugger, Analyzer, and Optimizer. The manifest is also the sole persisted Agent/provider/model route truth.
+- `settings.llm.agentRoutes`: read-only runtime projection derived from effective manifests; it is never written to settings or used as a fallback truth.
 - `settings.tooling.rdxActions`: configured shell actions for RDX runtime context.
 - `settings.tooling.rdxCli`: optional catalog/runtime summary configuration.
 

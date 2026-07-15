@@ -1,5 +1,5 @@
 import type { AgentRole } from './agent';
-import type { AgentManifestDraft, AgentManifestSettings } from './agentManifest';
+import type { AgentManifestSettings } from './agentManifest';
 import type {
   AgentRuntimeMcpDescriptor,
   AgentRuntimeSkillDescriptor,
@@ -17,7 +17,11 @@ export type BuiltinLlmProviderId =
   | 'openai-us'
   | 'anthropic'
   | 'anthropic-thirdparty'
-  | 'azure-openai'
+  | 'azure'
+  | 'azure-cognitive-services'
+  | 'amazon-bedrock'
+  | 'google-vertex'
+  | 'google-vertex-anthropic'
   | 'deepseek'
   | 'xai'
   | 'google-ai-studio'
@@ -39,8 +43,6 @@ export type BuiltinLlmProviderId =
   | 'xiaomi-mimo-token-plan'
   | 'bailian'
   | 'bailian-coding-plan'
-  | 'bedrock'
-  | 'vertex'
   | 'qwen'
   | 'volcengine'
   | 'volcengine-coding-plan'
@@ -55,8 +57,6 @@ export type BuiltinLlmProviderId =
   | 'chatgpt-account'
   | 'github-copilot'
   | 'grok-account'
-  | 'gemini-account'
-  | 'qwen-account'
   | 'iflow'
   | 'longcat'
   | 'opencode-zen'
@@ -69,9 +69,9 @@ export type BuiltinLlmProviderId =
   | 'nvidia-nim'
   | 'github-models'
   | 'ollama-cloud'
-  | 'minimax-account'
   | 'opencode-go'
-  | 'cline';
+  | 'cline'
+  | 'nous';
 export type LlmProviderId = BuiltinLlmProviderId | (string & {});
 
 /**
@@ -86,8 +86,11 @@ export type LlmProviderProtocol =
   | 'OpenRouterChatCompletions'
   | 'AzureOpenAIChatCompletions'
   | 'GoogleGemini'
-  | 'AwsBedrock'
-  | 'GoogleVertexAI'
+  | 'GoogleVertexGemini'
+  | 'GoogleVertexAnthropic'
+  | 'GitLabDuo'
+  | 'SapAiCoreOrchestration'
+  | 'SapAiCoreFoundationModels'
   | 'OllamaOpenAICompatibleChatCompletions';
 
 /**
@@ -100,7 +103,7 @@ export type LlmProviderProtocol =
  * - `account`     : OAuth / Device Flow login that yields a refreshable account session.
  * - `environment` : Resolved from ambient environment / cloud credential chain (AWS, GCP).
  */
-export type LlmProviderAuthMode = 'api-key' | 'local' | 'account' | 'environment';
+export type LlmProviderAuthMode = 'none' | 'api-key' | 'local' | 'account' | 'environment';
 export type LlmProviderLifecycleStatus = 'stable' | 'beta' | 'deprecated' | 'sunset';
 export type LlmProviderAvailabilityState = 'available' | 'unavailable' | 'unknown';
 
@@ -117,13 +120,74 @@ export type LlmProviderCategory =
   | 'login-authorization'
   | 'official-direct'
   | 'cloud-platform'
-  | 'official-compatible'
   | 'coding-token-plan'
-  | 'third-party-compatible'
+  | 'compatible-access'
   | 'local'
   | 'image';
 
-export type LlmProviderCatalogOwnership = 'app-managed' | 'user-managed';
+export type LlmProviderCatalogOwnership = 'app-managed' | 'provider-managed' | 'user-managed';
+
+/** Provider operating and endpoint facts are explicit and never inferred from UI grouping. */
+export type LlmProviderEndpointClass =
+  | 'first-party'
+  | 'third-party-gateway'
+  | 'cloud-hosted'
+  | 'coding-plan'
+  | 'account-surface'
+  | 'local-service'
+  | 'user-endpoint';
+
+export type LlmProviderConnectionFieldKind = 'secret' | 'text' | 'url' | 'region' | 'path';
+
+export interface LlmProviderConnectionField {
+  id: string;
+  label: string;
+  kind: LlmProviderConnectionFieldKind;
+  required: boolean;
+  environmentVariable?: string;
+  placeholder?: string;
+}
+
+export interface LlmProviderConnectionSchema {
+  fields: LlmProviderConnectionField[];
+  /** Secret field used as the HTTP provider credential by the selected adapter. */
+  primarySecretFieldId?: string;
+  /** At least one alternative must be complete; fields may otherwise remain optional. */
+  credentialAlternatives?: Array<{
+    id: string;
+    fieldIds: string[];
+    label?: string;
+    description?: string;
+    /** Uses the platform credential chain without persisting an additional field. */
+    ambient?: boolean;
+  }>;
+  /** Non-secret connection fields projected into the frozen request route. */
+  headerMappings?: Array<{ fieldId: string; header: string; prefix?: string }>;
+  /** Template variables use connection field ids, for example `${DATABRICKS_HOST}`. */
+  endpointTemplate?: string;
+}
+
+export interface LlmProviderCatalogProvenance {
+  source:
+    | 'user-control-panel'
+    | 'live-catalog'
+    | 'runtime-observation'
+    | 'provider-control-plane'
+    | 'provider-docs'
+    | 'upstream-implementation'
+    | 'models.dev'
+    | 'opencode'
+    | 'hermes'
+    | 'rdc-agent';
+  revision: string;
+  observedAt?: string;
+  refreshedAt: string;
+  identityId?: string;
+  surface?: string;
+  accountScope?: string;
+  surfaceBuild?: string;
+  plan?: string;
+}
 
 /**
  * Provider capability declaration - feature flags that downstream code can
@@ -248,6 +312,8 @@ export interface LlmProviderModelPreference {
   defaultReasoningSelection?: ReasoningSelection;
   /** Optional client-side prompt budget. It never changes a provider context tier. */
   defaultBudgetTokens?: number;
+  /** User-owned route selection for this exact provider surface and model. */
+  preferredRouteOptionId?: string;
 }
 
 export interface LlmProviderModel extends LlmProviderModelPreference {
@@ -273,17 +339,25 @@ export interface LlmProviderEntry {
   lifecycleStatus: LlmProviderLifecycleStatus;
   providerAvailability: LlmProviderAvailability;
   category: LlmProviderCategory;
+  /** Company or platform operating the configured service endpoint. */
+  serviceOperator: string;
+  endpointClass: LlmProviderEndpointClass;
   catalogOwnership: LlmProviderCatalogOwnership;
+  catalogProvenance: LlmProviderCatalogProvenance[];
   label: string;
   enabled: boolean;
   apiKey: string;
   secretRef?: string;
+  /** Account-keyed secret references for providers requiring more than one credential. */
+  secretRefs?: Record<string, string>;
+  /** Persisted non-secret connection fields only; secret values never enter settings JSON. */
+  connectionValues?: Record<string, string>;
+  /** Renderer-safe presence projection for connection-schema secret fields. */
+  hasStoredConnectionSecrets?: Record<string, boolean>;
+  connectionSchema?: LlmProviderConnectionSchema;
   hasStoredSecret: boolean;
   baseUrl?: string;
   baseUrlEditable?: boolean;
-  protocolEditable?: boolean;
-  protocolOptions?: LlmProviderProtocol[];
-  protocolBaseUrls?: Partial<Record<LlmProviderProtocol, string>>;
   models: LlmProviderModel[];
   recommendedModels: string[];
   docsUrl?: string;
@@ -299,6 +373,32 @@ export interface LlmProviderEntry {
   unavailableReason?: string;
   isConfigured: boolean;
   capabilities?: LlmProviderCapability[];
+}
+
+export interface ProviderDefinitionSaveRequest {
+  provider: LlmProviderEntry;
+  clientRevision: number;
+}
+
+export type ProviderDefinitionSaveStatus = 'committed' | 'superseded' | 'failed';
+
+export interface ProviderDefinitionCommitSnapshot {
+  clientRevision: number;
+  providerId: LlmProviderId;
+  commitHash: string;
+  provider: LlmProviderEntry | null;
+  catalogRevision: string | null;
+}
+
+export interface ProviderDefinitionSaveResult {
+  clientRevision: number;
+  providerId: LlmProviderId;
+  status: ProviderDefinitionSaveStatus;
+  commitHash: string | null;
+  provider: LlmProviderEntry | null;
+  catalogRevision: string | null;
+  lastSuccessful: ProviderDefinitionCommitSnapshot | null;
+  error?: string;
 }
 
 export interface LlmProviderCategoryDescriptor {
@@ -323,12 +423,13 @@ export interface LlmProviderCatalogEntry {
   lifecycleStatus: LlmProviderLifecycleStatus;
   providerAvailability: LlmProviderAvailability;
   category: LlmProviderCategory;
+  serviceOperator: string;
+  endpointClass: LlmProviderEndpointClass;
   catalogOwnership: LlmProviderCatalogOwnership;
+  catalogProvenance: LlmProviderCatalogProvenance[];
+  connectionSchema?: LlmProviderConnectionSchema;
   label: string;
   baseUrlEditable?: boolean;
-  protocolEditable?: boolean;
-  protocolOptions?: LlmProviderProtocol[];
-  protocolBaseUrls?: Partial<Record<LlmProviderProtocol, string>>;
   recommendedModels: string[];
   docsUrl?: string;
   accountLoginConfigured?: boolean;
@@ -350,6 +451,7 @@ export interface LlmAgentRoute {
 
 export interface LlmSettings {
   providers: LlmProviderEntry[];
+  /** Read-only runtime projection derived from canonical `.agent.md` manifests. */
   agentRoutes: LlmAgentRoute[];
 }
 
@@ -395,10 +497,8 @@ export type AppSettingsPatch = Partial<{
   }>;
   llm: Partial<{
     providers: LlmProviderEntry[];
-    agentRoutes: LlmAgentRoute[];
   }>;
   agents: Partial<{
-    definitions: AgentManifestDraft[];
     globalInstructions: string;
   }>;
 }>;
@@ -409,6 +509,8 @@ export interface LlmProviderDraftRequest {
   apiKey?: string;
   baseUrl?: string;
   protocol?: LlmProviderProtocol;
+  /** Transient connection-field values; secret kinds are committed only to secret storage. */
+  connectionValues?: Record<string, string>;
   /** User-owned fields only; discovery remains authoritative for identity and availability. */
   modelPreferences?: LlmProviderModelPreference[];
 }
@@ -417,7 +519,6 @@ export interface LlmProviderAccountLoginStartRequest {
   providerId: LlmProviderId;
   authMode?: LlmProviderAuthMode;
   accountLoginMode?: LlmProviderAccountLoginMode;
-  accountRegion?: LlmProviderAccountRegion;
 }
 
 export interface LlmProviderAccountLoginFinishRequest {
@@ -456,7 +557,6 @@ export interface LlmModelCapabilityProbeResult {
 }
 
 export type LlmProviderAccountLoginMode = 'browser' | 'device';
-export type LlmProviderAccountRegion = 'global' | 'cn';
 
 export interface LlmProviderAccountDiagnostic {
   stage: 'configuration' | 'metadata' | 'authorization' | 'callback' | 'token' | 'models' | 'refresh' | 'revoke';

@@ -7,6 +7,7 @@ import type {
   LlmProviderAccountLoginFinishRequest,
   LlmProviderDraftRequest,
   LlmProviderId,
+  ProviderDefinitionSaveRequest,
 } from '@shared/types/settings';
 import type { AgentDefinitionSaveRequest } from '@shared/types/agentManifest';
 import { appPathService } from '../runtime/AppPathService';
@@ -16,25 +17,24 @@ import { settingsService } from '../settings/SettingsService';
 import { resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
 import { effectiveCatalogService } from '../settings/EffectiveCatalogService';
 import { providerCapabilityProbeService } from '../settings/ProviderCapabilityProbeService';
-import { normalizeProviderDiscoveryLayer } from '../settings/ProviderDiscoveryNormalizer';
-import { reprojectProviderProtocolChange } from '../settings/ProviderProtocolSwitchService';
-import { storageAdapter } from '../sessions/StorageAdapter';
+import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
 export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void {
   effectiveCatalogService.setDiscoveryLoaderResolver((request) => (
     providerConnectionService.createEffectiveCatalogDiscoveryLoader(request)
   ));
-  effectiveCatalogService.setDiscoveryLayerNormalizer((request, layer) => (
-    normalizeProviderDiscoveryLayer(request.providerId, layer)
-  ));
   effectiveCatalogService.subscribe((snapshot) => {
     context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);
   });
 
-  const withEffectiveAgentModelOptions = (settings: AppSettings): AppSettings => {
+  const withEffectiveAgentModelOptions = async (settings: AppSettings): Promise<AppSettings> => {
+    const selectedProviderIds = [...new Set(settings.llm.agentRoutes
+      .map((route) => route.providerId)
+      .filter((providerId): providerId is string => Boolean(providerId)))];
+    await Promise.all(selectedProviderIds.map((providerId) => loadProviderSurface(providerId)));
     const catalogs = settings.llm.providers.flatMap((provider) => {
-      if (provider.catalogOwnership !== 'app-managed') return [];
+      if (provider.catalogOwnership === 'user-managed' || !selectedProviderIds.includes(provider.id)) return [];
       const snapshot = resolveEffectiveCatalog(provider.id, settings);
       return snapshot ? [snapshot] : [];
     });
@@ -49,7 +49,8 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     };
   };
 
-  const broadcastCatalog = (providerId: string): void => {
+  const broadcastCatalog = async (providerId: string): Promise<void> => {
+    await loadProviderSurface(providerId);
     const snapshot = resolveEffectiveCatalog(providerId, settingsService.getAll());
     if (snapshot) context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);
   };
@@ -62,29 +63,10 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   });
 
   ipcMain.handle('llm:connectProvider', async (_event, request: LlmProviderDraftRequest) => {
-    const previousProvider = settingsService.getAll().llm.providers.find((entry) => entry.id === request.providerId);
     const result = await providerConnectionService.connectProvider(request);
     if (result.success) {
       context.applyCurrentLlmConfig();
-      if (previousProvider && result.provider && previousProvider.protocol !== result.provider.protocol) {
-        try {
-          const snapshot = resolveEffectiveCatalog(request.providerId, settingsService.getAll());
-          if (!snapshot) throw new Error('Protocol change produced no EffectiveCatalog snapshot.');
-          await reprojectProviderProtocolChange({
-            providerId: request.providerId,
-            previousProtocol: previousProvider.protocol,
-            settings: settingsService.getAll(),
-            snapshot,
-          });
-        } catch (error) {
-          return {
-            ...result,
-            success: false,
-            error: error instanceof Error ? error.message : String(error),
-          };
-        }
-      }
-      broadcastCatalog(request.providerId);
+      await broadcastCatalog(request.providerId);
     }
     return result;
   });
@@ -93,7 +75,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const result = await providerConnectionService.refreshProviderModels(providerId);
     if (result.success) {
       context.applyCurrentLlmConfig();
-      broadcastCatalog(providerId);
+      await broadcastCatalog(providerId);
     }
     return result;
   });
@@ -102,7 +84,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const result = providerConnectionService.disconnectProvider(providerId);
     if (result.success) {
       context.applyCurrentLlmConfig();
-      broadcastCatalog(providerId);
+      await broadcastCatalog(providerId);
     }
     return result;
   });
@@ -123,7 +105,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const result = await providerConnectionService.finishProviderAccountLogin(request);
     if (result.connected) {
       context.applyCurrentLlmConfig();
-      broadcastCatalog(request.providerId);
+      await broadcastCatalog(request.providerId);
     }
     return result;
   });
@@ -131,7 +113,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   ipcMain.handle('llm:logoutProviderAccount', async (_event, providerId: LlmProviderId) => {
     const result = providerConnectionService.logoutProviderAccount(providerId);
     context.applyCurrentLlmConfig();
-    broadcastCatalog(providerId);
+    await broadcastCatalog(providerId);
     return result;
   });
 
@@ -162,10 +144,12 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     if (!route?.providerId || !route.modelId) {
       return null;
     }
+    await loadProviderSurface(route.providerId);
     return resolveEffectiveModel(route.providerId, route.modelId, settings);
   });
 
   ipcMain.handle('settings:getEffectiveCatalog', async (_event, providerId: string) => {
+    await loadProviderSurface(providerId);
     return resolveEffectiveCatalog(providerId, settingsService.getAll());
   });
 
@@ -176,7 +160,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
 
   ipcMain.handle('settings:importAgentManifest', async (_event, filePath: string) => {
     const paths = appPathService.getRuntimePaths();
-    agentManifestService.importFile(paths, filePath);
+    await agentManifestService.importFile(paths, filePath);
     return withEffectiveAgentModelOptions(settingsService.getAll(paths));
   });
 
@@ -184,33 +168,48 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return settingsService.saveAgentDefinition(request);
   });
 
-  ipcMain.handle('settings:set', async (_event, settings: unknown) => {
-    const previousSettings = settingsService.getAll();
-    const nextSettings = settingsService.setAll(settings as AppSettingsPatch, appPathService.getRuntimePaths());
-    await storageAdapter.initializeWorkspace();
-    await context.initializeIpcState();
+  ipcMain.handle('settings:getAgentDefinitionCommit', async (_event, agentId: string) => {
+    return settingsService.getAgentDefinitionCommit(agentId);
+  });
+
+  ipcMain.handle('settings:saveProviderDefinition', async (_event, request: ProviderDefinitionSaveRequest) => {
+    const result = await settingsService.saveProviderDefinition(request);
+    if (result.status !== 'committed' || !result.provider) return result;
     context.applyCurrentLlmConfig();
-    for (const provider of nextSettings.llm.providers) {
+    await loadProviderSurface(result.provider.id);
+    const snapshot = resolveEffectiveCatalog(result.provider.id, settingsService.getAll());
+    const catalogRevision = snapshot?.catalogRevision ?? null;
+    settingsService.setProviderDefinitionCatalogRevision(result.provider.id, catalogRevision);
+    if (snapshot) context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);
+    const lastSuccessful = result.lastSuccessful
+      ? { ...result.lastSuccessful, catalogRevision }
+      : null;
+    return { ...result, catalogRevision, lastSuccessful };
+  });
+
+  ipcMain.handle('settings:getProviderDefinitionCommit', async (_event, providerId: string) => {
+    const commit = await settingsService.getProviderDefinitionCommit(providerId);
+    if (!commit) return null;
+    await loadProviderSurface(providerId);
+    const snapshot = resolveEffectiveCatalog(providerId, settingsService.getAll());
+    const catalogRevision = snapshot?.catalogRevision ?? null;
+    settingsService.setProviderDefinitionCatalogRevision(providerId, catalogRevision);
+    return { ...commit, catalogRevision };
+  });
+
+  ipcMain.handle('settings:set', async (_event, settings: unknown) => {
+    const patch = settings as AppSettingsPatch;
+    const previousSettings = settingsService.getAll();
+    const nextSettings = settingsService.setAll(patch, appPathService.getRuntimePaths());
+    const changedProviderIds = new Set<string>();
+    if (patch.llm?.providers) context.applyCurrentLlmConfig();
+    for (const provider of patch.llm?.providers ? nextSettings.llm.providers : []) {
       const previous = previousSettings.llm.providers.find((entry) => entry.id === provider.id);
-      if (previous && previous.protocol !== provider.protocol) {
-        const discovery = await providerConnectionService.refreshProviderModels(provider.id);
-        if (!discovery.success) {
-          throw new Error(
-            `Protocol change to ${provider.protocol} was saved, but reprojection discovery failed: ${discovery.error ?? 'unknown error'}`,
-          );
-        }
-        const snapshot = resolveEffectiveCatalog(provider.id, settingsService.getAll());
-        if (!snapshot) throw new Error('Protocol change produced no EffectiveCatalog snapshot.');
-        await reprojectProviderProtocolChange({
-          providerId: provider.id,
-          previousProtocol: previous.protocol,
-          settings: settingsService.getAll(),
-          snapshot,
-        });
-      }
+      const changed = !previous || JSON.stringify(previous) !== JSON.stringify(provider);
+      if (changed) changedProviderIds.add(provider.id);
     }
     const settledSettings = settingsService.getAll();
-    for (const provider of settledSettings.llm.providers) broadcastCatalog(provider.id);
+    for (const providerId of changedProviderIds) await broadcastCatalog(providerId);
     return withEffectiveAgentModelOptions(settledSettings);
   });
 }

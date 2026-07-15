@@ -3,7 +3,11 @@ import type {
   WorkflowState,
 } from './workflow';
 import type { AgentConfig, AgentRole, AgentState } from './agent';
-import type { AgentDefinitionSaveRequest, AgentDefinitionSaveResult } from './agentManifest';
+import type {
+  AgentDefinitionCommitSnapshot,
+  AgentDefinitionSaveRequest,
+  AgentDefinitionSaveResult,
+} from './agentManifest';
 import type { ActionEvent, EventType } from './evidence';
 import type {
   ConversationCancelActiveTurnRequest,
@@ -13,9 +17,9 @@ import type {
   ConversationAnswerToolApprovalRequest,
   ConversationAnswerToolApprovalResult,
   ConversationMessage,
-  NextRequestContextPreviewRequest,
   ConversationRewriteFromMessageRequest,
   ConversationSendRequest,
+  ConversationSendResult,
   ConversationStreamEvent,
   ConversationTurnResult,
 } from './conversation';
@@ -34,6 +38,9 @@ import type {
   LlmProviderId,
   LlmModelCapabilityProbeRequest,
   LlmModelCapabilityProbeResult,
+  ProviderDefinitionCommitSnapshot,
+  ProviderDefinitionSaveRequest,
+  ProviderDefinitionSaveResult,
   ResolvedTheme,
 } from './settings';
 import type {
@@ -44,7 +51,6 @@ import type {
   ProjectInputRecord,
   ProjectRecord,
   RunContextUsageSummary,
-  NextRequestContextProjection,
   RunSummary,
   SessionAttachmentRecord,
   SessionOutputRecord,
@@ -117,8 +123,7 @@ export interface ElectronAPI {
   };
 
   conversation: {
-    sendMessage: (request: ConversationSendRequest) => Promise<ConversationTurnResult>;
-    previewNextRequestContext: (request: NextRequestContextPreviewRequest) => Promise<NextRequestContextProjection>;
+    sendMessage: (request: ConversationSendRequest) => Promise<ConversationSendResult>;
     rewriteFromMessage: (request: ConversationRewriteFromMessageRequest) => Promise<ConversationTurnResult>;
     cancelActiveTurn: (request?: ConversationCancelActiveTurnRequest) => Promise<ConversationCancelActiveTurnResult>;
     answerUserInput: (request: ConversationAnswerUserInputRequest) => Promise<ConversationAnswerUserInputResult>;
@@ -253,6 +258,9 @@ export interface ElectronAPI {
     getProviderSecret: (providerId: string) => Promise<string>;
     importAgentManifest: (filePath: string) => Promise<AppSettings>;
     saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
+    getAgentDefinitionCommit: (agentId: string) => Promise<AgentDefinitionCommitSnapshot | null>;
+    saveProviderDefinition: (request: ProviderDefinitionSaveRequest) => Promise<ProviderDefinitionSaveResult>;
+    getProviderDefinitionCommit: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;
     set: (settings: AppSettingsPatch) => Promise<AppSettings>;
   };
 

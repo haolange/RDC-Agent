@@ -4,9 +4,8 @@ import type {
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   ONE_MILLION_CONTEXT_TOKENS,
-  resolveContextTierChoices,
 } from '@shared/utils/contextTiers';
-import { evaluateModelControls, isFastModeSelectable } from '@shared/utils/modelControls';
+import { resolveModelControls } from '@shared/utils/modelControls';
 
 export const DEFAULT_TURN_CONTROLS: ConversationTurnControls = {
   reasoningLevel: 'off',
@@ -23,23 +22,33 @@ export function sanitizeTurnControls(
   capability: EffectiveModel | null,
 ): ConversationTurnControls {
   if (!capability) return DEFAULT_TURN_CONTROLS;
-  return evaluateModelControls(capability, controls).controls;
+  return resolveModelControls(capability, controls).controls;
 }
 
 export function hasSelectableOneMillionContext(capability: EffectiveModel | null): boolean {
-  return Boolean(capability && resolveContextTierChoices(capability).oneMillionTier);
+  if (!capability) return false;
+  const resolved = resolveModelControls(capability).resolved.context1m;
+  return resolved.state === 'selectable' && !resolved.disabled;
 }
 
 export function oneMillionContextTokens(capability: EffectiveModel | null): number | undefined {
-  return hasSelectableOneMillionContext(capability) ? ONE_MILLION_CONTEXT_TOKENS : undefined;
+  if (!capability) return undefined;
+  return capability.controls.context1m.state === 'unsupported'
+    || capability.controls.context1m.state === 'unknown'
+    ? undefined
+    : ONE_MILLION_CONTEXT_TOKENS;
 }
 
 export function isOneMillionContextUnverified(capability: EffectiveModel | null): boolean {
-  return Boolean(capability && resolveContextTierChoices(capability).oneMillionUnverified);
+  if (!capability) return false;
+  const control = capability.controls.context1m;
+  return control.state === 'selectable' && control.entitlement === 'unknown';
 }
 
 export function hasSelectableFastMode(capability: EffectiveModel | null): boolean {
-  return Boolean(capability && isFastModeSelectable(capability));
+  if (!capability) return false;
+  const resolved = resolveModelControls(capability).resolved.fast;
+  return resolved.state === 'selectable' && !resolved.disabled;
 }
 
 export function buildInitialTurnControls(
@@ -50,11 +59,11 @@ export function buildInitialTurnControls(
     return sanitizeTurnControls(sessionControls, capability);
   }
   if (capability) {
-    return {
-      reasoningLevel: capability.reasoning.defaultSelection,
+    return resolveModelControls(capability, {
+      reasoningLevel: capability.controls.reasoning.defaultSelection,
       maxContextMode: false,
       fastModel: false,
-    };
+    }).controls;
   }
   return DEFAULT_TURN_CONTROLS;
 }

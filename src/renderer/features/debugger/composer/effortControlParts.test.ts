@@ -58,7 +58,6 @@ describe('effortControlParts', () => {
     expect(resolveReasoningIconVariant('high')).toBe('high');
     expect(resolveReasoningIconVariant('xhigh')).toBe('xhigh');
     expect(resolveReasoningIconVariant('max')).toBe('max');
-    expect(resolveReasoningIconVariant('ultra')).toBe('max-plus');
   });
 
   it('keeps reasoning, 1M context, and fast mode as separate pill states', () => {
@@ -95,6 +94,21 @@ describe('effortControlParts', () => {
     expect(markup).toContain('aria-label="1M context · Unverified"');
   });
 
+  it('renders fixed 1M as active and disabled instead of flashing off', () => {
+    const markup = renderToStaticMarkup(React.createElement(EffortOneMillionContextSwitchRow, {
+      label: '1M context',
+      statusLabel: 'Fixed',
+      available: false,
+      active: true,
+      onToggle: () => undefined,
+    }));
+
+    expect(markup).toContain('aria-checked="true"');
+    expect(markup).toContain('disabled=""');
+    expect(markup).toContain('composer-effort-toggle active');
+    expect(markup).toContain('Fixed');
+  });
+
   it('calculates stop positions and clamps drag ratios', () => {
     expect(getStopPosition(0, 1)).toBe(0);
     expect(getStopPosition(2, 5)).toBe(0.5);
@@ -116,9 +130,8 @@ describe('effortControlParts', () => {
     expect(findAdjacentSupportedLevel('off', -1, [...supported])).toBeNull();
   });
 
-  it('treats max and ultra as the shared top-tier visual pipeline', () => {
+  it('treats max as the sole top-tier visual pipeline', () => {
     expect(isMaxTierLevel('max')).toBe(true);
-    expect(isMaxTierLevel('ultra')).toBe(true);
     expect(isMaxTierLevel('high')).toBe(false);
     expect(MAX_VISUAL_EVOLVE_MS).toBe(800);
     expect(MAX_VISUAL_RETREAT_MS).toBe(800);

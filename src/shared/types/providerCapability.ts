@@ -1,20 +1,30 @@
 import type {
   ConversationTurnControls,
   ReasoningControl,
-  ReasoningSelection,
   ResolvedReasoningSelection,
 } from './modelCapability';
 import type {
-  LlmProviderCapability,
-  LlmProviderCatalogOwnership,
-  LlmProviderCategory,
+  ProviderSurfaceManifest,
+} from '../provider-catalog/catalogManifestSchema';
+import type { ProviderAdapterId } from '../provider-catalog/implementationRegistry';
+import type {
+  BooleanControlDefinition,
+  CatalogJsonObject,
+  CatalogJsonPrimitive,
+  CatalogJsonValue,
+  ExecutionBinding,
+  ModelManifest,
+  ModelModeAction as CatalogModelModeAction,
+  ModelPresencePolicy,
+} from '../provider-catalog/modelManifestSchema';
+import type {
   LlmProviderLifecycleStatus,
   LlmProviderProtocol,
 } from './settings';
 
-export type JsonPrimitive = string | number | boolean | null;
-export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
-export type JsonObject = { [key: string]: JsonValue };
+export type JsonPrimitive = CatalogJsonPrimitive;
+export type JsonValue = CatalogJsonValue;
+export type JsonObject = CatalogJsonObject;
 
 export type EntitlementState = 'granted' | 'denied' | 'unknown';
 export type EffectiveAvailability = 'available' | 'unavailable' | 'unknown';
@@ -32,8 +42,7 @@ export type CapabilityState =
 export type TierActivation =
   | { kind: 'implicit' }
   | { kind: 'header'; headers: Record<string, string> }
-  | { kind: 'body'; patch: JsonObject }
-  | { kind: 'model-variant'; modelId: string };
+  | { kind: 'body'; patch: JsonObject };
 
 export interface ContextTier {
   id: string;
@@ -46,62 +55,109 @@ export interface ContextTier {
   entitlement: EntitlementState;
 }
 
-interface GatedFastCapability {
-  entitlement: EntitlementState;
-  label?: string;
-}
-
-export type FastCapability =
-  | ({ kind: 'request-param'; patch: JsonObject } & GatedFastCapability)
-  | ({ kind: 'model-variant'; modelId: string } & GatedFastCapability)
-  | ({ kind: 'client-tier'; tierId: string } & GatedFastCapability)
-  | { kind: 'unsupported'; reason?: string }
-  | { kind: 'unknown' };
-
 export interface ModelRoute {
   protocol: LlmProviderProtocol;
   baseUrl?: string;
   headers?: Record<string, string>;
-  source: 'model' | 'user' | 'preset';
+  source: 'model' | 'user' | 'catalog';
 }
 
-export interface CapabilityConstraintSelector {
-  fast?: boolean;
-  maxContextMode?: boolean;
-  tierIds?: string[];
-  reasoningSelections?: ReasoningSelection[];
-}
-
-export type CapabilityConstraintAction =
-  | {
-      kind: 'clamp';
-      control: 'fastModel' | 'maxContextMode' | 'reasoningLevel';
-      value: boolean | ReasoningSelection;
-    }
-  | { kind: 'reject'; code: string };
-
-export interface CapabilityConstraint {
+/** A route admitted for this exact model, independent from provider-wide protocol support. */
+export interface ModelRouteOption {
   id: string;
-  when: CapabilityConstraintSelector;
-  action: CapabilityConstraintAction;
-  reason: string;
+  label?: string;
+  route: ModelRoute;
+  routeRevision?: string;
+  availability: EffectiveAvailability;
+  unavailableReason?: string;
+  protocolOwner?: string;
+  endpointOwner?: string;
+  authMode?: import('./settings').LlmProviderAuthMode;
+  requiredConnectionFieldIds?: string[];
+}
+
+/** Picker visibility is independent from whether this model is another model's execution target. */
+export interface ModelSelection {
+  pickerVisibility: 'primary' | 'internal';
+  relatedPrimaryModelIds?: string[];
+}
+
+export type ControlDefinition = BooleanControlDefinition;
+export type ModelModeAction = CatalogModelModeAction;
+export type ExecutionBindingDefinition = ExecutionBinding;
+export type ModelPresence = ModelPresencePolicy;
+
+export type ResolvedControlState =
+  | 'selectable'
+  | 'fixed'
+  | 'blocked'
+  | 'unsupported'
+  | 'unknown'
+  | 'provider-managed';
+
+export interface ResolvedBooleanControlCapability {
+  state: ResolvedControlState;
+  value: boolean;
+  defaultValue: boolean;
+  disabled: boolean;
+  reason?: string;
+  entitlement?: EntitlementState;
+  bindingId?: string;
+  effectiveModelId?: string;
+  tierId?: string;
+}
+
+export interface ResolvedModelControls {
+  fast: ResolvedBooleanControlCapability;
+  context1m: ResolvedBooleanControlCapability;
+  reasoning: ReasoningControl;
+  catalogRevision?: string;
+  routeRevision?: string;
+}
+
+export interface ExecutionBindingResolution {
+  state: 'available' | 'blocked' | 'unknown';
+  reason?: string;
+  effectiveModelId?: string;
 }
 
 export type CapabilityEvidenceSource =
-  | 'seed'
+  | 'catalog'
   | 'discovery'
   | 'overlay'
   | 'entitlement'
   | 'observed'
+  | 'maintained-surface'
   | 'user';
 
 export interface CapabilityEvidence {
   field: string;
+  value?: JsonValue;
   source: CapabilityEvidenceSource;
+  sourceKind?:
+    | 'user-control-panel'
+    | 'live-catalog'
+    | 'runtime-observation'
+    | 'provider-control-plane'
+    | 'provider-docs'
+    | 'upstream-implementation'
+    | 'models.dev'
+    | 'opencode'
+    | 'hermes'
+    | 'rdc-agent'
+    | 'user';
   observedAt: string;
+  refreshedAt?: string;
+  sourceRevision?: string;
+  sourceHash?: string;
+  surface?: string;
+  accountScope?: string;
+  surfaceBuild?: string;
+  plan?: string;
   expiresAt?: string;
   protocol?: LlmProviderProtocol;
   detail?: string;
+  conflict?: string;
 }
 
 export interface EffectiveModel {
@@ -113,18 +169,30 @@ export interface EffectiveModel {
   /** User selection state; capability availability remains provider/account evidence. */
   enabled: boolean;
   route: ModelRoute;
+  catalogRevision?: string;
+  routeRevision?: string;
+  routeOptions?: ModelRouteOption[];
+  /** Account/provider/model-scoped route preference; an invalid id is retained so planning can fail closed. */
+  preferredRouteOptionId?: string;
+  selection?: ModelSelection;
   availability: EffectiveAvailability;
   unavailableReason?: string;
+  presencePolicy: ModelPresencePolicy;
   contextTiers: ContextTier[];
   defaultBudgetTokens: number;
-  fast: FastCapability;
-  reasoning: ReasoningControl;
+  controls: {
+    fast: BooleanControlDefinition;
+    context1m: BooleanControlDefinition;
+    reasoning: ReasoningControl;
+  };
+  executionBindings?: ExecutionBinding[];
+  bindingResolutions?: Record<string, ExecutionBindingResolution>;
+  resolvedControls?: ResolvedModelControls;
   toolCalling: CapabilityState;
   visionInput: CapabilityState;
   structuredOutput: CapabilityState;
   fixedTemperature?: number;
   quota?: { exhaustedUntil?: string; note?: string };
-  constraints?: CapabilityConstraint[];
   provenance: CapabilityEvidence[];
 }
 
@@ -132,6 +200,7 @@ export interface EffectiveCatalogSnapshot {
   providerId: string;
   accountId: string;
   protocol?: LlmProviderProtocol;
+  catalogRevision: string;
   models: EffectiveModel[];
   generatedAt: string;
   stale: boolean;
@@ -141,7 +210,13 @@ export interface EffectiveCatalogSnapshot {
 
 export interface RequestPlan {
   providerId: string;
+  adapterId: ProviderAdapterId;
+  catalogRevision: string;
+  routeRevision: string;
+  selectedModelId: string;
   effectiveModelId: string;
+  appliedBindingIds: string[];
+  modelSelection?: ModelSelection;
   route: ModelRoute;
   headers: Record<string, string>;
   bodyPatch: JsonObject;
@@ -184,7 +259,7 @@ export type RequestPlanningResult =
     };
 
 export type ProviderLifecycleStatus = LlmProviderLifecycleStatus;
-export type ProviderPresetAuthMode = 'api-key' | 'oauth' | 'device' | 'environment' | 'local';
+export type ProviderSurfaceAuthMode = 'none' | 'api-key' | 'oauth' | 'device' | 'environment' | 'local';
 
 export interface ProviderAvailability {
   state: EffectiveAvailability;
@@ -225,60 +300,8 @@ export interface DiscoveryAdmission {
   requireContextWindow?: boolean;
 }
 
-export type DiscoveryStrategy =
-  | {
-      kind: 'json-catalog';
-      method?: 'GET' | 'POST';
-      url?: string;
-      path?: string;
-      headers?: Record<string, string>;
-      collectionPath: string;
-      mapping: DiscoveryFieldMapping;
-      admission?: DiscoveryAdmission;
-      routeRules?: DiscoveryRouteRule[];
-      modelSet?: 'authoritative' | 'seed-validation';
-    }
-  | { kind: 'custom-parser'; parserId: string }
-  | null;
-
-export type SeedModelDefinition = Omit<
-  EffectiveModel,
-  'providerId' | 'vendorId' | 'provenance' | 'quota' | 'enabled'
-> & { enabled?: boolean };
-
-export interface ProviderPresetRoute {
-  protocol: LlmProviderProtocol;
-  baseUrl: string;
-  headers?: Record<string, string>;
-  default?: boolean;
-}
-
-export interface ProviderCapabilityOverlay {
-  modelId: string;
-  protocol?: LlmProviderProtocol;
-  patch: JsonObject;
-}
-
-export interface ProviderPreset {
-  schemaVersion: 1;
-  id: string;
-  vendorId: string;
-  label: string;
-  status: ProviderLifecycleStatus;
-  sunsetAt?: string;
-  availability: ProviderAvailability;
-  category: LlmProviderCategory;
-  catalogOwnership: LlmProviderCatalogOwnership;
-  authModes: ProviderPresetAuthMode[];
-  authModeAvailability?: Partial<Record<ProviderPresetAuthMode, ProviderAvailability>>;
-  baseUrlEditable?: boolean;
-  accountLoginConfigured?: boolean;
-  capabilities?: LlmProviderCapability[];
-  routes: ProviderPresetRoute[];
-  userSelectableRoute: boolean;
-  discovery: DiscoveryStrategy;
-  seedModels: SeedModelDefinition[];
-  overlays: ProviderCapabilityOverlay[];
-  recommendedModels: string[];
-  docsUrl: string;
-}
+export type DiscoveryStrategy = ProviderSurfaceManifest['discovery']['strategy'];
+export type CatalogModelDefinition = ModelManifest;
+export type ProviderSurfaceRoute = ProviderSurfaceManifest['routes'][number];
+export type ProviderProtocolOverride = ProviderSurfaceManifest['protocolOverrides'][number];
+export type ProviderSurfaceDefinition = ProviderSurfaceManifest;

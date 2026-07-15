@@ -95,6 +95,7 @@
 - Electron 窗口仍通过 `preload -> IPC` 进入主进程；浏览器真实会话通过 `localhost bridge -> IPC handler registry` 进入主进程。两条路径必须共享同一套 main/runtime 能力。
 - 涉及 UI/UX、布局、消息流、状态展示、样式、面板可达性的改动，优先用浏览器真实会话和内置浏览器点击/截图验证。
 - 产品级浏览器评审必须至少覆盖：Workbench 初始状态、Project/Session 入口、`.rdc` 导入或打开状态、Settings > Providers、Settings > Agents、桌面与窄屏视口、水平溢出检查、长路径/中文文件名显示、按钮 disabled/active 状态和前后端数据一致性。
+- Composer 性能回归使用同一真实 `/app?qaPerformance=1` 页面读取 `data-rdc-qa-performance`，以原生 Event Timing 的 click-to-next-paint p95 和 Long Task 为准；16 ms 以下未上报 entry 按阈值保守计入，不支持 Event Timing 时 fail-closed。不得用 Browser 工具调用往返时间或后台节流的 RAF cadence 替代 renderer 指标；默认 `/app` 不得安装该探针的 listener 或 observer。
 - 涉及 `src/main`、`src/preload`、窗口、IPC 注册、workspace 权限、RDX CLI invoker 或 `RenderDoc` 本地链路时，补真实启动检查或内置浏览器真实会话；禁止把 Playwright/Electron E2E 作为门禁。
 
 ## RDX CLI Invoker 边界
@@ -115,6 +116,8 @@
 - Agent Runtime 的用户资源根固定为 `~/.rdx`，项目资源根固定为 `<project-root>/.rdx`。不得新增可配置 workspace root、旧目录 fallback、双写或静默迁移。
 - Project Scope 必须覆盖 agents、skills、MCP、hooks、policies、knowledge 和 memory；RDX CLI action 与 secret 仍属于本机边界，不能由项目覆盖。
 - Prompt 调用链必须经 `PromptPlan -> RequestEnvelope -> provider adapter`。新增上下文来源时必须提供 scope、source、hash、precedence 和脱敏策略。
+- Provider/Model 事实只能写入 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth 与 discovery。禁止恢复 TS preset、factory 推导、名称/后缀/上游 SDK 包元数据/hostname 猜测或 renderer 静态 Catalog。
+- Fast、Max、1M 与 variant 必须由 `ControlDefinition + ExecutionBinding` 编译；可选控件没有唯一可执行路径时 fail-closed。认证 secret/header 只能进入主进程 opaque credential lease，不得进入 manifest、Route、RequestPlan、IPC 或 Trace。
 - Memory 写入必须由明确用户意图或交互审批触发；禁止恢复轮次自动抽取、自动 consolidation 或全索引 prompt 注入。
 
 ## 修改时的检查项
@@ -135,13 +138,14 @@
 - Work Process 投影、工具行文案/图标或 transcript UI 改动后执行 `pnpm run check:work-process`、`pnpm run check:work-process-tool-coverage`。
 - Work Process UI 验收必须覆盖：运行中顶层「工作中 / Working」与 Active Signal 文本能量扫光、完成后「工作过程 / Work process」+ meta、loop thinking 完成态「已思考 · {duration} / Thought for」+ 前置 quiet icon、commentary 散文（markdown，不进 thinking 槽）、统一单披露 tool 卡片（header icon+动词 + **结果优先** 族 body：有结果时显示计数/路径样本等，运行中才回退 pattern/path/`$ cmd`；展开为族内容层 + 样式化 Raw 面板；默认不展开 Raw；无 verb/target 双轨 toggle、无 `toolGroup` 双层壳）或 ≥8 聚合摘要行、同 loop 连续 tool 外距 `--space-3`（thinking/commentary → 首个 tool 入场呼吸更大）、file/search/shell/git/web/generic 族模板一致、安静 loop 级轨道点、web_search/fetch source pills、无 Reply 边界行（收束 thinking 归入普通折叠）、Request Inspector 不出现在消息流也不在右侧默认会话/Trace 面板、真实事件驱动的逐条出现与短 CSS 入场（禁止假 stagger）、**assistant full-bleed**（最终答案与 Work Process 含 tool 卡片横跨 transcript rail 全宽并与 composer 对齐；仅用户 prompt 使用 raised bubble、fit-content、右对齐）、**MessageMarkdown**（commentary 与最终答案：GFM、代码块 language+复制、KaTeX、Mermaid fail-closed；thinking/CoT 保持纯文本）、**Appearance 默认关**：`composerMarkdown`（composer Write/Preview + 高亮，开启后已发送用户气泡也走 Markdown）、`usePointerCursors`（`html[data-pointer-cursors='true']` 手型光标）。
 - provider thinking 投递或 reasoning artifact 投影改动后执行 `pnpm run check:reasoning-delivery`。
-- Provider/model/Composer control 改动的真实验收必须覆盖：`reasoning unknown` 显示中性 `未验证 / Provider managed`、`none` 才锁定 `Off`、canonical `XHigh`、上下文开关只叫 `1M`（reasoning 的 `Max` 不变）、快速 A→B→C 只保留最新 revision、在途 turn 保持创建时 `RequestPlan`、Context 主环即时显示下一请求 `Estimated` 且 popover 保留 `Last actual`、缩窗只提示下次发送压缩而不提前改写历史。
+- Provider/model/Composer control 改动的真实验收必须覆盖：`reasoning unknown` 显示中性 `未验证 / Provider managed`、`none` 才锁定 `Off`、canonical wire `xhigh` 统一显示 `Extra` 且产品最高档为 `Max`、上下文开关只叫 `1M`（reasoning 的 `Max` 不变）、固定 1M 开启且不可关闭、快速 A→B→C 只保留最新 revision、在途 turn 保持创建时冻结的 `RequestPlan`、切换和输入不触发 Context preview IPC、发送后依次显示 `Preparing` / `Current request ~` / provider `Actual`、缩窗只在发送 preflight 内派生压缩视图而不提前改写历史。
 - scoped resource、project instruction、prompt snapshot、skill、hook 或 memory policy 改动后，必须执行相应专项 contract check；缺少时应在同一改动中补齐。
 - 入口、构建或窗口逻辑改动后，再补 `pnpm run build` 或等价打包检查。
 - 发布配置改动后执行 `pnpm run pack`，并确认 unpacked 产物不包含开发期包管理器、lockfile、launcher 和缓存状态。
 - 浏览器真实会话使用 `pnpm run start:agent-browser`；Windows 也可用 `scripts/start-browser-session.cmd`，macOS/Linux 使用对应 `.sh`，然后用 Codex 内置浏览器打开主进程输出的 `/app`。
 - 人类开发入口使用 `pnpm run start:human:dev`，源码构建入口使用 `pnpm run start:human`；平台包装器只转发到共享 launcher，依赖与 build 由指纹条件式准备，发布模式直接双击 exe / app 包。
 - Provider 体系契约验证使用 `pnpm run check:provider-system`。
+- Provider Catalog strict manifest 与编译语义验证使用 `pnpm run check:provider-catalog`。
 - Builtin 工具目录、manifest token 展开与 `REJECTED_TOOL_TOKENS` 契约验证使用 `pnpm run check:tool-system`。
 - Settings Agents 路由契约验证使用 `pnpm run check:settings-agents`。
 - 产品级本地验收通过真实浏览器会话完成，并指向真实 project 和 `.rdc`；RDX/RenderDoc 失败必须 fail-closed 并显示诊断。

@@ -1,0 +1,366 @@
+{
+  "schemaVersion": 2,
+  "id": "google-ai-studio",
+  "identityIds": [
+    "google"
+  ],
+  "profileId": "google-gemini",
+  "adapterIds": [
+    "google-gemini"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "google-ai-studio",
+  "vendorId": "google",
+  "label": "Google AI Studio",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "official-direct",
+  "surfaceKind": "native-api",
+  "serviceOperator": "google",
+  "endpointClass": "first-party",
+  "endpointOwnership": "service-operator",
+  "catalogOwnership": "app-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:google-ai-studio:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "google-ai-studio"
+    },
+    {
+      "id": "models.dev:google:1",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "google",
+      "surface": "google-ai-studio"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:google-ai-studio:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "reasoning",
+    "vision-input",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "GoogleGemini",
+      "protocol": "GoogleGemini",
+      "adapterId": "google-gemini",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+      "default": true,
+      "protocolOwner": "google"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "google-ai-studio"
+    }
+  },
+  "models": [
+    {
+      "modelId": "gemini-3.5-flash",
+      "label": "gemini-3.5-flash",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1048576,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "GoogleGemini",
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "gemini-thinking-level",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:google-ai-studio:0"
+    },
+    {
+      "modelId": "gemini-3.1-pro-preview",
+      "label": "gemini-3.1-pro-preview",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1048576,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "GoogleGemini",
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+            "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "gemini-thinking-level",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:google-ai-studio:0"
+    },
+    {
+      "modelId": "gemini-2.5-pro",
+      "label": "gemini-2.5-pro",
+      "aliases": [
+        "gemini-pro"
+      ],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1048576,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "GoogleGemini",
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+            "defaultState": "provider-managed",
+          "wireProfile": {
+            "kind": "gemini-thinking-budget",
+            "on": "high",
+            "levels": {
+              "low": 1024,
+              "medium": 8192,
+              "high": 24576
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:google-ai-studio:0"
+    },
+    {
+      "modelId": "gemini-2.5-flash",
+      "label": "gemini-2.5-flash",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1048576,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "GoogleGemini",
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+            "defaultState": "provider-managed",
+          "wireProfile": {
+            "kind": "gemini-thinking-budget",
+            "on": "high",
+            "levels": {
+              "low": 1024,
+              "medium": 8192,
+              "high": 24576
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:google-ai-studio:0"
+    }
+  ],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "gemini-2.5-pro",
+    "gemini-2.5-flash"
+  ],
+  "docsUrl": "https://aistudio.google.com/app/apikey"
+}

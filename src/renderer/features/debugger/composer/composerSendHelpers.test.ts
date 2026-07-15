@@ -31,6 +31,33 @@ const branchState: ConversationBranchState = {
   forks: [],
 };
 
+const preparedContext: ConversationTurnResult['preparedContext'] = {
+  requestId: 'request-1',
+  turnId: 'turn-1',
+  route: {
+    providerId: 'provider-1',
+    adapterId: 'openai-compatible',
+    selectedModelId: 'model-1',
+    effectiveModelId: 'model-1',
+    protocol: 'OpenAICompatibleChatCompletions',
+    catalogRevision: 'catalog-1',
+    routeRevision: 'route-1',
+    bindingIds: [],
+  },
+  wirePatch: { headers: {}, body: {} },
+  controls: { reasoningLevel: 'off', maxContextMode: false, fastModel: false },
+  contextMode: 'normal',
+  preparedInputTokens: 10,
+  uncompactedInputTokens: 10,
+  promptBudgetTokens: 100,
+  contextWindowTokens: 128,
+  usagePercent: 10,
+  breakdown: [],
+  compactionApplied: false,
+  filteredArtifactCount: 0,
+  preparedAt: 1,
+};
+
 const makeElectronApi = () => ({
   project: { list: vi.fn().mockResolvedValue({ projects: [] }) },
   session: { list: vi.fn().mockResolvedValue({ sessions: [] }) },
@@ -52,6 +79,8 @@ describe('composerSendHelpers', () => {
       makeMessage('assistant-new', 'turn-new', 'assistant'),
     ];
     const result: ConversationTurnResult = {
+      requestId: 'request-1',
+      preparedContext,
       session: null,
       mode: 'talk',
       userMessage: visibleMessages[0],
@@ -102,6 +131,8 @@ describe('composerSendHelpers', () => {
     useConversationStore.getState().setConversationMessages([userMessage, terminalAssistant]);
 
     const result: ConversationTurnResult = {
+      requestId: 'request-1',
+      preparedContext,
       session: null,
       mode: 'talk',
       userMessage,
@@ -132,6 +163,8 @@ describe('composerSendHelpers', () => {
     const userMessage = makeMessage('user-1', 'turn-1', 'user', 'prompt');
     const assistantDraftMessage = makeMessage('assistant-1', 'turn-1', 'assistant');
     const result: ConversationTurnResult = {
+      requestId: 'request-1',
+      preparedContext,
       session: null,
       mode: 'talk',
       userMessage,

@@ -1,0 +1,561 @@
+{
+  "schemaVersion": 2,
+  "id": "volcengine",
+  "identityIds": [],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "bytedance",
+  "label": "Volcengine Ark (Doubao)",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "cloud-platform",
+  "surfaceKind": "cloud",
+  "serviceOperator": "volcengine",
+  "endpointClass": "cloud-hosted",
+  "endpointOwnership": "cloud-platform",
+  "catalogOwnership": "provider-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:volcengine:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "volcengine"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:volcengine:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [
+    {
+      "modelId": "doubao-seed-2.1-pro",
+      "label": "doubao-seed-2.1-pro",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 131072,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "high",
+            "onMode": "thinking-enabled",
+            "offMode": "thinking-disabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:volcengine:0"
+    },
+    {
+      "modelId": "doubao-seed-2.1-turbo",
+      "label": "doubao-seed-2.1-turbo",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 131072,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "high",
+            "onMode": "thinking-enabled",
+            "offMode": "thinking-disabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:volcengine:0"
+    },
+    {
+      "modelId": "glm-5",
+      "label": "glm-5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 131072,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "high",
+            "onMode": "enabled",
+            "offMode": "disabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:volcengine:0"
+    },
+    {
+      "modelId": "glm-4.7",
+      "label": "glm-4.7",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 131072,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "high",
+            "onMode": "enabled",
+            "offMode": "disabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:volcengine:0"
+    },
+    {
+      "modelId": "glm-4.6",
+      "label": "glm-4.6",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 131072,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "high",
+            "onMode": "enabled",
+            "offMode": "disabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:volcengine:0"
+    },
+    {
+      "modelId": "glm-4.5",
+      "label": "glm-4.5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 131072,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "high",
+            "onMode": "enabled",
+            "offMode": "disabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:volcengine:0"
+    },
+    {
+      "modelId": "deepseek-v4-pro",
+      "label": "deepseek-v4-pro",
+      "aliases": [
+        "deepseek-reasoner"
+      ],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "high",
+            "max"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "high",
+            "levels": {
+              "high": "high",
+              "max": "max"
+            },
+            "onMode": "enabled",
+            "offMode": "disabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:volcengine:0"
+    },
+    {
+      "modelId": "kimi-k2.5",
+      "label": "kimi-k2.5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 262144,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "toggle",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "moonshot-thinking",
+            "onMode": "enabled",
+            "offMode": "disabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:volcengine:0"
+    }
+  ],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "doubao-seed-2.1-pro",
+    "doubao-seed-2.1-turbo",
+    "glm-4.6",
+    "deepseek-v4-pro",
+    "kimi-k2.5"
+  ],
+  "docsUrl": "https://www.volcengine.com/docs/82379/1928262"
+}

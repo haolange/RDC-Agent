@@ -336,6 +336,8 @@ app.whenReady().then(async () => {
   const bridgeUrl = await startBrowserAppBridge({
     devRendererUrl: isDev ? getDevRendererUrl() : null,
     rendererRoot: path.join(__dirname, '../renderer'),
+    mainBundlePath: path.join(__dirname, 'index.js'),
+    appVersion: process.env.npm_package_version?.trim() || app.getVersion(),
   });
   runtimeLogService.log({
     scope: 'app',

@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 2,
+  "id": "google-vertex-anthropic",
+  "identityIds": [
+    "google-vertex-anthropic"
+  ],
+  "profileId": "google-vertex-anthropic",
+  "adapterIds": [
+    "google-vertex-anthropic"
+  ],
+  "authSchemaId": "google-vertex",
+  "discoveryPolicyId": "google-vertex-models",
+  "vendorId": "google-vertex-anthropic",
+  "label": "Vertex (Anthropic)",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "cloud-platform",
+  "surfaceKind": "cloud",
+  "serviceOperator": "google-cloud",
+  "endpointClass": "cloud-hosted",
+  "endpointOwnership": "cloud-platform",
+  "catalogOwnership": "provider-managed",
+  "factSources": [
+    {
+      "id": "models.dev:google-vertex-anthropic:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "google-vertex-anthropic",
+      "surface": "google-vertex-anthropic"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:google-vertex-anthropic:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "GOOGLE_VERTEX_PROJECT",
+        "label": "Google Cloud project ID",
+        "kind": "text",
+        "required": true,
+        "environmentVariable": "GOOGLE_VERTEX_PROJECT"
+      },
+      {
+        "id": "GOOGLE_VERTEX_LOCATION",
+        "label": "Vertex location",
+        "kind": "region",
+        "required": true,
+        "environmentVariable": "GOOGLE_VERTEX_LOCATION"
+      },
+      {
+        "id": "GOOGLE_APPLICATION_CREDENTIALS",
+        "label": "Service account / ADC JSON path",
+        "kind": "path",
+        "required": false,
+        "environmentVariable": "GOOGLE_APPLICATION_CREDENTIALS"
+      },
+      {
+        "id": "GOOGLE_VERTEX_ACCESS_TOKEN",
+        "label": "Google access token",
+        "kind": "secret",
+        "required": false
+      }
+    ],
+    "primarySecretFieldId": "GOOGLE_VERTEX_ACCESS_TOKEN",
+    "endpointTemplate": "https://${GOOGLE_VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${GOOGLE_VERTEX_PROJECT}/locations/${GOOGLE_VERTEX_LOCATION}/publishers/anthropic",
+    "credentialAlternatives": [
+      {
+        "id": "access-token",
+        "label": "Access token",
+        "fieldIds": [
+          "GOOGLE_VERTEX_ACCESS_TOKEN"
+        ]
+      },
+      {
+        "id": "service-account-file",
+        "label": "Service account / ADC JSON",
+        "fieldIds": [
+          "GOOGLE_APPLICATION_CREDENTIALS"
+        ]
+      },
+      {
+        "id": "application-default",
+        "label": "Application Default Credentials",
+        "fieldIds": [],
+        "ambient": true
+      }
+    ]
+  },
+  "authModes": [
+    "api-key",
+    "environment"
+  ],
+  "baseUrlEditable": true,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "GoogleVertexAnthropic",
+      "protocol": "GoogleVertexAnthropic",
+      "adapterId": "google-vertex-anthropic",
+      "baseUrl": "https://${GOOGLE_VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${GOOGLE_VERTEX_PROJECT}/locations/${GOOGLE_VERTEX_LOCATION}/publishers/anthropic",
+      "default": true,
+      "protocolOwner": "google"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "google-vertex-models"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://cloud.google.com/vertex-ai/generative-ai/docs/partner-models/claude"
+}

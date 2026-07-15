@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 2,
+  "id": "merge-gateway",
+  "identityIds": [
+    "merge-gateway"
+  ],
+  "profileId": "multi-protocol",
+  "adapterIds": [
+    "openai-compatible",
+    "openai-responses",
+    "anthropic-messages"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "merge-gateway",
+  "label": "Merge Gateway",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "merge-gateway",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "models.dev:merge-gateway:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "merge-gateway",
+      "surface": "merge-gateway"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:merge-gateway:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "MERGE_GATEWAY_API_KEY",
+        "label": "Merge Gateway Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "MERGE_GATEWAY_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "MERGE_GATEWAY_API_KEY",
+    "endpointTemplate": "https://api-gateway.merge.dev/v1/openai"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api-gateway.merge.dev/v1/openai",
+      "default": true,
+      "protocolOwner": "openai"
+    },
+    {
+      "id": "OpenAIResponses",
+      "protocol": "OpenAIResponses",
+      "adapterId": "openai-responses",
+      "baseUrl": "https://api-gateway.merge.dev/v1",
+      "protocolOwner": "openai"
+    },
+    {
+      "id": "AnthropicMessages",
+      "protocol": "AnthropicMessages",
+      "adapterId": "anthropic-messages",
+      "baseUrl": "https://api-gateway.merge.dev/v1/anthropic",
+      "protocolOwner": "anthropic"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://docs.merge.dev/merge-gateway"
+}

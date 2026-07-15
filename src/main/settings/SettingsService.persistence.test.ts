@@ -56,11 +56,11 @@ describe('SettingsService provider persistence', () => {
     settingsPath: string;
     workspaceRoot: string;
   }> {
-    const { createProviderEntryFromPreset } = await import('./ProviderPresetRegistry');
+    const { createProviderEntryFromCatalog } = await import('../provider-catalog/ProviderCatalogRegistry');
     const workspaceRoot = path.join(userDataRoot, '.rdx');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     const provider = {
-      ...createProviderEntryFromPreset('deepseek'),
+      ...createProviderEntryFromCatalog('deepseek'),
       enabled: true,
       hasStoredSecret: true,
       isConfigured: true,
@@ -77,15 +77,9 @@ describe('SettingsService provider persistence', () => {
 
     fs.mkdirSync(workspaceRoot, { recursive: true });
     fs.writeFileSync(settingsPath, JSON.stringify({
+      schemaVersion: 4,
       llm: {
         providers: [provider],
-        agentRoutes: [
-          {
-            agentId: 'ask',
-            providerId: 'deepseek',
-            modelId: 'deepseek-v4-flash',
-          },
-        ],
       },
     }, null, 2), 'utf8');
 
@@ -101,7 +95,6 @@ describe('SettingsService provider persistence', () => {
     const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
       llm: {
         providers: Array<{ id: string; isConfigured: boolean; status: string; hasStoredSecret: boolean }>;
-        agentRoutes: Array<{ agentId: string; providerId: string; modelId: string }>;
       };
     };
 
@@ -114,11 +107,7 @@ describe('SettingsService provider persistence', () => {
       status: 'verified',
       hasStoredSecret: true,
     });
-    expect(persisted.llm.agentRoutes).toContainEqual({
-      agentId: 'ask',
-      providerId: 'deepseek',
-      modelId: 'deepseek-v4-flash',
-    });
+    expect(persisted.llm).not.toHaveProperty('agentRoutes');
   });
 
   it('does not persist credential demotion when saving an unrelated settings patch', async () => {
@@ -133,7 +122,6 @@ describe('SettingsService provider persistence', () => {
       appearance: { theme: string };
       llm: {
         providers: Array<{ id: string; isConfigured: boolean; status: string; hasStoredSecret: boolean }>;
-        agentRoutes: Array<{ agentId: string; providerId: string; modelId: string }>;
       };
     };
     const persistedProvider = persisted.llm.providers.find((provider) => provider.id === 'deepseek');
@@ -144,106 +132,48 @@ describe('SettingsService provider persistence', () => {
       status: 'verified',
       hasStoredSecret: true,
     });
-    expect(persisted.llm.agentRoutes).toContainEqual({
-      agentId: 'ask',
-      providerId: 'deepseek',
-      modelId: 'deepseek-v4-flash',
-    });
+    expect(persisted.llm).not.toHaveProperty('agentRoutes');
   });
 
-  it('migrates an existing API key to an account-keyed secret without losing it', async () => {
-    const { settingsPath, workspaceRoot } = await createVerifiedPersistedSettings();
-    const { secretStorageService } = await import('./SecretStorageService');
-    secretStorageService.setSecret('provider-deepseek-api-key', 'sk-migrated', workspaceRoot);
-    const { SettingsService } = await import('./SettingsService');
-    const service = new SettingsService();
-
-    const runtime = service.initialize();
-    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-      llm: { providers: Array<{ id: string; activeAccountId?: string; secretRef?: string }> };
-    };
-    const provider = persisted.llm.providers.find((entry) => entry.id === 'deepseek');
-
-    expect(provider?.activeAccountId).toMatch(/^account-/);
-    expect(provider?.secretRef).toContain('-account-');
-    expect(secretStorageService.getSecret('provider-deepseek-api-key', workspaceRoot)).toBe('');
-    expect(secretStorageService.getSecret(provider?.secretRef, workspaceRoot)).toBe('sk-migrated');
-    expect(runtime.llm.providers.find((entry) => entry.id === 'deepseek')?.isConfigured).toBe(true);
-  });
-
-  it('migrates an encrypted secret record even when safeStorage is temporarily unavailable', async () => {
-    const { settingsPath, workspaceRoot } = await createVerifiedPersistedSettings();
-    const { secretStorageService } = await import('./SecretStorageService');
-    electronMock.encryptionAvailable = true;
-    const sourceRef = secretStorageService.createProviderSecretRef('deepseek');
-    secretStorageService.setSecret(sourceRef, 'sk-encrypted', workspaceRoot);
-    electronMock.encryptionAvailable = false;
-
-    const { SettingsService } = await import('./SettingsService');
-    const service = new SettingsService();
-    const runtime = service.initialize();
-    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-      schemaVersion?: number;
-      llm: { providers: Array<{ id: string; activeAccountId?: string; secretRef?: string }> };
-    };
-    const provider = persisted.llm.providers.find((entry) => entry.id === 'deepseek');
-
-    expect(persisted.schemaVersion).toBe(2);
-    expect(provider?.activeAccountId).toMatch(/^account-/);
-    expect(provider?.secretRef).toContain('-account-');
-    expect(secretStorageService.hasSecretRecord(sourceRef, workspaceRoot)).toBe(false);
-    expect(secretStorageService.hasSecretRecord(provider?.secretRef, workspaceRoot)).toBe(true);
-    expect(runtime.llm.providers.find((entry) => entry.id === 'deepseek')?.isConfigured).toBe(false);
-  });
-
-  it('migrates an OAuth bundle using its upstream account id', async () => {
-    const { createProviderEntryFromPreset } = await import('./ProviderPresetRegistry');
-    const { secretStorageService } = await import('./SecretStorageService');
+  it('invalidates the removed persisted agentRoutes field instead of using it as a fallback', async () => {
     const workspaceRoot = path.join(userDataRoot, '.rdx');
     const settingsPath = path.join(workspaceRoot, 'config.json');
-    const provider = {
-      ...createProviderEntryFromPreset('chatgpt-account'),
-      enabled: true,
-      hasStoredSecret: true,
-      isConfigured: true,
-      status: 'verified' as const,
-    };
-    fs.mkdirSync(workspaceRoot, { recursive: true });
-    fs.writeFileSync(settingsPath, JSON.stringify({
-      llm: { providers: [provider], agentRoutes: [] },
-    }), 'utf8');
-    const bundle = JSON.stringify({ accessToken: 'oauth-token', accountId: 'acct-upstream' });
-    const unkeyedRef = secretStorageService.createProviderOAuthSecretRef('chatgpt-account');
-    secretStorageService.setSecret(unkeyedRef, bundle, workspaceRoot);
-
-    const { SettingsService } = await import('./SettingsService');
-    const service = new SettingsService();
-    service.initialize();
-    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
-      llm: { providers: Array<{ id: string; activeAccountId?: string }> };
-    };
-
-    expect(persisted.llm.providers.find((entry) => entry.id === 'chatgpt-account')?.activeAccountId)
-      .toBe('acct-upstream');
-    expect(secretStorageService.getSecret(unkeyedRef, workspaceRoot)).toBe('');
-    expect(service.getProviderOAuthSecret('chatgpt-account', workspaceRoot)).toBe(bundle);
-  });
-
-  it('never reactivates an unkeyed credential after the canonical schema marker is committed', async () => {
-    const { createProviderEntryFromPreset } = await import('./ProviderPresetRegistry');
-    const { secretStorageService } = await import('./SecretStorageService');
-    const workspaceRoot = path.join(userDataRoot, '.rdx');
-    const settingsPath = path.join(workspaceRoot, 'config.json');
-    const provider = {
-      ...createProviderEntryFromPreset('chatgpt-account'),
-      enabled: true,
-      hasStoredSecret: true,
-      isConfigured: true,
-      status: 'verified' as const,
-    };
     fs.mkdirSync(workspaceRoot, { recursive: true });
     fs.writeFileSync(settingsPath, JSON.stringify({
       schemaVersion: 2,
+      llm: {
+        providers: [],
+        agentRoutes: [{ agentId: 'ask', providerId: 'retired-provider', modelId: 'retired-model' }],
+      },
+    }), 'utf8');
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+
+    const runtime = service.initialize();
+    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { llm: Record<string, unknown> };
+
+    expect(runtime.llm.agentRoutes.find((route) => route.agentId === 'ask')).toMatchObject({
+      providerId: '',
+      modelId: '',
+    });
+    expect(persisted.llm).not.toHaveProperty('agentRoutes');
+  });
+
+  it('never imports an unkeyed credential after the single-schema cutover', async () => {
+    const { createProviderEntryFromCatalog } = await import('../provider-catalog/ProviderCatalogRegistry');
+    const { secretStorageService } = await import('./SecretStorageService');
+    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const settingsPath = path.join(workspaceRoot, 'config.json');
+    const provider = {
+      ...createProviderEntryFromCatalog('chatgpt-account'),
+      enabled: true,
+      hasStoredSecret: true,
+      isConfigured: true,
+      status: 'verified' as const,
+    };
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    fs.writeFileSync(settingsPath, JSON.stringify({
+      schemaVersion: 4,
       llm: { providers: [provider], agentRoutes: [] },
     }), 'utf8');
     const unkeyedRef = secretStorageService.createProviderOAuthSecretRef('chatgpt-account');
@@ -262,13 +192,16 @@ describe('SettingsService provider persistence', () => {
     expect(secretStorageService.hasSecret(unkeyedRef, workspaceRoot)).toBe(true);
   });
 
-  it('removes a stale dynamic Super Grok catalog when no account credential exists', async () => {
-    const { createProviderEntryFromPreset } = await import('./ProviderPresetRegistry');
+  it('restores the maintained Super Grok structure when no account credential exists', async () => {
+    const { createProviderEntryFromCatalog } = await import('../provider-catalog/ProviderCatalogRegistry');
     const workspaceRoot = path.join(userDataRoot, '.rdx');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     const provider = {
-      ...createProviderEntryFromPreset('grok-account'),
-      models: [{ id: 'grok-4.5', label: 'Grok 4.5', enabled: true }],
+      ...createProviderEntryFromCatalog('grok-account'),
+      models: [
+        { id: 'grok-4.5', label: 'Grok 4.5', enabled: true },
+        { id: 'grok-composer-2.5-fast', label: 'Composer 2.5', enabled: true },
+      ],
       hasStoredSecret: false,
       hasStoredSecretByAuthMode: { account: false },
       status: 'unconfigured' as const,
@@ -276,7 +209,7 @@ describe('SettingsService provider persistence', () => {
     };
     fs.mkdirSync(workspaceRoot, { recursive: true });
     fs.writeFileSync(settingsPath, JSON.stringify({
-      schemaVersion: 2,
+      schemaVersion: 4,
       llm: { providers: [provider], agentRoutes: [] },
     }), 'utf8');
 
@@ -287,11 +220,21 @@ describe('SettingsService provider persistence', () => {
       llm: { providers: Array<{ id: string; models: unknown[] }> };
     };
 
-    expect(runtime.llm.providers.find((entry) => entry.id === 'grok-account')?.models).toEqual([]);
-    expect(persisted.llm.providers.find((entry) => entry.id === 'grok-account')?.models).toEqual([]);
+    const expectedIds = [
+      'grok-4.20-0309-non-reasoning',
+      'grok-4.20-0309-reasoning',
+      'grok-4.20-multi-agent-0309',
+      'grok-4.3',
+      'grok-4.5',
+      'grok-build-0.1',
+    ];
+    expect(runtime.llm.providers.find((entry) => entry.id === 'grok-account')?.models.map((model) => model.id))
+      .toEqual(expectedIds);
+    expect(persisted.llm.providers.find((entry) => entry.id === 'grok-account')?.models)
+      .toEqual(expect.arrayContaining(expectedIds.map((id) => expect.objectContaining({ id }))));
   });
 
-  it('retains a live Super Grok catalog while its account credential is connected', async () => {
+  it('keeps structural Super Grok facts and appends admitted live account models', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
     service.initialize();
@@ -304,10 +247,18 @@ describe('SettingsService provider persistence', () => {
       ],
     );
 
-    expect(service.getAll().llm.providers.find((entry) => entry.id === 'grok-account')).toMatchObject({
-      isConfigured: true,
-      models: [{ id: 'grok-composer-2.5-fast', label: 'Composer 2.5', enabled: true }],
-    });
+    const connected = service.getAll().llm.providers.find((entry) => entry.id === 'grok-account');
+    expect(connected).toMatchObject({ isConfigured: true });
+    expect(connected?.models.map((model) => model.id)).toEqual([
+      'grok-4.20-0309-non-reasoning',
+      'grok-4.20-0309-reasoning',
+      'grok-4.20-multi-agent-0309',
+      'grok-4.3',
+      'grok-4.5',
+      'grok-build-0.1',
+      'grok-composer-2.5-fast',
+    ]);
+    expect(connected?.models.some((model) => model.id === 'grok-imagine-video-1.5')).toBe(false);
   });
 
   it('stages account-keyed secrets without deleting the source before settings commit', async () => {
@@ -325,10 +276,10 @@ describe('SettingsService provider persistence', () => {
   it('atomically rotates account tokens without replacing the current model catalog', async () => {
     const { SettingsService } = await import('./SettingsService');
     const { secretStorageService } = await import('./SecretStorageService');
-    const { getProviderSeedModels } = await import('./ProviderPresetRegistry');
+    const { getProviderModelSummaries } = await import('../provider-catalog/ProviderCatalogRegistry');
     const service = new SettingsService();
     const settings = service.initialize();
-    const models = getProviderSeedModels('chatgpt-account').slice(0, 2);
+    const models = getProviderModelSummaries('chatgpt-account').slice(0, 2);
     service.saveProviderAccountConnection(
       'chatgpt-account',
       JSON.stringify({ providerId: 'chatgpt-account', accountId: 'acct-rotate', accessToken: 'old', refreshToken: 'refresh-old' }),
@@ -350,28 +301,37 @@ describe('SettingsService provider persistence', () => {
       .toMatchObject({ refreshToken: 'refresh-new' });
   });
 
-  it('preserves only the verified Volc Coding Plan model subset after saving and reloading', async () => {
+  it('keeps maintained Volc Coding Plan rows when candidate validation returns a subset', async () => {
     const { SettingsService } = await import('./SettingsService');
+    const { getProviderModelSummaries } = await import('../provider-catalog/ProviderCatalogRegistry');
     const service = new SettingsService();
     service.initialize();
 
     service.saveProviderConnection('volcengine-coding-plan', 'test-key', [
       { id: 'doubao-seed-2.0-code', label: 'Doubao Seed 2.0 Code', enabled: true, availability: 'available' },
       { id: 'glm-4.7', label: 'GLM 4.7', enabled: true, availability: 'available' },
+      { id: 'kimi-k2.7-code', label: 'Kimi K2.7 Code', enabled: true, availability: 'available' },
     ]);
 
     const reloaded = service.getAll();
-    expect(reloaded.llm.providers
-      .find((provider) => provider.id === 'volcengine-coding-plan')
-      ?.models.map((model) => model.id)).toEqual(['doubao-seed-2.0-code', 'glm-4.7']);
+    const models = reloaded.llm.providers
+      .find((provider) => provider.id === 'volcengine-coding-plan')?.models ?? [];
+    expect(models.map((model) => model.id))
+      .toEqual(getProviderModelSummaries('volcengine-coding-plan').map((model) => model.id));
+    expect(models.find((model) => model.id === 'doubao-seed-2.0-code')?.availability).toBe('available');
+    expect(models.find((model) => model.id === 'glm-4.7')?.availability).toBe('available');
+    expect(models.find((model) => model.id === 'kimi-k2.7-code')).toMatchObject({
+      availability: 'unavailable',
+      availabilityReason: expect.stringContaining('user-observed'),
+    });
   });
 
   it('persists user-owned model preferences and preserves them across discovery refresh', async () => {
     const { SettingsService } = await import('./SettingsService');
-    const { getProviderSeedModels } = await import('./ProviderPresetRegistry');
+    const { getProviderModelSummaries } = await import('../provider-catalog/ProviderCatalogRegistry');
     const service = new SettingsService();
     service.initialize();
-    const discovered = getProviderSeedModels('deepseek');
+    const discovered = getProviderModelSummaries('deepseek');
     const target = discovered[0];
     expect(target).toBeDefined();
 
@@ -382,6 +342,7 @@ describe('SettingsService provider persistence', () => {
         enabled: false,
         defaultReasoningSelection: 'high',
         defaultBudgetTokens: 180_000,
+        preferredRouteOptionId: 'OpenAICompatibleChatCompletions',
       }],
     );
     expect(service.getAll().llm.providers.find((provider) => provider.id === 'deepseek')
@@ -389,6 +350,7 @@ describe('SettingsService provider persistence', () => {
         enabled: false,
         defaultReasoningSelection: 'high',
         defaultBudgetTokens: 180_000,
+        preferredRouteOptionId: 'OpenAICompatibleChatCompletions',
       });
 
     service.saveProviderConnection('deepseek', '', discovered);
@@ -397,21 +359,47 @@ describe('SettingsService provider persistence', () => {
         enabled: false,
         defaultReasoningSelection: 'high',
         defaultBudgetTokens: 180_000,
+        preferredRouteOptionId: 'OpenAICompatibleChatCompletions',
       });
+  });
+
+  it('atomically persists an unconfigured provider model route preference', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    const initialized = service.initialize();
+    const provider = initialized.llm.providers.find((entry) => entry.id === 'longcat');
+    expect(provider).toBeDefined();
+
+    const result = await service.saveProviderDefinition({
+      provider: {
+        ...provider!,
+        models: provider!.models.map((model) => model.id === 'LongCat-2.0'
+          ? { ...model, preferredRouteOptionId: 'AnthropicMessages' }
+          : model),
+      },
+      clientRevision: 1,
+    });
+
+    expect(result.status).toBe('committed');
+    expect(service.getAll().llm.providers.find((entry) => entry.id === 'longcat')
+      ?.models.find((model) => model.id === 'LongCat-2.0')?.preferredRouteOptionId)
+      .toBe('AnthropicMessages');
   });
 
   it('preserves an invalid Volc route id so Settings can require an explicit reselection', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
-    service.initialize();
+    const initialized = service.initialize();
     service.saveProviderConnection('volcengine-coding-plan', 'test-key', [
       { id: 'glm-4.7', label: 'GLM 4.7', enabled: true, availability: 'available' },
     ]);
 
-    service.setAll({
-      llm: {
-        agentRoutes: [{ agentId: 'ask', providerId: 'volcengine-coding-plan', modelId: 'glm-5.2' }],
-      },
+    const ask = initialized.agents.definitions.find((definition) => definition.id === 'ask');
+    expect(ask).toBeDefined();
+    const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
+    await service.saveAgentDefinition({
+      draft: { ...draft, models: ['volcengine-coding-plan:glm-5.2'] },
+      clientRevision: 1,
     });
 
     expect(service.getAll().llm.agentRoutes).toContainEqual({
@@ -468,50 +456,90 @@ describe('SettingsService provider persistence', () => {
   it('preserves invalid routes so model removal requires explicit reselection', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
-    service.initialize();
-    service.setAll({
-      llm: {
-        agentRoutes: [{ agentId: 'ask', providerId: 'missing-provider', modelId: 'missing-model' }],
-      },
+    const initialized = service.initialize();
+    const ask = initialized.agents.definitions.find((definition) => definition.id === 'ask');
+    expect(ask).toBeDefined();
+    const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
+    await service.saveAgentDefinition({
+      draft: { ...draft, models: ['missing-provider:missing-model'] },
+      clientRevision: 1,
     });
     expect(service.getAll().llm.agentRoutes).toContainEqual({
       agentId: 'ask', providerId: 'missing-provider', modelId: 'missing-model',
     });
   });
 
-  it('saves one agent definition without a full settings rewrite and rejects stale revisions', async () => {
+  it('coalesces A -> B -> C so only C is committed and settings never mirrors the route', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
     const initialized = service.initialize();
     const ask = initialized.agents.definitions.find((definition) => definition.id === 'ask');
     expect(ask).toBeDefined();
     const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
+    const settingsBeforeSave = fs.readFileSync(initialized.paths.settingsPath, 'utf8');
 
     const first = service.saveAgentDefinition({
       draft: { ...draft, models: ['deepseek:model-a'] },
       clientRevision: 100,
     });
-    expect(first).toMatchObject({
-      applied: true,
-      clientRevision: 100,
-      route: { agentId: 'ask', providerId: 'deepseek', modelId: 'model-a' },
+    const middle = service.saveAgentDefinition({
+      draft: { ...draft, models: ['deepseek:model-b'] },
+      clientRevision: 200,
     });
-
     const newest = service.saveAgentDefinition({
       draft: { ...draft, models: ['deepseek:model-c'] },
       clientRevision: 300,
     });
-    const stale = service.saveAgentDefinition({
-      draft: { ...draft, models: ['deepseek:model-b'] },
-      clientRevision: 200,
+    const [firstResult, middleResult, newestResult] = await Promise.all([first, middle, newest]);
+    expect(firstResult.status).toBe('superseded');
+    expect(middleResult.status).toBe('superseded');
+    expect(newestResult).toMatchObject({
+      status: 'committed',
+      clientRevision: 300,
+      route: { agentId: 'ask', providerId: 'deepseek', modelId: 'model-c' },
     });
-    expect(newest.applied).toBe(true);
-    expect(stale.applied).toBe(false);
+    expect(newestResult.commitHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(newestResult.lastSuccessful?.commitHash).toBe(newestResult.commitHash);
     expect(service.getAll().llm.agentRoutes).toContainEqual({
       agentId: 'ask', providerId: 'deepseek', modelId: 'model-c',
     });
     const saved = service.getAll().agents.definitions.find((definition) => definition.id === 'ask');
     expect(saved?.models).toEqual(['deepseek:model-c']);
     expect(fs.readdirSync(initialized.paths.agentsPath).some((entry) => entry.endsWith('.tmp'))).toBe(false);
+    const persisted = JSON.parse(fs.readFileSync(initialized.paths.settingsPath, 'utf8')) as { llm: Record<string, unknown> };
+    expect(persisted.llm).not.toHaveProperty('agentRoutes');
+    expect(fs.readFileSync(initialized.paths.settingsPath, 'utf8')).toBe(settingsBeforeSave);
+  });
+
+  it('returns the last successful snapshot when the latest manifest commit fails', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const { agentManifestService } = await import('./AgentManifestService');
+    const service = new SettingsService();
+    const initialized = service.initialize();
+    const ask = initialized.agents.definitions.find((definition) => definition.id === 'ask');
+    expect(ask).toBeDefined();
+    const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
+    const committed = await service.saveAgentDefinition({
+      draft: { ...draft, models: ['deepseek:model-c'] },
+      clientRevision: 300,
+    });
+    const saveSpy = vi.spyOn(agentManifestService, 'saveDefinition')
+      .mockRejectedValueOnce(new Error('simulated atomic rename failure'));
+
+    const failed = await service.saveAgentDefinition({
+      draft: { ...draft, models: ['deepseek:model-d'] },
+      clientRevision: 400,
+    });
+
+    expect(failed).toMatchObject({
+      status: 'failed',
+      error: 'simulated atomic rename failure',
+      commitHash: committed.commitHash,
+      route: { agentId: 'ask', providerId: 'deepseek', modelId: 'model-c' },
+    });
+    expect(failed.lastSuccessful?.commitHash).toBe(committed.commitHash);
+    expect(service.getAll().agents.definitions.find((definition) => definition.id === 'ask')?.models)
+      .toEqual(['deepseek:model-c']);
+    saveSpy.mockRestore();
   });
 });

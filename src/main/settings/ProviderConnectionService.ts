@@ -1,14 +1,12 @@
 import {
-  getProviderPreset,
-  getProviderPresetAuthModeAvailability,
-  getProviderPresetCatalogOwnership,
-  getProviderSeedModelDefinitions,
-  getProviderSeedModels,
+  getProviderAuthModeAvailability,
+  getProviderCatalogOwnership,
+  getProviderDefaultBaseUrl,
+  getProviderModelDefinitions,
+  getProviderModelSummaries,
   isBuiltinProviderId,
-  resolveBaseUrlForProtocolChange,
-  resolveProviderPresetBaseUrl,
-  resolveProviderPresetProtocol,
-} from './ProviderPresetRegistry';
+  loadProviderSurface,
+} from '../provider-catalog/ProviderCatalogRegistry';
 import type {
   LlmProviderAccountLoginFinishRequest,
   LlmProviderAccountLoginStartRequest,
@@ -20,7 +18,7 @@ import type {
   LlmProviderId,
   LlmProviderModel,
 } from '@shared/types/settings';
-import type { ProviderPreset } from '@shared/types/providerCapability';
+import type { ProviderSurfaceDefinition } from '@shared/types/providerCapability';
 import { settingsService } from '../settings/SettingsService';
 import { providerAccountAuthService } from './ProviderAccountAuthService';
 import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
@@ -35,11 +33,20 @@ import type {
   EffectiveCatalogRequest,
 } from './EffectiveCatalogService';
 import {
-  completeDiscoveryContributions,
+  applyDiscoveryAuthority,
   refreshEffectiveCatalogDiscovery,
   toDiscoveryModelContributions,
 } from './EffectiveModelResolver';
-import { parseClineCatalog, parseOpenCodeGoCatalog } from './LiveProviderCatalogParsers';
+import { parseClineCatalog, parseFreeModelCatalog, parseOpenCodeGoCatalog } from './LiveProviderCatalogParsers';
+import {
+  isProviderConnectionSchemaSatisfied,
+  resolveProviderConnectionHeaders,
+  resolvePrimaryConnectionSecretFieldId,
+  resolveProviderEndpointTemplate,
+} from './ProviderConnectionSchema';
+import { resolveGoogleVertexAccessToken } from './GoogleApplicationCredentials';
+import { createAwsBedrockRequestAuthorizer } from './AwsBedrockCredentials';
+import { listSapAiCoreDeployments } from './SapAiCoreCredentials';
 
 const REQUEST_TIMEOUT_MS = 20000;
 
@@ -50,23 +57,134 @@ interface ModelDiscoveryResult {
   discoveryDiagnostic?: LlmProviderConnectionResult['discoveryDiagnostic'];
 }
 
+export function projectGoogleVertexModelRoutes(
+  models: readonly LlmProviderModel[],
+  nativeBaseUrl: string,
+  openAiBaseUrl: string,
+  protocol: 'GoogleVertexGemini' | 'GoogleVertexAnthropic',
+): CatalogModelContribution[] {
+  return models.map((model): CatalogModelContribution => {
+    const nativeRoute = { protocol, baseUrl: nativeBaseUrl, source: 'model' as const };
+    const routeOptions = protocol === 'GoogleVertexGemini'
+      ? [
+          {
+            id: 'GoogleVertexGemini',
+            route: nativeRoute,
+            availability: 'available' as const,
+            protocolOwner: 'google',
+            endpointOwner: 'google-cloud',
+            authMode: 'api-key' as const,
+          },
+          {
+            id: 'OpenAICompatibleChatCompletions',
+            route: {
+              protocol: 'OpenAICompatibleChatCompletions' as const,
+              baseUrl: openAiBaseUrl,
+              source: 'model' as const,
+            },
+            availability: 'available' as const,
+            protocolOwner: 'openai',
+            endpointOwner: 'google-cloud',
+            authMode: 'api-key' as const,
+          },
+        ]
+      : [{
+          id: 'GoogleVertexAnthropic',
+          route: nativeRoute,
+          availability: 'available' as const,
+          protocolOwner: 'google',
+          endpointOwner: 'google-cloud',
+          authMode: 'api-key' as const,
+        }];
+    return {
+      modelId: model.id,
+      label: model.label,
+      aliases: model.aliases,
+      availability: model.availability ?? 'available',
+      unavailableReason: model.availabilityReason,
+      route: nativeRoute,
+      routeOptions,
+    };
+  });
+}
+
+export function resolveBedrockResponsesBaseUrl(chatBaseUrl: string): string {
+  const normalized = chatBaseUrl.trim().replace(/\/+$/, '');
+  return normalized.endsWith('/openai/v1')
+    ? normalized
+    : normalized.endsWith('/v1')
+      ? `${normalized.slice(0, -3)}/openai/v1`
+      : `${normalized}/openai/v1`;
+}
+
+export function projectBedrockMantleModelRoutes(
+  models: readonly LlmProviderModel[],
+  chatBaseUrl: string,
+): CatalogModelContribution[] {
+  const responsesBaseUrl = resolveBedrockResponsesBaseUrl(chatBaseUrl);
+  return models.map((model): CatalogModelContribution => ({
+    modelId: model.id,
+    label: model.label,
+    aliases: model.aliases,
+    availability: model.availability ?? 'available',
+    unavailableReason: model.availabilityReason,
+    route: {
+      protocol: 'OpenAICompatibleChatCompletions',
+      baseUrl: chatBaseUrl,
+      source: 'model',
+    },
+    routeOptions: [
+      {
+        id: 'OpenAICompatibleChatCompletions',
+        route: {
+          protocol: 'OpenAICompatibleChatCompletions',
+          baseUrl: chatBaseUrl,
+          source: 'model',
+        },
+        availability: 'available',
+        protocolOwner: 'openai',
+        endpointOwner: 'aws',
+        authMode: 'api-key',
+      },
+      {
+        id: 'OpenAIResponses',
+        route: {
+          protocol: 'OpenAIResponses',
+          baseUrl: responsesBaseUrl,
+          source: 'model',
+        },
+        availability: 'available',
+        protocolOwner: 'openai',
+        endpointOwner: 'aws',
+        authMode: 'api-key',
+      },
+    ],
+  }));
+}
+
 type ProviderDiscoveryStrategy =
   | 'openai-compatible'
   | 'anthropic-candidate-validation'
   | 'google-ai-studio'
-  | 'azure-openai'
+  | 'azure-deployment'
+  | 'google-vertex-models'
   | 'ollama-tags'
   | 'opencode-go-catalog'
-  | 'cline-catalog';
+  | 'cline-catalog'
+  | 'freemodel-catalog'
+  | 'gitlab-duo-direct-access'
+  | 'sap-ai-core-deployments';
 
 function resolveDiscoveryStrategy(
   protocol: LlmProviderEntry['protocol'],
-  discovery: ProviderPreset['discovery'],
+  discovery: ProviderSurfaceDefinition['discovery']['strategy'],
 ): ProviderDiscoveryStrategy | null {
   if (!discovery) return null;
   const parserId = discovery.kind === 'custom-parser' ? discovery.parserId : undefined;
-  if (parserId === 'opencode-go-catalog' || parserId === 'cline-catalog') return parserId;
-  if (parserId === 'google-ai-studio' || parserId === 'azure-openai' || parserId === 'ollama-tags') return parserId;
+  if (parserId === 'opencode-go-catalog' || parserId === 'cline-catalog' || parserId === 'google-vertex-models'
+    || parserId === 'gitlab-duo-direct-access' || parserId === 'sap-ai-core-deployments') return parserId;
+  if (parserId === 'freemodel-catalog') return parserId;
+  if (parserId === 'google-ai-studio' || parserId === 'azure-deployment' || parserId === 'ollama-tags') return parserId;
   if (parserId === 'anthropic' || parserId === 'anthropic-candidate-validation') return 'anthropic-candidate-validation';
   if (parserId === 'openai-compatible') return 'openai-compatible';
   if (protocol === 'OpenAICompatibleChatCompletions' || protocol === 'OpenAIResponses' || protocol === 'OpenRouterChatCompletions') {
@@ -143,7 +261,7 @@ const toStaticModels = (modelIds: string[]): LlmProviderModel[] => requireModels
 );
 
 const requireManagedModels = (providerId: string): LlmProviderModel[] => {
-  const models = getProviderSeedModels(providerId);
+  const models = getProviderModelSummaries(providerId);
   if (models.length === 0) {
     throw new ProviderConnectionError('Provider is missing an app-managed model catalog.');
   }
@@ -186,6 +304,7 @@ export const mergeManagedModelAvailability = (
   discoveredModels: LlmProviderModel[],
   options?: {
     aliasesByModelId?: ReadonlyMap<string, readonly string[]>;
+    preserveMissing?: boolean;
   },
 ): LlmProviderModel[] => {
   if (discoveredModels.length === 0) {
@@ -222,6 +341,9 @@ export const mergeManagedModelAvailability = (
         availabilityReason: undefined,
       };
     }
+    if (options?.preserveMissing) {
+      return model;
+    }
     return {
       ...model,
       enabled: false,
@@ -246,7 +368,7 @@ export const selectSupportedCodingPlanModels = (
 
 const buildManagedAliasIndex = (providerId: string): Map<string, readonly string[]> => {
   const map = new Map<string, readonly string[]>();
-  for (const entry of getProviderSeedModelDefinitions(providerId)) {
+  for (const entry of getProviderModelDefinitions(providerId)) {
     map.set(entry.modelId, entry.aliases ?? []);
   }
   return map;
@@ -268,6 +390,73 @@ export const resolveCodingPlanModelsUrl = (baseUrl: string): string => {
     return `${trimmed}/models`;
   }
   return `${trimmed}/v1/models`;
+};
+
+export const resolveGoogleVertexOpenAiBaseUrl = (baseUrl: string): string => {
+  const trimmed = baseUrl.trim().replace(/\/+$/u, '');
+  const match = trimmed.match(/^(https:\/\/[^/]+)\/v1\/projects\/([^/]+)\/locations\/([^/]+)\/publishers\/google$/u);
+  if (!match) {
+    if (/\/v1beta1\/projects\/[^/]+\/locations\/[^/]+\/endpoints\/openapi$/u.test(trimmed)) {
+      return trimmed;
+    }
+    throw new ProviderConnectionError('Vertex endpoint does not match a supported publisher or OpenAI-compatible route.');
+  }
+  const [, origin, project, location] = match;
+  return `${origin}/v1beta1/projects/${project}/locations/${location}/endpoints/openapi`;
+};
+
+export const resolveGoogleVertexPublisherModelsUrl = (
+  baseUrl: string,
+  publisher: 'google' | 'anthropic',
+): string => {
+  const trimmed = baseUrl.trim().replace(/\/+$/u, '');
+  const match = trimmed.match(/^(https:\/\/[^/]+)\/v1\/projects\/[^/]+\/locations\/[^/]+\/publishers\/(google|anthropic)$/u);
+  if (!match || match[2] !== publisher) {
+    throw new ProviderConnectionError(`Vertex ${publisher} endpoint does not match the native publisher route.`);
+  }
+  return `${match[1]}/v1beta1/publishers/${publisher}/models?pageSize=1000&listAllVersions=true`;
+};
+
+export const parseGoogleVertexPublisherModels = (
+  payload: unknown,
+  publisher: 'google' | 'anthropic',
+): LlmProviderModel[] => {
+  if (!payload || typeof payload !== 'object') return [];
+  const publisherModels = (payload as { publisherModels?: unknown }).publisherModels;
+  if (!Array.isArray(publisherModels)) return [];
+  const byId = new Map<string, LlmProviderModel>();
+  const prefix = `publishers/${publisher}/models/`;
+  for (const value of publisherModels) {
+    if (!value || typeof value !== 'object') continue;
+    const entry = value as {
+      name?: unknown;
+      versionId?: unknown;
+      displayName?: unknown;
+      modelDisplayName?: unknown;
+    };
+    if (typeof entry.name !== 'string' || !entry.name.startsWith(prefix)) continue;
+    const baseId = entry.name.slice(prefix.length).trim();
+    if (!baseId) continue;
+    const versionId = typeof entry.versionId === 'string' ? entry.versionId.trim() : '';
+    const id = publisher === 'anthropic' && versionId && !baseId.includes('@')
+      ? `${baseId}@${versionId}`
+      : baseId;
+    const normalized = id.toLowerCase();
+    if (publisher === 'google' ? !normalized.includes('gemini') : !normalized.includes('claude')) continue;
+    const label = typeof entry.modelDisplayName === 'string' && entry.modelDisplayName.trim()
+      ? entry.modelDisplayName.trim()
+      : typeof entry.displayName === 'string' && entry.displayName.trim()
+        ? entry.displayName.trim()
+        : id;
+    byId.set(id, {
+      id,
+      label,
+      enabled: true,
+      availability: 'unknown',
+      availabilityReason: 'Model Garden listing does not confirm access for the configured Google Cloud project.',
+    });
+  }
+  return [...byId.values()].sort((left, right) => left.id.localeCompare(right.id));
 };
 
 const getJson = async (url: string, init: RequestInit): Promise<unknown> => {
@@ -358,6 +547,49 @@ const createTinyOpenAiProbeBody = (modelId: string): string => JSON.stringify({
   messages: [{ role: 'user', content: 'ping' }],
 });
 
+interface ResolvedProviderConnectionDraft {
+  apiKey: string;
+  baseUrl: string;
+  values: Record<string, string>;
+}
+
+export function resolveProviderConnectionDraft(
+  provider: LlmProviderEntry,
+  request: Pick<LlmProviderDraftRequest, 'apiKey' | 'baseUrl' | 'connectionValues'>,
+  storedValues: Readonly<Record<string, string>> = {},
+): ResolvedProviderConnectionDraft {
+  const primarySecretFieldId = resolvePrimaryConnectionSecretFieldId(provider.connectionSchema);
+  const values: Record<string, string> = {
+    ...storedValues,
+    ...(request.connectionValues ?? {}),
+  };
+  const apiKeyDraft = request.apiKey?.trim() ?? '';
+  if (apiKeyDraft && primarySecretFieldId) {
+    values[primarySecretFieldId] = apiKeyDraft;
+  }
+  const apiKey = primarySecretFieldId
+    ? values[primarySecretFieldId]?.trim() ?? ''
+    : apiKeyDraft;
+  if (provider.authMode === 'api-key') {
+    const schemaSatisfied = provider.connectionSchema?.fields.length
+      ? isProviderConnectionSchemaSatisfied(provider.connectionSchema, values)
+      : Boolean(apiKey);
+    const supportsCredentialResolver = provider.id === 'google-vertex'
+      || provider.id === 'google-vertex-anthropic'
+      || provider.id === 'amazon-bedrock';
+    if (!schemaSatisfied || (!apiKey && !supportsCredentialResolver)) {
+      throw new ProviderConnectionError('Provider connection fields are incomplete.');
+    }
+  }
+  const baseUrl = resolveProviderEndpointTemplate(
+    provider.connectionSchema,
+    values,
+    request.baseUrl ?? '',
+    provider.baseUrl ?? '',
+  );
+  return { apiKey, baseUrl, values };
+}
+
 export class ProviderConnectionService {
   constructor() {
     providerAccountAuthService.setCatalogPublisher(async (providerId, discovery) => {
@@ -386,13 +618,20 @@ export class ProviderConnectionService {
       return undefined;
     }
     return async () => {
+      const connection = provider.authMode === 'account'
+        ? null
+        : resolveProviderConnectionDraft(
+            provider,
+            {},
+            settingsService.getProviderConnectionValues(provider.id),
+          );
       const discovery = provider.authMode === 'account'
         ? await providerAccountAuthService.loadEffectiveCatalog(provider.id)
-        : await this.discoverModels(provider, '', '');
+        : await this.discoverModels(provider, connection?.apiKey ?? '', connection?.baseUrl ?? '', connection?.values ?? {});
       return {
         protocol: provider.protocol,
         ...('detail' in discovery && discovery.detail ? { detail: discovery.detail } : {}),
-        models: completeDiscoveryContributions(
+        models: applyDiscoveryAuthority(
           provider,
           discovery.contributions ?? toDiscoveryModelContributions(discovery.models),
         ),
@@ -411,14 +650,20 @@ export class ProviderConnectionService {
 
   async testProviderDraft(request: LlmProviderDraftRequest): Promise<LlmProviderConnectionResult> {
     try {
-      const provider = this.resolveProviderProtocol(
+      const provider = this.requireDefaultConnectionProtocol(
         this.resolveProviderAuthMode(this.getProvider(request.providerId), request.authMode),
         request.protocol,
       );
+      const connection = resolveProviderConnectionDraft(
+        provider,
+        request,
+        settingsService.getProviderConnectionValues(provider.id),
+      );
       const discovery = await this.discoverModels(
         provider,
-        request.apiKey?.trim() ?? '',
-        request.baseUrl?.trim() ?? '',
+        connection.apiKey,
+        connection.baseUrl,
+        connection.values,
       );
       return {
         success: true,
@@ -436,13 +681,17 @@ export class ProviderConnectionService {
 
   async connectProvider(request: LlmProviderDraftRequest): Promise<LlmProviderConnectionResult> {
     try {
-      const provider = this.resolveProviderProtocol(
+      const provider = this.requireDefaultConnectionProtocol(
         this.resolveProviderAuthMode(this.getProvider(request.providerId), request.authMode),
         request.protocol,
       );
-      const apiKey = request.apiKey?.trim() ?? '';
-      const baseUrl = request.baseUrl?.trim() ?? '';
-      const discovery = await this.discoverModels(provider, apiKey, baseUrl);
+      const connection = resolveProviderConnectionDraft(
+        provider,
+        request,
+        settingsService.getProviderConnectionValues(provider.id),
+      );
+      const { apiKey, baseUrl } = connection;
+      const discovery = await this.discoverModels(provider, apiKey, baseUrl, connection.values);
       const { models } = discovery;
       const nextSettings = settingsService.saveProviderConnection(
         provider.id,
@@ -452,6 +701,7 @@ export class ProviderConnectionService {
         provider.protocol,
         provider.authMode,
         request.modelPreferences,
+        request.connectionValues,
       );
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
       if (nextProvider) {
@@ -491,13 +741,18 @@ export class ProviderConnectionService {
           models: nextProvider?.models ?? [],
         };
       }
-      const discovery = await this.discoverModels(provider, '', '');
+      const connection = resolveProviderConnectionDraft(
+        provider,
+        {},
+        settingsService.getProviderConnectionValues(provider.id),
+      );
+      const discovery = await this.discoverModels(provider, connection.apiKey, connection.baseUrl, connection.values);
       const { models } = discovery;
       const nextSettings = settingsService.saveProviderConnection(
         provider.id,
         '',
         models,
-        '',
+        connection.baseUrl,
         provider.protocol,
         provider.authMode,
       );
@@ -586,19 +841,13 @@ export class ProviderConnectionService {
     return provider;
   }
 
-  private resolveProviderProtocol(provider: LlmProviderEntry, protocolDraft: unknown): LlmProviderEntry {
-    const protocol = resolveProviderPresetProtocol(provider.id, protocolDraft ?? provider.protocol);
-    if (!protocol) {
-      throw new ProviderConnectionError(`Provider ${provider.id} is not in the built-in catalog.`);
+  private requireDefaultConnectionProtocol(provider: LlmProviderEntry, protocolDraft: unknown): LlmProviderEntry {
+    if (protocolDraft !== undefined && protocolDraft !== provider.protocol) {
+      throw new ProviderConnectionError(
+        `Provider-level protocol switching is unsupported for ${provider.id}; choose a route on each model.`,
+      );
     }
-    if (protocol === provider.protocol) return provider;
-    const nextBaseUrl = resolveBaseUrlForProtocolChange(
-      provider.id,
-      provider.protocol,
-      protocol,
-      provider.baseUrl,
-    );
-    return { ...provider, protocol, baseUrl: nextBaseUrl || provider.baseUrl };
+    return provider;
   }
 
   private resolveProviderAuthMode(
@@ -610,7 +859,7 @@ export class ProviderConnectionService {
     if (!options.includes(authMode)) {
       throw new ProviderConnectionError(`Provider ${provider.id} does not support ${authMode} authentication.`);
     }
-    const availability = getProviderPresetAuthModeAvailability(provider.id)[authMode]
+    const availability = getProviderAuthModeAvailability(provider.id)[authMode]
       ?? provider.authModeAvailability?.[authMode]
       ?? provider.providerAvailability;
     return {
@@ -622,13 +871,18 @@ export class ProviderConnectionService {
     };
   }
 
-  private async discoverModels(provider: LlmProviderEntry, apiKeyDraft: string, baseUrlDraft: string): Promise<ModelDiscoveryResult> {
+  private async discoverModels(
+    provider: LlmProviderEntry,
+    apiKeyDraft: string,
+    baseUrlDraft: string,
+    connectionValues: Readonly<Record<string, string>> = {},
+  ): Promise<ModelDiscoveryResult> {
     if (provider.authMode === 'account') {
       throw new ProviderConnectionError('Account providers must be tested through the account login flow.');
     }
-    const definition = getProviderPreset(provider.id);
-    const catalogOwnership = getProviderPresetCatalogOwnership(provider.id);
-    const managedModels = catalogOwnership === 'app-managed'
+    const definition = await loadProviderSurface(provider.id);
+    const catalogOwnership = getProviderCatalogOwnership(provider.id);
+    const managedModels = catalogOwnership !== 'user-managed'
       ? requireManagedModels(provider.id)
       : [];
     if (provider.unavailableReason) {
@@ -637,16 +891,21 @@ export class ProviderConnectionService {
     if (!definition) {
       throw new ProviderConnectionError('Provider 不在内置 catalog 中');
     }
+    const hasCredentialResolver = provider.id === 'google-vertex'
+      || provider.id === 'google-vertex-anthropic'
+      || provider.id === 'amazon-bedrock';
     const apiKey = provider.authMode === 'api-key'
-      ? apiKeyDraft || settingsService.getProviderSecret(provider.id)
+      ? (provider.id === 'google-vertex' || provider.id === 'google-vertex-anthropic') && !apiKeyDraft
+        ? await resolveGoogleVertexAccessToken(connectionValues.GOOGLE_APPLICATION_CREDENTIALS)
+        : apiKeyDraft
       : '';
-    if (provider.authMode === 'api-key' && !apiKey) {
+    if (provider.authMode === 'api-key' && !apiKey && !hasCredentialResolver) {
       throw new ProviderConnectionError('请输入 API Key');
     }
 
-    const strategy = resolveDiscoveryStrategy(provider.protocol, definition.discovery);
+    const strategy = resolveDiscoveryStrategy(provider.protocol, definition.discovery.strategy);
     if (!strategy) {
-      if (catalogOwnership === 'app-managed') {
+      if (catalogOwnership !== 'user-managed') {
         return { models: managedModels };
       }
       throw new ProviderConnectionError('Provider 缺少模型发现配置');
@@ -654,19 +913,69 @@ export class ProviderConnectionService {
     const baseUrl = (
       baseUrlDraft
       || provider.baseUrl
-      || resolveProviderPresetBaseUrl(provider.id, provider.protocol)
+      || getProviderDefaultBaseUrl(provider.id)
       || ''
     ).trim().replace(/\/+$/, '');
     if (!baseUrl) {
       throw new ProviderConnectionError('请填写 Provider Base URL');
     }
-    const candidateModelIds = catalogOwnership === 'app-managed'
+    if (provider.id === 'amazon-bedrock') {
+      const url = appendPath(baseUrl, '/models');
+      const unsignedHeaders = { Accept: 'application/json' };
+      const headers = apiKey
+        ? { ...unsignedHeaders, Authorization: `Bearer ${apiKey}` }
+        : await createAwsBedrockRequestAuthorizer(connectionValues)({
+            url,
+            method: 'GET',
+            headers: unsignedHeaders,
+            body: '',
+          });
+      const payload = await getJson(url, { method: 'GET', headers });
+      const models = requireModels(parseModelsPayload('openai-compatible', payload));
+      return { models, contributions: projectBedrockMantleModelRoutes(models, baseUrl) };
+    }
+    if (strategy === 'gitlab-duo-direct-access') {
+      const { GitLabDirectAccessClient } = await import('gitlab-ai-provider');
+      const client = new GitLabDirectAccessClient({
+        instanceUrl: baseUrl,
+        getHeaders: () => ({
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'RDC-Agent/1.0',
+        }),
+        featureFlags: {
+          duo_agent_platform_agentic_chat: true,
+          duo_agent_platform: true,
+        },
+      });
+      await client.getDirectAccessToken();
+      return { models: managedModels };
+    }
+    if (strategy === 'sap-ai-core-deployments') {
+      const deployments = await listSapAiCoreDeployments({
+        serviceKeyJson: apiKey,
+        configuredApiUrl: baseUrl,
+        resourceGroup: connectionValues.AICORE_RESOURCE_GROUP,
+        scenarioId: provider.protocol === 'SapAiCoreFoundationModels' ? 'foundation-models' : 'orchestration',
+      });
+      const requestedDeploymentId = connectionValues.AICORE_DEPLOYMENT_ID?.trim();
+      const admitted = requestedDeploymentId
+        ? deployments.some((deployment) => deployment.id === requestedDeploymentId)
+        : deployments.length > 0;
+      if (!admitted) {
+        throw new ProviderConnectionError(requestedDeploymentId
+          ? `SAP AI Core deployment ${requestedDeploymentId} is not RUNNING for this route.`
+          : 'SAP AI Core returned no RUNNING deployment for this route.');
+      }
+      return { models: managedModels };
+    }
+    const candidateModelIds = catalogOwnership !== 'user-managed'
       ? managedModels.map((model) => model.id)
       : provider.recommendedModels;
     if (strategy === 'opencode-go-catalog' || strategy === 'cline-catalog') {
       const payload = await getJson(appendPath(baseUrl, '/models'), {
         method: 'GET',
-        headers: this.createHeaders(provider, apiKey),
+        headers: this.createHeaders(provider, apiKey, connectionValues),
       });
       const parsed = strategy === 'opencode-go-catalog'
         ? parseOpenCodeGoCatalog(payload)
@@ -677,16 +986,74 @@ export class ProviderConnectionService {
         entitlementContributions: parsed.entitlementContributions,
       };
     }
-    if (definition.discovery?.kind === 'json-catalog') {
-      const url = resolveDeclarativeDiscoveryUrl(definition.discovery, baseUrl);
+    if (strategy === 'freemodel-catalog') {
+      const [openAiPayload, claudePayload] = await Promise.all([
+        getJson('https://api.freemodel.dev/v1/models', {
+          method: 'GET',
+          headers: this.createHeaders(provider, apiKey, connectionValues),
+        }),
+        getJson('https://cc.freemodel.dev/v1/models', {
+          method: 'GET',
+          headers: this.createHeaders(provider, apiKey, connectionValues),
+        }),
+      ]);
+      const parsed = parseFreeModelCatalog(openAiPayload, claudePayload);
+      return {
+        models: requireModels(parsed.models),
+        contributions: parsed.contributions,
+      };
+    }
+    if (strategy === 'google-vertex-models') {
+      if (provider.protocol === 'GoogleVertexAnthropic') {
+        const payload = await getJson(resolveGoogleVertexPublisherModelsUrl(baseUrl, 'anthropic'), {
+          method: 'GET',
+          headers: this.createHeaders(provider, apiKey, connectionValues),
+        });
+        const admitted = requireModels(parseGoogleVertexPublisherModels(payload, 'anthropic'));
+        return {
+          models: admitted,
+          contributions: projectGoogleVertexModelRoutes(
+            admitted,
+            baseUrl,
+            '',
+            'GoogleVertexAnthropic',
+          ),
+        };
+      }
+      const modelsBaseUrl = resolveGoogleVertexOpenAiBaseUrl(baseUrl);
+      const payload = await getJson(appendPath(modelsBaseUrl, '/models'), {
+        method: 'GET',
+        headers: this.createHeaders(provider, apiKey, connectionValues),
+      });
+      const discovered = parseModelsPayload('openai-compatible', payload);
+      const models = provider.protocol === 'GoogleVertexGemini'
+        ? discovered.filter((model) => model.id.toLowerCase().includes('gemini'))
+        : discovered;
+      const admitted = requireModels(models);
+      return {
+        models: admitted,
+        contributions: projectGoogleVertexModelRoutes(
+          admitted,
+          baseUrl,
+          modelsBaseUrl,
+          'GoogleVertexGemini',
+        ),
+      };
+    }
+    const surfaceDiscoveryStrategy = definition.discovery.strategy;
+    const declarativeDiscovery = surfaceDiscoveryStrategy?.kind === 'json-catalog'
+      ? surfaceDiscoveryStrategy
+      : null;
+    if (declarativeDiscovery) {
+      const url = resolveDeclarativeDiscoveryUrl(declarativeDiscovery, baseUrl);
       const payload = await getJson(url, {
-        method: definition.discovery.method ?? 'GET',
+        method: declarativeDiscovery.method ?? 'GET',
         headers: {
-          ...this.createHeaders(provider, apiKey),
-          ...definition.discovery.headers,
+          ...this.createHeaders(provider, apiKey, connectionValues),
+          ...declarativeDiscovery.headers,
         },
       });
-      const parsedModels = parseDeclarativeCatalog(definition.discovery, payload);
+      const parsedModels = parseDeclarativeCatalog(declarativeDiscovery, payload);
       const discoveredModels = requireModels(parsedModels.map((model) => ({
         id: model.id,
         label: model.label,
@@ -698,9 +1065,9 @@ export class ProviderConnectionService {
         baseUrl,
       };
       const contributions = toDeclarativeCatalogContributions(parsedModels, fallbackRoute);
-      const authoritative = definition.discovery.modelSet === 'authoritative';
+      const authoritative = definition.discovery.authority === 'authoritative-list';
       return {
-        models: catalogOwnership === 'app-managed' && !authoritative
+        models: catalogOwnership !== 'user-managed' && !authoritative
           ? mergeManagedModelAvailability(managedModels, discoveredModels, {
             aliasesByModelId: buildManagedAliasIndex(provider.id),
           })
@@ -718,9 +1085,9 @@ export class ProviderConnectionService {
       return this.validateCodingPlanModels(provider.id, apiKey, baseUrl, candidateModelIds, managedModels);
     }
     if (strategy === 'anthropic-candidate-validation') {
-      return { models: await this.validateAnthropicCandidateModels(provider, apiKey, baseUrl, candidateModelIds, managedModels) };
+      return { models: await this.validateAnthropicCandidateModels(provider, apiKey, baseUrl, candidateModelIds, managedModels, connectionValues) };
     }
-    if (strategy === 'azure-openai') {
+    if (strategy === 'azure-deployment') {
       return { models: await this.validateAzureCandidateModels(apiKey, baseUrl, candidateModelIds, managedModels) };
     }
     if (strategy === 'google-ai-studio') {
@@ -729,7 +1096,7 @@ export class ProviderConnectionService {
       });
       const discoveredModels = requireModels(parseModelsPayload(strategy, payload));
       return {
-        models: catalogOwnership === 'app-managed'
+        models: catalogOwnership !== 'user-managed'
           ? mergeManagedModelAvailability(managedModels, discoveredModels, {
           aliasesByModelId: buildManagedAliasIndex(provider.id),
           })
@@ -739,14 +1106,14 @@ export class ProviderConnectionService {
     const url = strategy === 'ollama-tags'
       ? appendPath(new URL(baseUrl).origin, '/api/tags')
       : appendPath(baseUrl, '/models');
-    const headers = this.createHeaders(provider, apiKey);
+    const headers = this.createHeaders(provider, apiKey, connectionValues);
     const payload = await getJson(url, {
       method: 'GET',
       headers,
     });
     const discoveredModels = requireModels(parseModelsPayload(strategy, payload));
     return {
-      models: catalogOwnership === 'app-managed'
+      models: catalogOwnership !== 'user-managed'
         ? mergeManagedModelAvailability(managedModels, discoveredModels, {
         aliasesByModelId: buildManagedAliasIndex(provider.id),
         })
@@ -760,10 +1127,11 @@ export class ProviderConnectionService {
     baseUrl: string,
     modelIds: string[],
     managedModels: LlmProviderModel[] = [],
+    connectionValues: Readonly<Record<string, string>> = {},
   ): Promise<LlmProviderModel[]> {
     const validModels: string[] = [];
     const url = appendPath(baseUrl, '/messages');
-    const headers = this.createHeaders(provider, apiKey);
+    const headers = this.createHeaders(provider, apiKey, connectionValues);
     for (const modelId of modelIds) {
       try {
         const controller = new AbortController();
@@ -835,6 +1203,7 @@ export class ProviderConnectionService {
     const mergedModels = managedModels.length > 0
       ? mergeManagedModelAvailability(managedModels, discoveredModels.length > 0 ? discoveredModels : validatedModels, {
         aliasesByModelId,
+        preserveMissing: providerId === 'kimi-coding-plan',
       })
       : validatedModels;
     const models = selectSupportedCodingPlanModels(providerId, mergedModels);
@@ -889,19 +1258,26 @@ export class ProviderConnectionService {
     return managedModels.length > 0 ? mergeManagedModelAvailability(managedModels, validatedModels) : validatedModels;
   }
 
-  private createHeaders(provider: LlmProviderEntry, apiKey: string): HeadersInit {
+  private createHeaders(
+    provider: LlmProviderEntry,
+    apiKey: string,
+    connectionValues: Readonly<Record<string, string>> = {},
+  ): HeadersInit {
+    const connectionHeaders = resolveProviderConnectionHeaders(provider.connectionSchema, connectionValues);
     if (provider.authMode === 'local') {
-      return {};
+      return connectionHeaders;
     }
     if (provider.protocol === 'AnthropicMessages') {
       return {
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
         ...(provider.id === 'kimi-coding-plan' ? { 'User-Agent': 'RDC-Agent' } : {}),
+        ...connectionHeaders,
       };
     }
     return {
       Authorization: `Bearer ${apiKey}`,
+      ...connectionHeaders,
     };
   }
 }

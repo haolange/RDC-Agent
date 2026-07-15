@@ -31,8 +31,9 @@ export const EffortControlPopup: React.FC<{
   thumbEdgeClass: string;
   tooltipLabel: string;
   oneMillionContextAvailable: boolean;
-  oneMillionContextUnverified: boolean;
+  oneMillionContextStatusLabel?: string;
   fastModelAvailable: boolean;
+  fastModelStatusLabel?: string;
   oneMillionContextMode: boolean;
   fastModel: boolean;
   t: (key: TranslationKey) => string;
@@ -64,8 +65,9 @@ export const EffortControlPopup: React.FC<{
   thumbEdgeClass,
   tooltipLabel,
   oneMillionContextAvailable,
-  oneMillionContextUnverified,
+  oneMillionContextStatusLabel,
   fastModelAvailable,
+  fastModelStatusLabel,
   oneMillionContextMode,
   fastModel,
   t,
@@ -146,7 +148,7 @@ export const EffortControlPopup: React.FC<{
 
     <EffortOneMillionContextSwitchRow
       label={t('composer.effort.oneMillionContext')}
-      statusLabel={oneMillionContextUnverified ? t('composer.effort.unverified') : undefined}
+      statusLabel={oneMillionContextStatusLabel}
       available={oneMillionContextAvailable}
       active={oneMillionContextMode}
       onToggle={onToggleOneMillionContext}
@@ -154,6 +156,7 @@ export const EffortControlPopup: React.FC<{
 
     <EffortFastModeSwitchRow
       label={t('composer.effort.fastModel')}
+      statusLabel={fastModelStatusLabel}
       available={fastModelAvailable}
       active={fastModel}
       onToggle={onToggleFastModel}

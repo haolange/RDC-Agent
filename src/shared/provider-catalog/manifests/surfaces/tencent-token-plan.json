@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "id": "tencent-token-plan",
+  "identityIds": [
+    "tencent-token-plan"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "tencent-token-plan",
+  "label": "Tencent Token Plan",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "coding-token-plan",
+  "surfaceKind": "plan",
+  "serviceOperator": "tencent-cloud",
+  "endpointClass": "coding-plan",
+  "endpointOwnership": "service-operator",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "models.dev:tencent-token-plan:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "tencent-token-plan",
+      "surface": "tencent-token-plan"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:tencent-token-plan:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "TENCENT_TOKEN_PLAN_API_KEY",
+        "label": "Tencent Token Plan Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "TENCENT_TOKEN_PLAN_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "TENCENT_TOKEN_PLAN_API_KEY",
+    "endpointTemplate": "https://api.lkeap.cloud.tencent.com/plan/v3"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.lkeap.cloud.tencent.com/plan/v3",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://cloud.tencent.com/document/product/1823/130060"
+}

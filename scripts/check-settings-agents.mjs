@@ -4,7 +4,7 @@ const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
 
 const { AGENT_ROLES } = require('../src/shared/constants/agents.ts');
-const { createProviderEntryFromPreset } = require('../src/main/settings/ProviderPresetRegistry.ts');
+const { createProviderEntryFromCatalog } = require('../src/main/provider-catalog/ProviderCatalogRegistry.ts');
 const {
   canonicalAgentModelId,
   splitCanonicalAgentModelId,
@@ -21,7 +21,7 @@ function assert(condition, message) {
 }
 
 function configuredProvider(id, modelIds) {
-  const provider = createProviderEntryFromPreset(id);
+  const provider = createProviderEntryFromCatalog(id);
   return {
     ...provider,
     enabled: true,
@@ -104,7 +104,7 @@ function walkSourceFiles(directory) {
   return files;
 }
 
-function main() {
+async function main() {
   const ollama = configuredProvider('ollama', ['llama3']);
   const validRoutes = AGENT_ROLES.map((agentId) => route(agentId, 'ollama', 'llama3'));
   const customAgentId = 'custom-browser-use-agent';
@@ -212,7 +212,10 @@ function main() {
 
   const composerSendHelpers = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/debugger/composer/composerSendHelpers.ts'), 'utf8');
   assert(composerSendHelpers.includes("return EXECUTABLE_APP_MODES.has(mode) ? mode as AppMode : 'edit';"), 'Composer send should not map custom profiles to Ask mode.');
-  assert(composerSendHelpers.includes('selectedAgentId || currentMode'), 'Local send failures should preserve the selected Agent id.');
+  const composerSendFlow = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/debugger/composer/composerSendFlow.ts'), 'utf8');
+  assert(composerSendFlow.includes('agentId: selectedAgentId || null'), 'Conversation sends should freeze the selected Agent id.');
+  assert(composerSendFlow.includes('setPromptValue(sentPrompt)') && composerSendFlow.includes('setPendingAttachments(sentAttachments)'), 'Local preflight failures should restore the Composer snapshot.');
+  assert(!composerSendFlow.includes('setSelectedAgentId'), 'Local send failures must not rewrite the selected Agent id.');
 
   const handoffActions = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/debugger/AgentChat/useAgentHandoffActions.ts'), 'utf8');
   assert(handoffActions.includes(": 'edit';"), 'Handoff to a custom Agent should keep the custom agentId with a generic executable mode.');
@@ -241,6 +244,8 @@ function main() {
   assert(!settingsServiceSource.includes('KNOWN_AGENT_IDS'), 'Settings route normalization should not use a built-in Agent allowlist.');
   assert(settingsServiceSource.includes('isSafeAgentProfileId(route.agentId)'), 'Settings route normalization should validate safe custom profile ids.');
   assert(settingsServiceSource.includes('routeMap.set(route.agentId, route)'), 'Settings route normalization should preserve custom route ids.');
+  assert(!settingsServiceSource.includes('agentRoutes?: LlmAgentRoute[];'), 'Persisted settings must not mirror Agent routes.');
+  assert(settingsServiceSource.includes('routesFromDefinitions(createEmptyAgentRoutes(), baseAgentSettings.definitions)'), 'Runtime Agent routes must derive from .agent.md definitions.');
 
   const conversationServiceSource = fs.readFileSync(path.join(repoRoot, 'src/main/conversation/ConversationService.ts'), 'utf8');
   assert(conversationServiceSource.includes('resolveEnabledAgentDefinition'), 'Conversation routing should resolve enabled manifest definitions.');
@@ -280,13 +285,12 @@ function main() {
     }
 
     const savedAgentId = 'custom-saved-agent';
-    manifestService.save({ agentsPath, instructionsPath }, [
-      agentDraft({
-        id: savedAgentId,
-        fileName: 'wrong-file-name.agent.md',
-        models: [canonicalAgentModelId('ollama', 'llama3')],
-      }),
-    ], 'global custom instructions');
+    await manifestService.saveDefinition({ agentsPath, instructionsPath }, agentDraft({
+      id: savedAgentId,
+      fileName: 'wrong-file-name.agent.md',
+      models: [canonicalAgentModelId('ollama', 'llama3')],
+    }));
+    manifestService.saveGlobalInstructions({ instructionsPath }, 'global custom instructions');
     assert(fs.existsSync(path.join(agentsPath, `${savedAgentId}.agent.md`)), 'Saving a custom profile should write a safe id-based file name.');
     const savedSettings = manifestService.getSettings({ agentsPath, instructionsPath }, [ollama], validRoutes);
     assert(savedSettings.definitions.some((definition) => definition.id === savedAgentId), 'Saved custom profile should reload by custom id.');
@@ -308,7 +312,7 @@ function main() {
       name: 'Custom Imported Agent',
       model: canonicalAgentModelId('ollama', 'llama3'),
     });
-    const imported = manifestService.importFile({ agentsPath, instructionsPath }, importPath);
+    const imported = await manifestService.importFile({ agentsPath, instructionsPath }, importPath);
     assert(imported.id === 'custom-imported-agent', 'Import should accept safe non-built-in .agent.md profiles.');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
@@ -332,7 +336,7 @@ function main() {
 }
 
 try {
-  main();
+  await main();
 } catch (error) {
   console.error('[settings-agents] FAILED');
   console.error(error);

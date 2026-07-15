@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "kimi-for-coding",
+  "name": "Kimi For Coding",
+  "npm": "@ai-sdk/anthropic",
+  "env": [
+    "KIMI_API_KEY"
+  ],
+  "api": "https://api.kimi.com/coding/v1",
+  "docsUrl": "https://www.kimi.com/code/docs/en/third-party-tools/other-coding-agents.html",
+  "provenance": {
+    "sourceKind": "models.dev",
+    "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+    "refreshedAt": "2026-07-15",
+    "openCodeCommit": "571e7b852f82415faf65466e1536357a048bdf5a",
+    "hermesCommit": "bb5fc723b67cdf31828a5a64d997c9eaf4554f57"
+  }
+}

@@ -7,6 +7,9 @@ const repoRoot = path.resolve(__dirname, '..');
 const originalResolveFilename = Module._resolveFilename;
 
 function resolveSourcePath(request, parent) {
+  if (request === 'virtual:rdc-provider-catalog-index') {
+    return path.join(__dirname, 'provider-catalog-index.cjs');
+  }
   if (request.startsWith('@shared/')) {
     return resolveFile(path.join(repoRoot, 'src', 'shared', request.slice('@shared/'.length)));
   }
@@ -61,4 +64,3 @@ function compileTypeScript(module, filename) {
 
 require.extensions['.ts'] = compileTypeScript;
 require.extensions['.tsx'] = compileTypeScript;
-

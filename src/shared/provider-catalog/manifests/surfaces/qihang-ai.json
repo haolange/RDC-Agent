@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "id": "qihang-ai",
+  "identityIds": [
+    "qihang-ai"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "qihang-ai",
+  "label": "QiHang",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "qihang-ai",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "models.dev:qihang-ai:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "qihang-ai",
+      "surface": "qihang-ai"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:qihang-ai:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "QIHANG_API_KEY",
+        "label": "Qihang Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "QIHANG_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "QIHANG_API_KEY",
+    "endpointTemplate": "https://api.qhaigc.net/v1"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.qhaigc.net/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://www.qhaigc.net/docs"
+}

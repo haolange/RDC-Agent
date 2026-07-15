@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 2,
+  "id": "fastrouter",
+  "identityIds": [
+    "fastrouter"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "json-catalog",
+  "vendorId": "fastrouter",
+  "label": "FastRouter",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "fastrouter",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "provider-managed",
+  "factSources": [
+    {
+      "id": "models.dev:fastrouter:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "fastrouter",
+      "surface": "fastrouter"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:fastrouter:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "FASTROUTER_API_KEY",
+        "label": "Fastrouter Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "FASTROUTER_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "FASTROUTER_API_KEY",
+    "endpointTemplate": "https://go.fastrouter.ai/api/v1"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://go.fastrouter.ai/api/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "authoritative-list",
+    "strategy": {
+      "kind": "json-catalog",
+      "url": "https://api.fastrouter.ai/api/v1/models",
+      "collectionPath": "data",
+      "mapping": {
+        "id": "id",
+        "label": "name",
+        "contextWindow": "context_length",
+        "contextWindowKind": "total",
+        "maxOutputTokens": "top_provider.max_completion_tokens",
+        "modality": "architecture.modality"
+      },
+      "admission": {
+        "allowedModalities": [
+          "text->text"
+        ]
+      }
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://fastrouter.ai/models"
+}

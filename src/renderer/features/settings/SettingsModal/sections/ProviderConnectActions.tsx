@@ -10,7 +10,7 @@ interface ProviderConnectActionsProps {
   provider: LlmProviderEntry;
   accountConnected: boolean;
   devicePending: boolean;
-  needsApiKey: boolean;
+  needsCredentials: boolean;
   needsBaseUrl: boolean;
   hasFreshTest: boolean;
   onClose: () => void;
@@ -24,7 +24,7 @@ export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
   provider,
   accountConnected,
   devicePending,
-  needsApiKey,
+  needsCredentials,
   needsBaseUrl,
   hasFreshTest,
   onClose,
@@ -37,8 +37,8 @@ export const ProviderConnectActions: React.FC<ProviderConnectActionsProps> = ({
     && !accountConnected
     && (!accountRequiresCode || !draft.authCode.trim());
   const accountTestBlocked = provider.authMode === 'account' && !accountConnected;
-  const commonBlocked = draft.busy !== 'idle' || needsApiKey || needsBaseUrl || devicePending;
-  const noSupportedModels = provider.catalogOwnership === 'app-managed' && hasFreshTest && draft.models.length === 0;
+  const commonBlocked = draft.busy !== 'idle' || needsCredentials || needsBaseUrl || devicePending;
+  const noSupportedModels = provider.catalogOwnership !== 'user-managed' && hasFreshTest && draft.models.length === 0;
   const authModeUnavailable = (provider.authModeAvailability?.[draft.authMode]
     ?? provider.providerAvailability).state === 'unavailable';
 

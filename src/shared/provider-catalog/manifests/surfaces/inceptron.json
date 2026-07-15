@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "id": "inceptron",
+  "identityIds": [
+    "inceptron"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "inceptron",
+  "label": "Inceptron",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "inceptron",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "models.dev:inceptron:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "inceptron",
+      "surface": "inceptron"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:inceptron:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "INCEPTRON_API_KEY",
+        "label": "Inceptron Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "INCEPTRON_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "INCEPTRON_API_KEY",
+    "endpointTemplate": "https://api.inceptron.io/v1"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.inceptron.io/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://docs.inceptron.io"
+}

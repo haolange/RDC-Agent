@@ -66,8 +66,9 @@ export const Composer: React.FC<ComposerProps> = ({
     setSelectedAgentId,
     lastKnownUsage,
     usageStale,
-    nextRequestContextProjection,
-    nextRequestContextPending,
+    preparedTurnContext,
+    conversationPreparationPhase,
+    selectedContextWindowTokens,
     hasActiveDebugRun,
     isComposerBusy,
     promptPlaceholder,
@@ -248,8 +249,9 @@ export const Composer: React.FC<ComposerProps> = ({
           />
           <ContextUsageIndicator
             usage={lastKnownUsage}
-            projection={nextRequestContextProjection}
-            pending={nextRequestContextPending}
+            prepared={preparedTurnContext}
+            phase={conversationPreparationPhase}
+            selectedContextWindowTokens={selectedContextWindowTokens}
             stale={usageStale && !hasActiveDebugRun}
           />
           <button

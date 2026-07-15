@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "google-vertex-gemini",
+  "routeMechanics": [
+    {
+      "protocol": "GoogleVertexGemini",
+      "adapter": "google-vertex-gemini"
+    }
+  ]
+}

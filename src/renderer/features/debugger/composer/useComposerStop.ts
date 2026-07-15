@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, type MutableRefObject } from 'react';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { RunSummary, SessionRecord } from '@shared/types/session';
 import { useSessionStore } from '../../../stores/sessionStore';
@@ -43,8 +43,9 @@ export function useComposerStop(options: {
   currentSession: SessionRecord | null;
   currentRun: RunSummary | null;
   setIsPromptSending: (sending: boolean) => void;
+  activeRequestIdRef: MutableRefObject<string | null>;
 }) {
-  const { showNotice, t, currentSession, currentRun, setIsPromptSending } = options;
+  const { showNotice, t, currentSession, currentRun, setIsPromptSending, activeRequestIdRef } = options;
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
   const conversationMessages = useConversationStore((state) => state.conversationMessages);
   const updateAssistantMessageByTurnId = useConversationStore((state) => state.updateAssistantMessageByTurnId);
@@ -69,6 +70,7 @@ export function useComposerStop(options: {
 
       const stopPromises: Array<Promise<{ success: boolean; error?: string }>> = [
         electronAPI.conversation.cancelActiveTurn({
+          requestId: activeRequestIdRef.current ?? undefined,
           sessionId: currentSession?.sessionId,
         }),
       ];
@@ -82,6 +84,10 @@ export function useComposerStop(options: {
       }
 
       const results = await Promise.allSettled(stopPromises);
+      const conversationStop = results[0];
+      if (conversationStop?.status === 'fulfilled' && conversationStop.value.success) {
+        activeRequestIdRef.current = null;
+      }
       const failures = results
         .map((result) => (result.status === 'fulfilled' ? result.value : { success: false, error: String(result.reason) }))
         .filter((result) => !result.success);
@@ -94,7 +100,7 @@ export function useComposerStop(options: {
       setIsPromptSending(false);
       showNotice(error instanceof Error ? error.message : t('app.stopRunFailed'));
     }
-  }, [conversationMessages, currentRun, currentSession?.sessionId, setCurrentRun, setIsPromptSending, showNotice, t, updateAssistantMessageByTurnId]);
+  }, [activeRequestIdRef, conversationMessages, currentRun, currentSession?.sessionId, setCurrentRun, setIsPromptSending, showNotice, t, updateAssistantMessageByTurnId]);
 
   return { handlePrimaryStop };
 }

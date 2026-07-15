@@ -36,5 +36,11 @@ export const createSettingsApi = (): SettingsApi => ({
     ipcRenderer.invoke('settings:importAgentManifest', filePath),
   saveAgentDefinition: (request): ReturnType<SettingsApi['saveAgentDefinition']> =>
     ipcRenderer.invoke('settings:saveAgentDefinition', request),
+  getAgentDefinitionCommit: (agentId): ReturnType<SettingsApi['getAgentDefinitionCommit']> =>
+    ipcRenderer.invoke('settings:getAgentDefinitionCommit', agentId),
+  saveProviderDefinition: (request): ReturnType<SettingsApi['saveProviderDefinition']> =>
+    ipcRenderer.invoke('settings:saveProviderDefinition', request),
+  getProviderDefinitionCommit: (providerId): ReturnType<SettingsApi['getProviderDefinitionCommit']> =>
+    ipcRenderer.invoke('settings:getProviderDefinitionCommit', providerId),
   set: (settings): ReturnType<SettingsApi['set']> => ipcRenderer.invoke('settings:set', settings),
 });

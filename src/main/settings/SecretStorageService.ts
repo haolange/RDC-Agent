@@ -61,6 +61,10 @@ export class SecretStorageService {
     return `provider-${sanitizeToken(providerId)}-account-${sanitizeToken(accountId)}-${kind}`;
   }
 
+  createProviderConnectionSecretRef(providerId: string, accountId: string, fieldId: string): string {
+    return `${sanitizeToken(providerId)}:${sanitizeToken(accountId)}:connection:${sanitizeToken(fieldId)}`;
+  }
+
   copySecret(sourceRef: string, targetRef: string, workspaceRoot?: string): boolean {
     if (!sourceRef || !targetRef || sourceRef === targetRef) {
       return false;

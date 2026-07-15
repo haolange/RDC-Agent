@@ -53,16 +53,20 @@ describe('AgentManifestService seed manifests', () => {
     } satisfies AgentManifestSettings;
     const baseModel = {
       providerId: 'github-copilot', aliases: [], enabled: true,
-      route: { protocol: 'OpenAICompatibleChatCompletions' as const, source: 'preset' as const },
+      route: { protocol: 'OpenAICompatibleChatCompletions' as const, source: 'catalog' as const },
+      presencePolicy: 'account-entitled' as const,
       contextTiers: [{ id: 'default', label: 'Default', maxTotalTokens: 200_000, activation: { kind: 'implicit' as const }, entitlement: 'granted' as const }],
       defaultBudgetTokens: 200_000,
-      fast: { kind: 'unsupported' as const },
-      reasoning: { kind: 'unknown' as const, supportsOff: false, levels: [], defaultSelection: 'off' as const, wireProfile: { kind: 'none' as const } },
+      controls: {
+        fast: { state: 'unsupported' as const, fixedValue: false },
+        context1m: { state: 'unsupported' as const, fixedValue: false },
+        reasoning: { kind: 'unknown' as const, supportsOff: false, levels: [], defaultSelection: 'off' as const, wireProfile: { kind: 'none' as const } },
+      },
       toolCalling: { state: 'unknown' as const }, visionInput: { state: 'unknown' as const }, structuredOutput: { state: 'unknown' as const },
       provenance: [],
     };
     const catalog = {
-      providerId: 'github-copilot', accountId: 'account-a', protocol: 'OpenAICompatibleChatCompletions',
+      providerId: 'github-copilot', accountId: 'account-a', protocol: 'OpenAICompatibleChatCompletions', catalogRevision: 'test-catalog',
       generatedAt: '2026-07-14T00:00:00.000Z', stale: false, refreshing: false,
       models: [
         { ...baseModel, modelId: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', availability: 'available' as const },

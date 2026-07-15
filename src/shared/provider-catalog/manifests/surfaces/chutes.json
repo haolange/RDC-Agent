@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 2,
+  "id": "chutes",
+  "identityIds": [
+    "chutes"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "json-catalog",
+  "vendorId": "chutes",
+  "label": "Chutes",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "chutes",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "app-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:chutes:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "chutes"
+    },
+    {
+      "id": "models.dev:chutes:1",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "chutes",
+      "surface": "chutes"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:chutes:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://llm.chutes.ai/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "authoritative-list",
+    "strategy": {
+      "kind": "json-catalog",
+      "path": "/models",
+      "collectionPath": "data",
+      "mapping": {
+        "id": "id",
+        "contextWindow": "context_length",
+        "contextWindowKind": "prompt",
+        "maxOutputTokens": "max_output_length",
+        "modality": "input_modalities",
+        "toolCalling": {
+          "path": "supported_features",
+          "includes": "tools"
+        },
+        "visionInput": {
+          "path": "input_modalities",
+          "includes": "image"
+        },
+        "structuredOutput": {
+          "path": "supported_features",
+          "includes": "structured_outputs"
+        }
+      },
+      "admission": {
+        "allowedModalities": [
+          "text",
+          "image"
+        ]
+      }
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "Qwen/Qwen3-32B-TEE",
+    "google/gemma-4-31B-turbo-TEE"
+  ],
+  "docsUrl": "https://chutes.ai/docs/"
+}

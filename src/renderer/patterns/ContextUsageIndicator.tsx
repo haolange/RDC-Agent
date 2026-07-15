@@ -1,42 +1,52 @@
 import React, { useState } from 'react';
-import type { NextRequestContextProjection, RunContextUsageSummary } from '@shared/types/session';
+import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 import { ContextBreakdownPopover } from './ContextBreakdownPopover';
 import { formatTokenCount } from '@shared/utils/tokens';
 import { useI18n } from '../i18n';
 
+type PreparationPhase = 'idle' | 'preparing' | 'current' | 'actual';
+
 export const ContextUsageIndicator: React.FC<{
   usage: RunContextUsageSummary | null;
-  projection: NextRequestContextProjection | null;
-  pending?: boolean;
+  prepared: PreparedTurnContextSummary | null;
+  phase: PreparationPhase;
+  selectedContextWindowTokens: number | null;
   stale?: boolean;
-}> = ({ usage, projection, pending = false, stale = false }) => {
+}> = ({ usage, prepared, phase, selectedContextWindowTokens, stale = false }) => {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const hasProjection = projection !== null;
-  const usagePercent = projection?.status === 'ready'
-    ? projection.usagePercent
-    : usage?.usagePercent ?? 0;
+  const showPrepared = phase === 'current' && prepared !== null;
+  const usagePercent = showPrepared ? prepared.usagePercent : usage?.usagePercent ?? 0;
   const normalizedPercent = Math.max(0, Math.min(100, usagePercent));
   const radius = 14;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - (normalizedPercent / 100));
+  const windowTokens = showPrepared
+    ? prepared.contextWindowTokens
+    : usage?.contextWindowTokens ?? selectedContextWindowTokens;
 
-  const windowLabel = projection?.status === 'ready'
-    ? `${pending ? `${t('contextBreakdown.updatingShort')} · ` : ''}${t('contextBreakdown.estimatedNext')} ${formatTokenCount(projection.estimatedInputTokens)} / ${formatTokenCount(projection.promptBudgetTokens)} · ${t('contextBreakdown.completeWindow')} ${formatTokenCount(projection.contextWindowTokens)}`
-    : projection?.status === 'blocked'
-      ? projection.blockingReason?.message ?? t('contextBreakdown.blocked')
-      : usage?.contextWindowTokens
-        ? `${t('contextBreakdown.lastActual')} ${normalizedPercent}% · ${formatTokenCount(usage.contextWindowTokens)}`
-        : t('contextBreakdown.estimatingNext');
-  const ariaLabel = projection?.status === 'blocked'
-    ? t('contextBreakdown.blockedAria')
-    : t('contextBreakdown.estimatedAria', { percent: normalizedPercent });
+  const windowLabel = phase === 'preparing'
+    ? t('contextBreakdown.preparing')
+    : showPrepared
+      ? `${t('contextBreakdown.currentRequest')} ~${formatTokenCount(prepared.preparedInputTokens)} / ${formatTokenCount(prepared.promptBudgetTokens)}`
+      : usage
+        ? `${phase === 'actual' ? t('contextBreakdown.actual') : t('contextBreakdown.lastActual')} ${normalizedPercent}%${windowTokens ? ` · ${formatTokenCount(windowTokens)}` : ''}`
+        : `${t('contextBreakdown.noUsageYet')}${windowTokens ? ` · ${formatTokenCount(windowTokens)}` : ''}`;
+  const ariaLabel = phase === 'preparing'
+    ? t('contextBreakdown.preparing')
+    : showPrepared
+      ? t('contextBreakdown.currentRequestAria', { percent: normalizedPercent })
+      : usage
+        ? phase === 'actual'
+          ? t('contextBreakdown.actualAria', { percent: normalizedPercent })
+          : t('contextBreakdown.lastActualAria', { percent: normalizedPercent })
+        : t('contextBreakdown.noUsageYet');
 
   return (
     <div className="composer-usage">
       <button
         type="button"
-        className={`composer-usage-indicator${stale && !hasProjection ? ' is-stale' : ''}${pending ? ' is-pending' : ''}${projection?.status === 'blocked' ? ' is-blocked' : ''}`}
+        className={`composer-usage-indicator${stale && !showPrepared ? ' is-stale' : ''}${phase === 'preparing' ? ' is-pending' : ''}`}
         data-testid="composer-usage-indicator"
         aria-label={ariaLabel}
         aria-haspopup="dialog"
@@ -59,18 +69,25 @@ export const ContextUsageIndicator: React.FC<{
         </svg>
         <span className="composer-usage-value">
           <span className="composer-usage-value-label">
-            {hasProjection ? t('contextBreakdown.estimatedBadge') : t('contextBreakdown.lastBadge')}
+            {phase === 'preparing'
+              ? t('contextBreakdown.preparingBadge')
+              : showPrepared
+                ? t('contextBreakdown.currentBadge')
+                : phase === 'actual'
+                  ? t('contextBreakdown.actualBadge')
+                  : t('contextBreakdown.lastBadge')}
           </span>
           <span className="composer-usage-value-number">
-            {projection?.status === 'blocked' ? '!' : `${normalizedPercent}%`}
+            {phase === 'preparing' ? '…' : usage || showPrepared ? `${normalizedPercent}%` : '—'}
           </span>
         </span>
       </button>
       {open ? (
         <ContextBreakdownPopover
-          projection={projection}
-          pending={pending}
+          prepared={showPrepared ? prepared : null}
+          phase={phase}
           usage={usage}
+          selectedContextWindowTokens={selectedContextWindowTokens}
           stale={stale}
           onClose={() => setOpen(false)}
         />

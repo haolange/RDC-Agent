@@ -10,6 +10,8 @@ export function createEffortSliderHandlers(input: {
   trackRef: React.RefObject<HTMLDivElement | null>;
   dragActiveRef: React.MutableRefObject<boolean>;
   suppressClickRef: React.MutableRefObject<boolean>;
+  pointerFrameRef: React.MutableRefObject<number>;
+  pendingDragRatioRef: React.MutableRefObject<number | null>;
   hasAdjustableReasoning: boolean;
   displayLevel: ReasoningSelection;
   displayLevels: ReasoningSelection[];
@@ -17,6 +19,23 @@ export function createEffortSliderHandlers(input: {
   setDragRatio: React.Dispatch<React.SetStateAction<number | null>>;
   commitEffort: (level: ReasoningSelection) => void;
 }) {
+  const cancelPendingPointerPaint = () => {
+    if (input.pointerFrameRef.current) {
+      window.cancelAnimationFrame(input.pointerFrameRef.current);
+      input.pointerFrameRef.current = 0;
+    }
+    input.pendingDragRatioRef.current = null;
+  };
+  const queueDragRatio = (ratio: number) => {
+    input.pendingDragRatioRef.current = ratio;
+    if (input.pointerFrameRef.current) return;
+    input.pointerFrameRef.current = window.requestAnimationFrame(() => {
+      input.pointerFrameRef.current = 0;
+      const next = input.pendingDragRatioRef.current;
+      input.pendingDragRatioRef.current = null;
+      if (next !== null) input.setDragRatio(next);
+    });
+  };
   const ratioFromClientX = (clientX: number): number => {
     const track = input.trackRef.current;
     if (!track) return 0;
@@ -36,14 +55,16 @@ export function createEffortSliderHandlers(input: {
       event.currentTarget.setPointerCapture(event.pointerId);
       input.dragActiveRef.current = true;
       input.setSnapLevel(null);
+      cancelPendingPointerPaint();
       input.setDragRatio(ratioFromClientX(event.clientX));
     },
     handleTrackPointerMove: (event: React.PointerEvent<HTMLDivElement>) => {
       if (!input.dragActiveRef.current || !input.hasAdjustableReasoning) return;
-      input.setDragRatio(ratioFromClientX(event.clientX));
+      queueDragRatio(ratioFromClientX(event.clientX));
     },
     handleTrackPointerUp: (event: React.PointerEvent<HTMLDivElement>) => {
       if (!input.dragActiveRef.current) return;
+      cancelPendingPointerPaint();
       if (event.currentTarget.hasPointerCapture(event.pointerId)) {
         event.currentTarget.releasePointerCapture(event.pointerId);
       }

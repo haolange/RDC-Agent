@@ -1,9 +1,17 @@
 import type { Dispatch, SetStateAction } from 'react';
-import type { AppSettings, AppSettingsPatch, LlmProviderEntry } from '@shared/types/settings';
+import type { LlmProviderEntry, ProviderDefinitionSaveResult } from '@shared/types/settings';
 import type { useI18n } from '../../../i18n';
 import type { ProviderConnectionDraft } from './types';
 import { getErrorMessage } from './utils';
 import type { useProviderConnectionDraft } from './useProviderConnectionDraft';
+import {
+  getConnectionDraftSignature,
+  getConnectionRequestValues,
+} from './providerConnectionState';
+import {
+  hasProviderConnectionDefinitionChanged,
+  projectProviderModelPreferences,
+} from './providerConnectionRequest';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type DraftApi = Pick<
@@ -15,30 +23,21 @@ export const useProviderConnectionActions = (
   connectionDraft: ProviderConnectionDraft | null,
   setConnectionDraft: Dispatch<SetStateAction<ProviderConnectionDraft | null>>,
   providerDrafts: LlmProviderEntry[],
-  patchSettings: (patch: AppSettingsPatch) => Promise<AppSettings>,
+  saveProvider: (provider: LlmProviderEntry) => Promise<ProviderDefinitionSaveResult>,
   draftApi: DraftApi,
   t: Translate,
 ) => {
   const { connectionProvider, refreshLocalSettings, updateConnectionDraft } = draftApi;
 
-  const modelPreferences = () => connectionDraft?.models.map((model) => ({
-    id: model.id,
-    enabled: model.enabled,
-    defaultReasoningSelection: model.defaultReasoningSelection,
-    defaultBudgetTokens: model.defaultBudgetTokens,
-  })) ?? [];
+  const modelPreferences = () => projectProviderModelPreferences(connectionDraft);
 
   const saveModelPreferences = async (): Promise<void> => {
     if (!connectionDraft) return;
-    await patchSettings({
-      llm: {
-        providers: providerDrafts.map((provider) => provider.id !== connectionDraft.providerId
-          ? provider
-          : {
-              ...provider,
-              models: connectionDraft.models.map((model) => ({ ...model })),
-            }),
-      },
+    const provider = providerDrafts.find((entry) => entry.id === connectionDraft.providerId);
+    if (!provider) throw new Error(`Provider ${connectionDraft.providerId} is unavailable.`);
+    await saveProvider({
+      ...provider,
+      models: connectionDraft.models.map((model) => ({ ...model })),
     });
     await refreshLocalSettings(connectionDraft.providerId);
     setConnectionDraft(null);
@@ -62,6 +61,7 @@ export const useProviderConnectionActions = (
           testedBaseUrl: connectionDraft.baseUrl,
           testedProtocol: connectionDraft.protocol,
           testedAuthMode: connectionDraft.authMode,
+          testedConnectionSignature: getConnectionDraftSignature(connectionDraft),
           models: result.models,
         });
         await refreshLocalSettings(connectionDraft.providerId);
@@ -73,6 +73,7 @@ export const useProviderConnectionActions = (
         apiKey: connectionDraft.usingStoredSecret ? '' : connectionDraft.apiKey,
         baseUrl: connectionDraft.baseUrl,
         protocol: connectionDraft.protocol,
+        connectionValues: getConnectionRequestValues(connectionDraft),
       } as Parameters<typeof window.electronAPI.llm.testProviderDraft>[0] & { protocol?: typeof connectionDraft.protocol };
       const result = await window.electronAPI.llm.testProviderDraft(request);
       if (!result.success) {
@@ -87,6 +88,7 @@ export const useProviderConnectionActions = (
         testedBaseUrl: connectionDraft.baseUrl,
         testedProtocol: connectionDraft.protocol,
         testedAuthMode: connectionDraft.authMode,
+        testedConnectionSignature: getConnectionDraftSignature(connectionDraft),
         models: result.models,
       });
     } catch (error) {
@@ -115,7 +117,6 @@ export const useProviderConnectionActions = (
             providerId: connectionDraft.providerId,
             authMode: connectionDraft.authMode,
             accountLoginMode: connectionDraft.accountLoginMode,
-            accountRegion: connectionDraft.accountRegion,
           });
         if (!status.connected && status.state !== 'pending') {
           updateConnectionDraft({ busy: 'idle', error: '', accountStatus: status });
@@ -130,11 +131,7 @@ export const useProviderConnectionActions = (
         return;
       }
       const storedProvider = providerDrafts.find((provider) => provider.id === connectionDraft.providerId);
-      const connectionDefinitionChanged = !storedProvider
-        || storedProvider.configuredAuthMode !== connectionDraft.authMode
-        || storedProvider.protocol !== connectionDraft.protocol
-        || (storedProvider.baseUrl ?? '').replace(/\/+$/, '') !== connectionDraft.baseUrl.trim().replace(/\/+$/, '')
-        || (!connectionDraft.usingStoredSecret && Boolean(connectionDraft.apiKey.trim()));
+      const connectionDefinitionChanged = hasProviderConnectionDefinitionChanged(storedProvider, connectionDraft);
       if (connectionProvider?.isConfigured && !connectionDefinitionChanged) {
         await saveModelPreferences();
         return;
@@ -145,6 +142,7 @@ export const useProviderConnectionActions = (
         apiKey: connectionDraft.usingStoredSecret ? '' : connectionDraft.apiKey,
         baseUrl: connectionDraft.baseUrl,
         protocol: connectionDraft.protocol,
+        connectionValues: getConnectionRequestValues(connectionDraft),
         modelPreferences: modelPreferences(),
       } as Parameters<typeof window.electronAPI.llm.connectProvider>[0] & { protocol?: typeof connectionDraft.protocol };
       const result = await window.electronAPI.llm.connectProvider(request);
@@ -170,7 +168,6 @@ export const useProviderConnectionActions = (
         providerId: connectionDraft.providerId,
         authMode: connectionDraft.authMode,
         accountLoginMode,
-        accountRegion: connectionDraft.accountRegion,
       });
       updateConnectionDraft({
         busy: 'idle',

@@ -65,7 +65,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     connectionProvider,
     openProviderConnection,
     updateConnectionDraft,
-    connectionNeedsApiKey,
+    updateConnectionModelPreference,
+    connectionNeedsCredentials,
     connectionNeedsBaseUrl,
     connectionHasFreshTest,
     connectionAccountConnected,
@@ -233,11 +234,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
           getResolvedProviderLabel={getResolvedProviderLabel}
           connectionAccountConnected={connectionAccountConnected}
           connectionDevicePending={connectionDevicePending}
-          connectionNeedsApiKey={connectionNeedsApiKey}
+          connectionNeedsCredentials={connectionNeedsCredentials}
           connectionNeedsBaseUrl={connectionNeedsBaseUrl}
           connectionHasFreshTest={connectionHasFreshTest}
           onClose={() => setConnectionDraft(null)}
           onUpdateConnectionDraft={updateConnectionDraft}
+          onModelChange={updateConnectionModelPreference}
           onTest={handleTestProviderDraft}
           onSave={handleSaveProviderConnection}
           onStartAccountLogin={handleStartAccountLogin}

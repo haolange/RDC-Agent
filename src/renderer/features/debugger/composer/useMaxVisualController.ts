@@ -6,8 +6,6 @@ import {
   MAX_VISUAL_RETREAT_MS,
   type MaxVisualPhase,
   prefersReducedMotion,
-  resolveMaxAnimationProgress,
-  resolveMaxStopsOpacity,
 } from './maxVisual';
 
 export function useMaxVisualController(input: {
@@ -16,107 +14,71 @@ export function useMaxVisualController(input: {
   displayLevel: ReasoningSelection;
   selectedLevel: ReasoningSelection;
 }) {
-  const [maxPhase, setMaxPhaseState] = useState<MaxVisualPhase>('idle');
-  const [maxProgress, setMaxProgressState] = useState(0);
-  const [evolveHideStops, setEvolveHideStopsState] = useState(false);
-  const [retreatStopsFrom, setRetreatStopsFrom] = useState(0);
-  const maxPhaseRef = useRef<MaxVisualPhase>('idle');
-  const maxProgressRef = useRef(0);
-  const evolveHideStopsRef = useRef(false);
-  const animFrameRef = useRef(0);
+  const [maxPhase, setMaxPhase] = useState<MaxVisualPhase>('idle');
+  const phaseRef = useRef<MaxVisualPhase>('idle');
+  const timerRef = useRef<number | null>(null);
   const wasMaxWhileDraggingRef = useRef(false);
   const prevOpenRef = useRef(false);
 
-  const cancelAnimation = useCallback(() => {
-    if (!animFrameRef.current) return;
-    window.cancelAnimationFrame(animFrameRef.current);
-    animFrameRef.current = 0;
+  const clearTimer = useCallback(() => {
+    if (timerRef.current === null) return;
+    window.clearTimeout(timerRef.current);
+    timerRef.current = null;
   }, []);
 
-  const setPhase = useCallback((phase: MaxVisualPhase) => {
-    maxPhaseRef.current = phase;
-    setMaxPhaseState(phase);
+  const commitPhase = useCallback((phase: MaxVisualPhase) => {
+    phaseRef.current = phase;
+    setMaxPhase(phase);
   }, []);
-
-  const setProgress = useCallback((progress: number) => {
-    maxProgressRef.current = progress;
-    setMaxProgressState(progress);
-  }, []);
-
-  const setHideStops = useCallback((hide: boolean) => {
-    evolveHideStopsRef.current = hide;
-    setEvolveHideStopsState(hide);
-  }, []);
-
-  const runAnimation = useCallback((
-    phase: 'evolve' | 'retreat',
-    durationMs: number,
-    onComplete: () => void,
-  ) => {
-    cancelAnimation();
-    setPhase(phase);
-    setProgress(0);
-    const startedAt = performance.now();
-    const tick = (now: number) => {
-      const next = resolveMaxAnimationProgress(now - startedAt, durationMs);
-      setProgress(next);
-      if (next < 1) {
-        animFrameRef.current = window.requestAnimationFrame(tick);
-        return;
-      }
-      animFrameRef.current = 0;
-      onComplete();
-    };
-    animFrameRef.current = window.requestAnimationFrame(tick);
-  }, [cancelAnimation, setPhase, setProgress]);
 
   const resetState = useCallback(() => {
-    cancelAnimation();
-    setHideStops(false);
-    setPhase('idle');
-    setProgress(0);
-    setRetreatStopsFrom(0);
+    clearTimer();
     wasMaxWhileDraggingRef.current = false;
-  }, [cancelAnimation, setHideStops, setPhase, setProgress]);
+    commitPhase('idle');
+  }, [clearTimer, commitPhase]);
 
-  const startEvolve = useCallback((hideStops: boolean) => {
-    setHideStops(hideStops);
-    if (prefersReducedMotion()) {
-      cancelAnimation();
-      setPhase('settled');
-      setProgress(1);
+  const startEvolve = useCallback(() => {
+    clearTimer();
+    if (prefersReducedMotion() || document.hidden) {
+      commitPhase('settled');
       return;
     }
-    runAnimation('evolve', MAX_VISUAL_EVOLVE_MS, () => {
-      setPhase('settled');
-      setProgress(1);
-    });
-  }, [cancelAnimation, runAnimation, setHideStops, setPhase, setProgress]);
+    commitPhase('evolve');
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      commitPhase('settled');
+    }, MAX_VISUAL_EVOLVE_MS);
+  }, [clearTimer, commitPhase]);
 
   const startRetreat = useCallback(() => {
-    if (maxPhaseRef.current === 'retreat' && animFrameRef.current) return;
-    const stopsFrom = resolveMaxStopsOpacity({
-      phase: maxPhaseRef.current,
-      progress: maxProgressRef.current,
-      evolveHideStops: evolveHideStopsRef.current,
-    });
-    setRetreatStopsFrom(stopsFrom);
-    setHideStops(false);
-    if (prefersReducedMotion()) {
+    if (phaseRef.current === 'idle' || phaseRef.current === 'retreat') return;
+    clearTimer();
+    if (prefersReducedMotion() || document.hidden) {
       resetState();
       return;
     }
-    runAnimation('retreat', MAX_VISUAL_RETREAT_MS, resetState);
-  }, [resetState, runAnimation, setHideStops]);
+    commitPhase('retreat');
+    timerRef.current = window.setTimeout(() => {
+      timerRef.current = null;
+      commitPhase('idle');
+    }, MAX_VISUAL_RETREAT_MS);
+  }, [clearTimer, commitPhase, resetState]);
 
   const enterPreview = useCallback(() => {
-    cancelAnimation();
-    setHideStops(false);
-    setPhase('preview');
-    setProgress(0);
-  }, [cancelAnimation, setHideStops, setPhase, setProgress]);
+    clearTimer();
+    commitPhase('preview');
+  }, [clearTimer, commitPhase]);
 
-  useEffect(() => () => cancelAnimation(), [cancelAnimation]);
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.hidden) resetState();
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      clearTimer();
+    };
+  }, [clearTimer, resetState]);
 
   useEffect(() => {
     const justOpened = input.open && !prevOpenRef.current;
@@ -127,47 +89,34 @@ export function useMaxVisualController(input: {
       return;
     }
     if (!justOpened) return;
-    if (isMaxTierLevel(input.selectedLevel)) startEvolve(true);
+    if (isMaxTierLevel(input.selectedLevel)) startEvolve();
     else resetState();
   }, [input.open, input.selectedLevel, resetState, startEvolve]);
 
   const isMaxTier = isMaxTierLevel(input.displayLevel);
-
   useEffect(() => {
     if (!input.open || !input.isDragging) return;
     if (isMaxTier) {
       wasMaxWhileDraggingRef.current = true;
-      if (maxPhaseRef.current !== 'preview') enterPreview();
+      if (phaseRef.current !== 'preview') enterPreview();
       return;
     }
     const shouldRetreat = wasMaxWhileDraggingRef.current
-      || ['preview', 'settled', 'evolve'].includes(maxPhaseRef.current);
+      || ['preview', 'settled', 'evolve'].includes(phaseRef.current);
     wasMaxWhileDraggingRef.current = false;
-    if (shouldRetreat && maxPhaseRef.current !== 'retreat' && maxPhaseRef.current !== 'idle') {
-      startRetreat();
-    }
-  }, [input.open, input.isDragging, isMaxTier, enterPreview, startRetreat]);
+    if (shouldRetreat) startRetreat();
+  }, [enterPreview, input.isDragging, input.open, isMaxTier, startRetreat]);
 
   const applyCommittedLevelVisual = useCallback((level: ReasoningSelection) => {
     wasMaxWhileDraggingRef.current = false;
-    if (isMaxTierLevel(level)) {
-      startEvolve(false);
-      return;
-    }
-    if (maxPhaseRef.current !== 'idle' && maxPhaseRef.current !== 'retreat') startRetreat();
+    if (isMaxTierLevel(level)) startEvolve();
+    else startRetreat();
   }, [startEvolve, startRetreat]);
-
-  const stopsOpacity = resolveMaxStopsOpacity({
-    phase: maxPhase,
-    progress: maxProgress,
-    evolveHideStops,
-    retreatStopsFrom,
-  });
 
   return {
     maxPhase,
-    maxProgress,
-    stopsOpacity,
+    maxProgress: maxPhase === 'settled' ? 1 : 0,
+    stopsOpacity: maxPhase === 'evolve' || maxPhase === 'settled' || maxPhase === 'preview' ? 0 : 1,
     showMaxTrack: maxPhase !== 'idle',
     isMaxTier,
     resetMaxVisual: resetState,

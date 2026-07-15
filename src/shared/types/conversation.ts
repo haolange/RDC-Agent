@@ -3,7 +3,13 @@ import type { ConversationTurnControls } from './modelCapability';
 import type { AgentEvent } from './agentRuntime';
 import type { ConversationBranchState } from './conversationBranch';
 import type { ThinkingArtifact } from './reasoning';
-import type { AppMode, RunSummary, SessionAttachmentRecord, SessionRecord } from './session';
+import type {
+  AppMode,
+  PreparedTurnContextSummary,
+  RunSummary,
+  SessionAttachmentRecord,
+  SessionRecord,
+} from './session';
 
 export type ConversationMode = 'talk';
 
@@ -128,6 +134,8 @@ export interface ConversationWorkTrace {
 
 export interface ConversationMessage {
   id: string;
+  /** Stable idempotency key for the user request that created this message. */
+  requestId?: string;
   turnId: string;
   sessionId: string | null;
   projectId: string | null;
@@ -148,6 +156,8 @@ export interface ConversationMessage {
   forkId?: string;
   /** Variant index at the fork point, 0-based. */
   variantIndex?: number;
+  /** Frozen preflight summary persisted on both turn messages for restart-safe idempotency and trace audit. */
+  preparedContext?: PreparedTurnContextSummary;
 }
 
 export interface ConversationAttachmentInput {
@@ -176,6 +186,7 @@ export interface ConversationExecutionTransition {
 }
 
 export interface ConversationSendRequest {
+  requestId: string;
   projectId?: string | null;
   sessionId?: string | null;
   currentRunId?: string | null;
@@ -184,11 +195,16 @@ export interface ConversationSendRequest {
   agentId?: string | null;
   message: string;
   attachments?: ConversationAttachmentInput[];
-  turnControls?: ConversationTurnControls;
-}
-
-export interface NextRequestContextPreviewRequest extends ConversationSendRequest {
-  clientRevision: number;
+  turnControls: ConversationTurnControls;
+  /** Exact committed configuration observed by the renderer before send. */
+  configurationCommit?: {
+    agentId: string;
+    agentCommitHash?: string;
+    providerId?: string;
+    providerCommitHash?: string;
+    providerCatalogRevision?: string;
+    routeRevision?: string;
+  };
 }
 
 export interface ConversationRewriteFromMessageRequest extends ConversationSendRequest {
@@ -196,12 +212,15 @@ export interface ConversationRewriteFromMessageRequest extends ConversationSendR
 }
 
 export interface ConversationCancelActiveTurnRequest {
+  requestId?: string;
   sessionId?: string;
   turnId?: string;
 }
 
 export interface ConversationCancelActiveTurnResult {
   success: boolean;
+  phase?: 'preparing' | 'committing' | 'running';
+  cancelledRequestId?: string;
   cancelledTurnId?: string;
   error?: string;
 }
@@ -251,6 +270,7 @@ export interface ConversationAnswerToolApprovalResult {
 }
 
 export interface ConversationTurnResult {
+  requestId: string;
   session: SessionRecord | null;
   mode: ConversationMode;
   userMessage: ConversationMessage;
@@ -262,7 +282,47 @@ export interface ConversationTurnResult {
   tracePresentation?: import('./agenticTrace').AgentRunPresentation | null;
   uiHints?: ConversationUiHints;
   errorViewModel?: ConversationErrorViewModel | null;
+  preparedContext: PreparedTurnContextSummary;
 }
+
+export type ConversationPreflightErrorCode =
+  | 'REQUEST_CANCELLED'
+  | 'REQUEST_ID_CONFLICT'
+  | 'CONVERSATION_BUSY'
+  | 'AGENT_COMMIT_NOT_FOUND'
+  | 'AGENT_PROFILE_UNAVAILABLE'
+  | 'PROVIDER_UNAVAILABLE'
+  | 'MODEL_UNAVAILABLE'
+  | 'NO_USABLE_CONTEXT_TIER'
+  | 'PLAN_CONFLICT'
+  | 'CONSTRAINT_REJECTED'
+  | 'ATTACHMENT_INVALID'
+  | 'ATTACHMENT_UNSUPPORTED'
+  | 'PROMPT_PLAN_UNAVAILABLE'
+  | 'PROMPT_OVERHEAD_EXCEEDS_BUDGET'
+  | 'CONTEXT_CANNOT_FIT'
+  | 'TURN_COMMIT_FAILED'
+  | 'PREFLIGHT_FAILED';
+
+export type ConversationSendResult =
+  | {
+      status: 'accepted';
+      requestId: string;
+      turn: ConversationTurnResult;
+      preparedContext: PreparedTurnContextSummary;
+    }
+  | {
+      status: 'rejected';
+      requestId: string;
+      phase: 'preflight' | 'commit';
+      error: {
+        code: ConversationPreflightErrorCode;
+        message: string;
+        technicalMessage?: string;
+        retryable: boolean;
+        suggestedControls?: ConversationTurnControls;
+      };
+    };
 
 export interface ConversationMessagePatchedEvent {
   type: 'message_patched';

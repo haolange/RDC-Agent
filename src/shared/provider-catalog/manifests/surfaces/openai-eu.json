@@ -1,0 +1,790 @@
+{
+  "schemaVersion": 2,
+  "id": "openai-eu",
+  "identityIds": [],
+  "profileId": "openai-responses",
+  "adapterIds": [
+    "openai-responses"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "openai",
+  "label": "OpenAI (EU)",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "official-direct",
+  "surfaceKind": "native-api",
+  "serviceOperator": "openai",
+  "endpointClass": "first-party",
+  "endpointOwnership": "service-operator",
+  "catalogOwnership": "app-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:openai-eu:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "openai-eu"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:openai-eu:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "structured-output",
+    "vision-input",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAIResponses",
+      "protocol": "OpenAIResponses",
+      "adapterId": "openai-responses",
+      "baseUrl": "https://eu.api.openai.com/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [
+    {
+      "modelId": "gpt-5.6-sol",
+      "label": "GPT-5.6 Sol",
+      "aliases": [
+        "gpt-5.6"
+      ],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1050000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://eu.api.openai.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai-eu:0"
+    },
+    {
+      "modelId": "gpt-5.6-terra",
+      "label": "GPT-5.6 Terra",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1050000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://eu.api.openai.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai-eu:0"
+    },
+    {
+      "modelId": "gpt-5.6-luna",
+      "label": "GPT-5.6 Luna",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1050000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://eu.api.openai.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai-eu:0"
+    },
+    {
+      "modelId": "gpt-5.5",
+      "label": "gpt-5.5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1050000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://eu.api.openai.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai-eu:0"
+    },
+    {
+      "modelId": "gpt-5.4",
+      "label": "gpt-5.4",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1050000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://eu.api.openai.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "off",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai-eu:0"
+    },
+    {
+      "modelId": "gpt-5.4-mini",
+      "label": "gpt-5.4-mini",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 400000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://eu.api.openai.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "off",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai-eu:0"
+    },
+    {
+      "modelId": "gpt-5.4-nano",
+      "label": "gpt-5.4-nano",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 400000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://eu.api.openai.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "off",
+          "wireProfile": {
+            "kind": "openai-responses",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai-eu:0"
+    },
+    {
+      "modelId": "gpt-5.3-codex",
+      "label": "gpt-5.3-codex",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 400000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://eu.api.openai.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "offMode": "reasoning-none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai-eu:0"
+    },
+    {
+      "modelId": "gpt-5.2-codex",
+      "label": "gpt-5.2-codex",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 400000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://eu.api.openai.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "minimal": "minimal",
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "offMode": "reasoning-none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai-eu:0"
+    },
+    {
+      "modelId": "gpt-4.1",
+      "label": "gpt-4.1",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1047576,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "supported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://eu.api.openai.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "default",
+          "entitlement": "granted"
+        },
+        "reasoning": {
+          "kind": "none",
+          "supportsOff": true,
+          "levels": [],
+          "defaultSelection": "off",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai-eu:0"
+    }
+  ],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gpt-5.6-luna",
+    "gpt-5.5",
+    "gpt-5.4",
+    "gpt-5.4-mini",
+    "gpt-5.3-codex",
+    "gpt-4.1"
+  ],
+  "docsUrl": "https://platform.openai.com/api-keys"
+}

@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 2,
+  "id": "freemodel",
+  "identityIds": [
+    "freemodel"
+  ],
+  "profileId": "multi-protocol",
+  "adapterIds": [
+    "anthropic-messages",
+    "openai-compatible",
+    "openai-responses"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "freemodel-catalog",
+  "vendorId": "freemodel",
+  "label": "FreeModel",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "freemodel",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "provider-managed",
+  "factSources": [
+    {
+      "id": "models.dev:freemodel:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "freemodel",
+      "surface": "freemodel"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:freemodel:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "FREEMODEL_API_KEY",
+        "label": "Freemodel Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "FREEMODEL_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "FREEMODEL_API_KEY",
+    "endpointTemplate": "https://cc.freemodel.dev/v1"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+    "id": "AnthropicMessages",
+      "protocol": "AnthropicMessages",
+      "adapterId": "anthropic-messages",
+      "baseUrl": "https://cc.freemodel.dev/v1",
+      "default": true,
+      "protocolOwner": "anthropic"
+    },
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.freemodel.dev/v1",
+      "protocolOwner": "openai"
+    },
+    {
+      "id": "OpenAIResponses",
+      "protocol": "OpenAIResponses",
+      "adapterId": "openai-responses",
+      "baseUrl": "https://api.freemodel.dev/v1",
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "authoritative-list",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "freemodel-catalog"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "claude-haiku-4-5-20251001",
+    "claude-opus-4-6",
+    "claude-opus-4-7",
+    "claude-opus-4-8",
+    "claude-sonnet-4-6"
+  ],
+  "docsUrl": "https://freemodel.dev"
+}

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "anthropic-messages",
+  "routeMechanics": [
+    {
+      "protocol": "AnthropicMessages",
+      "adapter": "anthropic-messages"
+    }
+  ]
+}

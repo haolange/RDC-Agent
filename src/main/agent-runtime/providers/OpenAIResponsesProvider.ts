@@ -22,6 +22,7 @@ import {
   ProviderHttpError,
 } from './internal/http';
 import { buildOpenAiResponsesReasoning, isReasoningEnabled } from './reasoningWire';
+import type { ProviderRequestAuthorizer } from '../../settings/AwsBedrockCredentials';
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const PROVIDER_API = 'openai-responses';
@@ -35,6 +36,8 @@ export interface OpenAIResponsesProviderOptions {
   apiKey?: string;
   accountId?: string;
   headers?: Record<string, string>;
+  /** Body-aware authorization, used by transports such as AWS SigV4. */
+  requestAuthorizer?: ProviderRequestAuthorizer;
 }
 
 interface ResponsesCompletedPayload {
@@ -68,12 +71,14 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
   private readonly defaultApiKey: string | undefined;
   private readonly accountId: string | undefined;
   private readonly defaultHeaders: Record<string, string>;
+  private readonly requestAuthorizer: ProviderRequestAuthorizer | undefined;
 
   constructor(options: OpenAIResponsesProviderOptions = {}) {
     this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
     this.defaultApiKey = options.apiKey;
     this.accountId = options.accountId?.trim() || undefined;
     this.defaultHeaders = { ...(options.headers ?? {}) };
+    this.requestAuthorizer = options.requestAuthorizer;
   }
 
   stream(
@@ -108,14 +113,22 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
     try {
       builder.start();
 
-      if (!apiKey) {
+      if (!apiKey && !this.requestAuthorizer) {
         throw new ProviderHttpError(PROVIDER_API, 401, 'missing apiKey for OpenAI Responses provider');
       }
 
-      const response = await fetch(createResponsesUrl(baseUrl), {
+      const url = buildOpenAIResponsesUrl(baseUrl);
+      const bodyText = JSON.stringify(applyRequestPlanBody(buildRequestBody(model, context, options), options.requestPlan));
+      const unsignedHeaders = apiKey
+        ? { ...this.createHeaders(apiKey), ...requestPlanHeaders(options.requestPlan) }
+        : { 'Content-Type': 'application/json', ...this.defaultHeaders, ...requestPlanHeaders(options.requestPlan) };
+      const headers = this.requestAuthorizer
+        ? await this.requestAuthorizer({ url, method: 'POST', headers: unsignedHeaders, body: bodyText })
+        : unsignedHeaders;
+      const response = await fetch(url, {
         method: 'POST',
-        headers: { ...this.createHeaders(apiKey), ...requestPlanHeaders(options.requestPlan) },
-        body: JSON.stringify(applyRequestPlanBody(buildRequestBody(model, context, options), options.requestPlan)),
+        headers,
+        body: bodyText,
         signal: composed.signal,
       });
 
@@ -317,8 +330,9 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
   }
 }
 
-function createResponsesUrl(baseUrl: string): string {
-  return baseUrl.endsWith('/responses') ? baseUrl : `${baseUrl}/responses`;
+export function buildOpenAIResponsesUrl(baseUrl: string): string {
+  const trimmed = baseUrl.replace(/\/+$/u, '');
+  return trimmed.endsWith('/responses') ? trimmed : `${trimmed}/responses`;
 }
 
 function buildRequestBody(model: Model, context: Context, options: StreamOptions): Record<string, unknown> {
