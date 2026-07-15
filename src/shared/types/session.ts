@@ -207,22 +207,34 @@ export interface RunContextUsageSummary {
   reasoningTokens?: number;
 }
 
-export interface NextRequestContextProjection {
-  clientRevision: number;
-  requestEnvelopeId?: string;
-  status: 'ready' | 'blocked';
-  route: { providerId: string; modelId: string; protocol: string } | null;
-  contextMode: 'normal' | 'one-million' | null;
-  estimatedInputTokens: number;
+export interface PreparedTurnContextSummary {
+  requestId: string;
+  turnId: string;
+  route: {
+    providerId: string;
+    adapterId: string;
+    selectedModelId: string;
+    effectiveModelId: string;
+    protocol: string;
+    catalogRevision: string;
+    routeRevision: string;
+    bindingIds: string[];
+  };
+  wirePatch: {
+    headers: Record<string, string>;
+    body: import('./providerCapability').JsonObject;
+  };
+  controls: import('./modelCapability').ConversationTurnControls;
+  contextMode: 'normal' | 'one-million';
+  preparedInputTokens: number;
   uncompactedInputTokens: number;
   promptBudgetTokens: number;
   contextWindowTokens: number;
   usagePercent: number;
   breakdown: ContextUsageBreakdownEntry[];
-  willCompact: boolean;
+  compactionApplied: boolean;
   filteredArtifactCount: number;
-  blockingReason?: { code: string; message: string };
-  estimatedAt: number;
+  preparedAt: number;
 }
 
 export interface HumanPreviewSnapshot {

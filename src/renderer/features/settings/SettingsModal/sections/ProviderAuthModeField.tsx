@@ -12,8 +12,16 @@ interface ProviderAuthModeFieldProps {
   t: Translate;
 }
 
-const authModeLabel = (mode: LlmProviderAuthMode, t: Translate): string => {
-  if (mode === 'api-key') return t('settings.providerAuthApiKey');
+const authModeLabel = (
+  mode: LlmProviderAuthMode,
+  provider: LlmProviderEntry,
+  t: Translate,
+): string => {
+  if (mode === 'api-key') {
+    const usesTypedCredentials = (provider.connectionSchema?.fields ?? [])
+      .some((field) => field.id !== 'apiKey');
+    return t(usesTypedCredentials ? 'settings.providerAuthCredentials' : 'settings.providerAuthApiKey');
+  }
   if (mode === 'account') return t('settings.providerAuthAccount');
   if (mode === 'environment') return t('settings.providerAuthEnvironment');
   return t('settings.providerAuthLocal');
@@ -54,7 +62,7 @@ export const ProviderAuthModeField: React.FC<ProviderAuthModeFieldProps> = ({
               disabled={disabled || unavailable}
               onClick={() => onChange(mode)}
             >
-              {authModeLabel(mode, t)}
+              {authModeLabel(mode, provider, t)}
             </button>
           );
         })}

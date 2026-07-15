@@ -59,6 +59,10 @@ export function resolveTurnControlsForCapabilityChange(input: {
     rememberedControls,
   } = input;
 
+  if (isPendingCapabilityKey(nextCapabilityKey)) {
+    return input.currentControls;
+  }
+
   if (sessionChanged || sessionControlsChanged || isPendingCapabilityKey(previousCapabilityKey ?? '')) {
     return buildInitialTurnControls(capability, sessionControls);
   }

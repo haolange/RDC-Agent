@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "id": "berget",
+  "identityIds": [
+    "berget"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "berget",
+  "label": "Berget.AI",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "berget",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "provider-managed",
+  "factSources": [
+    {
+      "id": "models.dev:berget:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "berget",
+      "surface": "berget"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:berget:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "BERGET_API_KEY",
+        "label": "Berget Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "BERGET_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "BERGET_API_KEY",
+    "endpointTemplate": "https://api.berget.ai/v1"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.berget.ai/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://api.berget.ai"
+}

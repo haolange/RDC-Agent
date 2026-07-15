@@ -23,15 +23,16 @@ type Translate = ReturnType<typeof useI18n>['t'];
 const REASONING_LABEL_KEYS = {
   off: 'composer.effort.levelOff', on: 'composer.effort.levelOn', minimal: 'composer.effort.levelMinimal',
   low: 'composer.effort.levelLow', medium: 'composer.effort.levelMedium', high: 'composer.effort.levelHigh',
-  xhigh: 'composer.effort.levelXHigh', max: 'composer.effort.levelMax', ultra: 'composer.effort.levelUltra',
+  xhigh: 'composer.effort.levelExtra', max: 'composer.effort.levelMax',
 } as const satisfies Record<ReasoningSelection, Parameters<Translate>[0]>;
 
 const EVIDENCE_LABEL_KEYS = {
-  seed: 'settings.providers.capability.sourceSeed',
+  catalog: 'settings.providers.capability.sourceCatalog',
   discovery: 'settings.providers.capability.sourceDiscovery',
   overlay: 'settings.providers.capability.sourceOverlay',
   entitlement: 'settings.providers.capability.sourceEntitlement',
   observed: 'settings.providers.capability.sourceObserved',
+  'maintained-surface': 'settings.providers.capability.sourceMaintainedSurface',
   user: 'settings.providers.capability.sourceUser',
 } as const satisfies Record<CapabilityEvidenceSource, Parameters<Translate>[0]>;
 
@@ -86,7 +87,6 @@ function formatActivation(activation: TierActivation, t: Translate): string {
   switch (activation.kind) {
     case 'header': return t('settings.providers.capability.activationHeader');
     case 'body': return t('settings.providers.capability.activationBody');
-    case 'model-variant': return t('settings.providers.capability.activationModel', { model: activation.modelId });
     case 'implicit':
     default: return t('settings.providers.capability.activationImplicit');
   }
@@ -138,22 +138,40 @@ export function formatReasoningCapabilityValue(control: ReasoningControl | null,
 }
 
 export function formatReasoningCapability(model: EffectiveModel | null, t: Translate): string {
-  return formatReasoningCapabilityValue(model?.reasoning ?? null, t);
+  return formatReasoningCapabilityValue(model?.controls.reasoning ?? null, t);
 }
 
-export function formatFastCapability(model: EffectiveModel | null, t: Translate): string {
-  if (!model || model.fast.kind === 'unknown') return t('settings.providers.capability.unknown');
-  if (model.fast.kind === 'unsupported') return t('settings.providers.capability.unsupported');
-  const activation = model.fast.label ?? (model.fast.kind === 'model-variant'
-    ? t('settings.providers.capability.activationModel', { model: model.fast.modelId })
-    : model.fast.kind === 'client-tier'
-      ? t('settings.providers.capability.activationClientTier', { tier: model.fast.tierId })
-      : t('settings.providers.capability.activationRequest'));
-  return model.fast.entitlement === 'granted'
+export function formatFastControl(model: EffectiveModel | null, t: Translate): string {
+  if (!model || model.controls.fast.state === 'unknown') return t('settings.providers.capability.unknown');
+  if (model.controls.fast.state === 'unsupported') return t('settings.providers.capability.unsupported');
+  if (model.controls.fast.state === 'provider-managed') return t('composer.effort.providerManaged');
+  if (model.controls.fast.state === 'fixed') {
+    const activation = t('settings.providers.capability.lockedValue', {
+      value: t('settings.providers.capability.fastMode'),
+    });
+    return !model.controls.fast.entitlement || model.controls.fast.entitlement === 'granted'
+      ? activation
+      : t('settings.providers.capability.activationWithEntitlement', {
+          activation,
+          entitlement: formatEntitlement(model.controls.fast.entitlement, t),
+        });
+  }
+  const bindingId = model.resolvedControls?.fast.bindingId;
+  const binding = model.executionBindings?.find((candidate) => candidate.id === bindingId)
+    ?? model.executionBindings?.find((candidate) => candidate.when.fast === true);
+  const action = binding?.actions.find((candidate) => candidate.kind !== 'fixed');
+  const activation = model.controls.fast.label ?? (action?.kind === 'model-switch'
+    ? t('settings.providers.capability.activationModel', { model: action.targetModelId })
+    : action?.kind === 'client-tier'
+      ? t('settings.providers.capability.activationClientTier', { tier: action.tierId })
+      : action?.kind === 'unsupported'
+        ? t('settings.providers.capability.unsupported')
+        : t('settings.providers.capability.activationRequest'));
+  return model.controls.fast.entitlement === 'granted'
     ? activation
     : t('settings.providers.capability.activationWithEntitlement', {
         activation,
-        entitlement: formatEntitlement(model.fast.entitlement, t),
+        entitlement: formatEntitlement(model.controls.fast.entitlement, t),
       });
 }
 
@@ -181,12 +199,17 @@ function toolCallingTone(state: CapabilityState | undefined): CapabilityChip['to
 
 export function buildCapabilityChips(model: EffectiveModel | null, t: Translate): CapabilityChip[] {
   const context = formatContextCapability(model, t);
-  const fast = formatFastCapability(model, t);
-  const fastTone = !model || model.fast.kind === 'unknown'
+  const fast = formatFastControl(model, t);
+  const fastState = model?.resolvedControls?.fast.state ?? model?.controls.fast.state;
+  const fastTone = !model || fastState === 'unknown' || fastState === 'provider-managed'
     ? 'warning'
-    : model.fast.kind === 'unsupported' || model.fast.entitlement === 'denied'
+    : fastState === 'unsupported' || fastState === 'blocked'
       ? 'negative'
-      : model.fast.entitlement === 'unknown' ? 'warning' : 'positive';
+      : model.controls.fast.state === 'selectable' && model.controls.fast.entitlement === 'denied'
+          ? 'negative'
+          : model.controls.fast.state === 'selectable' && model.controls.fast.entitlement === 'unknown'
+            ? 'warning'
+            : 'positive';
   return [
     {
       label: t('settings.providers.capability.route'),
@@ -199,9 +222,9 @@ export function buildCapabilityChips(model: EffectiveModel | null, t: Translate)
     {
       label: t('settings.providers.capability.reasoning'),
       value: formatReasoningCapability(model, t),
-      tone: model?.reasoning.kind === 'unknown'
+      tone: model?.controls.reasoning.kind === 'unknown'
         ? 'default'
-        : model?.reasoning.kind === 'none'
+        : model?.controls.reasoning.kind === 'none'
           ? 'negative'
           : model ? 'positive' : 'warning',
     },

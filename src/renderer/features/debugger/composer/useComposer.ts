@@ -11,9 +11,8 @@ import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useComposerAttachments } from './useComposerAttachments';
 import { useComposerSend } from './useComposerSend';
 import { useScopedPromptDraft } from './useScopedPromptDraft';
-import { toConversationMode } from './composerSendHelpers';
-import { useNextRequestContextPreview } from './useNextRequestContextPreview';
 import { buildComposerPresentation } from './composerPresentation';
+import { useSelectedContextWindowTokens } from './useSelectedContextWindowTokens';
 
 export function useComposer(options: {
   showNotice: (message: string) => void;
@@ -36,6 +35,8 @@ export function useComposer(options: {
   const currentRun = useSessionStore((state) => state.currentRun);
   const lastKnownUsage = useSessionStore((state) => state.lastKnownUsage);
   const usageStale = useSessionStore((state) => state.usageStale);
+  const preparedTurnContext = useSessionStore((state) => state.preparedTurnContext);
+  const conversationPreparationPhase = useSessionStore((state) => state.conversationPreparationPhase);
   const conversationMessages = useConversationStore((state) => state.conversationMessages);
   const currentMode = useLayoutStore((state) => state.currentMode);
   const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
@@ -66,16 +67,7 @@ export function useComposer(options: {
     toggleLeftSidebar,
   });
   const selectedAgent = userInvocableAgents.find((agent) => agent.id === selectedAgentId) ?? userInvocableAgents[0];
-  const nextRequestContext = useNextRequestContextPreview({
-    project: currentProject,
-    session: currentSession,
-    currentRun,
-    replayDeviceId: selectedDeviceEntry?.id ?? null,
-    mode: toConversationMode(currentMode),
-    agentId: selectedAgentId,
-    draft: promptValue,
-    attachments: attachments.pendingAttachments,
-  });
+  const selectedContextWindowTokens = useSelectedContextWindowTokens();
   const currentModeConfig: ModeConfig = AGENT_MODES.find((mode) => mode.id === currentMode) ?? {
     id: selectedAgent?.id ?? currentMode,
     label: selectedAgent?.name ?? currentMode,
@@ -177,8 +169,9 @@ export function useComposer(options: {
     setSelectedAgentId,
     lastKnownUsage,
     usageStale,
-    nextRequestContextProjection: nextRequestContext.projection,
-    nextRequestContextPending: nextRequestContext.pending,
+    preparedTurnContext,
+    conversationPreparationPhase,
+    selectedContextWindowTokens,
     hasActiveDebugRun,
     isComposerBusy: send.isComposerBusy,
     promptPlaceholder: presentation.promptPlaceholder,

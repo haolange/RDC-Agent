@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import YAML from 'yaml';
 import type { AgentId } from '@shared/types/agent';
 import { isSafeAgentProfileId } from '@shared/types/agent';
@@ -93,8 +93,13 @@ const readHandoffs = (value: unknown): AgentHandoffDefinition[] => {
   return handoffs;
 };
 
-const parseAgentMarkdown = (filePath: string, fallbackId: string): AgentManifestDefinition => {
-  const raw = fs.readFileSync(filePath, 'utf8').replace(/^\uFEFF/u, '');
+const parseAgentMarkdownContent = (
+  rawContent: string,
+  filePath: string,
+  fallbackId: string,
+  updatedAt: string,
+): AgentManifestDefinition => {
+  const raw = rawContent.replace(/^\uFEFF/u, '');
   const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/u.exec(raw);
   const frontmatter = match ? YAML.parse(match[1]) as Record<string, unknown> : {};
   const instructions = match ? match[2].trim() : raw.trim();
@@ -127,9 +132,18 @@ const parseAgentMarkdown = (filePath: string, fallbackId: string): AgentManifest
     maxTurns: typeof frontmatter['max-turns'] === 'number' && frontmatter['max-turns'] > 0
       ? frontmatter['max-turns']
       : undefined,
-    updatedAt: fs.statSync(filePath).mtime.toISOString(),
+    updatedAt,
   };
 };
+
+const parseAgentMarkdown = (filePath: string, fallbackId: string): AgentManifestDefinition => (
+  parseAgentMarkdownContent(
+    fs.readFileSync(filePath, 'utf8'),
+    filePath,
+    fallbackId,
+    fs.statSync(filePath).mtime.toISOString(),
+  )
+);
 
 const serializeAgentMarkdown = (definition: AgentManifestDraft): string => {
   const frontmatter: Record<string, unknown> = {
@@ -148,9 +162,19 @@ const serializeAgentMarkdown = (definition: AgentManifestDraft): string => {
     'mcp-servers': definition.mcpServers,
     agents: definition.agents,
     handoffs: definition.handoffs,
+    metadata: definition.metadata,
   };
   return `---\n${YAML.stringify(frontmatter).trim()}\n---\n\n${definition.instructions.trim()}\n`;
 };
+
+const hashManifestContent = (content: string): string => (
+  createHash('sha256').update(content, 'utf8').digest('hex')
+);
+
+export interface AgentManifestCommit {
+  definition: AgentManifestDefinition | null;
+  commitHash: string;
+}
 
 const createSeedDefinition = (
   agentId: AgentId,
@@ -289,28 +313,19 @@ export class AgentManifestService {
     }));
   }
 
-  save(
-    paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
-    drafts: AgentManifestDraft[],
-    globalInstructions?: string,
+  saveGlobalInstructions(
+    paths: Pick<AppRuntimePaths, 'instructionsPath'>,
+    globalInstructions: string,
   ): void {
-    const directory = this.getAgentsDirectory(paths);
-    fs.mkdirSync(directory, { recursive: true });
-    for (const draft of drafts) {
-      this.saveDefinition(paths, draft);
-    }
-
-    if (typeof globalInstructions === 'string') {
-      fs.writeFileSync(this.getGlobalInstructionsPath(paths), globalInstructions.trim(), 'utf8');
-    }
+    fs.writeFileSync(this.getGlobalInstructionsPath(paths), globalInstructions.trim(), 'utf8');
   }
 
-  saveDefinition(
+  async saveDefinition(
     paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
     draft: AgentManifestDraft,
-  ): AgentManifestDefinition | null {
+  ): Promise<AgentManifestCommit> {
     const directory = this.getAgentsDirectory(paths);
-    fs.mkdirSync(directory, { recursive: true });
+    await fs.promises.mkdir(directory, { recursive: true });
     const agentId = draft.id || toSlug(draft.name);
     if (!isSafeAgentProfileId(agentId)) {
       throw new Error(`Invalid agent profile id: ${agentId}`);
@@ -318,30 +333,59 @@ export class AgentManifestService {
     const fileName = safeFileNameForDraft(draft);
     const filePath = path.join(directory, fileName);
     if (draft.delete) {
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-      return null;
+      await fs.promises.rm(filePath, { force: true });
+      return {
+        definition: null,
+        commitHash: hashManifestContent(`deleted:${agentId}`),
+      };
     }
 
+    const content = serializeAgentMarkdown({
+      ...draft,
+      id: agentId,
+      fileName,
+    });
     const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
     try {
-      fs.writeFileSync(temporaryPath, serializeAgentMarkdown({
-        ...draft,
-        id: agentId,
-        fileName,
-      }), 'utf8');
-      fs.renameSync(temporaryPath, filePath);
+      await fs.promises.writeFile(temporaryPath, content, 'utf8');
+      await fs.promises.rename(temporaryPath, filePath);
     } finally {
-      if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+      await fs.promises.rm(temporaryPath, { force: true });
     }
 
     const previousFileName = draft.fileName?.endsWith('.agent.md')
       ? path.basename(draft.fileName)
       : fileName;
     const previousPath = path.join(directory, previousFileName);
-    if (previousPath !== filePath && fs.existsSync(previousPath)) {
-      fs.rmSync(previousPath, { force: true });
+    if (previousPath !== filePath) {
+      await fs.promises.rm(previousPath, { force: true });
     }
-    return parseAgentMarkdown(filePath, agentId);
+    return {
+      definition: parseAgentMarkdownContent(content, filePath, agentId, new Date().toISOString()),
+      commitHash: hashManifestContent(content),
+    };
+  }
+
+  async readCommitHash(filePath: string): Promise<string> {
+    return hashManifestContent(await fs.promises.readFile(filePath, 'utf8'));
+  }
+
+  async readDefinition(
+    paths: Pick<AppRuntimePaths, 'agentsPath'>,
+    agentId: string,
+  ): Promise<AgentManifestDefinition | null> {
+    const directory = this.getAgentsDirectory(paths);
+    const entries = await fs.promises.readdir(directory).catch(() => [] as string[]);
+    const fileName = entries.find((entry) => (
+      entry.endsWith('.agent.md') && idFromFileName(entry) === agentId
+    ));
+    if (!fileName) return null;
+    const filePath = path.join(directory, fileName);
+    const [content, stat] = await Promise.all([
+      fs.promises.readFile(filePath, 'utf8'),
+      fs.promises.stat(filePath),
+    ]);
+    return parseAgentMarkdownContent(content, filePath, agentId, stat.mtime.toISOString());
   }
 
   routeFromDefinition(definition: Pick<AgentManifestDraft, 'id' | 'models'>): LlmAgentRoute {
@@ -351,23 +395,34 @@ export class AgentManifestService {
       : { agentId: definition.id, providerId: '', modelId: '' };
   }
 
-  importFile(paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>, sourcePath: string): AgentManifestDefinition {
+  async importFile(
+    paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
+    sourcePath: string,
+  ): Promise<AgentManifestDefinition> {
     if (!sourcePath.endsWith('.agent.md')) {
       throw new Error('Only .agent.md files can be imported.');
     }
-    if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
+    const sourceStat = await fs.promises.stat(sourcePath).catch(() => null);
+    if (!sourceStat?.isFile()) {
       throw new Error(`Agent manifest not found: ${sourcePath}`);
     }
-    const directory = this.getAgentsDirectory(paths);
-    fs.mkdirSync(directory, { recursive: true });
-    const imported = parseAgentMarkdown(sourcePath, path.basename(sourcePath, '.agent.md'));
+    const sourceContent = await fs.promises.readFile(sourcePath, 'utf8');
+    const imported = parseAgentMarkdownContent(
+      sourceContent,
+      sourcePath,
+      path.basename(sourcePath, '.agent.md'),
+      sourceStat.mtime.toISOString(),
+    );
     if (!isSafeAgentProfileId(imported.id)) {
       throw new Error(`Invalid agent profile id: ${imported.id}`);
     }
-    const fileName = fileNameForId(imported.id || imported.name);
-    const targetPath = path.join(directory, fileName);
-    fs.copyFileSync(sourcePath, targetPath);
-    return parseAgentMarkdown(targetPath, idFromFileName(fileName));
+    const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = imported;
+    const commit = await this.saveDefinition(paths, {
+      ...draft,
+      fileName: fileNameForId(imported.id || imported.name),
+    });
+    if (!commit.definition) throw new Error('Imported agent manifest was not committed.');
+    return commit.definition;
   }
 
   routesFromDefinitions(
@@ -460,7 +515,7 @@ export class AgentManifestService {
     };
 
     for (const provider of providers) {
-      if (provider.catalogOwnership === 'app-managed') {
+      if (provider.catalogOwnership !== 'user-managed') {
         const snapshot = catalogs.find((catalog) => (
           catalog.providerId === provider.id
           && catalog.accountId === (provider.activeAccountId ?? `anonymous:${provider.id}`)

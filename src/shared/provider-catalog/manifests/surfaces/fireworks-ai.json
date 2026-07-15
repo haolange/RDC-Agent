@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 2,
+  "id": "fireworks-ai",
+  "identityIds": [
+    "fireworks-ai"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "json-catalog",
+  "vendorId": "fireworks",
+  "label": "Fireworks AI",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "fireworks-ai",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "app-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:fireworks-ai:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "fireworks-ai"
+    },
+    {
+      "id": "models.dev:fireworks-ai:1",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "fireworks-ai",
+      "surface": "fireworks-ai"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:fireworks-ai:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "reasoning",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.fireworks.ai/inference/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "authoritative-list",
+    "strategy": {
+      "kind": "json-catalog",
+      "url": "https://api.fireworks.ai/v1/accounts/fireworks/models?filter=supports_serverless%3Dtrue",
+      "collectionPath": "models",
+      "mapping": {
+        "id": "name",
+        "label": "displayName",
+        "contextWindow": "contextLength",
+        "toolCalling": {
+          "path": "supportsTools"
+        },
+        "visionInput": {
+          "path": "supportsImageInput"
+        }
+      },
+      "admission": {
+        "requireContextWindow": true,
+        "denyPatterns": [
+          "*embed*",
+          "*rerank*",
+          "*guard*"
+        ]
+      }
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "accounts/fireworks/models/deepseek-v4-pro"
+  ],
+  "docsUrl": "https://docs.fireworks.ai/getting-started/quickstart"
+}

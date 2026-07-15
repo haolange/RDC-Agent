@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import type { LlmProviderModel } from '@shared/types/settings';
 import {
   mergeManagedModelAvailability,
@@ -6,8 +6,20 @@ import {
   normalizeCodingPlanModelMatchKey,
   selectSupportedCodingPlanModels,
   resolveCodingPlanModelsUrl,
+  resolveGoogleVertexOpenAiBaseUrl,
+  resolveGoogleVertexPublisherModelsUrl,
+  parseGoogleVertexPublisherModels,
+  projectBedrockMantleModelRoutes,
+  projectGoogleVertexModelRoutes,
+  resolveBedrockResponsesBaseUrl,
+  resolveProviderConnectionDraft,
   resolveVolcengineCodingPlanModelsUrl,
 } from './ProviderConnectionService';
+import {
+  createProviderEntryFromCatalog,
+  getLoadedProviderSurface,
+  loadProviderSurface,
+} from '../provider-catalog/ProviderCatalogRegistry';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -17,6 +29,10 @@ const managed = (...ids: string[]): LlmProviderModel[] => ids.map((id) => ({
   enabled: true,
   availability: 'unknown',
 }));
+
+beforeAll(async () => {
+  await loadProviderSurface('bailing');
+});
 
 describe('resolveCodingPlanModelsUrl', () => {
   it('appends /v1/models when the coding base has no /v1 suffix', () => {
@@ -46,6 +62,126 @@ describe('resolveVolcengineCodingPlanModelsUrl', () => {
     expect(resolveVolcengineCodingPlanModelsUrl('https://ark.cn-beijing.volces.com/api/coding/v3/')).toBe(
       'https://ark.cn-beijing.volces.com/api/coding/v3/models',
     );
+  });
+});
+
+describe('typed provider connection resolution', () => {
+  it('normalizes a Databricks URL-valued host without duplicating the scheme', () => {
+    const resolved = resolveProviderConnectionDraft(createProviderEntryFromCatalog('databricks'), {
+      connectionValues: {
+        DATABRICKS_HOST: 'https://dbc.example.com',
+        DATABRICKS_TOKEN: 'dapi-token',
+      },
+    });
+    expect(resolved.baseUrl).toBe('https://dbc.example.com/ai-gateway/mlflow/v1');
+    expect(resolved.apiKey).toBe('dapi-token');
+  });
+
+  it('expands Snowflake, Bedrock, Vertex and PrivateMode endpoints from typed fields', () => {
+    expect(resolveProviderConnectionDraft(createProviderEntryFromCatalog('snowflake-cortex'), {
+      connectionValues: { SNOWFLAKE_ACCOUNT: 'org-account', SNOWFLAKE_CORTEX_PAT: 'pat' },
+    }).baseUrl).toBe('https://org-account.snowflakecomputing.com/api/v2/cortex/v1');
+    expect(resolveProviderConnectionDraft(createProviderEntryFromCatalog('amazon-bedrock'), {
+      connectionValues: { AWS_REGION: 'us-east-1', AWS_BEARER_TOKEN_BEDROCK: 'bedrock-key' },
+    }).baseUrl).toBe('https://bedrock-mantle.us-east-1.api.aws/v1');
+    expect(resolveProviderConnectionDraft(createProviderEntryFromCatalog('amazon-bedrock'), {
+      connectionValues: {
+        AWS_REGION: 'us-west-2',
+        AWS_ACCESS_KEY_ID: 'access-key',
+        AWS_SECRET_ACCESS_KEY: 'secret-key',
+      },
+    })).toMatchObject({
+      apiKey: '',
+      baseUrl: 'https://bedrock-mantle.us-west-2.api.aws/v1',
+    });
+    const vertexProvider = createProviderEntryFromCatalog('google-vertex');
+    expect(vertexProvider).toMatchObject({
+      authMode: 'api-key',
+      authModeOptions: ['api-key', 'environment'],
+    });
+    expect(resolveProviderConnectionDraft(vertexProvider, {
+      connectionValues: {
+        GOOGLE_VERTEX_PROJECT: 'project-id',
+        GOOGLE_VERTEX_LOCATION: 'us-central1',
+        GOOGLE_VERTEX_ACCESS_TOKEN: 'oauth-token',
+      },
+    }).baseUrl).toBe(
+      'https://us-central1-aiplatform.googleapis.com/v1/projects/project-id/locations/us-central1/publishers/google',
+    );
+    expect(resolveProviderConnectionDraft(createProviderEntryFromCatalog('privatemode-ai'), {
+      connectionValues: { PRIVATEMODE_ENDPOINT: 'http://localhost:8080/v1', PRIVATEMODE_API_KEY: 'key' },
+    }).baseUrl).toBe('http://localhost:8080/v1');
+  });
+
+  it('keeps Gemini OpenAI discovery and Anthropic native Model Garden discovery separate', () => {
+    expect(resolveGoogleVertexOpenAiBaseUrl(
+      'https://us-east5-aiplatform.googleapis.com/v1/projects/p/locations/us-east5/publishers/google',
+    )).toBe(
+      'https://us-east5-aiplatform.googleapis.com/v1beta1/projects/p/locations/us-east5/endpoints/openapi',
+    );
+    expect(() => resolveGoogleVertexOpenAiBaseUrl(
+      'https://us-east5-aiplatform.googleapis.com/v1/projects/p/locations/us-east5/publishers/anthropic',
+    )).toThrow(/does not match/u);
+    expect(resolveGoogleVertexPublisherModelsUrl(
+      'https://us-east5-aiplatform.googleapis.com/v1/projects/p/locations/us-east5/publishers/anthropic',
+      'anthropic',
+    )).toBe(
+      'https://us-east5-aiplatform.googleapis.com/v1beta1/publishers/anthropic/models?pageSize=1000&listAllVersions=true',
+    );
+    expect(parseGoogleVertexPublisherModels({
+      publisherModels: [
+        { name: 'publishers/anthropic/models/claude-sonnet-4-6', versionId: '20260217' },
+        { name: 'publishers/google/models/gemini-3.1-pro' },
+      ],
+    }, 'anthropic')).toEqual([
+      expect.objectContaining({
+        id: 'claude-sonnet-4-6@20260217',
+        availability: 'unknown',
+      }),
+    ]);
+  });
+
+  it('projects model-level Vertex and Bedrock route matrices from proven discovery', () => {
+    const vertex = projectGoogleVertexModelRoutes(
+      managed('gemini-3.5-pro'),
+      'https://us-east5-aiplatform.googleapis.com/v1/projects/p/locations/us-east5/publishers/google',
+      'https://us-east5-aiplatform.googleapis.com/v1beta1/projects/p/locations/us-east5/endpoints/openapi',
+      'GoogleVertexGemini',
+    );
+    expect(vertex[0]?.routeOptions?.map((option) => option.id)).toEqual([
+      'GoogleVertexGemini',
+      'OpenAICompatibleChatCompletions',
+    ]);
+    const vertexAnthropic = projectGoogleVertexModelRoutes(
+      managed('claude-sonnet-4-6@20260217'),
+      'https://us-east5-aiplatform.googleapis.com/v1/projects/p/locations/us-east5/publishers/anthropic',
+      '',
+      'GoogleVertexAnthropic',
+    );
+    expect(vertexAnthropic[0]?.routeOptions?.map((option) => option.id)).toEqual([
+      'GoogleVertexAnthropic',
+    ]);
+
+    expect(resolveBedrockResponsesBaseUrl('https://bedrock-mantle.us-east-1.api.aws/v1'))
+      .toBe('https://bedrock-mantle.us-east-1.api.aws/openai/v1');
+    const bedrock = projectBedrockMantleModelRoutes(
+      managed('amazon.nova-pro-v1:0'),
+      'https://bedrock-mantle.us-east-1.api.aws/v1',
+    );
+    expect(bedrock[0]?.routeOptions).toEqual([
+      expect.objectContaining({
+        id: 'OpenAICompatibleChatCompletions',
+        route: expect.objectContaining({ baseUrl: 'https://bedrock-mantle.us-east-1.api.aws/v1' }),
+      }),
+      expect.objectContaining({
+        id: 'OpenAIResponses',
+        route: expect.objectContaining({ baseUrl: 'https://bedrock-mantle.us-east-1.api.aws/openai/v1' }),
+      }),
+    ]);
+  });
+
+  it('keeps operation paths out of OpenAI-compatible bases', () => {
+    expect(getLoadedProviderSurface('bailing')?.routes[0]?.baseUrl).toBe('https://api.tbox.cn/api/llm/v1');
   });
 });
 
@@ -100,6 +236,24 @@ describe('mergeManagedModelAvailability', () => {
         availability: 'unavailable',
       }),
     ]);
+  });
+
+  it('keeps maintained Kimi primary and internal variants when candidate validation returns only the base model', () => {
+    const models = mergeManagedModelAvailability(
+      managed('kimi-for-coding', 'kimi-for-coding-highspeed', 'k2p7', 'k2p6', 'k2p5', 'kimi-k2-thinking'),
+      [{ id: 'kimi-for-coding', label: 'kimi-for-coding', enabled: true }],
+      { preserveMissing: true },
+    );
+
+    expect(models.map((model) => model.id)).toEqual([
+      'kimi-for-coding',
+      'kimi-for-coding-highspeed',
+      'k2p7',
+      'k2p6',
+      'k2p5',
+      'kimi-k2-thinking',
+    ]);
+    expect(models.every((model) => model.enabled !== false && model.availability !== 'unavailable')).toBe(true);
   });
 
   it('treats catalog aliases as available when the endpoint returns the alias id', () => {

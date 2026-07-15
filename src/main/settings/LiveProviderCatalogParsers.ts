@@ -115,7 +115,6 @@ const REASONING_LEVEL_MAP: Record<string, NamedReasoningLevel | undefined> = {
   high: 'high',
   xhigh: 'xhigh',
   max: 'max',
-  ultra: 'ultra',
 };
 
 const OPENAI_EFFORT_MAP: Record<NamedReasoningLevel, OpenAiWireEffort> = {
@@ -125,8 +124,9 @@ const OPENAI_EFFORT_MAP: Record<NamedReasoningLevel, OpenAiWireEffort> = {
   high: 'high',
   xhigh: 'xhigh',
   max: 'max',
-  ultra: 'ultra',
 };
+
+const CHATGPT_SPARK_MODEL_ID = 'gpt-5.3-codex-spark';
 
 function reasoningLevels(values: unknown): NamedReasoningLevel[] {
   if (!Array.isArray(values)) return [];
@@ -194,24 +194,27 @@ export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog 
     const value = record(candidate);
     const id = text(value.slug) ?? text(value.id);
     const identity = liveIdentity(value, id);
+    const isSpark = identity?.id === CHATGPT_SPARK_MODEL_ID;
     if (
       !id
       || !identity
-      || value.supported_in_api === false
+      || (value.supported_in_api === false && !isSpark)
       || (text(value.visibility) && text(value.visibility) !== 'list')
       || /(?:^|-)pro$/i.test(id)
       || /(?:auto-review|compaction)/i.test(id)
     ) return [];
     const contextWindow = positiveInteger(value.context_window);
     const maxContextWindow = positiveInteger(value.max_context_window);
+    const supportsOneMillion = Boolean(maxContextWindow && maxContextWindow >= 1_000_000);
+    const effectiveContextWindow = contextWindow;
     const contextTiers: NonNullable<CatalogModelContribution['contextTiers']> = [{
       id: 'default',
       label: 'Codex service limit',
-      ...(contextWindow ? { maxPromptTokens: contextWindow } : {}),
+      ...(effectiveContextWindow ? { maxPromptTokens: effectiveContextWindow } : {}),
       activation: { kind: 'implicit' },
       entitlement: 'granted',
     }];
-    if (contextWindow && maxContextWindow && maxContextWindow > contextWindow) {
+    if (supportsOneMillion && contextWindow && maxContextWindow && maxContextWindow > contextWindow) {
       contextTiers.push({
         id: 'max',
         label: 'Maximum Codex limit',
@@ -230,11 +233,11 @@ export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog 
       availability: 'available',
       route: { protocol: 'OpenAIResponses', baseUrl: 'https://chatgpt.com/backend-api/codex', source: 'model' },
       contextTiers,
-      ...(contextWindow ? { defaultBudgetTokens: contextWindow } : {}),
-      fast: { kind: 'request-param', patch: { service_tier: 'priority' }, entitlement: 'granted', label: 'Fast' },
-      reasoning: parseOpenAiReasoningControl(value.supported_reasoning_levels, value.default_reasoning_level),
+      ...(effectiveContextWindow ? { defaultBudgetTokens: effectiveContextWindow } : {}),
       toolCalling: { state: 'supported' },
-      visionInput: inputModalities.length === 0
+      visionInput: isSpark
+        ? { state: 'unsupported' }
+        : inputModalities.length === 0
         ? { state: 'unknown' }
         : capabilityState(inputModalities.includes('image')),
       structuredOutput: { state: 'supported' },
@@ -308,7 +311,7 @@ export function parseClineCatalog(payload: unknown): ParsedLiveCatalog {
       ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
       label: text(value.label) ?? text(value.name) ?? identity.id,
       availability: 'available',
-      route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://api.cline.bot/api/v1', source: 'preset' },
+      route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://api.cline.bot/api/v1', source: 'catalog' },
       contextTiers: [{
         id: 'default',
         label: 'Default',
@@ -325,6 +328,68 @@ export function parseClineCatalog(payload: unknown): ParsedLiveCatalog {
     }
   }
   return asResult(contributions, entitlementContributions);
+}
+
+/**
+ * FreeModel exposes two credential-scoped catalogs on separate hosts. Keep the
+ * host/protocol join explicit so a Claude id can never fall through to the
+ * OpenAI endpoint (or vice versa).
+ */
+export function parseFreeModelCatalog(openAiPayload: unknown, claudePayload: unknown): ParsedLiveCatalog {
+  const parse = (
+    payload: unknown,
+    kind: 'openai' | 'anthropic',
+  ): CatalogModelContribution[] => records(payload).flatMap((value): CatalogModelContribution[] => {
+    const identity = liveIdentity(value);
+    if (!identity) return [];
+    const id = identity.id;
+    if (kind === 'openai') {
+      const chatRoute = {
+        protocol: 'OpenAICompatibleChatCompletions' as const,
+        baseUrl: 'https://api.freemodel.dev/v1',
+        source: 'model' as const,
+      };
+      const responsesRoute = {
+        protocol: 'OpenAIResponses' as const,
+        baseUrl: 'https://api.freemodel.dev/v1',
+        source: 'model' as const,
+      };
+      return [{
+        modelId: id,
+        ...(identity.aliases.length ? { aliases: identity.aliases } : {}),
+        label: text(value.name) ?? text(value.display_name) ?? id,
+        availability: 'available',
+        route: chatRoute,
+        routeOptions: [
+          {
+            id: 'OpenAICompatibleChatCompletions', route: chatRoute, availability: 'available',
+            protocolOwner: 'openai', endpointOwner: 'freemodel', authMode: 'api-key',
+          },
+          {
+            id: 'OpenAIResponses', route: responsesRoute, availability: 'unknown',
+            protocolOwner: 'openai', endpointOwner: 'freemodel', authMode: 'api-key',
+          },
+        ],
+      }];
+    }
+    const route = {
+      protocol: 'AnthropicMessages' as const,
+      baseUrl: 'https://cc.freemodel.dev/v1',
+      source: 'model' as const,
+    };
+    return [{
+      modelId: id,
+      ...(identity.aliases.length ? { aliases: identity.aliases } : {}),
+      label: text(value.name) ?? text(value.display_name) ?? id,
+      availability: 'available',
+      route,
+      routeOptions: [{
+        id: 'AnthropicMessages', route, availability: 'available',
+        protocolOwner: 'anthropic', endpointOwner: 'freemodel', authMode: 'api-key',
+      }],
+    }];
+  });
+  return asResult([...parse(openAiPayload, 'openai'), ...parse(claudePayload, 'anthropic')]);
 }
 
 /** Parse the models visible to the API key minted by OpenRouter PKCE. */
@@ -349,7 +414,7 @@ export function parseOpenRouterAccountCatalog(payload: unknown): ParsedLiveCatal
       route: {
         protocol: 'OpenRouterChatCompletions',
         baseUrl: 'https://openrouter.ai/api/v1',
-        source: 'preset',
+        source: 'catalog',
       },
       contextTiers: [{
         id: 'default',
@@ -359,7 +424,6 @@ export function parseOpenRouterAccountCatalog(payload: unknown): ParsedLiveCatal
         entitlement: 'granted',
       }],
       ...(contextWindow ? { defaultBudgetTokens: contextWindow } : {}),
-      fast: { kind: 'unsupported' },
       toolCalling: supportedParameters.includes('tools') ? { state: 'supported' } : { state: 'unknown' },
       visionInput: inputModalities.length === 0
         ? { state: 'unknown' }
@@ -377,8 +441,6 @@ export function parseGrokAccountCatalog(payload: unknown): ParsedLiveCatalog {
   const contributions = records(payload).flatMap((value): CatalogModelContribution[] => {
     const identity = liveIdentity(value);
     if (!identity) return [];
-    const isGrok420Reasoning = identity.id === 'grok-4.20-0309-reasoning';
-    const isGrok420NonReasoning = identity.id === 'grok-4.20-0309-non-reasoning';
     return [{
       modelId: identity.id,
       ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
@@ -390,50 +452,12 @@ export function parseGrokAccountCatalog(payload: unknown): ParsedLiveCatalog {
         activation: { kind: 'implicit' }, entitlement: 'granted',
       }],
       ...(contextTokens(value) ? { defaultBudgetTokens: contextTokens(value) } : {}),
-      fast: { kind: 'unsupported' },
-      ...(isGrok420Reasoning ? {
-        reasoning: {
-          kind: 'always-on' as const,
-          supportsOff: false,
-          levels: [],
-          defaultSelection: 'on' as const,
-          lockedSelection: 'on' as const,
-          wireProfile: { kind: 'none' as const },
-        },
-      } : isGrok420NonReasoning ? {
-        reasoning: {
-          kind: 'none' as const,
-          supportsOff: true,
-          levels: [],
-          defaultSelection: 'off' as const,
-          lockedSelection: 'off' as const,
-          wireProfile: { kind: 'none' as const },
-        },
-      } : {}),
       toolCalling: capabilityState(record(value.capabilities).tool_calls),
       visionInput: capabilityState(record(value.capabilities).vision),
       structuredOutput: capabilityState(record(value.capabilities).structured_output),
     }];
   });
-  const offId = 'grok-4.20-0309-non-reasoning';
-  const onId = 'grok-4.20-0309-reasoning';
-  const off = contributions.find((model) => model.modelId === offId);
-  const on = contributions.find((model) => model.modelId === onId);
-  if (!off || !on) return asResult(contributions);
-  return asResult(contributions
-    .filter((model) => model.modelId !== onId)
-    .map((model) => model.modelId !== offId ? model : {
-      ...model,
-      label: 'Grok 4.20',
-      reasoning: {
-        kind: 'toggle',
-        supportsOff: true,
-        levels: [],
-        defaultSelection: 'on',
-        modelVariants: { offModelId: offId, onModelId: onId },
-        wireProfile: { kind: 'none' },
-      },
-    }));
+  return asResult(contributions);
 }
 
 /** Parse the Grok Build subscription catalog returned by cli-chat-proxy. */
@@ -466,10 +490,11 @@ export function parseGrokBuilderCatalog(payload: unknown): ParsedLiveCatalog {
         activation: { kind: 'implicit' }, entitlement: 'granted',
       }],
       ...(contextWindow ? { defaultBudgetTokens: contextWindow } : {}),
-      fast: { kind: 'unsupported' },
-      reasoning: supportsReasoning
-        ? parseOpenAiReasoningControl(value.reasoning_efforts, value.reasoning_effort)
-        : parseOpenAiReasoningControl([], undefined),
+      controls: {
+        reasoning: supportsReasoning
+          ? parseOpenAiReasoningControl(value.reasoning_efforts, value.reasoning_effort)
+          : parseOpenAiReasoningControl([], undefined),
+      },
       toolCalling: { state: 'supported' },
       visionInput: { state: 'unknown' },
       structuredOutput: { state: 'unknown' },

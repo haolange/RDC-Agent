@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { describe, expect, it, vi } from 'vitest';
+import type { ConversationMessage } from '@shared/types/conversation';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-session-cleanup-'));
 
@@ -19,6 +20,7 @@ vi.mock('../runtime/AppPathService', () => {
     logPath: path.join(tempRoot, 'logs', 'app.log'),
     capturePreviewsPath: path.join(tempRoot, 'capture-previews'),
     profileStatePath: path.join(appStateRoot, 'profile'),
+    knowledgePath: path.join(appStateRoot, 'knowledge'),
   };
   for (const dir of Object.values(paths)) {
     if (typeof dir === 'string' && !dir.endsWith('.log')) {
@@ -118,5 +120,96 @@ describe('StorageAdapter.removeSession side-channel cleanup', () => {
     expect(fs.existsSync(llmDir)).toBe(false);
     expect(fs.existsSync(runFile)).toBe(false);
     expect(fs.existsSync(eventFile)).toBe(false);
+  });
+
+  it('keeps a new session invisible until its prepared turn is atomically committed', async () => {
+    const { storageAdapter } = await import('./StorageAdapter');
+    const projectRoot = path.join(tempRoot, 'staged-project-root');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const project = storageAdapter.createProject(projectRoot);
+    const sourcePath = path.join(tempRoot, 'staged-attachment.txt');
+    fs.writeFileSync(sourcePath, 'attachment', 'utf8');
+    const staged = storageAdapter.beginStagedConversationSession(
+      project.projectId,
+      'Prepared turn',
+      [sourcePath],
+      'request-staged',
+      'turn-staged',
+    );
+
+    expect(storageAdapter.listSessions(project.projectId)).toEqual([]);
+    expect(fs.existsSync(staged.finalPath)).toBe(false);
+
+    const preparedContext = {
+      requestId: 'request-staged',
+      turnId: 'turn-staged',
+      route: {
+        providerId: 'provider',
+        adapterId: 'openai-responses',
+        selectedModelId: 'model',
+        effectiveModelId: 'model-fast',
+        protocol: 'OpenAIResponses',
+        catalogRevision: 'catalog-1',
+        routeRevision: 'route-1',
+        bindingIds: ['fast:model-fast'],
+      },
+      wirePatch: { headers: {}, body: {} },
+      controls: { reasoningLevel: 'high' as const, maxContextMode: false, fastModel: true },
+      contextMode: 'normal' as const,
+      preparedInputTokens: 10,
+      uncompactedInputTokens: 10,
+      promptBudgetTokens: 100,
+      contextWindowTokens: 128,
+      usagePercent: 10,
+      breakdown: [],
+      compactionApplied: false,
+      filteredArtifactCount: 0,
+      preparedAt: 1,
+    };
+    const user: ConversationMessage = {
+      id: 'user-staged', requestId: 'request-staged', turnId: 'turn-staged',
+      sessionId: staged.session.sessionId, projectId: project.projectId, role: 'user',
+      content: 'hello', createdAt: 1, preparedContext, attachments: staged.attachments,
+    };
+    const assistant: ConversationMessage = {
+      id: 'assistant-staged', requestId: 'request-staged', turnId: 'turn-staged',
+      sessionId: staged.session.sessionId, projectId: project.projectId, role: 'assistant',
+      content: '', status: 'streaming', createdAt: 2, preparedContext,
+    };
+    storageAdapter.commitStagedConversationSession(staged, [user, assistant], null);
+
+    expect(storageAdapter.listSessions(project.projectId)).toHaveLength(1);
+    expect(storageAdapter.readConversationHistory(staged.session.sessionId)).toEqual([
+      { ...user, workTrace: null },
+      { ...assistant, workTrace: null },
+    ]);
+    expect(storageAdapter.listSessionAttachments(staged.session.sessionId)).toHaveLength(1);
+    expect(fs.readFileSync(staged.attachments[0]!.filePath, 'utf8')).toBe('attachment');
+  });
+
+  it('recovers a prepared existing-session commit without leaving orphan attachments or messages', async () => {
+    const { storageAdapter } = await import('./StorageAdapter');
+    const projectRoot = path.join(tempRoot, 'recover-project-root');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const project = storageAdapter.createProject(projectRoot);
+    const session = storageAdapter.createSession(project.projectId, 'Recover turn');
+    const sourcePath = path.join(tempRoot, 'recover-attachment.txt');
+    fs.writeFileSync(sourcePath, 'pending', 'utf8');
+
+    const pending = storageAdapter.beginExistingConversationTurnCommit(
+      session.sessionId,
+      [sourcePath],
+      'request-recover',
+      'turn-recover',
+    );
+    expect(storageAdapter.listSessionAttachments(session.sessionId)).toHaveLength(1);
+    expect(fs.existsSync(pending.attachments[0]!.filePath)).toBe(true);
+
+    await storageAdapter.initializeWorkspace();
+
+    expect(storageAdapter.listSessionAttachments(session.sessionId)).toEqual([]);
+    expect(storageAdapter.readConversationHistory(session.sessionId)).toEqual([]);
+    expect(fs.existsSync(pending.attachments[0]!.filePath)).toBe(false);
+    expect(fs.existsSync(path.join(session.sessionPath, 'turn-commit.json'))).toBe(false);
   });
 });

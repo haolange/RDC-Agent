@@ -63,9 +63,21 @@ export interface AgentDefinitionSaveRequest {
   clientRevision: number;
 }
 
-export interface AgentDefinitionSaveResult {
+export type AgentDefinitionSaveStatus = 'committed' | 'superseded' | 'failed';
+
+export interface AgentDefinitionCommitSnapshot {
   clientRevision: number;
-  applied: boolean;
+  commitHash: string;
   definition: AgentManifestDefinition | null;
   route: import('./settings').LlmAgentRoute | null;
+}
+
+export interface AgentDefinitionSaveResult {
+  clientRevision: number;
+  status: AgentDefinitionSaveStatus;
+  commitHash: string | null;
+  definition: AgentManifestDefinition | null;
+  route: import('./settings').LlmAgentRoute | null;
+  lastSuccessful: AgentDefinitionCommitSnapshot | null;
+  error?: string;
 }

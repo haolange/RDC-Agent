@@ -1,7 +1,5 @@
 import type {
-  LlmProviderCategory,
   LlmProviderCategoryDescriptor,
-  LlmProviderCatalogOwnership,
   LlmProviderProtocol,
   LlmProviderProtocolDescriptor,
 } from '@shared/types/settings';
@@ -12,12 +10,12 @@ export const SUPER_GROK_OAUTH_REDIRECT_URI = 'http://127.0.0.1:56121/callback';
 export const LLM_PROVIDER_CATEGORY_DEFINITIONS: LlmProviderCategoryDescriptor[] = [
   {
     id: 'login-authorization',
-    label: 'Login Authorization',
+    label: 'OAuth / Login',
     description: 'Official account login, OAuth, device flow, or account authorization providers.',
   },
   {
     id: 'official-direct',
-    label: 'Official Direct API',
+    label: 'First-party Direct',
     description: 'First-party native APIs operated directly by the model vendor.',
   },
   {
@@ -26,19 +24,14 @@ export const LLM_PROVIDER_CATEGORY_DEFINITIONS: LlmProviderCategoryDescriptor[] 
     description: 'Enterprise cloud platforms that host model APIs through cloud credentials or deployments.',
   },
   {
-    id: 'official-compatible',
-    label: 'Official Compatible API',
-    description: 'Vendor-official APIs reached through OpenAI, Anthropic, or similar compatibility protocols.',
+    id: 'compatible-access',
+    label: 'Compatible Access',
+    description: 'Official or third-party services reached through a compatibility protocol; operator facts remain explicit.',
   },
   {
     id: 'coding-token-plan',
     label: 'Coding / Token Plan',
     description: 'Separate coding plan or token plan products with their own provider entry.',
-  },
-  {
-    id: 'third-party-compatible',
-    label: 'Third-party Compatible Endpoint',
-    description: 'Gateways, routers, relays, and user-provided API endpoints.',
   },
   {
     id: 'local',
@@ -85,14 +78,29 @@ export const LLM_PROVIDER_PROTOCOL_DEFINITIONS: LlmProviderProtocolDescriptor[] 
     description: 'Google Generative Language / Gemini generateContent protocol.',
   },
   {
-    id: 'AwsBedrock',
-    label: 'AWS Bedrock',
-    description: 'AWS Bedrock model invocation through cloud credentials.',
+    id: 'GoogleVertexGemini',
+    label: 'Google Vertex Gemini',
+    description: 'Vertex AI publisher model streamGenerateContent with OAuth bearer authentication.',
   },
   {
-    id: 'GoogleVertexAI',
-    label: 'Google Vertex AI',
-    description: 'Google Vertex AI model invocation through cloud credentials.',
+    id: 'GoogleVertexAnthropic',
+    label: 'Google Vertex Anthropic',
+    description: 'Vertex AI Anthropic partner-model streamRawPredict with OAuth bearer authentication.',
+  },
+  {
+    id: 'GitLabDuo',
+    label: 'GitLab Duo',
+    description: 'GitLab Duo Agentic Chat using GitLab direct-access and AI Gateway contracts.',
+  },
+  {
+    id: 'SapAiCoreOrchestration',
+    label: 'SAP AI Core Orchestration',
+    description: 'SAP AI Core Orchestration API with deployment resolution and service-key OAuth.',
+  },
+  {
+    id: 'SapAiCoreFoundationModels',
+    label: 'SAP AI Core Foundation Models',
+    description: 'SAP AI Core Foundation Models API with deployment resolution and service-key OAuth.',
   },
   {
     id: 'OllamaOpenAICompatibleChatCompletions',
@@ -101,18 +109,6 @@ export const LLM_PROVIDER_PROTOCOL_DEFINITIONS: LlmProviderProtocolDescriptor[] 
   },
 ];
 
-
-const APP_MANAGED_PROVIDER_CATEGORIES = new Set<LlmProviderCategory>([
-  'login-authorization',
-  'official-direct',
-  'cloud-platform',
-  'official-compatible',
-  'coding-token-plan',
-]);
-
-export function getProviderCatalogOwnership(category: LlmProviderCategory): LlmProviderCatalogOwnership {
-  return APP_MANAGED_PROVIDER_CATEGORIES.has(category) ? 'app-managed' : 'user-managed';
-}
 
 export function isLlmProviderProtocol(value: unknown): value is LlmProviderProtocol {
   return typeof value === 'string'

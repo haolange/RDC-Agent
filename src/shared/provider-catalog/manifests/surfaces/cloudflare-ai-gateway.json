@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 2,
+  "id": "cloudflare-ai-gateway",
+  "identityIds": [
+    "cloudflare-ai-gateway"
+  ],
+  "profileId": "multi-protocol",
+  "adapterIds": [
+    "openai-compatible",
+    "openai-responses"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "cloudflare-ai-gateway",
+  "label": "Cloudflare AI Gateway",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "cloud-platform",
+  "surfaceKind": "cloud",
+  "serviceOperator": "cloudflare",
+  "endpointClass": "cloud-hosted",
+  "endpointOwnership": "cloud-platform",
+  "catalogOwnership": "provider-managed",
+  "factSources": [
+    {
+      "id": "models.dev:cloudflare-ai-gateway:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "cloudflare-ai-gateway",
+      "surface": "cloudflare-ai-gateway"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:cloudflare-ai-gateway:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "CLOUDFLARE_API_TOKEN",
+        "label": "Cloudflare API token",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "CLOUDFLARE_API_TOKEN"
+      },
+      {
+        "id": "CLOUDFLARE_ACCOUNT_ID",
+        "label": "Cloudflare account ID",
+        "kind": "text",
+        "required": true,
+        "environmentVariable": "CLOUDFLARE_ACCOUNT_ID"
+      },
+      {
+        "id": "CLOUDFLARE_GATEWAY_ID",
+        "label": "Cloudflare gateway ID",
+        "kind": "text",
+        "required": false,
+        "environmentVariable": "CLOUDFLARE_GATEWAY_ID"
+      }
+    ],
+    "primarySecretFieldId": "CLOUDFLARE_API_TOKEN",
+    "endpointTemplate": "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/v1",
+    "headerMappings": [
+      {
+        "fieldId": "CLOUDFLARE_GATEWAY_ID",
+        "header": "cf-aig-gateway-id"
+      }
+    ]
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": true,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    },
+    {
+      "id": "OpenAIResponses",
+      "protocol": "OpenAIResponses",
+      "adapterId": "openai-responses",
+      "baseUrl": "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/v1",
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://developers.cloudflare.com/ai-gateway/"
+}

@@ -20,7 +20,7 @@ export function updateProviderModelPreference(
   );
   let updated = false;
   const next = models.flatMap((model) => {
-    const matchesModel = catalogOwnership === 'app-managed' ? matches(model) : model.id === modelId;
+    const matchesModel = catalogOwnership !== 'user-managed' ? matches(model) : model.id === modelId;
     if (!matchesModel) return [model];
     if (updated) return [];
     updated = true;
@@ -46,7 +46,7 @@ export function projectProviderModels(
   models: LlmProviderModel[],
   snapshot: EffectiveCatalogSnapshot | null,
 ): ProjectedProviderModel[] {
-  if (catalogOwnership !== 'app-managed' || !snapshot) {
+  if (catalogOwnership === 'user-managed' || !snapshot) {
     return models.map((model) => ({
       model,
       effectiveModel: findEffectiveCapabilityModel(snapshot, model.id),
@@ -57,7 +57,12 @@ export function projectProviderModels(
     storedById.set(stored.id, stored);
     for (const alias of stored.aliases ?? []) storedById.set(alias, stored);
   }
-  const projected = snapshot.models.map((effectiveModel) => {
+  const internalVariantIds = new Set(snapshot.models
+    .filter((model) => model.selection?.pickerVisibility === 'internal')
+    .flatMap((model) => [model.modelId, ...model.aliases]));
+  const projected = snapshot.models
+    .filter((effectiveModel) => effectiveModel.selection?.pickerVisibility !== 'internal')
+    .map((effectiveModel) => {
     const stored = storedById.get(effectiveModel.modelId)
       ?? effectiveModel.aliases.map((alias) => storedById.get(alias)).find(Boolean);
     return {
@@ -71,14 +76,15 @@ export function projectProviderModels(
         availabilityReason: effectiveModel.unavailableReason,
         defaultReasoningSelection: stored?.defaultReasoningSelection,
         defaultBudgetTokens: stored?.defaultBudgetTokens,
+        preferredRouteOptionId: stored?.preferredRouteOptionId,
       },
     };
-  });
+    });
   const projectedIds = new Set(projected.flatMap(({ model }) => [model.id, ...(model.aliases ?? [])]));
   return [
     ...projected,
     ...models
-      .filter((model) => !projectedIds.has(model.id))
+      .filter((model) => !projectedIds.has(model.id) && !internalVariantIds.has(model.id))
       .map((model) => ({ model, effectiveModel: null })),
   ];
 }

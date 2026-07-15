@@ -1,8 +1,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { buildEffectiveCatalogRequest } from './EffectiveModelResolver';
-import { createProviderEntryFromPreset, getProviderPreset } from './ProviderPresetRegistry';
+import {
+  createProviderEntryFromCatalog,
+  getLoadedProviderSurface,
+  loadProviderSurface,
+} from '../provider-catalog/ProviderCatalogRegistry';
 import {
   parseDeclarativeCatalog,
   resolveDeclarativeDiscoveryUrl,
@@ -25,41 +29,58 @@ const cases = [
 ] as const;
 
 describe('data-only provider discovery fixtures', () => {
-  it.each(cases)('parses %s using only its declarative preset', (providerId, expectedIds) => {
-    const preset = getProviderPreset(providerId);
-    expect(preset?.discovery?.kind).toBe('json-catalog');
-    if (preset?.discovery?.kind !== 'json-catalog') throw new Error(`Missing discovery for ${providerId}`);
-    const payload = JSON.parse(fs.readFileSync(path.join(fixtureRoot, `${providerId}.json`), 'utf8')) as unknown;
-    const parsed = parseDeclarativeCatalog(preset.discovery, payload);
-    expect(parsed.map((model) => model.id)).toEqual(expectedIds);
-    expect(toDeclarativeCatalogContributions(parsed, {
-      protocol: preset.routes[0].protocol,
-      baseUrl: preset.routes[0].baseUrl,
-    })).toHaveLength(expectedIds.length);
-    expect(resolveDeclarativeDiscoveryUrl(preset.discovery, preset.routes[0].baseUrl)).toMatch(/^https?:\/\//u);
+  beforeAll(async () => {
+    await Promise.all([
+      ...cases.map(([providerId]) => loadProviderSurface(providerId)),
+      loadProviderSurface('iflow'),
+    ]);
   });
 
-  it('keeps iFlow beta and unavailable without inventing a catalog endpoint', () => {
-    expect(getProviderPreset('iflow')).toMatchObject({ status: 'beta', availability: { state: 'unavailable' }, discovery: null });
+  it.each(cases)('parses %s using only its declarative manifest', (providerId, expectedIds) => {
+    const surface = getLoadedProviderSurface(providerId);
+    const discovery = surface?.discovery.strategy;
+    expect(discovery?.kind).toBe('json-catalog');
+    if (!surface || discovery?.kind !== 'json-catalog') throw new Error(`Missing discovery for ${providerId}`);
+    const payload = JSON.parse(fs.readFileSync(path.join(fixtureRoot, `${providerId}.json`), 'utf8')) as unknown;
+    const parsed = parseDeclarativeCatalog(discovery, payload);
+    expect(parsed.map((model) => model.id)).toEqual(expectedIds);
+    expect(toDeclarativeCatalogContributions(parsed, {
+      protocol: surface.routes[0].protocol,
+      baseUrl: surface.routes[0].baseUrl,
+    })).toHaveLength(expectedIds.length);
+    expect(resolveDeclarativeDiscoveryUrl(discovery, surface.routes[0].baseUrl)).toMatch(/^https?:\/\//u);
+  });
+
+  it('keeps the pinned iFlow compatible surface discoverable without claiming credential availability', () => {
+    expect(getLoadedProviderSurface('iflow')).toMatchObject({
+      status: 'stable',
+      availability: { state: 'unknown' },
+      discovery: { strategy: { kind: 'custom-parser', parserId: 'openai-compatible' } },
+      routes: [expect.objectContaining({
+        protocol: 'OpenAICompatibleChatCompletions',
+        baseUrl: 'https://apis.iflow.cn/v1',
+      })],
+    });
   });
 
   it('projects both LongCat chat routes and keeps Zen protocols model-scoped', () => {
-    const longcat = createProviderEntryFromPreset('longcat');
+    const longcat = createProviderEntryFromCatalog('longcat');
     const anthropic = buildEffectiveCatalogRequest({ ...longcat, protocol: 'AnthropicMessages', baseUrl: 'https://api.longcat.chat/anthropic/v1' });
     const chat = buildEffectiveCatalogRequest({ ...longcat, protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://api.longcat.chat/openai/v1' });
     expect(anthropic.fallbackRoute.protocol).toBe('AnthropicMessages');
     expect(chat.fallbackRoute.protocol).toBe('OpenAICompatibleChatCompletions');
 
-    const zen = createProviderEntryFromPreset('opencode-zen');
-    const gpt = buildEffectiveCatalogRequest(zen).seed.models.find((model) => model.modelId === 'gpt-5.5');
+    const zen = createProviderEntryFromCatalog('opencode-zen');
+    const gpt = buildEffectiveCatalogRequest(zen).catalog.models.find((model) => model.modelId === 'gpt-5.5');
     expect(gpt?.route).toMatchObject({ protocol: 'OpenAIResponses', source: 'model' });
 
-    const preset = getProviderPreset('opencode-zen');
-    if (preset?.discovery?.kind !== 'json-catalog') throw new Error('Missing OpenCode Zen discovery');
+    const surface = getLoadedProviderSurface('opencode-zen');
+    const discovery = surface?.discovery.strategy;
+    if (!surface || discovery?.kind !== 'json-catalog') throw new Error('Missing OpenCode Zen discovery');
     const payload = JSON.parse(fs.readFileSync(path.join(fixtureRoot, 'opencode-zen.json'), 'utf8')) as unknown;
     const contributions = toDeclarativeCatalogContributions(
-      parseDeclarativeCatalog(preset.discovery, payload),
-      { protocol: preset.routes[0].protocol, baseUrl: preset.routes[0].baseUrl },
+      parseDeclarativeCatalog(discovery, payload),
+      { protocol: surface.routes[0].protocol, baseUrl: surface.routes[0].baseUrl },
     );
     expect(contributions.find((model) => model.modelId === 'gpt-5.5')?.route?.protocol).toBe('OpenAIResponses');
     expect(contributions.find((model) => model.modelId === 'claude-opus-4-8')?.route?.protocol).toBe('AnthropicMessages');
@@ -68,38 +89,40 @@ describe('data-only provider discovery fixtures', () => {
   });
 
   it('projects documented context and capability metadata without static inference', () => {
-    const githubPreset = getProviderPreset('github-models');
-    const chutesPreset = getProviderPreset('chutes');
-    const fireworksPreset = getProviderPreset('fireworks-ai');
+    const githubSurface = getLoadedProviderSurface('github-models');
+    const chutesSurface = getLoadedProviderSurface('chutes');
+    const fireworksSurface = getLoadedProviderSurface('fireworks-ai');
     if (
-      githubPreset?.discovery?.kind !== 'json-catalog'
-      || chutesPreset?.discovery?.kind !== 'json-catalog'
-      || fireworksPreset?.discovery?.kind !== 'json-catalog'
+      githubSurface?.discovery.strategy?.kind !== 'json-catalog'
+      || chutesSurface?.discovery.strategy?.kind !== 'json-catalog'
+      || fireworksSurface?.discovery.strategy?.kind !== 'json-catalog'
     ) throw new Error('Missing declarative discovery');
 
-    const project = (providerId: string, preset: typeof githubPreset) => {
-      if (!preset || preset.discovery?.kind !== 'json-catalog') throw new Error(`Missing ${providerId}`);
+    const project = (providerId: string, surface: typeof githubSurface) => {
+      const discovery = surface?.discovery.strategy;
+      if (!surface || discovery?.kind !== 'json-catalog') throw new Error(`Missing ${providerId}`);
       const payload = JSON.parse(fs.readFileSync(path.join(fixtureRoot, `${providerId}.json`), 'utf8')) as unknown;
       return toDeclarativeCatalogContributions(
-        parseDeclarativeCatalog(preset.discovery, payload),
-        { protocol: preset.routes[0].protocol, baseUrl: preset.routes[0].baseUrl },
+        parseDeclarativeCatalog(discovery, payload),
+        { protocol: surface.routes[0].protocol, baseUrl: surface.routes[0].baseUrl },
       )[0];
     };
 
-    expect(project('github-models', githubPreset)).toMatchObject({
-      contextTiers: [{ maxPromptTokens: 1_048_576, maxOutputTokens: 32_768 }],
+    expect(project('github-models', githubSurface)).toMatchObject({
+      contextTiers: [{ maxPromptTokens: 1_048_576, maxOutputTokens: 32_768, entitlement: 'unknown' }],
+      controls: { context1m: { state: 'unknown', defaultValue: false } },
       toolCalling: { state: 'supported' },
       visionInput: { state: 'supported' },
       structuredOutput: { state: 'supported' },
     });
-    expect(project('chutes', chutesPreset)).toMatchObject({
+    expect(project('chutes', chutesSurface)).toMatchObject({
       contextTiers: [{ maxPromptTokens: 40_960, maxOutputTokens: 40_960 }],
       defaultBudgetTokens: 40_960,
       toolCalling: { state: 'supported' },
       visionInput: { state: 'unsupported' },
       structuredOutput: { state: 'supported' },
     });
-    expect(project('fireworks-ai', fireworksPreset)).toMatchObject({
+    expect(project('fireworks-ai', fireworksSurface)).toMatchObject({
       contextTiers: [{ maxTotalTokens: 1_048_576 }],
       toolCalling: { state: 'supported' },
       visionInput: { state: 'unsupported' },

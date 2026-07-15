@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "gitlab-duo",
+  "routeMechanics": [
+    {
+      "protocol": "GitLabDuo",
+      "adapter": "gitlab-duo"
+    }
+  ]
+}

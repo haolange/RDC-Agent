@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 2,
+  "id": "ollama-cloud",
+  "identityIds": [
+    "ollama-cloud"
+  ],
+  "profileId": "ollama-openai-compatible",
+  "adapterIds": [
+    "ollama-openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "json-catalog",
+  "vendorId": "ollama",
+  "label": "Ollama Cloud",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "ollama",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:ollama-cloud:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "ollama-cloud"
+    },
+    {
+      "id": "models.dev:ollama-cloud:1",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "ollama-cloud",
+      "surface": "ollama-cloud"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:ollama-cloud:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OllamaOpenAICompatibleChatCompletions",
+      "protocol": "OllamaOpenAICompatibleChatCompletions",
+      "adapterId": "ollama-openai-compatible",
+      "baseUrl": "https://ollama.com",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "authoritative-list",
+    "strategy": {
+      "kind": "json-catalog",
+      "url": "https://ollama.com/api/tags",
+      "collectionPath": "models",
+      "mapping": {
+        "id": "name",
+        "label": "name"
+      },
+      "admission": {
+        "denyPatterns": [
+          "*embed*"
+        ]
+      }
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "deepseek-v4-flash",
+    "minimax-m3",
+    "qwen3.5:397b"
+  ],
+  "docsUrl": "https://docs.ollama.com/cloud"
+}

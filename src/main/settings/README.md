@@ -11,6 +11,10 @@
 
 Provider Catalog 不是 `settings:get` 的派生 UI 状态。它有独立 contract：
 
+- 事实输入：`src/shared/provider-catalog/manifests/{identities,profiles,surfaces}/*.json`
+- 构建入口：共享 strict Schema 与 Catalog compiler
+- 运行时入口：`ProviderCatalogRegistry.listProviderSummaries()` 与 `loadProviderSurface(id)`
+
 - IPC: `settings:getProviderCatalog`
 - Preload: `window.electronAPI.settings.getProviderCatalog()`
 - Browser app bridge: 同名 API 经 `/invoke` 调用同一 IPC handler
@@ -24,10 +28,12 @@ Provider Catalog 不是 `settings:get` 的派生 UI 状态。它有独立 contra
 
 Catalog DTO 不得包含 `apiKey`、`secretRef`、`hasStoredSecret`、OAuth token、account label、plan label、last test/error 状态、credential、password 或任何 secret-like 字段。
 
+Settings 初始列表只读取 summary index；surface 详情按需异步加载。renderer、preload 和 Browser bridge 不读取 raw manifest。任何 provider/model/route 更新只刷新对应 projection，不能重载完整 Catalog。
+
 Provider definition 的公开维度是：
 
 - `protocol`: wire protocol，供主进程 adapter 使用，例如 `AnthropicMessages` 或 `OpenAICompatibleChatCompletions`；
-- `category`: Settings UI category，固定八类；
+- `category`: Settings UI category，固定七类（OAuth/Login、第一方直连、Cloud、兼容接入、Coding/Token Plan、Local、Image）；
 - `authMode`: 用户如何认证；
 - `capabilities`: 下游可验证的能力声明。
 
@@ -39,6 +45,9 @@ Provider definition 的公开维度是：
 - `settings:get` 返回的 provider entry 继续清空 `apiKey`。
 - `settings:getProviderCatalog` 和 `/api/settings/providers/catalog` 不返回任何用户连接状态或 secret 引用。
 - account provider 的 OAuth bundle 只通过 `ProviderAccountAuthService` 与 `SecretStorageService` 在主进程内流转。
+- preflight 通过 `ProviderRuntimeCredentialService` 创建 opaque lease；typed connection secret、认证 header、Vertex/AWS 临时凭据只存在于该 lease。
+- Adapter 没有 lease handle 必须 fail-closed，运行中不得回读 Settings。401 刷新只替换同一 lease 的 credential material，不改变冻结 route。
+- Settings schema v4 不解析或迁移旧 credential 字段；Effective Catalog v5 直接失效旧缓存。
 
 ## Plan / Route Boundary
 
@@ -53,6 +62,7 @@ Plan 的 seed manifest 不包含 `bash`、`write`、`edit` 或 `rdxContext`；�
 相关改动后至少运行：
 
 - `pnpm run check:provider-system`
+- `pnpm run check:provider-catalog`
 - `pnpm run check:agent-runtime`
 - `pnpm run check:settings-agents`
 - `pnpm run check:shared-exports`

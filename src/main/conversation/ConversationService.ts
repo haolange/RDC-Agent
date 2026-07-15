@@ -15,7 +15,6 @@ import type {
   ConversationToolCall,
   ConversationWorkBlock,
   ConversationWorkTrace,
-  NextRequestContextPreviewRequest,
   ConversationSendRequest,
   ConversationStreamEvent,
   ConversationTurnResult,
@@ -39,7 +38,6 @@ import type {
   RunSummary,
   SessionAttachmentRecord,
   SessionRecord,
-  NextRequestContextProjection,
 } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import { isTopLevelAgentId } from '@shared/types/agent';
@@ -47,7 +45,10 @@ import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
 import type { AgentEvent } from '@shared/types/agentRuntime';
-import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
+import {
+  agentOrchestrator,
+  type PreparedAgentTurnContext,
+} from '../workflow/debugger/AgentOrchestrator';
 import { promptPlanBuilder, resolvePromptClock } from '../agent-runtime/prompt';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
@@ -60,6 +61,7 @@ import { agentManifestService } from '../settings/AgentManifestService';
 import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService';
 import { scopedInstructionResolver } from '../runtime/ScopedInstructionResolver';
 import { appPathService } from '../runtime/AppPathService';
+import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import {
   planEffectiveModelRequest,
   resolveEffectiveModel,
@@ -157,12 +159,6 @@ interface ConversationContextInput extends ConversationSendRequest {
   fallbackRunId?: string | null;
 }
 
-interface NextRequestContextInput extends NextRequestContextPreviewRequest {
-  fallbackProjectId?: string | null;
-  fallbackSessionId?: string | null;
-  fallbackRunId?: string | null;
-}
-
 interface ConversationRewriteContextInput extends ConversationRewriteFromMessageRequest {
   fallbackProjectId?: string | null;
   fallbackSessionId?: string | null;
@@ -187,6 +183,7 @@ interface PreparedConversationPrompt {
 }
 
 interface ActiveConversationTurn {
+  requestId: string;
   turnId: string;
   sessionId: string | null;
   startedAt: number;
@@ -244,6 +241,7 @@ function makeConversationMessage(
   role: ConversationMessage['role'],
   content: string,
   options: {
+    requestId?: string;
     turnId: string;
     sessionId?: string | null;
     projectId?: string | null;
@@ -257,11 +255,13 @@ function makeConversationMessage(
     branchId?: string;
     forkId?: string;
     variantIndex?: number;
+    preparedContext?: ConversationMessage['preparedContext'];
   },
 ): ConversationMessage {
   const createdAt = nowMs();
   return {
     id: generateEventId(role === 'user' ? 'msgu' : role === 'assistant' ? 'msga' : 'msgs'),
+    requestId: options.requestId,
     turnId: options.turnId,
     sessionId: options.sessionId ?? null,
     projectId: options.projectId ?? null,
@@ -278,6 +278,7 @@ function makeConversationMessage(
     branchId: options.branchId ?? ROOT_BRANCH_ID,
     forkId: options.forkId,
     variantIndex: options.variantIndex,
+    preparedContext: options.preparedContext,
     createdAt,
   };
 }
@@ -468,6 +469,16 @@ function createRequestFailedDiagnostic(route: AgentRoutePreflightOk, error: unkn
 
 export class ConversationService {
   private activeTurns = new Map<string, ActiveConversationTurn>();
+  private readonly preparingRequests = new Map<string, {
+    controller: AbortController;
+    phase: 'preparing' | 'committing';
+    scopeKey: string;
+    cancelAfterCommit: boolean;
+    credentialHandle?: string;
+    credentialLeaseTransferred: boolean;
+  }>();
+  private readonly sendRequests = new Map<string, Promise<ConversationTurnResult>>();
+  private readonly activeSendScopes = new Map<string, string>();
   /**
    * 待处理的 handoff（sessionId → {toProfile, prompt}）。
    *
@@ -549,7 +560,23 @@ export class ConversationService {
   async cancelActiveTurn(
     request: ConversationCancelActiveTurnRequest = {},
   ): Promise<ConversationCancelActiveTurnResult> {
+    const preparing = request.requestId
+      ? this.preparingRequests.get(request.requestId)
+      : Array.from(this.preparingRequests.entries())
+          .find(([, entry]) => entry.phase === 'preparing')?.[1];
+    const preparingRequestId = request.requestId
+      ?? Array.from(this.preparingRequests.entries()).find(([, entry]) => entry === preparing)?.[0];
+    if (preparing && preparingRequestId) {
+      if (preparing.phase === 'preparing') preparing.controller.abort();
+      else preparing.cancelAfterCommit = true;
+      return {
+        success: true,
+        phase: preparing.phase,
+        cancelledRequestId: preparingRequestId,
+      };
+    }
     const candidates = Array.from(this.activeTurns.values())
+      .filter((turn) => !request.requestId || turn.requestId === request.requestId)
       .filter((turn) => !request.turnId || turn.turnId === request.turnId)
       .filter((turn) => !request.sessionId || turn.sessionId === request.sessionId)
       .sort((left, right) => right.startedAt - left.startedAt);
@@ -561,6 +588,8 @@ export class ConversationService {
     target.stop();
     return {
       success: true,
+      phase: 'running',
+      cancelledRequestId: target.requestId,
       cancelledTurnId: target.turnId,
     };
   }
@@ -584,21 +613,150 @@ export class ConversationService {
     }
   }
 
+  private rememberSendRequest(requestId: string, pending: Promise<ConversationTurnResult>): void {
+    this.sendRequests.set(requestId, pending);
+    if (this.sendRequests.size <= 256) return;
+    const oldest = this.sendRequests.keys().next().value as string | undefined;
+    if (oldest && oldest !== requestId) this.sendRequests.delete(oldest);
+  }
+
+  private async findPersistedTurn(
+    input: ConversationContextInput | ConversationRewriteContextInput,
+    requestId: string,
+  ): Promise<ConversationTurnResult | null> {
+    const explicitSessionId = input.sessionId ?? input.fallbackSessionId ?? null;
+    const explicitProjectId = input.projectId ?? input.fallbackProjectId ?? null;
+    const sessions = explicitSessionId
+      ? [storageAdapter.readSession(explicitSessionId)].filter((entry): entry is SessionRecord => entry !== null)
+      : explicitProjectId
+        ? storageAdapter.listSessions(explicitProjectId)
+        : [];
+    for (const session of sessions) {
+      const history = storageAdapter.readConversationHistory(session.sessionId);
+      const requestMessages = history.filter((message) => message.requestId === requestId);
+      const userMessage = requestMessages.find((message) => message.role === 'user');
+      const assistantDraftMessage = requestMessages.find((message) => message.role === 'assistant');
+      const preparedContext = userMessage?.preparedContext ?? assistantDraftMessage?.preparedContext;
+      if (!userMessage || !assistantDraftMessage || !preparedContext) continue;
+      if (userMessage.content !== input.message.trim()) {
+        throw new Error('REQUEST_ID_CONFLICT: requestId already belongs to a different user message.');
+      }
+      const requestedCatalogRevision = input.configurationCommit?.providerCatalogRevision;
+      const requestedRouteRevision = input.configurationCommit?.routeRevision;
+      if (
+        (requestedCatalogRevision && requestedCatalogRevision !== preparedContext.route.catalogRevision)
+        || (requestedRouteRevision && requestedRouteRevision !== preparedContext.route.routeRevision)
+      ) {
+        throw new Error('REQUEST_ID_CONFLICT: requestId already belongs to a different frozen route.');
+      }
+      const branchState = this.readRepairedBranchState(session.sessionId, history);
+      const messages = branchState
+        ? resolveVisibleConversationMessages(history, branchState)
+        : history;
+      const tracePresentation = await traceService.buildConversationPresentation(
+        session.sessionId,
+        [userMessage, assistantDraftMessage],
+      );
+      return {
+        requestId,
+        session,
+        mode: 'talk',
+        userMessage,
+        assistantDraftMessage,
+        messages,
+        branchState,
+        executionTransition: { action: 'none' },
+        runUpdate: null,
+        tracePresentation,
+        errorViewModel: assistantDraftMessage.diagnostic
+          ? {
+              code: assistantDraftMessage.diagnostic.code,
+              message: assistantDraftMessage.diagnostic.userMessage,
+              technicalMessage: assistantDraftMessage.diagnostic.technicalMessage,
+            }
+          : null,
+        preparedContext,
+      };
+    }
+    return null;
+  }
+
+  private async runIdempotentTurn(
+    input: ConversationContextInput | ConversationRewriteContextInput,
+    operation: (requestId: string, controller: AbortController) => Promise<ConversationTurnResult>,
+  ): Promise<ConversationTurnResult> {
+    const requestId = input.requestId?.trim();
+    if (!requestId) throw new Error('PREFLIGHT_FAILED: requestId is required.');
+    const existing = this.sendRequests.get(requestId);
+    if (existing) return existing;
+    const persisted = await this.findPersistedTurn(input, requestId);
+    if (persisted) return persisted;
+
+    const scopeKey = input.sessionId ?? input.fallbackSessionId
+      ? `session:${input.sessionId ?? input.fallbackSessionId}`
+      : `project:${input.projectId ?? input.fallbackProjectId ?? 'ephemeral'}`;
+    const scopeOwner = this.activeSendScopes.get(scopeKey);
+    if (scopeOwner && scopeOwner !== requestId) {
+      throw new Error('CONVERSATION_BUSY: another request is preparing for this conversation.');
+    }
+    const controller = new AbortController();
+    this.activeSendScopes.set(scopeKey, requestId);
+    this.preparingRequests.set(requestId, {
+      controller,
+      phase: 'preparing',
+      scopeKey,
+      cancelAfterCommit: false,
+      credentialLeaseTransferred: false,
+    });
+    const pending = operation(requestId, controller)
+      .finally(() => {
+        const requestState = this.preparingRequests.get(requestId);
+        if (requestState?.credentialHandle && !requestState.credentialLeaseTransferred) {
+          agentOrchestrator.releaseProviderRuntimeCredentials(requestState.credentialHandle);
+        }
+        this.preparingRequests.delete(requestId);
+        if (this.activeSendScopes.get(scopeKey) === requestId) this.activeSendScopes.delete(scopeKey);
+      });
+    this.rememberSendRequest(requestId, pending);
+    void pending.catch(() => {
+      if (this.sendRequests.get(requestId) === pending) this.sendRequests.delete(requestId);
+    });
+    return pending;
+  }
+
   async sendMessage(input: ConversationContextInput): Promise<ConversationTurnResult> {
     const trimmed = input.message.trim();
-    const context = await this.resolveContext(input);
-    return this.startProfileTurn(
-      context,
-      input.mode,
-      input.agentId ?? null,
-      trimmed,
-      input.attachments ?? [],
-      undefined,
-      input.turnControls,
-    );
+    return this.runIdempotentTurn(input, async (requestId, controller) => {
+        const context = await this.resolveContext(input);
+        if (context.session && Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === context.session?.sessionId)) {
+          throw new Error('CONVERSATION_BUSY: this conversation already has a running turn.');
+        }
+        return await this.startProfileTurn(
+          context,
+          input.mode,
+          input.agentId ?? null,
+          trimmed,
+          input.attachments ?? [],
+          undefined,
+          input.turnControls,
+          requestId,
+          controller,
+          input.configurationCommit,
+        );
+    });
   }
 
   async rewriteFromMessage(input: ConversationRewriteContextInput): Promise<ConversationTurnResult> {
+    return this.runIdempotentTurn(input, (requestId, controller) => this.rewriteFromMessageCore(
+      { ...input, requestId },
+      controller,
+    ));
+  }
+
+  private async rewriteFromMessageCore(
+    input: ConversationRewriteContextInput,
+    preparationController: AbortController,
+  ): Promise<ConversationTurnResult> {
     const trimmed = input.message.trim();
     const context = await this.resolveContext(input);
     const sessionId = input.sessionId ?? context.session?.sessionId ?? null;
@@ -611,6 +769,9 @@ export class ConversationService {
         input.attachments ?? [],
         undefined,
         input.turnControls,
+        input.requestId,
+        preparationController,
+        input.configurationCommit,
       );
     }
 
@@ -699,6 +860,9 @@ export class ConversationService {
         branchState,
       },
       input.turnControls,
+      input.requestId,
+      preparationController,
+      input.configurationCommit,
     );
   }
 
@@ -850,117 +1014,6 @@ export class ConversationService {
     return { projectRootPath, allowedToolNames, promptPlan, visibleTurnIds };
   }
 
-  async previewNextRequestContext(
-    input: NextRequestContextInput,
-  ): Promise<NextRequestContextProjection> {
-    let route: NextRequestContextProjection['route'] = null;
-    let requestPlan: RequestPlan | null = null;
-    const blocked = (code: string, message: string): NextRequestContextProjection => ({
-      clientRevision: input.clientRevision,
-      status: 'blocked',
-      route,
-      contextMode: requestPlan?.contextMode ?? null,
-      estimatedInputTokens: 0,
-      uncompactedInputTokens: 0,
-      promptBudgetTokens: requestPlan?.contextBudgetTokens ?? 0,
-      contextWindowTokens: requestPlan?.contextWindowTokens ?? 0,
-      usagePercent: 0,
-      breakdown: [],
-      willCompact: false,
-      filteredArtifactCount: 0,
-      blockingReason: { code, message },
-      estimatedAt: nowMs(),
-    });
-
-    if (!Number.isSafeInteger(input.clientRevision) || input.clientRevision <= 0) {
-      return blocked('INVALID_PREVIEW_REVISION', 'The context preview revision must be a positive integer.');
-    }
-
-    try {
-      const context = await this.resolveContext(input);
-      const pendingHandoff = context.session
-        ? this.pendingHandoffs.get(context.session.sessionId)
-        : undefined;
-      const agentId = pendingHandoff && resolveEnabledAgentDefinition(pendingHandoff.toProfile)
-        ? pendingHandoff.toProfile
-        : resolveConversationAgentId(input.mode, input.agentId);
-      const effectiveMessage = pendingHandoff
-        ? `${pendingHandoff.prompt}\n\n---\n用户消息：${input.message}`
-        : input.message;
-      const routePreflight = resolveAgentRoutePreflight(agentId);
-      if (!routePreflight.ok) {
-        return blocked(routePreflight.diagnostic.code, routePreflight.diagnostic.userMessage);
-      }
-
-      const settings = settingsService.getAll();
-      const effectiveModel = resolveEffectiveModel(
-        routePreflight.providerId,
-        routePreflight.modelId,
-        settings,
-      );
-      if (!effectiveModel) {
-        return blocked(
-          'MODEL_UNAVAILABLE',
-          `The selected model is not available: ${routePreflight.providerId}/${routePreflight.modelId}.`,
-        );
-      }
-      const planning = planEffectiveModelRequest({
-        providerId: routePreflight.providerId,
-        modelId: routePreflight.modelId,
-        settings,
-        controls: {
-          ...(context.session?.turnControls ?? {}),
-          ...(input.turnControls ?? {}),
-        },
-        requestedTemperature: 0.35,
-      });
-      if (!planning.ok) return blocked(planning.code, planning.message);
-      requestPlan = planning.plan;
-      route = {
-        providerId: planning.plan.providerId,
-        modelId: planning.plan.effectiveModelId,
-        protocol: planning.plan.route.protocol,
-      };
-
-      const attachments = await resolvePendingAttachmentDescriptors(input.attachments ?? []);
-      const userInput = await materializeAgentUserInput(
-        effectiveMessage,
-        attachments,
-        routePreflight.routeCapability.visionInputMode,
-        false,
-      );
-      const prepared = this.prepareConversationPrompt({
-        context,
-        agentId,
-        routePreflight,
-        requestPlan: planning.plan,
-        effectiveModel,
-        attachmentPaths: attachments.map((attachment) => attachment.filePath),
-      });
-      return await agentOrchestrator.previewNextRequestContext({
-        clientRevision: input.clientRevision,
-        agentId,
-        content: userInput.content,
-        imageTokenAdjustment: userInput.imageTokenAdjustment,
-        providerId: routePreflight.providerId,
-        modelId: routePreflight.modelId,
-        routeCapability: routePreflight.routeCapability,
-        requestPlan: planning.plan,
-        turnControls: planning.controls,
-        promptPlan: prepared.promptPlan,
-        toolAllowlist: prepared.allowedToolNames,
-        projectRootPath: prepared.projectRootPath,
-        sessionId: context.session?.sessionId ?? null,
-        visibleTurnIds: prepared.visibleTurnIds,
-      });
-    } catch (error) {
-      const technicalMessage = redactTechnicalMessage(error);
-      const code = technicalMessage.match(/^([A-Z][A-Z0-9_]+):/)?.[1]
-        ?? 'CONTEXT_PREVIEW_FAILED';
-      return blocked(code, technicalMessage);
-    }
-  }
-
   private async startProfileTurn(
     context: ResolvedConversationContext,
     requestedMode: AppMode,
@@ -969,147 +1022,333 @@ export class ConversationService {
     pendingAttachments: ConversationAttachmentInput[],
     branchContext?: ConversationBranchTurnContext,
     requestTurnControls?: ConversationTurnControls,
+    requestId: string = generateEventId('request'),
+    preparationController: AbortController = new AbortController(),
+    configurationCommit?: ConversationSendRequest['configurationCommit'],
   ): Promise<ConversationTurnResult> {
-    let workingSession = context.session;
-    if (!workingSession && context.projectId) {
-      workingSession = storageAdapter.createSession(context.projectId, rawMessage.slice(0, 80));
-    }
-
-    // 检查待处理 handoff：若有，优先用 handoff 的 toProfile，并把 prompt 前置到用户消息。
-    let effectiveMessage = rawMessage;
-    let handoffProfile: AgentRole | null = null;
-    if (workingSession) {
-      const pending = this.pendingHandoffs.get(workingSession.sessionId);
-      if (pending && resolveEnabledAgentDefinition(pending.toProfile)) {
-        handoffProfile = pending.toProfile;
-        this.pendingHandoffs.delete(workingSession.sessionId);
-        // handoff prompt 前置为上下文引导，保留用户原始消息。
-        effectiveMessage = `${pending.prompt}\n\n---\n用户消息：${rawMessage}`;
-      }
-    }
-
-    // 优先级：handoff > 显式 requestedAgentId > requestedMode > ask
+    const pendingHandoff = context.session
+      ? this.pendingHandoffs.get(context.session.sessionId)
+      : undefined;
+    const handoffProfile = pendingHandoff && resolveEnabledAgentDefinition(pendingHandoff.toProfile)
+      ? pendingHandoff.toProfile
+      : null;
+    const effectiveMessage = pendingHandoff
+      ? `${pendingHandoff.prompt}\n\n---\nUser message: ${rawMessage}`
+      : rawMessage;
     const conversationAgentId = handoffProfile
       ?? resolveConversationAgentId(requestedMode, requestedAgentId);
-
     const turnId = generateEventId('turn');
-    const sessionIdForBranch = workingSession?.sessionId ?? null;
-    let branchState = branchContext?.branchState ?? (sessionIdForBranch
-      ? storageAdapter.readConversationBranchState(sessionIdForBranch)
-      : null);
-    if (sessionIdForBranch && !branchState) {
-      branchState = createDefaultBranchState(sessionIdForBranch);
-      storageAdapter.writeConversationBranchState(sessionIdForBranch, branchState);
-    }
-    const branchId = branchContext?.branchId
-      ?? branchState?.activeLeafBranchId
-      ?? ROOT_BRANCH_ID;
-    if (pendingAttachments.length > 0 && !workingSession) {
-      throw new Error('ATTACHMENT_SESSION_REQUIRED: select or create a project session before attaching files.');
-    }
-    const importedAttachments = workingSession
-      ? storageAdapter.importSessionAttachments(
-          workingSession.sessionId,
-          pendingAttachments.map((entry) => entry.sourcePath),
-        )
-      : [];
-    if (importedAttachments.length !== pendingAttachments.length) {
-      throw new Error('ATTACHMENT_IMPORT_FAILED: one or more selected attachments could not be imported.');
-    }
-    const userMessage = makeConversationMessage('user', rawMessage, {
-      turnId,
-      sessionId: workingSession?.sessionId ?? null,
-      projectId: context.projectId,
-      runId: isActiveRun(context.currentRun) ? context.currentRun.runId : null,
-      modeContext: requestedMode,
-      attachments: importedAttachments,
-      status: 'complete',
-      branchId,
-      forkId: branchContext?.forkId,
-      variantIndex: branchContext?.variantIndex,
-    });
-    const assistantDraftMessage = makeConversationMessage('assistant', '', {
-      turnId,
-      sessionId: workingSession?.sessionId ?? null,
-      projectId: context.projectId,
-      runId: isActiveRun(context.currentRun) ? context.currentRun.runId : null,
-      modeContext: requestedMode,
-      agentId: conversationAgentId,
-      status: 'streaming',
-      workTrace: createDraftWorkTrace(),
-      branchId,
-    });
+    const throwIfPreparationCancelled = () => {
+      if (preparationController.signal.aborted) {
+        throw new Error('REQUEST_CANCELLED: request preparation was cancelled.');
+      }
+    };
 
-    const previousBranchState = branchState;
-    if (sessionIdForBranch && branchState && branchContext) {
-      const nextBranchState = structuredClone(branchState);
-      const fork = nextBranchState.forks.find((entry) => entry.forkId === branchContext.forkId);
-      if (!fork || fork.branches.some((entry) => entry.branchId === branchId)) {
-        throw new Error('Edit and resend failed: conversation branch state changed before the new variant was committed.');
-      }
-      fork.branches.push({
-        branchId,
-        parentBranchId: branchContext.parentBranchId,
-        variantIndex: branchContext.variantIndex,
-        anchorUserMessageId: userMessage.id,
-        rootTurnId: turnId,
-      });
-      fork.activeBranchId = branchId;
-      nextBranchState.activeLeafBranchId = branchId;
-      try {
-        storageAdapter.writeConversationBranchState(sessionIdForBranch, nextBranchState);
-        branchState = nextBranchState;
-      } catch (error) {
-        console.error(`[ConversationService] Failed to persist branch state during rewrite for ${sessionIdForBranch}:`, error);
-        throw new Error(
-          error instanceof Error
-            ? `Edit and resend failed: ${error.message}`
-            : 'Edit and resend failed: could not persist conversation branch state.',
-        );
+    throwIfPreparationCancelled();
+    if (configurationCommit?.agentId && configurationCommit.agentId !== conversationAgentId) {
+      throw new Error('AGENT_COMMIT_NOT_FOUND: the committed Agent does not match the selected route.');
+    }
+    if (configurationCommit?.agentCommitHash) {
+      const latestCommit = await settingsService.getAgentDefinitionCommit(conversationAgentId);
+      if (!latestCommit || latestCommit.commitHash !== configurationCommit.agentCommitHash) {
+        throw new Error('AGENT_COMMIT_NOT_FOUND: the selected Agent definition changed before preflight.');
       }
     }
-    const userPersistError = this.persistConversationSnapshot(workingSession?.sessionId ?? null, userMessage);
-    const assistantPersistError = this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
-    if (userPersistError || assistantPersistError) {
-      if (sessionIdForBranch && branchContext && previousBranchState) {
-        try {
-          storageAdapter.writeConversationBranchState(sessionIdForBranch, previousBranchState);
-        } catch (rollbackError) {
-          console.error(`[ConversationService] Failed to roll back branch state for ${sessionIdForBranch}:`, rollbackError);
+    throwIfPreparationCancelled();
+
+    const configuredRoute = settingsService.getAll().llm.agentRoutes.find((entry) => entry.agentId === conversationAgentId);
+    if (configuredRoute?.providerId) {
+      const surface = await loadProviderSurface(configuredRoute.providerId);
+      if (!surface) throw new Error(`PROVIDER_UNAVAILABLE: ${configuredRoute.providerId} is not in the compiled Catalog.`);
+    }
+    throwIfPreparationCancelled();
+
+    let routePreflight = resolveAgentRoutePreflight(conversationAgentId);
+    if (!routePreflight.ok) {
+      const code = routePreflight.diagnostic.code === 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
+        ? 'PROVIDER_UNAVAILABLE'
+        : 'MODEL_UNAVAILABLE';
+      throw new Error(`${code}: ${routePreflight.diagnostic.userMessage}`);
+    }
+    if (configurationCommit?.providerId && configurationCommit.providerId !== routePreflight.providerId) {
+      throw new Error('PROVIDER_UNAVAILABLE: the committed Provider does not match the selected Agent route.');
+    }
+    if (configurationCommit?.providerCommitHash) {
+      const providerCommit = await settingsService.getProviderDefinitionCommit(routePreflight.providerId);
+      if (!providerCommit || providerCommit.commitHash !== configurationCommit.providerCommitHash) {
+        throw new Error('PROVIDER_UNAVAILABLE: the Provider configuration changed before preflight.');
+      }
+    }
+    const credentialHandle = await agentOrchestrator.refreshProviderRuntimeCredentials(routePreflight.providerId);
+    const credentialRequestState = this.preparingRequests.get(requestId);
+    if (credentialRequestState) credentialRequestState.credentialHandle = credentialHandle;
+    throwIfPreparationCancelled();
+    routePreflight = resolveAgentRoutePreflight(conversationAgentId);
+    if (!routePreflight.ok) {
+      const code = routePreflight.diagnostic.code === 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
+        ? 'PROVIDER_UNAVAILABLE'
+        : 'MODEL_UNAVAILABLE';
+      throw new Error(`${code}: ${routePreflight.diagnostic.userMessage}`);
+    }
+
+    const settings = settingsService.getAll();
+    const effectiveModel = resolveEffectiveModel(
+      routePreflight.providerId,
+      routePreflight.modelId,
+      settings,
+    );
+    if (!effectiveModel) {
+      throw new Error(`MODEL_UNAVAILABLE: ${routePreflight.providerId}/${routePreflight.modelId}`);
+    }
+    if (
+      configurationCommit?.providerCatalogRevision
+      && effectiveModel.catalogRevision !== configurationCommit.providerCatalogRevision
+    ) {
+      throw new Error('MODEL_UNAVAILABLE: the effective Provider catalog changed before preflight.');
+    }
+    if (configurationCommit?.routeRevision && effectiveModel.routeRevision !== configurationCommit.routeRevision) {
+      throw new Error('MODEL_UNAVAILABLE: the selected model route changed before preflight.');
+    }
+    const planning = planEffectiveModelRequest({
+      providerId: routePreflight.providerId,
+      modelId: routePreflight.modelId,
+      settings,
+      controls: {
+        ...(context.session?.turnControls ?? {}),
+        ...(requestTurnControls ?? {}),
+      },
+      requestedTemperature: 0.35,
+    });
+    if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
+    if (
+      configurationCommit?.providerCatalogRevision
+      && planning.plan.catalogRevision !== configurationCommit.providerCatalogRevision
+    ) {
+      throw new Error('MODEL_UNAVAILABLE: the frozen RequestPlan catalog revision does not match the committed selection.');
+    }
+    if (configurationCommit?.routeRevision && planning.plan.routeRevision !== configurationCommit.routeRevision) {
+      throw new Error('MODEL_UNAVAILABLE: the frozen RequestPlan route revision does not match the committed selection.');
+    }
+    const pendingAttachmentDescriptors = await resolvePendingAttachmentDescriptors(pendingAttachments);
+    throwIfPreparationCancelled();
+    const preparedUserInput = await materializeAgentUserInput(
+      effectiveMessage,
+      pendingAttachmentDescriptors,
+      routePreflight.routeCapability.visionInputMode,
+      false,
+    );
+    const preparedPrompt = this.prepareConversationPrompt({
+      context,
+      agentId: conversationAgentId,
+      routePreflight,
+      requestPlan: planning.plan,
+      effectiveModel,
+      attachmentPaths: pendingAttachmentDescriptors.map((attachment) => attachment.filePath),
+    });
+    const preparedBranchState = branchContext?.branchState ?? (context.session
+      ? storageAdapter.readConversationBranchState(context.session.sessionId)
+      : null);
+    const preparedBranchId = branchContext?.branchId
+      ?? preparedBranchState?.activeLeafBranchId
+      ?? ROOT_BRANCH_ID;
+    const preparedTurn = await agentOrchestrator.prepareTurnContext({
+      requestId,
+      credentialHandle,
+      turnId,
+      agentId: conversationAgentId,
+      content: preparedUserInput.content,
+      imageTokenAdjustment: preparedUserInput.imageTokenAdjustment,
+      providerId: routePreflight.providerId,
+      selectedModelId: routePreflight.modelId,
+      effectiveModel,
+      routeCapability: routePreflight.routeCapability,
+      requestPlan: planning.plan,
+      turnControls: planning.controls,
+      promptPlan: preparedPrompt.promptPlan,
+      toolAllowlist: preparedPrompt.allowedToolNames,
+      projectRootPath: preparedPrompt.projectRootPath,
+      sessionId: context.session?.sessionId ?? null,
+      visibleTurnIds: preparedPrompt.visibleTurnIds,
+      activeBranchId: preparedBranchId,
+      signal: preparationController.signal,
+    });
+    throwIfPreparationCancelled();
+    const requestState = this.preparingRequests.get(requestId);
+    if (requestState) requestState.phase = 'committing';
+
+    let workingSession = context.session;
+    let stagedSessionCommit: ReturnType<typeof storageAdapter.beginStagedConversationSession> | null = null;
+    let existingTurnCommit: ReturnType<typeof storageAdapter.beginExistingConversationTurnCommit> | null = null;
+    let importedAttachments: SessionAttachmentRecord[] = [];
+    let persistedHistoryBeforeCommit: ConversationMessage[] = [];
+    let persistedBranchBeforeCommit: ConversationBranchState | null = null;
+    let branchState: ConversationBranchState | null = null;
+    let userMessage: ConversationMessage;
+    let assistantDraftMessage: ConversationMessage;
+    try {
+      const attachmentPaths = pendingAttachments.map((entry) => entry.sourcePath);
+      if (!workingSession && context.projectId) {
+        stagedSessionCommit = storageAdapter.beginStagedConversationSession(
+          context.projectId,
+          rawMessage.slice(0, 80),
+          attachmentPaths,
+          requestId,
+          turnId,
+        );
+        workingSession = stagedSessionCommit.session;
+        importedAttachments = stagedSessionCommit.attachments;
+      } else if (workingSession) {
+        existingTurnCommit = storageAdapter.beginExistingConversationTurnCommit(
+          workingSession.sessionId,
+          attachmentPaths,
+          requestId,
+          turnId,
+        );
+        importedAttachments = existingTurnCommit.attachments;
+        persistedHistoryBeforeCommit = existingTurnCommit.beforeHistory;
+        persistedBranchBeforeCommit = existingTurnCommit.beforeBranch;
+      } else if (pendingAttachments.length > 0) {
+        throw new Error('ATTACHMENT_SESSION_REQUIRED: select or create a project session before attaching files.');
+      }
+      const sessionIdForBranch = workingSession?.sessionId ?? null;
+      branchState = branchContext?.branchState ?? (sessionIdForBranch
+        ? persistedBranchBeforeCommit
+        : null);
+      if (sessionIdForBranch && !branchState) branchState = createDefaultBranchState(sessionIdForBranch);
+      const branchId = branchContext?.branchId
+        ?? branchState?.activeLeafBranchId
+        ?? ROOT_BRANCH_ID;
+      userMessage = makeConversationMessage('user', rawMessage, {
+        requestId,
+        turnId,
+        sessionId: sessionIdForBranch,
+        projectId: context.projectId,
+        runId: isActiveRun(context.currentRun) ? context.currentRun.runId : null,
+        modeContext: requestedMode,
+        attachments: importedAttachments,
+        status: 'complete',
+        branchId,
+        forkId: branchContext?.forkId,
+        variantIndex: branchContext?.variantIndex,
+        preparedContext: preparedTurn.summary,
+      });
+      assistantDraftMessage = makeConversationMessage('assistant', '', {
+        requestId,
+        turnId,
+        sessionId: sessionIdForBranch,
+        projectId: context.projectId,
+        runId: isActiveRun(context.currentRun) ? context.currentRun.runId : null,
+        modeContext: requestedMode,
+        agentId: conversationAgentId,
+        status: 'streaming',
+        workTrace: createDraftWorkTrace(),
+        branchId,
+        preparedContext: preparedTurn.summary,
+      });
+      if (sessionIdForBranch && branchState && branchContext) {
+        const nextBranchState = structuredClone(branchState);
+        const fork = nextBranchState.forks.find((entry) => entry.forkId === branchContext.forkId);
+        if (!fork || fork.branches.some((entry) => entry.branchId === branchId)) {
+          throw new Error('Conversation branch state changed before the new variant was committed.');
+        }
+        fork.branches.push({
+          branchId,
+          parentBranchId: branchContext.parentBranchId,
+          variantIndex: branchContext.variantIndex,
+          anchorUserMessageId: userMessage.id,
+          rootTurnId: turnId,
+        });
+        fork.activeBranchId = branchId;
+        nextBranchState.activeLeafBranchId = branchId;
+        branchState = nextBranchState;
+      }
+      if (sessionIdForBranch) {
+        const committedHistory = [...persistedHistoryBeforeCommit, userMessage, assistantDraftMessage];
+        if (stagedSessionCommit) {
+          workingSession = storageAdapter.commitStagedConversationSession(
+            stagedSessionCommit,
+            committedHistory,
+            branchState,
+          );
+        } else if (existingTurnCommit) {
+          storageAdapter.commitExistingConversationTurn(existingTurnCommit, committedHistory, branchState);
         }
       }
-      const error = userPersistError ?? assistantPersistError;
-      throw new Error(`Conversation could not be saved: ${error?.message ?? 'unknown persistence error'}`);
+    } catch (error) {
+      try {
+        if (stagedSessionCommit) storageAdapter.rollbackStagedConversationSession(stagedSessionCommit);
+        if (existingTurnCommit) storageAdapter.rollbackExistingConversationTurn(existingTurnCommit);
+      } catch (rollbackError) {
+        console.error(`[ConversationService] Failed to roll back turn ${turnId}:`, rollbackError);
+      }
+      throw new Error(`TURN_COMMIT_FAILED: ${redactTechnicalMessage(error)}`);
     }
-    const visibleMessages = workingSession?.sessionId && branchState
+    if (pendingHandoff && context.session) {
+      this.pendingHandoffs.delete(context.session.sessionId);
+    }
+    let visibleMessages = workingSession?.sessionId && branchState
       ? resolveVisibleConversationMessages(
           storageAdapter.readConversationHistory(workingSession.sessionId),
           branchState,
         )
       : [userMessage, assistantDraftMessage];
     const traceSessionId = workingSession?.sessionId ?? this.ephemeralTraceSessionId(turnId);
-    const tracePresentation = await traceService.buildConversationPresentation(
+    let tracePresentation = await traceService.buildConversationPresentation(
       traceSessionId,
       [userMessage, assistantDraftMessage],
     );
+    const cancelAfterCommit = this.preparingRequests.get(requestId)?.cancelAfterCommit === true;
+    if (cancelAfterCommit) {
+      assistantDraftMessage.status = 'stopped';
+      assistantDraftMessage.updatedAt = nowMs();
+      assistantDraftMessage.workTrace = finalizeTrace(
+        assistantDraftMessage.workTrace,
+        'stopped',
+        'Request stopped after commit.',
+      );
+      const persistError = this.persistConversationSnapshot(workingSession?.sessionId ?? null, assistantDraftMessage);
+      if (persistError) console.error(`[ConversationService] Failed to persist cancelled turn ${turnId}:`, persistError);
+      visibleMessages = workingSession?.sessionId && branchState
+        ? resolveVisibleConversationMessages(
+            storageAdapter.readConversationHistory(workingSession.sessionId),
+            branchState,
+          )
+        : [userMessage, assistantDraftMessage];
+      tracePresentation = await traceService.buildConversationPresentation(
+        traceSessionId,
+        [userMessage, assistantDraftMessage],
+      );
+    }
     workflowProjectionPublisher.publishTraceProjectionChanged(traceSessionId, tracePresentation);
     this.publishConversationTrace(traceSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
 
-    void this.completeProfileTurn({
-      context: {
-        ...context,
-        session: workingSession,
-      },
-      requestedMode,
-      requestedAgentId: conversationAgentId,
-      rawMessage: effectiveMessage,
-      importedAttachments,
-      userMessage,
-      assistantDraftMessage,
-      requestTurnControls,
-    });
+    if (!cancelAfterCommit) {
+      const runningRequestState = this.preparingRequests.get(requestId);
+      if (runningRequestState) runningRequestState.credentialLeaseTransferred = true;
+      void this.completeProfileTurn({
+        context: {
+          ...context,
+          session: workingSession,
+        },
+        requestedMode,
+        requestedAgentId: conversationAgentId,
+        rawMessage: effectiveMessage,
+        importedAttachments,
+        userMessage,
+        assistantDraftMessage,
+        requestId,
+        routePreflight,
+        planning,
+        preparedPrompt,
+        preparedTurn,
+      }).catch((error) => {
+        agentOrchestrator.releaseProviderRuntimeCredentials(preparedTurn.runtime.credentialHandle);
+        console.error(`[ConversationService] Background turn ${turnId} failed before terminal cleanup:`, error);
+      });
+    }
 
     return {
+      requestId,
       session: workingSession,
       mode: 'talk',
       userMessage,
@@ -1120,6 +1359,7 @@ export class ConversationService {
       runUpdate: null,
       tracePresentation,
       errorViewModel: null,
+      preparedContext: preparedTurn.summary,
     };
   }
 
@@ -1131,7 +1371,16 @@ export class ConversationService {
     importedAttachments: SessionAttachmentRecord[];
     userMessage: ConversationMessage;
     assistantDraftMessage: ConversationMessage;
-    requestTurnControls?: ConversationTurnControls;
+    requestId: string;
+    routePreflight: AgentRoutePreflightOk;
+    planning: {
+      ok: true;
+      plan: RequestPlan;
+      controls: ConversationTurnControls;
+      warnings: string[];
+    };
+    preparedPrompt: PreparedConversationPrompt;
+    preparedTurn: PreparedAgentTurnContext;
   }) {
     let assistantMessage = input.assistantDraftMessage;
     const sessionId = input.context.session?.sessionId ?? null;
@@ -1144,25 +1393,9 @@ export class ConversationService {
     const agentLabel = getAgentLabel(conversationAgentId);
     const showWorkTrace = true;
 
-    const settings = settingsService.getAll();
-    const route = settings.llm.agentRoutes.find((entry) => entry.agentId === conversationAgentId);
-    const capability = route?.providerId && route.modelId
-      ? resolveEffectiveModel(route.providerId, route.modelId, settings)
-      : null;
-    const planning = route?.providerId && route.modelId
-      ? planEffectiveModelRequest({
-          providerId: route.providerId,
-          modelId: route.modelId,
-          settings,
-          controls: {
-            ...(input.context.session?.turnControls ?? {}),
-            ...(input.requestTurnControls ?? {}),
-          },
-          requestedTemperature: 0.35,
-        })
-      : null;
-    if (planning && !planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
-    const turnControls = planning?.ok ? planning.controls : undefined;
+    const capability = input.preparedTurn.effectiveModel;
+    const planning = input.planning;
+    const turnControls = planning.controls;
     if (sessionId && turnControls) {
       storageAdapter.updateSession(sessionId, { turnControls });
     }
@@ -1267,6 +1500,7 @@ export class ConversationService {
       settleStopped = resolve;
     });
     this.registerActiveTurn({
+      requestId: input.requestId,
       turnId: assistantMessage.turnId,
       sessionId,
       startedAt: nowMs(),
@@ -1368,7 +1602,7 @@ export class ConversationService {
     let llmDiagnostic: ConversationMessageDiagnostic | null = null;
     let runWasCancelled = false;
     const seenCompactionSummaries = new Set<string>();
-    const routePreflight = resolveAgentRoutePreflight(conversationAgentId);
+    const routePreflight = input.routePreflight;
     const currentLoopOptions = () => ({
       loopId: currentLoopId(),
       loopResultText: currentLoopText.trim() || undefined,
@@ -1398,7 +1632,7 @@ export class ConversationService {
       }
     };
 
-    if (routePreflight.ok && routePreflight.aliasRemap) {
+    if (routePreflight.aliasRemap) {
       runtimeLogService.log({
         scope: sessionId ? 'session' : 'app',
         namespace: 'llm',
@@ -1412,42 +1646,11 @@ export class ConversationService {
       });
     }
 
-    if (!routePreflight.ok) {
-      llmDiagnostic = routePreflight.diagnostic;
-      errorViewModel = {
-        code: llmDiagnostic.code,
-        message: llmDiagnostic.userMessage,
-        technicalMessage: llmDiagnostic.technicalMessage,
-      };
-      rawResponse = llmDiagnostic.userMessage;
-      visibleResponse = llmDiagnostic.userMessage;
-      recordLlmDiagnostic(input.context, llmDiagnostic);
-      commitVisibleAssistantText();
-      commitAssistantMessage('message_patched', {
-        ...withWorkTrace(upsertWorkBlock(assistantMessage.workTrace, 'runtime-route-diagnostic', {
-          kind: 'diagnostic',
-          status: llmDiagnostic.severity === 'error' ? 'error' : 'complete',
-          diagnosticSeverity: llmDiagnostic.severity,
-          title: 'Model route diagnostic',
-          stage: 'preflight',
-          summary: [llmDiagnostic.userMessage, llmDiagnostic.technicalMessage].filter(Boolean).join('\n'),
-          completedAt: nowMs(),
-        })),
-      });
-    } else {
-      try {
-        if (!planning?.ok || !capability) {
+    try {
+        if (!capability) {
           throw new Error(`MODEL_UNAVAILABLE: ${routePreflight.providerId}/${routePreflight.modelId}`);
         }
-        const prepared = this.prepareConversationPrompt({
-          context: input.context,
-          agentId: conversationAgentId,
-          routePreflight,
-          requestPlan: planning.plan,
-          effectiveModel: capability,
-          attachmentPaths: input.importedAttachments.map((attachment) => attachment.filePath),
-          excludeTurnId: assistantMessage.turnId,
-        });
+        const prepared = input.preparedPrompt;
         const userInput = await materializeAgentUserInput(
           input.rawMessage,
           input.importedAttachments,
@@ -1470,6 +1673,7 @@ export class ConversationService {
             signal: abortController.signal,
             turnControls,
             requestPlan: planning.plan,
+            preparedTurn: input.preparedTurn,
             userContent: userInput.content,
             visibleTurnIds: prepared.visibleTurnIds,
             activeBranchId: assistantMessage.branchId ?? input.userMessage.branchId ?? ROOT_BRANCH_ID,
@@ -2087,7 +2291,6 @@ export class ConversationService {
         recordLlmDiagnostic(input.context, llmDiagnostic);
         commitVisibleAssistantText();
       }
-    }
 
     if (abortController.signal.aborted || runWasCancelled) return;
     const assistantContent = (currentLoopText.trim() || rawResponse || visibleResponse).trim();
@@ -2226,6 +2429,7 @@ export class ConversationService {
         }
       }
       this.clearActiveTurn(assistantMessage.turnId, abortController);
+      agentOrchestrator.releaseProviderRuntimeCredentials(input.preparedTurn.runtime.credentialHandle);
       settleStopped();
     }
   }

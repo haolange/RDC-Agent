@@ -11,21 +11,28 @@ const levelsCapability: EffectiveModel = {
   providerId: 'openai',
   modelId: 'gpt-5.5',
   label: 'GPT-5.5', aliases: [], enabled: true,
-  route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test', source: 'preset' },
+  route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test', source: 'catalog' },
   availability: 'available',
+  presencePolicy: 'maintained',
   contextTiers: [
     { id: 'default', label: 'Default', maxPromptTokens: 256_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
     { id: 'max', label: 'Max', maxPromptTokens: 1_050_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
   ],
   defaultBudgetTokens: 256_000,
-  reasoning: {
-    kind: 'levels',
-    supportsOff: true,
-    levels: ['low', 'medium', 'high', 'xhigh'],
-    defaultSelection: 'medium',
-    wireProfile: { kind: 'none' },
+  controls: {
+    reasoning: {
+      kind: 'levels',
+      supportsOff: true,
+      levels: ['low', 'medium', 'high', 'xhigh'],
+      defaultSelection: 'medium',
+      wireProfile: { kind: 'none' },
+    },
+    fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
+    context1m: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'max' },
   },
-  fast: { kind: 'model-variant', modelId: 'gpt-5.5-fast', entitlement: 'granted' },
+  executionBindings: [{
+    id: 'fast:priority', when: { fast: true }, actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }], entitlement: 'granted',
+  }],
   toolCalling: { state: 'supported' }, visionInput: { state: 'supported' }, structuredOutput: { state: 'supported' },
   provenance: [],
 };
@@ -51,7 +58,11 @@ describe('turnControlsUtils', () => {
     }, {
       ...levelsCapability,
       contextTiers: levelsCapability.contextTiers.slice(0, 1),
-      fast: { kind: 'unsupported' },
+      controls: {
+        ...levelsCapability.controls,
+        fast: { state: 'unsupported', fixedValue: false },
+        context1m: { state: 'unsupported', fixedValue: false },
+      },
     })).toEqual({
       reasoningLevel: 'medium',
       maxContextMode: false,
@@ -76,12 +87,15 @@ describe('turnControlsUtils', () => {
       fastModel: false,
     }, {
       ...levelsCapability,
-      reasoning: {
-        kind: 'toggle',
-        supportsOff: true,
-        levels: [],
-        defaultSelection: 'off',
-        wireProfile: { kind: 'none' },
+      controls: {
+        ...levelsCapability.controls,
+        reasoning: {
+          kind: 'toggle',
+          supportsOff: true,
+          levels: [],
+          defaultSelection: 'off',
+          wireProfile: { kind: 'none' },
+        },
       },
     })).toEqual({
       reasoningLevel: 'off',
@@ -106,11 +120,30 @@ describe('turnControlsUtils', () => {
       maxContextMode: true,
       fastModel: true,
     });
+
+    const fixedModes = {
+      ...levelsCapability,
+      controls: {
+        ...levelsCapability.controls,
+        context1m: { state: 'fixed' as const, fixedValue: true, tierId: 'max' },
+        fast: { state: 'fixed' as const, fixedValue: true, entitlement: 'granted' as const },
+      },
+    };
+    expect(buildInitialTurnControls(fixedModes)).toEqual({
+      reasoningLevel: 'medium',
+      maxContextMode: true,
+      fastModel: true,
+    });
+    expect(hasSelectableOneMillionContext(fixedModes)).toBe(false);
   });
 
   it('shows a higher unknown tier as unverified and excludes denied tiers', () => {
     const unknownTier = {
       ...levelsCapability,
+      controls: {
+        ...levelsCapability.controls,
+        context1m: { ...levelsCapability.controls.context1m, entitlement: 'unknown' as const },
+      },
       contextTiers: levelsCapability.contextTiers.map((tier, index) => (
         index === 1 ? { ...tier, entitlement: 'unknown' as const } : tier
       )),

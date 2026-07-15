@@ -91,6 +91,7 @@ export interface AnthropicProviderOptions {
   apiKey?: string;
   anthropicVersion?: string;
   headers?: Record<string, string>;
+  surface?: 'anthropic' | 'vertex';
 }
 
 export class AnthropicProvider implements ProviderStrategy {
@@ -99,12 +100,14 @@ export class AnthropicProvider implements ProviderStrategy {
   private readonly defaultApiKey: string | undefined;
   private readonly anthropicVersion: string;
   private readonly defaultHeaders: Record<string, string>;
+  private readonly surface: 'anthropic' | 'vertex';
 
   constructor(options: AnthropicProviderOptions = {}) {
     this.defaultBaseUrl = (options.baseUrl ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
     this.defaultApiKey = options.apiKey;
     this.anthropicVersion = options.anthropicVersion ?? DEFAULT_ANTHROPIC_VERSION;
     this.defaultHeaders = { ...(options.headers ?? {}) };
+    this.surface = options.surface ?? 'anthropic';
   }
 
   stream(
@@ -144,7 +147,11 @@ export class AnthropicProvider implements ProviderStrategy {
       }
 
       const body = applyRequestPlanBody(this.buildRequestBody(model, context, options), options.requestPlan);
-      const url = `${baseUrl}/messages`;
+      if (this.surface === 'vertex') {
+        delete body.model;
+        body.anthropic_version = 'vertex-2023-10-16';
+      }
+      const url = buildAnthropicMessagesUrl(baseUrl, model.id, this.surface);
       const plannedHeaders = mergeAnthropicRequestHeaders(
         this.defaultHeaders,
         requestPlanHeaders(options.requestPlan),
@@ -154,8 +161,9 @@ export class AnthropicProvider implements ProviderStrategy {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': this.anthropicVersion,
+          ...(this.surface === 'vertex'
+            ? { Authorization: `Bearer ${apiKey}` }
+            : { 'x-api-key': apiKey, 'anthropic-version': this.anthropicVersion }),
           ...plannedHeaders,
         },
         body: JSON.stringify(body),
@@ -362,6 +370,17 @@ export class AnthropicProvider implements ProviderStrategy {
     }
     return body;
   }
+}
+
+export function buildAnthropicMessagesUrl(
+  baseUrl: string,
+  modelId: string,
+  surface: 'anthropic' | 'vertex' = 'anthropic',
+): string {
+  const trimmed = baseUrl.replace(/\/+$/u, '');
+  return surface === 'vertex'
+    ? `${trimmed}/models/${encodeURIComponent(modelId)}:streamRawPredict`
+    : trimmed.endsWith('/messages') ? trimmed : `${trimmed}/messages`;
 }
 
 function resolveAnthropicThinkingKind(reasoningVisibility?: ReasoningVisibility): ThinkingArtifactKind {

@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 2,
+  "id": "daoxe",
+  "identityIds": [
+    "daoxe"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "daoxe",
+  "label": "DaoXE",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "daoxe",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "provider-managed",
+  "factSources": [
+    {
+      "id": "runtime-observation:daoxe:2026-07-15",
+      "sourceKind": "runtime-observation",
+      "sourceRevision": "5a90f2b86c08bd983a9a2e6d66c255f4eaef9c4bc934386d2b6ae84ef0ff1f1f",
+      "observedAt": "2026-07-15",
+      "refreshedAt": "2026-07-15",
+      "surface": "DaoXE public pricing catalog"
+    },
+    {
+      "id": "models.dev:daoxe:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "daoxe",
+      "surface": "daoxe"
+    }
+  ],
+  "defaultFactSourceId": "runtime-observation:daoxe:2026-07-15",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "DAOXE_API_KEY",
+        "label": "Daoxe Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "DAOXE_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "DAOXE_API_KEY",
+    "endpointTemplate": "https://daoxe.com/v1"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://daoxe.com/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "authoritative-list",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://daoxe.com/pricing"
+}

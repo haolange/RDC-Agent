@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "google-vertex",
+  "name": "Vertex",
+  "npm": "@ai-sdk/google-vertex",
+  "env": [
+    "GOOGLE_VERTEX_PROJECT",
+    "GOOGLE_VERTEX_LOCATION",
+    "GOOGLE_APPLICATION_CREDENTIALS"
+  ],
+  "docsUrl": "https://cloud.google.com/vertex-ai/generative-ai/docs/models",
+  "provenance": {
+    "sourceKind": "models.dev",
+    "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+    "refreshedAt": "2026-07-15",
+    "openCodeCommit": "571e7b852f82415faf65466e1536357a048bdf5a",
+    "hermesCommit": "bb5fc723b67cdf31828a5a64d997c9eaf4554f57"
+  }
+}

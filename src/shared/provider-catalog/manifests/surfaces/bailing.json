@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "id": "bailing",
+  "identityIds": [
+    "bailing"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "bailing",
+  "label": "Bailing",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "bailing",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "provider-managed",
+  "factSources": [
+    {
+      "id": "models.dev:bailing:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "bailing",
+      "surface": "bailing"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:bailing:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "BAILING_API_TOKEN",
+        "label": "Bailing Api Token",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "BAILING_API_TOKEN"
+      }
+    ],
+    "primarySecretFieldId": "BAILING_API_TOKEN",
+    "endpointTemplate": "https://api.tbox.cn/api/llm/v1"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.tbox.cn/api/llm/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://alipaytbox.yuque.com/sxs0ba/ling/intro"
+}

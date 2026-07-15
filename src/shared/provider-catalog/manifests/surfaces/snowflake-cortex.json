@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 2,
+  "id": "snowflake-cortex",
+  "identityIds": [
+    "snowflake-cortex"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "snowflake-cortex",
+  "label": "Snowflake Cortex",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "cloud-platform",
+  "surfaceKind": "cloud",
+  "serviceOperator": "snowflake",
+  "endpointClass": "cloud-hosted",
+  "endpointOwnership": "cloud-platform",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "models.dev:snowflake-cortex:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "snowflake-cortex",
+      "surface": "snowflake-cortex"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:snowflake-cortex:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "SNOWFLAKE_ACCOUNT",
+        "label": "Snowflake account identifier",
+        "kind": "text",
+        "required": true,
+        "environmentVariable": "SNOWFLAKE_ACCOUNT"
+      },
+      {
+        "id": "SNOWFLAKE_CORTEX_PAT",
+        "label": "Snowflake Cortex PAT",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "SNOWFLAKE_CORTEX_PAT"
+      }
+    ],
+    "primarySecretFieldId": "SNOWFLAKE_CORTEX_PAT",
+    "endpointTemplate": "https://${SNOWFLAKE_ACCOUNT}.snowflakecomputing.com/api/v2/cortex/v1"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": true,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://${SNOWFLAKE_ACCOUNT}.snowflakecomputing.com/api/v2/cortex/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://docs.snowflake.com/en/user-guide/snowflake-cortex/cortex-rest-api"
+}

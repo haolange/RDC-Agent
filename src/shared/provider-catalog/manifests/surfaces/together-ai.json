@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 2,
+  "id": "together-ai",
+  "identityIds": [
+    "togetherai"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "json-catalog",
+  "vendorId": "together",
+  "label": "Together AI",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "together-ai",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "app-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:together-ai:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "together-ai"
+    },
+    {
+      "id": "models.dev:togetherai:1",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "togetherai",
+      "surface": "together-ai"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:together-ai:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "structured-output",
+    "vision-input",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.together.ai/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "authoritative-list",
+    "strategy": {
+      "kind": "json-catalog",
+      "path": "/models",
+      "collectionPath": "$",
+      "mapping": {
+        "id": "id",
+        "label": "display_name",
+        "contextWindow": "context_length",
+        "modality": "type"
+      },
+      "admission": {
+        "allowedModalities": [
+          "chat",
+          "language",
+          "code"
+        ]
+      }
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "openai/gpt-oss-120b",
+    "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8"
+  ],
+  "docsUrl": "https://docs.together.ai/docs/inference/openai-compatibility"
+}

@@ -9,7 +9,7 @@ const {
   reasoningDeliveryToStreamVisibility,
 } = require('../src/main/agent-runtime/capabilities/RouteCapabilityResolver.ts');
 
-const { createProviderEntryFromPreset } = require('../src/main/settings/ProviderPresetRegistry.ts');
+const { createProviderEntryFromCatalog } = require('../src/main/provider-catalog/ProviderCatalogRegistry.ts');
 
 const fail = (message) => {
   console.error(`[reasoning-delivery] ${message}`);
@@ -21,7 +21,7 @@ const assert = (condition, message) => {
 };
 
 function configuredProvider(id, protocolOverride) {
-  const provider = createProviderEntryFromPreset(id);
+  const provider = createProviderEntryFromCatalog(id);
   return {
     ...provider,
     protocol: protocolOverride ?? provider.protocol,
@@ -45,12 +45,15 @@ function effectiveModel(provider, modelId, overrides = {}) {
     label: modelId,
     aliases: [],
     enabled: true,
-    route: { protocol: provider.protocol, baseUrl: provider.baseUrl, source: 'preset' },
+    route: { protocol: provider.protocol, baseUrl: provider.baseUrl, source: 'catalog' },
     availability: 'available',
     contextTiers: [{ id: 'default', label: 'Default', activation: { kind: 'implicit' }, entitlement: 'granted' }],
     defaultBudgetTokens: 128000,
-    fast: { kind: 'unsupported' },
-    reasoning: { kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on', wireProfile: { kind: 'none' } },
+    controls: {
+      fast: { state: 'unsupported', fixedValue: false },
+      context1m: { state: 'unsupported', fixedValue: false },
+      reasoning: { kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on', wireProfile: { kind: 'none' } },
+    },
     toolCalling: { state: 'supported' },
     visionInput: { state: 'unknown' },
     structuredOutput: { state: 'unknown' },
@@ -61,7 +64,7 @@ function effectiveModel(provider, modelId, overrides = {}) {
 
 const anthropic = configuredProvider('anthropic', 'AnthropicMessages');
 const openaiResponses = configuredProvider('openai', 'OpenAIResponses');
-const gemini = configuredProvider('gemini-account', 'GoogleGemini');
+const gemini = configuredProvider('google-ai-studio', 'GoogleGemini');
 const ollama = configuredProvider('ollama', 'OllamaOpenAICompatibleChatCompletions');
 const deepseek = configuredProvider('deepseek', 'OpenAICompatibleChatCompletions');
 const kimi = configuredProvider('kimi-coding-plan', 'AnthropicMessages');
@@ -92,7 +95,11 @@ assert(resolveAgentRouteCapability(deepseekAnthropic, 'deepseek-v4-pro', effecti
 
 const noReasoningProvider = configuredProvider('openai', 'OpenAICompatibleChatCompletions');
 assert(resolveProviderReasoningContract(noReasoningProvider, effectiveModel(noReasoningProvider, 'test-model', {
-  reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+  controls: {
+    fast: { state: 'unsupported', fixedValue: false },
+    context1m: { state: 'unsupported', fixedValue: false },
+    reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+  },
 })).semantic === 'none', 'models without reasoning capability must be none');
 
 const fs = require('node:fs');

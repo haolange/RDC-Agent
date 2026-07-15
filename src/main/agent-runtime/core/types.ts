@@ -359,6 +359,8 @@ export interface StreamOptions {
   baseUrl?: string;
   /** Closed, secret-free wire contract compiled by RequestPlanner. */
   requestPlan: RequestPlan;
+  /** Opaque main-process lease created by send preflight; never persisted or exposed to renderer. */
+  credentialHandle?: string;
 }
 
 // =====================================================================

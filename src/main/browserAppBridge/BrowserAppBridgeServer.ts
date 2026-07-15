@@ -1,19 +1,53 @@
-import { createReadStream, existsSync, statSync } from 'fs';
+import { createReadStream, existsSync, readFileSync, statSync } from 'fs';
+import { createHash } from 'crypto';
 import { createServer, request as httpRequest, type IncomingMessage, type Server, type ServerResponse } from 'http';
 import { request as httpsRequest } from 'https';
 import { extname, join, normalize, resolve } from 'path';
 import { URL } from 'url';
 import { invokeRegisteredIpcChannel } from '../ipc/invokeRegistry';
 import { rendererEventHub } from './rendererEventHub';
+import { EFFECTIVE_CATALOG_SCHEMA_VERSION } from '../settings/EffectiveCatalogService';
+import {
+  MODELS_DEV_IDENTITY_COUNT,
+  MODELS_DEV_SNAPSHOT_SHA256,
+  PROVIDER_CATALOG_SCHEMA_VERSION,
+} from '@shared/provider-catalog/compiler';
+import {
+  getProviderCatalogRevision,
+  listProviderSummaries,
+} from '../provider-catalog/ProviderCatalogRegistry';
+import { SETTINGS_SCHEMA_VERSION } from '../settings/SettingsService';
 
 type BridgeOptions = {
   devRendererUrl: string | null;
   rendererRoot: string;
+  mainBundlePath: string;
+  appVersion: string;
   preferredPort?: number;
 };
 
+interface BrowserHealthMetadata {
+  appVersion: string;
+  buildFingerprint: string;
+  rendererFingerprint: string;
+  mainFingerprint: string;
+  schema: {
+    settings: number;
+    effectiveCatalog: number;
+    providerCatalog: number;
+  };
+  catalogRevision: string;
+  catalog: {
+    source: 'models.dev';
+    identityCount: number;
+    snapshotSha256: string;
+    materializedSurfaceCount: number;
+  };
+}
+
 let server: Server | null = null;
 let bridgeUrl: string | null = null;
+let healthMetadata: BrowserHealthMetadata | null = null;
 
 const contentTypes: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
@@ -24,6 +58,36 @@ const contentTypes: Record<string, string> = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
 };
+
+function sha256(value: string | Buffer): string {
+  return createHash('sha256').update(value).digest('hex');
+}
+
+function resolveHealthMetadata(options: BridgeOptions): BrowserHealthMetadata {
+  const rendererPath = join(options.rendererRoot, 'index.html');
+  const rendererFingerprint = sha256(readFileSync(rendererPath));
+  const mainFingerprint = sha256(readFileSync(options.mainBundlePath));
+  const surfaces = listProviderSummaries();
+  const catalogRevision = getProviderCatalogRevision();
+  return {
+    appVersion: options.appVersion,
+    buildFingerprint: sha256(`${options.appVersion}:${mainFingerprint}:${rendererFingerprint}`),
+    rendererFingerprint,
+    mainFingerprint,
+    schema: {
+      settings: SETTINGS_SCHEMA_VERSION,
+      effectiveCatalog: EFFECTIVE_CATALOG_SCHEMA_VERSION,
+      providerCatalog: PROVIDER_CATALOG_SCHEMA_VERSION,
+    },
+    catalogRevision,
+    catalog: {
+      source: 'models.dev',
+      identityCount: MODELS_DEV_IDENTITY_COUNT,
+      snapshotSha256: MODELS_DEV_SNAPSHOT_SHA256,
+      materializedSurfaceCount: surfaces.length,
+    },
+  };
+}
 
 function setCors(response: ServerResponse): void {
   response.setHeader('Access-Control-Allow-Origin', '*');
@@ -145,6 +209,7 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
       mode: 'browser-app-session',
       bridgeUrl,
       renderer,
+      ...healthMetadata,
     });
     return;
   }
@@ -207,6 +272,7 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
   }
 
   const preferredPort = options.preferredPort ?? Number(process.env.RDC_AGENT_BROWSER_BRIDGE_PORT || 5127);
+  healthMetadata = resolveHealthMetadata(options);
 
   server = createServer((request, response) => {
     void handleRequest(options, request, response).catch((error) => {
@@ -250,6 +316,7 @@ export async function stopBrowserAppBridge(): Promise<void> {
   const activeServer = server;
   server = null;
   bridgeUrl = null;
+  healthMetadata = null;
   delete (globalThis as typeof globalThis & { __RDC_AGENT_BROWSER_BRIDGE_URL__?: string }).__RDC_AGENT_BROWSER_BRIDGE_URL__;
   if (!activeServer) {
     return;

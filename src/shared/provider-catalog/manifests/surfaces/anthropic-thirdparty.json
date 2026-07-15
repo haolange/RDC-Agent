@@ -1,0 +1,86 @@
+{
+  "schemaVersion": 2,
+  "id": "anthropic-thirdparty",
+  "identityIds": [],
+  "profileId": "anthropic-messages",
+  "adapterIds": [
+    "anthropic-messages"
+  ],
+  "authSchemaId": "user-endpoint",
+  "discoveryPolicyId": "anthropic-candidate-validation",
+  "vendorId": "anthropic",
+  "label": "Custom Anthropic Endpoint",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "user",
+  "endpointClass": "user-endpoint",
+  "endpointOwnership": "user",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:anthropic-thirdparty:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "anthropic-thirdparty"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:anthropic-thirdparty:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "baseUrl",
+        "label": "Base URL",
+        "kind": "url",
+        "required": true
+      },
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "endpointTemplate": "${baseUrl}/v1"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": true,
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "reasoning",
+    "prompt-cache",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "AnthropicMessages",
+      "protocol": "AnthropicMessages",
+      "adapterId": "anthropic-messages",
+      "baseUrl": "${baseUrl}/v1",
+      "default": true,
+      "protocolOwner": "anthropic"
+    }
+  ],
+  "discovery": {
+    "authority": "candidate-validation",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "anthropic-candidate-validation"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "sonnet",
+    "opus",
+    "haiku"
+  ],
+  "docsUrl": "https://platform.claude.com/docs/en/api/overview"
+}

@@ -7,7 +7,7 @@ import type {
 function resolveWireLevel(
   reasoning: ResolvedReasoningSelection,
 ): NamedReasoningLevel | null {
-  if (reasoning.selection === 'off') {
+  if (reasoning.selection === 'off' || reasoning.selection === 'unknown') {
     return null;
   }
   if (reasoning.selection === 'on') {
@@ -28,7 +28,7 @@ function resolveWireLevel(
 }
 
 export function isReasoningEnabled(reasoning: ResolvedReasoningSelection | undefined): boolean {
-  return reasoning ? reasoning.selection !== 'off' : false;
+  return reasoning ? reasoning.selection !== 'off' && reasoning.selection !== 'unknown' : false;
 }
 
 export function buildOpenAiResponsesReasoning(

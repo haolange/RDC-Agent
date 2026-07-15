@@ -327,6 +327,7 @@ function ensureBuild(dependencyKey, env, forcePrepare) {
   const electronVite = path.join(nodeModulesPath, 'electron-vite', 'bin', 'electron-vite.js');
   const outputs = [
     path.join(repoRoot, 'out', 'main', 'index.js'),
+    path.join(repoRoot, 'out', 'main', 'provider-catalog', 'index.json'),
     path.join(repoRoot, 'out', 'preload', 'index.js'),
     path.join(repoRoot, 'out', 'renderer', 'index.html'),
   ];

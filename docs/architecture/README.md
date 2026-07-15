@@ -10,7 +10,7 @@
 - `agent-runtime-kernel.md`：RDX Runtime、Prompt/Request pipeline、provider routing、tool mediation 与 Agent Loop。
 - `rdx-runtime.md`：Scope、资源覆盖、Project Instructions、Skills、Hooks、显式 Memory、Request Snapshot 与 Reasoning contract。
 - `agentic-trace-protocol.md`：Trace、Progress 与 right-panel projection 契约。
-- `provider-architecture.md`：Provider preset/adapter、EffectiveModel、RequestPlan、账号证据与活体验证契约。
+- `provider-architecture.md`：strict JSON Catalog、compiler/Registry、EffectiveModel、RequestPlan、credential lease 与账号证据契约。
 - `spec-driven-development.md`：跨层规范与执行约束。
 
 ## 对照资料

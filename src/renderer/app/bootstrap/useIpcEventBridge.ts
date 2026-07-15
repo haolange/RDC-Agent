@@ -102,6 +102,12 @@ export function useIpcEventBridge(options: {
         return;
       }
       conversation.upsertConversationMessage(event.message);
+      if (event.type === 'message_completed' || event.type === 'message_errored') {
+        useSessionStore.getState().markConversationTurnTerminal(
+          event.turnId,
+          event.type === 'message_completed',
+        );
+      }
     };
 
     electronAPI.conversation.onEvent(handleConversationEvent);

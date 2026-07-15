@@ -87,6 +87,10 @@ const contextBreakdownPopover = fs.readFileSync(
   path.join(repoRoot, 'src/renderer/patterns/ContextBreakdownPopover.tsx'),
   'utf8',
 );
+const interactionPerformanceProbe = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/platform/performance/InteractionPerformanceProbe.ts'),
+  'utf8',
+);
 
 const requireCssContract = (condition, message) => {
   if (condition) return;
@@ -123,16 +127,27 @@ requireCssContract(
   'Global stacking contract must remain composer < modal backdrop < modal < tooltip < notification.',
 );
 requireCssContract(
-  contextUsageIndicator.includes("t('contextBreakdown.estimatedBadge')")
+  contextUsageIndicator.includes("t('contextBreakdown.preparingBadge')")
+    && contextUsageIndicator.includes("t('contextBreakdown.currentBadge')")
     && contextUsageIndicator.includes("t('contextBreakdown.lastBadge')")
-    && contextUsageIndicator.includes("projection?.status === 'blocked'"),
-  'Composer context ring must prioritize the next-request estimate and expose blocked projections.',
+    && !contextUsageIndicator.includes('NextRequestContextProjection'),
+  'Composer context ring must expose Preparing, Current request, and Last actual without draft-time prediction.',
 );
 requireCssContract(
-  contextBreakdownPopover.includes("t('contextBreakdown.estimatedNext')")
+  contextBreakdownPopover.includes("t('contextBreakdown.currentRequest')")
     && contextBreakdownPopover.includes("t('contextBreakdown.lastActual')")
-    && contextBreakdownPopover.includes('estimated.willCompact'),
-  'Context popover must separate Estimated from Last actual and disclose next-send compaction.',
+    && contextBreakdownPopover.includes('prepared.compactionApplied'),
+  'Context popover must separate prepared Current request from Last actual and disclose applied compaction.',
+);
+requireCssContract(
+  interactionPerformanceProbe.includes("get(PERFORMANCE_QUERY_KEY) !== '1') return")
+    && interactionPerformanceProbe.includes("PerformanceObserver.supportedEntryTypes.includes('event')")
+    && interactionPerformanceProbe.includes('durationThreshold: EVENT_TIMING_THRESHOLD_MS')
+    && interactionPerformanceProbe.includes("PerformanceObserver.supportedEntryTypes.includes('longtask')")
+    && !interactionPerformanceProbe.includes('window.requestAnimationFrame')
+    && !interactionPerformanceProbe.includes('window.setTimeout')
+    && interactionPerformanceProbe.includes('data-rdc-qa-performance'),
+  'Composer performance QA must remain query-gated and expose native Event Timing click-to-next-paint plus long-task metrics without timer/RAF proxies.',
 );
 
 console.log(

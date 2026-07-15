@@ -1,6 +1,5 @@
 import type {
   LlmProviderAccountLoginMode,
-  LlmProviderAccountRegion,
   LlmProviderAccountStatus,
   LlmProviderAuthMode,
   LlmProviderCatalogResponse,
@@ -17,6 +16,12 @@ export interface ProviderConnectionDraft {
   providerId: string;
   authMode: LlmProviderAuthMode;
   protocol: ProviderProtocol;
+  /** Transient typed connection fields. Secret values never enter persisted renderer settings. */
+  connectionValues: Record<string, string>;
+  /** Secret fields that should continue using their main-process secret reference. */
+  usingStoredConnectionSecrets: Record<string, boolean>;
+  /** Per-field visibility state for transient secret inputs. */
+  visibleConnectionSecrets: Record<string, boolean>;
   apiKey: string;
   baseUrl: string;
   showApiKey: boolean;
@@ -28,10 +33,10 @@ export interface ProviderConnectionDraft {
   testedBaseUrl: string;
   testedProtocol: ProviderProtocol;
   testedAuthMode: LlmProviderAuthMode;
+  testedConnectionSignature: string;
   models: LlmProviderModel[];
   accountStatus?: LlmProviderAccountStatus;
   accountLoginMode: LlmProviderAccountLoginMode;
-  accountRegion: LlmProviderAccountRegion;
   authCode: string;
 }
 

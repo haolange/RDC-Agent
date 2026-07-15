@@ -1,14 +1,32 @@
 {
   "data": [
     {
+      "id": "grok-4.20-0309-non-reasoning",
+      "label": "Grok 4.20 Non-Reasoning",
+      "context_window": 1000000,
+      "capabilities": { "tool_calls": true, "vision": true, "structured_output": true }
+    },
+    {
+      "id": "grok-4.20-0309-reasoning",
+      "label": "Grok 4.20 Reasoning",
+      "context_window": 1000000,
+      "capabilities": { "tool_calls": true, "vision": true, "structured_output": true }
+    },
+    {
+      "id": "grok-4.20-multi-agent-0309",
+      "label": "Grok 4.20 Multi-Agent",
+      "context_window": 1000000,
+      "capabilities": { "tool_calls": true, "vision": true, "structured_output": true }
+    },
+    {
       "id": "grok-4.5",
       "label": "Grok 4.5",
-      "context_window": 256000,
+      "context_window": 500000,
       "capabilities": { "tool_calls": true, "vision": true, "structured_output": true }
     },
     {
       "id": "grok-4.3",
-      "context_window": 1000000,
+      "context_window": 500000,
       "capabilities": { "tool_calls": true, "vision": true, "structured_output": false }
     }
   ]

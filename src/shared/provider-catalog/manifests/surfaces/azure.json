@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 2,
+  "id": "azure",
+  "identityIds": [
+    "azure"
+  ],
+  "profileId": "azure-openai-chat",
+  "adapterIds": [
+    "azure-openai-chat"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "azure-deployment",
+  "vendorId": "azure",
+  "label": "Azure",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "cloud-platform",
+  "surfaceKind": "cloud",
+  "serviceOperator": "microsoft",
+  "endpointClass": "cloud-hosted",
+  "endpointOwnership": "cloud-platform",
+  "catalogOwnership": "provider-managed",
+  "factSources": [
+    {
+      "id": "models.dev:azure:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "azure",
+      "surface": "azure"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:azure:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "AZURE_RESOURCE_NAME",
+        "label": "Azure Resource Name",
+        "kind": "text",
+        "required": true,
+        "environmentVariable": "AZURE_RESOURCE_NAME"
+      },
+      {
+        "id": "AZURE_API_KEY",
+        "label": "Azure Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "AZURE_API_KEY"
+      },
+      {
+        "id": "AZURE_DEPLOYMENT_NAME",
+        "label": "Azure Deployment Name",
+        "kind": "text",
+        "required": true,
+        "environmentVariable": "AZURE_DEPLOYMENT_NAME"
+      }
+    ],
+    "primarySecretFieldId": "AZURE_API_KEY",
+    "endpointTemplate": "https://${AZURE_RESOURCE_NAME}.openai.azure.com/openai/deployments/${AZURE_DEPLOYMENT_NAME}"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": true,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "AzureOpenAIChatCompletions",
+      "protocol": "AzureOpenAIChatCompletions",
+      "adapterId": "azure-openai-chat",
+      "baseUrl": "https://${AZURE_RESOURCE_NAME}.openai.azure.com/openai/deployments/${AZURE_DEPLOYMENT_NAME}",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "azure-deployment"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [
+    "gpt-5.5",
+    "gpt-5.4",
+    "gpt-5.2-codex"
+  ],
+  "docsUrl": "https://learn.microsoft.com/en-us/azure/ai-services/openai/concepts/models"
+}

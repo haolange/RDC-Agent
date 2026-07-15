@@ -1,6 +1,6 @@
 import type { ReasoningSelection } from '@shared/types/modelCapability';
 
-/** Max / Ultra share one top-tier visual pipeline. */
+/** Max is the sole top-tier visual pipeline. */
 export type MaxVisualPhase = 'idle' | 'preview' | 'evolve' | 'settled' | 'retreat';
 
 export const MAX_VISUAL_EVOLVE_MS = 800;
@@ -17,7 +17,7 @@ export function resolveMaxAnimationProgress(elapsedMs: number, durationMs: numbe
 }
 
 export function isMaxTierLevel(level: ReasoningSelection): boolean {
-  return level === 'max' || level === 'ultra';
+  return level === 'max';
 }
 
 /** Stable [0, 1) coordinate noise; wall-clock time never changes cell occupancy. */

@@ -7,6 +7,7 @@ import { effectiveCatalogService } from './EffectiveCatalogService';
 import type {
   EffectiveCatalogSnapshot,
   EffectiveModel,
+  ExecutionBindingDefinition,
   ModelRouteRecommendation,
   ModelRoute,
   RequestPlan,
@@ -23,12 +24,13 @@ import { planModelRequest } from './RequestPlanner';
 import { parseCopilotBillingTiers } from './CopilotBilling';
 import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 import { settingsService } from './SettingsService';
-import { projectProtocolOverlays, resolveModelRoutePrecedence } from './ProviderRouteProjection';
+import { projectModelProtocolOverlays, resolveModelRoutePrecedence } from './ProviderRouteProjection';
 import {
-  getProviderPreset,
-  getProviderSeedModelDefinitions,
-  lookupProviderSeedModel,
-} from './ProviderPresetRegistry';
+  getLoadedProviderSurface,
+  getProviderCatalogRevision,
+  getProviderModelDefinitions,
+  lookupProviderModelDefinition,
+} from '../provider-catalog/ProviderCatalogRegistry';
 
 const CONSERVATIVE_REASONING: ReasoningControl = {
   kind: 'unknown',
@@ -38,62 +40,125 @@ const CONSERVATIVE_REASONING: ReasoningControl = {
   wireProfile: { kind: 'none' },
 };
 
+function executionBindingMatchesPlan(binding: ExecutionBindingDefinition, plan: RequestPlan): boolean {
+  if (binding.when.fast !== undefined && binding.when.fast !== plan.fastMode) return false;
+  if (
+    binding.when.context1m !== undefined
+    && binding.when.context1m !== (plan.contextMode === 'one-million')
+  ) return false;
+  return !binding.when.reasoning
+    || (plan.reasoningWire.selection !== 'unknown'
+      && binding.when.reasoning.includes(plan.reasoningWire.selection));
+}
+
 function routeFor(provider: LlmProviderEntry, modelRoute?: ModelRoute): ModelRoute {
-  const preset = getProviderPreset(provider.id);
-  const presetRoute = preset?.routes.find((route) => route.protocol === provider.protocol)
-    ?? preset?.routes.find((route) => route.default)
-    ?? preset?.routes[0];
+  const surface = getLoadedProviderSurface(provider.id);
+  const catalogRoute = surface?.routes.find((route) => route.protocol === provider.protocol)
+    ?? surface?.routes.find((route) => route.default)
+    ?? surface?.routes[0];
+  if (!surface) {
+    return {
+      protocol: provider.protocol,
+      baseUrl: provider.baseUrl,
+      source: 'user',
+    };
+  }
   return resolveModelRoutePrecedence({
     modelRoute: modelRoute?.source === 'model' ? modelRoute : undefined,
-    userRoute: provider.protocolEditable
-      ? { protocol: provider.protocol, baseUrl: provider.baseUrl }
-      : undefined,
-    presetRoute: {
-      protocol: presetRoute?.protocol ?? provider.protocol,
-      baseUrl: presetRoute?.baseUrl ?? provider.baseUrl,
-      headers: presetRoute?.headers,
+    catalogRoute: {
+      protocol: catalogRoute?.protocol ?? provider.protocol,
+      baseUrl: catalogRoute?.baseUrl ?? provider.baseUrl,
+      headers: { ...(catalogRoute?.headers ?? {}) },
     },
   });
 }
 
-export function buildSeedModelContribution(
+export function buildCatalogModelContribution(
   provider: LlmProviderEntry,
   modelId: string,
 ): CatalogModelContribution {
-  const seed = provider.catalogOwnership === 'app-managed'
-    ? lookupProviderSeedModel(provider.id, modelId)
+  const definition = provider.catalogOwnership !== 'user-managed'
+    ? lookupProviderModelDefinition(provider.id, modelId)
     : null;
+  const surface = getLoadedProviderSurface(provider.id);
+  const factSource = definition
+    ? surface?.factSources.find((source) => source.id === definition.factSourceId)
+    : undefined;
   const conservative: CatalogModelContribution = {
     modelId,
     label: modelId,
     aliases: [],
     enabled: true,
     route: routeFor(provider),
+    presencePolicy: 'discovered',
     availability: 'unknown',
     contextTiers: [{
       id: 'default',
       label: 'Default',
       activation: { kind: 'implicit' },
-      entitlement: 'granted',
+      entitlement: 'unknown',
     }],
-    defaultBudgetTokens: 256_000,
-    fast: { kind: 'unsupported' },
-    reasoning: CONSERVATIVE_REASONING,
+    defaultBudgetTokens: 0,
+    controls: {
+      fast: { state: 'unknown', defaultValue: false, reason: 'Fast capability has not been verified.' },
+      context1m: { state: 'unknown', defaultValue: false, reason: '1M context capability has not been verified.' },
+      reasoning: CONSERVATIVE_REASONING,
+    },
     toolCalling: { state: 'unknown' },
     visionInput: { state: 'unknown' },
     structuredOutput: { state: 'unknown' },
   };
-  const base: CatalogModelContribution = seed
-    ? { ...seed, route: routeFor(provider, seed.route) }
+  const catalogDefinition = definition
+    ? (({ factSourceId: _factSourceId, fieldFactSourceIds: _fieldFactSourceIds, ...fields }) => fields)(definition)
+    : null;
+  const base: CatalogModelContribution = catalogDefinition
+    ? {
+        ...catalogDefinition,
+        route: routeFor(provider, catalogDefinition.route),
+      }
     : conservative;
   return {
     ...base,
     modelId: base.modelId,
-    label: seed?.label ?? modelId,
-    aliases: [...(seed?.aliases ?? [])],
-    enabled: seed?.enabled ?? true,
-    availability: seed?.availability === 'unavailable' ? 'unavailable' : 'unknown',
-    unavailableReason: seed?.availability === 'unavailable' ? seed.unavailableReason : undefined,
+    label: definition?.label ?? modelId,
+    aliases: [...(definition?.aliases ?? [])],
+    enabled: definition?.enabled ?? true,
+    availability: definition?.presencePolicy === 'maintained'
+      ? definition.availability
+      : definition?.availability === 'unavailable'
+        ? 'unavailable'
+        : 'unknown',
+    unavailableReason: definition?.availability === 'unavailable' ? definition.unavailableReason : undefined,
+    ...(factSource ? {
+      factSource: {
+        sourceKind: factSource.sourceKind,
+        observedAt: factSource.observedAt,
+        refreshedAt: factSource.refreshedAt,
+        sourceRevision: factSource.sourceRevision,
+        surface: factSource.surface,
+        accountScope: factSource.accountScope,
+        surfaceBuild: factSource.surfaceBuild,
+        plan: factSource.plan,
+        detail: `Compiled fact source ${factSource.id}`,
+      },
+    } : {}),
+    ...(definition?.fieldFactSourceIds && surface ? {
+      fieldFactSources: Object.fromEntries(Object.entries(definition.fieldFactSourceIds).map(([fieldPath, sourceId]) => {
+        const source = surface.factSources.find((entry) => entry.id === sourceId);
+        if (!source) throw new Error(`Compiled fact source ${sourceId} is missing for ${provider.id}/${definition.modelId}.`);
+        return [fieldPath, {
+          sourceKind: source.sourceKind,
+          observedAt: source.observedAt,
+          refreshedAt: source.refreshedAt,
+          sourceRevision: source.sourceRevision,
+          surface: source.surface,
+          accountScope: source.accountScope,
+          surfaceBuild: source.surfaceBuild,
+          plan: source.plan,
+          detail: `Compiled field fact source ${source.id}`,
+        }];
+      })),
+    } : {}),
   };
 }
 
@@ -119,22 +184,29 @@ function copilotEntitlementContribution(provider: LlmProviderEntry): CatalogLaye
   }
 }
 
-function seedContribution(provider: LlmProviderEntry, requestedModelId?: string): CatalogLayerContribution {
+function catalogContribution(provider: LlmProviderEntry, requestedModelId?: string): CatalogLayerContribution {
+  const surface = getLoadedProviderSurface(provider.id);
   const ids = new Set<string>();
-  if (provider.catalogOwnership === 'app-managed') {
-    for (const entry of getProviderSeedModelDefinitions(provider.id)) {
+  if (provider.catalogOwnership !== 'user-managed') {
+    for (const entry of getProviderModelDefinitions(provider.id)) {
       ids.add(entry.modelId);
     }
   }
-  if (requestedModelId && provider.catalogOwnership === 'app-managed') {
-    const canonical = lookupProviderSeedModel(provider.id, requestedModelId)?.modelId;
+  if (requestedModelId && provider.catalogOwnership !== 'user-managed') {
+    const canonical = lookupProviderModelDefinition(provider.id, requestedModelId)?.modelId;
     if (canonical) ids.add(canonical);
   }
   return {
-    source: 'seed',
-    observedAt: '2026-07-13T00:00:00.000Z',
-    detail: 'Provider preset seed',
-    models: [...ids].map((modelId) => buildSeedModelContribution(provider, modelId)),
+    source: 'catalog',
+    sourceKind: 'rdc-agent',
+    observedAt: surface?.factSources.find((source) => source.id === surface.defaultFactSourceId)?.observedAt
+      ?? surface?.factSources.find((source) => source.id === surface.defaultFactSourceId)?.refreshedAt
+      ?? '2026-07-13T00:00:00.000Z',
+    refreshedAt: surface?.factSources.find((source) => source.id === surface.defaultFactSourceId)?.refreshedAt,
+    sourceRevision: getProviderCatalogRevision(),
+    surface: surface?.id,
+    detail: 'Compiled Provider Catalog manifest',
+    models: [...ids].map((modelId) => buildCatalogModelContribution(provider, modelId)),
   };
 }
 
@@ -142,6 +214,23 @@ function userContribution(provider: LlmProviderEntry): CatalogLayerContribution 
   const configuredModels = provider.models;
   if (configuredModels.length === 0) return undefined;
   const userManaged = provider.catalogOwnership === 'user-managed';
+  const surface = getLoadedProviderSurface(provider.id);
+  const userRouteOptions = surface && surface.routes.length > 1
+    ? surface.routes.map((route) => ({
+        id: route.id,
+        label: route.protocol,
+        route: {
+          protocol: route.protocol,
+          baseUrl: provider.baseUrl ?? route.baseUrl,
+          headers: route.headers,
+          source: 'user' as const,
+        },
+        availability: 'unknown' as const,
+        protocolOwner: route.protocolOwner,
+        endpointOwner: surface.serviceOperator,
+        authMode: provider.authMode === 'account' ? 'account' as const : provider.authMode,
+      }))
+    : undefined;
   return {
     source: 'user',
     observedAt: provider.lastModelRefreshAt ?? provider.lastTestedAt ?? '2026-07-13T00:00:00.000Z',
@@ -151,9 +240,10 @@ function userContribution(provider: LlmProviderEntry): CatalogLayerContribution 
     models: configuredModels.map((model) => ({
       modelId: model.id,
       enabled: model.enabled !== false,
+      preferredRouteOptionId: model.preferredRouteOptionId,
       defaultBudgetTokens: model.defaultBudgetTokens,
-      reasoning: model.defaultReasoningSelection
-        ? { defaultSelection: model.defaultReasoningSelection }
+      controls: model.defaultReasoningSelection
+        ? { reasoning: { defaultSelection: model.defaultReasoningSelection } }
         : undefined,
       ...(userManaged ? {
         label: model.label,
@@ -161,6 +251,7 @@ function userContribution(provider: LlmProviderEntry): CatalogLayerContribution 
         availability: model.availability ?? 'available',
         unavailableReason: model.availabilityReason,
       } : {}),
+      ...(userRouteOptions ? { routeOptions: userRouteOptions } : {}),
     })),
   };
 }
@@ -175,22 +266,24 @@ export function toDiscoveryModelContributions(models: LlmProviderModel[]): Catal
   }));
 }
 
-export function completeDiscoveryContributions(
+export function applyDiscoveryAuthority(
   provider: LlmProviderEntry,
   contributions: CatalogModelContribution[],
 ): CatalogModelContribution[] {
-  if (provider.catalogOwnership !== 'app-managed') return contributions;
+  const surface = getLoadedProviderSurface(provider.id);
+  if (!surface || surface.discovery.authority !== 'authoritative-list') return contributions;
   const discoveredKeys = new Set(contributions.flatMap((model) => (
     [model.modelId, ...(model.aliases ?? [])].map(normalizeDiscoveredModelMatchKey).filter(Boolean)
   )));
   const completed = [...contributions];
-  for (const seed of getProviderSeedModelDefinitions(provider.id)) {
-    const seedKeys = [seed.modelId, ...(seed.aliases ?? [])].map(normalizeDiscoveredModelMatchKey);
-    if (seedKeys.some((value) => discoveredKeys.has(value))) continue;
+  for (const definition of getProviderModelDefinitions(provider.id)) {
+    if (definition.presencePolicy === 'maintained') continue;
+    const definitionKeys = [definition.modelId, ...definition.aliases].map(normalizeDiscoveredModelMatchKey);
+    if (definitionKeys.some((value) => discoveredKeys.has(value))) continue;
     completed.push({
-      modelId: seed.modelId,
+      modelId: definition.modelId,
       availability: 'unavailable',
-      unavailableReason: 'This model was not returned by the latest successful provider discovery.',
+      unavailableReason: 'This account-scoped model was absent from the authoritative provider catalog.',
     });
   }
   return completed;
@@ -212,21 +305,31 @@ export function buildEffectiveCatalogRequest(
   provider: LlmProviderEntry,
   requestedModelId?: string,
 ): EffectiveCatalogRequest {
-  const preset = getProviderPreset(provider.id);
-  const seed = seedContribution(provider, requestedModelId);
+  const surface = getLoadedProviderSurface(provider.id);
+  const catalog = catalogContribution(provider, requestedModelId);
   const observedAt = '2026-07-13T00:00:00.000Z';
-  const overlay = projectProtocolOverlays(
-    preset?.overlays ?? [],
+  const preferredProtocols = new Map((surface?.models ?? []).map((model) => {
+    const preferredRouteOptionId = provider.models.find((entry) => entry.id === model.modelId)
+      ?.preferredRouteOptionId;
+    const preferredRoute = preferredRouteOptionId
+      ? model.routeOptions?.find((option) => option.id === preferredRouteOptionId)
+      : undefined;
+    return [model.modelId, preferredRoute?.route.protocol ?? provider.protocol] as const;
+  }));
+  const overlay = projectModelProtocolOverlays(
+    surface?.protocolOverrides ?? [],
     provider.protocol,
-    preset ? observedAt : new Date().toISOString(),
+    preferredProtocols,
+    surface ? observedAt : new Date().toISOString(),
   );
   return {
     providerId: provider.id,
     accountId: provider.activeAccountId ?? `anonymous:${provider.id}`,
     protocol: provider.protocol,
     catalogOwnership: provider.catalogOwnership,
+    discoveryAuthority: surface?.discovery.authority ?? 'additive',
     fallbackRoute: routeFor(provider),
-    seed,
+    catalog,
     overlay,
     entitlement: copilotEntitlementContribution(provider),
     user: userContribution(provider),
@@ -248,9 +351,22 @@ export function refreshEffectiveCatalogDiscovery(
   detail?: string,
 ): Promise<EffectiveCatalogSnapshot> {
   const request = buildEffectiveCatalogRequest(provider);
-  const discovered = completeDiscoveryContributions(
+  const projection = getLoadedProviderSurface(provider.id)?.discoveredModelProjection;
+  const projectedContributions = (contributions ?? toDiscoveryModelContributions(models)).map((model) => ({
+    ...model,
+    ...(projection?.fast ? {
+      controls: {
+        ...model.controls,
+        fast: projection.fast,
+      },
+    } : {}),
+    ...(projection?.executionBindings ? {
+      executionBindings: projection.executionBindings,
+    } : {}),
+  }));
+  const discovered = applyDiscoveryAuthority(
     provider,
-    contributions ?? toDiscoveryModelContributions(models),
+    projectedContributions,
   );
   return effectiveCatalogService.refreshDiscovery(request, async () => ({
     protocol: provider.protocol,
@@ -288,13 +404,23 @@ export function selectEffectiveModelFromSnapshot(
   modelId: string,
   recommendedModelIds: readonly string[] = [],
 ): EffectiveModelSelection {
-  const isUsable = (entry: EffectiveModel): boolean => entry.enabled !== false && entry.availability === 'available';
-  const exact = snapshot.models.find((entry) => entry.modelId === modelId && isUsable(entry));
-  const alias = exact ? undefined : snapshot.models.find((entry) => entry.aliases.includes(modelId) && isUsable(entry));
+  // Structural capability resolution must survive an unconfigured account or a
+  // not-yet-refreshed entitlement catalog. Only an explicit denial removes the
+  // selected model here; RequestPlanner remains the fail-closed availability gate.
+  const isStructurallySelectable = (entry: EffectiveModel): boolean => entry.enabled !== false
+    && entry.availability !== 'unavailable'
+    && entry.selection?.pickerVisibility !== 'internal';
+  const exact = snapshot.models.find((entry) => entry.modelId === modelId && isStructurallySelectable(entry));
+  const alias = exact
+    ? undefined
+    : snapshot.models.find((entry) => entry.aliases.includes(modelId) && isStructurallySelectable(entry));
   const model = exact ?? alias ?? null;
   const recommendedOrder = new Map(recommendedModelIds.map((id, index) => [id, index]));
   const recommendations = snapshot.models
-    .filter((entry) => entry.enabled !== false && entry.availability === 'available' && entry.modelId !== model?.modelId)
+    .filter((entry) => entry.enabled !== false
+      && entry.availability === 'available'
+      && entry.selection?.pickerVisibility !== 'internal'
+      && entry.modelId !== model?.modelId)
     .sort((left, right) => (
       (recommendedOrder.get(left.modelId) ?? Number.MAX_SAFE_INTEGER)
       - (recommendedOrder.get(right.modelId) ?? Number.MAX_SAFE_INTEGER)
@@ -324,7 +450,7 @@ export function resolveEffectiveModelSelection(
   return selectEffectiveModelFromSnapshot(
     snapshot,
     modelId,
-    getProviderPreset(providerId)?.recommendedModels,
+    getLoadedProviderSurface(providerId)?.recommendedModels,
   );
 }
 
@@ -336,7 +462,14 @@ export function planEffectiveModelRequest(input: {
   clientBudgetTokens?: number;
   requestedTemperature?: number;
 }): RequestPlanningResult {
-  const selection = resolveEffectiveModelSelection(input.providerId, input.modelId, input.settings);
+  const snapshot = resolveEffectiveCatalog(input.providerId, input.settings, input.modelId);
+  const selection = snapshot
+    ? selectEffectiveModelFromSnapshot(
+        snapshot,
+        input.modelId,
+        getLoadedProviderSurface(input.providerId)?.recommendedModels,
+      )
+    : { requestedModelId: input.modelId, model: null, recommendations: [] };
   if (!selection.model) {
     const controls: ConversationTurnControls = {
       reasoningLevel: 'off',
@@ -354,6 +487,7 @@ export function planEffectiveModelRequest(input: {
   }
   const result = planModelRequest({
     model: selection.model,
+    catalogModels: snapshot?.models,
     controls: input.controls,
     clientBudgetTokens: input.clientBudgetTokens,
     requestedTemperature: input.requestedTemperature,
@@ -380,14 +514,23 @@ export function recordEffectivePlanSuccess(
   if (!provider || !model) return;
   const grantsTier = activeTier?.entitlement === 'unknown'
     && activeTier.activation.kind !== 'implicit';
+  const fastControl = model.controls.fast;
   const grantsFast = plan.fastMode
-    && model.fast.kind !== 'unsupported'
-    && model.fast.kind !== 'unknown'
-    && model.fast.entitlement === 'unknown';
-  if (!grantsTier && !grantsFast) return;
+    && fastControl.state === 'selectable'
+    && fastControl.entitlement === 'unknown';
+  const activatedBinding = model.executionBindings?.find((binding) => (
+    binding.entitlement === 'unknown'
+    && plan.appliedBindingIds.includes(binding.id)
+    && executionBindingMatchesPlan(binding, plan)
+    && binding.actions.some((action) => (
+      action.kind === 'model-switch' && action.targetModelId === plan.effectiveModelId
+    ))
+  ));
+  if (!grantsTier && !grantsFast && !activatedBinding) return;
   const activated = [
     grantsTier && activeTier ? `context tier ${activeTier.id}` : '',
     grantsFast ? 'Fast mode' : '',
+    activatedBinding ? `execution binding ${activatedBinding.id}` : '',
   ].filter(Boolean);
   effectiveCatalogService.recordObserved({
     providerId,
@@ -402,8 +545,17 @@ export function recordEffectivePlanSuccess(
           )),
         }
       : {}),
-    ...(grantsFast && model.fast.kind !== 'unsupported' && model.fast.kind !== 'unknown'
-      ? { fast: { ...model.fast, entitlement: 'granted' as const } }
+    ...(grantsFast && fastControl.state === 'selectable'
+      ? { controls: { fast: { ...fastControl, entitlement: 'granted' as const } } }
+      : {}),
+    ...(activatedBinding
+      ? {
+          executionBindings: model.executionBindings?.map((binding) => (
+            binding.id === activatedBinding.id
+              ? { ...binding, entitlement: 'granted' as const }
+              : binding
+          )),
+        }
       : {}),
   }], `Successful request activated ${activated.join(' and ')}`);
 }

@@ -25,9 +25,19 @@ export const cloneProvider = (provider: LlmProviderEntry): LlmProviderEntry => (
     : undefined,
   authAccountIds: provider.authAccountIds ? { ...provider.authAccountIds } : undefined,
   hasStoredSecretByAuthMode: provider.hasStoredSecretByAuthMode ? { ...provider.hasStoredSecretByAuthMode } : undefined,
+  secretRefs: provider.secretRefs ? { ...provider.secretRefs } : undefined,
+  connectionValues: provider.connectionValues ? { ...provider.connectionValues } : undefined,
   providerAvailability: { ...provider.providerAvailability },
-  protocolOptions: provider.protocolOptions ? [...provider.protocolOptions] : undefined,
-  protocolBaseUrls: provider.protocolBaseUrls ? { ...provider.protocolBaseUrls } : undefined,
+  catalogProvenance: provider.catalogProvenance.map((entry) => ({ ...entry })),
+  connectionSchema: provider.connectionSchema
+    ? {
+        ...provider.connectionSchema,
+        fields: provider.connectionSchema.fields.map((field) => ({ ...field })),
+        credentialAlternatives: provider.connectionSchema.credentialAlternatives
+          ?.map((alternative) => ({ ...alternative, fieldIds: [...alternative.fieldIds] })),
+        headerMappings: provider.connectionSchema.headerMappings?.map((mapping) => ({ ...mapping })),
+      }
+    : undefined,
   models: provider.models.map((model) => ({ ...model })),
   recommendedModels: [...provider.recommendedModels],
   capabilities: provider.capabilities ? [...provider.capabilities] : undefined,
@@ -56,17 +66,13 @@ const PROVIDER_CATEGORY_TRANSLATIONS = {
     label: 'settings.providerCategory.cloudPlatform.label',
     description: 'settings.providerCategory.cloudPlatform.description',
   },
-  'official-compatible': {
-    label: 'settings.providerCategory.officialCompatible.label',
-    description: 'settings.providerCategory.officialCompatible.description',
-  },
   'coding-token-plan': {
     label: 'settings.providerCategory.codingTokenPlan.label',
     description: 'settings.providerCategory.codingTokenPlan.description',
   },
-  'third-party-compatible': {
-    label: 'settings.providerCategory.thirdPartyCompatible.label',
-    description: 'settings.providerCategory.thirdPartyCompatible.description',
+  'compatible-access': {
+    label: 'settings.providerCategory.compatibleAccess.label',
+    description: 'settings.providerCategory.compatibleAccess.description',
   },
   local: {
     label: 'settings.providerCategory.local.label',
@@ -85,29 +91,6 @@ export const getProviderCategoryTranslation = (category: LlmProviderCategory) =>
 export const getProviderProtocolLabel = (protocol: ProviderProtocol): string => {
   const definition = LLM_PROVIDER_PROTOCOL_DEFINITIONS.find((entry) => entry.id === protocol);
   return definition?.label ?? protocol;
-};
-
-export const providerSupportsProtocolSelection = (
-  provider: Pick<LlmProviderEntry, 'protocolEditable' | 'protocolOptions'>,
-): boolean => Boolean(provider.protocolEditable && provider.protocolOptions?.length);
-
-export const getProviderProtocolOptions = (
-  provider: Pick<LlmProviderEntry, 'protocol' | 'protocolEditable' | 'protocolOptions'>,
-): ProviderProtocol[] => providerSupportsProtocolSelection(provider)
-  ? provider.protocolOptions ?? [provider.protocol]
-  : [provider.protocol];
-
-export const providerShowsResponsesHint = (protocol: ProviderProtocol): boolean =>
-  protocol === 'OpenAIResponses';
-
-export const resolveConnectionBaseUrlForProtocol = (
-  provider: Pick<LlmProviderEntry, 'protocol' | 'baseUrl' | 'protocolBaseUrls'>,
-  nextProtocol: ProviderProtocol,
-): string => {
-  const previousDefault = provider.protocolBaseUrls?.[provider.protocol]?.replace(/\/+$/, '') ?? '';
-  const nextDefault = provider.protocolBaseUrls?.[nextProtocol]?.replace(/\/+$/, '') ?? '';
-  const current = (provider.baseUrl ?? '').trim().replace(/\/+$/, '');
-  return !current || current === previousDefault ? nextDefault || current : provider.baseUrl?.trim() ?? current;
 };
 
 export const getProviderStatusLabel = (provider: Pick<LlmProviderEntry, 'status' | 'isConfigured'>): TranslationKey => {

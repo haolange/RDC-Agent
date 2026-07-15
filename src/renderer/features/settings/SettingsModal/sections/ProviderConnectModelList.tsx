@@ -10,7 +10,7 @@ import { ProviderConnectModelRow } from './ProviderConnectModelRow';
 type Translate = ReturnType<typeof useI18n>['t'];
 
 interface ProviderConnectModelListProps {
-  provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured'>;
+  provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured' | 'serviceOperator' | 'authMode'>;
   models: LlmProviderModel[];
   expandedModelId: string | null;
   disabled: boolean;
@@ -76,14 +76,14 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
   return (
     <div className="settings-model-section settings-provider-connect-models" data-testid="settings-provider-connect-models">
       <div className="settings-model-section-header">
-        <span>{provider.catalogOwnership === 'app-managed'
+        <span>{provider.catalogOwnership !== 'user-managed'
           ? t('settings.providers.capability.appManagedModels')
           : t('settings.providers.capability.userManagedModels')}</span>
         <span className="settings-help-text">
           {t('settings.providerModelCount', { count: resolvedModels.length })}
         </span>
       </div>
-      {provider.catalogOwnership === 'app-managed' ? (
+      {provider.catalogOwnership !== 'user-managed' ? (
         <div className="settings-provider-notice" data-testid="settings-provider-app-managed-models">
           {t('settings.providers.capability.appManagedProviderHint')}
         </div>

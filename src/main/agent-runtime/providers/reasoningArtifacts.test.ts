@@ -24,8 +24,13 @@ const openAiLevels = {
 
 const requestPlan: RequestPlan = {
   providerId: 'openai',
+  adapterId: 'openai-responses',
+  catalogRevision: 'test-catalog',
+  routeRevision: 'test-route',
+  selectedModelId: 'gpt-5.5',
   effectiveModelId: 'gpt-5.5',
-  route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test', source: 'preset' },
+  appliedBindingIds: [],
+  route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test', source: 'catalog' },
   headers: {},
   bodyPatch: {},
   contextBudgetTokens: 128_000,

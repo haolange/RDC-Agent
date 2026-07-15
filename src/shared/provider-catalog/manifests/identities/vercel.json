@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "id": "vercel",
+  "name": "Vercel AI Gateway",
+  "npm": "@ai-sdk/gateway",
+  "env": [
+    "AI_GATEWAY_API_KEY"
+  ],
+  "docsUrl": "https://github.com/vercel/ai/tree/5eb85cc45a259553501f535b8ac79a77d0e79223/packages/gateway",
+  "provenance": {
+    "sourceKind": "models.dev",
+    "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+    "refreshedAt": "2026-07-15",
+    "openCodeCommit": "571e7b852f82415faf65466e1536357a048bdf5a",
+    "hermesCommit": "bb5fc723b67cdf31828a5a64d997c9eaf4554f57"
+  }
+}

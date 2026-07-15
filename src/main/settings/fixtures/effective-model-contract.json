@@ -4,10 +4,10 @@
     "modelId": "gpt-5.5",
     "protocol": "OpenAIResponses",
     "defaultBudgetTokens": 256000,
-    "normalPromptCapTokens": null,
+    "normalPromptCapTokens": 256000,
     "oneMillionPromptCapTokens": null,
     "oneMillionActivation": null,
-    "fastKind": "request-param"
+    "fastState": "selectable"
   },
   {
     "providerId": "claude-account",
@@ -17,16 +17,16 @@
     "normalPromptCapTokens": 200000,
     "oneMillionPromptCapTokens": 1000000,
     "oneMillionActivation": "header",
-    "fastKind": "unsupported"
+    "fastState": "unsupported"
   },
   {
     "providerId": "anthropic",
     "modelId": "claude-sonnet-5",
     "protocol": "AnthropicMessages",
     "defaultBudgetTokens": 256000,
-    "normalPromptCapTokens": 872000,
-    "oneMillionPromptCapTokens": 872000,
+    "normalPromptCapTokens": 1000000,
+    "oneMillionPromptCapTokens": 1000000,
     "oneMillionActivation": "implicit",
-    "fastKind": "unsupported"
+    "fastState": "unsupported"
   }
 ]

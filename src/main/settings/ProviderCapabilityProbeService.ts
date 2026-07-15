@@ -72,8 +72,11 @@ export function buildProbeFailurePatch(
     return { modelId: target.model.modelId, contextTiers: [{ id: plan.activeTierId, entitlement: 'denied' }] };
   }
   if (request.mode === 'fast' && (status === 400 || status === 403)
-    && target.model.fast.kind !== 'unknown' && target.model.fast.kind !== 'unsupported') {
-    return { modelId: target.model.modelId, fast: { ...target.model.fast, entitlement: 'denied' } };
+    && target.model.controls.fast.state === 'selectable') {
+    return {
+      modelId: target.model.modelId,
+      controls: { fast: { ...target.model.controls.fast, entitlement: 'denied' } },
+    };
   }
   return null;
 }
@@ -147,14 +150,16 @@ export class ProviderCapabilityProbeService {
       }
     }
     if (request.mode === 'fast'
-      && (target.model.fast.kind === 'unknown'
-        || target.model.fast.kind === 'unsupported'
-        || target.model.fast.entitlement === 'denied')) {
+      && (target.model.controls.fast.state !== 'selectable'
+        || target.model.controls.fast.entitlement === 'denied'
+        || target.model.resolvedControls?.fast.state === 'blocked')) {
       return { success: false, status: 'denied', requestSent: false, detail: 'Fast activation is not selectable.' };
     }
 
     const controls = {
-      reasoningLevel: target.model.reasoning.supportsOff ? 'off' : target.model.reasoning.defaultSelection,
+      reasoningLevel: target.model.controls.reasoning.supportsOff
+        ? 'off' as const
+        : target.model.controls.reasoning.defaultSelection,
       maxContextMode: request.mode === 'one-million-context',
       fastModel: request.mode === 'fast',
     };

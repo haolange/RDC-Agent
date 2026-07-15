@@ -1,0 +1,2156 @@
+{
+  "schemaVersion": 2,
+  "id": "github-copilot",
+  "identityIds": [
+    "github-copilot"
+  ],
+  "profileId": "multi-protocol",
+  "adapterIds": [
+    "openai-compatible",
+    "openai-responses",
+    "anthropic-messages"
+  ],
+  "authSchemaId": "oauth-account",
+  "discoveryPolicyId": "account-catalog",
+  "vendorId": "github",
+  "label": "GitHub Copilot",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "login-authorization",
+  "surfaceKind": "account",
+  "serviceOperator": "github",
+  "endpointClass": "account-surface",
+  "endpointOwnership": "service-operator",
+  "catalogOwnership": "app-managed",
+  "factSources": [
+    {
+      "id": "user-observation:github-copilot:2026-07-14",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "RDC-Agent-Provider-Model-Catalog.md@2026-07-14",
+      "observedAt": "2026-07-14",
+      "refreshedAt": "2026-07-15T13:04:00+08:00",
+      "surface": "github-copilot",
+      "accountScope": "observed-account",
+      "surfaceBuild": "VS Code build unrecorded",
+      "plan": "Copilot Pro+"
+    },
+    {
+      "id": "models.dev:github-copilot:1",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "github-copilot",
+      "surface": "github-copilot"
+    }
+  ],
+  "defaultFactSourceId": "user-observation:github-copilot:2026-07-14",
+  "authModes": [
+    "oauth"
+  ],
+  "accountLoginConfigured": true,
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "reasoning",
+    "vision-input",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.githubcopilot.com",
+      "default": true,
+      "protocolOwner": "openai"
+    },
+    {
+      "id": "OpenAIResponses",
+      "protocol": "OpenAIResponses",
+      "adapterId": "openai-responses",
+      "baseUrl": "https://api.githubcopilot.com",
+      "protocolOwner": "openai"
+    },
+    {
+      "id": "AnthropicMessages",
+      "protocol": "AnthropicMessages",
+      "adapterId": "anthropic-messages",
+      "baseUrl": "https://api.githubcopilot.com/v1",
+      "protocolOwner": "anthropic"
+    }
+  ],
+  "discovery": {
+    "authority": "entitlement-overlay",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "account-catalog"
+    }
+  },
+  "models": [
+    {
+      "modelId": "claude-sonnet-4.6",
+      "label": "claude-sonnet-4.6",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Fixed 1M context",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "granted",
+          "tierId": "default"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-opus-4.6",
+      "label": "claude-opus-4.6",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Fixed 1M context",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "granted",
+          "tierId": "default"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-opus-4.8",
+      "label": "claude-opus-4.8",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Fixed 1M context",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted",
+          "label": "Fast"
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "granted",
+          "tierId": "default"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "executionBindings": [
+        {
+          "id": "fast:model-switch",
+          "when": {
+            "fast": true
+          },
+          "actions": [
+            {
+              "kind": "model-switch",
+              "targetModelId": "claude-opus-4.8-fast"
+            }
+          ],
+          "entitlement": "granted"
+        }
+      ],
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-opus-4.8-fast",
+      "label": "Claude Opus 4.8 Fast",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Fixed 1M context",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "internal",
+        "relatedPrimaryModelIds": [
+          "claude-opus-4.8"
+        ]
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.githubcopilot.com",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "github",
+          "authMode": "account",
+          "protocolOwner": "openai"
+        },
+        {
+          "id": "OpenAIResponses",
+          "route": {
+            "protocol": "OpenAIResponses",
+            "baseUrl": "https://api.githubcopilot.com",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "github",
+          "authMode": "account",
+          "protocolOwner": "openai"
+        },
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://api.githubcopilot.com/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "github",
+          "authMode": "account",
+          "protocolOwner": "anthropic"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "granted",
+          "tierId": "default"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-sonnet-5",
+      "label": "claude-sonnet-5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Fixed 1M context",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "granted",
+          "tierId": "default"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-fable-5",
+      "label": "claude-fable-5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Fixed 1M context",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "granted",
+          "tierId": "default"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.4-mini",
+      "label": "gpt-5.4-mini",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 128000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 128000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh"
+            },
+            "offMode": "reasoning-none"
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.4",
+      "label": "gpt-5.4",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        },
+        {
+          "id": "one-million",
+          "label": "1M context",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted",
+          "tierId": "one-million"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh"
+            },
+            "offMode": "reasoning-none"
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.5",
+      "label": "gpt-5.5",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        },
+        {
+          "id": "one-million",
+          "label": "1M context",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted",
+          "tierId": "one-million"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh"
+            },
+            "offMode": "reasoning-none"
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.6-luna",
+      "label": "gpt-5.6-luna",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        },
+        {
+          "id": "one-million",
+          "label": "1M context",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted",
+          "tierId": "one-million"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "offMode": "reasoning-none"
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.6-sol",
+      "label": "gpt-5.6-sol",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        },
+        {
+          "id": "one-million",
+          "label": "1M context",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted",
+          "tierId": "one-million"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "offMode": "reasoning-none"
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.6-terra",
+      "label": "gpt-5.6-terra",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        },
+        {
+          "id": "one-million",
+          "label": "1M context",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted",
+          "tierId": "one-million"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh",
+              "max": "max"
+            },
+            "offMode": "reasoning-none"
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gemini-3.1-pro-preview",
+      "label": "gemini-3.1-pro-preview",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 200000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        },
+        {
+          "id": "one-million",
+          "label": "1M context",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 200000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted",
+          "tierId": "one-million"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gemini-3.5-flash",
+      "label": "gemini-3.5-flash",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Fixed 1M context",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "granted",
+          "tierId": "default"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            },
+            "offMode": "reasoning-none"
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "kimi-k2.7-code",
+      "label": "kimi-k2.7-code",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    }
+  ],
+  "protocolOverrides": [
+    {
+      "modelId": "claude-sonnet-4.6",
+      "protocol": "OpenAIResponses",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-responses",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "max": "max"
+              }
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-sonnet-4.6",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "max": "max"
+              },
+              "onMode": "enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-opus-4.6",
+      "protocol": "OpenAIResponses",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-responses",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "max": "max"
+              }
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-opus-4.6",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "max": "max"
+              },
+              "onMode": "enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-opus-4.8",
+      "protocol": "OpenAIResponses",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-responses",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              }
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-opus-4.8",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "onMode": "enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-opus-4.8-fast",
+      "protocol": "OpenAIResponses",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-responses",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              }
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-opus-4.8-fast",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "onMode": "enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-sonnet-5",
+      "protocol": "OpenAIResponses",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-responses",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              }
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-sonnet-5",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "onMode": "enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-fable-5",
+      "protocol": "OpenAIResponses",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-responses",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              }
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-fable-5",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "onMode": "enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.4-mini",
+      "protocol": "OpenAIResponses",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-responses",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh"
+              }
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.4-mini",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh"
+              },
+              "onMode": "enabled",
+              "offMode": "disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.4",
+      "protocol": "OpenAIResponses",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-responses",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh"
+              }
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.4",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh"
+              },
+              "onMode": "enabled",
+              "offMode": "disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.5",
+      "protocol": "OpenAIResponses",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-responses",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh"
+              }
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.5",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh"
+              },
+              "onMode": "enabled",
+              "offMode": "disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.6-luna",
+      "protocol": "OpenAIResponses",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-responses",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              }
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.6-luna",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "onMode": "enabled",
+              "offMode": "disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.6-sol",
+      "protocol": "OpenAIResponses",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-responses",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              }
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.6-sol",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "onMode": "enabled",
+              "offMode": "disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.6-terra",
+      "protocol": "OpenAIResponses",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-responses",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              }
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gpt-5.6-terra",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "onMode": "enabled",
+              "offMode": "disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gemini-3.1-pro-preview",
+      "protocol": "OpenAIResponses",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-responses",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high"
+              }
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gemini-3.1-pro-preview",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high"
+              },
+              "onMode": "enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gemini-3.5-flash",
+      "protocol": "OpenAIResponses",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-responses",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high"
+              }
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "gemini-3.5-flash",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "medium",
+              "levels": {
+                "low": "low",
+                "medium": "medium",
+                "high": "high"
+              },
+              "onMode": "enabled",
+              "offMode": "disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14"
+    }
+  ],
+  "recommendedModels": [
+    "claude-sonnet-4.6",
+    "claude-opus-4.6",
+    "claude-opus-4.8",
+    "claude-sonnet-5",
+    "claude-fable-5",
+    "gpt-5.4-mini",
+    "gpt-5.4",
+    "gpt-5.5",
+    "gpt-5.6-luna",
+    "gpt-5.6-sol",
+    "gpt-5.6-terra",
+    "gemini-3.1-pro-preview",
+    "gemini-3.5-flash",
+    "kimi-k2.7-code"
+  ],
+  "docsUrl": "https://github.com/features/copilot"
+}

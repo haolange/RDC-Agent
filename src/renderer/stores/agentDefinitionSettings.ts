@@ -1,4 +1,9 @@
-import type { AgentDefinitionSaveRequest, AgentDefinitionSaveResult, AgentManifestDefinition } from '@shared/types/agentManifest';
+import type {
+  AgentDefinitionCommitSnapshot,
+  AgentDefinitionSaveRequest,
+  AgentDefinitionSaveResult,
+  AgentManifestDefinition,
+} from '@shared/types/agentManifest';
 import type { AppSettings, LlmAgentRoute } from '@shared/types/settings';
 import { splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
 
@@ -85,5 +90,5 @@ export const settleAgentDefinitionSave = (
 export const rollbackAgentDefinitionSave = (
   settings: AppSettings,
   agentId: string,
-  rollback: AgentDefinitionRollback,
-): AppSettings => projectSettings(settings, agentId, rollback.definition, rollback.route);
+  snapshot: AgentDefinitionCommitSnapshot | null,
+): AppSettings => projectSettings(settings, agentId, snapshot?.definition ?? null, snapshot?.route ?? null);

@@ -4,30 +4,45 @@ import type {
 } from './EffectiveCatalogService';
 import type {
   ModelRoute,
-  ProviderCapabilityOverlay,
+  ProviderProtocolOverride,
 } from '@shared/types/providerCapability';
 import type { LlmProviderProtocol } from '@shared/types/settings';
 
 export function resolveModelRoutePrecedence(input: {
   modelRoute?: ModelRoute;
-  userRoute?: Omit<ModelRoute, 'source'>;
-  presetRoute: Omit<ModelRoute, 'source'>;
+  catalogRoute: Omit<ModelRoute, 'source'>;
 }): ModelRoute {
-  if (input.modelRoute) return { ...input.modelRoute, source: 'model' };
-  if (input.userRoute) return { ...input.userRoute, source: 'user' };
-  return { ...input.presetRoute, source: 'preset' };
+  const withCatalogHeaders = <T extends Omit<ModelRoute, 'source'> | ModelRoute>(route: T): T => ({
+    ...route,
+    headers: {
+      ...(input.catalogRoute.headers ?? {}),
+      ...(route.headers ?? {}),
+    },
+  });
+  if (input.modelRoute) return { ...withCatalogHeaders(input.modelRoute), source: 'model' };
+  return { ...input.catalogRoute, source: 'catalog' };
 }
 
-export function projectProtocolOverlays(
-  overlays: ProviderCapabilityOverlay[],
-  protocol: LlmProviderProtocol,
+export function projectModelProtocolOverlays(
+  overlays: ProviderProtocolOverride[],
+  defaultProtocol: LlmProviderProtocol,
+  preferredProtocols: ReadonlyMap<string, LlmProviderProtocol>,
   observedAt: string,
 ): CatalogLayerContribution | undefined {
   const models = overlays
-    .filter((overlay) => !overlay.protocol || overlay.protocol === protocol)
+    .filter((overlay) => (
+      !overlay.protocol
+      || overlay.protocol === (preferredProtocols.get(overlay.modelId) ?? defaultProtocol)
+    ))
     .map((overlay) => ({ modelId: overlay.modelId, ...overlay.patch })) as CatalogModelContribution[];
   return models.length > 0
-    ? { source: 'overlay', protocol, observedAt, detail: `Capability overlay for ${protocol}`, models }
+    ? {
+        source: 'overlay',
+        protocol: defaultProtocol,
+        observedAt,
+        detail: 'Capability overlay resolved per selected model route',
+        models,
+      }
     : undefined;
 }
 

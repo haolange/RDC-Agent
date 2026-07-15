@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "id": "atomic-chat",
+  "identityIds": [
+    "atomic-chat"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "local-runtime",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "atomic-chat",
+  "label": "Atomic Chat",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "local",
+  "surfaceKind": "local",
+  "serviceOperator": "atomic-chat",
+  "endpointClass": "local-service",
+  "endpointOwnership": "local",
+  "catalogOwnership": "provider-managed",
+  "factSources": [
+    {
+      "id": "models.dev:atomic-chat:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "atomic-chat",
+      "surface": "atomic-chat"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:atomic-chat:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "ATOMIC_CHAT_API_KEY",
+        "label": "Atomic Chat Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "ATOMIC_CHAT_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "ATOMIC_CHAT_API_KEY",
+    "endpointTemplate": "http://127.0.0.1:1337/v1"
+  },
+  "authModes": [
+    "local"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "http://127.0.0.1:1337/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://atomic.chat"
+}

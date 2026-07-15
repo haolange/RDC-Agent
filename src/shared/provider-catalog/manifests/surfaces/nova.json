@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "id": "nova",
+  "identityIds": [
+    "nova"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "nova",
+  "label": "Nova",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "amazon-web-services",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "models.dev:nova:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "nova",
+      "surface": "nova"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:nova:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "NOVA_API_KEY",
+        "label": "Nova Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "NOVA_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "NOVA_API_KEY",
+    "endpointTemplate": "https://api.nova.amazon.com/v1"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.nova.amazon.com/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://nova.amazon.com/dev/documentation"
+}

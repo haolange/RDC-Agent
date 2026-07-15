@@ -3,6 +3,9 @@ import type { AppMode } from '@shared/types/session';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
+import { useAppSettingsStore } from '../../../stores/appSettingsStore';
+import { createConversationRequestId } from '../composer/composerSendFlow';
+import { useTurnControlsStore } from '../composer/useTurnControls';
 
 export const modeForHandoffAgent = (agentId: string): AppMode =>
   agentId === 'plan'
@@ -24,7 +27,9 @@ export function useAgentHandoffActions(message: {
   return async (handoff: { agent: string; prompt: string }) => {
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
+    const agentCommit = await useAppSettingsStore.getState().flushAgentDefinitionSaves(handoff.agent);
     const result = await electronAPI.conversation.sendMessage({
+      requestId: createConversationRequestId(),
       projectId: currentProject?.projectId ?? message.projectId ?? null,
       sessionId: currentSession?.sessionId ?? message.sessionId ?? null,
       currentRunId: currentRun?.runId ?? message.runId ?? null,
@@ -32,7 +37,14 @@ export function useAgentHandoffActions(message: {
       agentId: handoff.agent,
       message: handoff.prompt,
       attachments: [],
+      turnControls: { ...useTurnControlsStore.getState().turnControls },
+      configurationCommit: {
+        agentId: handoff.agent,
+        agentCommitHash: agentCommit?.commitHash,
+        providerId: agentCommit?.route?.providerId,
+      },
     });
-    upsertConversationMessages([result.userMessage, result.assistantDraftMessage]);
+    if (result.status === 'rejected') throw new Error(result.error.message);
+    upsertConversationMessages([result.turn.userMessage, result.turn.assistantDraftMessage]);
   };
 }

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "id": "multi-protocol",
+  "routeMechanics": [
+    {
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapter": "openai-compatible"
+    },
+    {
+      "protocol": "OpenAIResponses",
+      "adapter": "openai-responses"
+    },
+    {
+      "protocol": "AnthropicMessages",
+      "adapter": "anthropic-messages"
+    },
+    {
+      "protocol": "OpenRouterChatCompletions",
+      "adapter": "openrouter-chat"
+    },
+    {
+      "protocol": "AzureOpenAIChatCompletions",
+      "adapter": "azure-openai-chat"
+    },
+    {
+      "protocol": "GoogleGemini",
+      "adapter": "google-gemini"
+    },
+    {
+      "protocol": "GoogleVertexGemini",
+      "adapter": "google-vertex-gemini"
+    },
+    {
+      "protocol": "GoogleVertexAnthropic",
+      "adapter": "google-vertex-anthropic"
+    },
+    {
+      "protocol": "GitLabDuo",
+      "adapter": "gitlab-duo"
+    },
+    {
+      "protocol": "SapAiCoreOrchestration",
+      "adapter": "sap-ai-core-orchestration"
+    },
+    {
+      "protocol": "SapAiCoreFoundationModels",
+      "adapter": "sap-ai-core-foundation-models"
+    },
+    {
+      "protocol": "OllamaOpenAICompatibleChatCompletions",
+      "adapter": "ollama-openai-compatible"
+    }
+  ]
+}

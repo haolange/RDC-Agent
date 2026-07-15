@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 2,
+  "id": "deepinfra",
+  "identityIds": [
+    "deepinfra"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "json-catalog",
+  "vendorId": "deepinfra",
+  "label": "Deep Infra",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "deepinfra",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "provider-managed",
+  "factSources": [
+    {
+      "id": "models.dev:deepinfra:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "deepinfra",
+      "surface": "deepinfra"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:deepinfra:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "DEEPINFRA_API_KEY",
+        "label": "Deepinfra Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "DEEPINFRA_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "DEEPINFRA_API_KEY",
+    "endpointTemplate": "https://api.deepinfra.com/v1/openai"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.deepinfra.com/v1/openai",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "authoritative-list",
+    "strategy": {
+      "kind": "json-catalog",
+      "url": "https://api.deepinfra.com/v1/openai/models",
+      "collectionPath": "data",
+      "mapping": {
+        "id": "id",
+        "label": "id",
+        "contextWindow": "metadata.context_length",
+        "contextWindowKind": "total",
+        "maxOutputTokens": "metadata.max_output_tokens"
+      },
+      "admission": {
+        "predicates": [
+          {
+            "path": "metadata.tags",
+            "includes": "chat"
+          }
+        ]
+      }
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://deepinfra.com/models"
+}

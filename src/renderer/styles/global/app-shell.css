@@ -656,16 +656,6 @@
   opacity: 0.55;
 }
 
-.composer-usage-indicator.is-blocked {
-  border-color: color-mix(in srgb, var(--token-status-error) 42%, var(--token-border-default));
-}
-
-.composer-usage-indicator.is-blocked .composer-usage-ring-progress,
-.composer-usage-indicator.is-blocked .composer-usage-value-number {
-  color: var(--token-status-error);
-  stroke: var(--token-status-error);
-}
-
 /* composer-usage-tooltip 已移除，改为 title attribute hover */
 
 .composer-usage {
@@ -781,13 +771,6 @@
 
 .context-breakdown-status.is-pending {
   color: var(--token-status-info);
-}
-
-.context-breakdown-status.is-blocked {
-  align-items: flex-start;
-  flex-direction: column;
-  border-color: color-mix(in srgb, var(--token-status-error) 36%, var(--token-border-muted));
-  color: var(--token-status-error);
 }
 
 /* Hero: % Full · occupied/window · full-width bar */
@@ -1058,9 +1041,16 @@
   white-space: nowrap;
 }
 
+.context-breakdown-empty-state {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: 0 var(--space-5) var(--space-5);
+}
+
 .context-breakdown-empty {
   margin: 0;
-  padding: var(--space-5);
   color: var(--token-text-placeholder);
   font-size: var(--text-md);
   line-height: 1.55;

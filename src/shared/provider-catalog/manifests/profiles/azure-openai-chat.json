@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "azure-openai-chat",
+  "routeMechanics": [
+    {
+      "protocol": "AzureOpenAIChatCompletions",
+      "adapter": "azure-openai-chat"
+    }
+  ]
+}

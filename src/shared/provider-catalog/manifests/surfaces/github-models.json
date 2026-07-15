@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 2,
+  "id": "github-models",
+  "identityIds": [
+    "github-models"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "json-catalog",
+  "vendorId": "github",
+  "label": "GitHub Models",
+  "status": "beta",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "github",
+  "endpointClass": "first-party",
+  "endpointOwnership": "service-operator",
+  "catalogOwnership": "provider-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:github-models:0",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "github-models-api-2026-03-10",
+      "refreshedAt": "2026-07-15",
+      "surface": "github-models"
+    },
+    {
+      "id": "models.dev:github-models:1",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "github-models",
+      "surface": "github-models"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:github-models:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "vision-input",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://models.github.ai/inference",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2026-03-10"
+      },
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "authoritative-list",
+    "strategy": {
+      "kind": "json-catalog",
+      "url": "https://models.github.ai/catalog/models",
+      "collectionPath": "$",
+      "headers": {
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2026-03-10"
+      },
+      "mapping": {
+        "id": "id",
+        "label": "name",
+        "contextWindow": "limits.max_input_tokens",
+        "contextWindowKind": "prompt",
+        "contextWindowAuthority": "model-catalog",
+        "maxOutputTokens": "limits.max_output_tokens",
+        "modality": "supported_input_modalities",
+        "toolCalling": {
+          "path": "capabilities",
+          "includes": "tool-calling"
+        },
+        "visionInput": {
+          "path": "supported_input_modalities",
+          "includes": "image"
+        },
+        "structuredOutput": {
+          "path": "capabilities",
+          "includes": "structured-outputs"
+        }
+      },
+      "admission": {
+        "allowedModalities": [
+          "text",
+          "image"
+        ],
+        "denyPatterns": [
+          "*embed*",
+          "*rerank*"
+        ]
+      }
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://docs.github.com/en/rest/models/catalog"
+}

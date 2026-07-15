@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 2,
+  "id": "wafer.ai",
+  "identityIds": [
+    "wafer.ai"
+  ],
+  "profileId": "openai-compatible",
+  "adapterIds": [
+    "openai-compatible"
+  ],
+  "authSchemaId": "declarative-api-key",
+  "discoveryPolicyId": "openai-compatible",
+  "vendorId": "wafer.ai",
+  "label": "Wafer",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "compatible-access",
+  "surfaceKind": "compatible-api",
+  "serviceOperator": "wafer.ai",
+  "endpointClass": "third-party-gateway",
+  "endpointOwnership": "third-party",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "models.dev:wafer.ai:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "wafer.ai",
+      "surface": "wafer.ai"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:wafer.ai:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "WAFER_API_KEY",
+        "label": "Wafer Api Key",
+        "kind": "secret",
+        "required": true,
+        "environmentVariable": "WAFER_API_KEY"
+      }
+    ],
+    "primarySecretFieldId": "WAFER_API_KEY",
+    "endpointTemplate": "https://pass.wafer.ai/v1"
+  },
+  "authModes": [
+    "api-key"
+  ],
+  "baseUrlEditable": false,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://pass.wafer.ai/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "openai-compatible"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://docs.wafer.ai/wafer-pass"
+}

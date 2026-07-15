@@ -4,8 +4,8 @@ import type { ProviderReasoningContract } from '@shared/types/rdxRuntime';
 import type { LlmProviderEntry, LlmProviderId, LlmProviderProtocol } from '@shared/types/settings';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 
-const NATIVE_TOOL_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages', 'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'OpenRouterChatCompletions', 'GoogleGemini', 'OllamaOpenAICompatibleChatCompletions']);
-const STREAMING_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages', 'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'OpenRouterChatCompletions', 'GoogleGemini', 'OllamaOpenAICompatibleChatCompletions']);
+const NATIVE_TOOL_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages', 'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'OpenRouterChatCompletions', 'GoogleGemini', 'GitLabDuo', 'SapAiCoreOrchestration', 'SapAiCoreFoundationModels', 'OllamaOpenAICompatibleChatCompletions']);
+const STREAMING_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages', 'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'OpenRouterChatCompletions', 'GoogleGemini', 'GitLabDuo', 'SapAiCoreOrchestration', 'SapAiCoreFoundationModels', 'OllamaOpenAICompatibleChatCompletions']);
 const OPENAI_NATIVE_IDS = new Set(['openai', 'openai-eu', 'openai-us', 'chatgpt-account']);
 const ANTHROPIC_NATIVE_IDS = new Set(['anthropic', 'claude-account']);
 
@@ -38,6 +38,7 @@ const RAW_REASONING_PROVIDER_IDS = new Set([
   'minimax-global-coding-plan',
   'xiaomi-mimo',
   'xiaomi-mimo-token-plan',
+  'friendli',
 ]);
 
 const RAW_REASONING_EVIDENCE: Record<string, string> = {
@@ -54,13 +55,14 @@ const RAW_REASONING_EVIDENCE: Record<string, string> = {
   'minimax-global-coding-plan': 'https://platform.minimax.io/docs/token-plan/other-tools',
   'xiaomi-mimo': 'https://mimo.mi.com/docs/en-US/quick-start/usage-guide/text-generation/deep-thinking',
   'xiaomi-mimo-token-plan': 'https://mimo.mi.com/docs/en-US/quick-start/usage-guide/text-generation/deep-thinking',
+  friendli: 'https://friendli.ai/docs/guides/serverless_endpoints/reasoning',
 };
 
 export function resolveProviderReasoningContract(
   provider: LlmProviderEntry | undefined,
   model: EffectiveModel | null | undefined,
 ): ProviderReasoningContract {
-  if (!provider || !model || model.reasoning.kind === 'none') {
+  if (!provider || !model || model.controls.reasoning.kind === 'none') {
     return { semantic: 'none', source: 'effective-model', displayLabel: 'None' };
   }
   if (model.route.protocol === 'OpenAIResponses' && OPENAI_NATIVE_IDS.has(provider.id)) {

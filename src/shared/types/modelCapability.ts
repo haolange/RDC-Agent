@@ -1,4 +1,4 @@
-export type NamedReasoningLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
+export type NamedReasoningLevel = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export const NAMED_REASONING_LEVELS: readonly NamedReasoningLevel[] = [
   'minimal',
   'low',
@@ -6,7 +6,6 @@ export const NAMED_REASONING_LEVELS: readonly NamedReasoningLevel[] = [
   'high',
   'xhigh',
   'max',
-  'ultra',
 ];
 
 export type ReasoningSelection = 'off' | 'on' | NamedReasoningLevel;
@@ -18,7 +17,7 @@ export const REASONING_SELECTIONS: readonly ReasoningSelection[] = [
 
 export type ReasoningControlKind = 'unknown' | 'none' | 'toggle' | 'levels' | 'always-on';
 
-export type OpenAiWireEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'ultra';
+export type OpenAiWireEffort = 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export type AnthropicWireEffort = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 export type GeminiWireThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
 
@@ -33,8 +32,8 @@ export type ReasoningWireProfile =
       kind: 'openai-compatible';
       on: NamedReasoningLevel;
       levels?: Partial<Record<NamedReasoningLevel, string>>;
-      onMode?: 'enable-thinking-true' | 'thinking-enabled';
-      offMode?: 'reasoning-none' | 'enable-thinking-false' | 'thinking-disabled';
+      onMode?: 'enable-thinking-true' | 'thinking-enabled' | 'enabled';
+      offMode?: 'reasoning-none' | 'enable-thinking-false' | 'thinking-disabled' | 'disabled';
     }
   | {
       kind: 'anthropic';
@@ -65,13 +64,14 @@ export interface ReasoningControl {
   kind: ReasoningControlKind;
   supportsOff: boolean;
   levels: NamedReasoningLevel[];
+  /**
+   * Whether `defaultSelection` is an observed provider default or only the
+   * deterministic local fallback used when the provider does not publish one.
+   */
+  defaultState?: 'known' | 'provider-managed' | 'unknown';
   defaultSelection: ReasoningSelection;
   lockedSelection?: ReasoningSelection;
   wireProfile: ReasoningWireProfile;
-  modelVariants?: {
-    offModelId: string;
-    onModelId: string;
-  };
 }
 
 export interface ConversationTurnControls {
@@ -81,7 +81,7 @@ export interface ConversationTurnControls {
 }
 
 export interface ResolvedReasoningSelection {
-  selection: ReasoningSelection;
+  selection: ReasoningSelection | 'unknown';
   control: ReasoningControl;
 }
 
@@ -100,7 +100,6 @@ export function createReasoningControl(control: ReasoningControl): ReasoningCont
     ...control,
     levels: [...control.levels],
     wireProfile: cloneReasoningWireProfile(control.wireProfile),
-    modelVariants: control.modelVariants ? { ...control.modelVariants } : undefined,
   };
 }
 

@@ -4,6 +4,7 @@ import path from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SUPER_GROK_OAUTH_REDIRECT_URI } from '@shared/constants/llm';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { getProviderModelDefinitions } from '../provider-catalog/ProviderCatalogRegistry';
 import { ProviderAccountAuthService } from './ProviderAccountAuthService';
 
 const GROK_PUBLIC_CLIENT_ID = 'b1a00492-073a-47ea-816f-4c329264a828';
@@ -584,58 +585,6 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
     expect(mocks.disconnectedAuthModes.at(-1)).toBe('account');
   });
 
-  it('implements the pinned MiniMax CN device flow with regional Anthropic routing', async () => {
-    const service = new ProviderAccountAuthService();
-    const data = fixture('minimax-oauth.json') as {
-      authorization: Record<string, unknown>;
-      token: Record<string, unknown>;
-    };
-    mocks.provider = {
-      id: 'minimax-account',
-      authMode: 'account',
-      authModeAvailability: { account: { state: 'unavailable', reason: 'TODO(live-verify)' } },
-      isConfigured: false,
-      status: 'unavailable',
-      models: [],
-    };
-    const fetchMock = vi.fn()
-      .mockImplementationOnce(async (_url: string, init: RequestInit) => {
-        const state = new URLSearchParams(String(init.body)).get('state');
-        return jsonResponse({ ...data.authorization, state });
-      })
-      .mockResolvedValueOnce(jsonResponse(data.token));
-    vi.stubGlobal('fetch', fetchMock);
-
-    const pending = await service.startLogin({ providerId: 'minimax-account', accountRegion: 'cn' });
-    expect(pending).toMatchObject({ state: 'pending', authorizationMode: 'device', available: false });
-    expect(pending.verificationUri).toBe(data.authorization.verification_uri);
-    expect(pending.userCode).toBe(data.authorization.user_code);
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      1,
-      'https://api.minimaxi.com/oauth/code',
-      expect.objectContaining({ method: 'POST' }),
-    );
-    await vi.waitFor(() => expect(mocks.savedConnections.some((entry) => entry.providerId === 'minimax-account')).toBe(true));
-    const saved = mocks.savedConnections.find((entry) => entry.providerId === 'minimax-account');
-    const bundle = JSON.parse(saved?.secretPayload ?? '{}') as Record<string, unknown>;
-    expect(bundle).toMatchObject({
-      providerId: 'minimax-account',
-      region: 'cn',
-      accessToken: 'fixture-access',
-      refreshToken: 'fixture-refresh',
-      inferenceBaseUrl: 'https://api.minimaxi.com/anthropic',
-    });
-    expect(saved?.models).toEqual(expect.arrayContaining([
-      expect.objectContaining({ id: 'MiniMax-M2.7' }),
-      expect.objectContaining({ id: 'MiniMax-M2.7-highspeed' }),
-    ]));
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      'https://api.minimaxi.com/oauth/token',
-      expect.objectContaining({ method: 'POST' }),
-    );
-  });
-
   it('loads the live ChatGPT Codex catalog and excludes Web-only Pro surfaces', async () => {
     const service = new ProviderAccountAuthService();
     mocks.provider = {
@@ -671,13 +620,14 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
       expect.objectContaining({
         modelId: 'gpt-5.4',
         defaultBudgetTokens: 272000,
-        fast: expect.objectContaining({ kind: 'request-param', entitlement: 'granted' }),
         contextTiers: expect.arrayContaining([
           expect.objectContaining({ id: 'default', maxPromptTokens: 272000, entitlement: 'granted' }),
           expect.objectContaining({ id: 'max', maxPromptTokens: 1000000, entitlement: 'unknown' }),
         ]),
       }),
     ]);
+    expect(discovery.contributions?.[0]).not.toHaveProperty('controls');
+    expect(discovery.contributions?.[0]).not.toHaveProperty('executionBindings');
     expect(fetchMock).toHaveBeenCalledWith(
       'https://chatgpt.com/backend-api/codex/models?client_version=1.0.0',
       expect.objectContaining({
@@ -685,6 +635,53 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
           Authorization: 'Bearer chatgpt-access',
           'chatgpt-account-id': 'chatgpt-account-1',
         }),
+      }),
+    );
+  });
+
+  it('keeps Copilot execution variants available to planning without exposing them in the picker', async () => {
+    const service = new ProviderAccountAuthService();
+    mocks.provider = {
+      id: 'github-copilot',
+      isConfigured: true,
+      status: 'verified',
+      models: [],
+    };
+    mocks.oauthSecret = JSON.stringify({
+      providerId: 'github-copilot',
+      accessToken: 'github-access',
+      copilotToken: 'copilot-token',
+      copilotApiBaseUrl: 'https://api.githubcopilot.com',
+      expiresAt: new Date(Date.now() + 3600000).toISOString(),
+    });
+    const copilotFixture = JSON.parse(
+      fs.readFileSync(path.resolve(__dirname, 'fixtures', 'copilot-models.json'), 'utf8'),
+    ) as unknown;
+    const fetchMock = mockFetchJson(copilotFixture);
+
+    const discovery = await service.loadEffectiveCatalog('github-copilot');
+
+    expect(discovery.models.map((model) => model.id)).toContain('claude-opus-4.8');
+    expect(discovery.models.map((model) => model.id)).not.toContain('claude-opus-4.8-fast');
+    expect(discovery.contributions?.find((entry) => entry.modelId === 'claude-opus-4.8'))
+      .not.toHaveProperty('executionBindings');
+    expect(discovery.contributions?.find((entry) => entry.modelId === 'claude-opus-4.8-fast'))
+      .not.toHaveProperty('selection');
+    const catalogModels = getProviderModelDefinitions('github-copilot');
+    expect(catalogModels.find((entry) => entry.modelId === 'claude-opus-4.8')).toMatchObject({
+      controls: { fast: { state: 'selectable' } },
+      executionBindings: [expect.objectContaining({
+        when: { fast: true },
+        actions: [{ kind: 'model-switch', targetModelId: 'claude-opus-4.8-fast' }],
+      })],
+    });
+    expect(catalogModels.find((entry) => entry.modelId === 'claude-opus-4.8-fast')).toMatchObject({
+      selection: { pickerVisibility: 'internal', relatedPrimaryModelIds: ['claude-opus-4.8'] },
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.githubcopilot.com/models',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer copilot-token' }),
       }),
     );
   });
@@ -722,5 +719,108 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
         }),
       }),
     );
+  });
+
+  it('runs the pinned Nous Portal device flow and discovers the live account catalog', async () => {
+    const service = new ProviderAccountAuthService();
+    mocks.provider = {
+      id: 'nous',
+      isConfigured: false,
+      status: 'unconfigured',
+      models: [],
+    };
+    const fetchMock = mockFetchJson(
+      {
+        device_code: 'nous-device-1',
+        user_code: 'NOUS-CODE',
+        verification_uri: 'https://portal.nousresearch.com/activate',
+        verification_uri_complete: 'https://portal.nousresearch.com/activate?code=NOUS-CODE',
+        expires_in: 600,
+        interval: 1,
+      },
+      {
+        access_token: 'nous-access-1',
+        refresh_token: 'nous-refresh-1',
+        expires_in: 3600,
+        scope: 'inference:invoke',
+        inference_base_url: 'https://inference-api.nousresearch.com/v1',
+      },
+      {
+        data: [
+          { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6' },
+          { id: 'hermes-4-405b', name: 'Hermes 4' },
+        ],
+      },
+    );
+
+    const status = await service.startLogin({ providerId: 'nous', accountLoginMode: 'device' });
+
+    expect(status).toMatchObject({
+      state: 'pending',
+      authorizationMode: 'device',
+      verificationUri: 'https://portal.nousresearch.com/activate',
+      userCode: 'NOUS-CODE',
+    });
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'https://portal.nousresearch.com/api/oauth/device/code',
+      expect.objectContaining({ method: 'POST' }),
+    );
+    const deviceBody = new URLSearchParams(fetchMock.mock.calls[0][1].body as string);
+    expect(deviceBody.get('client_id')).toBe('hermes-cli');
+    expect(deviceBody.get('scope')).toBe('inference:invoke');
+    await vi.waitFor(() => expect(mocks.savedConnections).toHaveLength(1));
+    expect(mocks.savedConnections[0].providerId).toBe('nous');
+    expect(mocks.savedConnections[0].models).toEqual([
+      { id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', enabled: true },
+    ]);
+    const bundle = JSON.parse(mocks.savedConnections[0].secretPayload) as Record<string, unknown>;
+    expect(bundle).toMatchObject({
+      providerId: 'nous',
+      accessToken: 'nous-access-1',
+      refreshToken: 'nous-refresh-1',
+      resourceUrl: 'https://inference-api.nousresearch.com/v1',
+    });
+  });
+
+  it('refreshes a Nous Portal token with the rotating refresh-token header', async () => {
+    const service = new ProviderAccountAuthService();
+    mocks.provider = {
+      id: 'nous',
+      isConfigured: true,
+      status: 'verified',
+      models: [{ id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', enabled: true }],
+    };
+    mocks.oauthSecret = JSON.stringify({
+      providerId: 'nous',
+      accessToken: 'nous-access-old',
+      refreshToken: 'nous-refresh-old',
+      resourceUrl: 'https://inference-api.nousresearch.com/v1',
+      expiresAt: new Date(Date.now() - 1000).toISOString(),
+    });
+    const fetchMock = mockFetchJson(
+      {
+        access_token: 'nous-access-new',
+        refresh_token: 'nous-refresh-new',
+        expires_in: 3600,
+      },
+      { data: [{ id: 'claude-sonnet-4-6' }] },
+    );
+
+    const status = await service.test('nous');
+
+    expect(status.state).toBe('connected');
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      'https://portal.nousresearch.com/api/oauth/token',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'x-nous-refresh-token': 'nous-refresh-old' }),
+      }),
+    );
+    expect(JSON.parse(mocks.savedConnections[0].secretPayload)).toMatchObject({
+      accessToken: 'nous-access-new',
+      refreshToken: 'nous-refresh-new',
+    });
   });
 });

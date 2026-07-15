@@ -23,6 +23,11 @@ export function resetWorkbenchStores(): void {
     runs: [],
     currentRun: null,
     currentRunUsage: null,
+    lastKnownUsage: null,
+    usageStale: false,
+    preparedTurnContext: null,
+    conversationPreparationPhase: 'idle',
+    conversationTerminalTurnId: null,
     isLoading: false,
   });
 }

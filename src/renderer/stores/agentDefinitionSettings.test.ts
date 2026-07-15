@@ -59,12 +59,24 @@ describe('agent definition optimistic settings projection', () => {
     const pending = beginAgentDefinitionSave(base, { draft: draft('provider:b'), clientRevision: 201 });
     const settled = settleAgentDefinitionSave(pending.settings, 'ask', {
       clientRevision: 201,
-      applied: true,
+      status: 'committed',
+      commitHash: 'commit-b',
       definition: definition('provider:b'),
       route: { agentId: 'ask', providerId: 'provider', modelId: 'b' },
+      lastSuccessful: {
+        clientRevision: 201,
+        commitHash: 'commit-b',
+        definition: definition('provider:b'),
+        route: { agentId: 'ask', providerId: 'provider', modelId: 'b' },
+      },
     });
     expect(settled.agents.definitions[0].models).toEqual(['provider:b']);
-    expect(rollbackAgentDefinitionSave(settled, 'ask', pending.rollback)).toMatchObject({
+    expect(rollbackAgentDefinitionSave(settled, 'ask', {
+      clientRevision: 200,
+      commitHash: 'commit-a',
+      definition: pending.rollback.definition,
+      route: pending.rollback.route,
+    })).toMatchObject({
       agents: { definitions: [{ models: ['provider:a'] }] },
       llm: { agentRoutes: [{ agentId: 'ask', providerId: 'provider', modelId: 'a' }] },
     });

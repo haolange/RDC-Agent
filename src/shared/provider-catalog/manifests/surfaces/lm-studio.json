@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 2,
+  "id": "lm-studio",
+  "identityIds": [
+    "lmstudio"
+  ],
+  "profileId": "multi-protocol",
+  "adapterIds": [
+    "openai-compatible",
+    "openai-responses"
+  ],
+  "authSchemaId": "local-runtime",
+  "discoveryPolicyId": "json-catalog",
+  "vendorId": "lm-studio",
+  "label": "LM Studio",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "local",
+  "surfaceKind": "local",
+  "serviceOperator": "lm-studio",
+  "endpointClass": "local-service",
+  "endpointOwnership": "local",
+  "catalogOwnership": "user-managed",
+  "factSources": [
+    {
+      "id": "rdc-agent:lm-studio:0",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "provider-registry-v4",
+      "refreshedAt": "2026-07-15",
+      "surface": "lm-studio"
+    },
+    {
+      "id": "models.dev:lmstudio:1",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "lmstudio",
+      "surface": "lm-studio"
+    }
+  ],
+  "defaultFactSourceId": "rdc-agent:lm-studio:0",
+  "authModes": [
+    "local"
+  ],
+  "baseUrlEditable": true,
+  "capabilities": [
+    "chat",
+    "tool-calling",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "http://127.0.0.1:1234/v1",
+      "default": true,
+      "protocolOwner": "openai"
+    },
+    {
+      "id": "OpenAIResponses",
+      "protocol": "OpenAIResponses",
+      "adapterId": "openai-responses",
+      "baseUrl": "http://127.0.0.1:1234/v1",
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "json-catalog",
+      "path": "/models",
+      "collectionPath": "data",
+      "mapping": {
+        "id": "id",
+        "label": "id"
+      },
+      "admission": {
+        "denyPatterns": [
+          "*embed*",
+          "*rerank*"
+        ]
+      }
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://lmstudio.ai/docs/developer/openai-compat/models"
+}

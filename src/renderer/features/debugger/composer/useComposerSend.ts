@@ -44,6 +44,7 @@ export function useComposerSend(options: {
     setPromptValue, pendingAttachments, setPendingAttachments,
   } = options;
   const [isPromptSending, setIsPromptSending] = useState(false);
+  const activeRequestIdRef = useRef<string | null>(null);
   const promptValueRef = useRef(promptValue);
   promptValueRef.current = promptValue;
 
@@ -57,7 +58,14 @@ export function useComposerSend(options: {
   const setConversationSnapshot = useConversationStore((state) => state.setConversationSnapshot);
   const upsertConversationMessages = useConversationStore((state) => state.upsertConversationMessages);
 
-  const { handlePrimaryStop } = useComposerStop({ showNotice, t, currentSession, currentRun, setIsPromptSending });
+  const { handlePrimaryStop } = useComposerStop({
+    showNotice,
+    t,
+    currentSession,
+    currentRun,
+    setIsPromptSending,
+    activeRequestIdRef,
+  });
 
   const isComposerBusy = isPromptSending || hasActiveConversationTurn || hasActiveDebugRun;
 
@@ -118,6 +126,10 @@ export function useComposerSend(options: {
         setCurrentRun,
         setRuns,
         setTracePresentation,
+        setActiveRequestId: (requestId) => {
+          activeRequestIdRef.current = requestId;
+        },
+        showNotice,
         failedSummary: t('app.conversationRequestFailed'),
       });
     } finally {

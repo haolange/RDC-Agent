@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 2,
+  "id": "google-vertex",
+  "identityIds": [
+    "google-vertex"
+  ],
+  "profileId": "multi-protocol",
+  "adapterIds": [
+    "google-vertex-gemini",
+    "openai-compatible"
+  ],
+  "authSchemaId": "google-vertex",
+  "discoveryPolicyId": "google-vertex-models",
+  "vendorId": "google-vertex",
+  "label": "Vertex",
+  "status": "stable",
+  "availability": {
+    "state": "unknown"
+  },
+  "category": "cloud-platform",
+  "surfaceKind": "cloud",
+  "serviceOperator": "google-cloud",
+  "endpointClass": "cloud-hosted",
+  "endpointOwnership": "cloud-platform",
+  "catalogOwnership": "provider-managed",
+  "factSources": [
+    {
+      "id": "models.dev:google-vertex:0",
+      "sourceKind": "models.dev",
+      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+      "refreshedAt": "2026-07-15",
+      "identityId": "google-vertex",
+      "surface": "google-vertex"
+    }
+  ],
+  "defaultFactSourceId": "models.dev:google-vertex:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "GOOGLE_VERTEX_PROJECT",
+        "label": "Google Cloud project ID",
+        "kind": "text",
+        "required": true,
+        "environmentVariable": "GOOGLE_VERTEX_PROJECT"
+      },
+      {
+        "id": "GOOGLE_VERTEX_LOCATION",
+        "label": "Vertex location",
+        "kind": "region",
+        "required": true,
+        "environmentVariable": "GOOGLE_VERTEX_LOCATION"
+      },
+      {
+        "id": "GOOGLE_APPLICATION_CREDENTIALS",
+        "label": "Service account / ADC JSON path",
+        "kind": "path",
+        "required": false,
+        "environmentVariable": "GOOGLE_APPLICATION_CREDENTIALS"
+      },
+      {
+        "id": "GOOGLE_VERTEX_ACCESS_TOKEN",
+        "label": "Google access token",
+        "kind": "secret",
+        "required": false
+      }
+    ],
+    "primarySecretFieldId": "GOOGLE_VERTEX_ACCESS_TOKEN",
+    "endpointTemplate": "https://${GOOGLE_VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${GOOGLE_VERTEX_PROJECT}/locations/${GOOGLE_VERTEX_LOCATION}/publishers/google",
+    "credentialAlternatives": [
+      {
+        "id": "access-token",
+        "label": "Access token",
+        "fieldIds": [
+          "GOOGLE_VERTEX_ACCESS_TOKEN"
+        ]
+      },
+      {
+        "id": "service-account-file",
+        "label": "Service account / ADC JSON",
+        "fieldIds": [
+          "GOOGLE_APPLICATION_CREDENTIALS"
+        ]
+      },
+      {
+        "id": "application-default",
+        "label": "Application Default Credentials",
+        "fieldIds": [],
+        "ambient": true
+      }
+    ]
+  },
+  "authModes": [
+    "api-key",
+    "environment"
+  ],
+  "baseUrlEditable": true,
+  "capabilities": [
+    "chat",
+    "model-discovery"
+  ],
+  "routes": [
+    {
+      "id": "GoogleVertexGemini",
+      "protocol": "GoogleVertexGemini",
+      "adapterId": "google-vertex-gemini",
+      "baseUrl": "https://${GOOGLE_VERTEX_LOCATION}-aiplatform.googleapis.com/v1/projects/${GOOGLE_VERTEX_PROJECT}/locations/${GOOGLE_VERTEX_LOCATION}/publishers/google",
+      "default": true,
+      "protocolOwner": "google"
+    },
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://${GOOGLE_VERTEX_LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${GOOGLE_VERTEX_PROJECT}/locations/${GOOGLE_VERTEX_LOCATION}/endpoints/openapi",
+      "protocolOwner": "openai"
+    }
+  ],
+  "discovery": {
+    "authority": "additive",
+    "strategy": {
+      "kind": "custom-parser",
+      "parserId": "google-vertex-models"
+    }
+  },
+  "models": [],
+  "protocolOverrides": [],
+  "recommendedModels": [],
+  "docsUrl": "https://cloud.google.com/vertex-ai/generative-ai/docs/models"
+}

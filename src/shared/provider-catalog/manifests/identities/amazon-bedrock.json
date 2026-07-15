@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "amazon-bedrock",
+  "name": "Amazon Bedrock",
+  "npm": "@ai-sdk/amazon-bedrock",
+  "env": [
+    "AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY",
+    "AWS_REGION",
+    "AWS_BEARER_TOKEN_BEDROCK"
+  ],
+  "docsUrl": "https://docs.aws.amazon.com/bedrock/latest/userguide/models-supported.html",
+  "provenance": {
+    "sourceKind": "models.dev",
+    "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
+    "refreshedAt": "2026-07-15",
+    "openCodeCommit": "571e7b852f82415faf65466e1536357a048bdf5a",
+    "hermesCommit": "bb5fc723b67cdf31828a5a64d997c9eaf4554f57"
+  }
+}

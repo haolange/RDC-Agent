@@ -5,3 +5,8 @@ allowBuilds:
   '@swc/core': true
   electron-winstaller: true
   esbuild: true
+
+minimumReleaseAgeExclude:
+  - '@ai-sdk/gateway@3.0.150'
+  - '@ai-sdk/provider-utils@4.0.39'
+  - ai@6.0.226

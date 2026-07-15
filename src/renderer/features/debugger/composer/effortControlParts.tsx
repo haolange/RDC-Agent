@@ -31,9 +31,8 @@ export const EFFORT_LABEL_KEYS = {
   low: 'composer.effort.levelLow',
   medium: 'composer.effort.levelMedium',
   high: 'composer.effort.levelHigh',
-  xhigh: 'composer.effort.levelXHigh',
+  xhigh: 'composer.effort.levelExtra',
   max: 'composer.effort.levelMax',
-  ultra: 'composer.effort.levelUltra',
 } as const;
 
 export type EffortPillMode = 'one-million-context' | 'fast';
@@ -50,14 +49,11 @@ export interface EffortPillPresentation {
   badges: EffortPillModeBadge[];
 }
 
-export type ReasoningIconVariant = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max' | 'max-plus';
+export type ReasoningIconVariant = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
 
 export function resolveReasoningIconVariant(level: ReasoningSelection): ReasoningIconVariant {
   if (level === 'on') {
     return 'medium';
-  }
-  if (level === 'ultra') {
-    return 'max-plus';
   }
   return level;
 }
@@ -232,25 +228,6 @@ export function ReasoningLevelIcon({ level }: { level: ReasoningSelection }) {
         </>
       ) : null}
 
-      {variant === 'max-plus' ? (
-        <>
-          <circle cx="12" cy="12" r="8.5" />
-          <circle cx="12" cy="12" r="10.2" opacity="0.55" />
-          <circle cx="12" cy="12" r="2.5" />
-          <circle cx="6.4" cy="7.3" r="1.6" />
-          <circle cx="17.6" cy="7.3" r="1.6" />
-          <circle cx="6.6" cy="16.9" r="1.6" />
-          <circle cx="17.4" cy="16.9" r="1.6" />
-          <circle cx="12" cy="4.5" r="1.3" />
-          <path d="M7.8 8.4 9.8 10.2" />
-          <path d="M16.2 8.4 14.2 10.2" />
-          <path d="M8.3 15.7 9.7 13.9" />
-          <path d="M15.7 15.7 14.3 13.9" />
-          <path d="M8.2 7.3h7.6" />
-          <path d="M8.3 16.9h7.4" />
-          <path d="M12 5.8v3.5" />
-        </>
-      ) : null}
     </svg>
   );
 }

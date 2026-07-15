@@ -1,43 +1,51 @@
 import { describe, expect, it } from 'vitest';
 import type { EffectiveModel } from '@shared/types/providerCapability';
-import type { ReasoningControl, ReasoningSelection } from '@shared/types/modelCapability';
+import { resolveModelControls } from '@shared/utils/modelControls';
 import { planModelRequest } from './RequestPlanner';
+
+const reasoning = {
+  kind: 'levels' as const,
+  supportsOff: false,
+  levels: ['low', 'medium', 'high', 'xhigh', 'max'] as const,
+  defaultSelection: 'medium' as const,
+  wireProfile: {
+    kind: 'openai-responses' as const,
+    on: 'medium' as const,
+    levels: { low: 'low' as const, medium: 'medium' as const, high: 'high' as const, xhigh: 'xhigh' as const, max: 'max' as const },
+  },
+};
 
 function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
   return {
-    providerId: 'provider-a',
-    modelId: 'model-a',
-    label: 'Model A',
+    providerId: 'provider',
+    modelId: 'base',
+    label: 'Base',
     aliases: [],
     enabled: true,
-    route: {
-      protocol: 'OpenAIResponses',
-      baseUrl: 'https://example.test/v1',
-      source: 'preset',
-    },
+    route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test/v1', source: 'catalog' },
+    routeOptions: [{
+      id: 'responses',
+      route: { protocol: 'OpenAIResponses', baseUrl: 'https://example.test/v1', source: 'catalog' },
+      availability: 'available',
+    }],
     availability: 'available',
+    presencePolicy: 'maintained',
     contextTiers: [{
       id: 'default',
       label: 'Default',
-      maxPromptTokens: 256_000,
+      maxTotalTokens: 256_000,
+      maxOutputTokens: 16_000,
       activation: { kind: 'implicit' },
       entitlement: 'granted',
     }],
-    defaultBudgetTokens: 128_000,
-    fast: { kind: 'unsupported' },
-    reasoning: {
-      kind: 'levels',
-      supportsOff: true,
-      levels: ['low', 'high'],
-      defaultSelection: 'low',
-      wireProfile: {
-        kind: 'openai-responses',
-        on: 'low',
-        levels: { low: 'low', high: 'high' },
-      },
+    defaultBudgetTokens: 240_000,
+    controls: {
+      fast: { state: 'unsupported', fixedValue: false },
+      context1m: { state: 'unsupported', fixedValue: false },
+      reasoning: { ...reasoning, levels: [...reasoning.levels] },
     },
     toolCalling: { state: 'supported' },
-    visionInput: { state: 'unknown' },
+    visionInput: { state: 'unsupported' },
     structuredOutput: { state: 'supported' },
     provenance: [],
     ...overrides,
@@ -45,349 +53,280 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
 }
 
 describe('planModelRequest', () => {
-  it('creates the conservative default plan', () => {
-    expect(planModelRequest({ model: model() })).toEqual({
-      ok: true,
-      controls: { reasoningLevel: 'low', maxContextMode: false, fastModel: false },
-      warnings: [],
-      plan: {
-        providerId: 'provider-a',
-        effectiveModelId: 'model-a',
-        route: {
-          protocol: 'OpenAIResponses',
-          baseUrl: 'https://example.test/v1',
-          source: 'preset',
-          headers: undefined,
+  it('records unknown provider reasoning without emitting an Off selection or wire patch', () => {
+    const result = planModelRequest({
+      model: model({
+        controls: {
+          ...model().controls,
+          reasoning: {
+            kind: 'unknown',
+            supportsOff: false,
+            levels: [],
+            defaultSelection: 'off',
+            defaultState: 'unknown',
+            wireProfile: { kind: 'none' },
+          },
         },
-        headers: {},
-        bodyPatch: {},
-        contextBudgetTokens: 128_000,
-        contextMode: 'normal',
-        contextWindowTokens: 256_000,
-        activeTierId: 'default',
-        fastMode: false,
-        reasoningWire: {
-          selection: 'low',
-          control: model().reasoning,
-        },
-        temperature: undefined,
+      }),
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.reasoningWire.selection).toBe('unknown');
+    expect(result.plan.bodyPatch).not.toHaveProperty('reasoning_effort');
+  });
+
+  it('applies request-patch Fast from one execution binding', () => {
+    const base = model({
+      controls: {
+        ...model().controls,
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
       },
+      executionBindings: [{
+        id: 'fast:priority',
+        when: { fast: true },
+        actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
+        entitlement: 'granted',
+      }],
+    });
+    const result = planModelRequest({ model: base, catalogModels: [base], controls: { fastModel: true } });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan).toMatchObject({
+      adapterId: 'openai-responses',
+      selectedModelId: 'base',
+      effectiveModelId: 'base',
+      appliedBindingIds: ['fast:priority'],
+      fastMode: true,
+      bodyPatch: { service_tier: 'priority' },
     });
   });
 
-  it('selects the Anthropic unverified header-activated 1M tier and clamps its budget', () => {
-    const result = planModelRequest({
-      model: model({
-        contextTiers: [
-          ...model().contextTiers,
-          {
-            id: 'long',
-            label: '1M',
-            maxPromptTokens: 1_000_000,
-            activation: { kind: 'header', headers: { 'anthropic-beta': 'context-1m' } },
-            entitlement: 'unknown',
-          },
-        ],
-      }),
-      controls: { maxContextMode: true, reasoningLevel: 'high' },
-      clientBudgetTokens: 2_000_000,
-    });
-    expect(result).toMatchObject({
-      ok: true,
-      controls: { maxContextMode: true, reasoningLevel: 'high' },
-      warnings: ['1M context entitlement is unverified'],
-      plan: {
-        activeTierId: 'long',
-        headers: { 'anthropic-beta': 'context-1m' },
-        contextBudgetTokens: 1_000_000,
-        contextMode: 'one-million',
-        contextWindowTokens: 1_000_000,
+  it('switches Kimi Fast to its hidden highspeed target on the selected protocol', () => {
+    const routes: EffectiveModel['routeOptions'] = [
+      { id: 'anthropic', route: { protocol: 'AnthropicMessages', baseUrl: 'https://kimi.test/v1', source: 'catalog' }, availability: 'available' },
+      { id: 'openai', route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://kimi.test/v1', source: 'catalog' }, availability: 'available' },
+    ];
+    const base = model({
+      modelId: 'kimi-for-coding',
+      route: routes[0].route,
+      routeOptions: routes,
+      preferredRouteOptionId: 'openai',
+      controls: {
+        ...model().controls,
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
       },
+      executionBindings: [{
+        id: 'fast:kimi-highspeed',
+        when: { fast: true },
+        actions: [{ kind: 'model-switch', targetModelId: 'kimi-for-coding-highspeed' }],
+        entitlement: 'granted',
+      }],
     });
-  });
-
-  it('recognizes Copilot 922K prompt plus 128K output as a 1M-class window', () => {
+    const highspeed = model({
+      modelId: 'kimi-for-coding-highspeed',
+      route: routes[0].route,
+      routeOptions: routes,
+      selection: { pickerVisibility: 'internal', relatedPrimaryModelIds: ['kimi-for-coding'] },
+    });
     const result = planModelRequest({
-      model: model({
-        providerId: 'github-copilot',
-        modelId: 'gpt-5.4',
-        contextTiers: [
-          {
-            id: 'default', label: 'Default', maxPromptTokens: 272_000,
-            activation: { kind: 'implicit' }, entitlement: 'granted',
-          },
-          {
-            id: 'long_context', label: 'Long context', maxPromptTokens: 922_000, maxOutputTokens: 128_000,
-            activation: { kind: 'implicit' }, entitlement: 'unknown',
-          },
-        ],
-        defaultBudgetTokens: 272_000,
-      }),
-      controls: { maxContextMode: true },
-    });
-    expect(result).toMatchObject({
-      ok: true,
-      warnings: ['1M context entitlement is unverified'],
-      plan: {
-        providerId: 'github-copilot',
-        effectiveModelId: 'gpt-5.4',
-        activeTierId: 'long_context',
-        contextBudgetTokens: 922_000,
-        contextMode: 'one-million',
-        contextWindowTokens: 1_050_000,
-        headers: {},
-        bodyPatch: {},
-      },
-    });
-  });
-
-  it('selects a granted 1M tier instead of a larger unknown tier', () => {
-    const result = planModelRequest({
-      model: model({
-        contextTiers: [
-          ...model().contextTiers,
-          {
-            id: 'long',
-            label: '1M',
-            maxPromptTokens: 1_000_000,
-            activation: { kind: 'implicit' },
-            entitlement: 'granted',
-          },
-          {
-            id: 'experimental',
-            label: '1.5M',
-            maxPromptTokens: 1_500_000,
-            activation: { kind: 'implicit' },
-            entitlement: 'unknown',
-          },
-        ],
-      }),
-      controls: { maxContextMode: true },
-    });
-    expect(result).toMatchObject({
-      ok: true,
-      warnings: [],
-      plan: {
-        activeTierId: 'long',
-        contextBudgetTokens: 1_000_000,
-        contextMode: 'one-million',
-        contextWindowTokens: 1_000_000,
-      },
-    });
-  });
-
-  it('lets a single 1M-class tier serve normal and explicit 1M budgets', () => {
-    const result = planModelRequest({
-      model: model({
-        contextTiers: [{
-          id: 'default',
-          label: 'Default',
-          maxPromptTokens: 1_050_000,
-          activation: { kind: 'implicit' },
-          entitlement: 'granted',
-        }],
-        defaultBudgetTokens: 272_000,
-      }),
-      controls: { maxContextMode: true },
-    });
-    expect(result).toMatchObject({
-      ok: true,
-      controls: { maxContextMode: true },
-      plan: {
-        activeTierId: 'default',
-        contextBudgetTokens: 1_000_000,
-        contextMode: 'one-million',
-        contextWindowTokens: 1_050_000,
-      },
-    });
-    expect(planModelRequest({
-      model: model({
-        contextTiers: [{
-          id: 'default', label: 'Default', maxPromptTokens: 1_050_000,
-          activation: { kind: 'implicit' }, entitlement: 'granted',
-        }],
-        defaultBudgetTokens: 272_000,
-      }),
-    })).toMatchObject({
-      ok: true,
-      plan: { contextBudgetTokens: 272_000, contextMode: 'normal', contextWindowTokens: 1_050_000 },
-    });
-  });
-
-  it('fails closed when EffectiveModel has no positive default budget', () => {
-    expect(planModelRequest({ model: model({ defaultBudgetTokens: 0 }) })).toMatchObject({
-      ok: false,
-      code: 'NO_USABLE_CONTEXT_TIER',
-    });
-  });
-
-  it('compiles Kimi model-variant Fast and fixed temperature', () => {
-    const result = planModelRequest({
-      model: model({
-        providerId: 'kimi-coding-plan',
-        modelId: 'kimi-for-coding',
-        fast: { kind: 'model-variant', modelId: 'kimi-for-coding-highspeed', entitlement: 'granted' },
-        fixedTemperature: 1,
-      }),
+      model: base,
+      catalogModels: [base, highspeed],
       controls: { fastModel: true },
-      requestedTemperature: 0.2,
     });
-    expect(result).toMatchObject({
-      ok: true,
-      controls: { fastModel: true },
-      plan: {
-        providerId: 'kimi-coding-plan',
-        effectiveModelId: 'kimi-for-coding-highspeed',
-        temperature: 1,
-      },
-    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.effectiveModelId).toBe('kimi-for-coding-highspeed');
+    expect(result.plan.adapterId).toBe('openai-compatible');
+    expect(result.plan.route.protocol).toBe('OpenAICompatibleChatCompletions');
+    expect(result.plan.appliedBindingIds).toEqual(['fast:kimi-highspeed']);
   });
 
-  it('switches a reasoning model-variant family without emitting a reasoning wire parameter', () => {
-    const reasoning: ReasoningControl = {
-      kind: 'toggle',
-      supportsOff: true,
-      levels: [],
-      defaultSelection: 'off',
-      modelVariants: {
-        offModelId: 'grok-4.20-0309-non-reasoning',
-        onModelId: 'grok-4.20-0309-reasoning',
+  it('returns the same blocked reason as the shared control resolver', () => {
+    const base = model({
+      controls: {
+        ...model().controls,
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
       },
-      wireProfile: {
-        kind: 'openai-compatible',
-        on: 'high',
-        onMode: 'enable-thinking-true',
-        offMode: 'enable-thinking-false',
-      },
+      executionBindings: [{
+        id: 'fast:missing',
+        when: { fast: true },
+        actions: [{ kind: 'model-switch', targetModelId: 'missing' }],
+        entitlement: 'granted',
+      }],
+    });
+    const controls = resolveModelControls(base, { fastModel: true }, [base]);
+    const result = planModelRequest({ model: base, catalogModels: [base], controls: { fastModel: true } });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.message).toBe(controls.error?.message);
+    expect(result.code).toBe('MODEL_UNAVAILABLE');
+  });
+
+  it('returns the same protocol-conflict reason in Composer resolution and planning', () => {
+    const openAi = {
+      id: 'openai',
+      route: { protocol: 'OpenAICompatibleChatCompletions' as const, baseUrl: 'https://example.test/v1', source: 'catalog' as const },
+      availability: 'available' as const,
     };
-    const result = planModelRequest({
-      model: model({ modelId: 'grok-4.20-0309-non-reasoning', reasoning }),
-      controls: { reasoningLevel: 'on' },
+    const base = model({
+      route: openAi.route,
+      routeOptions: [openAi],
+      preferredRouteOptionId: 'openai',
+      controls: {
+        ...model().controls,
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
+      },
+      executionBindings: [{
+        id: 'fast:anthropic-only',
+        when: { fast: true },
+        actions: [{ kind: 'model-switch', targetModelId: 'anthropic-only' }],
+        entitlement: 'granted',
+      }],
     });
-    expect(result).toMatchObject({
-      ok: true,
-      plan: {
-        effectiveModelId: 'grok-4.20-0309-reasoning',
-        bodyPatch: {},
-        reasoningWire: {
-          selection: 'on',
-          control: { modelVariants: reasoning.modelVariants, wireProfile: { kind: 'none' } },
-        },
+    const target = model({
+      modelId: 'anthropic-only',
+      route: { protocol: 'AnthropicMessages', baseUrl: 'https://example.test/v1', source: 'catalog' },
+      routeOptions: [{
+        id: 'anthropic',
+        route: { protocol: 'AnthropicMessages', baseUrl: 'https://example.test/v1', source: 'catalog' },
+        availability: 'available',
+      }],
+    });
+    const controls = resolveModelControls(base, { fastModel: true }, [base, target]);
+    const result = planModelRequest({ model: base, catalogModels: [base, target], controls: { fastModel: true } });
+    expect(controls.resolved.fast).toMatchObject({ state: 'blocked', disabled: true });
+    expect(result).toMatchObject({ ok: false, code: 'MODEL_UNAVAILABLE', message: controls.error?.message });
+  });
+
+  it('fails closed when an internal target route is still unverified', () => {
+    const base = model({
+      controls: {
+        ...model().controls,
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
+      },
+      executionBindings: [{
+        id: 'fast:unverified-route',
+        when: { fast: true },
+        actions: [{ kind: 'model-switch', targetModelId: 'target' }],
+        entitlement: 'granted',
+      }],
+    });
+    const target = model({
+      modelId: 'target',
+      routeOptions: [{
+        id: 'responses',
+        route: model().route,
+        availability: 'unknown',
+      }],
+    });
+    expect(planModelRequest({ model: base, catalogModels: [base, target], controls: { fastModel: true } }))
+      .toMatchObject({ ok: false, code: 'MODEL_UNAVAILABLE', message: expect.stringContaining('unknown') });
+  });
+
+  it('keeps fixed 1M enabled and disabled in UI while planning the explicit tier', () => {
+    const fixed = model({
+      contextTiers: [{
+        id: 'fixed-1m',
+        label: 'Fixed 1M',
+        maxTotalTokens: 1_000_000,
+        maxOutputTokens: 64_000,
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
+      }],
+      controls: {
+        ...model().controls,
+        context1m: { state: 'fixed', fixedValue: true, tierId: 'fixed-1m' },
       },
     });
+    const result = planModelRequest({ model: fixed, catalogModels: [fixed] });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.controls.maxContextMode).toBe(true);
+    expect(result.plan).toMatchObject({ contextMode: 'one-million', activeTierId: 'fixed-1m' });
+    expect(result.plan.contextWindowTokens).toBe(1_000_000);
   });
 
-  it.each(([
-    ['none', { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } }, 'off'],
-    ['openai-responses', { kind: 'levels', supportsOff: true, levels: ['high'], defaultSelection: 'high', wireProfile: { kind: 'openai-responses', on: 'high', levels: { high: 'high' } } }, 'high'],
-    ['openai-compatible', { kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on', wireProfile: { kind: 'openai-compatible', on: 'high', onMode: 'enable-thinking-true', offMode: 'enable-thinking-false' } }, 'on'],
-    ['anthropic', { kind: 'levels', supportsOff: true, levels: ['high'], defaultSelection: 'high', wireProfile: { kind: 'anthropic', on: 'high', levels: { high: 'high' }, onMode: 'adaptive', offMode: 'disabled' } }, 'high'],
-    ['gemini-thinking-level', { kind: 'levels', supportsOff: false, levels: ['high'], defaultSelection: 'high', wireProfile: { kind: 'gemini-thinking-level', on: 'high', levels: { high: 'high' } } }, 'high'],
-    ['gemini-thinking-budget', { kind: 'levels', supportsOff: true, levels: ['medium'], defaultSelection: 'medium', wireProfile: { kind: 'gemini-thinking-budget', on: 'medium', levels: { medium: 8192 }, offBudget: 0 } }, 'medium'],
-    ['moonshot-thinking', { kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on', wireProfile: { kind: 'moonshot-thinking', onMode: 'enabled', offMode: 'disabled' } }, 'on'],
-  ] satisfies Array<[string, ReasoningControl, ReasoningSelection]>))(
-    'preserves the %s reasoning wire contract in the closed plan',
-    (_kind, reasoning, selection) => {
-      const result = planModelRequest({ model: model({ reasoning }), controls: { reasoningLevel: selection } });
-      expect(result).toMatchObject({
-        ok: true,
-        plan: { reasoningWire: { selection, control: reasoning } },
-      });
-    },
-  );
-
-  it('uses request and body tier patches when they do not conflict', () => {
-    const result = planModelRequest({
-      model: model({
-        contextTiers: [
-          ...model().contextTiers,
-          {
-            id: 'long',
-            label: 'Long',
-            maxTotalTokens: 1_000_000,
-            activation: { kind: 'body', patch: { context: { tier: 'long' } } },
-            entitlement: 'granted',
-          },
-        ],
-        fast: { kind: 'request-param', patch: { latency: 'fast' }, entitlement: 'granted' },
-      }),
-      controls: { maxContextMode: true, fastModel: true },
+  it('activates selectable 1M through its tier body patch', () => {
+    const long = model({
+      contextTiers: [
+        model().contextTiers[0],
+        {
+          id: 'long',
+          label: '1M',
+          maxTotalTokens: 1_000_000,
+          maxOutputTokens: 64_000,
+          activation: { kind: 'body', patch: { context_mode: '1m' } },
+          entitlement: 'granted',
+        },
+      ],
+      controls: {
+        ...model().controls,
+        context1m: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'long' },
+      },
     });
-    expect(result).toMatchObject({
-      ok: true,
-      plan: { bodyPatch: { latency: 'fast', context: { tier: 'long' } } },
-    });
+    const result = planModelRequest({ model: long, catalogModels: [long], controls: { maxContextMode: true } });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.bodyPatch).toEqual({ context_mode: '1m' });
+    expect(result.plan.contextMode).toBe('one-million');
   });
 
-  it('fails closed when two activations conflict', () => {
+  it('uses a model-switch reasoning Max binding and suppresses duplicate wire effort', () => {
+    const base = model({
+      executionBindings: [{
+        id: 'reasoning:max-model',
+        when: { reasoning: ['max'] },
+        actions: [{ kind: 'model-switch', targetModelId: 'max-model', suppressReasoningWire: true }],
+        entitlement: 'granted',
+      }],
+    });
+    const max = model({
+      modelId: 'max-model',
+      selection: { pickerVisibility: 'internal', relatedPrimaryModelIds: ['base'] },
+    });
     const result = planModelRequest({
-      model: model({
-        contextTiers: [
-          ...model().contextTiers,
-          {
-            id: 'long',
-            label: 'Long',
-            maxTotalTokens: 1_000_000,
-            activation: { kind: 'body', patch: { mode: 'long' } },
-            entitlement: 'granted',
-          },
-        ],
-        fast: { kind: 'request-param', patch: { mode: 'fast' }, entitlement: 'granted' },
-      }),
-      controls: { maxContextMode: true, fastModel: true },
+      model: base,
+      catalogModels: [base, max],
+      controls: { reasoningLevel: 'max' },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.effectiveModelId).toBe('max-model');
+    expect(result.plan.reasoningWire.control.wireProfile).toEqual({ kind: 'none' });
+  });
+
+  it('chooses a single most-specific Fast + 1M binding', () => {
+    const combined = model({
+      contextTiers: [
+        model().contextTiers[0],
+        { id: 'long', label: '1M', maxTotalTokens: 1_000_000, activation: { kind: 'implicit' }, entitlement: 'granted' },
+      ],
+      controls: {
+        ...model().controls,
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
+        context1m: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'long' },
+      },
+      executionBindings: [
+        { id: 'fast', when: { fast: true }, actions: [{ kind: 'request-patch', patch: { mode: 'fast' } }], entitlement: 'granted' },
+        { id: 'fast+1m', when: { fast: true, context1m: true }, actions: [{ kind: 'request-patch', patch: { mode: 'fast-long' } }], entitlement: 'granted' },
+      ],
+    });
+    const result = planModelRequest({
+      model: combined,
+      catalogModels: [combined],
+      controls: { fastModel: true, maxContextMode: true },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.appliedBindingIds).toEqual(['fast+1m']);
+    expect(result.plan.bodyPatch).toEqual({ mode: 'fast-long' });
+  });
+
+  it('fails closed for an invalid persisted route preference', () => {
+    const result = planModelRequest({
+      model: model({ preferredRouteOptionId: 'removed-route' }),
+      catalogModels: [],
     });
     expect(result).toMatchObject({ ok: false, code: 'PLAN_CONFLICT' });
-  });
-
-  it('applies declarative constraint clamps before planning', () => {
-    const result = planModelRequest({
-      model: model({
-        fast: { kind: 'model-variant', modelId: 'model-a-fast', entitlement: 'granted' },
-        constraints: [{
-          id: 'fast-no-high',
-          when: { fast: true, reasoningSelections: ['high'] },
-          action: { kind: 'clamp', control: 'reasoningLevel', value: 'off' },
-          reason: 'Fast does not support high reasoning',
-        }],
-      }),
-      controls: { fastModel: true, reasoningLevel: 'high' },
-    });
-    expect(result).toMatchObject({
-      ok: true,
-      controls: { fastModel: true, reasoningLevel: 'off' },
-      plan: { reasoningWire: { selection: 'off' } },
-    });
-  });
-
-  it('returns a typed error for a declarative constraint rejection', () => {
-    expect(planModelRequest({
-      model: model({
-        constraints: [{
-          id: 'reject-high',
-          when: { reasoningSelections: ['high'] },
-          action: { kind: 'reject', code: 'HIGH_DENIED' },
-          reason: 'High reasoning is unavailable for this route.',
-        }],
-      }),
-      controls: { reasoningLevel: 'high' },
-    })).toMatchObject({
-      ok: false,
-      code: 'CONSTRAINT_REJECTED',
-      message: 'High reasoning is unavailable for this route.',
-    });
-  });
-
-  it('returns typed errors for unavailable models and tiers', () => {
-    expect(planModelRequest({
-      model: model({ availability: 'unavailable', unavailableReason: 'coming soon' }),
-    })).toMatchObject({ ok: false, code: 'MODEL_UNAVAILABLE', message: 'coming soon' });
-
-    expect(planModelRequest({
-      model: model({ availability: 'unknown' }),
-    })).toMatchObject({ ok: false, code: 'MODEL_UNAVAILABLE', message: 'model-a is not yet verified' });
-
-    expect(planModelRequest({
-      model: model({ contextTiers: model().contextTiers.map((tier) => ({ ...tier, entitlement: 'denied' })) }),
-    })).toMatchObject({ ok: false, code: 'NO_USABLE_CONTEXT_TIER' });
   });
 });

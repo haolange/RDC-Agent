@@ -2,19 +2,13 @@ import React, { useState } from 'react';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import type { ProviderConnectionDraft } from '../types';
-import { updateProviderModelPreference } from '../providerModelProjection';
-import {
-  getProviderCategoryTranslation,
-  getProviderProtocolOptions,
-  providerSupportsProtocolSelection,
-  resolveConnectionBaseUrlForProtocol,
-} from '../utils';
+import { getProviderCategoryTranslation } from '../utils';
 import { ProviderAccountOAuthPanel } from './ProviderAccountOAuthPanel';
-import { ProviderApiKeyFields } from './ProviderApiKeyFields';
+import { ProviderConnectionFields } from './ProviderConnectionFields';
 import { ProviderAuthModeField } from './ProviderAuthModeField';
 import { ProviderConnectModelList } from './ProviderConnectModelList';
 import { ProviderConnectActions } from './ProviderConnectActions';
-import { ProviderProtocolField } from './ProviderProtocolField';
+import { shouldUseProviderDocsLink } from '../providerConnectionState';
 type Translate = ReturnType<typeof useI18n>['t'];
 interface ProviderConnectDialogProps {
   connectionDraft: ProviderConnectionDraft;
@@ -22,11 +16,12 @@ interface ProviderConnectDialogProps {
   getResolvedProviderLabel: (provider: Pick<LlmProviderEntry, 'label'>) => string;
   connectionAccountConnected: boolean;
   connectionDevicePending: boolean;
-  connectionNeedsApiKey: boolean;
+  connectionNeedsCredentials: boolean;
   connectionNeedsBaseUrl: boolean;
   connectionHasFreshTest: boolean;
   onClose: () => void;
   onUpdateConnectionDraft: (patch: Partial<ProviderConnectionDraft>) => void;
+  onModelChange: (modelId: string, patch: Partial<LlmProviderModel>) => void;
   onTest: () => void | Promise<void>;
   onSave: () => void | Promise<void>;
   onStartAccountLogin: (mode?: ProviderConnectionDraft['accountLoginMode']) => void | Promise<void>;
@@ -38,11 +33,12 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   getResolvedProviderLabel,
   connectionAccountConnected,
   connectionDevicePending,
-  connectionNeedsApiKey,
+  connectionNeedsCredentials,
   connectionNeedsBaseUrl,
   connectionHasFreshTest,
   onClose,
   onUpdateConnectionDraft,
+  onModelChange,
   onTest,
   onSave,
   onStartAccountLogin,
@@ -57,24 +53,10 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
     connectionProvider.recommendedModels?.length ?? 0,
   );
   const modelListSize = catalogModelCount >= 24 ? 'long' : catalogModelCount >= 8 ? 'medium' : 'short';
-  const showProtocolField = connectionProvider.authMode !== 'account';
-  const showProtocolSelector = showProtocolField && providerSupportsProtocolSelection(connectionProvider);
-  const protocolOptions = showProtocolField ? getProviderProtocolOptions(connectionProvider) : [];
 
   const handleToggleModelCapability = (modelId: string) => {
     setExpandedModelId((current) => (current === modelId ? null : modelId));
   };
-  const handleModelChange = (modelId: string, patch: Partial<LlmProviderModel>) => {
-    onUpdateConnectionDraft({
-      models: updateProviderModelPreference(
-        connectionProvider.catalogOwnership,
-        connectionDraft.models,
-        modelId,
-        patch,
-      ),
-    });
-  };
-
   return (
   <div
     className="settings-provider-connect-layer"
@@ -128,41 +110,14 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
           testedBaseUrl: '',
           testedProtocol: connectionDraft.protocol,
           testedAuthMode: authMode,
+          testedConnectionSignature: '',
           models: [],
         })}
         t={t}
       />
 
-      {showProtocolField && (
-        <ProviderProtocolField
-          value={connectionDraft.protocol}
-          options={protocolOptions}
-          disabled={connectionDraft.busy !== 'idle'}
-          readOnly={!showProtocolSelector}
-          onChange={(protocol) => onUpdateConnectionDraft({
-            protocol,
-            baseUrl: resolveConnectionBaseUrlForProtocol(
-              {
-                protocol: connectionDraft.protocol,
-                baseUrl: connectionDraft.baseUrl,
-                protocolBaseUrls: connectionProvider.protocolBaseUrls,
-              },
-              protocol,
-            ),
-            error: '',
-            discoveryDiagnostic: null,
-            testedApiKey: '',
-            testedBaseUrl: '',
-            testedProtocol: protocol,
-            testedAuthMode: connectionDraft.authMode,
-            models: [],
-          })}
-          t={t}
-        />
-      )}
-
       {connectionProvider.authMode === 'api-key' && (
-        <ProviderApiKeyFields
+        <ProviderConnectionFields
           connectionDraft={connectionDraft}
           connectionProvider={connectionProvider}
           onUpdateConnectionDraft={onUpdateConnectionDraft}
@@ -186,16 +141,6 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             })}
           />
         </label>
-      )}
-      {connectionProvider.authMode === 'api-key'
-        && Boolean(connectionProvider.protocolEditable && connectionDraft.baseUrl) && (
-        <div className="settings-field settings-provider-protocol-field">
-          <span className="settings-field-label">{t('settings.providerBaseUrl')}</span>
-          <span className="settings-provider-protocol-readonly" data-testid="settings-provider-connect-protocol-base-url">
-            {connectionDraft.baseUrl}
-          </span>
-          <span className="settings-help-text">{t('settings.providerProtocolBaseUrlHint')}</span>
-        </div>
       )}
       {connectionProvider.authMode === 'local' && (
         <div className="settings-provider-notice">
@@ -223,7 +168,9 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
 
       {connectionProvider.docsUrl && (
         <a className="settings-link" href={connectionProvider.docsUrl} target="_blank" rel="noreferrer">
-          {connectionProvider.authMode === 'local' || connectionProvider.authMode === 'account' || connectionProvider.authMode === 'environment' ? t('settings.providerDocs') : t('settings.getApiKey')}
+          {shouldUseProviderDocsLink(connectionProvider)
+            ? t('settings.providerDocs')
+            : t('settings.getApiKey')}
         </a>
       )}
 
@@ -250,7 +197,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         expandedModelId={expandedModelId}
         disabled={connectionDraft.busy !== 'idle'}
         onToggleExpanded={handleToggleModelCapability}
-        onModelChange={handleModelChange}
+        onModelChange={onModelChange}
         onModelCountChange={setEffectiveModelCount}
         t={t}
       />
@@ -260,7 +207,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         provider={connectionProvider}
         accountConnected={connectionAccountConnected}
         devicePending={connectionDevicePending}
-        needsApiKey={connectionNeedsApiKey}
+        needsCredentials={connectionNeedsCredentials}
         needsBaseUrl={connectionNeedsBaseUrl}
         hasFreshTest={connectionHasFreshTest}
         onClose={onClose}

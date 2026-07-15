@@ -41,8 +41,11 @@ export const EffortControl: React.FC<{
   const dragActiveRef = useRef(false);
   const popupShiftRef = useRef(0);
   const suppressClickRef = useRef(false);
+  const pointerFrameRef = useRef(0);
+  const pendingDragRatioRef = useRef<number | null>(null);
   const isDragging = dragRatio !== null;
-  const reasoningControl = capability?.reasoning ?? null;
+  const reasoningControl = capability?.controls.reasoning ?? null;
+  const capabilityPending = capability === null;
   const capabilityKey = capability
     ? `${capability.providerId}:${capability.modelId}`
     : 'pending';
@@ -96,8 +99,17 @@ export const EffortControl: React.FC<{
     setSnapLevel(null);
     setDragRatio(null);
     dragActiveRef.current = false;
+    pendingDragRatioRef.current = null;
+    if (pointerFrameRef.current) {
+      window.cancelAnimationFrame(pointerFrameRef.current);
+      pointerFrameRef.current = 0;
+    }
     resetMaxVisual();
   }, [capabilityKey, displayLevelsKey, resetMaxVisual]);
+
+  useEffect(() => () => {
+    if (pointerFrameRef.current) window.cancelAnimationFrame(pointerFrameRef.current);
+  }, []);
 
   const effortLabel = reasoningUnverified
     ? t('composer.effort.providerManaged')
@@ -106,9 +118,22 @@ export const EffortControl: React.FC<{
     ? t('composer.effort.unverified')
     : t(EFFORT_LABEL_KEYS[displayLevel]);
   const oneMillionTokens = oneMillionContextTokens(capability);
+  const oneMillionCapability = capability?.resolvedControls?.context1m ?? null;
   const oneMillionAvailable = hasSelectableOneMillionContext(capability);
   const oneMillionUnverified = isOneMillionContextUnverified(capability);
   const fastAvailable = hasSelectableFastMode(capability);
+  const oneMillionContextStatusLabel = capabilityPending
+    ? t('composer.effort.capabilityLoading')
+    : oneMillionCapability?.state === 'fixed'
+      ? t('composer.effort.fixed')
+      : oneMillionUnverified
+        ? t('composer.effort.unverified')
+        : undefined;
+  const fastModelStatusLabel = capabilityPending
+    ? t('composer.effort.capabilityLoading')
+    : capability?.resolvedControls?.fast.state === 'fixed'
+      ? t('composer.effort.fixed')
+      : undefined;
   const oneMillionContextBadgeLabel = oneMillionTokens
     ? formatTokenCount(oneMillionTokens)
     : t('composer.effort.oneMillionContextBadge');
@@ -180,6 +205,8 @@ export const EffortControl: React.FC<{
     trackRef,
     dragActiveRef,
     suppressClickRef,
+    pointerFrameRef,
+    pendingDragRatioRef,
     hasAdjustableReasoning,
     displayLevel,
     displayLevels,
@@ -196,7 +223,7 @@ export const EffortControl: React.FC<{
     <div ref={menuRef} className="composer-effort-menu">
       <button
         type="button"
-        className={`composer-effort-pill ${open ? 'open' : ''}${selectedLevel === 'max' || selectedLevel === 'ultra' ? ` is-level-${selectedLevel}` : ''}`}
+        className={`composer-effort-pill ${open ? 'open' : ''}${selectedLevel === 'max' ? ' is-level-max' : ''}`}
         data-testid="composer-effort-pill"
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -227,7 +254,9 @@ export const EffortControl: React.FC<{
           popupStyle={popupStyle}
           trackRef={trackRef}
           reasoningUnverified={reasoningUnverified}
-          reasoningStateLabel={t('composer.effort.providerManaged')}
+          reasoningStateLabel={capabilityPending
+            ? t('composer.effort.capabilityLoading')
+            : t('composer.effort.providerManaged')}
           hasAdjustableReasoning={hasAdjustableReasoning}
           displayLevel={displayLevel}
           displayLevels={displayLevels}
@@ -243,8 +272,9 @@ export const EffortControl: React.FC<{
           thumbEdgeClass={thumbEdgeClass}
           tooltipLabel={tooltipLabel}
           oneMillionContextAvailable={oneMillionAvailable}
-          oneMillionContextUnverified={oneMillionUnverified}
+          oneMillionContextStatusLabel={oneMillionContextStatusLabel}
           fastModelAvailable={fastAvailable}
+          fastModelStatusLabel={fastModelStatusLabel}
           oneMillionContextMode={turnControls.maxContextMode}
           fastModel={turnControls.fastModel}
           t={t}

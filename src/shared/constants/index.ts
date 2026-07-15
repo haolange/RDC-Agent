@@ -53,7 +53,6 @@ export {
   LLM_PROVIDER_CATEGORY_DEFINITIONS,
   LLM_PROVIDER_PROTOCOL_DEFINITIONS,
   SUPER_GROK_OAUTH_REDIRECT_URI,
-  getProviderCatalogOwnership,
   isLlmProviderProtocol,
 } from './llm';
 export { MODE_CAPABILITIES, assignDefaultCaptureRoles } from './modes';
