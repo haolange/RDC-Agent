@@ -326,6 +326,25 @@ describe('SettingsService provider persistence', () => {
     });
   });
 
+  it('drops non-catalog Kimi rows for candidate validation without persisting compatibility aliases', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    service.initialize();
+
+    service.saveProviderConnection('kimi-coding-plan', 'test-key', [
+      { id: 'kimi-for-coding', label: 'kimi-for-coding', enabled: true, availability: 'available' },
+      { id: 'kimi-for-coding-highspeed', label: 'kimi-for-coding-highspeed', enabled: true, availability: 'available' },
+      { id: 'k2p7', label: 'Kimi K2.7 Code', enabled: true, availability: 'available' },
+      { id: 'k2p6', label: 'Kimi K2.6', enabled: true, availability: 'available' },
+      { id: 'k2p5', label: 'Kimi K2.5', enabled: true, availability: 'available' },
+      { id: 'kimi-k2-thinking', label: 'Kimi K2 Thinking', enabled: true, availability: 'available' },
+    ]);
+
+    const provider = service.getAll().llm.providers.find((entry) => entry.id === 'kimi-coding-plan');
+    expect(provider?.models.map((model) => model.id)).toEqual(['kimi-for-coding']);
+    expect(provider?.recommendedModels).toEqual(['kimi-for-coding']);
+  });
+
   it('persists user-owned model preferences and preserves them across discovery refresh', async () => {
     const { SettingsService } = await import('./SettingsService');
     const { getProviderModelSummaries } = await import('../provider-catalog/ProviderCatalogRegistry');

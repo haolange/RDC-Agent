@@ -269,10 +269,10 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
 
   const headers = { ...(route.headers ?? {}) };
   if (oneMillionMode && tierChoices.oneMillionUnverified) {
-    warnings.push('1M context entitlement is unverified');
+    warnings.push('Max mode entitlement is unverified');
   } else if (activeTier.entitlement === 'unknown') {
     warnings.push(oneMillionMode
-      ? '1M context entitlement is unverified'
+      ? 'Max mode entitlement is unverified'
       : `Context tier ${activeTier.label} is unverified`);
   }
   if (activeTier.activation.kind === 'header') {

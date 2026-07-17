@@ -459,6 +459,24 @@ export class AgentManifestService {
     };
   }
 
+  modelOptionCatalogProviderIds(
+    providers: LlmProviderEntry[],
+    routes: LlmAgentRoute[],
+  ): string[] {
+    return [...new Set([
+      ...routes
+        .map((route) => route.providerId)
+        .filter((providerId): providerId is string => Boolean(providerId)),
+      ...providers
+        .filter((provider) => (
+          provider.catalogOwnership !== 'user-managed'
+          && provider.enabled
+          && provider.isConfigured
+        ))
+        .map((provider) => provider.id),
+    ])];
+  }
+
   private getModelOptions(
     providers: LlmProviderEntry[],
     definitions: Array<Pick<AgentManifestDefinition, 'models'>>,
@@ -471,6 +489,9 @@ export class AgentManifestService {
     ]);
     const options: AgentModelOption[] = [];
     const seen = new Set<string>();
+    const internalTargets = new Set(catalogs.flatMap((catalog) => catalog.models
+      .filter((model) => model.selection?.pickerVisibility === 'internal')
+      .map((model) => canonicalAgentModelId(catalog.providerId, model.modelId))));
     const addOption = (option: AgentModelOption): void => {
       if (!option.canonicalId || seen.has(option.canonicalId)) return;
       seen.add(option.canonicalId);
@@ -484,11 +505,12 @@ export class AgentManifestService {
       const canonicalId = canonicalAgentModelId(provider.id, model.modelId);
       const providerUnavailable = !provider.enabled || !provider.isConfigured;
       const modelDisabled = model.enabled === false;
+      const missingVerifiedBudget = !Number.isFinite(model.defaultBudgetTokens) || model.defaultBudgetTokens <= 0;
       const status: AgentModelOption['status'] = providerUnavailable
         ? 'provider-unavailable'
         : modelDisabled
           ? 'model-disabled'
-          : model.availability === 'available'
+          : model.availability === 'available' && !missingVerifiedBudget
             ? 'ready'
             : model.availability === 'unavailable'
               ? 'model-unavailable'
@@ -500,7 +522,9 @@ export class AgentManifestService {
           : status === 'model-unavailable'
             ? model.unavailableReason ?? 'Model is unavailable for this account and route.'
             : status === 'model-unverified'
-              ? 'Model availability has not been verified for this account and route.'
+              ? missingVerifiedBudget
+                ? 'Model has no verified positive context budget and cannot be executed safely.'
+                : 'Model availability has not been verified for this account and route.'
               : undefined;
       return {
         canonicalId,
@@ -522,8 +546,12 @@ export class AgentManifestService {
           && catalog.protocol === provider.protocol
         ));
         for (const model of snapshot?.models ?? []) {
+          if (model.selection?.pickerVisibility === 'internal') continue;
           const canonicalId = canonicalAgentModelId(provider.id, model.modelId);
-          if (model.availability === 'available' || referenced.has(canonicalId)) {
+          const executable = model.availability === 'available'
+            && Number.isFinite(model.defaultBudgetTokens)
+            && model.defaultBudgetTokens > 0;
+          if (executable || referenced.has(canonicalId)) {
             addOption(fromEffectiveModel(provider, model));
           }
         }
@@ -552,7 +580,7 @@ export class AgentManifestService {
     }
 
     for (const canonicalId of referenced) {
-      if (seen.has(canonicalId)) continue;
+      if (seen.has(canonicalId) || internalTargets.has(canonicalId)) continue;
       const parsed = splitCanonicalAgentModelId(canonicalId);
       if (!parsed) continue;
       const provider = providers.find((entry) => entry.id === parsed.providerId);

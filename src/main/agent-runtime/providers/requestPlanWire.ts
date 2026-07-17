@@ -12,7 +12,9 @@ function cloneJson(value: JsonValue): JsonValue {
 
 function mergeJson(target: Record<string, unknown>, patch: JsonObject): void {
   for (const [key, value] of Object.entries(patch)) {
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
+    if (value === null) {
+      delete target[key];
+    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
       const current = target[key];
       const nested = current && typeof current === 'object' && !Array.isArray(current)
         ? current as Record<string, unknown>

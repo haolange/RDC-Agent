@@ -9,11 +9,17 @@ import {
 } from './effortControlParts';
 import type { MaxVisualPhase } from './maxVisual';
 import { EffortMaxField } from './EffortMaxField';
+import { Button } from '../../../ui/Button';
 
 export const EffortControlPopup: React.FC<{
   popupRef: React.RefObject<HTMLDivElement>;
   popupStyle: React.CSSProperties;
   trackRef: React.RefObject<HTMLDivElement>;
+  capabilityStateLabel?: string;
+  capabilityStateDetail?: string;
+  capabilityRefreshing: boolean;
+  capabilityRetryLabel: string;
+  onRetryCapability: () => void;
   reasoningUnverified: boolean;
   reasoningStateLabel: string;
   hasAdjustableReasoning: boolean;
@@ -48,6 +54,11 @@ export const EffortControlPopup: React.FC<{
   popupRef,
   popupStyle,
   trackRef,
+  capabilityStateLabel,
+  capabilityStateDetail,
+  capabilityRefreshing,
+  capabilityRetryLabel,
+  onRetryCapability,
   reasoningUnverified,
   reasoningStateLabel,
   hasAdjustableReasoning,
@@ -80,7 +91,20 @@ export const EffortControlPopup: React.FC<{
   onToggleFastModel,
 }) => (
   <div ref={popupRef} className="composer-effort-popup" data-testid="composer-effort-popup" role="dialog" aria-label={t('composer.effort.popupTitle')} style={popupStyle}>
-    {reasoningUnverified ? (
+    {capabilityStateLabel ? (
+      <div className="composer-effort-capability-state" data-testid="composer-effort-capability-state" role="status">
+        <div className="composer-effort-capability-state-copy">
+          <span>{t('composer.effort.reasoning')}</span>
+          <strong>{capabilityStateLabel}</strong>
+          {capabilityStateDetail ? <small>{capabilityStateDetail}</small> : null}
+        </div>
+        {capabilityStateDetail ? (
+          <Button variant="ghost" size="sm" onClick={onRetryCapability}>
+            {capabilityRetryLabel}
+          </Button>
+        ) : null}
+      </div>
+    ) : reasoningUnverified ? (
       <div className="composer-effort-reasoning-state" data-testid="composer-effort-reasoning-unverified" role="status">
         <span>{t('composer.effort.reasoning')}</span>
         <strong>{reasoningStateLabel}</strong>
@@ -143,6 +167,12 @@ export const EffortControlPopup: React.FC<{
       </div>
       </div>
     )}
+
+    {capabilityRefreshing ? (
+      <div className="composer-effort-refreshing" role="status">
+        {t('composer.effort.capabilityRefreshing')}
+      </div>
+    ) : null}
 
     <div className="composer-effort-popup-divider" aria-hidden="true" />
 

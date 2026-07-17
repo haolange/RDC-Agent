@@ -117,7 +117,7 @@
 - Project Scope 必须覆盖 agents、skills、MCP、hooks、policies、knowledge 和 memory；RDX CLI action 与 secret 仍属于本机边界，不能由项目覆盖。
 - Prompt 调用链必须经 `PromptPlan -> RequestEnvelope -> provider adapter`。新增上下文来源时必须提供 scope、source、hash、precedence 和脱敏策略。
 - Provider/Model 事实只能写入 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth 与 discovery。禁止恢复 TS preset、factory 推导、名称/后缀/上游 SDK 包元数据/hostname 猜测或 renderer 静态 Catalog。
-- Fast、Max、1M 与 variant 必须由 `ControlDefinition + ExecutionBinding` 编译；可选控件没有唯一可执行路径时 fail-closed。认证 secret/header 只能进入主进程 opaque credential lease，不得进入 manifest、Route、RequestPlan、IPC 或 Trace。
+- Fast、Reasoning Max、Max mode 与 variant 必须由 `ControlDefinition + ExecutionBinding` 编译；可选控件没有唯一可执行路径时 fail-closed。认证 secret/header 只能进入主进程 opaque credential lease，不得进入 manifest、Route、RequestPlan、IPC 或 Trace。
 - Memory 写入必须由明确用户意图或交互审批触发；禁止恢复轮次自动抽取、自动 consolidation 或全索引 prompt 注入。
 
 ## 修改时的检查项
@@ -138,7 +138,7 @@
 - Work Process 投影、工具行文案/图标或 transcript UI 改动后执行 `pnpm run check:work-process`、`pnpm run check:work-process-tool-coverage`。
 - Work Process UI 验收必须覆盖：运行中顶层「工作中 / Working」与 Active Signal 文本能量扫光、完成后「工作过程 / Work process」+ meta、loop thinking 完成态「已思考 · {duration} / Thought for」+ 前置 quiet icon、commentary 散文（markdown，不进 thinking 槽）、统一单披露 tool 卡片（header icon+动词 + **结果优先** 族 body：有结果时显示计数/路径样本等，运行中才回退 pattern/path/`$ cmd`；展开为族内容层 + 样式化 Raw 面板；默认不展开 Raw；无 verb/target 双轨 toggle、无 `toolGroup` 双层壳）或 ≥8 聚合摘要行、同 loop 连续 tool 外距 `--space-3`（thinking/commentary → 首个 tool 入场呼吸更大）、file/search/shell/git/web/generic 族模板一致、安静 loop 级轨道点、web_search/fetch source pills、无 Reply 边界行（收束 thinking 归入普通折叠）、Request Inspector 不出现在消息流也不在右侧默认会话/Trace 面板、真实事件驱动的逐条出现与短 CSS 入场（禁止假 stagger）、**assistant full-bleed**（最终答案与 Work Process 含 tool 卡片横跨 transcript rail 全宽并与 composer 对齐；仅用户 prompt 使用 raised bubble、fit-content、右对齐）、**MessageMarkdown**（commentary 与最终答案：GFM、代码块 language+复制、KaTeX、Mermaid fail-closed；thinking/CoT 保持纯文本）、**Appearance 默认关**：`composerMarkdown`（composer Write/Preview + 高亮，开启后已发送用户气泡也走 Markdown）、`usePointerCursors`（`html[data-pointer-cursors='true']` 手型光标）。
 - provider thinking 投递或 reasoning artifact 投影改动后执行 `pnpm run check:reasoning-delivery`。
-- Provider/model/Composer control 改动的真实验收必须覆盖：`reasoning unknown` 显示中性 `未验证 / Provider managed`、`none` 才锁定 `Off`、canonical wire `xhigh` 统一显示 `Extra` 且产品最高档为 `Max`、上下文开关只叫 `1M`（reasoning 的 `Max` 不变）、固定 1M 开启且不可关闭、快速 A→B→C 只保留最新 revision、在途 turn 保持创建时冻结的 `RequestPlan`、切换和输入不触发 Context preview IPC、发送后依次显示 `Preparing` / `Current request ~` / provider `Actual`、缩窗只在发送 preflight 内派生压缩视图而不提前改写历史。
+- Provider/model/Composer control 改动的真实验收必须覆盖：`reasoning unknown` 显示中性 `未验证 / Provider managed`、`none` 才锁定 `Off`、canonical wire `xhigh` 统一显示 `Extra` 且产品最高档为 `Max`、上下文开关只叫 `Max mode / Max 模式`（reasoning 的 `Max` 不变）、固定 Max mode 开启且不可关闭、快速 A→B→C 只保留最新 revision、在途 turn 保持创建时冻结的 `RequestPlan`、切换和输入不触发 Context preview IPC、发送后依次显示 `Preparing` / `Current request ~` / provider `Actual`、缩窗只在发送 preflight 内派生压缩视图而不提前改写历史。
 - scoped resource、project instruction、prompt snapshot、skill、hook 或 memory policy 改动后，必须执行相应专项 contract check；缺少时应在同一改动中补齐。
 - 入口、构建或窗口逻辑改动后，再补 `pnpm run build` 或等价打包检查。
 - 发布配置改动后执行 `pnpm run pack`，并确认 unpacked 产物不包含开发期包管理器、lockfile、launcher 和缓存状态。

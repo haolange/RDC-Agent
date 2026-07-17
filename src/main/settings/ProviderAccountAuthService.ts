@@ -19,6 +19,7 @@ import { settingsService } from './SettingsService';
 import { oauthRefreshManager } from './OAuthRefreshManager';
 import {
   getProviderModelDefinitions,
+  getLoadedProviderSurface,
   loadProviderSurface,
 } from '../provider-catalog/ProviderCatalogRegistry';
 import {
@@ -610,11 +611,12 @@ export class ProviderAccountAuthService {
     const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
     const isAccount = isAccountProviderId(providerId);
     const flow = isAccount ? this.findFlow(providerId) : null;
-    const connected = Boolean(
+    const authenticated = Boolean(
       provider?.isConfigured
       && provider.status === 'verified'
       && (providerId !== 'openrouter' || provider.authMode === 'account'),
     );
+    const connected = authenticated && forcedState !== 'failed' && !flow?.error;
     const accountBundle = isAccount ? this.readBundle(providerId) : null;
     const available = isAccount && provider?.authModeAvailability?.account?.state !== 'unavailable';
     const state: LlmProviderAccountStatus['state'] = forcedState
@@ -1568,22 +1570,35 @@ export class ProviderAccountAuthService {
     if (bundle.providerId === 'grok-account') {
       const token = bundle.accessToken ?? bundle.apiKey;
       if (!token) throw new Error('Super Grok OAuth token is missing.');
-      const headers = { Accept: 'application/json', Authorization: `Bearer ${token}` };
+      const builderRoute = getLoadedProviderSurface('grok-account')?.routes.find((route) => (
+        route.protocol === 'OpenAIResponses'
+      ));
+      const builderHeaders = {
+        Accept: 'application/json',
+        ...(builderRoute?.headers ?? {}),
+        Authorization: `Bearer ${token}`,
+      };
+      const apiHeaders = { Accept: 'application/json', Authorization: `Bearer ${token}` };
       const [builderResult, apiResult] = await Promise.allSettled([
-        fetchJson(`${GROK_BUILD_API_BASE_URL}/models`, { method: 'GET', headers }).then(parseGrokBuilderCatalog),
-        fetchJson(`${XAI_API_BASE_URL}/models`, { method: 'GET', headers }).then(parseGrokAccountCatalog),
+        fetchJson(`${GROK_BUILD_API_BASE_URL}/models`, { method: 'GET', headers: builderHeaders }).then(parseGrokBuilderCatalog),
+        fetchJson(`${XAI_API_BASE_URL}/models`, { method: 'GET', headers: apiHeaders }).then(parseGrokAccountCatalog),
       ]);
       const builder = builderResult.status === 'fulfilled'
         ? builderResult.value
-        : { models: [], contributions: [] };
+        : { models: [], contributions: [], diagnostic: undefined };
       const api = apiResult.status === 'fulfilled'
         ? apiResult.value
         : { models: [], contributions: [] };
       const parsed = mergeParsedLiveCatalogs(api, builder);
+      const builderDiagnostic = builder.diagnostic
+        ? `envelope=${builder.diagnostic.envelopeKind}, candidates=${builder.diagnostic.candidateCount}, `
+          + `admitted=${builder.diagnostic.admittedCount}, filtered=${JSON.stringify(builder.diagnostic.filtered)}`
+        : 'envelope=unknown';
+
       const sourceDetail = [
         builderResult.status === 'rejected'
           ? `Builder unavailable (${parseProviderError(builderResult.reason)})`
-          : `Builder returned ${builder.models.length} agent-routable model(s)`,
+          : `Builder returned ${builder.models.length} agent-routable model(s) (${builderDiagnostic})`,
         apiResult.status === 'rejected'
           ? `xAI API unavailable (${parseProviderError(apiResult.reason)})`
           : `xAI API returned ${api.models.length} agent-routable model(s)`,

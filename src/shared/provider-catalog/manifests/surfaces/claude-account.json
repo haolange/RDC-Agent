@@ -76,7 +76,7 @@
         },
         {
           "id": "max",
-          "label": "1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "header",
@@ -161,7 +161,7 @@
         },
         {
           "id": "max",
-          "label": "1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "header",
@@ -247,7 +247,7 @@
         },
         {
           "id": "max",
-          "label": "1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "header",

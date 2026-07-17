@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -25,6 +26,31 @@ function mutableSurface(value: ProviderCatalogCompileInput, id: string): Record<
 }
 
 describe('Provider Catalog compiler', () => {
+  it('keeps every user-facing one-million control named Max mode', () => {
+    const translations = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/renderer/i18n.ts'),
+      'utf8',
+    );
+    for (const banned of [
+      "'1M context'",
+      "'1M 上下文'",
+      "'Verify 1M'",
+      "'验证 1M'",
+      "'1M mode'",
+      "'1M 模式'",
+    ]) {
+      expect(translations, banned).not.toContain(banned);
+    }
+
+    for (const surface of input().surfaces as Array<{ models?: Array<{ contextTiers?: Array<{ label?: string }> }> }>) {
+      for (const model of surface.models ?? []) {
+        for (const tier of model.contextTiers ?? []) {
+          expect(['1M context', 'Fixed 1M context']).not.toContain(tier.label);
+        }
+      }
+    }
+  });
+
   it('compiles the pinned 166 identities and every explicit RDC surface deterministically', () => {
     const source = input();
     const first = compileProviderCatalog(source);
@@ -106,15 +132,16 @@ describe('Provider Catalog compiler', () => {
   });
 
   it('keeps Kimi maintained discovery and the Fast target as one execution binding truth', () => {
-    const surface = compileProviderCatalog(input()).surfaces.get('kimi-coding-plan')?.surface;
+    const catalog = compileProviderCatalog(input());
+    const surface = catalog.surfaces.get('kimi-coding-plan')?.surface;
+    expect(catalog.index.surfaces.find((entry) => entry.id === 'kimi-coding-plan')).toMatchObject({
+      discoveryAuthority: 'candidate-validation',
+      modelCount: 1,
+    });
     expect(surface?.discovery.authority).toBe('candidate-validation');
     expect(surface?.models.map((model) => model.modelId)).toEqual([
       'kimi-for-coding',
       'kimi-for-coding-highspeed',
-      'k2p7',
-      'k2p6',
-      'k2p5',
-      'kimi-k2-thinking',
     ]);
     expect(surface?.models.every((model) => model.presencePolicy === 'maintained')).toBe(true);
     expect(surface?.models.find((model) => model.modelId === 'kimi-for-coding')).toMatchObject({
@@ -127,7 +154,7 @@ describe('Provider Catalog compiler', () => {
     expect(surface?.models.find((model) => model.modelId === 'kimi-for-coding-highspeed')?.selection)
       .toEqual({ pickerVisibility: 'internal', relatedPrimaryModelIds: ['kimi-for-coding'] });
     expect(surface?.models.filter((model) => model.selection.pickerVisibility === 'primary').map((model) => model.modelId))
-      .toEqual(['kimi-for-coding', 'k2p7', 'k2p6', 'k2p5', 'kimi-k2-thinking']);
+      .toEqual(['kimi-for-coding']);
   });
 
   it('keeps every MiniMax highspeed relation as one hidden execution target', () => {
@@ -211,7 +238,7 @@ describe('Provider Catalog compiler', () => {
       ['gpt-5.6-terra', 256_000, 'unsupported', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-luna', 256_000, 'unsupported', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.5', 256_000, 'unsupported', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
-      ['gpt-5.4-mini', 128_000, 'unsupported', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
+      ['gpt-5.4-mini', 128_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
       ['gpt-5.4', 256_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
       ['gpt-5.3-codex-spark', 256_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
     ]);
@@ -238,10 +265,17 @@ describe('Provider Catalog compiler', () => {
       ['grok-4.20-0309-non-reasoning', 1_000_000, 'fixed', 'unsupported', 'unknown', false, [], 'off'],
       ['grok-4.20-0309-reasoning', 1_000_000, 'fixed', 'unsupported', 'unknown', false, [], 'off'],
       ['grok-4.20-multi-agent-0309', 1_000_000, 'fixed', 'unsupported', 'unknown', false, [], 'off'],
-      ['grok-4.3', 500_000, 'selectable', 'unsupported', 'unknown', false, [], 'off'],
+      ['grok-4.3', 1_000_000, 'fixed', 'unsupported', 'unknown', false, [], 'off'],
       ['grok-4.5', 500_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high'], 'medium'],
       ['grok-build-0.1', 256_000, 'unsupported', 'unsupported', 'unknown', false, [], 'off'],
     ]);
+    const grokSurface = catalog.surfaces.get('grok-account')?.surface;
+    expect(grokSurface?.routes).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        baseUrl: 'https://cli-chat-proxy.grok.com/v1',
+        headers: { 'x-grok-client-version': '0.2.101' },
+      }),
+    ]));
 
     verify('deepseek', [
       ['deepseek-v4-pro', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
@@ -255,10 +289,6 @@ describe('Provider Catalog compiler', () => {
     verify('kimi-coding-plan', [
       ['kimi-for-coding', 256_000, 'unsupported', 'selectable', 'toggle', true, [], 'on'],
       ['kimi-for-coding-highspeed', 256_000, 'unsupported', 'unsupported', 'toggle', true, [], 'on', 'internal'],
-      ['k2p7', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on'],
-      ['k2p6', 256_000, 'unsupported', 'unsupported', 'toggle', true, [], 'on'],
-      ['k2p5', 256_000, 'unsupported', 'unsupported', 'toggle', true, [], 'on'],
-      ['kimi-k2-thinking', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on'],
     ]);
 
     verify('volcengine-coding-plan', [
@@ -324,6 +354,13 @@ describe('Provider Catalog compiler', () => {
     const missingProfile = clone(input());
     mutableSurface(missingProfile, 'openai').profileId = 'not-registered';
     expect(() => compileProviderCatalog(missingProfile)).toThrow(/unknown profile/u);
+
+    const subMillionMax = clone(input());
+    const gemini = mutableSurface(subMillionMax, 'github-copilot').models
+      .find((model: Record<string, unknown>) => model.modelId === 'gemini-3.1-pro-preview');
+    gemini.contextTiers.find((tier: Record<string, unknown>) => tier.id === 'one-million')
+      .maxPromptTokens = 200_000;
+    expect(() => compileProviderCatalog(subMillionMax)).toThrow(/Max mode control references a sub-one-million context tier/u);
 
     const missingTarget = clone(input());
     const kimi = mutableSurface(missingTarget, 'kimi-coding-plan');

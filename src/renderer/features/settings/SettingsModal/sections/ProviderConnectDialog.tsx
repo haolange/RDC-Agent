@@ -94,113 +94,115 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         </button>
       </div>
 
-      <ProviderAuthModeField
-        provider={connectionProvider}
-        value={connectionDraft.authMode}
-        disabled={connectionDraft.busy !== 'idle' || connectionDevicePending}
-        onChange={(authMode) => onUpdateConnectionDraft({
-          authMode,
-          usingStoredSecret: authMode === 'api-key'
-            && connectionProvider.hasStoredSecretByAuthMode?.['api-key'] === true,
-          accountStatus: undefined,
-          authCode: '',
-          error: '',
-          discoveryDiagnostic: null,
-          testedApiKey: '',
-          testedBaseUrl: '',
-          testedProtocol: connectionDraft.protocol,
-          testedAuthMode: authMode,
-          testedConnectionSignature: '',
-          models: [],
-        })}
-        t={t}
-      />
-
-      {connectionProvider.authMode === 'api-key' && (
-        <ProviderConnectionFields
-          connectionDraft={connectionDraft}
-          connectionProvider={connectionProvider}
-          onUpdateConnectionDraft={onUpdateConnectionDraft}
+      <div className="settings-provider-connect-body" data-testid="settings-provider-connect-body">
+        <ProviderAuthModeField
+          provider={connectionProvider}
+          value={connectionDraft.authMode}
+          disabled={connectionDraft.busy !== 'idle' || connectionDevicePending}
+          onChange={(authMode) => onUpdateConnectionDraft({
+            authMode,
+            usingStoredSecret: authMode === 'api-key'
+              && connectionProvider.hasStoredSecretByAuthMode?.['api-key'] === true,
+            accountStatus: undefined,
+            authCode: '',
+            error: '',
+            discoveryDiagnostic: null,
+            testedApiKey: '',
+            testedBaseUrl: '',
+            testedProtocol: connectionDraft.protocol,
+            testedAuthMode: authMode,
+            testedConnectionSignature: '',
+            models: [],
+          })}
           t={t}
         />
-      )}
-      {connectionProvider.authMode === 'local' && connectionProvider.baseUrlEditable && (
-        <label className="settings-field">
-          <span className="settings-field-label">{t('settings.providerBaseUrl')}</span>
-          <input
-            className="input"
-            data-testid="settings-provider-connect-base-url"
-            value={connectionDraft.baseUrl}
-            onChange={(event) => onUpdateConnectionDraft({
-              baseUrl: event.target.value,
-              error: '',
-              discoveryDiagnostic: null,
-              testedApiKey: '',
-              testedBaseUrl: '',
-              models: [],
-            })}
+
+        {connectionProvider.authMode === 'api-key' && (
+          <ProviderConnectionFields
+            connectionDraft={connectionDraft}
+            connectionProvider={connectionProvider}
+            onUpdateConnectionDraft={onUpdateConnectionDraft}
+            t={t}
           />
-        </label>
-      )}
-      {connectionProvider.authMode === 'local' && (
-        <div className="settings-provider-notice">
-          {t('settings.localProviderConnectHint')}
-        </div>
-      )}
+        )}
+        {connectionProvider.authMode === 'local' && connectionProvider.baseUrlEditable && (
+          <label className="settings-field">
+            <span className="settings-field-label">{t('settings.providerBaseUrl')}</span>
+            <input
+              className="input"
+              data-testid="settings-provider-connect-base-url"
+              value={connectionDraft.baseUrl}
+              onChange={(event) => onUpdateConnectionDraft({
+                baseUrl: event.target.value,
+                error: '',
+                discoveryDiagnostic: null,
+                testedApiKey: '',
+                testedBaseUrl: '',
+                models: [],
+              })}
+            />
+          </label>
+        )}
+        {connectionProvider.authMode === 'local' && (
+          <div className="settings-provider-notice">
+            {t('settings.localProviderConnectHint')}
+          </div>
+        )}
 
-      {connectionProvider.authMode === 'environment' && (
-        <div className="settings-provider-notice" data-testid="settings-provider-environment-notice">
-          {t('settings.environmentProviderConnectHint')}
-        </div>
-      )}
+        {connectionProvider.authMode === 'environment' && (
+          <div className="settings-provider-notice" data-testid="settings-provider-environment-notice">
+            {t('settings.environmentProviderConnectHint')}
+          </div>
+        )}
 
-      {connectionProvider.authMode === 'account' && (
-        <ProviderAccountOAuthPanel
-          connectionDraft={connectionDraft}
-          connectionProvider={connectionProvider}
-          connectionAccountConnected={connectionAccountConnected}
-          connectionDevicePending={connectionDevicePending}
-          onUpdateConnectionDraft={onUpdateConnectionDraft}
-          onStartAccountLogin={onStartAccountLogin}
+        {connectionProvider.authMode === 'account' && (
+          <ProviderAccountOAuthPanel
+            connectionDraft={connectionDraft}
+            connectionProvider={connectionProvider}
+            connectionAccountConnected={connectionAccountConnected}
+            connectionDevicePending={connectionDevicePending}
+            onUpdateConnectionDraft={onUpdateConnectionDraft}
+            onStartAccountLogin={onStartAccountLogin}
+            t={t}
+          />
+        )}
+
+        {connectionProvider.docsUrl && (
+          <a className="settings-link" href={connectionProvider.docsUrl} target="_blank" rel="noreferrer">
+            {shouldUseProviderDocsLink(connectionProvider)
+              ? t('settings.providerDocs')
+              : t('settings.getApiKey')}
+          </a>
+        )}
+
+        {connectionDraft.error && (
+          <div className="settings-provider-notice error" data-testid="settings-provider-connect-error">
+            {connectionDraft.error}
+          </div>
+        )}
+
+        {!connectionDraft.error && connectionDraft.discoveryDiagnostic && (
+          <div className="settings-provider-notice" data-testid="settings-provider-connect-discovery-diagnostic">
+            {t(
+              connectionDraft.discoveryDiagnostic.status === 'no-supported-models'
+                ? 'settings.providerDiscoveryNoSupportedModels'
+                : 'settings.providerDiscoveryMatched',
+              connectionDraft.discoveryDiagnostic,
+            )}
+          </div>
+        )}
+
+        <ProviderConnectModelList
+          provider={connectionProvider}
+          models={connectionDraft.models}
+          expandedModelId={expandedModelId}
+          disabled={connectionDraft.busy !== 'idle'}
+          onToggleExpanded={handleToggleModelCapability}
+          onModelChange={onModelChange}
+          onModelCountChange={setEffectiveModelCount}
           t={t}
         />
-      )}
-
-      {connectionProvider.docsUrl && (
-        <a className="settings-link" href={connectionProvider.docsUrl} target="_blank" rel="noreferrer">
-          {shouldUseProviderDocsLink(connectionProvider)
-            ? t('settings.providerDocs')
-            : t('settings.getApiKey')}
-        </a>
-      )}
-
-      {connectionDraft.error && (
-        <div className="settings-provider-notice error" data-testid="settings-provider-connect-error">
-          {connectionDraft.error}
-        </div>
-      )}
-
-      {!connectionDraft.error && connectionDraft.discoveryDiagnostic && (
-        <div className="settings-provider-notice" data-testid="settings-provider-connect-discovery-diagnostic">
-          {t(
-            connectionDraft.discoveryDiagnostic.status === 'no-supported-models'
-              ? 'settings.providerDiscoveryNoSupportedModels'
-              : 'settings.providerDiscoveryMatched',
-            connectionDraft.discoveryDiagnostic,
-          )}
-        </div>
-      )}
-
-      <ProviderConnectModelList
-        provider={connectionProvider}
-        models={connectionDraft.models}
-        expandedModelId={expandedModelId}
-        disabled={connectionDraft.busy !== 'idle'}
-        onToggleExpanded={handleToggleModelCapability}
-        onModelChange={onModelChange}
-        onModelCountChange={setEffectiveModelCount}
-        t={t}
-      />
+      </div>
 
       <ProviderConnectActions
         draft={connectionDraft}

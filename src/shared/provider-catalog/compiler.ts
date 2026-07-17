@@ -14,6 +14,7 @@ import {
   providerAdapterSupportsProtocol,
 } from './implementationRegistry';
 import type { ExecutionBinding, ModelManifest } from './modelManifestSchema';
+import { isMaxContextTier } from '../utils/contextTiers';
 
 export const PROVIDER_CATALOG_SCHEMA_VERSION = 1 as const;
 export const MODELS_DEV_IDENTITY_COUNT = 166 as const;
@@ -48,6 +49,7 @@ export type ProviderSurfaceSummary = Omit<ProviderSurfaceManifest,
   | 'models'
   | 'protocolOverrides'
 > & {
+  discoveryAuthority: ProviderSurfaceManifest['discovery']['authority'];
   modelCount: number;
   models: ProviderModelSummary[];
 };
@@ -242,9 +244,13 @@ function validateModel(
     errors.push(`${surface.id}/${model.modelId} has duplicate context tier ids`);
   }
   const contextControl = model.controls.context1m;
-  if ((contextControl.state === 'selectable' || contextControl.state === 'fixed')
-    && (!contextControl.tierId || !tierIds.has(contextControl.tierId))) {
-    errors.push(`${surface.id}/${model.modelId} 1M control references a missing context tier`);
+  if (contextControl.state === 'selectable' || contextControl.state === 'fixed') {
+    const contextTier = model.contextTiers.find((tier) => tier.id === contextControl.tierId);
+    if (!contextTier) {
+      errors.push(`${surface.id}/${model.modelId} Max mode control references a missing context tier`);
+    } else if (!isMaxContextTier(contextTier)) {
+      errors.push(`${surface.id}/${model.modelId} Max mode control references a sub-one-million context tier`);
+    }
   }
   validatePublicPatch(model.route.headers, `${surface.id}/${model.modelId}.route.headers`, errors);
   for (const tier of model.contextTiers) {
@@ -534,12 +540,13 @@ export function compileProviderCatalog(input: ProviderCatalogCompileInput): Comp
     accountLoginConfigured: surface.accountLoginConfigured,
     capabilities: surface.capabilities,
     routes: surface.routes,
+    discoveryAuthority: surface.discovery.authority,
     recommendedModels: surface.recommendedModels.filter((modelId) => {
       const model = surface.models.find((entry) => entry.modelId === modelId);
       return !model || model.selection.pickerVisibility !== 'internal';
     }),
     docsUrl: surface.docsUrl,
-      modelCount: surface.models.filter((model) => model.selection.pickerVisibility !== 'internal').length,
+    modelCount: surface.models.filter((model) => model.selection.pickerVisibility !== 'internal').length,
     models: surface.models.map((model) => ({
       modelId: model.modelId,
       label: model.label,

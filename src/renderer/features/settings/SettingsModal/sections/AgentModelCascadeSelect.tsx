@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentModelOption } from '@shared/types/agentManifest';
-import { splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
 import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -11,6 +10,20 @@ interface AgentModelCascadeSelectProps {
   onChange: (value: string) => void;
   t: Translate;
 }
+
+export const isAgentModelSelectionInvalid = (
+  value: string,
+  options: AgentModelOption[],
+): boolean => Boolean(value && !options.some((option) => option.canonicalId === value));
+
+export const agentModelOptionAccessibleLabel = (
+  option: AgentModelOption,
+  unavailableLabel: string,
+): string => [
+  option.modelLabel,
+  option.canonicalId,
+  ...(!option.configured ? [option.disabledReason ?? unavailableLabel] : []),
+].join(' · ');
 
 export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = ({
   value,
@@ -38,39 +51,12 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
       .filter((group) => group.options.some((option) => option.configured || option.canonicalId === value));
   }, [options, value]);
   const selected = options.find((option) => option.canonicalId === value);
-  const missingSelection = useMemo<AgentModelOption | null>(() => {
-    if (!value || selected) {
-      return null;
-    }
-    const parsed = splitCanonicalAgentModelId(value);
-    if (!parsed) {
-      return null;
-    }
-    return {
-      canonicalId: value,
-      providerId: parsed.providerId,
-      providerLabel: parsed.providerId,
-      modelId: parsed.modelId,
-      modelLabel: parsed.modelId,
-      configured: false,
-      status: 'missing',
-    };
-  }, [selected, value]);
-  const visibleSelected = selected ?? missingSelection;
-  const displayGroups = useMemo(() => [
-    ...(missingSelection
-      ? [{
-        providerId: missingSelection.providerId,
-        label: missingSelection.providerLabel,
-        options: [missingSelection],
-      }]
-      : []),
-    ...groups,
-  ], [groups, missingSelection]);
+  const invalidSelection = isAgentModelSelectionInvalid(value, options);
+  const displayGroups = groups;
   const resolvedActiveProviderId = displayGroups.some((group) => group.providerId === activeProviderId)
     ? activeProviderId
-    : visibleSelected?.providerId && displayGroups.some((group) => group.providerId === visibleSelected.providerId)
-      ? visibleSelected.providerId
+    : selected?.providerId && displayGroups.some((group) => group.providerId === selected.providerId)
+      ? selected.providerId
       : displayGroups[0]?.providerId ?? '';
   const activeGroup = displayGroups.find((group) => group.providerId === resolvedActiveProviderId) ?? displayGroups[0];
 
@@ -94,16 +80,21 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
       editorRect?.bottom ?? window.innerHeight - viewportPadding,
       statusRect?.top ?? window.innerHeight - viewportPadding,
     );
-    const boundaryWidth = Math.max(280, boundaryRight - boundaryLeft - viewportPadding * 2);
-    const menuWidth = Math.min(544, boundaryWidth);
-    const preferredHeight = Math.min(368, boundaryBottom - boundaryTop - viewportPadding * 2);
-    const spaceBelow = boundaryBottom - rect.bottom - menuGap;
-    const availableHeight = Math.max(48, Math.min(preferredHeight, Math.max(0, spaceBelow)));
+    const availableLeft = boundaryLeft + menuGap;
+    const availableRight = boundaryRight - menuGap;
+    const menuWidth = Math.max(0, Math.min(544, availableRight - availableLeft));
+    const preferredHeight = Math.max(48, Math.min(368, boundaryBottom - boundaryTop));
+    const spaceBelow = Math.max(0, boundaryBottom - rect.bottom - menuGap);
+    const spaceAbove = Math.max(0, rect.top - boundaryTop - menuGap);
+    const placeAbove = spaceBelow < 160 && spaceAbove > spaceBelow;
+    const availableHeight = Math.max(48, Math.min(preferredHeight, placeAbove ? spaceAbove : spaceBelow));
     const left = Math.min(
-      Math.max(boundaryLeft + viewportPadding, rect.left),
-      Math.max(boundaryLeft + viewportPadding, boundaryRight - menuWidth - viewportPadding),
+      Math.max(availableLeft, rect.left),
+      Math.max(availableLeft, availableRight - menuWidth),
     );
-    const top = rect.bottom + menuGap;
+    const top = placeAbove
+      ? Math.max(boundaryTop, rect.top - menuGap - availableHeight)
+      : Math.min(rect.bottom + menuGap, Math.max(boundaryTop, boundaryBottom - availableHeight));
 
     root.style.setProperty('--settings-model-menu-left', `${left}px`);
     root.style.setProperty('--settings-model-menu-top', `${top}px`);
@@ -130,8 +121,8 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
           if (displayGroups.some((group) => group.providerId === currentProviderId)) {
             return currentProviderId;
           }
-          return visibleSelected?.providerId && displayGroups.some((group) => group.providerId === visibleSelected.providerId)
-            ? visibleSelected.providerId
+          return selected?.providerId && displayGroups.some((group) => group.providerId === selected.providerId)
+            ? selected.providerId
             : displayGroups[0]?.providerId ?? '';
         });
       }
@@ -186,11 +177,17 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
         data-testid="settings-model-cascade-trigger"
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-invalid={invalidSelection}
         onClick={toggleOpen}
       >
-        <span>{visibleSelected ? visibleSelected.providerLabel : t('settings.selectProviderPlaceholder')}</span>
-        <strong>{visibleSelected ? visibleSelected.modelLabel : t('settings.selectModelPlaceholder')}</strong>
+        <span>{selected ? selected.providerLabel : t('settings.selectProviderPlaceholder')}</span>
+        <strong>{selected ? selected.modelLabel : t('settings.selectModelPlaceholder')}</strong>
       </button>
+      {invalidSelection ? (
+        <small className="settings-model-cascade-invalid" data-testid="settings-agent-model-invalid">
+          {t('settings.routeReasonModelInvalid')}: {value}
+        </small>
+      ) : null}
       <div className="settings-model-cascade-menu" role="listbox">
         <div className="settings-model-provider-list">
           {displayGroups.map((group) => (
@@ -207,30 +204,30 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
           ))}
         </div>
         <div className="settings-model-submenu">
-          {activeGroup?.options.map((option) => (
-            <button
-              key={option.canonicalId}
-              type="button"
-              className={`settings-model-option ${option.canonicalId === value ? 'active' : ''}`}
-              data-provider-id={option.providerId}
-              data-model-id={option.modelId}
-              data-canonical-id={option.canonicalId}
-              disabled={!option.configured}
-              role="option"
-              aria-selected={option.canonicalId === value}
-              onClick={() => {
-                onChange(option.canonicalId);
-                setOpen(false);
-              }}
-            >
-              <span>{option.modelLabel}</span>
-              <small>
-                {option.configured
-                  ? option.canonicalId
-                  : `${option.canonicalId} / ${option.disabledReason ?? t('settings.modelUnavailable')}`}
-              </small>
-            </button>
-          ))}
+          {activeGroup?.options.map((option) => {
+            const accessibleLabel = agentModelOptionAccessibleLabel(option, t('settings.modelUnavailable'));
+            return (
+              <button
+                key={option.canonicalId}
+                type="button"
+                className={`settings-model-option ${option.canonicalId === value ? 'active' : ''}`}
+                data-provider-id={option.providerId}
+                data-model-id={option.modelId}
+                data-canonical-id={option.canonicalId}
+                disabled={!option.configured}
+                role="option"
+                aria-label={accessibleLabel}
+                aria-selected={option.canonicalId === value}
+                title={accessibleLabel}
+                onClick={() => {
+                  onChange(option.canonicalId);
+                  setOpen(false);
+                }}
+              >
+                <span>{option.modelLabel}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

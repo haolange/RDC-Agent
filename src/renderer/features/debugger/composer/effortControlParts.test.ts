@@ -60,29 +60,29 @@ describe('effortControlParts', () => {
     expect(resolveReasoningIconVariant('max')).toBe('max');
   });
 
-  it('keeps reasoning, 1M context, and fast mode as separate pill states', () => {
+  it('keeps reasoning, Max mode, and Fast mode as separate pill states', () => {
     const presentation = buildEffortPillPresentation({
-      reasoningLabel: 'Max',
+      reasoningLabel: 'Reasoning Max',
       oneMillionContextMode: true,
-      oneMillionContextLabel: '1M context',
-      oneMillionContextBadgeLabel: '1M',
+      oneMillionContextLabel: 'Max mode',
+      oneMillionContextBadgeLabel: 'Max mode',
       fastModel: true,
       fastModelLabel: 'Fast mode',
       fastModelBadgeLabel: '2x',
     });
 
-    expect(presentation.label).toBe('Max');
-    expect(presentation.title).toBe('Max | 1M context | Fast mode');
+    expect(presentation.label).toBe('Reasoning Max');
+    expect(presentation.title).toBe('Reasoning Max | Max mode | Fast mode');
     expect(presentation.badges).toEqual([
-      { mode: 'one-million-context', label: '1M', title: '1M context' },
+      { mode: 'one-million-context', label: 'Max mode', title: 'Max mode' },
       { mode: 'fast', label: '2x', title: 'Fast mode' },
     ]);
-    expect(presentation.label).not.toContain('1M context');
+    expect(presentation.label).not.toContain('Max mode');
   });
 
-  it('projects unverified 1M entitlement visibly and into the switch accessible name', () => {
+  it('projects unverified Max mode entitlement visibly and into the switch accessible name', () => {
     const markup = renderToStaticMarkup(React.createElement(EffortOneMillionContextSwitchRow, {
-      label: '1M context',
+      label: 'Max mode',
       statusLabel: 'Unverified',
       available: true,
       active: false,
@@ -91,12 +91,12 @@ describe('effortControlParts', () => {
 
     expect(markup).toContain('composer-effort-toggle-status');
     expect(markup).toContain('Unverified');
-    expect(markup).toContain('aria-label="1M context · Unverified"');
+    expect(markup).toContain('aria-label="Max mode · Unverified"');
   });
 
-  it('renders fixed 1M as active and disabled instead of flashing off', () => {
+  it('renders fixed Max mode as active and disabled instead of flashing off', () => {
     const markup = renderToStaticMarkup(React.createElement(EffortOneMillionContextSwitchRow, {
-      label: '1M context',
+      label: 'Max mode',
       statusLabel: 'Fixed',
       available: false,
       active: true,

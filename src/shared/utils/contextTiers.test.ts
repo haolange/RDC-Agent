@@ -80,6 +80,16 @@ describe('resolveContextTierChoices', () => {
     expect(choices.oneMillionTier).toBeUndefined();
   });
 
+  it('fails closed when a billing overlay leaves Max mode below one million tokens', () => {
+    const choices = resolveContextTierChoices(input([
+      tier('default', { maxPromptTokens: 200_000, maxOutputTokens: 64_000 }, 'granted'),
+    ], {
+      state: 'fixed', fixedValue: true, tierId: 'default',
+    }));
+    expect(choices.normalTier?.id).toBe('default');
+    expect(choices.oneMillionTier).toBeUndefined();
+  });
+
   it('fails closed when the explicit tier is missing or denied', () => {
     expect(resolveContextTierChoices(input([
       tier('default', { maxTotalTokens: 256_000 }, 'granted'),

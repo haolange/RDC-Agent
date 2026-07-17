@@ -181,6 +181,7 @@ export function parseCopilotModelCatalog(
       availability: deniedByAccountPolicy ? 'unavailable' : 'available',
       ...(unavailableReason ? { unavailableReason } : {}),
       ...(routeOptions.length > 0 ? { routeOptions } : {}),
+      ...(routeOptions.length === 1 ? { preferredRouteOptionId: routeOptions[0].id } : {}),
     });
     const metadata: CopilotModelCapabilityMetadata = {
       limits: {

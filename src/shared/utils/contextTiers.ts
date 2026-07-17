@@ -42,6 +42,10 @@ export function contextTierWindowTokens(tier: ContextTier): number | undefined {
   return tier.maxPromptTokens + outputReserve;
 }
 
+export function isMaxContextTier(tier: ContextTier): boolean {
+  return (contextTierWindowTokens(tier) ?? 0) >= ONE_MILLION_CONTEXT_TOKENS;
+}
+
 function highestTier(tiers: ContextTier[], sourceOrder: Map<string, number>): ContextTier | undefined {
   return [...tiers].sort((left, right) => {
     const leftCap = contextTierWindowTokens(left);
@@ -56,8 +60,8 @@ function highestTier(tiers: ContextTier[], sourceOrder: Map<string, number>): Co
 }
 
 /**
- * Resolves normal and explicit 1M modes. A single tier can serve both modes;
- * eligibility is based on the complete window, not only the input ceiling.
+ * Resolves normal and explicit Max modes. A single tier can serve both modes;
+ * eligibility requires a complete window of at least one million tokens.
  */
 export function resolveContextTierChoices(
   model: Pick<EffectiveModel, 'contextTiers' | 'controls'>,
@@ -80,7 +84,7 @@ export function resolveContextTierChoices(
   const explicitTier = explicitTierId
     ? usable.find((tier) => tier.id === explicitTierId)
     : undefined;
-  const eligible = explicitTier ? [explicitTier] : [];
+  const eligible = explicitTier && isMaxContextTier(explicitTier) ? [explicitTier] : [];
   const grantedEligible = eligible.filter((tier) => tier.entitlement === 'granted');
   const unknownEligible = eligible.filter((tier) => tier.entitlement === 'unknown');
   const oneMillionTier = highestTier(grantedEligible, sourceOrder)

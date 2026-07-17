@@ -26,7 +26,7 @@
     },
     {
       "id": "grok-4.3",
-      "context_window": 500000,
+      "context_window": 1000000,
       "capabilities": { "tool_calls": true, "vision": true, "structured_output": false }
     }
   ]

@@ -97,7 +97,7 @@
       "contextTiers": [
         {
           "id": "default",
-          "label": "Fixed 1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "implicit"
@@ -167,7 +167,7 @@
       "contextTiers": [
         {
           "id": "default",
-          "label": "Fixed 1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "implicit"
@@ -237,7 +237,7 @@
       "contextTiers": [
         {
           "id": "default",
-          "label": "Fixed 1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "implicit"
@@ -326,7 +326,7 @@
       "contextTiers": [
         {
           "id": "default",
-          "label": "Fixed 1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "implicit"
@@ -439,7 +439,7 @@
       "contextTiers": [
         {
           "id": "default",
-          "label": "Fixed 1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "implicit"
@@ -511,7 +511,7 @@
       "contextTiers": [
         {
           "id": "default",
-          "label": "Fixed 1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "implicit"
@@ -661,7 +661,7 @@
         },
         {
           "id": "one-million",
-          "label": "1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "implicit"
@@ -741,7 +741,7 @@
         },
         {
           "id": "one-million",
-          "label": "1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "implicit"
@@ -821,7 +821,7 @@
         },
         {
           "id": "one-million",
-          "label": "1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "implicit"
@@ -903,7 +903,7 @@
         },
         {
           "id": "one-million",
-          "label": "1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "implicit"
@@ -985,7 +985,7 @@
         },
         {
           "id": "one-million",
-          "label": "1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "implicit"
@@ -1067,7 +1067,7 @@
         },
         {
           "id": "one-million",
-          "label": "1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "implicit"
@@ -1135,7 +1135,7 @@
       "contextTiers": [
         {
           "id": "default",
-          "label": "Fixed 1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "implicit"

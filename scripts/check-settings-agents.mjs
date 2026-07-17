@@ -167,7 +167,9 @@ async function main() {
   );
   assert(modelCascade.includes('settings-model-cascade'), 'Agents settings should use the provider/model cascade picker.');
   assert(modelCascade.includes('aria-expanded={open}'), 'Model cascade should have explicit open state.');
-  assert(modelCascade.includes('splitCanonicalAgentModelId'), 'Model cascade should keep unavailable canonical model ids readable.');
+  assert(!modelCascade.includes('splitCanonicalAgentModelId'), 'Model cascade must not synthesize missing selector options from persisted canonical ids.');
+  assert(modelCascade.includes('aria-invalid={invalidSelection}'), 'Model cascade should fail closed with explicit validation for an unavailable persisted selection.');
+  assert(modelCascade.includes('settings-agent-model-invalid'), 'Model cascade should render a stable unavailable-selection diagnostic anchor.');
   assert(modelCascade.includes('data-provider-id={group.providerId}'), 'Provider options should expose stable provider ids.');
   assert(modelCascade.includes('data-canonical-id={option.canonicalId}'), 'Model options should expose stable canonical ids.');
   assert(!modelCascade.includes('閫'), 'Model cascade must not hardcode mojibake text.');
@@ -206,6 +208,21 @@ async function main() {
   assert(composer.includes('userInvocableAgents.map'), 'Composer should list user-invocable Agent manifests.');
   assert(!composer.includes('AGENT_MODES.map'), 'Composer should not hardcode mode entries as Agent choices.');
   assert(composer.includes('composer-agent-menu-item-tooltip'), 'Composer should keep Agent descriptions in hover tooltip UI.');
+  const capabilityHook = fs.readFileSync(
+    path.join(repoRoot, 'src/renderer/features/debugger/composer/useEffectiveModelCapability.ts'),
+    'utf8',
+  );
+  const turnControls = fs.readFileSync(
+    path.join(repoRoot, 'src/renderer/features/debugger/composer/useTurnControls.ts'),
+    'utf8',
+  );
+  assert(capabilityHook.includes("status: 'syncing-route'"), 'Composer capability resolution should wait for the committed Agent route revision.');
+  assert(capabilityHook.includes('routeCommitKey'), 'Composer capability resolution should re-run on Agent route commits even when route text is unchanged.');
+  assert(capabilityHook.includes('validateCapabilityResolution'), 'Capability mismatches should terminate as unavailable instead of loading forever.');
+  assert(capabilityHook.includes("status: 'error'"), 'Capability request failures should have an explicit error state.');
+  assert(!capabilityHook.includes('catch {'), 'Capability request failures must not be swallowed by an empty catch.');
+  assert(!turnControls.includes(':pending'), 'Turn controls must not retain the legacy pending capability-key sentinel.');
+  assert(turnControls.includes('capabilityState'), 'Turn controls should consume the closed capability resolution state.');
 
   const modeGlyph = fs.readFileSync(path.join(repoRoot, 'src/renderer/ui/ModeGlyph.tsx'), 'utf8');
   assert(modeGlyph.includes('FALLBACK_MODE_CONFIG'), 'ModeGlyph should provide a safe fallback for custom Agent profiles.');

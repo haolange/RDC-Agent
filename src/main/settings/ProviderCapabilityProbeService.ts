@@ -138,7 +138,7 @@ export class ProviderCapabilityProbeService {
     const choices = resolveContextTierChoices(target.model);
     if (request.mode === 'one-million-context') {
       if (!choices.oneMillionTier) {
-        return { success: false, status: 'denied', requestSent: false, detail: 'No selectable 1M context mode.' };
+        return { success: false, status: 'denied', requestSent: false, detail: 'No selectable Max mode.' };
       }
       if (choices.oneMillionTier.entitlement === 'unknown' && choices.oneMillionTier.activation.kind === 'implicit') {
         return {

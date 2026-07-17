@@ -8,10 +8,22 @@ import type {
 import type { LlmProviderModel } from '@shared/types/settings';
 import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 
+export interface GrokBuilderCatalogDiagnostic {
+  envelopeKind: 'root-array' | 'models-array' | 'models-map' | 'data-array' | 'items-array' | 'unknown';
+  candidateCount: number;
+  admittedCount: number;
+  filtered: {
+    invalidIdentity: number;
+    hidden: number;
+    unsupportedInApi: number;
+  };
+}
+
 export interface ParsedLiveCatalog {
   models: LlmProviderModel[];
   contributions: CatalogModelContribution[];
   entitlementContributions?: CatalogModelContribution[];
+  diagnostic?: GrokBuilderCatalogDiagnostic;
 }
 
 function records(payload: unknown): Record<string, unknown>[] {
@@ -436,7 +448,7 @@ export function parseOpenRouterAccountCatalog(payload: unknown): ParsedLiveCatal
   }));
 }
 
-/** Grok account models are accepted only from the live account catalog. */
+/** Grok account discovery contributes availability and context facts; the OAuth proxy route remains manifest-owned. */
 export function parseGrokAccountCatalog(payload: unknown): ParsedLiveCatalog {
   const contributions = records(payload).flatMap((value): CatalogModelContribution[] => {
     const identity = liveIdentity(value);
@@ -446,7 +458,6 @@ export function parseGrokAccountCatalog(payload: unknown): ParsedLiveCatalog {
       ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
       label: text(value.label) ?? identity.id,
       availability: 'available',
-      route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://api.x.ai/v1', source: 'model' },
       contextTiers: [{
         id: 'default', label: 'Default', maxPromptTokens: contextTokens(value),
         activation: { kind: 'implicit' }, entitlement: 'granted',
@@ -462,13 +473,43 @@ export function parseGrokAccountCatalog(payload: unknown): ParsedLiveCatalog {
 
 /** Parse the Grok Build subscription catalog returned by cli-chat-proxy. */
 export function parseGrokBuilderCatalog(payload: unknown): ParsedLiveCatalog {
-  const modelMap = record(record(payload).models);
-  return asResult(Object.values(modelMap).flatMap((candidate): CatalogModelContribution[] => {
+  const root = record(payload);
+  const envelope = (() => {
+    if (Array.isArray(payload)) {
+      return { kind: 'root-array' as const, candidates: payload };
+    }
+    for (const key of ['models', 'data', 'items'] as const) {
+      const value = root[key];
+      if (Array.isArray(value)) {
+        return { kind: `${key}-array` as 'models-array' | 'data-array' | 'items-array', candidates: value };
+      }
+      if (key === 'models') {
+        const modelMap = record(value);
+        if (Object.keys(modelMap).length > 0) {
+          return { kind: 'models-map' as const, candidates: Object.values(modelMap) };
+        }
+      }
+    }
+    return { kind: 'unknown' as const, candidates: [] };
+  })();
+  const filtered = { invalidIdentity: 0, hidden: 0, unsupportedInApi: 0 };
+  const contributions = envelope.candidates.flatMap((candidate): CatalogModelContribution[] => {
     const wrapper = record(candidate);
     const info = record(wrapper.info);
     const value = Object.keys(info).length > 0 ? info : wrapper;
     const identity = liveIdentity(value);
-    if (!identity || value.hidden === true || value.supported_in_api === false) return [];
+    if (!identity) {
+      filtered.invalidIdentity += 1;
+      return [];
+    }
+    if (value.hidden === true) {
+      filtered.hidden += 1;
+      return [];
+    }
+    if (value.supported_in_api === false) {
+      filtered.unsupportedInApi += 1;
+      return [];
+    }
     const contextWindow = contextTokens(value);
     const supportsReasoning = value.supports_reasoning_effort === true;
     return [{
@@ -478,6 +519,7 @@ export function parseGrokBuilderCatalog(payload: unknown): ParsedLiveCatalog {
         ? 'Composer 2.5'
         : text(value.name) ?? text(value.label) ?? identity.id,
       availability: 'available',
+      selection: { pickerVisibility: 'primary' },
       route: {
         protocol: text(value.api_backend)?.toLowerCase() === 'responses'
           ? 'OpenAIResponses'
@@ -491,6 +533,8 @@ export function parseGrokBuilderCatalog(payload: unknown): ParsedLiveCatalog {
       }],
       ...(contextWindow ? { defaultBudgetTokens: contextWindow } : {}),
       controls: {
+        fast: { state: 'unsupported', fixedValue: false },
+        context1m: { state: 'unsupported', fixedValue: false },
         reasoning: supportsReasoning
           ? parseOpenAiReasoningControl(value.reasoning_efforts, value.reasoning_effort)
           : parseOpenAiReasoningControl([], undefined),
@@ -499,5 +543,14 @@ export function parseGrokBuilderCatalog(payload: unknown): ParsedLiveCatalog {
       visionInput: { state: 'unknown' },
       structuredOutput: { state: 'unknown' },
     }];
-  }));
+  });
+  return {
+    ...asResult(contributions),
+    diagnostic: {
+      envelopeKind: envelope.kind,
+      candidateCount: envelope.candidates.length,
+      admittedCount: contributions.length,
+      filtered,
+    },
+  };
 }

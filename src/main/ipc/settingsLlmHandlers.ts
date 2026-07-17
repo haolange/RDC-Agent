@@ -18,6 +18,7 @@ import { resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/Effe
 import { effectiveCatalogService } from '../settings/EffectiveCatalogService';
 import { providerCapabilityProbeService } from '../settings/ProviderCapabilityProbeService';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
+import { runtimeLogService } from '../runtime/RuntimeLogService';
 import type { WorkbenchIpcContext } from './workbenchContext';
 
 export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void {
@@ -29,12 +30,13 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   });
 
   const withEffectiveAgentModelOptions = async (settings: AppSettings): Promise<AppSettings> => {
-    const selectedProviderIds = [...new Set(settings.llm.agentRoutes
-      .map((route) => route.providerId)
-      .filter((providerId): providerId is string => Boolean(providerId)))];
-    await Promise.all(selectedProviderIds.map((providerId) => loadProviderSurface(providerId)));
+    const catalogProviderIds = agentManifestService.modelOptionCatalogProviderIds(
+      settings.llm.providers,
+      settings.llm.agentRoutes,
+    );
+    await Promise.all(catalogProviderIds.map((providerId) => loadProviderSurface(providerId)));
     const catalogs = settings.llm.providers.flatMap((provider) => {
-      if (provider.catalogOwnership === 'user-managed' || !selectedProviderIds.includes(provider.id)) return [];
+      if (provider.catalogOwnership === 'user-managed' || !catalogProviderIds.includes(provider.id)) return [];
       const snapshot = resolveEffectiveCatalog(provider.id, settings);
       return snapshot ? [snapshot] : [];
     });
@@ -139,13 +141,24 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   });
 
   ipcMain.handle('settings:getEffectiveModel', async (_event, agentId: string) => {
-    const settings = settingsService.getAll();
-    const route = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
-    if (!route?.providerId || !route.modelId) {
-      return null;
+    try {
+      const settings = settingsService.getAll();
+      const route = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
+      if (!route?.providerId || !route.modelId) return null;
+      await loadProviderSurface(route.providerId);
+      return resolveEffectiveModel(route.providerId, route.modelId, settings);
+    } catch (error) {
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'llm',
+        severity: 'error',
+        title: `Capability resolution failed for ${agentId || 'unknown Agent'}`,
+        summary: 'The effective model capability could not be resolved.',
+        detail: error instanceof Error ? error.name : 'UnknownError',
+        raw: { code: 'EFFECTIVE_MODEL_CAPABILITY_RESOLUTION_FAILED', agentId },
+      });
+      throw error;
     }
-    await loadProviderSurface(route.providerId);
-    return resolveEffectiveModel(route.providerId, route.modelId, settings);
   });
 
   ipcMain.handle('settings:getEffectiveCatalog', async (_event, providerId: string) => {
