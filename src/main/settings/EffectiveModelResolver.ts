@@ -101,7 +101,7 @@ export function buildCatalogModelContribution(
     defaultBudgetTokens: 0,
     controls: {
       fast: { state: 'unknown', defaultValue: false, reason: 'Fast capability has not been verified.' },
-      context1m: { state: 'unknown', defaultValue: false, reason: '1M context capability has not been verified.' },
+      context1m: { state: 'unknown', defaultValue: false, reason: 'Max mode capability has not been verified.' },
       reasoning: CONSERVATIVE_REASONING,
     },
     toolCalling: { state: 'unknown' },

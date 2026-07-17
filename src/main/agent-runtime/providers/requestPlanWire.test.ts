@@ -38,6 +38,18 @@ describe('requestPlanWire', () => {
     });
   });
 
+  it('treats null request patches as declarative parameter deletion', () => {
+    const suppressionPlan: RequestPlan = {
+      ...plan,
+      bodyPatch: { temperature: null, top_p: null, max_output_tokens: null },
+    };
+    expect(applyRequestPlanBody({
+      model: 'gpt-5.4-mini',
+      temperature: 0.35,
+      top_p: 0.9,
+      max_output_tokens: 1200,
+    }, suppressionPlan)).toEqual({ model: 'gpt-5.4-mini' });
+  });
   it('passes activation headers but rejects credential injection', () => {
     expect(requestPlanHeaders(plan)).toEqual({ 'anthropic-beta': 'context-1m' });
   });

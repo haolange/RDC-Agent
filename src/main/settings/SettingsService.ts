@@ -61,6 +61,7 @@ import {
   createProviderEntriesFromCatalog,
   getProviderAuthModeAvailability,
   getProviderCatalogOwnership,
+  getProviderDiscoveryAuthority,
   getProviderDefaultBaseUrl,
   getProviderModelSummaries,
   getProviderCatalogModelIds,
@@ -681,9 +682,9 @@ function resolveProviderModels(providerId: string, persistedModels: unknown): Ll
   if (getProviderCatalogOwnership(providerId) === 'user-managed') {
     return sanitized;
   }
-  const admittedDynamicModels = sanitized.filter((model) => (
-    isAdmittedDiscoveredModel({ id: model.id })
-  ));
+  const admittedDynamicModels = getProviderDiscoveryAuthority(providerId) === 'candidate-validation'
+    ? []
+    : sanitized.filter((model) => isAdmittedDiscoveredModel({ id: model.id }));
   const catalogModels = getProviderModelSummaries(providerId);
   if (catalogModels.length === 0) return admittedDynamicModels;
   const catalogKeys = new Set(getProviderCatalogModelIds(providerId));

@@ -56,6 +56,41 @@ describe('Copilot account catalog parser', () => {
     ]);
   });
 
+  it('parses a Gemini 3.5 billing threshold without declaring structural controls', () => {
+    const catalog = parseCopilotModelCatalog({
+      data: [{
+        id: 'gemini-3.5-flash',
+        name: 'Gemini 3.5 Flash',
+        model_picker_enabled: true,
+        supported_endpoints: ['/chat/completions'],
+        capabilities: {
+          type: 'chat',
+          limits: {
+            max_prompt_tokens: 200_000,
+            max_output_tokens: 64_000,
+            max_context_window_tokens: 264_000,
+          },
+        },
+        billing: {
+          token_prices: {
+            default: { context_max: 200_000, entitlement: 'granted' },
+          },
+        },
+      }],
+    });
+
+    expect(parseCopilotBillingTiers(catalog.billingByModel['gemini-3.5-flash'])).toEqual([{
+      id: 'default',
+      label: 'Default',
+      maxPromptTokens: 200_000,
+      maxOutputTokens: 64_000,
+      maxTotalTokens: 264_000,
+      activation: { kind: 'implicit' },
+      entitlement: 'granted',
+    }]);
+    expect(catalog.contributions[0]).not.toHaveProperty('controls');
+  });
+
   it('lets an account policy denial dominate incomplete billing metadata', () => {
     expect(parseCopilotBillingTiers({
       limits: { maxPromptTokens: 272_000, maxTotalTokens: 1_000_000 },
@@ -78,5 +113,24 @@ describe('Copilot account catalog parser', () => {
       expect(contribution).not.toHaveProperty('executionBindings');
       expect(contribution).not.toHaveProperty('contextTiers');
     }
+  });
+
+  it('selects the only account-advertised route instead of retaining an unsupported provider default', () => {
+    const catalog = parseCopilotModelCatalog({
+      data: [{
+        id: 'responses-only-model',
+        model_picker_enabled: true,
+        supported_endpoints: ['/responses'],
+        capabilities: { type: 'chat', supports: {}, limits: { max_context_window_tokens: 128_000 } },
+      }],
+    });
+
+    expect(catalog.contributions).toEqual([
+      expect.objectContaining({
+        modelId: 'responses-only-model',
+        preferredRouteOptionId: 'OpenAIResponses',
+        routeOptions: [expect.objectContaining({ id: 'OpenAIResponses' })],
+      }),
+    ]);
   });
 });

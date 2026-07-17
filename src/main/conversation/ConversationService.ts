@@ -642,10 +642,9 @@ export class ConversationService {
         throw new Error('REQUEST_ID_CONFLICT: requestId already belongs to a different user message.');
       }
       const requestedCatalogRevision = input.configurationCommit?.providerCatalogRevision;
-      const requestedRouteRevision = input.configurationCommit?.routeRevision;
       if (
-        (requestedCatalogRevision && requestedCatalogRevision !== preparedContext.route.catalogRevision)
-        || (requestedRouteRevision && requestedRouteRevision !== preparedContext.route.routeRevision)
+        requestedCatalogRevision
+        && requestedCatalogRevision !== preparedContext.route.catalogRevision
       ) {
         throw new Error('REQUEST_ID_CONFLICT: requestId already belongs to a different frozen route.');
       }
@@ -1117,7 +1116,6 @@ export class ConversationService {
         ...(context.session?.turnControls ?? {}),
         ...(requestTurnControls ?? {}),
       },
-      requestedTemperature: 0.35,
     });
     if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
     if (
@@ -1126,9 +1124,11 @@ export class ConversationService {
     ) {
       throw new Error('MODEL_UNAVAILABLE: the frozen RequestPlan catalog revision does not match the committed selection.');
     }
-    if (configurationCommit?.routeRevision && planning.plan.routeRevision !== configurationCommit.routeRevision) {
-      throw new Error('MODEL_UNAVAILABLE: the frozen RequestPlan route revision does not match the committed selection.');
-    }
+    // configurationCommit.routeRevision identifies the renderer-selected model and
+    // was verified against effectiveModel above. A model-switch binding (for
+    // example Kimi Fast) intentionally gives the frozen RequestPlan a different
+    // effective route revision, so comparing those two revisions would reject a
+    // valid canonical-model -> internal-target plan.
     const pendingAttachmentDescriptors = await resolvePendingAttachmentDescriptors(pendingAttachments);
     throwIfPreparationCancelled();
     const preparedUserInput = await materializeAgentUserInput(
@@ -1669,7 +1669,6 @@ export class ConversationService {
             systemPrompt: prepared.promptPlan.systemPrompt,
             promptPlan: prepared.promptPlan,
             maxTokens: 1200,
-            temperature: 0.35,
             signal: abortController.signal,
             turnControls,
             requestPlan: planning.plan,

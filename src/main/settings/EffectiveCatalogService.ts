@@ -386,9 +386,19 @@ function mergeContextTiers(
       activation: { kind: 'implicit' } as const,
       entitlement: 'unknown' as const,
     };
+    const contextControl = target.controls.context1m;
+    const protectsCatalogMaxTier = layer.source === 'entitlement'
+      && (contextControl.state === 'fixed' || contextControl.state === 'selectable')
+      && contextControl.tierId === patch.id;
+    const effectivePatch: PartialContextTier = protectsCatalogMaxTier
+      ? {
+          id: patch.id,
+          ...(patch.entitlement !== undefined ? { entitlement: patch.entitlement } : {}),
+        }
+      : patch;
     mergeObjectLeaves(
       current as unknown as Record<string, unknown>,
-      patch as unknown as Record<string, unknown>,
+      effectivePatch as unknown as Record<string, unknown>,
       `contextTiers.${patch.id}`,
       layer,
       target.provenance,

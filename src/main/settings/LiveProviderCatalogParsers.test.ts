@@ -109,14 +109,59 @@ describe('live Provider Catalog parsers', () => {
       'grok-4.5',
       'grok-composer-2.5-fast',
     ]);
+    expect(parsed.contributions.find((model) => model.modelId === 'grok-4.3')).toMatchObject({
+      contextTiers: [expect.objectContaining({ id: 'default', maxPromptTokens: 1_000_000 })],
+      defaultBudgetTokens: 1_000_000,
+    });
+    expect(parsed.contributions.find((model) => model.modelId === 'grok-4.3'))
+      .not.toHaveProperty('route');
     expect(parsed.contributions.find((model) => model.modelId === 'grok-4.5')).toMatchObject({
       route: { protocol: 'OpenAIResponses', baseUrl: 'https://cli-chat-proxy.grok.com/v1' },
       controls: { reasoning: { levels: ['high', 'medium', 'low'] } },
     });
+    expect(parsed.contributions.find((model) => model.modelId === 'grok-4.5')?.controls?.fast)
+      .toEqual({ state: 'unsupported', fixedValue: false });
     expect(parsed.contributions.find((model) => model.modelId === 'grok-4.20-0309-reasoning')?.controls)
       .toBeUndefined();
   });
 
+  it('admits Composer 2.5 from every supported Builder envelope without inventing Fast mode', () => {
+    const composer = {
+      id: 'grok-composer-2.5-fast',
+      name: 'Composer 2.5',
+      api_backend: 'responses',
+      context_window: 200_000,
+      supported_in_api: true,
+      supports_reasoning_effort: false,
+    };
+    const payloads = [
+      { expectedEnvelope: 'models-map', payload: { models: { [composer.id]: { info: composer } } } },
+      { expectedEnvelope: 'models-array', payload: { models: [{ info: composer }] } },
+      { expectedEnvelope: 'data-array', payload: { data: [{ info: composer }] } },
+      { expectedEnvelope: 'items-array', payload: { items: [{ info: composer }] } },
+    ];
+
+    for (const { expectedEnvelope, payload } of payloads) {
+      const parsed = parseGrokBuilderCatalog(payload);
+      expect(parsed.diagnostic).toMatchObject({
+        envelopeKind: expectedEnvelope,
+        candidateCount: 1,
+        admittedCount: 1,
+        filtered: { invalidIdentity: 0, hidden: 0, unsupportedInApi: 0 },
+      });
+      expect(parsed.contributions).toEqual([expect.objectContaining({
+        modelId: 'grok-composer-2.5-fast',
+        label: 'Composer 2.5',
+        selection: { pickerVisibility: 'primary' },
+        defaultBudgetTokens: 200_000,
+        controls: expect.objectContaining({
+          fast: { state: 'unsupported', fixedValue: false },
+          context1m: { state: 'unsupported', fixedValue: false },
+        }),
+      })]);
+
+    }
+  });
   it('filters media models and canonicalizes proven aliases', () => {
     const parsed = parseGrokAccountCatalog({ data: [
       { id: 'grok-4.3', context_window: 1_000_000 },

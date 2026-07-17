@@ -44,7 +44,7 @@ const t = (key: string, params?: Record<string, string | number>): string => {
   if (key === 'settings.providers.capability.activationWithEntitlement') return `${params?.activation} · ${params?.entitlement}`;
   if (key === 'settings.providers.capability.contextRange') return `${params?.base} -> ${params?.maximum}`;
   if (key === 'settings.providers.capability.contextRangeUnverified') return `${params?.base} -> ${params?.maximum} (Unverified)`;
-  if (key === 'settings.providers.capability.oneMillionTierLabel') return `${params?.label} · 1M`;
+  if (key === 'settings.providers.capability.oneMillionTierLabel') return `${params?.label} · Max mode`;
   if (key === 'settings.providers.capability.sources') return `${params?.sources} @ ${params?.date}`;
   return labels[key] ?? key;
 };
@@ -143,7 +143,7 @@ describe('modelCapabilitySummaryUtils', () => {
     });
     expect(formatContextCapability(effective, t)).toBe('272k -> 1.1M (Unverified)');
     expect(buildContextTierRows(effective, t)).toContainEqual(expect.objectContaining({
-      id: 'long', label: 'Long · 1M', entitlement: 'Unverified', activation: 'Header', tone: 'warning',
+      id: 'long', label: 'Long · Max mode', entitlement: 'Unverified', activation: 'Header', tone: 'warning',
     }));
   });
 

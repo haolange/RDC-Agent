@@ -51,6 +51,9 @@
       "protocol": "OpenAIResponses",
       "adapterId": "openai-responses",
       "baseUrl": "https://cli-chat-proxy.grok.com/v1",
+      "headers": {
+        "x-grok-client-version": "0.2.101"
+      },
       "default": true,
       "protocolOwner": "openai"
     },
@@ -59,6 +62,9 @@
       "protocol": "OpenAICompatibleChatCompletions",
       "adapterId": "openai-compatible",
       "baseUrl": "https://cli-chat-proxy.grok.com/v1",
+      "headers": {
+        "x-grok-client-version": "0.2.101"
+      },
       "protocolOwner": "openai"
     }
   ],
@@ -255,15 +261,6 @@
       "contextTiers": [
         {
           "id": "default",
-          "label": "Default",
-          "maxPromptTokens": 500000,
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "granted"
-        },
-        {
-          "id": "one-million",
           "label": "Native 1M window",
           "maxPromptTokens": 1000000,
           "maxTotalTokens": 1000000,
@@ -273,7 +270,7 @@
           "entitlement": "granted"
         }
       ],
-      "defaultBudgetTokens": 500000,
+      "defaultBudgetTokens": 1000000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -298,10 +295,10 @@
           "fixedValue": false
         },
         "context1m": {
-          "state": "selectable",
-          "defaultValue": false,
+          "state": "fixed",
+          "fixedValue": true,
           "entitlement": "granted",
-          "tierId": "one-million"
+          "tierId": "default"
         },
         "reasoning": {
           "kind": "unknown",

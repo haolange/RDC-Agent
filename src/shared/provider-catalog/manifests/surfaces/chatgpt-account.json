@@ -439,7 +439,7 @@
         },
         {
           "id": "max",
-          "label": "1M context",
+          "label": "Max mode",
           "maxPromptTokens": 1000000,
           "activation": {
             "kind": "implicit"
@@ -559,10 +559,8 @@
       },
       "controls": {
         "fast": {
-          "state": "selectable",
-          "defaultValue": false,
-          "entitlement": "granted",
-          "label": "Fast"
+          "state": "unsupported",
+          "fixedValue": false
         },
         "context1m": {
           "state": "unsupported",
@@ -594,15 +592,15 @@
       },
       "executionBindings": [
         {
-          "id": "fast:activation",
-          "when": {
-            "fast": true
-          },
+          "id": "route:chatgpt-codex-parameter-policy",
+          "when": {},
           "actions": [
             {
               "kind": "request-patch",
               "patch": {
-                "service_tier": "priority"
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null
               }
             }
           ],

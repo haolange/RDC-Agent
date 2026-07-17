@@ -259,10 +259,7 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
     ]);
     expect(publishCatalog).toHaveBeenCalledWith('grok-account', expect.objectContaining({
       contributions: expect.arrayContaining([
-        expect.objectContaining({
-          modelId: 'grok-4.3',
-          route: expect.objectContaining({ protocol: 'OpenAICompatibleChatCompletions' }),
-        }),
+        expect.objectContaining({ modelId: 'grok-4.3' }),
         expect.objectContaining({
           modelId: 'grok-4.5',
           route: expect.objectContaining({ protocol: 'OpenAIResponses' }),
@@ -279,7 +276,12 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
       'https://cli-chat-proxy.grok.com/v1/models',
-      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer access-1' }) }),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer access-1',
+          'x-grok-client-version': '0.2.101',
+        }),
+      }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       5,
@@ -514,6 +516,30 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
     expect(bundle.accessToken).toBe('new-access');
     expect(bundle.refreshToken).toBe('refresh-2');
     expect(bundle.authorizationMode).toBe('browser');
+  });
+
+  it('does not report a failed live catalog refresh as connected', async () => {
+    const service = new ProviderAccountAuthService();
+    mocks.provider = {
+      id: 'grok-account',
+      isConfigured: true,
+      status: 'verified',
+      models: [{ id: 'grok-4.5', label: 'Grok 4.5', enabled: true }],
+    };
+    mocks.oauthSecret = JSON.stringify({
+      providerId: 'grok-account',
+      accessToken: 'access-1',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    });
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
+
+    const status = await service.test('grok-account');
+
+    expect(status).toMatchObject({
+      state: 'failed',
+      connected: false,
+    });
+    expect(status.error).toContain('fetch failed');
   });
 
   it('revokes Super Grok tokens best-effort through metadata before clearing the local account', async () => {

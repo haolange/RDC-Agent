@@ -64,16 +64,16 @@ describe('projectProviderModels', () => {
   });
 
   it('hides exact internal variants from the picker and removes stale persisted variant rows', () => {
-    const primary = effectiveModel('model-a', 'Model A');
+    const primary = effectiveModel('kimi-for-coding', 'kimi-for-coding');
     const variant = {
-      ...effectiveModel('model-a-fast', 'Model A Fast'),
-      selection: { pickerVisibility: 'internal' as const, relatedPrimaryModelIds: ['model-a'] },
+      ...effectiveModel('kimi-for-coding-highspeed', 'kimi-for-coding-highspeed'),
+      selection: { pickerVisibility: 'internal' as const, relatedPrimaryModelIds: ['kimi-for-coding'] },
     };
     expect(projectProviderModels(
       'app-managed',
-      [{ id: 'model-a-fast', label: 'Old Fast row', enabled: true }],
+      [{ id: 'kimi-for-coding-highspeed', label: 'Old Fast row', enabled: true }],
       snapshot([primary, variant]),
-    ).map(({ model }) => model.id)).toEqual(['model-a']);
+    ).map(({ model }) => model.id)).toEqual(['kimi-for-coding']);
   });
 
   it('rekeys an app-managed preference through a proven effective alias without duplicating it', () => {

@@ -4,10 +4,12 @@ import {
   resolveContextTierChoices,
 } from '@shared/utils/contextTiers';
 import { resolveModelControls } from '@shared/utils/modelControls';
+import { resolvedCapability } from './capabilityResolution';
 
 export function useSelectedContextWindowTokens(): number | null {
-  const capability = useTurnControlsStore((state) => state.capability);
+  const capabilityState = useTurnControlsStore((state) => state.capabilityState);
   const controls = useTurnControlsStore((state) => state.turnControls);
+  const capability = resolvedCapability(capabilityState);
   if (!capability) return null;
 
   const choices = resolveContextTierChoices(capability);

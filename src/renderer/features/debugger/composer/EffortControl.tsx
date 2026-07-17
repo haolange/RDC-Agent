@@ -24,13 +24,14 @@ import {
 } from './turnControlsUtils';
 import { useMaxVisualController } from './useMaxVisualController';
 import { createEffortSliderHandlers } from './effortSliderHandlers';
+import { capabilityStatusPresentation } from './capabilityPresentation';
 export const EffortControl: React.FC<{
   agentId: string;
   currentSession: SessionRecord | null;
   disabled?: boolean;
 }> = ({ agentId, currentSession, disabled = false }) => {
   const { t } = useI18n();
-  const { turnControls, capability, updateTurnControls } = useTurnControls(agentId, currentSession);
+  const { turnControls, capability, capabilityState, retryCapability, updateTurnControls } = useTurnControls(agentId, currentSession);
   const [open, setOpen] = useState(false);
   const [dragRatio, setDragRatio] = useState<number | null>(null);
   const [snapLevel, setSnapLevel] = useState<ReasoningSelection | null>(null);
@@ -45,7 +46,7 @@ export const EffortControl: React.FC<{
   const pendingDragRatioRef = useRef<number | null>(null);
   const isDragging = dragRatio !== null;
   const reasoningControl = capability?.controls.reasoning ?? null;
-  const capabilityPending = capability === null;
+  const capabilityReady = capabilityState.status === 'ready' || capabilityState.status === 'refreshing';
   const capabilityKey = capability
     ? `${capability.providerId}:${capability.modelId}`
     : 'pending';
@@ -122,15 +123,18 @@ export const EffortControl: React.FC<{
   const oneMillionAvailable = hasSelectableOneMillionContext(capability);
   const oneMillionUnverified = isOneMillionContextUnverified(capability);
   const fastAvailable = hasSelectableFastMode(capability);
-  const oneMillionContextStatusLabel = capabilityPending
-    ? t('composer.effort.capabilityLoading')
+  const statusPresentation = capabilityStatusPresentation(capabilityState);
+  const capabilityStateLabel = statusPresentation.labelKey ? t(statusPresentation.labelKey) : undefined;
+  const capabilityStateDetail = statusPresentation.detailKey ? t(statusPresentation.detailKey) : undefined;
+  const oneMillionContextStatusLabel = !capabilityReady
+    ? capabilityStateLabel
     : oneMillionCapability?.state === 'fixed'
       ? t('composer.effort.fixed')
       : oneMillionUnverified
         ? t('composer.effort.unverified')
         : undefined;
-  const fastModelStatusLabel = capabilityPending
-    ? t('composer.effort.capabilityLoading')
+  const fastModelStatusLabel = !capabilityReady
+    ? capabilityStateLabel
     : capability?.resolvedControls?.fast.state === 'fixed'
       ? t('composer.effort.fixed')
       : undefined;
@@ -253,10 +257,13 @@ export const EffortControl: React.FC<{
           popupRef={popupRef}
           popupStyle={popupStyle}
           trackRef={trackRef}
+          capabilityStateLabel={capabilityStateLabel}
+          capabilityStateDetail={capabilityStateDetail}
+          capabilityRefreshing={statusPresentation.refreshing}
+          capabilityRetryLabel={t('composer.effort.capabilityRetry')}
+          onRetryCapability={retryCapability}
           reasoningUnverified={reasoningUnverified}
-          reasoningStateLabel={capabilityPending
-            ? t('composer.effort.capabilityLoading')
-            : t('composer.effort.providerManaged')}
+          reasoningStateLabel={t('composer.effort.providerManaged')}
           hasAdjustableReasoning={hasAdjustableReasoning}
           displayLevel={displayLevel}
           displayLevels={displayLevels}
@@ -271,9 +278,9 @@ export const EffortControl: React.FC<{
           thumbStyle={thumbStyle}
           thumbEdgeClass={thumbEdgeClass}
           tooltipLabel={tooltipLabel}
-          oneMillionContextAvailable={oneMillionAvailable}
+          oneMillionContextAvailable={capabilityReady && oneMillionAvailable}
           oneMillionContextStatusLabel={oneMillionContextStatusLabel}
-          fastModelAvailable={fastAvailable}
+          fastModelAvailable={capabilityReady && fastAvailable}
           fastModelStatusLabel={fastModelStatusLabel}
           oneMillionContextMode={turnControls.maxContextMode}
           fastModel={turnControls.fastModel}

@@ -811,6 +811,38 @@
   font-weight: var(--font-medium);
 }
 
+.composer-effort-capability-state {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--space-8);
+}
+
+.composer-effort-capability-state-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+}
+
+.composer-effort-capability-state-copy strong {
+  color: var(--token-text-body);
+  font-weight: var(--font-medium);
+}
+
+.composer-effort-capability-state-copy small,
+.composer-effort-refreshing {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+}
+
+.composer-effort-refreshing {
+  min-height: var(--space-4);
+}
+
 .composer-effort-slider {
   position: relative;
   height: calc(var(--space-10) + var(--space-2));

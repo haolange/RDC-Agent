@@ -285,6 +285,18 @@
   border-radius: var(--radius-md);
 }
 
+.settings-model-cascade-trigger[aria-invalid='true'] {
+  border-color: var(--token-status-error);
+}
+
+.settings-model-cascade-invalid {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--token-status-error);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
 .settings-model-cascade-trigger span, .settings-model-cascade-trigger strong {
   min-width: 0;
   overflow: hidden;
@@ -359,11 +371,21 @@
 
 .settings-model-option {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: var(--space-1);
+  flex: 0 0 auto;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: hidden;
   padding: var(--space-2) var(--space-3);
+  text-align: left;
+}
+
+.settings-model-option span {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-model-option.active {
@@ -374,10 +396,6 @@
 .settings-model-option:disabled {
   cursor: not-allowed;
   opacity: 0.45;
-}
-
-.settings-model-option small {
-  color: var(--token-text-caption);
 }
 
 .settings-renderdoc-toolchain {
@@ -2160,7 +2178,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  overflow: auto;
+  overflow: hidden;
   padding: var(--space-5);
   border: 1px solid var(--token-border-default);
   border-radius: var(--modal-radius);
@@ -2168,6 +2186,18 @@
   box-shadow: var(--shadow-xl);
   border-color: var(--modal-border);
   overscroll-behavior: contain;
+}
+
+.settings-provider-connect-body {
+  min-height: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-inline-end: var(--space-1);
+  scrollbar-gutter: stable;
 }
 
 .settings-provider-connect-header {
@@ -2259,14 +2289,12 @@
 
 .settings-provider-connect-models {
   min-height: 120px;
-  overflow: auto;
-  max-height: 240px;
+  flex: 0 0 auto;
 }
 
 .settings-provider-connect-actions {
   justify-content: flex-end;
-  position: sticky;
-  bottom: calc(var(--space-5) * -1);
+  flex: 0 0 auto;
   margin: 0 calc(var(--space-5) * -1) calc(var(--space-5) * -1);
   padding: var(--space-4) var(--space-5) var(--space-5);
   border-top: 1px solid var(--token-border-muted);
@@ -2950,23 +2978,12 @@
 
 .settings-provider-connect-dialog[data-model-list-size='medium'] {
   width: min(40rem, calc(100vw - var(--space-8)));
+  height: min(46rem, calc(100dvh - var(--space-8)));
 }
 
 .settings-provider-connect-dialog[data-model-list-size='long'] {
   width: min(46rem, calc(100vw - var(--space-8)));
-  max-height: min(52rem, calc(100vh - var(--space-8)));
-}
-
-.settings-provider-connect-dialog[data-model-list-size='short'] .settings-provider-connect-models {
-  max-height: clamp(10rem, 26vh, 15rem);
-}
-
-.settings-provider-connect-dialog[data-model-list-size='medium'] .settings-provider-connect-models {
-  max-height: clamp(14rem, 34vh, 22rem);
-}
-
-.settings-provider-connect-dialog[data-model-list-size='long'] .settings-provider-connect-models {
-  max-height: clamp(18rem, 44vh, 30rem);
+  height: min(52rem, calc(100dvh - var(--space-8)));
 }
 
 .settings-browser-page-head {
@@ -4434,7 +4451,6 @@
 @media (max-width: 760px) {
   .settings-model-cascade-menu {
     grid-template-columns: 1fr;
-    width: 100%;
     max-height: min(30rem, 78vh);
   }
 
@@ -4637,6 +4653,15 @@
 }
 
 @media (max-width: 640px) {
+  .settings-model-cascade-menu {
+    grid-template-columns: minmax(8rem, 0.44fr) minmax(0, 0.56fr);
+  }
+
+  .settings-model-provider-trigger,
+  .settings-model-option {
+    padding-inline: var(--space-2);
+  }
+
   .settings-center {
     width: 100vw;
     height: 100vh;

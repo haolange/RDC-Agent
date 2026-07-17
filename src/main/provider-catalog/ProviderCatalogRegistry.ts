@@ -149,6 +149,12 @@ export function getProviderCatalogOwnership(id: string): LlmProviderCatalogOwner
   return summaryById(id)?.catalogOwnership ?? 'user-managed';
 }
 
+export function getProviderDiscoveryAuthority(
+  id: string,
+): ProviderSurfaceSummary['discoveryAuthority'] | undefined {
+  return summaryById(id)?.discoveryAuthority;
+}
+
 export function getProviderAuthModeAvailability(
   id: string,
 ): Partial<Record<LlmProviderAuthMode, LlmProviderAvailability>> {

@@ -101,6 +101,24 @@ describe('planModelRequest', () => {
     });
   });
 
+  it('applies an unconditional route parameter policy without inventing a UI control', () => {
+    const base = model({
+      executionBindings: [{
+        id: 'route:chatgpt-codex-parameter-policy',
+        when: {},
+        actions: [{
+          kind: 'request-patch',
+          patch: { temperature: null, top_p: null, max_output_tokens: null },
+        }],
+        entitlement: 'granted',
+      }],
+    });
+    const result = planModelRequest({ model: base, catalogModels: [base] });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.appliedBindingIds).toEqual(['route:chatgpt-codex-parameter-policy']);
+    expect(result.plan.bodyPatch).toEqual({ temperature: null, top_p: null, max_output_tokens: null });
+  });
   it('switches Kimi Fast to its hidden highspeed target on the selected protocol', () => {
     const routes: EffectiveModel['routeOptions'] = [
       { id: 'anthropic', route: { protocol: 'AnthropicMessages', baseUrl: 'https://kimi.test/v1', source: 'catalog' }, availability: 'available' },
@@ -108,6 +126,7 @@ describe('planModelRequest', () => {
     ];
     const base = model({
       modelId: 'kimi-for-coding',
+      routeRevision: 'kimi-selected-route',
       route: routes[0].route,
       routeOptions: routes,
       preferredRouteOptionId: 'openai',
@@ -124,6 +143,7 @@ describe('planModelRequest', () => {
     });
     const highspeed = model({
       modelId: 'kimi-for-coding-highspeed',
+      routeRevision: 'kimi-fast-target-route',
       route: routes[0].route,
       routeOptions: routes,
       selection: { pickerVisibility: 'internal', relatedPrimaryModelIds: ['kimi-for-coding'] },
@@ -136,6 +156,8 @@ describe('planModelRequest', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.plan.effectiveModelId).toBe('kimi-for-coding-highspeed');
+    expect(result.plan.routeRevision).toBe('kimi-fast-target-route');
+    expect(result.plan.routeRevision).not.toBe(base.routeRevision);
     expect(result.plan.adapterId).toBe('openai-compatible');
     expect(result.plan.route.protocol).toBe('OpenAICompatibleChatCompletions');
     expect(result.plan.appliedBindingIds).toEqual(['fast:kimi-highspeed']);
@@ -223,11 +245,11 @@ describe('planModelRequest', () => {
       .toMatchObject({ ok: false, code: 'MODEL_UNAVAILABLE', message: expect.stringContaining('unknown') });
   });
 
-  it('keeps fixed 1M enabled and disabled in UI while planning the explicit tier', () => {
+  it('keeps fixed Max mode enabled and disabled in UI while planning the explicit tier', () => {
     const fixed = model({
       contextTiers: [{
         id: 'fixed-1m',
-        label: 'Fixed 1M',
+        label: 'Max mode',
         maxTotalTokens: 1_000_000,
         maxOutputTokens: 64_000,
         activation: { kind: 'implicit' },
@@ -246,7 +268,7 @@ describe('planModelRequest', () => {
     expect(result.plan.contextWindowTokens).toBe(1_000_000);
   });
 
-  it('activates selectable 1M through its tier body patch', () => {
+  it('activates selectable Max mode through its tier body patch', () => {
     const long = model({
       contextTiers: [
         model().contextTiers[0],
@@ -295,7 +317,7 @@ describe('planModelRequest', () => {
     expect(result.plan.reasoningWire.control.wireProfile).toEqual({ kind: 'none' });
   });
 
-  it('chooses a single most-specific Fast + 1M binding', () => {
+  it('chooses a single most-specific Fast + Max mode binding', () => {
     const combined = model({
       contextTiers: [
         model().contextTiers[0],

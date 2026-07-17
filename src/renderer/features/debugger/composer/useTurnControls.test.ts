@@ -4,9 +4,7 @@ import type { EffectiveModel } from '@shared/types/providerCapability';
 import { buildInitialTurnControls } from './turnControlsUtils';
 import {
   buildSessionTurnControlsKey,
-  isPendingCapabilityKey,
   resolveTurnControlsForCapabilityChange,
-  shouldResyncTurnControls,
 } from './turnControlHelpers';
 
 const limitedLevelsCapability: EffectiveModel = {
@@ -56,7 +54,7 @@ const maxControls: ConversationTurnControls = {
 };
 
 describe('useTurnControls sync guards', () => {
-  it('treats a capability resolution as a required resync even when the session is unchanged', () => {
+  it('restores session controls when the first committed capability resolves', () => {
     const persistedControls = {
       reasoningLevel: 'off',
       maxContextMode: false,
@@ -64,20 +62,17 @@ describe('useTurnControls sync guards', () => {
     } as const;
     const sessionControlsKey = buildSessionTurnControlsKey(persistedControls);
 
-    expect(shouldResyncTurnControls(
-      {
-        sessionId: 'sess_reload',
-        capabilityKey: 'ask:pending',
-        sessionControlsKey,
-      },
-      {
-        sessionId: 'sess_reload',
-        capabilityKey: 'ask:deepseek:deepseek-v4-flash',
-        sessionControlsKey,
-      },
-    )).toBe(true);
-
-    expect(buildInitialTurnControls(limitedLevelsCapability, persistedControls)).toEqual({
+    expect(sessionControlsKey).toBe('{"reasoningLevel":"off","maxContextMode":false,"fastModel":false}');
+    expect(resolveTurnControlsForCapabilityChange({
+      previousCapabilityKey: null,
+      nextCapabilityKey: 'ask:deepseek:deepseek-v4-flash',
+      sessionChanged: false,
+      sessionControlsChanged: false,
+      capability: limitedLevelsCapability,
+      sessionControls: persistedControls,
+      currentControls: buildInitialTurnControls(null),
+      rememberedControls: undefined,
+    })).toEqual({
       reasoningLevel: 'off',
       maxContextMode: false,
       fastModel: false,
@@ -92,19 +87,14 @@ describe('useTurnControls sync guards', () => {
     })).toBe('{"reasoningLevel":"max","maxContextMode":true,"fastModel":false}');
   });
 
-  it('detects pending capability keys', () => {
-    expect(isPendingCapabilityKey('ask:pending')).toBe(true);
-    expect(isPendingCapabilityKey('ask:deepseek:deepseek-v4-flash')).toBe(false);
-  });
-
-  it('keeps session controls when capability first resolves from pending', () => {
+  it('keeps session controls when capability first resolves', () => {
     const sessionControls = {
       reasoningLevel: 'off' as const,
       maxContextMode: false,
       fastModel: false,
     };
     expect(resolveTurnControlsForCapabilityChange({
-      previousCapabilityKey: 'ask:pending',
+      previousCapabilityKey: null,
       nextCapabilityKey: 'ask:deepseek:deepseek-v4-flash',
       sessionChanged: false,
       sessionControlsChanged: false,
@@ -117,19 +107,6 @@ describe('useTurnControls sync guards', () => {
       maxContextMode: false,
       fastModel: false,
     });
-  });
-
-  it('keeps the visible control state while a new route capability is pending', () => {
-    expect(resolveTurnControlsForCapabilityChange({
-      previousCapabilityKey: 'ask:openai:gpt-5.5:catalog-a:route-a',
-      nextCapabilityKey: 'ask:pending',
-      sessionChanged: false,
-      sessionControlsChanged: false,
-      capability: null,
-      sessionControls: null,
-      currentControls: maxControls,
-      rememberedControls: undefined,
-    })).toEqual(maxControls);
   });
 
   it('restores remembered controls when switching back to a model', () => {

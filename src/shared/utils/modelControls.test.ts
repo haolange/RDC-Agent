@@ -134,6 +134,34 @@ describe('resolveModelControls', () => {
       .toMatchObject({ state: 'unsupported', value: false, disabled: true });
   });
 
+  it('blocks only Max mode when its merged tier is below one million tokens', () => {
+    const subMillion = model({
+      contextTiers: [{
+        id: 'default',
+        label: 'Default',
+        maxPromptTokens: 200_000,
+        maxOutputTokens: 64_000,
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
+      }],
+      controls: {
+        fast: { state: 'unsupported', fixedValue: false },
+        context1m: { state: 'fixed', fixedValue: true, tierId: 'default' },
+        reasoning: noReasoning,
+      },
+    });
+
+    const result = resolveModelControls(subMillion, { maxContextMode: true });
+    expect(result.resolved.context1m).toMatchObject({
+      state: 'blocked',
+      value: false,
+      disabled: true,
+      reason: 'Max mode tier is below one million tokens.',
+    });
+    expect(result.controls.maxContextMode).toBe(false);
+    expect(result.error?.code).toBe('CONTEXT_1M_BLOCKED');
+  });
+
   it('chooses the most specific Fast + Max binding', () => {
     const combined = model({
       contextTiers: [

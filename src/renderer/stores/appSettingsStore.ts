@@ -1,22 +1,4 @@
 import { create } from 'zustand';
-import type {
-  AppLanguage,
-  AgentPermissionMode,
-  AppSettings,
-  AppSettingsPatch,
-  AppTheme,
-  FontScale,
-  LlmProviderEntry,
-  ProviderDefinitionCommitSnapshot,
-  ProviderDefinitionSaveResult,
-  ProfileSettings,
-  ResolvedTheme,
-} from '@shared/types/settings';
-import type {
-  AgentDefinitionCommitSnapshot,
-  AgentDefinitionSaveRequest,
-  AgentDefinitionSaveResult,
-} from '@shared/types/agentManifest';
 import { DEFAULT_SETTINGS } from './defaultAppSettings';
 import {
   beginAgentDefinitionSave,
@@ -26,6 +8,10 @@ import {
 } from './agentDefinitionSettings';
 import { AgentDefinitionMutationCoordinator } from './AgentDefinitionMutationCoordinator';
 import {
+  routeMutationAffectsCapability,
+  withAgentRouteSyncState,
+} from './agentRouteSyncState';
+import {
   beginProviderDefinitionSave,
   enqueueProviderDefinitionSave,
   flushProviderDefinitionSaves,
@@ -33,31 +19,9 @@ import {
   rollbackProviderDefinitionSave,
   settleProviderDefinitionSave,
 } from './providerDefinitionSettings';
+import type { AppSettingsState } from './appSettingsStoreState';
 
 export { nextAgentDefinitionClientRevision } from './agentDefinitionSettings';
-
-interface AppSettingsState {
-  settings: AppSettings;
-  hydrated: boolean;
-  systemTheme: ResolvedTheme;
-  hydrate: (settings: AppSettings, systemTheme: ResolvedTheme) => void;
-  setSystemTheme: (systemTheme: ResolvedTheme) => void;
-  patchSettings: (patch: AppSettingsPatch) => Promise<AppSettings>;
-  saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
-  flushAgentDefinitionSaves: (agentId: string) => Promise<AgentDefinitionCommitSnapshot | null>;
-  reloadSettings: () => Promise<AppSettings>;
-  setTheme: (theme: AppTheme) => Promise<void>;
-  setLanguage: (language: AppLanguage) => Promise<void>;
-  setFontScale: (fontScale: FontScale) => Promise<void>;
-  setComposerMarkdown: (composerMarkdown: boolean) => Promise<void>;
-  setUsePointerCursors: (usePointerCursors: boolean) => Promise<void>;
-  setContextBreakdownExpanded: (contextBreakdownExpanded: boolean) => Promise<void>;
-  updateProfile: (profile: Partial<ProfileSettings>) => Promise<void>;
-  saveProvider: (provider: LlmProviderEntry) => Promise<ProviderDefinitionSaveResult>;
-  flushProviderSaves: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;
-  removeProvider: (providerId: string) => Promise<void>;
-  setAgentPermissionMode: (mode: AgentPermissionMode) => Promise<void>;
-}
 
 const agentDefinitionMutations = new AgentDefinitionMutationCoordinator(
   (request) => window.electronAPI.settings.saveAgentDefinition(request),
@@ -67,7 +31,8 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   settings: DEFAULT_SETTINGS,
   hydrated: false,
   systemTheme: 'dark',
-  hydrate: (settings, systemTheme) => set({ settings, systemTheme, hydrated: true }),
+  agentRouteSyncById: {},
+  hydrate: (settings, systemTheme) => set({ settings, systemTheme, hydrated: true, agentRouteSyncById: {} }),
   setSystemTheme: (systemTheme) => set({ systemTheme }),
   patchSettings: async (patch) => {
     const nextSettings = await window.electronAPI.settings.set(patch);
@@ -77,7 +42,18 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   saveAgentDefinition: async (request) => {
     const agentId = request.draft.id;
     const optimistic = beginAgentDefinitionSave(get().settings, request);
-    set({ settings: optimistic.settings });
+    const previousSync = get().agentRouteSyncById[agentId];
+    const previousRoute = optimistic.rollback.route;
+    const optimisticRoute = optimistic.settings.llm.agentRoutes.find((entry) => entry.agentId === agentId) ?? null;
+    const routeChanged = routeMutationAffectsCapability(previousSync, previousRoute, optimisticRoute);
+    set((state) => ({
+      settings: optimistic.settings,
+      agentRouteSyncById: withAgentRouteSyncState(state.agentRouteSyncById, agentId, routeChanged, {
+          status: 'saving',
+          clientRevision: request.clientRevision,
+          commitHash: previousSync?.commitHash ?? null,
+      }),
+    }));
 
     try {
       const result = await agentDefinitionMutations.enqueue(request);
@@ -85,6 +61,12 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
       if (result.status === 'failed') {
         set((state) => ({
           settings: rollbackAgentDefinitionSave(state.settings, agentId, result.lastSuccessful),
+          agentRouteSyncById: withAgentRouteSyncState(state.agentRouteSyncById, agentId, routeChanged, {
+              status: 'failed',
+              clientRevision: request.clientRevision,
+              commitHash: result.lastSuccessful?.commitHash ?? null,
+              error: result.error ?? 'Agent definition save failed.',
+          }),
         }));
         return Promise.reject(new Error(result.error ?? 'Agent definition save failed.'));
       }
@@ -92,6 +74,11 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
         set((state) => ({
           settings: settleAgentDefinitionSave(state.settings, agentId, result),
           hydrated: true,
+          agentRouteSyncById: withAgentRouteSyncState(state.agentRouteSyncById, agentId, routeChanged, {
+              status: 'committed',
+              clientRevision: result.clientRevision,
+              commitHash: result.commitHash,
+          }),
         }));
       }
       return result;
@@ -100,6 +87,12 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
         const lastSuccessful = await window.electronAPI.settings.getAgentDefinitionCommit(agentId).catch(() => null);
         set((state) => ({
           settings: rollbackAgentDefinitionSave(state.settings, agentId, lastSuccessful),
+          agentRouteSyncById: withAgentRouteSyncState(state.agentRouteSyncById, agentId, routeChanged, {
+              status: 'failed',
+              clientRevision: request.clientRevision,
+              commitHash: lastSuccessful?.commitHash ?? null,
+              error: error instanceof Error ? error.message : 'Agent definition save failed.',
+          }),
         }));
       }
       throw error;

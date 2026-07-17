@@ -7,6 +7,7 @@
 - 事实只来自严格 JSON manifest；TypeScript 只实现 Schema、编译器、Registry、Resolver、Planner、Adapter、认证和 Discovery 行为。
 - 唯一链路是“声明 → 构建期编译 → 运行时解析”。禁止 TS 数据 preset、factory 推导、renderer 静态表或按名称猜测形成第二真值。
 - `EffectiveModel` 是能力真值；`RequestPlan` 是一次请求的冻结执行真值。Adapter 不得重算 Fast、Max、1M、route、temperature 或 context budget。
+- Conversation/Agent 调用不得注入隐藏的默认 	emperature；只有 manifest/route 明确固定的值或调用方显式选择才进入 RequestPlan，否则省略并交由 Provider 管理。
 - 认证秘密不进入 manifest、`EffectiveModel`、`RequestPlan`、IPC、renderer、会话、journal 或 Trace。
 - 未证实字段保持 `unknown / Provider managed / Unverified`；不得补写 256K、按后缀关联 variant，或按 provider 名、上游 SDK 包元数据、endpoint hostname 推断分类与协议。
 - 当前账号 discovery、policy 和 entitlement 只能收窄账号可用性，不能把 manifest 中已证实的结构能力改成全局不支持。
@@ -89,9 +90,9 @@ Discovery authority 为 `authoritative-list`、`candidate-validation`、`additiv
 - `discovered`：完整 authoritative list 的缺席可以判定不可用；
 - `account-entitled`：由账号完整列表决定访问权。
 
-Catalog ownership 只用于审计，不能决定 discovery 缺席语义。Kimi Coding Plan 的五个 primary model 与 highspeed internal target 均为 `maintained`，Discovery 为 `candidate-validation`；仅返回 base 时不得删除其他 primary 或 highspeed，只有显式 denial 才能阻止 Fast。
+Catalog ownership 只用于审计，不能决定 discovery 缺席语义。Kimi Coding Plan 只有 `kimi-for-coding` 一个 primary model；`kimi-for-coding-highspeed` 是不可选择的 Fast execution target。两者均为 `maintained`，Discovery 为 `candidate-validation`，只验证 compiled catalog 已声明的 model，不接纳额外版本行；仅返回 base 时仍保留 internal target，只有显式 denial 才能阻止 Fast。
 
-Discovery、overlay、entitlement、observed evidence 和 user preference 按字段合并。冲突记录 provenance，不静默覆盖。Unknown model fallback 不创造窗口、Fast、1M 或 reasoning 事实。
+Discovery、overlay、entitlement、observed evidence 和 user preference 按字段合并。冲突记录 provenance，不静默覆盖。Unknown model fallback 不创造窗口、Fast、Max mode 或 reasoning 事实。Max mode 的目标 tier 在每次 live overlay 合并后都必须保持完整窗口至少一百万 tokens；否则只阻断 Max mode，默认模型继续可用。 Account discovery 只有在当前认证表面同时证明 endpoint 与协议可执行时才可贡献 route；Super Grok 的 direct xAI `/models` 仅提供 availability/context 事实，执行 route 继续由 `cli-chat-proxy.grok.com` OAuth manifest/Builder catalog 掌管。该 proxy 所需的非秘密客户端协议版本同样属于 route manifest；不得依赖运行机器恰好安装 Grok CLI，也不得在 adapter 中按 hostname 猜测或伪造。
 
 ## 凭据与请求事务
 
@@ -115,12 +116,12 @@ Preflight 失败或取消不得留下 Session、Turn、branch、attachment、jou
 
 ## 重点事实契约
 
-- ChatGPT OAuth：GPT-5.4 mini/5.4/5.5/5.6 的 Fast 按该 surface 精确 binding；5.6 支持 Low/Medium/High/Extra/Max。Spark 为独立模型，无 Fast/Max/1M。
-- Copilot：结构能力由 manifest/user-observed fact 保留，账号 `/models` policy 与 entitlement 只收窄访问。标记原生 1M 的 Claude 显示开启且 disabled；Opus Fast 仅使用精确 internal binding。
-- Kimi Coding Plan：全部 maintained primary model 保留；highspeed 为内部 target，partial discovery 不得删减。
+- ChatGPT OAuth：GPT-5.4/5.5/5.6 的 Fast 按该 surface 精确 binding；GPT-5.4 mini 与 Spark 均无 Fast。5.6 支持 Low/Medium/High/Extra/Max。
+- Copilot：结构能力由 manifest/user-observed fact 保留，账号 `/models` policy 与 entitlement 只收窄访问。Gemini 3.1 Pro 默认 200K 并可选 Max mode；Gemini 3.5 Flash 只有固定 1M Max mode，不存在 200K 普通模式。标记原生 1M 的 Claude 显示固定 Max mode；Opus Fast 仅使用精确 internal binding。
+- Kimi Coding Plan：只投影 `kimi-for-coding`；highspeed 仅作为内部 Fast target，partial discovery 不得把它提升为可选 model，也不得引入其他版本。
 - GLM-5.2：固定 1M、High/Max、默认 High、无 Off/Fast；不同协议使用不同 wire profile。
 - DeepSeek Pro/Flash：固定 1M、Off/High/Max、默认 High。
-- Grok 4.20 non-reasoning、reasoning、multi-agent 是三个独立模型；multi-agent 为 Provider managed，不提供 reasoning toggle。
+- Grok 4.20 non-reasoning、reasoning、multi-agent 是三个独立模型；multi-agent 为 Provider managed，不提供 reasoning toggle。Grok 4.3 是固定 1M 的 Max mode，Grok 4.5 Super Grok OAuth 不继承 direct xAI API 的 Priority Fast，Grok Build 0.1 为 256K。
 - canonical wire 保留 `xhigh`，产品统一显示 `Extra`；不存在 Ultra 档位。
 
 ## Adapter 边界

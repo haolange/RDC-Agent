@@ -238,9 +238,9 @@ describe('mergeManagedModelAvailability', () => {
     ]);
   });
 
-  it('keeps maintained Kimi primary and internal variants when candidate validation returns only the base model', () => {
+  it('keeps the single Kimi primary and internal Fast target when candidate validation returns the base model', () => {
     const models = mergeManagedModelAvailability(
-      managed('kimi-for-coding', 'kimi-for-coding-highspeed', 'k2p7', 'k2p6', 'k2p5', 'kimi-k2-thinking'),
+      managed('kimi-for-coding', 'kimi-for-coding-highspeed'),
       [{ id: 'kimi-for-coding', label: 'kimi-for-coding', enabled: true }],
       { preserveMissing: true },
     );
@@ -248,10 +248,6 @@ describe('mergeManagedModelAvailability', () => {
     expect(models.map((model) => model.id)).toEqual([
       'kimi-for-coding',
       'kimi-for-coding-highspeed',
-      'k2p7',
-      'k2p6',
-      'k2p5',
-      'kimi-k2-thinking',
     ]);
     expect(models.every((model) => model.enabled !== false && model.availability !== 'unavailable')).toBe(true);
   });

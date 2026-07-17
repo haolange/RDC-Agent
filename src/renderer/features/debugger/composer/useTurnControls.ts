@@ -1,44 +1,39 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { create } from 'zustand';
-import type {
-  ConversationTurnControls,
-} from '@shared/types/modelCapability';
-import type { EffectiveModel } from '@shared/types/providerCapability';
+import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { SessionRecord } from '@shared/types/session';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
-import {
-  buildInitialTurnControls,
-  sanitizeTurnControls,
-} from './turnControlsUtils';
+import { buildInitialTurnControls, sanitizeTurnControls } from './turnControlsUtils';
 import {
   buildSessionTurnControlsKey,
-  isPendingCapabilityKey,
   resolveTurnControlsForCapabilityChange,
-  shouldResyncTurnControls,
-  type TurnControlsSyncFingerprint,
 } from './turnControlHelpers';
+import {
+  type CapabilityResolutionState,
+  resolvedCapability,
+} from './capabilityResolution';
 import { useEffectiveModelCapability } from './useEffectiveModelCapability';
 
 interface TurnControlsState {
   turnControls: ConversationTurnControls;
-  capability: EffectiveModel | null;
+  capabilityState: CapabilityResolutionState;
   controlsByCapabilityKey: Record<string, ConversationTurnControls>;
   setTurnControls: (
     next: ConversationTurnControls | ((prev: ConversationTurnControls) => ConversationTurnControls),
   ) => void;
-  setCapability: (capability: EffectiveModel | null) => void;
+  setCapabilityState: (state: CapabilityResolutionState) => void;
   rememberControls: (capabilityKey: string, controls: ConversationTurnControls) => void;
   clearRememberedControls: () => void;
 }
 
 export const useTurnControlsStore = create<TurnControlsState>((set) => ({
   turnControls: buildInitialTurnControls(null),
-  capability: null,
+  capabilityState: { status: 'loading' },
   controlsByCapabilityKey: {},
   setTurnControls: (next) => set((state) => ({
     turnControls: typeof next === 'function' ? next(state.turnControls) : next,
   })),
-  setCapability: (capability) => set({ capability }),
+  setCapabilityState: (capabilityState) => set({ capabilityState }),
   rememberControls: (capabilityKey, controls) => set((state) => ({
     controlsByCapabilityKey: {
       ...state.controlsByCapabilityKey,
@@ -50,9 +45,9 @@ export const useTurnControlsStore = create<TurnControlsState>((set) => ({
 
 export function useTurnControls(agentId: string, currentSession: SessionRecord | null) {
   const turnControls = useTurnControlsStore((state) => state.turnControls);
-  const capability = useTurnControlsStore((state) => state.capability);
+  const capabilityState = useTurnControlsStore((state) => state.capabilityState);
   const setTurnControls = useTurnControlsStore((state) => state.setTurnControls);
-  const setCapability = useTurnControlsStore((state) => state.setCapability);
+  const setCapabilityState = useTurnControlsStore((state) => state.setCapabilityState);
   const rememberControls = useTurnControlsStore((state) => state.rememberControls);
   const clearRememberedControls = useTurnControlsStore((state) => state.clearRememberedControls);
   const routeFingerprint = useAppSettingsStore((state) => {
@@ -71,52 +66,51 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
         ].join('\u001f')
       : '';
   });
+  const routeSyncState = useAppSettingsStore((state) => state.agentRouteSyncById[agentId]);
   const settingsHydrated = useAppSettingsStore((state) => state.hydrated);
   const sessionId = currentSession?.sessionId ?? null;
   const sessionControls = currentSession?.turnControls ?? null;
+  const capability = resolvedCapability(capabilityState);
   const lastSessionIdRef = useRef<string | null>(null);
   const lastCapabilityKeyRef = useRef<string | null>(null);
   const lastSessionControlsKeyRef = useRef<string>('none');
-  useEffectiveModelCapability(agentId, routeFingerprint, settingsHydrated, setCapability);
+  const retryCapability = useEffectiveModelCapability(
+    agentId,
+    routeFingerprint,
+    routeSyncState,
+    settingsHydrated,
+    setCapabilityState,
+  );
 
   const capabilityKey = capability
-    ? `${agentId}:${capability.providerId}:${capability.modelId}:${capability.route.protocol}:${capability.catalogRevision ?? 'missing-catalog'}:${capability.routeRevision ?? 'missing-route'}`
-    : `${agentId}:pending`;
+    ? `${agentId}:${capability.providerId}:${capability.modelId}:${capability.route.protocol}:${capability.catalogRevision}:${capability.routeRevision}`
+    : null;
   const sessionControlsKey = buildSessionTurnControlsKey(sessionControls);
 
   useEffect(() => {
-    const nextFingerprint: TurnControlsSyncFingerprint = {
-      sessionId,
-      capabilityKey,
-      sessionControlsKey,
-    };
-    const previousFingerprint: TurnControlsSyncFingerprint = {
-      sessionId: lastSessionIdRef.current,
-      capabilityKey: lastCapabilityKeyRef.current ?? '',
-      sessionControlsKey: lastSessionControlsKeyRef.current,
-    };
-    if (!shouldResyncTurnControls(previousFingerprint, nextFingerprint)) {
-      return;
-    }
-
-    const sessionChanged = previousFingerprint.sessionId !== nextFingerprint.sessionId;
-    const sessionControlsChanged = previousFingerprint.sessionControlsKey !== nextFingerprint.sessionControlsKey;
+    const sessionChanged = lastSessionIdRef.current !== sessionId;
+    const sessionControlsChanged = lastSessionControlsKeyRef.current !== sessionControlsKey;
     const previousCapabilityKey = lastCapabilityKeyRef.current;
     const store = useTurnControlsStore.getState();
 
-    if (sessionChanged) {
-      clearRememberedControls();
-    } else if (
+    if (sessionChanged) clearRememberedControls();
+    if (!capability || !capabilityKey) {
+      if (sessionChanged || sessionControlsChanged) {
+        setTurnControls(buildInitialTurnControls(null, sessionControls));
+      }
+      lastSessionIdRef.current = sessionId;
+      lastSessionControlsKeyRef.current = sessionControlsKey;
+      return;
+    }
+
+    if (
       previousCapabilityKey
       && previousCapabilityKey !== capabilityKey
-      && !isPendingCapabilityKey(previousCapabilityKey)
-      && previousFingerprint.sessionId === sessionId
+      && !sessionChanged
     ) {
       rememberControls(previousCapabilityKey, store.turnControls);
     }
-
     const rememberedControls = useTurnControlsStore.getState().controlsByCapabilityKey[capabilityKey];
-
     setTurnControls(resolveTurnControlsForCapabilityChange({
       previousCapabilityKey,
       nextCapabilityKey: capabilityKey,
@@ -133,28 +127,24 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
     lastSessionControlsKeyRef.current = sessionControlsKey;
   }, [
     sessionId,
-    capabilityKey,
     sessionControlsKey,
     sessionControls,
     capability,
+    capabilityKey,
     setTurnControls,
     rememberControls,
     clearRememberedControls,
   ]);
 
   useEffect(() => {
-    if (!capability) {
-      return;
-    }
-    setTurnControls((current) => sanitizeTurnControls(current, capability));
+    if (capability) setTurnControls((current) => sanitizeTurnControls(current, capability));
   }, [capability, setTurnControls]);
 
   const updateTurnControls = useCallback((patch: Partial<ConversationTurnControls>) => {
+    if (!capability || !capabilityKey) return;
     setTurnControls((current) => {
       const next = sanitizeTurnControls({ ...current, ...patch }, capability);
-      if (!isPendingCapabilityKey(capabilityKey)) {
-        rememberControls(capabilityKey, next);
-      }
+      rememberControls(capabilityKey, next);
       return next;
     });
   }, [capability, capabilityKey, rememberControls, setTurnControls]);
@@ -162,12 +152,13 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   return {
     turnControls,
     capability,
+    capabilityState,
+    retryCapability,
     updateTurnControls,
     setTurnControls: (next: ConversationTurnControls) => {
+      if (!capability || !capabilityKey) return;
       const sanitized = sanitizeTurnControls(next, capability);
-      if (!isPendingCapabilityKey(capabilityKey)) {
-        rememberControls(capabilityKey, sanitized);
-      }
+      rememberControls(capabilityKey, sanitized);
       setTurnControls(sanitized);
     },
   };

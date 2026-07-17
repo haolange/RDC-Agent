@@ -131,6 +131,53 @@ describe('EffectiveCatalogService', () => {
     ]));
   });
 
+  it('keeps a catalog-owned Max tier structural when billing reports a lower default threshold', async () => {
+    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const [model] = mergeEffectiveCatalog(request({
+      catalog: {
+        ...request().catalog,
+        models: [{
+          ...request().catalog.models[0],
+          contextTiers: [{
+            id: 'default',
+            label: 'Max mode',
+            maxTotalTokens: 1_000_000,
+            activation: { kind: 'implicit' },
+            entitlement: 'granted',
+          }],
+          controls: {
+            fast: { state: 'unsupported', fixedValue: false },
+            context1m: { state: 'fixed', fixedValue: true, tierId: 'default' },
+          },
+        }],
+      },
+      entitlement: {
+        source: 'entitlement',
+        observedAt: '2026-07-17T00:00:00.000Z',
+        models: [{
+          modelId: 'model-a',
+          contextTiers: [{
+            id: 'default',
+            maxPromptTokens: 200_000,
+            maxOutputTokens: 64_000,
+            maxTotalTokens: 264_000,
+          }],
+        }],
+      },
+    }));
+
+    expect(model.availability).toBe('available');
+    expect(model.contextTiers[0]).toMatchObject({
+      maxTotalTokens: 1_000_000,
+      entitlement: 'granted',
+    });
+    expect(model.resolvedControls?.context1m).toMatchObject({
+      state: 'fixed',
+      value: true,
+      disabled: true,
+    });
+  });
+
   it('projects field-level fact sources onto every affected leaf', async () => {
     const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
     const [model] = mergeEffectiveCatalog(request({

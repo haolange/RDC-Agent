@@ -8,6 +8,7 @@ import type {
   ResolvedBooleanControlCapability,
   ResolvedModelControls,
 } from '../types/providerCapability';
+import { isMaxContextTier } from './contextTiers';
 
 export interface ModelControlEvaluation {
   controls: ConversationTurnControls;
@@ -245,13 +246,18 @@ export function resolveModelControls(
   if (model.controls.context1m.state === 'selectable' || model.controls.context1m.state === 'fixed') {
     const contextTierId = model.controls.context1m.tierId;
     const tier = model.contextTiers.find((candidate) => candidate.id === contextTierId);
-    if (!tier || tier.entitlement === 'denied') {
+    if (!tier || tier.entitlement === 'denied' || !isMaxContextTier(tier)) {
+      const reason = !tier
+        ? 'Max mode tier is missing.'
+        : tier.entitlement === 'denied'
+          ? 'Max mode tier is not entitled.'
+          : 'Max mode tier is below one million tokens.';
       context1m = {
         ...context1m,
         state: 'blocked',
         value: false,
         disabled: true,
-        reason: !tier ? '1M context tier is missing.' : '1M context tier is not entitled.',
+        reason,
       };
     }
   }
@@ -269,7 +275,7 @@ export function resolveModelControls(
   const blockedRequest = requestedFast && fast.state === 'blocked'
     ? { code: 'FAST_BLOCKED', message: fast.reason ?? 'Fast is unavailable.' }
     : requestedContext && context1m.state === 'blocked'
-      ? { code: 'CONTEXT_1M_BLOCKED', message: context1m.reason ?? '1M context is unavailable.' }
+      ? { code: 'CONTEXT_1M_BLOCKED', message: context1m.reason ?? 'Max mode is unavailable.' }
       : undefined;
   return {
     controls,

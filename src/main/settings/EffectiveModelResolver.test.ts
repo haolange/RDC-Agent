@@ -109,7 +109,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     expect(anthropicKimi?.controls.reasoning.wireProfile).toMatchObject({ kind: 'anthropic' });
   });
 
-  it('keeps all maintained Kimi models when candidate validation returns only the base', () => {
+  it('keeps the single Kimi primary and hidden Fast target when candidate validation returns the base', () => {
     const kimi = provider('kimi-coding-plan', 'AnthropicMessages');
     const discovery = applyDiscoveryAuthority(kimi, [{
       modelId: 'kimi-for-coding',
@@ -120,7 +120,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     request.discovery = { source: 'discovery', observedAt: '2026-07-15T00:00:00.000Z', models: discovery };
     const models = mergeEffectiveCatalog(request);
     expect(models.filter((model) => model.selection?.pickerVisibility !== 'internal').map((model) => model.modelId))
-      .toEqual(['kimi-for-coding', 'k2p7', 'k2p6', 'k2p5', 'kimi-k2-thinking']);
+      .toEqual(['kimi-for-coding']);
     expect(models.find((model) => model.modelId === 'kimi-for-coding-highspeed')).toMatchObject({
       selection: { pickerVisibility: 'internal' },
       availability: 'available',
