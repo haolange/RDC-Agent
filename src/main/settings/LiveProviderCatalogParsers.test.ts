@@ -43,7 +43,7 @@ describe('live Provider Catalog parsers', () => {
         supports_tool_call: true,
       },
       {
-        id: 'k3', display_name: 'backend-version-name', context_length: 1_000_000,
+        id: 'k3', display_name: 'backend-version-name', context_length: 256_000,
         supports_reasoning: true, supports_thinking_type: 'only', protocol: 'openai',
         think_efforts: { valid_efforts: ['low', 'high', 'max'], default_effort: 'max' },
       },
@@ -66,11 +66,11 @@ describe('live Provider Catalog parsers', () => {
       },
       executionBindings: [{
         id: 'context:max',
-        actions: [{ kind: 'client-tier', tierId: 'max' }],
+        actions: [{ kind: 'model-switch', targetModelId: 'k3[1m]' }],
       }],
     });
     expect(parsed.contributions.find((model) => model.modelId === 'kimi-for-coding')).toMatchObject({
-      controls: { fast: { state: 'selectable', entitlement: 'granted' } },
+      controls: { fast: { state: 'selectable', entitlement: 'unknown' } },
       executionBindings: expect.arrayContaining([
         expect.objectContaining({
           actions: [{ kind: 'model-switch', targetModelId: 'kimi-for-coding-highspeed' }],
@@ -89,7 +89,7 @@ describe('live Provider Catalog parsers', () => {
     expect(maxOnly).toMatchObject({
       controls: {
         fast: { state: 'unsupported', fixedValue: false },
-        context1m: { state: 'unsupported', fixedValue: false },
+        context1m: { state: 'selectable', entitlement: 'unknown', tierId: 'max' },
         reasoning: { kind: 'always-on', supportsOff: false, levels: ['max'], defaultSelection: 'max' },
       },
     });
@@ -105,7 +105,8 @@ describe('live Provider Catalog parsers', () => {
     const modelCatalogSurface = structuredClone(KIMI_SURFACE);
     const k3 = modelCatalogSurface.models.find((model) => model.modelId === 'k3');
     if (!k3?.liveProjection?.context) throw new Error('Missing K3 live context policy fixture.');
-    k3.liveProjection.context.authority = 'model-catalog';
+    k3.liveProjection.context.observedTierId = 'max';
+    k3.liveProjection.context.entitlementAuthority = 'manifest';
 
     const contribution = parseKimiCodeCatalogWithSurface({ data: [{
       id: 'k3',
@@ -116,8 +117,9 @@ describe('live Provider Catalog parsers', () => {
 
     expect(contribution.route).toEqual(k3.route);
     expect(contribution.controls?.context1m).toMatchObject({
-      state: 'unknown',
+      state: 'selectable',
       defaultValue: false,
+      entitlement: 'unknown',
     });
     expect(contribution.controls?.reasoning).toMatchObject({ kind: 'unknown', supportsOff: false });
   });

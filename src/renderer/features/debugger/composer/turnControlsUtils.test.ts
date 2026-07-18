@@ -137,7 +137,7 @@ describe('turnControlsUtils', () => {
     expect(hasSelectableOneMillionContext(fixedModes)).toBe(false);
   });
 
-  it('shows a higher unknown tier as unverified and excludes denied tiers', () => {
+  it('shows a higher unknown tier as unverified while keeping it non-selectable', () => {
     const unknownTier = {
       ...levelsCapability,
       controls: {
@@ -148,7 +148,7 @@ describe('turnControlsUtils', () => {
         index === 1 ? { ...tier, entitlement: 'unknown' as const } : tier
       )),
     };
-    expect(hasSelectableOneMillionContext(unknownTier)).toBe(true);
+    expect(hasSelectableOneMillionContext(unknownTier)).toBe(false);
     expect(isOneMillionContextUnverified(unknownTier)).toBe(true);
     expect(hasSelectableOneMillionContext({
       ...unknownTier,

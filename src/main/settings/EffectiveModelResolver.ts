@@ -16,6 +16,7 @@ import type {
 import type { ConversationTurnControls, ReasoningControl } from '@shared/types/modelCapability';
 import type {
   AppSettings,
+  LlmModelCapabilityProbeMode,
   LlmProviderEntry,
   LlmProviderModel,
   LlmProviderProtocol,
@@ -505,6 +506,51 @@ export function planEffectiveModelRequest(input: {
   };
 }
 
+
+/** Plans an explicit capability probe against structural capability, bypassing only cached entitlement evidence. */
+export function planEffectiveModelCapabilityProbe(input: {
+  providerId: string;
+  modelId: string;
+  mode: LlmModelCapabilityProbeMode;
+  settings: AppSettings;
+  controls: Partial<ConversationTurnControls> & { reasoningLevel?: unknown };
+}): RequestPlanningResult {
+  const snapshot = resolveEffectiveCatalog(input.providerId, input.settings, input.modelId);
+  const selection = snapshot
+    ? selectEffectiveModelFromSnapshot(
+        snapshot,
+        input.modelId,
+        getLoadedProviderSurface(input.providerId)?.recommendedModels,
+      )
+    : null;
+  if (!snapshot || !selection?.model) return planEffectiveModelRequest(input);
+
+  const selected = structuredClone(selection.model);
+  const models = snapshot.models.map((candidate) => (
+    candidate.modelId === selected.modelId ? selected : structuredClone(candidate)
+  ));
+  if (input.mode === 'fast' && selected.controls.fast.state === 'selectable') {
+    selected.controls.fast.entitlement = 'granted';
+    selected.executionBindings = selected.executionBindings?.map((binding) => (
+      binding.when.fast === true ? { ...binding, entitlement: 'granted' as const } : binding
+    ));
+  }
+  if (input.mode === 'one-million-context' && selected.controls.context1m.state === 'selectable') {
+    selected.controls.context1m.entitlement = 'granted';
+    const maxTierId = selected.controls.context1m.tierId;
+    selected.contextTiers = selected.contextTiers.map((tier) => (
+      tier.id === maxTierId ? { ...tier, entitlement: 'granted' as const } : tier
+    ));
+    selected.executionBindings = selected.executionBindings?.map((binding) => (
+      binding.when.context1m === true ? { ...binding, entitlement: 'granted' as const } : binding
+    ));
+  }
+  return planModelRequest({
+    model: selected,
+    catalogModels: models,
+    controls: input.controls,
+  });
+}
 export function recordEffectivePlanSuccess(
   providerId: string,
   modelId: string,
@@ -539,7 +585,7 @@ export function recordEffectivePlanSuccess(
     providerId,
     accountId: provider.activeAccountId ?? `anonymous:${providerId}`,
     protocol: plan.route.protocol,
-  }, [{
+  }, `activation:${model.modelId}:${plan.route.protocol}:${plan.appliedBindingIds.join(',') || plan.activeTierId}`, [{
     modelId: model.modelId,
     ...(grantsTier && activeTier
       ? {
@@ -576,7 +622,7 @@ export function recordObservedToolCallingSupport(
     providerId,
     accountId: provider.activeAccountId ?? `anonymous:${providerId}`,
     protocol,
-  }, [{
+  }, `tool-calling:${model.modelId}:${protocol}`, [{
     modelId: model.modelId,
     toolCalling: { state: 'supported' },
   }], 'Structured tool call completed through the active provider adapter.');

@@ -4,6 +4,8 @@ import { providerAdapterIdForProtocol } from '@shared/provider-catalog/implement
 import type { LlmModelCapabilityProbeRequest, LlmProviderEntry } from '@shared/types/settings';
 import {
   buildProbeFailurePatch,
+  buildProbeSuccessPatch,
+  classifyCapabilityProbeFailure,
   ProviderCapabilityProbeService,
   type ProviderCapabilityProbeDependencies,
   type ResolvedProbeTarget,
@@ -182,6 +184,15 @@ describe('ProviderCapabilityProbeService', () => {
     });
     expect(fixture.execute).toHaveBeenCalledOnce();
     expect(fixture.recordSuccess).toHaveBeenCalledOnce();
+    expect(buildProbeSuccessPatch(
+      { providerId: 'provider-a', modelId: 'model-a', mode: 'one-million-context' },
+      fixture.resolved,
+      plan({ providerId: 'provider-a', modelId: 'model-a', mode: 'one-million-context' }, fixture.resolved.model).plan,
+    )).toMatchObject({
+      modelId: 'model-a',
+      controls: { context1m: expect.objectContaining({ entitlement: 'granted' }) },
+      contextTiers: expect.arrayContaining([expect.objectContaining({ id: 'long', entitlement: 'granted' })]),
+    });
   });
 
   it('records a deterministic Fast denial for HTTP 403', async () => {
@@ -204,13 +215,35 @@ describe('ProviderCapabilityProbeService', () => {
     await expect(service.test(request)).resolves.toMatchObject({
       success: false, status: 'denied', requestSent: true,
     });
-    expect(fixture.recordFailure).toHaveBeenCalledWith(request, fixture.resolved, expect.any(Object), 403);
-    expect(buildProbeFailurePatch(request, fixture.resolved, plan(request, effectiveModel).plan, 403)).toMatchObject({
+    expect(fixture.recordFailure).toHaveBeenCalledWith(request, fixture.resolved, expect.any(Object), 403, 'HTTP 403');
+    expect(buildProbeFailurePatch(request, fixture.resolved, plan(request, effectiveModel).plan, 403, true)).toMatchObject({
       modelId: 'model-a', controls: { fast: { entitlement: 'denied' } },
+    });
+    expect(buildProbeSuccessPatch(request, fixture.resolved, plan(request, effectiveModel).plan)).toMatchObject({
+      modelId: 'model-a',
+      controls: { fast: { entitlement: 'granted' } },
+      executionBindings: [expect.objectContaining({ id: 'fast:priority', entitlement: 'granted' })],
     });
   });
 
-  it('treats HTTP 401 as entitlement denial only for a Fast model-switch target', () => {
+  it('keeps an undeclared HTTP 403 fail-closed instead of inventing entitlement evidence', () => {
+    const effectiveModel = model({
+      controls: {
+        ...model().controls,
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'unknown' },
+      },
+    });
+    const request = { providerId: 'provider-a', modelId: 'model-a', mode: 'fast' } as const;
+
+    expect(buildProbeFailurePatch(request, target(effectiveModel), plan(request, effectiveModel).plan, 403)).toBeNull();
+  });
+
+  it('accepts a manifest-matched HTTP 401 as entitlement denial without changing generic 401 classification', () => {
+    expect(classifyCapabilityProbeFailure(401)).toBe('authentication-failed');
+    expect(classifyCapabilityProbeFailure(401, true)).toBe('entitlement-denied');
+  });
+
+  it('never turns HTTP 401 authentication failure into entitlement evidence', () => {
     const effectiveModel = model({
       controls: {
         ...model().controls,
@@ -228,12 +261,7 @@ describe('ProviderCapabilityProbeService', () => {
       effectiveModelId: 'model-a-highspeed',
     };
 
-    expect(buildProbeFailurePatch(request, target(effectiveModel), switchedPlan, 401)).toMatchObject({
-      modelId: 'model-a', controls: { fast: { entitlement: 'denied' } },
-      executionBindings: [
-        { id: 'fast:model-a-highspeed', entitlement: 'denied' },
-      ],
-    });
+    expect(buildProbeFailurePatch(request, target(effectiveModel), switchedPlan, 401)).toBeNull();
     expect(buildProbeFailurePatch(request, target(effectiveModel), basePlan, 401)).toBeNull();
   });
 
@@ -256,7 +284,7 @@ describe('ProviderCapabilityProbeService', () => {
     await expect(service.test(request)).resolves.toMatchObject({
       success: false, status: 'failed', requestSent: true,
     });
-    expect(fixture.recordFailure).toHaveBeenCalledWith(request, fixture.resolved, expect.any(Object), 429);
+    expect(fixture.recordFailure).toHaveBeenCalledWith(request, fixture.resolved, expect.any(Object), 429, 'HTTP 429');
     expect(buildProbeFailurePatch(request, fixture.resolved, plan(request, effectiveModel).plan, 429)).toBeNull();
   });
 });

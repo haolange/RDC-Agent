@@ -152,9 +152,11 @@
           "fixedValue": false
         },
         "context1m": {
-          "state": "unknown",
+          "state": "selectable",
           "defaultValue": false,
-          "reason": "Max mode requires an account-effective live catalog limit."
+          "entitlement": "unknown",
+          "tierId": "max",
+          "label": "Max mode"
         },
         "reasoning": {
           "kind": "always-on",
@@ -187,9 +189,9 @@
       ],
       "liveProjection": {
         "context": {
-          "authority": "account-effective",
-          "defaultTierId": "default",
-          "maxTierId": "max"
+          "observedTierId": "max",
+          "maxTierId": "max",
+          "entitlementAuthority": "catalog-observation"
         },
         "capabilities": [
           "toolCalling",

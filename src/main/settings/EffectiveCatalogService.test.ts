@@ -398,7 +398,7 @@ describe('EffectiveCatalogService', () => {
       schemaVersion: number;
       discoveries: Record<string, { models: Array<{ modelId: string }> }>;
     };
-    expect(persisted.schemaVersion).toBe(5);
+    expect(persisted.schemaVersion).toBe(6);
     expect(persisted.discoveries).toEqual({});
   });
 
@@ -634,6 +634,7 @@ describe('EffectiveCatalogService', () => {
     const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-02T00:00:00.000Z') });
     service.recordObserved(
       { providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol },
+      'tool:model-a',
       [{ modelId: 'model-a', toolCalling: { state: 'unsupported', reason: 'rejected' } }],
       'real request',
     );
@@ -653,12 +654,14 @@ describe('EffectiveCatalogService', () => {
     const service = new EffectiveCatalogService({ statePath, now: () => new Date(nowMs) });
     service.recordObserved(
       { providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol },
+      'tool:model-a',
       [{ modelId: 'model-a', toolCalling: { state: 'supported' } }],
       'first result',
     );
     nowMs += 1000;
     service.recordObserved(
       { providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol },
+      'tool:model-a',
       [{ modelId: 'model-a', toolCalling: { state: 'unsupported', reason: 'latest rejection' } }],
       'latest result',
     );
@@ -719,6 +722,7 @@ describe('EffectiveCatalogService', () => {
         accountId: 'account-a',
         protocol: 'OpenAICompatibleChatCompletions',
       },
+      'tool:model-chat',
       [{ modelId: 'model-chat', toolCalling: { state: 'supported' } }],
       'structured adapter event',
     );
@@ -747,6 +751,7 @@ describe('EffectiveCatalogService', () => {
 
     service.recordObserved(
       { providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol },
+      'vision:model-a',
       [{ modelId: 'model-a', visionInput: { state: 'unsupported', reason: 'request rejected' } }],
     );
     expect(snapshots.at(-1)?.models[0].visionInput).toMatchObject({ state: 'unsupported' });
@@ -793,5 +798,42 @@ describe('EffectiveCatalogService', () => {
 
     nowMs += 61_000;
     expect(service.getSnapshot(request()).models[0].quota).toBeUndefined();
+  });
+
+  it('replaces scoped observed evidence and expires entitlement denials', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    let nowMs = Date.parse('2026-07-13T00:00:00.000Z');
+    const service = new EffectiveCatalogService({ statePath, now: () => new Date(nowMs) });
+    const scope = { providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol };
+    service.recordObserved(
+      scope,
+      'capability-probe:model-a:fast',
+      [{ modelId: 'model-a', controls: { fast: { state: 'selectable', defaultValue: false, entitlement: 'denied' } } }],
+      'denied',
+      60_000,
+    );
+    expect(service.getSnapshot(request()).models[0].controls.fast).toMatchObject({ entitlement: 'denied' });
+
+    nowMs += 1_000;
+    service.recordObserved(
+      scope,
+      'capability-probe:model-a:fast',
+      [{ modelId: 'model-a', controls: { fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' } } }],
+      'granted',
+      60_000,
+    );
+    const replaced = service.getSnapshot(request()).models[0];
+    expect(replaced.controls.fast).toMatchObject({ entitlement: 'granted' });
+    expect(replaced.provenance.filter((entry) => entry.field === 'controls.fast.entitlement' && entry.source === 'observed'))
+      .toHaveLength(1);
+
+    nowMs += 61_000;
+    const expired = service.getSnapshot(request()).models[0];
+    expect(expired.controls.fast).toEqual({ state: 'unsupported', fixedValue: false });
+    expect(
+      expired.provenance.some(
+        (entry) => entry.field === 'controls.fast.entitlement' && entry.source === 'observed',
+      ),
+    ).toBe(false);
   });
 });

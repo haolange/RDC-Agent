@@ -95,15 +95,6 @@
             "kind": "implicit"
           },
           "entitlement": "unknown"
-        },
-        {
-          "id": "max",
-          "label": "Max mode",
-          "maxPromptTokens": 1000000,
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "unknown"
         }
       ],
       "defaultBudgetTokens": 256000,
@@ -152,12 +143,13 @@
       ],
       "controls": {
         "fast": {
-          "state": "unknown",
-          "defaultValue": false
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "unknown"
         },
         "context1m": {
-          "state": "unknown",
-          "defaultValue": false
+          "state": "unsupported",
+          "fixedValue": false
         },
         "reasoning": {
           "kind": "unknown",
@@ -183,27 +175,22 @@
             }
           ],
           "entitlement": "unknown"
-        },
-        {
-          "id": "context:max",
-          "when": {
-            "context1m": true
-          },
-          "actions": [
-            {
-              "kind": "client-tier",
-              "tierId": "max"
-            }
-          ],
-          "entitlement": "unknown"
         }
       ],
       "factSourceId": "rdc-agent:kimi-coding-plan:0",
       "liveProjection": {
+        "entitlementDenialMatchers": [
+          {
+            "mode": "fast",
+            "statuses": [
+              401
+            ],
+            "messageIncludes": "does not have access to kimi-for-coding-highspeed"
+          }
+        ],
         "context": {
-          "authority": "account-effective",
-          "defaultTierId": "default",
-          "maxTierId": "max"
+          "observedTierId": "default",
+          "entitlementAuthority": "manifest"
         },
         "reasoning": {
           "offPolicy": "from-live",
@@ -316,8 +303,11 @@
           "fixedValue": false
         },
         "context1m": {
-          "state": "unknown",
-          "defaultValue": false
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "unknown",
+          "tierId": "max",
+          "label": "Max mode"
         },
         "reasoning": {
           "kind": "unknown",
@@ -338,8 +328,8 @@
           },
           "actions": [
             {
-              "kind": "client-tier",
-              "tierId": "max"
+              "kind": "model-switch",
+              "targetModelId": "k3[1m]"
             }
           ],
           "entitlement": "unknown"
@@ -347,10 +337,18 @@
       ],
       "factSourceId": "rdc-agent:kimi-coding-plan:0",
       "liveProjection": {
+        "entitlementDenialMatchers": [
+          {
+            "mode": "one-million-context",
+            "statuses": [
+              403
+            ]
+          }
+        ],
         "context": {
-          "authority": "account-effective",
-          "defaultTierId": "default",
-          "maxTierId": "max"
+          "observedTierId": "default",
+          "maxTierId": "max",
+          "entitlementAuthority": "execution-evidence"
         },
         "reasoning": {
           "offPolicy": "forbidden",
@@ -388,6 +386,93 @@
           "structuredOutput"
         ]
       }
+    },
+    {
+      "modelId": "k3[1m]",
+      "label": "Kimi K3 Max target",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "internal",
+        "relatedPrimaryModelIds": [
+          "k3"
+        ]
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://api.kimi.com/coding/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://api.kimi.com/coding/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "moonshot-ai",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://api.kimi.com/coding/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "moonshot-ai",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "unknown",
+          "tierId": "default",
+          "label": "Max mode"
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:kimi-coding-plan:0"
     },
     {
       "modelId": "kimi-for-coding-highspeed",
@@ -475,8 +560,8 @@
       "factSourceId": "rdc-agent:kimi-coding-plan:0",
       "liveProjection": {
         "context": {
-          "authority": "account-effective",
-          "defaultTierId": "default"
+          "observedTierId": "default",
+          "entitlementAuthority": "manifest"
         },
         "reasoning": {
           "offPolicy": "from-live",

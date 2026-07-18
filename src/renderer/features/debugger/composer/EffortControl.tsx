@@ -110,17 +110,16 @@ export const EffortControl: React.FC<{
     if (pointerFrameRef.current) window.cancelAnimationFrame(pointerFrameRef.current);
   }, []);
 
-  const effortLabel = reasoningUnverified
-    ? t('composer.effort.providerManaged')
-    : t(EFFORT_LABEL_KEYS[selectedLevel]);
-  const tooltipLabel = reasoningUnverified
-    ? t('composer.effort.unverified')
-    : t(EFFORT_LABEL_KEYS[displayLevel]);
+  const effortLabelKey = selectedLevel === 'max' ? 'composer.effort.reasoningMax' : EFFORT_LABEL_KEYS[selectedLevel];
+  const effortLabel = t(reasoningUnverified ? 'composer.effort.providerManaged' : effortLabelKey);
+  const tooltipLabelKey = displayLevel === 'max' ? 'composer.effort.reasoningMax' : EFFORT_LABEL_KEYS[displayLevel];
+  const tooltipLabel = t(reasoningUnverified ? 'composer.effort.unverified' : tooltipLabelKey);
   const oneMillionTokens = oneMillionContextTokens(capability);
   const oneMillionCapability = capability?.resolvedControls?.context1m ?? null;
   const oneMillionAvailable = hasSelectableOneMillionContext(capability);
   const oneMillionUnverified = isOneMillionContextUnverified(capability);
   const fastAvailable = hasSelectableFastMode(capability);
+  const fastUnverified = capability?.controls.fast.state === 'selectable' && capability.controls.fast.entitlement === 'unknown';
   const statusPresentation = capabilityStatusPresentation(capabilityState);
   const capabilityStateLabel = statusPresentation.labelKey ? t(statusPresentation.labelKey) : undefined;
   const capabilityStateDetail = statusPresentation.detailKey ? t(statusPresentation.detailKey) : undefined;
@@ -130,12 +129,18 @@ export const EffortControl: React.FC<{
       ? t('composer.effort.fixed')
       : oneMillionUnverified
         ? t('composer.effort.unverified')
-        : undefined;
+        : capability?.controls.context1m.state === 'selectable' && capability.controls.context1m.entitlement === 'denied'
+          ? t('composer.effort.currentAccountUnavailable')
+          : undefined;
   const fastModelStatusLabel = !capabilityReady
     ? capabilityStateLabel
     : capability?.resolvedControls?.fast.state === 'fixed'
       ? t('composer.effort.fixed')
-      : undefined;
+      : fastUnverified
+        ? t('composer.effort.unverified')
+        : capability?.controls.fast.state === 'selectable' && capability.controls.fast.entitlement === 'denied'
+          ? t('composer.effort.currentAccountUnavailable')
+          : undefined;
   const oneMillionContextBadgeLabel = oneMillionTokens
     ? formatTokenCount(oneMillionTokens)
     : t('composer.effort.oneMillionContextBadge');
@@ -148,7 +153,6 @@ export const EffortControl: React.FC<{
     fastModelLabel: t('composer.effort.fastModel'),
     fastModelBadgeLabel: t('composer.effort.fastMultiplier'),
   });
-
   const closeMenu = useCallback(() => setOpen(false), []);
   useEffect(() => {
     if (!open) return undefined;

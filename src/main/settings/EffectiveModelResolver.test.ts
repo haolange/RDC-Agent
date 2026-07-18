@@ -17,6 +17,7 @@ import {
   applyDiscoveryAuthority,
   buildCatalogModelContribution,
   buildEffectiveCatalogRequest,
+  planEffectiveModelCapabilityProbe,
   planEffectiveModelRequest,
   refreshEffectiveCatalogDiscovery,
   resolveEffectiveModelSelection,
@@ -114,7 +115,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
   it('preserves a live Kimi K3 Max tier only when discovery supplies its executable binding', () => {
     const kimi = provider('kimi-coding-plan', 'OpenAICompatibleChatCompletions');
     const parsed = parseKimiCodeCatalog({ data: [{
-      id: 'k3', context_length: 1_000_000, supports_reasoning: true,
+      id: 'k3', context_length: 256_000, supports_reasoning: true,
       think_efforts: { valid_efforts: ['low', 'high', 'max'], default_effort: 'max' },
     }] });
     const request = buildEffectiveCatalogRequest(kimi);
@@ -132,11 +133,45 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       controls: { context1m: { state: 'selectable', tierId: 'max' } },
       executionBindings: [{
         id: 'context:max',
-        actions: [{ kind: 'client-tier', tierId: 'max' }],
+        actions: [{ kind: 'model-switch', targetModelId: 'k3[1m]' }],
       }],
-      resolvedControls: { context1m: { state: 'selectable', disabled: false } },
+      resolvedControls: { context1m: { state: 'blocked', disabled: true, entitlement: 'unknown' } },
     });
   });
+  it('keeps normal K3 Max planning blocked while an explicit probe may verify the internal target', async () => {
+    const kimi = provider('kimi-coding-plan', 'OpenAICompatibleChatCompletions');
+    const settings = { llm: { providers: [kimi], agentRoutes: [] } } as unknown as AppSettings;
+    const parsed = parseKimiCodeCatalog({ data: [{
+      id: 'k3', context_length: 256_000, supports_reasoning: true,
+    }] });
+    await refreshEffectiveCatalogDiscovery(kimi, [], parsed.contributions);
+
+    expect(planEffectiveModelRequest({
+      providerId: 'kimi-coding-plan', modelId: 'k3', settings,
+      controls: { maxContextMode: false },
+    })).toMatchObject({
+      ok: true,
+      plan: { selectedModelId: 'k3', effectiveModelId: 'k3', contextBudgetTokens: 256_000 },
+    });
+    expect(planEffectiveModelRequest({
+      providerId: 'kimi-coding-plan', modelId: 'k3', settings,
+      controls: { maxContextMode: true },
+    })).toMatchObject({ ok: false, code: 'NO_USABLE_CONTEXT_TIER' });
+    expect(planEffectiveModelCapabilityProbe({
+      providerId: 'kimi-coding-plan', modelId: 'k3', mode: 'one-million-context', settings,
+      controls: { maxContextMode: true },
+    })).toMatchObject({
+      ok: true,
+      plan: {
+        selectedModelId: 'k3',
+        effectiveModelId: 'k3[1m]',
+        activeTierId: 'max',
+        contextMode: 'one-million',
+        appliedBindingIds: ['context:max'],
+      },
+    });
+  });
+
   it('tombstones absent Kimi account models and fails closed when HighSpeed is absent', () => {
     const kimi = provider('kimi-coding-plan', 'AnthropicMessages');
     const discovery = applyDiscoveryAuthority(kimi, [{

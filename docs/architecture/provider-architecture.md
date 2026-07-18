@@ -90,15 +90,17 @@ Discovery authority 为 `authoritative-list`、`candidate-validation`、`additiv
 - `discovered`：完整 authoritative list 的缺席可以判定不可用；
 - `account-entitled`：由账号完整列表决定访问权。
 
-Catalog ownership 只用于审计，不能决定 discovery 缺席语义。Kimi Coding Plan 使用稳定产品身份：`kimi-for-coding` 是基础 primary，精确 `k3` 仅在当前 credential-scoped authoritative catalog 返回时成为第二个 primary，`kimi-for-coding-highspeed` 始终是不可选择的 internal Fast target。三者均为 `account-entitled`；缺席会 tombstone，已引用 route 保持 fail-closed。后台 K2.x/K3 版本名只可进入 provenance/脱敏诊断，禁止生成 selector、alias、持久化 route 或跨 surface 映射。
+Catalog ownership 只用于审计，不能决定 discovery 缺席语义。Kimi Coding Plan 使用稳定产品身份：`kimi-for-coding` 是基础 primary，精确 `k3` 仅在当前 credential-scoped authoritative catalog 返回时成为第二个 primary，`kimi-for-coding-highspeed` 始终是不可选择的 internal Fast target，`k3[1m]` 是 manifest-maintained 的 internal Context Max target。三个 live identity 均按 `account-entitled` 处理，缺席会 tombstone；internal target 永远不进入 selector 或持久化配置，已引用 primary route 保持 fail-closed。后台 K2.x/K3 版本名只可进入 provenance/脱敏诊断，禁止生成 selector、alias、持久化 route 或跨 surface 映射。
 Credential-scoped live discovery follows one path: `parser -> LiveModelObservation -> manifest.liveProjection -> CatalogModelContribution -> Effective Catalog`. Parsers report only explicit upstream identity, availability, context, protocol, reasoning metadata, and capability evidence. Product labels, selection, routes, tiers, controls, bindings, and Fast targets remain compiled-manifest facts. `liveProjection` declares allowed fields and authority; it is never exposed through IPC or Settings persistence.
-Missing protocol, context, or reasoning efforts remain manifest-owned or unknown; projection never guesses OpenAI-compatible, 256K, or High. Only an `account-effective` observation at or above 1M can grant selectable Max mode. A `model-catalog` capacity without entitlement stays unverified.
+Missing protocol, context, or reasoning efforts remain manifest-owned or unknown; projection never guesses OpenAI-compatible, 256K, or High. `observedTierId` scopes a live capacity to one manifest tier, and `entitlementAuthority` independently selects manifest, catalog-observation, or execution-evidence authority. A default-tier 256K observation cannot erase a separate 1M tier; target presence cannot grant a Fast or Max binding.
 
 Discovery、overlay、entitlement、observed evidence 和 user preference 按字段合并。冲突记录 provenance，不静默覆盖。Unknown model fallback 不创造窗口、Fast、Max mode 或 reasoning 事实。Max mode 的目标 tier 在每次 live overlay 合并后都必须保持完整窗口至少一百万 tokens；否则只阻断 Max mode，默认模型继续可用。 Account discovery 只有在当前认证表面同时证明 endpoint 与协议可执行时才可贡献 route；Super Grok 的 direct xAI `/models` 仅提供 availability/context 事实，执行 route 继续由 `cli-chat-proxy.grok.com` OAuth manifest/Builder catalog 掌管。该 proxy 所需的非秘密客户端协议版本同样属于 route manifest；不得依赖运行机器恰好安装 Grok CLI，也不得在 adapter 中按 hostname 猜测或伪造。
+Structural capability, account entitlement, expiring execution evidence, and transient quota are independent dimensions. Unknown or denied entitlement disables normal execution without hiding the explicit Retry surface. Observed evidence replaces the same provider/account/protocol/model/binding scope, and capability-probe denials expire or are cleared by catalog refresh and explicit Retry. HTTP 401/403 is not itself subscription evidence: only a strict manifest matcher scoped to the model, mode, and optional protocol may classify a rejection as entitlement denial.
+
 
 ## 凭据与请求事务
 
-Settings schema 当前为 v4，Effective Catalog cache schema 为 v5。版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。稳定 provider/model/surface ID、secret ref 与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
+Settings schema 当前为 v4，Effective Catalog cache schema 为 v6。版本不匹配的缓存直接失效；不保留旧字段 parser、双读或兼容 shim。稳定 provider/model/surface ID、secret ref 与合法 route preference 继续使用当前字段；失效 route 要求用户重新选择，禁止静默回退。
 
 发送 preflight 创建主进程内 opaque credential lease，冻结 provider 配置、typed connection values、认证 headers、OAuth/Vertex 短时 token 与 AWS Bedrock credentials。认证 header 不进入 `ModelRoute` 或 `RequestPlan`。Adapter 必须持有 lease handle 才能发送；运行中不允许回读 Settings。
 

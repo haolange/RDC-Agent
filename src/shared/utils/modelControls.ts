@@ -81,8 +81,10 @@ export function resolveExecutionBinding(
   binding: ExecutionBindingDefinition,
   catalogModels?: readonly EffectiveModel[],
 ): ExecutionBindingResolution {
-  if (binding.entitlement === 'denied') {
-    return { state: 'blocked', reason: binding.unavailableReason ?? 'Execution binding is not entitled.' };
+  if (binding.entitlement !== 'granted') {
+    return binding.entitlement === 'denied'
+      ? { state: 'blocked', reason: binding.unavailableReason ?? 'Execution binding is not entitled.' }
+      : { state: 'unknown', reason: binding.unavailableReason ?? 'Execution binding entitlement is not yet verified.' };
   }
   const selectedRouteOption = model.preferredRouteOptionId
     ? model.routeOptions?.find((option) => option.id === model.preferredRouteOptionId)
@@ -165,16 +167,22 @@ function resolvedDefinition(
         entitlement: definition.entitlement,
         tierId: definition.tierId,
       };
-    case 'selectable':
+    case 'selectable': {
+      const entitled = definition.entitlement === 'granted';
       return {
-        state: definition.entitlement === 'denied' ? 'blocked' : 'selectable',
-        value: definition.entitlement === 'denied' ? false : value,
+        state: entitled ? 'selectable' : 'blocked',
+        value: entitled ? value : false,
         defaultValue: definition.defaultValue,
-        disabled: definition.entitlement === 'denied',
+        disabled: !entitled,
         entitlement: definition.entitlement,
-        reason: definition.entitlement === 'denied' ? 'Control is not entitled for the active account.' : undefined,
+        reason: entitled
+          ? undefined
+          : definition.entitlement === 'denied'
+            ? 'Control is not entitled for the active account.'
+            : 'Control entitlement is not yet verified.',
         tierId: definition.tierId,
       };
+    }
     case 'provider-managed': {
       const managedValue = definition.fixedValue ?? definition.defaultValue ?? false;
       return {

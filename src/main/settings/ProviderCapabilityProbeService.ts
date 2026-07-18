@@ -16,10 +16,11 @@ import {
   type CatalogModelContribution,
 } from './EffectiveCatalogService';
 import {
-  planEffectiveModelRequest,
+  planEffectiveModelCapabilityProbe,
   recordEffectivePlanSuccess,
   resolveEffectiveModel,
 } from './EffectiveModelResolver';
+import { getLoadedProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { settingsService } from './SettingsService';
 import {
   executeCapabilityProbe,
@@ -29,6 +30,26 @@ import {
   freezeProviderRuntimeCredentials,
   releaseProviderRuntimeCredentials,
 } from './ProviderRuntimeCredentialLease';
+const OBSERVED_ENTITLEMENT_TTL_MS = 24 * 60 * 60 * 1000;
+
+export type CapabilityProbeFailureKind =
+  | 'entitlement-denied'
+  | 'quota-exhausted'
+  | 'authentication-failed'
+  | 'route-unavailable'
+  | 'unknown';
+
+export function classifyCapabilityProbeFailure(
+  status: number,
+  manifestDeclaresEntitlementDenial = false,
+): CapabilityProbeFailureKind {
+  if (manifestDeclaresEntitlementDenial) return 'entitlement-denied';
+  if (status === 401) return 'authentication-failed';
+  if (status === 404) return 'route-unavailable';
+  if (status === 429) return 'quota-exhausted';
+  return 'unknown';
+}
+
 
 export interface ResolvedProbeTarget {
   provider: LlmProviderEntry;
@@ -50,6 +71,7 @@ export interface ProviderCapabilityProbeDependencies {
     target: ResolvedProbeTarget,
     plan: RequestPlan,
     status: number,
+    detail: string,
   ) => boolean;
 }
 
@@ -61,24 +83,83 @@ function identity(target: ResolvedProbeTarget, plan: RequestPlan) {
   };
 }
 
+function manifestDeclaresEntitlementDenial(
+  request: LlmModelCapabilityProbeRequest,
+  plan: RequestPlan,
+  status: number,
+  detail: string,
+): boolean {
+  const model = getLoadedProviderSurface(request.providerId)?.models
+    .find((candidate) => candidate.modelId === request.modelId);
+  return model?.liveProjection?.entitlementDenialMatchers?.some((matcher) => (
+    matcher.mode === request.mode
+    && matcher.statuses.includes(status)
+    && (!matcher.protocols || matcher.protocols.includes(plan.route.protocol))
+    && (!matcher.messageIncludes || detail.toLowerCase().includes(matcher.messageIncludes.toLowerCase()))
+  )) ?? false;
+}
+
+export function buildProbeSuccessPatch(
+  request: LlmModelCapabilityProbeRequest,
+  target: ResolvedProbeTarget,
+  plan: RequestPlan,
+): CatalogModelContribution | null {
+  const availability = target.model.availability === 'unknown' ? 'available' as const : undefined;
+  if (request.mode === 'fast' && target.model.controls.fast.state === 'selectable') {
+    return {
+      modelId: target.model.modelId,
+      ...(availability ? { availability } : {}),
+      controls: { fast: { ...target.model.controls.fast, entitlement: 'granted' } },
+      executionBindings: target.model.executionBindings?.map((binding) => (
+        plan.appliedBindingIds.includes(binding.id)
+          ? { ...binding, entitlement: 'granted' }
+          : binding
+      )),
+    };
+  }
+  if (request.mode === 'one-million-context') {
+    return {
+      modelId: target.model.modelId,
+      ...(availability ? { availability } : {}),
+      controls: target.model.controls.context1m.state === 'selectable'
+        ? { context1m: { ...target.model.controls.context1m, entitlement: 'granted' } }
+        : undefined,
+      contextTiers: target.model.contextTiers.map((tier) => (
+        tier.id === plan.activeTierId ? { ...tier, entitlement: 'granted' } : tier
+      )),
+      executionBindings: target.model.executionBindings?.map((binding) => (
+        plan.appliedBindingIds.includes(binding.id)
+          ? { ...binding, entitlement: 'granted' }
+          : binding
+      )),
+    };
+  }
+  return availability ? { modelId: target.model.modelId, availability } : null;
+}
+
 export function buildProbeFailurePatch(
   request: LlmModelCapabilityProbeRequest,
   target: ResolvedProbeTarget,
   plan: RequestPlan,
   status: number,
+  manifestMatchesDenial = false,
 ): CatalogModelContribution | null {
-  if (status === 404) {
+  const kind = classifyCapabilityProbeFailure(status, manifestMatchesDenial);
+  if (request.mode === 'one-million-context' && kind === 'entitlement-denied') {
     return {
       modelId: target.model.modelId,
-      availability: 'unavailable',
-      unavailableReason: 'Explicit model probe returned HTTP 404.',
+      controls: target.model.controls.context1m.state === 'selectable'
+        ? { context1m: { ...target.model.controls.context1m, entitlement: 'denied' } }
+        : undefined,
+      contextTiers: [{ id: plan.activeTierId, entitlement: 'denied' }],
+      executionBindings: target.model.executionBindings?.map((binding) => (
+        plan.appliedBindingIds.includes(binding.id)
+          ? { ...binding, entitlement: 'denied' }
+          : binding
+      )),
     };
   }
-  if (request.mode === 'one-million-context' && (status === 400 || status === 403)) {
-    return { modelId: target.model.modelId, contextTiers: [{ id: plan.activeTierId, entitlement: 'denied' }] };
-  }
-  const modelSwitchFastDenied = status === 401 && plan.effectiveModelId !== plan.selectedModelId;
-  if (request.mode === 'fast' && (status === 400 || status === 403 || modelSwitchFastDenied)
+  if (request.mode === 'fast' && kind === 'entitlement-denied'
     && target.model.controls.fast.state === 'selectable') {
     return {
       modelId: target.model.modelId,
@@ -100,9 +181,10 @@ const productionDependencies: ProviderCapabilityProbeDependencies = {
     const model = resolveEffectiveModel(request.providerId, request.modelId, settings);
     return provider && provider.isConfigured && model ? { provider, model } : null;
   },
-  plan: (request, controls) => planEffectiveModelRequest({
+  plan: (request, controls) => planEffectiveModelCapabilityProbe({
     providerId: request.providerId,
     modelId: request.modelId,
+    mode: request.mode,
     settings: settingsService.getAll(),
     controls,
   }),
@@ -110,21 +192,44 @@ const productionDependencies: ProviderCapabilityProbeDependencies = {
   freezeCredentials: async (providerId) => (await freezeProviderRuntimeCredentials(providerId)).handle,
   releaseCredentials: releaseProviderRuntimeCredentials,
   recordSuccess: (request, target, plan) => {
+    const evidenceId = [
+      'capability-probe', target.model.modelId, request.mode, plan.route.protocol,
+      plan.appliedBindingIds.join(',') || 'default',
+    ].join(':');
     recordEffectivePlanSuccess(request.providerId, request.modelId, settingsService.getAll(), plan);
-    if (target.model.availability === 'unknown') {
-      effectiveCatalogService.recordObserved(identity(target, plan), [{
-        modelId: target.model.modelId,
-        availability: 'available',
-      }], 'Explicit model capability probe succeeded');
+    const patch = buildProbeSuccessPatch(request, target, plan);
+    if (patch) {
+      effectiveCatalogService.recordObserved(
+        identity(target, plan),
+        evidenceId,
+        [patch],
+        'Explicit model capability probe succeeded',
+      );
     }
   },
-  recordFailure: (request, target, plan, status) => {
-    const patch = buildProbeFailurePatch(request, target, plan, status);
+  recordFailure: (request, target, plan, status, detail) => {
+    const manifestMatchesDenial = manifestDeclaresEntitlementDenial(request, plan, status, detail);
+    const failureKind = classifyCapabilityProbeFailure(status, manifestMatchesDenial);
+    if (failureKind === 'quota-exhausted') {
+      effectiveCatalogService.recordTransientQuota(
+        identity(target, plan),
+        target.model.modelId,
+        { note: `Capability probe received HTTP ${status}` },
+      );
+      return false;
+    }
+    const patch = buildProbeFailurePatch(request, target, plan, status, manifestMatchesDenial);
     if (!patch) return false;
+    const evidenceId = [
+      'capability-probe', target.model.modelId, request.mode, plan.route.protocol,
+      plan.appliedBindingIds.join(',') || 'default',
+    ].join(':');
     effectiveCatalogService.recordObserved(
       identity(target, plan),
+      evidenceId,
       [patch],
       `Explicit ${request.mode} capability probe rejected with HTTP ${status}`,
+      OBSERVED_ENTITLEMENT_TTL_MS,
     );
     return true;
   },
@@ -154,7 +259,12 @@ export class ProviderCapabilityProbeService {
       if (!choices.oneMillionTier) {
         return { success: false, status: 'denied', requestSent: false, detail: 'No selectable Max mode.' };
       }
-      if (choices.oneMillionTier.entitlement === 'unknown' && choices.oneMillionTier.activation.kind === 'implicit') {
+      const explicitBinding = target.model.executionBindings?.find((binding) => (
+        binding.when.context1m === true
+        && binding.actions.some((action) => action.kind === 'model-switch' || action.kind === 'request-patch')
+      ));
+      if (choices.oneMillionTier.entitlement === 'unknown'
+        && choices.oneMillionTier.activation.kind === 'implicit' && !explicitBinding) {
         return {
           success: false,
           status: 'inconclusive',
@@ -163,10 +273,7 @@ export class ProviderCapabilityProbeService {
         };
       }
     }
-    if (request.mode === 'fast'
-      && (target.model.controls.fast.state !== 'selectable'
-        || target.model.controls.fast.entitlement === 'denied'
-        || target.model.resolvedControls?.fast.state === 'blocked')) {
+    if (request.mode === 'fast' && target.model.controls.fast.state !== 'selectable') {
       return { success: false, status: 'denied', requestSent: false, detail: 'Fast activation is not selectable.' };
     }
 
@@ -204,13 +311,14 @@ export class ProviderCapabilityProbeService {
       return { success: true, status: 'verified', requestSent: true };
     } catch (error) {
       const status = statusFromError(error);
+      const detail = errorDetail(error);
       const recorded = status !== undefined
-        && this.dependencies.recordFailure(request, target, planning.plan, status);
+        && this.dependencies.recordFailure(request, target, planning.plan, status, detail);
       return {
         success: false,
         status: recorded ? 'denied' : 'failed',
         requestSent: true,
-        detail: errorDetail(error),
+        detail: recorded ? 'Not available for current account.' : detail,
       };
     } finally {
       this.dependencies.releaseCredentials(credentialHandle);

@@ -102,6 +102,29 @@ describe('resolveModelControls', () => {
     expect(result.error?.code).toBe('FAST_BLOCKED');
   });
 
+  it('keeps structurally selectable controls disabled until account entitlement is verified', () => {
+    const unverified = model({
+      controls: {
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'unknown' },
+        context1m: { state: 'unsupported', fixedValue: false },
+        reasoning: noReasoning,
+      },
+      executionBindings: [{
+        id: 'fast:unverified',
+        when: { fast: true },
+        actions: [{ kind: 'request-patch', patch: { speed: 'fast' } }],
+        entitlement: 'unknown',
+      }],
+    });
+
+    const result = resolveModelControls(unverified, { fastModel: true }, [unverified]);
+    expect(result.controls.fastModel).toBe(false);
+    expect(result.resolved.fast).toMatchObject({
+      state: 'blocked', value: false, disabled: true, entitlement: 'unknown',
+    });
+    expect(result.error?.code).toBe('FAST_BLOCKED');
+  });
+
   it('projects fixed, selectable and unsupported 1M states without numeric guessing', () => {
     const tier = {
       id: 'one-million',
