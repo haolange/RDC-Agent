@@ -12,14 +12,53 @@ import {
   resolveNearestSnapLevel,
 } from './effortControlParts';
 import {
+  createActiveMaxTimeline,
+  createMaxTimeline,
+  createReopenMaxTimeline,
   isMaxTierLevel,
-  MAX_VISUAL_EVOLVE_MS,
-  MAX_VISUAL_RETREAT_MS,
+  MAX_TRAVEL_CYCLE_MS,
+  MAX_TRAVEL_SPATIAL_CYCLES,
+  MAX_VISUAL_EGRESS_MS,
+  MAX_VISUAL_INGRESS_MS,
+  type MaxFieldMode,
   resolveMaxAnimationProgress,
+  resolveMaxClipX,
   resolveMaxFieldCell,
-  resolveMaxFieldCoverage,
-  resolveMaxStopsOpacity,
+  resolveMaxTravelingAmplitude,
+  resolveMaxVisualFrame,
+  shouldStartMaxDragIngress,
 } from './maxVisual';
+
+const FIELD_COLS = 72;
+const FIELD_ROWS = 5;
+
+function resolveGrid(
+  energy: number,
+  fieldTimeMs = 0,
+  emitterRatio = 1,
+  fieldMode: MaxFieldMode = 'propagate',
+  formationEnergy = energy,
+) {
+  return Array.from({ length: FIELD_COLS * FIELD_ROWS }, (_, index) => {
+    const col = index % FIELD_COLS;
+    const row = Math.floor(index / FIELD_COLS);
+    return {
+      col,
+      row,
+      sample: resolveMaxFieldCell({
+        col,
+        row,
+        cols: FIELD_COLS,
+        rows: FIELD_ROWS,
+        energy,
+        formationEnergy,
+        fieldMode,
+        fieldTimeMs,
+        emitterRatio,
+      }),
+    };
+  });
+}
 
 describe('effortControlParts', () => {
   it('builds visible selections for levels, toggle, and always-on controls', () => {
@@ -133,96 +172,259 @@ describe('effortControlParts', () => {
   it('treats max as the sole top-tier visual pipeline', () => {
     expect(isMaxTierLevel('max')).toBe(true);
     expect(isMaxTierLevel('high')).toBe(false);
-    expect(MAX_VISUAL_EVOLVE_MS).toBe(800);
-    expect(MAX_VISUAL_RETREAT_MS).toBe(800);
+    expect(MAX_VISUAL_INGRESS_MS).toBe(1_600);
+    expect(MAX_VISUAL_EGRESS_MS).toBe(384);
   });
 
-  it('maps max visual phases to stop opacity and field coverage', () => {
-    expect(resolveMaxStopsOpacity({ phase: 'idle', progress: 0, evolveHideStops: false })).toBe(1);
-    expect(resolveMaxStopsOpacity({ phase: 'preview', progress: 0, evolveHideStops: false })).toBe(1);
-    expect(resolveMaxStopsOpacity({ phase: 'evolve', progress: 0.25, evolveHideStops: false })).toBe(0.75);
-    expect(resolveMaxStopsOpacity({ phase: 'evolve', progress: 0.25, evolveHideStops: true })).toBe(0);
-    expect(resolveMaxStopsOpacity({ phase: 'settled', progress: 1, evolveHideStops: false })).toBe(0);
-    expect(resolveMaxStopsOpacity({ phase: 'retreat', progress: 0.4, evolveHideStops: false })).toBe(0.4);
-    expect(resolveMaxStopsOpacity({ phase: 'retreat', progress: 0.4, evolveHideStops: false, retreatStopsFrom: 0 })).toBe(0.4);
-    expect(resolveMaxStopsOpacity({ phase: 'retreat', progress: 0.5, evolveHideStops: false, retreatStopsFrom: 1 })).toBe(1);
-    expect(resolveMaxStopsOpacity({ phase: 'retreat', progress: 0.5, evolveHideStops: false, retreatStopsFrom: 0.2 })).toBeCloseTo(0.6);
-
-    expect(resolveMaxFieldCoverage({ phase: 'idle', progress: 0 })).toBe(0);
-    expect(resolveMaxFieldCoverage({ phase: 'preview', progress: 0 })).toBe(0);
-    expect(resolveMaxFieldCoverage({ phase: 'evolve', progress: 0.6 })).toBe(0.6);
-    expect(resolveMaxFieldCoverage({ phase: 'settled', progress: 1 })).toBe(1);
-    expect(resolveMaxFieldCoverage({ phase: 'retreat', progress: 0.25 })).toBe(0.75);
+  it('starts drag ingress only when entry or reversal needs a preview timeline', () => {
+    expect(shouldStartMaxDragIngress('idle')).toBe(true);
+    expect(shouldStartMaxDragIngress('egress')).toBe(true);
+    expect(shouldStartMaxDragIngress('ingress-committed')).toBe(true);
+    expect(shouldStartMaxDragIngress('active')).toBe(false);
+    expect(shouldStartMaxDragIngress('ingress-reopen')).toBe(false);
+    expect(shouldStartMaxDragIngress('ingress-drag')).toBe(false);
   });
 
-  it('uses one symmetric progress curve for evolve and retreat', () => {
-    expect(resolveMaxAnimationProgress(0, MAX_VISUAL_EVOLVE_MS)).toBe(0);
-    expect(resolveMaxAnimationProgress(400, MAX_VISUAL_EVOLVE_MS)).toBe(0.5);
-    expect(resolveMaxAnimationProgress(800, MAX_VISUAL_EVOLVE_MS)).toBe(1);
-    expect(resolveMaxAnimationProgress(1_000, MAX_VISUAL_EVOLVE_MS)).toBe(1);
-
-    const growCoverage = resolveMaxFieldCoverage({ phase: 'evolve', progress: 0.35 });
-    const retreatCoverage = resolveMaxFieldCoverage({ phase: 'retreat', progress: 0.65 });
-    expect(growCoverage).toBeCloseTo(retreatCoverage);
-  });
-
-  it('preserves stop opacity when evolve or preview transitions into retreat', () => {
-    const evolveOpacity = resolveMaxStopsOpacity({
-      phase: 'evolve',
-      progress: 0.38,
-      evolveHideStops: false,
+  it('uses one interruptible timeline for drag, commit, and reopen ingress', () => {
+    const dragStartedAt = 1_000;
+    const drag = createMaxTimeline({
+      phase: 'ingress-drag',
+      revision: 1,
+      now: dragStartedAt,
+      fromEnergy: 0,
+      fromStopsOpacity: 0.2,
+      fieldEpoch: dragStartedAt,
     });
-    expect(resolveMaxStopsOpacity({
-      phase: 'retreat',
-      progress: 0,
-      evolveHideStops: false,
-      retreatStopsFrom: evolveOpacity,
-    })).toBe(evolveOpacity);
+    expect(drag.fromStopsOpacity).toBe(0.2);
+    const dragMid = resolveMaxVisualFrame(drag, dragStartedAt + MAX_VISUAL_INGRESS_MS / 2);
+    expect(dragMid.energy).toBe(0.5);
+    expect(dragMid.stopsOpacity).toBe(0.2);
+    expect(dragMid.running).toBe(true);
 
-    const previewOpacity = resolveMaxStopsOpacity({
-      phase: 'preview',
-      progress: 0,
-      evolveHideStops: false,
+    const dragEndedAt = dragStartedAt + MAX_VISUAL_INGRESS_MS;
+    const dragEnd = resolveMaxVisualFrame(drag, dragEndedAt);
+    expect(dragEnd.energy).toBe(1);
+    expect(dragEnd.stopsOpacity).toBe(0.2);
+    expect(dragEnd.complete).toBe(false);
+    expect(dragEnd.running).toBe(true);
+
+    const committed = createMaxTimeline({
+      phase: 'ingress-committed',
+      revision: 2,
+      now: dragEndedAt,
+      fromEnergy: dragEnd.energy,
+      fromStopsOpacity: dragEnd.stopsOpacity,
+      fieldEpoch: drag.fieldEpoch,
     });
-    expect(resolveMaxStopsOpacity({
-      phase: 'retreat',
-      progress: 0,
-      evolveHideStops: false,
-      retreatStopsFrom: previewOpacity,
-    })).toBe(1);
-    expect(resolveMaxStopsOpacity({
-      phase: 'evolve',
-      progress: 0,
-      evolveHideStops: true,
-    })).toBe(0);
+    expect(committed.durationMs).toBe(MAX_VISUAL_EGRESS_MS);
+    const committedStart = resolveMaxVisualFrame(committed, dragEndedAt);
+    expect(committedStart.energy).toBe(dragEnd.energy);
+    expect(committedStart.stopsOpacity).toBe(dragEnd.stopsOpacity);
+    expect(resolveMaxVisualFrame(committed, dragEndedAt + MAX_VISUAL_EGRESS_MS / 2).stopsOpacity).toBeCloseTo(0.1);
+    expect(resolveMaxVisualFrame(committed, dragEndedAt + MAX_VISUAL_EGRESS_MS).stopsOpacity).toBe(0);
   });
 
-  it('keeps max pixel topology deterministic, porous, and brighter on the right', () => {
-    const cols = 72;
-    const rows = 5;
-    const samples = Array.from({ length: cols * rows }, (_, index) => {
-      const col = index % cols;
-      const row = Math.floor(index / cols);
-      return { col, sample: resolveMaxFieldCell({ col, row, cols, rows, coverage: 1 }) };
+  it('hides committed stops on the 384ms egress clock without slowing the 1.6s field ingress', () => {
+    const committed = createMaxTimeline({
+      phase: 'ingress-committed',
+      revision: 8,
+      now: 1_000,
+      fromEnergy: 0,
+      fromStopsOpacity: 1,
+      fieldEpoch: 1_000,
     });
-    expect(samples[137]?.sample).toEqual(resolveMaxFieldCell({
-      col: 137 % cols,
-      row: Math.floor(137 / cols),
-      cols,
-      rows,
-      coverage: 1,
-    }));
+    const stopsSettled = resolveMaxVisualFrame(committed, 1_000 + MAX_VISUAL_EGRESS_MS);
+    expect(stopsSettled.stopsOpacity).toBe(0);
+    expect(stopsSettled.energy).toBeLessThan(0.25);
+    expect(stopsSettled.complete).toBe(false);
+    expect(resolveMaxVisualFrame(committed, 1_000 + MAX_VISUAL_INGRESS_MS)).toMatchObject({
+      energy: 1,
+      stopsOpacity: 0,
+      complete: true,
+    });
+  });
 
-    const visible = samples.filter(({ sample }) => sample.visible);
-    expect(visible.length).toBeGreaterThan(samples.length * 0.65);
-    expect(visible.length).toBeLessThan(samples.length * 0.95);
+  it('constructs reopen before-paint state with no gray stops or field energy', () => {
+    const reopen = createReopenMaxTimeline(3, 2_000);
+    expect(reopen).toMatchObject({
+      phase: 'ingress-reopen',
+      fromEnergy: 0,
+      fromStopsOpacity: 0,
+      fieldEpoch: 2_000,
+    });
+    expect(resolveMaxVisualFrame(reopen, 2_000)).toMatchObject({
+      energy: 0,
+      stopsOpacity: 0,
+      running: true,
+    });
+  });
 
-    const leftAlpha = samples
-      .filter(({ col, sample }) => col < cols / 3 && sample.visible)
-      .reduce((sum, { sample }) => sum + sample.alpha, 0);
-    const rightAlpha = samples
-      .filter(({ col, sample }) => col >= cols * 2 / 3 && sample.visible)
-      .reduce((sum, { sample }) => sum + sample.alpha, 0);
-    expect(rightAlpha).toBeGreaterThan(leftAlpha);
+  it('keeps egress and mid-flight reversal continuous, including field time', () => {
+    const egress = createMaxTimeline({
+      phase: 'egress',
+      revision: 2,
+      now: 1_000,
+      fromEnergy: 0.7,
+      fromStopsOpacity: 0.2,
+      fieldEpoch: 240,
+    });
+    const egressMidAt = 1_000 + MAX_VISUAL_EGRESS_MS / 2;
+    const egressMid = resolveMaxVisualFrame(egress, egressMidAt);
+    expect(egressMid.energy).toBeCloseTo(0.35);
+    expect(egressMid.stopsOpacity).toBeCloseTo(0.6);
+
+    const reverse = createMaxTimeline({
+      phase: 'ingress-drag',
+      revision: 3,
+      now: egressMidAt,
+      fromEnergy: egressMid.energy,
+      formationEnergy: egress.formationEnergy,
+      fieldMode: egress.fieldMode,
+      fromStopsOpacity: egressMid.stopsOpacity,
+      fieldEpoch: egress.fieldEpoch,
+    });
+    const reverseStart = resolveMaxVisualFrame(reverse, egressMidAt);
+    expect(reverseStart.energy).toBeCloseTo(egressMid.energy);
+    expect(reverseStart.stopsOpacity).toBeCloseTo(egressMid.stopsOpacity);
+    expect(resolveMaxVisualFrame(reverse, egressMidAt + MAX_VISUAL_EGRESS_MS).stopsOpacity).toBeCloseTo(egressMid.stopsOpacity);
+    expect(reverse.fieldEpoch).toBe(egress.fieldEpoch);
+    expect(reverse.formationEnergy).toBe(egress.formationEnergy);
+    expect(reverse.fieldMode).toBe('dissolve');
+    expect(resolveMaxVisualFrame(egress, 1_000 + MAX_VISUAL_EGRESS_MS)).toMatchObject({
+      energy: 0,
+      stopsOpacity: 1,
+      complete: true,
+    });
+  });
+
+  it('resolves reduced motion to static endpoints without a running loop', () => {
+    const ingress = createMaxTimeline({
+      phase: 'ingress-committed',
+      revision: 1,
+      now: 0,
+      fromEnergy: 0,
+      fromStopsOpacity: 1,
+      fieldEpoch: 0,
+    });
+    expect(resolveMaxVisualFrame(ingress, 0, true)).toMatchObject({
+      energy: 1,
+      stopsOpacity: 0,
+      running: false,
+      complete: true,
+    });
+    expect(resolveMaxVisualFrame(createActiveMaxTimeline(2, 0), 10, true)).toMatchObject({
+      energy: 1,
+      stopsOpacity: 0,
+      running: false,
+    });
+  });
+
+  it('keeps one deterministic porous topology while the unified field changes brightness', () => {
+    const first = resolveGrid(1, 0);
+    const later = resolveGrid(1, 430);
+    expect(first.map(({ sample }) => sample.occupied)).toEqual(
+      later.map(({ sample }) => sample.occupied),
+    );
+    const occupied = first.filter(({ sample }) => sample.occupied);
+    expect(occupied.length).toBeGreaterThan(first.length * 0.7);
+    expect(occupied.length).toBeLessThan(first.length * 0.85);
+
+    const deltas = occupied.map(({ col, row, sample }) => {
+      const laterAlpha = later[row * FIELD_COLS + col]?.sample.alpha ?? sample.alpha;
+      return laterAlpha - sample.alpha;
+    });
+    expect(deltas.filter((delta) => Math.abs(delta) > 0.01).length).toBeGreaterThan(occupied.length * 0.35);
+    expect(deltas.some((delta) => delta > 0.01)).toBe(true);
+    expect(deltas.some((delta) => delta < -0.01)).toBe(true);
+  });
+
+  it('advances the noisy ingress boundary leftward while the formed right side stays alive', () => {
+    const early = resolveGrid(0.18, 224);
+    const middle = resolveGrid(0.55, 800);
+    const late = resolveGrid(1, 1_600);
+    const leftBoundary = (grid: ReturnType<typeof resolveGrid>) => Math.min(
+      ...grid.filter(({ sample }) => sample.visible).map(({ col }) => col),
+    );
+    expect(leftBoundary(middle)).toBeLessThan(leftBoundary(early));
+    expect(leftBoundary(late)).toBeLessThan(leftBoundary(middle));
+    for (const grid of [early, middle, late]) {
+      expect(grid.some(({ col, sample }) => col > FIELD_COLS * 0.8 && sample.visible)).toBe(true);
+    }
+  });
+
+  it('keeps the completed field translucent with a visible left floor and brighter right edge', () => {
+    const active = resolveGrid(1, 620).filter(({ sample }) => sample.occupied);
+    const left = active.filter(({ col }) => col < FIELD_COLS / 3);
+    const right = active.filter(({ col }) => col >= FIELD_COLS * 2 / 3);
+    const averageAlpha = (cells: typeof active) => (
+      cells.reduce((sum, { sample }) => sum + sample.alpha, 0) / cells.length
+    );
+
+    expect(active.every(({ sample }) => sample.visible)).toBe(true);
+    expect(Math.min(...active.map(({ sample }) => sample.alpha))).toBeGreaterThanOrEqual(0.099);
+    expect(Math.max(...active.map(({ sample }) => sample.alpha))).toBeLessThan(0.7);
+    expect(averageAlpha(left)).toBeLessThan(0.18);
+    expect(averageAlpha(right)).toBeGreaterThan(averageAlpha(left) + 0.18);
+  });
+
+  it('moves one continuous correlated brightness amplitude from right to left', () => {
+    const position = 0.72;
+    const elapsedMs = 180;
+    const leftShift = elapsedMs / (MAX_TRAVEL_CYCLE_MS * MAX_TRAVEL_SPATIAL_CYCLES);
+    const phaseOffset = 0.37;
+    expect(resolveMaxTravelingAmplitude(position, 240, phaseOffset)).toBeCloseTo(
+      resolveMaxTravelingAmplitude(position - leftShift, 240 + elapsedMs, phaseOffset),
+      10,
+    );
+  });
+
+  it('fades the formed field across its full width without an inward-contracting edge', () => {
+    const full = resolveGrid(1, 620);
+    const retreat = resolveGrid(0.5, 620, 1, 'dissolve', 1);
+    const occupied = full.filter(({ sample }) => sample.occupied);
+    const surviving = occupied.filter(({ col, row }) => {
+      const index = row * FIELD_COLS + col;
+      return retreat[index]?.sample.visible;
+    });
+    expect(surviving.length).toBeGreaterThan(0);
+    expect(surviving.length).toBeLessThan(occupied.length);
+
+    const thirds = [0, 1, 2].map((third) => surviving.filter(({ col }) => (
+      col >= third * FIELD_COLS / 3 && col < (third + 1) * FIELD_COLS / 3
+    )).length);
+    expect(thirds.every((count) => count > 0)).toBe(true);
+
+    const restoredFormation = resolveGrid(0.5, 620, 1, 'dissolve', 0.5);
+    const propagationAtFormation = resolveGrid(0.5, 620);
+    expect(restoredFormation.map(({ sample }) => sample.alpha)).toEqual(
+      propagationAtFormation.map(({ sample }) => sample.alpha),
+    );
+    const resumedGrowth = resolveGrid(0.8, 620, 1, 'dissolve', 0.5);
+    expect(resumedGrowth.filter(({ sample }) => sample.visible).length).toBeGreaterThan(
+      restoredFormation.filter(({ sample }) => sample.visible).length,
+    );
+
+    const alphaRatios = surviving.map(({ col, row, sample }) => {
+      const retreatAlpha = retreat[row * FIELD_COLS + col]?.sample.alpha ?? 0;
+      return retreatAlpha / sample.alpha;
+    });
+    expect(Math.max(...alphaRatios) - Math.min(...alphaRatios)).toBeGreaterThan(0.2);
+  });
+
+  it('enforces the thumb as an exact hard clip boundary', () => {
+    expect(resolveMaxClipX(300, 1)).toBe(300);
+    expect(resolveMaxClipX(300, 0.42)).toBe(126);
+    expect(resolveMaxClipX(300, -1)).toBe(0);
+    const clipped = resolveGrid(1, 500, 0.42);
+    expect(clipped.every(({ col, sample }) => (
+      col / (FIELD_COLS - 1) <= 0.42 || sample.alpha === 0
+    ))).toBe(true);
+  });
+
+  it('uses one symmetric progress curve for ingress and egress', () => {
+    expect(resolveMaxAnimationProgress(0, MAX_VISUAL_INGRESS_MS)).toBe(0);
+    expect(resolveMaxAnimationProgress(800, MAX_VISUAL_INGRESS_MS)).toBe(0.5);
+    expect(resolveMaxAnimationProgress(1_600, MAX_VISUAL_INGRESS_MS)).toBe(1);
+    expect(resolveMaxAnimationProgress(2_000, MAX_VISUAL_INGRESS_MS)).toBe(1);
   });
 });

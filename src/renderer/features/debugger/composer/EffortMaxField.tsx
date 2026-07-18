@@ -1,13 +1,14 @@
-import React, { useEffect, useRef } from 'react';
-import type { MaxVisualPhase } from './maxVisual';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   clampMaxProgress,
-  MAX_VISUAL_EVOLVE_MS,
-  MAX_VISUAL_RETREAT_MS,
   maxFieldNoise,
+  type MaxFieldMode,
+  type MaxVisualFrame,
+  type MaxVisualTimeline,
   prefersReducedMotion,
+  resolveMaxClipX,
   resolveMaxFieldCell,
-  resolveMaxFieldCoverage,
+  resolveMaxVisualFrame,
 } from './maxVisual';
 
 const CELL = 3;
@@ -50,74 +51,43 @@ function resolveCellColor(colors: FieldColors, tone: number, sparkle: number): s
   return base;
 }
 
-function paintPreview(
-  ctx: CanvasRenderingContext2D,
-  originY: number,
-  thumbCol: number,
-  colors: FieldColors,
-): void {
-  for (let col = Math.max(0, thumbCol - 7); col < thumbCol; col += 1) {
-    const distance = thumbCol - col;
-    const falloff = 1 - (distance - 1) / 7;
-    for (let row = 0; row < ROWS; row += 1) {
-      const occupancy = maxFieldNoise(col, row, 3);
-      const detail = maxFieldNoise(col, row, 5);
-      if (occupancy < 0.46 - falloff * 0.18) continue;
-      const rowMid = (ROWS - 1) / 2;
-      const rowWeight = 0.76 + (1 - Math.abs(row - rowMid) / (rowMid + 0.5)) * 0.24;
-      const alpha = (0.24 + falloff * 0.5) * rowWeight * (0.86 + detail * 0.14);
-      ctx.globalAlpha = clampMaxProgress(alpha);
-      ctx.fillStyle = resolveCellColor(colors, 0.7 + falloff * 0.3, occupancy);
-      ctx.fillRect(
-        GAP + col * STRIDE,
-        originY + row * STRIDE,
-        CELL,
-        CELL,
-      );
-    }
-  }
-  ctx.globalAlpha = 1;
-}
-
 function paintField(
   ctx: CanvasRenderingContext2D,
   width: number,
   height: number,
-  input: {
-    phase: MaxVisualPhase;
-    progress: number;
-    thumbRatio: number;
-    timeMs: number;
-    colors: FieldColors;
-    reduced: boolean;
-  },
+  frame: MaxVisualFrame,
+  colors: FieldColors,
+  fieldTimeMs: number,
+  emitterRatio: number,
+  formationEnergy: number,
+  fieldMode: MaxFieldMode,
 ): void {
   ctx.clearRect(0, 0, width, height);
-  if (width < 2 || height < 2) return;
+  const clipX = resolveMaxClipX(width, emitterRatio);
+  if (width < 2 || height < 2 || frame.energy <= 0 || clipX <= 0) return;
 
   const cols = Math.max(1, Math.floor((width - GAP) / STRIDE));
   const originY = Math.round((height - (ROWS * STRIDE - GAP)) / 2);
-  const thumbCol = Math.max(0, Math.min(cols - 1, Math.round(input.thumbRatio * (cols - 1))));
-  if (input.phase === 'preview') {
-    paintPreview(ctx, originY, thumbCol, input.colors);
-    return;
-  }
-
-  const coverage = resolveMaxFieldCoverage(input);
-  if (coverage <= 0) return;
-  const breath = 0;
-
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, clipX, height);
+  ctx.clip();
   for (let col = 0; col < cols; col += 1) {
     for (let row = 0; row < ROWS; row += 1) {
-      const sample = resolveMaxFieldCell({ col, row, cols, rows: ROWS, coverage });
-      if (!sample.visible || sample.alpha <= 0.02) continue;
-      const shimmerWeight = 0.45 + maxFieldNoise(col, row, 6) * 0.55;
-      ctx.globalAlpha = clampMaxProgress(sample.alpha + breath * shimmerWeight);
-      ctx.fillStyle = resolveCellColor(
-        input.colors,
-        sample.tone,
-        maxFieldNoise(col, row, 0),
-      );
+      const sample = resolveMaxFieldCell({
+        col,
+        row,
+        cols,
+        rows: ROWS,
+        energy: frame.energy,
+        formationEnergy,
+        fieldMode,
+        fieldTimeMs,
+        emitterRatio,
+      });
+      if (!sample.visible || sample.alpha <= 0.018) continue;
+      ctx.globalAlpha = sample.alpha;
+      ctx.fillStyle = resolveCellColor(colors, sample.tone, maxFieldNoise(col, row, 0));
       ctx.fillRect(
         GAP + col * STRIDE,
         originY + row * STRIDE,
@@ -126,36 +96,64 @@ function paintField(
       );
     }
   }
+  ctx.restore();
   ctx.globalAlpha = 1;
 }
 
+function syncVisualHost(
+  host: HTMLElement,
+  frame: MaxVisualFrame,
+  emitterRatio: number,
+): void {
+  const stopsOpacity = clampMaxProgress(frame.stopsOpacity);
+  const clipRatio = clampMaxProgress(emitterRatio);
+  host.style.setProperty('--composer-effort-stops-opacity', stopsOpacity.toFixed(3));
+  host.dataset.maxPhase = frame.phase;
+  host.dataset.maxProgress = frame.progress.toFixed(3);
+  host.dataset.maxStopsOpacity = stopsOpacity.toFixed(3);
+  host.dataset.maxEmitterRatio = clipRatio.toFixed(3);
+  host.dataset.maxFieldEnergy = clampMaxProgress(frame.energy).toFixed(3);
+  host.dataset.maxClipRatio = clipRatio.toFixed(3);
+}
+
 export const EffortMaxField: React.FC<{
-  phase: MaxVisualPhase;
-  progress: number;
+  timeline: MaxVisualTimeline;
   thumbRatio: number;
-}> = ({ phase, progress, thumbRatio }) => {
+  onTimelineComplete: (revision: number) => void;
+}> = ({ timeline, thumbRatio, onTimelineComplete }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layerRef = useRef<HTMLSpanElement>(null);
-  const phaseRef = useRef(phase);
-  const progressRef = useRef(progress);
+  const timelineRef = useRef(timeline);
   const thumbRef = useRef(thumbRatio);
-  const paintRef = useRef<(timeMs: number, phase?: MaxVisualPhase, progress?: number) => void>(() => undefined);
-  const fieldActive = phase !== 'idle';
+  const completeRef = useRef(onTimelineComplete);
+  const paintRef = useRef<(timeMs: number) => MaxVisualFrame | null>(() => null);
+  const [motionRevision, setMotionRevision] = useState(0);
 
-  phaseRef.current = phase;
-  progressRef.current = progress;
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onMotionPreferenceChange = () => setMotionRevision((revision) => revision + 1);
+    media.addEventListener('change', onMotionPreferenceChange);
+    return () => media.removeEventListener('change', onMotionPreferenceChange);
+  }, []);
+
+  const fieldActive = timeline.phase !== 'idle';
+  timelineRef.current = timeline;
   thumbRef.current = thumbRatio;
+  completeRef.current = onTimelineComplete;
 
   useEffect(() => {
     if (!fieldActive) return undefined;
     const canvas = canvasRef.current;
     const layer = layerRef.current;
+    const host = layer?.closest<HTMLElement>('.composer-effort-slider');
     const ctx = canvas?.getContext('2d', { alpha: true });
-    if (!canvas || !layer || !ctx) return undefined;
+    if (!canvas || !layer || !host || !ctx) return undefined;
 
     let colors = readFieldColors(layer);
-    const reduced = prefersReducedMotion();
-    const paint = (timeMs: number, phaseOverride?: MaxVisualPhase, progressOverride?: number) => {
+    const paint = (timeMs: number) => {
+      const activeTimeline = timelineRef.current;
+      const reduced = prefersReducedMotion();
+      const frame = resolveMaxVisualFrame(activeTimeline, timeMs, reduced);
       const width = Math.max(1, Math.floor(layer.clientWidth));
       const height = Math.max(1, Math.floor(layer.clientHeight));
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -168,14 +166,21 @@ export const EffortMaxField: React.FC<{
         canvas.style.height = `${height}px`;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
-      paintField(ctx, width, height, {
-        phase: phaseOverride ?? phaseRef.current,
-        progress: progressOverride ?? progressRef.current,
-        thumbRatio: thumbRef.current,
-        timeMs,
+      const emitterRatio = clampMaxProgress(thumbRef.current);
+      const fieldTimeMs = reduced ? 0 : Math.max(0, timeMs - activeTimeline.fieldEpoch);
+      paintField(
+        ctx,
+        width,
+        height,
+        frame,
         colors,
-        reduced,
-      });
+        fieldTimeMs,
+        emitterRatio,
+        activeTimeline.formationEnergy,
+        activeTimeline.fieldMode,
+      );
+      syncVisualHost(host, frame, emitterRatio);
+      return frame;
     };
     paintRef.current = paint;
 
@@ -194,44 +199,34 @@ export const EffortMaxField: React.FC<{
     return () => {
       resizeObserver.disconnect();
       themeObserver.disconnect();
-      paintRef.current = () => undefined;
+      host.style.setProperty('--composer-effort-stops-opacity', '1');
+      paintRef.current = () => null;
     };
   }, [fieldActive]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (fieldActive) paintRef.current(performance.now());
-  }, [fieldActive, phase, progress, thumbRatio]);
+  }, [fieldActive, thumbRatio]);
 
   useEffect(() => {
-    if (phase !== 'evolve' && phase !== 'retreat') return undefined;
-    const duration = phase === 'evolve' ? MAX_VISUAL_EVOLVE_MS : MAX_VISUAL_RETREAT_MS;
-    if (prefersReducedMotion() || document.hidden) {
-      paintRef.current(performance.now(), phase, 1);
-      return undefined;
-    }
-    let frame = 0;
-    const startedAt = performance.now();
-    const stop = () => {
-      if (!frame) return;
-      window.cancelAnimationFrame(frame);
-      frame = 0;
-    };
+    if (!fieldActive) return undefined;
+    let frameRequest = 0;
+    let completionSent = false;
     const tick = (now: number) => {
-      const next = clampMaxProgress((now - startedAt) / duration);
-      paintRef.current(now, phase, next);
-      if (next < 1 && !document.hidden) frame = window.requestAnimationFrame(tick);
-      else frame = 0;
+      const frame = paintRef.current(now);
+      if (!frame) return;
+      if (frame.complete && !completionSent) {
+        completionSent = true;
+        completeRef.current(timeline.revision);
+        return;
+      }
+      if (frame.running) frameRequest = window.requestAnimationFrame(tick);
     };
-    const onVisibilityChange = () => {
-      if (document.hidden) stop();
-    };
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    frame = window.requestAnimationFrame(tick);
+    frameRequest = window.requestAnimationFrame(tick);
     return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-      stop();
+      if (frameRequest) window.cancelAnimationFrame(frameRequest);
     };
-  }, [phase]);
+  }, [fieldActive, motionRevision, timeline.revision]);
 
   if (!fieldActive) return null;
   return (

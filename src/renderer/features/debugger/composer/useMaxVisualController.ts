@@ -1,12 +1,21 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReasoningSelection } from '@shared/types/modelCapability';
 import {
+  createActiveMaxTimeline,
+  createIdleMaxTimeline,
+  createReopenMaxTimeline,
+  createMaxTimeline,
   isMaxTierLevel,
-  MAX_VISUAL_EVOLVE_MS,
-  MAX_VISUAL_RETREAT_MS,
   type MaxVisualPhase,
+  type MaxVisualTimeline,
   prefersReducedMotion,
+  resolveMaxVisualFrame,
+  shouldStartMaxDragIngress,
 } from './maxVisual';
+
+function visualNow(): number {
+  return typeof performance === 'undefined' ? Date.now() : performance.now();
+}
 
 export function useMaxVisualController(input: {
   open: boolean;
@@ -14,73 +23,106 @@ export function useMaxVisualController(input: {
   displayLevel: ReasoningSelection;
   selectedLevel: ReasoningSelection;
 }) {
-  const [maxPhase, setMaxPhase] = useState<MaxVisualPhase>('idle');
-  const phaseRef = useRef<MaxVisualPhase>('idle');
-  const timerRef = useRef<number | null>(null);
-  const wasMaxWhileDraggingRef = useRef(false);
+  const initialTimeline = useRef(createIdleMaxTimeline(0, visualNow()));
+  const [maxTimeline, setMaxTimeline] = useState<MaxVisualTimeline>(initialTimeline.current);
+  const timelineRef = useRef(initialTimeline.current);
+  const revisionRef = useRef(0);
   const prevOpenRef = useRef(false);
 
-  const clearTimer = useCallback(() => {
-    if (timerRef.current === null) return;
-    window.clearTimeout(timerRef.current);
-    timerRef.current = null;
+  const commitTimeline = useCallback((timeline: MaxVisualTimeline) => {
+    timelineRef.current = timeline;
+    setMaxTimeline(timeline);
   }, []);
 
-  const commitPhase = useCallback((phase: MaxVisualPhase) => {
-    phaseRef.current = phase;
-    setMaxPhase(phase);
+  const nextRevision = useCallback(() => {
+    revisionRef.current += 1;
+    return revisionRef.current;
   }, []);
 
   const resetState = useCallback(() => {
-    clearTimer();
-    wasMaxWhileDraggingRef.current = false;
-    commitPhase('idle');
-  }, [clearTimer, commitPhase]);
+    commitTimeline(createIdleMaxTimeline(nextRevision(), visualNow()));
+  }, [commitTimeline, nextRevision]);
 
-  const startEvolve = useCallback(() => {
-    clearTimer();
-    if (prefersReducedMotion() || document.hidden) {
-      commitPhase('settled');
-      return;
-    }
-    commitPhase('evolve');
-    timerRef.current = window.setTimeout(() => {
-      timerRef.current = null;
-      commitPhase('settled');
-    }, MAX_VISUAL_EVOLVE_MS);
-  }, [clearTimer, commitPhase]);
+  const currentFrame = useCallback((now: number) => (
+    resolveMaxVisualFrame(timelineRef.current, now, prefersReducedMotion())
+  ), []);
 
-  const startRetreat = useCallback(() => {
-    if (phaseRef.current === 'idle' || phaseRef.current === 'retreat') return;
-    clearTimer();
-    if (prefersReducedMotion() || document.hidden) {
+  const startIngress = useCallback((phase: Extract<MaxVisualPhase,
+    'ingress-drag' | 'ingress-committed' | 'ingress-reopen'>) => {
+    const now = visualNow();
+    if (document.hidden) {
       resetState();
       return;
     }
-    commitPhase('retreat');
-    timerRef.current = window.setTimeout(() => {
-      timerRef.current = null;
-      commitPhase('idle');
-    }, MAX_VISUAL_RETREAT_MS);
-  }, [clearTimer, commitPhase, resetState]);
+    const current = timelineRef.current;
+    const fieldEpoch = phase === 'ingress-reopen' || current.phase === 'idle'
+      ? now
+      : current.fieldEpoch;
+    if (prefersReducedMotion() && phase !== 'ingress-drag') {
+      commitTimeline(createActiveMaxTimeline(nextRevision(), now, fieldEpoch));
+      return;
+    }
+    if (phase === 'ingress-reopen') {
+      commitTimeline(createReopenMaxTimeline(nextRevision(), now));
+      return;
+    }
+    const frame = currentFrame(now);
+    commitTimeline(createMaxTimeline({
+      phase,
+      revision: nextRevision(),
+      now,
+      fromEnergy: frame.energy,
+      formationEnergy: current.phase === 'egress' ? current.formationEnergy : frame.energy,
+      fieldMode: current.phase === 'egress' ? 'dissolve' : 'propagate',
+      fromStopsOpacity: frame.stopsOpacity,
+      fieldEpoch,
+    }));
+  }, [commitTimeline, currentFrame, nextRevision, resetState]);
 
-  const enterPreview = useCallback(() => {
-    clearTimer();
-    commitPhase('preview');
-  }, [clearTimer, commitPhase]);
+  const startEgress = useCallback(() => {
+    const now = visualNow();
+    const current = timelineRef.current;
+    const frame = currentFrame(now);
+    if (frame.energy <= 0 || prefersReducedMotion()) {
+      resetState();
+      return;
+    }
+    commitTimeline(createMaxTimeline({
+      phase: 'egress',
+      revision: nextRevision(),
+      now,
+      fromEnergy: frame.energy,
+      formationEnergy: current.phase === 'egress' ? current.formationEnergy : frame.energy,
+      fieldMode: 'dissolve',
+      fromStopsOpacity: frame.stopsOpacity,
+      fieldEpoch: current.fieldEpoch,
+    }));
+  }, [commitTimeline, currentFrame, nextRevision, resetState]);
+
+  const completeTimeline = useCallback((revision: number) => {
+    const current = timelineRef.current;
+    if (current.revision !== revision) return;
+    const now = visualNow();
+    if (current.phase === 'ingress-committed' || current.phase === 'ingress-reopen') {
+      commitTimeline(createActiveMaxTimeline(nextRevision(), now, current.fieldEpoch));
+    } else if (current.phase === 'egress') {
+      commitTimeline(createIdleMaxTimeline(nextRevision(), now));
+    }
+  }, [commitTimeline, nextRevision]);
 
   useEffect(() => {
     const onVisibilityChange = () => {
-      if (document.hidden) resetState();
+      if (document.hidden) {
+        resetState();
+      } else if (input.open && isMaxTierLevel(input.selectedLevel)) {
+        startIngress('ingress-reopen');
+      }
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', onVisibilityChange);
-      clearTimer();
-    };
-  }, [clearTimer, resetState]);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, [input.open, input.selectedLevel, resetState, startIngress]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const justOpened = input.open && !prevOpenRef.current;
     const justClosed = !input.open && prevOpenRef.current;
     prevOpenRef.current = input.open;
@@ -89,37 +131,40 @@ export function useMaxVisualController(input: {
       return;
     }
     if (!justOpened) return;
-    if (isMaxTierLevel(input.selectedLevel)) startEvolve();
+    if (isMaxTierLevel(input.selectedLevel)) startIngress('ingress-reopen');
     else resetState();
-  }, [input.open, input.selectedLevel, resetState, startEvolve]);
+  }, [input.open, input.selectedLevel, resetState, startIngress]);
 
   const isMaxTier = isMaxTierLevel(input.displayLevel);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!input.open || !input.isDragging) return;
+    const currentPhase = timelineRef.current.phase;
     if (isMaxTier) {
-      wasMaxWhileDraggingRef.current = true;
-      if (phaseRef.current !== 'preview') enterPreview();
+      // Ordinary-tier entry starts fully visible; a return from egress freezes the
+      // current stop opacity. Merely pressing an already-active Max must not reveal stops.
+      if (shouldStartMaxDragIngress(currentPhase)) {
+        startIngress('ingress-drag');
+      }
       return;
     }
-    const shouldRetreat = wasMaxWhileDraggingRef.current
-      || ['preview', 'settled', 'evolve'].includes(phaseRef.current);
-    wasMaxWhileDraggingRef.current = false;
-    if (shouldRetreat) startRetreat();
-  }, [enterPreview, input.isDragging, input.open, isMaxTier, startRetreat]);
+    if (currentPhase !== 'idle' && currentPhase !== 'egress') startEgress();
+  }, [input.isDragging, input.open, isMaxTier, startEgress, startIngress]);
 
   const applyCommittedLevelVisual = useCallback((level: ReasoningSelection) => {
-    wasMaxWhileDraggingRef.current = false;
-    if (isMaxTierLevel(level)) startEvolve();
-    else startRetreat();
-  }, [startEvolve, startRetreat]);
+    if (isMaxTierLevel(level)) {
+      startIngress('ingress-committed');
+      return;
+    }
+    const phase = timelineRef.current.phase;
+    if (phase !== 'idle' && phase !== 'egress') startEgress();
+  }, [startEgress, startIngress]);
 
   return {
-    maxPhase,
-    maxProgress: maxPhase === 'settled' ? 1 : 0,
-    stopsOpacity: maxPhase === 'evolve' || maxPhase === 'settled' || maxPhase === 'preview' ? 0 : 1,
-    showMaxTrack: maxPhase !== 'idle',
+    maxTimeline,
+    showMaxTrack: maxTimeline.phase !== 'idle',
     isMaxTier,
     resetMaxVisual: resetState,
     applyCommittedLevelVisual,
+    completeMaxTimeline: completeTimeline,
   };
 }
