@@ -41,9 +41,9 @@ export type ProviderSurfaceSummary = Omit<ProviderSurfaceManifest,
   | 'profileId'
   | 'adapterIds'
   | 'authSchemaId'
-  | 'discoveryPolicyId'
   | 'defaultFactSourceId'
   | 'discovery'
+  | 'discoveryPolicyId'
   | 'factConflicts'
   | 'discoveredModelProjection'
   | 'models'
@@ -113,6 +113,14 @@ function bindingSpecificity(binding: ExecutionBinding): number {
   return Number(binding.when.fast !== undefined)
     + Number(binding.when.context1m !== undefined)
     + Number(Boolean(binding.when.reasoning));
+}
+
+function bindingDimensions(binding: ExecutionBinding): string {
+  return [
+    binding.when.fast !== undefined ? 'fast' : '',
+    binding.when.context1m !== undefined ? 'context1m' : '',
+    binding.when.reasoning ? 'reasoning' : '',
+  ].filter(Boolean).join('|');
 }
 
 function bindingsCanOverlap(left: ExecutionBinding, right: ExecutionBinding): boolean {
@@ -206,7 +214,8 @@ function validateBindingTargets(
     for (let rightIndex = leftIndex + 1; rightIndex < bindings.length; rightIndex += 1) {
       const left = bindings[leftIndex];
       const right = bindings[rightIndex];
-      if (bindingSpecificity(left) !== bindingSpecificity(right)
+      if (bindingDimensions(left) !== bindingDimensions(right)
+        || bindingSpecificity(left) !== bindingSpecificity(right)
         || !bindingsCanOverlap(left, right)
         || stableJson(left.actions) === stableJson(right.actions)) continue;
       errors.push(`${surface.id}/${model.modelId} has conflicting equal-specificity bindings ${left.id} and ${right.id}`);
@@ -250,6 +259,31 @@ function validateModel(
       errors.push(`${surface.id}/${model.modelId} Max mode control references a missing context tier`);
     } else if (!isMaxContextTier(contextTier)) {
       errors.push(`${surface.id}/${model.modelId} Max mode control references a sub-one-million context tier`);
+    }
+  }
+  const liveContext = model.liveProjection?.context;
+  if (liveContext) {
+    if (!tierIds.has(liveContext.defaultTierId)) {
+      errors.push(`${surface.id}/${model.modelId} live context projection references a missing default tier`);
+    }
+    if (liveContext.maxTierId) {
+      const maxTier = model.contextTiers.find((tier) => tier.id === liveContext.maxTierId);
+      if (!maxTier || !isMaxContextTier(maxTier)) {
+        errors.push(`${surface.id}/${model.modelId} live context projection references an invalid Max tier`);
+      }
+      const maxBindings = (model.executionBindings ?? []).filter((binding) => (
+        binding.when.context1m === true
+        && binding.actions.some((action) => action.kind === 'client-tier' && action.tierId === liveContext.maxTierId)
+      ));
+      if (maxBindings.length !== 1) {
+        errors.push(`${surface.id}/${model.modelId} live Max projection requires one executable binding`);
+      }
+    }
+  }
+  const modelRouteProtocols = modelProtocols(model);
+  for (const protocol of Object.keys(model.liveProjection?.reasoning?.wireProfiles ?? {})) {
+    if (!modelRouteProtocols.has(protocol)) {
+      errors.push(`${surface.id}/${model.modelId} live reasoning projection targets an unavailable protocol ${protocol}`);
     }
   }
   validatePublicPatch(model.route.headers, `${surface.id}/${model.modelId}.route.headers`, errors);

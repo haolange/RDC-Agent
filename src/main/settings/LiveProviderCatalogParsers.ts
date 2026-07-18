@@ -1,12 +1,13 @@
 import type { CatalogModelContribution } from './EffectiveCatalogService';
-import type { CapabilityState } from '@shared/types/providerCapability';
+import type { CapabilityState, ProviderSurfaceDefinition } from '@shared/types/providerCapability';
 import type {
   NamedReasoningLevel,
   OpenAiWireEffort,
   ReasoningControl,
 } from '@shared/types/modelCapability';
-import type { LlmProviderModel } from '@shared/types/settings';
+import type { LlmProviderModel, LlmProviderProtocol } from '@shared/types/settings';
 import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
+import { projectLiveModelObservations, type LiveModelObservation } from './LiveProviderCatalogProjection';
 
 export interface GrokBuilderCatalogDiagnostic {
   envelopeKind: 'root-array' | 'models-array' | 'models-map' | 'data-array' | 'items-array' | 'unknown';
@@ -57,6 +58,12 @@ function capabilityState(value: unknown): CapabilityState {
   if (value === true) return { state: 'supported' };
   if (value === false) return { state: 'unsupported' };
   return { state: 'unknown' };
+}
+
+function explicitCapabilityState(value: unknown): CapabilityState | undefined {
+  if (value === true) return { state: 'supported' };
+  if (value === false) return { state: 'unsupported' };
+  return undefined;
 }
 
 function modelId(value: Record<string, unknown>): string | undefined {
@@ -198,6 +205,90 @@ export function parseOpenAiReasoningControl(
   };
 }
 
+
+function strictCatalogRecords(payload: unknown, surfaceLabel: string): Record<string, unknown>[] {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    throw new Error(`${surfaceLabel} catalog must be an object envelope.`);
+  }
+  const root = payload as Record<string, unknown>;
+  const values = Array.isArray(root.data) ? root.data : Array.isArray(root.models) ? root.models : null;
+  if (!values) throw new Error(`${surfaceLabel} catalog is missing a data or models array.`);
+  return values.map((value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      throw new Error(`${surfaceLabel} catalog contains a non-object entry.`);
+    }
+    const entry = value as Record<string, unknown>;
+    if (!text(entry.id)) throw new Error(`${surfaceLabel} catalog contains an entry without an id.`);
+    return entry;
+  });
+}
+
+function explicitProtocol(value: Record<string, unknown>): LlmProviderProtocol | undefined {
+  const protocol = text(value.protocol)?.toLowerCase();
+  const endpoint = text(value.endpoint)?.toLowerCase();
+  const api = text(value.api)?.toLowerCase();
+  const sdk = text(value.npm)?.toLowerCase();
+  const backend = text(value.api_backend)?.toLowerCase();
+  const joined = [protocol, endpoint, api, sdk, backend].filter(Boolean).join(' ');
+  if (joined.includes('anthropic') || joined.includes('/messages')) return 'AnthropicMessages';
+  if (joined.includes('responses') || joined.includes('/responses')) return 'OpenAIResponses';
+  if (joined.includes('openai') || joined.includes('chat/completions')) return 'OpenAICompatibleChatCompletions';
+  return undefined;
+}
+
+function observedReasoning(value: Record<string, unknown>): LiveModelObservation['reasoning'] | undefined {
+  const supported = value.supports_reasoning === true || value.supports_reasoning_effort === true
+    ? true
+    : value.supports_reasoning === false || value.supports_reasoning_effort === false ? false : undefined;
+  const efforts = record(value.think_efforts);
+  const levels = reasoningLevels(efforts.valid_efforts ?? value.think_efforts ?? value.reasoning_efforts);
+  const rawDefault = text(efforts.default_effort ?? value.default_effort ?? value.reasoning_effort)?.toLowerCase();
+  const defaultEffort = rawDefault ? REASONING_LEVEL_MAP[rawDefault] : undefined;
+  const rawThinkingType = text(value.supports_thinking_type)?.toLowerCase();
+  const thinkingType = rawThinkingType === 'only' || rawThinkingType === 'optional' || rawThinkingType === 'both'
+    ? rawThinkingType
+    : undefined;
+  if (supported === undefined && levels.length === 0 && !thinkingType) return undefined;
+  return {
+    ...(supported !== undefined ? { supported } : {}),
+    ...(levels.length ? { efforts: levels } : {}),
+    ...(defaultEffort ? { defaultEffort } : {}),
+    ...(thinkingType ? { thinkingType } : {}),
+  };
+}
+
+function observationFromCatalogRow(value: Record<string, unknown>): LiveModelObservation | null {
+  const identity = liveIdentity(value);
+  if (!identity) return null;
+  const toolCalling = explicitCapabilityState(value.supports_tool_call ?? value.supports_tools ?? value.tool_call);
+  const visionInput = explicitCapabilityState(value.supports_image ?? value.supports_vision ?? value.image);
+  const structuredOutput = explicitCapabilityState(value.supports_structured_output ?? value.structured_output);
+  return {
+    modelId: identity.id,
+    ...(identity.aliases.length ? { aliases: identity.aliases } : {}),
+    upstreamLabel: text(value.display_name) ?? text(value.label) ?? text(value.name),
+    availability: 'available',
+    protocol: explicitProtocol(value),
+    contextWindowTokens: contextTokens(value),
+    reasoning: observedReasoning(value),
+    ...(toolCalling ? { toolCalling } : {}),
+    ...(visionInput ? { visionInput } : {}),
+    ...(structuredOutput ? { structuredOutput } : {}),
+  };
+}
+
+/** Parse only credential-scoped observations; compiled manifests own product identity and controls. */
+export function parseKimiCodeCatalog(
+  payload: unknown,
+  surface: ProviderSurfaceDefinition,
+): ParsedLiveCatalog {
+  const observations = strictCatalogRecords(payload, surface.label)
+    .flatMap((value) => {
+      const observation = observationFromCatalogRow(value);
+      return observation ? [observation] : [];
+    });
+  return asResult(projectLiveModelObservations(surface, observations));
+}
 /** Parse the account-specific Codex manifest; web-only Instant/Thinking/Pro variants are excluded. */
 export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog {
   const root = record(payload);
@@ -272,39 +363,18 @@ export function parseClaudeAccountCatalog(payload: unknown): ParsedLiveCatalog {
   }));
 }
 
-function opencodeProtocol(value: Record<string, unknown>): 'AnthropicMessages' | 'OpenAIResponses' | 'OpenAICompatibleChatCompletions' {
-  const endpoint = text(value.endpoint)?.toLowerCase() ?? '';
-  const api = (text(value.api) ?? text(value.protocol) ?? '').toLowerCase();
-  const sdk = text(value.npm)?.toLowerCase() ?? '';
-  if (endpoint.includes('/messages') || api.includes('anthropic') || sdk.includes('anthropic')) return 'AnthropicMessages';
-  if (endpoint.includes('/responses') || api.includes('responses')) return 'OpenAIResponses';
-  return 'OpenAICompatibleChatCompletions';
+/** Parse OpenCode Go observations; the compiled surface owns exact model contracts. */
+export function parseOpenCodeGoCatalog(
+  payload: unknown,
+  surface: ProviderSurfaceDefinition,
+): ParsedLiveCatalog {
+  const observations = strictCatalogRecords(payload, surface.label)
+    .flatMap((value) => {
+      const observation = observationFromCatalogRow(value);
+      return observation ? [observation] : [];
+    });
+  return asResult(projectLiveModelObservations(surface, observations));
 }
-
-/** Parse OpenCode Go's account catalog without collapsing its per-model API surface. */
-export function parseOpenCodeGoCatalog(payload: unknown): ParsedLiveCatalog {
-  const contributions = records(payload).flatMap((value): CatalogModelContribution[] => {
-    const identity = liveIdentity(value);
-    if (!identity) return [];
-    const protocol = opencodeProtocol(value);
-    return [{
-      modelId: identity.id,
-      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
-      label: text(value.label) ?? text(value.name) ?? identity.id,
-      availability: 'available',
-      route: { protocol, baseUrl: 'https://opencode.ai/zen/go/v1', source: 'model' },
-      contextTiers: [{
-        id: 'default',
-        label: 'Default',
-        maxPromptTokens: contextTokens(value),
-        activation: { kind: 'implicit' },
-        entitlement: 'granted',
-      }],
-    }];
-  });
-  return asResult(contributions);
-}
-
 function hasClinePass(value: Record<string, unknown>): boolean {
   const entitlement = text(value.entitlement)?.toLowerCase();
   const groups = Array.isArray(value.groups) ? value.groups.map((entry) => text(entry)?.toLowerCase()) : [];
@@ -405,8 +475,12 @@ export function parseFreeModelCatalog(openAiPayload: unknown, claudePayload: unk
 }
 
 /** Parse the models visible to the API key minted by OpenRouter PKCE. */
-export function parseOpenRouterAccountCatalog(payload: unknown): ParsedLiveCatalog {
-  return asResult(records(payload).flatMap((value): CatalogModelContribution[] => {
+/** Parse account-visible OpenRouter observations without attaching model-specific product controls. */
+export function parseOpenRouterAccountCatalog(
+  payload: unknown,
+  surface: ProviderSurfaceDefinition,
+): ParsedLiveCatalog {
+  const observations = strictCatalogRecords(payload, surface.label).flatMap((value): LiveModelObservation[] => {
     const identity = liveIdentity(value);
     if (!identity) return [];
     const supportedParameters = Array.isArray(value.supported_parameters)
@@ -417,25 +491,12 @@ export function parseOpenRouterAccountCatalog(payload: unknown): ParsedLiveCatal
         .map((entry) => text(entry)?.toLowerCase())
         .filter(Boolean)
       : [];
-    const contextWindow = contextTokens(value);
     return [{
       modelId: identity.id,
-      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
-      label: text(value.name) ?? identity.id,
+      ...(identity.aliases.length ? { aliases: identity.aliases } : {}),
+      upstreamLabel: text(value.name),
       availability: 'available',
-      route: {
-        protocol: 'OpenRouterChatCompletions',
-        baseUrl: 'https://openrouter.ai/api/v1',
-        source: 'catalog',
-      },
-      contextTiers: [{
-        id: 'default',
-        label: 'OpenRouter catalog limit',
-        ...(contextWindow ? { maxPromptTokens: contextWindow } : {}),
-        activation: { kind: 'implicit' },
-        entitlement: 'granted',
-      }],
-      ...(contextWindow ? { defaultBudgetTokens: contextWindow } : {}),
+      contextWindowTokens: contextTokens(value),
       toolCalling: supportedParameters.includes('tools') ? { state: 'supported' } : { state: 'unknown' },
       visionInput: inputModalities.length === 0
         ? { state: 'unknown' }
@@ -445,9 +506,9 @@ export function parseOpenRouterAccountCatalog(payload: unknown): ParsedLiveCatal
         ? { state: 'supported' }
         : { state: 'unknown' },
     }];
-  }));
+  });
+  return asResult(projectLiveModelObservations(surface, observations));
 }
-
 /** Grok account discovery contributes availability and context facts; the OAuth proxy route remains manifest-owned. */
 export function parseGrokAccountCatalog(payload: unknown): ParsedLiveCatalog {
   const contributions = records(payload).flatMap((value): CatalogModelContribution[] => {
@@ -471,8 +532,11 @@ export function parseGrokAccountCatalog(payload: unknown): ParsedLiveCatalog {
   return asResult(contributions);
 }
 
-/** Parse the Grok Build subscription catalog returned by cli-chat-proxy. */
-export function parseGrokBuilderCatalog(payload: unknown): ParsedLiveCatalog {
+/** Parse Builder observations; the compiled Grok surface owns identity, route, controls, and bindings. */
+export function parseGrokBuilderCatalog(
+  payload: unknown,
+  surface: ProviderSurfaceDefinition,
+): ParsedLiveCatalog {
   const root = record(payload);
   const envelope = (() => {
     if (Array.isArray(payload)) {
@@ -481,24 +545,35 @@ export function parseGrokBuilderCatalog(payload: unknown): ParsedLiveCatalog {
     for (const key of ['models', 'data', 'items'] as const) {
       const value = root[key];
       if (Array.isArray(value)) {
-        return { kind: `${key}-array` as 'models-array' | 'data-array' | 'items-array', candidates: value };
+        return {
+          kind: (key + '-array') as 'models-array' | 'data-array' | 'items-array',
+          candidates: value,
+        };
       }
       if (key === 'models') {
         const modelMap = record(value);
         if (Object.keys(modelMap).length > 0) {
-          return { kind: 'models-map' as const, candidates: Object.values(modelMap) };
+          const candidates = Object.entries(modelMap).map(([id, candidate]) => {
+            const wrapper = record(candidate);
+            const info = record(wrapper.info);
+            if (text(info.id) || text(wrapper.id)) return candidate;
+            return Object.keys(info).length > 0
+              ? { ...wrapper, info: { ...info, id } }
+              : { ...wrapper, id };
+          });
+          return { kind: 'models-map' as const, candidates };
         }
       }
     }
     return { kind: 'unknown' as const, candidates: [] };
   })();
   const filtered = { invalidIdentity: 0, hidden: 0, unsupportedInApi: 0 };
-  const contributions = envelope.candidates.flatMap((candidate): CatalogModelContribution[] => {
+  const observations = envelope.candidates.flatMap((candidate): LiveModelObservation[] => {
     const wrapper = record(candidate);
     const info = record(wrapper.info);
     const value = Object.keys(info).length > 0 ? info : wrapper;
-    const identity = liveIdentity(value);
-    if (!identity) {
+    const observation = observationFromCatalogRow(value);
+    if (!observation) {
       filtered.invalidIdentity += 1;
       return [];
     }
@@ -510,40 +585,9 @@ export function parseGrokBuilderCatalog(payload: unknown): ParsedLiveCatalog {
       filtered.unsupportedInApi += 1;
       return [];
     }
-    const contextWindow = contextTokens(value);
-    const supportsReasoning = value.supports_reasoning_effort === true;
-    return [{
-      modelId: identity.id,
-      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
-      label: identity.id === 'grok-composer-2.5-fast'
-        ? 'Composer 2.5'
-        : text(value.name) ?? text(value.label) ?? identity.id,
-      availability: 'available',
-      selection: { pickerVisibility: 'primary' },
-      route: {
-        protocol: text(value.api_backend)?.toLowerCase() === 'responses'
-          ? 'OpenAIResponses'
-          : 'OpenAICompatibleChatCompletions',
-        baseUrl: 'https://cli-chat-proxy.grok.com/v1',
-        source: 'model',
-      },
-      contextTiers: [{
-        id: 'default', label: 'Grok Build limit', ...(contextWindow ? { maxPromptTokens: contextWindow } : {}),
-        activation: { kind: 'implicit' }, entitlement: 'granted',
-      }],
-      ...(contextWindow ? { defaultBudgetTokens: contextWindow } : {}),
-      controls: {
-        fast: { state: 'unsupported', fixedValue: false },
-        context1m: { state: 'unsupported', fixedValue: false },
-        reasoning: supportsReasoning
-          ? parseOpenAiReasoningControl(value.reasoning_efforts, value.reasoning_effort)
-          : parseOpenAiReasoningControl([], undefined),
-      },
-      toolCalling: { state: 'supported' },
-      visionInput: { state: 'unknown' },
-      structuredOutput: { state: 'unknown' },
-    }];
+    return [observation];
   });
+  const contributions = projectLiveModelObservations(surface, observations);
   return {
     ...asResult(contributions),
     diagnostic: {

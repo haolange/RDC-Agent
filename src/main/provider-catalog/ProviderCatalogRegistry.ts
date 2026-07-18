@@ -154,7 +154,6 @@ export function getProviderDiscoveryAuthority(
 ): ProviderSurfaceSummary['discoveryAuthority'] | undefined {
   return summaryById(id)?.discoveryAuthority;
 }
-
 export function getProviderAuthModeAvailability(
   id: string,
 ): Partial<Record<LlmProviderAuthMode, LlmProviderAvailability>> {
@@ -183,10 +182,10 @@ export function getProviderModelSummaries(id: string): LlmProviderModel[] {
     .map(toProviderModel) ?? [];
 }
 
-export function getProviderCatalogModelIds(id: string): string[] {
-  const summary = summaryById(id);
-  return summary?.models.flatMap((model) => [model.modelId, ...model.aliases]) ?? [];
+export function getProviderCatalogModelSummaries(id: string): ProviderSurfaceSummary['models'] {
+  return cloneJson(summaryById(id)?.models ?? []);
 }
+
 
 export function getProviderModelDefinitions(id: string): ModelManifest[] {
   return cloneJson(loadedSurfaces.get(id)?.models ?? []);
@@ -212,7 +211,8 @@ export function createProviderEntryFromCatalog(id: string): LlmProviderEntry {
   const route = surface ? defaultRoute(surface) : undefined;
   if (!surface || !route) throw new Error(`Unknown builtin provider: ${id}`);
   const models = surface.catalogOwnership !== 'user-managed'
-    ? surface.models.filter((model) => model.selection.pickerVisibility !== 'internal').map(toProviderModel)
+    ? surface.models.filter((model) => model.selection.pickerVisibility !== 'internal'
+      && (model.presencePolicy !== 'account-entitled' || model.availability === 'available')).map(toProviderModel)
     : [];
   const authMode = mapAuthMode(surface.authModes[0]);
   const authModeAvailability = getProviderAuthModeAvailability(id);

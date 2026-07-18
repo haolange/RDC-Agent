@@ -62,6 +62,13 @@ export function projectProviderModels(
     .flatMap((model) => [model.modelId, ...model.aliases]));
   const projected = snapshot.models
     .filter((effectiveModel) => effectiveModel.selection?.pickerVisibility !== 'internal')
+    .filter((effectiveModel) => {
+      if (effectiveModel.presencePolicy !== 'account-entitled' || effectiveModel.availability === 'available') {
+        return true;
+      }
+      return storedById.has(effectiveModel.modelId)
+        || effectiveModel.aliases.some((alias) => storedById.has(alias));
+    })
     .map((effectiveModel) => {
     const stored = storedById.get(effectiveModel.modelId)
       ?? effectiveModel.aliases.map((alias) => storedById.get(alias)).find(Boolean);

@@ -63,8 +63,31 @@ describe('projectProviderModels', () => {
     }]);
   });
 
+  it('hides an unreturned account-entitled model until live discovery or persisted diagnosis', () => {
+    const base = effectiveModel('kimi-for-coding', 'Kimi for Coding');
+    const k3 = {
+      ...effectiveModel('k3', 'Kimi K3'),
+      availability: 'unknown' as const,
+      presencePolicy: 'account-entitled' as const,
+    };
+
+    expect(projectProviderModels(
+      'app-managed',
+      [{ id: 'kimi-for-coding', label: 'Kimi for Coding', enabled: true }],
+      snapshot([base, k3]),
+    ).map(({ model }) => model.id)).toEqual(['kimi-for-coding']);
+
+    expect(projectProviderModels(
+      'app-managed',
+      [
+        { id: 'kimi-for-coding', label: 'Kimi for Coding', enabled: true },
+        { id: 'k3', label: 'Kimi K3', enabled: false },
+      ],
+      snapshot([base, k3]),
+    ).map(({ model }) => model.id)).toEqual(['kimi-for-coding', 'k3']);
+  });
   it('hides exact internal variants from the picker and removes stale persisted variant rows', () => {
-    const primary = effectiveModel('kimi-for-coding', 'kimi-for-coding');
+    const primary = effectiveModel('kimi-for-coding', 'Kimi for Coding');
     const variant = {
       ...effectiveModel('kimi-for-coding-highspeed', 'kimi-for-coding-highspeed'),
       selection: { pickerVisibility: 'internal' as const, relatedPrimaryModelIds: ['kimi-for-coding'] },

@@ -90,7 +90,9 @@ Discovery authority 为 `authoritative-list`、`candidate-validation`、`additiv
 - `discovered`：完整 authoritative list 的缺席可以判定不可用；
 - `account-entitled`：由账号完整列表决定访问权。
 
-Catalog ownership 只用于审计，不能决定 discovery 缺席语义。Kimi Coding Plan 只有 `kimi-for-coding` 一个 primary model；`kimi-for-coding-highspeed` 是不可选择的 Fast execution target。两者均为 `maintained`，Discovery 为 `candidate-validation`，只验证 compiled catalog 已声明的 model，不接纳额外版本行；仅返回 base 时仍保留 internal target，只有显式 denial 才能阻止 Fast。
+Catalog ownership 只用于审计，不能决定 discovery 缺席语义。Kimi Coding Plan 使用稳定产品身份：`kimi-for-coding` 是基础 primary，精确 `k3` 仅在当前 credential-scoped authoritative catalog 返回时成为第二个 primary，`kimi-for-coding-highspeed` 始终是不可选择的 internal Fast target。三者均为 `account-entitled`；缺席会 tombstone，已引用 route 保持 fail-closed。后台 K2.x/K3 版本名只可进入 provenance/脱敏诊断，禁止生成 selector、alias、持久化 route 或跨 surface 映射。
+Credential-scoped live discovery follows one path: `parser -> LiveModelObservation -> manifest.liveProjection -> CatalogModelContribution -> Effective Catalog`. Parsers report only explicit upstream identity, availability, context, protocol, reasoning metadata, and capability evidence. Product labels, selection, routes, tiers, controls, bindings, and Fast targets remain compiled-manifest facts. `liveProjection` declares allowed fields and authority; it is never exposed through IPC or Settings persistence.
+Missing protocol, context, or reasoning efforts remain manifest-owned or unknown; projection never guesses OpenAI-compatible, 256K, or High. Only an `account-effective` observation at or above 1M can grant selectable Max mode. A `model-catalog` capacity without entitlement stays unverified.
 
 Discovery、overlay、entitlement、observed evidence 和 user preference 按字段合并。冲突记录 provenance，不静默覆盖。Unknown model fallback 不创造窗口、Fast、Max mode 或 reasoning 事实。Max mode 的目标 tier 在每次 live overlay 合并后都必须保持完整窗口至少一百万 tokens；否则只阻断 Max mode，默认模型继续可用。 Account discovery 只有在当前认证表面同时证明 endpoint 与协议可执行时才可贡献 route；Super Grok 的 direct xAI `/models` 仅提供 availability/context 事实，执行 route 继续由 `cli-chat-proxy.grok.com` OAuth manifest/Builder catalog 掌管。该 proxy 所需的非秘密客户端协议版本同样属于 route manifest；不得依赖运行机器恰好安装 Grok CLI，也不得在 adapter 中按 hostname 猜测或伪造。
 
@@ -118,7 +120,7 @@ Preflight 失败或取消不得留下 Session、Turn、branch、attachment、jou
 
 - ChatGPT OAuth：GPT-5.4/5.5/5.6 的 Fast 按该 surface 精确 binding；GPT-5.4 mini 与 Spark 均无 Fast。5.6 支持 Low/Medium/High/Extra/Max。
 - Copilot：结构能力由 manifest/user-observed fact 保留，账号 `/models` policy 与 entitlement 只收窄访问。Gemini 3.1 Pro 默认 200K 并可选 Max mode；Gemini 3.5 Flash 只有固定 1M Max mode，不存在 200K 普通模式。标记原生 1M 的 Claude 显示固定 Max mode；Opus Fast 仅使用精确 internal binding。
-- Kimi Coding Plan：只投影 `kimi-for-coding`；highspeed 仅作为内部 Fast target，partial discovery 不得把它提升为可选 model，也不得引入其他版本。
+- Kimi Coding Plan：稳定基础入口为 `kimi-for-coding`；账户目录精确返回 `k3` 时才增加 `Kimi K3`，highspeed 仅作为内部 Fast target。禁止显示或接纳 `Kimi K2.7 Code` / `kimi-k2.7-code`。K3 reasoning、Context Max mode 与 Fast 分别服从该 surface 的 live contract，不从名称或其他 Moonshot surface 推断。
 - GLM-5.2：固定 1M、High/Max、默认 High、无 Off/Fast；不同协议使用不同 wire profile。
 - DeepSeek Pro/Flash：固定 1M、Off/High/Max、默认 High。
 - Grok 4.20 non-reasoning、reasoning、multi-agent 是三个独立模型；multi-agent 为 Provider managed，不提供 reasoning toggle。Grok 4.3 是固定 1M 的 Max mode，Grok 4.5 Super Grok OAuth 不继承 direct xAI API 的 Priority Fast，Grok Build 0.1 为 256K。

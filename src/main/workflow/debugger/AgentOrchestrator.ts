@@ -115,12 +115,9 @@ import { getRdxRuntimeContext } from '../../sessions/RdxRuntimeContextRegistry';
 import { executionProfileService } from '../../settings/ExecutionProfileService';
 import { agentManifestService } from '../../settings/AgentManifestService';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
-import { providerAccountAuthService } from '../../settings/ProviderAccountAuthService';
 import { settingsService } from '../../settings/SettingsService';
-import { resolveGoogleVertexAccessToken } from '../../settings/GoogleApplicationCredentials';
-import { resolveAwsBedrockCredentials } from '../../settings/AwsBedrockCredentials';
 import { providerRuntimeCredentialService } from '../../settings/ProviderRuntimeCredentialService';
-import { loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
+import { freezeProviderRuntimeCredentials } from '../../settings/ProviderRuntimeCredentialLease';
 import {
   planEffectiveModelRequest,
   recordEffectivePlanSuccess,
@@ -502,10 +499,11 @@ export class AgentOrchestrator {
   }
 
   async refreshProviderRuntimeCredentials(providerId: LlmProviderId): Promise<string> {
-    const surface = await loadProviderSurface(providerId);
-    if (!surface) throw new Error(`Provider Catalog surface ${providerId} is unavailable.`);
-    await this.refreshAccountRuntimeCredentials(providerId);
-    return providerRuntimeCredentialService.freeze(providerId);
+    const lease = await freezeProviderRuntimeCredentials(providerId);
+    if (lease.accountCredentialsRefreshed) {
+      this.applyLlmConfig(settingsService.getLlmConfig());
+    }
+    return lease.handle;
   }
 
   releaseProviderRuntimeCredentials(credentialHandle: string | undefined): void {
@@ -2681,31 +2679,6 @@ export class AgentOrchestrator {
       timeZone: promptClock.timeZone,
       contextWindowTokens: input.contextWindowTokens,
     });
-  }
-
-  private async refreshAccountRuntimeCredentials(providerId: LlmProviderId): Promise<void> {
-    const provider = settingsService.getAll().llm.providers.find((entry) => entry.id === providerId);
-    if (provider?.id === 'google-vertex' || provider?.id === 'google-vertex-anthropic') {
-      const values = settingsService.getProviderConnectionValues(provider.id);
-      if (!values.GOOGLE_VERTEX_ACCESS_TOKEN?.trim()) {
-        await resolveGoogleVertexAccessToken(values.GOOGLE_APPLICATION_CREDENTIALS);
-      }
-      return;
-    }
-    if (provider?.id === 'amazon-bedrock') {
-      const values = settingsService.getProviderConnectionValues(provider.id);
-      if (!values.AWS_BEARER_TOKEN_BEDROCK?.trim()) {
-        await resolveAwsBedrockCredentials(values);
-      }
-      return;
-    }
-    if (provider?.authMode !== 'account') {
-      return;
-    }
-
-    await providerAccountAuthService.ensureRuntimeCredentials(providerId);
-    const llmConfig = settingsService.getLlmConfig();
-    this.applyLlmConfig(llmConfig);
   }
 
   private modeForAgent(agentId: AgentRole): AppMode {

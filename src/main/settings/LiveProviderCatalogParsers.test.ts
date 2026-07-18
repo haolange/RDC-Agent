@@ -1,22 +1,126 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
+import { ProviderSurfaceManifestSchema } from '@shared/provider-catalog/catalogManifestSchema';
 import {
   mergeParsedLiveCatalogs,
   parseChatGptAccountCatalog,
   parseClaudeAccountCatalog,
   parseClineCatalog,
   parseGrokAccountCatalog,
-  parseGrokBuilderCatalog,
-  parseOpenCodeGoCatalog,
-  parseOpenRouterAccountCatalog,
+  parseGrokBuilderCatalog as parseGrokBuilderCatalogWithSurface,
+  parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface,
+  parseOpenCodeGoCatalog as parseOpenCodeGoCatalogWithSurface,
+  parseOpenRouterAccountCatalog as parseOpenRouterAccountCatalogWithSurface,
 } from './LiveProviderCatalogParsers';
 
 function fixture(name: string): unknown {
   return JSON.parse(readFileSync(resolve(__dirname, 'fixtures/provider-catalogs', name), 'utf8')) as unknown;
 }
 
+function surface(name: string) {
+  return ProviderSurfaceManifestSchema.parse(JSON.parse(readFileSync(
+    resolve(__dirname, '../../shared/provider-catalog/manifests/surfaces', `${name}.json`),
+    'utf8',
+  )));
+}
+
+const KIMI_SURFACE = surface('kimi-coding-plan');
+const GROK_SURFACE = surface('grok-account');
+const parseGrokBuilderCatalog = (payload: unknown) => parseGrokBuilderCatalogWithSurface(payload, GROK_SURFACE);
+const OPENCODE_GO_SURFACE = surface('opencode-go');
+const OPENROUTER_SURFACE = surface('openrouter');
+const parseKimiCodeCatalog = (payload: unknown) => parseKimiCodeCatalogWithSurface(payload, KIMI_SURFACE);
+const parseOpenCodeGoCatalog = (payload: unknown) => parseOpenCodeGoCatalogWithSurface(payload, OPENCODE_GO_SURFACE);
+const parseOpenRouterAccountCatalog = (payload: unknown) => parseOpenRouterAccountCatalogWithSurface(payload, OPENROUTER_SURFACE);
+
 describe('live Provider Catalog parsers', () => {
+  it('admits only exact Kimi Coding Plan product ids and keeps labels manifest-owned', () => {
+    const parsed = parseKimiCodeCatalog({ data: [
+      {
+        id: 'kimi-for-coding', display_name: 'Kimi K2.7 Code', context_length: 256_000,
+        supports_reasoning: true, supports_thinking_type: 'only', protocol: 'anthropic',
+        supports_tool_call: true,
+      },
+      {
+        id: 'k3', display_name: 'backend-version-name', context_length: 1_000_000,
+        supports_reasoning: true, supports_thinking_type: 'only', protocol: 'openai',
+        think_efforts: { valid_efforts: ['low', 'high', 'max'], default_effort: 'max' },
+      },
+      { id: 'kimi-for-coding-highspeed', context_length: 256_000, supports_reasoning: true },
+      { id: 'kimi-k2.7-code', display_name: 'must-not-enter' },
+    ] });
+
+    expect(parsed.models.map((model) => [model.id, model.label])).toEqual([
+      ['k3', 'Kimi K3'],
+      ['kimi-for-coding', 'Kimi for Coding'],
+      ['kimi-for-coding-highspeed', 'Kimi for Coding HighSpeed'],
+    ]);
+    expect(parsed.contributions.find((model) => model.modelId === 'k3')).toMatchObject({
+      controls: {
+        fast: { state: 'unsupported', fixedValue: false },
+        context1m: { state: 'selectable', tierId: 'max' },
+        reasoning: {
+          kind: 'levels', supportsOff: false, levels: ['low', 'high', 'max'], defaultSelection: 'max',
+        },
+      },
+      executionBindings: [{
+        id: 'context:max',
+        actions: [{ kind: 'client-tier', tierId: 'max' }],
+      }],
+    });
+    expect(parsed.contributions.find((model) => model.modelId === 'kimi-for-coding')).toMatchObject({
+      controls: { fast: { state: 'selectable', entitlement: 'granted' } },
+      executionBindings: expect.arrayContaining([
+        expect.objectContaining({
+          actions: [{ kind: 'model-switch', targetModelId: 'kimi-for-coding-highspeed' }],
+        }),
+      ]),
+    });
+    expect(parsed.contributions.find((model) => model.modelId === 'kimi-for-coding-highspeed'))
+      .toMatchObject({ selection: { pickerVisibility: 'internal' } });
+  });
+
+  it('projects Kimi K3 single-effort and unknown metadata without inventing Off or Fast', () => {
+    const maxOnly = parseKimiCodeCatalog({ models: [{
+      id: 'k3', context_length: 256_000, supports_reasoning: true,
+      think_efforts: { valid_efforts: ['max'], default_effort: 'max' },
+    }] }).contributions[0];
+    expect(maxOnly).toMatchObject({
+      controls: {
+        fast: { state: 'unsupported', fixedValue: false },
+        context1m: { state: 'unsupported', fixedValue: false },
+        reasoning: { kind: 'always-on', supportsOff: false, levels: ['max'], defaultSelection: 'max' },
+      },
+    });
+
+    const unknown = parseKimiCodeCatalog({ data: [{ id: 'k3', context_length: 256_000 }] })
+      .contributions[0];
+    expect(unknown?.controls?.reasoning).toMatchObject({
+      kind: 'unknown', supportsOff: false, defaultState: 'provider-managed',
+    });
+    expect(() => parseKimiCodeCatalog({ unexpected: [] })).toThrow(/missing a data or models array/u);
+  });
+  it('keeps structural context and unknown protocol observations fail-closed', () => {
+    const modelCatalogSurface = structuredClone(KIMI_SURFACE);
+    const k3 = modelCatalogSurface.models.find((model) => model.modelId === 'k3');
+    if (!k3?.liveProjection?.context) throw new Error('Missing K3 live context policy fixture.');
+    k3.liveProjection.context.authority = 'model-catalog';
+
+    const contribution = parseKimiCodeCatalogWithSurface({ data: [{
+      id: 'k3',
+      protocol: 'unrecognized-wire',
+      context_length: 1_000_000,
+      supports_reasoning: true,
+    }] }, modelCatalogSurface).contributions[0];
+
+    expect(contribution.route).toEqual(k3.route);
+    expect(contribution.controls?.context1m).toMatchObject({
+      state: 'unknown',
+      defaultValue: false,
+    });
+    expect(contribution.controls?.reasoning).toMatchObject({ kind: 'unknown', supportsOff: false });
+  });
   it('preserves OpenCode Go per-model protocols', () => {
     const parsed = parseOpenCodeGoCatalog(fixture('opencode-go.json'));
     expect(Object.fromEntries(parsed.contributions.map((model) => [model.modelId, model.route?.protocol]))).toEqual({
@@ -24,9 +128,50 @@ describe('live Provider Catalog parsers', () => {
       'gpt-5.4': 'OpenAIResponses',
       'minimax-m2.5': 'AnthropicMessages',
     });
-    expect(parsed.contributions.every((model) => model.route?.source === 'model')).toBe(true);
+    expect(parsed.contributions.every((model) => model.route?.source === 'catalog')).toBe(true);
   });
 
+  it('projects Kimi K3 only from exact OpenCode Go and OpenRouter live rows', () => {
+    const openCode = parseOpenCodeGoCatalog({ data: [{
+      id: 'kimi-k3',
+      endpoint: '/chat/completions',
+      context_length: 1_000_000,
+    }] });
+    expect(openCode.contributions[0]).toMatchObject({
+      modelId: 'kimi-k3',
+      label: 'Kimi K3',
+      defaultBudgetTokens: 256_000,
+      controls: {
+        fast: { state: 'unsupported', fixedValue: false },
+        context1m: { state: 'selectable', tierId: 'max' },
+        reasoning: {
+          kind: 'always-on', supportsOff: false, defaultSelection: 'max', lockedSelection: 'max',
+        },
+      },
+    });
+
+    const openRouter = parseOpenRouterAccountCatalog({ data: [{
+      id: 'moonshotai/kimi-k3',
+      name: 'Moonshot backend display',
+      context_length: 1_000_000,
+      supported_parameters: ['tools'],
+    }] });
+    expect(openRouter.contributions[0]).toMatchObject({
+      modelId: 'moonshotai/kimi-k3',
+      label: 'Kimi K3',
+      defaultBudgetTokens: 256_000,
+      controls: {
+        fast: { state: 'unsupported', fixedValue: false },
+        context1m: { state: 'selectable', tierId: 'max' },
+        reasoning: {
+          kind: 'always-on', supportsOff: false, defaultSelection: 'max', lockedSelection: 'max',
+        },
+      },
+    });
+    expect(parseOpenRouterAccountCatalog({ data: [{
+      id: 'moonshotai/kimi-k2.7-code', context_length: 256_000,
+    }] }).contributions[0]?.controls).toBeUndefined();
+  });
   it('uses explicit ClinePass groups only as entitlement evidence', () => {
     const parsed = parseClineCatalog(fixture('cline.json'));
     expect(parsed.entitlementContributions).toEqual([expect.objectContaining({
@@ -117,7 +262,7 @@ describe('live Provider Catalog parsers', () => {
       .not.toHaveProperty('route');
     expect(parsed.contributions.find((model) => model.modelId === 'grok-4.5')).toMatchObject({
       route: { protocol: 'OpenAIResponses', baseUrl: 'https://cli-chat-proxy.grok.com/v1' },
-      controls: { reasoning: { levels: ['high', 'medium', 'low'] } },
+      controls: { reasoning: { levels: ['low', 'medium', 'high'] } },
     });
     expect(parsed.contributions.find((model) => model.modelId === 'grok-4.5')?.controls?.fast)
       .toEqual({ state: 'unsupported', fixedValue: false });

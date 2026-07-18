@@ -8,12 +8,15 @@ import { generateEventId } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
 import { hashScopedResource } from '../runtime/ScopedResourceResolver';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
+const PROBE_MAX_OUTPUT_TOKENS = 64;
+
 
 export interface CapabilityProbeExecution {
   request: LlmModelCapabilityProbeRequest;
   provider: LlmProviderEntry;
   model: EffectiveModel;
   plan: RequestPlan;
+  credentialHandle: string;
 }
 
 function buildProbePromptPlan(): PromptPlan {
@@ -59,7 +62,7 @@ export async function executeCapabilityProbe(input: CapabilityProbeExecution): P
     controls: {
       capabilityProbeMode: input.request.mode,
       reasoningSelection: input.plan.reasoningWire.selection,
-      maxTokens: 1,
+      maxTokens: PROBE_MAX_OUTPUT_TOKENS,
     },
     reasoning,
   });
@@ -72,9 +75,10 @@ export async function executeCapabilityProbe(input: CapabilityProbeExecution): P
     { systemPrompt: promptPlan.systemPrompt, messages, tools: [] },
     {
       requestPlan: input.plan,
+      credentialHandle: input.credentialHandle,
       reasoning: input.plan.reasoningWire,
       temperature: input.plan.temperature,
-      maxTokens: 1,
+      maxTokens: PROBE_MAX_OUTPUT_TOKENS,
     },
   );
   for await (const _event of stream) {
