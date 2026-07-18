@@ -8,7 +8,7 @@ import type {
   ConversationWorkBlock,
   ConversationWorkTrace,
 } from '@shared/types/conversation';
-import type { ThinkingArtifact } from '@shared/types/reasoning';
+import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
 import { nowMs } from '@shared/utils/id';
 import { normalizeToolName } from '../workflow/debugger/DebuggerRuntimePolicy';
 
@@ -31,6 +31,7 @@ interface LoopTraceOptions {
   loopResultStatus?: ConversationLoopResultStatus;
   loopStopReason?: ConversationLoopStopReason;
   loopOutputPhase?: ConversationLoopOutputPhase;
+  loopProviderOutputRefs?: ProviderOutputRef[];
   loopReasoningState?: ConversationReasoningState;
   loopThinking?: ThinkingArtifact;
   loopThinkingStatus?: ConversationWorkBlock['thinkingStatus'];
@@ -74,6 +75,7 @@ export function createDraftWorkTrace(summary?: string, blocks: ConversationWorkB
 function cloneToolCall(toolCall: ConversationToolCall): ConversationToolCall {
   return {
     ...toolCall,
+    providerOutputRef: toolCall.providerOutputRef ? { ...toolCall.providerOutputRef } : undefined,
     userInputQuestions: toolCall.userInputQuestions?.map((question) => ({
       ...question,
       options: question.options.map((option) => ({ ...option })),
@@ -100,6 +102,7 @@ function cloneLoopResult(result: ConversationLoopResult | undefined): Conversati
   return result
     ? {
         ...result,
+        providerOutputRefs: result.providerOutputRefs?.map((ref) => ({ ...ref })),
         toolCallIds: result.toolCallIds.slice(),
       }
     : undefined;
@@ -276,6 +279,7 @@ export function upsertRuntimeToolCall(
       id: patch.id,
       toolName: patch.toolName,
       status: patch.status ?? 'pending',
+      providerOutputRef: patch.providerOutputRef ? { ...patch.providerOutputRef } : undefined,
       userInputQuestions: patch.userInputQuestions?.map((question) => ({
         ...question,
         options: question.options.map((option) => ({ ...option })),
@@ -389,6 +393,12 @@ function applyLoopFields(block: ConversationWorkBlock, options: LoopTraceOptions
     if (options.loopOutputPhase) {
       result.outputPhase = options.loopOutputPhase;
     }
+    if (options.loopProviderOutputRefs) {
+      result.providerOutputRefs = uniqueProviderOutputRefs([
+        ...(result.providerOutputRefs ?? []),
+        ...options.loopProviderOutputRefs,
+      ]);
+    }
     block.result = result;
   }
   if (options.loopReasoningState) {
@@ -455,6 +465,7 @@ export function upsertLoopResult(
   stopReason?: ConversationLoopStopReason,
   outputPhase?: ConversationLoopOutputPhase,
   reasoningState?: ConversationReasoningState,
+  providerOutputRefs?: ProviderOutputRef[],
 ): ConversationWorkTrace {
   const nextTrace = cloneTrace(trace);
   let block = nextTrace.blocks.find((entry) => entry.id === loopId);
@@ -469,6 +480,7 @@ export function upsertLoopResult(
     loopResultStatus: resultStatus,
     loopStopReason: stopReason,
     loopOutputPhase: outputPhase,
+    loopProviderOutputRefs: providerOutputRefs,
     loopReasoningState: reasoningState,
     loopThinking: thinking,
     loopThinkingStatus: thinkingStatus,
@@ -506,6 +518,9 @@ function normalizeLoopResult(
     ...(text ? { text } : {}),
     ...(result?.stopReason ? { stopReason: result.stopReason } : {}),
     ...(result?.outputPhase ? { outputPhase: result.outputPhase } : {}),
+    ...(result?.providerOutputRefs?.length
+      ? { providerOutputRefs: uniqueProviderOutputRefs(result.providerOutputRefs) }
+      : {}),
     status,
     toolCallIds: uniqueStrings([...(result?.toolCallIds ?? []), ...toolCalls.map((toolCall) => toolCall.id)]),
   };
@@ -520,6 +535,70 @@ function syncLoopResultToolIds(block: ConversationWorkBlock): void {
 
 function uniqueStrings(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
+}
+
+function uniqueProviderOutputRefs(refs: ProviderOutputRef[]): ProviderOutputRef[] {
+  const seen = new Set<string>();
+  const unique: ProviderOutputRef[] = [];
+  for (const ref of refs) {
+    const key = [
+      ref.protocol,
+      ref.responseId ?? '',
+      ref.providerBlockKey,
+      ref.sourceIndex ?? '',
+      ref.itemId ?? '',
+      ref.contentIndex,
+    ].join('\u0000');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push({ ...ref });
+  }
+  return unique;
+}
+
+function isProviderOutputRef(value: unknown): value is ProviderOutputRef {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const ref = value as Partial<ProviderOutputRef>;
+  return typeof ref.protocol === 'string'
+    && ref.protocol.trim().length > 0
+    && typeof ref.providerBlockKey === 'string'
+    && ref.providerBlockKey.trim().length > 0
+    && Number.isInteger(ref.contentIndex)
+    && Number(ref.contentIndex) >= 0
+    && (ref.responseId === undefined || typeof ref.responseId === 'string')
+    && (ref.itemId === undefined || typeof ref.itemId === 'string')
+    && (ref.sourceIndex === undefined || (Number.isInteger(ref.sourceIndex) && Number(ref.sourceIndex) >= 0));
+}
+
+function providerOutputRefKey(ref: ProviderOutputRef): string {
+  return [
+    ref.protocol,
+    ref.responseId ?? '',
+    ref.providerBlockKey,
+    ref.sourceIndex ?? '',
+    ref.itemId ?? '',
+  ].join('\u0000');
+}
+
+function hasProviderChannelCollision(block: ConversationWorkBlock): boolean {
+  const owners = new Map<string, 'thinking' | 'text' | 'tool_call'>();
+  const claim = (ref: ProviderOutputRef | undefined, channel: 'thinking' | 'text' | 'tool_call'): boolean => {
+    if (!ref) return false;
+    if (!isProviderOutputRef(ref)) return true;
+    const key = providerOutputRefKey(ref);
+    const owner = owners.get(key);
+    if (owner && owner !== channel) return true;
+    owners.set(key, channel);
+    return false;
+  };
+  if (claim(block.thinking?.providerOutputRef, 'thinking')) return true;
+  for (const ref of block.result?.providerOutputRefs ?? []) {
+    if (claim(ref, 'text')) return true;
+  }
+  for (const toolCall of block.toolCalls) {
+    if (claim(toolCall.providerOutputRef, 'tool_call')) return true;
+  }
+  return false;
 }
 
 function shouldReplaceThinking(current: ThinkingArtifact | undefined, next: ThinkingArtifact): boolean {
@@ -549,6 +628,11 @@ export function sanitizeStoredWorkTrace(
     if ('detail' in block && (block as { detail?: unknown }).detail !== undefined) return null;
     if ('thinkingPresentation' in block) return null;
     if (block.kind === 'llm_turn' && block.result && !Array.isArray(block.result.toolCallIds)) return null;
+    if (block.result?.providerOutputRefs && (
+      !Array.isArray(block.result.providerOutputRefs)
+      || !block.result.providerOutputRefs.every(isProviderOutputRef)
+    )) return null;
+    if (hasProviderChannelCollision(block)) return null;
     if (block.children && !block.children.every((child) => Boolean(normalizeWorkBlockKind(child.kind)))) {
       return null;
     }

@@ -115,7 +115,10 @@ describe('live Provider Catalog parsers', () => {
       supports_reasoning: true,
     }] }, modelCatalogSurface).contributions[0];
 
-    expect(contribution.route).toEqual(k3.route);
+    expect(contribution.route).toEqual({
+      ...k3.route,
+      reasoningContract: expect.objectContaining({ semantic: 'raw', displayLabel: 'Raw reasoning' }),
+    });
     expect(contribution.controls?.context1m).toMatchObject({
       state: 'selectable',
       defaultValue: false,

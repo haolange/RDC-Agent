@@ -24,7 +24,7 @@ import type {
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
-import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, createProviderOutputRef } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
   ensureOk,
@@ -132,6 +132,10 @@ export class OllamaProvider implements ProviderStrategy {
       const TEXT_INDEX = 0;
       const THINKING_INDEX = 1;
       let toolCallCounter = 0;
+      const textRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:text', contentIndex: TEXT_INDEX });
+      const thinkingRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:thinking', contentIndex: THINKING_INDEX });
+      let textStarted = false;
+      let thinkingStarted = false;
       let doneReason: string | null = null;
       let lastChunk: OllamaChunk | null = null;
       let sawOutput = false;
@@ -150,7 +154,11 @@ export class OllamaProvider implements ProviderStrategy {
         if (message) {
           if (typeof message.thinking === 'string' && message.thinking.length > 0) {
             sawOutput = true;
-            builder.appendThinking(THINKING_INDEX, message.thinking, {
+            if (!thinkingStarted) {
+              builder.startThinking(thinkingRef, { kind: 'unknown', source: 'ollama-raw', visibility: 'raw-collapsed', replayPolicy: 'none' });
+              thinkingStarted = true;
+            }
+            builder.appendThinking(thinkingRef, message.thinking, {
               kind: 'unknown',
               source: 'ollama-raw',
               visibility: 'raw-collapsed',
@@ -159,7 +167,8 @@ export class OllamaProvider implements ProviderStrategy {
           }
           if (typeof message.content === 'string' && message.content.length > 0) {
             sawOutput = true;
-            builder.appendText(TEXT_INDEX, message.content);
+            if (!textStarted) { builder.startText(textRef); textStarted = true; }
+            builder.appendText(textRef, message.content);
           }
           if (Array.isArray(message.tool_calls)) {
             for (const tc of message.tool_calls) {
@@ -169,13 +178,14 @@ export class OllamaProvider implements ProviderStrategy {
               toolCallCounter += 1;
               const callId = `ollama-call-${Date.now()}-${slot}`;
               sawOutput = true;
-              builder.ensureToolCall(slot, callId, fn.name);
+              const toolRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: `function:${toolCallCounter - 1}`, sourceIndex: toolCallCounter - 1, contentIndex: slot });
+              builder.startToolCall(toolRef, callId, fn.name);
               const argsRaw =
                 typeof fn.arguments === 'string'
                   ? fn.arguments
                   : JSON.stringify(fn.arguments ?? {});
-              builder.appendToolCallArgs(slot, argsRaw);
-              builder.endToolCall(slot);
+              builder.appendToolCallArgs(toolRef, argsRaw);
+              builder.endToolCall(toolRef);
             }
           }
         }

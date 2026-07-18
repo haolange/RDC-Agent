@@ -6,6 +6,7 @@ import {
   JsonPrimitiveSchema,
   ModelManifestPatchSchema,
   ModelManifestSchema,
+  ProviderReasoningContractSchema,
   ProviderProtocolSchema,
 } from './modelManifestSchema';
 import {
@@ -142,6 +143,7 @@ export const ProviderSurfaceRouteSchema = z.object({
   baseUrl: z.string().min(1),
   headers: z.record(z.string(), z.string()).optional(),
   default: z.boolean().optional(),
+  reasoningContract: ProviderReasoningContractSchema.optional(),
 }).strict();
 
 export const ProviderSurfaceManifestSchema = z.object({

@@ -46,7 +46,7 @@ export async function executeCapabilityProbe(input: CapabilityProbeExecution): P
   const turnId = generateEventId('capability-probe');
   const messages = [{ role: 'user' as const, content: 'OK', timestamp: Date.now() }];
   const callIndex = requestSnapshotStore.nextCallIndex(undefined, turnId);
-  const reasoning = resolveAgentRouteCapability(input.provider, input.model.modelId, input.model).reasoningContract;
+  const reasoning = resolveAgentRouteCapability(input.provider, input.model.modelId, input.model, input.plan).reasoningContract;
   const snapshot = requestEnvelopeBuilder.build({
     promptPlan,
     turnId,

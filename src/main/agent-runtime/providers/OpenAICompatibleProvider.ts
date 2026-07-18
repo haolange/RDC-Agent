@@ -24,7 +24,7 @@ import type {
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
-import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, createProviderOutputRef, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
 import { composeAbortSignals, ensureOk, normalizeError, parseSSE, ProviderHttpError } from './internal/http';
 import { applyOpenAiCompatibleReasoning } from './reasoningWire';
 import type { ProviderRequestAuthorizer } from '../../settings/AwsBedrockCredentials';
@@ -166,6 +166,11 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
       const TEXT_INDEX = 0;
       const THINKING_INDEX = 1;
       const TOOL_INDEX_BASE = 2;
+      const textRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:text', contentIndex: TEXT_INDEX });
+      const thinkingRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:thinking', contentIndex: THINKING_INDEX });
+      const toolRefs = new Map<number, ReturnType<typeof createProviderOutputRef>>();
+      let textStarted = false;
+      let thinkingStarted = false;
       let sawOutput = false;
 
       for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
@@ -194,22 +199,43 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
 
         const choice = chunk.choices?.[0];
         if (!choice) continue;
+        if (finishReason !== null) {
+          throw new ProviderStreamProtocolError(
+            'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
+            textRef,
+            'Provider emitted another Chat Completions choice after finish_reason.',
+          );
+        }
+
 
         const delta = choice.delta ?? {};
         const reasoningDelta = delta.reasoning_content ?? delta.reasoning;
         if (typeof reasoningDelta === 'string' && reasoningDelta.length > 0) {
           sawOutput = true;
-          builder.appendThinking(THINKING_INDEX, reasoningDelta, {
+          if (!thinkingStarted) {
+            builder.startThinking(thinkingRef, {
+              kind: 'raw',
+              source: isOpenRouterBaseUrl(baseUrl) ? 'openrouter-raw' : 'openai-compatible-raw',
+              visibility: 'raw-collapsed',
+              replayPolicy: 'openai-reasoning-content',
+            });
+            thinkingStarted = true;
+          }
+          builder.appendThinking(thinkingRef, reasoningDelta, {
             kind: 'raw',
             source: isOpenRouterBaseUrl(baseUrl) ? 'openrouter-raw' : 'openai-compatible-raw',
             visibility: 'raw-collapsed',
-            // Tool-loop vendors (DeepSeek/Kimi/GLM/…) require reasoning_content replay.
+            // Tool-loop vendors require reasoning_content replay on assistant tool-call turns.
             replayPolicy: 'openai-reasoning-content',
           });
         }
         if (typeof delta.content === 'string' && delta.content.length > 0) {
           sawOutput = true;
-          builder.appendText(TEXT_INDEX, delta.content);
+          if (!textStarted) {
+            builder.startText(textRef);
+            textStarted = true;
+          }
+          builder.appendText(textRef, delta.content);
         }
 
         if (Array.isArray(delta.tool_calls)) {
@@ -217,10 +243,22 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
             const callIndex = typeof tc.index === 'number' ? tc.index : 0;
             const slot = TOOL_INDEX_BASE + callIndex;
             sawOutput = true;
-            builder.ensureToolCall(slot, tc.id ?? '', tc.function?.name ?? '');
+            let toolRef = toolRefs.get(callIndex);
+            if (!toolRef) {
+              toolRef = createProviderOutputRef({
+                protocol: PROVIDER_API,
+                providerBlockKey: `virtual:tool:${callIndex}`,
+                sourceIndex: callIndex,
+                contentIndex: slot,
+              });
+              toolRefs.set(callIndex, toolRef);
+              builder.startToolCall(toolRef, tc.id ?? '', tc.function?.name ?? '');
+            } else {
+              builder.updateToolCall(toolRef, tc.id ?? '', tc.function?.name ?? '');
+            }
             const args = tc.function?.arguments;
             if (typeof args === 'string' && args.length > 0) {
-              builder.appendToolCallArgs(slot, args);
+              builder.appendToolCallArgs(toolRef, args);
             }
           }
         }

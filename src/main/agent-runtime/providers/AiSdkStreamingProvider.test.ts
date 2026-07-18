@@ -77,9 +77,9 @@ describe('AiSdkStreamingProvider', () => {
     expect(message.stopReason).toBe('toolUse');
     expect(message.usage).toMatchObject({ inputTokens: 12, outputTokens: 8, totalTokens: 20, reasoningTokens: 2 });
     expect(message.content).toEqual([
-      { type: 'text', text: 'hello' },
+      expect.objectContaining({ type: 'text', text: 'hello', providerOutputRef: expect.objectContaining({ providerBlockKey: 'part:text-1' }) }),
       expect.objectContaining({ type: 'thinking', text: 'think', kind: 'unknown' }),
-      { type: 'toolCall', id: 'call-1', name: 'inspect', arguments: { path: 'a.rdc' } },
+      expect.objectContaining({ type: 'toolCall', id: 'call-1', name: 'inspect', arguments: { path: 'a.rdc' }, providerOutputRef: expect.objectContaining({ providerBlockKey: 'part:call-1' }) }),
     ]);
     expect(streamTextMock).toHaveBeenCalledWith(expect.objectContaining({
       system: 'system',

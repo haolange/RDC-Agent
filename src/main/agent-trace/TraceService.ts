@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { ActionEvent } from '@shared/types/evidence';
-import type { ConversationMessage } from '@shared/types/conversation';
+import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
 import type { ArtifactRecord } from '@shared/types/harness';
 import type { RunSummary, AppMode } from '@shared/types/session';
 import type {
@@ -40,11 +40,40 @@ const toIso = (value: number | string | undefined, fallback = nowIso()): string 
   return fallback;
 };
 
-const firstLine = (value: unknown, fallback: string): string => {
-  const text = typeof value === 'string' ? value : value == null ? '' : JSON.stringify(value);
-  return text.trim().split(/\r?\n/)[0]?.trim() || fallback;
+const collectExplicitThinking = (
+  blocks: ConversationWorkBlock[] | undefined,
+): Array<{ blockId: string; thinking: NonNullable<ConversationWorkBlock['thinking']> }> => {
+  const collected: Array<{ blockId: string; thinking: NonNullable<ConversationWorkBlock['thinking']> }> = [];
+  const visit = (items: ConversationWorkBlock[] | undefined) => {
+    for (const block of items ?? []) {
+      if (block.thinking) collected.push({ blockId: block.id, thinking: block.thinking });
+      visit(block.children);
+    }
+  };
+  visit(blocks);
+  return collected;
 };
 
+export function findCanonicalFinalAnswer(
+  conversations: ConversationMessage[],
+  runId: string,
+): string | null {
+  let finalAnswer: string | null = null;
+  const visit = (blocks: ConversationWorkBlock[] | undefined) => {
+    for (const block of blocks ?? []) {
+      const resultText = block.result?.text?.trim();
+      if (block.result?.outputPhase === 'final_answer' && resultText) {
+        finalAnswer = resultText;
+      }
+      visit(block.children);
+    }
+  };
+  for (const message of conversations) {
+    if (message.runId !== runId || message.role !== 'assistant') continue;
+    visit(message.workTrace?.blocks);
+  }
+  return finalAnswer;
+}
 const runStatusFromSummary = (run: RunSummary, planStatus?: PlanStatus): TraceStatus => {
   if (planStatus === 'awaiting_approval' || run.status === 'awaiting_approval') return 'waiting_approval';
   if (run.status === 'failed' || run.status === 'interrupted') return 'failed';
@@ -221,9 +250,10 @@ export class TraceService {
       }
       startPhase('understand');
       for (const msg of conversations.filter((m) => m.runId === runId && m.role === 'assistant')) {
-        const thoughtId = `thought-${msg.id}`;
-        if (msg.content.trim() && !existingNodeIds.has(thoughtId)) {
-          this.emitter.emitThoughtFromText(runId, msg.content, thoughtId);
+        for (const item of collectExplicitThinking(msg.workTrace?.blocks)) {
+          const thoughtId = `thought-${msg.id}-${item.blockId}`;
+          if (existingNodeIds.has(thoughtId)) continue;
+          this.emitter.emitThinkingArtifact(runId, item.thinking, thoughtId);
           existingNodeIds.add(thoughtId);
         }
       }
@@ -243,7 +273,7 @@ export class TraceService {
           completePhase('understand');
           completePhase('plan');
           startPhase('execute');
-          this.emitter.emitThoughtFromText(runId, String(event.payload.summary || event.payload.content || ''));
+          // Agent summaries are workflow metadata, not provider thinking artifacts.
         }
         existingNodeIds.add(event.event_id);
       }
@@ -310,9 +340,10 @@ export class TraceService {
         this.emitter.emitTaskFrame(runId, userPrompt);
       }
       for (const msg of turn.assistantMessages) {
-        const thoughtId = `thought-${msg.id}`;
-        if (msg.content.trim() && !existingAskNodeIds.has(thoughtId)) {
-          this.emitter.emitThoughtFromText(runId, msg.content, thoughtId);
+        for (const item of collectExplicitThinking(msg.workTrace?.blocks)) {
+          const thoughtId = `thought-${msg.id}-${item.blockId}`;
+          if (existingAskNodeIds.has(thoughtId)) continue;
+          this.emitter.emitThinkingArtifact(runId, item.thinking, thoughtId);
           existingAskNodeIds.add(thoughtId);
         }
       }
@@ -379,25 +410,13 @@ export class TraceService {
 
   private finalContentForRun(
     run: RunSummary,
-    events: ActionEvent[],
+    _events: ActionEvent[],
     conversations: ConversationMessage[],
     runId: string,
   ): string | null {
-    if (run.status === 'awaiting_approval') {
-      return null;
-    }
-    if (run.status === 'completed') {
-      const report = events.find((e) => e.event_type === 'report_published');
-      if (report) return firstLine(report.payload.summary, '调试执行已完成，报告已生成。');
-      const assistant = conversations.filter((m) => m.runId === runId && m.role === 'assistant').slice(-1)[0];
-      if (assistant?.content.trim()) return assistant.content;
-      return '调试执行已完成。';
-    }
-    if (run.status === 'failed' || run.status === 'interrupted') {
-      return '执行失败，请查看错误详情与 raw trace。';
-    }
-    if (run.status === 'cancelled') return '任务已取消。';
-    return null;
+    if (run.status !== 'completed') return null;
+    return findCanonicalFinalAnswer(conversations, runId);
+
   }
 
   /**

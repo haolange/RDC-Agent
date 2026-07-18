@@ -73,7 +73,13 @@
       "protocol": "AnthropicMessages",
       "adapterId": "anthropic-messages",
       "baseUrl": "https://api.deepseek.com/anthropic/v1",
-      "protocolOwner": "anthropic"
+      "protocolOwner": "anthropic",
+      "reasoningContract": {
+        "semantic": "raw",
+        "source": "deepseek-documented-raw-reasoning",
+        "evidence": "https://api-docs.deepseek.com/guides/thinking_mode",
+        "displayLabel": "Raw reasoning"
+      }
     },
     {
       "id": "OpenAICompatibleChatCompletions",
@@ -81,7 +87,13 @@
       "adapterId": "openai-compatible",
       "baseUrl": "https://api.deepseek.com",
       "default": true,
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "reasoningContract": {
+        "semantic": "raw",
+        "source": "deepseek-documented-raw-reasoning",
+        "evidence": "https://api-docs.deepseek.com/guides/thinking_mode",
+        "displayLabel": "Raw reasoning"
+      }
     }
   ],
   "discovery": {

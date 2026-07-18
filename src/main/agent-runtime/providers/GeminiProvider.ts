@@ -25,7 +25,7 @@ import type {
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
-import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, createProviderOutputRef } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
   ensureOk,
@@ -150,6 +150,10 @@ export class GeminiProvider implements ProviderStrategy {
       const TEXT_INDEX = 0;
       const THINKING_INDEX = 1;
       let toolCallCounter = 0;
+      const textRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:text', contentIndex: TEXT_INDEX });
+      const thinkingRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:thinking', contentIndex: THINKING_INDEX });
+      let textStarted = false;
+      let thinkingStarted = false;
       let finishReason: string | null = null;
       let sawOutput = false;
 
@@ -182,7 +186,11 @@ export class GeminiProvider implements ProviderStrategy {
             const textPart = part as GeminiTextPart;
             if (textPart.thought) {
               sawOutput = true;
-              builder.appendThinking(THINKING_INDEX, textPart.text, {
+              if (!thinkingStarted) {
+                builder.startThinking(thinkingRef, { kind: 'unknown', source: 'gemini-raw', visibility: 'raw-collapsed', replayPolicy: 'none' });
+                thinkingStarted = true;
+              }
+              builder.appendThinking(thinkingRef, textPart.text, {
                 kind: 'unknown',
                 source: 'gemini-raw',
                 visibility: 'raw-collapsed',
@@ -190,7 +198,8 @@ export class GeminiProvider implements ProviderStrategy {
               });
             } else {
               sawOutput = true;
-              builder.appendText(TEXT_INDEX, textPart.text);
+              if (!textStarted) { builder.startText(textRef); textStarted = true; }
+              builder.appendText(textRef, textPart.text);
             }
             continue;
           }
@@ -200,10 +209,11 @@ export class GeminiProvider implements ProviderStrategy {
             toolCallCounter += 1;
             const callId = `gemini-call-${Date.now()}-${slot}`;
             sawOutput = true;
-            builder.ensureToolCall(slot, callId, fc.name);
+            const toolRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: `function:${toolCallCounter - 1}`, sourceIndex: toolCallCounter - 1, contentIndex: slot });
+            builder.startToolCall(toolRef, callId, fc.name);
             const args = JSON.stringify(fc.args ?? {});
-            builder.appendToolCallArgs(slot, args);
-            builder.endToolCall(slot);
+            builder.appendToolCallArgs(toolRef, args);
+            builder.endToolCall(toolRef);
           }
           // inlineData / 其它 part 暂不处理。
         }

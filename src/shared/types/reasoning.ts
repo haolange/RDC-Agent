@@ -1,3 +1,12 @@
+export interface ProviderOutputRef {
+  protocol: string;
+  responseId?: string;
+  providerBlockKey: string;
+  sourceIndex?: number;
+  itemId?: string;
+  contentIndex: number;
+}
+
 export type ThinkingArtifactKind = 'summary' | 'raw' | 'opaque' | 'unknown';
 
 export type ThinkingArtifactVisibility = 'summary' | 'raw-collapsed' | 'hidden';
@@ -34,4 +43,5 @@ export interface ThinkingArtifact {
   visibility: ThinkingArtifactVisibility;
   replayPolicy: ThinkingArtifactReplayPolicy;
   artifact?: ProviderReasoningArtifact;
+  providerOutputRef?: ProviderOutputRef;
 }

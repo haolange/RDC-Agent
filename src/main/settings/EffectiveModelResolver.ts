@@ -52,9 +52,14 @@ function executionBindingMatchesPlan(binding: ExecutionBindingDefinition, plan: 
       && binding.when.reasoning.includes(plan.reasoningWire.selection));
 }
 
-function routeFor(provider: LlmProviderEntry, modelRoute?: ModelRoute): ModelRoute {
+function routeFor(
+  provider: LlmProviderEntry,
+  modelRoute?: ModelRoute,
+  selectedProtocol = modelRoute?.source === 'model' ? modelRoute.protocol : provider.protocol,
+): ModelRoute {
   const surface = getLoadedProviderSurface(provider.id);
-  const catalogRoute = surface?.routes.find((route) => route.protocol === provider.protocol)
+  const targetProtocol = selectedProtocol;
+  const catalogRoute = surface?.routes.find((route) => route.protocol === targetProtocol)
     ?? surface?.routes.find((route) => route.default)
     ?? surface?.routes[0];
   if (!surface) {
@@ -67,9 +72,10 @@ function routeFor(provider: LlmProviderEntry, modelRoute?: ModelRoute): ModelRou
   return resolveModelRoutePrecedence({
     modelRoute: modelRoute?.source === 'model' ? modelRoute : undefined,
     catalogRoute: {
-      protocol: catalogRoute?.protocol ?? provider.protocol,
+      protocol: catalogRoute?.protocol ?? targetProtocol,
       baseUrl: catalogRoute?.baseUrl ?? provider.baseUrl,
       headers: { ...(catalogRoute?.headers ?? {}) },
+      reasoningContract: catalogRoute?.reasoningContract,
     },
   });
 }
@@ -119,6 +125,10 @@ export function buildCatalogModelContribution(
     ? {
         ...catalogDefinition,
         route: routeFor(provider, catalogDefinition.route),
+        routeOptions: catalogDefinition.routeOptions?.map((option) => ({
+          ...option,
+          route: routeFor(provider, option.route, option.route.protocol),
+        })),
       }
     : conservative;
   return {
@@ -227,6 +237,7 @@ function userContribution(provider: LlmProviderEntry): CatalogLayerContribution 
           protocol: route.protocol,
           baseUrl: provider.baseUrl ?? route.baseUrl,
           headers: route.headers,
+          reasoningContract: route.reasoningContract,
           source: 'user' as const,
         },
         availability: 'unknown' as const,

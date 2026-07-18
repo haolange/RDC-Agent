@@ -16,6 +16,7 @@ import type {
   ModelManifest,
   ModelModeAction as CatalogModelModeAction,
   ModelPresencePolicy,
+  ProviderReasoningContract,
 } from '../provider-catalog/modelManifestSchema';
 import type {
   LlmProviderLifecycleStatus,
@@ -59,6 +60,7 @@ export interface ModelRoute {
   protocol: LlmProviderProtocol;
   baseUrl?: string;
   headers?: Record<string, string>;
+  reasoningContract?: ProviderReasoningContract;
   source: 'model' | 'user' | 'catalog';
 }
 

@@ -69,7 +69,13 @@
       "adapterId": "anthropic-messages",
       "baseUrl": "https://api.anthropic.com/v1",
       "default": true,
-      "protocolOwner": "anthropic"
+      "protocolOwner": "anthropic",
+      "reasoningContract": {
+        "semantic": "summary",
+        "source": "anthropic-extended-thinking-summary",
+        "evidence": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking",
+        "displayLabel": "Reasoning summary"
+      }
     }
   ],
   "discovery": {

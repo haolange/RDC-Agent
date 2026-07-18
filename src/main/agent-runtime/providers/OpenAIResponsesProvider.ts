@@ -13,7 +13,7 @@ import type {
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
-import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, createProviderOutputRef, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
   ensureOk,
@@ -138,9 +138,30 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
       const toolSlotsByItemId = new Map<string, number>();
       const toolArgBuffers = new Map<number, string>();
       let currentReasoningArtifact: ProviderReasoningArtifact | undefined;
+      const textRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:text', contentIndex: TEXT_INDEX });
+      const reasoningRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:reasoning', contentIndex: REASONING_INDEX });
+      const toolRefs = new Map<number, ReturnType<typeof createProviderOutputRef>>();
+      const toolStartedSlots = new Set<number>();
+      let textStarted = false;
+      let thinkingStarted = false;
+      let thinkingClosed = false;
+      const toolRefFor = (slot: number, itemId?: string) => {
+        const existing = toolRefs.get(slot);
+        if (existing) return existing;
+        const sourceIndex = slot - TOOL_INDEX_BASE;
+        const ref = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: `output:tool:${sourceIndex}`, sourceIndex, itemId, contentIndex: slot });
+        toolRefs.set(slot, ref);
+        return ref;
+      };
       let sawToolCall = false;
       let sawOutput = false;
       let finishReason: StopReason = 'stop';
+      let providerTerminalSeen = false;
+      const terminalRef = createProviderOutputRef({
+        protocol: PROVIDER_API,
+        providerBlockKey: 'response:terminal',
+        contentIndex: 1_000_000,
+      });
 
       for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
@@ -148,23 +169,38 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
         if (!event) continue;
 
         const eventType = readString(event.type);
+        if (providerTerminalSeen) {
+          throw new ProviderStreamProtocolError(
+            'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
+            terminalRef,
+            'Provider emitted ' + (eventType || 'an unknown event') + ' after the Responses terminal event.',
+          );
+        }
         switch (eventType) {
           case 'response.output_text.delta': {
             const delta = readString(event.delta) || readString(event.text);
             if (delta) {
               sawOutput = true;
-              builder.appendText(TEXT_INDEX, delta);
+              if (!textStarted) { builder.startText(textRef); textStarted = true; }
+              builder.appendText(textRef, delta);
             }
             break;
           }
           case 'response.output_text.done':
-            builder.endText(TEXT_INDEX);
+            if (textStarted) builder.endText(textRef);
             break;
           case 'response.reasoning_summary_text.delta': {
             const delta = readString(event.delta) || readString(event.text);
             if (delta) {
               sawOutput = true;
-              builder.appendThinking(REASONING_INDEX, delta, {
+              if (!thinkingStarted) {
+                builder.startThinking(reasoningRef, {
+                  kind: 'summary', source: 'openai-responses-summary', visibility: 'summary',
+                  replayPolicy: currentReasoningArtifact ? 'provider-artifact' : 'none', artifact: currentReasoningArtifact,
+                });
+                thinkingStarted = true;
+              }
+              builder.appendThinking(reasoningRef, delta, {
                 kind: 'summary',
                 source: 'openai-responses-summary',
                 visibility: 'summary',
@@ -175,13 +211,21 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
             break;
           }
           case 'response.reasoning_summary_text.done':
-            builder.endThinking(REASONING_INDEX, {
+            if (!thinkingStarted) {
+              builder.startThinking(reasoningRef, {
+                kind: 'summary', source: 'openai-responses-summary', visibility: 'summary',
+                replayPolicy: currentReasoningArtifact ? 'provider-artifact' : 'none', artifact: currentReasoningArtifact,
+              });
+              thinkingStarted = true;
+            }
+            builder.endThinking(reasoningRef, {
               kind: 'summary',
               source: 'openai-responses-summary',
               visibility: 'summary',
               replayPolicy: currentReasoningArtifact ? 'provider-artifact' : 'none',
               artifact: currentReasoningArtifact,
             });
+            thinkingClosed = true;
             break;
           case 'response.output_item.added': {
             const outputIndex = readNumber(event.output_index) ?? 0;
@@ -190,7 +234,16 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
             if (reasoningArtifact) {
               currentReasoningArtifact = reasoningArtifact;
               sawOutput = true;
-              builder.updateThinking(REASONING_INDEX, {
+              if (!thinkingStarted) {
+                builder.startThinking(reasoningRef, {
+                  kind: 'opaque',
+                  source: 'openai-responses-encrypted',
+                  visibility: 'hidden',
+                  replayPolicy: 'provider-artifact',
+                  artifact: currentReasoningArtifact,
+                });
+                thinkingStarted = true;
+              } else if (!thinkingClosed) builder.updateThinking(reasoningRef, {
                 kind: 'opaque',
                 source: 'openai-responses-encrypted',
                 visibility: 'hidden',
@@ -203,11 +256,13 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
               if (itemId) toolSlotsByItemId.set(itemId, slot);
               sawToolCall = true;
               sawOutput = true;
-              builder.ensureToolCall(
-                slot,
+              const toolRef = toolRefFor(slot, itemId || undefined);
+              builder.startToolCall(
+                toolRef,
                 readString(item?.call_id) || readString(item?.id) || '',
                 readString(item?.name) || '',
               );
+              toolStartedSlots.add(slot);
             }
             break;
           }
@@ -216,7 +271,7 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
             const delta = readString(event.delta);
             if (slot !== null && delta) {
               toolArgBuffers.set(slot, `${toolArgBuffers.get(slot) ?? ''}${delta}`);
-              builder.appendToolCallArgs(slot, delta);
+              builder.appendToolCallArgs(toolRefFor(slot, readString(event.item_id) || undefined), delta);
             }
             break;
           }
@@ -225,9 +280,8 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
             const args = readString(event.arguments);
             if (slot !== null && args && !toolArgBuffers.get(slot)) {
               toolArgBuffers.set(slot, args);
-              builder.appendToolCallArgs(slot, args);
+              builder.appendToolCallArgs(toolRefFor(slot, readString(event.item_id) || undefined), args);
             }
-            if (slot !== null) builder.endToolCall(slot);
             break;
           }
           case 'response.output_item.done': {
@@ -237,7 +291,16 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
             if (reasoningArtifact) {
               currentReasoningArtifact = reasoningArtifact;
               sawOutput = true;
-              builder.updateThinking(REASONING_INDEX, {
+              if (!thinkingStarted) {
+                builder.startThinking(reasoningRef, {
+                  kind: 'opaque',
+                  source: 'openai-responses-encrypted',
+                  visibility: 'hidden',
+                  replayPolicy: 'provider-artifact',
+                  artifact: currentReasoningArtifact,
+                });
+                thinkingStarted = true;
+              } else if (!thinkingClosed) builder.updateThinking(reasoningRef, {
                 kind: 'opaque',
                 source: 'openai-responses-encrypted',
                 visibility: 'hidden',
@@ -250,28 +313,30 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
               if (itemId) toolSlotsByItemId.set(itemId, slot);
               sawToolCall = true;
               sawOutput = true;
-              builder.ensureToolCall(
-                slot,
-                readString(item?.call_id) || readString(item?.id) || '',
-                readString(item?.name) || '',
-              );
+              const toolRef = toolRefFor(slot, itemId || undefined);
+              if (toolStartedSlots.has(slot)) {
+                builder.updateToolCall(toolRef, readString(item?.call_id) || readString(item?.id) || '', readString(item?.name) || '');
+              } else {
+                builder.startToolCall(toolRef, readString(item?.call_id) || readString(item?.id) || '', readString(item?.name) || '');
+                toolStartedSlots.add(slot);
+              }
               const args = readString(item?.arguments);
               if (args && !toolArgBuffers.get(slot)) {
                 toolArgBuffers.set(slot, args);
-                builder.appendToolCallArgs(slot, args);
+                builder.appendToolCallArgs(toolRef, args);
               }
-              builder.endToolCall(slot);
+              builder.endToolCall(toolRef);
             }
             break;
           }
           case 'response.completed': {
             const completed = readRecord(event.response) as ResponsesCompletedPayload | null;
             if (completed) {
-              applyCompletedResponse(builder, completed);
+              applyCompletedUsage(builder, completed);
               const completedArtifact = findResponsesReasoningArtifact(model, completed.output);
               if (completedArtifact) {
                 currentReasoningArtifact = completedArtifact;
-                builder.updateThinking(REASONING_INDEX, {
+                if (thinkingStarted && !thinkingClosed) builder.updateThinking(reasoningRef, {
                   kind: 'summary',
                   source: 'openai-responses-summary',
                   visibility: 'summary',
@@ -281,10 +346,18 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
               }
               finishReason = completed.status === 'incomplete' ? 'length' : sawToolCall ? 'toolUse' : 'stop';
             }
+            if (!sawOutput) {
+              throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+            }
+            providerTerminalSeen = true;
             break;
           }
           case 'response.incomplete':
             finishReason = 'length';
+            if (!sawOutput) {
+              throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+            }
+            providerTerminalSeen = true;
             break;
           case 'response.failed': {
             const failed = readRecord(event.response);
@@ -457,7 +530,7 @@ function toResponsesTool(tool: ToolDefinition): Record<string, unknown> {
   };
 }
 
-function applyCompletedResponse(builder: AssistantStreamBuilder, payload: ResponsesCompletedPayload): void {
+function applyCompletedUsage(builder: AssistantStreamBuilder, payload: ResponsesCompletedPayload): void {
   if (payload.usage) {
     const cacheReadTokens = payload.usage.input_tokens_details?.cached_tokens;
     const reasoningTokens = payload.usage.output_tokens_details?.reasoning_tokens;

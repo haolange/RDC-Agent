@@ -6,6 +6,7 @@ import type {
   Context,
   Message,
   Model,
+  ProviderOutputRef,
   ProviderReasoningArtifact,
   StopReason,
   StreamOptions,
@@ -16,7 +17,7 @@ import type {
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
 import type { ReasoningVisibility } from '@shared/types/agentRuntime';
-import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, createProviderOutputRef } from './internal/AssistantStreamBuilder';
 import {
   composeAbortSignals,
   ensureOk,
@@ -72,6 +73,7 @@ interface AnthropicMessageDelta extends AnthropicEventBase {
 interface AnthropicMessageStart extends AnthropicEventBase {
   type: 'message_start';
   message: {
+    id?: string;
     usage?: {
       input_tokens?: number;
       output_tokens?: number;
@@ -173,7 +175,13 @@ export class AnthropicProvider implements ProviderStrategy {
       recordQuotaFromResponse(options.requestPlan, response);
       await ensureOk(response, PROVIDER_API);
 
+      let responseId: string | undefined;
       const thinkingArtifactsByIndex = new Map<number, ProviderReasoningArtifact>();
+      const blockRefs = new Map<number, ProviderOutputRef>();
+      const blockKinds = new Map<number, 'text' | 'thinking' | 'tool_call'>();
+      const refFor = (index: number): ProviderOutputRef => blockRefs.get(index) ?? createProviderOutputRef({
+        protocol: PROVIDER_API, responseId, providerBlockKey: `content:${index}`, sourceIndex: index, contentIndex: index,
+      });
       const thinkingKind = resolveAnthropicThinkingKind(options.reasoningVisibility);
       const thinkingVisibility = resolveAnthropicThinkingVisibility(options.reasoningVisibility);
       let stopReason: string | null = null;
@@ -195,6 +203,7 @@ export class AnthropicProvider implements ProviderStrategy {
         switch (event.type) {
           case 'message_start': {
             const evt = event as AnthropicMessageStart;
+            responseId = evt.message.id?.trim() || responseId;
             inputTokens = evt.message.usage?.input_tokens ?? inputTokens;
             outputTokens = evt.message.usage?.output_tokens ?? outputTokens;
             if (typeof evt.message.usage?.cache_read_input_tokens === 'number') {
@@ -216,24 +225,29 @@ export class AnthropicProvider implements ProviderStrategy {
           case 'content_block_start': {
             const evt = event as AnthropicContentBlockStart;
             const block = evt.content_block;
+            const blockRef = createProviderOutputRef({ protocol: PROVIDER_API, responseId, providerBlockKey: `content:${evt.index}`, sourceIndex: evt.index, contentIndex: evt.index });
+            blockRefs.set(evt.index, blockRef);
             if (block.type === 'text') {
+              builder.startText(blockRef);
+              blockKinds.set(evt.index, 'text');
               if (block.text) {
                 sawOutput = true;
-                builder.appendText(evt.index, block.text);
+                builder.appendText(blockRef, block.text);
               }
             } else if (block.type === 'thinking') {
               const artifact = createAnthropicThinkingArtifact(model, block.signature);
               thinkingArtifactsByIndex.set(evt.index, artifact);
-              builder.updateThinking(evt.index, {
+              builder.startThinking(blockRef, {
                 kind: thinkingKind,
                 source: 'anthropic-thinking',
                 visibility: thinkingVisibility,
                 replayPolicy: 'provider-artifact',
                 artifact,
               });
+              blockKinds.set(evt.index, 'thinking');
               if (block.thinking) {
                 sawOutput = true;
-                builder.appendThinking(evt.index, block.thinking, {
+                builder.appendThinking(blockRef, block.thinking, {
                   kind: thinkingKind,
                   source: 'anthropic-thinking',
                   visibility: thinkingVisibility,
@@ -245,18 +259,20 @@ export class AnthropicProvider implements ProviderStrategy {
               const artifact = createAnthropicRedactedArtifact(model, block.data);
               thinkingArtifactsByIndex.set(evt.index, artifact);
               sawOutput = true;
-              builder.updateThinking(evt.index, {
+              builder.startThinking(blockRef, {
                 kind: 'opaque',
                 source: 'anthropic-redacted-thinking',
                 visibility: 'hidden',
                 replayPolicy: 'provider-artifact',
                 artifact,
               });
+              blockKinds.set(evt.index, 'thinking');
             } else if (block.type === 'tool_use') {
               sawOutput = true;
-              builder.ensureToolCall(evt.index, block.id, block.name);
+              builder.startToolCall(blockRef, block.id, block.name);
+              blockKinds.set(evt.index, 'tool_call');
               if (block.input && typeof block.input === 'object' && Object.keys(block.input as Record<string, unknown>).length > 0) {
-                builder.appendToolCallArgs(evt.index, JSON.stringify(block.input));
+                builder.appendToolCallArgs(blockRef, JSON.stringify(block.input));
               }
             }
             break;
@@ -265,10 +281,10 @@ export class AnthropicProvider implements ProviderStrategy {
             const evt = event as AnthropicContentBlockDelta;
             if (evt.delta.type === 'text_delta') {
               sawOutput = true;
-              builder.appendText(evt.index, evt.delta.text);
+              builder.appendText(refFor(evt.index), evt.delta.text);
             } else if (evt.delta.type === 'thinking_delta') {
               sawOutput = true;
-              builder.appendThinking(evt.index, evt.delta.thinking, {
+              builder.appendThinking(refFor(evt.index), evt.delta.thinking, {
                 kind: thinkingKind,
                 source: 'anthropic-thinking',
                 visibility: thinkingVisibility,
@@ -281,7 +297,7 @@ export class AnthropicProvider implements ProviderStrategy {
                 evt.delta.signature,
               );
               thinkingArtifactsByIndex.set(evt.index, artifact);
-              builder.updateThinking(evt.index, {
+              builder.updateThinking(refFor(evt.index), {
                 kind: thinkingKind,
                 source: 'anthropic-thinking',
                 visibility: thinkingVisibility,
@@ -290,15 +306,18 @@ export class AnthropicProvider implements ProviderStrategy {
               });
             } else if (evt.delta.type === 'input_json_delta') {
               sawOutput = true;
-              builder.appendToolCallArgs(evt.index, evt.delta.partial_json);
+              builder.appendToolCallArgs(refFor(evt.index), evt.delta.partial_json);
             }
             break;
           }
           case 'content_block_stop': {
             const evt = event as AnthropicContentBlockStop;
-            builder.endText(evt.index);
-            builder.endThinking(evt.index);
-            builder.endToolCall(evt.index);
+            const ref = refFor(evt.index);
+            const kind = blockKinds.get(evt.index);
+            if (kind === 'text') builder.endText(ref);
+            else if (kind === 'thinking') builder.endThinking(ref);
+            else if (kind === 'tool_call') builder.endToolCall(ref);
+            else builder.endText(ref);
             break;
           }
           case 'message_delta': {

@@ -30,6 +30,75 @@ describe('ConversationService work trace tool approvals', () => {
     })).toBeNull();
   });
 
+  it('preserves source refs and rejects a persisted cross-channel collision', () => {
+    const thinkingRef = {
+      protocol: 'anthropic-messages',
+      responseId: 'msg-1',
+      providerBlockKey: 'content:0',
+      sourceIndex: 0,
+      contentIndex: 0,
+    };
+    const textRef = {
+      protocol: 'anthropic-messages',
+      responseId: 'msg-1',
+      providerBlockKey: 'content:1',
+      sourceIndex: 1,
+      contentIndex: 1,
+    };
+    const toolRef = {
+      protocol: 'anthropic-messages',
+      responseId: 'msg-1',
+      providerBlockKey: 'content:2',
+      sourceIndex: 2,
+      itemId: 'tool-1',
+      contentIndex: 2,
+    };
+    const trace = {
+      status: 'complete' as const,
+      updatedAt: 100,
+      blocks: [{
+        id: 'runtime-loop-1',
+        kind: 'llm_turn' as const,
+        title: 'LLM turn',
+        status: 'complete' as const,
+        thinking: {
+          text: 'reasoning',
+          kind: 'raw' as const,
+          source: 'anthropic-thinking' as const,
+          visibility: 'raw-collapsed' as const,
+          replayPolicy: 'provider-artifact' as const,
+          providerOutputRef: thinkingRef,
+        },
+        result: {
+          text: 'answer',
+          status: 'complete' as const,
+          outputPhase: 'final_answer' as const,
+          providerOutputRefs: [textRef],
+          toolCallIds: ['tool-1'],
+        },
+        toolCalls: [{
+          id: 'tool-1',
+          toolName: 'read_file',
+          status: 'complete' as const,
+          providerOutputRef: toolRef,
+          startedAt: 90,
+          completedAt: 100,
+        }],
+        startedAt: 80,
+        completedAt: 100,
+      }],
+    };
+
+    expect(sanitizeStoredWorkTrace(trace)).not.toBeNull();
+    expect(sanitizeStoredWorkTrace({
+      ...trace,
+      blocks: [{
+        ...trace.blocks[0],
+        result: { ...trace.blocks[0].result, providerOutputRefs: [thinkingRef] },
+      }],
+    })).toBeNull();
+  });
+
   it('nests approval.requested and approval.answered under the matching tool call', () => {
     let trace = upsertRuntimeToolCall(undefined, {
       id: 'tool-web-search',

@@ -70,6 +70,22 @@ describe('Provider Catalog compiler', () => {
     expect(first.index.modelCount).toBeGreaterThanOrEqual(200);
   });
 
+  it('keeps provider reasoning semantics route-scoped and manifest-driven', () => {
+    const catalog = compileProviderCatalog(input());
+    const kimi = catalog.surfaces.get('kimi-coding-plan')?.surface;
+    expect(kimi?.routes.map((route) => ({
+      protocol: route.protocol,
+      semantic: route.reasoningContract?.semantic,
+      label: route.reasoningContract?.displayLabel,
+    }))).toEqual([
+      { protocol: 'AnthropicMessages', semantic: 'raw', label: 'Raw reasoning' },
+      { protocol: 'OpenAICompatibleChatCompletions', semantic: 'raw', label: 'Raw reasoning' },
+    ]);
+
+    const custom = catalog.surfaces.get('custom-endpoint')?.surface;
+    expect(custom?.routes.every((route) => route.reasoningContract === undefined)).toBe(true);
+  });
+
   it('exposes protocols only through precise model route matrices', () => {
     const catalog = compileProviderCatalog(input());
     expect(catalog.index.surfaces.every((surface) => !('userSelectableRoute' in surface))).toBe(true);

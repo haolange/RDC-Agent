@@ -61,7 +61,13 @@
       "adapterId": "openai-compatible",
       "baseUrl": "https://api.friendli.ai/serverless/v1",
       "default": true,
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "reasoningContract": {
+        "semantic": "raw",
+        "source": "friendli-documented-raw-reasoning",
+        "evidence": "https://friendli.ai/docs/guides/serverless_endpoints/reasoning",
+        "displayLabel": "Raw reasoning"
+      }
     }
   ],
   "discovery": {

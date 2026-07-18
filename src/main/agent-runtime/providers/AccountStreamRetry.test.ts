@@ -4,6 +4,13 @@ import type { AssistantMessage, AssistantMessageEvent } from '../core/types';
 import { ProviderHttpError } from './internal/http';
 import { streamWithUnauthorizedRefresh } from './AccountStreamRetry';
 
+const textRef = {
+  protocol: 'test',
+  providerBlockKey: 'text:0',
+  sourceIndex: 0,
+  contentIndex: 0,
+};
+
 const message: AssistantMessage = {
   role: 'assistant',
   content: [],
@@ -36,7 +43,7 @@ describe('account stream 401 retry', () => {
       ], unauthorized),
       () => attempt([
         { type: 'start', partial: message },
-        { type: 'text_delta', contentIndex: 0, delta: 'ok', partial: message },
+        { type: 'text_delta', contentIndex: 0, delta: 'ok', providerOutputRef: textRef, partial: message },
         { type: 'done', reason: 'stop', message },
       ]),
     ];
@@ -54,7 +61,7 @@ describe('account stream 401 retry', () => {
     const stream = streamWithUnauthorizedRefresh({
       createAttempt: () => attempt([
         { type: 'start', partial: message },
-        { type: 'text_delta', contentIndex: 0, delta: 'partial', partial: message },
+        { type: 'text_delta', contentIndex: 0, delta: 'partial', providerOutputRef: textRef, partial: message },
         { type: 'error', error: unauthorized, message },
       ], unauthorized),
       refresh,

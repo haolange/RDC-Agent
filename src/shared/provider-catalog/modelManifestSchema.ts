@@ -132,10 +132,24 @@ export const ContextTierSchema = z.object({
   entitlement: EntitlementStateSchema,
 }).strict();
 
+export const ProviderReasoningContractSchema = z.object({
+  semantic: z.enum(['raw', 'summary', 'opaque', 'none', 'unknown']),
+  source: z.string().min(1),
+  evidence: z.string().min(1).optional(),
+  displayLabel: z.enum([
+    'Raw reasoning',
+    'Reasoning summary',
+    'Provider reasoning',
+    'Reasoning metadata',
+    'None',
+  ]),
+}).strict();
+
 export const ModelRouteSchema = z.object({
   protocol: ProviderProtocolSchema,
   baseUrl: z.string().min(1).optional(),
   headers: z.record(z.string(), z.string()).optional(),
+  reasoningContract: ProviderReasoningContractSchema.optional(),
   source: z.enum(['model', 'user', 'catalog']),
 }).strict();
 
@@ -314,6 +328,7 @@ export type BooleanControlDefinition = z.infer<typeof BooleanControlDefinitionSc
 export type ExecutionBinding = z.infer<typeof ExecutionBindingSchema>;
 export type ModelControls = z.infer<typeof ModelControlsSchema>;
 export type ModelModeAction = z.infer<typeof ModelModeActionSchema>;
+export type ProviderReasoningContract = z.infer<typeof ProviderReasoningContractSchema>;
 export type ModelPresencePolicy = ModelManifest['presencePolicy'];
 export type ModelManifest = z.infer<typeof ModelManifestSchema>;
 export type ModelLiveProjection = z.infer<typeof ModelLiveProjectionSchema>;

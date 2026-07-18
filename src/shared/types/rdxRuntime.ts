@@ -186,14 +186,8 @@ export interface RequestEnvelopeSnapshot {
   redactions: Array<{ path: string; reason: string; hash?: string }>;
 }
 
-export type ReasoningSemantic = 'raw' | 'summary' | 'opaque' | 'none' | 'unknown';
-
-export interface ProviderReasoningContract {
-  semantic: ReasoningSemantic;
-  source: string;
-  evidence?: string;
-  displayLabel: 'Raw reasoning' | 'Reasoning summary' | 'Provider reasoning' | 'Reasoning metadata' | 'None';
-}
+export type ProviderReasoningContract = import('../provider-catalog/modelManifestSchema').ProviderReasoningContract;
+export type ReasoningSemantic = ProviderReasoningContract['semantic'];
 
 export interface ScopedResourceDocument {
   id: string;

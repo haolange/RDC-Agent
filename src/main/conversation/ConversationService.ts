@@ -30,7 +30,7 @@ import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { PromptPlan } from '@shared/types/rdxRuntime';
-import type { ThinkingArtifact } from '@shared/types/reasoning';
+import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
 import type {
   AppMode,
   OpenedCaptureState,
@@ -96,6 +96,11 @@ import {
   type ConversationLoopContinuationState,
 } from '@shared/conversation/loopOutputPhase';
 import { beginAssistantContentLoopIfPending } from './ConversationLoopRuntimeState';
+import {
+  EMPTY_CANONICAL_ASSISTANT_OUTPUT,
+  reduceCanonicalAssistantOutput,
+  requireCanonicalFinalAnswer,
+} from './CanonicalAssistantOutput';
 import {
   materializeAgentUserInput,
   resolvePendingAttachmentDescriptors,
@@ -1118,6 +1123,12 @@ export class ConversationService {
       },
     });
     if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
+    const plannedRouteCapability = resolveAgentRouteCapability(
+      settings.llm.providers.find((entry) => entry.id === routePreflight.providerId),
+      routePreflight.modelId,
+      effectiveModel,
+      planning.plan,
+    );
     if (
       configurationCommit?.providerCatalogRevision
       && planning.plan.catalogRevision !== configurationCommit.providerCatalogRevision
@@ -1134,13 +1145,13 @@ export class ConversationService {
     const preparedUserInput = await materializeAgentUserInput(
       effectiveMessage,
       pendingAttachmentDescriptors,
-      routePreflight.routeCapability.visionInputMode,
+      plannedRouteCapability.visionInputMode,
       false,
     );
     const preparedPrompt = this.prepareConversationPrompt({
       context,
       agentId: conversationAgentId,
-      routePreflight,
+      routePreflight: { ...routePreflight, routeCapability: plannedRouteCapability },
       requestPlan: planning.plan,
       effectiveModel,
       attachmentPaths: pendingAttachmentDescriptors.map((attachment) => attachment.filePath),
@@ -1161,7 +1172,7 @@ export class ConversationService {
       providerId: routePreflight.providerId,
       selectedModelId: routePreflight.modelId,
       effectiveModel,
-      routeCapability: routePreflight.routeCapability,
+      routeCapability: plannedRouteCapability,
       requestPlan: planning.plan,
       turnControls: planning.controls,
       promptPlan: preparedPrompt.promptPlan,
@@ -1535,10 +1546,11 @@ export class ConversationService {
       showWorkTrace ? { workTrace } : {}
     );
 
-    let rawResponse = '';
     let visibleResponse = '';
+    let canonicalOutput = EMPTY_CANONICAL_ASSISTANT_OUTPUT;
     // Assistant turns are split into LLM loop turns. The loop result is model output;
     let currentLoopText = '';
+    let currentLoopProviderOutputRefs: ProviderOutputRef[] = [];
     let currentLoopThinking: ThinkingArtifact | undefined;
     let currentLoopThinkingStatus: ConversationThinkingStatus | undefined;
     let loopSeq = 1;
@@ -1598,6 +1610,18 @@ export class ConversationService {
       }
     };
     const currentLoopId = () => `runtime-loop-${loopSeq}`;
+    const recordProviderOutputRefs = (refs: ProviderOutputRef[] | undefined) => {
+      for (const ref of refs ?? []) {
+        const duplicate = currentLoopProviderOutputRefs.some((candidate) => (
+          candidate.protocol === ref.protocol
+          && candidate.responseId === ref.responseId
+          && candidate.providerBlockKey === ref.providerBlockKey
+          && candidate.sourceIndex === ref.sourceIndex
+          && candidate.itemId === ref.itemId
+        ));
+        if (!duplicate) currentLoopProviderOutputRefs.push({ ...ref });
+      }
+    };
     let errorViewModel: ConversationTurnResult['errorViewModel'] = null;
     let llmDiagnostic: ConversationMessageDiagnostic | null = null;
     let runWasCancelled = false;
@@ -1606,6 +1630,7 @@ export class ConversationService {
     const currentLoopOptions = () => ({
       loopId: currentLoopId(),
       loopResultText: currentLoopText.trim() || undefined,
+      loopProviderOutputRefs: currentLoopProviderOutputRefs,
       loopThinking: currentLoopThinking,
       loopThinkingStatus: currentLoopThinkingStatus,
     });
@@ -1629,6 +1654,7 @@ export class ConversationService {
       visibleResponse = next.visibleResponse;
       if (next.loopSeq !== previousLoopSeq) {
         currentLoopOutputPhase = undefined;
+        currentLoopProviderOutputRefs = [];
       }
     };
 
@@ -1654,10 +1680,10 @@ export class ConversationService {
         const userInput = await materializeAgentUserInput(
           input.rawMessage,
           input.importedAttachments,
-          routePreflight.routeCapability.visionInputMode,
+          input.preparedTurn.runtime.routeCapability.visionInputMode,
           true,
         );
-        const responseText = await agentOrchestrator.sendProfileMessage(
+        await agentOrchestrator.sendProfileMessage(
           conversationAgentId,
           input.rawMessage,
           {
@@ -1734,10 +1760,11 @@ export class ConversationService {
                 }
               }
               if (event.type === 'assistant.delta') {
-                const chunk = typeof event.payload.text === 'string' ? event.payload.text : '';
+                const payload = event.payload as { text?: string; providerOutputRef?: ProviderOutputRef };
+                const chunk = typeof payload.text === 'string' ? payload.text : '';
                 if (chunk) {
+                  recordProviderOutputRefs(payload.providerOutputRef ? [payload.providerOutputRef] : undefined);
                   beginAssistantContentLoop();
-                  rawResponse += chunk;
                   currentLoopText += chunk;
                   syncVisibleResponseForStreaming();
                   commitVisibleAssistantText();
@@ -1750,6 +1777,8 @@ export class ConversationService {
                     'streaming',
                     undefined,
                     resolveStreamingOutputPhase(),
+                    undefined,
+                    currentLoopProviderOutputRefs,
                   ));
                 }
               }
@@ -1780,6 +1809,8 @@ export class ConversationService {
                     'streaming',
                     undefined,
                     resolveStreamingOutputPhase(),
+                    undefined,
+                    currentLoopProviderOutputRefs,
                   ));
                 }
               }
@@ -1807,6 +1838,8 @@ export class ConversationService {
                     'streaming',
                     undefined,
                     resolveStreamingOutputPhase(),
+                    undefined,
+                    currentLoopProviderOutputRefs,
                   ));
                 }
               }
@@ -1845,6 +1878,7 @@ export class ConversationService {
               if (event.type === 'tool.requested') {
                 const payload = event.payload as {
                   toolCall?: { id?: string; name?: string; arguments?: Record<string, unknown> };
+                  providerOutputRef?: ProviderOutputRef;
                 };
                 if (payload.toolCall?.id && payload.toolCall.name) {
                   const loopScoped = isLoopTool(String(payload.toolCall.name));
@@ -1868,6 +1902,8 @@ export class ConversationService {
                         'streaming',
                         undefined,
                         'commentary',
+                        undefined,
+                        currentLoopProviderOutputRefs,
                       ));
                     }
                   }
@@ -1876,6 +1912,7 @@ export class ConversationService {
                       id: String(payload.toolCall.id),
                       toolName: String(payload.toolCall.name),
                       status: 'pending',
+                      providerOutputRef: payload.providerOutputRef ? { ...payload.providerOutputRef } : undefined,
                       argsPreview: JSON.stringify(payload.toolCall.arguments ?? {}).slice(0, 600),
                       startedAt: nowMs(),
                     }, loopScoped ? currentLoopOptions() : undefined),
@@ -1885,7 +1922,8 @@ export class ConversationService {
               if (event.type === 'tool.started') {
                 const loopScoped = isLoopTool(String(event.payload.toolName));
                 if (loopScoped) {
-                  beginAssistantContentLoop();
+                  // Tool execution belongs to the provider loop that requested it. Only a
+                  // subsequent assistant semantic event may consume pendingNewLoop.
                   loopHasTools = true;
                   markLoopCommentary();
                 }
@@ -1964,6 +2002,8 @@ export class ConversationService {
                       'complete',
                       'tool_use',
                       'commentary',
+                      undefined,
+                      currentLoopProviderOutputRefs,
                     ),
                   });
                   return;
@@ -2178,10 +2218,12 @@ export class ConversationService {
                 const payload = event.payload as {
                   text?: string;
                   thinking?: ThinkingArtifact[];
+                  providerOutputRefs?: ProviderOutputRef[];
                   stopReason?: ConversationLoopStopReason;
                 };
                 beginAssistantContentLoop();
                 const loopResult = typeof payload.text === 'string' ? payload.text.trim() : '';
+                recordProviderOutputRefs(payload.providerOutputRefs);
                 const stopReason = payload.stopReason;
                 const completedThinking = selectCompletedThinking(payload.thinking) ?? currentLoopThinking;
                 if (completedThinking) {
@@ -2197,7 +2239,7 @@ export class ConversationService {
                 currentLoopOutputPhase = outputPhase;
                 const reasoningState = resolveConversationReasoningState(
                   completedThinking,
-                  routePreflight.routeCapability.reasoningDelivery,
+                  input.preparedTurn.runtime.routeCapability.reasoningDelivery,
                 );
                 if (loopResult || currentLoopThinking || stopReason || outputPhase) {
                   commitAssistantMessage('message_patched', {
@@ -2211,11 +2253,13 @@ export class ConversationService {
                       stopReason,
                       outputPhase,
                       reasoningState,
+                      currentLoopProviderOutputRefs,
                     ),
                   });
                 }
                 if (outputPhase === 'final_answer') {
-                  visibleResponse = loopResult;
+                  canonicalOutput = reduceCanonicalAssistantOutput(canonicalOutput, loopResult, outputPhase);
+                  visibleResponse = canonicalOutput.finalAnswerText;
                 } else {
                   // Commentary stays in Work Process; never leave process text in the bubble.
                   visibleResponse = '';
@@ -2274,9 +2318,7 @@ export class ConversationService {
           },
         );
 
-        if (!rawResponse) {
-          rawResponse = responseText;
-        }
+        requireCanonicalFinalAnswer(canonicalOutput);
       } catch (error) {
         llmDiagnostic = createRequestFailedDiagnostic(routePreflight, error);
         errorViewModel = {
@@ -2284,7 +2326,6 @@ export class ConversationService {
           message: llmDiagnostic.userMessage,
           technicalMessage: llmDiagnostic.technicalMessage,
         };
-        rawResponse = llmDiagnostic.userMessage;
         visibleResponse = llmDiagnostic.userMessage;
         currentLoopText = llmDiagnostic.userMessage;
         recordLlmDiagnostic(input.context, llmDiagnostic);
@@ -2292,7 +2333,9 @@ export class ConversationService {
       }
 
     if (abortController.signal.aborted || runWasCancelled) return;
-    const assistantContent = (currentLoopText.trim() || rawResponse || visibleResponse).trim();
+    const assistantContent = llmDiagnostic
+      ? llmDiagnostic.userMessage.trim()
+      : requireCanonicalFinalAnswer(canonicalOutput);
     visibleResponse = assistantContent;
     const isRouteMissingDiagnostic = llmDiagnostic?.code === 'CONVERSATION_LLM_ROUTE_MISSING';
     const finalStatus: ConversationMessage['status'] = runWasCancelled

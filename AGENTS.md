@@ -116,6 +116,8 @@
 - Agent Runtime 的用户资源根固定为 `~/.rdx`，项目资源根固定为 `<project-root>/.rdx`。不得新增可配置 workspace root、旧目录 fallback、双写或静默迁移。
 - Project Scope 必须覆盖 agents、skills、MCP、hooks、policies、knowledge 和 memory；RDX CLI action 与 secret 仍属于本机边界，不能由项目覆盖。
 - Prompt 调用链必须经 `PromptPlan -> RequestEnvelope -> provider adapter`。新增上下文来源时必须提供 scope、source、hash、precedence 和脱敏策略。
+- Provider 输出必须先获得稳定 `ProviderOutputRef`；同一 source ref 只能归属 `thinking`、`text`、`tool_call` 之一。kind collision、start 前 delta、close 后 delta、terminal 后语义事件必须 fail-closed，禁止按文本相同/相似做跨通道去重或 UI 隐藏。
+- 普通 assistant text 永远不能合成为 thinking。commentary/final 仅由 canonical `outputPhase` 决定；只有 `final_answer` 可写 assistant 正文和 final trace，正常结束但无 canonical final 必须报诊断，禁止用 thinking/commentary fallback。
 - Provider/Model 事实只能写入 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth 与 discovery。禁止恢复 TS preset、factory 推导、名称/后缀/上游 SDK 包元数据/hostname 猜测或 renderer 静态 Catalog。
 - Fast、Reasoning Max、Max mode 与 variant 必须由 `ControlDefinition + ExecutionBinding` 编译；可选控件没有唯一可执行路径时 fail-closed。认证 secret/header 只能进入主进程 opaque credential lease，不得进入 manifest、Route、RequestPlan、IPC 或 Trace。
 - Memory 写入必须由明确用户意图或交互审批触发；禁止恢复轮次自动抽取、自动 consolidation 或全索引 prompt 注入。
