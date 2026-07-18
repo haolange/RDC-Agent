@@ -24,7 +24,7 @@ import { isAdmittedDiscoveredModel, normalizeDiscoveredModelMatchKey } from './D
 import { resolveExecutionBinding, resolveModelControls } from '@shared/utils/modelControls';
 
 export const DISCOVERY_TTL_MS = 24 * 60 * 60 * 1000;
-export const EFFECTIVE_CATALOG_SCHEMA_VERSION = 5 as const;
+export const EFFECTIVE_CATALOG_SCHEMA_VERSION = 6 as const;
 
 type PartialContextTier = Partial<ContextTier> & Pick<ContextTier, 'id'>;
 
@@ -75,6 +75,7 @@ export interface CatalogLayerContribution {
   observedAt: string;
   refreshedAt?: string;
   sourceRevision?: string;
+  evidenceKey?: string;
   sourceHash?: string;
   surface?: string;
   accountScope?: string;
@@ -725,7 +726,7 @@ export class EffectiveCatalogService {
     this.discoveryTtlMs = options.discoveryTtlMs ?? DISCOVERY_TTL_MS;
     const persisted = sanitizePersistedCatalogState(this.readState());
     this.state = persisted.state;
-    if (persisted.changed || this.stateNeedsRewrite) this.persistState();
+    if (persisted.changed || (this.stateNeedsRewrite && options.statePath)) this.persistState();
   }
 
   subscribe(listener: EffectiveCatalogListener): () => void {
@@ -755,6 +756,14 @@ export class EffectiveCatalogService {
         this.lastErrors.delete(key);
       }
     }
+    const observedKey = evidenceKey(input.providerId, input.accountId);
+    if (this.state.observed[observedKey]) {
+      this.state.observed[observedKey] = this.state.observed[observedKey].filter((layer) => (
+        !layer.evidenceKey?.startsWith('capability-probe:')
+        || (input.protocol !== undefined && layer.protocol !== input.protocol)
+      ));
+      if (this.state.observed[observedKey].length === 0) delete this.state.observed[observedKey];
+    }
     if (exactKey) this.lastErrors.delete(exactKey);
     this.persistState();
     this.emitLatestSnapshots(input);
@@ -778,7 +787,14 @@ export class EffectiveCatalogService {
       ? this.discoveryLayerNormalizer?.(request, rawDiscovery) ?? rawDiscovery
       : undefined;
     const cachedEntitlement = request.entitlement ?? this.state.entitlements[key];
-    const persistedObserved = request.observed ?? this.state.observed[evidenceKey(request.providerId, request.accountId)];
+    const nowMs = this.now().getTime();
+    const rawObserved = request.observed ?? this.state.observed[evidenceKey(request.providerId, request.accountId)];
+    const persistedObserved = (Array.isArray(rawObserved)
+      ? rawObserved
+      : rawObserved ? [rawObserved] : [])
+      .filter((layer) => (
+        !layer.expiresAt || Date.parse(layer.expiresAt) > nowMs
+      ));
     const stale = cachedDiscovery?.expiresAt
       ? Date.parse(cachedDiscovery.expiresAt) <= this.now().getTime()
       : Boolean(cachedDiscovery);
@@ -854,6 +870,12 @@ export class EffectiveCatalogService {
           observedAt: observedAt.toISOString(),
           expiresAt,
         };
+        const observedKey = evidenceKey(request.providerId, request.accountId);
+        if (this.state.observed[observedKey]) {
+          this.state.observed[observedKey] = this.state.observed[observedKey].filter((layer) => (
+            layer.protocol !== request.protocol || !layer.evidenceKey?.startsWith('capability-probe:')
+          ));
+        }
         this.state.discoveries[key] = enforceDiscoveryAdmission(
           this.discoveryLayerNormalizer?.(request, loadedDiscovery) ?? loadedDiscovery,
         ) ?? loadedDiscovery;
@@ -882,16 +904,31 @@ export class EffectiveCatalogService {
     return refresh;
   }
 
-  recordObserved(request: Pick<EffectiveCatalogRequest, 'providerId' | 'accountId' | 'protocol'>, models: CatalogModelContribution[], detail?: string): void {
+  recordObserved(
+    request: Pick<EffectiveCatalogRequest, 'providerId' | 'accountId' | 'protocol'>,
+    evidenceId: string,
+    models: CatalogModelContribution[],
+    detail?: string,
+    ttlMs?: number,
+  ): void {
     const key = evidenceKey(request.providerId, request.accountId);
     const next: CatalogLayerContribution = {
       source: 'observed',
       observedAt: this.now().toISOString(),
+      evidenceKey: evidenceId,
+      ...(ttlMs ? { expiresAt: new Date(this.now().getTime() + ttlMs).toISOString() } : {}),
       protocol: request.protocol,
       detail,
       models,
     };
-    this.state.observed[key] = [...(this.state.observed[key] ?? []), next];
+    const nowMs = this.now().getTime();
+    this.state.observed[key] = [
+      ...(this.state.observed[key] ?? []).filter((layer) => (
+        (!layer.expiresAt || Date.parse(layer.expiresAt) > nowMs)
+        && !(layer.protocol === request.protocol && layer.evidenceKey === evidenceId)
+      )),
+      next,
+    ];
     this.persistState();
     this.emitLatestSnapshots({ providerId: request.providerId, accountId: request.accountId });
   }

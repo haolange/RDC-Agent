@@ -151,29 +151,23 @@ function projectContext(
   const policy = model.liveProjection?.context;
   const tokens = observation.contextWindowTokens;
   if (!policy || !tokens) return {};
-  const defaultTier = model.contextTiers.find((tier) => tier.id === policy.defaultTierId);
-  if (!defaultTier) return {};
-  const contextTiers: NonNullable<CatalogModelContribution['contextTiers']> = [{
-    id: defaultTier.id,
-    label: defaultTier.label,
-    maxPromptTokens: Math.min(tokens, defaultTier.maxPromptTokens ?? tokens),
-    activation: defaultTier.activation,
-    entitlement: 'granted',
-  }];
+  const observedTier = model.contextTiers.find((tier) => tier.id === policy.observedTierId);
+  if (!observedTier) return {};
+  const contextTiers: NonNullable<CatalogModelContribution['contextTiers']> = model.contextTiers.map((tier) => (
+    tier.id === observedTier.id
+      ? { ...tier, maxPromptTokens: tokens, entitlement: 'granted' as const }
+      : tier
+  ));
   if (!policy.maxTierId) return { contextTiers };
   const maxTier = model.contextTiers.find((tier) => tier.id === policy.maxTierId);
   if (!maxTier) return { contextTiers };
-  const maxEntitlement = policy.authority === 'account-effective'
-    ? tokens >= 1_000_000 ? 'granted' as const : 'denied' as const
-    : 'unknown' as const;
-  const maxAvailable = maxEntitlement === 'granted';
-  contextTiers.push({
-    id: maxTier.id,
-    label: maxTier.label,
-    maxPromptTokens: maxAvailable ? tokens : maxTier.maxPromptTokens,
-    activation: maxTier.activation,
-    entitlement: maxEntitlement,
-  });
+  const maxEntitlement = policy.entitlementAuthority === 'manifest'
+    ? maxTier.entitlement
+    : policy.entitlementAuthority === 'catalog-observation' && observedTier.id === maxTier.id
+      ? tokens >= 1_000_000 ? 'granted' as const : 'denied' as const
+      : 'unknown' as const;
+  const maxTierIndex = contextTiers.findIndex((tier) => tier.id === maxTier.id);
+  contextTiers[maxTierIndex] = { ...contextTiers[maxTierIndex], entitlement: maxEntitlement };
   const executionBindings = (model.executionBindings ?? []).map((binding) => (
     binding.when.context1m === true
       ? { ...binding, entitlement: maxEntitlement }
@@ -182,14 +176,9 @@ function projectContext(
   return {
     contextTiers,
     controls: {
-      context1m: maxEntitlement === 'granted'
-        ? { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: maxTier.id, label: 'Max mode' }
-        : maxEntitlement === 'denied'
-          ? { state: 'unsupported', fixedValue: false, reason: 'The account-effective catalog limit is below Max mode.' }
-          : {
-              state: 'unknown', defaultValue: false,
-              reason: 'Max mode entitlement was not reported by the account catalog.',
-            },
+      context1m: model.controls.context1m.state === 'selectable'
+        ? { ...model.controls.context1m, entitlement: maxEntitlement }
+        : model.controls.context1m,
     },
     executionBindings,
   };
@@ -207,7 +196,12 @@ function projectCompiledModel(
   const executionBindings = (context.executionBindings ?? model.executionBindings)?.map((binding) => {
     const target = binding.actions.find((action) => action.kind === 'model-switch');
     return target
-      ? { ...binding, entitlement: availableModelIds.has(target.targetModelId) ? 'granted' as const : 'denied' as const }
+      ? {
+          ...binding,
+          entitlement: availableModelIds.has(target.targetModelId)
+            ? binding.entitlement
+            : 'denied' as const,
+        }
       : binding;
   });
   const fastBinding = executionBindings?.find((binding) => (
@@ -229,9 +223,9 @@ function projectCompiledModel(
       ...model.controls,
       ...context.controls,
       ...(fastBinding ? {
-        fast: fastBinding.entitlement === 'granted'
-          ? { state: 'selectable', defaultValue: false, entitlement: 'granted' }
-          : { state: 'unsupported', fixedValue: false },
+        fast: model.controls.fast.state === 'selectable'
+          ? { ...model.controls.fast, entitlement: fastBinding.entitlement }
+          : model.controls.fast,
       } : {}),
       ...(reasoning ? { reasoning } : {}),
     },

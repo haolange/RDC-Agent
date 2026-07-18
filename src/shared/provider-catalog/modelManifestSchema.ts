@@ -208,9 +208,9 @@ export const ModelControlsSchema = z.object({
 }).strict();
 
 const LiveContextProjectionSchema = z.object({
-  authority: z.enum(['model-catalog', 'account-effective']),
-  defaultTierId: z.string().min(1),
+  observedTierId: z.string().min(1),
   maxTierId: z.string().min(1).optional(),
+  entitlementAuthority: z.enum(['manifest', 'catalog-observation', 'execution-evidence']),
 }).strict();
 
 const LiveReasoningProjectionSchema = z.object({
@@ -218,10 +218,18 @@ const LiveReasoningProjectionSchema = z.object({
   wireProfiles: z.partialRecord(ProviderProtocolSchema, ReasoningWireProfileSchema),
 }).strict();
 
+const EntitlementDenialMatcherSchema = z.object({
+  mode: z.enum(['fast', 'one-million-context']),
+  statuses: z.array(z.number().int().min(400).max(599)).min(1),
+  protocols: z.array(ProviderProtocolSchema).min(1).optional(),
+  messageIncludes: z.string().min(1).optional(),
+}).strict();
+
 export const ModelLiveProjectionSchema = z.object({
   context: LiveContextProjectionSchema.optional(),
   reasoning: LiveReasoningProjectionSchema.optional(),
   capabilities: z.array(z.enum(['toolCalling', 'visionInput', 'structuredOutput'])).optional(),
+  entitlementDenialMatchers: z.array(EntitlementDenialMatcherSchema).optional(),
 }).strict();
 
 export const ModelModeActionSchema = z.discriminatedUnion('kind', [

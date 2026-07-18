@@ -263,8 +263,8 @@ function validateModel(
   }
   const liveContext = model.liveProjection?.context;
   if (liveContext) {
-    if (!tierIds.has(liveContext.defaultTierId)) {
-      errors.push(`${surface.id}/${model.modelId} live context projection references a missing default tier`);
+    if (!tierIds.has(liveContext.observedTierId)) {
+      errors.push(`${surface.id}/${model.modelId} live context projection references a missing observed tier`);
     }
     if (liveContext.maxTierId) {
       const maxTier = model.contextTiers.find((tier) => tier.id === liveContext.maxTierId);
@@ -273,7 +273,10 @@ function validateModel(
       }
       const maxBindings = (model.executionBindings ?? []).filter((binding) => (
         binding.when.context1m === true
-        && binding.actions.some((action) => action.kind === 'client-tier' && action.tierId === liveContext.maxTierId)
+        && binding.actions.some((action) => (
+          (action.kind === 'client-tier' && action.tierId === liveContext.maxTierId)
+          || action.kind === 'model-switch'
+        ))
       ));
       if (maxBindings.length !== 1) {
         errors.push(`${surface.id}/${model.modelId} live Max projection requires one executable binding`);

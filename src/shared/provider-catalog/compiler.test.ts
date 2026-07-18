@@ -147,25 +147,37 @@ describe('Provider Catalog compiler', () => {
     expect(surface?.models.map((model) => model.modelId)).toEqual([
       'kimi-for-coding',
       'k3',
+      'k3[1m]',
       'kimi-for-coding-highspeed',
     ]);
-    expect(surface?.models.every((model) => model.presencePolicy === 'account-entitled')).toBe(true);
+    expect(surface?.models.filter((model) => model.selection.pickerVisibility === 'primary')
+      .every((model) => model.presencePolicy === 'account-entitled')).toBe(true);
     expect(surface?.models.find((model) => model.modelId === 'kimi-for-coding')).toMatchObject({
       label: 'Kimi for Coding',
-      controls: { fast: { state: 'unknown' }, reasoning: { kind: 'unknown', supportsOff: false } },
+      controls: { fast: { state: 'selectable' }, reasoning: { kind: 'unknown', supportsOff: false } },
       executionBindings: expect.arrayContaining([
         expect.objectContaining({
           when: { fast: true },
           actions: [{ kind: 'model-switch', targetModelId: 'kimi-for-coding-highspeed' }],
         }),
       ]),
+      liveProjection: {
+        entitlementDenialMatchers: [{
+          mode: 'fast',
+          statuses: [401],
+          messageIncludes: 'does not have access to kimi-for-coding-highspeed',
+        }],
+      },
     });
     expect(surface?.models.find((model) => model.modelId === 'k3')).toMatchObject({
       label: 'Kimi K3',
       controls: {
         fast: { state: 'unsupported' },
-        context1m: { state: 'unknown' },
+        context1m: { state: 'selectable' },
         reasoning: { kind: 'unknown', supportsOff: false },
+      },
+      liveProjection: {
+        entitlementDenialMatchers: [{ mode: 'one-million-context', statuses: [403] }],
       },
     });
     expect(surface?.models.find((model) => model.modelId === 'kimi-for-coding-highspeed')?.selection)
@@ -199,7 +211,7 @@ describe('Provider Catalog compiler', () => {
       availability: 'unknown',
       controls: {
         fast: { state: 'unsupported', fixedValue: false },
-        context1m: { state: 'unknown' },
+        context1m: { state: 'selectable' },
         reasoning: { kind: 'always-on', supportsOff: false, lockedSelection: 'max' },
       },
     });
@@ -346,8 +358,9 @@ describe('Provider Catalog compiler', () => {
     expect(deepseek?.models.every((model) => model.aliases.length === 0)).toBe(true);
 
     verify('kimi-coding-plan', [
-      ['kimi-for-coding', 256_000, 'unknown', 'unknown', 'unknown', false, [], 'on'],
-      ['k3', 256_000, 'unknown', 'unsupported', 'unknown', false, [], 'on'],
+      ['kimi-for-coding', 256_000, 'unsupported', 'selectable', 'unknown', false, [], 'on'],
+      ['k3', 256_000, 'selectable', 'unsupported', 'unknown', false, [], 'on'],
+      ['k3[1m]', 1_000_000, 'fixed', 'unsupported', 'unknown', false, [], 'on', 'internal'],
       ['kimi-for-coding-highspeed', 256_000, 'unknown', 'unsupported', 'unknown', false, [], 'on', 'internal'],
     ]);
 
@@ -425,8 +438,8 @@ describe('Provider Catalog compiler', () => {
     const missingLiveDefaultTier = clone(input());
     mutableSurface(missingLiveDefaultTier, 'kimi-coding-plan').models
       .find((model: Record<string, unknown>) => model.modelId === 'k3')
-      .liveProjection.context.defaultTierId = 'missing-default';
-    expect(() => compileProviderCatalog(missingLiveDefaultTier)).toThrow(/missing default tier/u);
+      .liveProjection.context.observedTierId = 'missing-default';
+    expect(() => compileProviderCatalog(missingLiveDefaultTier)).toThrow(/missing observed tier/u);
 
     const missingLiveMaxTier = clone(input());
     mutableSurface(missingLiveMaxTier, 'kimi-coding-plan').models
@@ -460,7 +473,7 @@ describe('Provider Catalog compiler', () => {
 
     const overlap = clone(input());
     const overlapKimi = mutableSurface(overlap, 'kimi-coding-plan');
-    overlapKimi.models.find((model: Record<string, unknown>) => model.modelId === 'kimi-for-coding')
+    overlapKimi.models.find((model: Record<string, unknown>) => model.modelId === 'k3')
       .executionBindings.push({
         id: 'context:conflict',
         when: { context1m: true },

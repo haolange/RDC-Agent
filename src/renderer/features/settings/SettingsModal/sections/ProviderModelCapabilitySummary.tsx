@@ -73,8 +73,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
   const probeModes: LlmModelCapabilityProbeMode[] = effectiveModel ? [
     'default',
     ...(contextChoices?.oneMillionTier ? ['one-million-context' as const] : []),
-    ...(effectiveModel.resolvedControls?.fast.state === 'selectable'
-      && !effectiveModel.resolvedControls.fast.disabled ? ['fast' as const] : []),
+    ...(effectiveModel.controls.fast.state === 'selectable' ? ['fast' as const] : []),
   ] : [];
   const updateBudget = (raw: string) => {
     if (!raw.trim()) {

@@ -491,8 +491,8 @@
       },
       "liveProjection": {
         "context": {
-          "authority": "account-effective",
-          "defaultTierId": "default"
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
         },
         "reasoning": {
           "offPolicy": "forbidden",
