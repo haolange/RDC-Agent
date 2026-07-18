@@ -2,7 +2,7 @@ import type { AgentRole } from './agent';
 import type { ConversationTurnControls } from './modelCapability';
 import type { AgentEvent } from './agentRuntime';
 import type { ConversationBranchState } from './conversationBranch';
-import type { ThinkingArtifact } from './reasoning';
+import type { ProviderOutputRef, ThinkingArtifact } from './reasoning';
 import type {
   AppMode,
   PreparedTurnContextSummary,
@@ -72,6 +72,7 @@ export interface ConversationToolCall {
   id: string;
   toolName: string;
   status: ConversationToolCallStatus;
+  providerOutputRef?: ProviderOutputRef;
   /** Canonical ask_user payload. Renderer state must never be reconstructed from argsPreview. */
   userInputQuestions?: ConversationAskUserQuestion[];
   argsPreview?: string;
@@ -100,6 +101,7 @@ export interface ConversationLoopResult {
   status: ConversationLoopResultStatus;
   stopReason?: ConversationLoopStopReason;
   outputPhase?: ConversationLoopOutputPhase;
+  providerOutputRefs?: ProviderOutputRef[];
   toolCallIds: string[];
 }
 

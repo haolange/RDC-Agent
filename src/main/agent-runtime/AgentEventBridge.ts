@@ -118,7 +118,11 @@ export function translateCoreToSharedAgentEvent(
     case 'message_update': {
       const ev = event.assistantMessageEvent as AssistantMessageEvent;
       if (ev.type === 'text_delta') {
-        return buildSharedAgentEvent('assistant.delta', { text: ev.delta }, context);
+        return buildSharedAgentEvent(
+          'assistant.delta',
+          { text: ev.delta, providerOutputRef: { ...ev.providerOutputRef } },
+          context,
+        );
       }
       if (ev.type === 'thinking_delta') {
         return buildSharedAgentEvent(
@@ -146,6 +150,7 @@ export function translateCoreToSharedAgentEvent(
               name: ev.toolCall.name,
               arguments: ev.toolCall.arguments,
             },
+            providerOutputRef: { ...ev.providerOutputRef },
           },
           context,
         );
@@ -161,6 +166,7 @@ export function translateCoreToSharedAgentEvent(
           {
             text,
             thinking: thinking.length > 0 ? thinking : undefined,
+            providerOutputRefs: extractAssistantTextOutputRefs(event.message.content),
             stopReason: mapCoreStopReasonToShared(event.message.stopReason),
             usage: event.message.usage
               ? {
@@ -354,6 +360,15 @@ function extractAssistantTextFromContent(content: AssistantMessage['content']): 
     .filter((block) => block.type === 'text')
     .map((block) => block.text)
     .join('');
+}
+
+function extractAssistantTextOutputRefs(
+  content: AssistantMessage['content'],
+): NonNullable<import('@shared/types/agentRuntime').AgentAssistantCompletedPayload['providerOutputRefs']> | undefined {
+  const refs = content
+    .filter((block) => block.type === 'text' && block.providerOutputRef)
+    .map((block) => ({ ...block.providerOutputRef! }));
+  return refs.length > 0 ? refs : undefined;
 }
 
 function extractAssistantThinkingFromContent(content: AssistantMessage['content']): ThinkingArtifact[] {

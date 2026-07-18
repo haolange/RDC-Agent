@@ -16,10 +16,11 @@ import type {
   Context,
   Message,
   Model,
+  ProviderOutputRef,
   StopReason,
   StreamOptions,
 } from '../core/types';
-import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, createProviderOutputRef } from './internal/AssistantStreamBuilder';
 import { composeAbortSignals, normalizeError } from './internal/http';
 
 type RuntimeLanguageModel = Exclude<LanguageModel, string>;
@@ -145,36 +146,72 @@ async function consumeFullStream(
   model: Model,
 ): Promise<void> {
   const indexes = new Map<string, number>();
+  const refs = new Map<string, ProviderOutputRef>();
+  const startedKinds = new Map<string, 'text' | 'thinking' | 'tool_call'>();
   const toolBuffers = new Map<string, string>();
   let nextIndex = 0;
-  const indexFor = (id: string): number => {
-    const existing = indexes.get(id);
-    if (existing !== undefined) return existing;
-    const created = nextIndex++;
-    indexes.set(id, created);
-    return created;
+  const refFor = (id: string): ProviderOutputRef => {
+    const existing = refs.get(id);
+    if (existing) return existing;
+    const index = indexes.get(id) ?? nextIndex++;
+    indexes.set(id, index);
+    const ref = createProviderOutputRef({
+      protocol: model.api,
+      providerBlockKey: `part:${id}`,
+      itemId: id,
+      contentIndex: index,
+    });
+    refs.set(id, ref);
+    return ref;
   };
+  const thinkingInput = {
+    kind: 'unknown' as const,
+    source: 'unknown' as const,
+    visibility: 'raw-collapsed' as const,
+    replayPolicy: 'none' as const,
+    artifact: {
+      providerId: model.provider,
+      modelId: model.id,
+      protocol: model.api,
+      type: 'ai-sdk-reasoning',
+    },
+  };
+
   for await (const part of parts) {
     const partWithId = part as TextStreamPart<ToolSet> & { id?: string };
-    if (part.type === 'text-delta') builder.appendText(indexFor(part.id), part.text);
-    else if (part.type === 'text-end') builder.endText(indexFor(part.id));
-    else if (part.type === 'reasoning-delta') {
-      builder.appendThinking(indexFor(part.id), part.text, {
-        kind: 'unknown', source: 'unknown', visibility: 'raw-collapsed', replayPolicy: 'none',
-        artifact: { providerId: model.provider, modelId: model.id, protocol: model.api, type: 'ai-sdk-reasoning' },
-      });
-    } else if (part.type === 'reasoning-end') builder.endThinking(indexFor(part.id));
-    else if (part.type === 'tool-input-start') {
-      builder.ensureToolCall(indexFor(part.id), part.id, part.toolName);
+    if (part.type === 'text-start') {
+      builder.startText(refFor(part.id));
+      startedKinds.set(part.id, 'text');
+    } else if (part.type === 'text-delta') {
+      builder.appendText(refFor(part.id), part.text);
+    } else if (part.type === 'text-end') {
+      builder.endText(refFor(part.id));
+    } else if (part.type === 'reasoning-start') {
+      builder.startThinking(refFor(part.id), thinkingInput);
+      startedKinds.set(part.id, 'thinking');
+    } else if (part.type === 'reasoning-delta') {
+      builder.appendThinking(refFor(part.id), part.text, thinkingInput);
+    } else if (part.type === 'reasoning-end') {
+      builder.endThinking(refFor(part.id));
+    } else if (part.type === 'tool-input-start') {
+      builder.startToolCall(refFor(part.id), part.id, part.toolName);
+      startedKinds.set(part.id, 'tool_call');
       toolBuffers.set(part.id, '');
     } else if (part.type === 'tool-input-delta') {
-      builder.appendToolCallArgs(indexFor(part.id), part.delta);
+      builder.appendToolCallArgs(refFor(part.id), part.delta);
       toolBuffers.set(part.id, `${toolBuffers.get(part.id) ?? ''}${part.delta}`);
     } else if (part.type === 'tool-call') {
-      const index = indexFor(part.toolCallId);
-      builder.ensureToolCall(index, part.toolCallId, part.toolName);
-      if (!toolBuffers.get(part.toolCallId)) builder.appendToolCallArgs(index, JSON.stringify(part.input ?? {}));
-      builder.endToolCall(index);
+      const ref = refFor(part.toolCallId);
+      if (startedKinds.get(part.toolCallId) === 'tool_call') {
+        builder.updateToolCall(ref, part.toolCallId, part.toolName);
+      } else {
+        builder.startToolCall(ref, part.toolCallId, part.toolName);
+        startedKinds.set(part.toolCallId, 'tool_call');
+      }
+      if (!toolBuffers.get(part.toolCallId)) {
+        builder.appendToolCallArgs(ref, JSON.stringify(part.input ?? {}));
+      }
+      builder.endToolCall(ref);
     } else if (part.type === 'finish') {
       builder.setUsage({
         inputTokens: part.totalUsage.inputTokens ?? 0,
@@ -185,9 +222,13 @@ async function consumeFullStream(
         reasoningTokens: part.totalUsage.outputTokenDetails.reasoningTokens ?? undefined,
       });
       builder.done(mapFinishReason(part.finishReason));
-    } else if (part.type === 'abort') builder.done('aborted');
-    else if (part.type === 'error') throw normalizeError(part.error);
-    else if (partWithId.id && (part.type === 'text-start' || part.type === 'reasoning-start')) indexFor(partWithId.id);
+    } else if (part.type === 'abort') {
+      builder.done('aborted');
+    } else if (part.type === 'error') {
+      throw normalizeError(part.error);
+    } else if (partWithId.id) {
+      refFor(partWithId.id);
+    }
   }
 }
 

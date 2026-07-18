@@ -95,6 +95,7 @@ export function toSharedThinkingArtifact(thinking: ThinkingContent): SharedThink
     visibility: thinking.visibility,
     replayPolicy: thinking.replayPolicy,
     artifact: thinking.artifact,
+    providerOutputRef: thinking.providerOutputRef ? { ...thinking.providerOutputRef } : undefined,
   };
 }
 

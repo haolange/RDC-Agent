@@ -63,14 +63,26 @@
       "adapterId": "anthropic-messages",
       "baseUrl": "https://api.kimi.com/coding/v1",
       "default": true,
-      "protocolOwner": "anthropic"
+      "protocolOwner": "anthropic",
+      "reasoningContract": {
+        "semantic": "raw",
+        "source": "kimi-coding-plan-documented-raw-reasoning",
+        "evidence": "https://www.kimi.com/code/docs/en/",
+        "displayLabel": "Raw reasoning"
+      }
     },
     {
       "id": "OpenAICompatibleChatCompletions",
       "protocol": "OpenAICompatibleChatCompletions",
       "adapterId": "openai-compatible",
       "baseUrl": "https://api.kimi.com/coding/v1",
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "reasoningContract": {
+        "semantic": "raw",
+        "source": "kimi-coding-plan-documented-raw-reasoning",
+        "evidence": "https://www.kimi.com/code/docs/en/",
+        "displayLabel": "Raw reasoning"
+      }
     }
   ],
   "discovery": {

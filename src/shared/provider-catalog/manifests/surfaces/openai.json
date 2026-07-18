@@ -68,7 +68,13 @@
       "adapterId": "openai-responses",
       "baseUrl": "https://api.openai.com/v1",
       "default": true,
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "reasoningContract": {
+        "semantic": "summary",
+        "source": "openai-responses-reasoning-summary",
+        "evidence": "https://platform.openai.com/docs/api-reference/responses-streaming/response/reasoning_summary_part/added",
+        "displayLabel": "Reasoning summary"
+      }
     }
   ],
   "discovery": {

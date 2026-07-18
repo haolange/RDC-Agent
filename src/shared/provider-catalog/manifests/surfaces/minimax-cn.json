@@ -79,14 +79,26 @@
       "adapterId": "anthropic-messages",
       "baseUrl": "https://api.minimaxi.com/anthropic/v1",
       "default": true,
-      "protocolOwner": "anthropic"
+      "protocolOwner": "anthropic",
+      "reasoningContract": {
+        "semantic": "raw",
+        "source": "minimax-cn-documented-raw-reasoning",
+        "evidence": "https://platform.minimaxi.com/docs/api-reference/text-openai-api",
+        "displayLabel": "Raw reasoning"
+      }
     },
     {
       "id": "OpenAICompatibleChatCompletions",
       "protocol": "OpenAICompatibleChatCompletions",
       "adapterId": "openai-compatible",
       "baseUrl": "https://api.minimaxi.com/v1",
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "reasoningContract": {
+        "semantic": "raw",
+        "source": "minimax-cn-documented-raw-reasoning",
+        "evidence": "https://platform.minimaxi.com/docs/api-reference/text-openai-api",
+        "displayLabel": "Raw reasoning"
+      }
     }
   ],
   "discovery": {

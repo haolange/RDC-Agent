@@ -1,6 +1,6 @@
 import type { CatalogModelContribution } from './EffectiveCatalogService';
 import type { ModelManifest } from '@shared/provider-catalog/modelManifestSchema';
-import type { CapabilityState, ProviderSurfaceDefinition } from '@shared/types/providerCapability';
+import type { CapabilityState, ModelRoute, ProviderSurfaceDefinition } from '@shared/types/providerCapability';
 import type {
   NamedReasoningLevel,
   ReasoningControl,
@@ -26,6 +26,17 @@ export interface LiveModelObservation {
   toolCalling?: CapabilityState;
   visionInput?: CapabilityState;
   structuredOutput?: CapabilityState;
+}
+
+function withRouteReasoningContract(
+  surface: ProviderSurfaceDefinition,
+  route: ModelRoute,
+): ModelRoute {
+  const surfaceRoute = surface.routes.find((candidate) => candidate.protocol === route.protocol);
+  return {
+    ...route,
+    reasoningContract: surfaceRoute?.reasoningContract,
+  };
 }
 
 function definitionKeys(model: ModelManifest): string[] {
@@ -211,8 +222,11 @@ function projectCompiledModel(
     modelId: model.modelId,
     label: model.label,
     aliases: [...model.aliases],
-    route: model.route,
-    routeOptions: model.routeOptions,
+    route: withRouteReasoningContract(surface, model.route),
+    routeOptions: model.routeOptions?.map((option) => ({
+      ...option,
+      route: withRouteReasoningContract(surface, option.route),
+    })),
     selection: model.selection,
     presencePolicy: model.presencePolicy,
     availability: observation.availability ?? 'available',
@@ -259,7 +273,12 @@ function projectDynamicModel(
     label: observation.upstreamLabel ?? observation.modelId,
     availability: observation.availability ?? 'available',
     unavailableReason: observation.unavailableReason,
-    route: { protocol: route.protocol, baseUrl: route.baseUrl, source: 'catalog' },
+    route: {
+      protocol: route.protocol,
+      baseUrl: route.baseUrl,
+      reasoningContract: route.reasoningContract,
+      source: 'catalog',
+    },
     ...(observation.contextWindowTokens ? {
       contextTiers: [{
         id: 'default', label: 'Provider catalog limit', maxPromptTokens: observation.contextWindowTokens,

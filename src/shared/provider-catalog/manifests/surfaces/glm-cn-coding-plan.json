@@ -68,14 +68,26 @@
       "adapterId": "anthropic-messages",
       "baseUrl": "https://open.bigmodel.cn/api/anthropic/v1",
       "default": true,
-      "protocolOwner": "anthropic"
+      "protocolOwner": "anthropic",
+      "reasoningContract": {
+        "semantic": "raw",
+        "source": "glm-cn-coding-plan-documented-raw-reasoning",
+        "evidence": "https://docs.bigmodel.cn/",
+        "displayLabel": "Raw reasoning"
+      }
     },
     {
       "id": "OpenAICompatibleChatCompletions",
       "protocol": "OpenAICompatibleChatCompletions",
       "adapterId": "openai-compatible",
       "baseUrl": "https://open.bigmodel.cn/api/coding/paas/v4",
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "reasoningContract": {
+        "semantic": "raw",
+        "source": "glm-cn-coding-plan-documented-raw-reasoning",
+        "evidence": "https://docs.bigmodel.cn/",
+        "displayLabel": "Raw reasoning"
+      }
     }
   ],
   "discovery": {

@@ -2,6 +2,7 @@ import type { EventStream } from '../../core/EventStream';
 import type {
   AssistantMessage,
   AssistantMessageEvent,
+  ProviderOutputRef,
   StopReason,
   TextContent,
   ThinkingContent,
@@ -16,23 +17,66 @@ import {
   type ThinkingContentInput,
 } from '../../reasoning/ReasoningArtifacts';
 
+type BlockKind = 'text' | 'thinking' | 'tool_call';
+
 type Block =
-  | { kind: 'text'; index: number; text: string; closed: boolean }
-  | { kind: 'thinking'; index: number; thinking: ThinkingContent; closed: boolean }
+  | { kind: 'text'; ref: ProviderOutputRef; text: string; closed: boolean }
+  | { kind: 'thinking'; ref: ProviderOutputRef; thinking: ThinkingContent; closed: boolean }
   | {
-      kind: 'tool';
-      index: number;
+      kind: 'tool_call';
+      ref: ProviderOutputRef;
       id: string;
       name: string;
       argsBuffer: string;
       closed: boolean;
     };
 
+export type ProviderStreamDiagnosticCode =
+  | 'PROVIDER_STREAM_CHANNEL_COLLISION'
+  | 'PROVIDER_STREAM_DELTA_BEFORE_START'
+  | 'PROVIDER_STREAM_DUPLICATE_BLOCK_START'
+  | 'PROVIDER_STREAM_BLOCK_CLOSED'
+  | 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL';
+
+export class ProviderStreamProtocolError extends Error {
+  readonly code: ProviderStreamDiagnosticCode;
+  readonly outputRef: ProviderOutputRef;
+
+  constructor(code: ProviderStreamDiagnosticCode, ref: ProviderOutputRef, message: string) {
+    super(message);
+    this.name = 'ProviderStreamProtocolError';
+    this.code = code;
+    this.outputRef = { ...ref };
+  }
+}
+
 const EMPTY_USAGE: Usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+
+export function createProviderOutputRef(input: ProviderOutputRef): ProviderOutputRef {
+  if (!input.protocol.trim() || !input.providerBlockKey.trim()) {
+    throw new Error('ProviderOutputRef requires protocol and providerBlockKey.');
+  }
+  if (!Number.isInteger(input.contentIndex) || input.contentIndex < 0) {
+    throw new Error('ProviderOutputRef contentIndex must be a non-negative integer.');
+  }
+  return Object.freeze({ ...input });
+}
+
+function outputRefKey(ref: ProviderOutputRef): string {
+  return [
+    ref.protocol,
+    ref.responseId ?? '',
+    ref.providerBlockKey,
+    ref.sourceIndex ?? '',
+    ref.itemId ?? '',
+  ].join('\u0000');
+}
 
 export class AssistantStreamBuilder {
   private readonly stream: EventStream<AssistantMessageEvent, AssistantMessage>;
-  private readonly blocks: Block[] = [];
+  private readonly blocks = new Map<string, Block>();
+  private readonly orderedBlockKeys: string[] = [];
+  private readonly contentIndexOwners = new Map<number, string>();
   private readonly modelId: string;
   private readonly providerId: string;
   private usage: Usage = { ...EMPTY_USAGE };
@@ -50,159 +94,144 @@ export class AssistantStreamBuilder {
   }
 
   start(): void {
+    if (this.finished) {
+      throw new Error('Cannot start a provider stream after its terminal event.');
+    }
     if (this.started) return;
     this.started = true;
     this.stream.push({ type: 'start', partial: this.snapshot('stop') });
   }
 
-  appendText(index: number, delta: string): void {
+  startText(ref: ProviderOutputRef): void {
+    this.claim(ref, 'text', {
+      kind: 'text',
+      ref,
+      text: '',
+      closed: false,
+    });
+    this.stream.push({
+      type: 'text_start',
+      contentIndex: ref.contentIndex,
+      providerOutputRef: { ...ref },
+      partial: this.snapshot('stop'),
+    });
+  }
+
+  appendText(ref: ProviderOutputRef, delta: string): void {
     if (!delta) return;
-    let block = this.blocks[index] as Block | undefined;
-    if (!block || block.kind !== 'text') {
-      block = { kind: 'text', index, text: '', closed: false };
-      this.blocks[index] = block;
-      this.stream.push({
-        type: 'text_start',
-        contentIndex: index,
-        partial: this.snapshot('stop'),
-      });
-    }
+    const block = this.requireOpenBlock(ref, 'text', 'delta');
     block.text += delta;
     this.stream.push({
       type: 'text_delta',
-      contentIndex: index,
+      contentIndex: ref.contentIndex,
       delta,
+      providerOutputRef: { ...ref },
       partial: this.snapshot('stop'),
     });
   }
 
-  endText(index: number): void {
-    const block = this.blocks[index];
-    if (!block || block.kind !== 'text' || block.closed) return;
-    block.closed = true;
-    this.stream.push({
-      type: 'text_end',
-      contentIndex: index,
-      content: block.text,
-      partial: this.snapshot('stop'),
+  endText(ref: ProviderOutputRef): void {
+    const block = this.requireOpenBlock(ref, 'text', 'end');
+    this.closeBlock(block);
+  }
+
+  startThinking(ref: ProviderOutputRef, input: ThinkingContentInput = {}): void {
+    const thinking: ThinkingContent = {
+      ...createThinkingContent(input),
+      providerOutputRef: { ...ref },
+    };
+    this.claim(ref, 'thinking', {
+      kind: 'thinking',
+      ref,
+      thinking,
+      closed: false,
     });
-  }
-
-  ensureThinking(index: number, input: ThinkingContentInput = {}): ThinkingContent {
-    let block = this.blocks[index] as Block | undefined;
-    if (!block || block.kind !== 'thinking') {
-      const thinking = createThinkingContent(input);
-      block = { kind: 'thinking', index, thinking, closed: false };
-      this.blocks[index] = block;
-      this.stream.push({
-        type: 'thinking_start',
-        contentIndex: index,
-        thinking,
-        partial: this.snapshot('stop'),
-      });
-      return thinking;
-    }
-    if (Object.keys(input).length > 0) {
-      block.thinking = mergeThinkingContent(block.thinking, input);
-    }
-    return block.thinking;
-  }
-
-  appendThinking(index: number, delta: string, input: ThinkingContentInput = {}): void {
-    if (!delta) return;
-    let thinking = this.ensureThinking(index, input);
-    const block = this.blocks[index];
-    if (!block || block.kind !== 'thinking') return;
-    thinking = appendThinkingText(thinking, delta);
-    block.thinking = thinking;
     this.stream.push({
-      type: 'thinking_delta',
-      contentIndex: index,
-      delta,
+      type: 'thinking_start',
+      contentIndex: ref.contentIndex,
+      providerOutputRef: { ...ref },
       thinking,
       partial: this.snapshot('stop'),
     });
   }
 
-  updateThinking(index: number, input: ThinkingContentInput): void {
-    this.ensureThinking(index, input);
-  }
-
-  endThinking(index: number, input: ThinkingContentInput = {}): void {
-    const block = this.blocks[index];
-    if (!block || block.kind !== 'thinking' || block.closed) return;
+  appendThinking(ref: ProviderOutputRef, delta: string, input: ThinkingContentInput = {}): void {
+    if (!delta) return;
+    const block = this.requireOpenBlock(ref, 'thinking', 'delta');
     if (Object.keys(input).length > 0) {
       block.thinking = mergeThinkingContent(block.thinking, input);
     }
-    block.closed = true;
+    block.thinking = appendThinkingText(block.thinking, delta);
     this.stream.push({
-      type: 'thinking_end',
-      contentIndex: index,
-      content: getThinkingText(block.thinking),
+      type: 'thinking_delta',
+      contentIndex: ref.contentIndex,
+      delta,
+      providerOutputRef: { ...ref },
       thinking: block.thinking,
       partial: this.snapshot('stop'),
     });
   }
 
-  ensureToolCall(index: number, id: string, name: string): void {
-    let block = this.blocks[index] as Block | undefined;
-    if (!block || block.kind !== 'tool') {
-      block = {
-        kind: 'tool',
-        index,
-        id: id || `call_${index}`,
-        name: name || '',
-        argsBuffer: '',
-        closed: false,
-      };
-      this.blocks[index] = block;
-      this.stream.push({
-        type: 'toolcall_start',
-        contentIndex: index,
-        partial: this.snapshot('stop'),
-      });
-    } else {
-      if (id && block.id.startsWith('call_')) {
-        block.id = id;
-      }
-      if (name && !block.name) {
-        block.name = name;
-      }
-    }
+  updateThinking(ref: ProviderOutputRef, input: ThinkingContentInput): void {
+    const block = this.requireOpenBlock(ref, 'thinking', 'update');
+    block.thinking = mergeThinkingContent(block.thinking, input);
   }
 
-  appendToolCallArgs(index: number, delta: string): void {
+  endThinking(ref: ProviderOutputRef, input: ThinkingContentInput = {}): void {
+    const block = this.requireOpenBlock(ref, 'thinking', 'end');
+    if (Object.keys(input).length > 0) {
+      block.thinking = mergeThinkingContent(block.thinking, input);
+    }
+    this.closeBlock(block);
+  }
+
+  startToolCall(ref: ProviderOutputRef, id: string, name: string): void {
+    this.claim(ref, 'tool_call', {
+      kind: 'tool_call',
+      ref,
+      id: id || `call_${ref.contentIndex}`,
+      name: name || '',
+      argsBuffer: '',
+      closed: false,
+    });
+    this.stream.push({
+      type: 'toolcall_start',
+      contentIndex: ref.contentIndex,
+      providerOutputRef: { ...ref },
+      partial: this.snapshot('stop'),
+    });
+  }
+
+  updateToolCall(ref: ProviderOutputRef, id: string, name: string): void {
+    const block = this.requireOpenBlock(ref, 'tool_call', 'update');
+    if (id && block.id.startsWith('call_')) block.id = id;
+    if (name && !block.name) block.name = name;
+  }
+
+  appendToolCallArgs(ref: ProviderOutputRef, delta: string): void {
     if (!delta) return;
-    const block = this.blocks[index];
-    if (!block || block.kind !== 'tool') return;
+    const block = this.requireOpenBlock(ref, 'tool_call', 'delta');
     block.argsBuffer += delta;
     this.stream.push({
       type: 'toolcall_delta',
-      contentIndex: index,
+      contentIndex: ref.contentIndex,
       delta,
+      providerOutputRef: { ...ref },
       partial: this.snapshot('stop'),
     });
   }
 
-  endToolCall(index: number): void {
-    const block = this.blocks[index];
-    if (!block || block.kind !== 'tool' || block.closed) return;
-    block.closed = true;
-    const toolCall: ToolCall = {
-      type: 'toolCall',
-      id: block.id,
-      name: block.name,
-      arguments: parseJsonSafely(block.argsBuffer),
-    };
-    this.stream.push({
-      type: 'toolcall_end',
-      contentIndex: index,
-      toolCall,
-      partial: this.snapshot('stop'),
-    });
+  endToolCall(ref: ProviderOutputRef): void {
+    const block = this.requireOpenBlock(ref, 'tool_call', 'end');
+    this.closeBlock(block);
   }
 
   setUsage(partial: Partial<Usage>): void {
+    this.assertSemanticEvent({
+      protocol: 'provider-usage',
+      providerBlockKey: 'usage',
+      contentIndex: 0,
+    });
     this.usage = {
       inputTokens: partial.inputTokens ?? this.usage.inputTokens,
       outputTokens: partial.outputTokens ?? this.usage.outputTokens,
@@ -218,15 +247,17 @@ export class AssistantStreamBuilder {
   }
 
   done(reason: StopReason): void {
-    if (this.finished) return;
-    this.finished = true;
-    for (let i = 0; i < this.blocks.length; i += 1) {
-      const block = this.blocks[i];
-      if (!block || block.closed) continue;
-      if (block.kind === 'text') this.endText(i);
-      else if (block.kind === 'thinking') this.endThinking(i);
-      else this.endToolCall(i);
+    const terminalRef = createProviderOutputRef({
+      protocol: 'provider-terminal',
+      providerBlockKey: 'done',
+      contentIndex: 0,
+    });
+    this.assertSemanticEvent(terminalRef);
+    for (const key of this.orderedBlockKeys) {
+      const block = this.blocks.get(key);
+      if (block && !block.closed) this.closeBlock(block);
     }
+    this.finished = true;
     const message = this.snapshot(reason);
     this.stream.push({ type: 'done', reason, message });
   }
@@ -243,24 +274,150 @@ export class AssistantStreamBuilder {
     return this.finished;
   }
 
+  private assertSemanticEvent(ref: ProviderOutputRef): void {
+    if (this.finished) {
+      throw new ProviderStreamProtocolError(
+        'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
+        ref,
+        `Provider emitted a semantic event after terminal for ${ref.providerBlockKey}.`,
+      );
+    }
+    if (!this.started) {
+      throw new Error('Provider stream blocks cannot be emitted before stream start.');
+    }
+  }
+
+  private claim<T extends Block>(
+    ref: ProviderOutputRef,
+    kind: BlockKind,
+    block: T,
+  ): T {
+    this.assertSemanticEvent(ref);
+    const key = outputRefKey(ref);
+    const existing = this.blocks.get(key);
+    if (existing) {
+      if (existing.kind !== kind) {
+        throw new ProviderStreamProtocolError(
+          'PROVIDER_STREAM_CHANNEL_COLLISION',
+          ref,
+          `Provider output source ${ref.providerBlockKey} changed channel from ${existing.kind} to ${kind}.`,
+        );
+      }
+      throw new ProviderStreamProtocolError(
+        'PROVIDER_STREAM_DUPLICATE_BLOCK_START',
+        ref,
+        `Provider output source ${ref.providerBlockKey} started more than once.`,
+      );
+    }
+    const contentIndexOwner = this.contentIndexOwners.get(ref.contentIndex);
+    if (contentIndexOwner && contentIndexOwner !== key) {
+      throw new ProviderStreamProtocolError(
+        'PROVIDER_STREAM_CHANNEL_COLLISION',
+        ref,
+        `Provider content index ${ref.contentIndex} was claimed by more than one source.`,
+      );
+    }
+    this.blocks.set(key, block);
+    this.orderedBlockKeys.push(key);
+    this.contentIndexOwners.set(ref.contentIndex, key);
+    return block;
+  }
+
+  private requireOpenBlock<K extends BlockKind>(
+    ref: ProviderOutputRef,
+    kind: K,
+    operation: 'delta' | 'update' | 'end',
+  ): Extract<Block, { kind: K }> {
+    this.assertSemanticEvent(ref);
+    const block = this.blocks.get(outputRefKey(ref));
+    if (!block) {
+      throw new ProviderStreamProtocolError(
+        'PROVIDER_STREAM_DELTA_BEFORE_START',
+        ref,
+        `Provider emitted ${operation} before starting ${ref.providerBlockKey}.`,
+      );
+    }
+    if (block.kind !== kind) {
+      throw new ProviderStreamProtocolError(
+        'PROVIDER_STREAM_CHANNEL_COLLISION',
+        ref,
+        `Provider output source ${ref.providerBlockKey} was declared as ${block.kind}, not ${kind}.`,
+      );
+    }
+    if (block.closed) {
+      throw new ProviderStreamProtocolError(
+        'PROVIDER_STREAM_BLOCK_CLOSED',
+        ref,
+        `Provider emitted ${operation} after closing ${ref.providerBlockKey}.`,
+      );
+    }
+    return block as Extract<Block, { kind: K }>;
+  }
+
+  private closeBlock(block: Block): void {
+    block.closed = true;
+    if (block.kind === 'text') {
+      this.stream.push({
+        type: 'text_end',
+        contentIndex: block.ref.contentIndex,
+        content: block.text,
+        providerOutputRef: { ...block.ref },
+        partial: this.snapshot('stop'),
+      });
+      return;
+    }
+    if (block.kind === 'thinking') {
+      this.stream.push({
+        type: 'thinking_end',
+        contentIndex: block.ref.contentIndex,
+        providerOutputRef: { ...block.ref },
+        content: getThinkingText(block.thinking),
+        thinking: block.thinking,
+        partial: this.snapshot('stop'),
+      });
+      return;
+    }
+    const toolCall: ToolCall = {
+      type: 'toolCall',
+      id: block.id,
+      name: block.name,
+      arguments: parseJsonSafely(block.argsBuffer),
+      providerOutputRef: { ...block.ref },
+    };
+    this.stream.push({
+      type: 'toolcall_end',
+      contentIndex: block.ref.contentIndex,
+      providerOutputRef: { ...block.ref },
+      toolCall,
+      partial: this.snapshot('stop'),
+    });
+  }
+
   private snapshot(reason: StopReason): AssistantMessage {
     const content: AssistantMessage['content'] = [];
-    for (const block of this.blocks) {
+    for (const key of this.orderedBlockKeys) {
+      const block = this.blocks.get(key);
       if (!block) continue;
       if (block.kind === 'text') {
-        const item: TextContent = { type: 'text', text: block.text };
+        const item: TextContent = {
+          type: 'text',
+          text: block.text,
+          providerOutputRef: { ...block.ref },
+        };
         content.push(item);
       } else if (block.kind === 'thinking') {
-        const item: ThinkingContent = block.thinking;
-        content.push(item);
+        content.push({
+          ...block.thinking,
+          providerOutputRef: { ...block.ref },
+        });
       } else {
-        const item: ToolCall = {
+        content.push({
           type: 'toolCall',
           id: block.id,
           name: block.name,
           arguments: parseJsonSafely(block.argsBuffer),
-        };
-        content.push(item);
+          providerOutputRef: { ...block.ref },
+        });
       }
     }
     return {
@@ -276,9 +433,7 @@ export class AssistantStreamBuilder {
 }
 
 function parseJsonSafely(raw: string): Record<string, unknown> {
-  if (!raw || !raw.trim()) {
-    return {};
-  }
+  if (!raw || !raw.trim()) return {};
   try {
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {

@@ -68,14 +68,26 @@
       "adapterId": "anthropic-messages",
       "baseUrl": "https://api.moonshot.cn/anthropic/v1",
       "default": true,
-      "protocolOwner": "anthropic"
+      "protocolOwner": "anthropic",
+      "reasoningContract": {
+        "semantic": "raw",
+        "source": "moonshot-documented-raw-reasoning",
+        "evidence": "https://platform.moonshot.cn/docs/",
+        "displayLabel": "Raw reasoning"
+      }
     },
     {
       "id": "OpenAICompatibleChatCompletions",
       "protocol": "OpenAICompatibleChatCompletions",
       "adapterId": "openai-compatible",
       "baseUrl": "https://api.moonshot.cn/v1",
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "reasoningContract": {
+        "semantic": "raw",
+        "source": "moonshot-documented-raw-reasoning",
+        "evidence": "https://platform.moonshot.cn/docs/",
+        "displayLabel": "Raw reasoning"
+      }
     }
   ],
   "discovery": {

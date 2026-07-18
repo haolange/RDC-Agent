@@ -2291,7 +2291,7 @@ export class AgentOrchestrator {
     const effectiveModel = input.effectiveModel
       ?? (runtimeSettings ? resolveEffectiveModel(input.providerId, input.modelId, runtimeSettings) : null);
     const routeCapability = input.preparedRuntime?.routeCapability
-      ?? resolveAgentRouteCapability(routeProvider, input.modelId, effectiveModel);
+      ?? resolveAgentRouteCapability(routeProvider, input.modelId, effectiveModel, requestPlan);
     const mcpConnectionErrors = input.preparedRuntime?.mcpConnectionErrors
       ?? await this.ensureMcpConnections(input.agentId, input.projectRootPath);
     const runtimeTools = input.preparedRuntime?.runtimeTools

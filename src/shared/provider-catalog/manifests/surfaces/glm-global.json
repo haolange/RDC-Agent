@@ -68,14 +68,26 @@
       "adapterId": "anthropic-messages",
       "baseUrl": "https://api.z.ai/api/anthropic/v1",
       "default": true,
-      "protocolOwner": "anthropic"
+      "protocolOwner": "anthropic",
+      "reasoningContract": {
+        "semantic": "raw",
+        "source": "glm-global-documented-raw-reasoning",
+        "evidence": "https://docs.z.ai/",
+        "displayLabel": "Raw reasoning"
+      }
     },
     {
       "id": "OpenAICompatibleChatCompletions",
       "protocol": "OpenAICompatibleChatCompletions",
       "adapterId": "openai-compatible",
       "baseUrl": "https://api.z.ai/api/paas/v4",
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "reasoningContract": {
+        "semantic": "raw",
+        "source": "glm-global-documented-raw-reasoning",
+        "evidence": "https://docs.z.ai/",
+        "displayLabel": "Raw reasoning"
+      }
     }
   ],
   "discovery": {

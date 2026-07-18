@@ -398,7 +398,7 @@ describe('EffectiveCatalogService', () => {
       schemaVersion: number;
       discoveries: Record<string, { models: Array<{ modelId: string }> }>;
     };
-    expect(persisted.schemaVersion).toBe(6);
+    expect(persisted.schemaVersion).toBe(7);
     expect(persisted.discoveries).toEqual({});
   });
 

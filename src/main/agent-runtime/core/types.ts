@@ -1,23 +1,18 @@
 /**
- * Agent Runtime 核心类型系统。
- *
- * 该文件定义了 Agent Runtime 内部使用的统一类型，
- * 与上层 `@shared/types/*` 中面向 IPC / UI 的协议类型分层独立：
- * - 这里的 `Message`、`AssistantMessage` 等描述 Provider/Runtime 之间的契约。
- * - `@shared/types/llm` 等仍负责 main ↔ renderer 的事件协议。
- *
- * 任何对外暴露给渲染层或 IPC 的事件，需要在 IPC 层做一次显式映射，
- * 不要把这里的类型直接透传出去。
+ * Internal types for the provider/runtime boundary.
+ * Renderer and IPC surfaces must receive explicit shared projections, never these objects directly.
  */
 
 // =====================================================================
-// 内容块（ContentBlock）
+// Content blocks
 // =====================================================================
 
-/** 纯文本内容块。 */
+export type ProviderOutputRef = import('@shared/types/reasoning').ProviderOutputRef;
+
 export interface TextContent {
   type: 'text';
   text: string;
+  providerOutputRef?: ProviderOutputRef;
 }
 
 export type ThinkingArtifactKind = 'summary' | 'raw' | 'opaque' | 'unknown';
@@ -57,35 +52,25 @@ export interface ThinkingContent {
   visibility: ThinkingArtifactVisibility;
   replayPolicy: ThinkingArtifactReplayPolicy;
   artifact?: ProviderReasoningArtifact;
+  providerOutputRef?: ProviderOutputRef;
 }
 
-/** 图像内容块，使用 base64 编码。 */
 export interface ImageContent {
   type: 'image';
-  /** base64 编码的图像数据，不含 data URI 前缀。 */
   data: string;
-  /** 图像 MIME 类型，例如 `image/png`。 */
   mimeType: string;
 }
 
-/**
- * 工具调用内容块。
- *
- * 注意：与 `@shared/types/llm` 中的 `ToolCall` 不是同一类型，
- * 该类型属于 Agent Runtime 内部契约。
- */
 export interface ToolCall {
   type: 'toolCall';
-  /** 工具调用的唯一 id（由 Provider 或 Runtime 分配）。 */
   id: string;
-  /** 被调用的工具名。 */
   name: string;
-  /** 已解析的参数对象。 */
   arguments: Record<string, unknown>;
+  providerOutputRef?: ProviderOutputRef;
 }
 
-/** 任意内容块的联合类型。 */
 export type ContentBlock = TextContent | ThinkingContent | ImageContent | ToolCall;
+
 
 // =====================================================================
 // 消息（Message）
@@ -261,15 +246,15 @@ export interface Model {
  */
 export type AssistantMessageEvent =
   | { type: 'start'; partial: AssistantMessage }
-  | { type: 'text_start'; contentIndex: number; partial: AssistantMessage }
-  | { type: 'text_delta'; contentIndex: number; delta: string; partial: AssistantMessage }
-  | { type: 'text_end'; contentIndex: number; content: string; partial: AssistantMessage }
-  | { type: 'thinking_start'; contentIndex: number; thinking: ThinkingContent; partial: AssistantMessage }
-  | { type: 'thinking_delta'; contentIndex: number; delta: string; thinking: ThinkingContent; partial: AssistantMessage }
-  | { type: 'thinking_end'; contentIndex: number; content: string; thinking: ThinkingContent; partial: AssistantMessage }
-  | { type: 'toolcall_start'; contentIndex: number; partial: AssistantMessage }
-  | { type: 'toolcall_delta'; contentIndex: number; delta: string; partial: AssistantMessage }
-  | { type: 'toolcall_end'; contentIndex: number; toolCall: ToolCall; partial: AssistantMessage }
+  | { type: 'text_start'; contentIndex: number; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
+  | { type: 'text_delta'; contentIndex: number; delta: string; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
+  | { type: 'text_end'; contentIndex: number; content: string; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
+  | { type: 'thinking_start'; contentIndex: number; thinking: ThinkingContent; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
+  | { type: 'thinking_delta'; contentIndex: number; delta: string; thinking: ThinkingContent; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
+  | { type: 'thinking_end'; contentIndex: number; content: string; thinking: ThinkingContent; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
+  | { type: 'toolcall_start'; contentIndex: number; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
+  | { type: 'toolcall_delta'; contentIndex: number; delta: string; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
+  | { type: 'toolcall_end'; contentIndex: number; toolCall: ToolCall; providerOutputRef: ProviderOutputRef; partial: AssistantMessage }
   | { type: 'done'; reason: StopReason; message: AssistantMessage }
   | { type: 'error'; error: Error; message: AssistantMessage };
 

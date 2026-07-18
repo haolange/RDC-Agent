@@ -7,7 +7,7 @@
 import type { LLMStreamEvent, ToolCall } from './llm';
 import type { MCPTransport } from './mcp';
 import type { AgentPromptProfile, AgentToolPolicy } from './profile';
-import type { ThinkingArtifact } from './reasoning';
+import type { ProviderOutputRef, ThinkingArtifact } from './reasoning';
 import type { ProviderReasoningContract } from './rdxRuntime';
 import type {
   ConversationAskUserAnswer,
@@ -80,6 +80,7 @@ export interface AgentRunStartedPayload extends AgentEventBasePayload {
 
 export interface AgentAssistantDeltaPayload extends AgentEventBasePayload {
   text: string;
+  providerOutputRef: ProviderOutputRef;
 }
 
 export interface AgentAssistantThinkingPayload extends AgentEventBasePayload {
@@ -90,6 +91,7 @@ export interface AgentAssistantThinkingPayload extends AgentEventBasePayload {
 export interface AgentAssistantCompletedPayload extends AgentEventBasePayload {
   text: string;
   thinking?: ThinkingArtifact[];
+  providerOutputRefs?: ProviderOutputRef[];
   stopReason?: ConversationLoopStopReason;
   usage?: {
     inputTokens: number;
@@ -99,6 +101,7 @@ export interface AgentAssistantCompletedPayload extends AgentEventBasePayload {
 
 export interface AgentToolRequestedPayload extends AgentEventBasePayload {
   toolCall: ToolCall;
+  providerOutputRef: ProviderOutputRef;
   streamEvent?: LLMStreamEvent;
 }
 

@@ -50,7 +50,13 @@
       "adapterId": "openai-responses",
       "baseUrl": "https://chatgpt.com/backend-api/codex",
       "default": true,
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "reasoningContract": {
+        "semantic": "summary",
+        "source": "openai-responses-reasoning-summary",
+        "evidence": "https://platform.openai.com/docs/api-reference/responses-streaming/response/reasoning_summary_part/added",
+        "displayLabel": "Reasoning summary"
+      }
     }
   ],
   "discovery": {

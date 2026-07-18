@@ -42,6 +42,59 @@ function model(patch: Partial<EffectiveModel> = {}): EffectiveModel {
 }
 
 describe('resolveAgentRouteCapability effective-state policy', () => {
+  it('resolves reasoning only from the active route contract and honors the frozen RequestPlan route', () => {
+    const rawModel = model({
+      controls: {
+        fast: { state: 'unsupported', fixedValue: false },
+        context1m: { state: 'unsupported', fixedValue: false },
+        reasoning: {
+          kind: 'toggle',
+          supportsOff: true,
+          levels: [],
+          defaultSelection: 'on',
+          wireProfile: { kind: 'none' },
+        },
+      },
+      route: {
+        protocol: 'OpenAICompatibleChatCompletions',
+        baseUrl: 'https://example.test',
+        source: 'catalog',
+        reasoningContract: {
+          semantic: 'raw',
+          source: 'manifest:test-raw',
+          displayLabel: 'Raw reasoning',
+        },
+      },
+    });
+    expect(resolveAgentRouteCapability(provider, 'model-a', rawModel).reasoningContract.semantic).toBe('raw');
+
+    const frozenPlan = {
+      route: {
+        protocol: 'OpenAIResponses',
+        baseUrl: 'https://example.test/v1',
+        source: 'catalog',
+        reasoningContract: {
+          semantic: 'summary',
+          source: 'manifest:test-summary',
+          displayLabel: 'Reasoning summary',
+        },
+      },
+    } as unknown as import('@shared/types/providerCapability').RequestPlan;
+    expect(resolveAgentRouteCapability(provider, 'model-a', rawModel, frozenPlan).reasoningContract.semantic)
+      .toBe('summary');
+
+    const undeclared = model({
+      controls: rawModel.controls,
+      route: {
+        protocol: 'OpenAICompatibleChatCompletions',
+        baseUrl: 'https://third-party.test',
+        source: 'user',
+      },
+    });
+    expect(resolveAgentRouteCapability(provider, 'model-a', undeclared).reasoningContract.semantic)
+      .toBe('unknown');
+  });
+
   it('fails open for unknown tools but marks the route unverified', () => {
     const capability = resolveAgentRouteCapability(provider, 'model-a', model());
     expect(capability).toMatchObject({

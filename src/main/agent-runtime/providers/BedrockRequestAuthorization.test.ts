@@ -105,4 +105,36 @@ describe('Bedrock body-aware request authorization', () => {
     expect(fetched?.init?.body).toBe(requestAuthorizer.mock.calls[0]?.[0].body);
     expect(new Headers(fetched?.init?.headers).get('Authorization')).toBe('AWS4-HMAC-SHA256 signed-responses');
   });
+  it('fails closed when Chat Completions emits a semantic choice after finish_reason', async () => {
+    vi.stubGlobal('fetch', async () => new Response([
+      'data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}',
+      'data: {"choices":[{"delta":{"content":"late"},"finish_reason":null}]}',
+      'data: [DONE]',
+      '',
+    ].join('\n\n'), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+    const baseUrl = 'https://bedrock-mantle.us-east-1.api.aws/v1';
+    const provider = new OpenAICompatibleProvider({ baseUrl, authorization: 'none', requestAuthorizer: async (input) => input.headers });
+
+    await expect(provider.stream(model, context, {
+      requestPlan: plan('OpenAICompatibleChatCompletions', baseUrl),
+    }).result()).rejects.toMatchObject({ code: 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL' });
+  });
+
+  it('fails closed when Responses emits an event after response.completed', async () => {
+    vi.stubGlobal('fetch', async () => new Response([
+      'data: {"type":"response.output_text.delta","delta":"ok"}',
+      'data: {"type":"response.completed","response":{"status":"completed"}}',
+      'data: {"type":"response.output_text.delta","delta":"late"}',
+      'data: [DONE]',
+      '',
+    ].join('\n\n'), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+    const baseUrl = 'https://bedrock-mantle.us-east-1.api.aws/openai/v1';
+    const provider = new OpenAIResponsesProvider({ baseUrl, requestAuthorizer: async (input) => input.headers });
+
+    await expect(provider.stream(
+      { ...model, api: 'openai-responses' },
+      context,
+      { requestPlan: plan('OpenAIResponses', baseUrl) },
+    ).result()).rejects.toMatchObject({ code: 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL' });
+  });
 });

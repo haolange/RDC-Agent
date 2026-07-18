@@ -68,14 +68,26 @@
       "adapterId": "openai-compatible",
       "baseUrl": "https://token-plan-cn.xiaomimimo.com/v1",
       "default": true,
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "reasoningContract": {
+        "semantic": "raw",
+        "source": "xiaomi-mimo-token-plan-documented-raw-reasoning",
+        "evidence": "https://mimo.mi.com/docs/en-US/quick-start/usage-guide/text-generation/deep-thinking",
+        "displayLabel": "Raw reasoning"
+      }
     },
     {
       "id": "OpenAIResponses",
       "protocol": "OpenAIResponses",
       "adapterId": "openai-responses",
       "baseUrl": "https://token-plan-cn.xiaomimimo.com/v1",
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "reasoningContract": {
+        "semantic": "raw",
+        "source": "xiaomi-mimo-token-plan-documented-raw-reasoning",
+        "evidence": "https://mimo.mi.com/docs/en-US/quick-start/usage-guide/text-generation/deep-thinking",
+        "displayLabel": "Raw reasoning"
+      }
     }
   ],
   "discovery": {

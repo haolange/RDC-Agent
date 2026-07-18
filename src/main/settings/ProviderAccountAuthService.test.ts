@@ -254,7 +254,7 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
     expect(bundle.planLabel).toBe('Super Grok OAuth');
     expect(mocks.savedConnections[0].models).toEqual([
       { id: 'grok-4.3', label: 'grok-4.3', enabled: true },
-      { id: 'grok-4.5', label: 'Grok 4.5', enabled: true },
+      { id: 'grok-4.5', label: 'grok-4.5', enabled: true },
       { id: 'grok-composer-2.5-fast', label: 'Composer 2.5', enabled: true },
     ]);
     expect(publishCatalog).toHaveBeenCalledWith('grok-account', expect.objectContaining({
