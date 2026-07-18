@@ -727,7 +727,7 @@
 
 .composer-effort-pill.is-level-max .composer-effort-pill-label,
 .composer-effort-pill.is-level-max .composer-effort-pill-icon {
-  color: var(--token-effort-fill-6);
+  color: var(--token-effort-max-mid);
 }
 
 .composer-effort-pill-modes {
@@ -877,10 +877,6 @@
   --composer-effort-track-fill: var(--token-effort-fill-5);
 }
 
-.composer-effort-slider.is-level-max {
-  --composer-effort-track-fill: var(--token-effort-fill-6);
-}
-
 .composer-effort-slider.is-dragging {
   cursor: grabbing;
 }
@@ -939,12 +935,13 @@
 
 .composer-effort-slider-stops {
   position: absolute;
-  z-index: 1;
+  z-index: 3;
   left: 0;
   right: 0;
   top: 50%;
   height: 0;
   pointer-events: none;
+  opacity: var(--composer-effort-stops-opacity, 1);
   transition: opacity var(--transition-fast);
 }
 
@@ -1017,7 +1014,7 @@
 
 .composer-effort-slider-thumb {
   position: absolute;
-  z-index: 3;
+  z-index: 4;
   left: 0;
   top: 50%;
   width: var(--space-8);

@@ -263,18 +263,17 @@
   --token-effort-fill-3:       hsl(265 48% 70%);
   --token-effort-fill-4:       hsl(265 52% 60%);
   --token-effort-fill-5:       hsl(265 56% 50%);
-  --token-effort-fill-6:       hsl(265 60% 40%);
   --token-effort-thumb:        hsl(265 52% 50%);
   --token-effort-track:        color-mix(in srgb, var(--token-border-muted) 80%, transparent);
   /* Max-tier pixel field palette (dark rail + growing cells); not a track fill gradient */
   /* Max: translucent dark-gray rail + soft lavender pixel cloud (reference grow frames).
      Pixel hues stay near effort purple family so High→Max brightness does not jump. */
-  --token-effort-max-track:    color-mix(in srgb, var(--token-bg-overlay) 42%, #3a3a44);
-  --token-effort-max-from:     color-mix(in srgb, var(--token-effort-fill-5) 30%, #746b82);
-  --token-effort-max-mid:      color-mix(in srgb, var(--token-effort-fill-4) 32%, #a89bbd);
-  --token-effort-max-to:       color-mix(in srgb, var(--token-effort-fill-4) 22%, #d0c6df);
-  --token-effort-max-sparkle:  rgb(236 230 245 / 0.92);
-  --token-effort-max-thumb:    color-mix(in srgb, var(--token-effort-max-sparkle) 86%, var(--token-effort-max-to));
+  --token-effort-max-track:    color-mix(in srgb, var(--token-bg-overlay) 54%, #34343b);
+  --token-effort-max-from:     color-mix(in srgb, var(--token-effort-fill-5) 20%, #746f7c);
+  --token-effort-max-mid:      color-mix(in srgb, var(--token-effort-fill-4) 24%, #9d94ad);
+  --token-effort-max-to:       color-mix(in srgb, var(--token-effort-fill-4) 18%, #c8c0d4);
+  --token-effort-max-sparkle:  rgb(236 230 245 / 0.86);
+  --token-effort-max-thumb:    color-mix(in srgb, var(--token-effort-max-sparkle) 88%, var(--token-effort-max-to));
 
   /* Context breakdown 分段专用（light），不得挪作它用 — 略加深以保证浅色底对比 */
   --token-context-system-prompt: rgb(var(--color-purple));
@@ -794,15 +793,14 @@
   --token-effort-fill-3:       hsl(265 54% 60%);
   --token-effort-fill-4:       hsl(265 58% 52%);
   --token-effort-fill-5:       hsl(265 62% 44%);
-  --token-effort-fill-6:       hsl(265 66% 36%);
   --token-effort-thumb:        hsl(265 58% 54%);
   --token-effort-track:        color-mix(in srgb, var(--token-border-muted) 72%, transparent);
-  --token-effort-max-track:    color-mix(in srgb, var(--token-bg-overlay) 48%, #2e2e36);
-  --token-effort-max-from:     color-mix(in srgb, var(--token-effort-fill-5) 28%, #6d657b);
-  --token-effort-max-mid:      color-mix(in srgb, var(--token-effort-fill-4) 30%, #a093b6);
-  --token-effort-max-to:       color-mix(in srgb, var(--token-effort-fill-4) 20%, #c9bfd8);
-  --token-effort-max-sparkle:  rgb(236 230 245 / 0.88);
-  --token-effort-max-thumb:    color-mix(in srgb, var(--token-effort-max-sparkle) 84%, var(--token-effort-max-to));
+  --token-effort-max-track:    color-mix(in srgb, var(--token-bg-overlay) 60%, #292930);
+  --token-effort-max-from:     color-mix(in srgb, var(--token-effort-fill-5) 18%, #6a6474);
+  --token-effort-max-mid:      color-mix(in srgb, var(--token-effort-fill-4) 22%, #958aa8);
+  --token-effort-max-to:       color-mix(in srgb, var(--token-effort-fill-4) 16%, #c0b6cf);
+  --token-effort-max-sparkle:  rgb(236 230 245 / 0.84);
+  --token-effort-max-thumb:    color-mix(in srgb, var(--token-effort-max-sparkle) 88%, var(--token-effort-max-to));
 
   /* Context breakdown 分段专用，不得挪作它用。
    * 多彩但克制的彩虹序：紫/金/青/绿/橙/粉 + 主蓝对话段；deferred/free 用中性灰。

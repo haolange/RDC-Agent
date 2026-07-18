@@ -82,13 +82,11 @@ export const EffortControl: React.FC<{
   const thumbPercent = thumbRatio * 100;
 
   const {
-    maxPhase,
-    maxProgress,
-    stopsOpacity,
+    maxTimeline,
     showMaxTrack,
-    isMaxTier,
     resetMaxVisual,
     applyCommittedLevelVisual,
+    completeMaxTimeline,
   } = useMaxVisualController({
     open,
     isDragging,
@@ -269,12 +267,10 @@ export const EffortControl: React.FC<{
           displayLevels={displayLevels}
           displayIndex={displayIndex}
           isDragging={isDragging}
-          isMaxTier={isMaxTier}
           showMaxTrack={showMaxTrack}
-          maxPhase={maxPhase}
-          maxProgress={maxProgress}
+          maxTimeline={maxTimeline}
           thumbRatio={thumbRatio}
-          stopsOpacity={stopsOpacity}
+          onMaxTimelineComplete={completeMaxTimeline}
           thumbStyle={thumbStyle}
           thumbEdgeClass={thumbEdgeClass}
           tooltipLabel={tooltipLabel}
