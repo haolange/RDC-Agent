@@ -110,6 +110,8 @@ describe('Provider Catalog compiler', () => {
     const summary = catalog.index.surfaces.find((surface) => surface.id === 'cortecs') as Record<string, unknown>;
     expect(summary).not.toHaveProperty('discovery');
     expect(summary).not.toHaveProperty('discoveredModelProjection');
+    expect(summary).not.toHaveProperty('discoveryPolicyId');
+    expect(summary.models).not.toEqual(expect.arrayContaining([expect.objectContaining({ liveProjection: expect.anything() })]));
     expect(summary).not.toHaveProperty('profileId');
   });
 
@@ -131,32 +133,89 @@ describe('Provider Catalog compiler', () => {
     expect(() => compileProviderCatalog(foreignWire)).toThrow(/first-party direct.*protocol owner/u);
   });
 
-  it('keeps Kimi maintained discovery and the Fast target as one execution binding truth', () => {
+  it('keeps Kimi stable aliases and account-scoped K3 behind authoritative discovery', () => {
     const catalog = compileProviderCatalog(input());
     const surface = catalog.surfaces.get('kimi-coding-plan')?.surface;
     expect(catalog.index.surfaces.find((entry) => entry.id === 'kimi-coding-plan')).toMatchObject({
-      discoveryAuthority: 'candidate-validation',
-      modelCount: 1,
+      discoveryAuthority: 'authoritative-list',
+      modelCount: 2,
     });
-    expect(surface?.discovery.authority).toBe('candidate-validation');
+    expect(surface?.discovery).toMatchObject({
+      authority: 'authoritative-list',
+      strategy: { kind: 'custom-parser', parserId: 'kimi-code-catalog' },
+    });
     expect(surface?.models.map((model) => model.modelId)).toEqual([
       'kimi-for-coding',
+      'k3',
       'kimi-for-coding-highspeed',
     ]);
-    expect(surface?.models.every((model) => model.presencePolicy === 'maintained')).toBe(true);
+    expect(surface?.models.every((model) => model.presencePolicy === 'account-entitled')).toBe(true);
     expect(surface?.models.find((model) => model.modelId === 'kimi-for-coding')).toMatchObject({
-      controls: { fast: { state: 'selectable' } },
-      executionBindings: [{
-        when: { fast: true },
-        actions: [{ kind: 'model-switch', targetModelId: 'kimi-for-coding-highspeed' }],
-      }],
+      label: 'Kimi for Coding',
+      controls: { fast: { state: 'unknown' }, reasoning: { kind: 'unknown', supportsOff: false } },
+      executionBindings: expect.arrayContaining([
+        expect.objectContaining({
+          when: { fast: true },
+          actions: [{ kind: 'model-switch', targetModelId: 'kimi-for-coding-highspeed' }],
+        }),
+      ]),
+    });
+    expect(surface?.models.find((model) => model.modelId === 'k3')).toMatchObject({
+      label: 'Kimi K3',
+      controls: {
+        fast: { state: 'unsupported' },
+        context1m: { state: 'unknown' },
+        reasoning: { kind: 'unknown', supportsOff: false },
+      },
     });
     expect(surface?.models.find((model) => model.modelId === 'kimi-for-coding-highspeed')?.selection)
       .toEqual({ pickerVisibility: 'internal', relatedPrimaryModelIds: ['kimi-for-coding'] });
-    expect(surface?.models.filter((model) => model.selection.pickerVisibility === 'primary').map((model) => model.modelId))
-      .toEqual(['kimi-for-coding']);
+    expect(surface?.models.some((model) => model.modelId === 'kimi-k2.7-code')).toBe(false);
   });
+  it('keeps direct and subscription K3 identities isolated by Provider surface', () => {
+    const catalog = compileProviderCatalog(input());
+    const moonshot = catalog.surfaces.get('moonshot')?.surface;
+    expect(moonshot?.models.find((model) => model.modelId === 'kimi-k3')).toMatchObject({
+      label: 'Kimi K3',
+      route: {
+        protocol: 'OpenAICompatibleChatCompletions',
+        baseUrl: 'https://api.moonshot.cn/v1',
+      },
+      controls: {
+        fast: { state: 'unsupported', fixedValue: false },
+        context1m: { state: 'selectable', tierId: 'max' },
+        reasoning: {
+          kind: 'always-on', supportsOff: false, defaultSelection: 'max', lockedSelection: 'max',
+        },
+      },
+    });
+    const openCodeGo = catalog.surfaces.get('opencode-go')?.surface;
+    expect(openCodeGo).toMatchObject({
+      catalogOwnership: 'provider-managed',
+      discovery: { authority: 'authoritative-list' },
+    });
+    expect(openCodeGo?.models.find((model) => model.modelId === 'kimi-k3')).toMatchObject({
+      presencePolicy: 'account-entitled',
+      availability: 'unknown',
+      controls: {
+        fast: { state: 'unsupported', fixedValue: false },
+        context1m: { state: 'unknown' },
+        reasoning: { kind: 'always-on', supportsOff: false, lockedSelection: 'max' },
+      },
+    });
+    expect(catalog.surfaces.get('openrouter')?.surface.discovery.strategy)
+      .toEqual({ kind: 'custom-parser', parserId: 'openrouter-catalog' });
 
+    for (const surfaceId of ['github-copilot', 'bailian', 'bailian-coding-plan', 'volcengine-coding-plan']) {
+      expect(catalog.surfaces.get(surfaceId)?.surface.models.some((model) => (
+        model.modelId === 'kimi-k3' || model.modelId === 'k3'
+      )), surfaceId).toBe(false);
+    }
+    expect(moonshot?.models.some((model) => model.modelId === 'k3')).toBe(false);
+    expect(catalog.surfaces.get('kimi-coding-plan')?.surface.models.some((model) => (
+      model.modelId === 'kimi-k3' || model.modelId === 'kimi-k2.7-code'
+    ))).toBe(false);
+  });
   it('keeps every MiniMax highspeed relation as one hidden execution target', () => {
     const catalog = compileProviderCatalog(input());
     for (const surfaceId of [
@@ -204,8 +263,8 @@ describe('Provider Catalog compiler', () => {
     type ExpectedRow = readonly [
       modelId: string,
       contextTokens: number,
-      context1m: 'unsupported' | 'selectable' | 'fixed',
-      fast: 'unsupported' | 'selectable',
+      context1m: 'unknown' | 'unsupported' | 'selectable' | 'fixed',
+      fast: 'unknown' | 'unsupported' | 'selectable',
       reasoningKind: 'unknown' | 'toggle' | 'always-on' | 'levels',
       supportsOff: boolean,
       levels: readonly string[],
@@ -287,8 +346,9 @@ describe('Provider Catalog compiler', () => {
     expect(deepseek?.models.every((model) => model.aliases.length === 0)).toBe(true);
 
     verify('kimi-coding-plan', [
-      ['kimi-for-coding', 256_000, 'unsupported', 'selectable', 'toggle', true, [], 'on'],
-      ['kimi-for-coding-highspeed', 256_000, 'unsupported', 'unsupported', 'toggle', true, [], 'on', 'internal'],
+      ['kimi-for-coding', 256_000, 'unknown', 'unknown', 'unknown', false, [], 'on'],
+      ['k3', 256_000, 'unknown', 'unsupported', 'unknown', false, [], 'on'],
+      ['kimi-for-coding-highspeed', 256_000, 'unknown', 'unsupported', 'unknown', false, [], 'on', 'internal'],
     ]);
 
     verify('volcengine-coding-plan', [
@@ -362,6 +422,25 @@ describe('Provider Catalog compiler', () => {
       .maxPromptTokens = 200_000;
     expect(() => compileProviderCatalog(subMillionMax)).toThrow(/Max mode control references a sub-one-million context tier/u);
 
+    const missingLiveDefaultTier = clone(input());
+    mutableSurface(missingLiveDefaultTier, 'kimi-coding-plan').models
+      .find((model: Record<string, unknown>) => model.modelId === 'k3')
+      .liveProjection.context.defaultTierId = 'missing-default';
+    expect(() => compileProviderCatalog(missingLiveDefaultTier)).toThrow(/missing default tier/u);
+
+    const missingLiveMaxTier = clone(input());
+    mutableSurface(missingLiveMaxTier, 'kimi-coding-plan').models
+      .find((model: Record<string, unknown>) => model.modelId === 'k3')
+      .liveProjection.context.maxTierId = 'missing-max';
+    expect(() => compileProviderCatalog(missingLiveMaxTier)).toThrow(/invalid Max tier/u);
+
+    const unavailableLiveProtocol = clone(input());
+    mutableSurface(unavailableLiveProtocol, 'kimi-coding-plan').models
+      .find((model: Record<string, unknown>) => model.modelId === 'k3')
+      .liveProjection.reasoning.wireProfiles.GoogleGemini = { kind: 'gemini-thinking-level', on: 'high', levels: { high: 'high' } };
+    expect(() => compileProviderCatalog(unavailableLiveProtocol)).toThrow(/unavailable protocol GoogleGemini/u);
+
+
     const missingTarget = clone(input());
     const kimi = mutableSurface(missingTarget, 'kimi-coding-plan');
     kimi.models.find((model: Record<string, unknown>) => model.modelId === 'kimi-for-coding')
@@ -384,7 +463,7 @@ describe('Provider Catalog compiler', () => {
     overlapKimi.models.find((model: Record<string, unknown>) => model.modelId === 'kimi-for-coding')
       .executionBindings.push({
         id: 'context:conflict',
-        when: { context1m: false },
+        when: { context1m: true },
         actions: [{ kind: 'request-patch', patch: { mode: 'normal' } }],
         entitlement: 'granted',
       });

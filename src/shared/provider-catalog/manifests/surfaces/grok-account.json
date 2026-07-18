@@ -106,11 +106,11 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "account-entitled",
+      "presencePolicy": "maintained",
       "route": {
         "protocol": "OpenAIResponses",
         "baseUrl": "https://cli-chat-proxy.grok.com/v1",
-        "source": "catalog"
+        "source": "model"
       },
       "controls": {
         "fast": {
@@ -165,11 +165,11 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "account-entitled",
+      "presencePolicy": "maintained",
       "route": {
         "protocol": "OpenAIResponses",
         "baseUrl": "https://cli-chat-proxy.grok.com/v1",
-        "source": "catalog"
+        "source": "model"
       },
       "controls": {
         "fast": {
@@ -224,11 +224,11 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "account-entitled",
+      "presencePolicy": "maintained",
       "route": {
         "protocol": "OpenAIResponses",
         "baseUrl": "https://cli-chat-proxy.grok.com/v1",
-        "source": "catalog"
+        "source": "model"
       },
       "controls": {
         "fast": {
@@ -283,11 +283,11 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "account-entitled",
+      "presencePolicy": "maintained",
       "route": {
         "protocol": "OpenAIResponses",
         "baseUrl": "https://cli-chat-proxy.grok.com/v1",
-        "source": "catalog"
+        "source": "model"
       },
       "controls": {
         "fast": {
@@ -341,11 +341,11 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "account-entitled",
+      "presencePolicy": "maintained",
       "route": {
         "protocol": "OpenAIResponses",
         "baseUrl": "https://cli-chat-proxy.grok.com/v1",
-        "source": "catalog"
+        "source": "model"
       },
       "controls": {
         "fast": {
@@ -407,11 +407,11 @@
       "selection": {
         "pickerVisibility": "primary"
       },
-      "presencePolicy": "account-entitled",
+      "presencePolicy": "maintained",
       "route": {
         "protocol": "OpenAIResponses",
         "baseUrl": "https://cli-chat-proxy.grok.com/v1",
-        "source": "catalog"
+        "source": "model"
       },
       "controls": {
         "fast": {
@@ -431,6 +431,78 @@
             "kind": "none"
           }
         }
+      },
+      "factSourceId": "user-observation:grok-account:2026-07-14"
+    },
+    {
+      "modelId": "grok-composer-2.5-fast",
+      "label": "Composer 2.5",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Builder catalog limit",
+          "maxPromptTokens": 200000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 200000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAIResponses",
+        "baseUrl": "https://cli-chat-proxy.grok.com/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "liveProjection": {
+        "context": {
+          "authority": "account-effective",
+          "defaultTierId": "default"
+        },
+        "reasoning": {
+          "offPolicy": "forbidden",
+          "wireProfiles": {}
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
       },
       "factSourceId": "user-observation:grok-account:2026-07-14"
     }

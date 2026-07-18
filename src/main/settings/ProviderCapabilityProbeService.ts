@@ -25,6 +25,10 @@ import {
   executeCapabilityProbe,
   type CapabilityProbeExecution,
 } from './ProviderCapabilityProbeRuntime';
+import {
+  freezeProviderRuntimeCredentials,
+  releaseProviderRuntimeCredentials,
+} from './ProviderRuntimeCredentialLease';
 
 export interface ResolvedProbeTarget {
   provider: LlmProviderEntry;
@@ -38,6 +42,8 @@ export interface ProviderCapabilityProbeDependencies {
     controls: { reasoningLevel: ReasoningSelection; maxContextMode: boolean; fastModel: boolean },
   ) => RequestPlanningResult;
   execute: (input: CapabilityProbeExecution) => Promise<AssistantMessage>;
+  freezeCredentials: (providerId: LlmProviderEntry['id']) => Promise<string>;
+  releaseCredentials: (handle: string | undefined) => void;
   recordSuccess: (request: LlmModelCapabilityProbeRequest, target: ResolvedProbeTarget, plan: RequestPlan) => void;
   recordFailure: (
     request: LlmModelCapabilityProbeRequest,
@@ -71,11 +77,17 @@ export function buildProbeFailurePatch(
   if (request.mode === 'one-million-context' && (status === 400 || status === 403)) {
     return { modelId: target.model.modelId, contextTiers: [{ id: plan.activeTierId, entitlement: 'denied' }] };
   }
-  if (request.mode === 'fast' && (status === 400 || status === 403)
+  const modelSwitchFastDenied = status === 401 && plan.effectiveModelId !== plan.selectedModelId;
+  if (request.mode === 'fast' && (status === 400 || status === 403 || modelSwitchFastDenied)
     && target.model.controls.fast.state === 'selectable') {
     return {
       modelId: target.model.modelId,
       controls: { fast: { ...target.model.controls.fast, entitlement: 'denied' } },
+      executionBindings: target.model.executionBindings?.map((binding) => (
+        plan.appliedBindingIds.includes(binding.id)
+          ? { ...binding, entitlement: 'denied' }
+          : binding
+      )),
     };
   }
   return null;
@@ -95,6 +107,8 @@ const productionDependencies: ProviderCapabilityProbeDependencies = {
     controls,
   }),
   execute: executeCapabilityProbe,
+  freezeCredentials: async (providerId) => (await freezeProviderRuntimeCredentials(providerId)).handle,
+  releaseCredentials: releaseProviderRuntimeCredentials,
   recordSuccess: (request, target, plan) => {
     recordEffectivePlanSuccess(request.providerId, request.modelId, settingsService.getAll(), plan);
     if (target.model.availability === 'unknown') {
@@ -172,8 +186,20 @@ export class ProviderCapabilityProbeService {
       return { success: false, status: 'denied', requestSent: false, detail: 'The active model constraints rejected this mode.' };
     }
 
+    let credentialHandle: string | undefined;
     try {
-      await this.dependencies.execute({ request, ...target, plan: planning.plan });
+      credentialHandle = await this.dependencies.freezeCredentials(request.providerId);
+    } catch (error) {
+      return {
+        success: false,
+        status: 'failed',
+        requestSent: false,
+        detail: errorDetail(error),
+      };
+    }
+
+    try {
+      await this.dependencies.execute({ request, ...target, plan: planning.plan, credentialHandle });
       this.dependencies.recordSuccess(request, target, planning.plan);
       return { success: true, status: 'verified', requestSent: true };
     } catch (error) {
@@ -186,6 +212,8 @@ export class ProviderCapabilityProbeService {
         requestSent: true,
         detail: errorDetail(error),
       };
+    } finally {
+      this.dependencies.releaseCredentials(credentialHandle);
     }
   }
 }

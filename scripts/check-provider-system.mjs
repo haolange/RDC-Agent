@@ -71,6 +71,33 @@ for (const forbidden of ['nodeManifestLoader', 'compileProviderCatalog(', 'src/s
   if (registrySource.includes(forbidden)) fail(`ProviderCatalogRegistry contains a source-manifest runtime fallback: ${forbidden}`);
 }
 
+const liveParserSource = fs.readFileSync(
+  path.join(repoRoot, 'src/main/settings/LiveProviderCatalogParsers.ts'),
+  'utf8',
+);
+for (const forbidden of [
+  'kimi-for-coding',
+  'kimi-for-coding-highspeed',
+  'kimi-k2.7-code',
+  'moonshotai/kimi-k3',
+  'grok-composer-2.5-fast',
+  'Kimi K3',
+  'Composer 2.5',
+]) {
+  if (liveParserSource.includes(forbidden)) {
+    fail(`LiveProviderCatalogParsers reintroduced manifest-owned product fact ${forbidden}`);
+  }
+}
+
+const settingsSource = fs.readFileSync(path.join(repoRoot, 'src/main/settings/SettingsService.ts'), 'utf8');
+if (settingsSource.includes('discoveryPolicyId ===')) {
+  fail('SettingsService must derive persistence from the authority matrix, not parser policy ids');
+}
+const connectionSource = fs.readFileSync(path.join(repoRoot, 'src/main/settings/ProviderConnectionService.ts'), 'utf8');
+if (connectionSource.includes("provider.id === 'moonshot'")) {
+  fail('Moonshot discovery must use its declarative manifest instead of a Provider id branch');
+}
+
 const contractTests = [
   'src/shared/provider-catalog/compiler.test.ts',
   'src/shared/utils/modelControls.test.ts',

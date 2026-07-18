@@ -192,7 +192,7 @@ describe('coding-plan Anthropic discovery routing', () => {
       'utf8',
     );
     expect(source).toMatch(
-      /provider\.id === 'kimi-coding-plan'[\s\S]*provider\.id === 'volcengine-coding-plan'/,
+      /provider\.id === 'volcengine-coding-plan'/,
     );
     expect(source).not.toMatch(
       /provider\.id === 'volcengine-coding-plan'[\s\S]*&& provider\.protocol === 'AnthropicMessages'/,
@@ -200,6 +200,8 @@ describe('coding-plan Anthropic discovery routing', () => {
     expect(source).toContain('resolveVolcengineCodingPlanModelsUrl');
     expect(source).toContain('validateCodingPlanModels');
     expect(source).toContain('selectSupportedCodingPlanModels');
+    expect(source).toContain("strategy === 'kimi-code-catalog'");
+    expect(source).toContain('parseKimiCodeCatalog');
   });
 });
 
@@ -238,19 +240,6 @@ describe('mergeManagedModelAvailability', () => {
     ]);
   });
 
-  it('keeps the single Kimi primary and internal Fast target when candidate validation returns the base model', () => {
-    const models = mergeManagedModelAvailability(
-      managed('kimi-for-coding', 'kimi-for-coding-highspeed'),
-      [{ id: 'kimi-for-coding', label: 'kimi-for-coding', enabled: true }],
-      { preserveMissing: true },
-    );
-
-    expect(models.map((model) => model.id)).toEqual([
-      'kimi-for-coding',
-      'kimi-for-coding-highspeed',
-    ]);
-    expect(models.every((model) => model.enabled !== false && model.availability !== 'unavailable')).toBe(true);
-  });
 
   it('treats catalog aliases as available when the endpoint returns the alias id', () => {
     const models = mergeManagedModelAvailability(

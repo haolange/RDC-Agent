@@ -77,9 +77,7 @@ export function buildCatalogModelContribution(
   provider: LlmProviderEntry,
   modelId: string,
 ): CatalogModelContribution {
-  const definition = provider.catalogOwnership !== 'user-managed'
-    ? lookupProviderModelDefinition(provider.id, modelId)
-    : null;
+  const definition = lookupProviderModelDefinition(provider.id, modelId);
   const surface = getLoadedProviderSurface(provider.id);
   const factSource = definition
     ? surface?.factSources.find((source) => source.id === definition.factSourceId)
@@ -109,7 +107,12 @@ export function buildCatalogModelContribution(
     structuredOutput: { state: 'unknown' },
   };
   const catalogDefinition = definition
-    ? (({ factSourceId: _factSourceId, fieldFactSourceIds: _fieldFactSourceIds, ...fields }) => fields)(definition)
+    ? (({
+        factSourceId: _factSourceId,
+        fieldFactSourceIds: _fieldFactSourceIds,
+        liveProjection: _liveProjection,
+        ...fields
+      }) => fields)(definition)
     : null;
   const base: CatalogModelContribution = catalogDefinition
     ? {

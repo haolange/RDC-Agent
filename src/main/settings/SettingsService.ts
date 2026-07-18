@@ -60,11 +60,11 @@ import {
   createProviderEntryFromCatalog,
   createProviderEntriesFromCatalog,
   getProviderAuthModeAvailability,
+  getProviderCatalogModelSummaries,
   getProviderCatalogOwnership,
   getProviderDiscoveryAuthority,
   getProviderDefaultBaseUrl,
   getProviderModelSummaries,
-  getProviderCatalogModelIds,
   isBuiltinProviderId,
 } from '../provider-catalog/ProviderCatalogRegistry';
 import { appPathService } from '../runtime/AppPathService';
@@ -73,7 +73,7 @@ import { executionProfileService } from './ExecutionProfileService';
 import { providerCatalogService } from './ProviderCatalogService';
 import { normalizeProviderCategory, normalizeProviderProtocol } from './providerCatalogNormalize';
 import { secretStorageService } from './SecretStorageService';
-import { isAdmittedDiscoveredModel } from './DiscoveryAdmission';
+import { isAdmittedDiscoveredModel, normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 import { resolvePrimaryConnectionSecretFieldId } from './ProviderConnectionSchema';
 
 type PersistedLlmProviderEntry = Partial<LlmProviderEntry>;
@@ -679,21 +679,38 @@ function applyModelPreferences(
 
 function resolveProviderModels(providerId: string, persistedModels: unknown): LlmProviderModel[] {
   const sanitized = sanitizeModels(persistedModels);
-  if (getProviderCatalogOwnership(providerId) === 'user-managed') {
-    return sanitized;
-  }
-  const admittedDynamicModels = getProviderDiscoveryAuthority(providerId) === 'candidate-validation'
-    ? []
-    : sanitized.filter((model) => isAdmittedDiscoveredModel({ id: model.id }));
+  const ownership = getProviderCatalogOwnership(providerId);
+  const authority = getProviderDiscoveryAuthority(providerId);
+  const catalogMetadata = getProviderCatalogModelSummaries(providerId);
+  const metadataById = new Map(catalogMetadata.map((metadata) => [metadata.modelId, metadata]));
   const catalogModels = getProviderModelSummaries(providerId);
-  if (catalogModels.length === 0) return admittedDynamicModels;
-  const catalogKeys = new Set(getProviderCatalogModelIds(providerId));
+  const catalogKeys = new Set(catalogMetadata.flatMap((metadata) => (
+    [metadata.modelId, ...metadata.aliases].map(normalizeDiscoveredModelMatchKey).filter(Boolean)
+  )));
+  const observedKeys = new Set(sanitized.flatMap((model) => (
+    [model.id, ...(model.aliases ?? [])].map(normalizeDiscoveredModelMatchKey).filter(Boolean)
+  )));
+  const visibleCatalogModels = catalogModels.filter((model) => {
+    const metadata = metadataById.get(model.id);
+    if (!metadata || metadata.presencePolicy === 'maintained') return true;
+    return [metadata.modelId, ...metadata.aliases]
+      .map(normalizeDiscoveredModelMatchKey)
+      .some((key) => observedKeys.has(key));
+  });
+  const dynamicAllowed = ownership !== 'app-managed'
+    && authority !== 'candidate-validation'
+    && authority !== 'entitlement-overlay';
+  const dynamicModels = dynamicAllowed
+    ? sanitized.filter((model) => {
+        if (!isAdmittedDiscoveredModel({ id: model.id })) return false;
+        return ![model.id, ...(model.aliases ?? [])]
+          .map(normalizeDiscoveredModelMatchKey)
+          .some((key) => catalogKeys.has(key));
+      })
+    : [];
   return [
-    ...applyModelEnabledState(catalogModels, sanitized),
-    ...admittedDynamicModels.filter((model) => (
-      !catalogKeys.has(model.id)
-      && !(model.aliases ?? []).some((alias) => catalogKeys.has(alias))
-    )),
+    ...applyModelEnabledState(visibleCatalogModels, sanitized),
+    ...dynamicModels,
   ];
 }
 
@@ -955,7 +972,11 @@ function sanitizeUserProvider(
   ) as Partial<Record<LlmProviderAuthMode, boolean>>;
   const hasStoredSecret = hasStoredSecretByAuthMode[authMode] === true;
   const persistedModels = resolveProviderModels(rawId, provider.models ?? []);
-  const structuralModels = getProviderModelSummaries(rawId);
+  const structuralMetadataById = new Map(
+    getProviderCatalogModelSummaries(rawId).map((metadata) => [metadata.modelId, metadata]),
+  );
+  const structuralModels = getProviderModelSummaries(rawId)
+    .filter((model) => structuralMetadataById.get(model.id)?.presencePolicy === 'maintained');
   const structuralModelsById = new Map(structuralModels.map((model) => [model.id, model]));
   // Account discovery is scoped to the active identity. Once its credential is
   // absent, retain only released structural rows and discard account-specific

@@ -11,7 +11,7 @@
     "anthropic-messages"
   ],
   "authSchemaId": "oauth-account",
-  "discoveryPolicyId": "openai-compatible",
+  "discoveryPolicyId": "openrouter-catalog",
   "vendorId": "openrouter",
   "label": "OpenRouter",
   "status": "stable",
@@ -98,10 +98,108 @@
     "authority": "authoritative-list",
     "strategy": {
       "kind": "custom-parser",
-      "parserId": "openai-compatible"
+      "parserId": "openrouter-catalog"
     }
   },
-  "models": [],
+  "models": [
+    {
+      "modelId": "moonshotai/kimi-k3",
+      "label": "Kimi K3",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenRouterChatCompletions",
+        "baseUrl": "https://openrouter.ai/api/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unknown",
+          "defaultValue": false,
+          "reason": "Max mode requires an account-effective live catalog limit."
+        },
+        "reasoning": {
+          "kind": "always-on",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "known",
+          "defaultSelection": "max",
+          "lockedSelection": "max",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "max",
+            "onMode": "thinking-enabled"
+          }
+        }
+      },
+      "executionBindings": [
+        {
+          "id": "context:max",
+          "when": {
+            "context1m": true
+          },
+          "actions": [
+            {
+              "kind": "client-tier",
+              "tierId": "max"
+            }
+          ],
+          "entitlement": "unknown"
+        }
+      ],
+      "liveProjection": {
+        "context": {
+          "authority": "account-effective",
+          "defaultTierId": "default",
+          "maxTierId": "max"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      },
+      "factSourceId": "rdc-agent:openrouter:0"
+    }
+  ],
   "protocolOverrides": [],
   "recommendedModels": [
     "anthropic/claude-haiku-latest",

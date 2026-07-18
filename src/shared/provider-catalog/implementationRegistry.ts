@@ -140,8 +140,10 @@ export const PROVIDER_DISCOVERY_POLICY_IDS = [
   'google-vertex-models',
   'grok-account-catalog',
   'json-catalog',
+  'kimi-code-catalog',
   'ollama-tags',
   'openai-compatible',
+  'openrouter-catalog',
   'opencode-go-catalog',
   'sap-ai-core-deployments',
 ] as const;

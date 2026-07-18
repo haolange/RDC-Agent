@@ -22,8 +22,14 @@ import {
   resolveEffectiveModelSelection,
 } from './EffectiveModelResolver';
 import { mergeEffectiveCatalog } from './EffectiveCatalogService';
-import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
+import { getLoadedProviderSurface, loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { planModelRequest } from './RequestPlanner';
+import { parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface } from './LiveProviderCatalogParsers';
+
+const parseKimiCodeCatalog = (payload: unknown) => parseKimiCodeCatalogWithSurface(
+  payload,
+  getLoadedProviderSurface('kimi-coding-plan')!,
+);
 
 function provider(id: string, protocol: LlmProviderEntry['protocol']): LlmProviderEntry {
   return {
@@ -91,56 +97,74 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     });
   });
 
-  it('projects model-level protocol overlays before live discovery', () => {
+  it('keeps Kimi catalog controls provider-managed before live discovery', () => {
     const openAiKimi = mergeEffectiveCatalog(buildEffectiveCatalogRequest(
       provider('kimi-coding-plan', 'OpenAICompatibleChatCompletions'),
     )).find((model) => model.modelId === 'kimi-for-coding');
     expect(openAiKimi).toMatchObject({
       route: { protocol: 'OpenAICompatibleChatCompletions' },
-      controls: { reasoning: { wireProfile: { kind: 'openai-compatible' } } },
+      controls: { reasoning: { kind: 'unknown', wireProfile: { kind: 'none' } } },
       routeOptions: [
         { id: 'AnthropicMessages', route: { protocol: 'AnthropicMessages' } },
         { id: 'OpenAICompatibleChatCompletions', route: { protocol: 'OpenAICompatibleChatCompletions' } },
       ],
     });
-    const anthropicKimi = mergeEffectiveCatalog(buildEffectiveCatalogRequest(
-      provider('kimi-coding-plan', 'AnthropicMessages'),
-    )).find((model) => model.modelId === 'kimi-for-coding');
-    expect(anthropicKimi?.controls.reasoning.wireProfile).toMatchObject({ kind: 'anthropic' });
   });
 
-  it('keeps the single Kimi primary and hidden Fast target when candidate validation returns the base', () => {
+  it('preserves a live Kimi K3 Max tier only when discovery supplies its executable binding', () => {
+    const kimi = provider('kimi-coding-plan', 'OpenAICompatibleChatCompletions');
+    const parsed = parseKimiCodeCatalog({ data: [{
+      id: 'k3', context_length: 1_000_000, supports_reasoning: true,
+      think_efforts: { valid_efforts: ['low', 'high', 'max'], default_effort: 'max' },
+    }] });
+    const request = buildEffectiveCatalogRequest(kimi);
+    request.discovery = {
+      source: 'discovery',
+      observedAt: '2026-07-17T00:00:00.000Z',
+      models: applyDiscoveryAuthority(kimi, parsed.contributions),
+    };
+
+    expect(mergeEffectiveCatalog(request).find((model) => model.modelId === 'k3')).toMatchObject({
+      contextTiers: [
+        { id: 'default', maxPromptTokens: 256_000 },
+        { id: 'max', maxPromptTokens: 1_000_000 },
+      ],
+      controls: { context1m: { state: 'selectable', tierId: 'max' } },
+      executionBindings: [{
+        id: 'context:max',
+        actions: [{ kind: 'client-tier', tierId: 'max' }],
+      }],
+      resolvedControls: { context1m: { state: 'selectable', disabled: false } },
+    });
+  });
+  it('tombstones absent Kimi account models and fails closed when HighSpeed is absent', () => {
     const kimi = provider('kimi-coding-plan', 'AnthropicMessages');
     const discovery = applyDiscoveryAuthority(kimi, [{
       modelId: 'kimi-for-coding',
       availability: 'available',
+      controls: {
+        fast: { state: 'unsupported', fixedValue: false },
+      },
+      executionBindings: [],
     }]);
-    expect(discovery).toEqual([{ modelId: 'kimi-for-coding', availability: 'available' }]);
+    expect(discovery).toEqual([
+      expect.objectContaining({ modelId: 'kimi-for-coding', availability: 'available' }),
+      expect.objectContaining({ modelId: 'k3', availability: 'unavailable' }),
+      expect.objectContaining({ modelId: 'kimi-for-coding-highspeed', availability: 'unavailable' }),
+    ]);
     const request = buildEffectiveCatalogRequest(kimi);
-    request.discovery = { source: 'discovery', observedAt: '2026-07-15T00:00:00.000Z', models: discovery };
+    request.discovery = { source: 'discovery', observedAt: '2026-07-17T00:00:00.000Z', models: discovery };
     const models = mergeEffectiveCatalog(request);
-    expect(models.filter((model) => model.selection?.pickerVisibility !== 'internal').map((model) => model.modelId))
-      .toEqual(['kimi-for-coding']);
+    expect(models.filter((model) => (
+      model.selection?.pickerVisibility !== 'internal' && model.availability === 'available'
+    )).map((model) => model.modelId)).toEqual(['kimi-for-coding']);
     expect(models.find((model) => model.modelId === 'kimi-for-coding-highspeed')).toMatchObject({
       selection: { pickerVisibility: 'internal' },
-      availability: 'available',
+      availability: 'unavailable',
     });
-    const base = models.find((model) => model.modelId === 'kimi-for-coding');
-    if (!base) throw new Error('Missing maintained Kimi base model');
-    expect(planModelRequest({
-      model: base,
-      catalogModels: models,
-      controls: { fastModel: true, reasoningLevel: 'on', maxContextMode: false },
-    })).toMatchObject({
-      ok: true,
-      plan: {
-        selectedModelId: 'kimi-for-coding',
-        effectiveModelId: 'kimi-for-coding-highspeed',
-        appliedBindingIds: ['fast:kimi-for-coding-highspeed'],
-      },
-    });
+    expect(models.find((model) => model.modelId === 'kimi-for-coding')?.controls.fast)
+      .toEqual({ state: 'unsupported', fixedValue: false });
   });
-
   it('keeps the maintained MiniMax highspeed target when discovery validates only the base', () => {
     const minimax = provider('minimax-global', 'AnthropicMessages');
     const discovery = applyDiscoveryAuthority(minimax, [{

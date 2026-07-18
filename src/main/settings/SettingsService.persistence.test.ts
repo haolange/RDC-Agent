@@ -326,7 +326,7 @@ describe('SettingsService provider persistence', () => {
     });
   });
 
-  it('drops non-catalog Kimi rows for candidate validation without persisting compatibility aliases', async () => {
+  it('drops undeclared Kimi rows under strict authoritative discovery', async () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
     service.initialize();
@@ -345,6 +345,24 @@ describe('SettingsService provider persistence', () => {
     expect(provider?.recommendedModels).toEqual(['kimi-for-coding']);
   });
 
+  it('persists exact live Kimi K3 without persisting the internal HighSpeed target', async () => {
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    service.initialize();
+
+    service.saveProviderConnection('kimi-coding-plan', 'test-key', [
+      { id: 'kimi-for-coding', label: 'Kimi for Coding', enabled: true, availability: 'available' },
+      { id: 'k3', label: 'Kimi K3', enabled: true, availability: 'available' },
+      { id: 'kimi-for-coding-highspeed', label: 'Kimi for Coding HighSpeed', enabled: true, availability: 'available' },
+    ]);
+
+    const provider = service.getAll().llm.providers.find((entry) => entry.id === 'kimi-coding-plan');
+    expect(provider?.models.map((model) => model.id)).toEqual(['kimi-for-coding', 'k3']);
+    expect(provider?.models.find((model) => model.id === 'k3')).toMatchObject({
+      label: 'Kimi K3',
+      availability: 'available',
+    });
+  });
   it('persists user-owned model preferences and preserves them across discovery refresh', async () => {
     const { SettingsService } = await import('./SettingsService');
     const { getProviderModelSummaries } = await import('../provider-catalog/ProviderCatalogRegistry');

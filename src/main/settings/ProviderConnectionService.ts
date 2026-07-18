@@ -37,7 +37,14 @@ import {
   refreshEffectiveCatalogDiscovery,
   toDiscoveryModelContributions,
 } from './EffectiveModelResolver';
-import { parseClineCatalog, parseFreeModelCatalog, parseOpenCodeGoCatalog } from './LiveProviderCatalogParsers';
+import {
+  parseClineCatalog,
+  parseFreeModelCatalog,
+  parseKimiCodeCatalog,
+  parseOpenCodeGoCatalog,
+  parseOpenRouterAccountCatalog,
+  type ParsedLiveCatalog,
+} from './LiveProviderCatalogParsers';
 import {
   isProviderConnectionSchemaSatisfied,
   resolveProviderConnectionHeaders,
@@ -47,6 +54,17 @@ import {
 import { resolveGoogleVertexAccessToken } from './GoogleApplicationCredentials';
 import { createAwsBedrockRequestAuthorizer } from './AwsBedrockCredentials';
 import { listSapAiCoreDeployments } from './SapAiCoreCredentials';
+
+type ManifestProjectedCatalogParser = (
+  payload: unknown,
+  surface: ProviderSurfaceDefinition,
+) => ParsedLiveCatalog;
+
+const MANIFEST_PROJECTED_CATALOG_PARSERS: Readonly<Record<string, ManifestProjectedCatalogParser>> = {
+  'kimi-code-catalog': parseKimiCodeCatalog,
+  'opencode-go-catalog': parseOpenCodeGoCatalog,
+  'openrouter-catalog': parseOpenRouterAccountCatalog,
+};
 
 const REQUEST_TIMEOUT_MS = 20000;
 
@@ -169,7 +187,9 @@ type ProviderDiscoveryStrategy =
   | 'azure-deployment'
   | 'google-vertex-models'
   | 'ollama-tags'
+  | 'kimi-code-catalog'
   | 'opencode-go-catalog'
+  | 'openrouter-catalog'
   | 'cline-catalog'
   | 'freemodel-catalog'
   | 'gitlab-duo-direct-access'
@@ -181,7 +201,7 @@ function resolveDiscoveryStrategy(
 ): ProviderDiscoveryStrategy | null {
   if (!discovery) return null;
   const parserId = discovery.kind === 'custom-parser' ? discovery.parserId : undefined;
-  if (parserId === 'opencode-go-catalog' || parserId === 'cline-catalog' || parserId === 'google-vertex-models'
+  if (parserId === 'kimi-code-catalog' || parserId === 'openrouter-catalog' || parserId === 'opencode-go-catalog' || parserId === 'cline-catalog' || parserId === 'google-vertex-models'
     || parserId === 'gitlab-duo-direct-access' || parserId === 'sap-ai-core-deployments') return parserId;
   if (parserId === 'freemodel-catalog') return parserId;
   if (parserId === 'google-ai-studio' || parserId === 'azure-deployment' || parserId === 'ollama-tags') return parserId;
@@ -304,7 +324,6 @@ export const mergeManagedModelAvailability = (
   discoveredModels: LlmProviderModel[],
   options?: {
     aliasesByModelId?: ReadonlyMap<string, readonly string[]>;
-    preserveMissing?: boolean;
   },
 ): LlmProviderModel[] => {
   if (discoveredModels.length === 0) {
@@ -341,9 +360,7 @@ export const mergeManagedModelAvailability = (
         availabilityReason: undefined,
       };
     }
-    if (options?.preserveMissing) {
-      return model;
-    }
+
     return {
       ...model,
       enabled: false,
@@ -383,7 +400,7 @@ export const resolveVolcengineCodingPlanModelsUrl = (baseUrl: string): string =>
   return resolveCodingPlanModelsUrl(trimmed);
 };
 
-/** Coding Plan models list: align with CodePilot — append `/v1/models` when base has no `/v1`. */
+/** Coding Plan model list: append /v1/models only when the configured base has no /v1. */
 export const resolveCodingPlanModelsUrl = (baseUrl: string): string => {
   const trimmed = baseUrl.trim().replace(/\/+$/, '');
   if (/\/v1$/i.test(trimmed)) {
@@ -972,14 +989,34 @@ export class ProviderConnectionService {
     const candidateModelIds = catalogOwnership !== 'user-managed'
       ? managedModels.map((model) => model.id)
       : provider.recommendedModels;
-    if (strategy === 'opencode-go-catalog' || strategy === 'cline-catalog') {
+    const manifestProjectedParser = MANIFEST_PROJECTED_CATALOG_PARSERS[strategy];
+    if (manifestProjectedParser) {
+      const url = strategy === 'kimi-code-catalog'
+        ? resolveCodingPlanModelsUrl(baseUrl)
+        : appendPath(baseUrl, '/models');
+      const headers = strategy === 'kimi-code-catalog'
+        ? {
+            Authorization: 'Bearer ' + apiKey,
+            'User-Agent': 'RDC-Agent',
+            ...resolveProviderConnectionHeaders(provider.connectionSchema, connectionValues),
+          }
+        : this.createHeaders(provider, apiKey, connectionValues);
+      const parsed = manifestProjectedParser(
+        await getJson(url, { method: 'GET', headers }),
+        definition,
+      );
+      return {
+        models: requireModels(parsed.models),
+        contributions: parsed.contributions,
+        entitlementContributions: parsed.entitlementContributions,
+      };
+    }
+    if (strategy === 'cline-catalog') {
       const payload = await getJson(appendPath(baseUrl, '/models'), {
         method: 'GET',
         headers: this.createHeaders(provider, apiKey, connectionValues),
       });
-      const parsed = strategy === 'opencode-go-catalog'
-        ? parseOpenCodeGoCatalog(payload)
-        : parseClineCatalog(payload);
+      const parsed = parseClineCatalog(payload);
       return {
         models: requireModels(parsed.models),
         contributions: parsed.contributions,
@@ -1076,8 +1113,7 @@ export class ProviderConnectionService {
       };
     }
     if (
-      provider.id === 'kimi-coding-plan'
-      || provider.id === 'volcengine-coding-plan'
+      provider.id === 'volcengine-coding-plan'
     ) {
       // Both Anthropic and OpenAI Coding Plan protocols share the same /models surface.
       // Always resolve through the Coding Plan helper so OpenAI never hits a wrong
@@ -1168,9 +1204,7 @@ export class ProviderConnectionService {
     modelIds: string[],
     managedModels: LlmProviderModel[] = [],
   ): Promise<ModelDiscoveryResult> {
-    const modelsUrl = providerId === 'volcengine-coding-plan'
-      ? resolveVolcengineCodingPlanModelsUrl(baseUrl)
-      : resolveCodingPlanModelsUrl(baseUrl);
+    const modelsUrl = resolveVolcengineCodingPlanModelsUrl(baseUrl);
     const payload = await getJson(modelsUrl, {
       method: 'GET',
       headers: {
@@ -1203,7 +1237,6 @@ export class ProviderConnectionService {
     const mergedModels = managedModels.length > 0
       ? mergeManagedModelAvailability(managedModels, discoveredModels.length > 0 ? discoveredModels : validatedModels, {
         aliasesByModelId,
-        preserveMissing: providerId === 'kimi-coding-plan',
       })
       : validatedModels;
     const models = selectSupportedCodingPlanModels(providerId, mergedModels);

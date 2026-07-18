@@ -64,7 +64,9 @@ function plan(
     routeRevision: effectiveModel.routeRevision ?? 'test-route',
     selectedModelId: request.modelId,
     effectiveModelId: request.modelId,
-    appliedBindingIds: [],
+    appliedBindingIds: request.mode === 'fast' && effectiveModel.executionBindings?.[0]
+      ? [effectiveModel.executionBindings[0].id]
+      : [],
     route: effectiveModel.route,
     headers: request.mode === 'one-million-context' && oneMillionTier.activation.kind === 'header'
       ? oneMillionTier.activation.headers
@@ -95,16 +97,20 @@ function plan(
 function dependencies(effectiveModel: EffectiveModel) {
   const resolved = target(effectiveModel);
   const execute = vi.fn(async () => ({} as never));
+  const freezeCredentials = vi.fn(async () => 'credential-probe');
+  const releaseCredentials = vi.fn();
   const recordSuccess = vi.fn();
   const recordFailure = vi.fn(() => false);
   const value: ProviderCapabilityProbeDependencies = {
     resolve: () => resolved,
     plan: (request) => plan(request, effectiveModel),
     execute,
+    freezeCredentials,
+    releaseCredentials,
     recordSuccess,
     recordFailure,
   };
-  return { value, resolved, execute, recordSuccess, recordFailure };
+  return { value, resolved, execute, freezeCredentials, releaseCredentials, recordSuccess, recordFailure };
 }
 
 describe('ProviderCapabilityProbeService', () => {
@@ -117,8 +123,24 @@ describe('ProviderCapabilityProbeService', () => {
       success: true, status: 'verified', requestSent: true,
     });
     expect(fixture.execute).toHaveBeenCalledOnce();
+    expect(fixture.execute).toHaveBeenCalledWith(expect.objectContaining({ credentialHandle: 'credential-probe' }));
+    expect(fixture.releaseCredentials).toHaveBeenCalledWith('credential-probe');
     expect(fixture.recordSuccess).toHaveBeenCalledOnce();
   });
+  it('reports credential freeze failure before any provider request is sent', async () => {
+    const fixture = dependencies(model());
+    fixture.freezeCredentials.mockRejectedValue(new Error('Credential lease unavailable'));
+    const service = new ProviderCapabilityProbeService(fixture.value);
+
+    await expect(service.test({
+      providerId: 'provider-a', modelId: 'model-a', mode: 'default',
+    })).resolves.toMatchObject({
+      success: false, status: 'failed', requestSent: false,
+    });
+    expect(fixture.execute).not.toHaveBeenCalled();
+    expect(fixture.releaseCredentials).not.toHaveBeenCalled();
+  });
+
 
   it('keeps an implicit unknown 1M tier inconclusive without sending a fake proof request', async () => {
     const fixture = dependencies(model({
@@ -186,6 +208,33 @@ describe('ProviderCapabilityProbeService', () => {
     expect(buildProbeFailurePatch(request, fixture.resolved, plan(request, effectiveModel).plan, 403)).toMatchObject({
       modelId: 'model-a', controls: { fast: { entitlement: 'denied' } },
     });
+  });
+
+  it('treats HTTP 401 as entitlement denial only for a Fast model-switch target', () => {
+    const effectiveModel = model({
+      controls: {
+        ...model().controls,
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'unknown' },
+      },
+      executionBindings: [{
+        id: 'fast:model-a-highspeed', when: { fast: true },
+        actions: [{ kind: 'model-switch', targetModelId: 'model-a-highspeed' }], entitlement: 'unknown',
+      }],
+    });
+    const request = { providerId: 'provider-a', modelId: 'model-a', mode: 'fast' } as const;
+    const basePlan = plan(request, effectiveModel).plan;
+    const switchedPlan = {
+      ...basePlan,
+      effectiveModelId: 'model-a-highspeed',
+    };
+
+    expect(buildProbeFailurePatch(request, target(effectiveModel), switchedPlan, 401)).toMatchObject({
+      modelId: 'model-a', controls: { fast: { entitlement: 'denied' } },
+      executionBindings: [
+        { id: 'fast:model-a-highspeed', entitlement: 'denied' },
+      ],
+    });
+    expect(buildProbeFailurePatch(request, target(effectiveModel), basePlan, 401)).toBeNull();
   });
 
   it('does not downgrade capability evidence for a transient HTTP 429', async () => {

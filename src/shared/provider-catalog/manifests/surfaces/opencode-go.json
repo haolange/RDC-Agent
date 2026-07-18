@@ -23,38 +23,37 @@
   "serviceOperator": "opencode",
   "endpointClass": "coding-plan",
   "endpointOwnership": "service-operator",
-  "catalogOwnership": "user-managed",
+  "catalogOwnership": "provider-managed",
   "factSources": [
     {
       "id": "rdc-agent:opencode-go:0",
       "sourceKind": "rdc-agent",
-      "sourceRevision": "provider-registry-v4",
-      "refreshedAt": "2026-07-15",
-      "surface": "opencode-go"
-    },
-    {
-      "id": "models.dev:opencode-go:1",
-      "sourceKind": "models.dev",
-      "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
-      "refreshedAt": "2026-07-15",
-      "identityId": "opencode-go",
-      "surface": "opencode-go"
-    },
-    {
-      "id": "opencode:opencode-go:2",
-      "sourceKind": "opencode",
-      "sourceRevision": "571e7b852f82415faf65466e1536357a048bdf5a",
-      "refreshedAt": "2026-07-15",
-      "surface": "opencode-go"
+      "sourceRevision": "opencode-go-kimi-k3-v1",
+      "observedAt": "2026-07-17",
+      "refreshedAt": "2026-07-17T00:00:00+08:00",
+      "surface": "opencode-go",
+      "accountScope": "credential-scoped"
     }
   ],
   "defaultFactSourceId": "rdc-agent:opencode-go:0",
+  "connectionSchema": {
+    "fields": [
+      {
+        "id": "apiKey",
+        "label": "API Key",
+        "kind": "secret",
+        "required": true
+      }
+    ],
+    "primarySecretFieldId": "apiKey"
+  },
   "authModes": [
     "api-key"
   ],
   "capabilities": [
     "chat",
     "tool-calling",
+    "reasoning",
     "model-discovery"
   ],
   "routes": [
@@ -82,14 +81,135 @@
     }
   ],
   "discovery": {
-    "authority": "additive",
+    "authority": "authoritative-list",
     "strategy": {
       "kind": "custom-parser",
       "parserId": "opencode-go-catalog"
     }
   },
-  "models": [],
-  "protocolOverrides": [],
+  "models": [
+    {
+      "modelId": "kimi-k3",
+      "label": "Kimi K3",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 256000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 256000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unknown",
+          "defaultValue": false,
+          "reason": "Max mode requires an account-effective live catalog limit."
+        },
+        "reasoning": {
+          "kind": "always-on",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "known",
+          "defaultSelection": "max",
+          "lockedSelection": "max",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "max",
+            "onMode": "thinking-enabled"
+          }
+        }
+      },
+      "executionBindings": [
+        {
+          "id": "context:max",
+          "when": {
+            "context1m": true
+          },
+          "actions": [
+            {
+              "kind": "client-tier",
+              "tierId": "max"
+            }
+          ],
+          "entitlement": "unknown"
+        }
+      ],
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "authority": "account-effective",
+          "defaultTierId": "default",
+          "maxTierId": "max"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    }
+  ],
+  "protocolOverrides": [
+    {
+      "modelId": "kimi-k3",
+      "protocol": "AnthropicMessages",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "always-on",
+            "supportsOff": false,
+            "levels": [],
+            "defaultState": "known",
+            "defaultSelection": "max",
+            "lockedSelection": "max",
+            "wireProfile": {
+              "kind": "anthropic",
+              "on": "max",
+              "onMode": "enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0"
+    }
+  ],
   "recommendedModels": [],
   "docsUrl": "https://opencode.ai/docs/go/"
 }

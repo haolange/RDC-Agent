@@ -207,6 +207,23 @@ export const ModelControlsSchema = z.object({
   reasoning: ReasoningControlSchema,
 }).strict();
 
+const LiveContextProjectionSchema = z.object({
+  authority: z.enum(['model-catalog', 'account-effective']),
+  defaultTierId: z.string().min(1),
+  maxTierId: z.string().min(1).optional(),
+}).strict();
+
+const LiveReasoningProjectionSchema = z.object({
+  offPolicy: z.enum(['forbidden', 'from-live', 'allowed']),
+  wireProfiles: z.partialRecord(ProviderProtocolSchema, ReasoningWireProfileSchema),
+}).strict();
+
+export const ModelLiveProjectionSchema = z.object({
+  context: LiveContextProjectionSchema.optional(),
+  reasoning: LiveReasoningProjectionSchema.optional(),
+  capabilities: z.array(z.enum(['toolCalling', 'visionInput', 'structuredOutput'])).optional(),
+}).strict();
+
 export const ModelModeActionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('request-patch'), patch: JsonObjectSchema }).strict(),
   z.object({
@@ -250,6 +267,7 @@ export const ModelManifestSchema = z.object({
   defaultBudgetTokens: z.number().int().nonnegative(),
   controls: ModelControlsSchema,
   executionBindings: z.array(ExecutionBindingSchema).optional(),
+  liveProjection: ModelLiveProjectionSchema.optional(),
   toolCalling: CapabilityStateSchema,
   visionInput: CapabilityStateSchema,
   structuredOutput: CapabilityStateSchema,
@@ -290,3 +308,4 @@ export type ModelControls = z.infer<typeof ModelControlsSchema>;
 export type ModelModeAction = z.infer<typeof ModelModeActionSchema>;
 export type ModelPresencePolicy = ModelManifest['presencePolicy'];
 export type ModelManifest = z.infer<typeof ModelManifestSchema>;
+export type ModelLiveProjection = z.infer<typeof ModelLiveProjectionSchema>;

@@ -1570,7 +1570,9 @@ export class ProviderAccountAuthService {
     if (bundle.providerId === 'grok-account') {
       const token = bundle.accessToken ?? bundle.apiKey;
       if (!token) throw new Error('Super Grok OAuth token is missing.');
-      const builderRoute = getLoadedProviderSurface('grok-account')?.routes.find((route) => (
+      const grokSurface = getLoadedProviderSurface('grok-account');
+      if (!grokSurface) throw new Error('Super Grok compiled surface is unavailable.');
+      const builderRoute = grokSurface.routes.find((route) => (
         route.protocol === 'OpenAIResponses'
       ));
       const builderHeaders = {
@@ -1580,7 +1582,8 @@ export class ProviderAccountAuthService {
       };
       const apiHeaders = { Accept: 'application/json', Authorization: `Bearer ${token}` };
       const [builderResult, apiResult] = await Promise.allSettled([
-        fetchJson(`${GROK_BUILD_API_BASE_URL}/models`, { method: 'GET', headers: builderHeaders }).then(parseGrokBuilderCatalog),
+        fetchJson(`${GROK_BUILD_API_BASE_URL}/models`, { method: 'GET', headers: builderHeaders })
+          .then((payload) => parseGrokBuilderCatalog(payload, grokSurface)),
         fetchJson(`${XAI_API_BASE_URL}/models`, { method: 'GET', headers: apiHeaders }).then(parseGrokAccountCatalog),
       ]);
       const builder = builderResult.status === 'fulfilled'
@@ -1668,7 +1671,9 @@ export class ProviderAccountAuthService {
         method: 'GET',
         headers: { Accept: 'application/json', Authorization: `Bearer ${bundle.apiKey}` },
       });
-      const parsed = parseOpenRouterAccountCatalog(payload);
+      const surface = getLoadedProviderSurface('openrouter');
+      if (!surface) throw new Error('OpenRouter compiled surface is unavailable.');
+      const parsed = parseOpenRouterAccountCatalog(payload, surface);
       if (parsed.models.length === 0) {
         throw new Error('OpenRouter OAuth catalog returned no agent-routable models.');
       }
