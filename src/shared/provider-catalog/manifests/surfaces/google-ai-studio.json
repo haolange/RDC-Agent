@@ -4,9 +4,9 @@
   "identityIds": [
     "google"
   ],
-  "profileId": "google-gemini",
+  "profileId": "google-interactions",
   "adapterIds": [
-    "google-gemini"
+    "google-interactions"
   ],
   "authSchemaId": "declarative-api-key",
   "discoveryPolicyId": "google-ai-studio",
@@ -63,12 +63,30 @@
   ],
   "routes": [
     {
-      "id": "GoogleGemini",
-      "protocol": "GoogleGemini",
-      "adapterId": "google-gemini",
-      "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+      "id": "GoogleInteractions",
+      "protocol": "GoogleInteractions",
+      "adapterId": "google-interactions",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1",
       "default": true,
-      "protocolOwner": "google"
+      "protocolOwner": "google",
+      "contractOverrides": {
+        "compatibilityGroup": "google-ai-studio:GoogleInteractions",
+        "reasoning": {
+          "semantic": "summary",
+          "source": "google-interactions-thought-steps",
+          "evidence": "https://ai.google.dev/gemini-api/docs/thinking",
+          "displayLabel": "Reasoning summary",
+          "carrier": "thought-signature",
+          "artifactFormat": "google.interactions.thought-step",
+          "artifactVersion": "steps-v1",
+          "compatibilityGroup": "google-ai-studio:GoogleInteractions",
+          "continuation": "same-compatibility-group",
+          "projectionSources": {
+            "summary": "gemini-interactions-summary",
+            "opaque": "gemini-interactions-thought-signature"
+          }
+        }
+      }
     }
   ],
   "discovery": {
@@ -110,8 +128,8 @@
       },
       "presencePolicy": "maintained",
       "route": {
-        "protocol": "GoogleGemini",
-        "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+        "protocol": "GoogleInteractions",
+        "baseUrl": "https://generativelanguage.googleapis.com/v1",
         "source": "catalog"
       },
       "controls": {
@@ -180,8 +198,8 @@
       },
       "presencePolicy": "maintained",
       "route": {
-        "protocol": "GoogleGemini",
-        "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+        "protocol": "GoogleInteractions",
+        "baseUrl": "https://generativelanguage.googleapis.com/v1",
         "source": "catalog"
       },
       "controls": {
@@ -203,7 +221,7 @@
             "medium",
             "high"
           ],
-            "defaultSelection": "high",
+          "defaultSelection": "high",
           "wireProfile": {
             "kind": "gemini-thinking-level",
             "on": "medium",
@@ -251,8 +269,8 @@
       },
       "presencePolicy": "maintained",
       "route": {
-        "protocol": "GoogleGemini",
-        "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+        "protocol": "GoogleInteractions",
+        "baseUrl": "https://generativelanguage.googleapis.com/v1",
         "source": "catalog"
       },
       "controls": {
@@ -274,14 +292,14 @@
             "medium",
             "high"
           ],
-            "defaultState": "provider-managed",
+          "defaultState": "provider-managed",
           "wireProfile": {
-            "kind": "gemini-thinking-budget",
+            "kind": "gemini-thinking-level",
             "on": "high",
             "levels": {
-              "low": 1024,
-              "medium": 8192,
-              "high": 24576
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
             }
           }
         }
@@ -319,8 +337,8 @@
       },
       "presencePolicy": "maintained",
       "route": {
-        "protocol": "GoogleGemini",
-        "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+        "protocol": "GoogleInteractions",
+        "baseUrl": "https://generativelanguage.googleapis.com/v1",
         "source": "catalog"
       },
       "controls": {
@@ -336,20 +354,20 @@
         },
         "reasoning": {
           "kind": "levels",
-          "supportsOff": true,
+          "supportsOff": false,
           "levels": [
             "low",
             "medium",
             "high"
           ],
-            "defaultState": "provider-managed",
+          "defaultState": "provider-managed",
           "wireProfile": {
-            "kind": "gemini-thinking-budget",
+            "kind": "gemini-thinking-level",
             "on": "high",
             "levels": {
-              "low": 1024,
-              "medium": 8192,
-              "high": 24576
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
             }
           }
         }

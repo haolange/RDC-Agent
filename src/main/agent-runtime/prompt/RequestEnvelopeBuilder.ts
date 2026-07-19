@@ -4,7 +4,19 @@ import type { RequestPlan } from '@shared/types/providerCapability';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 
 const SECRET_KEY = /(?:api[-_]?key|authorization|password|secret|access[-_]?token|refresh[-_]?token)/i;
-const PROTECTED_KEY = /^(?:encryptedContent|signature|raw)$/i;
+const PROTECTED_KEY = /^(?:encryptedContent|signature|thoughtSignature|redactedContent|opaqueState|reasoningContent|raw)$/i;
+const SECRET_ASSIGNMENT = /((?:api[-_ ]?key|authorization|password|secret|access[-_ ]?token|refresh[-_ ]?token)\s*[:=]\s*)(?:\"[^\"\r\n]*\"|'[^'\r\n]*'|[^\r\n,;]+)/gi;
+const BEARER_TOKEN = /\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi;
+const PREFIXED_SECRET = /\b(?:sk|rk|xai|ghp|github_pat|sk-ant)-[A-Za-z0-9_-]{12,}\b/gi;
+const GOOGLE_API_KEY = /\bAIza[A-Za-z0-9_-]{20,}\b/g;
+const JWT_TOKEN = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
+
+const redactCredentialLikeText = (value: string): string => value
+  .replace(SECRET_ASSIGNMENT, '$1[REDACTED]')
+  .replace(BEARER_TOKEN, 'Bearer [REDACTED]')
+  .replace(PREFIXED_SECRET, '[REDACTED]')
+  .replace(GOOGLE_API_KEY, '[REDACTED]')
+  .replace(JWT_TOKEN, '[REDACTED]');
 
 export interface RequestEnvelopeInput {
   promptPlan: PromptPlan;
@@ -17,6 +29,7 @@ export interface RequestEnvelopeInput {
   tools: unknown[];
   controls: Record<string, unknown>;
   reasoning: RequestEnvelopeSnapshot['reasoning'];
+  cache: RequestEnvelopeSnapshot['cache'];
 }
 
 export class RequestEnvelopeBuilder {
@@ -24,7 +37,13 @@ export class RequestEnvelopeBuilder {
     const redactions: RequestEnvelopeSnapshot['redactions'] = [];
     const sanitize = (value: unknown, currentPath: string, seen: WeakSet<object>): unknown => {
       if (value === null || value === undefined || typeof value === 'number' || typeof value === 'boolean') return value;
-      if (typeof value === 'string') return value;
+      if (typeof value === 'string') {
+        const sanitized = redactCredentialLikeText(value);
+        if (sanitized !== value) {
+          redactions.push({ path: currentPath, reason: 'credential-like text', hash: hashScopedResource(value) });
+        }
+        return sanitized;
+      }
       if (Array.isArray(value)) return value.map((entry, index) => sanitize(entry, `${currentPath}[${index}]`, seen));
       if (typeof value !== 'object') return String(value);
       if (seen.has(value)) return '[Circular]';
@@ -64,11 +83,12 @@ export class RequestEnvelopeBuilder {
       callIndex: input.callIndex,
       route: input.route,
       requestPlan: sanitize(input.requestPlan, 'requestPlan', new WeakSet()) as unknown as RequestPlan,
-      promptPlan: input.promptPlan,
+      promptPlan: sanitize(input.promptPlan, 'promptPlan', new WeakSet()) as PromptPlan,
       messages: sanitize(input.messages, 'messages', new WeakSet()) as unknown[],
       tools: sanitize(input.tools, 'tools', new WeakSet()) as unknown[],
       controls: sanitize(input.controls, 'controls', new WeakSet()) as Record<string, unknown>,
       reasoning: input.reasoning,
+      cache: input.cache,
       redactions,
     };
   }

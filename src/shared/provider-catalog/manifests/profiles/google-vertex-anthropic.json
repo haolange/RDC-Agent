@@ -4,7 +4,57 @@
   "routeMechanics": [
     {
       "protocol": "GoogleVertexAnthropic",
-      "adapter": "google-vertex-anthropic"
+      "adapter": "google-vertex-anthropic",
+      "contracts": {
+        "protocolDialect": "GoogleVertexAnthropic",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "signed-content-block",
+          "artifactFormat": "anthropic.messages.thinking-block",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "none",
+          "continuation": "unknown"
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "preserve-exact",
+          "artifactScope": "tool-call-turn",
+          "ordering": "strict-block-order",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sse",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "http-status"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     }
   ]
 }

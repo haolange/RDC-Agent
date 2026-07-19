@@ -17,14 +17,19 @@ import type {
   AssistantMessage,
   ImageContent,
   Message,
-  ProviderReasoningArtifact,
+  ProviderContinuationArtifact,
   TextContent,
   ToolCall,
   ToolResultMessage,
   UserMessage,
 } from '../core/types';
+import type { DerivedContextView } from '@shared/types/semanticContext';
 import { charsToTokens } from '@shared/utils/tokens';
 import { TokenizerService } from '../core/TokenizerService';
+import {
+  buildDerivedContextView,
+  createStructuredHandoffMessage,
+} from '../context/StructuredHandoffBuilder';
 
 /** 上下文压缩配置。 */
 export interface ContextManagerConfig {
@@ -47,6 +52,7 @@ const DEFAULT_MAX_MESSAGES = 50;
 const DEFAULT_KEEP_RECENT_TOOL_RESULTS = 3;
 const SNIP_HEAD = 3;
 const TOOL_RESULT_TRUNCATE_HEAD = 2000;
+const TOOL_RESULT_COMPACTION_TEXT = '[Earlier tool result compacted]';
 
 export const estimateImageTokensFromBase64Length = (base64Length: number): number => {
   const byteLength = Math.max(0, Math.floor(base64Length * 0.75));
@@ -57,16 +63,13 @@ export const estimateImageTokensFromBase64Length = (base64Length: number): numbe
  * 各级压缩写入的占位符前缀，唯一来源。
  * 写入点（snip / micro / full）与读取点（classifyMessages）共享，避免字符串漂移。
  */
-export const COMPACTION_MARKERS = {
-  snip: '[snipped ',
-  toolResult: '[Earlier tool result compacted]',
-  summary: '[Conversation summary:',
-} as const;
 
 export interface CompressResult {
   messages: AgentMessage[];
   /** 实际发生压缩时的人类可读摘要；no-op 时为 undefined。 */
   summary?: string;
+  /** Provenance-bearing derived view created by the last semantic compaction stage. */
+  derivedContextView?: DerivedContextView;
 }
 
 /** 上下文管理器。 */
@@ -106,87 +109,71 @@ export class ContextManager {
     const beforeCount = messages.length;
     const beforeTokens = this.estimateTokens(messages);
     const stages: string[] = [];
+    let derivedContextView: DerivedContextView | undefined;
 
-    // Level 1: 工具结果预算控制
     let result = this.toolResultBudget(messages);
-    if (!messagesEqual(result, messages)) {
-      stages.push('toolResultBudget');
-    }
+    if (!messagesEqual(result, messages)) stages.push('toolResultBudget');
 
-    // Level 2: 消息数过多 → snip 中间
     const afterBudget = result;
-    result = this.snipCompact(result);
-    if (!messagesEqual(result, afterBudget)) {
-      stages.push('snip');
+    const snipped = this.snipCompact(result);
+    result = snipped.messages;
+    derivedContextView = snipped.view;
+    if (!messagesEqual(result, afterBudget)) stages.push('snip');
+
+    if (this.estimateTokens(result) > tokenLimit && derivedContextView) {
+      // Do not derive a second handoff from a rendered handoff. If count-based
+      // snipping did not satisfy the token budget, restart semantic compaction
+      // from the post-tool-budget source and let full compaction own provenance.
+      result = afterBudget;
+      derivedContextView = undefined;
+      const snipStage = stages.lastIndexOf('snip');
+      if (snipStage >= 0) stages.splice(snipStage, 1);
     }
 
-    // Level 3: 早期工具结果 → 占位
     if (this.estimateTokens(result) > tokenLimit) {
       const beforeMicro = result;
       result = this.microCompact(result);
-      if (!messagesEqual(result, beforeMicro)) {
-        stages.push('micro');
-      }
+      if (!messagesEqual(result, beforeMicro)) stages.push('micro');
     }
 
-    // Level 4: 仍超限 → 全量摘要
     if (this.estimateTokens(result) > tokenLimit) {
       const beforeFull = result;
-      result = await this.fullCompact(result);
-      if (!messagesEqual(result, beforeFull)) {
-        stages.push('full');
-      }
+      const compacted = await this.fullCompact(result);
+      result = compacted.messages;
+      derivedContextView = compacted.view ?? derivedContextView;
+      if (!messagesEqual(result, beforeFull)) stages.push('full');
     }
 
-    const semanticStages = stages.filter(
-      (stage): stage is 'snip' | 'micro' | 'full' =>
-        stage === 'snip' || stage === 'micro' || stage === 'full',
+    const semanticStages = stages.filter((stage) =>
+      stage === 'snip' || stage === 'micro' || stage === 'full',
     );
-    if (semanticStages.length === 0) {
-      return { messages: result };
-    }
+    if (semanticStages.length === 0) return { messages: result };
 
     const afterCount = result.length;
     const afterTokens = this.estimateTokens(result);
-    const removedMessages = Math.max(0, beforeCount - afterCount);
-    const summary = removedMessages > 0
-      ? `上下文压缩（${semanticStages.join('、')}）：${beforeCount} → ${afterCount} 条消息，约 ${beforeTokens} → ${afterTokens} token`
-      : `上下文压缩（${semanticStages.join('、')}）：约 ${beforeTokens} → ${afterTokens} token`;
-
-    return { messages: result, summary };
+    const summary = 'Context compacted (' + semanticStages.join(', ') + '): '
+      + beforeCount + ' -> ' + afterCount + ' messages, approximately '
+      + beforeTokens + ' -> ' + afterTokens + ' tokens.';
+    return {
+      messages: result,
+      summary,
+      ...(derivedContextView ? { derivedContextView } : {}),
+    };
   }
 
-  /**
-   * 将消息数组分为"压缩摘要"和"活跃对话"两组，返回各组的 token 估算与条数。
-   *
-   * 判断标准：消息内容包含已知的压缩占位符关键词（来自 snipCompact/microCompact/fullCompact）。
-   */
+  /** Split typed derived context from ordinary conversation without content guessing. */
   classifyMessages(messages: AgentMessage[]): {
     summaryTokens: number;
     conversationTokens: number;
     conversationCount: number;
   } {
-    const summaryPatterns = Object.values(COMPACTION_MARKERS);
-
-    const isSummaryMessage = (msg: AgentMessage): boolean => {
-      const content = (msg as { content?: unknown }).content;
-      const text = typeof content === 'string'
-        ? content
-        : Array.isArray(content)
-          ? content.map((b) => (typeof b === 'object' && b !== null && 'text' in b ? String((b as { text: unknown }).text) : '')).join('')
-          : '';
-      return summaryPatterns.some((p) => text.includes(p));
-    };
-
-    const summaryMessages: AgentMessage[] = [];
-    const conversationMessages: AgentMessage[] = [];
-    for (const msg of messages) {
-      if (isSummaryMessage(msg)) {
-        summaryMessages.push(msg);
-      } else {
-        conversationMessages.push(msg);
-      }
-    }
+    const summaryMessages = messages.filter(
+      (message): message is UserMessage =>
+        message.role === 'user' && Boolean(message.derivedContext),
+    );
+    const conversationMessages = messages.filter(
+      (message) => !(message.role === 'user' && message.derivedContext),
+    );
     return {
       summaryTokens:      this.estimateTokens(summaryMessages),
       conversationTokens: this.estimateTokens(conversationMessages),
@@ -266,49 +253,34 @@ export class ContextManager {
    * 如果切口左侧的 assistant 消息含 toolCall，
    * 则把切口往右推一格直到对应的 toolResult 之后。
    */
-  private snipCompact(messages: AgentMessage[]): AgentMessage[] {
+  private snipCompact(
+    messages: AgentMessage[],
+  ): { messages: AgentMessage[]; view?: DerivedContextView } {
     const max = this.config.maxMessages ?? DEFAULT_MAX_MESSAGES;
-    if (messages.length <= max) {
-      return [...messages];
-    }
+    if (messages.length <= max) return { messages: [...messages] };
 
-    const head = SNIP_HEAD;
-    const tailCount = max - head - 1; // 减去插入的占位符
-    if (tailCount <= 0) {
-      return [...messages];
-    }
+    const tailCount = max - SNIP_HEAD - 1;
+    if (tailCount <= 0) return { messages: [...messages] };
 
-    let snipStart = head;
-    let snipEnd = messages.length - tailCount; // exclusive
+    const snipStart = this.adjustSnipStart(messages, SNIP_HEAD);
+    const snipEnd = this.adjustSnipEnd(messages, messages.length - tailCount);
+    if (snipStart >= snipEnd) return { messages: [...messages] };
 
-    // 调整 snipStart：如果它指向的位置是某个 assistant.toolCall 的 toolResult，
-    // 或者它前一条是含 toolCall 的 assistant，则继续往后推。
-    snipStart = this.adjustSnipStart(messages, snipStart);
-    snipEnd = this.adjustSnipEnd(messages, snipEnd);
-
-    if (snipStart >= snipEnd) {
-      return [...messages];
-    }
-
-    const snippedCount = snipEnd - snipStart;
-    if (snippedCount <= 0) {
-      return [...messages];
-    }
-
-    const placeholder: UserMessage = {
-      role: 'user',
-      content: `${COMPACTION_MARKERS.snip}${snippedCount} messages]`,
-      timestamp: Date.now(),
+    const source = messages.slice(snipStart, snipEnd);
+    if (source.length === 0) return { messages: [...messages] };
+    const compacted = this.buildCompactionView(source);
+    if (!compacted) return { messages: [...messages] };
+    return {
+      messages: [
+        ...messages.slice(0, snipStart),
+        compacted.message,
+        ...messages.slice(snipEnd),
+      ],
+      view: compacted.view,
     };
-
-    return [
-      ...messages.slice(0, snipStart),
-      placeholder,
-      ...messages.slice(snipEnd),
-    ];
   }
 
-  /** Level 3: Micro 压缩（早期工具结果 → 占位符）。 */
+  /** Compact early tool results while preserving tool-call/result pairing. */
   private microCompact(messages: AgentMessage[]): AgentMessage[] {
     const keep =
       this.config.keepRecentToolResults ?? DEFAULT_KEEP_RECENT_TOOL_RESULTS;
@@ -334,7 +306,7 @@ export class ContextManager {
         toolCallId: original.toolCallId,
         toolName: original.toolName,
         content: [
-          { type: 'text', text: COMPACTION_MARKERS.toolResult },
+          { type: 'text', text: TOOL_RESULT_COMPACTION_TEXT },
         ],
         isError: false,
         timestamp: original.timestamp,
@@ -346,18 +318,40 @@ export class ContextManager {
   /** Level 4: Full 压缩（生成摘要替换全部）。 */
   private async fullCompact(
     messages: AgentMessage[],
-  ): Promise<AgentMessage[]> {
-    const tail = messages.slice(-5);
-    const summary = this.buildSummary(messages.slice(0, -5));
-    if (!summary) {
-      return [...tail];
-    }
-    const summaryMsg: UserMessage = {
-      role: 'user',
-      content: summary,
-      timestamp: Date.now(),
+  ): Promise<{ messages: AgentMessage[]; view?: DerivedContextView }> {
+    const tailStart = this.adjustSnipEnd(messages, Math.max(0, messages.length - 5));
+    const tail = messages.slice(tailStart);
+    const source = messages.slice(0, tailStart);
+    if (source.length === 0) return { messages: [...tail] };
+    const compacted = this.buildCompactionView(source);
+    if (!compacted) return { messages: [...messages] };
+    return {
+      messages: [compacted.message, ...tail],
+      view: compacted.view,
     };
-    return [summaryMsg, ...tail];
+  }
+
+  private buildCompactionView(
+    source: AgentMessage[],
+  ): { view: DerivedContextView; message: UserMessage } | null {
+    const sourceTokens = this.estimateTokens(source);
+    if (sourceTokens <= 0) return null;
+    const createdAt = Date.now();
+    for (const candidate of [
+      { maxFactsPerGroup: 4, maxResourceRefs: 8 },
+      { maxFactsPerGroup: 2, maxResourceRefs: 4 },
+      { maxFactsPerGroup: 1, maxResourceRefs: 2 },
+      { maxFactsPerGroup: 0, maxResourceRefs: 0 },
+    ]) {
+      const view = buildDerivedContextView(source, {
+        scope: 'ephemeral',
+        createdAt,
+        ...candidate,
+      });
+      const message = createStructuredHandoffMessage(view);
+      if (this.estimateTokens([message]) < sourceTokens) return { view, message };
+    }
+    return null;
   }
 
   // =====================================================================
@@ -405,11 +399,8 @@ export class ContextManager {
       if (block.type === 'text') {
         total += block.text.length;
       } else if (block.type === 'thinking') {
-        if (block.replayPolicy === 'provider-artifact' && block.artifact) {
-          total += this.providerArtifactChars(block.artifact);
-        } else if (block.replayPolicy === 'openai-reasoning-content' && block.text) {
-          total += block.text.length;
-        }
+        if (block.continuation) total += this.providerArtifactChars(block.continuation);
+        else if (block.text) total += block.text.length;
       } else if (block.type === 'toolCall') {
         const tc = block as ToolCall;
         try {
@@ -422,7 +413,7 @@ export class ContextManager {
     return total;
   }
 
-  private providerArtifactChars(artifact: ProviderReasoningArtifact): number {
+  private providerArtifactChars(artifact: ProviderContinuationArtifact): number {
     try {
       return JSON.stringify(artifact).length;
     } catch {
@@ -530,21 +521,7 @@ export class ContextManager {
     return e;
   }
 
-  private buildSummary(messages: AgentMessage[]): string {
-    if (messages.length === 0) return '';
-    const userCount = messages.filter((m) => m.role === 'user').length;
-    const assistantCount = messages.filter(
-      (m) => m.role === 'assistant',
-    ).length;
-    const toolResultCount = messages.filter(
-      (m) => m.role === 'toolResult',
-    ).length;
-    return (
-      `${COMPACTION_MARKERS.summary} ${messages.length} earlier messages compacted ` +
-      `(user=${userCount}, assistant=${assistantCount}, ` +
-      `toolResult=${toolResultCount}). Earlier context omitted to fit window.]`
-    );
-  }
+
 }
 
 function messagesEqual(left: AgentMessage[], right: AgentMessage[]): boolean {

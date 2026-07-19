@@ -3,9 +3,9 @@ import type { ConversationDiagnosticSeverity } from '@shared/types/conversation'
 import type { ProviderReasoningContract } from '@shared/types/rdxRuntime';
 import type { LlmProviderEntry, LlmProviderId, LlmProviderProtocol } from '@shared/types/settings';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import { createFailClosedProviderContracts, createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
 
-const NATIVE_TOOL_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages', 'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'OpenRouterChatCompletions', 'GoogleGemini', 'GitLabDuo', 'SapAiCoreOrchestration', 'SapAiCoreFoundationModels', 'OllamaOpenAICompatibleChatCompletions']);
-const STREAMING_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages', 'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'OpenRouterChatCompletions', 'GoogleGemini', 'GitLabDuo', 'SapAiCoreOrchestration', 'SapAiCoreFoundationModels', 'OllamaOpenAICompatibleChatCompletions']);
+const NATIVE_TOOL_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages', 'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'OpenRouterChatCompletions', 'GoogleInteractions', 'GoogleGemini', 'GitLabDuo', 'SapAiCoreOrchestration', 'SapAiCoreFoundationModels', 'OllamaOpenAICompatibleChatCompletions']);
 
 export interface RouteCapabilityDiagnostic {
   code:
@@ -27,14 +27,12 @@ export function resolveProviderReasoningContract(
   requestPlan?: RequestPlan,
 ): ProviderReasoningContract {
   if (!provider || !model || model.controls.reasoning.kind === 'none') {
-    return { semantic: 'none', source: 'effective-model', displayLabel: 'None' };
+    return createNoneReasoningContract('effective-model');
   }
   const route = requestPlan?.route ?? model.route;
-  return route.reasoningContract ?? {
-    semantic: 'unknown',
-    source: 'provider-catalog:unverified-route-semantics',
-    displayLabel: 'Provider reasoning',
-  };
+  return requestPlan?.contracts?.reasoning
+    ?? route.contracts?.reasoning
+    ?? createFailClosedProviderContracts(route.protocol).reasoning;
 }
 
 export function reasoningContractToDelivery(contract: ProviderReasoningContract): ReasoningDelivery {
@@ -57,7 +55,7 @@ export function reasoningContractToStreamVisibility(contract: ProviderReasoningC
   return 'none';
 }
 
-const disabledCapability = (providerId: LlmProviderId, modelId: string): AgentRouteCapability => ({ providerId, modelId, toolCallingMode: 'disabled', reasoningVisibility: 'none', reasoningDelivery: 'none', reasoningContract: { semantic: 'none', source: 'route-disabled', displayLabel: 'None' }, supportsStreaming: false, supportsToolResults: false, toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'prompt-fallback' });
+const disabledCapability = (providerId: LlmProviderId, modelId: string): AgentRouteCapability => ({ providerId, modelId, toolCallingMode: 'disabled', reasoningVisibility: 'none', reasoningDelivery: 'none', reasoningContract: createNoneReasoningContract('route-disabled'), supportsStreaming: false, supportsToolResults: false, toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'prompt-fallback' });
 
 export function resolveAgentRouteCapability(
   provider: LlmProviderEntry | undefined,
@@ -75,7 +73,10 @@ export function resolveAgentRouteCapability(
     || effectiveModel.availability === 'unavailable'
   ) return disabledCapability(providerId, modelId);
   const activeRoute = requestPlan?.route ?? effectiveModel.route;
-  const supportsStreaming = STREAMING_PROTOCOLS.has(activeRoute.protocol);
+  const activeContracts = requestPlan?.contracts
+    ?? activeRoute.contracts
+    ?? createFailClosedProviderContracts(activeRoute.protocol);
+  const supportsStreaming = activeContracts.streaming.transport !== 'unknown';
   let toolCallingMode: ToolCallingMode = 'text-only';
   const toolState = effectiveModel.toolCalling.state;
   if (toolState !== 'unsupported' && NATIVE_TOOL_PROTOCOLS.has(activeRoute.protocol)) toolCallingMode = 'native-structured';

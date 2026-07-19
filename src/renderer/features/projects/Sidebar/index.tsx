@@ -1,20 +1,26 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useI18n } from '../../../i18n';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import { ProjectGroup } from './ProjectGroup';
 import { RenamePopover, useSidebarPopovers } from './RenamePopover';
 import { useProjectSelection } from './useProjectSelection';
 import { useProjectTree } from './useProjectTree';
+import { ConfirmationDialog } from '../../../ui/ConfirmationDialog';
 import './Sidebar.css';
 
 interface SidebarProps {
   collapsed?: boolean;
 }
 
+type PendingRemoval =
+  | { kind: 'session'; session: SessionRecord }
+  | { kind: 'project'; project: ProjectRecord };
+
 export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
   const { t } = useI18n();
   const tree = useProjectTree();
   const popovers = useSidebarPopovers();
+  const [pendingRemoval, setPendingRemoval] = useState<PendingRemoval | null>(null);
   const selection = useProjectSelection({
     ensureProjectExpanded: tree.ensureProjectExpanded,
     loadProjectSessionList: tree.loadProjectSessionList,
@@ -27,16 +33,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
   const handleRemoveClick = useCallback((event: React.MouseEvent, session: SessionRecord) => {
     event.preventDefault();
     event.stopPropagation();
-    void selection.handleSessionRemove(session, popovers.closeRenamePopover);
+    setPendingRemoval({ kind: 'session', session });
   }, [popovers.closeRenamePopover, selection]);
 
   const handleRemoveKeyDown = useCallback((event: React.KeyboardEvent, session: SessionRecord) => {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       event.stopPropagation();
-      void selection.handleSessionRemove(session, popovers.closeRenamePopover);
+      setPendingRemoval({ kind: 'session', session });
     }
   }, [popovers.closeRenamePopover, selection]);
+
+  const confirmRemoval = useCallback(async () => {
+    const target = pendingRemoval;
+    if (!target) return;
+    if (target.kind === 'session') {
+      await selection.handleSessionRemove(target.session, popovers.closeRenamePopover);
+    } else {
+      popovers.closeProjectMenu();
+      await selection.handleRemoveProject(target.project);
+    }
+    setPendingRemoval(null);
+  }, [pendingRemoval, popovers.closeProjectMenu, popovers.closeRenamePopover, selection]);
 
   const handleProjectChevronClick = useCallback(async (event: React.SyntheticEvent, project: ProjectRecord) => {
     event.preventDefault();
@@ -58,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
             <div className="session-section-actions">
               {selection.currentProject && (
                 <button type="button" className="session-section-action" title={t('sidebar.removeProject')}
-                  onClick={() => void selection.handleRemoveProject()} disabled={selection.isBusy}>
+                  onClick={() => setPendingRemoval({ kind: 'project', project: selection.currentProject! })} disabled={selection.isBusy}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" />
                   </svg>
@@ -136,8 +154,29 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
         onOpenExplorer={() => void selection.handleOpenExplorer(popovers.projectMenuPopover!.project)}
         onStartProjectRename={popovers.startProjectRename}
         onSessionCreate={() => void selection.handleSessionCreate(popovers.projectMenuPopover!.project)}
-        onRemoveProject={() => void selection.handleRemoveProject(popovers.projectMenuPopover!.project)}
+        onRemoveProject={() => {
+          const project = popovers.projectMenuPopover?.project;
+          if (!project) return;
+          popovers.closeProjectMenu();
+          setPendingRemoval({ kind: 'project', project });
+        }}
       />
+
+      {pendingRemoval ? (
+        <ConfirmationDialog
+          title={pendingRemoval.kind === 'session'
+            ? t('sidebar.removeSessionTitle')
+            : t('sidebar.removeProjectTitle')}
+          message={pendingRemoval.kind === 'session'
+            ? t('sidebar.removeSessionConfirm', { title: pendingRemoval.session.title })
+            : t('sidebar.removeProjectConfirm', { name: pendingRemoval.project.name })}
+          confirmLabel={selection.isBusy ? t('dialog.deleting') : t('dialog.delete')}
+          cancelLabel={t('dialog.cancel')}
+          busy={selection.isBusy}
+          onCancel={() => setPendingRemoval(null)}
+          onConfirm={confirmRemoval}
+        />
+      ) : null}
     </div>
   );
 };

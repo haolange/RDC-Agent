@@ -23,7 +23,7 @@ describe('ConversationStreamPatchScheduler', () => {
       {
         type: 'message_patched',
         patch: { status: 'streaming', content: 'ab' },
-        options: { persist: true, publishTrace: false },
+        options: { persist: true, publishTrace: false, emit: true },
       },
     ]);
 
@@ -34,7 +34,7 @@ describe('ConversationStreamPatchScheduler', () => {
     expect(commits[1]).toEqual({
       type: 'message_patched',
       patch: { status: 'streaming', content: 'abc' },
-      options: { persist: false, publishTrace: false },
+      options: { persist: false, publishTrace: false, emit: true },
     });
 
     scheduler.close();

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { RdxRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdxRuntime';
 import { useI18n } from '../../../../i18n';
+import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
 import { ScopedResourceEditor } from './ScopedResourceEditor';
 import { contentFromForm, emptyForm, formFromContent, resourceCardMeta, type ResourceFormState } from './scopedResourceForm';
 
@@ -27,6 +28,7 @@ export const RuntimeScopePanel: React.FC<{
   const [form, setForm] = useState<ResourceFormState>(() => emptyForm(kind, templateId(kind)));
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<ScopedResourceDocument | null>(null);
 
   useEffect(() => {
     setSelectedId(null);
@@ -86,10 +88,16 @@ export const RuntimeScopePanel: React.FC<{
   };
 
   const remove = async () => {
-    if (!selected || !window.confirm(t('settings.scopeDeleteConfirm', { id: selected.id }))) return;
+    const target = pendingDelete;
+    if (!target) return;
     setBusy(true);
     try {
-      onChanged?.(await window.electronAPI.rdxRuntime.deleteResource(kind, scope, selected.id, overview?.projectRoot));
+      onChanged?.(await window.electronAPI.rdxRuntime.deleteResource(
+        target.kind,
+        target.scope,
+        target.id,
+        overview?.projectRoot,
+      ));
       setSelectedId(null);
       setCreating(false);
       setForm(emptyForm(kind, templateId(kind)));
@@ -97,6 +105,7 @@ export const RuntimeScopePanel: React.FC<{
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
+      setPendingDelete(null);
     }
   };
 
@@ -190,7 +199,7 @@ export const RuntimeScopePanel: React.FC<{
                 busy={busy}
                 onChange={patchForm}
                 onSave={() => void save()}
-                onDelete={selected && !creating ? () => void remove() : undefined}
+                onDelete={selected && !creating ? () => setPendingDelete(selected) : undefined}
                 onCancel={cancelEdit}
               />
             ) : (
@@ -201,6 +210,17 @@ export const RuntimeScopePanel: React.FC<{
           </div>
           {message ? <div className="settings-runtime-result">{message}</div> : null}
         </div>
+      ) : null}
+      {pendingDelete ? (
+        <ConfirmationDialog
+          title={t('settings.scopeDeleteTitle')}
+          message={t('settings.scopeDeleteConfirm', { id: pendingDelete.id })}
+          confirmLabel={busy ? t('dialog.deleting') : t('dialog.delete')}
+          cancelLabel={t('dialog.cancel')}
+          busy={busy}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={remove}
+        />
       ) : null}
     </section>
   );

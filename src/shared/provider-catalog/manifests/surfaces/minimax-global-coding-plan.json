@@ -80,11 +80,19 @@
       "baseUrl": "https://api.minimax.io/anthropic/v1",
       "default": true,
       "protocolOwner": "anthropic",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "minimax-global-coding-plan-documented-raw-reasoning",
-        "evidence": "https://platform.minimax.io/docs/token-plan/other-tools",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "minimax-global-coding-plan-documented-raw-reasoning",
+          "evidence": "https://platform.minimax.io/docs/token-plan/other-tools",
+          "displayLabel": "Raw reasoning",
+          "carrier": "signed-content-block",
+          "artifactFormat": "anthropic.messages.thinking-block",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "minimax-global-coding-plan:AnthropicMessages",
+          "continuation": "exact-execution"
+        },
+        "compatibilityGroup": "minimax-global-coding-plan:AnthropicMessages"
       }
     },
     {
@@ -93,11 +101,19 @@
       "adapterId": "openai-compatible",
       "baseUrl": "https://api.minimax.io/v1",
       "protocolOwner": "openai",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "minimax-global-coding-plan-documented-raw-reasoning",
-        "evidence": "https://platform.minimax.io/docs/token-plan/other-tools",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "minimax-global-coding-plan-documented-raw-reasoning",
+          "evidence": "https://platform.minimax.io/docs/token-plan/other-tools",
+          "displayLabel": "Raw reasoning",
+          "carrier": "reasoning-content",
+          "artifactFormat": "openai-chat.reasoning-content",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "minimax-global-coding-plan:OpenAICompatibleChatCompletions",
+          "continuation": "unknown"
+        },
+        "compatibilityGroup": "minimax-global-coding-plan:OpenAICompatibleChatCompletions"
       }
     }
   ],

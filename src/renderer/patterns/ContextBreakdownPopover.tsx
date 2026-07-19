@@ -58,6 +58,11 @@ export const ContextBreakdownPopover: React.FC<{
     (entry) => entry.tokens > 0 && entry.id !== 'free' && entry.id !== 'mcp_tools_deferred',
   );
   const hasRunTotals = Boolean(usage && (usage.inputTokens > 0 || usage.outputTokens > 0));
+  const derivedContextLabel = prepared?.derivedContext.status === 'applied'
+    ? t('contextBreakdown.derivedContextApplied')
+    : prepared?.derivedContext.status === 'stale'
+      ? t('contextBreakdown.derivedContextStale')
+      : t('contextBreakdown.derivedContextNone');
   const runExtras = [
     usage?.cacheReadTokens
       ? `${t('contextBreakdown.cacheReadLabel')} ${formatTokenCount(usage.cacheReadTokens)}`
@@ -198,6 +203,49 @@ export const ContextBreakdownPopover: React.FC<{
         {breakdown.length > 0 && detailsExpanded ? (
           <div id="context-breakdown-details" className="context-breakdown-details">
             <ContextBreakdownLegend entries={orderedEntries} />
+            {showPrepared ? (
+              <div className="context-breakdown-runtime" data-testid="context-breakdown-runtime">
+                <div className="context-breakdown-runtime-row">
+                  <span className="context-breakdown-runtime-label">{t('contextBreakdown.continuationLabel')}</span>
+                  <span className="context-breakdown-runtime-value">
+                    <code>{prepared.continuation.strategy}</code>
+                    <span>{t('contextBreakdown.replayedArtifacts', { count: prepared.continuation.replayedArtifactCount })}</span>
+                    <span>{t('contextBreakdown.droppedArtifacts', { count: prepared.continuation.droppedArtifactCount })}</span>
+                  </span>
+                </div>
+                {prepared.continuation.decisionCounts.length > 0 ? (
+                  <div className="context-breakdown-runtime-row">
+                    <span className="context-breakdown-runtime-label">{t('contextBreakdown.replayDecisionsLabel')}</span>
+                    <span className="context-breakdown-runtime-value is-wrapping">
+                      {prepared.continuation.decisionCounts.map((entry) => (
+                        <code key={entry.reason}>{entry.reason} × {entry.count}</code>
+                      ))}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="context-breakdown-runtime-row">
+                  <span className="context-breakdown-runtime-label">{t('contextBreakdown.derivedContextLabel')}</span>
+                  <span className={'context-breakdown-runtime-value status-' + prepared.derivedContext.status}>
+                    <span>{derivedContextLabel}</span>
+                    {prepared.derivedContext.compactedTurnCount > 0 ? (
+                      <span>{t('contextBreakdown.compactedTurns', { count: prepared.derivedContext.compactedTurnCount })}</span>
+                    ) : null}
+                  </span>
+                </div>
+                <div className="context-breakdown-runtime-row">
+                  <span className="context-breakdown-runtime-label">{t('contextBreakdown.cachePolicyLabel')}</span>
+                  <span className="context-breakdown-runtime-value is-wrapping">
+                    <code>{prepared.cache.enabled ? prepared.cache.mode : t('contextBreakdown.cacheDisabled')}</code>
+                    {prepared.cache.enabled ? <code>{prepared.cache.breakpoint} · {prepared.cache.ttl}</code> : null}
+                    <span>{t('contextBreakdown.cacheStablePrefix', {
+                      segments: prepared.cache.stableSegmentCount,
+                      tokens: formatTokenCount(prepared.cache.stableTokenEstimate),
+                    })}</span>
+                    {prepared.cache.providerReported ? <span>{t('contextBreakdown.providerTelemetry')}</span> : null}
+                  </span>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
 

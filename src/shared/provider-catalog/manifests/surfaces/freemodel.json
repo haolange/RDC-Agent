@@ -58,7 +58,7 @@
   ],
   "routes": [
     {
-    "id": "AnthropicMessages",
+      "id": "AnthropicMessages",
       "protocol": "AnthropicMessages",
       "adapterId": "anthropic-messages",
       "baseUrl": "https://cc.freemodel.dev/v1",

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import type { LlmProviderEntry } from '@shared/types/settings';
+import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
+import type { ProviderReasoningContract } from '@shared/provider-catalog/modelManifestSchema';
 import {
   claimStructuredToolCallingEvidence,
   describeRouteCapabilityDiagnostic,
@@ -16,6 +18,33 @@ const provider = {
   capabilities: ['chat', 'tool-calling', 'vision-input', 'structured-output'],
 } as LlmProviderEntry;
 
+function testContracts(
+  protocol: Parameters<typeof createFailClosedProviderContracts>[0],
+) {
+  const contracts = createFailClosedProviderContracts(protocol);
+  return {
+    ...contracts,
+    streaming: {
+      transport: 'sse' as const,
+      outputIdentity: 'provider-output-ref' as const,
+      usage: 'terminal' as const,
+      errors: 'http-status' as const,
+    },
+  };
+}
+
+function withReasoningContract(
+  protocol: Parameters<typeof createFailClosedProviderContracts>[0],
+  reasoning: ProviderReasoningContract,
+) {
+  const contracts = testContracts(protocol);
+  return {
+    ...contracts,
+    compatibilityGroup: reasoning.compatibilityGroup,
+    reasoning,
+  };
+}
+
 function model(patch: Partial<EffectiveModel> = {}): EffectiveModel {
   return {
     providerId: provider.id,
@@ -23,7 +52,7 @@ function model(patch: Partial<EffectiveModel> = {}): EffectiveModel {
     label: 'Model A',
     aliases: [],
     enabled: true,
-    route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://example.test', source: 'catalog' },
+    route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://example.test', contracts: testContracts('OpenAICompatibleChatCompletions'), source: 'catalog' },
     availability: 'available',
     presencePolicy: 'maintained',
     contextTiers: [{ id: 'default', label: 'Default', activation: { kind: 'implicit' }, entitlement: 'granted' }],
@@ -59,11 +88,16 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
         protocol: 'OpenAICompatibleChatCompletions',
         baseUrl: 'https://example.test',
         source: 'catalog',
-        reasoningContract: {
+        contracts: withReasoningContract('OpenAICompatibleChatCompletions', {
           semantic: 'raw',
           source: 'manifest:test-raw',
           displayLabel: 'Raw reasoning',
-        },
+          carrier: 'reasoning-content',
+          artifactFormat: 'test.reasoning-content',
+          artifactVersion: 'v1',
+          compatibilityGroup: 'test-chat',
+          continuation: 'exact-execution',
+        }),
       },
     });
     expect(resolveAgentRouteCapability(provider, 'model-a', rawModel).reasoningContract.semantic).toBe('raw');
@@ -73,11 +107,16 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
         protocol: 'OpenAIResponses',
         baseUrl: 'https://example.test/v1',
         source: 'catalog',
-        reasoningContract: {
+        contracts: withReasoningContract('OpenAIResponses', {
           semantic: 'summary',
           source: 'manifest:test-summary',
           displayLabel: 'Reasoning summary',
-        },
+          carrier: 'reasoning-item',
+          artifactFormat: 'test.reasoning-summary',
+          artifactVersion: 'v1',
+          compatibilityGroup: 'test-responses',
+          continuation: 'exact-execution',
+        }),
       },
     } as unknown as import('@shared/types/providerCapability').RequestPlan;
     expect(resolveAgentRouteCapability(provider, 'model-a', rawModel, frozenPlan).reasoningContract.semantic)

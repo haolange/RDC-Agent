@@ -1,4 +1,5 @@
 import type { AgentManifestDefinition } from './agentManifest';
+import type { CompiledPromptCache, PromptStablePrefix } from './semanticContext';
 
 export type ResourceScope = 'builtin' | 'user' | 'project';
 
@@ -143,6 +144,7 @@ export interface PromptSegment {
   sourceHash: string;
   precedence: number;
   content: string;
+  stability: 'stable' | 'volatile';
   tokenEstimate: number;
 }
 
@@ -157,6 +159,7 @@ export interface PromptPlan {
   segments: PromptSegment[];
   systemPrompt: string;
   totalTokenEstimate: number;
+  stablePrefix: PromptStablePrefix;
   metrics: PromptPlanMetrics;
   diagnostics: Array<{ code: string; severity: 'warning' | 'error'; message: string; sourcePath?: string }>;
 }
@@ -175,6 +178,7 @@ export interface RequestEnvelopeSnapshot {
   tools: unknown[];
   controls: Record<string, unknown>;
   reasoning: ProviderReasoningContract;
+  cache: CompiledPromptCache;
   usage?: {
     inputTokens?: number;
     outputTokens?: number;

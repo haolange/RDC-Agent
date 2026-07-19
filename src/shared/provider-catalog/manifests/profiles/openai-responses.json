@@ -4,7 +4,61 @@
   "routeMechanics": [
     {
       "protocol": "OpenAIResponses",
-      "adapter": "openai-responses"
+      "adapter": "openai-responses",
+      "contracts": {
+        "protocolDialect": "OpenAIResponses",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "reasoning-item",
+          "artifactFormat": "openai.responses.reasoning",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "none",
+          "continuation": "unknown",
+          "projectionSources": {
+            "summary": "openai-responses-summary",
+            "opaque": "openai-responses-encrypted"
+          }
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "preserve-exact",
+          "artifactScope": "tool-call-turn",
+          "ordering": "provider-native",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sse",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "http-status"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     }
   ]
 }

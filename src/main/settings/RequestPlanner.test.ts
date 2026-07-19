@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import { resolveModelControls } from '@shared/utils/modelControls';
+import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 import { planModelRequest } from './RequestPlanner';
 
 const reasoning = {
@@ -351,4 +352,168 @@ describe('planModelRequest', () => {
     });
     expect(result).toMatchObject({ ok: false, code: 'PLAN_CONFLICT' });
   });
+  it('prefers a model-level cache contract over the route default', () => {
+    const routeContracts = {
+      ...createFailClosedProviderContracts('OpenAIResponses'),
+      cache: {
+        mode: 'implicit-prefix' as const,
+        keyCarrier: 'prompt-cache-key' as const,
+        breakpointCarrier: 'none' as const,
+        telemetry: ['cached-input-tokens' as const],
+        ttl: 'five-minutes' as const,
+      },
+    };
+    const cacheContract = {
+      mode: 'automatic-and-explicit-breakpoints' as const,
+      keyCarrier: 'prompt-cache-key' as const,
+      breakpointCarrier: 'openai-prompt-cache' as const,
+      telemetry: ['cached-input-tokens' as const, 'cache-write-input-tokens' as const],
+      ttl: 'thirty-minutes' as const,
+    };
+    const cached = model({
+      cacheContract,
+      route: { ...model().route, contracts: routeContracts },
+      routeOptions: [{
+        id: 'responses',
+        route: { ...model().route, contracts: routeContracts },
+        availability: 'available',
+      }],
+    });
+
+    const result = planModelRequest({ model: cached, catalogModels: [cached] });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.contracts.cache).toEqual(cacheContract);
+    expect(result.plan.cachePlan).toEqual({ enabled: true, ...cacheContract });
+  });
+
+  it('defaults to secret-free local stateless execution even when the route supports provider state', () => {
+    const contracts: ReturnType<typeof createFailClosedProviderContracts> = {
+      ...createFailClosedProviderContracts('OpenAIResponses'),
+      compatibilityGroup: 'openai-responses:test',
+      state: {
+        supportedModes: ['local-stateless', 'provider-managed'],
+        defaultMode: 'local-stateless' as const,
+        carrier: 'previous-response-id' as const,
+        retention: 'provider' as const,
+        crossModel: 'never' as const,
+      },
+    };
+    const stateful = model({
+      route: { ...model().route, contracts },
+      routeOptions: [{
+        id: 'responses',
+        route: { ...model().route, contracts },
+        availability: 'available',
+      }],
+    });
+    const secretScope = 'account-secret-that-must-not-be-persisted';
+    const result = planModelRequest({ model: stateful, credentialScopeId: secretScope });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.statePlan).toEqual({
+      mode: 'local-stateless',
+      carrier: 'none',
+      store: false,
+      reuseProviderState: false,
+    });
+    expect(result.plan.contextTransitionPlan).toMatchObject({
+      strategy: 'semantic-replay',
+      portable: true,
+    });
+    expect(result.plan.executionIdentity.credentialScopeHash).toMatch(/^[a-f0-9]{64}$/u);
+    expect(result.plan.executionIdentity.fingerprint).toMatch(/^[a-f0-9]{64}$/u);
+    expect(JSON.stringify(result.plan)).not.toContain(secretScope);
+  });
+
+  it('enables provider-managed state only through an explicit supported request mode', () => {
+    const contracts: ReturnType<typeof createFailClosedProviderContracts> = {
+      ...createFailClosedProviderContracts('OpenAIResponses'),
+      compatibilityGroup: 'openai-responses:test',
+      state: {
+        supportedModes: ['local-stateless', 'provider-managed'],
+        defaultMode: 'local-stateless' as const,
+        carrier: 'previous-response-id' as const,
+        retention: 'provider' as const,
+        crossModel: 'never' as const,
+      },
+    };
+    const stateful = model({
+      route: { ...model().route, contracts },
+      routeOptions: [{
+        id: 'responses',
+        route: { ...model().route, contracts },
+        availability: 'available',
+      }],
+    });
+    const enabled = planModelRequest({ model: stateful, stateMode: 'provider-managed' });
+    expect(enabled.ok).toBe(true);
+    if (!enabled.ok) return;
+    expect(enabled.plan.statePlan).toEqual({
+      mode: 'provider-managed',
+      carrier: 'previous-response-id',
+      store: true,
+      reuseProviderState: true,
+    });
+    expect(enabled.plan.contextTransitionPlan).toMatchObject({
+      strategy: 'provider-managed',
+      portable: false,
+    });
+
+    expect(planModelRequest({ model: model(), stateMode: 'provider-managed' }))
+      .toMatchObject({ ok: false, code: 'CONSTRAINT_REJECTED' });
+  });
+
+  it('changes execution identity for account, endpoint, control, and binding changes', () => {
+    const getPlan = (
+      selected: EffectiveModel,
+      options: Parameters<typeof planModelRequest>[0] = { model: selected },
+    ) => {
+      const result = planModelRequest({ ...options, model: selected });
+      expect(result.ok).toBe(true);
+      if (!result.ok) throw new Error(result.message);
+      return result.plan;
+    };
+    const base = model();
+    const accountA = getPlan(base, { model: base, credentialScopeId: 'account-a' });
+    const accountB = getPlan(base, { model: base, credentialScopeId: 'account-b' });
+    const endpoint = model({
+      route: { ...base.route, baseUrl: 'https://other.example.test/v1' },
+      routeOptions: [{
+        id: 'responses',
+        route: { ...base.route, baseUrl: 'https://other.example.test/v1' },
+        availability: 'available',
+      }],
+    });
+    const endpointPlan = getPlan(endpoint);
+    const high = getPlan(base, { model: base, controls: { reasoningLevel: 'high' } });
+    const fastModel = model({
+      controls: {
+        ...base.controls,
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
+      },
+      executionBindings: [{
+        id: 'fast:priority',
+        when: { fast: true },
+        actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }],
+        entitlement: 'granted',
+      }],
+    });
+    const fast = getPlan(fastModel, {
+      model: fastModel,
+      catalogModels: [fastModel],
+      controls: { fastModel: true },
+    });
+
+    expect(new Set([
+      accountA.executionIdentity.fingerprint,
+      accountB.executionIdentity.fingerprint,
+      endpointPlan.executionIdentity.fingerprint,
+      high.executionIdentity.fingerprint,
+      fast.executionIdentity.fingerprint,
+    ]).size).toBe(5);
+    expect(accountA.executionIdentity.variantKey).not.toBe(high.executionIdentity.variantKey);
+    expect(accountA.executionIdentity.variantKey).not.toBe(fast.executionIdentity.variantKey);
+  });
+
 });

@@ -2,9 +2,8 @@
   "schemaVersion": 2,
   "id": "grok-account",
   "identityIds": [],
-  "profileId": "multi-protocol",
+  "profileId": "openai-responses",
   "adapterIds": [
-    "openai-compatible",
     "openai-responses"
   ],
   "authSchemaId": "oauth-account",
@@ -55,17 +54,46 @@
         "x-grok-client-version": "0.2.101"
       },
       "default": true,
-      "protocolOwner": "openai"
-    },
-    {
-      "id": "OpenAICompatibleChatCompletions",
-      "protocol": "OpenAICompatibleChatCompletions",
-      "adapterId": "openai-compatible",
-      "baseUrl": "https://cli-chat-proxy.grok.com/v1",
-      "headers": {
-        "x-grok-client-version": "0.2.101"
-      },
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "contractOverrides": {
+        "compatibilityGroup": "xai:OpenAIResponses",
+        "reasoning": {
+          "semantic": "summary",
+          "source": "xai-responses-reasoning-summary",
+          "evidence": "https://docs.x.ai/developers/model-capabilities/text/reasoning",
+          "displayLabel": "Reasoning summary",
+          "carrier": "reasoning-item",
+          "artifactFormat": "openai.responses.reasoning",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "xai:OpenAIResponses",
+          "continuation": "exact-execution",
+          "projectionSources": {
+            "summary": "xai-responses-summary",
+            "opaque": "xai-responses-encrypted"
+          }
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless",
+            "provider-managed"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "previous-response-id",
+          "retention": "provider",
+          "crossModel": "never",
+          "evidence": "https://docs.x.ai/developers/model-capabilities/text/comparison"
+        },
+        "cache": {
+          "mode": "implicit-prefix",
+          "keyCarrier": "provider-managed",
+          "breakpointCarrier": "provider-managed",
+          "telemetry": [
+            "cached-input-tokens"
+          ],
+          "ttl": "provider-managed",
+          "evidence": "https://docs.x.ai/developers/advanced-api-usage/prompt-caching/multi-turn"
+        }
+      }
     }
   ],
   "discovery": {
@@ -507,36 +535,7 @@
       "factSourceId": "user-observation:grok-account:2026-07-14"
     }
   ],
-  "protocolOverrides": [
-    {
-      "modelId": "grok-4.5",
-      "protocol": "OpenAICompatibleChatCompletions",
-      "patch": {
-        "controls": {
-          "reasoning": {
-            "kind": "levels",
-            "supportsOff": false,
-            "levels": [
-              "low",
-              "medium",
-              "high"
-            ],
-            "defaultSelection": "medium",
-            "wireProfile": {
-              "kind": "openai-compatible",
-              "on": "medium",
-              "levels": {
-                "low": "low",
-                "medium": "medium",
-                "high": "high"
-              }
-            }
-          }
-        }
-      },
-      "factSourceId": "user-observation:grok-account:2026-07-14"
-    }
-  ],
+  "protocolOverrides": [],
   "recommendedModels": [
     "grok-4.20-0309-non-reasoning",
     "grok-4.20-0309-reasoning",

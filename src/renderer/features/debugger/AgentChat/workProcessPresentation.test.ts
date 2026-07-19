@@ -282,7 +282,7 @@ describe('buildWorkProcessPresentation', () => {
             kind: 'raw',
             source: 'openai-compatible-raw',
             visibility: 'raw-collapsed',
-            replayPolicy: 'none',
+
           },
           thinkingStatus: 'complete',
           toolCalls: [
@@ -329,7 +329,7 @@ describe('buildWorkProcessPresentation', () => {
             kind: 'summary',
             source: 'anthropic-thinking',
             visibility: 'summary',
-            replayPolicy: 'provider-artifact',
+
           },
           thinkingStatus: 'streaming',
           toolCalls: [
@@ -370,7 +370,7 @@ describe('buildWorkProcessPresentation', () => {
             kind: 'summary',
             source: 'anthropic-thinking',
             visibility: 'summary',
-            replayPolicy: 'provider-artifact',
+
           },
           thinkingStatus: 'complete',
           toolCalls: [],
@@ -582,7 +582,7 @@ describe('buildWorkProcessPresentation', () => {
             kind: 'summary',
             source: 'anthropic-thinking',
             visibility: 'summary',
-            replayPolicy: 'provider-artifact',
+
           },
           thinkingStatus: 'complete',
           toolCalls: [],
@@ -657,7 +657,7 @@ describe('buildWorkProcessPresentation', () => {
             kind: 'summary',
             source: 'anthropic-thinking',
             visibility: 'summary',
-            replayPolicy: 'provider-artifact',
+
           },
           thinkingStatus: 'complete',
           toolCalls: [

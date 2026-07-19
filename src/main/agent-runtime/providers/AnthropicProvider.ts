@@ -7,7 +7,7 @@ import type {
   Message,
   Model,
   ProviderOutputRef,
-  ProviderReasoningArtifact,
+  ProviderContinuationArtifact,
   StopReason,
   StreamOptions,
   ThinkingArtifactKind,
@@ -15,6 +15,7 @@ import type {
   ToolDefinition,
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
+import { partitionSystemPrompt } from './promptCacheWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
 import type { ReasoningVisibility } from '@shared/types/agentRuntime';
 import { AssistantStreamBuilder, createProviderOutputRef } from './internal/AssistantStreamBuilder';
@@ -26,6 +27,10 @@ import {
   ProviderHttpError,
 } from './internal/http';
 import { applyReasoningToAnthropicLikeBody } from './reasoningWire';
+import { reasoningProjectionSource } from './reasoningProjection';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
+import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 
 const DEFAULT_BASE_URL = 'https://api.anthropic.com/v1';
 const DEFAULT_ANTHROPIC_VERSION = '2023-06-01';
@@ -176,7 +181,7 @@ export class AnthropicProvider implements ProviderStrategy {
       await ensureOk(response, PROVIDER_API);
 
       let responseId: string | undefined;
-      const thinkingArtifactsByIndex = new Map<number, ProviderReasoningArtifact>();
+      const thinkingArtifactsByIndex = new Map<number, ProviderContinuationArtifact | undefined>();
       const blockRefs = new Map<number, ProviderOutputRef>();
       const blockKinds = new Map<number, 'text' | 'thinking' | 'tool_call'>();
       const refFor = (index: number): ProviderOutputRef => blockRefs.get(index) ?? createProviderOutputRef({
@@ -184,6 +189,8 @@ export class AnthropicProvider implements ProviderStrategy {
       });
       const thinkingKind = resolveAnthropicThinkingKind(options.reasoningVisibility);
       const thinkingVisibility = resolveAnthropicThinkingVisibility(options.reasoningVisibility);
+      const thinkingSource = reasoningProjectionSource(options.requestPlan, 'raw');
+      const redactedThinkingSource = reasoningProjectionSource(options.requestPlan, 'opaque');
       let stopReason: string | null = null;
       let inputTokens = 0;
       let outputTokens = 0;
@@ -235,36 +242,33 @@ export class AnthropicProvider implements ProviderStrategy {
                 builder.appendText(blockRef, block.text);
               }
             } else if (block.type === 'thinking') {
-              const artifact = createAnthropicThinkingArtifact(model, block.signature);
+              const artifact = createAnthropicThinkingArtifact(options.requestPlan, block.signature);
               thinkingArtifactsByIndex.set(evt.index, artifact);
               builder.startThinking(blockRef, {
                 kind: thinkingKind,
-                source: 'anthropic-thinking',
+                source: thinkingSource,
                 visibility: thinkingVisibility,
-                replayPolicy: 'provider-artifact',
-                artifact,
+                continuation: artifact,
               });
               blockKinds.set(evt.index, 'thinking');
               if (block.thinking) {
                 sawOutput = true;
                 builder.appendThinking(blockRef, block.thinking, {
                   kind: thinkingKind,
-                  source: 'anthropic-thinking',
+                  source: thinkingSource,
                   visibility: thinkingVisibility,
-                  replayPolicy: 'provider-artifact',
-                  artifact,
+                  continuation: artifact,
                 });
               }
             } else if (block.type === 'redacted_thinking') {
-              const artifact = createAnthropicRedactedArtifact(model, block.data);
+              const artifact = createAnthropicRedactedArtifact(options.requestPlan, block.data);
               thinkingArtifactsByIndex.set(evt.index, artifact);
               sawOutput = true;
               builder.startThinking(blockRef, {
                 kind: 'opaque',
-                source: 'anthropic-redacted-thinking',
+                source: redactedThinkingSource,
                 visibility: 'hidden',
-                replayPolicy: 'provider-artifact',
-                artifact,
+                continuation: artifact,
               });
               blockKinds.set(evt.index, 'thinking');
             } else if (block.type === 'tool_use') {
@@ -286,23 +290,22 @@ export class AnthropicProvider implements ProviderStrategy {
               sawOutput = true;
               builder.appendThinking(refFor(evt.index), evt.delta.thinking, {
                 kind: thinkingKind,
-                source: 'anthropic-thinking',
+                source: thinkingSource,
                 visibility: thinkingVisibility,
-                replayPolicy: 'provider-artifact',
-                artifact: thinkingArtifactsByIndex.get(evt.index) ?? createAnthropicThinkingArtifact(model),
+                continuation: thinkingArtifactsByIndex.get(evt.index) ?? createAnthropicThinkingArtifact(options.requestPlan),
               });
             } else if (evt.delta.type === 'signature_delta') {
               const artifact = mergeAnthropicSignature(
-                thinkingArtifactsByIndex.get(evt.index) ?? createAnthropicThinkingArtifact(model),
+                options.requestPlan,
+                thinkingArtifactsByIndex.get(evt.index) ?? createAnthropicThinkingArtifact(options.requestPlan),
                 evt.delta.signature,
               );
               thinkingArtifactsByIndex.set(evt.index, artifact);
               builder.updateThinking(refFor(evt.index), {
                 kind: thinkingKind,
-                source: 'anthropic-thinking',
+                source: thinkingSource,
                 visibility: thinkingVisibility,
-                replayPolicy: 'provider-artifact',
-                artifact,
+                continuation: artifact,
               });
             } else if (evt.delta.type === 'input_json_delta') {
               sawOutput = true;
@@ -373,7 +376,12 @@ export class AnthropicProvider implements ProviderStrategy {
     context: Context,
     options: StreamOptions,
   ): Record<string, unknown> {
-    const { system, messages } = toAnthropicMessages(context);
+    const { system, messages } = toAnthropicMessages(
+      context,
+      options.requestPlan,
+      options.promptCache,
+      this.surface,
+    );
     const body: Record<string, unknown> = {
       model: model.id,
       messages,
@@ -381,6 +389,15 @@ export class AnthropicProvider implements ProviderStrategy {
       max_tokens: options.maxTokens ?? model.maxTokens ?? 4096,
     };
     if (system) body.system = system;
+    if (this.surface === 'anthropic'
+      && options.promptCache?.enabled
+      && options.promptCache.breakpointCarrier === 'anthropic-cache-control'
+      && (
+        options.promptCache.breakpoint === 'automatic'
+        || options.promptCache.breakpoint === 'automatic-and-explicit'
+      )) {
+      body.cache_control = anthropicCacheControl(options.promptCache.ttl);
+    }
     if (typeof options.temperature === 'number') body.temperature = options.temperature;
     if (typeof options.topP === 'number') body.top_p = options.topP;
     applyReasoningToAnthropicLikeBody(body, options.reasoning, options.reasoningVisibility);
@@ -411,6 +428,12 @@ function resolveAnthropicThinkingVisibility(reasoningVisibility?: ReasoningVisib
   return reasoningVisibility === 'summary-events' ? 'summary' : 'raw-collapsed';
 }
 
+interface AnthropicSystemBlock {
+  type: 'text';
+  text: string;
+  cache_control?: { type: 'ephemeral'; ttl: '5m' | '1h' };
+}
+
 interface AnthropicMessage {
   role: 'user' | 'assistant';
   content: AnthropicContentBlock[];
@@ -432,8 +455,13 @@ type AnthropicContentBlock =
       is_error?: boolean;
     };
 
-function toAnthropicMessages(context: Context): {
-  system?: string;
+function toAnthropicMessages(
+  context: Context,
+  requestPlan: RequestPlan,
+  promptCache?: StreamOptions['promptCache'],
+  surface: 'anthropic' | 'vertex' = 'anthropic',
+): {
+  system?: string | AnthropicSystemBlock[];
   messages: AnthropicMessage[];
 } {
   const messages: AnthropicMessage[] = [];
@@ -451,15 +479,42 @@ function toAnthropicMessages(context: Context): {
       messages.push({ role: 'user', content: toolResultBlocks });
       continue;
     }
-    messages.push(...convertMessage(message).filter((converted) => converted.content.length > 0));
+    messages.push(...convertMessage(message, requestPlan).filter((converted) => converted.content.length > 0));
+  }
+
+  const prompt = partitionSystemPrompt(context);
+  const explicitBreakpoint = promptCache?.enabled === true
+    && promptCache.breakpointCarrier === 'anthropic-cache-control'
+    && (
+      promptCache.breakpoint === 'explicit'
+      || promptCache.breakpoint === 'automatic-and-explicit'
+    );
+  if (explicitBreakpoint && surface !== 'anthropic') {
+    throw new Error(
+      'PROMPT_CACHE_SURFACE_UNSUPPORTED: explicit Anthropic cache blocks are not enabled for this surface manifest.',
+    );
+  }
+  if (explicitBreakpoint) {
+    if (!prompt.stableText) {
+      throw new Error(
+        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE: explicit Anthropic cache mode requires PromptPlan-owned stable segments.',
+      );
+    }
+    const system: AnthropicSystemBlock[] = [{
+      type: 'text',
+      text: prompt.stableText,
+      cache_control: anthropicCacheControl(promptCache.ttl),
+    }];
+    if (prompt.volatileText) system.push({ type: 'text', text: prompt.volatileText });
+    return { system, messages };
   }
   return {
-    system: context.systemPrompt && context.systemPrompt.trim() ? context.systemPrompt : undefined,
+    system: prompt.combinedText,
     messages,
   };
 }
 
-function convertMessage(message: Message): AnthropicMessage[] {
+function convertMessage(message: Message, requestPlan: RequestPlan): AnthropicMessage[] {
   if (message.role === 'user') {
     if (typeof message.content === 'string') {
       const text = message.content.trim();
@@ -485,7 +540,12 @@ function convertMessage(message: Message): AnthropicMessage[] {
       if (block.type === 'text' && block.text.trim()) {
         blocks.push({ type: 'text', text: block.text });
       } else if (block.type === 'thinking') {
-        const replayBlock = toAnthropicThinkingReplayBlock(block.text, block.artifact, block.replayPolicy);
+        const replayBlock = toAnthropicThinkingReplayBlock(
+          block.text,
+          block.continuation,
+          requestPlan,
+          message.content.some((candidate) => candidate.type === 'toolCall'),
+        );
         if (replayBlock) blocks.push(replayBlock);
       } else if (block.type === 'toolCall') {
         blocks.push({
@@ -520,49 +580,56 @@ function toAnthropicToolResultBlock(message: Extract<Message, { role: 'toolResul
   };
 }
 
-function createAnthropicThinkingArtifact(model: Model, signature?: string): ProviderReasoningArtifact {
-  return {
-    providerId: model.provider,
-    modelId: model.id,
-    protocol: PROVIDER_API,
+function createAnthropicThinkingArtifact(
+  requestPlan: RequestPlan,
+  signature?: string,
+): ProviderContinuationArtifact | undefined {
+  return createContinuationArtifact(requestPlan, {
     type: 'thinking',
     signature: signature || undefined,
-  };
+  });
 }
 
-function createAnthropicRedactedArtifact(model: Model, data: string): ProviderReasoningArtifact {
-  return {
-    providerId: model.provider,
-    modelId: model.id,
-    protocol: PROVIDER_API,
+function createAnthropicRedactedArtifact(
+  requestPlan: RequestPlan,
+  data: string,
+): ProviderContinuationArtifact | undefined {
+  return createContinuationArtifact(requestPlan, {
     type: 'redacted_thinking',
-    data,
-  };
+    redactedContent: data,
+  });
 }
 
 function mergeAnthropicSignature(
-  artifact: ProviderReasoningArtifact,
+  requestPlan: RequestPlan,
+  artifact: ProviderContinuationArtifact | undefined,
   signatureDelta: string,
-): ProviderReasoningArtifact {
-  return {
-    ...artifact,
+): ProviderContinuationArtifact | undefined {
+  return createContinuationArtifact(requestPlan, {
     type: 'thinking',
-    signature: `${artifact.signature ?? ''}${signatureDelta}`,
-  };
+    signature: (artifact?.signature ?? '') + signatureDelta,
+  });
 }
 
 function toAnthropicThinkingReplayBlock(
   text: string | undefined,
-  artifact: ProviderReasoningArtifact | undefined,
-  replayPolicy: string,
+  artifact: ProviderContinuationArtifact | undefined,
+  requestPlan: RequestPlan,
+  sameToolLoop: boolean,
 ): Extract<AnthropicContentBlock, { type: 'thinking' | 'redacted_thinking' }> | null {
-  if (replayPolicy !== 'provider-artifact' || !artifact) return null;
-  if (artifact.protocol !== PROVIDER_API && artifact.protocol !== 'AnthropicMessages') return null;
+  const decision = decideContinuationReplay(artifact, requestPlan, { sameToolLoop });
+  if (decision.action !== 'replay' || !artifact || artifact.carrier !== 'signed-content-block') return null;
   if (artifact.type === 'redacted_thinking') {
-    return artifact.data ? { type: 'redacted_thinking', data: artifact.data } : null;
+    return artifact.redactedContent ? { type: 'redacted_thinking', data: artifact.redactedContent } : null;
   }
   if (artifact.type !== 'thinking' || !text || !artifact.signature) return null;
   return { type: 'thinking', thinking: text, signature: artifact.signature };
+}
+
+function anthropicCacheControl(
+  ttl: NonNullable<StreamOptions['promptCache']>['ttl'],
+): { type: 'ephemeral'; ttl: '5m' | '1h' } {
+  return { type: 'ephemeral', ttl: ttl === 'one-hour' ? '1h' : '5m' };
 }
 
 function toAnthropicTool(tool: ToolDefinition): Record<string, unknown> {

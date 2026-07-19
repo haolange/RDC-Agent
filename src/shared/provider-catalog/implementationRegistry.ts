@@ -4,6 +4,7 @@ export type ProviderOperationBuilderId =
   | 'anthropic-messages'
   | 'azure-chat-completions'
   | 'gitlab-agentic-chat'
+  | 'google-interactions'
   | 'google-gemini'
   | 'google-vertex-anthropic'
   | 'google-vertex-gemini'
@@ -39,6 +40,11 @@ export const PROVIDER_ADAPTER_IMPLEMENTATIONS = {
     protocols: ['GitLabDuo'],
     operationBuilderId: 'gitlab-agentic-chat',
     transport: 'sdk',
+  },
+  'google-interactions': {
+    protocols: ['GoogleInteractions'],
+    operationBuilderId: 'google-interactions',
+    transport: 'http',
   },
   'google-gemini': {
     protocols: ['GoogleGemini'],

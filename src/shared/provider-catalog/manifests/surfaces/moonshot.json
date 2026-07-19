@@ -69,11 +69,24 @@
       "baseUrl": "https://api.moonshot.cn/anthropic/v1",
       "default": true,
       "protocolOwner": "anthropic",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "moonshot-documented-raw-reasoning",
-        "evidence": "https://platform.moonshot.cn/docs/",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "moonshot-documented-raw-reasoning",
+          "evidence": "https://platform.moonshot.cn/docs/",
+          "displayLabel": "Raw reasoning",
+          "carrier": "signed-content-block",
+          "artifactFormat": "anthropic.messages.thinking-block",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "moonshot:AnthropicMessages",
+          "continuation": "exact-execution",
+          "projectionSources": {
+            "summary": "anthropic-thinking",
+            "raw": "anthropic-thinking",
+            "opaque": "anthropic-redacted-thinking"
+          }
+        },
+        "compatibilityGroup": "moonshot:AnthropicMessages"
       }
     },
     {
@@ -82,11 +95,27 @@
       "adapterId": "openai-compatible",
       "baseUrl": "https://api.moonshot.cn/v1",
       "protocolOwner": "openai",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "moonshot-documented-raw-reasoning",
-        "evidence": "https://platform.moonshot.cn/docs/",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "moonshot-documented-raw-reasoning",
+          "evidence": "https://platform.moonshot.cn/docs/",
+          "displayLabel": "Raw reasoning",
+          "carrier": "reasoning-content",
+          "artifactFormat": "openai-chat.reasoning-content",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "moonshot:OpenAICompatibleChatCompletions",
+          "continuation": "exact-execution",
+          "projectionSources": {
+            "raw": "kimi-raw"
+          }
+        },
+        "compatibilityGroup": "moonshot:OpenAICompatibleChatCompletions",
+        "toolLoop": {
+          "artifactPolicy": "preserve-reasoning-content",
+          "artifactScope": "all-assistant-turns",
+          "ordering": "assistant-tool-result"
+        }
       }
     }
   ],

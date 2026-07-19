@@ -80,11 +80,19 @@
       "baseUrl": "https://api.minimaxi.com/anthropic/v1",
       "default": true,
       "protocolOwner": "anthropic",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "minimax-cn-coding-plan-documented-raw-reasoning",
-        "evidence": "https://platform.minimaxi.com/docs/api-reference/text-openai-api",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "minimax-cn-coding-plan-documented-raw-reasoning",
+          "evidence": "https://platform.minimaxi.com/docs/api-reference/text-openai-api",
+          "displayLabel": "Raw reasoning",
+          "carrier": "signed-content-block",
+          "artifactFormat": "anthropic.messages.thinking-block",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "minimax-cn-coding-plan:AnthropicMessages",
+          "continuation": "exact-execution"
+        },
+        "compatibilityGroup": "minimax-cn-coding-plan:AnthropicMessages"
       }
     },
     {
@@ -93,11 +101,19 @@
       "adapterId": "openai-compatible",
       "baseUrl": "https://api.minimaxi.com/v1",
       "protocolOwner": "openai",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "minimax-cn-coding-plan-documented-raw-reasoning",
-        "evidence": "https://platform.minimaxi.com/docs/api-reference/text-openai-api",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "minimax-cn-coding-plan-documented-raw-reasoning",
+          "evidence": "https://platform.minimaxi.com/docs/api-reference/text-openai-api",
+          "displayLabel": "Raw reasoning",
+          "carrier": "reasoning-content",
+          "artifactFormat": "openai-chat.reasoning-content",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "minimax-cn-coding-plan:OpenAICompatibleChatCompletions",
+          "continuation": "unknown"
+        },
+        "compatibilityGroup": "minimax-cn-coding-plan:OpenAICompatibleChatCompletions"
       }
     }
   ],

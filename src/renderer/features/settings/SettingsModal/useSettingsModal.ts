@@ -104,6 +104,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     { id: 'agents', label: t('settings.agentManifestTitle') },
     { id: 'tools', label: t('settings.toolsAndExtensions') },
     { id: 'hooks', label: t('settings.hooks') },
+    { id: 'diagnostics', label: t('settings.diagnostics') },
   ], [t]);
 
   const actions = createSettingsModalActions({

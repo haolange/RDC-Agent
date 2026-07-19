@@ -8,6 +8,7 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    globalSetup: ['./scripts/vitest-global-setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],

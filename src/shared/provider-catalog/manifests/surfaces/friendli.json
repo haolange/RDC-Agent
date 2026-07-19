@@ -62,11 +62,19 @@
       "baseUrl": "https://api.friendli.ai/serverless/v1",
       "default": true,
       "protocolOwner": "openai",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "friendli-documented-raw-reasoning",
-        "evidence": "https://friendli.ai/docs/guides/serverless_endpoints/reasoning",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "friendli-documented-raw-reasoning",
+          "evidence": "https://friendli.ai/docs/guides/serverless_endpoints/reasoning",
+          "displayLabel": "Raw reasoning",
+          "carrier": "reasoning-content",
+          "artifactFormat": "openai-chat.reasoning-content",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "friendli:OpenAICompatibleChatCompletions",
+          "continuation": "unknown"
+        },
+        "compatibilityGroup": "friendli:OpenAICompatibleChatCompletions"
       }
     }
   ],

@@ -8,6 +8,7 @@ type TimerHandle = ReturnType<typeof setTimeout>;
 export interface ConversationStreamPatchCommitOptions {
   persist: boolean;
   publishTrace: boolean;
+  emit: boolean;
 }
 
 export interface ConversationStreamPatchCommit {
@@ -97,6 +98,7 @@ export class ConversationStreamPatchScheduler {
       options: {
         persist,
         publishTrace: options.publishTrace ?? true,
+        emit: options.emit ?? true,
       },
     });
     if (persist) {
@@ -107,6 +109,7 @@ export class ConversationStreamPatchScheduler {
   commitTerminal(
     type: ConversationStreamEvent['type'],
     patch: Partial<ConversationMessage>,
+    options: Partial<ConversationStreamPatchCommitOptions> = {},
   ): void {
     if (this.closed) return;
     this.flushPending({ forcePersist: true, publishTrace: true });
@@ -114,11 +117,12 @@ export class ConversationStreamPatchScheduler {
       type,
       patch,
       options: {
-        persist: true,
-        publishTrace: true,
+        persist: options.persist ?? true,
+        publishTrace: options.publishTrace ?? true,
+        emit: options.emit ?? true,
       },
     });
-    this.lastPersistedAt = this.now();
+    if (options.persist ?? true) this.lastPersistedAt = this.now();
     this.close();
   }
 
@@ -159,6 +163,7 @@ export class ConversationStreamPatchScheduler {
       options: {
         persist,
         publishTrace: false,
+        emit: true,
       },
     });
     if (persist) {
@@ -183,6 +188,7 @@ export class ConversationStreamPatchScheduler {
       options: {
         persist,
         publishTrace,
+        emit: true,
       },
     });
     if (persist) {

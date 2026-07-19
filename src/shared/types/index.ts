@@ -127,6 +127,13 @@ export type {
   JsonObject,
   JsonPrimitive,
   JsonValue,
+  CachePlan,
+  ContextTransitionPlan,
+  ContextTransitionStrategy,
+  ExecutionIdentity,
+  ProviderStateMode,
+  StatePlan,
+  StreamingPlan,
   ControlDefinition,
   CatalogModelDefinition,
   ModelModeAction,
@@ -145,9 +152,11 @@ export type {
   RequestPlanningErrorCode,
   RequestPlanningResult,
   ResolvedBooleanControlCapability,
+  ToolLoopPhase,
   ResolvedControlState,
   ResolvedModelControls,
   TierActivation,
+  ToolLoopPlan,
 } from './providerCapability';
 export type { RuntimeLogEntry, RuntimeLogScope, RuntimeLogSeverity } from './runtimeLog';
 export type {
@@ -176,6 +185,15 @@ export type {
   SkillLoadResult,
   SkillMetadata,
 } from './rdxRuntime';
+export type {
+  CompiledPromptCache,
+  DerivedContextView,
+  PromptStablePrefix,
+  StructuredHandoff,
+  StructuredHandoffFact,
+  StructuredHandoffKind,
+  StructuredHandoffResourceRef,
+} from './semanticContext';
 export type {
   CaptureDescriptor,
   ContextSnapshot,

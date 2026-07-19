@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useI18n } from '../../../i18n';
 import { Button } from '../../../ui/Button';
+import { ConfirmationDialog } from '../../../ui/ConfirmationDialog';
 import { useMemory } from './useMemory';
 import type { MemoryWriteRequest } from '@shared/types/electron';
 import './MemoryPanel.css';
@@ -16,6 +17,8 @@ export const MemoryPanel: React.FC = () => {
   const { t } = useI18n();
   const { memories, selected, loading, error, scope, setScope, select, write, remove } = useMemory();
   const [editing, setEditing] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [draft, setDraft] = useState<MemoryWriteRequest>({
     scope,
     approved: true,
@@ -53,9 +56,19 @@ export const MemoryPanel: React.FC = () => {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
+    if (selected) setPendingDelete(true);
+  };
+
+  const confirmDelete = async () => {
     if (!selected) return;
-    if (window.confirm(t('memory.deleteConfirm'))) await remove(selected.name);
+    setDeleteBusy(true);
+    try {
+      await remove(selected.name);
+      setPendingDelete(false);
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   return (
@@ -146,6 +159,17 @@ export const MemoryPanel: React.FC = () => {
           ))}
         </ul>
       )}
+      {pendingDelete && selected ? (
+        <ConfirmationDialog
+          title={t('memory.deleteTitle')}
+          message={t('memory.deleteConfirm')}
+          confirmLabel={deleteBusy ? t('dialog.deleting') : t('dialog.delete')}
+          cancelLabel={t('dialog.cancel')}
+          busy={deleteBusy}
+          onCancel={() => setPendingDelete(false)}
+          onConfirm={confirmDelete}
+        />
+      ) : null}
     </div>
   );
 };

@@ -24,7 +24,7 @@ import { isAdmittedDiscoveredModel, normalizeDiscoveredModelMatchKey } from './D
 import { resolveExecutionBinding, resolveModelControls } from '@shared/utils/modelControls';
 
 export const DISCOVERY_TTL_MS = 24 * 60 * 60 * 1000;
-export const EFFECTIVE_CATALOG_SCHEMA_VERSION = 7 as const;
+export const EFFECTIVE_CATALOG_SCHEMA_VERSION = 8 as const;
 
 type PartialContextTier = Partial<ContextTier> & Pick<ContextTier, 'id'>;
 
@@ -43,6 +43,7 @@ export interface CatalogModelContribution {
   unavailableReason?: string;
   contextTiers?: PartialContextTier[];
   defaultBudgetTokens?: number;
+  cacheContract?: EffectiveModel['cacheContract'];
   controls?: {
     fast?: ControlDefinition;
     context1m?: ControlDefinition;

@@ -234,6 +234,30 @@ export interface PreparedTurnContextSummary {
   breakdown: ContextUsageBreakdownEntry[];
   compactionApplied: boolean;
   filteredArtifactCount: number;
+  continuation: {
+    executionFingerprint: string;
+    strategy: import('./providerCapability').ContextTransitionStrategy;
+    replayedArtifactCount: number;
+    droppedArtifactCount: number;
+    decisionCounts: Array<{ reason: string; count: number }>;
+  };
+  derivedContext: {
+    status: 'none' | 'applied' | 'stale';
+    compactedTurnCount: number;
+  };
+  cache: {
+    enabled: boolean;
+    mode: import('./semanticContext').CompiledPromptCache['mode'];
+    keyCarrier: import('./semanticContext').CompiledPromptCache['keyCarrier'];
+    breakpointCarrier: import('./semanticContext').CompiledPromptCache['breakpointCarrier'];
+    ttl: import('./semanticContext').CompiledPromptCache['ttl'];
+    breakpoint: import('./semanticContext').CompiledPromptCache['breakpoint'];
+    keyFingerprint?: string;
+    stableTokenEstimate: number;
+    stableSegmentCount: number;
+    providerReported: boolean;
+    reason: string;
+  };
   preparedAt: number;
 }
 

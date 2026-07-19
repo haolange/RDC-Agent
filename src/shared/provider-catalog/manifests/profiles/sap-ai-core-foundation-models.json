@@ -4,7 +4,57 @@
   "routeMechanics": [
     {
       "protocol": "SapAiCoreFoundationModels",
-      "adapter": "sap-ai-core-foundation-models"
+      "adapter": "sap-ai-core-foundation-models",
+      "contracts": {
+        "protocolDialect": "SapAiCoreFoundationModels",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "unknown",
+          "artifactFormat": "unknown",
+          "artifactVersion": "unknown",
+          "compatibilityGroup": "none",
+          "continuation": "unknown"
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "discard",
+          "artifactScope": "none",
+          "ordering": "provider-native",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sdk-events",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "sdk-error"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     }
   ]
 }

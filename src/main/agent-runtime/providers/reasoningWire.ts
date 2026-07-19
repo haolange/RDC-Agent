@@ -52,12 +52,11 @@ export function buildOpenAiResponsesReasoning(
   const nextReasoning: Record<string, unknown> = { effort };
   if (reasoningVisibility === 'summary-events') {
     nextReasoning.summary = 'auto';
-    return {
-      reasoning: nextReasoning,
-      include: ['reasoning.encrypted_content'],
-    };
   }
-  return { reasoning: nextReasoning };
+  return {
+    reasoning: nextReasoning,
+    include: ['reasoning.encrypted_content'],
+  };
 }
 
 export function applyOpenAiCompatibleReasoning(
@@ -160,6 +159,20 @@ export function applyGeminiReasoning(
       generationConfig.thinkingConfig = { thinkingBudget };
     }
   }
+}
+
+export function applyGoogleInteractionsReasoning(
+  generationConfig: Record<string, unknown>,
+  reasoning: ResolvedReasoningSelection | undefined,
+  reasoningVisibility?: ReasoningVisibility,
+): void {
+  if (!reasoning || reasoning.control.wireProfile.kind !== 'gemini-thinking-level') return;
+  const wireLevel = resolveWireLevel(reasoning);
+  if (!wireLevel) return;
+  const thinkingLevel = reasoning.control.wireProfile.levels[wireLevel];
+  if (!thinkingLevel) return;
+  generationConfig.thinking_level = thinkingLevel;
+  if (reasoningVisibility === 'summary-events') generationConfig.thinking_summaries = 'auto';
 }
 
 export function applyMoonshotReasoning(

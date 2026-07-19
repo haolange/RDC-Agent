@@ -69,11 +69,24 @@
       "baseUrl": "https://open.bigmodel.cn/api/anthropic/v1",
       "default": true,
       "protocolOwner": "anthropic",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "glm-cn-coding-plan-documented-raw-reasoning",
-        "evidence": "https://docs.bigmodel.cn/",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "glm-cn-coding-plan-documented-raw-reasoning",
+          "evidence": "https://docs.bigmodel.cn/",
+          "displayLabel": "Raw reasoning",
+          "carrier": "signed-content-block",
+          "artifactFormat": "anthropic.messages.thinking-block",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "glm-cn-coding-plan:AnthropicMessages",
+          "continuation": "exact-execution",
+          "projectionSources": {
+            "summary": "anthropic-thinking",
+            "raw": "anthropic-thinking",
+            "opaque": "anthropic-redacted-thinking"
+          }
+        },
+        "compatibilityGroup": "glm-cn-coding-plan:AnthropicMessages"
       }
     },
     {
@@ -82,11 +95,33 @@
       "adapterId": "openai-compatible",
       "baseUrl": "https://open.bigmodel.cn/api/coding/paas/v4",
       "protocolOwner": "openai",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "glm-cn-coding-plan-documented-raw-reasoning",
-        "evidence": "https://docs.bigmodel.cn/",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "glm-cn-coding-plan-documented-raw-reasoning",
+          "evidence": "https://docs.bigmodel.cn/",
+          "displayLabel": "Raw reasoning",
+          "carrier": "reasoning-content",
+          "artifactFormat": "openai-chat.reasoning-content",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "glm-cn-coding-plan:OpenAICompatibleChatCompletions",
+          "continuation": "exact-execution",
+          "projectionSources": {
+            "raw": "glm-raw"
+          }
+        },
+        "compatibilityGroup": "glm-cn-coding-plan:OpenAICompatibleChatCompletions",
+        "toolLoop": {
+          "artifactPolicy": "preserve-reasoning-content",
+          "artifactScope": "all-assistant-turns",
+          "ordering": "assistant-tool-result",
+          "requestPatch": {
+            "thinking": {
+              "clear_thinking": false
+            }
+          },
+          "evidence": "https://docs.z.ai/guides/capabilities/thinking-mode"
+        }
       }
     }
   ],

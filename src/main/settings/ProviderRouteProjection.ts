@@ -14,6 +14,7 @@ export function resolveModelRoutePrecedence(input: {
 }): ModelRoute {
   const withCatalogHeaders = <T extends Omit<ModelRoute, 'source'> | ModelRoute>(route: T): T => ({
     ...route,
+    contracts: route.contracts ?? input.catalogRoute.contracts,
     headers: {
       ...(input.catalogRoute.headers ?? {}),
       ...(route.headers ?? {}),

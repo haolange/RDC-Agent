@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { LanguageModel } from 'ai';
-import type { RequestPlan } from '@shared/types/providerCapability';
+import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 
 const streamTextMock = vi.hoisted(() => vi.fn());
 
@@ -11,7 +11,7 @@ vi.mock('ai', async () => {
 
 import { AiSdkStreamingProvider } from './AiSdkStreamingProvider';
 
-const requestPlan: RequestPlan = {
+const requestPlan = createTestRequestPlan({
   providerId: 'gitlab',
   adapterId: 'gitlab-duo',
   catalogRevision: 'catalog-1',
@@ -31,7 +31,7 @@ const requestPlan: RequestPlan = {
     selection: 'off',
     control: { kind: 'unknown', supportsOff: false, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
   },
-};
+});
 
 describe('AiSdkStreamingProvider', () => {
   it('maps the shared prompt and normalizes text, reasoning, tool calls, and usage', async () => {

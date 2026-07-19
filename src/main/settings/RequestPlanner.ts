@@ -1,6 +1,9 @@
 import { createHash } from 'crypto';
 import type {
   EffectiveModel,
+  ExecutionIdentity,
+  ProviderStateMode,
+  ToolLoopPhase,
   JsonObject,
   JsonValue,
   ModelRoute,
@@ -23,6 +26,7 @@ import {
 import { resolveModelControls } from '@shared/utils/modelControls';
 import { providerAdapterIdForProtocol } from '@shared/provider-catalog/implementationRegistry';
 
+import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 export interface RequestPlannerInput {
   model: EffectiveModel;
   /** Effective snapshot used to validate hidden internal model targets. */
@@ -30,6 +34,11 @@ export interface RequestPlannerInput {
   controls?: Partial<ConversationTurnControls> & { reasoningLevel?: unknown };
   clientBudgetTokens?: number;
   requestedTemperature?: number;
+  /** Secret-free account/credential scope identifier; only its hash enters RequestPlan. */
+  credentialScopeId?: string;
+  /** Provider-managed state is opt-in. Local stateless is the product default. */
+  stateMode?: ProviderStateMode;
+  toolLoopPhase?: ToolLoopPhase;
 }
 
 function valuesEqual(left: JsonValue, right: JsonValue): boolean {
@@ -75,8 +84,19 @@ function planningError(
   return { ok: false, code, message, controls };
 }
 
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => `${JSON.stringify(key)}:${stableJson(child)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
 function revisionFor(value: unknown): string {
-  return createHash('sha256').update(JSON.stringify(value), 'utf8').digest('hex');
+  return createHash('sha256').update(stableJson(value), 'utf8').digest('hex');
 }
 
 function routeMatches(left: ModelRoute, right: ModelRoute): boolean {
@@ -322,24 +342,141 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
   const reasoningControl = createReasoningControl(model.controls.reasoning);
   if (suppressReasoningWire) reasoningControl.wireProfile = { kind: 'none' };
 
-  const plan: RequestPlan = {
+  const routeContracts = route.contracts ?? createFailClosedProviderContracts(route.protocol);
+  const contracts = effectiveModel.cacheContract
+    ? { ...routeContracts, cache: effectiveModel.cacheContract }
+    : routeContracts;
+  route = { ...route, contracts };
+  const continuationModelAdmitted = !contracts.reasoning.continuationModelIds
+    || contracts.reasoning.continuationModelIds.includes(effectiveModelId);
+  if (
+    continuationModelAdmitted
+    && contracts.reasoning.continuation !== 'none'
+    && contracts.reasoning.continuation !== 'unknown'
+    && contracts.toolLoop.requestPatch
+  ) {
+    const conflict = mergePatch(bodyPatch, contracts.toolLoop.requestPatch);
+    if (conflict) {
+      return planningError('PLAN_CONFLICT', `Tool-loop continuation conflicts at ${conflict}`, controls);
+    }
+  }
+  const stateMode = input.stateMode ?? contracts.state.defaultMode;
+  if (!contracts.state.supportedModes.includes(stateMode)) {
+    return planningError(
+      'CONSTRAINT_REJECTED',
+      `State mode ${stateMode} is not supported by ${model.providerId}/${effectiveModelId}`,
+      controls,
+    );
+  }
+  const catalogRevision = model.catalogRevision ?? revisionFor({
     providerId: model.providerId,
-    adapterId: providerAdapterIdForProtocol(route.protocol),
-    catalogRevision: model.catalogRevision ?? revisionFor({
-      providerId: model.providerId,
-      modelId: model.modelId,
-      provenance: model.provenance,
-    }),
+    modelId: model.modelId,
+    provenance: model.provenance,
+  });
+  const appliedBindingIds = binding ? [binding.id] : [];
+  const contextMode = oneMillionMode ? 'one-million' as const : 'normal' as const;
+  const toolLoopPhase = input.toolLoopPhase ?? 'top-level';
+  const contractHash = revisionFor(contracts);
+  const credentialScopeHash = revisionFor({
+    providerId: model.providerId,
+    credentialScopeId: input.credentialScopeId ?? 'default',
+  });
+  const endpointHash = revisionFor(
+    (route.baseUrl ?? `${route.protocol}:default`).trim().replace(/\/+$/u, '').toLowerCase(),
+  );
+  const identityBase: Omit<ExecutionIdentity, 'fingerprint'> = {
+    schemaVersion: 1,
+    providerId: model.providerId,
+    credentialScopeHash,
+    endpointHash,
+    protocolFamily: route.protocol,
+    protocolDialect: contracts.protocolDialect,
+    protocolVersion: contracts.protocolVersion,
+    catalogRevision,
     routeRevision: selectedRouteRevision,
     selectedModelId: model.modelId,
     effectiveModelId,
-    appliedBindingIds: binding ? [binding.id] : [],
+    canonicalModelId: effectiveModel.modelId,
+    modelSnapshotId: revisionFor({
+      catalogRevision,
+      routeRevision: selectedRouteRevision,
+      effectiveModelId,
+      provenance: effectiveModel.provenance,
+    }),
+    compatibilityGroup: contracts.compatibilityGroup,
+    bindingIds: appliedBindingIds,
+    variantKey: revisionFor({
+      bindingIds: appliedBindingIds,
+      fast: evaluation.resolved.fast.value,
+      contextMode,
+      reasoningSelection,
+    }),
+    reasoningMode: reasoningSelection,
+    contextMode,
+    stateMode,
+    artifactFormat: contracts.reasoning.artifactFormat,
+    artifactVersion: contracts.reasoning.artifactVersion,
+    contractHash,
+    toolLoopPhase,
+  };
+  const executionIdentity: ExecutionIdentity = {
+    ...identityBase,
+    fingerprint: revisionFor(identityBase),
+  };
+  const statePlan = {
+    mode: stateMode,
+    carrier: stateMode === 'provider-managed' ? contracts.state.carrier : 'none' as const,
+    store: stateMode === 'provider-managed',
+    reuseProviderState: stateMode === 'provider-managed',
+  };
+  const cachePlan = {
+    enabled: contracts.cache.mode !== 'none' && contracts.cache.mode !== 'unknown',
+    mode: contracts.cache.mode,
+    keyCarrier: contracts.cache.keyCarrier,
+    breakpointCarrier: contracts.cache.breakpointCarrier,
+    telemetry: [...contracts.cache.telemetry],
+    ttl: contracts.cache.ttl,
+  };
+  const toolLoopPlan = {
+    phase: toolLoopPhase,
+    pinned: true as const,
+    artifactPolicy: contracts.toolLoop.artifactPolicy,
+    artifactScope: contracts.toolLoop.artifactScope,
+    ordering: contracts.toolLoop.ordering,
+  };
+  const streamingPlan = { ...contracts.streaming };
+  const contextTransitionPlan = stateMode === 'provider-managed'
+    ? {
+        strategy: 'provider-managed' as const,
+        portable: false,
+        reason: 'Explicit provider-managed state mode.',
+      }
+    : {
+        strategy: 'semantic-replay' as const,
+        portable: true,
+        reason: 'Local stateless mode replays canonical semantic context.',
+      };
+  const plan: RequestPlan = {
+    providerId: model.providerId,
+    adapterId: providerAdapterIdForProtocol(route.protocol),
+    catalogRevision,
+    routeRevision: selectedRouteRevision,
+    selectedModelId: model.modelId,
+    effectiveModelId,
+    appliedBindingIds,
     modelSelection,
     route,
     headers,
+    contracts,
+    executionIdentity,
+    statePlan,
+    cachePlan,
+    toolLoopPlan,
+    streamingPlan,
+    contextTransitionPlan,
     bodyPatch,
     contextBudgetTokens,
-    contextMode: oneMillionMode ? 'one-million' : 'normal',
+    contextMode,
     contextWindowTokens,
     activeTierId: activeTier.id,
     fastMode: evaluation.resolved.fast.value,

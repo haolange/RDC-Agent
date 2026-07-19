@@ -230,9 +230,9 @@ assert(
 const conversationService = fs.readFileSync(
   path.join(process.cwd(), 'src/main/conversation/ConversationService.ts'),
   'utf8',
-);
+).replace(/\r\n/g, '\n');
 assert(
-  conversationService.includes('sessionContextJournal.append')
+  conversationService.includes('storageAdapter.commitConversationTerminal')
     && conversationService.includes('visibleTurnIds')
     && conversationService.includes('await Promise.allSettled')
     && conversationService.includes('Failed to persist conversation snapshot')
@@ -241,10 +241,13 @@ assert(
 );
 const stopImplementation = conversationService.match(/stop:\s*\(\)\s*=>\s*\{([\s\S]*?)\n\s*\},\n\s*\}\);/)?.[1] ?? '';
 const awaitStoppedIndex = conversationService.indexOf('await Promise.allSettled(turnsToStop.map((turn) => turn.stopped))');
+const terminalCleanupIndex = conversationService.lastIndexOf('this.clearActiveTurn(assistantMessage.turnId, abortController);');
+const stoppedSettledIndex = conversationService.indexOf('settleStopped();', terminalCleanupIndex);
 assert(
   awaitStoppedIndex >= 0
     && conversationService.indexOf('const history = storageAdapter.readConversationHistory(sessionId);', awaitStoppedIndex) > awaitStoppedIndex
-    && conversationService.includes('this.clearActiveTurn(assistantMessage.turnId, abortController);\n      settleStopped();')
+    && terminalCleanupIndex >= 0
+    && stoppedSettledIndex > terminalCleanupIndex
     && !stopImplementation.includes('settleStopped()')
     && !stopImplementation.includes('clearActiveTurn('),
   'stopped must resolve only after completeProfileTurn cleanup, and rewrite must re-read history after awaiting it',

@@ -28,7 +28,7 @@ import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import type { AgentRole } from '@shared/types/agent';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { EffectiveModel, ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
 import type { PromptPlan } from '@shared/types/rdxRuntime';
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
 import type {
@@ -70,7 +70,8 @@ import {
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
-import { sessionContextJournal, type SessionContextRoute } from './SessionContextJournal';
+import { canonicalizeSessionContextTurnEntry, sessionContextJournal } from './SessionContextJournal';
+import type { DerivedContextView } from '@shared/types/semanticContext';
 import type { Message as AgentRuntimeMessage } from '../agent-runtime/core/types';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { normalizeToolName, resolveAgentToolAllowlist } from '../workflow/debugger/DebuggerRuntimePolicy';
@@ -132,7 +133,6 @@ function mergeThinkingPayload(
       kind: 'raw',
       source: 'unknown',
       visibility: 'raw-collapsed',
-      replayPolicy: 'none',
     }),
     text: `${current?.text ?? ''}${delta}`,
   });
@@ -142,7 +142,7 @@ function selectCompletedThinking(thinking: ThinkingArtifact[] | undefined): Thin
   if (!Array.isArray(thinking) || thinking.length === 0) return undefined;
   for (let index = thinking.length - 1; index >= 0; index -= 1) {
     const candidate = thinking[index];
-    if (candidate.artifact || candidate.text) return cloneThinkingArtifact(candidate);
+    if (candidate.continuation || candidate.text) return cloneThinkingArtifact(candidate);
   }
   return undefined;
 }
@@ -150,12 +150,7 @@ function selectCompletedThinking(thinking: ThinkingArtifact[] | undefined): Thin
 function cloneThinkingArtifact(thinking: ThinkingArtifact): ThinkingArtifact {
   return {
     ...thinking,
-    artifact: thinking.artifact
-      ? {
-          ...thinking.artifact,
-          raw: thinking.artifact.raw ? { ...thinking.artifact.raw } : undefined,
-        }
-      : undefined,
+    continuation: thinking.continuation ? { ...thinking.continuation } : undefined,
   };
 }
 interface ConversationContextInput extends ConversationSendRequest {
@@ -509,6 +504,7 @@ export class ConversationService {
 
   async clearHistory(sessionId: string): Promise<ConversationMessage[]> {
     storageAdapter.writeConversationHistory(sessionId, []);
+    storageAdapter.clearSessionContextState(sessionId);
     this.publishConversationTrace(sessionId, [], sessionId);
     return [];
   }
@@ -525,43 +521,37 @@ export class ConversationService {
 
     const nextHistory = history.filter((message) => message.turnId !== lastUserMessage.turnId);
     storageAdapter.writeConversationHistory(sessionId, nextHistory);
-    this.publishConversationTrace(sessionId, nextHistory, sessionId);
-    return nextHistory;
-  }
-
-  async compactHistory(sessionId: string): Promise<ConversationMessage[]> {
-    const history = storageAdapter.readConversationHistory(sessionId);
-    const keepCount = 6;
-    if (history.length <= keepCount + 1) {
-      return history;
-    }
-
-    const head = history.slice(0, -keepCount);
-    const tail = history.slice(-keepCount);
-    const compactedAt = nowMs();
-    const summaryMessage: ConversationMessage = {
-      id: `compact-${compactedAt}`,
-      turnId: `compact-turn-${compactedAt}`,
+    storageAdapter.writeSessionContextJournal(
       sessionId,
-      projectId: tail[0]?.projectId ?? head[0]?.projectId ?? null,
-      role: 'system',
-      content: `Context compacted: ${head.length} earlier messages summarized. User messages: ${head.filter((message) => message.role === 'user').length}; assistant messages: ${head.filter((message) => message.role === 'assistant').length}; system messages: ${head.filter((message) => message.role === 'system').length}.`,
-      status: 'complete',
-      createdAt: compactedAt,
-      updatedAt: compactedAt,
-      workTrace: {
-        status: 'complete',
-        summary: `Compacted ${head.length} earlier messages.`,
-        blocks: [],
-        updatedAt: compactedAt,
-      },
-    };
-    const nextHistory = [summaryMessage, ...tail];
-    storageAdapter.writeConversationHistory(sessionId, nextHistory);
+      sessionContextJournal.readEntries(sessionId).filter((entry) => entry.turnId !== lastUserMessage.turnId),
+    );
+    storageAdapter.clearSessionDerivedContextView(sessionId);
     this.publishConversationTrace(sessionId, nextHistory, sessionId);
     return nextHistory;
   }
 
+  async compactHistory(sessionId: string): Promise<{
+    messages: ConversationMessage[];
+    contextView: DerivedContextView | null;
+  }> {
+    const history = storageAdapter.readConversationHistory(sessionId);
+    const branchState = this.readRepairedBranchState(sessionId, history);
+    const visibleMessages = branchState
+      ? resolveVisibleConversationMessages(history, branchState)
+      : history;
+    const journalTurnIds = new Set(sessionContextJournal.readEntries(sessionId).map((entry) => entry.turnId));
+    const visibleTurnIds = Array.from(new Set(
+      visibleMessages
+        .map((message) => message.turnId)
+        .filter((turnId) => journalTurnIds.has(turnId)),
+    ));
+    const contextView = sessionContextJournal.createDerivedView(
+      sessionId,
+      visibleTurnIds,
+      branchState?.activeLeafBranchId ?? ROOT_BRANCH_ID,
+    );
+    return { messages: history, contextView };
+  }
   async cancelActiveTurn(
     request: ConversationCancelActiveTurnRequest = {},
   ): Promise<ConversationCancelActiveTurnResult> {
@@ -1413,16 +1403,17 @@ export class ConversationService {
 
     let streamScheduler: ConversationStreamPatchScheduler | null = null;
     let conversationPersistenceError: Error | null = null;
+    let deferredTerminalEventType: ConversationStreamEvent['type'] | null = null;
     const terminalContext: { value: {
       messages: AgentRuntimeMessage[];
-      route: SessionContextRoute;
+      executionIdentity: ExecutionIdentity;
       status: 'complete' | 'stopped' | 'error';
     } | null } = { value: null };
 
     const applyAssistantMessagePatch = (
       type: ConversationStreamEvent['type'],
       patch: Partial<ConversationMessage>,
-      options: ConversationStreamPatchCommitOptions = { persist: true, publishTrace: true },
+      options: ConversationStreamPatchCommitOptions = { persist: true, publishTrace: true, emit: true },
     ) => {
       if (abortController.signal.aborted && patch.status !== 'stopped') {
         return;
@@ -1458,12 +1449,14 @@ export class ConversationService {
           return;
         }
       }
-      this.emitConversationEvent({
-        type,
-        sessionId: sessionId ?? '',
-        turnId: assistantMessage.turnId,
-        message: assistantMessage,
-      } as ConversationStreamEvent);
+      if (options.emit) {
+        this.emitConversationEvent({
+          type,
+          sessionId: sessionId ?? '',
+          turnId: assistantMessage.turnId,
+          message: assistantMessage,
+        } as ConversationStreamEvent);
+      }
       if (options.publishTrace) {
         this.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
       }
@@ -1485,7 +1478,12 @@ export class ConversationService {
       type: ConversationStreamEvent['type'],
       patch: Partial<ConversationMessage>,
     ) => {
-      streamScheduler?.commitTerminal(type, patch);
+      if (sessionId) deferredTerminalEventType = type;
+      streamScheduler?.commitTerminal(
+        type,
+        patch,
+        sessionId ? { persist: false, publishTrace: false, emit: false } : undefined,
+      );
     };
 
     const commitStoppedMessage = () => {
@@ -1705,7 +1703,7 @@ export class ConversationService {
             onTerminalContext: (result) => {
               terminalContext.value = {
                 messages: result.messages,
-                route: result.route,
+                executionIdentity: result.executionIdentity,
                 status: result.status,
               };
             },
@@ -2415,8 +2413,34 @@ export class ConversationService {
           console.error('[ConversationService] terminal stop commit failed:', error);
         }
       }
-      if (sessionId && terminalContext.value && !conversationPersistenceError) {
-        const capturedContext = terminalContext.value;
+      if (sessionId && deferredTerminalEventType && !conversationPersistenceError) {
+        const terminalStatus = assistantMessage.status === 'stopped'
+          ? 'stopped'
+          : assistantMessage.status === 'error'
+            ? 'error'
+            : 'complete';
+        const capturedContext = terminalContext.value ?? {
+          executionIdentity: planning.plan.executionIdentity,
+          status: terminalStatus,
+          messages: [
+            {
+              role: 'user' as const,
+              content: input.rawMessage,
+              timestamp: input.userMessage.createdAt,
+            },
+            {
+              role: 'assistant' as const,
+              content: assistantMessage.content
+                ? [{ type: 'text' as const, text: assistantMessage.content }]
+                : [],
+              model: planning.plan.effectiveModelId,
+              provider: planning.plan.providerId,
+              usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+              stopReason: terminalStatus === 'stopped' ? 'aborted' as const : terminalStatus === 'error' ? 'error' as const : 'stop' as const,
+              timestamp: assistantMessage.updatedAt ?? nowMs(),
+            },
+          ],
+        };
         try {
           this.assertTerminalContextOwnership(
             sessionId,
@@ -2425,49 +2449,54 @@ export class ConversationService {
             assistantMessage.id,
             capturedBranchId,
           );
-          sessionContextJournal.append(sessionId, {
-            schemaVersion: 1,
+          const contextEntry = canonicalizeSessionContextTurnEntry({
+            schemaVersion: 2,
             turnId: assistantMessage.turnId,
             userMessageId: input.userMessage.id,
             assistantMessageId: assistantMessage.id,
             branchId: capturedBranchId,
             agentId: conversationAgentId,
-            route: capturedContext.route,
+            executionIdentity: capturedContext.executionIdentity,
             controls: turnControls ?? { reasoningLevel: 'off', maxContextMode: false, fastModel: false },
-            status: assistantMessage.status === 'stopped' ? 'stopped' : assistantMessage.status === 'error' ? 'error' : capturedContext.status,
+            status: terminalStatus === 'complete' ? capturedContext.status : terminalStatus,
             messages: capturedContext.messages,
             createdAt: input.userMessage.createdAt,
             completedAt: assistantMessage.updatedAt ?? nowMs(),
           });
+          storageAdapter.commitConversationTerminal(
+            sessionId,
+            input.requestId,
+            assistantMessage.turnId,
+            assistantMessage,
+            contextEntry,
+          );
+          this.emitConversationEvent({
+            type: deferredTerminalEventType,
+            sessionId,
+            turnId: assistantMessage.turnId,
+            message: assistantMessage,
+          } as ConversationStreamEvent);
+          this.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
         } catch (error) {
-          console.error(`[ConversationService] Context journal append failed for ${assistantMessage.turnId}:`, error);
-          if (assistantMessage.status !== 'stopped') {
-            assistantMessage = {
-              ...assistantMessage,
-              status: 'error',
-              diagnostic: {
-                code: 'CONVERSATION_LLM_REQUEST_FAILED',
-                severity: 'error',
-                userMessage: 'Conversation context could not be saved. Retry before continuing.',
-                technicalMessage: error instanceof Error ? error.message : String(error),
-              },
-              updatedAt: nowMs(),
-            };
-            const terminalPersistError = this.persistConversationSnapshot(sessionId, assistantMessage);
-            if (terminalPersistError) {
-              console.error(
-                `[ConversationService] Failed to persist context-persistence error for ${assistantMessage.turnId}; subsequent materialization will fail closed.`,
-                terminalPersistError,
-              );
-            }
-            this.emitConversationEvent({
-              type: 'message_errored',
-              sessionId,
-              turnId: assistantMessage.turnId,
-              message: assistantMessage,
-            });
-            this.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
-          }
+          console.error(`[ConversationService] Terminal transaction failed for ${assistantMessage.turnId}:`, error);
+          assistantMessage = {
+            ...assistantMessage,
+            status: 'error',
+            diagnostic: {
+              code: 'CONVERSATION_LLM_REQUEST_FAILED',
+              severity: 'error',
+              userMessage: 'Conversation state could not be committed. Restart before continuing.',
+              technicalMessage: error instanceof Error ? error.message : String(error),
+            },
+            updatedAt: nowMs(),
+          };
+          this.emitConversationEvent({
+            type: 'message_errored',
+            sessionId,
+            turnId: assistantMessage.turnId,
+            message: assistantMessage,
+          });
+          this.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
         }
       }
       this.clearActiveTurn(assistantMessage.turnId, abortController);

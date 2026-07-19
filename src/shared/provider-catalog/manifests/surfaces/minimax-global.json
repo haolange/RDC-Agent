@@ -80,11 +80,19 @@
       "baseUrl": "https://api.minimax.io/anthropic/v1",
       "default": true,
       "protocolOwner": "anthropic",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "minimax-global-documented-raw-reasoning",
-        "evidence": "https://platform.minimax.io/docs/guides/text-generation",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "minimax-global-documented-raw-reasoning",
+          "evidence": "https://platform.minimax.io/docs/guides/text-generation",
+          "displayLabel": "Raw reasoning",
+          "carrier": "signed-content-block",
+          "artifactFormat": "anthropic.messages.thinking-block",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "minimax-global:AnthropicMessages",
+          "continuation": "exact-execution"
+        },
+        "compatibilityGroup": "minimax-global:AnthropicMessages"
       }
     },
     {
@@ -93,11 +101,19 @@
       "adapterId": "openai-compatible",
       "baseUrl": "https://api.minimax.io/v1",
       "protocolOwner": "openai",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "minimax-global-documented-raw-reasoning",
-        "evidence": "https://platform.minimax.io/docs/guides/text-generation",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "minimax-global-documented-raw-reasoning",
+          "evidence": "https://platform.minimax.io/docs/guides/text-generation",
+          "displayLabel": "Raw reasoning",
+          "carrier": "reasoning-content",
+          "artifactFormat": "openai-chat.reasoning-content",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "minimax-global:OpenAICompatibleChatCompletions",
+          "continuation": "unknown"
+        },
+        "compatibilityGroup": "minimax-global:OpenAICompatibleChatCompletions"
       }
     }
   ],

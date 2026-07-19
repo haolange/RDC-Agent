@@ -73,8 +73,14 @@ export const LLM_PROVIDER_PROTOCOL_DEFINITIONS: LlmProviderProtocolDescriptor[] 
     description: 'Azure OpenAI deployment endpoint with Azure API version and api-key header.',
   },
   {
+    id: 'GoogleInteractions',
+    label: 'Google Interactions',
+    description: 'Google Gemini Interactions API with structured steps and optional provider-managed state.',
+    responseEndpointHint: 'First-party Gemini /v1/interactions endpoint.',
+  },
+  {
     id: 'GoogleGemini',
-    label: 'Google Gemini',
+    label: 'Google GenerateContent',
     description: 'Google Generative Language / Gemini generateContent protocol.',
   },
   {

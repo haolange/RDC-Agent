@@ -75,7 +75,7 @@ function routeFor(
       protocol: catalogRoute?.protocol ?? targetProtocol,
       baseUrl: catalogRoute?.baseUrl ?? provider.baseUrl,
       headers: { ...(catalogRoute?.headers ?? {}) },
-      reasoningContract: catalogRoute?.reasoningContract,
+      contracts: catalogRoute?.contracts,
     },
   });
 }
@@ -237,7 +237,7 @@ function userContribution(provider: LlmProviderEntry): CatalogLayerContribution 
           protocol: route.protocol,
           baseUrl: provider.baseUrl ?? route.baseUrl,
           headers: route.headers,
-          reasoningContract: route.reasoningContract,
+          contracts: route.contracts,
           source: 'user' as const,
         },
         availability: 'unknown' as const,
@@ -506,6 +506,7 @@ export function planEffectiveModelRequest(input: {
     controls: input.controls,
     clientBudgetTokens: input.clientBudgetTokens,
     requestedTemperature: input.requestedTemperature,
+    credentialScopeId: snapshot?.accountId,
   });
   if (!result.ok || !selection.remappedFrom) return result;
   return {
@@ -560,6 +561,7 @@ export function planEffectiveModelCapabilityProbe(input: {
     model: selected,
     catalogModels: models,
     controls: input.controls,
+    credentialScopeId: snapshot.accountId,
   });
 }
 export function recordEffectivePlanSuccess(

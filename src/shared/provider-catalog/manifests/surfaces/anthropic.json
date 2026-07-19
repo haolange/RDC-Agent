@@ -70,11 +70,36 @@
       "baseUrl": "https://api.anthropic.com/v1",
       "default": true,
       "protocolOwner": "anthropic",
-      "reasoningContract": {
-        "semantic": "summary",
-        "source": "anthropic-extended-thinking-summary",
-        "evidence": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking",
-        "displayLabel": "Reasoning summary"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "summary",
+          "source": "anthropic-extended-thinking-summary",
+          "evidence": "https://platform.claude.com/docs/en/build-with-claude/extended-thinking",
+          "displayLabel": "Reasoning summary",
+          "carrier": "signed-content-block",
+          "artifactFormat": "anthropic.messages.thinking-block",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "anthropic:AnthropicMessages",
+          "continuation": "exact-execution",
+          "projectionSources": {
+            "summary": "anthropic-thinking",
+            "raw": "anthropic-thinking",
+            "opaque": "anthropic-redacted-thinking"
+          }
+        },
+        "compatibilityGroup": "anthropic:AnthropicMessages",
+        "cache": {
+          "mode": "automatic-breakpoint",
+          "keyCarrier": "none",
+          "breakpointCarrier": "anthropic-cache-control",
+          "telemetry": [
+            "cache-read-input-tokens",
+            "cache-write-input-tokens",
+            "provider-reported"
+          ],
+          "ttl": "five-minutes",
+          "evidence": "https://platform.claude.com/docs/en/build-with-claude/prompt-caching"
+        }
       }
     }
   ],
@@ -311,13 +336,17 @@
       "executionBindings": [
         {
           "id": "fast:anthropic-speed",
-          "when": { "fast": true },
+          "when": {
+            "fast": true
+          },
           "actions": [
             {
               "kind": "request-patch",
               "patch": {
                 "speed": "fast",
-                "headers": { "anthropic-beta": "fast-mode-2026-02-01" }
+                "headers": {
+                  "anthropic-beta": "fast-mode-2026-02-01"
+                }
               }
             }
           ],

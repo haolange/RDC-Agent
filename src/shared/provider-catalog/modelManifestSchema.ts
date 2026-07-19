@@ -46,6 +46,7 @@ export const ProviderProtocolSchema = z.enum([
   'AnthropicMessages',
   'OpenRouterChatCompletions',
   'AzureOpenAIChatCompletions',
+  'GoogleInteractions',
   'GoogleGemini',
   'GoogleVertexGemini',
   'GoogleVertexAnthropic',
@@ -132,6 +133,33 @@ export const ContextTierSchema = z.object({
   entitlement: EntitlementStateSchema,
 }).strict();
 
+export const ProviderThinkingProjectionSourceSchema = z.enum([
+  'openai-responses-summary',
+  'openai-responses-encrypted',
+  'xai-responses-summary',
+  'xai-responses-encrypted',
+  'anthropic-thinking',
+  'anthropic-redacted-thinking',
+  'openai-compatible-raw',
+  'openrouter-raw',
+  'deepseek-raw',
+  'kimi-raw',
+  'glm-raw',
+  'qwen-raw',
+  'gemini-summary',
+  'gemini-thought-signature',
+  'gemini-interactions-summary',
+  'gemini-interactions-thought-signature',
+  'ollama-raw',
+  'unknown',
+]);
+
+const ProviderThinkingProjectionSourcesSchema = z.object({
+  summary: ProviderThinkingProjectionSourceSchema.optional(),
+  raw: ProviderThinkingProjectionSourceSchema.optional(),
+  opaque: ProviderThinkingProjectionSourceSchema.optional(),
+}).strict();
+
 export const ProviderReasoningContractSchema = z.object({
   semantic: z.enum(['raw', 'summary', 'opaque', 'none', 'unknown']),
   source: z.string().min(1),
@@ -143,13 +171,165 @@ export const ProviderReasoningContractSchema = z.object({
     'Reasoning metadata',
     'None',
   ]),
+  carrier: z.enum([
+    'none',
+    'assistant-text',
+    'reasoning-content',
+    'reasoning-item',
+    'signed-content-block',
+    'thought-signature',
+    'opaque-provider-state',
+    'unknown',
+  ]),
+  artifactFormat: z.string().min(1),
+  artifactVersion: z.string().min(1),
+  compatibilityGroup: z.string().min(1),
+  continuation: z.enum([
+    'none',
+    'exact-execution',
+    'same-provider-model',
+    'same-compatibility-group',
+    'provider-managed',
+    'unknown',
+  ]),
+  projectionSources: ProviderThinkingProjectionSourcesSchema.optional(),
+  continuationModelIds: z.array(z.string().min(1)).min(1).optional(),
+}).strict();
+
+export const ProviderStateContractSchema = z.object({
+  supportedModes: z.array(z.enum(['local-stateless', 'provider-managed'])).min(1),
+  defaultMode: z.enum(['local-stateless', 'provider-managed']),
+  carrier: z.enum([
+    'none',
+    'previous-response-id',
+    'conversation-id',
+    'previous-interaction-id',
+    'opaque-provider-state',
+    'unknown',
+  ]),
+  retention: z.enum(['request', 'session', 'provider', 'unknown']),
+  crossModel: z.enum(['never', 'same-compatibility-group', 'provider-managed', 'unknown']),
+  evidence: z.string().min(1).optional(),
+}).strict();
+
+export const ProviderCacheContractSchema = z.object({
+  mode: z.enum([
+    'none',
+    'implicit-prefix',
+    'automatic-breakpoint',
+    'automatic-and-explicit-breakpoints',
+    'explicit-breakpoints',
+    'provider-managed',
+    'unknown',
+  ]),
+  keyCarrier: z.enum([
+    'none',
+    'prompt-cache-key',
+    'provider-managed',
+    'unknown',
+  ]),
+  breakpointCarrier: z.enum([
+    'none',
+    'openai-prompt-cache',
+    'anthropic-cache-control',
+    'provider-managed',
+    'unknown',
+  ]),
+  telemetry: z.array(z.enum([
+    'cached-input-tokens',
+    'cache-read-input-tokens',
+    'cache-write-input-tokens',
+    'provider-reported',
+  ])),
+  ttl: z.enum([
+    'none',
+    'five-minutes',
+    'thirty-minutes',
+    'one-hour',
+    'twenty-four-hours',
+    'provider-managed',
+    'unknown',
+  ]),
+  evidence: z.string().min(1).optional(),
+}).strict();
+
+export const ProviderToolLoopContractSchema = z.object({
+  artifactPolicy: z.enum([
+    'discard',
+    'preserve-exact',
+    'preserve-reasoning-content',
+    'preserve-thought-signature',
+    'provider-managed',
+    'unknown',
+  ]),
+  artifactScope: z.enum([
+    'none',
+    'tool-call-turn',
+    'all-assistant-turns',
+    'provider-managed',
+    'unknown',
+  ]),
+  ordering: z.enum([
+    'assistant-tool-result',
+    'provider-native',
+    'strict-block-order',
+    'unknown',
+  ]),
+  modelSwitch: z.literal('pin-until-terminal'),
+  evidence: z.string().min(1).optional(),
+  requestPatch: JsonObjectSchema.optional(),
+}).strict();
+
+export const ProviderStreamingContractSchema = z.object({
+  transport: z.enum(['sse', 'json-lines', 'websocket', 'sdk-events', 'unknown']),
+  outputIdentity: z.enum([
+    'provider-output-ref',
+    'provider-event-id',
+    'event-index',
+    'unknown',
+  ]),
+  usage: z.enum(['terminal', 'incremental', 'none', 'unknown']),
+  errors: z.enum(['http-status', 'provider-event', 'sdk-error', 'unknown']),
+  evidence: z.string().min(1).optional(),
+}).strict();
+
+export const SemanticContextContractSchema = z.object({
+  version: z.literal('semantic-context-v1'),
+  history: z.literal('canonical-messages'),
+  toolPairs: z.literal('strict'),
+  attachments: z.literal('fail-closed'),
+  overflow: z.literal('structured-handoff'),
+}).strict();
+
+export const ProviderContractBundleSchema = z.object({
+  protocolDialect: z.string().min(1),
+  protocolVersion: z.string().min(1),
+  compatibilityGroup: z.string().min(1),
+  reasoning: ProviderReasoningContractSchema,
+  state: ProviderStateContractSchema,
+  cache: ProviderCacheContractSchema,
+  toolLoop: ProviderToolLoopContractSchema,
+  streaming: ProviderStreamingContractSchema,
+  semanticContext: SemanticContextContractSchema,
+}).strict();
+
+export const ProviderContractBundlePatchSchema = z.object({
+  protocolDialect: z.string().min(1).optional(),
+  protocolVersion: z.string().min(1).optional(),
+  compatibilityGroup: z.string().min(1).optional(),
+  reasoning: ProviderReasoningContractSchema.partial().strict().optional(),
+  state: ProviderStateContractSchema.partial().strict().optional(),
+  cache: ProviderCacheContractSchema.partial().strict().optional(),
+  toolLoop: ProviderToolLoopContractSchema.partial().strict().optional(),
+  streaming: ProviderStreamingContractSchema.partial().strict().optional(),
+  semanticContext: SemanticContextContractSchema.partial().strict().optional(),
 }).strict();
 
 export const ModelRouteSchema = z.object({
   protocol: ProviderProtocolSchema,
   baseUrl: z.string().min(1).optional(),
   headers: z.record(z.string(), z.string()).optional(),
-  reasoningContract: ProviderReasoningContractSchema.optional(),
+  contracts: ProviderContractBundleSchema.optional(),
   source: z.enum(['model', 'user', 'catalog']),
 }).strict();
 
@@ -287,6 +467,7 @@ export const ModelManifestSchema = z.object({
   unavailableReason: z.string().optional(),
   contextTiers: z.array(ContextTierSchema).min(1),
   defaultBudgetTokens: z.number().int().nonnegative(),
+  cacheContract: ProviderCacheContractSchema.optional(),
   controls: ModelControlsSchema,
   executionBindings: z.array(ExecutionBindingSchema).optional(),
   liveProjection: ModelLiveProjectionSchema.optional(),
@@ -316,6 +497,7 @@ export const ModelManifestPatchSchema = z.object({
   unavailableReason: z.string().optional(),
   contextTiers: z.array(ContextTierSchema).optional(),
   defaultBudgetTokens: z.number().int().nonnegative().optional(),
+  cacheContract: ProviderCacheContractSchema.optional(),
   controls: ModelControlsPatchSchema.optional(),
   executionBindings: z.array(ExecutionBindingSchema).optional(),
   toolCalling: CapabilityStateSchema.optional(),
@@ -329,6 +511,14 @@ export type ExecutionBinding = z.infer<typeof ExecutionBindingSchema>;
 export type ModelControls = z.infer<typeof ModelControlsSchema>;
 export type ModelModeAction = z.infer<typeof ModelModeActionSchema>;
 export type ProviderReasoningContract = z.infer<typeof ProviderReasoningContractSchema>;
+export type ProviderThinkingProjectionSource = z.infer<typeof ProviderThinkingProjectionSourceSchema>;
+export type ProviderStateContract = z.infer<typeof ProviderStateContractSchema>;
+export type ProviderCacheContract = z.infer<typeof ProviderCacheContractSchema>;
+export type ProviderToolLoopContract = z.infer<typeof ProviderToolLoopContractSchema>;
+export type ProviderStreamingContract = z.infer<typeof ProviderStreamingContractSchema>;
+export type SemanticContextContract = z.infer<typeof SemanticContextContractSchema>;
+export type ProviderContractBundle = z.infer<typeof ProviderContractBundleSchema>;
+export type ProviderContractBundlePatch = z.infer<typeof ProviderContractBundlePatchSchema>;
 export type ModelPresencePolicy = ModelManifest['presencePolicy'];
 export type ModelManifest = z.infer<typeof ModelManifestSchema>;
 export type ModelLiveProjection = z.infer<typeof ModelLiveProjectionSchema>;

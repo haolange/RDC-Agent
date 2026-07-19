@@ -11,7 +11,7 @@ import type {
   Model,
   StreamOptions,
 } from '../core/types';
-import type { RequestPlan } from '@shared/types/providerCapability';
+import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 
 const TEST_MODEL: Model = {
   id: 'test-model',
@@ -24,7 +24,7 @@ const TEST_MODEL: Model = {
   vision: false,
 };
 
-const TEST_REQUEST_PLAN: RequestPlan = {
+const TEST_REQUEST_PLAN = createTestRequestPlan({
   providerId: 'test',
   adapterId: 'openai-compatible',
   catalogRevision: 'test-catalog',
@@ -54,7 +54,7 @@ const TEST_REQUEST_PLAN: RequestPlan = {
       wireProfile: { kind: 'none' },
     },
   },
-};
+});
 
 function makeAssistantMessage(text: string): AssistantMessage {
   return {

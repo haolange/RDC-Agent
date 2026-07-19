@@ -4,7 +4,61 @@
   "routeMechanics": [
     {
       "protocol": "GoogleVertexGemini",
-      "adapter": "google-vertex-gemini"
+      "adapter": "google-vertex-gemini",
+      "contracts": {
+        "protocolDialect": "GoogleVertexGemini",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "thought-signature",
+          "artifactFormat": "google.generate-content.thought-signature",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "none",
+          "continuation": "unknown",
+          "projectionSources": {
+            "summary": "gemini-summary",
+            "opaque": "gemini-thought-signature"
+          }
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "preserve-thought-signature",
+          "artifactScope": "tool-call-turn",
+          "ordering": "provider-native",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sse",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "http-status"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     }
   ]
 }

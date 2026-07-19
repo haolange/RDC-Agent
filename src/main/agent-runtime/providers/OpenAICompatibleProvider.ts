@@ -23,11 +23,16 @@ import type {
   ToolDefinition,
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
+import { partitionSystemPrompt } from './promptCacheWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
 import { AssistantStreamBuilder, createProviderOutputRef, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
 import { composeAbortSignals, ensureOk, normalizeError, parseSSE, ProviderHttpError } from './internal/http';
 import { applyOpenAiCompatibleReasoning } from './reasoningWire';
+import { reasoningProjectionSource } from './reasoningProjection';
 import type { ProviderRequestAuthorizer } from '../../settings/AwsBedrockCredentials';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
+import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const PROVIDER_API = 'openai-compatible';
@@ -63,7 +68,7 @@ interface OpenAIStreamChunk {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
-    prompt_tokens_details?: { cached_tokens?: number };
+    prompt_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
     completion_tokens_details?: { reasoning_tokens?: number };
   };
 }
@@ -171,6 +176,8 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
       const toolRefs = new Map<number, ReturnType<typeof createProviderOutputRef>>();
       let textStarted = false;
       let thinkingStarted = false;
+      let reasoningBuffer = '';
+      const reasoningSource = reasoningProjectionSource(options.requestPlan, 'raw');
       let sawOutput = false;
 
       for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
@@ -185,6 +192,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
 
         if (chunk.usage) {
           const cacheReadTokens = chunk.usage.prompt_tokens_details?.cached_tokens;
+          const cacheWriteTokens = chunk.usage.prompt_tokens_details?.cache_write_tokens;
           const reasoningTokens = chunk.usage.completion_tokens_details?.reasoning_tokens;
           builder.setUsage({
             inputTokens: chunk.usage.prompt_tokens ?? 0,
@@ -193,6 +201,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
               chunk.usage.total_tokens
               ?? (chunk.usage.prompt_tokens ?? 0) + (chunk.usage.completion_tokens ?? 0),
             ...(typeof cacheReadTokens === 'number' ? { cacheReadTokens } : {}),
+            ...(typeof cacheWriteTokens === 'number' ? { cacheWriteTokens } : {}),
             ...(typeof reasoningTokens === 'number' ? { reasoningTokens } : {}),
           });
         }
@@ -212,21 +221,25 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
         const reasoningDelta = delta.reasoning_content ?? delta.reasoning;
         if (typeof reasoningDelta === 'string' && reasoningDelta.length > 0) {
           sawOutput = true;
+          reasoningBuffer += reasoningDelta;
+          const continuation = createContinuationArtifact(options.requestPlan, {
+            type: 'reasoning_content',
+            reasoningContent: reasoningBuffer,
+          });
           if (!thinkingStarted) {
             builder.startThinking(thinkingRef, {
               kind: 'raw',
-              source: isOpenRouterBaseUrl(baseUrl) ? 'openrouter-raw' : 'openai-compatible-raw',
+              source: reasoningSource,
               visibility: 'raw-collapsed',
-              replayPolicy: 'openai-reasoning-content',
+              continuation,
             });
             thinkingStarted = true;
           }
           builder.appendThinking(thinkingRef, reasoningDelta, {
             kind: 'raw',
-            source: isOpenRouterBaseUrl(baseUrl) ? 'openrouter-raw' : 'openai-compatible-raw',
+            source: reasoningSource,
             visibility: 'raw-collapsed',
-            // Tool-loop vendors require reasoning_content replay on assistant tool-call turns.
-            replayPolicy: 'openai-reasoning-content',
+            continuation,
           });
         }
         if (typeof delta.content === 'string' && delta.content.length > 0) {
@@ -288,12 +301,28 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
     context: Context,
     options: StreamOptions,
   ): Record<string, unknown> {
-    const messages = toOpenAIMessages(context);
+    const messages = toOpenAIMessages(context, options.requestPlan, options.promptCache);
     const body: Record<string, unknown> = {
       model: model.id,
       messages,
       stream: true,
     };
+    if (options.promptCache?.enabled
+      && options.promptCache.keyCarrier === 'prompt-cache-key'
+      && options.promptCache.requestKey) {
+      body.prompt_cache_key = options.promptCache.requestKey;
+    }
+    if (options.promptCache?.enabled
+      && options.promptCache.breakpointCarrier === 'openai-prompt-cache'
+      && (
+        options.promptCache.breakpoint === 'explicit'
+        || options.promptCache.breakpoint === 'automatic-and-explicit'
+      )) {
+      body.prompt_cache_options = {
+        mode: options.promptCache.breakpoint === 'explicit' ? 'explicit' : 'implicit',
+        ...(options.promptCache.ttl === 'thirty-minutes' ? { ttl: '30m' } : {}),
+      };
+    }
     if (typeof options.temperature === 'number') body.temperature = options.temperature;
     if (typeof options.topP === 'number') body.top_p = options.topP;
     applyOpenAiCompatibleReasoning(body, options.reasoning);
@@ -336,18 +365,42 @@ interface OpenAIMessage {
   reasoning_content?: string;
 }
 
-function toOpenAIMessages(context: Context): OpenAIMessage[] {
+function toOpenAIMessages(
+  context: Context,
+  requestPlan: RequestPlan,
+  promptCache?: StreamOptions['promptCache'],
+): OpenAIMessage[] {
   const out: OpenAIMessage[] = [];
-  if (context.systemPrompt && context.systemPrompt.trim()) {
-    out.push({ role: 'system', content: context.systemPrompt });
+  const prompt = partitionSystemPrompt(context);
+  const explicitBreakpoint = promptCache?.enabled === true
+    && promptCache.breakpointCarrier === 'openai-prompt-cache'
+    && (
+      promptCache.breakpoint === 'explicit'
+      || promptCache.breakpoint === 'automatic-and-explicit'
+    );
+  if (explicitBreakpoint) {
+    if (!prompt.stableText) {
+      throw new Error(
+        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE: explicit OpenAI cache mode requires PromptPlan-owned stable segments.',
+      );
+    }
+    const content: Array<Record<string, unknown>> = [{
+      type: 'text',
+      text: prompt.stableText,
+      prompt_cache_breakpoint: { mode: 'explicit' },
+    }];
+    if (prompt.volatileText) content.push({ type: 'text', text: prompt.volatileText });
+    out.push({ role: 'system', content });
+  } else if (prompt.combinedText) {
+    out.push({ role: 'system', content: prompt.combinedText });
   }
   for (const message of context.messages) {
-    out.push(...convertMessage(message));
+    out.push(...convertMessage(message, requestPlan));
   }
   return out;
 }
 
-function convertMessage(message: Message): OpenAIMessage[] {
+function convertMessage(message: Message, requestPlan: RequestPlan): OpenAIMessage[] {
   if (message.role === 'user') {
     if (typeof message.content === 'string') {
       return [{ role: 'user', content: message.content }];
@@ -372,8 +425,14 @@ function convertMessage(message: Message): OpenAIMessage[] {
     const toolCalls: Required<OpenAIMessage>['tool_calls'] = [];
     for (const block of message.content) {
       if (block.type === 'text') text.push(block.text);
-      else if (block.type === 'thinking' && typeof block.text === 'string' && block.text.length > 0) {
-        reasoning.push(block.text);
+      else if (block.type === 'thinking') {
+        const sameToolLoop = message.content.some((candidate) => candidate.type === 'toolCall');
+        const decision = decideContinuationReplay(block.continuation, requestPlan, { sameToolLoop });
+        if (
+          decision.action === 'replay'
+          && block.continuation?.carrier === 'reasoning-content'
+          && block.continuation.reasoningContent
+        ) reasoning.push(block.continuation.reasoningContent);
       } else if (block.type === 'toolCall') {
         toolCalls.push({
           id: block.id,
@@ -389,13 +448,8 @@ function convertMessage(message: Message): OpenAIMessage[] {
       role: 'assistant',
       content: text.length > 0 ? text.join('') : null,
     };
-    if (toolCalls.length > 0) {
-      out.tool_calls = toolCalls;
-      // DeepSeek/Kimi/etc. require reasoning_content on assistant turns that carry tool_calls.
-      if (reasoning.length > 0) {
-        out.reasoning_content = reasoning.join('');
-      }
-    }
+    if (toolCalls.length > 0) out.tool_calls = toolCalls;
+    if (reasoning.length > 0) out.reasoning_content = reasoning.join('');
     return [out];
   }
 
@@ -423,10 +477,6 @@ function toOpenAITool(tool: ToolDefinition): Record<string, unknown> {
       parameters: tool.parameters,
     },
   };
-}
-
-function isOpenRouterBaseUrl(baseUrl: string): boolean {
-  return baseUrl.toLowerCase().includes('openrouter');
 }
 
 function mapFinishReason(reason: string | null | undefined): StopReason {

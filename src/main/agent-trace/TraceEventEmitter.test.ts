@@ -26,7 +26,7 @@ describe('TraceEventEmitter explicit thinking boundary', () => {
       kind: 'raw',
       source: 'openai-compatible-raw',
       visibility: 'raw-collapsed',
-      replayPolicy: 'none',
+
       providerOutputRef: {
         protocol: 'openai-compatible',
         providerBlockKey: 'virtual:thinking',
@@ -43,7 +43,7 @@ describe('TraceEventEmitter explicit thinking boundary', () => {
       kind: 'opaque',
       source: 'anthropic-redacted-thinking',
       visibility: 'hidden',
-      replayPolicy: 'provider-artifact',
+
     })).toBeNull();
     expect(store.getEvents('run')).toEqual([]);
   });
@@ -55,7 +55,7 @@ describe('TraceEventEmitter explicit thinking boundary', () => {
       kind: 'summary',
       source: 'openai-responses-summary',
       visibility: 'summary',
-      replayPolicy: 'none',
+
     });
     traceEmitter.emitFinalResponse('run', 'same bytes');
 

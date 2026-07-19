@@ -34,6 +34,10 @@ import {
   ProviderHttpError,
 } from './internal/http';
 import { applyGeminiReasoning } from './reasoningWire';
+import { reasoningProjectionSource } from './reasoningProjection';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
+import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
 
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com';
 const PROVIDER_API = 'google-gemini';
@@ -152,6 +156,8 @@ export class GeminiProvider implements ProviderStrategy {
       let toolCallCounter = 0;
       const textRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:text', contentIndex: TEXT_INDEX });
       const thinkingRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:thinking', contentIndex: THINKING_INDEX });
+      const summarySource = reasoningProjectionSource(options.requestPlan, 'summary');
+      const signatureSource = reasoningProjectionSource(options.requestPlan, 'opaque');
       let textStarted = false;
       let thinkingStarted = false;
       let finishReason: string | null = null;
@@ -181,20 +187,32 @@ export class GeminiProvider implements ProviderStrategy {
         if (!candidate) continue;
 
         const parts = candidate.content?.parts ?? [];
-        for (const part of parts) {
+        for (const [partIndex, part] of parts.entries()) {
+          const partRecord = part as Record<string, unknown>;
+          const thoughtSignature = typeof partRecord.thoughtSignature === 'string'
+            ? partRecord.thoughtSignature
+            : undefined;
+          const partBindingKey = 'candidate:' + (candidate.index ?? 0) + ':part:' + partIndex;
           if ('text' in part && typeof (part as GeminiTextPart).text === 'string') {
             const textPart = part as GeminiTextPart;
             if (textPart.thought) {
               sawOutput = true;
+              const continuation = thoughtSignature
+                ? createContinuationArtifact(options.requestPlan, {
+                    type: 'thought_signature',
+                    thoughtSignature,
+                    containerBinding: { providerBlockKey: partBindingKey },
+                  })
+                : undefined;
               if (!thinkingStarted) {
-                builder.startThinking(thinkingRef, { kind: 'unknown', source: 'gemini-raw', visibility: 'raw-collapsed', replayPolicy: 'none' });
+                builder.startThinking(thinkingRef, { kind: 'summary', source: summarySource, visibility: 'summary', continuation });
                 thinkingStarted = true;
               }
               builder.appendThinking(thinkingRef, textPart.text, {
-                kind: 'unknown',
-                source: 'gemini-raw',
-                visibility: 'raw-collapsed',
-                replayPolicy: 'none',
+                kind: 'summary',
+                source: summarySource,
+                visibility: 'summary',
+                continuation,
               });
             } else {
               sawOutput = true;
@@ -207,8 +225,28 @@ export class GeminiProvider implements ProviderStrategy {
             const fc = (part as GeminiFunctionCallPart).functionCall;
             const slot = 2 + toolCallCounter;
             toolCallCounter += 1;
-            const callId = `gemini-call-${Date.now()}-${slot}`;
+            const callId = 'gemini-call-' + Date.now() + '-' + slot;
             sawOutput = true;
+            if (thoughtSignature) {
+              const signatureRef = createProviderOutputRef({
+                protocol: PROVIDER_API,
+                providerBlockKey: partBindingKey + ':thought-signature',
+                sourceIndex: partIndex,
+                contentIndex: 10_000 + toolCallCounter,
+              });
+              const continuation = createContinuationArtifact(options.requestPlan, {
+                type: 'thought_signature',
+                thoughtSignature,
+                containerBinding: { providerBlockKey: partBindingKey, toolCallIds: [callId] },
+              });
+              builder.startThinking(signatureRef, {
+                kind: 'opaque',
+                source: signatureSource,
+                visibility: 'hidden',
+                continuation,
+              });
+              builder.endThinking(signatureRef);
+            }
             const toolRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: `function:${toolCallCounter - 1}`, sourceIndex: toolCallCounter - 1, contentIndex: slot });
             builder.startToolCall(toolRef, callId, fc.name);
             const args = JSON.stringify(fc.args ?? {});
@@ -242,7 +280,7 @@ export class GeminiProvider implements ProviderStrategy {
     context: Context,
     options: StreamOptions,
   ): Record<string, unknown> {
-    const { systemInstruction, contents } = toGeminiContents(context);
+    const { systemInstruction, contents } = toGeminiContents(context, options.requestPlan);
     const body: Record<string, unknown> = { contents };
     if (systemInstruction) {
       body.systemInstruction = { parts: [{ text: systemInstruction }] };
@@ -291,13 +329,13 @@ interface GeminiContent {
   parts: Array<Record<string, unknown>>;
 }
 
-function toGeminiContents(context: Context): {
+function toGeminiContents(context: Context, requestPlan: RequestPlan): {
   systemInstruction?: string;
   contents: GeminiContent[];
 } {
   const contents: GeminiContent[] = [];
   for (const message of context.messages) {
-    contents.push(...convertMessage(message));
+    contents.push(...convertMessage(message, requestPlan));
   }
   return {
     systemInstruction:
@@ -306,7 +344,7 @@ function toGeminiContents(context: Context): {
   };
 }
 
-function convertMessage(message: Message): GeminiContent[] {
+function convertMessage(message: Message, requestPlan: RequestPlan): GeminiContent[] {
   if (message.role === 'user') {
     if (typeof message.content === 'string') {
       return [{ role: 'user', parts: [{ text: message.content }] }];
@@ -326,12 +364,33 @@ function convertMessage(message: Message): GeminiContent[] {
 
   if (message.role === 'assistant') {
     const parts: Array<Record<string, unknown>> = [];
+    const pendingSignatures = new Map<string, string>();
+    const toolCallIds = message.content
+      .filter((block) => block.type === 'toolCall')
+      .map((block) => block.id);
     for (const block of message.content) {
       if (block.type === 'text') {
         parts.push({ text: block.text });
+      } else if (block.type === 'thinking') {
+        const binding = block.continuation?.containerBinding;
+        const decision = decideContinuationReplay(block.continuation, requestPlan, {
+          sameToolLoop: toolCallIds.length > 0,
+          providerBlockKey: binding?.providerBlockKey,
+          itemId: binding?.itemId,
+          toolCallIds: binding?.toolCallIds,
+        });
+        if (decision.action !== 'replay' || !block.continuation?.thoughtSignature) continue;
+        if (binding?.toolCallIds?.length) {
+          for (const toolCallId of binding.toolCallIds) {
+            if (toolCallIds.includes(toolCallId)) pendingSignatures.set(toolCallId, block.continuation.thoughtSignature);
+          }
+        } else if (block.text) {
+          parts.push({ text: block.text, thought: true, thoughtSignature: block.continuation.thoughtSignature });
+        }
       } else if (block.type === 'toolCall') {
         parts.push({
           functionCall: { name: block.name, args: block.arguments ?? {} },
+          ...(pendingSignatures.has(block.id) ? { thoughtSignature: pendingSignatures.get(block.id) } : {}),
         });
       }
     }

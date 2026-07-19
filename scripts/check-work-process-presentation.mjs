@@ -205,7 +205,7 @@ const rawThinkingPresentation = buildWorkProcessPresentation({
         kind: 'raw',
         source: 'openai-compatible-raw',
         visibility: 'raw-collapsed',
-        replayPolicy: 'none',
+
       },
       thinkingStatus: 'complete',
       toolCalls: [{ id: 'think-glob', toolName: 'glob', status: 'complete', argsPreview: JSON.stringify({ pattern: 'src/**/*.ts' }), startedAt: now + 200, completedAt: now + 220 }],
@@ -235,7 +235,7 @@ const summaryThinkingPresentation = buildWorkProcessPresentation({
         kind: 'summary',
         source: 'anthropic-thinking',
         visibility: 'summary',
-        replayPolicy: 'provider-artifact',
+
       },
       thinkingStatus: 'complete',
       toolCalls: [],
@@ -266,7 +266,7 @@ const duplicateSummaryPresentation = buildWorkProcessPresentation({
         kind: 'summary',
         source: 'anthropic-thinking',
         visibility: 'summary',
-        replayPolicy: 'provider-artifact',
+
       },
       thinkingStatus: 'complete',
       toolCalls: [
@@ -286,7 +286,7 @@ const duplicateSummaryPresentation = buildWorkProcessPresentation({
         kind: 'summary',
         source: 'anthropic-thinking',
         visibility: 'summary',
-        replayPolicy: 'provider-artifact',
+
       },
       thinkingStatus: 'complete',
       toolCalls: [],
@@ -315,7 +315,7 @@ const streamingResponsePresentation = buildWorkProcessPresentation({
         kind: 'summary',
         source: 'anthropic-thinking',
         visibility: 'summary',
-        replayPolicy: 'provider-artifact',
+
       },
       thinkingStatus: 'complete',
       toolCalls: [
@@ -345,7 +345,7 @@ const streamingResponsePresentation = buildWorkProcessPresentation({
         kind: 'summary',
         source: 'anthropic-thinking',
         visibility: 'summary',
-        replayPolicy: 'provider-artifact',
+
       },
       thinkingStatus: 'streaming',
       toolCalls: [],
@@ -380,8 +380,8 @@ const opaquePresentation = buildWorkProcessPresentation({
         kind: 'opaque',
         source: 'openai-responses-encrypted',
         visibility: 'hidden',
-        replayPolicy: 'provider-artifact',
-        artifact: { providerId: 'openai', protocol: 'responses', type: 'reasoning', encryptedContent: 'sealed' },
+
+
       },
       thinkingStatus: 'complete',
       toolCalls: [],

@@ -48,7 +48,7 @@ import type {
   ResolvedReasoningSelection,
 } from '@shared/types/modelCapability';
 import { CONTEXT_COMPACTION_RATIO } from '@shared/types/modelCapability';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { EffectiveModel, ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
 import type {
   AppMode,
   ContextUsageBreakdownEntry,
@@ -59,6 +59,7 @@ import type { WorkflowStage } from '@shared/types/workflow';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
 import type { HookEvent } from '@shared/types/rdxRuntime';
 import type { PromptPlan } from '@shared/types/rdxRuntime';
+import type { CompiledPromptCache } from '@shared/types/semanticContext';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
@@ -66,6 +67,7 @@ import { Agent } from '../../agent-runtime/agent/Agent';
 import { ContextManager } from '../../agent-runtime/agent/ContextManager';
 import { turnPreparationWorkerPool } from '../../workers/TurnPreparationWorkerPool';
 import { promptPlanBuilder, requestEnvelopeBuilder, requestSnapshotStore, resolvePromptClock } from '../../agent-runtime/prompt';
+import { promptCacheCompiler } from '../../agent-runtime/prompt/PromptCacheCompiler';
 import { ErrorRecovery } from '../../agent-runtime/agent/ErrorRecovery';
 import { handoffController } from '../../agent-runtime/agent/HandoffController';
 import type { AgentTool, AgentToolResult, ToolExecutionContext } from '../../agent-runtime/agent/AgentTool';
@@ -81,7 +83,7 @@ import type {
   UserMessage,
   Message,
 } from '../../agent-runtime/core/types';
-import { sessionContextJournal, type SessionContextRoute } from '../../conversation/SessionContextJournal';
+import { sessionContextJournal } from '../../conversation/SessionContextJournal';
 import { createToolSearchTool, getPrimitiveTools } from '../../agent-runtime/tools';
 import { MCPManager, type MCPServerConfig } from '../../agent-runtime/agent/MCPManager';
 import {
@@ -170,7 +172,7 @@ interface AgentProfileTurnOptions extends AgentTurnOptions {
   preparedTurn?: PreparedAgentTurnContext;
   onTerminalContext?: (result: {
     messages: Message[];
-    route: SessionContextRoute;
+    executionIdentity: ExecutionIdentity;
     status: 'complete' | 'stopped' | 'error';
     selectedTurnCount: number;
     filteredArtifactCount: number;
@@ -203,6 +205,7 @@ interface PreparedAgentRuntime {
   routeCapability: AgentRouteCapability;
   mcpConnectionErrors: string[];
   credentialHandle: string;
+  promptCache: CompiledPromptCache;
 }
 
 export interface PreparedAgentTurnContext {
@@ -215,6 +218,10 @@ export interface PreparedAgentTurnContext {
     selectedTurnCount: number;
     activeBranchId: string | null;
     filteredArtifactCount: number;
+    replayedArtifactCount: number;
+    continuationDecisionCounts: Array<{ reason: string; count: number }>;
+    derivedContextStatus: 'none' | 'applied' | 'stale';
+    compactedTurnCount: number;
     compactionState: 'prepared' | 'not-required';
   };
   runtime: PreparedAgentRuntime;
@@ -229,6 +236,14 @@ interface ToolExecutorRuntimeContext {
   projectRootPath?: string | null;
   /** 当前激活项目 id（审计/事件关联）。 */
   projectId?: string | null;
+}
+
+function countContinuationDecisions(
+  decisions: Array<{ reason: string }>,
+): Array<{ reason: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const decision of decisions) counts.set(decision.reason, (counts.get(decision.reason) ?? 0) + 1);
+  return [...counts].map(([reason, count]) => ({ reason, count }));
 }
 
 export class AgentOrchestrator {
@@ -535,14 +550,27 @@ export class AgentOrchestrator {
       if (input.signal?.aborted) throw new Error('REQUEST_CANCELLED: request preparation was cancelled.');
     };
     throwIfCancelled();
-    const contextRoute: SessionContextRoute = {
+    const contextRoute = {
       providerId: input.providerId,
       modelId: input.requestPlan.effectiveModelId,
       protocol: input.requestPlan.route.protocol,
     };
     const materialized = input.sessionId
-      ? sessionContextJournal.materialize(input.sessionId, input.visibleTurnIds, contextRoute)
-      : { messages: [], selectedTurnCount: 0, filteredArtifactCount: 0, migrated: false };
+      ? sessionContextJournal.materialize(
+          input.sessionId,
+          input.visibleTurnIds,
+          input.requestPlan,
+          input.activeBranchId ?? undefined,
+        )
+      : {
+          messages: [],
+          selectedTurnCount: 0,
+          replayedArtifactCount: 0,
+          filteredArtifactCount: 0,
+          artifactDecisions: [],
+          derivedContextStatus: 'none' as const,
+          compactedTurnCount: 0,
+        };
     throwIfCancelled();
     const mcpConnectionErrors = await this.ensureMcpConnections(input.agentId, input.projectRootPath);
     throwIfCancelled();
@@ -593,6 +621,13 @@ export class AgentOrchestrator {
     const uncompactedInputTokens = fixedTokens + beforeConversationTokens;
     const preparedInputTokens = fixedTokens + afterConversationTokens;
     const compactionApplied = computation.compactionApplied;
+    const effectiveContextView = computation.derivedContextView ?? materialized.derivedContextView;
+    const promptCache = promptCacheCompiler.compile({
+      promptPlan: input.promptPlan,
+      requestPlan: input.requestPlan,
+      tools: activeToolDefinitions,
+      ...(effectiveContextView ? { derivedContextView: effectiveContextView } : {}),
+    });
     if (preparedInputTokens > input.requestPlan.contextBudgetTokens) {
       throw new Error(
         'CONTEXT_CANNOT_FIT: The request cannot fit after compaction. Remove attachments or select a larger context mode.',
@@ -641,6 +676,7 @@ export class AgentOrchestrator {
       tools: activeToolDefinitions,
       controls: { ...input.turnControls },
       reasoning: input.routeCapability.reasoningContract,
+      cache: promptCache,
     });
     const lastPreparedMessage = compactedMessages.at(-1);
     if (
@@ -677,6 +713,30 @@ export class AgentOrchestrator {
       breakdown,
       compactionApplied,
       filteredArtifactCount: materialized.filteredArtifactCount,
+      derivedContext: {
+        status: materialized.derivedContextStatus,
+        compactedTurnCount: materialized.compactedTurnCount,
+      },
+      continuation: {
+        executionFingerprint: input.requestPlan.executionIdentity.fingerprint,
+        strategy: input.requestPlan.contextTransitionPlan.strategy,
+        replayedArtifactCount: materialized.replayedArtifactCount,
+        droppedArtifactCount: materialized.filteredArtifactCount,
+        decisionCounts: countContinuationDecisions(materialized.artifactDecisions),
+      },
+      cache: {
+        enabled: promptCache.enabled,
+        mode: promptCache.mode,
+        keyCarrier: promptCache.keyCarrier,
+        breakpointCarrier: promptCache.breakpointCarrier,
+        ttl: promptCache.ttl,
+        breakpoint: promptCache.breakpoint,
+        ...(promptCache.prefixFingerprint ? { keyFingerprint: promptCache.prefixFingerprint } : {}),
+        stableTokenEstimate: promptCache.stableTokenEstimate,
+        stableSegmentCount: promptCache.stableSegmentIds.length,
+        providerReported: promptCache.providerReported,
+        reason: promptCache.reason,
+      },
       preparedAt: nowMs(),
     };
     return {
@@ -689,6 +749,10 @@ export class AgentOrchestrator {
         selectedTurnCount: materialized.selectedTurnCount,
         activeBranchId: input.activeBranchId ?? null,
         filteredArtifactCount: materialized.filteredArtifactCount,
+        replayedArtifactCount: materialized.replayedArtifactCount,
+        continuationDecisionCounts: countContinuationDecisions(materialized.artifactDecisions),
+        derivedContextStatus: materialized.derivedContextStatus,
+        compactedTurnCount: materialized.compactedTurnCount,
         compactionState: compactionApplied ? 'prepared' : 'not-required',
       },
       runtime: {
@@ -697,6 +761,7 @@ export class AgentOrchestrator {
         routeCapability: input.routeCapability,
         mcpConnectionErrors,
         credentialHandle: input.credentialHandle,
+        promptCache,
       },
     };
   }
@@ -790,11 +855,7 @@ export class AgentOrchestrator {
         systemPrompt: config.systemPrompt,
       });
       if (!promptPlan) throw new Error(`PROMPT_PLAN_UNAVAILABLE: ${agentId}`);
-      const contextRoute: SessionContextRoute = {
-        providerId: routeProviderId,
-        modelId: planning.plan.effectiveModelId,
-        protocol: planning.plan.route.protocol,
-      };
+
       const journalSessionId = options?.sessionId && !options.sessionId.includes('::subagent::')
         ? options.sessionId
         : null;
@@ -803,11 +864,27 @@ export class AgentOrchestrator {
             messages: preparedTurn.initialMessages,
             selectedTurnCount: preparedTurn.contextDiagnostic.selectedTurnCount,
             filteredArtifactCount: preparedTurn.contextDiagnostic.filteredArtifactCount,
-            migrated: false,
+            replayedArtifactCount: preparedTurn.contextDiagnostic.replayedArtifactCount,
+            artifactDecisions: [],
+            derivedContextStatus: preparedTurn.contextDiagnostic.derivedContextStatus,
+            compactedTurnCount: preparedTurn.contextDiagnostic.compactedTurnCount,
           }
         : journalSessionId
-          ? sessionContextJournal.materialize(journalSessionId, options?.visibleTurnIds ?? [], contextRoute)
-          : { messages: [], selectedTurnCount: 0, filteredArtifactCount: 0, migrated: false };
+          ? sessionContextJournal.materialize(
+              journalSessionId,
+              options?.visibleTurnIds ?? [],
+              planning.plan,
+              options?.activeBranchId ?? undefined,
+            )
+          : {
+              messages: [],
+              selectedTurnCount: 0,
+              replayedArtifactCount: 0,
+              filteredArtifactCount: 0,
+              artifactDecisions: [],
+              derivedContextStatus: 'none' as const,
+              compactedTurnCount: 0,
+            };
 
       const responseText = await this.runAgentTurn({
         agentId,
@@ -841,13 +918,17 @@ export class AgentOrchestrator {
           selectedTurnCount: materialized.selectedTurnCount,
           activeBranchId: options?.activeBranchId ?? null,
           filteredArtifactCount: materialized.filteredArtifactCount,
+          replayedArtifactCount: materialized.replayedArtifactCount,
+          continuationDecisionCounts: countContinuationDecisions(materialized.artifactDecisions),
+          derivedContextStatus: materialized.derivedContextStatus,
+          compactedTurnCount: materialized.compactedTurnCount,
           compactionState: 'derived-view-only',
         },
         preparedRuntime: preparedTurn?.runtime,
         terminalContext: options?.onTerminalContext
           ? (messages, status) => options.onTerminalContext?.({
               messages,
-              route: contextRoute,
+              executionIdentity: planning.plan.executionIdentity,
               status,
               selectedTurnCount: materialized.selectedTurnCount,
               filteredArtifactCount: materialized.filteredArtifactCount,
@@ -1166,6 +1247,7 @@ export class AgentOrchestrator {
       initialState: {
         model: agentModel,
         systemPrompt,
+        systemPromptSegments: promptPlan.segments,
         tools,
         messages: initialMessages,
       },
@@ -1200,6 +1282,11 @@ export class AgentOrchestrator {
             contextDiagnostic,
           },
           reasoning: reasoningContract,
+          cache: requestOptions.promptCache ?? streamOptions.promptCache ?? promptCacheCompiler.compile({
+            promptPlan,
+            requestPlan: requestOptions.requestPlan,
+            tools: requestContext.tools ?? [],
+          }),
         });
         requestSnapshotStore.write(snapshot);
         return snapshot.id;
@@ -2343,6 +2430,11 @@ export class AgentOrchestrator {
       projectRootPath: input.projectRootPath ?? null,
       projectId: input.projectId ?? null,
     });
+    const promptCache = input.preparedRuntime?.promptCache ?? promptCacheCompiler.compile({
+      promptPlan: input.promptPlan,
+      requestPlan,
+      tools: activeToolDefinitions,
+    });
     const streamOptions: StreamOptions = {
       maxTokens: input.maxTokens,
       temperature: requestPlan.temperature,
@@ -2350,6 +2442,7 @@ export class AgentOrchestrator {
       reasoningVisibility: requestPlan.reasoningWire.selection === 'off' ? 'none' : routeCapability.reasoningVisibility,
       signal: input.options?.signal,
       requestPlan,
+      promptCache,
       credentialHandle: input.preparedRuntime?.credentialHandle ?? input.credentialHandle,
     };
     const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);

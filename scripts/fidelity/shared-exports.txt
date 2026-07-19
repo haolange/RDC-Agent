@@ -498,7 +498,6 @@ ProviderProfileManifest
 ProviderProfileManifestSchema
 ProviderProtocolOverride
 ProviderProtocolSchema
-ProviderReasoningArtifact
 ProviderReasoningContract
 ProviderSurfaceAuthMode
 ProviderSurfaceDefinition
@@ -643,7 +642,6 @@ TerminalTabStatus
 TextPreview
 ThinkingArtifact
 ThinkingArtifactKind
-ThinkingArtifactReplayPolicy
 ThinkingArtifactSource
 ThinkingArtifactVisibility
 ThoughtSummaryNode

@@ -4,51 +4,682 @@
   "routeMechanics": [
     {
       "protocol": "OpenAICompatibleChatCompletions",
-      "adapter": "openai-compatible"
+      "adapter": "openai-compatible",
+      "contracts": {
+        "protocolDialect": "OpenAICompatibleChatCompletions",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "unknown",
+          "artifactFormat": "unknown",
+          "artifactVersion": "unknown",
+          "compatibilityGroup": "none",
+          "continuation": "unknown",
+          "projectionSources": {
+            "raw": "openai-compatible-raw"
+          }
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "discard",
+          "artifactScope": "none",
+          "ordering": "assistant-tool-result",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sse",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "http-status"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     },
     {
       "protocol": "OpenAIResponses",
-      "adapter": "openai-responses"
+      "adapter": "openai-responses",
+      "contracts": {
+        "protocolDialect": "OpenAIResponses",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "reasoning-item",
+          "artifactFormat": "openai.responses.reasoning",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "none",
+          "continuation": "unknown",
+          "projectionSources": {
+            "summary": "openai-responses-summary",
+            "opaque": "openai-responses-encrypted"
+          }
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "preserve-exact",
+          "artifactScope": "tool-call-turn",
+          "ordering": "provider-native",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sse",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "http-status"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     },
     {
       "protocol": "AnthropicMessages",
-      "adapter": "anthropic-messages"
+      "adapter": "anthropic-messages",
+      "contracts": {
+        "protocolDialect": "AnthropicMessages",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "signed-content-block",
+          "artifactFormat": "anthropic.messages.thinking-block",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "none",
+          "continuation": "unknown",
+          "projectionSources": {
+            "summary": "anthropic-thinking",
+            "raw": "anthropic-thinking",
+            "opaque": "anthropic-redacted-thinking"
+          }
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "preserve-exact",
+          "artifactScope": "tool-call-turn",
+          "ordering": "strict-block-order",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sse",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "http-status"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     },
     {
       "protocol": "OpenRouterChatCompletions",
-      "adapter": "openrouter-chat"
+      "adapter": "openrouter-chat",
+      "contracts": {
+        "protocolDialect": "OpenRouterChatCompletions",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "unknown",
+          "artifactFormat": "unknown",
+          "artifactVersion": "unknown",
+          "compatibilityGroup": "none",
+          "continuation": "unknown",
+          "projectionSources": {
+            "raw": "openrouter-raw"
+          }
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "discard",
+          "artifactScope": "none",
+          "ordering": "assistant-tool-result",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sse",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "http-status"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     },
     {
       "protocol": "AzureOpenAIChatCompletions",
-      "adapter": "azure-openai-chat"
+      "adapter": "azure-openai-chat",
+      "contracts": {
+        "protocolDialect": "AzureOpenAIChatCompletions",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "unknown",
+          "artifactFormat": "unknown",
+          "artifactVersion": "unknown",
+          "compatibilityGroup": "none",
+          "continuation": "unknown"
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "discard",
+          "artifactScope": "none",
+          "ordering": "assistant-tool-result",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sse",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "http-status"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     },
     {
       "protocol": "GoogleGemini",
-      "adapter": "google-gemini"
+      "adapter": "google-gemini",
+      "contracts": {
+        "protocolDialect": "GoogleGemini",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "thought-signature",
+          "artifactFormat": "google.generate-content.thought-signature",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "none",
+          "continuation": "unknown",
+          "projectionSources": {
+            "summary": "gemini-summary",
+            "opaque": "gemini-thought-signature"
+          }
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "preserve-thought-signature",
+          "artifactScope": "tool-call-turn",
+          "ordering": "provider-native",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sse",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "http-status"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     },
     {
       "protocol": "GoogleVertexGemini",
-      "adapter": "google-vertex-gemini"
+      "adapter": "google-vertex-gemini",
+      "contracts": {
+        "protocolDialect": "GoogleVertexGemini",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "thought-signature",
+          "artifactFormat": "google.generate-content.thought-signature",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "none",
+          "continuation": "unknown",
+          "projectionSources": {
+            "summary": "gemini-summary",
+            "opaque": "gemini-thought-signature"
+          }
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "preserve-thought-signature",
+          "artifactScope": "tool-call-turn",
+          "ordering": "provider-native",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sse",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "http-status"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     },
     {
       "protocol": "GoogleVertexAnthropic",
-      "adapter": "google-vertex-anthropic"
+      "adapter": "google-vertex-anthropic",
+      "contracts": {
+        "protocolDialect": "GoogleVertexAnthropic",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "signed-content-block",
+          "artifactFormat": "anthropic.messages.thinking-block",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "none",
+          "continuation": "unknown",
+          "projectionSources": {
+            "summary": "anthropic-thinking",
+            "raw": "anthropic-thinking",
+            "opaque": "anthropic-redacted-thinking"
+          }
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "preserve-exact",
+          "artifactScope": "tool-call-turn",
+          "ordering": "strict-block-order",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sse",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "http-status"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     },
     {
       "protocol": "GitLabDuo",
-      "adapter": "gitlab-duo"
+      "adapter": "gitlab-duo",
+      "contracts": {
+        "protocolDialect": "GitLabDuo",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "unknown",
+          "artifactFormat": "unknown",
+          "artifactVersion": "unknown",
+          "compatibilityGroup": "none",
+          "continuation": "unknown"
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "discard",
+          "artifactScope": "none",
+          "ordering": "provider-native",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sdk-events",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "sdk-error"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     },
     {
       "protocol": "SapAiCoreOrchestration",
-      "adapter": "sap-ai-core-orchestration"
+      "adapter": "sap-ai-core-orchestration",
+      "contracts": {
+        "protocolDialect": "SapAiCoreOrchestration",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "unknown",
+          "artifactFormat": "unknown",
+          "artifactVersion": "unknown",
+          "compatibilityGroup": "none",
+          "continuation": "unknown"
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "discard",
+          "artifactScope": "none",
+          "ordering": "provider-native",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sdk-events",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "sdk-error"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     },
     {
       "protocol": "SapAiCoreFoundationModels",
-      "adapter": "sap-ai-core-foundation-models"
+      "adapter": "sap-ai-core-foundation-models",
+      "contracts": {
+        "protocolDialect": "SapAiCoreFoundationModels",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "unknown",
+          "artifactFormat": "unknown",
+          "artifactVersion": "unknown",
+          "compatibilityGroup": "none",
+          "continuation": "unknown"
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "discard",
+          "artifactScope": "none",
+          "ordering": "provider-native",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sdk-events",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "sdk-error"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     },
     {
       "protocol": "OllamaOpenAICompatibleChatCompletions",
-      "adapter": "ollama-openai-compatible"
+      "adapter": "ollama-openai-compatible",
+      "contracts": {
+        "protocolDialect": "OllamaOpenAICompatibleChatCompletions",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "unknown",
+          "artifactFormat": "unknown",
+          "artifactVersion": "unknown",
+          "compatibilityGroup": "none",
+          "continuation": "unknown",
+          "projectionSources": {
+            "raw": "ollama-raw"
+          }
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "discard",
+          "artifactScope": "none",
+          "ordering": "assistant-tool-result",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sse",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "http-status"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     }
   ]
 }

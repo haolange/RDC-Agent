@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import { providerAdapterIdForProtocol } from '@shared/provider-catalog/implementationRegistry';
+import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import type { Context, Model } from '../core/types';
 import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
 import { OpenAIResponsesProvider } from './OpenAIResponsesProvider';
@@ -20,7 +21,7 @@ const context: Context = {
 };
 
 function plan(protocol: RequestPlan['route']['protocol'], baseUrl: string): RequestPlan {
-  return {
+  return createTestRequestPlan({
     providerId: 'amazon-bedrock',
     adapterId: providerAdapterIdForProtocol(protocol),
     catalogRevision: 'catalog',
@@ -40,7 +41,7 @@ function plan(protocol: RequestPlan['route']['protocol'], baseUrl: string): Requ
       selection: 'off',
       control: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
     },
-  };
+  });
 }
 
 afterEach(() => {

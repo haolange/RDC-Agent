@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "id": "google-interactions",
+  "routeMechanics": [
+    {
+      "protocol": "GoogleInteractions",
+      "adapter": "google-interactions",
+      "contracts": {
+        "protocolDialect": "GoogleInteractions",
+        "protocolVersion": "v1",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "summary",
+          "source": "google-interactions-thought-steps",
+          "evidence": "https://ai.google.dev/gemini-api/docs/thinking",
+          "displayLabel": "Reasoning summary",
+          "carrier": "thought-signature",
+          "artifactFormat": "google.interactions.thought-step",
+          "artifactVersion": "steps-v1",
+          "compatibilityGroup": "none",
+          "continuation": "same-compatibility-group",
+          "projectionSources": {
+            "summary": "gemini-interactions-summary",
+            "opaque": "gemini-interactions-thought-signature"
+          }
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless",
+            "provider-managed"
+          ],
+          "defaultMode": "provider-managed",
+          "carrier": "previous-interaction-id",
+          "retention": "provider",
+          "crossModel": "provider-managed",
+          "evidence": "https://ai.google.dev/gemini-api/docs/interactions-overview"
+        },
+        "cache": {
+          "mode": "implicit-prefix",
+          "keyCarrier": "provider-managed",
+          "breakpointCarrier": "provider-managed",
+          "telemetry": [
+            "cached-input-tokens"
+          ],
+          "ttl": "provider-managed",
+          "evidence": "https://ai.google.dev/gemini-api/docs/interactions-overview"
+        },
+        "toolLoop": {
+          "artifactPolicy": "preserve-exact",
+          "artifactScope": "all-assistant-turns",
+          "ordering": "provider-native",
+          "modelSwitch": "pin-until-terminal",
+          "evidence": "https://ai.google.dev/gemini-api/docs/thinking"
+        },
+        "streaming": {
+          "transport": "sse",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "provider-event",
+          "evidence": "https://ai.google.dev/api/interactions-api-v1"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
+    }
+  ]
+}

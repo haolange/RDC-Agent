@@ -18,6 +18,7 @@ import { CLAUDE_ACCOUNT_WIRE_HEADERS } from '../../settings/ClaudeWire';
 import { COPILOT_WIRE_HEADERS } from '../../settings/CopilotWire';
 import { AnthropicProvider } from './AnthropicProvider';
 import { GeminiProvider } from './GeminiProvider';
+import { GoogleInteractionsProvider } from './GoogleInteractionsProvider';
 import { OllamaProvider } from './OllamaProvider';
 import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
 import { OpenAIResponsesProvider } from './OpenAIResponsesProvider';
@@ -78,6 +79,8 @@ function toRuntimeApi(protocol: LlmProviderProtocol): Model['api'] {
   switch (protocol) {
     case 'AnthropicMessages':
       return 'anthropic-messages';
+    case 'GoogleInteractions':
+      return 'google-interactions';
     case 'GoogleGemini':
       return 'google-gemini';
     case 'GoogleVertexGemini':
@@ -128,6 +131,12 @@ function createProviderStrategy(
         headers: provider.id === 'kimi-coding-plan'
           ? { ...connectionHeaders, 'User-Agent': 'RDC-Agent' }
           : { ...connectionHeaders, ...accountHeaders },
+      });
+    case 'google-interactions':
+      return new GoogleInteractionsProvider({
+        apiKey: provider.apiKey,
+        baseUrl: provider.baseUrl,
+        headers: connectionHeaders,
       });
     case 'google-gemini':
       return new GeminiProvider({

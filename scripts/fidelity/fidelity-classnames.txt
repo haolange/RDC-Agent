@@ -51,8 +51,6 @@ artifact-viewer-header
 artifact-viewer-title
 artifact-viewer-title-icon
 breadcrumb-item
-btn-cancel
-btn-confirm
 button
 button-danger
 button-ghost
@@ -499,8 +497,6 @@ request-inspector-payload
 request-inspector-tabs
 request-inspector-title
 right-panel-body
-risk-
-risk-badge
 runtime-terminal-activity-body
 runtime-terminal-activity-pane
 runtime-terminal-close-mark

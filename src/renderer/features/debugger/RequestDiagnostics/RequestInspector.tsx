@@ -2,6 +2,8 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { RequestEnvelopeSnapshot } from '@shared/types/rdxRuntime';
 import { useI18n, type TranslationKey } from '../../../i18n';
 import { getElectronApi } from '../../../platform/getElectronApi';
+import { Button } from '../../../ui/Button';
+import './RequestInspector.css';
 
 type InspectorTab = 'overview' | 'instructions' | 'messages' | 'tools' | 'resources' | 'protocol' | 'tokens';
 
@@ -29,6 +31,9 @@ export const RequestInspector: React.FC<{
   useEffect(() => {
     let cancelled = false;
     const api = getElectronApi();
+    setSnapshots([]);
+    setSelectedId('');
+    setError('');
     if (!api) {
       setError(t('control.requestInspectorUnavailable'));
       return () => { cancelled = true; };
@@ -37,7 +42,9 @@ export const RequestInspector: React.FC<{
       if (cancelled) return;
       setError('');
       setSnapshots(items);
-      setSelectedId((current) => current || items[items.length - 1]?.id || '');
+      setSelectedId((current) => items.some((item) => item.id === current)
+        ? current
+        : items[items.length - 1]?.id ?? '');
     }).catch((reason) => {
       if (!cancelled) setError(reason instanceof Error ? reason.message : String(reason));
     });
@@ -58,7 +65,11 @@ export const RequestInspector: React.FC<{
           id: selected.id,
           callIndex: selected.callIndex,
           route: selected.route,
+          execution: selected.requestPlan.executionIdentity,
+          state: selected.requestPlan.statePlan,
+          transition: selected.requestPlan.contextTransitionPlan,
           reasoning: selected.reasoning,
+          cache: selected.cache,
           redactions: selected.redactions,
           createdAt: selected.createdAt,
           completedAt: selected.completedAt,
@@ -70,23 +81,37 @@ export const RequestInspector: React.FC<{
       case 'tools':
         return selected.tools;
       case 'resources':
-        return selected.promptPlan.segments.map(({ id, kind, scope, sourcePath, sourceHash, precedence, tokenEstimate }) => ({
-          id, kind, scope, sourcePath, sourceHash, precedence, tokenEstimate,
+        return selected.promptPlan.segments.map(({ id, kind, scope, sourcePath, sourceHash, precedence, stability, tokenEstimate }) => ({
+          id, kind, scope, sourcePath, sourceHash, precedence, stability, tokenEstimate,
         }));
       case 'protocol':
-        return { route: selected.route, controls: selected.controls, reasoning: selected.reasoning };
+        return {
+          route: selected.requestPlan.route,
+          statePlan: selected.requestPlan.statePlan,
+          cachePlan: selected.requestPlan.cachePlan,
+          toolLoopPlan: selected.requestPlan.toolLoopPlan,
+          streamingPlan: selected.requestPlan.streamingPlan,
+          contextTransitionPlan: selected.requestPlan.contextTransitionPlan,
+          headers: selected.requestPlan.headers,
+          bodyPatch: selected.requestPlan.bodyPatch,
+          controls: selected.controls,
+          reasoning: selected.reasoning,
+          compiledCache: selected.cache,
+        };
       case 'tokens':
         return {
           usage: selected.usage,
           promptEstimate: selected.promptPlan.totalTokenEstimate,
           metrics: selected.promptPlan.metrics,
+          stablePrefix: selected.promptPlan.stablePrefix,
+          cache: selected.cache,
         };
     }
   }, [selected, tab]);
 
   if (!snapshots.length && !error) {
     return (
-      <div className="request-inspector is-loading" data-testid="request-inspector">
+      <div className="request-inspector is-loading" data-testid="request-inspector" role="status">
         {t('control.requestInspectorWaiting')}
       </div>
     );
@@ -104,7 +129,7 @@ export const RequestInspector: React.FC<{
         {snapshots.length > 1 ? (
           <select
             className="request-inspector-call"
-            value={selected?.id}
+            value={selected?.id ?? ''}
             onChange={(event) => setSelectedId(event.target.value)}
             aria-label={t('control.requestInspectorCallLabel')}
           >
@@ -121,20 +146,22 @@ export const RequestInspector: React.FC<{
         ) : null}
         <div className="request-inspector-tabs" role="tablist">
           {TAB_KEYS.map((item) => (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               type="button"
               role="tab"
               aria-selected={tab === item.id}
-              className={tab === item.id ? 'active' : ''}
+              className={'request-inspector-tab' + (tab === item.id ? ' active' : '')}
               key={item.id}
               onClick={() => setTab(item.id)}
             >
               {t(item.labelKey)}
-            </button>
+            </Button>
           ))}
         </div>
         {error ? (
-          <div className="request-inspector-error">{error}</div>
+          <div className="request-inspector-error" role="alert">{error}</div>
         ) : (
           <pre className="request-inspector-payload">{JSON.stringify(payload, null, 2)}</pre>
         )}

@@ -85,6 +85,7 @@ export type LlmProviderProtocol =
   | 'AnthropicMessages'
   | 'OpenRouterChatCompletions'
   | 'AzureOpenAIChatCompletions'
+  | 'GoogleInteractions'
   | 'GoogleGemini'
   | 'GoogleVertexGemini'
   | 'GoogleVertexAnthropic'
