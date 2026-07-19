@@ -185,6 +185,8 @@ export interface RequestEnvelopeSnapshot {
     reasoningTokens?: number;
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
+    cacheHitTokens?: number;
+    cacheMissTokens?: number;
     estimated?: boolean;
   };
   redactions: Array<{ path: string; reason: string; hash?: string }>;

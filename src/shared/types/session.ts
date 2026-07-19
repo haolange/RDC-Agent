@@ -204,6 +204,29 @@ export interface RunContextUsageSummary {
   cacheReadTokens?: number;
   /** 本 run 累计 cache write tokens；provider 未上报时缺省。 */
   cacheWriteTokens?: number;
+  /**
+   * 本 run 累计 cache hit tokens（原生或由 cacheRead 归一化）。
+   * 与 cacheMissTokens 成对出现；无 cache 遥测时缺省。可为 0。
+   */
+  cacheHitTokens?: number;
+  /**
+   * 本 run 累计 cache miss tokens。
+   * 与 cacheHitTokens 成对出现；无 cache 遥测时缺省。可为 0。
+   */
+  cacheMissTokens?: number;
+  /** 本 run 最近一次 LLM call 的 cache hit；无该轮遥测时缺省。 */
+  lastTurnCacheHitTokens?: number;
+  /** 本 run 最近一次 LLM call 的 cache miss；无该轮遥测时缺省。 */
+  lastTurnCacheMissTokens?: number;
+  /**
+   * 缓存命中节省（= 本 run 累计 cacheHitTokens）。
+   * 仅在有 cache 遥测时出现。
+   */
+  cacheSavedTokens?: number;
+  /** 最近一轮命中率 0–100；分母为 0 时缺省。 */
+  lastTurnCacheHitRate?: number;
+  /** 本 run 累计命中率 0–100；分母为 0 时缺省。 */
+  cumulativeCacheHitRate?: number;
   /** 本 run 累计 reasoning tokens；provider 未上报时缺省。 */
   reasoningTokens?: number;
 }

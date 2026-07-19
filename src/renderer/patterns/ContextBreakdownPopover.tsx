@@ -12,6 +12,96 @@ import {
 
 type PreparationPhase = 'idle' | 'preparing' | 'current' | 'actual';
 
+const METER_UNAVAILABLE = '—';
+
+function hasCacheTelemetry(usage: RunContextUsageSummary): boolean {
+  return typeof usage.cacheHitTokens === 'number' || typeof usage.cacheMissTokens === 'number';
+}
+
+function formatMeterTokens(value: number | undefined): string {
+  return typeof value === 'number' ? formatTokenCount(value) : METER_UNAVAILABLE;
+}
+
+function formatMeterPercent(value: number | undefined): string {
+  return typeof value === 'number' ? `${value}%` : METER_UNAVAILABLE;
+}
+
+const MeterStat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className={`context-breakdown-meter-stat${value === METER_UNAVAILABLE ? ' is-empty' : ''}`}>
+    <span className="context-breakdown-meter-stat-label">{label}</span>
+    <span className="context-breakdown-meter-stat-value">{value}</span>
+  </div>
+);
+
+const ContextRunMeterBand: React.FC<{
+  usage: RunContextUsageSummary;
+  phaseLabel: string;
+  showWindowPercent?: boolean;
+}> = ({ usage, phaseLabel, showWindowPercent = false }) => {
+  const { t } = useI18n();
+  const cacheReady = hasCacheTelemetry(usage);
+  const saved = cacheReady ? (usage.cacheSavedTokens ?? usage.cacheHitTokens) : undefined;
+  const hit = cacheReady ? usage.cacheHitTokens : undefined;
+  const miss = cacheReady ? usage.cacheMissTokens : undefined;
+  const reasoningValue = typeof usage.reasoningTokens === 'number' && usage.reasoningTokens > 0
+    ? formatTokenCount(usage.reasoningTokens)
+    : METER_UNAVAILABLE;
+
+  // Hero already shows Actual; keep eyebrow only for Last actual under Current request.
+  const showEyebrow = showWindowPercent || /last/i.test(phaseLabel);
+
+  return (
+    <div
+      className="context-breakdown-run-meter"
+      data-testid="context-breakdown-run-meter"
+      data-columns="3"
+    >
+      {showEyebrow ? (
+        <div className="context-breakdown-meter-eyebrow">{phaseLabel}</div>
+      ) : null}
+      <div className="context-breakdown-run-columns">
+        <section className="context-breakdown-run-col" data-col="tokens" aria-label={t('contextBreakdown.tokensColumn')}>
+          <h3 className="context-breakdown-run-col-title">{t('contextBreakdown.tokensColumn')}</h3>
+          <div className="context-breakdown-meter-stats">
+            {showWindowPercent ? (
+              <MeterStat label={t('contextBreakdown.windowUsed')} value={`${usage.usagePercent}%`} />
+            ) : null}
+            <MeterStat label={t('contextBreakdown.inputLabel')} value={formatTokenCount(usage.inputTokens)} />
+            <MeterStat label={t('contextBreakdown.outputLabel')} value={formatTokenCount(usage.outputTokens)} />
+            <MeterStat label={t('contextBreakdown.totalLabel')} value={formatTokenCount(usage.totalTokens)} />
+          </div>
+        </section>
+        <section className="context-breakdown-run-col" data-col="cache" aria-label={t('contextBreakdown.cacheColumn')}>
+          <h3 className="context-breakdown-run-col-title">{t('contextBreakdown.cacheColumn')}</h3>
+          <div className="context-breakdown-meter-stats">
+            <MeterStat label={t('contextBreakdown.cacheSavedLabel')} value={formatMeterTokens(saved)} />
+            <MeterStat
+              label={t('contextBreakdown.cacheLatestLabel')}
+              value={formatMeterPercent(usage.lastTurnCacheHitRate)}
+            />
+            <MeterStat
+              label={t('contextBreakdown.cacheCumulativeLabel')}
+              value={formatMeterPercent(usage.cumulativeCacheHitRate)}
+            />
+            <MeterStat
+              label={t('contextBreakdown.cacheHitMissShort')}
+              value={cacheReady
+                ? `${formatMeterTokens(hit)} / ${formatMeterTokens(miss)}`
+                : METER_UNAVAILABLE}
+            />
+          </div>
+        </section>
+        <section className="context-breakdown-run-col" data-col="reasoning" aria-label={t('contextBreakdown.reasoningLabel')}>
+          <h3 className="context-breakdown-run-col-title">{t('contextBreakdown.reasoningLabel')}</h3>
+          <div className="context-breakdown-meter-stats">
+            <MeterStat label={t('contextBreakdown.totalLabel')} value={reasoningValue} />
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+};
+
 export const ContextBreakdownPopover: React.FC<{
   prepared: PreparedTurnContextSummary | null;
   phase: PreparationPhase;
@@ -66,17 +156,6 @@ export const ContextBreakdownPopover: React.FC<{
     : prepared?.derivedContext.status === 'stale'
       ? t('contextBreakdown.derivedContextStale')
       : t('contextBreakdown.derivedContextNone');
-  const runExtras = [
-    usage?.cacheReadTokens
-      ? `${t('contextBreakdown.cacheReadLabel')} ${formatTokenCount(usage.cacheReadTokens)}`
-      : null,
-    usage?.cacheWriteTokens
-      ? `${t('contextBreakdown.cacheWriteLabel')} ${formatTokenCount(usage.cacheWriteTokens)}`
-      : null,
-    usage?.reasoningTokens
-      ? `${t('contextBreakdown.reasoningLabel')} ${formatTokenCount(usage.reasoningTokens)}`
-      : null,
-  ].filter(Boolean);
 
   return (
     <>
@@ -87,7 +166,6 @@ export const ContextBreakdownPopover: React.FC<{
           <button type="button" className="context-breakdown-close" onClick={onClose} aria-label={t('contextBreakdown.close')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
@@ -160,27 +238,18 @@ export const ContextBreakdownPopover: React.FC<{
         )}
 
         {hasRunTotals && showActualAsPrimary && usage ? (
-          <div className="context-breakdown-run-totals">
-            <span className="context-breakdown-run-label">{t('contextBreakdown.actual')}</span>
-            <span className="context-breakdown-run-stat">
-              {t('contextBreakdown.inputLabel')} {formatTokenCount(usage.inputTokens)}
-              {' · '}{t('contextBreakdown.outputLabel')} {formatTokenCount(usage.outputTokens)}
-              {' · '}{t('contextBreakdown.totalLabel')} {formatTokenCount(usage.totalTokens)}
-              {runExtras.length > 0 ? ` · ${runExtras.join(' · ')}` : ''}
-            </span>
-          </div>
+          <ContextRunMeterBand
+            usage={usage}
+            phaseLabel={phase === 'actual' ? t('contextBreakdown.actual') : t('contextBreakdown.lastActual')}
+          />
         ) : null}
 
         {usage && showPrepared ? (
-          <div className="context-breakdown-last-actual">
-            <span className="context-breakdown-run-label">{t('contextBreakdown.lastActual')}</span>
-            <span className="context-breakdown-run-stat">
-              {usage.usagePercent}% · {t('contextBreakdown.inputLabel')} {formatTokenCount(usage.inputTokens)}
-              {' · '}{t('contextBreakdown.outputLabel')} {formatTokenCount(usage.outputTokens)}
-              {usage.contextWindowTokens ? ` · ${formatTokenCount(usage.contextWindowTokens)}` : ''}
-              {runExtras.length > 0 ? ` · ${runExtras.join(' · ')}` : ''}
-            </span>
-          </div>
+          <ContextRunMeterBand
+            usage={usage}
+            phaseLabel={t('contextBreakdown.lastActual')}
+            showWindowPercent
+          />
         ) : null}
 
         {breakdown.length > 0 ? (

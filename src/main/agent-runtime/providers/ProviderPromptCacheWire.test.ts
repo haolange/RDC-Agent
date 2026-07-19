@@ -134,7 +134,12 @@ describe('provider prompt cache wire', () => {
       text: 'Stable instructions\n\n',
       prompt_cache_breakpoint: { mode: 'explicit' },
     });
-    expect(message.usage).toMatchObject({ cacheReadTokens: 8, cacheWriteTokens: 6 });
+    expect(message.usage).toMatchObject({
+      cacheReadTokens: 8,
+      cacheWriteTokens: 6,
+      cacheHitTokens: 8,
+      cacheMissTokens: 12,
+    });
   });
 
   it('emits Chat Completions prompt_cache_options and a marked stable system block', async () => {
@@ -172,7 +177,12 @@ describe('provider prompt cache wire', () => {
       text: 'Stable instructions\n\n',
       prompt_cache_breakpoint: { mode: 'explicit' },
     });
-    expect(message.usage).toMatchObject({ cacheReadTokens: 9, cacheWriteTokens: 7 });
+    expect(message.usage).toMatchObject({
+      cacheReadTokens: 9,
+      cacheWriteTokens: 7,
+      cacheHitTokens: 9,
+      cacheMissTokens: 11,
+    });
   });
 
   it('keeps Anthropic automatic caching and the stable system breakpoint orthogonal', async () => {
@@ -218,7 +228,12 @@ describe('provider prompt cache wire', () => {
       cache_control: { type: 'ephemeral', ttl: '1h' },
     });
     expect(system[1]).toEqual({ type: 'text', text: 'Current date: 2026-07-19' });
-    expect(message.usage).toMatchObject({ cacheReadTokens: 10, cacheWriteTokens: 5 });
+    expect(message.usage).toMatchObject({
+      cacheReadTokens: 10,
+      cacheWriteTokens: 5,
+      cacheHitTokens: 10,
+      cacheMissTokens: 25,
+    });
   });
 
   it('keeps ordinary Responses instructions unchanged when explicit caching is unavailable', () => {

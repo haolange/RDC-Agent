@@ -6,6 +6,7 @@ import type {
   RunContextUsageSummary,
 } from '@shared/types/session';
 import type { WorkflowStage } from '@shared/types/workflow';
+import { cacheHitRatePercent } from '../agent-runtime/providers/internal/normalizeCacheUsage';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { planEffectiveModelRequest } from './EffectiveModelResolver';
@@ -24,6 +25,10 @@ export interface RunLlmExecutionSummary {
   totalOutputTokens: number;
   totalCacheReadTokens?: number;
   totalCacheWriteTokens?: number;
+  totalCacheHitTokens?: number;
+  totalCacheMissTokens?: number;
+  lastTurnCacheHitTokens?: number;
+  lastTurnCacheMissTokens?: number;
   totalReasoningTokens?: number;
   lastOccupiedTokens?: number;
   lastPromptBreakdown?: ContextUsageBreakdownEntry[] | null;
@@ -111,6 +116,8 @@ export class DebuggerLlmService {
     outputTokens: number;
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
+    cacheHitTokens?: number;
+    cacheMissTokens?: number;
     reasoningTokens?: number;
     precomputedBreakdown: ContextUsageBreakdownEntry[];
   }): void {
@@ -138,6 +145,20 @@ export class DebuggerLlmService {
     if (typeof params.cacheWriteTokens === 'number') {
       existing.totalCacheWriteTokens = (existing.totalCacheWriteTokens ?? 0) + params.cacheWriteTokens;
     }
+    const hasCacheStats = typeof params.cacheHitTokens === 'number'
+      || typeof params.cacheMissTokens === 'number';
+    if (hasCacheStats) {
+      const hit = params.cacheHitTokens ?? 0;
+      const miss = params.cacheMissTokens ?? 0;
+      existing.totalCacheHitTokens = (existing.totalCacheHitTokens ?? 0) + hit;
+      existing.totalCacheMissTokens = (existing.totalCacheMissTokens ?? 0) + miss;
+      existing.lastTurnCacheHitTokens = hit;
+      existing.lastTurnCacheMissTokens = miss;
+    } else {
+      // Latest LLM call had no cache telemetry — clear last-turn only; keep run totals.
+      existing.lastTurnCacheHitTokens = undefined;
+      existing.lastTurnCacheMissTokens = undefined;
+    }
     if (typeof params.reasoningTokens === 'number') {
       existing.totalReasoningTokens = (existing.totalReasoningTokens ?? 0) + params.reasoningTokens;
     }
@@ -159,6 +180,21 @@ export class DebuggerLlmService {
     });
     const contextWindowTokens = planning.ok ? planning.plan.contextBudgetTokens : 0;
     const occupiedTokens = summary.lastOccupiedTokens ?? 0;
+    const hasCacheStats = typeof summary.totalCacheHitTokens === 'number'
+      || typeof summary.totalCacheMissTokens === 'number';
+    const cacheHitTokens = hasCacheStats ? (summary.totalCacheHitTokens ?? 0) : undefined;
+    const cacheMissTokens = hasCacheStats ? (summary.totalCacheMissTokens ?? 0) : undefined;
+    const lastHit = summary.lastTurnCacheHitTokens;
+    const lastMiss = summary.lastTurnCacheMissTokens;
+    const hasLastTurnCache = typeof lastHit === 'number' || typeof lastMiss === 'number';
+    const lastTurnHit = hasLastTurnCache ? (lastHit ?? 0) : undefined;
+    const lastTurnMiss = hasLastTurnCache ? (lastMiss ?? 0) : undefined;
+    const lastTurnRate = hasLastTurnCache
+      ? cacheHitRatePercent(lastTurnHit ?? 0, lastTurnMiss ?? 0)
+      : undefined;
+    const cumulativeRate = hasCacheStats
+      ? cacheHitRatePercent(cacheHitTokens ?? 0, cacheMissTokens ?? 0)
+      : undefined;
     return {
       runId: key,
       providerId: summary.providerId,
@@ -179,6 +215,13 @@ export class DebuggerLlmService {
       ...(positiveTokenOrOmit(summary.totalCacheWriteTokens) !== undefined
         ? { cacheWriteTokens: positiveTokenOrOmit(summary.totalCacheWriteTokens) }
         : {}),
+      ...(cacheHitTokens !== undefined ? { cacheHitTokens } : {}),
+      ...(cacheMissTokens !== undefined ? { cacheMissTokens } : {}),
+      ...(lastTurnHit !== undefined ? { lastTurnCacheHitTokens: lastTurnHit } : {}),
+      ...(lastTurnMiss !== undefined ? { lastTurnCacheMissTokens: lastTurnMiss } : {}),
+      ...(cacheHitTokens !== undefined ? { cacheSavedTokens: cacheHitTokens } : {}),
+      ...(lastTurnRate !== undefined ? { lastTurnCacheHitRate: lastTurnRate } : {}),
+      ...(cumulativeRate !== undefined ? { cumulativeCacheHitRate: cumulativeRate } : {}),
       ...(positiveTokenOrOmit(summary.totalReasoningTokens) !== undefined
         ? { reasoningTokens: positiveTokenOrOmit(summary.totalReasoningTokens) }
         : {}),

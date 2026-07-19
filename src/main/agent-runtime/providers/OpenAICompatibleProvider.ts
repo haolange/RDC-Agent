@@ -27,6 +27,7 @@ import { partitionSystemPrompt } from './promptCacheWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
 import { AssistantStreamBuilder, createProviderOutputRef, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
 import { composeAbortSignals, ensureOk, normalizeError, parseSSE, ProviderHttpError } from './internal/http';
+import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import { applyOpenAiCompatibleReasoning } from './reasoningWire';
 import { reasoningProjectionSource } from './reasoningProjection';
 import type { ProviderRequestAuthorizer } from '../../settings/AwsBedrockCredentials';
@@ -68,6 +69,8 @@ interface OpenAIStreamChunk {
     prompt_tokens?: number;
     completion_tokens?: number;
     total_tokens?: number;
+    prompt_cache_hit_tokens?: number;
+    prompt_cache_miss_tokens?: number;
     prompt_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
     completion_tokens_details?: { reasoning_tokens?: number };
   };
@@ -194,7 +197,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
           const cacheReadTokens = chunk.usage.prompt_tokens_details?.cached_tokens;
           const cacheWriteTokens = chunk.usage.prompt_tokens_details?.cache_write_tokens;
           const reasoningTokens = chunk.usage.completion_tokens_details?.reasoning_tokens;
-          builder.setUsage({
+          builder.setUsage(finalizeProviderUsage({
             inputTokens: chunk.usage.prompt_tokens ?? 0,
             outputTokens: chunk.usage.completion_tokens ?? 0,
             totalTokens:
@@ -203,7 +206,13 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
             ...(typeof cacheReadTokens === 'number' ? { cacheReadTokens } : {}),
             ...(typeof cacheWriteTokens === 'number' ? { cacheWriteTokens } : {}),
             ...(typeof reasoningTokens === 'number' ? { reasoningTokens } : {}),
-          });
+            ...(typeof chunk.usage.prompt_cache_hit_tokens === 'number'
+              ? { promptCacheHitTokens: chunk.usage.prompt_cache_hit_tokens }
+              : {}),
+            ...(typeof chunk.usage.prompt_cache_miss_tokens === 'number'
+              ? { promptCacheMissTokens: chunk.usage.prompt_cache_miss_tokens }
+              : {}),
+          }));
         }
 
         const choice = chunk.choices?.[0];
