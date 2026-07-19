@@ -127,11 +127,15 @@ requireCssContract(
   'Global stacking contract must remain composer < modal backdrop < modal < tooltip < notification.',
 );
 requireCssContract(
-  contextUsageIndicator.includes("t('contextBreakdown.preparingBadge')")
-    && contextUsageIndicator.includes("t('contextBreakdown.currentBadge')")
-    && contextUsageIndicator.includes("t('contextBreakdown.lastBadge')")
+  contextUsageIndicator.includes("data-testid=\"composer-usage-indicator\"")
+    && contextUsageIndicator.includes("t('contextBreakdown.preparing')")
+    && contextUsageIndicator.includes("t('contextBreakdown.currentRequest')")
+    && contextUsageIndicator.includes("t('contextBreakdown.lastActual')")
+    && contextUsageIndicator.includes('composer-usage-value-number')
+    && !contextUsageIndicator.includes('composer-usage-value-label')
+    && !contextUsageIndicator.includes('preparingBadge')
     && !contextUsageIndicator.includes('NextRequestContextProjection'),
-  'Composer context ring must expose Preparing, Current request, and Last actual without draft-time prediction.',
+  'Composer context ring must stay percent-first; Preparing / Current request / Last actual live in title and popover, never as in-ring badges or draft-time prediction.',
 );
 requireCssContract(
   contextBreakdownPopover.includes("t('contextBreakdown.currentRequest')")

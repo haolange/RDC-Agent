@@ -1,6 +1,8 @@
 import * as fs from 'fs/promises';
+import * as path from 'path';
 import type { AgentTool } from '../../agent/AgentTool';
-import { safeResolvePath } from '../primitives/_shared';
+import { assertFileSizeCap, assertTextReadable, safeResolvePath } from '../primitives/_shared';
+import { NOTEBOOK_MAX_BYTES } from '../primitives/toolLimits';
 
 interface NotebookEditParams {
   notebook_path: string;
@@ -18,7 +20,7 @@ interface NotebookEditDetails {
 export const notebookEditTool: AgentTool<NotebookEditParams, NotebookEditDetails> = {
   name: 'notebook_edit',
   label: '编辑 Notebook',
-  description: 'Edit a single cell in a Jupyter-like notebook file (JSON .ipynb).',
+  description: 'Edit a single cell in a Jupyter notebook file (JSON .ipynb).',
   parameters: {
     type: 'object',
     properties: {
@@ -34,6 +36,12 @@ export const notebookEditTool: AgentTool<NotebookEditParams, NotebookEditDetails
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');
     const absolute = safeResolvePath(params.notebook_path, undefined, context);
+    if (path.extname(absolute).toLowerCase() !== '.ipynb') {
+      throw new Error(`notebook_edit requires a .ipynb file: ${absolute}`);
+    }
+    assertFileSizeCap(absolute, NOTEBOOK_MAX_BYTES, 'Notebook');
+    assertTextReadable(absolute, { maxBytes: NOTEBOOK_MAX_BYTES });
+
     const raw = await fs.readFile(absolute, 'utf8');
     const notebook = JSON.parse(raw) as { cells?: Array<{ source: string | string[] }> };
     if (!Array.isArray(notebook.cells)) {
@@ -44,12 +52,20 @@ export const notebookEditTool: AgentTool<NotebookEditParams, NotebookEditDetails
       throw new Error(`Cell index ${idx} out of range (0..${notebook.cells.length - 1})`);
     }
     const cell = notebook.cells[idx];
-    const oldSource = Array.isArray(cell.source) ? cell.source.join('') : String(cell.source);
-    cell.source = params.new_source;
+    const oldSource = Array.isArray(cell.source) ? cell.source.join('') : String(cell.source ?? '');
+    // Preserve Jupyter array source shape when the cell originally used string[].
+    cell.source = Array.isArray(cell.source)
+      ? params.new_source.split(/(?<=\n)/)
+      : params.new_source;
     await fs.writeFile(absolute, JSON.stringify(notebook, null, 2), 'utf8');
     return {
       content: [{ type: 'text', text: `Edited cell ${idx} in ${absolute}` }],
-      details: { notebook_path: absolute, cell_index: idx, old_length: oldSource.length, new_length: params.new_source.length },
+      details: {
+        notebook_path: absolute,
+        cell_index: idx,
+        old_length: oldSource.length,
+        new_length: params.new_source.length,
+      },
     };
   },
 };

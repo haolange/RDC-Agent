@@ -7,6 +7,7 @@ import {
   EffortOneMillionContextSwitchRow,
   getStopPosition,
 } from './effortControlParts';
+import { EFFORT_THUMB_WIDTH_PX, thumbInsetPercent } from './effortSliderGeometry';
 import type { MaxVisualTimeline } from './maxVisual';
 import { EffortMaxField } from './EffortMaxField';
 import { Button } from '../../../ui/Button';
@@ -31,8 +32,9 @@ export const EffortControlPopup: React.FC<{
   maxTimeline: MaxVisualTimeline;
   thumbRatio: number;
   thumbStyle: React.CSSProperties;
-  thumbEdgeClass: string;
+  tooltipStyle: React.CSSProperties;
   tooltipLabel: string;
+  trackWidthPx: number;
   oneMillionContextAvailable: boolean;
   oneMillionContextStatusLabel?: string;
   fastModelAvailable: boolean;
@@ -68,8 +70,9 @@ export const EffortControlPopup: React.FC<{
   maxTimeline,
   thumbRatio,
   thumbStyle,
-  thumbEdgeClass,
+  tooltipStyle,
   tooltipLabel,
+  trackWidthPx,
   oneMillionContextAvailable,
   oneMillionContextStatusLabel,
   fastModelAvailable,
@@ -130,7 +133,13 @@ export const EffortControlPopup: React.FC<{
                 <div
                   key={level}
                   className={`composer-effort-slider-stop${level === displayLevel ? ' is-current' : ''}`}
-                  style={{ left: `${getStopPosition(index, displayLevels.length) * 100}%` }}
+                  style={{
+                    left: `${thumbInsetPercent(
+                      getStopPosition(index, displayLevels.length),
+                      trackWidthPx,
+                      EFFORT_THUMB_WIDTH_PX,
+                    )}%`,
+                  }}
                 />
               ))}
             </div>
@@ -145,7 +154,7 @@ export const EffortControlPopup: React.FC<{
           />
 
           <div
-            className={`composer-effort-slider-thumb${isDragging ? ' is-dragging' : ''}${thumbEdgeClass}`}
+            className={`composer-effort-slider-thumb${isDragging ? ' is-dragging' : ''}`}
             style={thumbStyle}
             role="slider"
             tabIndex={hasAdjustableReasoning ? 0 : -1}
@@ -155,9 +164,13 @@ export const EffortControlPopup: React.FC<{
             aria-valuetext={t(EFFORT_LABEL_KEYS[displayLevel])}
             aria-disabled={!hasAdjustableReasoning}
             onKeyDown={onThumbKeyDown}
-          >
-            {isDragging ? <span className="composer-effort-slider-tooltip">{tooltipLabel}</span> : null}
-          </div>
+          />
+
+          {isDragging ? (
+            <span className="composer-effort-slider-tooltip" style={tooltipStyle}>
+              {tooltipLabel}
+            </span>
+          ) : null}
         </div>
 
         <div className="composer-effort-slider-labels" aria-hidden="true">

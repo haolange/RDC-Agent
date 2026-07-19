@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReasoningSelection } from '@shared/types/modelCapability';
 import { formatTokenCount } from '@shared/utils/tokens';
 import { useI18n } from '../../../i18n';
@@ -15,6 +15,11 @@ import {
   resolveNearestSnapLevel,
   resolveSelectedLevel,
 } from './effortControlParts';
+import {
+  clampCenteredTooltipPercent,
+  EFFORT_THUMB_WIDTH_PX,
+  thumbInsetPercent,
+} from './effortSliderGeometry';
 import { EffortControlPopup } from './EffortControlPopup';
 import {
   hasSelectableFastMode,
@@ -25,6 +30,8 @@ import {
 import { useMaxVisualController } from './useMaxVisualController';
 import { createEffortSliderHandlers } from './effortSliderHandlers';
 import { capabilityStatusPresentation } from './capabilityPresentation';
+import { useEffortPopupLayout } from './useEffortPopupLayout';
+
 export const EffortControl: React.FC<{
   agentId: string;
   currentSession: SessionRecord | null;
@@ -35,12 +42,10 @@ export const EffortControl: React.FC<{
   const [open, setOpen] = useState(false);
   const [dragRatio, setDragRatio] = useState<number | null>(null);
   const [snapLevel, setSnapLevel] = useState<ReasoningSelection | null>(null);
-  const [popupShift, setPopupShift] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const dragActiveRef = useRef(false);
-  const popupShiftRef = useRef(0);
   const suppressClickRef = useRef(false);
   const pointerFrameRef = useRef(0);
   const pendingDragRatioRef = useRef<number | null>(null);
@@ -79,7 +84,6 @@ export const EffortControl: React.FC<{
   const thumbRatio = isDragging
     ? clampSliderRatio(dragRatio)
     : getStopPosition(displayIndex, displayLevels.length);
-  const thumbPercent = thumbRatio * 100;
 
   const {
     maxTimeline,
@@ -110,10 +114,8 @@ export const EffortControl: React.FC<{
     if (pointerFrameRef.current) window.cancelAnimationFrame(pointerFrameRef.current);
   }, []);
 
-  const effortLabelKey = selectedLevel === 'max' ? 'composer.effort.reasoningMax' : EFFORT_LABEL_KEYS[selectedLevel];
-  const effortLabel = t(reasoningUnverified ? 'composer.effort.providerManaged' : effortLabelKey);
-  const tooltipLabelKey = displayLevel === 'max' ? 'composer.effort.reasoningMax' : EFFORT_LABEL_KEYS[displayLevel];
-  const tooltipLabel = t(reasoningUnverified ? 'composer.effort.unverified' : tooltipLabelKey);
+  const effortLabel = t(reasoningUnverified ? 'composer.effort.providerManaged' : EFFORT_LABEL_KEYS[selectedLevel]);
+  const tooltipLabel = t(reasoningUnverified ? 'composer.effort.unverified' : EFFORT_LABEL_KEYS[displayLevel]);
   const oneMillionTokens = oneMillionContextTokens(capability);
   const oneMillionCapability = capability?.resolvedControls?.context1m ?? null;
   const oneMillionAvailable = hasSelectableOneMillionContext(capability);
@@ -170,29 +172,21 @@ export const EffortControl: React.FC<{
     };
   }, [closeMenu, open]);
 
-  useLayoutEffect(() => {
-    if (!open) return undefined;
-    const syncPopupPosition = () => {
-      const popup = popupRef.current;
-      if (!popup) return;
-      const gutter = 8;
-      const currentShift = popupShiftRef.current;
-      const rect = popup.getBoundingClientRect();
-      const boundary = menuRef.current?.closest('.composer-shell')?.getBoundingClientRect();
-      const minLeft = Math.max(gutter, boundary ? boundary.left + gutter : gutter);
-      const maxRight = Math.min(window.innerWidth - gutter, boundary ? boundary.right - gutter : window.innerWidth - gutter);
-      const baseLeft = rect.left - currentShift;
-      const baseRight = rect.right - currentShift;
-      let nextShift = 0;
-      if (baseRight > maxRight) nextShift -= baseRight - maxRight;
-      if (baseLeft + nextShift < minLeft) nextShift += minLeft - (baseLeft + nextShift);
-      popupShiftRef.current = Math.round(nextShift);
-      setPopupShift(popupShiftRef.current);
-    };
-    syncPopupPosition();
-    window.addEventListener('resize', syncPopupPosition);
-    return () => window.removeEventListener('resize', syncPopupPosition);
-  }, [open]);
+  const trackObserveKey = [
+    capabilityStateLabel ?? '',
+    reasoningUnverified ? '1' : '0',
+    hasAdjustableReasoning ? '1' : '0',
+  ].join('|');
+  const { popupShift, trackWidthPx } = useEffortPopupLayout({
+    open,
+    menuRef,
+    popupRef,
+    trackRef,
+    trackObserveKey,
+  });
+  const thumbPercent = thumbInsetPercent(thumbRatio, trackWidthPx, EFFORT_THUMB_WIDTH_PX);
+  const tooltipWidthPx = Math.max(96, Math.ceil(tooltipLabel.length * 8 + 24));
+  const tooltipLeftPercent = clampCenteredTooltipPercent(thumbPercent, trackWidthPx, tooltipWidthPx);
 
   const commitEffort = useCallback((level: ReasoningSelection) => {
     if (!displayLevels.includes(level)) return;
@@ -223,7 +217,7 @@ export const EffortControl: React.FC<{
 
   const popupStyle = { '--composer-effort-popup-shift-x': `${popupShift}px` } as React.CSSProperties;
   const thumbStyle = { left: `${thumbPercent}%` } as React.CSSProperties;
-  const thumbEdgeClass = thumbPercent <= 0.01 ? ' is-start' : thumbPercent >= 99.99 ? ' is-end' : '';
+  const tooltipStyle = { left: `${tooltipLeftPercent}%` } as React.CSSProperties;
 
   return (
     <div ref={menuRef} className="composer-effort-menu">
@@ -276,8 +270,9 @@ export const EffortControl: React.FC<{
           thumbRatio={thumbRatio}
           onMaxTimelineComplete={completeMaxTimeline}
           thumbStyle={thumbStyle}
-          thumbEdgeClass={thumbEdgeClass}
+          tooltipStyle={tooltipStyle}
           tooltipLabel={tooltipLabel}
+          trackWidthPx={trackWidthPx}
           oneMillionContextAvailable={capabilityReady && oneMillionAvailable}
           oneMillionContextStatusLabel={oneMillionContextStatusLabel}
           fastModelAvailable={capabilityReady && fastAvailable}

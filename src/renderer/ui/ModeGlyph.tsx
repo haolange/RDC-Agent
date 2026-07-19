@@ -155,7 +155,7 @@ export const ModeGlyph: React.FC<ModeGlyphProps> = ({
   accentColor,
   className,
   size = 16,
-  strokeWidth = 1.85,
+  strokeWidth = 2,
 }) => {
   const modeConfig = getAgentModeConfig(mode) ?? FALLBACK_MODE_CONFIG;
   const resolvedIcon = icon ?? modeConfig.icon;
@@ -164,7 +164,13 @@ export const ModeGlyph: React.FC<ModeGlyphProps> = ({
   return (
     <span
       className={className}
-      style={{ color: resolvedAccent }}
+      style={{
+        color: resolvedAccent,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        lineHeight: 0,
+      }}
       aria-hidden="true"
     >
       <svg

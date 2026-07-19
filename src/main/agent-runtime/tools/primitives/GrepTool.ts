@@ -2,6 +2,12 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { AgentTool } from '../../agent/AgentTool';
 import { getWorkspaceRoot, safeResolvePath, truncateOutput } from './_shared';
+import {
+  GREP_MAX_FILE_BYTES,
+  GREP_MAX_LINE_CHARS,
+  GREP_MAX_OUTPUT_BYTES,
+  GREP_REGEX_TIMEOUT_MS,
+} from './toolLimits';
 
 interface GrepParams {
   pattern: string;
@@ -19,7 +25,6 @@ interface GrepDetails {
 }
 
 const DEFAULT_MAX_MATCHES = 200;
-const MAX_OUTPUT_BYTES = 120 * 1024;
 const DEFAULT_IGNORED_DIRS = new Set([
   'node_modules',
   '.git',
@@ -86,8 +91,8 @@ export const grepTool: AgentTool<GrepParams, GrepDetails> = {
     const rawText = matches.length > 0
       ? matches.join('\n')
       : `(no matches for pattern "${params.pattern}")`;
-    const text = truncateOutput(rawText, MAX_OUTPUT_BYTES);
-    truncated = truncated || Buffer.byteLength(rawText, 'utf8') > MAX_OUTPUT_BYTES;
+    const text = truncateOutput(rawText, GREP_MAX_OUTPUT_BYTES);
+    truncated = truncated || Buffer.byteLength(rawText, 'utf8') > GREP_MAX_OUTPUT_BYTES;
 
     return {
       content: [{ type: 'text', text }],
@@ -152,16 +157,25 @@ async function searchFile(
 ): Promise<void> {
   throwIfAborted(signal);
   if (matches.length >= maxMatches) return;
+  const stat = await fs.stat(absolute).catch(() => null);
+  if (!stat || !stat.isFile() || stat.size > GREP_MAX_FILE_BYTES) return;
   const buffer = await fs.readFile(absolute).catch(() => null);
   if (!buffer || buffer.includes(0)) return;
   const text = buffer.toString('utf8');
   const rel = path.relative(workspaceRoot, absolute).split(path.sep).join('/');
   const lines = text.split(/\r?\n/);
+  const deadline = Date.now() + GREP_REGEX_TIMEOUT_MS;
   for (let index = 0; index < lines.length && matches.length < maxMatches; index += 1) {
+    if (Date.now() > deadline) {
+      throw new Error(`grep pattern timed out after ${GREP_REGEX_TIMEOUT_MS}ms`);
+    }
+    const line = lines[index].length > GREP_MAX_LINE_CHARS
+      ? `${lines[index].slice(0, GREP_MAX_LINE_CHARS)}…`
+      : lines[index];
     regex.lastIndex = 0;
-    if (regex.test(lines[index])) {
+    if (regex.test(line)) {
       matchedFiles.add(rel);
-      matches.push(`${rel}:${index + 1}: ${lines[index]}`);
+      matches.push(`${rel}:${index + 1}: ${line}`);
     }
   }
 }

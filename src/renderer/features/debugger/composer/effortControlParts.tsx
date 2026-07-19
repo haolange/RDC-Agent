@@ -141,93 +141,84 @@ export function EffortFastModeSwitchRow(props: EffortModeSwitchRowProps) {
   );
 }
 
+/**
+ * Reasoning icons share optical center (12,12) in a 24 viewBox.
+ * Density grows with level; stroke stays integer 2 for crisp 16px @ 1.5dpr.
+ */
 export function ReasoningLevelIcon({ level }: { level: ReasoningSelection }) {
   const variant = resolveReasoningIconVariant(level);
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" data-reasoning-icon={variant}>
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      data-reasoning-icon={variant}
+    >
       {variant === 'off' ? (
         <>
-          <circle cx="12" cy="9.5" r="5.1" opacity="0.72" />
-          <path d="M9.2 15.1h5.6" opacity="0.72" />
-          <path d="M9.8 18h4.4" opacity="0.72" />
+          <circle cx="12" cy="12" r="3" opacity="0.55" />
+          <circle cx="12" cy="12" r="8" opacity="0.4" />
         </>
-      ) : null}
+      ) : (
+        <circle cx="12" cy="12" r="3" />
+      )}
 
       {variant === 'minimal' ? (
-        <>
-          <circle cx="12" cy="11" r="3.8" />
-          <path d="M12 14.8v2.8" />
-          <path d="M10.3 18h3.4" />
-        </>
+        <path d="M12 5v3M12 16v3" />
       ) : null}
 
       {variant === 'low' ? (
         <>
-          <circle cx="10.5" cy="11" r="3.7" />
-          <circle cx="17.2" cy="7" r="1.8" />
-          <path d="M13.6 9.1 15.7 7.9" />
-          <path d="M8.7 14.2h3.6" />
-          <path d="M9.4 17h2.2" />
+          <circle cx="12" cy="5" r="2" />
+          <path d="M12 7v2" />
         </>
       ) : null}
 
       {variant === 'medium' ? (
         <>
-          <circle cx="12" cy="12" r="3.2" />
-          <circle cx="6.2" cy="9" r="2.1" />
-          <circle cx="17.8" cy="9" r="2.1" />
-          <path d="M8.1 9.9 9.5 10.8" />
-          <path d="M15.9 9.9 14.5 10.8" />
-          <path d="M9.4 15.4h5.2" />
+          <circle cx="6" cy="8" r="2" />
+          <circle cx="18" cy="8" r="2" />
+          <path d="M8 9 10 11M16 9 14 11" />
         </>
       ) : null}
 
       {variant === 'high' ? (
         <>
-          <circle cx="12" cy="12" r="3" />
-          <circle cx="5.5" cy="7" r="1.9" />
-          <circle cx="18.5" cy="7" r="1.9" />
-          <circle cx="6.5" cy="18" r="1.9" />
-          <circle cx="18" cy="17" r="1.7" />
-          <path d="M7.1 8.2 9.5 10.1" />
-          <path d="M16.9 8.2 14.5 10.1" />
-          <path d="M8.1 16.5 10 14.4" />
-          <path d="M16.4 15.6 14.4 14.1" />
+          <circle cx="6" cy="7" r="2" />
+          <circle cx="18" cy="7" r="2" />
+          <circle cx="7" cy="17" r="2" />
+          <circle cx="17" cy="17" r="2" />
+          <path d="M8 9 10 11M16 9 14 11M9 15 10 14M15 15 14 14" />
         </>
       ) : null}
 
       {variant === 'xhigh' ? (
         <>
-          <path d="M6.2 5.7a8.7 8.7 0 0 1 11.6 0" />
-          <circle cx="12" cy="12" r="3" />
-          <circle cx="5.5" cy="8" r="1.8" />
-          <circle cx="18.5" cy="8" r="1.8" />
-          <circle cx="6.5" cy="17.2" r="1.8" />
-          <circle cx="17.5" cy="17.2" r="1.8" />
-          <path d="M7.2 8.9 9.4 10.4" />
-          <path d="M16.8 8.9 14.6 10.4" />
-          <path d="M8.1 15.8 9.8 14.3" />
-          <path d="M15.9 15.8 14.2 14.3" />
+          <path d="M7 5a8 8 0 0 1 10 0" />
+          <circle cx="6" cy="8" r="2" />
+          <circle cx="18" cy="8" r="2" />
+          <circle cx="7" cy="17" r="2" />
+          <circle cx="17" cy="17" r="2" />
+          <path d="M8 9 10 11M16 9 14 11M9 15 10 14M15 15 14 14" />
         </>
       ) : null}
 
       {variant === 'max' ? (
         <>
-          <circle cx="12" cy="12" r="8.2" />
-          <circle cx="12" cy="12" r="2.7" />
-          <circle cx="6.7" cy="7.4" r="1.7" />
-          <circle cx="17.3" cy="7.4" r="1.7" />
-          <circle cx="6.9" cy="16.8" r="1.7" />
-          <circle cx="17.1" cy="16.8" r="1.7" />
-          <path d="M8.1 8.6 9.9 10.2" />
-          <path d="M15.9 8.6 14.1 10.2" />
-          <path d="M8.4 15.6 9.8 13.9" />
-          <path d="M15.6 15.6 14.2 13.9" />
-          <path d="M8.6 7.4h6.8" />
-          <path d="M8.7 16.8h6.6" />
+          <circle cx="12" cy="12" r="8" />
+          <circle cx="6" cy="7" r="2" />
+          <circle cx="18" cy="7" r="2" />
+          <circle cx="7" cy="17" r="2" />
+          <circle cx="17" cy="17" r="2" />
+          <path d="M8 9 10 11M16 9 14 11M9 15 10 14M15 15 14 14" />
         </>
       ) : null}
-
     </svg>
   );
 }

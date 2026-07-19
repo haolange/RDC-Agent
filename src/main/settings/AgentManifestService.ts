@@ -132,6 +132,9 @@ const parseAgentMarkdownContent = (
     maxTurns: typeof frontmatter['max-turns'] === 'number' && frontmatter['max-turns'] > 0
       ? frontmatter['max-turns']
       : undefined,
+    harness: frontmatter.harness === 'lean' || frontmatter.harness === 'standard'
+      ? frontmatter.harness
+      : undefined,
     updatedAt,
   };
 };
@@ -157,6 +160,7 @@ const serializeAgentMarkdown = (definition: AgentManifestDraft): string => {
     'user-invocable': definition.userInvocable,
     enabled: definition.enabled,
     ...(definition.maxTurns ? { 'max-turns': definition.maxTurns } : {}),
+    ...(definition.harness ? { harness: definition.harness } : {}),
     tools: definition.tools,
     skills: definition.skills,
     'mcp-servers': definition.mcpServers,
@@ -183,13 +187,15 @@ const createSeedDefinition = (
   const route = routes.find((entry) => entry.agentId === agentId);
   const model = canonicalAgentModelId(route?.providerId ?? '', route?.modelId ?? '');
   const name = AGENT_DISPLAY_NAMES[agentId];
+  // 窄核心 seed：core tier 常驻注入；extended token 只授予权限，
+  // schema 经 tool_search 发现或直接调用激活后再注入。
   const tools = agentId === 'ask'
-    ? ['read', 'search', 'web', 'askUser', 'task', 'tool_search']
+    ? ['read', 'search', 'web', 'askUser', 'tool_search']
     : agentId === 'plan'
-      ? ['read', 'search', 'web', 'askUser', 'agent', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search']
+      ? ['read', 'search', 'web', 'askUser', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search']
       : agentId === 'edit'
-        ? ['read', 'search', 'web', 'bash', 'write', 'edit', 'git', 'askUser', 'agent', 'task', 'memory', 'skill', 'mcp', 'subagent', 'tool_search']
-        : ['read', 'search', 'web', 'bash', 'askUser', 'agent', 'task', 'memory', 'rdxContext', 'subagent', 'tool_search'];
+        ? ['read', 'search', 'web', 'bash', 'write', 'edit', 'git', 'file-manage', 'askUser', 'handoff', 'task', 'memory', 'memory-write', 'skill', 'mcp', 'subagent', 'tool_search']
+        : ['read', 'search', 'web', 'bash', 'askUser', 'handoff', 'task', 'memory', 'rdxContext', 'subagent', 'tool_search'];
   return {
     id: agentId,
     fileName: fileNameForId(agentId),

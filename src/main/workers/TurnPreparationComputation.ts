@@ -1,6 +1,10 @@
 import type { AgentMessage, Message } from '../agent-runtime/core/types';
 import type { DerivedContextView } from '@shared/types/semanticContext';
 import { ContextManager } from '../agent-runtime/agent/ContextManager';
+import { TokenizerService } from '../agent-runtime/core/TokenizerService';
+
+// 进程内共享实例：编码器缓存跨调用复用。
+const tokenizerService = new TokenizerService();
 
 export interface TurnPreparationComputationInput {
   messages: AgentMessage[];
@@ -30,6 +34,7 @@ export async function computeTurnPreparation(
     contextTokenLimit: input.messageBudget,
     toolResultBudget: 200 * 1024,
     keepRecentToolResults: 3,
+    tokenizer: tokenizerService,
   });
   const beforeConversationTokens = contextManager.estimateTokens(input.messages)
     + input.imageTokenAdjustment;

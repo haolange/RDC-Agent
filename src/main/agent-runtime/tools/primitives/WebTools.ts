@@ -2,6 +2,7 @@ import { lookup } from 'dns/promises';
 import * as net from 'net';
 import type { AgentTool } from '../../agent/AgentTool';
 import { truncateOutput } from './_shared';
+import { WEB_MAX_REDIRECTS, WEB_MAX_RESPONSE_BYTES } from './toolLimits';
 
 interface WebFetchParams {
   url: string;
@@ -56,7 +57,7 @@ interface SearchProvider {
   parse: (html: string) => WebSearchResult[];
 }
 
-const MAX_RESPONSE_BYTES = 160 * 1024;
+const MAX_RESPONSE_BYTES = WEB_MAX_RESPONSE_BYTES;
 const REQUEST_TIMEOUT_MS = 12_000;
 const SEARCH_RESULT_LIMIT = 6;
 
@@ -208,39 +209,94 @@ async function searchPublicWeb(query: string, signal?: AbortSignal): Promise<{
 }
 
 async function requestPublicText(rawUrl: string, signal?: AbortSignal, accept = '*/*'): Promise<PublicTextResponse> {
-  const url = await assertPublicHttpUrl(rawUrl);
+  let currentUrl = await assertPublicHttpUrl(rawUrl);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(new Error(`Timed out after ${REQUEST_TIMEOUT_MS}ms`)), REQUEST_TIMEOUT_MS);
   const abort = (): void => controller.abort(signal?.reason ?? new Error('Request aborted'));
   signal?.addEventListener('abort', abort, { once: true });
   try {
-    const response = await fetch(url, {
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        Accept: accept,
-        'User-Agent': 'RDC-Agent/AskReadonlyWebTool',
-      },
-    });
-    const finalUrl = await assertPublicHttpUrl(response.url);
-    const arrayBuffer = await response.arrayBuffer();
-    const bytes = arrayBuffer.byteLength;
-    const limited = arrayBuffer.slice(0, MAX_RESPONSE_BYTES);
-    const text = new TextDecoder('utf-8', { fatal: false }).decode(limited);
-    return {
-      finalUrl,
-      status: response.status,
-      statusText: response.statusText,
-      bytes,
-      truncated: bytes > MAX_RESPONSE_BYTES,
-      text,
-    };
+    for (let hop = 0; hop <= WEB_MAX_REDIRECTS; hop += 1) {
+      const response = await fetch(currentUrl, {
+        redirect: 'manual',
+        signal: controller.signal,
+        headers: {
+          Accept: accept,
+          'User-Agent': 'RDC-Agent/AskReadonlyWebTool',
+        },
+      });
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location');
+        if (!location) {
+          throw new Error(`Redirect missing Location header from ${currentUrl}`);
+        }
+        const next = new URL(location, currentUrl).toString();
+        currentUrl = await assertPublicHttpUrl(next);
+        continue;
+      }
+      const { bytes, text, truncated } = await readResponseBodyLimited(response, MAX_RESPONSE_BYTES);
+      return {
+        finalUrl: currentUrl,
+        status: response.status,
+        statusText: response.statusText,
+        bytes,
+        truncated,
+        text,
+      };
+    }
+    throw new Error(`Too many redirects (>${WEB_MAX_REDIRECTS}) starting from ${rawUrl}`);
   } catch (error) {
-    throw createNetworkError(url, error);
+    throw createNetworkError(currentUrl, error);
   } finally {
     clearTimeout(timeoutId);
     signal?.removeEventListener('abort', abort);
   }
+}
+
+async function readResponseBodyLimited(
+  response: Response,
+  maxBytes: number,
+): Promise<{ bytes: number; text: string; truncated: boolean }> {
+  if (!response.body) {
+    return { bytes: 0, text: '', truncated: false };
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  let truncated = false;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    if (total >= maxBytes) {
+      truncated = true;
+      break;
+    }
+    const remaining = maxBytes - total;
+    if (value.byteLength > remaining) {
+      chunks.push(value.subarray(0, remaining));
+      total += remaining;
+      truncated = true;
+      break;
+    }
+    chunks.push(value);
+    total += value.byteLength;
+  }
+  try {
+    await reader.cancel();
+  } catch {
+    /* ignore */
+  }
+  const merged = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    merged.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return {
+    bytes: total,
+    truncated,
+    text: new TextDecoder('utf-8', { fatal: false }).decode(merged),
+  };
 }
 
 async function assertPublicHttpUrl(rawUrl: string): Promise<string> {
@@ -260,7 +316,17 @@ async function assertPublicHttpUrl(rawUrl: string): Promise<string> {
   if (isPrivateIp(hostname)) {
     throw new Error(`Blocked private network address: ${hostname}`);
   }
-  const addresses = await lookup(hostname, { all: true }).catch(() => []);
+  let addresses: Array<{ address: string }>;
+  try {
+    addresses = await lookup(hostname, { all: true });
+  } catch (error) {
+    throw new Error(
+      `DNS lookup failed for ${hostname}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+  if (addresses.length === 0) {
+    throw new Error(`DNS lookup returned no addresses for ${hostname}`);
+  }
   for (const address of addresses) {
     if (isPrivateIp(address.address)) {
       throw new Error(`Blocked private network address: ${address.address}`);
@@ -297,30 +363,49 @@ function safeHost(rawUrl: string): string {
 function isPrivateIp(value: string): boolean {
   const ipVersion = net.isIP(value);
   if (ipVersion === 4) {
-    const parts = value.split('.').map((part) => Number(part));
-    if (parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) return true;
-    const [a, b] = parts;
-    return (
-      a === 0
-      || a === 10
-      || a === 127
-      || (a === 169 && b === 254)
-      || (a === 172 && b >= 16 && b <= 31)
-      || (a === 192 && b === 168)
-      || a >= 224
-    );
+    return isPrivateIpv4(value);
   }
   if (ipVersion === 6) {
     const normalized = value.toLowerCase();
-    return (
+    if (
       normalized === '::1'
       || normalized === '::'
       || normalized.startsWith('fc')
       || normalized.startsWith('fd')
       || normalized.startsWith('fe80:')
-    );
+    ) {
+      return true;
+    }
+    // IPv4-mapped IPv6 (::ffff:127.0.0.1)
+    const mapped = normalized.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (mapped) {
+      return isPrivateIpv4(mapped[1]);
+    }
+    const mappedHex = normalized.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+    if (mappedHex) {
+      const hi = Number.parseInt(mappedHex[1], 16);
+      const lo = Number.parseInt(mappedHex[2], 16);
+      const ipv4 = `${(hi >> 8) & 0xff}.${hi & 0xff}.${(lo >> 8) & 0xff}.${lo & 0xff}`;
+      return isPrivateIpv4(ipv4);
+    }
+    return false;
   }
   return false;
+}
+
+function isPrivateIpv4(value: string): boolean {
+  const parts = value.split('.').map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => !Number.isFinite(part))) return true;
+  const [a, b] = parts;
+  return (
+    a === 0
+    || a === 10
+    || a === 127
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || a >= 224
+  );
 }
 
 export function parseDuckDuckGoResults(html: string): WebSearchResult[] {

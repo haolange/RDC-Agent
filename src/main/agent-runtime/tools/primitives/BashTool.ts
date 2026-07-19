@@ -3,15 +3,19 @@
  *
  * - 跨平台：Windows 走 cmd.exe /d /s /c，其它平台走 /bin/sh -c。
  * - 输出捕获 stdout + stderr，并合并展示。
- * - 默认超时 120s，可通过 `timeout` 参数覆盖（毫秒）。
- * - 超过 50KB 自动截断。
+ * - 默认超时 120s，timeout 有硬顶；输出按字节硬截断。
  * - 监听 AbortSignal，触发时 SIGTERM 终止子进程。
+ * - run_in_background 未闭环前 fail-closed 拒绝。
  */
 
 import { spawn } from 'child_process';
 import type { AgentTool, AgentToolResult } from '../../agent/AgentTool';
-import { getBackgroundTaskRunner } from '../../scheduler';
 import { getWorkspaceRoot, truncateOutput } from './_shared';
+import {
+  BASH_DEFAULT_TIMEOUT_MS,
+  BASH_MAX_OUTPUT_BYTES,
+  BASH_MAX_TIMEOUT_MS,
+} from './toolLimits';
 
 interface BashParams {
   command: string;
@@ -30,14 +34,11 @@ interface BashDetails {
   bgTaskId?: string;
 }
 
-const DEFAULT_TIMEOUT_MS = 120_000;
-const MAX_OUTPUT_BYTES = 50 * 1024;
-
 export const bashTool: AgentTool<BashParams, BashDetails> = {
   name: 'bash',
   label: '终端命令',
   description:
-    'Run a shell command in the workspace directory. Use for file operations, git, build tools, etc. Output is captured (stdout+stderr) and truncated at 50KB.',
+    'Run a shell command in the workspace directory. Use for file operations, git, build tools, etc. Output is captured (stdout+stderr) and truncated at 50KB. Background execution is currently disabled.',
   parameters: {
     type: 'object',
     properties: {
@@ -47,12 +48,12 @@ export const bashTool: AgentTool<BashParams, BashDetails> = {
       },
       timeout: {
         type: 'number',
-        description: 'Timeout in milliseconds (default: 120000)',
+        description: `Timeout in milliseconds (default: ${BASH_DEFAULT_TIMEOUT_MS}, max: ${BASH_MAX_TIMEOUT_MS})`,
       },
       run_in_background: {
         type: 'boolean',
         description:
-          'Run the command in the background without waiting for completion',
+          'Background execution is not available; requests with true are rejected.',
       },
     },
     required: ['command'],
@@ -62,30 +63,20 @@ export const bashTool: AgentTool<BashParams, BashDetails> = {
 
   async execute(_toolCallId, params, signal, onUpdate, context) {
     const command = params.command;
-    const timeoutMs = params.timeout ?? DEFAULT_TIMEOUT_MS;
+    const timeoutMs = Math.max(
+      1,
+      Math.min(
+        BASH_MAX_TIMEOUT_MS,
+        Math.floor(Number.isFinite(params.timeout) ? Number(params.timeout) : BASH_DEFAULT_TIMEOUT_MS),
+      ),
+    );
     const cwd = getWorkspaceRoot(context);
     const startedAt = Date.now();
 
-    // 后台模式：交给 BackgroundTaskRunner，立即返回 bgTaskId。
     if (params.run_in_background === true) {
-      const runner = getBackgroundTaskRunner();
-      const bgTaskId = runner.startBackground(command, cwd, signal);
-      const text =
-        `[Background task ${bgTaskId} started]\n` +
-        `Command: ${command}\n` +
-        `Result will be delivered via background task notification when complete.`;
-      return {
-        content: [{ type: 'text', text }],
-        details: {
-          command,
-          exitCode: null,
-          signal: null,
-          durationMs: Date.now() - startedAt,
-          truncated: false,
-          cwd,
-          bgTaskId,
-        },
-      };
+      throw new Error(
+        'bash run_in_background is disabled until background task results are wired into the agent loop.',
+      );
     }
 
     const isWindows = process.platform === 'win32';
@@ -97,6 +88,7 @@ export const bashTool: AgentTool<BashParams, BashDetails> = {
       let stderr = '';
       let timedOut = false;
       let aborted = false;
+      let outputCapped = false;
 
       const child = spawn(shell, shellArgs, {
         cwd,
@@ -129,20 +121,30 @@ export const bashTool: AgentTool<BashParams, BashDetails> = {
         }
       }
 
+      const appendBounded = (current: string, chunk: Buffer | string): string => {
+        if (outputCapped) return current;
+        const next = current + (typeof chunk === 'string' ? chunk : chunk.toString('utf8'));
+        if (Buffer.byteLength(next, 'utf8') <= BASH_MAX_OUTPUT_BYTES * 2) {
+          return next;
+        }
+        outputCapped = true;
+        return truncateOutput(next, BASH_MAX_OUTPUT_BYTES * 2);
+      };
+
       const emitUpdate = (): void => {
         if (!onUpdate) return;
         const text = combineOutput(stdout, stderr);
         onUpdate({
-          content: [{ type: 'text', text: truncateOutput(text, MAX_OUTPUT_BYTES) }],
+          content: [{ type: 'text', text: truncateOutput(text, BASH_MAX_OUTPUT_BYTES) }],
         });
       };
 
       child.stdout?.on('data', (chunk: Buffer | string) => {
-        stdout += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+        stdout = appendBounded(stdout, chunk);
         emitUpdate();
       });
       child.stderr?.on('data', (chunk: Buffer | string) => {
-        stderr += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
+        stderr = appendBounded(stderr, chunk);
         emitUpdate();
       });
 
@@ -150,10 +152,10 @@ export const bashTool: AgentTool<BashParams, BashDetails> = {
         clearTimeout(timer);
         if (signal) signal.removeEventListener('abort', onAbort);
         const text = combineOutput(stdout, stderr) + `\n[spawn error] ${err.message}`;
-        const truncated = Buffer.byteLength(text, 'utf8') > MAX_OUTPUT_BYTES;
+        const truncated = Buffer.byteLength(text, 'utf8') > BASH_MAX_OUTPUT_BYTES;
         resolve({
           content: [
-            { type: 'text', text: truncateOutput(text, MAX_OUTPUT_BYTES) },
+            { type: 'text', text: truncateOutput(text, BASH_MAX_OUTPUT_BYTES) },
           ],
           details: {
             command,
@@ -176,10 +178,10 @@ export const bashTool: AgentTool<BashParams, BashDetails> = {
         if (aborted) {
           combined += `\n[aborted]`;
         }
-        const truncated = Buffer.byteLength(combined, 'utf8') > MAX_OUTPUT_BYTES;
+        const truncated = Buffer.byteLength(combined, 'utf8') > BASH_MAX_OUTPUT_BYTES || outputCapped;
         resolve({
           content: [
-            { type: 'text', text: truncateOutput(combined, MAX_OUTPUT_BYTES) },
+            { type: 'text', text: truncateOutput(combined, BASH_MAX_OUTPUT_BYTES) },
           ],
           details: {
             command,

@@ -172,6 +172,7 @@ export type ContextUsageBreakdownId =
   | 'system_tools'
   | 'mcp_tools'
   | 'mcp_tools_deferred'
+  | 'builtin_tools_deferred'
   | 'subagent_definitions'
   | 'summarized_conversation'
   | 'conversation'

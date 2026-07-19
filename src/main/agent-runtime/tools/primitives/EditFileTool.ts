@@ -3,12 +3,13 @@
  *
  * - 必须精确匹配 old_text；
  * - old_text 在文件中必须唯一出现（保护多处误改）；
- * - 写回后保留原换行风格（按 \r\n / \n 自动检测）。
+ * - 二进制 / 超大文件 fail-closed。
  */
 
 import * as fs from 'fs/promises';
 import type { AgentTool } from '../../agent/AgentTool';
-import { safeResolvePath } from './_shared';
+import { assertTextReadable, safeResolvePath } from './_shared';
+import { TEXT_FILE_MAX_BYTES } from './toolLimits';
 
 interface EditFileParams {
   path: string;
@@ -29,7 +30,7 @@ export const editFileTool: AgentTool<EditFileParams, EditFileDetails> = {
   name: 'edit_file',
   label: '编辑文件',
   description:
-    'Edit a file by replacing old_text with new_text. The old_text must match exactly and appear exactly once in the file.',
+    'Edit a text file by replacing old_text with new_text. The old_text must match exactly and appear exactly once in the file. Binary files are rejected.',
   parameters: {
     type: 'object',
     properties: {
@@ -64,6 +65,8 @@ export const editFileTool: AgentTool<EditFileParams, EditFileDetails> = {
     }
 
     const absolute = safeResolvePath(params.path, undefined, context);
+    assertTextReadable(absolute, { maxBytes: TEXT_FILE_MAX_BYTES });
+
     const original = await fs.readFile(absolute, 'utf8');
     if (signal?.aborted) {
       throw new Error('Aborted');
@@ -88,11 +91,14 @@ export const editFileTool: AgentTool<EditFileParams, EditFileDetails> = {
 
     await fs.writeFile(absolute, updated, 'utf8');
 
+    const oldBytes = Buffer.byteLength(params.old_text, 'utf8');
+    const newBytes = Buffer.byteLength(params.new_text, 'utf8');
+
     return {
       content: [
         {
           type: 'text',
-          text: `Edited ${absolute}: replaced 1 occurrence (${params.old_text.length} → ${params.new_text.length} chars).`,
+          text: `Edited ${absolute}: replaced 1 occurrence (${oldBytes} → ${newBytes} bytes).`,
         },
       ],
       details: {
@@ -100,7 +106,7 @@ export const editFileTool: AgentTool<EditFileParams, EditFileDetails> = {
         oldLength: params.old_text.length,
         newLength: params.new_text.length,
         occurrence: 1,
-        delta: params.new_text.length - params.old_text.length,
+        delta: newBytes - oldBytes,
       },
     };
   },

@@ -3,7 +3,14 @@
  */
 import { describe, it, expect } from 'vitest';
 import { ContextManager, estimateImageTokensFromBase64Length } from './ContextManager';
-import type { AgentMessage, ToolResultMessage, AssistantMessage, UserMessage } from '../core/types';
+import { TokenizerService } from '../core/TokenizerService';
+import type {
+  AgentMessage,
+  AssistantMessage,
+  ProviderContinuationArtifact,
+  ToolResultMessage,
+  UserMessage,
+} from '../core/types';
 
 function user(text: string): UserMessage {
   return { role: 'user', content: text, timestamp: Date.now() };
@@ -102,6 +109,82 @@ describe('ContextManager', () => {
     });
   });
 
+  describe('estimateTokens — 注入真实 tokenizer', () => {
+    const tokenizer = new TokenizerService();
+
+    function tokenizedManager(): ContextManager {
+      return createContextManager({ tokenizer, modelId: 'gpt-test' });
+    }
+
+    it('注入 tokenizer 后使用真实计数而非字符估算', () => {
+      const cm = tokenizedManager();
+      const text = 'The quick brown fox jumps over the lazy dog.';
+      const expected = tokenizer.countMessagesTokens(
+        [{ role: 'user', content: text }],
+        'gpt-test',
+      );
+      expect(cm.estimateTokens([user(text)])).toBe(expected);
+      // 真实计数含消息格式开销，与纯字符估算（len/4）不同
+      expect(expected).not.toBe(Math.ceil(text.length / 4));
+    });
+
+    it('toolCall arguments 计入 token 数', () => {
+      const cm = tokenizedManager();
+      const base: AssistantMessage = assistant('run');
+      const withCall: AssistantMessage = {
+        ...base,
+        content: [
+          ...base.content,
+          {
+            type: 'toolCall',
+            id: 'tc1',
+            name: 'grep',
+            arguments: { pattern: 'a'.repeat(400), path: '/repo/src' },
+          },
+        ],
+      };
+      expect(cm.estimateTokens([withCall])).toBeGreaterThan(cm.estimateTokens([base]) + 50);
+    });
+
+    it('thinking continuation payload 按序列化字节计量', () => {
+      const cm = tokenizedManager();
+      const base: AssistantMessage = assistant('done');
+      const withContinuation: AssistantMessage = {
+        ...base,
+        content: [
+          ...base.content,
+          {
+            type: 'thinking',
+            text: '',
+            kind: 'opaque',
+            source: 'unknown',
+            visibility: 'hidden',
+            continuation: {
+              type: 'test.opaque',
+              format: 'opaque',
+              signature: 'c'.repeat(4000),
+            } as unknown as ProviderContinuationArtifact,
+          },
+        ],
+      };
+      expect(cm.estimateTokens([withContinuation]))
+        .toBeGreaterThan(cm.estimateTokens([base]) + 900);
+    });
+
+    it('图像块经 tokenizer 路径仍按解码字节估算', () => {
+      const cm = tokenizedManager();
+      const base64Length = 4 * 1024 * 1024;
+      const tokens = cm.estimateTokens([{
+        role: 'user',
+        content: [{ type: 'image', data: 'a'.repeat(base64Length), mimeType: 'image/png' }],
+        timestamp: Date.now(),
+      }]);
+      // 3072 图像 token + 少量消息格式开销
+      expect(tokens).toBeGreaterThanOrEqual(3072);
+      expect(tokens).toBeLessThan(3072 + 16);
+    });
+  });
+
   describe('compress — 工具结果预算', () => {
     it('工具结果总大小在预算内时不应修改', async () => {
       const cm = createContextManager({ toolResultBudget: 1000 });
@@ -191,6 +274,31 @@ describe('ContextManager', () => {
         type: 'text',
         text: 'output2',
       });
+    });
+
+    it('压缩后的错误工具结果保留 isError 与错误摘录', async () => {
+      const cm = createContextManager({
+        keepRecentToolResults: 1,
+        maxMessages: 100,
+        toolResultBudget: 100000,
+        contextTokenLimit: 1,
+      });
+      const failed: ToolResultMessage = {
+        ...toolResult('tc1', 'bash', 'Command failed: exit code 2 — permission denied'),
+        isError: true,
+      };
+      const msgs: AgentMessage[] = [
+        user('hello'),
+        failed,
+        assistant('ok'),
+        toolResult('tc2', 'bash', 'output2'),
+      ];
+      const result = await cm.compress(msgs);
+      const firstTR = result.messages[1] as ToolResultMessage;
+      expect(firstTR.isError).toBe(true);
+      const text = (firstTR.content[0] as { text: string }).text;
+      expect(text).toContain('[Earlier tool error compacted:');
+      expect(text).toContain('permission denied');
     });
   });
 

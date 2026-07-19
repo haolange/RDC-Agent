@@ -40,4 +40,19 @@ describe('BashTool', () => {
       truncated: false,
     });
   });
+
+  it('rejects run_in_background until background delivery is wired', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-bash-bg-'));
+    roots.push(root);
+    const context: ToolExecutionContext = {
+      workspaceRoot: root,
+      projectRootPath: root,
+      projectId: null,
+      sessionId: null,
+    };
+
+    await expect(
+      bashTool.execute('b2', { command: 'echo hi', run_in_background: true }, undefined, undefined, context),
+    ).rejects.toThrow(/run_in_background is disabled/i);
+  });
 });

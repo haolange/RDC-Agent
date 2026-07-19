@@ -4,6 +4,7 @@ import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types
 import type { AgentTool } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
 import { settingsService } from '../../settings/SettingsService';
+import { matchBashHardDeny } from '../tools/primitives/bashHardDeny';
 
 export type AgentPermissionDecisionAction = 'allow' | 'ask_user' | 'auto_review' | 'deny';
 
@@ -22,7 +23,14 @@ export interface AgentPermissionDecisionInput {
 }
 
 const READ_ONLY_FILE_TOOLS = new Set(['read_file', 'glob', 'grep']);
-const MUTATION_TOOLS = new Set(['write_file', 'edit_file']);
+const MUTATION_TOOLS = new Set([
+  'write_file',
+  'edit_file',
+  'copy_file',
+  'move_file',
+  'delete_file',
+  'notebook_edit',
+]);
 const NETWORK_TOOL_NAMES = new Set(['web_fetch', 'web_search']);
 const DEFAULT_ROUTINE_COMMAND_PREFIXES = [
   'dir',
@@ -118,9 +126,24 @@ function inferPathTargetFromGlobPattern(pattern: string): string {
 }
 
 function extractPathTargets(toolName: string, toolCall: ToolCall): string[] {
-  if (toolName === 'read_file' || toolName === 'write_file' || toolName === 'edit_file') {
+  if (
+    toolName === 'read_file'
+    || toolName === 'write_file'
+    || toolName === 'edit_file'
+    || toolName === 'delete_file'
+  ) {
     const filePath = extractStringArg(toolCall, 'path');
     return filePath ? [filePath] : [];
+  }
+  if (toolName === 'notebook_edit') {
+    const notebookPath = extractStringArg(toolCall, 'notebook_path');
+    return notebookPath ? [notebookPath] : [];
+  }
+  if (toolName === 'copy_file' || toolName === 'move_file') {
+    return [
+      extractStringArg(toolCall, 'source'),
+      extractStringArg(toolCall, 'destination'),
+    ].filter(Boolean);
   }
   if (toolName === 'glob' || toolName === 'grep') {
     const cwd = extractStringArg(toolCall, 'cwd') || extractStringArg(toolCall, 'path');
@@ -196,6 +219,15 @@ export class AgentPermissionPolicyService {
       || settings.paths.userRdxRoot
       || process.cwd(),
     );
+
+    // Catastrophic bash patterns are hard-denied in every mode, including full-access.
+    if (toolName === 'bash') {
+      const command = extractStringArg(input.toolCall, 'command');
+      const hardDeny = matchBashHardDeny(command);
+      if (hardDeny) {
+        return denied(`Shell command hard-denied (matched "${hardDeny}").`, 'high');
+      }
+    }
 
     if (mode === 'full-access') {
       return { action: 'allow', risk: 'low', temporaryPathRoots: ['*'] };

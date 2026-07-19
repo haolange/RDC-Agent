@@ -138,6 +138,20 @@ assert(anthropicSource.includes('redacted_thinking'), 'Anthropic provider must p
 assert(anthropicSource.includes('toAnthropicThinkingReplayBlock'), 'Anthropic provider must replay provider thinking blocks as native blocks.');
 assert(contextManagerSource.includes('block.continuation') && contextManagerSource.includes('providerArtifactChars'), 'Context budget must count opaque continuation payloads without promoting them to readable thinking.');
 
+// Continuation 持久化回放契约（D1/D2）：
+// 1) journal 落盘不得升格为可读 thinking（text 永远剥离）；
+// 2) 跨身份必经 ReplayPolicy 决策（drop / replay）；
+// 3) retention 上限必须生效。
+const journalSource = fs.readFileSync('src/main/conversation/SessionContextJournal.ts', 'utf8');
+const replayPolicySource = fs.readFileSync('src/main/agent-runtime/reasoning/ContinuationReplayPolicy.ts', 'utf8');
+assert(journalSource.includes('text: undefined'), 'Journal persistence must strip readable thinking text; artifacts must never be promoted to display copy.');
+assert(journalSource.includes('sanitizeContinuationForJournal'), 'Journal persistence must go through the cross-turn-scope continuation sanitizer.');
+assert(!journalSource.includes('sanitizeReadableContinuation'), 'Legacy readable-only continuation persistence must remain removed.');
+assert(journalSource.includes('decideContinuationReplay'), 'Journal materialization must route every artifact through ContinuationReplayPolicy.');
+assert(/CONTINUATION_RETENTION_TURNS\s*=\s*\d+/.test(journalSource), 'Journal must define a bounded CONTINUATION_RETENTION_TURNS constant.');
+assert(journalSource.includes("'retention-expired'"), 'Artifacts older than the retention window must drop with a retention-expired decision.');
+assert(replayPolicySource.includes("'retention-expired'"), 'ContinuationReplayReason must include retention-expired.');
+
 
 const resolverSource = fs.readFileSync('src/main/agent-runtime/capabilities/RouteCapabilityResolver.ts', 'utf8');
 const builderSource = fs.readFileSync('src/main/agent-runtime/providers/internal/AssistantStreamBuilder.ts', 'utf8');

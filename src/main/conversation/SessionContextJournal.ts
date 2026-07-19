@@ -51,10 +51,17 @@ export interface SessionContextMaterialization {
   compactedTurnCount: number;
 }
 
+/**
+ * Continuation 制品回放的 turn 数上限：只回放最近 N 个可见 turn 内的制品，
+ * 更旧的落盘保留但不回放（防连续长会话 token bomb）。
+ */
+export const CONTINUATION_RETENTION_TURNS = 8;
+
 export const filterSessionContextMessageArtifacts = (
   message: Message,
   requestPlan: RequestPlan,
   messageIndex = 0,
+  withinRetention = true,
 ): { message: Message; filtered: number; replayed: number; decisions: SessionContextArtifactDecision[] } => {
   if (message.role !== 'assistant') return { message, filtered: 0, replayed: 0, decisions: [] };
   let filtered = 0;
@@ -65,7 +72,9 @@ export const filterSessionContextMessageArtifacts = (
       blocks.push(block);
       return blocks;
     }
-    const decision = decideContinuationReplay(block.continuation, requestPlan, { sameToolLoop: false });
+    const decision = withinRetention
+      ? decideContinuationReplay(block.continuation, requestPlan, { sameToolLoop: false })
+      : { action: 'drop' as const, reason: 'retention-expired' as const };
     decisions.push({
       messageIndex,
       contentIndex,
@@ -101,7 +110,7 @@ export const canonicalizeTerminalContextMessages = (messages: Message[]): Messag
       if (block.type === 'toolCall') {
         if (completedToolCalls.has((block as ToolCall).id)) blocks.push(block);
       } else if (block.type === 'thinking') {
-        const continuation = sanitizeReadableContinuation(block.continuation);
+        const continuation = sanitizeContinuationForJournal(block.continuation);
         if (continuation) blocks.push({ ...block, text: undefined, continuation });
       } else blocks.push(block);
       return blocks;
@@ -168,11 +177,16 @@ export class SessionContextJournal {
     let filteredArtifactCount = 0;
     let replayedArtifactCount = 0;
     const artifactDecisions: SessionContextArtifactDecision[] = [];
+    // Retention 上限：只有最近 N 个可见 turn 的制品才进入回放决策，
+    // 更旧的制品留在 journal 但按 retention-expired 丢弃。
+    const retentionStartIndex = Math.max(0, visibleTurnIds.length - CONTINUATION_RETENTION_TURNS);
+    const retainedForReplay = new Set(visibleTurnIds.slice(retentionStartIndex));
     const messages = materializedTurnIds.flatMap((turnId) => {
       const entry = entryByTurn.get(turnId);
       if (!entry) return [];
+      const withinRetention = retainedForReplay.has(turnId);
       return entry.messages.map((message, messageIndex) => {
-        const filtered = filterSessionContextMessageArtifacts(message, requestPlan, messageIndex);
+        const filtered = filterSessionContextMessageArtifacts(message, requestPlan, messageIndex, withinRetention);
         filteredArtifactCount += filtered.filtered;
         replayedArtifactCount += filtered.replayed;
         artifactDecisions.push(...filtered.decisions);
@@ -254,30 +268,22 @@ export class SessionContextJournal {
   }
 }
 
-function sanitizeReadableContinuation(
+/**
+ * 终态落盘的 continuation 制品筛选：只有跨 turn scope
+ * （`all-assistant-turns` / `provider-managed`）的制品才值得持久化；
+ * `tool-call-turn` / `none` / `unknown` 永远不会跨 turn 回放，直接丢弃。
+ *
+ * 制品必须整体 verbatim 落盘（含 opaque signature / encrypted / thoughtSignature
+ * / redacted / opaqueState / raw payload）：`integrityHash` 覆盖全部字段与
+ * origin ExecutionIdentity，任何裁剪都会让回放时的完整性校验 fail-closed。
+ * 身份是否匹配由 materialize 时的 `ContinuationReplayPolicy` 决策，不在落盘时预判。
+ */
+function sanitizeContinuationForJournal(
   artifact: ProviderContinuationArtifact | undefined,
 ): ProviderContinuationArtifact | undefined {
-  if (
-    !artifact
-    || artifact.carrier !== 'reasoning-content'
-    || artifact.scope !== 'all-assistant-turns'
-    || !artifact.reasoningContent
-  ) return undefined;
-  return {
-    type: artifact.type,
-    carrier: artifact.carrier,
-    format: artifact.format,
-    version: artifact.version,
-    compatibilityGroup: artifact.compatibilityGroup,
-    continuationPolicy: artifact.continuationPolicy,
-    requirement: artifact.requirement,
-    scope: artifact.scope,
-    mutationPolicy: artifact.mutationPolicy,
-    originFingerprint: artifact.originFingerprint,
-    integrityHash: artifact.integrityHash,
-    origin: { ...artifact.origin, bindingIds: [...artifact.origin.bindingIds] },
-    reasoningContent: artifact.reasoningContent,
-  };
+  if (!artifact) return undefined;
+  if (artifact.scope !== 'all-assistant-turns' && artifact.scope !== 'provider-managed') return undefined;
+  return artifact;
 }
 
 export const sessionContextJournal = new SessionContextJournal();

@@ -45,6 +45,55 @@ export class ToolResultSummarizer {
         return `[${name}] ${firstLine.slice(0, 80)}...`;
       },
     });
+    // web_fetch 结果：保留 URL / Status 头，正文省略
+    this.rules.push({
+      match: (name, r) => name === 'web_fetch' && !!firstText(r),
+      summarize: (_name, r) => {
+        const text = firstText(r) ?? '';
+        const head = text
+          .split('\n')
+          .filter((line) => line.startsWith('URL:') || line.startsWith('Status:'))
+          .slice(0, 2)
+          .join(' | ');
+        return `[web_fetch] ${head || text.slice(0, 100)} — ${text.length} chars body omitted (truncated summary)`;
+      },
+    });
+    // web_search 结果：保留 query/provider/results 头 + 前 3 条标题与 URL
+    this.rules.push({
+      match: (name, r) => name === 'web_search' && !!firstText(r),
+      summarize: (_name, r) => {
+        const lines = (firstText(r) ?? '').split('\n');
+        const header = lines
+          .filter((line) => /^(Search query|Provider|Results):/.test(line))
+          .join(' | ');
+        const entries: string[] = [];
+        for (let i = 0; i < lines.length && entries.length < 6; i++) {
+          if (/^\d+\.\s/.test(lines[i])) {
+            entries.push(lines[i].trim().slice(0, 120));
+            const url = lines[i + 1]?.trim();
+            if (url) entries.push(url.slice(0, 160));
+          }
+        }
+        return `[web_search] ${header}\n${entries.slice(0, 6).join('\n')}\n(truncated summary)`;
+      },
+    });
+    // git 族结果：保留首行 + 总行数（diff/log 正文省略）
+    this.rules.push({
+      match: (name, r) => name.startsWith('git_') && !!firstText(r),
+      summarize: (name, r) => {
+        const text = firstText(r) ?? '';
+        const lines = text.split('\n');
+        return `[${name}] ${lines[0].slice(0, 100)} — ${lines.length} lines (truncated summary)`;
+      },
+    });
+    // edit 族结果（edit_file / write_file）：保留首行（路径与字节 delta 已在首行内）
+    this.rules.push({
+      match: (name, r) => (name === 'edit_file' || name === 'write_file') && !!firstText(r),
+      summarize: (name, r) => {
+        const firstLine = (firstText(r) ?? '').split('\n')[0];
+        return `[${name}] ${firstLine.slice(0, 160)} (truncated summary)`;
+      },
+    });
   }
 
   /**

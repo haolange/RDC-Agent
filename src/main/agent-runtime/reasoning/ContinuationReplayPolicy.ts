@@ -15,6 +15,7 @@ export type ContinuationReplayReason =
   | 'container-mismatch'
   | 'execution-mismatch'
   | 'model-not-admitted'
+  | 'retention-expired'
   | 'unsupported-policy';
 
 export interface ContinuationReplayContext {

@@ -191,7 +191,7 @@ export const Composer: React.FC<ComposerProps> = ({
               title={selectedAgentCapability || currentModeLabel}
             >
               <span className="composer-agent-pill-icon" aria-hidden="true">
-                <ModeGlyph mode={currentMode} icon={selectedAgentDefinition?.icon ?? currentModeConfig.icon} size={15} strokeWidth={1.9} />
+                <ModeGlyph mode={currentMode} icon={selectedAgentDefinition?.icon ?? currentModeConfig.icon} size={16} strokeWidth={2} />
               </span>
               <span className="composer-agent-pill-label">{currentModeLabel}</span>
               <span className="composer-agent-pill-caret" aria-hidden="true">
@@ -220,7 +220,7 @@ export const Composer: React.FC<ComposerProps> = ({
                     >
                       <span className="composer-agent-menu-item-copy">
                         <span className="composer-agent-menu-item-icon" aria-hidden="true">
-                          <ModeGlyph mode={agentMode} icon={agent.icon ?? undefined} size={15} strokeWidth={1.9} />
+                          <ModeGlyph mode={agentMode} icon={agent.icon ?? undefined} size={16} strokeWidth={2} />
                         </span>
                         <span className="composer-agent-menu-item-label">{agent.name}</span>
                         {activeAgentId === agent.id ? (

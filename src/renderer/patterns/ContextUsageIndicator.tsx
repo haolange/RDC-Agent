@@ -42,6 +42,12 @@ export const ContextUsageIndicator: React.FC<{
           : t('contextBreakdown.lastActualAria', { percent: normalizedPercent })
         : t('contextBreakdown.noUsageYet');
 
+  const valueText = phase === 'preparing'
+    ? '…'
+    : usage || showPrepared
+      ? `${normalizedPercent}%`
+      : '—';
+
   return (
     <div className="composer-usage">
       <button
@@ -68,18 +74,7 @@ export const ContextUsageIndicator: React.FC<{
           />
         </svg>
         <span className="composer-usage-value">
-          <span className="composer-usage-value-label">
-            {phase === 'preparing'
-              ? t('contextBreakdown.preparingBadge')
-              : showPrepared
-                ? t('contextBreakdown.currentBadge')
-                : phase === 'actual'
-                  ? t('contextBreakdown.actualBadge')
-                  : t('contextBreakdown.lastBadge')}
-          </span>
-          <span className="composer-usage-value-number">
-            {phase === 'preparing' ? '…' : usage || showPrepared ? `${normalizedPercent}%` : '—'}
-          </span>
+          <span className="composer-usage-value-number">{valueText}</span>
         </span>
       </button>
       {open ? (

@@ -2,14 +2,15 @@
  * WriteFileTool — 在 workspace 内写入文本文件。
  *
  * - 父目录不存在时递归创建。
- * - 文件存在时直接覆盖。
- * - 路径越界时抛错。
+ * - 文件存在时覆盖（details.overwritten / isDestructive）。
+ * - content 有字节上限；拒写目录路径。
  */
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { AgentTool } from '../../agent/AgentTool';
-import { safeResolvePath } from './_shared';
+import { isPathExisting, safeResolvePath } from './_shared';
+import { WRITE_FILE_MAX_CONTENT_BYTES } from './toolLimits';
 
 interface WriteFileParams {
   path: string;
@@ -20,13 +21,14 @@ interface WriteFileDetails {
   path: string;
   bytesWritten: number;
   created: boolean;
+  overwritten: boolean;
 }
 
 export const writeFileTool: AgentTool<WriteFileParams, WriteFileDetails> = {
   name: 'write_file',
   label: '写入文件',
   description:
-    'Write content to a file inside the workspace. Creates the file (and parent directories) if needed; overwrites if it exists.',
+    'Write content to a text file inside the workspace. Creates the file (and parent directories) if needed; overwrites if it exists.',
   parameters: {
     type: 'object',
     properties: {
@@ -41,7 +43,7 @@ export const writeFileTool: AgentTool<WriteFileParams, WriteFileDetails> = {
     },
     required: ['path', 'content'],
   },
-  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
+  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'mutation',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
@@ -49,24 +51,33 @@ export const writeFileTool: AgentTool<WriteFileParams, WriteFileDetails> = {
       throw new Error('Aborted');
     }
 
+    const content = typeof params.content === 'string' ? params.content : '';
+    const bytesWritten = Buffer.byteLength(content, 'utf8');
+    if (bytesWritten > WRITE_FILE_MAX_CONTENT_BYTES) {
+      throw new Error(
+        `write_file content exceeds limit (${bytesWritten} > ${WRITE_FILE_MAX_CONTENT_BYTES} bytes)`,
+      );
+    }
+
     const absolute = safeResolvePath(params.path, undefined, context);
     const dir = path.dirname(absolute);
 
-    let created = true;
-    try {
-      await fs.access(absolute);
-      created = false;
-    } catch {
-      created = true;
+    if (isPathExisting(absolute)) {
+      const stat = await fs.stat(absolute);
+      if (stat.isDirectory()) {
+        throw new Error(`Refusing to write to directory path: ${absolute}`);
+      }
     }
 
+    const existed = isPathExisting(absolute);
     await fs.mkdir(dir, { recursive: true });
     if (signal?.aborted) {
       throw new Error('Aborted');
     }
-    await fs.writeFile(absolute, params.content, 'utf8');
+    await fs.writeFile(absolute, content, 'utf8');
 
-    const bytesWritten = Buffer.byteLength(params.content, 'utf8');
+    const created = !existed;
+    const overwritten = existed;
     const text = `${created ? 'Created' : 'Overwrote'} ${absolute} (${bytesWritten} bytes)`;
 
     return {
@@ -75,6 +86,7 @@ export const writeFileTool: AgentTool<WriteFileParams, WriteFileDetails> = {
         path: absolute,
         bytesWritten,
         created,
+        overwritten,
       },
     };
   },

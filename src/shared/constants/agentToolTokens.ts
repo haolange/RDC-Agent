@@ -47,6 +47,57 @@ export type BuiltinAgentToolId = (typeof BUILTIN_AGENT_TOOL_IDS)[number];
 
 export const BUILTIN_AGENT_TOOL_ID_SET = new Set<string>(BUILTIN_AGENT_TOOL_IDS);
 
+/**
+ * 工具面分层：core 每请求常驻注入 schema；extended 走 deferred 机制，
+ * 由 tool_search 发现或直接调用 fail-open 激活后再注入（与 mcp__* 同机制）。
+ */
+export type BuiltinAgentToolTier = 'core' | 'extended';
+
+export const BUILTIN_AGENT_TOOL_TIERS: Record<BuiltinAgentToolId, BuiltinAgentToolTier> = {
+  bash: 'core',
+  read_file: 'core',
+  write_file: 'core',
+  edit_file: 'core',
+  glob: 'core',
+  grep: 'core',
+  git_status: 'core',
+  git_diff: 'core',
+  git_log: 'core',
+  git_add: 'extended',
+  git_unstage: 'extended',
+  git_commit: 'extended',
+  web_fetch: 'core',
+  web_search: 'core',
+  delete_file: 'extended',
+  move_file: 'extended',
+  copy_file: 'extended',
+  notebook_edit: 'extended',
+  task_create: 'extended',
+  task_update: 'extended',
+  task_get: 'extended',
+  task_list: 'extended',
+  task_stop: 'extended',
+  ask_user: 'core',
+  agent_handoff: 'extended',
+  memory_search: 'extended',
+  memory_read: 'extended',
+  memory_write: 'extended',
+  memory_delete: 'extended',
+  plan_artifact: 'extended',
+  skills: 'extended',
+  skill_read: 'extended',
+  mcp: 'extended',
+  subagent: 'extended',
+  rdx_context: 'core',
+  tool_search: 'core',
+};
+
+export function getBuiltinToolTier(toolName: string): BuiltinAgentToolTier | null {
+  return BUILTIN_AGENT_TOOL_ID_SET.has(toolName)
+    ? BUILTIN_AGENT_TOOL_TIERS[toolName as BuiltinAgentToolId]
+    : null;
+}
+
 /** Manifest-facing canonical tokens → concrete tool ids. */
 export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
   read: ['read_file'],
@@ -62,6 +113,8 @@ export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
   handoff: ['agent_handoff'],
   task: ['task_create', 'task_update', 'task_get', 'task_list', 'task_stop'],
   memory: ['memory_search', 'memory_read'],
+  'memory-write': ['memory_write', 'memory_delete'],
+  'file-manage': ['delete_file', 'move_file', 'copy_file', 'notebook_edit'],
   planArtifact: ['plan_artifact'],
   artifact: ['plan_artifact'],
   'vscode/memory': ['memory_read'],

@@ -25,10 +25,18 @@ describe('AgentManifestService seed manifests', () => {
 
     expect(settings.definitions.length).toBeGreaterThan(0);
     for (const definition of settings.definitions) {
-      expect(definition.tools).toContain('task');
       expect(definition.tools).not.toContain('todo');
       expect(definition.tools).not.toContain('search_codebase');
+      // 所有 seed 都保留 tool_search 发现入口。
+      expect(definition.tools).toContain('tool_search');
     }
+    // Tier 收窄：ask 是纯问答面（无 task），plan/edit 保留 task。
+    const byId = new Map(settings.definitions.map((definition) => [definition.id, definition]));
+    expect(byId.get('ask')?.tools).not.toContain('task');
+    expect(byId.get('plan')?.tools).toContain('task');
+    expect(byId.get('edit')?.tools).toContain('task');
+    expect(byId.get('edit')?.tools).toContain('file-manage');
+    expect(byId.get('edit')?.tools).toContain('memory-write');
   });
 
   it('projects app-managed choices from EffectiveCatalog and retains only referenced tombstones', () => {

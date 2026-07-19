@@ -2,12 +2,19 @@
  * ReadFileTool — 读取 workspace 内的文本文件。
  *
  * 支持按行 offset / limit 分段读取（offset 从 1 起，limit 默认 2000 行）。
- * 文件不存在或越界时返回错误结果（由 ToolRegistry 处理 throw）。
+ * 二进制 / `.rdc` / 超大文件 fail-closed；按行窗口流式读取避免整文件入内存。
  */
 
-import * as fs from 'fs/promises';
+import * as fs from 'fs';
+import * as readline from 'readline';
 import type { AgentTool } from '../../agent/AgentTool';
-import { safeResolvePath, truncateOutput } from './_shared';
+import { assertTextReadable, safeResolvePath, truncateOutput } from './_shared';
+import {
+  READ_FILE_DEFAULT_LIMIT,
+  READ_FILE_MAX_LIMIT,
+  READ_FILE_MAX_OUTPUT_BYTES,
+  TEXT_FILE_MAX_BYTES,
+} from './toolLimits';
 
 interface ReadFileParams {
   path: string;
@@ -23,14 +30,11 @@ interface ReadFileDetails {
   truncated: boolean;
 }
 
-const DEFAULT_LIMIT = 2000;
-const MAX_OUTPUT_BYTES = 200 * 1024;
-
 export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails> = {
   name: 'read_file',
   label: '读取文件',
   description:
-    'Read the contents of a file in the workspace. Supports line offset (1-based) and limit. Default limit is 2000 lines.',
+    'Read the contents of a text file in the workspace. Supports line offset (1-based) and limit. Default limit is 2000 lines. Binary files and RenderDoc .rdc captures are rejected.',
   parameters: {
     type: 'object',
     properties: {
@@ -44,7 +48,7 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails> = {
       },
       limit: {
         type: 'integer',
-        description: 'Maximum number of lines to read (default: 2000).',
+        description: `Maximum number of lines to read (default: ${READ_FILE_DEFAULT_LIMIT}, max: ${READ_FILE_MAX_LIMIT}).`,
       },
     },
     required: ['path'],
@@ -58,28 +62,29 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails> = {
     }
 
     const absolute = safeResolvePath(params.path, undefined, context);
-    const offset = Math.max(1, Math.floor(params.offset ?? 1));
-    const limit = Math.max(1, Math.floor(params.limit ?? DEFAULT_LIMIT));
+    assertTextReadable(absolute, { maxBytes: TEXT_FILE_MAX_BYTES });
 
-    const raw = await fs.readFile(absolute, 'utf8');
+    const offset = Math.max(1, Math.floor(params.offset ?? 1));
+    const limit = Math.max(
+      1,
+      Math.min(READ_FILE_MAX_LIMIT, Math.floor(params.limit ?? READ_FILE_DEFAULT_LIMIT)),
+    );
+
+    const { lines, totalLines, hitEof } = await readLineWindow(absolute, offset, limit, signal);
     if (signal?.aborted) {
       throw new Error('Aborted');
     }
-    const lines = raw.split(/\r?\n/);
-    const totalLines = lines.length;
 
     const startIdx = offset - 1;
-    const endIdx = Math.min(totalLines, startIdx + limit);
-    const slice = lines.slice(startIdx, endIdx);
-
-    const numbered = slice
+    const numbered = lines
       .map((line, i) => `${String(startIdx + i + 1).padStart(6, ' ')}→${line}`)
       .join('\n');
 
-    const text = truncateOutput(numbered, MAX_OUTPUT_BYTES);
+    const text = truncateOutput(numbered, READ_FILE_MAX_OUTPUT_BYTES);
     const truncated =
-      Buffer.byteLength(numbered, 'utf8') > MAX_OUTPUT_BYTES ||
-      endIdx < totalLines;
+      Buffer.byteLength(numbered, 'utf8') > READ_FILE_MAX_OUTPUT_BYTES
+      || !hitEof
+      || lines.length < Math.min(limit, Math.max(0, totalLines - startIdx));
 
     return {
       content: [{ type: 'text', text }],
@@ -93,3 +98,38 @@ export const readFileTool: AgentTool<ReadFileParams, ReadFileDetails> = {
     };
   },
 };
+
+async function readLineWindow(
+  absolute: string,
+  offset: number,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<{ lines: string[]; totalLines: number; hitEof: boolean }> {
+  const stream = fs.createReadStream(absolute, { encoding: 'utf8' });
+  const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
+  const lines: string[] = [];
+  let lineNo = 0;
+
+  try {
+    for await (const line of rl) {
+      if (signal?.aborted) {
+        throw new Error('Aborted');
+      }
+      lineNo += 1;
+      if (lineNo < offset) continue;
+      if (lines.length < limit) {
+        lines.push(line);
+      }
+    }
+  } finally {
+    rl.close();
+    stream.destroy();
+  }
+
+  const lastCaptured = offset - 1 + lines.length;
+  return {
+    lines,
+    totalLines: lineNo,
+    hitEof: lastCaptured >= lineNo,
+  };
+}

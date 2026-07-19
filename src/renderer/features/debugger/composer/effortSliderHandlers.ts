@@ -1,10 +1,10 @@
 import type React from 'react';
 import type { ReasoningSelection } from '@shared/types/modelCapability';
 import {
-  clampSliderRatio,
   findAdjacentSupportedLevel,
   resolveNearestSnapLevel,
 } from './effortControlParts';
+import { EFFORT_THUMB_WIDTH_PX, ratioFromInsetClientX } from './effortSliderGeometry';
 
 export function createEffortSliderHandlers(input: {
   trackRef: React.RefObject<HTMLDivElement | null>;
@@ -40,13 +40,16 @@ export function createEffortSliderHandlers(input: {
     const track = input.trackRef.current;
     if (!track) return 0;
     const rect = track.getBoundingClientRect();
-    return clampSliderRatio((clientX - rect.left) / rect.width);
+    return ratioFromInsetClientX(clientX, rect.left, rect.width, EFFORT_THUMB_WIDTH_PX);
   };
   const levelFromClientX = (clientX: number): ReasoningSelection => {
     const track = input.trackRef.current;
     if (!track) return input.displayLevels[0] ?? 'off';
     const rect = track.getBoundingClientRect();
-    return resolveNearestSnapLevel((clientX - rect.left) / rect.width, input.displayLevels);
+    return resolveNearestSnapLevel(
+      ratioFromInsetClientX(clientX, rect.left, rect.width, EFFORT_THUMB_WIDTH_PX),
+      input.displayLevels,
+    );
   };
 
   return {
