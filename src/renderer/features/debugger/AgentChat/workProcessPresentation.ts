@@ -195,7 +195,9 @@ const resolveSectionThinking = (
           visibility: thinking.visibility,
           status,
           expandable: true,
-          openByDefault: isSummary,
+          // Policy hint for UI: expand while the loop is live; fold after settle.
+          // summary / raw / unknown share the same lifecycle (user sticky lives in the row).
+          openByDefault: isActiveBlock || status === 'streaming',
         };
       }
     }
@@ -216,6 +218,8 @@ const resolveResponseThinking = (
   expandable: boolean;
   openByDefault: boolean;
 } => {
+  // Final-answer / closing thinking shares the same lifecycle policy as process loops:
+  // expand while the section is live, fold after settle (UI may sticky-override).
   const resolved = resolveSectionThinking(block, Boolean(block.thinking));
   if (!resolved.expandable) return { ...resolved, label: '', openByDefault: false };
   return {
@@ -225,7 +229,7 @@ const resolveResponseThinking = (
     visibility: resolved.visibility,
     status: resolved.status,
     expandable: true,
-    openByDefault: false,
+    openByDefault: resolved.openByDefault,
   };
 };
 

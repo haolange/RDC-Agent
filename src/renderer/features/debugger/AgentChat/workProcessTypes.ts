@@ -180,6 +180,7 @@ export type WorkProcessRow =
     thinkingVisibility?: ThinkingArtifact['visibility'];
     thinkingStatus?: ConversationWorkBlock['thinkingStatus'];
     thinkingExpandable: boolean;
+    /** Policy hint: expand while loop is live; fold after settle. UI may sticky-override. */
     thinkingOpenByDefault: boolean;
     stepCount: number;
     stepsDisclosure: 'visible' | 'deferred';

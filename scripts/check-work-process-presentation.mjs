@@ -218,7 +218,60 @@ const rawThinkingSection = rawThinkingPresentation.rows.find((row) => row.type =
 assert(rawThinkingSection?.type === 'section', 'raw thinking loop should render a section');
 assert(rawThinkingSection.thinkingLabel === '已思考 · 0ms', 'raw thinking should use 已思考 · duration settled label');
 assert(rawThinkingSection.thinkingPreview === 'provider-visible raw thinking', 'raw provider thinking should remain available behind disclosure');
-assert(rawThinkingSection.thinkingOpenByDefault === false, 'raw thinking should stay folded by default');
+assert(rawThinkingSection.thinkingOpenByDefault === false, 'settled process-loop raw thinking should fold by policy');
+
+const activeRawThinkingPresentation = buildWorkProcessPresentation({
+  status: 'running',
+  updatedAt: now + 9810,
+  blocks: [
+    {
+      id: 'runtime-loop-raw-active',
+      kind: 'llm_turn',
+      title: 'LLM turn',
+      status: 'running',
+      result: { text: 'Working…', status: 'streaming', toolCallIds: ['think-glob-active'] },
+      thinking: {
+        text: 'provider-visible raw thinking while live',
+        kind: 'raw',
+        source: 'openai-compatible-raw',
+        visibility: 'raw-collapsed',
+      },
+      thinkingStatus: 'streaming',
+      toolCalls: [{ id: 'think-glob-active', toolName: 'glob', status: 'running', argsPreview: JSON.stringify({ pattern: 'src/**/*.ts' }), startedAt: now + 200 }],
+      startedAt: now + 200,
+    },
+  ],
+});
+const activeRawThinkingSection = activeRawThinkingPresentation.rows.find((row) => row.type === 'section');
+assert(activeRawThinkingSection?.type === 'section', 'active raw thinking loop should render a section');
+assert(activeRawThinkingSection.thinkingLabel === '正在思考', 'active raw thinking should use streaming label');
+assert(activeRawThinkingSection.thinkingOpenByDefault === true, 'active process-loop raw thinking should expand by policy');
+
+const activeSummaryThinkingPresentation = buildWorkProcessPresentation({
+  status: 'running',
+  updatedAt: now + 9820,
+  blocks: [
+    {
+      id: 'runtime-loop-summary-active',
+      kind: 'llm_turn',
+      title: 'LLM turn',
+      status: 'running',
+      result: { text: 'Working…', status: 'streaming', toolCallIds: ['think-read-active'] },
+      thinking: {
+        text: 'planning the next tool call',
+        kind: 'summary',
+        source: 'anthropic-thinking',
+        visibility: 'summary',
+      },
+      thinkingStatus: 'streaming',
+      toolCalls: [{ id: 'think-read-active', toolName: 'read_file', status: 'running', argsPreview: JSON.stringify({ path: 'README.md' }), startedAt: now + 210 }],
+      startedAt: now + 210,
+    },
+  ],
+});
+const activeSummaryThinkingSection = activeSummaryThinkingPresentation.rows.find((row) => row.type === 'section');
+assert(activeSummaryThinkingSection?.type === 'section', 'active summary thinking loop should render a section');
+assert(activeSummaryThinkingSection.thinkingOpenByDefault === true, 'active process-loop summary thinking should expand by policy');
 
 const summaryThinkingPresentation = buildWorkProcessPresentation({
   status: 'complete',
@@ -356,9 +409,94 @@ const streamingResponsePresentation = buildWorkProcessPresentation({
 assert(streamingResponsePresentation.rows.map((row) => row.type).join(',') === 'section,section', 'final answer streaming should render process section plus quiet thinking-only section');
 assert(!streamingResponsePresentation.rows.some((row) => row.type === 'response'), 'final answer streaming must not create a Reply boundary row');
 const closingThinking = streamingResponsePresentation.rows.filter((row) => row.type === 'section').at(-1);
-assert(closingThinking?.thinkingOpenByDefault === false, 'closing thinking should be folded by default');
+assert(closingThinking?.thinkingOpenByDefault === true, 'active closing thinking should expand by policy while streaming');
 assert(closingThinking?.thinkingPreview === 'Now produce the final answer.', 'closing summary should fold into a thinking-only section');
 assert(!JSON.stringify(closingThinking).includes('Streaming final answer tokens.'), 'streaming final answer text should stay out of Work Process');
+
+const settledClosingThinkingPresentation = buildWorkProcessPresentation({
+  status: 'complete',
+  updatedAt: now + 9968,
+  blocks: [
+    {
+      id: 'runtime-loop-response-before-tools-settled',
+      kind: 'llm_turn',
+      title: 'LLM turn',
+      status: 'complete',
+      result: { text: 'Read memory before answer.', status: 'complete', toolCallIds: ['response-tool-memory-settled'] },
+      thinking: {
+        text: 'Read project memory before answering settled.',
+        kind: 'summary',
+        source: 'anthropic-thinking',
+        visibility: 'summary',
+      },
+      thinkingStatus: 'complete',
+      toolCalls: [
+        { id: 'response-tool-memory-settled', toolName: 'memory_read', status: 'complete', argsPreview: JSON.stringify({ key: 'project-identity' }), startedAt: now + 370, completedAt: now + 375 },
+      ],
+      startedAt: now + 370,
+      completedAt: now + 375,
+    },
+    {
+      id: 'runtime-loop-response-final-settled',
+      kind: 'llm_turn',
+      title: 'LLM turn',
+      status: 'complete',
+      result: {
+        text: 'Final answer body.',
+        status: 'complete',
+        toolCallIds: [],
+        stopReason: 'end_turn',
+        outputPhase: 'final_answer',
+      },
+      thinking: {
+        text: 'Now produce the final answer settled.',
+        kind: 'summary',
+        source: 'anthropic-thinking',
+        visibility: 'summary',
+      },
+      thinkingStatus: 'complete',
+      toolCalls: [],
+      startedAt: now + 380,
+      completedAt: now + 390,
+    },
+  ],
+});
+const settledClosingThinking = settledClosingThinkingPresentation.rows.filter((row) => row.type === 'section').at(-1);
+assert(settledClosingThinking?.thinkingOpenByDefault === false, 'settled closing thinking should fold by policy');
+assert(settledClosingThinking?.thinkingPreview === 'Now produce the final answer settled.', 'settled closing thinking keeps preview behind disclosure');
+
+const activeFinalAnswerThinkingPresentation = buildWorkProcessPresentation({
+  status: 'running',
+  updatedAt: now + 9970,
+  blocks: [
+    {
+      id: 'runtime-loop-final-active',
+      kind: 'llm_turn',
+      title: 'LLM turn',
+      status: 'running',
+      result: {
+        text: '',
+        status: 'streaming',
+        toolCallIds: [],
+        stopReason: 'end_turn',
+        outputPhase: 'final_answer',
+      },
+      thinking: {
+        text: 'compose the final answer while streaming',
+        kind: 'raw',
+        source: 'openai-compatible-raw',
+        visibility: 'raw-collapsed',
+      },
+      thinkingStatus: 'streaming',
+      toolCalls: [],
+      startedAt: now + 400,
+    },
+  ],
+});
+const activeFinalAnswerThinkingSection = activeFinalAnswerThinkingPresentation.rows.find((row) => row.type === 'section');
+assert(activeFinalAnswerThinkingSection?.type === 'section', 'active final-answer thinking should render a section');
+assert(activeFinalAnswerThinkingSection.thinkingOpenByDefault === true, 'active final-answer thinking should expand by policy');
+assert(activeFinalAnswerThinkingSection.thinkingLabel === '正在思考', 'active final-answer thinking should use streaming label');
 
 const opaquePresentation = buildWorkProcessPresentation({
   status: 'complete',
@@ -820,8 +958,17 @@ assert(
   'ConversationService must not blind-slice resultPreview JSON at 800 chars',
 );
 assert(!componentSource.includes('setRawOpen(true);\n      setPreviewOpen(true);'), 'failed tools must not force-open preview and raw together on error');
-assert(componentSource.includes('<details className={thinkingClassName}'), 'thinking should render as a user-collapsible top disclosure');
+assert(componentSource.includes('<details'), 'thinking should render as a user-collapsible top disclosure');
+assert(componentSource.includes('handleThinkingSummaryClick'), 'thinking disclosure must accept user summary-click gestures');
+assert(componentSource.includes('thinkingUserOverridden'), 'thinking disclosure must sticky-override policy after user gesture');
+assert(!componentSource.includes('open={row.thinkingOpenByDefault}'), 'thinking disclosure must not bind open solely to policy without local state');
+assert(!componentSource.includes('onToggle={handleThinkingToggle}'), 'thinking must not use details onToggle for sticky override (programmatic open fires toggle)');
 assert(!componentSource.includes('isSummaryThinking'), 'summary thinking must not bypass the top disclosure hierarchy');
+assert(
+  presentationSource.includes('openByDefault: isActiveBlock || status === \'streaming\'')
+    || presentationSource.includes('openByDefault: isActiveBlock || status === "streaming"'),
+  'process-loop thinking policy must expand while active/streaming',
+);
 assert(!componentSource.includes("t('chat.workProcessViewSteps'"), 'section should not expose the legacy tool-step disclosure');
 assert(!componentSource.includes('StepsListIcon'), 'legacy steps icon component should be removed');
 assert(!componentSource.includes('thinking-full'), 'component must not render full hidden CoT mode');
@@ -855,12 +1002,20 @@ assert(cssSource.includes('.work-process-source-pills') || cssSource.includes('.
 assert(cssSource.includes('.work-process-step.is-appear'), 'step appear animation should exist');
 assert(!cssSource.includes('.work-process-response'), 'response boundary styling must be removed');
 assert(
-  /\.work-process-step\.kind-section\s*\{[^}]*padding-bottom:\s*var\(--space-2\)/.test(cssSource),
-  'section turns should use compact space-2 bottom padding',
+  /\.work-process-step\.kind-section\s*\{[^}]*padding-bottom:\s*0/.test(cssSource),
+  'section turns should zero bottom padding so turn gap is only the next section top pad',
 );
 assert(
-  cssSource.includes('.work-process-section + .work-process-section:not(.has-prose)'),
-  'non-prose section adjacency should lock top padding to zero',
+  /\.work-process-section\s*\+\s*\.work-process-section\s*\{[^}]*padding-top:\s*var\(--space-3\)/.test(cssSource),
+  'adjacent loop sections should share space-3 top padding as loop-boundary breath',
+);
+assert(
+  /\.work-process-section-list\s*\{[^}]*margin:\s*var\(--space-3\)\s+0\s+0/.test(cssSource),
+  'thinking/commentary → first tool should use space-3 entrance margin',
+);
+assert(
+  !cssSource.includes('.work-process-section + .work-process-section:not(.has-prose)'),
+  'non-prose section adjacency must not lock top padding to zero',
 );
 assert(
   /\.work-process\s*\+\s*\.conversation-bubble-assistant\s*\{[^}]*margin-top:\s*calc\(10px\s*-\s*var\(--space-2\)\)/.test(cssSource),
@@ -875,8 +1030,8 @@ assert(
   'last process step must zero bottom padding so expanded ends flush like collapsed',
 );
 assert(
-  /\.work-process-section-list\s+\.work-process-step\s*\{[^}]*padding:\s*var\(--space-3\)\s+0\s+0/.test(cssSource),
-  'nested tool rows should use top-only space-3 padding so sibling cards breathe without padding into the answer',
+  /\.work-process-section-list\s+\.work-process-step\s*\{[^}]*padding:\s*var\(--space-2\)\s+0\s+0/.test(cssSource),
+  'nested tool rows should use top-only space-2 padding (denser than loop entrance / turn boundary)',
 );
 assert(
   cssSource.includes('.work-process.is-collapsed .work-process-label'),
