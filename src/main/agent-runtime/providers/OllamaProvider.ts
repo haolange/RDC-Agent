@@ -155,14 +155,13 @@ export class OllamaProvider implements ProviderStrategy {
           if (typeof message.thinking === 'string' && message.thinking.length > 0) {
             sawOutput = true;
             if (!thinkingStarted) {
-              builder.startThinking(thinkingRef, { kind: 'unknown', source: 'ollama-raw', visibility: 'raw-collapsed', replayPolicy: 'none' });
+              builder.startThinking(thinkingRef, { kind: 'unknown', source: 'ollama-raw', visibility: 'raw-collapsed' });
               thinkingStarted = true;
             }
             builder.appendThinking(thinkingRef, message.thinking, {
               kind: 'unknown',
               source: 'ollama-raw',
               visibility: 'raw-collapsed',
-              replayPolicy: 'none',
             });
           }
           if (typeof message.content === 'string' && message.content.length > 0) {

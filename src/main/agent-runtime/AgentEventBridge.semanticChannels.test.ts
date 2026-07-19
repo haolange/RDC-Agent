@@ -36,7 +36,7 @@ const thinking: ThinkingContent = {
   kind: 'raw',
   source: 'openai-compatible-raw',
   visibility: 'raw-collapsed',
-  replayPolicy: 'none',
+
   providerOutputRef: thinkingRef,
 };
 const toolCall: ToolCall = {

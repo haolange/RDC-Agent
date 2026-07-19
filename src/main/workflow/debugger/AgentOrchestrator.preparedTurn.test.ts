@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
+import type { EffectiveModel } from '@shared/types/providerCapability';
+import { createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
+import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 
 vi.mock('electron', () => ({
   app: {
@@ -15,7 +17,7 @@ vi.mock('electron', () => ({
 
 import { AgentOrchestrator } from './AgentOrchestrator';
 
-const requestPlan: RequestPlan = {
+const requestPlan = createTestRequestPlan({
   providerId: 'provider',
   adapterId: 'openai-responses',
   catalogRevision: 'test-catalog',
@@ -45,7 +47,7 @@ const requestPlan: RequestPlan = {
       wireProfile: { kind: 'none' },
     },
   },
-};
+});
 
 const effectiveModel: EffectiveModel = {
   providerId: 'provider',
@@ -82,7 +84,7 @@ const routeCapability = {
   toolCallingMode: 'native-structured' as const,
   reasoningVisibility: 'none' as const,
   reasoningDelivery: 'none' as const,
-  reasoningContract: { semantic: 'none' as const, source: 'test', displayLabel: 'None' as const },
+  reasoningContract: createNoneReasoningContract('test'),
   supportsStreaming: true,
   supportsToolResults: true,
   toolCallingUnverified: false,
@@ -108,6 +110,7 @@ const baseInput = {
     segments: [],
     systemPrompt: 'system',
     totalTokenEstimate: 20,
+    stablePrefix: { fingerprint: 'prefix', segmentIds: [], sourceHashes: [], tokenEstimate: 0, volatileSegmentIds: [] },
     metrics: { systemPrompt: 24, scopedInstructions: 0, skills: 0 },
     diagnostics: [],
   },
@@ -128,6 +131,13 @@ describe('AgentOrchestrator prepared turn context', () => {
       contextWindowTokens: 500_000,
       contextMode: 'normal',
       compactionApplied: false,
+      derivedContext: { status: 'none', compactedTurnCount: 0 },
+      cache: {
+        enabled: false,
+        breakpoint: 'none',
+        stableTokenEstimate: 0,
+        stableSegmentCount: 0,
+      },
       route: {
         providerId: 'provider',
         selectedModelId: 'model',

@@ -1,105 +1,311 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
+import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
+import type { RequestPlan } from '@shared/types/providerCapability';
 import type { AssistantMessage, Message } from '../agent-runtime/core/types';
-import type { ConversationMessage } from '@shared/types/conversation';
+import { createContinuationArtifact } from '../agent-runtime/reasoning/ContinuationArtifacts';
+import { createProviderStateRef } from '../agent-runtime/reasoning/ProviderStateRefs';
+import { createTestRequestPlan } from '../testing/createTestRequestPlan';
 import {
   canonicalizeTerminalContextMessages,
   filterSessionContextMessageArtifacts,
   SessionContextJournal,
+  type SessionContextTurnEntry,
 } from './SessionContextJournal';
 import { storageAdapter } from '../sessions/StorageAdapter';
+import { buildDerivedContextView } from '../agent-runtime/context/StructuredHandoffBuilder';
 
 afterEach(() => vi.restoreAllMocks());
 
-const assistant = (protocol = 'OpenAIResponses'): AssistantMessage => ({
-  role: 'assistant',
-  provider: 'openai',
-  model: 'gpt-5',
-  content: [{
+type PlanOptions = {
+  providerId: string;
+  adapterId: RequestPlan['adapterId'];
+  protocol: RequestPlan['route']['protocol'];
+  modelId: string;
+  carrier: ProviderContractBundle['reasoning']['carrier'];
+  continuation: ProviderContractBundle['reasoning']['continuation'];
+  artifactPolicy: ProviderContractBundle['toolLoop']['artifactPolicy'];
+  artifactScope: ProviderContractBundle['toolLoop']['artifactScope'];
+  compatibilityGroup: string;
+};
+
+function createPlan(options: PlanOptions): RequestPlan {
+  const fallback = createFailClosedProviderContracts(options.protocol);
+  const contracts: ProviderContractBundle = {
+    ...fallback,
+    protocolDialect: options.protocol,
+    protocolVersion: 'test-v1',
+    compatibilityGroup: options.compatibilityGroup,
+    reasoning: {
+      semantic: options.carrier === 'reasoning-content' ? 'raw' : 'opaque',
+      source: 'test-contract',
+      displayLabel: options.carrier === 'reasoning-content' ? 'Raw reasoning' : 'Provider reasoning',
+      carrier: options.carrier,
+      artifactFormat: options.compatibilityGroup,
+      artifactVersion: 'v1',
+      compatibilityGroup: options.compatibilityGroup,
+      continuation: options.continuation,
+    },
+    toolLoop: {
+      artifactPolicy: options.artifactPolicy,
+      artifactScope: options.artifactScope,
+      ordering: 'provider-native',
+      modelSwitch: 'pin-until-terminal',
+    },
+  };
+  return createTestRequestPlan({
+    providerId: options.providerId,
+    adapterId: options.adapterId,
+    catalogRevision: 'catalog-v1',
+    routeRevision: 'route-v1',
+    selectedModelId: options.modelId,
+    effectiveModelId: options.modelId,
+    appliedBindingIds: [],
+    route: {
+      protocol: options.protocol,
+      baseUrl: 'https://example.test',
+      source: 'catalog',
+      contracts,
+    },
+    contracts,
+    headers: {},
+    bodyPatch: {},
+    contextBudgetTokens: 128_000,
+    contextMode: 'normal',
+    contextWindowTokens: 128_000,
+    activeTierId: 'default',
+    fastMode: false,
+    reasoningWire: {
+      selection: 'off',
+      control: {
+        kind: 'none',
+        supportsOff: true,
+        levels: [],
+        defaultSelection: 'off',
+        wireProfile: { kind: 'none' },
+      },
+    },
+  });
+}
+
+const responsesPlan = createPlan({
+  providerId: 'openai',
+  adapterId: 'openai-responses',
+  protocol: 'OpenAIResponses',
+  modelId: 'gpt-5',
+  carrier: 'reasoning-item',
+  continuation: 'exact-execution',
+  artifactPolicy: 'preserve-exact',
+  artifactScope: 'all-assistant-turns',
+  compatibilityGroup: 'openai-responses-v1',
+});
+
+function providerManagedResponsesPlan(): RequestPlan {
+  const contracts: ProviderContractBundle = {
+    ...responsesPlan.contracts,
+    state: {
+      supportedModes: ['local-stateless', 'provider-managed'],
+      defaultMode: 'provider-managed',
+      carrier: 'previous-response-id',
+      retention: 'provider',
+      crossModel: 'never',
+    },
+  };
+  return {
+    ...responsesPlan,
+    contracts,
+    route: { ...responsesPlan.route, contracts },
+    statePlan: {
+      mode: 'provider-managed',
+      carrier: 'previous-response-id',
+      store: true,
+      reuseProviderState: true,
+    },
+    executionIdentity: {
+      ...responsesPlan.executionIdentity,
+      stateMode: 'provider-managed',
+    },
+  };
+}
+
+const anthropicPlan = createPlan({
+  providerId: 'anthropic',
+  adapterId: 'anthropic-messages',
+  protocol: 'AnthropicMessages',
+  modelId: 'claude',
+  carrier: 'signed-content-block',
+  continuation: 'exact-execution',
+  artifactPolicy: 'preserve-exact',
+  artifactScope: 'tool-call-turn',
+  compatibilityGroup: 'anthropic-messages-v1',
+});
+
+const reasoningContentPlan = createPlan({
+  providerId: 'deepseek',
+  adapterId: 'openai-compatible',
+  protocol: 'OpenAICompatibleChatCompletions',
+  modelId: 'deepseek-reasoner',
+  carrier: 'reasoning-content',
+  continuation: 'same-provider-model',
+  artifactPolicy: 'preserve-reasoning-content',
+  artifactScope: 'all-assistant-turns',
+  compatibilityGroup: 'deepseek-reasoning-v1',
+});
+
+const usage = { inputTokens: 1, outputTokens: 1, totalTokens: 2 };
+
+function assistant(content: AssistantMessage['content']): AssistantMessage {
+  return {
+    role: 'assistant',
+    provider: 'openai',
+    model: 'gpt-5',
+    content,
+    usage,
+    stopReason: 'stop',
+    timestamp: 1,
+  };
+}
+
+function encryptedAssistant(plan = responsesPlan): AssistantMessage {
+  return assistant([{
     type: 'thinking',
     kind: 'opaque',
     source: 'openai-responses-encrypted',
     visibility: 'hidden',
-    replayPolicy: 'provider-artifact',
-    artifact: {
-      providerId: 'openai',
-      modelId: 'gpt-5',
-      protocol,
+    continuation: createContinuationArtifact(plan, {
       type: 'reasoning',
       encryptedContent: 'protected',
-    },
-  }],
-  usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-  stopReason: 'stop',
-  timestamp: 1,
-});
+    }),
+  }]);
+}
 
-describe('SessionContextJournal canonicalization', () => {
-  it('replays provider artifacts only for an exact provider, model, and protocol route', () => {
-    const same = filterSessionContextMessageArtifacts(assistant(), {
-      providerId: 'openai', modelId: 'gpt-5', protocol: 'OpenAIResponses',
+function entry(overrides: Partial<SessionContextTurnEntry> = {}): SessionContextTurnEntry {
+  return {
+    schemaVersion: 2,
+    turnId: 'turn-1',
+    userMessageId: 'user-1',
+    assistantMessageId: 'assistant-1',
+    branchId: 'branch-root',
+    agentId: 'ask',
+    executionIdentity: responsesPlan.executionIdentity,
+    controls: { reasoningLevel: 'off', maxContextMode: false, fastModel: false },
+    status: 'complete',
+    messages: [],
+    createdAt: 1,
+    completedAt: 2,
+    ...overrides,
+  };
+}
+
+describe('SessionContextJournal v2', () => {
+  it('replays an exact artifact only for the matching execution identity', () => {
+    const exact = filterSessionContextMessageArtifacts(encryptedAssistant(), responsesPlan);
+    expect(exact.replayed).toBe(1);
+    expect(exact.filtered).toBe(0);
+    expect(exact.decisions).toMatchObject([{ action: 'replay', reason: 'exact-execution' }]);
+
+    const changedModel = createPlan({
+      ...{
+        providerId: 'openai',
+        adapterId: 'openai-responses' as const,
+        protocol: 'OpenAIResponses' as const,
+        carrier: 'reasoning-item' as const,
+        continuation: 'exact-execution' as const,
+        artifactPolicy: 'preserve-exact' as const,
+        artifactScope: 'all-assistant-turns' as const,
+        compatibilityGroup: 'openai-responses-v1',
+      },
+      modelId: 'gpt-5-mini',
     });
-    expect(same.filtered).toBe(0);
-    expect((same.message as AssistantMessage).content).toHaveLength(1);
-    const canonicalSame = filterSessionContextMessageArtifacts(assistant('anthropic-messages'), {
-      providerId: 'openai', modelId: 'gpt-5', protocol: 'AnthropicMessages',
-    });
-    expect(canonicalSame.filtered).toBe(0);
-
-    for (const route of [
-      { providerId: 'openrouter', modelId: 'gpt-5', protocol: 'OpenAIResponses' },
-      { providerId: 'openai', modelId: 'gpt-5-mini', protocol: 'OpenAIResponses' },
-      { providerId: 'openai', modelId: 'gpt-5', protocol: 'OpenAICompatibleChatCompletions' },
-    ]) {
-      const changed = filterSessionContextMessageArtifacts(assistant(), route);
-      expect(changed.filtered).toBe(1);
-      expect((changed.message as AssistantMessage).content).toHaveLength(0);
-    }
-  });
-
-  it('drops readable thinking unless its replay policy and source route are exact', () => {
-    const readable: AssistantMessage = {
-      ...assistant(),
-      content: [{
-        type: 'thinking',
-        text: 'provider continuation state',
-        kind: 'raw',
-        source: 'openai-compatible-raw',
-        visibility: 'hidden',
-        replayPolicy: 'openai-reasoning-content',
-      }],
-    };
-    const route = { providerId: 'openai', modelId: 'gpt-5', protocol: 'OpenAICompatibleChatCompletions' };
-    expect((filterSessionContextMessageArtifacts(readable, route, route).message as AssistantMessage).content).toHaveLength(1);
-    const changed = filterSessionContextMessageArtifacts(readable, { ...route, modelId: 'gpt-5-mini' }, route);
+    const changed = filterSessionContextMessageArtifacts(encryptedAssistant(), changedModel);
     expect(changed.filtered).toBe(1);
-    expect((changed.message as AssistantMessage).content).toHaveLength(0);
-
-    const displayOnly: AssistantMessage = {
-      ...readable,
-      content: [{
-        type: 'thinking',
-        text: 'display only',
-        kind: 'raw',
-        source: 'openai-compatible-raw',
-        visibility: 'hidden',
-        replayPolicy: 'none',
-      }],
-    };
-    expect((filterSessionContextMessageArtifacts(displayOnly, route, route).message as AssistantMessage).content).toHaveLength(0);
+    expect(changed.decisions).toMatchObject([{ action: 'drop', reason: 'execution-mismatch' }]);
   });
 
-  it('removes dangling tool calls but retains paired tool facts and safe partial text', () => {
-    const messages: Message[] = [{ role: 'user', content: 'inspect', timestamp: 1 }, {
-      ...assistant(),
-      content: [
+  it('drops a tampered artifact even when route identity still matches', () => {
+    const message = encryptedAssistant();
+    const block = message.content[0];
+    if (block.type !== 'thinking' || !block.continuation) throw new Error('fixture failed');
+    block.continuation.encryptedContent = 'tampered';
+    const result = filterSessionContextMessageArtifacts(message, responsesPlan);
+    expect(result.filtered).toBe(1);
+    expect(result.decisions).toMatchObject([{ action: 'drop', reason: 'invalid-integrity' }]);
+  });
+
+  it('preserves compatible provider state without leaking it across provider boundaries', () => {
+    const sourcePlan = providerManagedResponsesPlan();
+    const providerState = createProviderStateRef(sourcePlan, 'response_1');
+    const message: AssistantMessage = {
+      ...assistant([{ type: 'text', text: 'portable semantic answer' }]),
+      providerState,
+    };
+
+    const compatible = filterSessionContextMessageArtifacts(message, sourcePlan);
+    expect((compatible.message as AssistantMessage).providerState).toEqual(providerState);
+
+    const incompatibleTarget: RequestPlan = {
+      ...sourcePlan,
+      executionIdentity: {
+        ...sourcePlan.executionIdentity,
+        endpointHash: 'different-endpoint',
+        fingerprint: 'different-execution',
+      },
+    };
+    const incompatible = filterSessionContextMessageArtifacts(message, incompatibleTarget);
+    expect(incompatible.message).not.toHaveProperty('providerState');
+    expect(message.providerState).toEqual(providerState);
+  });
+
+  it('preserves only readable cross-turn reasoning_content in terminal context', () => {
+    const readable = createContinuationArtifact(reasoningContentPlan, {
+      type: 'reasoning_content',
+      reasoningContent: 'required continuation',
+    });
+    const canonical = canonicalizeTerminalContextMessages([
+      assistant([
+        {
+          type: 'thinking',
+          text: 'display copy must not be persisted',
+          kind: 'raw',
+          source: 'deepseek-raw',
+          visibility: 'raw-collapsed',
+          continuation: readable,
+        },
+        ...encryptedAssistant().content,
+        { type: 'text', text: 'final' },
+      ]),
+    ]);
+    const content = (canonical[0] as AssistantMessage).content;
+    const thinking = content.find((block) => block.type === 'thinking');
+    expect(thinking).toMatchObject({
+      type: 'thinking',
+      text: undefined,
+      continuation: {
+        carrier: 'reasoning-content',
+        reasoningContent: 'required continuation',
+      },
+    });
+    expect(JSON.stringify(canonical)).not.toContain('protected');
+    expect(JSON.stringify(canonical)).not.toContain('display copy');
+  });
+
+  it('removes dangling tool calls but retains paired tool facts and safe text', () => {
+    const messages: Message[] = [
+      { role: 'user', content: 'inspect', timestamp: 1 },
+      assistant([
         { type: 'text', text: 'I inspected the file.' },
         { type: 'toolCall', id: 'paired', name: 'read_file', arguments: {} },
         { type: 'toolCall', id: 'dangling', name: 'read_file', arguments: {} },
-      ],
-    }, {
-      role: 'toolResult', toolCallId: 'paired', toolName: 'read_file',
-      content: [{ type: 'text', text: 'contents' }], isError: false, timestamp: 2,
-    }];
+      ]),
+      {
+        role: 'toolResult',
+        toolCallId: 'paired',
+        toolName: 'read_file',
+        content: [{ type: 'text', text: 'contents' }],
+        isError: false,
+        timestamp: 2,
+      },
+    ];
     const canonical = canonicalizeTerminalContextMessages(messages);
     const content = (canonical[1] as AssistantMessage).content;
     expect(content.some((block) => block.type === 'text')).toBe(true);
@@ -107,121 +313,158 @@ describe('SessionContextJournal canonicalization', () => {
     expect(canonical[2].role).toBe('toolResult');
   });
 
-  it('rejects a conflicting duplicate turn instead of silently keeping the wrong branch entry', () => {
+  it('rejects conflicting duplicate turns and accepts byte-identical retries', () => {
+    const journal = new SessionContextJournal();
+    const existing = entry();
+    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([existing]);
+    const append = vi.spyOn(storageAdapter, 'appendSessionContextTurn');
+
+    expect(() => journal.append('session-1', existing)).not.toThrow();
+    expect(append).not.toHaveBeenCalled();
+    expect(() => journal.append('session-1', entry({ status: 'error' })))
+      .toThrow('Conflicting session context entry');
+  });
+
+  it('fails closed on legacy v1 entries instead of performing a hot migration', () => {
     const journal = new SessionContextJournal();
     vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([{
       schemaVersion: 1,
       turnId: 'turn-1',
-      userMessageId: 'user-1',
-      assistantMessageId: 'assistant-1',
-      branchId: 'branch-a',
-      agentId: 'ask',
-      route: { providerId: 'openai', modelId: 'gpt-5', protocol: 'OpenAIResponses' },
-      controls: { reasoningLevel: 'off', maxContextMode: false, fastModel: false },
-      status: 'complete',
-      messages: [],
-      createdAt: 1,
-      completedAt: 2,
-    }]);
-    expect(() => journal.append('session-1', {
-      schemaVersion: 1,
-      turnId: 'turn-1',
-      userMessageId: 'user-2',
-      assistantMessageId: 'assistant-2',
-      branchId: 'branch-b',
-      agentId: 'ask',
-      route: { providerId: 'openai', modelId: 'gpt-5', protocol: 'OpenAIResponses' },
-      controls: { reasoningLevel: 'off', maxContextMode: false, fastModel: false },
-      status: 'complete',
-      messages: [],
-      createdAt: 1,
-      completedAt: 2,
-    })).toThrow('Conflicting session context entry');
+    } as unknown as SessionContextTurnEntry]);
+
+    expect(() => journal.readEntries('session-1'))
+      .toThrow('invalid v2 entry');
   });
 
-  it('rejects a same-identity duplicate when its terminal payload differs', () => {
+  it('fails closed when a visible turn is missing from the journal', () => {
     const journal = new SessionContextJournal();
-    const entry = {
-      schemaVersion: 1 as const,
-      turnId: 'turn-1', userMessageId: 'user-1', assistantMessageId: 'assistant-1', branchId: 'branch-a',
-      agentId: 'ask' as const,
-      route: { providerId: 'openai', modelId: 'gpt-5', protocol: 'OpenAIResponses' },
-      controls: { reasoningLevel: 'off' as const, maxContextMode: false, fastModel: false },
-      status: 'complete' as const, messages: [] as Message[], createdAt: 1, completedAt: 2,
-    };
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([entry]);
-    expect(() => journal.append('session-1', { ...entry, status: 'error' })).toThrow('Conflicting session context entry');
-  });
-
-  it('does not commit the migration marker when a journal append fails', () => {
-    const journal = new SessionContextJournal();
-    const history = [{
-      id: 'user-1', role: 'user', content: 'question', turnId: 'turn-1', branchId: 'branch-root',
-      createdAt: 1, updatedAt: 1, status: 'complete',
-    }, {
-      id: 'assistant-1', role: 'assistant', content: 'answer', turnId: 'turn-1', branchId: 'branch-root',
-      createdAt: 2, updatedAt: 2, status: 'complete', agentId: 'ask',
-    }] as ConversationMessage[];
-    vi.spyOn(storageAdapter, 'readSessionContextMigrationVersion').mockReturnValue(0);
     vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([]);
-    vi.spyOn(storageAdapter, 'readConversationHistory').mockReturnValue(history);
-    vi.spyOn(storageAdapter, 'readConversationBranchState').mockReturnValue(null);
-    vi.spyOn(storageAdapter, 'appendSessionContextTurn').mockImplementation(() => { throw new Error('disk full'); });
-    const marker = vi.spyOn(storageAdapter, 'writeSessionContextMigrationVersion');
-    expect(() => journal.ensureMigrated('session-1')).toThrow('disk full');
-    expect(marker).not.toHaveBeenCalled();
+    expect(() => journal.materialize('session-1', ['missing-turn'], responsesPlan))
+      .toThrow('Session context journal is incomplete');
   });
 
-  it('fails closed when a visible turn is missing from a migrated journal', () => {
+  it('keeps semantic messages and paired tool facts while dropping incompatible native state', () => {
     const journal = new SessionContextJournal();
-    vi.spyOn(storageAdapter, 'readSessionContextMigrationVersion').mockReturnValue(1);
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([]);
-    expect(() => journal.materialize('session-1', ['missing-turn'], {
-      providerId: 'openai', modelId: 'gpt-5', protocol: 'OpenAIResponses',
-    })).toThrow('Session context journal is incomplete');
-  });
-
-  it('replays ordinary messages and paired tool facts across providers while dropping native reasoning', () => {
-    const journal = new SessionContextJournal();
-    vi.spyOn(storageAdapter, 'readSessionContextMigrationVersion').mockReturnValue(1);
-    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([{
-      schemaVersion: 1,
-      turnId: 'turn-1',
-      userMessageId: 'user-1',
-      assistantMessageId: 'assistant-1',
-      branchId: 'branch-root',
-      agentId: 'ask',
-      route: { providerId: 'openai', modelId: 'gpt-5', protocol: 'OpenAIResponses' },
-      controls: { reasoningLevel: 'high', maxContextMode: false, fastModel: false },
-      status: 'complete',
-      messages: [{ role: 'user', content: 'inspect the capture', timestamp: 1 }, {
-        ...assistant(),
-        content: [
-          ...assistant().content,
+    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([entry({
+      messages: [
+        { role: 'user', content: 'inspect the capture', timestamp: 1 },
+        assistant([
+          ...encryptedAssistant().content,
           { type: 'text', text: 'Found one suspicious event.' },
           { type: 'toolCall', id: 'tool-1', name: 'read_file', arguments: { path: 'capture.rdc' } },
-        ],
-      }, {
-        role: 'toolResult',
-        toolCallId: 'tool-1',
-        toolName: 'read_file',
-        content: [{ type: 'text', text: 'event facts' }],
-        isError: false,
-        timestamp: 2,
-      }],
-      createdAt: 1,
-      completedAt: 2,
-    }]);
+        ]),
+        {
+          role: 'toolResult',
+          toolCallId: 'tool-1',
+          toolName: 'read_file',
+          content: [{ type: 'text', text: 'event facts' }],
+          isError: false,
+          timestamp: 2,
+        },
+      ],
+    })]);
 
-    const result = journal.materialize('session-1', ['turn-1'], {
-      providerId: 'anthropic', modelId: 'claude-sonnet-5', protocol: 'AnthropicMessages',
-    });
+    vi.spyOn(storageAdapter, 'readSessionDerivedContextView').mockReturnValue(null);
+    const result = journal.materialize('session-1', ['turn-1'], anthropicPlan);
     expect(result.filteredArtifactCount).toBe(1);
     expect(result.messages.map((message) => message.role)).toEqual(['user', 'assistant', 'toolResult']);
     expect((result.messages[1] as AssistantMessage).content).toEqual([
       { type: 'text', text: 'Found one suspicious event.' },
       { type: 'toolCall', id: 'tool-1', name: 'read_file', arguments: { path: 'capture.rdc' } },
     ]);
-    expect(result.messages[2]).toMatchObject({ toolCallId: 'tool-1', isError: false });
+  });
+
+  it('applies a valid structured derived view and then replays retained and new turns', () => {
+    const journal = new SessionContextJournal();
+    const first = entry({
+      turnId: 'turn-1',
+      userMessageId: 'user-1',
+      assistantMessageId: 'assistant-1',
+      messages: [
+        { role: 'user', content: 'Inspect the capture.', timestamp: 1 },
+        assistant([{ type: 'text', text: 'Found event 42.' }]),
+      ],
+    });
+    const second = entry({
+      turnId: 'turn-2',
+      userMessageId: 'user-2',
+      assistantMessageId: 'assistant-2',
+      messages: [{ role: 'user', content: 'Keep the finding.', timestamp: 2 }],
+    });
+    const third = entry({
+      turnId: 'turn-3',
+      userMessageId: 'user-3',
+      assistantMessageId: 'assistant-3',
+      messages: [{ role: 'user', content: 'Continue.', timestamp: 3 }],
+    });
+    const view = buildDerivedContextView(first.messages, {
+      scope: 'session',
+      sessionId: 'session-1',
+      branchId: 'branch-root',
+      sourceTurnIds: ['turn-1'],
+      retainedTurnIds: ['turn-2'],
+      messageSourceRefs: ['turn:turn-1:message:0', 'turn:turn-1:message:1'],
+      createdAt: 10,
+    });
+    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([first, second, third]);
+    vi.spyOn(storageAdapter, 'readSessionDerivedContextView').mockReturnValue(view);
+
+    const result = journal.materialize(
+      'session-1',
+      ['turn-1', 'turn-2', 'turn-3'],
+      responsesPlan,
+      'branch-root',
+    );
+
+    expect(result).toMatchObject({
+      derivedContextStatus: 'applied',
+      compactedTurnCount: 1,
+      selectedTurnCount: 3,
+      derivedContextView: { viewId: view.viewId },
+    });
+    expect(result.messages[0]).toMatchObject({
+      role: 'user',
+      derivedContext: { viewId: view.viewId, sourceHash: view.sourceHash },
+    });
+    expect(result.messages.slice(1).map((message) => message.role)).toEqual(['user', 'user']);
+  });
+
+  it('fails closed to the canonical transcript when a derived view is stale', () => {
+    const journal = new SessionContextJournal();
+    const first = entry({
+      turnId: 'turn-1',
+      messages: [{ role: 'user', content: 'Current source.', timestamp: 1 }],
+    });
+    const second = entry({
+      turnId: 'turn-2',
+      userMessageId: 'user-2',
+      assistantMessageId: 'assistant-2',
+      messages: [{ role: 'user', content: 'Latest turn.', timestamp: 2 }],
+    });
+    const staleView = buildDerivedContextView(
+      [{ role: 'user', content: 'Old source.', timestamp: 1 }],
+      {
+        scope: 'session',
+        sessionId: 'session-1',
+        branchId: 'branch-root',
+        sourceTurnIds: ['turn-1'],
+        retainedTurnIds: ['turn-2'],
+        createdAt: 10,
+      },
+    );
+    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([first, second]);
+    vi.spyOn(storageAdapter, 'readSessionDerivedContextView').mockReturnValue(staleView);
+
+    const result = journal.materialize(
+      'session-1',
+      ['turn-1', 'turn-2'],
+      responsesPlan,
+      'branch-root',
+    );
+
+    expect(result).toMatchObject({ derivedContextStatus: 'stale', compactedTurnCount: 0 });
+    expect(result.derivedContextView).toBeUndefined();
+    expect(result.messages.map((message) => message.role)).toEqual(['user', 'user']);
+    expect(result.messages[0]).not.toHaveProperty('derivedContext');
   });
 });

@@ -4,7 +4,57 @@
   "routeMechanics": [
     {
       "protocol": "AzureOpenAIChatCompletions",
-      "adapter": "azure-openai-chat"
+      "adapter": "azure-openai-chat",
+      "contracts": {
+        "protocolDialect": "AzureOpenAIChatCompletions",
+        "protocolVersion": "unspecified",
+        "compatibilityGroup": "none",
+        "reasoning": {
+          "semantic": "unknown",
+          "source": "profile-explicit-unknown",
+          "displayLabel": "Provider reasoning",
+          "carrier": "unknown",
+          "artifactFormat": "unknown",
+          "artifactVersion": "unknown",
+          "compatibilityGroup": "none",
+          "continuation": "unknown"
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "none",
+          "retention": "request",
+          "crossModel": "never"
+        },
+        "cache": {
+          "mode": "unknown",
+          "keyCarrier": "unknown",
+          "breakpointCarrier": "unknown",
+          "telemetry": [],
+          "ttl": "unknown"
+        },
+        "toolLoop": {
+          "artifactPolicy": "discard",
+          "artifactScope": "none",
+          "ordering": "assistant-tool-result",
+          "modelSwitch": "pin-until-terminal"
+        },
+        "streaming": {
+          "transport": "sse",
+          "outputIdentity": "provider-output-ref",
+          "usage": "terminal",
+          "errors": "http-status"
+        },
+        "semanticContext": {
+          "version": "semantic-context-v1",
+          "history": "canonical-messages",
+          "toolPairs": "strict",
+          "attachments": "fail-closed",
+          "overflow": "structured-handoff"
+        }
+      }
     }
   ]
 }

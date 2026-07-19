@@ -168,13 +168,6 @@ async function consumeFullStream(
     kind: 'unknown' as const,
     source: 'unknown' as const,
     visibility: 'raw-collapsed' as const,
-    replayPolicy: 'none' as const,
-    artifact: {
-      providerId: model.provider,
-      modelId: model.id,
-      protocol: model.api,
-      type: 'ai-sdk-reasoning',
-    },
   };
 
   for await (const part of parts) {

@@ -4,8 +4,9 @@
   "identityIds": [
     "openai"
   ],
-  "profileId": "openai-responses",
+  "profileId": "multi-protocol",
   "adapterIds": [
+    "openai-compatible",
     "openai-responses"
   ],
   "authSchemaId": "declarative-api-key",
@@ -59,7 +60,8 @@
     "tool-calling",
     "structured-output",
     "vision-input",
-    "model-discovery"
+    "model-discovery",
+    "prompt-cache"
   ],
   "routes": [
     {
@@ -69,11 +71,80 @@
       "baseUrl": "https://api.openai.com/v1",
       "default": true,
       "protocolOwner": "openai",
-      "reasoningContract": {
-        "semantic": "summary",
-        "source": "openai-responses-reasoning-summary",
-        "evidence": "https://platform.openai.com/docs/api-reference/responses-streaming/response/reasoning_summary_part/added",
-        "displayLabel": "Reasoning summary"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "summary",
+          "source": "openai-responses-reasoning-summary",
+          "evidence": "https://developers.openai.com/api/docs/guides/reasoning",
+          "displayLabel": "Reasoning summary",
+          "carrier": "reasoning-item",
+          "artifactFormat": "openai.responses.reasoning",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "openai:OpenAIResponses",
+          "continuation": "exact-execution",
+          "projectionSources": {
+            "summary": "openai-responses-summary",
+            "opaque": "openai-responses-encrypted"
+          }
+        },
+        "compatibilityGroup": "openai:OpenAIResponses",
+        "state": {
+          "supportedModes": [
+            "local-stateless",
+            "provider-managed"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "previous-response-id",
+          "retention": "provider",
+          "crossModel": "never",
+          "evidence": "https://developers.openai.com/api/docs/guides/conversation-state"
+        },
+        "cache": {
+          "mode": "implicit-prefix",
+          "keyCarrier": "prompt-cache-key",
+          "breakpointCarrier": "provider-managed",
+          "telemetry": [
+            "cached-input-tokens"
+          ],
+          "ttl": "provider-managed",
+          "evidence": "https://developers.openai.com/api/docs/guides/prompt-caching"
+        }
+      }
+    },
+    {
+      "id": "OpenAICompatibleChatCompletions",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "adapterId": "openai-compatible",
+      "baseUrl": "https://api.openai.com/v1",
+      "protocolOwner": "openai",
+      "contractOverrides": {
+        "compatibilityGroup": "openai:OpenAICompatibleChatCompletions",
+        "reasoning": {
+          "semantic": "opaque",
+          "source": "openai-chat-reasoning-not-returned",
+          "evidence": "https://developers.openai.com/api/docs/guides/migrate-to-responses",
+          "displayLabel": "Reasoning metadata",
+          "carrier": "none",
+          "artifactFormat": "none",
+          "artifactVersion": "none",
+          "compatibilityGroup": "openai:OpenAICompatibleChatCompletions",
+          "continuation": "none"
+        },
+        "toolLoop": {
+          "artifactPolicy": "discard",
+          "artifactScope": "none",
+          "ordering": "assistant-tool-result"
+        },
+        "cache": {
+          "mode": "implicit-prefix",
+          "keyCarrier": "prompt-cache-key",
+          "breakpointCarrier": "provider-managed",
+          "telemetry": [
+            "cached-input-tokens"
+          ],
+          "ttl": "provider-managed",
+          "evidence": "https://developers.openai.com/api/docs/guides/prompt-caching"
+        }
       }
     }
   ],
@@ -158,7 +229,18 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:openai:0"
+      "factSourceId": "rdc-agent:openai:0",
+      "cacheContract": {
+        "mode": "automatic-and-explicit-breakpoints",
+        "keyCarrier": "prompt-cache-key",
+        "breakpointCarrier": "openai-prompt-cache",
+        "telemetry": [
+          "cached-input-tokens",
+          "cache-write-input-tokens"
+        ],
+        "ttl": "thirty-minutes",
+        "evidence": "https://developers.openai.com/api/docs/guides/prompt-caching"
+      }
     },
     {
       "modelId": "gpt-5.6-terra",
@@ -231,7 +313,18 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:openai:0"
+      "factSourceId": "rdc-agent:openai:0",
+      "cacheContract": {
+        "mode": "automatic-and-explicit-breakpoints",
+        "keyCarrier": "prompt-cache-key",
+        "breakpointCarrier": "openai-prompt-cache",
+        "telemetry": [
+          "cached-input-tokens",
+          "cache-write-input-tokens"
+        ],
+        "ttl": "thirty-minutes",
+        "evidence": "https://developers.openai.com/api/docs/guides/prompt-caching"
+      }
     },
     {
       "modelId": "gpt-5.6-luna",
@@ -304,7 +397,18 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:openai:0"
+      "factSourceId": "rdc-agent:openai:0",
+      "cacheContract": {
+        "mode": "automatic-and-explicit-breakpoints",
+        "keyCarrier": "prompt-cache-key",
+        "breakpointCarrier": "openai-prompt-cache",
+        "telemetry": [
+          "cached-input-tokens",
+          "cache-write-input-tokens"
+        ],
+        "ttl": "thirty-minutes",
+        "evidence": "https://developers.openai.com/api/docs/guides/prompt-caching"
+      }
     },
     {
       "modelId": "gpt-5.5",
@@ -645,7 +749,7 @@
           ],
           "defaultSelection": "medium",
           "wireProfile": {
-            "kind": "openai-compatible",
+            "kind": "openai-responses",
             "on": "medium",
             "levels": {
               "minimal": "minimal",
@@ -654,8 +758,7 @@
               "high": "high",
               "xhigh": "xhigh",
               "max": "max"
-            },
-            "offMode": "reasoning-none"
+            }
           }
         }
       },
@@ -716,7 +819,7 @@
           ],
           "defaultSelection": "medium",
           "wireProfile": {
-            "kind": "openai-compatible",
+            "kind": "openai-responses",
             "on": "medium",
             "levels": {
               "minimal": "minimal",
@@ -725,8 +828,7 @@
               "high": "high",
               "xhigh": "xhigh",
               "max": "max"
-            },
-            "offMode": "reasoning-none"
+            }
           }
         }
       },
@@ -791,7 +893,308 @@
       "factSourceId": "rdc-agent:openai:0"
     }
   ],
-  "protocolOverrides": [],
+  "protocolOverrides": [
+    {
+      "modelId": "gpt-5.6-sol",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "medium",
+              "levels": {
+                "minimal": "minimal",
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "offMode": "reasoning-none"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai:0"
+    },
+    {
+      "modelId": "gpt-5.6-terra",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "medium",
+              "levels": {
+                "minimal": "minimal",
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "offMode": "reasoning-none"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai:0"
+    },
+    {
+      "modelId": "gpt-5.6-luna",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh",
+              "max"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "medium",
+              "levels": {
+                "minimal": "minimal",
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "offMode": "reasoning-none"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai:0"
+    },
+    {
+      "modelId": "gpt-5.5",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "medium",
+              "levels": {
+                "minimal": "minimal",
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "offMode": "reasoning-none"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai:0"
+    },
+    {
+      "modelId": "gpt-5.4",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "defaultSelection": "off",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "medium",
+              "levels": {
+                "minimal": "minimal",
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "offMode": "reasoning-none"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai:0"
+    },
+    {
+      "modelId": "gpt-5.4-mini",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "defaultSelection": "off",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "medium",
+              "levels": {
+                "minimal": "minimal",
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "offMode": "reasoning-none"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai:0"
+    },
+    {
+      "modelId": "gpt-5.4-nano",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "defaultSelection": "off",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "medium",
+              "levels": {
+                "minimal": "minimal",
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "offMode": "reasoning-none"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai:0"
+    },
+    {
+      "modelId": "gpt-5.3-codex",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "medium",
+              "levels": {
+                "minimal": "minimal",
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "offMode": "reasoning-none"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai:0"
+    },
+    {
+      "modelId": "gpt-5.2-codex",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "low",
+              "medium",
+              "high",
+              "xhigh"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "medium",
+              "levels": {
+                "minimal": "minimal",
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
+                "xhigh": "xhigh",
+                "max": "max"
+              },
+              "offMode": "reasoning-none"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:openai:0"
+    }
+  ],
   "recommendedModels": [
     "gpt-5.6-sol",
     "gpt-5.6-terra",

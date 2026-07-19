@@ -4,9 +4,9 @@
   "identityIds": [
     "xai"
   ],
-  "profileId": "openai-compatible",
+  "profileId": "openai-responses",
   "adapterIds": [
-    "openai-compatible"
+    "openai-responses"
   ],
   "authSchemaId": "declarative-api-key",
   "discoveryPolicyId": "openai-compatible",
@@ -62,12 +62,51 @@
   ],
   "routes": [
     {
-      "id": "OpenAICompatibleChatCompletions",
-      "protocol": "OpenAICompatibleChatCompletions",
-      "adapterId": "openai-compatible",
+      "id": "OpenAIResponses",
+      "protocol": "OpenAIResponses",
+      "adapterId": "openai-responses",
       "baseUrl": "https://api.x.ai/v1",
       "default": true,
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "contractOverrides": {
+        "compatibilityGroup": "xai:OpenAIResponses",
+        "reasoning": {
+          "semantic": "summary",
+          "source": "xai-responses-reasoning-summary",
+          "evidence": "https://docs.x.ai/developers/model-capabilities/text/reasoning",
+          "displayLabel": "Reasoning summary",
+          "carrier": "reasoning-item",
+          "artifactFormat": "openai.responses.reasoning",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "xai:OpenAIResponses",
+          "continuation": "exact-execution",
+          "projectionSources": {
+            "summary": "xai-responses-summary",
+            "opaque": "xai-responses-encrypted"
+          }
+        },
+        "state": {
+          "supportedModes": [
+            "local-stateless",
+            "provider-managed"
+          ],
+          "defaultMode": "local-stateless",
+          "carrier": "previous-response-id",
+          "retention": "provider",
+          "crossModel": "never",
+          "evidence": "https://docs.x.ai/developers/model-capabilities/text/comparison"
+        },
+        "cache": {
+          "mode": "implicit-prefix",
+          "keyCarrier": "provider-managed",
+          "breakpointCarrier": "provider-managed",
+          "telemetry": [
+            "cached-input-tokens"
+          ],
+          "ttl": "provider-managed",
+          "evidence": "https://docs.x.ai/developers/advanced-api-usage/prompt-caching/multi-turn"
+        }
+      }
     }
   ],
   "discovery": {
@@ -112,7 +151,7 @@
       },
       "presencePolicy": "maintained",
       "route": {
-        "protocol": "OpenAICompatibleChatCompletions",
+        "protocol": "OpenAIResponses",
         "baseUrl": "https://api.x.ai/v1",
         "source": "catalog"
       },
@@ -135,7 +174,7 @@
           ],
           "defaultSelection": "high",
           "wireProfile": {
-            "kind": "openai-compatible",
+            "kind": "openai-responses",
             "on": "medium",
             "levels": {
               "minimal": "minimal",
@@ -144,8 +183,7 @@
               "high": "high",
               "xhigh": "xhigh",
               "max": "max"
-            },
-            "offMode": "reasoning-none"
+            }
           }
         }
       },
@@ -182,7 +220,7 @@
       },
       "presencePolicy": "maintained",
       "route": {
-        "protocol": "OpenAICompatibleChatCompletions",
+        "protocol": "OpenAIResponses",
         "baseUrl": "https://api.x.ai/v1",
         "source": "catalog"
       },
@@ -207,7 +245,7 @@
           ],
           "defaultSelection": "low",
           "wireProfile": {
-            "kind": "openai-compatible",
+            "kind": "openai-responses",
             "on": "medium",
             "levels": {
               "minimal": "minimal",
@@ -216,8 +254,7 @@
               "high": "high",
               "xhigh": "xhigh",
               "max": "max"
-            },
-            "offMode": "reasoning-none"
+            }
           }
         }
       },
@@ -254,7 +291,7 @@
       },
       "presencePolicy": "maintained",
       "route": {
-        "protocol": "OpenAICompatibleChatCompletions",
+        "protocol": "OpenAIResponses",
         "baseUrl": "https://api.x.ai/v1",
         "source": "catalog"
       },
@@ -273,7 +310,7 @@
           "levels": [],
           "defaultSelection": "on",
           "wireProfile": {
-            "kind": "openai-compatible",
+            "kind": "openai-responses",
             "on": "medium",
             "levels": {
               "minimal": "minimal",
@@ -282,8 +319,7 @@
               "high": "high",
               "xhigh": "xhigh",
               "max": "max"
-            },
-            "offMode": "reasoning-none"
+            }
           }
         }
       },
@@ -320,7 +356,7 @@
       },
       "presencePolicy": "maintained",
       "route": {
-        "protocol": "OpenAICompatibleChatCompletions",
+        "protocol": "OpenAIResponses",
         "baseUrl": "https://api.x.ai/v1",
         "source": "catalog"
       },
@@ -339,7 +375,7 @@
           "levels": [],
           "defaultSelection": "on",
           "wireProfile": {
-            "kind": "openai-compatible",
+            "kind": "openai-responses",
             "on": "medium",
             "levels": {
               "minimal": "minimal",
@@ -348,8 +384,7 @@
               "high": "high",
               "xhigh": "xhigh",
               "max": "max"
-            },
-            "offMode": "reasoning-none"
+            }
           }
         }
       },

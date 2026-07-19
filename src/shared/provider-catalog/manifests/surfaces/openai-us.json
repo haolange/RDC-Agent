@@ -49,7 +49,8 @@
     "tool-calling",
     "structured-output",
     "vision-input",
-    "model-discovery"
+    "model-discovery",
+    "prompt-cache"
   ],
   "routes": [
     {
@@ -59,11 +60,29 @@
       "baseUrl": "https://us.api.openai.com/v1",
       "default": true,
       "protocolOwner": "openai",
-      "reasoningContract": {
-        "semantic": "summary",
-        "source": "openai-responses-reasoning-summary",
-        "evidence": "https://platform.openai.com/docs/api-reference/responses-streaming/response/reasoning_summary_part/added",
-        "displayLabel": "Reasoning summary"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "summary",
+          "source": "openai-responses-reasoning-summary",
+          "evidence": "https://platform.openai.com/docs/api-reference/responses-streaming/response/reasoning_summary_part/added",
+          "displayLabel": "Reasoning summary",
+          "carrier": "reasoning-item",
+          "artifactFormat": "openai.responses.reasoning",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "openai-us:OpenAIResponses",
+          "continuation": "exact-execution"
+        },
+        "compatibilityGroup": "openai-us:OpenAIResponses",
+        "cache": {
+          "mode": "implicit-prefix",
+          "keyCarrier": "prompt-cache-key",
+          "breakpointCarrier": "provider-managed",
+          "telemetry": [
+            "cached-input-tokens"
+          ],
+          "ttl": "provider-managed",
+          "evidence": "https://developers.openai.com/api/docs/guides/prompt-caching"
+        }
       }
     }
   ],
@@ -148,7 +167,18 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:openai-us:0"
+      "factSourceId": "rdc-agent:openai-us:0",
+      "cacheContract": {
+        "mode": "automatic-and-explicit-breakpoints",
+        "keyCarrier": "prompt-cache-key",
+        "breakpointCarrier": "openai-prompt-cache",
+        "telemetry": [
+          "cached-input-tokens",
+          "cache-write-input-tokens"
+        ],
+        "ttl": "thirty-minutes",
+        "evidence": "https://developers.openai.com/api/docs/guides/prompt-caching"
+      }
     },
     {
       "modelId": "gpt-5.6-terra",
@@ -221,7 +251,18 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:openai-us:0"
+      "factSourceId": "rdc-agent:openai-us:0",
+      "cacheContract": {
+        "mode": "automatic-and-explicit-breakpoints",
+        "keyCarrier": "prompt-cache-key",
+        "breakpointCarrier": "openai-prompt-cache",
+        "telemetry": [
+          "cached-input-tokens",
+          "cache-write-input-tokens"
+        ],
+        "ttl": "thirty-minutes",
+        "evidence": "https://developers.openai.com/api/docs/guides/prompt-caching"
+      }
     },
     {
       "modelId": "gpt-5.6-luna",
@@ -294,7 +335,18 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:openai-us:0"
+      "factSourceId": "rdc-agent:openai-us:0",
+      "cacheContract": {
+        "mode": "automatic-and-explicit-breakpoints",
+        "keyCarrier": "prompt-cache-key",
+        "breakpointCarrier": "openai-prompt-cache",
+        "telemetry": [
+          "cached-input-tokens",
+          "cache-write-input-tokens"
+        ],
+        "ttl": "thirty-minutes",
+        "evidence": "https://developers.openai.com/api/docs/guides/prompt-caching"
+      }
     },
     {
       "modelId": "gpt-5.5",

@@ -66,7 +66,7 @@ describe('ConversationService work trace tool approvals', () => {
           kind: 'raw' as const,
           source: 'anthropic-thinking' as const,
           visibility: 'raw-collapsed' as const,
-          replayPolicy: 'provider-artifact' as const,
+
           providerOutputRef: thinkingRef,
         },
         result: {

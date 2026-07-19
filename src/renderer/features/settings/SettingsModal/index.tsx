@@ -13,6 +13,7 @@ import { SettingsNavIcon } from './SettingsNavIcon';
 import { useRdxRuntimeOverview } from './useRdxRuntimeOverview';
 import { RuntimeScopePanel } from './sections/RuntimeScopePanel';
 import { HooksSettings } from './sections/HooksSettings';
+import { DeveloperDiagnosticsSettings } from './sections/DeveloperDiagnosticsSettings';
 import './SettingsModal.css';
 
 interface SettingsModalProps {
@@ -79,7 +80,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape' && !document.querySelector('[data-confirmation-dialog]')) onClose();
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
@@ -221,6 +222,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
 
               {activeSection === 'hooks' && (
                 <HooksSettings overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} onChanged={runtime.setOverview} />
+              )}
+
+              {activeSection === 'diagnostics' && (
+                <DeveloperDiagnosticsSettings
+                  overview={runtime.overview}
+                  loading={runtime.loading}
+                  error={runtime.error}
+                />
               )}
             </div>
           </div>

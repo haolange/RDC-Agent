@@ -61,7 +61,44 @@
       "adapterId": "openai-compatible",
       "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
       "default": true,
-      "protocolOwner": "openai"
+      "protocolOwner": "openai",
+      "contractOverrides": {
+        "compatibilityGroup": "alibaba:OpenAICompatibleChatCompletions",
+        "reasoning": {
+          "semantic": "raw",
+          "source": "alibaba-documented-preserved-thinking",
+          "evidence": "https://help.aliyun.com/en/model-studio/qwen-api-via-openai-chat-completions",
+          "displayLabel": "Raw reasoning",
+          "carrier": "reasoning-content",
+          "artifactFormat": "openai-chat.reasoning-content",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "alibaba:OpenAICompatibleChatCompletions",
+          "continuation": "same-provider-model",
+          "projectionSources": {
+            "raw": "qwen-raw"
+          },
+          "continuationModelIds": [
+            "qwen3.7-max",
+            "qwen3.7-max-2026-05-20",
+            "qwen3.6-max-preview",
+            "qwen3.7-plus",
+            "qwen3.7-plus-2026-05-26",
+            "qwen3.6-plus",
+            "qwen3.6-plus-2026-04-02",
+            "qwen3.6-flash",
+            "qwen3.6-flash-2026-04-16"
+          ]
+        },
+        "toolLoop": {
+          "artifactPolicy": "preserve-reasoning-content",
+          "artifactScope": "all-assistant-turns",
+          "ordering": "assistant-tool-result",
+          "requestPatch": {
+            "preserve_thinking": true
+          },
+          "evidence": "https://help.aliyun.com/en/model-studio/qwen-api-via-openai-chat-completions"
+        }
+      }
     }
   ],
   "discovery": {

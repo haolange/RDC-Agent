@@ -28,14 +28,14 @@ export interface LiveModelObservation {
   structuredOutput?: CapabilityState;
 }
 
-function withRouteReasoningContract(
+function withRouteContracts(
   surface: ProviderSurfaceDefinition,
   route: ModelRoute,
 ): ModelRoute {
   const surfaceRoute = surface.routes.find((candidate) => candidate.protocol === route.protocol);
   return {
     ...route,
-    reasoningContract: surfaceRoute?.reasoningContract,
+    contracts: surfaceRoute?.contracts,
   };
 }
 
@@ -222,10 +222,10 @@ function projectCompiledModel(
     modelId: model.modelId,
     label: model.label,
     aliases: [...model.aliases],
-    route: withRouteReasoningContract(surface, model.route),
+    route: withRouteContracts(surface, model.route),
     routeOptions: model.routeOptions?.map((option) => ({
       ...option,
-      route: withRouteReasoningContract(surface, option.route),
+      route: withRouteContracts(surface, option.route),
     })),
     selection: model.selection,
     presencePolicy: model.presencePolicy,
@@ -276,7 +276,7 @@ function projectDynamicModel(
     route: {
       protocol: route.protocol,
       baseUrl: route.baseUrl,
-      reasoningContract: route.reasoningContract,
+      contracts: route.contracts,
       source: 'catalog',
     },
     ...(observation.contextWindowTokens ? {

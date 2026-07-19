@@ -64,11 +64,24 @@
       "baseUrl": "https://api.kimi.com/coding/v1",
       "default": true,
       "protocolOwner": "anthropic",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "kimi-coding-plan-documented-raw-reasoning",
-        "evidence": "https://www.kimi.com/code/docs/en/",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "kimi-coding-plan-documented-raw-reasoning",
+          "evidence": "https://www.kimi.com/code/docs/en/",
+          "displayLabel": "Raw reasoning",
+          "carrier": "signed-content-block",
+          "artifactFormat": "anthropic.messages.thinking-block",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "kimi-coding-plan:AnthropicMessages",
+          "continuation": "exact-execution",
+          "projectionSources": {
+            "summary": "anthropic-thinking",
+            "raw": "anthropic-thinking",
+            "opaque": "anthropic-redacted-thinking"
+          }
+        },
+        "compatibilityGroup": "kimi-coding-plan:AnthropicMessages"
       }
     },
     {
@@ -77,11 +90,27 @@
       "adapterId": "openai-compatible",
       "baseUrl": "https://api.kimi.com/coding/v1",
       "protocolOwner": "openai",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "kimi-coding-plan-documented-raw-reasoning",
-        "evidence": "https://www.kimi.com/code/docs/en/",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "kimi-coding-plan-documented-raw-reasoning",
+          "evidence": "https://www.kimi.com/code/docs/en/",
+          "displayLabel": "Raw reasoning",
+          "carrier": "reasoning-content",
+          "artifactFormat": "openai-chat.reasoning-content",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "kimi-coding-plan:OpenAICompatibleChatCompletions",
+          "continuation": "exact-execution",
+          "projectionSources": {
+            "raw": "kimi-raw"
+          }
+        },
+        "compatibilityGroup": "kimi-coding-plan:OpenAICompatibleChatCompletions",
+        "toolLoop": {
+          "artifactPolicy": "preserve-reasoning-content",
+          "artifactScope": "all-assistant-turns",
+          "ordering": "assistant-tool-result"
+        }
       }
     }
   ],

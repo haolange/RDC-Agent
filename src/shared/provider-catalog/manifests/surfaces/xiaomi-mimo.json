@@ -69,11 +69,19 @@
       "baseUrl": "https://api.xiaomimimo.com/v1",
       "default": true,
       "protocolOwner": "openai",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "xiaomi-mimo-documented-raw-reasoning",
-        "evidence": "https://mimo.mi.com/docs/en-US/quick-start/usage-guide/text-generation/deep-thinking",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "xiaomi-mimo-documented-raw-reasoning",
+          "evidence": "https://mimo.mi.com/docs/en-US/quick-start/usage-guide/text-generation/deep-thinking",
+          "displayLabel": "Raw reasoning",
+          "carrier": "reasoning-content",
+          "artifactFormat": "openai-chat.reasoning-content",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "xiaomi-mimo:OpenAICompatibleChatCompletions",
+          "continuation": "unknown"
+        },
+        "compatibilityGroup": "xiaomi-mimo:OpenAICompatibleChatCompletions"
       }
     },
     {
@@ -82,11 +90,19 @@
       "adapterId": "openai-responses",
       "baseUrl": "https://api.xiaomimimo.com/v1",
       "protocolOwner": "openai",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "xiaomi-mimo-documented-raw-reasoning",
-        "evidence": "https://mimo.mi.com/docs/en-US/quick-start/usage-guide/text-generation/deep-thinking",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "xiaomi-mimo-documented-raw-reasoning",
+          "evidence": "https://mimo.mi.com/docs/en-US/quick-start/usage-guide/text-generation/deep-thinking",
+          "displayLabel": "Raw reasoning",
+          "carrier": "reasoning-item",
+          "artifactFormat": "openai.responses.reasoning",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "xiaomi-mimo:OpenAIResponses",
+          "continuation": "exact-execution"
+        },
+        "compatibilityGroup": "xiaomi-mimo:OpenAIResponses"
       }
     }
   ],

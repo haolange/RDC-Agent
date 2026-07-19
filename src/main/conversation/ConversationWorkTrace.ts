@@ -88,12 +88,7 @@ function cloneThinkingArtifact(thinking: ThinkingArtifact | undefined): Thinking
   return thinking
     ? {
         ...thinking,
-        artifact: thinking.artifact
-          ? {
-              ...thinking.artifact,
-              raw: thinking.artifact.raw ? { ...thinking.artifact.raw } : undefined,
-            }
-          : undefined,
+        continuation: thinking.continuation ? { ...thinking.continuation } : undefined,
       }
     : undefined;
 }
@@ -603,8 +598,8 @@ function hasProviderChannelCollision(block: ConversationWorkBlock): boolean {
 
 function shouldReplaceThinking(current: ThinkingArtifact | undefined, next: ThinkingArtifact): boolean {
   if (!current) return true;
-  if (next.replayPolicy === 'provider-artifact' && !current.artifact) return true;
-  if (next.artifact && JSON.stringify(next.artifact) !== JSON.stringify(current.artifact)) return true;
+  if (next.continuation && !current.continuation) return true;
+  if (next.continuation && JSON.stringify(next.continuation) !== JSON.stringify(current.continuation)) return true;
   return (next.text?.length ?? 0) >= (current.text?.length ?? 0);
 }
 

@@ -7,6 +7,7 @@ import {
 import type { LlmProviderProtocol } from '@shared/types/settings';
 import { buildAnthropicMessagesUrl } from './AnthropicProvider';
 import { buildGeminiStreamUrl } from './GeminiProvider';
+import { buildGoogleInteractionsUrl } from './GoogleInteractionsProvider';
 import { buildChatCompletionsUrl } from './OpenAICompatibleProvider';
 import { buildOpenAIResponsesUrl } from './OpenAIResponsesProvider';
 
@@ -49,6 +50,8 @@ function buildOperationUrl(
       return buildAnthropicMessagesUrl(baseUrl, input.modelId);
     case 'google-vertex-anthropic':
       return buildAnthropicMessagesUrl(baseUrl, input.modelId, 'vertex');
+    case 'google-interactions':
+      return buildGoogleInteractionsUrl(baseUrl);
     case 'google-gemini':
       return buildGeminiStreamUrl(baseUrl, input.modelId, 'catalog-contract-key', 'ai-studio');
     case 'google-vertex-gemini':

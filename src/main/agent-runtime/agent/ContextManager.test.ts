@@ -143,10 +143,13 @@ describe('ContextManager', () => {
       const result = await cm.compress(msgs);
       // 保留头 3 + 占位符 + 尾 (5 - 3 - 1 = 1) = 5
       expect(result.messages.length).toBeLessThan(msgs.length);
-      const hasSnipPlaceholder = result.messages.some(
-        (m) => m.role === 'user' && typeof (m as UserMessage).content === 'string' && String((m as UserMessage).content).includes('snipped'),
-      );
-      expect(hasSnipPlaceholder).toBe(true);
+      const handoff = result.messages.find(
+        (message) => message.role === 'user' && Boolean((message as UserMessage).derivedContext),
+      ) as UserMessage | undefined;
+      expect(handoff?.derivedContext).toMatchObject({
+        viewId: result.derivedContextView?.viewId,
+        sourceHash: result.derivedContextView?.sourceHash,
+      });
     });
 
     it('消息数未超 maxMessages 时不应 snip', async () => {
@@ -205,13 +208,10 @@ describe('ContextManager', () => {
       }
       const result = await cm.compress(msgs);
       // 应包含摘要
-      const hasSummary = result.messages.some(
-        (m) =>
-          m.role === 'user' &&
-          typeof (m as UserMessage).content === 'string' &&
-          String((m as UserMessage).content).includes('compacted'),
-      );
-      expect(hasSummary).toBe(true);
+      const handoff = result.messages.find(
+        (message) => message.role === 'user' && Boolean((message as UserMessage).derivedContext),
+      ) as UserMessage | undefined;
+      expect(handoff?.derivedContext?.handoffId).toBe(result.derivedContextView?.handoff.handoffId);
     });
   });
 });

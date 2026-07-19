@@ -28,6 +28,26 @@ const prepared = (overrides: Partial<PreparedTurnContextSummary> = {}): Prepared
   filteredArtifactCount: 0,
   preparedAt: 100,
   ...overrides,
+  continuation: overrides.continuation ?? {
+    executionFingerprint: 'test-execution',
+    strategy: 'semantic-replay',
+    replayedArtifactCount: 0,
+    droppedArtifactCount: 0,
+    decisionCounts: [],
+  },
+  derivedContext: overrides.derivedContext ?? { status: 'none', compactedTurnCount: 0 },
+  cache: overrides.cache ?? {
+    enabled: false,
+    mode: 'none',
+    keyCarrier: 'none',
+    breakpointCarrier: 'none',
+    ttl: 'none',
+    breakpoint: 'none',
+    stableTokenEstimate: 0,
+    stableSegmentCount: 0,
+    providerReported: false,
+    reason: 'test fixture',
+  },
 });
 
 const usage = (overrides: Partial<RunContextUsageSummary> = {}): RunContextUsageSummary => ({

@@ -149,7 +149,8 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       return { success: false, messages: [], error: 'No session selected.' };
     }
     try {
-      return { success: true, messages: await conversationService.compactHistory(sessionId) };
+      const compacted = await conversationService.compactHistory(sessionId);
+      return { success: true, ...compacted };
     } catch (error) {
       return { success: false, messages: [], error: error instanceof Error ? error.message : String(error) };
     }

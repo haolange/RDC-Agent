@@ -42,6 +42,7 @@ export type AgentEventSubscriber = (event: AgentEvent) => void;
 /** Agent 当前持有的可变状态。 */
 export interface AgentState {
   systemPrompt?: string;
+  systemPromptSegments?: AgentContext['systemPromptSegments'];
   model: Model;
   tools?: ToolDefinition[];
   messages: AgentMessage[];
@@ -114,6 +115,9 @@ export class Agent {
     this._toolExecutor = options.toolExecutor;
     this._state = {
       systemPrompt: options.initialState.systemPrompt,
+      systemPromptSegments: options.initialState.systemPromptSegments
+        ? options.initialState.systemPromptSegments.map((segment) => ({ ...segment }))
+        : undefined,
       model: options.initialState.model,
       tools: options.initialState.tools ? [...options.initialState.tools] : [],
       messages: options.initialState.messages ? [...options.initialState.messages] : [],
@@ -135,6 +139,9 @@ export class Agent {
   get state(): Readonly<AgentState> {
     return {
       systemPrompt: this._state.systemPrompt,
+      systemPromptSegments: this._state.systemPromptSegments
+        ? this._state.systemPromptSegments.map((segment) => ({ ...segment }))
+        : undefined,
       model: this._state.model,
       tools: this._state.tools ? [...this._state.tools] : undefined,
       messages: [...this._state.messages],
@@ -235,6 +242,7 @@ export class Agent {
 
     const context: AgentContext = {
       systemPrompt: this._state.systemPrompt,
+      systemPromptSegments: this._state.systemPromptSegments,
       messages: this._state.messages,
       tools: this._state.tools,
     };

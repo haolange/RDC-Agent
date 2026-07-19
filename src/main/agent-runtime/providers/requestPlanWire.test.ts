@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { RequestPlan } from '@shared/types/providerCapability';
+import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 
-const plan: RequestPlan = {
+const plan = createTestRequestPlan({
   providerId: 'anthropic',
   adapterId: 'anthropic-messages',
   catalogRevision: 'test-catalog',
@@ -28,7 +29,7 @@ const plan: RequestPlan = {
     selection: 'high',
     control: { kind: 'levels', supportsOff: true, levels: ['high'], defaultSelection: 'high', wireProfile: { kind: 'none' } },
   },
-};
+});
 
 describe('requestPlanWire', () => {
   it('applies declarative body patches without dropping the base request', () => {

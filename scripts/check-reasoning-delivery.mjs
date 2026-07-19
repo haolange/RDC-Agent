@@ -62,8 +62,8 @@ function effectiveModel(provider, modelId, overrides = {}) {
     route: {
       protocol: provider.protocol,
       baseUrl: provider.baseUrl,
-      reasoningContract: getLoadedProviderSurface(provider.id)?.routes
-        .find((route) => route.protocol === provider.protocol)?.reasoningContract,
+      contracts: getLoadedProviderSurface(provider.id)?.routes
+        .find((route) => route.protocol === provider.protocol)?.contracts,
       source: 'catalog',
     },
     availability: 'available',
@@ -128,7 +128,7 @@ const openaiResponsesSource = fs.readFileSync('src/main/agent-runtime/providers/
 const anthropicSource = fs.readFileSync('src/main/agent-runtime/providers/AnthropicProvider.ts', 'utf8');
 const contextManagerSource = fs.readFileSync('src/main/agent-runtime/agent/ContextManager.ts', 'utf8');
 
-assert(openaiCompatibleSource.includes("replayPolicy: 'openai-reasoning-content'"), 'OpenAI-compatible thinking must mark openai-reasoning-content replay.');
+assert(openaiCompatibleSource.includes('createContinuationArtifact'), 'OpenAI-compatible thinking must build a contract-bound continuation artifact.');
 assert(openaiCompatibleSource.includes('out.reasoning_content = reasoning.join'), 'OpenAI-compatible tool loops must replay reasoning_content.');
 assert(openaiResponsesSource.includes("'reasoning.encrypted_content'"), 'OpenAI Responses must request encrypted reasoning content for stateless continuation.');
 assert(openaiResponsesSource.includes('toResponsesReasoningReplayItem'), 'OpenAI Responses must replay only provider reasoning artifacts.');
@@ -136,7 +136,7 @@ assert(anthropicSource.includes('signature_delta'), 'Anthropic provider must cap
 assert(anthropicSource.includes('responseId = evt.message.id'), 'Anthropic provider source refs must retain message_start response ids.');
 assert(anthropicSource.includes('redacted_thinking'), 'Anthropic provider must preserve redacted thinking blocks.');
 assert(anthropicSource.includes('toAnthropicThinkingReplayBlock'), 'Anthropic provider must replay provider thinking blocks as native blocks.');
-assert(contextManagerSource.includes("block.replayPolicy === 'provider-artifact'"), 'Context budget must separate readable thinking from provider artifact replay.');
+assert(contextManagerSource.includes('block.continuation') && contextManagerSource.includes('providerArtifactChars'), 'Context budget must count opaque continuation payloads without promoting them to readable thinking.');
 
 
 const resolverSource = fs.readFileSync('src/main/agent-runtime/capabilities/RouteCapabilityResolver.ts', 'utf8');
@@ -149,10 +149,10 @@ const traceCanonicalSource = fs.readFileSync('src/main/agent-trace/TraceService.
 const kimiSurface = getLoadedProviderSurface('kimi-coding-plan');
 
 assert(kimiSurface?.routes.length === 2, 'Kimi must retain both declared protocol routes.');
-assert(kimiSurface?.routes.every((route) => route.reasoningContract?.semantic === 'raw'), 'Every Kimi protocol route must explicitly declare raw reasoning.');
+assert(kimiSurface?.routes.every((route) => route.contracts.reasoning.semantic === 'raw'), 'Every Kimi protocol route must explicitly declare raw reasoning.');
 assert(!resolverSource.includes('RAW_REASONING_PROVIDER_IDS'), 'Reasoning resolver must not restore provider-id raw lists.');
 assert(!resolverSource.includes('api-docs.deepseek.com'), 'Reasoning evidence URLs belong to strict manifests, not TypeScript.');
-assert(resolverSource.includes('route.reasoningContract'), 'Reasoning resolver must consume the frozen route contract.');
+assert(resolverSource.includes('route.contracts?.reasoning'), 'Reasoning resolver must consume the frozen route contract.');
 assert(builderSource.includes('PROVIDER_STREAM_CHANNEL_COLLISION'), 'Provider builder must fail closed on channel collisions.');
 assert(builderSource.includes('PROVIDER_STREAM_EVENT_AFTER_TERMINAL'), 'Provider builder must reject semantic events after terminal.');
 assert(!traceServiceSource.includes('emitThoughtFromText'), 'Conversation text must never be synthesized into trace thinking.');

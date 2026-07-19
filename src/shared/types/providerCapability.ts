@@ -16,7 +16,7 @@ import type {
   ModelManifest,
   ModelModeAction as CatalogModelModeAction,
   ModelPresencePolicy,
-  ProviderReasoningContract,
+  ProviderContractBundle,
 } from '../provider-catalog/modelManifestSchema';
 import type {
   LlmProviderLifecycleStatus,
@@ -60,7 +60,7 @@ export interface ModelRoute {
   protocol: LlmProviderProtocol;
   baseUrl?: string;
   headers?: Record<string, string>;
-  reasoningContract?: ProviderReasoningContract;
+  contracts?: ProviderContractBundle;
   source: 'model' | 'user' | 'catalog';
 }
 
@@ -182,6 +182,7 @@ export interface EffectiveModel {
   presencePolicy: ModelPresencePolicy;
   contextTiers: ContextTier[];
   defaultBudgetTokens: number;
+  cacheContract?: ProviderContractBundle['cache'];
   controls: {
     fast: BooleanControlDefinition;
     context1m: BooleanControlDefinition;
@@ -210,6 +211,79 @@ export interface EffectiveCatalogSnapshot {
   lastRefreshError?: string;
 }
 
+export type ProviderStateMode = 'local-stateless' | 'provider-managed';
+export type ToolLoopPhase = 'top-level' | 'assistant-tool-call' | 'tool-result' | 'terminal';
+
+export interface StatePlan {
+  mode: ProviderStateMode;
+  carrier: ProviderContractBundle['state']['carrier'];
+  store: boolean;
+  reuseProviderState: boolean;
+}
+
+export interface CachePlan {
+  enabled: boolean;
+  mode: ProviderContractBundle['cache']['mode'];
+  keyCarrier: ProviderContractBundle['cache']['keyCarrier'];
+  breakpointCarrier: ProviderContractBundle['cache']['breakpointCarrier'];
+  telemetry: ProviderContractBundle['cache']['telemetry'];
+  ttl: ProviderContractBundle['cache']['ttl'];
+}
+
+export interface ToolLoopPlan {
+  phase: ToolLoopPhase;
+  pinned: true;
+  artifactPolicy: ProviderContractBundle['toolLoop']['artifactPolicy'];
+  artifactScope: ProviderContractBundle['toolLoop']['artifactScope'];
+  ordering: ProviderContractBundle['toolLoop']['ordering'];
+}
+
+export interface StreamingPlan {
+  transport: ProviderContractBundle['streaming']['transport'];
+  outputIdentity: ProviderContractBundle['streaming']['outputIdentity'];
+  usage: ProviderContractBundle['streaming']['usage'];
+  errors: ProviderContractBundle['streaming']['errors'];
+}
+
+export type ContextTransitionStrategy =
+  | 'exact-continuation'
+  | 'provider-managed'
+  | 'semantic-replay'
+  | 'structured-handoff'
+  | 'fresh-chain';
+
+export interface ContextTransitionPlan {
+  strategy: ContextTransitionStrategy;
+  portable: boolean;
+  reason: string;
+}
+
+export interface ExecutionIdentity {
+  schemaVersion: 1;
+  providerId: string;
+  credentialScopeHash: string;
+  endpointHash: string;
+  protocolFamily: LlmProviderProtocol;
+  protocolDialect: string;
+  protocolVersion: string;
+  catalogRevision: string;
+  routeRevision: string;
+  selectedModelId: string;
+  effectiveModelId: string;
+  canonicalModelId: string;
+  modelSnapshotId: string;
+  compatibilityGroup: string;
+  bindingIds: string[];
+  variantKey: string;
+  reasoningMode: ResolvedReasoningSelection['selection'];
+  contextMode: 'normal' | 'one-million';
+  stateMode: ProviderStateMode;
+  artifactFormat: string;
+  artifactVersion: string;
+  contractHash: string;
+  toolLoopPhase: ToolLoopPhase;
+  fingerprint: string;
+}
 export interface RequestPlan {
   providerId: string;
   adapterId: ProviderAdapterId;
@@ -220,6 +294,13 @@ export interface RequestPlan {
   appliedBindingIds: string[];
   modelSelection?: ModelSelection;
   route: ModelRoute;
+  contracts: ProviderContractBundle;
+  executionIdentity: ExecutionIdentity;
+  statePlan: StatePlan;
+  cachePlan: CachePlan;
+  toolLoopPlan: ToolLoopPlan;
+  streamingPlan: StreamingPlan;
+  contextTransitionPlan: ContextTransitionPlan;
   headers: Record<string, string>;
   bodyPatch: JsonObject;
   /** Prompt/input budget after applying the selected context mode. */

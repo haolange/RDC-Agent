@@ -40,10 +40,19 @@ export class PromptPlanBuilder {
   build(input: PromptPlanInput): PromptPlan {
     const diagnostics = [...input.scopedInstructions.diagnostics];
     const segments: PromptSegment[] = [];
-    const push = (segment: Omit<PromptSegment, 'precedence' | 'tokenEstimate'>) => {
+    const push = (
+      segment: Omit<PromptSegment, 'precedence' | 'tokenEstimate' | 'stability'>
+        & { stability?: PromptSegment['stability'] },
+    ) => {
       const content = segment.content.trim();
       if (!content) return;
-      segments.push({ ...segment, content, precedence: segments.length, tokenEstimate: charsToTokens(content.length) });
+      segments.push({
+        ...segment,
+        content,
+        stability: segment.stability ?? 'stable',
+        precedence: segments.length,
+        tokenEstimate: charsToTokens(content.length),
+      });
     };
 
     for (const fileName of CORE_FILES) {
@@ -102,33 +111,53 @@ export class PromptPlanBuilder {
     });
 
     const permission = input.permissionSettings;
+    const runtimeFactsContent = [
+      '# Runtime Facts',
+      `Agent id: ${input.profile.id}`,
+      `Model route: ${input.routeCapability.providerId}/${input.routeCapability.modelId}`,
+      `Tool calling: ${input.routeCapability.toolCallingMode}`,
+      `Tool calling evidence: ${input.routeCapability.toolCallingUnverified ? 'unverified (fail-open)' : 'verified'}`,
+      `Vision input: ${input.routeCapability.visionInputMode}`,
+      `Structured output: ${input.routeCapability.structuredOutputMode}`,
+      ...(input.routeCapability.structuredOutputMode === 'prompt-fallback'
+        ? ['When a structured response is requested, follow the requested schema in the prompt; no native structured-output contract is available.']
+        : []),
+      `Project root: ${input.workDir || '(none)'}`,
+      `Permission mode: ${permission.mode}`,
+      `Additional readable roots: ${permission.readableRoots.join(', ') || '(none)'}`,
+      `Additional writable roots: ${permission.writableRoots.join(', ') || '(none)'}`,
+      `Current date: ${input.currentDate}`,
+      `Time zone: ${input.timeZone}`,
+    ].join('\n');
     push({
       id: 'runtime:facts',
       kind: 'runtime-fact',
       scope: 'runtime',
       sourcePath: 'runtime://facts',
-      sourceHash: hashScopedResource({ route: input.routeCapability, permission, workDir: input.workDir }),
-      content: [
-        '# Runtime Facts',
-        `Agent id: ${input.profile.id}`,
-        `Model route: ${input.routeCapability.providerId}/${input.routeCapability.modelId}`,
-        `Tool calling: ${input.routeCapability.toolCallingMode}`,
-        `Tool calling evidence: ${input.routeCapability.toolCallingUnverified ? 'unverified (fail-open)' : 'verified'}`,
-        `Vision input: ${input.routeCapability.visionInputMode}`,
-        `Structured output: ${input.routeCapability.structuredOutputMode}`,
-        ...(input.routeCapability.structuredOutputMode === 'prompt-fallback'
-          ? ['When a structured response is requested, follow the requested schema in the prompt; no native structured-output contract is available.']
-          : []),
-        `Project root: ${input.workDir || '(none)'}`,
-        `Permission mode: ${permission.mode}`,
-        `Additional readable roots: ${permission.readableRoots.join(', ') || '(none)'}`,
-        `Additional writable roots: ${permission.writableRoots.join(', ') || '(none)'}`,
-        `Current date: ${input.currentDate}`,
-        `Time zone: ${input.timeZone}`,
-      ].join('\n'),
+      sourceHash: hashScopedResource(runtimeFactsContent),
+      stability: 'volatile',
+      content: runtimeFactsContent,
     });
 
     const systemPrompt = segments.map((segment) => segment.content).join('\n\n');
+    const stableSegments = segments.filter((segment) => segment.stability === 'stable');
+    const firstVolatileIndex = segments.findIndex((segment) => segment.stability === 'volatile');
+    if (firstVolatileIndex >= 0 && segments.slice(firstVolatileIndex).some((segment) => segment.stability === 'stable')) {
+      throw new Error('PromptPlan stable segments must form one contiguous prefix.');
+    }
+    const stablePrefix = {
+      fingerprint: hashScopedResource(stableSegments.map((segment) => ({
+        id: segment.id,
+        sourceHash: segment.sourceHash,
+        content: segment.content,
+      }))),
+      segmentIds: stableSegments.map((segment) => segment.id),
+      sourceHashes: stableSegments.map((segment) => segment.sourceHash),
+      tokenEstimate: stableSegments.reduce((sum, segment) => sum + segment.tokenEstimate, 0),
+      volatileSegmentIds: segments
+        .filter((segment) => segment.stability === 'volatile')
+        .map((segment) => segment.id),
+    };
     const scopedInstructions = segments.filter((segment) => segment.kind === 'scoped-instruction').reduce((sum, segment) => sum + segment.content.length, 0);
     const skills = segments.filter((segment) => segment.kind === 'preloaded-skill' || segment.kind === 'skill-catalog').reduce((sum, segment) => sum + segment.content.length, 0);
     return {
@@ -136,6 +165,7 @@ export class PromptPlanBuilder {
       segments,
       systemPrompt,
       totalTokenEstimate: segments.reduce((sum, segment) => sum + segment.tokenEstimate, 0),
+      stablePrefix,
       metrics: { systemPrompt: Math.max(0, systemPrompt.length - scopedInstructions - skills), scopedInstructions, skills },
       diagnostics,
     };

@@ -8,7 +8,7 @@ const toolLoopThinking: ThinkingArtifact = {
   kind: 'summary',
   source: 'anthropic-thinking',
   visibility: 'summary',
-  replayPolicy: 'provider-artifact',
+
 };
 
 const finalLoopThinking: ThinkingArtifact = {
@@ -16,7 +16,7 @@ const finalLoopThinking: ThinkingArtifact = {
   kind: 'summary',
   source: 'anthropic-thinking',
   visibility: 'summary',
-  replayPolicy: 'provider-artifact',
+
 };
 
 describe('conversation loop runtime state', () => {

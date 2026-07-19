@@ -59,6 +59,19 @@ interface ConversationTurnCommitJournal {
   importedPaths: string[];
 }
 
+interface ConversationTerminalCommitJournal {
+  schemaVersion: '1';
+  requestId: string;
+  turnId: string;
+  phase: 'prepared' | 'committing' | 'committed';
+  beforeHistory: ConversationMessage[];
+  beforeBranch: ConversationBranchState | null;
+  beforeContext: SessionContextTurnEntry[];
+  afterHistory: ConversationMessage[];
+  afterBranch: ConversationBranchState | null;
+  afterContext: SessionContextTurnEntry[];
+}
+
 export interface ExistingConversationTurnCommit {
   session: SessionRecord;
   requestId: string;
@@ -84,6 +97,7 @@ export class StorageAdapter {
   private registryPath = '';
   private selectionPath = '';
   private readonly turnCommitSessionIds = new Set<string>();
+  private readonly terminalCommitSessionIds = new Set<string>();
 
   constructor() {
     this.syncRuntimePaths();
@@ -906,6 +920,44 @@ export class StorageAdapter {
     this.writeJson(usagePath, usage);
   }
 
+
+  writeSessionContextJournal(sessionId: string, entries: SessionContextTurnEntry[]): void {
+    this.writeJsonlAtomic(this.getSessionContextJournalPath(sessionId), entries);
+  }
+
+  clearSessionContextState(sessionId: string): void {
+    this.writeSessionContextJournal(sessionId, []);
+    this.clearSessionDerivedContextView(sessionId);
+  }
+
+
+  getSessionDerivedContextViewPath(sessionId: string): string {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) throw new Error(`Session not found for derived context view: ${sessionId}`);
+    return path.join(location.sessionPath, 'context-view.json');
+  }
+
+  readSessionDerivedContextView(sessionId: string): import('@shared/types/semanticContext').DerivedContextView | null {
+    const viewPath = this.getSessionDerivedContextViewPath(sessionId);
+    return fs.existsSync(viewPath)
+      ? this.readJson<import('@shared/types/semanticContext').DerivedContextView>(viewPath)
+      : null;
+  }
+
+  writeSessionDerivedContextView(
+    sessionId: string,
+    view: import('@shared/types/semanticContext').DerivedContextView,
+  ): void {
+    if (view.scope !== 'session' || view.sessionId !== sessionId) {
+      throw new Error('Derived context view session ownership mismatch.');
+    }
+    this.writeJsonAtomic(this.getSessionDerivedContextViewPath(sessionId), view);
+  }
+
+  clearSessionDerivedContextView(sessionId: string): void {
+    fs.rmSync(this.getSessionDerivedContextViewPath(sessionId), { force: true });
+  }
+
   getSessionContextJournalPath(sessionId: string): string {
     const location = this.findSessionLocation(sessionId);
     if (!location) throw new Error(`Session not found for context journal: ${sessionId}`);
@@ -921,26 +973,65 @@ export class StorageAdapter {
     appendJsonl(this.getSessionContextJournalPath(sessionId), entry);
   }
 
-  readSessionContextMigrationVersion(sessionId: string): number {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) throw new Error(`Session not found for context migration: ${sessionId}`);
-    const markerPath = path.join(location.sessionPath, 'session-context-version.json');
-    if (!fs.existsSync(markerPath)) return 0;
-    const marker = this.readJson<{ version?: number }>(markerPath);
-    return marker?.version === 1 ? 1 : 0;
-  }
+  commitConversationTerminal(
+    sessionId: string,
+    requestId: string,
+    turnId: string,
+    assistantMessage: ConversationMessage,
+    contextEntry: SessionContextTurnEntry,
+  ): void {
+    if (this.terminalCommitSessionIds.has(sessionId)) {
+      throw new Error(`Conversation terminal commit is already active for session ${sessionId}.`);
+    }
+    this.recoverSessionTurnCommit(sessionId);
+    this.recoverSessionTerminalCommit(sessionId);
+    const session = this.readSession(sessionId);
+    if (!session) throw new Error(`Session not found: ${sessionId}`);
+    if (
+      contextEntry.turnId !== turnId
+      || contextEntry.assistantMessageId !== assistantMessage.id
+      || assistantMessage.turnId !== turnId
+    ) {
+      throw new Error('Conversation terminal commit ownership mismatch.');
+    }
 
-  writeSessionContextMigrationVersion(sessionId: string): void {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) throw new Error(`Session not found for context migration: ${sessionId}`);
-    const markerPath = path.join(location.sessionPath, 'session-context-version.json');
-    const temporaryPath = `${markerPath}.${process.pid}.tmp`;
-    fs.writeFileSync(temporaryPath, JSON.stringify({ version: 1 }, null, 2), 'utf8');
+    const beforeHistory = this.readConversationHistory(sessionId);
+    const beforeBranch = this.readConversationBranchState(sessionId);
+    const beforeContext = this.readSessionContextJournal(sessionId);
+    const duplicate = beforeContext.find((entry) => entry.turnId === turnId);
+    if (duplicate && JSON.stringify(duplicate) !== JSON.stringify(contextEntry)) {
+      throw new Error(`Conflicting session context entry for turn ${turnId}.`);
+    }
+    const afterHistory = beforeHistory.slice();
+    const assistantIndex = afterHistory.findIndex((message) => message.id === assistantMessage.id);
+    if (assistantIndex >= 0) afterHistory[assistantIndex] = assistantMessage;
+    else afterHistory.push(assistantMessage);
+    afterHistory.sort((left, right) => left.createdAt - right.createdAt);
+    const afterContext = duplicate ? beforeContext : beforeContext.concat(contextEntry);
+    const journal: ConversationTerminalCommitJournal = {
+      schemaVersion: '1',
+      requestId,
+      turnId,
+      phase: 'prepared',
+      beforeHistory,
+      beforeBranch,
+      beforeContext,
+      afterHistory,
+      afterBranch: beforeBranch,
+      afterContext,
+    };
+    const journalPath = this.getConversationTerminalCommitJournalPath(session.sessionPath);
+    this.writeJsonAtomic(journalPath, journal);
+    this.terminalCommitSessionIds.add(sessionId);
+    const committing: ConversationTerminalCommitJournal = { ...journal, phase: 'committing' };
     try {
-      fs.renameSync(temporaryPath, markerPath);
-    } catch (error) {
-      if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
-      throw error;
+      this.writeJsonAtomic(journalPath, committing);
+      this.applyConversationTerminalJournal(session, committing, true);
+      this.writeJsonAtomic(journalPath, { ...committing, phase: 'committed' });
+      fs.rmSync(journalPath, { force: true });
+      this.updateSession(sessionId, {});
+    } finally {
+      this.terminalCommitSessionIds.delete(sessionId);
     }
   }
 
@@ -1729,6 +1820,10 @@ export class StorageAdapter {
     return path.join(sessionPath, 'turn-commit.json');
   }
 
+  private getConversationTerminalCommitJournalPath(sessionPath: string): string {
+    return path.join(sessionPath, 'terminal-commit.json');
+  }
+
   private planAttachmentsForTurn(
     session: SessionRecord,
     sourcePaths: string[],
@@ -1791,7 +1886,10 @@ export class StorageAdapter {
           continue;
         }
         const session = this.readJson<SessionRecord>(path.join(entryPath, 'session.json'));
-        if (session) this.recoverSessionTurnCommit(session.sessionId);
+        if (session) {
+          this.recoverSessionTurnCommit(session.sessionId);
+          this.recoverSessionTerminalCommit(session.sessionId);
+        }
       }
     }
   }
@@ -1809,6 +1907,34 @@ export class StorageAdapter {
       && Array.isArray(journal.afterHistory);
     this.applyConversationTurnJournal(session, journal, shouldRollForward);
     fs.rmSync(journalPath, { force: true });
+  }
+
+  private recoverSessionTerminalCommit(sessionId: string): void {
+    const location = this.findSessionLocation(sessionId);
+    if (!location) return;
+    const journalPath = this.getConversationTerminalCommitJournalPath(location.sessionPath);
+    const journal = this.readJson<ConversationTerminalCommitJournal>(journalPath);
+    if (!journal) return;
+    const session = this.readJson<SessionRecord>(path.join(location.sessionPath, 'session.json'));
+    if (!session) return;
+    const shouldRollForward = journal.phase === 'committing' || journal.phase === 'committed';
+    this.applyConversationTerminalJournal(session, journal, shouldRollForward);
+    fs.rmSync(journalPath, { force: true });
+  }
+
+  private applyConversationTerminalJournal(
+    session: SessionRecord,
+    journal: ConversationTerminalCommitJournal,
+    useAfter: boolean,
+  ): void {
+    const history = useAfter ? journal.afterHistory : journal.beforeHistory;
+    const branch = useAfter ? journal.afterBranch : journal.beforeBranch;
+    const context = useAfter ? journal.afterContext : journal.beforeContext;
+    this.writeJsonlAtomic(path.join(session.sessionPath, 'conversation.jsonl'), history);
+    const branchPath = path.join(session.sessionPath, 'conversation-branches.json');
+    if (branch) this.writeJsonAtomic(branchPath, branch);
+    else if (fs.existsSync(branchPath)) fs.rmSync(branchPath, { force: true });
+    this.writeJsonlAtomic(path.join(session.sessionPath, 'session-context.jsonl'), context);
   }
 
   private applyConversationTurnJournal(

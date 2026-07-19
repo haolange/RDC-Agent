@@ -183,6 +183,9 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
       const result = await electronAPI.conversation.compactHistory(sessionId);
       if (result.success) {
         context.setConversationMessages(result.messages);
+        context.showNotice(result.contextView
+          ? 'Context view created from ' + result.contextView.sourceTurnIds.length + ' earlier turns; transcript preserved.'
+          : 'The session is already within the manual compaction threshold.');
       } else {
         context.showNotice(result.error ?? 'Compaction failed.');
       }

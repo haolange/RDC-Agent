@@ -44,7 +44,7 @@ describe('AssistantStreamBuilder channel invariant', () => {
       kind: 'raw',
       source: 'openai-compatible-raw',
       visibility: 'raw-collapsed',
-      replayPolicy: 'none',
+
     });
     builder.appendThinking(thinkingRef, 'same bytes');
     builder.endThinking(thinkingRef);
@@ -79,7 +79,7 @@ describe('AssistantStreamBuilder channel invariant', () => {
       kind: 'raw',
       source: 'unknown',
       visibility: 'raw-collapsed',
-      replayPolicy: 'none',
+
     })).toThrowError(expect.objectContaining({
       code: 'PROVIDER_STREAM_CHANNEL_COLLISION',
     }) as ProviderStreamProtocolError);
@@ -124,7 +124,7 @@ describe('AssistantStreamBuilder channel invariant', () => {
       kind: 'raw',
       source: 'unknown',
       visibility: 'raw-collapsed',
-      replayPolicy: 'none',
+
     })).toThrowError(expect.objectContaining({
       code: 'PROVIDER_STREAM_CHANNEL_COLLISION',
     }) as ProviderStreamProtocolError);

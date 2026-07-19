@@ -48,15 +48,15 @@
   "connectionSchema": {
     "fields": [
       {
-      "id": "apiKey",
+        "id": "apiKey",
         "label": "DeepSeek API Key",
         "kind": "secret",
         "required": true,
         "environmentVariable": "DEEPSEEK_API_KEY"
       }
     ],
-    "primarySecretFieldId": "apiKey"
-    ,"endpointTemplate": "https://api.deepseek.com"
+    "primarySecretFieldId": "apiKey",
+    "endpointTemplate": "https://api.deepseek.com"
   },
   "authModes": [
     "api-key"
@@ -74,11 +74,24 @@
       "adapterId": "anthropic-messages",
       "baseUrl": "https://api.deepseek.com/anthropic/v1",
       "protocolOwner": "anthropic",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "deepseek-documented-raw-reasoning",
-        "evidence": "https://api-docs.deepseek.com/guides/thinking_mode",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "deepseek-documented-raw-reasoning",
+          "evidence": "https://api-docs.deepseek.com/guides/thinking_mode",
+          "displayLabel": "Raw reasoning",
+          "carrier": "signed-content-block",
+          "artifactFormat": "anthropic.messages.thinking-block",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "deepseek:AnthropicMessages",
+          "continuation": "exact-execution",
+          "projectionSources": {
+            "summary": "anthropic-thinking",
+            "raw": "anthropic-thinking",
+            "opaque": "anthropic-redacted-thinking"
+          }
+        },
+        "compatibilityGroup": "deepseek:AnthropicMessages"
       }
     },
     {
@@ -88,11 +101,27 @@
       "baseUrl": "https://api.deepseek.com",
       "default": true,
       "protocolOwner": "openai",
-      "reasoningContract": {
-        "semantic": "raw",
-        "source": "deepseek-documented-raw-reasoning",
-        "evidence": "https://api-docs.deepseek.com/guides/thinking_mode",
-        "displayLabel": "Raw reasoning"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "raw",
+          "source": "deepseek-documented-raw-reasoning",
+          "evidence": "https://api-docs.deepseek.com/guides/thinking_mode",
+          "displayLabel": "Raw reasoning",
+          "carrier": "reasoning-content",
+          "artifactFormat": "openai-chat.reasoning-content",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "deepseek:OpenAICompatibleChatCompletions",
+          "continuation": "exact-execution",
+          "projectionSources": {
+            "raw": "deepseek-raw"
+          }
+        },
+        "compatibilityGroup": "deepseek:OpenAICompatibleChatCompletions",
+        "toolLoop": {
+          "artifactPolicy": "preserve-reasoning-content",
+          "artifactScope": "tool-call-turn",
+          "ordering": "assistant-tool-result"
+        }
       }
     }
   ],

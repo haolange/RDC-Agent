@@ -3,6 +3,7 @@ import type {
   AssistantMessage,
   AssistantMessageEvent,
   ProviderOutputRef,
+  ProviderStateRef,
   StopReason,
   TextContent,
   ThinkingContent,
@@ -80,6 +81,7 @@ export class AssistantStreamBuilder {
   private readonly modelId: string;
   private readonly providerId: string;
   private usage: Usage = { ...EMPTY_USAGE };
+  private providerState: ProviderStateRef | undefined;
   private started = false;
   private finished = false;
 
@@ -224,6 +226,18 @@ export class AssistantStreamBuilder {
   endToolCall(ref: ProviderOutputRef): void {
     const block = this.requireOpenBlock(ref, 'tool_call', 'end');
     this.closeBlock(block);
+  }
+
+  setProviderState(state: ProviderStateRef): void {
+    this.assertSemanticEvent({
+      protocol: 'provider-state',
+      providerBlockKey: state.carrier,
+      contentIndex: 0,
+    });
+    this.providerState = {
+      ...state,
+      origin: { ...state.origin, bindingIds: [...state.origin.bindingIds] },
+    };
   }
 
   setUsage(partial: Partial<Usage>): void {
@@ -427,6 +441,15 @@ export class AssistantStreamBuilder {
       provider: this.providerId,
       usage: { ...this.usage },
       stopReason: reason,
+      ...(this.providerState ? {
+        providerState: {
+          ...this.providerState,
+          origin: {
+            ...this.providerState.origin,
+            bindingIds: [...this.providerState.origin.bindingIds],
+          },
+        },
+      } : {}),
       timestamp: Date.now(),
     };
   }

@@ -13,10 +13,19 @@ import {
   PROVIDER_DISCOVERY_POLICY_IDS,
   providerAdapterSupportsProtocol,
 } from './implementationRegistry';
-import type { ExecutionBinding, ModelManifest } from './modelManifestSchema';
+import {
+  ProviderContractBundlePatchSchema,
+  ProviderProtocolSchema,
+  ProviderContractBundleSchema,
+  type ExecutionBinding,
+  type ModelManifest,
+  type ProviderContractBundle,
+  type ProviderContractBundlePatch,
+} from './modelManifestSchema';
 import { isMaxContextTier } from '../utils/contextTiers';
+import { createFailClosedProviderContracts } from './providerContracts';
 
-export const PROVIDER_CATALOG_SCHEMA_VERSION = 1 as const;
+export const PROVIDER_CATALOG_SCHEMA_VERSION = 2 as const;
 export const MODELS_DEV_IDENTITY_COUNT = 166 as const;
 export const MODELS_DEV_SNAPSHOT_SHA256 = 'd4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733';
 
@@ -87,6 +96,64 @@ function stableJson(value: unknown): string {
   return JSON.stringify(value) ?? 'null';
 }
 
+function mergeProviderContracts(
+  base: ProviderContractBundle,
+  patch: ProviderContractBundlePatch,
+): ProviderContractBundle {
+  return ProviderContractBundleSchema.parse({
+    ...base,
+    ...patch,
+    reasoning: { ...base.reasoning, ...patch.reasoning },
+    state: { ...base.state, ...patch.state },
+    cache: { ...base.cache, ...patch.cache },
+    toolLoop: { ...base.toolLoop, ...patch.toolLoop },
+    streaming: { ...base.streaming, ...patch.streaming },
+    semanticContext: { ...base.semanticContext, ...patch.semanticContext },
+  });
+}
+
+function materializeSurfaceContractInput(
+  value: unknown,
+  profiles: Map<string, ProviderProfileManifest>,
+): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const surface = value as Record<string, unknown>;
+  const surfaceId = typeof surface.id === 'string' ? surface.id : '(unknown surface)';
+  const profileId = typeof surface.profileId === 'string' ? surface.profileId : '';
+  const profile = profiles.get(profileId);
+  const routes = Array.isArray(surface.routes) ? surface.routes : [];
+  return {
+    ...surface,
+    routes: routes.map((routeValue) => {
+      if (!routeValue || typeof routeValue !== 'object' || Array.isArray(routeValue)) return routeValue;
+      const sourceRoute = { ...(routeValue as Record<string, unknown>) };
+      const routeId = typeof sourceRoute.id === 'string' ? sourceRoute.id : '(unknown route)';
+      if (sourceRoute.contracts !== undefined) {
+        throw new Error(
+          `${surfaceId}/${routeId} must inherit contracts from its profile and use contractOverrides for route facts.`,
+        );
+      }
+      const mechanic = profile?.routeMechanics.find((candidate) => (
+        candidate.protocol === sourceRoute.protocol && candidate.adapter === sourceRoute.adapterId
+      )) ?? profile?.routeMechanics.find((candidate) => (
+        candidate.protocol === sourceRoute.protocol
+      ));
+      const contractOverrides = ProviderContractBundlePatchSchema.parse(
+        sourceRoute.contractOverrides ?? {},
+      );
+      delete sourceRoute.contractOverrides;
+      const protocol = ProviderProtocolSchema.safeParse(sourceRoute.protocol);
+      return {
+        ...sourceRoute,
+        contracts: mechanic
+          ? mergeProviderContracts(mechanic.contracts, contractOverrides)
+          : protocol.success
+            ? createFailClosedProviderContracts(protocol.data)
+            : undefined,
+      };
+    }),
+  };
+}
 function uniqueById<T extends { id: string }>(values: T[], label: string, errors: string[]): Map<string, T> {
   const result = new Map<string, T>();
   for (const value of values) {
@@ -482,6 +549,12 @@ function validateSurface(
       mechanic.protocol === route.protocol && mechanic.adapter === route.adapterId
     ));
     if (profile && !admitted) errors.push(`${surface.id}/${route.id} is not admitted by profile ${profile.id}`);
+    if (!route.contracts.state.supportedModes.includes(route.contracts.state.defaultMode)) {
+      errors.push(`${surface.id}/${route.id} state default is not included in supportedModes`);
+    }
+    if (route.contracts.toolLoop.modelSwitch !== 'pin-until-terminal') {
+      errors.push(`${surface.id}/${route.id} must pin an active tool loop to its frozen execution identity`);
+    }
   }
   if (stableJson([...routeAdapters].sort()) !== stableJson([...surface.adapterIds].sort())) {
     errors.push(`${surface.id} adapterIds do not match its routes`);
@@ -520,7 +593,10 @@ function validateSurface(
 export function compileProviderCatalog(input: ProviderCatalogCompileInput): CompiledProviderCatalog {
   const identities = input.identities.map((value) => ProviderIdentityManifestSchema.parse(value));
   const profiles = input.profiles.map((value) => ProviderProfileManifestSchema.parse(value));
-  const surfaces = input.surfaces.map((value) => ProviderSurfaceManifestSchema.parse(value));
+  const profileContractsById = new Map(profiles.map((profile) => [profile.id, profile]));
+  const surfaces = input.surfaces.map((value) => ProviderSurfaceManifestSchema.parse(
+    materializeSurfaceContractInput(value, profileContractsById),
+  ));
   identities.sort((left, right) => left.id.localeCompare(right.id));
   profiles.sort((left, right) => left.id.localeCompare(right.id));
   surfaces.sort((left, right) => left.id.localeCompare(right.id));

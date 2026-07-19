@@ -46,7 +46,7 @@ Scoped Runtime Resolution
 
 `PromptPlan` 的每个 segment 都保存 kind、scope、path、hash、precedence、content 与 token estimate。`RequestEnvelopeBuilder` 负责 provider-neutral 的完整合并；Provider Adapter 只映射 wire protocol。
 
-每次 `llm_turn` 保存脱敏 `RequestEnvelopeSnapshot`，包含 effective instructions、messages、tools、resource provenance、provider/model/protocol、usage 与 redaction metadata。Credential、capture binary 和 provider protected payload 不落盘；protected payload 只保留 hash 与脱敏原因。Request Inspector 组件可保留为代码层调试能力，但不得挂到默认 Session/Trace 右侧面板，也不得嵌入 Work Process 消息流。
+每次 `llm_turn` 保存脱敏 `RequestEnvelopeSnapshot`，包含 effective instructions、messages、tools、resource provenance、provider/model/protocol、usage 与 redaction metadata。Credential、capture binary 和 provider protected payload 不落盘；protected payload 只保留 hash 与脱敏原因。Request Inspector 的唯一产品入口位于 Settings > Diagnostics；它是代码层调试能力，不得挂到默认 Session/Trace 右侧面板，也不得嵌入 Work Process 消息流。该入口同时投影冻结的 execution identity、continuation replay、derived-context 与 prompt-cache 编译结果。
 
 ## Context Usage 计量
 

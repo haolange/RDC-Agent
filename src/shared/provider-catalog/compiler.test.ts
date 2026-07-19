@@ -75,15 +75,15 @@ describe('Provider Catalog compiler', () => {
     const kimi = catalog.surfaces.get('kimi-coding-plan')?.surface;
     expect(kimi?.routes.map((route) => ({
       protocol: route.protocol,
-      semantic: route.reasoningContract?.semantic,
-      label: route.reasoningContract?.displayLabel,
+      semantic: route.contracts.reasoning.semantic,
+      label: route.contracts.reasoning.displayLabel,
     }))).toEqual([
       { protocol: 'AnthropicMessages', semantic: 'raw', label: 'Raw reasoning' },
       { protocol: 'OpenAICompatibleChatCompletions', semantic: 'raw', label: 'Raw reasoning' },
     ]);
 
     const custom = catalog.surfaces.get('custom-endpoint')?.surface;
-    expect(custom?.routes.every((route) => route.reasoningContract === undefined)).toBe(true);
+    expect(custom?.routes.every((route) => route.contracts.reasoning.semantic === 'unknown')).toBe(true);
   });
 
   it('exposes protocols only through precise model route matrices', () => {

@@ -3,6 +3,7 @@ import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
 import type { TranslationKey, useI18n } from '../../../../i18n';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
+import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
 import { AgentManifestEditor } from './AgentManifestEditor';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -79,6 +80,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
 }) => {
   const activeDrafts = visibleDrafts(agentManifestDrafts);
   const [selectedAgentId, setSelectedAgentId] = useState(activeDrafts[0]?.id ?? '');
+  const [pendingDelete, setPendingDelete] = useState<AgentManifestDraft | null>(null);
   const selectedAgent = activeDrafts.find((agent) => agent.id === selectedAgentId) ?? activeDrafts[0] ?? null;
   const selectedId = selectedAgent?.id ?? '';
 
@@ -113,13 +115,18 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   };
 
   const deleteAgent = () => {
-    if (!selectedAgent) return;
-    if (!window.confirm(t('settings.deleteAgentConfirm', { name: selectedAgent.name || selectedAgent.id }))) return;
+    if (selectedAgent) setPendingDelete(selectedAgent);
+  };
+
+  const confirmDeleteAgent = () => {
+    const target = pendingDelete;
+    if (!target) return;
     onAgentManifestDraftsChange((current) => current.map((agent) => (
-      agent.id === selectedAgent.id ? { ...agent, delete: true, enabled: false } : agent
+      agent.id === target.id ? { ...agent, delete: true, enabled: false } : agent
     )));
-    const next = activeDrafts.find((agent) => agent.id !== selectedAgent.id);
+    const next = activeDrafts.find((agent) => agent.id !== target.id);
     setSelectedAgentId(next?.id ?? '');
+    setPendingDelete(null);
   };
 
   return (
@@ -171,6 +178,16 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
             />
           )}
         </div>
+        {pendingDelete ? (
+          <ConfirmationDialog
+            title={t('settings.deleteAgentTitle')}
+            message={t('settings.deleteAgentConfirm', { name: pendingDelete.name || pendingDelete.id })}
+            confirmLabel={t('dialog.delete')}
+            cancelLabel={t('dialog.cancel')}
+            onCancel={() => setPendingDelete(null)}
+            onConfirm={confirmDeleteAgent}
+          />
+        ) : null}
     </div>
   );
 };

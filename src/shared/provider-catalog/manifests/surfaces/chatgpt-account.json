@@ -51,11 +51,19 @@
       "baseUrl": "https://chatgpt.com/backend-api/codex",
       "default": true,
       "protocolOwner": "openai",
-      "reasoningContract": {
-        "semantic": "summary",
-        "source": "openai-responses-reasoning-summary",
-        "evidence": "https://platform.openai.com/docs/api-reference/responses-streaming/response/reasoning_summary_part/added",
-        "displayLabel": "Reasoning summary"
+      "contractOverrides": {
+        "reasoning": {
+          "semantic": "summary",
+          "source": "openai-responses-reasoning-summary",
+          "evidence": "https://platform.openai.com/docs/api-reference/responses-streaming/response/reasoning_summary_part/added",
+          "displayLabel": "Reasoning summary",
+          "carrier": "reasoning-item",
+          "artifactFormat": "openai.responses.reasoning",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "chatgpt-account:OpenAIResponses",
+          "continuation": "exact-execution"
+        },
+        "compatibilityGroup": "chatgpt-account:OpenAIResponses"
       }
     }
   ],

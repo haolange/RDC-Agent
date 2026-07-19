@@ -1,3 +1,6 @@
+import type { CompiledPromptCache, DerivedContextMessageRef } from '@shared/types/semanticContext';
+import type { PromptSegment } from '@shared/types/rdxRuntime';
+
 /**
  * Internal types for the provider/runtime boundary.
  * Renderer and IPC surfaces must receive explicit shared projections, never these objects directly.
@@ -9,39 +12,20 @@
 
 export type ProviderOutputRef = import('@shared/types/reasoning').ProviderOutputRef;
 
+export type ProviderContinuationArtifact = import('@shared/types/reasoning').ProviderContinuationArtifact;
+
+export type ProviderStateRef = import('@shared/types/reasoning').ProviderStateRef;
+
+export type ThinkingArtifactKind = import('@shared/types/reasoning').ThinkingArtifactKind;
+
+export type ThinkingArtifactVisibility = import('@shared/types/reasoning').ThinkingArtifactVisibility;
+
+export type ThinkingArtifactSource = import('@shared/types/reasoning').ThinkingArtifactSource;
+
 export interface TextContent {
   type: 'text';
   text: string;
   providerOutputRef?: ProviderOutputRef;
-}
-
-export type ThinkingArtifactKind = 'summary' | 'raw' | 'opaque' | 'unknown';
-
-export type ThinkingArtifactVisibility = 'summary' | 'raw-collapsed' | 'hidden';
-
-export type ThinkingArtifactReplayPolicy = 'none' | 'provider-artifact' | 'openai-reasoning-content';
-
-export type ThinkingArtifactSource =
-  | 'openai-responses-summary'
-  | 'openai-responses-encrypted'
-  | 'anthropic-thinking'
-  | 'anthropic-redacted-thinking'
-  | 'openai-compatible-raw'
-  | 'openrouter-raw'
-  | 'gemini-raw'
-  | 'ollama-raw'
-  | 'unknown';
-
-export interface ProviderReasoningArtifact {
-  providerId: string;
-  modelId?: string;
-  protocol?: string;
-  type: string;
-  id?: string;
-  encryptedContent?: string;
-  signature?: string;
-  data?: string;
-  raw?: Record<string, unknown>;
 }
 
 export interface ThinkingContent {
@@ -50,8 +34,7 @@ export interface ThinkingContent {
   kind: ThinkingArtifactKind;
   source: ThinkingArtifactSource;
   visibility: ThinkingArtifactVisibility;
-  replayPolicy: ThinkingArtifactReplayPolicy;
-  artifact?: ProviderReasoningArtifact;
+  continuation?: ProviderContinuationArtifact;
   providerOutputRef?: ProviderOutputRef;
 }
 
@@ -81,6 +64,8 @@ export interface UserMessage {
   role: 'user';
   content: string | (TextContent | ImageContent)[];
   /** Unix 毫秒时间戳。 */
+  /** Typed derived context ownership; canonical transcript messages never set this field. */
+  derivedContext?: DerivedContextMessageRef;
   timestamp: number;
 }
 
@@ -96,6 +81,8 @@ export interface AssistantMessage {
   usage: Usage;
   /** 助手消息结束的原因。 */
   stopReason: StopReason;
+  /** Opaque provider-managed continuation state. Never projected to renderer or IPC. */
+  providerState?: ProviderStateRef;
   /** Unix 毫秒时间戳。 */
   timestamp: number;
 }
@@ -158,6 +145,8 @@ export interface Usage {
 export interface Context {
   /** 系统提示词。 */
   systemPrompt?: string;
+  /** PromptPlan-owned segments used to compile stable provider cache blocks. */
+  systemPromptSegments?: PromptSegment[];
   /** 历史消息序列。 */
   messages: Message[];
   /** 可用工具集合。 */
@@ -202,6 +191,7 @@ export type ModelApi =
   | 'openai-compatible'
   | 'openai-responses'
   | 'anthropic-messages'
+  | 'google-interactions'
   | 'google-gemini'
   | 'ollama'
   | (string & {});
@@ -345,6 +335,8 @@ export interface StreamOptions {
   /** Closed, secret-free wire contract compiled by RequestPlanner. */
   requestPlan: RequestPlan;
   /** Opaque main-process lease created by send preflight; never persisted or exposed to renderer. */
+  /** Provider-specific cache behavior compiled from the prompt prefix and provider contract. */
+  promptCache?: CompiledPromptCache;
   credentialHandle?: string;
 }
 

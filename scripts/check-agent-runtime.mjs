@@ -42,7 +42,14 @@ function effectiveModel(provider, modelId, overrides = {}) {
     label: modelId,
     aliases: [],
     enabled: true,
-    route: { protocol: provider.protocol, baseUrl: provider.baseUrl, source: 'catalog' },
+    route: {
+      protocol: provider.protocol,
+      baseUrl: provider.baseUrl,
+      source: 'catalog',
+      contracts: require('../src/main/provider-catalog/ProviderCatalogRegistry.ts')
+        .getLoadedProviderSurface(provider.id)?.routes
+        .find((route) => route.protocol === provider.protocol)?.contracts,
+    },
     availability: 'available',
     contextTiers: [{ id: 'default', label: 'Default', activation: { kind: 'implicit' }, entitlement: 'granted' }],
     defaultBudgetTokens: 128000,
@@ -81,13 +88,15 @@ function assertIncludesNone(values, forbidden, label) {
   }
 }
 
-function main() {
+async function main() {
+  const { loadProviderSurface } = require('../src/main/provider-catalog/ProviderCatalogRegistry.ts');
+  await Promise.all(['kimi-coding-plan', 'grok-account', 'openrouter'].map((id) => loadProviderSurface(id)));
   const routeResolverSource = read('src/main/agent-runtime/capabilities/RouteCapabilityResolver.ts');
   assert(routeResolverSource.includes('LlmProviderProtocol'), 'RouteCapabilityResolver must use the new LlmProviderProtocol enum.');
   assert(!routeResolverSource.includes('LlmProviderKind'), 'RouteCapabilityResolver must not keep legacy LlmProviderKind.');
 assert(routeResolverSource.includes('reasoningDelivery'), 'RouteCapabilityResolver must expose reasoningDelivery.');
 assert(routeResolverSource.includes('ProviderReasoningContract'), 'RouteCapabilityResolver must expose a provider/model reasoning contract.');
-assert(routeResolverSource.includes("semantic: 'unknown'"), 'Compatible providers must retain unknown reasoning semantics without official evidence.');
+assert(routeResolverSource.includes('createFailClosedProviderContracts'), 'Compatible providers must resolve missing contract evidence through the fail-closed contract factory.');
 assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning semantics must not be inferred from compatibility protocol.');
   assert(!routeResolverSource.includes('provider.kind'), 'RouteCapabilityResolver must not route on legacy provider.kind.');
 
@@ -216,7 +225,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
     assert(!conversationService.includes(forbidden), `ConversationService must not preload local files outside the tool permission policy: ${forbidden}.`);
   }
   assert(conversationService.includes('promptPlanBuilder.build'), 'ConversationService must build a PromptPlan for system instructions.');
-  assert(conversationService.includes('routeCapability: routePreflight.routeCapability'), 'ConversationService must pass route capability into PromptPlanBuilder.');
+  assert(conversationService.includes('routeCapability: input.routePreflight.routeCapability'), 'ConversationService must pass the frozen route capability into PromptPlanBuilder.');
   assert(conversationService.includes('permissionSettings: runtimeSettings.agentRuntime.permissions'), 'ConversationService must pass runtime permission settings into PromptPlanBuilder.');
   assert(conversationService.includes('answerToolApproval'), 'ConversationService must expose tool approval resume.');
   for (const token of ['prepareTurnContext', 'prepareConversationPrompt', 'materializeAgentUserInput', 'preparedTurn', 'requestId']) {
@@ -226,8 +235,8 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(!conversationService.includes('previewNextRequestContext'), 'ConversationService must not restore draft-time context preview work.');
 
   const contextJournal = read('src/main/conversation/SessionContextJournal.ts');
-  for (const token of ['filteredArtifactCount', "replayPolicy === 'provider-artifact'", "replayPolicy === 'openai-reasoning-content'"]) {
-    assert(contextJournal.includes(token), `Session context route-private artifact filtering must include ${token}.`);
+  for (const token of ['filteredArtifactCount', 'decideContinuationReplay', 'canonicalizeTerminalContextMessages', 'schemaVersion !== 2']) {
+    assert(contextJournal.includes(token), `Session context v2 continuation filtering must include ${token}.`);
   }
   const conversationIpc = read('src/main/ipc/conversationHandlers.ts');
   assert(conversationIpc.includes("status: 'accepted'"), 'Main IPC must return a structured accepted send result after commit.');
@@ -274,7 +283,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
 }
 
 try {
-  main();
+  await main();
 } catch (error) {
   console.error('[agent-runtime] FAILED');
   console.error(error);

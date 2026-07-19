@@ -6,7 +6,7 @@ import {
   JsonPrimitiveSchema,
   ModelManifestPatchSchema,
   ModelManifestSchema,
-  ProviderReasoningContractSchema,
+  ProviderContractBundleSchema,
   ProviderProtocolSchema,
 } from './modelManifestSchema';
 import {
@@ -143,7 +143,7 @@ export const ProviderSurfaceRouteSchema = z.object({
   baseUrl: z.string().min(1),
   headers: z.record(z.string(), z.string()).optional(),
   default: z.boolean().optional(),
-  reasoningContract: ProviderReasoningContractSchema.optional(),
+  contracts: ProviderContractBundleSchema,
 }).strict();
 
 export const ProviderSurfaceManifestSchema = z.object({
@@ -253,6 +253,7 @@ export const ProviderProfileManifestSchema = z.object({
   routeMechanics: z.array(z.object({
     protocol: ProviderProtocolSchema,
     adapter: ProviderAdapterIdSchema,
+    contracts: ProviderContractBundleSchema,
   }).strict()).min(1),
 }).strict();
 

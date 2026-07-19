@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { __testing as openAiWire } from './OpenAICompatibleProvider';
 import { buildGeminiStreamUrl } from './GeminiProvider';
+import { buildGoogleInteractionsUrl } from './GoogleInteractionsProvider';
 import { buildAnthropicMessagesUrl } from './AnthropicProvider';
 import { buildOpenAIResponsesUrl } from './OpenAIResponsesProvider';
 
@@ -34,6 +35,15 @@ describe('provider request URL contracts', () => {
       'https://api-gateway.merge.dev/v1/anthropic',
       'claude-sonnet-4-6',
     )).toBe('https://api-gateway.merge.dev/v1/anthropic/messages');
+  });
+
+  it('builds the GA Google Interactions operation exactly once', () => {
+    expect(buildGoogleInteractionsUrl('https://generativelanguage.googleapis.com/v1/')).toBe(
+      'https://generativelanguage.googleapis.com/v1/interactions',
+    );
+    expect(buildGoogleInteractionsUrl('https://generativelanguage.googleapis.com/v1/interactions')).toBe(
+      'https://generativelanguage.googleapis.com/v1/interactions',
+    );
   });
 
   it('builds the native Vertex Gemini publisher URL without an API-key query parameter', () => {

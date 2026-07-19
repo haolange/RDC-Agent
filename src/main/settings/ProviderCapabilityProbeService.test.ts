@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { EffectiveModel, RequestPlan, RequestPlanningResult } from '@shared/types/providerCapability';
 import { providerAdapterIdForProtocol } from '@shared/provider-catalog/implementationRegistry';
+import { createTestRequestPlan } from '../testing/createTestRequestPlan';
 import type { LlmModelCapabilityProbeRequest, LlmProviderEntry } from '@shared/types/settings';
 import {
   buildProbeFailurePatch,
@@ -59,7 +60,7 @@ function plan(
   effectiveModel: EffectiveModel,
 ): Extract<RequestPlanningResult, { ok: true }> {
   const oneMillionTier = effectiveModel.contextTiers.at(-1)!;
-  const requestPlan: RequestPlan = {
+  const requestPlan: RequestPlan = createTestRequestPlan({
     providerId: request.providerId,
     adapterId: providerAdapterIdForProtocol(effectiveModel.route.protocol),
     catalogRevision: effectiveModel.catalogRevision ?? 'test-catalog',
@@ -83,7 +84,7 @@ function plan(
     activeTierId: request.mode === 'one-million-context' ? oneMillionTier.id : effectiveModel.contextTiers[0].id,
     fastMode: request.mode === 'fast',
     reasoningWire: { selection: 'off', control: effectiveModel.controls.reasoning },
-  };
+  });
   return {
     ok: true,
     plan: requestPlan,

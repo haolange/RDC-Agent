@@ -84,6 +84,7 @@ export interface AgentLoopConfig {
 /** Agent 上下文（可变；agentLoop 会原地修改 messages）。 */
 export interface AgentContext {
   systemPrompt?: string;
+  systemPromptSegments?: Context['systemPromptSegments'];
   messages: AgentMessage[];
   tools?: ToolDefinition[];
 }
@@ -525,6 +526,7 @@ async function streamAssistantResponse(
   // 3. 构建 LLM Context
   const llmContext: Context = {
     systemPrompt: context.systemPrompt,
+    systemPromptSegments: context.systemPromptSegments,
     messages: llmMessages,
     tools: context.tools,
   };

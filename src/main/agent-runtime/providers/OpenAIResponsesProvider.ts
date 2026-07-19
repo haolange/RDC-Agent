@@ -6,12 +6,13 @@ import type {
   Context,
   Message,
   Model,
-  ProviderReasoningArtifact,
+  ProviderContinuationArtifact,
   StopReason,
   StreamOptions,
   ToolDefinition,
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
+import { partitionSystemPrompt } from './promptCacheWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
 import { AssistantStreamBuilder, createProviderOutputRef, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
 import {
@@ -22,7 +23,12 @@ import {
   ProviderHttpError,
 } from './internal/http';
 import { buildOpenAiResponsesReasoning, isReasoningEnabled } from './reasoningWire';
+import { reasoningProjectionSource } from './reasoningProjection';
 import type { ProviderRequestAuthorizer } from '../../settings/AwsBedrockCredentials';
+import type { RequestPlan } from '@shared/types/providerCapability';
+import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
+import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
+import { createProviderStateRef, findLatestProviderState } from '../reasoning/ProviderStateRefs';
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const PROVIDER_API = 'openai-responses';
@@ -49,7 +55,7 @@ interface ResponsesCompletedPayload {
     input_tokens?: number;
     output_tokens?: number;
     total_tokens?: number;
-    input_tokens_details?: { cached_tokens?: number };
+    input_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number };
     output_tokens_details?: { reasoning_tokens?: number };
   };
 }
@@ -62,7 +68,7 @@ type InputMessageContent = string | Array<{
 }>;
 
 type ResponsesInputContentPart =
-  | { type: 'input_text'; text: string }
+  | { type: 'input_text'; text: string; prompt_cache_breakpoint?: { mode: 'explicit' } }
   | { type: 'input_image'; image_url: string };
 
 export class OpenAIResponsesProvider implements ProviderStrategy {
@@ -137,7 +143,9 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
 
       const toolSlotsByItemId = new Map<string, number>();
       const toolArgBuffers = new Map<number, string>();
-      let currentReasoningArtifact: ProviderReasoningArtifact | undefined;
+      let currentReasoningArtifact: ProviderContinuationArtifact | undefined;
+      const summarySource = reasoningProjectionSource(options.requestPlan, 'summary');
+      const opaqueSource = reasoningProjectionSource(options.requestPlan, 'opaque');
       const textRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:text', contentIndex: TEXT_INDEX });
       const reasoningRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:reasoning', contentIndex: REASONING_INDEX });
       const toolRefs = new Map<number, ReturnType<typeof createProviderOutputRef>>();
@@ -195,17 +203,16 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
               sawOutput = true;
               if (!thinkingStarted) {
                 builder.startThinking(reasoningRef, {
-                  kind: 'summary', source: 'openai-responses-summary', visibility: 'summary',
-                  replayPolicy: currentReasoningArtifact ? 'provider-artifact' : 'none', artifact: currentReasoningArtifact,
+                  kind: 'summary', source: summarySource, visibility: 'summary',
+                  continuation: currentReasoningArtifact,
                 });
                 thinkingStarted = true;
               }
               builder.appendThinking(reasoningRef, delta, {
                 kind: 'summary',
-                source: 'openai-responses-summary',
+                source: summarySource,
                 visibility: 'summary',
-                replayPolicy: currentReasoningArtifact ? 'provider-artifact' : 'none',
-                artifact: currentReasoningArtifact,
+                continuation: currentReasoningArtifact,
               });
             }
             break;
@@ -213,42 +220,39 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
           case 'response.reasoning_summary_text.done':
             if (!thinkingStarted) {
               builder.startThinking(reasoningRef, {
-                kind: 'summary', source: 'openai-responses-summary', visibility: 'summary',
-                replayPolicy: currentReasoningArtifact ? 'provider-artifact' : 'none', artifact: currentReasoningArtifact,
+                kind: 'summary', source: summarySource, visibility: 'summary',
+                continuation: currentReasoningArtifact,
               });
               thinkingStarted = true;
             }
             builder.endThinking(reasoningRef, {
               kind: 'summary',
-              source: 'openai-responses-summary',
+              source: summarySource,
               visibility: 'summary',
-              replayPolicy: currentReasoningArtifact ? 'provider-artifact' : 'none',
-              artifact: currentReasoningArtifact,
+              continuation: currentReasoningArtifact,
             });
             thinkingClosed = true;
             break;
           case 'response.output_item.added': {
             const outputIndex = readNumber(event.output_index) ?? 0;
             const item = readRecord(event.item);
-            const reasoningArtifact = createResponsesReasoningArtifact(model, item);
+            const reasoningArtifact = createResponsesReasoningArtifact(options.requestPlan, item);
             if (reasoningArtifact) {
               currentReasoningArtifact = reasoningArtifact;
               sawOutput = true;
               if (!thinkingStarted) {
                 builder.startThinking(reasoningRef, {
                   kind: 'opaque',
-                  source: 'openai-responses-encrypted',
+                  source: opaqueSource,
                   visibility: 'hidden',
-                  replayPolicy: 'provider-artifact',
-                  artifact: currentReasoningArtifact,
+                  continuation: currentReasoningArtifact,
                 });
                 thinkingStarted = true;
               } else if (!thinkingClosed) builder.updateThinking(reasoningRef, {
                 kind: 'opaque',
-                source: 'openai-responses-encrypted',
+                source: opaqueSource,
                 visibility: 'hidden',
-                replayPolicy: 'provider-artifact',
-                artifact: currentReasoningArtifact,
+                continuation: currentReasoningArtifact,
               });
             } else if (readString(item?.type) === 'function_call') {
               const slot = TOOL_INDEX_BASE + outputIndex;
@@ -287,25 +291,23 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
           case 'response.output_item.done': {
             const outputIndex = readNumber(event.output_index) ?? 0;
             const item = readRecord(event.item);
-            const reasoningArtifact = createResponsesReasoningArtifact(model, item);
+            const reasoningArtifact = createResponsesReasoningArtifact(options.requestPlan, item);
             if (reasoningArtifact) {
               currentReasoningArtifact = reasoningArtifact;
               sawOutput = true;
               if (!thinkingStarted) {
                 builder.startThinking(reasoningRef, {
                   kind: 'opaque',
-                  source: 'openai-responses-encrypted',
+                  source: opaqueSource,
                   visibility: 'hidden',
-                  replayPolicy: 'provider-artifact',
-                  artifact: currentReasoningArtifact,
+                  continuation: currentReasoningArtifact,
                 });
                 thinkingStarted = true;
               } else if (!thinkingClosed) builder.updateThinking(reasoningRef, {
                 kind: 'opaque',
-                source: 'openai-responses-encrypted',
+                source: opaqueSource,
                 visibility: 'hidden',
-                replayPolicy: 'provider-artifact',
-                artifact: currentReasoningArtifact,
+                continuation: currentReasoningArtifact,
               });
             } else if (readString(item?.type) === 'function_call') {
               const slot = TOOL_INDEX_BASE + outputIndex;
@@ -333,15 +335,16 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
             const completed = readRecord(event.response) as ResponsesCompletedPayload | null;
             if (completed) {
               applyCompletedUsage(builder, completed);
-              const completedArtifact = findResponsesReasoningArtifact(model, completed.output);
+              const providerState = createProviderStateRef(options.requestPlan, completed.id);
+              if (providerState) builder.setProviderState(providerState);
+              const completedArtifact = findResponsesReasoningArtifact(options.requestPlan, completed.output);
               if (completedArtifact) {
                 currentReasoningArtifact = completedArtifact;
                 if (thinkingStarted && !thinkingClosed) builder.updateThinking(reasoningRef, {
                   kind: 'summary',
-                  source: 'openai-responses-summary',
+                  source: summarySource,
                   visibility: 'summary',
-                  replayPolicy: 'provider-artifact',
-                  artifact: currentReasoningArtifact,
+                  continuation: currentReasoningArtifact,
                 });
               }
               finishReason = completed.status === 'incomplete' ? 'length' : sawToolCall ? 'toolUse' : 'stop';
@@ -409,15 +412,55 @@ export function buildOpenAIResponsesUrl(baseUrl: string): string {
 }
 
 function buildRequestBody(model: Model, context: Context, options: StreamOptions): Record<string, unknown> {
+  const providerState = findLatestProviderState(context, options.requestPlan);
+  const inputContext = providerState
+    ? { ...context, messages: context.messages.slice(providerState.assistantMessageIndex + 1) }
+    : context;
+  const prompt = partitionSystemPrompt(context);
+  const explicitBreakpoint = options.promptCache?.enabled === true
+    && options.promptCache.breakpointCarrier === 'openai-prompt-cache'
+    && (
+      options.promptCache.breakpoint === 'explicit'
+      || options.promptCache.breakpoint === 'automatic-and-explicit'
+    );
+  const input = toResponsesInput(inputContext, options.requestPlan);
+  if (explicitBreakpoint) {
+    if (!prompt.stableText) {
+      throw new Error(
+        'PROMPT_CACHE_STABLE_PREFIX_UNAVAILABLE: explicit OpenAI cache mode requires PromptPlan-owned stable segments.',
+      );
+    }
+    const content: ResponsesInputContentPart[] = [{
+      type: 'input_text',
+      text: prompt.stableText,
+      prompt_cache_breakpoint: { mode: 'explicit' },
+    }];
+    if (prompt.volatileText) {
+      content.push({ type: 'input_text', text: prompt.volatileText });
+    }
+    input.unshift({ type: 'message', role: 'developer', content });
+  }
   const body: Record<string, unknown> = {
     model: model.id,
-    input: toResponsesInput(context),
+    input,
     stream: true,
-    store: false,
+    store: options.requestPlan.statePlan.store,
     parallel_tool_calls: true,
   };
-  if (context.systemPrompt?.trim()) {
-    body.instructions = context.systemPrompt.trim();
+  if (options.promptCache?.enabled
+    && options.promptCache.keyCarrier === 'prompt-cache-key'
+    && options.promptCache.requestKey) {
+    body.prompt_cache_key = options.promptCache.requestKey;
+  }
+  if (explicitBreakpoint) {
+    body.prompt_cache_options = {
+      mode: options.promptCache?.breakpoint === 'explicit' ? 'explicit' : 'implicit',
+      ...(options.promptCache?.ttl === 'thirty-minutes' ? { ttl: '30m' } : {}),
+    };
+  }
+  if (providerState) body.previous_response_id = providerState.state.value;
+  if (!explicitBreakpoint && prompt.combinedText) {
+    body.instructions = prompt.combinedText;
   }
   if (typeof options.temperature === 'number') body.temperature = options.temperature;
   if (typeof options.topP === 'number') body.top_p = options.topP;
@@ -439,15 +482,15 @@ function buildRequestBody(model: Model, context: Context, options: StreamOptions
   return body;
 }
 
-function toResponsesInput(context: Context): unknown[] {
+function toResponsesInput(context: Context, requestPlan: RequestPlan): unknown[] {
   const items: unknown[] = [];
   for (const message of context.messages) {
-    items.push(...convertMessage(message));
+    items.push(...convertMessage(message, requestPlan));
   }
   return items;
 }
 
-function convertMessage(message: Message): unknown[] {
+function convertMessage(message: Message, requestPlan: RequestPlan): unknown[] {
   if (message.role === 'user') {
     return [toInputMessage('user', message.content)];
   }
@@ -456,7 +499,11 @@ function convertMessage(message: Message): unknown[] {
     const items: unknown[] = [];
     for (const block of message.content) {
       if (block.type === 'thinking') {
-        const replayItem = toResponsesReasoningReplayItem(block.artifact, block.replayPolicy);
+        const replayItem = toResponsesReasoningReplayItem(
+          block.continuation,
+          requestPlan,
+          message.content.some((candidate) => candidate.type === 'toolCall'),
+        );
         if (replayItem) items.push(replayItem);
       }
     }
@@ -509,11 +556,12 @@ function toInputMessage(role: 'user' | 'assistant', content: InputMessageContent
 }
 
 function toResponsesReasoningReplayItem(
-  artifact: ProviderReasoningArtifact | undefined,
-  replayPolicy: string,
+  artifact: ProviderContinuationArtifact | undefined,
+  requestPlan: RequestPlan,
+  sameToolLoop: boolean,
 ): Record<string, unknown> | null {
-  if (replayPolicy !== 'provider-artifact' || !artifact) return null;
-  if (artifact.protocol !== PROVIDER_API && artifact.protocol !== 'OpenAIResponses') return null;
+  const decision = decideContinuationReplay(artifact, requestPlan, { sameToolLoop });
+  if (decision.action !== 'replay' || !artifact || artifact.carrier !== 'reasoning-item') return null;
   if (artifact.raw) return artifact.raw;
   const item: Record<string, unknown> = { type: artifact.type || 'reasoning' };
   if (artifact.id) item.id = artifact.id;
@@ -533,6 +581,7 @@ function toResponsesTool(tool: ToolDefinition): Record<string, unknown> {
 function applyCompletedUsage(builder: AssistantStreamBuilder, payload: ResponsesCompletedPayload): void {
   if (payload.usage) {
     const cacheReadTokens = payload.usage.input_tokens_details?.cached_tokens;
+    const cacheWriteTokens = payload.usage.input_tokens_details?.cache_write_tokens;
     const reasoningTokens = payload.usage.output_tokens_details?.reasoning_tokens;
     builder.setUsage({
       inputTokens: payload.usage.input_tokens ?? 0,
@@ -541,35 +590,33 @@ function applyCompletedUsage(builder: AssistantStreamBuilder, payload: Responses
         payload.usage.total_tokens
         ?? (payload.usage.input_tokens ?? 0) + (payload.usage.output_tokens ?? 0),
       ...(typeof cacheReadTokens === 'number' ? { cacheReadTokens } : {}),
+      ...(typeof cacheWriteTokens === 'number' ? { cacheWriteTokens } : {}),
       ...(typeof reasoningTokens === 'number' ? { reasoningTokens } : {}),
     });
   }
 }
 
 function createResponsesReasoningArtifact(
-  model: Model,
+  requestPlan: RequestPlan,
   item: Record<string, unknown> | null | undefined,
-): ProviderReasoningArtifact | undefined {
+): ProviderContinuationArtifact | undefined {
   if (readString(item?.type) !== 'reasoning') return undefined;
   const encryptedContent = readString(item?.encrypted_content) || readString(item?.encryptedContent);
-  return {
-    providerId: model.provider,
-    modelId: model.id,
-    protocol: PROVIDER_API,
+  return createContinuationArtifact(requestPlan, {
     type: 'reasoning',
     id: readString(item?.id) || undefined,
     encryptedContent: encryptedContent || undefined,
     raw: item ?? undefined,
-  };
+  });
 }
 
 function findResponsesReasoningArtifact(
-  model: Model,
+  requestPlan: RequestPlan,
   output: unknown[] | undefined,
-): ProviderReasoningArtifact | undefined {
+): ProviderContinuationArtifact | undefined {
   if (!Array.isArray(output)) return undefined;
   for (const item of output) {
-    const artifact = createResponsesReasoningArtifact(model, readRecord(item));
+    const artifact = createResponsesReasoningArtifact(requestPlan, readRecord(item));
     if (artifact) return artifact;
   }
   return undefined;

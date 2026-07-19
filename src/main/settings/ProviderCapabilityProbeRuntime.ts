@@ -1,6 +1,7 @@
 import type { AssistantMessage } from '../agent-runtime/core/types';
 import { encodeAgentModel, configuredRuntimeProvider } from '../agent-runtime/providers/ConfiguredRuntimeProvider';
 import { requestEnvelopeBuilder, requestSnapshotStore } from '../agent-runtime/prompt';
+import { promptCacheCompiler } from '../agent-runtime/prompt/PromptCacheCompiler';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { LlmModelCapabilityProbeRequest, LlmProviderEntry } from '@shared/types/settings';
 import type { PromptPlan } from '@shared/types/rdxRuntime';
@@ -31,10 +32,18 @@ function buildProbePromptPlan(): PromptPlan {
       sourceHash: hashScopedResource(content),
       precedence: 0,
       content,
+      stability: 'stable',
       tokenEstimate: charsToTokens(content.length),
     }],
     systemPrompt: content,
     totalTokenEstimate: charsToTokens(content.length),
+    stablePrefix: {
+      fingerprint: hashScopedResource([{ id: 'runtime:provider-capability-probe', content }]),
+      segmentIds: ['runtime:provider-capability-probe'],
+      sourceHashes: [hashScopedResource(content)],
+      tokenEstimate: charsToTokens(content.length),
+      volatileSegmentIds: [],
+    },
     metrics: { systemPrompt: content.length, scopedInstructions: 0, skills: 0 },
     diagnostics: [],
   };
@@ -47,6 +56,7 @@ export async function executeCapabilityProbe(input: CapabilityProbeExecution): P
   const messages = [{ role: 'user' as const, content: 'OK', timestamp: Date.now() }];
   const callIndex = requestSnapshotStore.nextCallIndex(undefined, turnId);
   const reasoning = resolveAgentRouteCapability(input.provider, input.model.modelId, input.model, input.plan).reasoningContract;
+  const promptCache = promptCacheCompiler.compile({ promptPlan, requestPlan: input.plan, tools: [] });
   const snapshot = requestEnvelopeBuilder.build({
     promptPlan,
     turnId,
@@ -65,6 +75,7 @@ export async function executeCapabilityProbe(input: CapabilityProbeExecution): P
       maxTokens: PROBE_MAX_OUTPUT_TOKENS,
     },
     reasoning,
+    cache: promptCache,
   });
   requestSnapshotStore.write(snapshot);
 
@@ -72,9 +83,15 @@ export async function executeCapabilityProbe(input: CapabilityProbeExecution): P
     encodeAgentModel(input.request.providerId, input.model.modelId, {
       contextWindow: input.plan.contextBudgetTokens,
     }),
-    { systemPrompt: promptPlan.systemPrompt, messages, tools: [] },
+    {
+      systemPrompt: promptPlan.systemPrompt,
+      systemPromptSegments: promptPlan.segments,
+      messages,
+      tools: [],
+    },
     {
       requestPlan: input.plan,
+      promptCache,
       credentialHandle: input.credentialHandle,
       reasoning: input.plan.reasoningWire,
       temperature: input.plan.temperature,

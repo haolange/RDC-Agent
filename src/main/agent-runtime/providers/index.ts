@@ -12,6 +12,8 @@ export { AnthropicProvider } from './AnthropicProvider';
 export type { AnthropicProviderOptions } from './AnthropicProvider';
 export { GeminiProvider } from './GeminiProvider';
 export type { GeminiProviderOptions } from './GeminiProvider';
+export { GoogleInteractionsProvider } from './GoogleInteractionsProvider';
+export type { GoogleInteractionsProviderOptions } from './GoogleInteractionsProvider';
 export { OllamaProvider } from './OllamaProvider';
 export type { OllamaProviderOptions } from './OllamaProvider';
 export * from './ProviderAuth';
@@ -21,6 +23,7 @@ import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
 import { OpenAIResponsesProvider } from './OpenAIResponsesProvider';
 import { AnthropicProvider } from './AnthropicProvider';
 import { GeminiProvider } from './GeminiProvider';
+import { GoogleInteractionsProvider } from './GoogleInteractionsProvider';
 import { OllamaProvider } from './OllamaProvider';
 
 /**
@@ -32,5 +35,6 @@ export function registerBuiltinProviders(registry: ProviderRegistry): void {
   registry.register(new OpenAIResponsesProvider());
   registry.register(new AnthropicProvider());
   registry.register(new GeminiProvider());
+  registry.register(new GoogleInteractionsProvider());
   registry.register(new OllamaProvider());
 }

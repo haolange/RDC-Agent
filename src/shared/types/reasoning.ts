@@ -1,3 +1,10 @@
+import type { ExecutionIdentity } from './providerCapability';
+import type {
+  ProviderContractBundle,
+  ProviderReasoningContract,
+  ProviderThinkingProjectionSource,
+} from '../provider-catalog/modelManifestSchema';
+
 export interface ProviderOutputRef {
   protocol: string;
   responseId?: string;
@@ -8,32 +15,56 @@ export interface ProviderOutputRef {
 }
 
 export type ThinkingArtifactKind = 'summary' | 'raw' | 'opaque' | 'unknown';
-
 export type ThinkingArtifactVisibility = 'summary' | 'raw-collapsed' | 'hidden';
 
-export type ThinkingArtifactReplayPolicy = 'none' | 'provider-artifact' | 'openai-reasoning-content';
+export type ThinkingArtifactSource = ProviderThinkingProjectionSource;
 
-export type ThinkingArtifactSource =
-  | 'openai-responses-summary'
-  | 'openai-responses-encrypted'
-  | 'anthropic-thinking'
-  | 'anthropic-redacted-thinking'
-  | 'openai-compatible-raw'
-  | 'openrouter-raw'
-  | 'gemini-raw'
-  | 'ollama-raw'
-  | 'unknown';
+export type ContinuationArtifactRequirement = 'optional' | 'required';
+export type ContinuationArtifactScope = ProviderContractBundle['toolLoop']['artifactScope'];
+export type ContinuationArtifactMutationPolicy =
+  | 'verbatim'
+  | 'verbatim-ordered'
+  | 'container-bound'
+  | 'provider-managed';
 
-export interface ProviderReasoningArtifact {
-  providerId: string;
-  modelId?: string;
-  protocol?: string;
+export interface ContinuationArtifactMetadata {
   type: string;
+  continuationPolicy: ProviderReasoningContract['continuation'];
+  carrier: ProviderReasoningContract['carrier'];
+  format: string;
+  version: string;
+  compatibilityGroup: string;
+  requirement: ContinuationArtifactRequirement;
+  scope: ContinuationArtifactScope;
+  mutationPolicy: ContinuationArtifactMutationPolicy;
+  originFingerprint: string;
+  integrityHash: string;
+}
+
+export interface ProviderStateRef {
+  schemaVersion: 1;
+  carrier: ProviderContractBundle['state']['carrier'];
+  value: string;
+  origin: ExecutionIdentity;
+  originFingerprint: string;
+  integrityHash: string;
+}
+
+export interface ProviderContinuationArtifact extends ContinuationArtifactMetadata {
+  origin: ExecutionIdentity;
   id?: string;
   encryptedContent?: string;
   signature?: string;
-  data?: string;
+  thoughtSignature?: string;
+  redactedContent?: string;
+  opaqueState?: string;
+  reasoningContent?: string;
   raw?: Record<string, unknown>;
+  containerBinding?: {
+    providerBlockKey: string;
+    itemId?: string;
+    toolCallIds?: string[];
+  };
 }
 
 export interface ThinkingArtifact {
@@ -41,7 +72,6 @@ export interface ThinkingArtifact {
   kind: ThinkingArtifactKind;
   source: ThinkingArtifactSource;
   visibility: ThinkingArtifactVisibility;
-  replayPolicy: ThinkingArtifactReplayPolicy;
-  artifact?: ProviderReasoningArtifact;
+  continuation?: ContinuationArtifactMetadata;
   providerOutputRef?: ProviderOutputRef;
 }

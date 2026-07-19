@@ -55,6 +55,26 @@ const preparedContext: ConversationTurnResult['preparedContext'] = {
   breakdown: [],
   compactionApplied: false,
   filteredArtifactCount: 0,
+  continuation: {
+    executionFingerprint: 'test-execution',
+    strategy: 'semantic-replay',
+    replayedArtifactCount: 0,
+    droppedArtifactCount: 0,
+    decisionCounts: [],
+  },
+  derivedContext: { status: 'none', compactedTurnCount: 0 },
+  cache: {
+    enabled: false,
+    mode: 'none',
+    keyCarrier: 'none',
+    breakpointCarrier: 'none',
+    ttl: 'none',
+    breakpoint: 'none',
+    stableTokenEstimate: 0,
+    stableSegmentCount: 0,
+    providerReported: false,
+    reason: 'test fixture',
+  },
   preparedAt: 1,
 };
 

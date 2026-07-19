@@ -146,6 +146,7 @@ export interface ElectronAPI {
     compactHistory: (sessionId: string) => Promise<{
       success: boolean;
       messages: ConversationMessage[];
+      contextView?: import('./semanticContext').DerivedContextView | null;
       error?: string;
     }>;
     onEvent: (callback: (event: ConversationStreamEvent) => void) => void;

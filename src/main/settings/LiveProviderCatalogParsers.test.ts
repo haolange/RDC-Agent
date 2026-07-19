@@ -1,7 +1,8 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
-import { ProviderSurfaceManifestSchema } from '@shared/provider-catalog/catalogManifestSchema';
+import { compileProviderCatalog } from '@shared/provider-catalog/compiler';
+import { loadProviderCatalogManifestInput } from '@shared/provider-catalog/nodeManifestLoader';
 import {
   mergeParsedLiveCatalogs,
   parseChatGptAccountCatalog,
@@ -18,11 +19,14 @@ function fixture(name: string): unknown {
   return JSON.parse(readFileSync(resolve(__dirname, 'fixtures/provider-catalogs', name), 'utf8')) as unknown;
 }
 
+const compiledCatalog = compileProviderCatalog(loadProviderCatalogManifestInput(
+  resolve(__dirname, '../../shared/provider-catalog/manifests'),
+));
+
 function surface(name: string) {
-  return ProviderSurfaceManifestSchema.parse(JSON.parse(readFileSync(
-    resolve(__dirname, '../../shared/provider-catalog/manifests/surfaces', `${name}.json`),
-    'utf8',
-  )));
+  const entry = compiledCatalog.surfaces.get(name)?.surface;
+  if (!entry) throw new Error('Missing compiled Provider surface ' + name);
+  return entry;
 }
 
 const KIMI_SURFACE = surface('kimi-coding-plan');
@@ -115,10 +119,8 @@ describe('live Provider Catalog parsers', () => {
       supports_reasoning: true,
     }] }, modelCatalogSurface).contributions[0];
 
-    expect(contribution.route).toEqual({
-      ...k3.route,
-      reasoningContract: expect.objectContaining({ semantic: 'raw', displayLabel: 'Raw reasoning' }),
-    });
+    expect(contribution.route).toMatchObject(k3.route);
+    expect(contribution.route?.contracts?.reasoning).toMatchObject({ semantic: 'raw', displayLabel: 'Raw reasoning' });
     expect(contribution.controls?.context1m).toMatchObject({
       state: 'selectable',
       defaultValue: false,
@@ -190,7 +192,7 @@ describe('live Provider Catalog parsers', () => {
     expect(parseOpenRouterAccountCatalog(source.models).contributions).toEqual([
       expect.objectContaining({
         modelId: 'anthropic/claude-sonnet-4.6',
-        route: { protocol: 'OpenRouterChatCompletions', baseUrl: 'https://openrouter.ai/api/v1', source: 'catalog' },
+        route: expect.objectContaining({ protocol: 'OpenRouterChatCompletions', baseUrl: 'https://openrouter.ai/api/v1', source: 'catalog' }),
         contextTiers: [expect.objectContaining({ maxPromptTokens: 1_000_000 })],
         toolCalling: { state: 'supported' },
         visionInput: { state: 'supported' },
