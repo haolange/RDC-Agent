@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActiveSignalText } from '../../../ui/ActiveSignalText';
 import type { WorkProcessRow } from './workProcessPresentation';
 import { useWorkProcessLabel } from './workProcessUseLabel';
@@ -37,6 +37,23 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
     </>
   );
 
+  // Policy hint from projection; sticky user gesture wins until this section remounts (key=row.id).
+  // Summary click (not details onToggle) owns the gesture so programmatic `open` updates do not
+  // get misclassified as user overrides when the browser emits a synthetic toggle.
+  const [thinkingOpen, setThinkingOpen] = useState(row.thinkingOpenByDefault);
+  const [thinkingUserOverridden, setThinkingUserOverridden] = useState(false);
+
+  useEffect(() => {
+    if (thinkingUserOverridden) return;
+    setThinkingOpen(row.thinkingOpenByDefault);
+  }, [row.thinkingOpenByDefault, thinkingUserOverridden]);
+
+  const handleThinkingSummaryClick = (event: React.MouseEvent<HTMLElement>) => {
+    event.preventDefault();
+    setThinkingOpen((current) => !current);
+    setThinkingUserOverridden(true);
+  };
+
   return (
     <li
       className={`work-process-step work-process-section kind-section status-${row.status}${hasProse ? ' has-prose' : ''}${firstLineCaption ? ' first-line-caption' : ''}`}
@@ -45,8 +62,11 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
       <WorkProcessRailIcon variant="section" status={row.status} />
       <div className="work-process-step-content">
         {row.thinkingExpandable ? (
-          <details className={thinkingClassName} open={row.thinkingOpenByDefault}>
-            <summary className="work-process-thinking-summary">
+          <details className={thinkingClassName} open={thinkingOpen}>
+            <summary
+              className="work-process-thinking-summary"
+              onClick={handleThinkingSummaryClick}
+            >
               {thinkingLabelNode}
               {row.thinkingSource ? <span className="work-process-thinking-source">{row.thinkingSource}</span> : null}
               <span className="work-process-row-caret" aria-hidden="true" />

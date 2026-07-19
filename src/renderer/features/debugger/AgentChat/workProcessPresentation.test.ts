@@ -351,6 +351,117 @@ describe('buildWorkProcessPresentation', () => {
       type: 'section',
       thinkingLabel: '正在思考',
       thinkingExpandable: true,
+      thinkingOpenByDefault: true,
+    });
+  });
+
+  it('expands active final-answer thinking by the same lifecycle policy', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'running',
+      updatedAt: now,
+      blocks: [
+        {
+          id: 'runtime-loop-final-active',
+          kind: 'llm_turn',
+          title: 'LLM turn',
+          status: 'running',
+          result: {
+            text: '',
+            status: 'streaming',
+            toolCallIds: [],
+            stopReason: 'end_turn',
+            outputPhase: 'final_answer',
+          },
+          thinking: {
+            text: 'compose a short identity answer',
+            kind: 'raw',
+            source: 'openai-compatible-raw',
+            visibility: 'raw-collapsed',
+          },
+          thinkingStatus: 'streaming',
+          toolCalls: [],
+          startedAt: now,
+        },
+      ],
+    });
+    expect(presentation.rows.find((row) => row.type === 'section')).toMatchObject({
+      thinkingOpenByDefault: true,
+      thinkingLabel: '正在思考',
+    });
+  });
+
+  it('expands active raw thinking and folds settled process-loop thinking by policy', () => {
+    const active = buildWorkProcessPresentation({
+      status: 'running',
+      updatedAt: now,
+      blocks: [
+        {
+          id: 'runtime-loop-raw-open',
+          kind: 'llm_turn',
+          title: 'LLM turn',
+          status: 'running',
+          result: { text: 'Working…', status: 'streaming', toolCallIds: ['tool-glob-raw'] },
+          thinking: {
+            text: 'live raw thinking',
+            kind: 'raw',
+            source: 'openai-compatible-raw',
+            visibility: 'raw-collapsed',
+          },
+          thinkingStatus: 'streaming',
+          toolCalls: [
+            {
+              id: 'tool-glob-raw',
+              toolName: 'glob',
+              status: 'running',
+              argsPreview: JSON.stringify({ pattern: '**/*' }),
+              startedAt: now + 100,
+            },
+          ],
+          startedAt: now,
+        },
+      ],
+    });
+    expect(active.rows.find((row) => row.type === 'section')).toMatchObject({
+      thinkingOpenByDefault: true,
+      thinkingLabel: '正在思考',
+    });
+
+    const settled = buildWorkProcessPresentation({
+      status: 'complete',
+      updatedAt: now + 1000,
+      blocks: [
+        {
+          id: 'runtime-loop-raw-closed',
+          kind: 'llm_turn',
+          title: 'LLM turn',
+          status: 'complete',
+          result: { text: 'Done.', status: 'complete', toolCallIds: ['tool-glob-raw-done'] },
+          thinking: {
+            text: 'settled raw thinking',
+            kind: 'raw',
+            source: 'openai-compatible-raw',
+            visibility: 'raw-collapsed',
+          },
+          thinkingStatus: 'complete',
+          toolCalls: [
+            {
+              id: 'tool-glob-raw-done',
+              toolName: 'glob',
+              status: 'complete',
+              argsPreview: JSON.stringify({ pattern: '**/*' }),
+              resultPreview: JSON.stringify({ files: ['a.ts'] }),
+              startedAt: now + 100,
+              completedAt: now + 200,
+            },
+          ],
+          startedAt: now,
+          completedAt: now + 200,
+        },
+      ],
+    });
+    expect(settled.rows.find((row) => row.type === 'section')).toMatchObject({
+      thinkingOpenByDefault: false,
+      thinkingLabel: '已思考 · 100ms',
     });
   });
 
