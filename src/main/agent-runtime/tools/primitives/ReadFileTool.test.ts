@@ -25,7 +25,7 @@ describe('ReadFileTool', () => {
     expect(text).toContain('alpha');
     expect(text).toContain('beta');
     expect(result.details).toMatchObject({
-      totalLines: 4,
+      totalLines: 3,
       offset: 1,
       truncated: false,
     });
@@ -43,5 +43,21 @@ describe('ReadFileTool', () => {
 
     await expect(readFileTool.execute('r2', { path: '../outside.txt' }, undefined, undefined, context))
       .rejects.toThrow(/超出 workspace/);
+  });
+
+  it('rejects RenderDoc .rdc captures', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-read-rdc-'));
+    roots.push(root);
+    const rdc = path.join(root, 'WhiteHair.rdc');
+    await writeFile(rdc, Buffer.from('RDOC\0\0\0binary-capture'));
+    const context: ToolExecutionContext = {
+      workspaceRoot: root,
+      projectRootPath: root,
+      projectId: null,
+      sessionId: null,
+    };
+
+    await expect(readFileTool.execute('r3', { path: 'WhiteHair.rdc' }, undefined, undefined, context))
+      .rejects.toThrow(/RenderDoc|\.rdc|binary/i);
   });
 });

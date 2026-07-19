@@ -55,7 +55,10 @@ export const ContextBreakdownPopover: React.FC<{
     breakdown.find((entry) => entry.id === id) ?? { id, tokens: 0 }
   ));
   const barEntries = orderedEntries.filter(
-    (entry) => entry.tokens > 0 && entry.id !== 'free' && entry.id !== 'mcp_tools_deferred',
+    (entry) => entry.tokens > 0
+      && entry.id !== 'free'
+      && entry.id !== 'mcp_tools_deferred'
+      && entry.id !== 'builtin_tools_deferred',
   );
   const hasRunTotals = Boolean(usage && (usage.inputTokens > 0 || usage.outputTokens > 0));
   const derivedContextLabel = prepared?.derivedContext.status === 'applied'

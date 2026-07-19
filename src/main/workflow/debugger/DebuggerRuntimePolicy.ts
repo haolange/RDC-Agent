@@ -202,6 +202,67 @@ export function normalizeToolName(toolName: string): string {
   return RUNTIME_TOOL_ALIASES[toolName] ?? toolName;
 }
 
+/**
+ * Skill 激活后仍保持可用的元工具：
+ * 继续发现/加载其它 skill、向用户提问、搜索工具面不受 skill 收窄影响。
+ */
+const SKILL_NARROWING_EXEMPT_TOOLS = new Set(['skills', 'skill_read', 'ask_user', 'tool_search']);
+
+function matchesAllowlistPattern(normalizedToolName: string, allowlist: readonly string[]): boolean {
+  for (const pattern of allowlist) {
+    const normalizedPattern = normalizeToolName(pattern);
+    if (normalizedPattern === '*' || normalizedPattern === normalizedToolName) {
+      return true;
+    }
+    if (normalizedPattern.endsWith('.*') && normalizedToolName.startsWith(normalizedPattern.slice(0, -1))) {
+      return true;
+    }
+    if (normalizedPattern.endsWith('*') && normalizedToolName.startsWith(normalizedPattern.slice(0, -1))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Skill `allowed-tools` 与 runtime allowlist 求交（DESIGN Skills 条款）：
+ * skill 只能收窄、绝不能扩展 effective profile tool set。
+ *
+ * - 空声明 = 不收窄，原样返回；
+ * - 声明支持 canonical token（read/search/git…）、具体工具 id 与 `mcp__*` 前缀模式；
+ * - 结果 = runtime allowlist 中被 skill 声明覆盖的条目
+ *   ∪ skill 声明中被 runtime 模式（如 `mcp__*`）覆盖的具体工具，
+ *   外加元工具豁免（skills/skill_read/ask_user/tool_search）。
+ */
+export function intersectSkillAllowedTools(
+  runtimeAllowlist: readonly string[],
+  skillAllowedTools: readonly string[],
+): string[] {
+  if (skillAllowedTools.length === 0) {
+    return [...runtimeAllowlist];
+  }
+  const requested = skillAllowedTools.flatMap(expandToken).map(normalizeToolName);
+  const result = new Set<string>();
+  for (const entry of runtimeAllowlist) {
+    const normalizedEntry = normalizeToolName(entry);
+    if (SKILL_NARROWING_EXEMPT_TOOLS.has(normalizedEntry)) {
+      result.add(normalizedEntry);
+      continue;
+    }
+    // runtime 条目被 skill 声明（含模式）覆盖时保留。
+    if (matchesAllowlistPattern(normalizedEntry, requested)) {
+      result.add(normalizedEntry);
+    }
+  }
+  for (const requestedTool of requested) {
+    // skill 声明的具体工具被 runtime 模式（如 mcp__*）覆盖时保留；不能扩展。
+    if (!requestedTool.endsWith('*') && matchesAllowlistPattern(requestedTool, runtimeAllowlist)) {
+      result.add(requestedTool);
+    }
+  }
+  return Array.from(result);
+}
+
 function isDeniedAskTool(originalToolName: string, normalizedToolName: string): boolean {
   if (ASK_DENIED_TOOLS.has(originalToolName) || ASK_DENIED_TOOLS.has(normalizedToolName)) {
     return true;

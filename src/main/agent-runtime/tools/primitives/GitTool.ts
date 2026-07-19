@@ -2,10 +2,10 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { AgentTool, AgentToolResult } from '../../agent/AgentTool';
-import { getWorkspaceRoot, truncateOutput } from './_shared';
+import { getWorkspaceRoot, isWithinRoot, truncateOutput } from './_shared';
+import { GIT_MAX_OUTPUT_BYTES, GIT_TIMEOUT_MS } from './toolLimits';
 
 const execFileAsync = promisify(execFile);
-const MAX_OUTPUT_BYTES = 64 * 1024;
 
 interface GitStatusParams {
   short?: boolean;
@@ -39,20 +39,29 @@ interface GitOutput {
   stderr: string;
 }
 
-async function runGit(cwd: string, args: string[]): Promise<GitOutput> {
+async function runGit(
+  cwd: string,
+  args: string[],
+  signal?: AbortSignal,
+): Promise<GitOutput> {
   try {
     const result = await execFileAsync('git', ['-c', 'core.quotepath=false', ...args], {
       cwd,
       encoding: 'utf8',
-      maxBuffer: MAX_OUTPUT_BYTES * 2,
+      maxBuffer: GIT_MAX_OUTPUT_BYTES * 2,
       windowsHide: true,
+      timeout: GIT_TIMEOUT_MS,
+      signal,
     });
     return {
       stdout: String(result.stdout ?? ''),
       stderr: String(result.stderr ?? ''),
     };
   } catch (error) {
-    const err = error as Error & { stdout?: string | Buffer; stderr?: string | Buffer };
+    const err = error as Error & { stdout?: string | Buffer; stderr?: string | Buffer; killed?: boolean };
+    if (err.killed || /timed out/i.test(err.message)) {
+      throw new Error(`git command timed out after ${GIT_TIMEOUT_MS}ms`);
+    }
     const output = [String(err.stdout ?? '').trim(), String(err.stderr ?? '').trim(), err.message]
       .filter(Boolean)
       .join('\n');
@@ -60,9 +69,17 @@ async function runGit(cwd: string, args: string[]): Promise<GitOutput> {
   }
 }
 
-async function resolveGitRoot(workspaceRoot: string): Promise<string> {
-  const output = await runGit(workspaceRoot, ['rev-parse', '--show-toplevel']);
-  return path.resolve(output.stdout.trim());
+async function resolveGitRoot(workspaceRoot: string, signal?: AbortSignal): Promise<string> {
+  const output = await runGit(workspaceRoot, ['rev-parse', '--show-toplevel'], signal);
+  const gitRoot = path.resolve(output.stdout.trim());
+  // Accept equal roots, workspace-inside-repo, or repo-inside-workspace; reject unrelated trees.
+  const related =
+    isWithinRoot(gitRoot, workspaceRoot)
+    || isWithinRoot(workspaceRoot, gitRoot);
+  if (!related) {
+    throw new Error(`Git root ${gitRoot} is outside workspace ${workspaceRoot}`);
+  }
+  return gitRoot;
 }
 
 function validateGitPath(input: string): string {
@@ -78,7 +95,7 @@ function validateGitPath(input: string): string {
 
 function createResult(cwd: string, args: string[], output: string): AgentToolResult<GitDetails> {
   return {
-    content: [{ type: 'text', text: truncateOutput(output || 'No output.', MAX_OUTPUT_BYTES) }],
+    content: [{ type: 'text', text: truncateOutput(output || 'No output.', GIT_MAX_OUTPUT_BYTES) }],
     details: { cwd, args },
   };
 }
@@ -86,9 +103,10 @@ function createResult(cwd: string, args: string[], output: string): AgentToolRes
 async function executeGit(
   args: string[],
   contextRoot: string,
+  signal?: AbortSignal,
 ): Promise<AgentToolResult<GitDetails>> {
-  const gitRoot = await resolveGitRoot(contextRoot);
-  const output = await runGit(gitRoot, args);
+  const gitRoot = await resolveGitRoot(contextRoot, signal);
+  const output = await runGit(gitRoot, args, signal);
   const text = [output.stdout.trim(), output.stderr.trim()]
     .filter(Boolean)
     .join('\n');
@@ -108,12 +126,12 @@ export const gitStatusTool: AgentTool<GitStatusParams, GitDetails> = {
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'system', requiresApproval: false },
   permissionHint: 'readonly',
 
-  async execute(_toolCallId, params, _signal, _onUpdate, context) {
+  async execute(_toolCallId, params, signal, _onUpdate, context) {
     const root = getWorkspaceRoot(context);
     const args = params.short === false
       ? ['status', '-sb']
       : ['status', '--porcelain=v1', '-b', '-uall'];
-    return executeGit(args, root);
+    return executeGit(args, root, signal);
   },
 };
 
@@ -132,13 +150,13 @@ export const gitDiffTool: AgentTool<GitDiffParams, GitDetails> = {
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'system', requiresApproval: false },
   permissionHint: 'readonly',
 
-  async execute(_toolCallId, params, _signal, _onUpdate, context) {
+  async execute(_toolCallId, params, signal, _onUpdate, context) {
     const root = getWorkspaceRoot(context);
     const args = ['diff'];
     if (params.stat) args.push('--stat');
     if (params.staged) args.push('--cached');
     if (params.path) args.push('--', validateGitPath(params.path));
-    return executeGit(args, root);
+    return executeGit(args, root, signal);
   },
 };
 
@@ -155,10 +173,10 @@ export const gitLogTool: AgentTool<GitLogParams, GitDetails> = {
   spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none', category: 'system', requiresApproval: false },
   permissionHint: 'readonly',
 
-  async execute(_toolCallId, params, _signal, _onUpdate, context) {
+  async execute(_toolCallId, params, signal, _onUpdate, context) {
     const root = getWorkspaceRoot(context);
     const limit = Math.max(1, Math.min(50, Math.floor(params.limit ?? 10)));
-    return executeGit(['log', '--oneline', `-${limit}`], root);
+    return executeGit(['log', '--oneline', `-${limit}`], root, signal);
   },
 };
 
@@ -176,9 +194,9 @@ export const gitAddTool: AgentTool<GitPathParams, GitDetails> = {
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'system', requiresApproval: true },
   permissionHint: 'mutation',
 
-  async execute(_toolCallId, params, _signal, _onUpdate, context) {
+  async execute(_toolCallId, params, signal, _onUpdate, context) {
     const root = getWorkspaceRoot(context);
-    return executeGit(['add', '--', validateGitPath(params.path)], root);
+    return executeGit(['add', '--', validateGitPath(params.path)], root, signal);
   },
 };
 
@@ -196,9 +214,9 @@ export const gitUnstageTool: AgentTool<GitPathParams, GitDetails> = {
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'system', requiresApproval: true },
   permissionHint: 'mutation',
 
-  async execute(_toolCallId, params, _signal, _onUpdate, context) {
+  async execute(_toolCallId, params, signal, _onUpdate, context) {
     const root = getWorkspaceRoot(context);
-    return executeGit(['restore', '--staged', '--', validateGitPath(params.path)], root);
+    return executeGit(['restore', '--staged', '--', validateGitPath(params.path)], root, signal);
   },
 };
 
@@ -216,12 +234,12 @@ export const gitCommitTool: AgentTool<GitCommitParams, GitDetails> = {
   spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'system', requiresApproval: true },
   permissionHint: 'mutation',
 
-  async execute(_toolCallId, params, _signal, _onUpdate, context) {
+  async execute(_toolCallId, params, signal, _onUpdate, context) {
     const message = String(params.message ?? '').trim();
     if (!message) {
       throw new Error('Commit message is required.');
     }
     const root = getWorkspaceRoot(context);
-    return executeGit(['commit', '-m', message], root);
+    return executeGit(['commit', '-m', message], root, signal);
   },
 };

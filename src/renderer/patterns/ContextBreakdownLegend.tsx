@@ -23,7 +23,7 @@ export const ContextBreakdownLegend: React.FC<{
         : suffix
           ? `0${suffix}`
           : null;
-    const isDeferred = entry.id === 'mcp_tools_deferred';
+    const isDeferred = entry.id === 'mcp_tools_deferred' || entry.id === 'builtin_tools_deferred';
     const isFree = entry.id === 'free';
     const isZero = !isFree && entry.tokens <= 0;
 

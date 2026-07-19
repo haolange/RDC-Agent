@@ -8,6 +8,7 @@ export const CONTEXT_BREAKDOWN_ORDER: ContextUsageBreakdownId[] = [
   'system_tools',
   'mcp_tools',
   'mcp_tools_deferred',
+  'builtin_tools_deferred',
   'subagent_definitions',
   'summarized_conversation',
   'conversation',
@@ -22,6 +23,7 @@ export const SEGMENT_COLOR_VAR: Record<ContextUsageBreakdownId, string> = {
   system_tools: 'var(--token-context-system-tools)',
   mcp_tools: 'var(--token-context-mcp-tools)',
   mcp_tools_deferred: 'var(--token-context-deferred)',
+  builtin_tools_deferred: 'var(--token-context-deferred)',
   subagent_definitions: 'var(--token-context-subagents)',
   summarized_conversation: 'var(--token-context-summarized)',
   conversation: 'var(--token-context-conversation)',
@@ -37,7 +39,7 @@ export const CONTEXT_BREAKDOWN_GROUPS: {
   {
     id: 'tools',
     labelKey: 'contextBreakdown.groupTools',
-    ids: ['system_tools', 'mcp_tools', 'mcp_tools_deferred', 'subagent_definitions'],
+    ids: ['system_tools', 'mcp_tools', 'mcp_tools_deferred', 'builtin_tools_deferred', 'subagent_definitions'],
   },
   {
     id: 'conversation',
@@ -54,6 +56,7 @@ export const SEGMENT_LABEL_KEYS: Record<ContextUsageBreakdownId, TranslationKey>
   system_tools: 'contextBreakdown.segment.system_tools',
   mcp_tools: 'contextBreakdown.segment.mcp_tools',
   mcp_tools_deferred: 'contextBreakdown.segment.mcp_tools_deferred',
+  builtin_tools_deferred: 'contextBreakdown.segment.builtin_tools_deferred',
   subagent_definitions: 'contextBreakdown.segment.subagent_definitions',
   summarized_conversation: 'contextBreakdown.segment.summarized_conversation',
   conversation: 'contextBreakdown.segment.conversation',
@@ -64,6 +67,7 @@ export const COUNT_SUFFIX_KEYS: Partial<Record<ContextUsageBreakdownId, Translat
   system_tools: 'contextBreakdown.countSuffix.system_tools',
   mcp_tools: 'contextBreakdown.countSuffix.mcp_tools',
   mcp_tools_deferred: 'contextBreakdown.countSuffix.mcp_tools_deferred',
+  builtin_tools_deferred: 'contextBreakdown.countSuffix.builtin_tools_deferred',
   subagent_definitions: 'contextBreakdown.countSuffix.subagent_definitions',
   conversation: 'contextBreakdown.countSuffix.conversation',
 };

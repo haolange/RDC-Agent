@@ -304,11 +304,14 @@ body {
   font-size: var(--text-base);
 }
 
+/* Shared composer chrome: tokens are already resolved colors — never wrap in rgb() */
 .composer-attach-button,
 .composer-agent-pill,
+.composer-permission-pill,
+.composer-effort-pill,
 .composer-usage-indicator {
-  border-color: rgb(var(--token-border-default));
-  background: rgb(var(--token-bg-panel));
+  border-color: var(--token-border-default);
+  background: var(--token-bg-panel);
 }
 
 .chat-send-button.primary,

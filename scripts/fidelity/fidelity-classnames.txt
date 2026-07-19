@@ -172,7 +172,6 @@ composer-usage-ring
 composer-usage-ring-progress
 composer-usage-ring-track
 composer-usage-value
-composer-usage-value-label
 composer-usage-value-number
 composer-user-input-custom
 composer-user-input-custom-field

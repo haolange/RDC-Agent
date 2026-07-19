@@ -9,6 +9,7 @@ import type { PromptPlan, PromptSegment, ScopedInstructionResolution, SkillLoadR
 import { charsToTokens } from '@shared/utils/tokens';
 import { generateEventId } from '@shared/utils/id';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
+import { resolveHarnessProfile } from '../capabilities/HarnessProfileResolver';
 
 const CORE_FILES = ['identity-collaboration.md', 'agent-loop.md', 'tool-evidence.md', 'completion.md'];
 
@@ -87,19 +88,32 @@ export class PromptPlanBuilder {
       content: `# Preloaded Skill · ${skill.name}\n\n${skill.instructions}`,
     }));
 
-    const catalogLimitChars = input.contextWindowTokens
-      ? Math.max(1000, Math.floor(input.contextWindowTokens * 0.02 * 4))
-      : 8000;
-    const catalogLines: string[] = ['# Available Skills', 'Use `skill_read` to load a skill not already preloaded.'];
-    for (const skill of input.skillCatalog) {
-      const line = `- ${skill.id}: ${skill.description} [${skill.scope}]`;
-      if (catalogLines.join('\n').length + line.length + 1 > catalogLimitChars) {
-        diagnostics.push({ code: 'skills.catalog.truncated', severity: 'warning', message: `Skill metadata catalog exceeded ${catalogLimitChars} characters.` });
-        break;
+    // Harness 丰俭裁决：显式 `.agent.md` harness 偏好优先，
+    // 否则按模型事实（窗口/reasoning）启发；空 catalog 一律省略该段。
+    const harness = resolveHarnessProfile({
+      ...(input.profile.harness ? { manifestHarness: input.profile.harness } : {}),
+      declaredSkillCount: input.profile.skills.length,
+      skillCatalogCount: input.skillCatalog.length,
+      ...(input.contextWindowTokens !== undefined
+        ? { contextWindowTokens: input.contextWindowTokens }
+        : {}),
+      ...(input.effectiveModel
+        ? { reasoningKind: input.effectiveModel.controls.reasoning.kind }
+        : {}),
+    });
+    if (harness.includeSkillCatalog) {
+      const catalogLimitChars = harness.catalogCharBudget;
+      const catalogLines: string[] = ['# Available Skills', 'Use `skill_read` to load a skill not already preloaded.'];
+      for (const skill of input.skillCatalog) {
+        const line = `- ${skill.id}: ${skill.description} [${skill.scope}]`;
+        if (catalogLines.join('\n').length + line.length + 1 > catalogLimitChars) {
+          diagnostics.push({ code: 'skills.catalog.truncated', severity: 'warning', message: `Skill metadata catalog exceeded ${catalogLimitChars} characters.` });
+          break;
+        }
+        catalogLines.push(line);
       }
-      catalogLines.push(line);
+      push({ id: 'skills:catalog', kind: 'skill-catalog', scope: 'runtime', sourcePath: 'runtime://skills/catalog', sourceHash: hashScopedResource(catalogLines), content: catalogLines.join('\n') });
     }
-    push({ id: 'skills:catalog', kind: 'skill-catalog', scope: 'runtime', sourcePath: 'runtime://skills/catalog', sourceHash: hashScopedResource(catalogLines), content: catalogLines.join('\n') });
 
     push({
       id: 'runtime:tools',

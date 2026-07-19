@@ -49,6 +49,23 @@ const webSearchTool: AgentTool = {
   execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
 };
 
+const bashTool: AgentTool = {
+  name: 'bash',
+  description: 'shell',
+  parameters: { type: 'object', properties: {} },
+  permissionHint: 'mutation',
+  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'process', category: 'system', requiresApproval: true },
+  execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+};
+
+const deleteFileTool: AgentTool = {
+  name: 'delete_file',
+  description: 'delete',
+  parameters: { type: 'object', properties: {} },
+  permissionHint: 'destructive',
+  execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+};
+
 function makeReadFileToolCall(path: string): ToolCall {
   return {
     type: 'toolCall',
@@ -188,5 +205,52 @@ describe('AgentPermissionPolicyService network tools', () => {
     });
 
     expect(decision.action).toBe('allow');
+  });
+});
+
+describe('AgentPermissionPolicyService hard deny and path extract', () => {
+  const service = new AgentPermissionPolicyService();
+
+  beforeEach(() => {
+    mockSettings.agentRuntime.permissions.mode = 'full-access';
+    mockSettings.agentRuntime.permissions.readableRoots = [];
+    mockSettings.agentRuntime.permissions.writableRoots = [];
+    mockSettings.agentRuntime.permissions.allowedCommandPrefixes = [];
+    mockSettings.agentRuntime.permissions.deniedCommandPrefixes = [];
+  });
+
+  it('hard-denies catastrophic bash even in full-access', () => {
+    const decision = service.evaluate({
+      tool: bashTool,
+      toolCall: {
+        type: 'toolCall',
+        id: 'tc-bash',
+        name: 'bash',
+        arguments: { command: 'rm -rf /' },
+      },
+      projectRootPath: workspaceRoot,
+    });
+
+    expect(decision.action).toBe('deny');
+    expect(decision.reason).toMatch(/hard-denied|rm -rf \//i);
+  });
+
+  it('surfaces delete_file path targets in default-mode approval reasons', () => {
+    mockSettings.agentRuntime.permissions.mode = 'default';
+    const target = path.join(workspaceRoot, 'tmp.txt');
+
+    const decision = service.evaluate({
+      tool: deleteFileTool,
+      toolCall: {
+        type: 'toolCall',
+        id: 'tc-del',
+        name: 'delete_file',
+        arguments: { path: target },
+      },
+      projectRootPath: workspaceRoot,
+    });
+
+    expect(decision.action).toBe('ask_user');
+    expect(decision.reason).toContain('delete_file');
   });
 });

@@ -14,6 +14,7 @@
 import * as path from 'path';
 import type { ToolCall } from '../core/types';
 import type { AgentTool } from './AgentTool';
+import { matchBashHardDeny } from '../tools/primitives/bashHardDeny';
 
 // =====================================================================
 // 类型
@@ -137,34 +138,17 @@ export class ToolPermission {
 export class BashDenyListRule implements PermissionRule {
   readonly name = 'bash-deny-list';
 
-  private readonly denyPatterns: string[] = [
-    'rm -rf /',
-    'rm -rf /*',
-    'sudo ',
-    'shutdown',
-    'reboot',
-    'mkfs',
-    'dd if=',
-    '> /dev/',
-    'chmod 777',
-    'format c:',
-    'format /q',
-    ':(){ :|:& };:',
-  ];
-
   evaluate(context: PermissionContext): PermissionResult {
     if (context.toolName !== 'bash') {
       return { decision: 'allow', reason: 'not bash' };
     }
     const command = String(context.toolCall.arguments?.command ?? '');
-    const lowered = command.toLowerCase();
-    for (const pattern of this.denyPatterns) {
-      if (lowered.includes(pattern.toLowerCase())) {
-        return {
-          decision: 'deny',
-          reason: `命令包含危险模式 "${pattern}"`,
-        };
-      }
+    const matched = matchBashHardDeny(command);
+    if (matched) {
+      return {
+        decision: 'deny',
+        reason: `命令包含危险模式 "${matched}"`,
+      };
     }
     return { decision: 'allow', reason: 'safe' };
   }

@@ -65,6 +65,7 @@ import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
 import { Agent } from '../../agent-runtime/agent/Agent';
 import { ContextManager } from '../../agent-runtime/agent/ContextManager';
+import { TokenizerService } from '../../agent-runtime/core/TokenizerService';
 import { turnPreparationWorkerPool } from '../../workers/TurnPreparationWorkerPool';
 import { promptPlanBuilder, requestEnvelopeBuilder, requestSnapshotStore, resolvePromptClock } from '../../agent-runtime/prompt';
 import { promptCacheCompiler } from '../../agent-runtime/prompt/PromptCacheCompiler';
@@ -128,12 +129,21 @@ import {
 } from '../../settings/EffectiveModelResolver';
 import { debuggerLlmService } from '../../settings/DebuggerLlmService';
 import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
-import { isToolAllowedForAgent, normalizeToolName, resolveAgentToolAllowlist } from './DebuggerRuntimePolicy';
 import {
-  extractMcpToolNamesFromToolSearchDetails,
+  intersectSkillAllowedTools,
+  isToolAllowedForAgent,
+  normalizeToolName,
+  resolveAgentToolAllowlist,
+} from './DebuggerRuntimePolicy';
+import {
+  extractDeferredToolNamesFromToolSearchDetails,
+  isDeferredToolName,
   isMcpPrefixedToolName,
-  partitionDeferredMcpTools,
-} from './mcpDeferredTools';
+  partitionDeferredTools,
+} from './deferredTools';
+
+// 进程内共享 tokenizer：编码器缓存跨 turn 复用，主线程回退路径与 worker 路径同精度。
+const orchestratorTokenizerService = new TokenizerService();
 
 interface AgentTurnContext {
   runId?: string;
@@ -190,8 +200,8 @@ interface AgentSlot {
   toolSignature: string;
   turnSignature: string;
   contextTokenLimit: number;
-  /** 本 slot 已激活、可注入 prompt 的 mcp__* 工具名。 */
-  activatedMcpTools: Set<string>;
+  /** 本 slot 已激活、可注入 prompt 的 deferred 工具名（mcp__* 与 extended builtin）。 */
+  activatedDeferredTools: Set<string>;
 }
 
 interface ResolvedRuntimeTools {
@@ -266,18 +276,18 @@ export class AgentOrchestrator {
     agentId?: AgentRole;
   } | null = null;
   /**
-   * 当前 turn 的 MCP deferred 激活上下文。
+   * 当前 turn 的 deferred 工具激活上下文（mcp__* 与 extended builtin 同机制）。
    * 工具执行器可能来自复用 slot 的旧闭包，因此经实例字段查找，而非闭包捕获。
    */
-  private currentTurnMcpActivation: {
+  private currentTurnDeferredActivation: {
     slotKey: string;
     allDefinitions: ToolDefinition[];
   } | null = null;
   /**
-   * MCP 工具激活集：按 session+agent 的 slotKey 持久化。
+   * Deferred 工具激活集：按 session+agent 的 slotKey 持久化。
    * toolSignature（全部可用工具名）变化时重置；turnSignature 变化不重置。
    */
-  private activatedMcpBySlotKey = new Map<string, { toolSignature: string; names: Set<string> }>();
+  private activatedDeferredBySlotKey = new Map<string, { toolSignature: string; names: Set<string> }>();
   /**
    * 待处理的 handoff 请求（agent_handoff 工具成功时设置，
    * ConversationService turn 结束后 consume，实现 session 级 profile 切换）。
@@ -582,13 +592,13 @@ export class AgentOrchestrator {
     );
     const slotKey = this.agentSlotKey(input.sessionId, input.agentId);
     const toolSignature = this.createToolSignature(runtimeTools.definitions);
-    const activation = this.activatedMcpBySlotKey.get(slotKey);
-    const activatedMcpTools = activation?.toolSignature === toolSignature
+    const activation = this.activatedDeferredBySlotKey.get(slotKey);
+    const activatedDeferredTools = activation?.toolSignature === toolSignature
       ? activation.names
       : new Set<string>();
-    const { injected, deferredMcp } = partitionDeferredMcpTools(
+    const { injected, deferredMcp, deferredBuiltin } = partitionDeferredTools(
       runtimeTools.definitions,
-      activatedMcpTools,
+      activatedDeferredTools,
     );
     const activeToolDefinitions = input.routeCapability.toolCallingMode === 'native-structured'
       ? injected
@@ -655,6 +665,9 @@ export class AgentOrchestrator {
         : []),
       ...(deferredMcp.length > 0
         ? [{ id: 'mcp_tools_deferred' as const, tokens: charsToTokens(JSON.stringify(deferredMcp).length), count: deferredMcp.length }]
+        : []),
+      ...(deferredBuiltin.length > 0
+        ? [{ id: 'builtin_tools_deferred' as const, tokens: charsToTokens(JSON.stringify(deferredBuiltin).length), count: deferredBuiltin.length }]
         : []),
       ...(subagentDefinitions.length > 0
         ? [{ id: 'subagent_definitions' as const, tokens: charsToTokens(JSON.stringify(subagentDefinitions).length), count: subagentDefinitions.length }]
@@ -1216,8 +1229,8 @@ export class AgentOrchestrator {
       && existing.contextTokenLimit === resolvedContextTokenLimit
       && !existing.agent.isStreaming
     ) {
-      // 复用 slot 时按当前激活集同步注入列表（保留 activatedMcpTools）。
-      existing.activatedMcpTools = this.resolveActivatedMcpSet(slotKey, toolSignature);
+      // 复用 slot 时按当前激活集同步注入列表（保留 activatedDeferredTools）。
+      existing.activatedDeferredTools = this.resolveActivatedDeferredSet(slotKey, toolSignature);
       existing.agent.setTools(tools);
       return existing;
     }
@@ -1237,6 +1250,7 @@ export class AgentOrchestrator {
       contextTokenLimit: resolvedContextTokenLimit,
       toolResultBudget: 200 * 1024,
       keepRecentToolResults: 3,
+      tokenizer: orchestratorTokenizerService,
     });
 
     // ErrorRecovery：错误分类与恢复策略（retry/escalate_tokens/reactive_compact/continue/abort）。
@@ -1320,32 +1334,32 @@ export class AgentOrchestrator {
       toolSignature,
       turnSignature,
       contextTokenLimit: resolvedContextTokenLimit,
-      activatedMcpTools: this.resolveActivatedMcpSet(slotKey, toolSignature),
+      activatedDeferredTools: this.resolveActivatedDeferredSet(slotKey, toolSignature),
     };
     this.agentSlots.set(slotKey, slot);
     return slot;
   }
 
   /**
-   * 解析（或重置）slot 的 MCP 激活集。
+   * 解析（或重置）slot 的 deferred 工具激活集（mcp__* 与 extended builtin）。
    * 仅在全部可用工具 signature 变化时清空；跨 turn 复用同一 Set。
    */
-  private resolveActivatedMcpSet(slotKey: string, toolSignature: string): Set<string> {
-    const existing = this.activatedMcpBySlotKey.get(slotKey);
+  private resolveActivatedDeferredSet(slotKey: string, toolSignature: string): Set<string> {
+    const existing = this.activatedDeferredBySlotKey.get(slotKey);
     if (existing && existing.toolSignature === toolSignature) {
       return existing.names;
     }
     const names = new Set<string>();
-    this.activatedMcpBySlotKey.set(slotKey, { toolSignature, names });
+    this.activatedDeferredBySlotKey.set(slotKey, { toolSignature, names });
     return names;
   }
 
   /**
-   * 激活 deferred MCP 工具：写入激活集并更新 Agent 注入列表，
-   * 供同 turn 内下一次 LLM 调用使用。
+   * 激活 deferred 工具（mcp__* 与 extended builtin）：写入激活集并更新
+   * Agent 注入列表，供同 turn 内下一次 LLM 调用使用。
    */
-  private activateMcpTools(toolNames: string[]): void {
-    const activation = this.currentTurnMcpActivation;
+  private activateDeferredTools(toolNames: string[]): void {
+    const activation = this.currentTurnDeferredActivation;
     if (!activation || toolNames.length === 0) {
       return;
     }
@@ -1356,18 +1370,18 @@ export class AgentOrchestrator {
     const available = new Set(activation.allDefinitions.map((def) => def.name));
     let changed = false;
     for (const name of toolNames) {
-      if (!isMcpPrefixedToolName(name) || !available.has(name)) {
+      if (!isDeferredToolName(name) || !available.has(name)) {
         continue;
       }
-      if (!slot.activatedMcpTools.has(name)) {
-        slot.activatedMcpTools.add(name);
+      if (!slot.activatedDeferredTools.has(name)) {
+        slot.activatedDeferredTools.add(name);
         changed = true;
       }
     }
     if (!changed) {
       return;
     }
-    const { injected } = partitionDeferredMcpTools(activation.allDefinitions, slot.activatedMcpTools);
+    const { injected } = partitionDeferredTools(activation.allDefinitions, slot.activatedDeferredTools);
     slot.agent.setTools(injected);
   }
 
@@ -1497,7 +1511,14 @@ export class AgentOrchestrator {
     for (const tool of this.mcpManager.getAgentTools()) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
-    const toolSearchTool = createToolSearchTool(() => Array.from(availableTools.values()));
+    // tool_search 只能发现 allowlist + runtime policy 过滤后的工具集，
+    // 否则模型会看到（并尝试调用）本轮被禁止的工具。
+    const toolSearchTool = createToolSearchTool(() =>
+      Array.from(availableTools.values()).filter((tool) =>
+        this.matchesToolAllowlist(tool.name, toolAllowlist)
+        && this.isAllowedForRuntime(agentId, tool.name, stage),
+      ),
+    );
     availableTools.set(normalizeToolName(toolSearchTool.name), toolSearchTool);
 
     const definitions: ToolDefinition[] = [];
@@ -1539,11 +1560,43 @@ export class AgentOrchestrator {
     runtimeContext?: ToolExecutorRuntimeContext,
   ): ToolExecutor {
     const tools = this.resolveRuntimeTools(agentId, toolAllowlist, stage, sessionId).toolMap;
+    // Skill allowed-tools 收窄集（DESIGN Skills 条款：只收窄、不扩展）。
+    // skill_read 激活声明了 allowed-tools 的 skill 后，本 turn 后续工具调用
+    // 只能命中「激活 skill 允许集 ∪ 元工具豁免」。多 skill 取并集。
+    let activeSkillAllowlist: Set<string> | null = null;
+    const applySkillNarrowing = (skillAllowedTools: string[]): void => {
+      if (skillAllowedTools.length === 0) return;
+      const narrowed = intersectSkillAllowedTools(toolAllowlist, skillAllowedTools);
+      if (activeSkillAllowlist === null) activeSkillAllowlist = new Set(narrowed);
+      else for (const name of narrowed) activeSkillAllowlist.add(name);
+    };
+    // .agent.md 声明的 preloaded skills 在 turn 开始即生效收窄。
+    const manifestDefinition = settingsService.getAll().agents.definitions
+      .find((definition) => definition.id === agentId && definition.enabled);
+    for (const skillId of manifestDefinition?.skills ?? []) {
+      const preloaded = agentRuntimeConfigService.loadSkill(
+        skillId,
+        runtimeContext?.projectRootPath ?? undefined,
+      );
+      if (preloaded?.allowedTools?.length) {
+        applySkillNarrowing(preloaded.allowedTools);
+      }
+    }
     return {
       execute: async (toolCall: ToolCall, signal?: AbortSignal, onUpdate?: (partialResult: unknown) => void) => {
         const normalizedName = normalizeToolName(toolCall.name);
         if (!this.isAllowedForRuntime(agentId, toolCall.name, stage) || !tools.has(normalizedName)) {
           return this.createPolicyDeniedToolResult(toolCall, agentId);
+        }
+        if (
+          activeSkillAllowlist !== null
+          && !this.matchesToolAllowlist(normalizedName, Array.from(activeSkillAllowlist))
+        ) {
+          return this.createPolicyDeniedToolResult(
+            toolCall,
+            agentId,
+            `Tool "${toolCall.name}" is outside the allowed-tools set declared by the active skill.`,
+          );
         }
         const tool = tools.get(normalizedName);
         if (!tool) {
@@ -1621,12 +1674,23 @@ export class AgentOrchestrator {
             toolCallId: toolCall.id,
             isError: result.isError === true,
           });
-          // MCP deferred 激活：直接调用未注入的 mcp__* 时 fail-open 执行并激活；
-          // tool_search 命中的 mcp__* 视为已发现，schema 随下次请求注入。
-          if (isMcpPrefixedToolName(normalizedName)) {
-            this.activateMcpTools([normalizedName]);
+          // Deferred 激活：直接调用未注入的 mcp__* / extended builtin 时 fail-open
+          // 执行并激活；tool_search 命中的 deferred 工具视为已发现，
+          // schema 随下次请求注入。
+          if (isDeferredToolName(normalizedName)) {
+            this.activateDeferredTools([normalizedName]);
           } else if (normalizedName === 'tool_search' && result.isError !== true) {
-            this.activateMcpTools(extractMcpToolNamesFromToolSearchDetails(result.details));
+            this.activateDeferredTools(extractDeferredToolNamesFromToolSearchDetails(result.details));
+          }
+          // Skill 激活：skill_read 成功后按其 allowed-tools 收窄本 turn 工具面。
+          if (normalizedName === 'skill_read' && result.isError !== true) {
+            const skillId = (result.details as { skillId?: string } | undefined)?.skillId;
+            const skill = skillId
+              ? agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined)
+              : null;
+            if (skill?.allowedTools?.length) {
+              applySkillNarrowing(skill.allowedTools);
+            }
           }
           return this.agentToolResultToMessage(toolCall, result);
         } catch (error) {
@@ -2385,10 +2449,11 @@ export class AgentOrchestrator {
       ?? this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
     const slotKey = this.agentSlotKey(input.sessionId, input.agentId);
     const allToolSignature = this.createToolSignature(runtimeTools.definitions);
-    const activatedMcpTools = this.resolveActivatedMcpSet(slotKey, allToolSignature);
+    const activatedDeferredTools = this.resolveActivatedDeferredSet(slotKey, allToolSignature);
     const injectedToolDefinitions = input.preparedRuntime?.activeToolDefinitions
-      ?? partitionDeferredMcpTools(runtimeTools.definitions, activatedMcpTools).injected;
-    // native-structured：非 MCP 全量注入，mcp__* 默认 deferred；其它路由不注入工具 schema。
+      ?? partitionDeferredTools(runtimeTools.definitions, activatedDeferredTools).injected;
+    // native-structured：core 常驻注入，mcp__* 与 extended builtin 默认 deferred；
+    // 其它路由不注入工具 schema。
     const activeToolDefinitions = routeCapability.toolCallingMode === 'native-structured'
       ? injectedToolDefinitions
       : [];
@@ -2413,11 +2478,11 @@ export class AgentOrchestrator {
       projectId: input.projectId ?? null,
       agentId: input.agentId,
     };
-    this.currentTurnMcpActivation = {
+    this.currentTurnDeferredActivation = {
       slotKey,
       allDefinitions: runtimeTools.definitions,
     };
-    // native-structured：执行器用完整 allowlist，deferred mcp__* 仍可执行。
+    // native-structured：执行器用完整 allowlist，deferred 工具仍可执行。
     // 其它路由：与注入列表一致（通常为空），保持既有行为。
     const executorAllowlist = routeCapability.toolCallingMode === 'native-structured'
       ? input.toolAllowlist
@@ -2556,12 +2621,12 @@ export class AgentOrchestrator {
           .map((block) => (block as { text: string }).text)
           .join('');
         if (event.message.usage) {
-          // 按当前实际注入的工具定义计量（含本 turn 内新激活的 mcp__*）；
-          // deferred 段仅计未激活 MCP schema 估算，且仅在 >0 时加入。
+          // 按当前实际注入的工具定义计量（含本 turn 内新激活的 deferred 工具）；
+          // deferred 段仅计未激活 schema 估算，且仅在 >0 时加入。
           const injectedDefs = slot.agent.state.tools ?? [];
-          const { deferredMcp: deferredMcpDefs } = partitionDeferredMcpTools(
+          const { deferredMcp: deferredMcpDefs, deferredBuiltin: deferredBuiltinDefs } = partitionDeferredTools(
             runtimeTools.definitions,
-            slot.activatedMcpTools,
+            slot.activatedDeferredTools,
           );
           const isMcpDef = (d: ToolDefinition) => isMcpPrefixedToolName(d.name);
           const isSubagentDef = (d: ToolDefinition) => d.name === 'subagent';
@@ -2598,6 +2663,13 @@ export class AgentOrchestrator {
                   id: 'mcp_tools_deferred' as const,
                   tokens: charsToTokens(JSON.stringify(deferredMcpDefs).length),
                   count: deferredMcpDefs.length,
+                }]
+              : []),
+            ...(deferredBuiltinDefs.length > 0
+              ? [{
+                  id: 'builtin_tools_deferred' as const,
+                  tokens: charsToTokens(JSON.stringify(deferredBuiltinDefs).length),
+                  count: deferredBuiltinDefs.length,
                 }]
               : []),
             ...(subagentDefs.length > 0
@@ -2682,7 +2754,7 @@ export class AgentOrchestrator {
       agentUserInputRequestService.cancelTurn(input.turnId);
       agentToolApprovalRequestService.cancelTurn(input.turnId);
       this.currentTurnEventSink = null;
-      this.currentTurnMcpActivation = null;
+      this.currentTurnDeferredActivation = null;
       input.terminalContext?.(slot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus);
     }
   }

@@ -30,6 +30,7 @@ import {
   buildDerivedContextView,
   createStructuredHandoffMessage,
 } from '../context/StructuredHandoffBuilder';
+import { ToolResultSummarizer } from '../tools/ToolResultSummarizer';
 
 /** 上下文压缩配置。 */
 export interface ContextManagerConfig {
@@ -48,6 +49,7 @@ export interface ContextManagerConfig {
 }
 
 const DEFAULT_TOOL_RESULT_BUDGET = 200 * 1024;
+const toolResultSummarizer = new ToolResultSummarizer();
 const DEFAULT_MAX_MESSAGES = 50;
 const DEFAULT_KEEP_RECENT_TOOL_RESULTS = 3;
 const SNIP_HEAD = 3;
@@ -301,14 +303,27 @@ export class ContextManager {
     const result: AgentMessage[] = messages.slice();
     for (const idx of compactSet) {
       const original = result[idx] as ToolResultMessage;
+      // isError 是模型的重要信号：压缩后仍保留错误标记与错误首行摘录。
+      const errorExcerpt = original.isError
+        ? original.content
+            .filter((block): block is TextContent => block.type === 'text')
+            .map((block) => block.text)
+            .join(' ')
+            .slice(0, 160)
+        : '';
       result[idx] = {
         role: 'toolResult',
         toolCallId: original.toolCallId,
         toolName: original.toolName,
         content: [
-          { type: 'text', text: TOOL_RESULT_COMPACTION_TEXT },
+          {
+            type: 'text',
+            text: original.isError
+              ? `[Earlier tool error compacted: ${errorExcerpt}]`
+              : TOOL_RESULT_COMPACTION_TEXT,
+          },
         ],
-        isError: false,
+        isError: original.isError,
         timestamp: original.timestamp,
       };
     }
@@ -434,6 +449,22 @@ export class ContextManager {
   }
 
   private truncateToolResult(msg: ToolResultMessage): ToolResultMessage {
+    const summary = toolResultSummarizer.trySummarize(
+      msg.toolName,
+      { content: msg.content },
+      TOOL_RESULT_TRUNCATE_HEAD,
+    );
+    if (summary) {
+      return {
+        role: 'toolResult',
+        toolCallId: msg.toolCallId,
+        toolName: msg.toolName,
+        content: [{ type: 'text', text: summary }],
+        isError: msg.isError,
+        timestamp: msg.timestamp,
+      };
+    }
+
     const newContent: (TextContent | ImageContent)[] = [];
     let remaining = TOOL_RESULT_TRUNCATE_HEAD;
     let truncated = false;

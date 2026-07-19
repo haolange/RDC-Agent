@@ -54,6 +54,24 @@ describe('WebTools', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('blocks redirect hops that land on private addresses', async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce(new Response(null, {
+      status: 302,
+      headers: { Location: 'http://127.0.0.1/secret' },
+    }));
+
+    await expect(webFetchTool.execute('fetch-redirect', { url: 'https://example.com/start' }))
+      .rejects.toThrow(/Blocked local host|Blocked private network/i);
+  });
+
+  it('fails closed when DNS lookup fails', async () => {
+    lookupMock.mockRejectedValueOnce(new Error('ENOTFOUND'));
+    await expect(webFetchTool.execute('fetch-dns', { url: 'https://missing.example' }))
+      .rejects.toThrow(/DNS lookup failed/i);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('reports network failures with host and low-level cause', async () => {
     const fetchMock = vi.mocked(fetch);
     const cause = Object.assign(new Error('Client network socket disconnected'), { code: 'ECONNRESET' });

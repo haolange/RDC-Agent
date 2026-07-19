@@ -32,6 +32,7 @@ function walkSourceFiles(dir, out = []) {
 function main() {
   const {
     BUILTIN_AGENT_TOOL_IDS,
+    BUILTIN_AGENT_TOOL_TIERS,
     CANONICAL_TOOL_TOKEN_EXPANSIONS,
     REJECTED_TOOL_TOKENS,
   } = require('../src/shared/constants/agentToolTokens.ts');
@@ -105,6 +106,38 @@ function main() {
   assert(REJECTED_TOOL_TOKENS.todo, 'REJECTED_TOOL_TOKENS must include todo');
   assert(REJECTED_TOOL_TOKENS.search_codebase, 'REJECTED_TOOL_TOKENS must include search_codebase');
 
+  // Core/extended tool tiering contracts.
+  for (const id of BUILTIN_AGENT_TOOL_IDS) {
+    assert(
+      BUILTIN_AGENT_TOOL_TIERS[id] === 'core' || BUILTIN_AGENT_TOOL_TIERS[id] === 'extended',
+      `BUILTIN_AGENT_TOOL_TIERS must classify ${id} as core or extended`,
+    );
+  }
+  assert(
+    Object.keys(BUILTIN_AGENT_TOOL_TIERS).length === BUILTIN_AGENT_TOOL_IDS.length,
+    'BUILTIN_AGENT_TOOL_TIERS must not contain unknown tool ids',
+  );
+  assert(BUILTIN_AGENT_TOOL_TIERS.tool_search === 'core', 'tool_search must stay core (discovery entry)');
+  assert(BUILTIN_AGENT_TOOL_TIERS.read_file === 'core', 'read_file must stay core');
+  for (const orphan of ['delete_file', 'move_file', 'copy_file', 'notebook_edit', 'memory_write', 'memory_delete']) {
+    assert(
+      BUILTIN_AGENT_TOOL_TIERS[orphan] === 'extended',
+      `${orphan} must be extended (discovered via tool_search)`,
+    );
+  }
+  assert(
+    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS['file-manage'])
+      && ['delete_file', 'move_file', 'copy_file', 'notebook_edit']
+        .every((id) => CANONICAL_TOOL_TOKEN_EXPANSIONS['file-manage'].includes(id)),
+    'CANONICAL_TOOL_TOKEN_EXPANSIONS.file-manage must cover delete/move/copy/notebook_edit',
+  );
+  assert(
+    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS['memory-write'])
+      && ['memory_write', 'memory_delete']
+        .every((id) => CANONICAL_TOOL_TOKEN_EXPANSIONS['memory-write'].includes(id)),
+    'CANONICAL_TOOL_TOKEN_EXPANSIONS.memory-write must cover memory_write/memory_delete',
+  );
+
   // Context Window Phase 2：MCP deferred loading 计量 id 与前缀规则。
   const sessionTypes = fs.readFileSync(
     path.join(repoRoot, 'src/shared/types/session.ts'),
@@ -114,14 +147,18 @@ function main() {
     /ContextUsageBreakdownId\s*=[\s\S]*?'mcp_tools_deferred'/.test(sessionTypes),
     'ContextUsageBreakdownId must include mcp_tools_deferred',
   );
+  assert(
+    /ContextUsageBreakdownId\s*=[\s\S]*?'builtin_tools_deferred'/.test(sessionTypes),
+    'ContextUsageBreakdownId must include builtin_tools_deferred',
+  );
 
-  const mcpDeferredTools = fs.readFileSync(
-    path.join(repoRoot, 'src/main/workflow/debugger/mcpDeferredTools.ts'),
+  const deferredTools = fs.readFileSync(
+    path.join(repoRoot, 'src/main/workflow/debugger/deferredTools.ts'),
     'utf8',
   );
   assert(
-    /export const MCP_TOOL_NAME_PREFIX\s*=\s*['"]mcp__['"]/.test(mcpDeferredTools),
-    'mcpDeferredTools MCP_TOOL_NAME_PREFIX must be mcp__',
+    /export const MCP_TOOL_NAME_PREFIX\s*=\s*['"]mcp__['"]/.test(deferredTools),
+    'deferredTools MCP_TOOL_NAME_PREFIX must be mcp__',
   );
   const mcpManager = fs.readFileSync(
     path.join(repoRoot, 'src/main/agent-runtime/agent/MCPManager.ts'),
@@ -133,9 +170,18 @@ function main() {
     'MCPManager isMCPTool must use mcp__ prefix',
   );
   assert(
-    mcpDeferredTools.includes("startsWith(MCP_TOOL_NAME_PREFIX)")
-      || /startsWith\(['"]mcp__['"]\)/.test(mcpDeferredTools),
-    'mcpDeferredTools isMcpPrefixedToolName must match MCPManager mcp__ prefix',
+    deferredTools.includes("startsWith(MCP_TOOL_NAME_PREFIX)")
+      || /startsWith\(['"]mcp__['"]\)/.test(deferredTools),
+    'deferredTools isMcpPrefixedToolName must match MCPManager mcp__ prefix',
+  );
+  assert(
+    deferredTools.includes('getBuiltinToolTier')
+      && deferredTools.includes("=== 'extended'"),
+    'deferredTools must defer extended builtin tools via BUILTIN_AGENT_TOOL_TIERS',
+  );
+  assert(
+    !fs.existsSync(path.join(repoRoot, 'src/main/workflow/debugger/mcpDeferredTools.ts')),
+    'legacy mcpDeferredTools.ts must not exist (converged into deferredTools.ts)',
   );
 
   const orchestrator = fs.readFileSync(
@@ -143,12 +189,76 @@ function main() {
     'utf8',
   );
   assert(
-    orchestrator.includes('partitionDeferredMcpTools'),
-    'AgentOrchestrator must use partitionDeferredMcpTools for MCP deferred loading',
+    orchestrator.includes('partitionDeferredTools'),
+    'AgentOrchestrator must use partitionDeferredTools for deferred loading',
   );
   assert(
     orchestrator.includes('mcp_tools_deferred'),
     'AgentOrchestrator breakdown must emit mcp_tools_deferred',
+  );
+  assert(
+    orchestrator.includes('builtin_tools_deferred'),
+    'AgentOrchestrator breakdown must emit builtin_tools_deferred',
+  );
+  // tool_search must only discover the allowlist/runtime-policy filtered tool set.
+  assert(
+    /createToolSearchTool\(\(\)\s*=>\s*\n?\s*Array\.from\(availableTools\.values\(\)\)\.filter/.test(orchestrator),
+    'tool_search closure must filter available tools by allowlist and runtime policy',
+  );
+  // Skill allowed-tools narrowing must be wired into the tool executor.
+  assert(
+    orchestrator.includes('intersectSkillAllowedTools'),
+    'AgentOrchestrator must intersect skill allowed-tools with the runtime allowlist',
+  );
+
+  // Primitive tool convergence contracts.
+  const shared = fs.readFileSync(
+    path.join(repoRoot, 'src/main/agent-runtime/tools/primitives/_shared.ts'),
+    'utf8',
+  );
+  assert(shared.includes('function truncateOutput'), 'primitives/_shared must export truncateOutput');
+  assert(shared.includes('sliceUtf8Bytes'), 'truncateOutput must use byte-accurate UTF-8 slicing');
+  assert(shared.includes('assertTextReadable'), 'primitives/_shared must expose assertTextReadable');
+  assert(shared.includes('realpathSync') || shared.includes('realpath'), 'safeResolvePath must realpath targets');
+
+  const readFileTool = fs.readFileSync(
+    path.join(repoRoot, 'src/main/agent-runtime/tools/primitives/ReadFileTool.ts'),
+    'utf8',
+  );
+  assert(readFileTool.includes('assertTextReadable'), 'read_file must gate binary/.rdc via assertTextReadable');
+
+  const webTools = fs.readFileSync(
+    path.join(repoRoot, 'src/main/agent-runtime/tools/primitives/WebTools.ts'),
+    'utf8',
+  );
+  assert(!/redirect:\s*['"]follow['"]/.test(webTools), 'WebTools must not use redirect: follow');
+  assert(webTools.includes("redirect: 'manual'") || webTools.includes('redirect: "manual"'), 'WebTools must use manual redirects');
+
+  const contextManager = fs.readFileSync(
+    path.join(repoRoot, 'src/main/agent-runtime/agent/ContextManager.ts'),
+    'utf8',
+  );
+  assert(
+    contextManager.includes('ToolResultSummarizer'),
+    'ContextManager must wire ToolResultSummarizer into toolResultBudget truncation',
+  );
+
+  const permissionPolicy = fs.readFileSync(
+    path.join(repoRoot, 'src/main/agent-runtime/permissions/AgentPermissionPolicy.ts'),
+    'utf8',
+  );
+  assert(
+    permissionPolicy.includes('matchBashHardDeny'),
+    'AgentPermissionPolicy must hard-deny catastrophic bash via matchBashHardDeny',
+  );
+
+  const bashTool = fs.readFileSync(
+    path.join(repoRoot, 'src/main/agent-runtime/tools/primitives/BashTool.ts'),
+    'utf8',
+  );
+  assert(
+    bashTool.includes('run_in_background is disabled'),
+    'bash must fail-closed on run_in_background until background delivery is wired',
   );
 
   console.log('[tool-system] OK');

@@ -19,6 +19,7 @@ import {
   rollbackProviderDefinitionSave,
   settleProviderDefinitionSave,
 } from './providerDefinitionSettings';
+import type { AgentPermissionMode, AppSettings } from '@shared/types/settings';
 import type { AppSettingsState } from './appSettingsStoreState';
 
 export { nextAgentDefinitionClientRevision } from './agentDefinitionSettings';
@@ -26,6 +27,16 @@ export { nextAgentDefinitionClientRevision } from './agentDefinitionSettings';
 const agentDefinitionMutations = new AgentDefinitionMutationCoordinator(
   (request) => window.electronAPI.settings.saveAgentDefinition(request),
 );
+
+let permissionModeRevision = 0;
+
+function withPermissionMode(settings: AppSettings, mode: AgentPermissionMode): AppSettings {
+  const permissions = settings.agentRuntime?.permissions ?? DEFAULT_SETTINGS.agentRuntime.permissions;
+  return {
+    ...settings,
+    agentRuntime: { ...settings.agentRuntime, permissions: { ...permissions, mode } },
+  };
+}
 
 export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   settings: DEFAULT_SETTINGS,
@@ -160,10 +171,19 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
     });
   },
   setAgentPermissionMode: async (mode) => {
-    await get().patchSettings({
-      agentRuntime: {
-        permissions: { mode },
-      },
-    });
+    const previousMode = get().settings.agentRuntime?.permissions?.mode ?? 'default';
+    if (previousMode === mode) return;
+    const revision = ++permissionModeRevision;
+    set((state) => ({ settings: withPermissionMode(state.settings, mode), hydrated: true }));
+    try {
+      const nextSettings = await window.electronAPI.settings.set({ agentRuntime: { permissions: { mode } } });
+      if (revision !== permissionModeRevision) return;
+      set({ settings: nextSettings, hydrated: true });
+    } catch (error) {
+      if (revision === permissionModeRevision) {
+        set((state) => ({ settings: withPermissionMode(state.settings, previousMode) }));
+      }
+      throw error;
+    }
   },
 }));

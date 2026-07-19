@@ -1,7 +1,8 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { AgentTool } from '../../agent/AgentTool';
-import { safeResolvePath } from '../primitives/_shared';
+import { assertFileSizeCap, isPathExisting, safeResolvePath } from '../primitives/_shared';
+import { COPY_MOVE_MAX_BYTES } from '../primitives/toolLimits';
 
 interface MoveFileParams {
   source: string;
@@ -17,7 +18,8 @@ interface MoveFileDetails {
 export const moveFileTool: AgentTool<MoveFileParams, MoveFileDetails> = {
   name: 'move_file',
   label: '移动文件',
-  description: 'Move or rename a file inside the workspace. Creates parent directories if needed.',
+  description:
+    'Move or rename a file inside the workspace. Creates parent directories if needed. Fails closed when destination already exists.',
   parameters: {
     type: 'object',
     properties: {
@@ -26,24 +28,23 @@ export const moveFileTool: AgentTool<MoveFileParams, MoveFileDetails> = {
     },
     required: ['source', 'destination'],
   },
-  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
+  spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'filesystem', category: 'file', requiresApproval: true },
   permissionHint: 'mutation',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');
     const src = safeResolvePath(params.source, undefined, context);
     const dest = safeResolvePath(params.destination, undefined, context);
+    assertFileSizeCap(src, COPY_MOVE_MAX_BYTES, 'Source file');
     const destDir = path.dirname(dest);
     await fs.mkdir(destDir, { recursive: true });
-    let overwritten = false;
-    try {
-      await fs.access(dest);
-      overwritten = true;
-    } catch { /* no-op */ }
+    if (isPathExisting(dest)) {
+      throw new Error(`Destination already exists; refusing overwrite: ${dest}`);
+    }
     await fs.rename(src, dest);
     return {
-      content: [{ type: 'text', text: `Moved ${src} → ${dest}${overwritten ? ' (overwrote existing)' : ''}` }],
-      details: { source: src, destination: dest, overwritten },
+      content: [{ type: 'text', text: `Moved ${src} → ${dest}` }],
+      details: { source: src, destination: dest, overwritten: false },
     };
   },
 };

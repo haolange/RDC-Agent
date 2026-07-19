@@ -16,7 +16,8 @@ import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import type { AgentTool } from '../../agent/AgentTool';
-import { getWorkspaceRoot, safeResolvePath } from './_shared';
+import { getWorkspaceRoot, safeResolvePath, truncateOutput } from './_shared';
+import { GLOB_MAX_OUTPUT_BYTES } from './toolLimits';
 
 interface GlobParams {
   pattern: string;
@@ -103,10 +104,12 @@ export const globTool: AgentTool<GlobParams, GlobDetails> = {
 
     matches.sort();
 
-    const text =
+    const rawText =
       matches.length === 0
         ? `(no matches for pattern "${pattern}")`
         : matches.join('\n') + (truncated ? `\n... [truncated at ${MAX_RESULTS}]` : '');
+    const text = truncateOutput(rawText, GLOB_MAX_OUTPUT_BYTES);
+    truncated = truncated || Buffer.byteLength(rawText, 'utf8') > GLOB_MAX_OUTPUT_BYTES;
 
     return {
       content: [{ type: 'text', text }],
@@ -214,7 +217,8 @@ function compileGlob(pattern: string): RegExp {
         i++;
         continue;
       }
-      out += pattern.slice(i, end + 1);
+      const body = pattern.slice(i + 1, end);
+      out += `[${escapeCharClassBody(body)}]`;
       i = end + 1;
       continue;
     }
@@ -225,6 +229,19 @@ function compileGlob(pattern: string): RegExp {
 
   out += '$';
   return new RegExp(out);
+}
+
+function escapeCharClassBody(body: string): string {
+  let out = '';
+  for (let i = 0; i < body.length; i += 1) {
+    const c = body[i];
+    if (c === '\\' || c === ']') {
+      out += '\\' + c;
+    } else {
+      out += c;
+    }
+  }
+  return out;
 }
 
 function escapeReg(ch: string): string {

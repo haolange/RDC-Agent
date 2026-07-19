@@ -43,15 +43,40 @@ export const MAX_VISUAL_INGRESS_MS = 1_600;
 export const MAX_VISUAL_EGRESS_MS = 384;
 export const MAX_TRAVEL_CYCLE_MS = 1_600;
 export const MAX_TRAVEL_SPATIAL_CYCLES = 1.2;
+/**
+ * Energy at which the birth front reaches mid-track.
+ * Earlier than 0.5 so deceleration is already readable from the middle onward.
+ */
+export const MAX_INGRESS_MID_ENERGY = 0.42;
+/** Ease-out power applied only on the left half after mid-track. */
+export const MAX_INGRESS_LEFT_EASE = 2.1;
 
 export function clampMaxProgress(value: number): number {
   return Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : 0;
 }
 
-/** Symmetric easing keeps reversals visually quiet and both endpoints soft. */
+/** Symmetric easing keeps egress / stop fades quiet at both endpoints. */
 export function resolveMaxAnimationProgress(elapsedMs: number, durationMs: number): number {
   const linear = durationMs > 0 ? clampMaxProgress(elapsedMs / durationMs) : 1;
   return linear * linear * (3 - 2 * linear);
+}
+
+/** Linear ingress energy clock — spatial shape comes from {@link resolveMaxIngressCoverage}. */
+export function resolveMaxIngressEnergyProgress(elapsedMs: number, durationMs: number): number {
+  return durationMs > 0 ? clampMaxProgress(elapsedMs / durationMs) : 1;
+}
+
+/**
+ * Birth-front coverage vs linear energy:
+ * roughly linear to mid-track by {@link MAX_INGRESS_MID_ENERGY}, then ease-out into the left.
+ */
+export function resolveMaxIngressCoverage(energy: number): number {
+  const e = clampMaxProgress(energy);
+  if (e <= MAX_INGRESS_MID_ENERGY) {
+    return (e / MAX_INGRESS_MID_ENERGY) * 0.5;
+  }
+  const u = (e - MAX_INGRESS_MID_ENERGY) / (1 - MAX_INGRESS_MID_ENERGY);
+  return 0.5 + (1 - (1 - u) ** MAX_INGRESS_LEFT_EASE) * 0.5;
 }
 
 export function isMaxTierLevel(level: ReasoningSelection): boolean {
@@ -181,7 +206,7 @@ export function resolveMaxVisualFrame(
   const remainingIngressMs = (1 - timeline.fromEnergy) * MAX_VISUAL_INGRESS_MS;
   const energyProgress = reducedMotion
     ? 1
-    : resolveMaxAnimationProgress(elapsedMs, remainingIngressMs);
+    : resolveMaxIngressEnergyProgress(elapsedMs, remainingIngressMs);
   const energy = timeline.fromEnergy + (1 - timeline.fromEnergy) * energyProgress;
   const dragPreview = timeline.phase === 'ingress-drag';
   const stopsProgress = reducedMotion
@@ -199,7 +224,7 @@ export function resolveMaxVisualFrame(
   };
 }
 
-/** Stable [0, 1) coordinate noise; wall-clock time never changes cell occupancy. */
+/** Stable [0, 1) coordinate noise for birth timing and brightness; not occupancy. */
 export function maxFieldNoise(col: number, row: number, salt = 0): number {
   const n = Math.sin((col + 1.7) * 12.9898 + (row + 1.3) * 78.233 + salt * 45.164) * 43758.5453;
   return n - Math.floor(n);
@@ -257,19 +282,23 @@ export function resolveMaxFieldCell(input: {
     ? clampMaxProgress(position / formationEmitterRatio)
     : 0;
   const distanceFromSource = 1 - normalizedPosition;
-  const occupancyNoise = maxFieldNoise(input.col, input.row, 4);
-  const occupied = occupancyNoise >= 0.2;
-  if (!occupied || emitterRatio <= 0 || position > emitterRatio) {
-    return { occupied, visible: false, alpha: 0, tone: 0 };
+  // Full lattice: no static occupancy holes. Brightness comes only from
+  // breath / shimmer / traveling amplitude — dead-black pores read as stuck dots.
+  if (emitterRatio <= 0 || position > emitterRatio) {
+    return { occupied: false, visible: false, alpha: 0, tone: 0 };
   }
+  const occupied = true;
 
   const energy = clampMaxProgress(input.energy);
   const birthNoise = maxFieldNoise(input.col, input.row, 0);
-  const birthThreshold = Math.min(0.84, distanceFromSource * 0.78 + birthNoise * 0.2);
+  // Soft front around coverage(energy): energy=1 always fully covers distance=1.
+  const coverage = resolveMaxIngressCoverage(energy);
+  const frontSlack = 0.07 + birthNoise * 0.05;
+  let cellEnvelope = smoothUnit((coverage - distanceFromSource + frontSlack) / 0.14);
   const formationEnergy = clampMaxProgress(input.formationEnergy ?? 1);
-  let cellEnvelope = smoothUnit((energy - birthThreshold) / 0.16);
   if (fieldMode === 'dissolve' && energy <= formationEnergy) {
-    const formedEnvelope = smoothUnit((formationEnergy - birthThreshold) / 0.16);
+    const formedCoverage = resolveMaxIngressCoverage(formationEnergy);
+    const formedEnvelope = smoothUnit((formedCoverage - distanceFromSource + frontSlack) / 0.14);
     const remaining = formationEnergy > 0 ? clampMaxProgress(energy / formationEnergy) : 0;
     const deathThreshold = 0.06 + maxFieldNoise(input.col, input.row, 12) * 0.68;
     const distributedFade = smoothUnit((remaining - deathThreshold) / 0.18);
@@ -296,11 +325,18 @@ export function resolveMaxFieldCell(input: {
     coherentNoise * Math.PI * 1.6 + input.row * 0.34,
   ) * (0.035 + coherentNoise * 0.035);
 
-  const alphaGradient = normalizedPosition ** 1.45;
-  const base = 0.11 + alphaGradient * 0.34 + detailNoise * 0.025;
-  const temporalScale = 0.35 + alphaGradient * 0.65;
+  // Right keeps a smoother ramp; left leans on per-cell noise so alpha is non-uniform.
+  const leftBias = distanceFromSource;
+  const cellMottle = (detailNoise - 0.5) * (0.025 + leftBias * 0.22)
+    + (coherentNoise - 0.5) * (0.012 + leftBias * 0.14)
+    + (maxFieldNoise(input.col, input.row, 3) - 0.5) * leftBias * 0.1;
+  const alphaGradient = normalizedPosition ** 1.6;
+  const base = 0.07 + alphaGradient * 0.38 + cellMottle;
+  // Temporal motion stays stronger on the right; left relies more on static cell mottle.
+  const temporalScale = 0.22 + alphaGradient * 0.78;
+  const alphaFloor = 0.045 + alphaGradient * 0.055;
   const fieldAlpha = Math.max(
-    0.1,
+    alphaFloor,
     rowWeight * (base + (breath + shimmer + traveling) * temporalScale),
   );
   const alpha = clampMaxProgress(cellEnvelope * fieldAlpha);
@@ -315,8 +351,16 @@ export function resolveMaxFieldCell(input: {
   };
 }
 
-export function resolveMaxClipX(width: number, emitterRatio: number): number {
-  return Math.max(0, width) * clampMaxProgress(emitterRatio);
+export function resolveMaxClipX(
+  width: number,
+  emitterRatio: number,
+  thumbWidthPx: number = 32,
+): number {
+  const safeWidth = Math.max(0, width);
+  if (safeWidth <= 0) return 0;
+  const ratio = clampMaxProgress(emitterRatio);
+  const half = Math.min(Math.max(thumbWidthPx, 0) / 2, safeWidth / 2);
+  return half + ratio * (safeWidth - 2 * half);
 }
 
 export function prefersReducedMotion(): boolean {

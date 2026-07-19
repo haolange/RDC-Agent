@@ -8,9 +8,17 @@ import {
   EffortOneMillionContextSwitchRow,
   findAdjacentSupportedLevel,
   getStopPosition,
+  ReasoningLevelIcon,
   resolveReasoningIconVariant,
   resolveNearestSnapLevel,
 } from './effortControlParts';
+import {
+  clampCenteredTooltipPercent,
+  EFFORT_THUMB_WIDTH_PX,
+  ratioFromInsetClientX,
+  thumbInsetCenterPx,
+  thumbInsetPercent,
+} from './effortSliderGeometry';
 import {
   createActiveMaxTimeline,
   createMaxTimeline,
@@ -18,12 +26,16 @@ import {
   isMaxTierLevel,
   MAX_TRAVEL_CYCLE_MS,
   MAX_TRAVEL_SPATIAL_CYCLES,
+  MAX_INGRESS_LEFT_EASE,
+  MAX_INGRESS_MID_ENERGY,
   MAX_VISUAL_EGRESS_MS,
   MAX_VISUAL_INGRESS_MS,
   type MaxFieldMode,
   resolveMaxAnimationProgress,
   resolveMaxClipX,
   resolveMaxFieldCell,
+  resolveMaxIngressCoverage,
+  resolveMaxIngressEnergyProgress,
   resolveMaxTravelingAmplitude,
   resolveMaxVisualFrame,
   shouldStartMaxDragIngress,
@@ -99,9 +111,21 @@ describe('effortControlParts', () => {
     expect(resolveReasoningIconVariant('max')).toBe('max');
   });
 
+  it('renders reasoning icons on a crisp 16px integer grid', () => {
+    for (const level of ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const) {
+      const markup = renderToStaticMarkup(React.createElement(ReasoningLevelIcon, { level }));
+      expect(markup).toContain('width="16"');
+      expect(markup).toContain('height="16"');
+      expect(markup).toContain('stroke-width="2"');
+      expect(markup).toContain(`data-reasoning-icon="${level}"`);
+    }
+    expect(renderToStaticMarkup(React.createElement(ReasoningLevelIcon, { level: 'on' })))
+      .toContain('data-reasoning-icon="medium"');
+  });
+
   it('keeps reasoning, Max mode, and Fast mode as separate pill states', () => {
     const presentation = buildEffortPillPresentation({
-      reasoningLabel: 'Reasoning Max',
+      reasoningLabel: 'Max',
       oneMillionContextMode: true,
       oneMillionContextLabel: 'Max mode',
       oneMillionContextBadgeLabel: 'Max mode',
@@ -110,8 +134,8 @@ describe('effortControlParts', () => {
       fastModelBadgeLabel: '2x',
     });
 
-    expect(presentation.label).toBe('Reasoning Max');
-    expect(presentation.title).toBe('Reasoning Max | Max mode | Fast mode');
+    expect(presentation.label).toBe('Max');
+    expect(presentation.title).toBe('Max | Max mode | Fast mode');
     expect(presentation.badges).toEqual([
       { mode: 'one-million-context', label: 'Max mode', title: 'Max mode' },
       { mode: 'fast', label: '2x', title: 'Fast mode' },
@@ -156,6 +180,45 @@ describe('effortControlParts', () => {
     expect(clampSliderRatio(9)).toBe(1);
   });
 
+  it('keeps inset thumb centers inside the track for every ratio', () => {
+    const trackWidth = 280;
+    const half = EFFORT_THUMB_WIDTH_PX / 2;
+    for (const ratio of [0, 0.25, 0.5, 0.75, 1]) {
+      const centerPercent = thumbInsetPercent(ratio, trackWidth);
+      const centerPx = (centerPercent / 100) * trackWidth;
+      expect(centerPx - half).toBeGreaterThanOrEqual(-0.001);
+      expect(centerPx + half).toBeLessThanOrEqual(trackWidth + 0.001);
+    }
+    expect(thumbInsetPercent(0, trackWidth)).toBeCloseTo((half / trackWidth) * 100);
+    expect(thumbInsetPercent(1, trackWidth)).toBeCloseTo(((trackWidth - half) / trackWidth) * 100);
+    expect(thumbInsetPercent(0.5, trackWidth)).toBeCloseTo(50);
+    expect(thumbInsetPercent(-2, 0)).toBe(0);
+    expect(thumbInsetPercent(2, Number.NaN)).toBe(100);
+  });
+
+  it('clamps drag tooltip centers so they stay inside the track', () => {
+    const trackWidth = 280;
+    const tooltipWidth = 96;
+    const half = tooltipWidth / 2;
+    expect(clampCenteredTooltipPercent(0, trackWidth, tooltipWidth)).toBeCloseTo((half / trackWidth) * 100);
+    expect(clampCenteredTooltipPercent(100, trackWidth, tooltipWidth)).toBeCloseTo(
+      ((trackWidth - half) / trackWidth) * 100,
+    );
+    expect(clampCenteredTooltipPercent(50, trackWidth, tooltipWidth)).toBeCloseTo(50);
+  });
+
+  it('inverts inset pointer mapping so thumb centers follow the pointer', () => {
+    const trackWidth = 280;
+    const trackLeft = 100;
+    const half = EFFORT_THUMB_WIDTH_PX / 2;
+    expect(ratioFromInsetClientX(trackLeft + half, trackLeft, trackWidth)).toBeCloseTo(0);
+    expect(ratioFromInsetClientX(trackLeft + trackWidth - half, trackLeft, trackWidth)).toBeCloseTo(1);
+    expect(ratioFromInsetClientX(trackLeft + trackWidth / 2, trackLeft, trackWidth)).toBeCloseTo(0.5);
+    const ratio = 0.37;
+    const center = thumbInsetCenterPx(ratio, trackWidth);
+    expect(ratioFromInsetClientX(trackLeft + center, trackLeft, trackWidth)).toBeCloseTo(ratio);
+  });
+
   it('snaps to the nearest visible level and moves across adjacent stops', () => {
     const supported = ['off', 'low', 'medium', 'high', 'xhigh'] as const;
 
@@ -197,7 +260,7 @@ describe('effortControlParts', () => {
     });
     expect(drag.fromStopsOpacity).toBe(0.2);
     const dragMid = resolveMaxVisualFrame(drag, dragStartedAt + MAX_VISUAL_INGRESS_MS / 2);
-    expect(dragMid.energy).toBe(0.5);
+    expect(dragMid.energy).toBeCloseTo(0.5);
     expect(dragMid.stopsOpacity).toBe(0.2);
     expect(dragMid.running).toBe(true);
 
@@ -235,7 +298,8 @@ describe('effortControlParts', () => {
     });
     const stopsSettled = resolveMaxVisualFrame(committed, 1_000 + MAX_VISUAL_EGRESS_MS);
     expect(stopsSettled.stopsOpacity).toBe(0);
-    expect(stopsSettled.energy).toBeLessThan(0.25);
+    // Stops finish on the 384ms clock while linear ingress energy is only partway (~0.24).
+    expect(stopsSettled.energy).toBeCloseTo(MAX_VISUAL_EGRESS_MS / MAX_VISUAL_INGRESS_MS);
     expect(stopsSettled.complete).toBe(false);
     expect(resolveMaxVisualFrame(committed, 1_000 + MAX_VISUAL_INGRESS_MS)).toMatchObject({
       energy: 1,
@@ -319,21 +383,19 @@ describe('effortControlParts', () => {
     });
   });
 
-  it('keeps one deterministic porous topology while the unified field changes brightness', () => {
+  it('keeps a full lattice occupied while only brightness breathes over time', () => {
     const first = resolveGrid(1, 0);
     const later = resolveGrid(1, 430);
+    expect(first.every(({ sample }) => sample.occupied)).toBe(true);
     expect(first.map(({ sample }) => sample.occupied)).toEqual(
       later.map(({ sample }) => sample.occupied),
     );
-    const occupied = first.filter(({ sample }) => sample.occupied);
-    expect(occupied.length).toBeGreaterThan(first.length * 0.7);
-    expect(occupied.length).toBeLessThan(first.length * 0.85);
 
-    const deltas = occupied.map(({ col, row, sample }) => {
+    const deltas = first.map(({ col, row, sample }) => {
       const laterAlpha = later[row * FIELD_COLS + col]?.sample.alpha ?? sample.alpha;
       return laterAlpha - sample.alpha;
     });
-    expect(deltas.filter((delta) => Math.abs(delta) > 0.01).length).toBeGreaterThan(occupied.length * 0.35);
+    expect(deltas.filter((delta) => Math.abs(delta) > 0.01).length).toBeGreaterThan(first.length * 0.35);
     expect(deltas.some((delta) => delta > 0.01)).toBe(true);
     expect(deltas.some((delta) => delta < -0.01)).toBe(true);
   });
@@ -352,19 +414,49 @@ describe('effortControlParts', () => {
     }
   });
 
-  it('keeps the completed field translucent with a visible left floor and brighter right edge', () => {
+  it('reaches mid-track near mid-energy then eases out across the left half', () => {
+    expect(resolveMaxIngressEnergyProgress(800, MAX_VISUAL_INGRESS_MS)).toBeCloseTo(0.5);
+    expect(resolveMaxIngressCoverage(MAX_INGRESS_MID_ENERGY)).toBeCloseTo(0.5);
+    expect(resolveMaxIngressCoverage(0.5)).toBeGreaterThan(0.55);
+    expect(resolveMaxIngressCoverage(0.5)).toBeLessThan(0.72);
+    expect(MAX_INGRESS_LEFT_EASE).toBeGreaterThan(1);
+
+    // After mid-track, equal energy steps cover progressively less distance.
+    const cMid = resolveMaxIngressCoverage(MAX_INGRESS_MID_ENERGY);
+    const c60 = resolveMaxIngressCoverage(0.6);
+    const c80 = resolveMaxIngressCoverage(0.8);
+    const c100 = resolveMaxIngressCoverage(1);
+    expect(c60 - cMid).toBeGreaterThan(c80 - c60);
+    expect(c80 - c60).toBeGreaterThan(c100 - c80);
+
+    const leftBoundary = (grid: ReturnType<typeof resolveGrid>) => Math.min(
+      ...grid.filter(({ sample }) => sample.visible).map(({ col }) => col),
+    );
+    const atMid = leftBoundary(resolveGrid(MAX_INGRESS_MID_ENERGY, 700));
+    const at070 = leftBoundary(resolveGrid(0.7, 1_100));
+    const at100 = leftBoundary(resolveGrid(1, 1_600));
+    expect(atMid - at070).toBeGreaterThan(at070 - at100);
+  });
+
+  it('keeps the completed field translucent with a mottled left edge and brighter right edge', () => {
     const active = resolveGrid(1, 620).filter(({ sample }) => sample.occupied);
     const left = active.filter(({ col }) => col < FIELD_COLS / 3);
     const right = active.filter(({ col }) => col >= FIELD_COLS * 2 / 3);
     const averageAlpha = (cells: typeof active) => (
       cells.reduce((sum, { sample }) => sum + sample.alpha, 0) / cells.length
     );
+    const alphaRange = (cells: typeof active) => {
+      const values = cells.map(({ sample }) => sample.alpha);
+      return Math.max(...values) - Math.min(...values);
+    };
 
     expect(active.every(({ sample }) => sample.visible)).toBe(true);
-    expect(Math.min(...active.map(({ sample }) => sample.alpha))).toBeGreaterThanOrEqual(0.099);
+    expect(Math.min(...active.map(({ sample }) => sample.alpha))).toBeGreaterThanOrEqual(0.02);
     expect(Math.max(...active.map(({ sample }) => sample.alpha))).toBeLessThan(0.7);
     expect(averageAlpha(left)).toBeLessThan(0.18);
-    expect(averageAlpha(right)).toBeGreaterThan(averageAlpha(left) + 0.18);
+    expect(averageAlpha(right)).toBeGreaterThan(averageAlpha(left) + 0.16);
+    // Left mottling is primarily spatial; require a clear per-cell spread there.
+    expect(alphaRange(left)).toBeGreaterThan(0.1);
   });
 
   it('moves one continuous correlated brightness amplitude from right to left', () => {
@@ -412,9 +504,10 @@ describe('effortControlParts', () => {
   });
 
   it('enforces the thumb as an exact hard clip boundary', () => {
-    expect(resolveMaxClipX(300, 1)).toBe(300);
-    expect(resolveMaxClipX(300, 0.42)).toBe(126);
-    expect(resolveMaxClipX(300, -1)).toBe(0);
+    expect(resolveMaxClipX(300, 1)).toBe(284);
+    expect(resolveMaxClipX(300, 0.42)).toBeCloseTo(128.56);
+    expect(resolveMaxClipX(300, -1)).toBe(16);
+    expect(resolveMaxClipX(300, 0)).toBe(16);
     const clipped = resolveGrid(1, 500, 0.42);
     expect(clipped.every(({ col, sample }) => (
       col / (FIELD_COLS - 1) <= 0.42 || sample.alpha === 0

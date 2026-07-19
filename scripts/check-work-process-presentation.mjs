@@ -928,7 +928,8 @@ assert(!cssSource.includes('.work-process-empty'), 'placeholder empty-state CSS 
 assert(!appShellSource.includes('composerEnergyFlow'), 'composer running border must not use the legacy uniform sweep keyframe');
 assert(appShellSource.includes('@keyframes composerEnergyOrbit'), 'composer running border orbit keyframe should exist');
 assert(appShellSource.includes('.composer-shell.is-running::before'), 'composer running border core layer should exist');
-assert(appShellSource.includes('.composer-shell.is-running::after'), 'composer running border halo layer should exist');
+assert(!appShellSource.includes('.composer-shell.is-running::after'), 'composer running halo must use drop-shadow bloom, not a second masked ring (reads as cut edges)');
+assert(/is-running::before[\s\S]{0,900}drop-shadow/.test(appShellSource), 'composer running border bloom should follow the stroke via drop-shadow');
 assert(appShellSource.includes('.composer-shell.is-running:focus-within'), 'composer running border must preserve the focus ring layer');
 assert(appShellSource.includes('@media (prefers-reduced-motion: reduce)'), 'composer running border should honor reduced motion');
 assert(responsiveThemeSource.includes('--composer-shell-radius: 12px'), 'composer responsive radius token should stay synchronized with the running border');

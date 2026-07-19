@@ -1,6 +1,10 @@
 import * as fs from 'fs/promises';
 import type { AgentTool } from '../../agent/AgentTool';
-import { safeResolvePath } from '../primitives/_shared';
+import {
+  assertNotSensitiveDeletePath,
+  getWorkspaceRoot,
+  safeResolvePath,
+} from '../primitives/_shared';
 
 interface DeleteFileParams {
   path: string;
@@ -14,7 +18,7 @@ interface DeleteFileDetails {
 export const deleteFileTool: AgentTool<DeleteFileParams, DeleteFileDetails> = {
   name: 'delete_file',
   label: '删除文件',
-  description: 'Delete a file inside the workspace. Returns whether the file existed before deletion.',
+  description: 'Delete a file inside the workspace. Returns whether the file existed before deletion. Refuses paths under .git.',
   parameters: {
     type: 'object',
     properties: {
@@ -27,7 +31,9 @@ export const deleteFileTool: AgentTool<DeleteFileParams, DeleteFileDetails> = {
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');
-    const absolute = safeResolvePath(params.path, undefined, context);
+    const workspaceRoot = getWorkspaceRoot(context);
+    const absolute = safeResolvePath(params.path, workspaceRoot, context);
+    assertNotSensitiveDeletePath(absolute, workspaceRoot);
     let existed = false;
     try {
       await fs.access(absolute);

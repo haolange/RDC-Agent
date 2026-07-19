@@ -38,7 +38,10 @@ export interface RunLlmExecutionSummary {
   }>;
 }
 
-const NON_OCCUPYING_BREAKDOWN_IDS = new Set<ContextUsageBreakdownId>(['mcp_tools_deferred']);
+const NON_OCCUPYING_BREAKDOWN_IDS = new Set<ContextUsageBreakdownId>([
+  'mcp_tools_deferred',
+  'builtin_tools_deferred',
+]);
 
 function buildScaledBreakdown(
   raw: ContextUsageBreakdownEntry[] | null,

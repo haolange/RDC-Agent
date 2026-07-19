@@ -151,12 +151,13 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   const planTools = extractPlanTools(agentManifestService);
   assertIncludesAll(
     planTools,
-    ['read', 'search', 'web', 'askUser', 'agent', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search'],
+    ['read', 'search', 'web', 'askUser', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search'],
     'Plan seed tools',
   );
   assertIncludesNone(
     planTools,
-    ['bash', 'write', 'edit', 'rdxContext'],
+    // 'agent' 是宽泛 token；Plan 通过 handoff/subagent 精确协作，不需要它。
+    ['bash', 'write', 'edit', 'rdxContext', 'agent'],
     'Plan seed tools',
   );
   assert(agentManifestService.includes("handoffs: agentId === 'plan'"), 'Plan must own a dedicated handoff entry.');

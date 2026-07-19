@@ -256,10 +256,14 @@ describe('SessionContextJournal v2', () => {
     expect(message.providerState).toEqual(providerState);
   });
 
-  it('preserves only readable cross-turn reasoning_content in terminal context', () => {
+  it('persists cross-turn continuation artifacts verbatim and drops turn-scoped ones', () => {
     const readable = createContinuationArtifact(reasoningContentPlan, {
       type: 'reasoning_content',
       reasoningContent: 'required continuation',
+    });
+    const toolTurnScoped = createContinuationArtifact(anthropicPlan, {
+      type: 'thinking',
+      signature: 'anthropic-signature',
     });
     const canonical = canonicalizeTerminalContextMessages([
       assistant([
@@ -272,21 +276,62 @@ describe('SessionContextJournal v2', () => {
           continuation: readable,
         },
         ...encryptedAssistant().content,
+        {
+          type: 'thinking',
+          kind: 'opaque',
+          source: 'anthropic-thinking',
+          visibility: 'hidden',
+          continuation: toolTurnScoped,
+        },
         { type: 'text', text: 'final' },
       ]),
     ]);
     const content = (canonical[0] as AssistantMessage).content;
-    const thinking = content.find((block) => block.type === 'thinking');
-    expect(thinking).toMatchObject({
-      type: 'thinking',
+    const thinkingBlocks = content.filter((block) => block.type === 'thinking');
+    // 可读 reasoning-content 与 opaque encrypted 都是 all-assistant-turns，整体落盘。
+    expect(thinkingBlocks).toHaveLength(2);
+    expect(thinkingBlocks[0]).toMatchObject({
       text: undefined,
-      continuation: {
-        carrier: 'reasoning-content',
-        reasoningContent: 'required continuation',
-      },
+      continuation: { carrier: 'reasoning-content', reasoningContent: 'required continuation' },
     });
-    expect(JSON.stringify(canonical)).not.toContain('protected');
+    expect(thinkingBlocks[1]).toMatchObject({
+      continuation: { encryptedContent: 'protected' },
+    });
+    // 落盘的 opaque 制品必须能通过完整性回放校验（verbatim，未被裁剪）。
+    const persisted = filterSessionContextMessageArtifacts(canonical[0], responsesPlan);
+    expect(persisted.decisions.some((decision) => decision.action === 'replay' && decision.reason === 'exact-execution')).toBe(true);
+    // tool-call-turn scope 的制品不落盘；thinking 展示文案不落盘。
+    expect(JSON.stringify(canonical)).not.toContain('anthropic-signature');
     expect(JSON.stringify(canonical)).not.toContain('display copy');
+  });
+
+  it('replays artifacts only within the retention window of recent turns', () => {
+    const journal = new SessionContextJournal();
+    const totalTurns = 10;
+    const entries = Array.from({ length: totalTurns }, (_, index) => entry({
+      turnId: `turn-${index + 1}`,
+      userMessageId: `user-${index + 1}`,
+      assistantMessageId: `assistant-${index + 1}`,
+      messages: [
+        { role: 'user', content: `question ${index + 1}`, timestamp: index + 1 },
+        encryptedAssistant(),
+      ],
+    }));
+    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue(entries);
+    vi.spyOn(storageAdapter, 'readSessionDerivedContextView').mockReturnValue(null);
+
+    const result = journal.materialize(
+      'session-1',
+      entries.map((item) => item.turnId),
+      responsesPlan,
+    );
+
+    // 10 个 turn，retention=8：最旧 2 个 turn 的制品按 retention-expired 丢弃。
+    expect(result.replayedArtifactCount).toBe(8);
+    expect(result.filteredArtifactCount).toBe(2);
+    const retentionDrops = result.artifactDecisions.filter((decision) => decision.reason === 'retention-expired');
+    expect(retentionDrops).toHaveLength(2);
+    expect(retentionDrops.every((decision) => decision.action === 'drop')).toBe(true);
   });
 
   it('removes dangling tool calls but retains paired tool facts and safe text', () => {

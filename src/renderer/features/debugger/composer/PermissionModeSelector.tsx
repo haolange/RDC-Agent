@@ -41,23 +41,14 @@ const PERMISSION_MODES: Array<{
 
 export const PermissionModeSelector: React.FC = () => {
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
   const mode = useAppSettingsStore((state) => state.settings.agentRuntime?.permissions?.mode ?? 'default');
   const setMode = useAppSettingsStore((state) => state.setAgentPermissionMode);
   const current = PERMISSION_MODES.find((entry) => entry.id === mode) ?? PERMISSION_MODES[0];
 
-  const selectMode = async (nextMode: AgentPermissionMode) => {
-    if (nextMode === mode || busy) {
-      setOpen(false);
-      return;
-    }
-    setBusy(true);
-    try {
-      await setMode(nextMode);
-      setOpen(false);
-    } finally {
-      setBusy(false);
-    }
+  const selectMode = (nextMode: AgentPermissionMode) => {
+    setOpen(false);
+    if (nextMode === mode) return;
+    void setMode(nextMode);
   };
 
   return (
@@ -66,9 +57,9 @@ export const PermissionModeSelector: React.FC = () => {
         type="button"
         className={`composer-permission-pill ${open ? 'open' : ''}`}
         data-testid="composer-permission-pill"
+        data-mode={current.id}
         aria-haspopup="menu"
         aria-expanded={open}
-        disabled={busy}
         title={`当前模式：${current.labelZh}（${current.descriptionZh}）`}
         onClick={() => setOpen((value) => !value)}
       >
@@ -86,10 +77,10 @@ export const PermissionModeSelector: React.FC = () => {
               key={entry.id}
               type="button"
               className={`composer-permission-menu-item ${entry.id === mode ? 'active' : ''}`}
+              data-mode={entry.id}
               role="menuitemradio"
               aria-checked={entry.id === mode}
-              disabled={busy}
-              onClick={() => void selectMode(entry.id)}
+              onClick={() => selectMode(entry.id)}
             >
               <span className="composer-permission-menu-label">{entry.label}</span>
               <span className="composer-permission-menu-desc">{entry.descriptionZh}</span>
