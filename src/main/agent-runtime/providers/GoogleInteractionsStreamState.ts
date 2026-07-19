@@ -7,6 +7,7 @@ import {
   ProviderStreamProtocolError,
 } from './internal/AssistantStreamBuilder';
 import { ProviderHttpError } from './internal/http';
+import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import { GoogleInteractionsStepState } from './GoogleInteractionsStepState';
 
 const PROVIDER_API = 'google-interactions';
@@ -113,13 +114,15 @@ export class GoogleInteractionsStreamState {
 
   private applyUsage(usage: Record<string, unknown> | null): void {
     if (!usage) return;
-    this.builder.setUsage({
+    const cacheReadTokens = numberValue(usage.total_cached_tokens);
+    const reasoningTokens = numberValue(usage.total_thought_tokens);
+    this.builder.setUsage(finalizeProviderUsage({
       inputTokens: numberValue(usage.total_input_tokens) ?? 0,
       outputTokens: numberValue(usage.total_output_tokens) ?? 0,
       totalTokens: numberValue(usage.total_tokens) ?? 0,
-      cacheReadTokens: numberValue(usage.total_cached_tokens) ?? 0,
-      reasoningTokens: numberValue(usage.total_thought_tokens) ?? 0,
-    });
+      ...(cacheReadTokens !== null ? { cacheReadTokens } : {}),
+      ...(reasoningTokens !== null ? { reasoningTokens } : {}),
+    }));
   }
 }
 

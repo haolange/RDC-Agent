@@ -22,6 +22,7 @@ import type {
 } from '../core/types';
 import { AssistantStreamBuilder, createProviderOutputRef } from './internal/AssistantStreamBuilder';
 import { composeAbortSignals, normalizeError } from './internal/http';
+import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 
 type RuntimeLanguageModel = Exclude<LanguageModel, string>;
 export interface AiSdkStreamingProviderOptions {
@@ -206,14 +207,20 @@ async function consumeFullStream(
       }
       builder.endToolCall(ref);
     } else if (part.type === 'finish') {
-      builder.setUsage({
+      builder.setUsage(finalizeProviderUsage({
         inputTokens: part.totalUsage.inputTokens ?? 0,
         outputTokens: part.totalUsage.outputTokens ?? 0,
         totalTokens: part.totalUsage.totalTokens ?? undefined,
-        cacheReadTokens: part.totalUsage.inputTokenDetails.cacheReadTokens ?? undefined,
-        cacheWriteTokens: part.totalUsage.inputTokenDetails.cacheWriteTokens ?? undefined,
-        reasoningTokens: part.totalUsage.outputTokenDetails.reasoningTokens ?? undefined,
-      });
+        ...(typeof part.totalUsage.inputTokenDetails.cacheReadTokens === 'number'
+          ? { cacheReadTokens: part.totalUsage.inputTokenDetails.cacheReadTokens }
+          : {}),
+        ...(typeof part.totalUsage.inputTokenDetails.cacheWriteTokens === 'number'
+          ? { cacheWriteTokens: part.totalUsage.inputTokenDetails.cacheWriteTokens }
+          : {}),
+        ...(typeof part.totalUsage.outputTokenDetails.reasoningTokens === 'number'
+          ? { reasoningTokens: part.totalUsage.outputTokenDetails.reasoningTokens }
+          : {}),
+      }));
       builder.done(mapFinishReason(part.finishReason));
     } else if (part.type === 'abort') {
       builder.done('aborted');

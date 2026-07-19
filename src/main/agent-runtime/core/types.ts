@@ -127,6 +127,16 @@ export interface Usage {
   cacheReadTokens?: number;
   /** Provider 上报的 cache write / creation tokens；未提供时缺省。 */
   cacheWriteTokens?: number;
+  /**
+   * Normalized cache hit tokens for this request (native or derived from cacheRead).
+   * Omitted when the provider reported no cache telemetry.
+   */
+  cacheHitTokens?: number;
+  /**
+   * Normalized cache miss tokens for this request (native or derived).
+   * Omitted when the provider reported no cache telemetry.
+   */
+  cacheMissTokens?: number;
   /** Provider 上报的 reasoning tokens；未提供时缺省。 */
   reasoningTokens?: number;
   /** 可选成本信息（单位：美元）。 */

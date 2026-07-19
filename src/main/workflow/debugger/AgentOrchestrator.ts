@@ -1317,6 +1317,12 @@ export class AgentOrchestrator {
           ...(typeof message.usage.cacheWriteTokens === 'number'
             ? { cacheWriteTokens: message.usage.cacheWriteTokens }
             : {}),
+          ...(typeof message.usage.cacheHitTokens === 'number'
+            ? { cacheHitTokens: message.usage.cacheHitTokens }
+            : {}),
+          ...(typeof message.usage.cacheMissTokens === 'number'
+            ? { cacheMissTokens: message.usage.cacheMissTokens }
+            : {}),
           ...(typeof message.usage.reasoningTokens === 'number'
             ? { reasoningTokens: message.usage.reasoningTokens }
             : {}),
@@ -2697,6 +2703,12 @@ export class AgentOrchestrator {
               : {}),
             ...(typeof event.message.usage.cacheWriteTokens === 'number'
               ? { cacheWriteTokens: event.message.usage.cacheWriteTokens }
+              : {}),
+            ...(typeof event.message.usage.cacheHitTokens === 'number'
+              ? { cacheHitTokens: event.message.usage.cacheHitTokens }
+              : {}),
+            ...(typeof event.message.usage.cacheMissTokens === 'number'
+              ? { cacheMissTokens: event.message.usage.cacheMissTokens }
               : {}),
             ...(typeof event.message.usage.reasoningTokens === 'number'
               ? { reasoningTokens: event.message.usage.reasoningTokens }

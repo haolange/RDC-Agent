@@ -75,7 +75,15 @@ describe('AiSdkStreamingProvider', () => {
 
     const message = await stream.result();
     expect(message.stopReason).toBe('toolUse');
-    expect(message.usage).toMatchObject({ inputTokens: 12, outputTokens: 8, totalTokens: 20, reasoningTokens: 2 });
+    expect(message.usage).toMatchObject({
+      inputTokens: 12,
+      outputTokens: 8,
+      totalTokens: 20,
+      reasoningTokens: 2,
+      cacheReadTokens: 2,
+      cacheHitTokens: 2,
+      cacheMissTokens: 10,
+    });
     expect(message.content).toEqual([
       expect.objectContaining({ type: 'text', text: 'hello', providerOutputRef: expect.objectContaining({ providerBlockKey: 'part:text-1' }) }),
       expect.objectContaining({ type: 'thinking', text: 'think', kind: 'unknown' }),

@@ -202,6 +202,8 @@ describe('GoogleInteractionsProvider', () => {
       totalTokens: 21,
       reasoningTokens: 3,
       cacheReadTokens: 5,
+      cacheHitTokens: 5,
+      cacheMissTokens: 6,
     });
     expect(message.providerState).toMatchObject({
       carrier: 'previous-interaction-id',

@@ -107,6 +107,8 @@ export async function executeCapabilityProbe(input: CapabilityProbeExecution): P
     outputTokens: message.usage.outputTokens,
     cacheReadTokens: message.usage.cacheReadTokens,
     cacheWriteTokens: message.usage.cacheWriteTokens,
+    cacheHitTokens: message.usage.cacheHitTokens,
+    cacheMissTokens: message.usage.cacheMissTokens,
     reasoningTokens: message.usage.reasoningTokens,
   });
   return message;

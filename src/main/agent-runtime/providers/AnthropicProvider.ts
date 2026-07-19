@@ -19,6 +19,7 @@ import { partitionSystemPrompt } from './promptCacheWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
 import type { ReasoningVisibility } from '@shared/types/agentRuntime';
 import { AssistantStreamBuilder, createProviderOutputRef } from './internal/AssistantStreamBuilder';
+import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import {
   composeAbortSignals,
   ensureOk,
@@ -219,14 +220,14 @@ export class AnthropicProvider implements ProviderStrategy {
             if (typeof evt.message.usage?.cache_creation_input_tokens === 'number') {
               cacheWriteTokens = evt.message.usage.cache_creation_input_tokens;
             }
-            builder.setUsage({
+            builder.setUsage(finalizeProviderUsage({
               // Anthropic 的 input_tokens 不含 prompt cache 命中/写入部分；
               // agent-runtime Usage.inputTokens 归一为完整 prompt 占用（与 OpenAI prompt_tokens 口径一致）。
               inputTokens: inputTokens + (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0),
               outputTokens,
               ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
               ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
-            });
+            }));
             break;
           }
           case 'content_block_start': {
@@ -336,12 +337,12 @@ export class AnthropicProvider implements ProviderStrategy {
               cacheWriteTokens = evt.usage.cache_creation_input_tokens;
             }
             if (evt.usage) {
-              builder.setUsage({
+              builder.setUsage(finalizeProviderUsage({
                 inputTokens: inputTokens + (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0),
                 outputTokens,
                 ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
                 ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
-              });
+              }));
             }
             break;
           }

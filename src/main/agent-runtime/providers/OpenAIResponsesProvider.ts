@@ -22,6 +22,7 @@ import {
   parseSSE,
   ProviderHttpError,
 } from './internal/http';
+import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import { buildOpenAiResponsesReasoning, isReasoningEnabled } from './reasoningWire';
 import { reasoningProjectionSource } from './reasoningProjection';
 import type { ProviderRequestAuthorizer } from '../../settings/AwsBedrockCredentials';
@@ -583,7 +584,7 @@ function applyCompletedUsage(builder: AssistantStreamBuilder, payload: Responses
     const cacheReadTokens = payload.usage.input_tokens_details?.cached_tokens;
     const cacheWriteTokens = payload.usage.input_tokens_details?.cache_write_tokens;
     const reasoningTokens = payload.usage.output_tokens_details?.reasoning_tokens;
-    builder.setUsage({
+    builder.setUsage(finalizeProviderUsage({
       inputTokens: payload.usage.input_tokens ?? 0,
       outputTokens: payload.usage.output_tokens ?? 0,
       totalTokens:
@@ -592,7 +593,7 @@ function applyCompletedUsage(builder: AssistantStreamBuilder, payload: Responses
       ...(typeof cacheReadTokens === 'number' ? { cacheReadTokens } : {}),
       ...(typeof cacheWriteTokens === 'number' ? { cacheWriteTokens } : {}),
       ...(typeof reasoningTokens === 'number' ? { reasoningTokens } : {}),
-    });
+    }));
   }
 }
 
