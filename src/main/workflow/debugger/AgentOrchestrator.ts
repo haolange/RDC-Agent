@@ -63,6 +63,7 @@ import type { CompiledPromptCache } from '@shared/types/semanticContext';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
+import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
 import { Agent } from '../../agent-runtime/agent/Agent';
 import { ContextManager } from '../../agent-runtime/agent/ContextManager';
 import { TokenizerService } from '../../agent-runtime/core/TokenizerService';
@@ -162,6 +163,7 @@ interface AgentTurnOptions {
   turnControls?: ConversationTurnControls;
   requestPlan?: RequestPlan;
   userContent?: UserMessage['content'];
+  preloadSkillIds?: string[];
 }
 
 interface AgentProfileTurnOptions extends AgentTurnOptions {
@@ -469,6 +471,8 @@ export class AgentOrchestrator {
         contextWindowTokens: activeContextWindow,
         capability,
         systemPrompt: config.systemPrompt,
+        messageText: content,
+        preloadSkillIds: options?.preloadSkillIds,
       });
       if (!stub && !promptPlan) {
         throw new Error(`PROMPT_PLAN_UNAVAILABLE: ${agentId}`);
@@ -866,6 +870,8 @@ export class AgentOrchestrator {
         contextWindowTokens: activeContextWindow,
         capability,
         systemPrompt: config.systemPrompt,
+        messageText: typeof content === 'string' ? content : '',
+        preloadSkillIds: options?.preloadSkillIds,
       });
       if (!promptPlan) throw new Error(`PROMPT_PLAN_UNAVAILABLE: ${agentId}`);
 
@@ -2811,6 +2817,8 @@ export class AgentOrchestrator {
     contextWindowTokens: number;
     capability: EffectiveModel;
     systemPrompt?: string;
+    messageText?: string;
+    preloadSkillIds?: string[];
   }): PromptPlan | null {
     const runtimeSettings = settingsService.getAll();
     const definition = agentManifestService.getEffectiveProfiles(
@@ -2838,9 +2846,19 @@ export class AgentOrchestrator {
           activePaths,
         })
       : { sources: [], totalBytes: 0, diagnostics: [] };
-    const preloadedSkills = activeDefinition.skills
-      .map((skillId) => agentRuntimeConfigService.loadSkill(skillId, input.projectRootPath ?? undefined))
-      .filter((skill): skill is NonNullable<typeof skill> => skill !== null);
+    const preloadSkillIds = mergeTurnPreloadSkillIds({
+      profileSkills: activeDefinition.skills,
+      messageText: input.messageText ?? '',
+      pendingSkillIds: input.preloadSkillIds,
+    });
+    const preloadedSkills = [];
+    for (const skillId of preloadSkillIds) {
+      const skill = agentRuntimeConfigService.loadSkill(skillId, input.projectRootPath ?? undefined);
+      if (!skill) {
+        throw new Error(`SKILL_UNAVAILABLE: skill is not configured: ${skillId}`);
+      }
+      preloadedSkills.push(skill);
+    }
     const promptClock = resolvePromptClock();
     return promptPlanBuilder.build({
       profile: activeDefinition,

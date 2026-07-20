@@ -54,6 +54,8 @@ export const Composer: React.FC<ComposerProps> = ({
     promptValue,
     setPromptValue,
     pendingAttachments,
+    pendingSkillIds,
+    removePendingSkill,
     modeMenuOpen,
     setModeMenuOpen,
     promptInputRef,
@@ -111,8 +113,25 @@ export const Composer: React.FC<ComposerProps> = ({
       className={`composer-shell ${isComposerBusy ? 'is-running' : ''}`}
       style={{ ['--composer-mode-accent' as string]: currentModeConfig.accentColor }}
     >
-      {pendingAttachments.length > 0 && (
+      {(pendingAttachments.length > 0 || pendingSkillIds.length > 0) && (
         <div className="composer-attachments" data-testid="composer-attachments">
+          {pendingSkillIds.map((skillId) => (
+            <div key={`skill-${skillId}`} className="composer-attachment-chip skill" data-testid="composer-skill-chip">
+              <span className="composer-attachment-chip-icon" aria-hidden="true">SKL</span>
+              <span className="composer-attachment-chip-copy">
+                <span className="composer-attachment-chip-name">${skillId}</span>
+                <span className="composer-attachment-chip-meta">{t('app.armedSkillMeta')}</span>
+              </span>
+              <button
+                type="button"
+                className="composer-attachment-chip-remove"
+                onClick={() => removePendingSkill(skillId)}
+                aria-label={t('app.removeArmedSkill', { skillId })}
+              >
+                x
+              </button>
+            </div>
+          ))}
           {pendingAttachments.map((attachment) => (
             <div key={attachment.id} className={`composer-attachment-chip ${attachment.kind}`}>
               <span className="composer-attachment-chip-icon" aria-hidden="true">

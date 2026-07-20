@@ -25,17 +25,26 @@ export const skillsCommand: CommandDefinition = {
       };
     }
     const action = args[0];
+    const resolveSkill = (rawId: string) => skills.find((entry) => (
+      entry.id === rawId || entry.name === rawId || entry.label === rawId
+    ));
     if (action === 'run') {
       const skillId = args[1] ?? '';
+      const skill = resolveSkill(skillId);
+      if (!skill) {
+        return {
+          success: false,
+          message: `Skill is not configured: ${skillId || 'unnamed'}`,
+        };
+      }
       return {
         success: true,
-        message: `Running skill: ${skillId || 'unnamed'}...`,
-        uiAction: { type: 'run-skill', payload: { skillId } },
+        message: `Armed skill for next send: ${skill.id}`,
+        uiAction: { type: 'run-skill', payload: { skillId: skill.id } },
+        data: { skill },
       };
     }
-    const skill = skills.find((entry) => (
-      entry.id === action || entry.name === action || entry.label === action
-    ));
+    const skill = resolveSkill(action);
     if (!skill) {
       return {
         success: false,
@@ -44,7 +53,8 @@ export const skillsCommand: CommandDefinition = {
     }
     return {
       success: true,
-      message: `${skill.id}: ${skill.label || skill.name}\n${skill.description || 'No description.'}`,
+      message: `Armed skill for next send: ${skill.id}`,
+      uiAction: { type: 'run-skill', payload: { skillId: skill.id } },
       data: { skill },
     };
   },

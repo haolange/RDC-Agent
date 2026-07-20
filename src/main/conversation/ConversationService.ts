@@ -43,6 +43,7 @@ import type { ReplayDeviceEntry } from '@shared/types/device';
 import { isTopLevelAgentId } from '@shared/types/agent';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { generateEventId, nowMs } from '@shared/utils/id';
+import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
 import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 import {
@@ -731,6 +732,7 @@ export class ConversationService {
           input.agentId ?? null,
           trimmed,
           input.attachments ?? [],
+          input.preloadSkillIds ?? [],
           undefined,
           input.turnControls,
           requestId,
@@ -761,6 +763,7 @@ export class ConversationService {
         input.agentId ?? null,
         trimmed,
         input.attachments ?? [],
+        input.preloadSkillIds ?? [],
         undefined,
         input.turnControls,
         input.requestId,
@@ -846,6 +849,7 @@ export class ConversationService {
       input.agentId ?? null,
       trimmed,
       input.attachments ?? [],
+      input.preloadSkillIds ?? [],
       {
         branchId: newBranchId,
         forkId,
@@ -942,6 +946,8 @@ export class ConversationService {
     requestPlan: RequestPlan;
     effectiveModel: EffectiveModel | null;
     attachmentPaths: string[];
+    messageText: string;
+    preloadSkillIds?: string[];
     excludeTurnId?: string;
   }): PreparedConversationPrompt {
     const projectRootPath = input.context.projectId
@@ -973,9 +979,19 @@ export class ConversationService {
           activePaths,
         })
       : { sources: [], totalBytes: 0, diagnostics: [] };
-    const preloadedSkills = definition.skills
-      .map((skillId) => agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined))
-      .filter((skill): skill is NonNullable<typeof skill> => skill !== null);
+    const preloadSkillIds = mergeTurnPreloadSkillIds({
+      profileSkills: definition.skills,
+      messageText: input.messageText,
+      pendingSkillIds: input.preloadSkillIds,
+    });
+    const preloadedSkills = [];
+    for (const skillId of preloadSkillIds) {
+      const skill = agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined);
+      if (!skill) {
+        throw new Error(`SKILL_UNAVAILABLE: skill is not configured: ${skillId}`);
+      }
+      preloadedSkills.push(skill);
+    }
     const promptClock = resolvePromptClock();
     const promptPlan = promptPlanBuilder.build({
       profile: definition,
@@ -1014,6 +1030,7 @@ export class ConversationService {
     requestedAgentId: string | null,
     rawMessage: string,
     pendingAttachments: ConversationAttachmentInput[],
+    preloadSkillIds: string[] = [],
     branchContext?: ConversationBranchTurnContext,
     requestTurnControls?: ConversationTurnControls,
     requestId: string = generateEventId('request'),
@@ -1145,6 +1162,8 @@ export class ConversationService {
       requestPlan: planning.plan,
       effectiveModel,
       attachmentPaths: pendingAttachmentDescriptors.map((attachment) => attachment.filePath),
+      messageText: effectiveMessage,
+      preloadSkillIds,
     });
     const preparedBranchState = branchContext?.branchState ?? (context.session
       ? storageAdapter.readConversationBranchState(context.session.sessionId)

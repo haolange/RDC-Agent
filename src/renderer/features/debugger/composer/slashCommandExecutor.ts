@@ -20,6 +20,7 @@ interface SlashCommandContext {
   upsertConversationMessages: (messages: ConversationMessage[]) => void;
   openSettings: (section?: string) => void;
   showNotice: (message: string) => void;
+  armPendingSkill?: (skillId: string) => void;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -221,7 +222,12 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
     }
     case 'run-skill': {
       const skillId = getPayloadString(action, 'skillId');
-      context.showNotice(skillId ? `Skill execution is available to agent tools: ${skillId}` : 'No skill selected.');
+      if (!skillId) {
+        context.showNotice('No skill selected.');
+        return;
+      }
+      context.armPendingSkill?.(skillId);
+      context.showNotice(`Skill armed for next send: ${skillId}`);
       return;
     }
     default:

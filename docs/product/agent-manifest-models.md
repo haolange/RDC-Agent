@@ -73,9 +73,11 @@ Supported frontmatter fields are:
 - `disable-model-invocation`
 - `tools`
 - `agents`
-- `skills`
+- `skills`（强制全文 preload；空列表表示不预载，不等于不可发现）
 - `mcp-servers`
 - `handoffs`
+
+Removed fields (do not restore): `harness` / lean|standard thickness modes. Skill discovery thickness is Progressive Skill Index only.
 
 `handoffs` support:
 

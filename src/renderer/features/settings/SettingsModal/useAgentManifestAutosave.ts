@@ -38,7 +38,6 @@ export const serializeAgentManifestDraft = (draft: AgentManifestDraft): string =
   instructions: draft.instructions,
   enabled: draft.enabled,
   maxTurns: draft.maxTurns,
-  harness: draft.harness,
   delete: Boolean(draft.delete),
 });
 

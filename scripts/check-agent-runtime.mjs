@@ -210,15 +210,24 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
 
   const promptPlanBuilder = read('src/main/agent-runtime/prompt/PromptPlanBuilder.ts');
   const requestEnvelopeBuilder = read('src/main/agent-runtime/prompt/RequestEnvelopeBuilder.ts');
+  const skillCatalogBudget = read('src/main/agent-runtime/capabilities/SkillCatalogBudget.ts');
   assert(promptPlanBuilder.includes('CORE_FILES'), 'PromptPlanBuilder must assemble source-controlled Core Prompt modules.');
   assert(promptPlanBuilder.includes("kind: 'skill-catalog'"), 'PromptPlanBuilder must own progressive Skill catalog composition.');
+  assert(promptPlanBuilder.includes('resolveSkillCatalogBudget'), 'PromptPlanBuilder must use SkillCatalogBudget for progressive skill index.');
   assert(promptPlanBuilder.includes('Permission mode:'), 'PromptPlanBuilder must describe effective runtime permission mode.');
   assert(promptPlanBuilder.includes('routeCapability'), 'PromptPlanBuilder must include effective route capabilities.');
+  assert(skillCatalogBudget.includes('includeSkillCatalog'), 'SkillCatalogBudget must decide catalog inclusion.');
+  assert(!skillCatalogBudget.includes("harness:"), 'SkillCatalogBudget must not restore harness frontmatter modes.');
+  assert(!skillCatalogBudget.includes('HarnessProfile'), 'SkillCatalogBudget must not restore HarnessProfile modes.');
+  assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/capabilities/HarnessProfileResolver.ts')), 'HarnessProfileResolver must be removed after Progressive Skill convergence.');
+  assert(!read('src/shared/types/agentManifest.ts').includes('AgentHarnessPreference'), 'agentManifest must not restore AgentHarnessPreference.');
   assert(requestEnvelopeBuilder.includes('promptPlan'), 'RequestEnvelopeBuilder must produce provider-neutral snapshots from PromptPlan.');
   assert(requestEnvelopeBuilder.includes('requestPlan'), 'RequestEnvelopeBuilder must snapshot the exact RequestPlan sent to the adapter.');
   assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/prompt/PromptAssembler.ts')), 'PromptAssembler must be removed after PromptPlan formalization.');
 
   const conversationService = read('src/main/conversation/ConversationService.ts');
+  assert(conversationService.includes('mergeTurnPreloadSkillIds'), 'ConversationService must merge profile/$skill/pending skill preload ids.');
+  assert(conversationService.includes('SKILL_UNAVAILABLE'), 'ConversationService must fail closed on missing preload skills.');
   for (const forbidden of ['buildProfileSystemPrompt', 'buildProfileCatalogPrompt', 'buildProfileTurnPrompt', 'mentionsTextualToolCall', 'traceHasRuntimeToolCalls', 'AGENT_WORKBENCH_TOOL_CATALOG']) {
     assert(!conversationService.includes(forbidden), `ConversationService must not keep legacy prompt/text-tool logic: ${forbidden}.`);
   }

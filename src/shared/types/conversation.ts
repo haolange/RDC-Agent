@@ -197,6 +197,8 @@ export interface ConversationSendRequest {
   agentId?: string | null;
   message: string;
   attachments?: ConversationAttachmentInput[];
+  /** Composer `/skills` 武装的当轮预载 skill id（与 `$skill` / profile.skills 合并）。 */
+  preloadSkillIds?: string[];
   turnControls: ConversationTurnControls;
   /** Exact committed configuration observed by the renderer before send. */
   configurationCommit?: {
