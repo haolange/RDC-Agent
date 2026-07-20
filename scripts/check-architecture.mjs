@@ -273,6 +273,25 @@ if (fs.existsSync(sharedExportsPath)) {
   }
 }
 
+const settingsTypes = read('src/renderer/features/settings/SettingsModal/types.ts');
+if (settingsTypes.includes("'diagnostics'")) {
+  fail('SettingsSection must not restore diagnostics navigation.');
+}
+if (!settingsTypes.includes("'policy'")) {
+  fail('SettingsSection must include peer policy navigation.');
+}
+const settingsNav = read('src/renderer/features/settings/SettingsModal/useSettingsModal.ts');
+if (!settingsNav.includes("id: 'policy'") || settingsNav.includes("id: 'diagnostics'")) {
+  fail('Settings nav must list Policy after Hooks and must not list Diagnostics.');
+}
+if (exists('src/renderer/features/debugger/RequestDiagnostics')
+  || exists('src/renderer/features/settings/SettingsModal/sections/DeveloperDiagnosticsSettings.tsx')) {
+  fail('Settings Diagnostics / RequestInspector frontend must remain removed.');
+}
+if (!exists('src/renderer/features/settings/SettingsModal/sections/PolicySettings.tsx')) {
+  fail('PolicySettings peer section is required.');
+}
+
 if (process.exitCode) {
   process.exit(process.exitCode);
 }

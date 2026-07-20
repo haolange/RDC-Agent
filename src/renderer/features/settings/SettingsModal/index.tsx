@@ -13,7 +13,7 @@ import { SettingsNavIcon } from './SettingsNavIcon';
 import { useRdxRuntimeOverview } from './useRdxRuntimeOverview';
 import { RuntimeScopePanel } from './sections/RuntimeScopePanel';
 import { HooksSettings } from './sections/HooksSettings';
-import { DeveloperDiagnosticsSettings } from './sections/DeveloperDiagnosticsSettings';
+import { PolicySettings } from './sections/PolicySettings';
 import './SettingsModal.css';
 
 interface SettingsModalProps {
@@ -224,12 +224,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 <HooksSettings overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} onChanged={runtime.setOverview} />
               )}
 
-              {activeSection === 'diagnostics' && (
-                <DeveloperDiagnosticsSettings
-                  overview={runtime.overview}
-                  loading={runtime.loading}
-                  error={runtime.error}
-                />
+              {activeSection === 'policy' && (
+                <PolicySettings overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} onChanged={runtime.setOverview} />
               )}
             </div>
           </div>

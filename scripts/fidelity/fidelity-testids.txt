@@ -56,7 +56,6 @@ message-variant-navigator
 mode-menu-item-${agent.id}
 open-settings-entry
 opened-capture-preview-window
-request-inspector
 runtime-log-entry-${entry.id}
 runtime-terminal
 runtime-terminal-activity-pane

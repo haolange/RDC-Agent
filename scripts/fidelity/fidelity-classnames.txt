@@ -486,15 +486,6 @@ project-stack
 project-stack-item
 rdx-runtime-context-facts
 rdx-runtime-context-panel
-request-inspector
-request-inspector-body
-request-inspector-call
-request-inspector-calls
-request-inspector-error
-request-inspector-head
-request-inspector-payload
-request-inspector-tabs
-request-inspector-title
 right-panel-body
 runtime-terminal-activity-body
 runtime-terminal-activity-pane

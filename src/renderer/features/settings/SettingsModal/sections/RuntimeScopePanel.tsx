@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { RdxRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdxRuntime';
-import { useI18n } from '../../../../i18n';
+import { useI18n, type TranslationKey } from '../../../../i18n';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
 import { ScopedResourceEditor } from './ScopedResourceEditor';
 import { contentFromForm, emptyForm, formFromContent, resourceCardMeta, type ResourceFormState } from './scopedResourceForm';
 
 const templateId = (kind: ScopedResourceKind): string => `new-${kind}`;
+const kindLabelKey = (kind: ScopedResourceKind): TranslationKey => `settings.kind.${kind}` as TranslationKey;
 
 export const RuntimeScopePanel: React.FC<{
   overview: RdxRuntimeOverview | null;
@@ -17,6 +18,7 @@ export const RuntimeScopePanel: React.FC<{
 }> = ({ overview, scope, onScopeChange, kinds, onChanged, showResourceStrip = true }) => {
   const { t } = useI18n();
   const kind = kinds[0];
+  const kindLabel = t(kindLabelKey(kind));
   const resources = useMemo(
     () => overview?.resources.filter((entry) => entry.scope === scope && kinds.includes(entry.kind)) ?? [],
     [overview, scope, kinds],
@@ -162,7 +164,7 @@ export const RuntimeScopePanel: React.FC<{
                     {t('settings.scopeImport')}
                   </button>
                   <button type="button" className="button button-secondary" disabled={addDisabled || busy} onClick={startNew}>
-                    {t('settings.scopeAdd', { kind })}
+                    {t('settings.scopeAdd', { kind: kindLabel })}
                   </button>
                 </div>
               </div>
@@ -185,7 +187,7 @@ export const RuntimeScopePanel: React.FC<{
                   );
                 }) : (
                   <div className="settings-empty settings-empty-dashed settings-runtime-list-empty">
-                    {t('settings.scopeEmpty', { kind })}
+                    {t('settings.scopeEmpty', { kind: kindLabel })}
                   </div>
                 )}
               </div>
@@ -204,7 +206,7 @@ export const RuntimeScopePanel: React.FC<{
               />
             ) : (
               <div className="settings-runtime-editor-placeholder settings-empty-dashed">
-                {t('settings.scopeSelectOrCreate', { kind })}
+                {t('settings.scopeSelectOrCreate', { kind: kindLabel })}
               </div>
             )}
           </div>
