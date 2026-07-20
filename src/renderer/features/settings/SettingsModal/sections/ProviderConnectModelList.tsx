@@ -12,6 +12,7 @@ type Translate = ReturnType<typeof useI18n>['t'];
 interface ProviderConnectModelListProps {
   provider: Pick<LlmProviderEntry, 'id' | 'catalogOwnership' | 'activeAccountId' | 'protocol' | 'isConfigured' | 'serviceOperator' | 'authMode'>;
   models: LlmProviderModel[];
+  discoveryAccountId?: string | null;
   expandedModelId: string | null;
   disabled: boolean;
   onToggleExpanded: (modelId: string) => void;
@@ -23,6 +24,7 @@ interface ProviderConnectModelListProps {
 export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> = ({
   provider,
   models,
+  discoveryAccountId = null,
   expandedModelId,
   disabled,
   onToggleExpanded,
@@ -33,28 +35,34 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
   const [snapshot, setSnapshot] = useState<EffectiveCatalogSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
+  const catalogAccountId = discoveryAccountId?.trim()
+    || provider.activeAccountId
+    || `anonymous:${provider.id}`;
 
   useEffect(() => {
     let cancelled = false;
     setSnapshot(null);
     setLoading(true);
     setLoadFailed(false);
-    void getElectronApi()?.settings.getEffectiveCatalog(provider.id)
+    void getElectronApi()?.settings.getEffectiveCatalog(provider.id, catalogAccountId)
       .then((next) => {
         if (cancelled) return;
-        setSnapshot(next && snapshotMatchesProvider(next, provider) ? next : null);
+        const matched = next && snapshotMatchesProvider(next, provider, catalogAccountId) ? next : null;
+        setSnapshot(matched);
         setLoadFailed(false);
+        // Keep row-level loading while background discovery refresh is in flight.
+        setLoading(matched?.refreshing === true);
       })
       .catch(() => {
-        if (!cancelled) setLoadFailed(true);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoadFailed(true);
+          setLoading(false);
+        }
       });
     const unsubscribe = getElectronApi()?.events.onEffectiveCatalogChanged((next) => {
-      if (!cancelled && snapshotMatchesProvider(next, provider)) {
+      if (!cancelled && snapshotMatchesProvider(next, provider, catalogAccountId)) {
         setSnapshot(next);
-        setLoading(false);
+        setLoading(next.refreshing === true);
         setLoadFailed(false);
       }
     });
@@ -62,7 +70,7 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
       cancelled = true;
       unsubscribe?.();
     };
-  }, [provider.activeAccountId, provider.id, provider.protocol]);
+  }, [catalogAccountId, provider.activeAccountId, provider.id, provider.protocol]);
 
   const resolvedModels = useMemo(
     () => projectProviderModels(provider.catalogOwnership, models, snapshot),
@@ -72,6 +80,7 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
   const allUnavailable = resolvedModels.length > 0 && resolvedModels.every(({ model, effectiveModel }) => (
     effectiveModel?.availability ?? model.availability
   ) === 'unavailable');
+  const rowLoading = loading || snapshot?.refreshing === true;
 
   return (
     <div className="settings-model-section settings-provider-connect-models" data-testid="settings-provider-connect-models">
@@ -105,7 +114,7 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
             model={model}
             effectiveModel={effectiveModel}
             snapshot={snapshot}
-            loading={loading}
+            loading={rowLoading}
             loadFailed={loadFailed}
             expanded={expandedModelId === model.id}
             disabled={disabled}

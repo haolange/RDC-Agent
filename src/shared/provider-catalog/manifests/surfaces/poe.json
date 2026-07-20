@@ -37,7 +37,7 @@
     "fields": [
       {
         "id": "POE_API_KEY",
-        "label": "Poe Api Key",
+        "label": "Poe API Key",
         "kind": "secret",
         "required": true,
         "environmentVariable": "POE_API_KEY"

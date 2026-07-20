@@ -37,7 +37,7 @@
     "fields": [
       {
         "id": "NANO_GPT_API_KEY",
-        "label": "Nano Gpt Api Key",
+        "label": "NanoGPT API Key",
         "kind": "secret",
         "required": true,
         "environmentVariable": "NANO_GPT_API_KEY"

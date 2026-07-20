@@ -12,7 +12,12 @@ type EventCallback = (...args: unknown[]) => void;
 
 function resolveBridgeOrigin(): string {
   const explicitOrigin = new URL(window.location.href).searchParams.get('rdcBridgeOrigin');
-  return explicitOrigin || window.location.origin;
+  if (explicitOrigin) {
+    return explicitOrigin;
+  }
+  // browser-dev：Vite 已同源代理 /invoke|/events|/health，缺 query 时也走本页 origin。
+  // 生产 browser 会话：页面由 bridge `/app` 直出，origin 即 bridge。
+  return window.location.origin;
 }
 
 function detectPlatform(): NodeJS.Platform {
@@ -124,7 +129,7 @@ class BrowserAppBridgeClient {
       get: () => this.invoke<AppSettings>('settings:get'),
       getProviderCatalog: () => this.invoke('settings:getProviderCatalog') as Promise<LlmProviderCatalogResponse>,
       getEffectiveModel: (agentId) => this.invoke('settings:getEffectiveModel', agentId) as Promise<EffectiveModel | null>,
-      getEffectiveCatalog: (providerId) => this.invoke('settings:getEffectiveCatalog', providerId) as Promise<EffectiveCatalogSnapshot | null>,
+      getEffectiveCatalog: (providerId, accountId) => this.invoke('settings:getEffectiveCatalog', providerId, accountId) as Promise<EffectiveCatalogSnapshot | null>,
       getProviderSecret: (providerId) => this.invoke('settings:getProviderSecret', providerId),
       importAgentManifest: (filePath) => this.invoke('settings:importAgentManifest', filePath),
       saveAgentDefinition: (request) => this.invoke('settings:saveAgentDefinition', request),

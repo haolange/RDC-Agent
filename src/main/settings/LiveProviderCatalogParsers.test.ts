@@ -8,6 +8,7 @@ import {
   parseChatGptAccountCatalog,
   parseClaudeAccountCatalog,
   parseClineCatalog,
+  parseClinePassCatalog,
   parseGrokAccountCatalog,
   parseGrokBuilderCatalog as parseGrokBuilderCatalogWithSurface,
   parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface,
@@ -179,12 +180,40 @@ describe('live Provider Catalog parsers', () => {
       id: 'moonshotai/kimi-k2.7-code', context_length: 256_000,
     }] }).contributions[0]?.controls).toBeUndefined();
   });
-  it('uses explicit ClinePass groups only as entitlement evidence', () => {
-    const parsed = parseClineCatalog(fixture('cline.json'));
-    expect(parsed.entitlementContributions).toEqual([expect.objectContaining({
-      modelId: 'anthropic/claude-sonnet-4.6',
-      contextTiers: [{ id: 'default', label: 'ClinePass', entitlement: 'granted' }],
-    })]);
+  it('excludes ClinePass models from the Cline usage catalog', () => {
+    const parsed = parseClineCatalog(fixture('cline.json'), surface('cline'));
+    expect(parsed.models.map((model) => model.id).sort()).toEqual([
+      'anthropic/claude-sonnet-4.6',
+      'openai/gpt-5.4',
+    ]);
+    expect(parsed.entitlementContributions).toBeUndefined();
+    expect(parsed.contributions.every((model) => !model.modelId.startsWith('cline-pass/'))).toBe(true);
+  });
+
+  it('projects only ClinePass models onto the ClinePass plan surface', () => {
+    const parsed = parseClinePassCatalog(fixture('cline-pass.json'), surface('cline-pass'));
+    expect(parsed.models.map((model) => model.id).sort()).toEqual([
+      'cline-pass/glm-5.2',
+      'cline-pass/qwen3.7-max',
+    ]);
+    expect(parsed.models.every((model) => model.id.startsWith('cline-pass/'))).toBe(true);
+    expect(parsed.contributions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        modelId: 'cline-pass/qwen3.7-max',
+        label: 'Qwen3.7 Max',
+        availability: 'available',
+        route: expect.objectContaining({
+          protocol: 'OpenAICompatibleChatCompletions',
+          baseUrl: 'https://api.cline.bot/api/v1',
+        }),
+        // recommended-models rows do not carry context; keep catalog-observation entitlement unknown.
+        contextTiers: [expect.objectContaining({
+          id: 'default',
+          maxPromptTokens: 256000,
+          entitlement: 'unknown',
+        })],
+      }),
+    ]));
   });
 
   it('projects OpenRouter live metadata on the OpenRouter route', () => {

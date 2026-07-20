@@ -3,6 +3,7 @@ import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/pro
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import { Switch } from '../../../../ui/Switch';
+import { resolveProviderModelAvailabilityBadge } from '../providerModelAvailabilityBadge';
 import { ProviderModelCapabilitySummary } from './ProviderModelCapabilitySummary';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -35,17 +36,23 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
   t,
 }) => {
   const availability = effectiveModel?.availability ?? model.availability ?? 'unknown';
-  const isUnavailable = availability === 'unavailable';
-  const isUnverified = availability === 'unknown';
-  const statusLabel = isUnavailable
+  const badge = resolveProviderModelAvailabilityBadge({
+    availability,
+    enabled: model.enabled,
+    loading,
+    refreshing: snapshot?.refreshing === true,
+  });
+  const isUnavailable = badge === 'unavailable';
+  const isUnverified = badge === 'unverified';
+  const statusLabel = badge === 'unavailable'
     ? t('settings.providers.modelUnavailable')
-    : !model.enabled
+    : badge === 'disabled'
       ? t('settings.providers.modelDisabled')
-      : loading
+      : badge === 'loading'
         ? t('settings.providers.modelLoading')
-      : isUnverified
-        ? t('settings.providers.modelUnverified')
-        : t('settings.providers.modelAvailable');
+        : badge === 'unverified'
+          ? t('settings.providers.modelUnverified')
+          : t('settings.providers.modelAvailable');
   const statusTitle = isUnavailable
     ? (model.availabilityReason || t('settings.providers.modelUnavailableReason'))
     : undefined;
@@ -54,6 +61,7 @@ export const ProviderConnectModelRow: React.FC<ProviderConnectModelRowProps> = (
     <div
       className={`settings-model-row${expanded ? ' settings-model-row--expanded' : ''}${isUnavailable || !model.enabled ? ' settings-model-row--disabled' : ''}${isUnverified ? ' settings-model-row--unverified' : ''}`}
       data-testid={`settings-provider-model-row-${model.id}`}
+      data-availability-badge={badge}
       aria-disabled={isUnavailable}
     >
       <div className="settings-model-row-main">

@@ -180,7 +180,11 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
                     {' · '}{routeOptions[0] ? routeOptionMeta(routeOptions[0]) : provider.serviceOperator}
                   </span>
                 )}
-                <span className="settings-help-text">{t('settings.providers.capability.routeHint')}</span>
+                <span className="settings-help-text">
+                  {routeOptions.length > 1
+                    ? t('settings.providers.capability.routeHint')
+                    : t('settings.providers.capability.routeReadonlyHint')}
+                </span>
               </label>
               <label className="settings-field">
                 <span className="settings-field-label">{t('settings.providers.capability.defaultReasoning')}</span>

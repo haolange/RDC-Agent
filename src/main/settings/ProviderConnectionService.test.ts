@@ -6,6 +6,8 @@ import {
   normalizeCodingPlanModelMatchKey,
   selectSupportedCodingPlanModels,
   resolveCodingPlanModelsUrl,
+  resolveClineCatalogUrl,
+  resolveClineCredentialProbeUrl,
   resolveGoogleVertexOpenAiBaseUrl,
   resolveGoogleVertexPublisherModelsUrl,
   parseGoogleVertexPublisherModels,
@@ -13,6 +15,7 @@ import {
   projectGoogleVertexModelRoutes,
   resolveBedrockResponsesBaseUrl,
   resolveProviderConnectionDraft,
+  resolveTestDiscoveryAccountId,
   resolveVolcengineCodingPlanModelsUrl,
 } from './ProviderConnectionService';
 import {
@@ -48,6 +51,53 @@ describe('resolveCodingPlanModelsUrl', () => {
     expect(resolveCodingPlanModelsUrl('https://api.kimi.com/coding/v1')).toBe(
       'https://api.kimi.com/coding/v1/models',
     );
+  });
+});
+
+describe('resolveClineCatalogUrl', () => {
+  it('maps the shared Cline base to usage and ClinePass catalog paths', () => {
+    expect(resolveClineCatalogUrl('https://api.cline.bot/api/v1', 'usage')).toBe(
+      'https://api.cline.bot/api/v1/ai/cline/models',
+    );
+    expect(resolveClineCatalogUrl('https://api.cline.bot/api/v1/', 'pass')).toBe(
+      'https://api.cline.bot/api/v1/ai/cline/recommended-models',
+    );
+    expect(resolveClineCredentialProbeUrl('https://api.cline.bot/api/v1')).toBe(
+      'https://api.cline.bot/api/v1/users/me',
+    );
+  });
+});
+
+describe('resolveTestDiscoveryAccountId', () => {
+  const base = {
+    id: 'cline-pass' as const,
+    connectionSchema: {
+      fields: [{ id: 'apiKey', label: 'API Key', kind: 'secret' as const, required: true }],
+      primarySecretFieldId: 'apiKey',
+    },
+  };
+
+  it('uses the live account when testing with stored credentials', () => {
+    expect(resolveTestDiscoveryAccountId({
+      ...base,
+      activeAccountId: 'acct-live',
+      isConfigured: true,
+    }, {})).toBe('acct-live');
+  });
+
+  it('uses anonymous scope for first-time unconfigured providers', () => {
+    expect(resolveTestDiscoveryAccountId({
+      ...base,
+      isConfigured: false,
+    }, { apiKey: 'sk_new' })).toBe('anonymous:cline-pass');
+  });
+
+  it('does not overwrite a live account when testing an uncommitted replacement key', () => {
+    expect(resolveTestDiscoveryAccountId({
+      ...base,
+      activeAccountId: 'acct-live',
+      isConfigured: true,
+    }, { apiKey: 'sk_replacement' })).toBe('anonymous:cline-pass');
   });
 });
 
@@ -202,6 +252,8 @@ describe('coding-plan Anthropic discovery routing', () => {
     expect(source).toContain('selectSupportedCodingPlanModels');
     expect(source).toContain("strategy === 'kimi-code-catalog'");
     expect(source).toContain('parseKimiCodeCatalog');
+    expect(source).toContain('resolveClineCatalogUrl');
+    expect(source).toContain('resolveClineCredentialProbeUrl');
   });
 });
 

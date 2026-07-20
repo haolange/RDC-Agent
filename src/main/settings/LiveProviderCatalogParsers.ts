@@ -375,41 +375,68 @@ export function parseOpenCodeGoCatalog(
     });
   return asResult(projectLiveModelObservations(surface, observations));
 }
-function hasClinePass(value: Record<string, unknown>): boolean {
+function isClinePassCatalogRow(value: Record<string, unknown>, modelId: string): boolean {
+  if (modelId.toLowerCase().startsWith('cline-pass/')) return true;
   const entitlement = text(value.entitlement)?.toLowerCase();
   const groups = Array.isArray(value.groups) ? value.groups.map((entry) => text(entry)?.toLowerCase()) : [];
-  return entitlement === 'clinepass' || entitlement === 'cline-pass' || groups.includes('clinepass') || groups.includes('cline-pass');
+  return entitlement === 'clinepass'
+    || entitlement === 'cline-pass'
+    || groups.includes('clinepass')
+    || groups.includes('cline-pass');
 }
 
-/** ClinePass is entitlement evidence only when the catalog says so explicitly. */
-export function parseClineCatalog(payload: unknown): ParsedLiveCatalog {
-  const contributions: CatalogModelContribution[] = [];
-  const entitlementContributions: CatalogModelContribution[] = [];
-  for (const value of records(payload)) {
-    const identity = liveIdentity(value);
-    if (!identity) continue;
-    contributions.push({
-      modelId: identity.id,
-      ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
-      label: text(value.label) ?? text(value.name) ?? identity.id,
-      availability: 'available',
-      route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://api.cline.bot/api/v1', source: 'catalog' },
-      contextTiers: [{
-        id: 'default',
-        label: 'Default',
-        maxPromptTokens: contextTokens(value),
-        activation: { kind: 'implicit' },
-        entitlement: 'unknown',
-      }],
-    });
-    if (hasClinePass(value)) {
-      entitlementContributions.push({
-        modelId: identity.id,
-        contextTiers: [{ id: 'default', label: 'ClinePass', entitlement: 'granted' }],
-      });
-    }
+/** Prefer `data` from `/ai/cline/models`; keep OpenAI-shaped fixtures working. */
+function clineUsageCatalogRecords(payload: unknown): Record<string, unknown>[] {
+  return records(payload);
+}
+
+/**
+ * ClinePass plan models come from `recommended-models.clinePass` only.
+ * Do not admit `free` / `recommended` buckets — those are not the plan surface.
+ */
+function clinePassCatalogRecords(payload: unknown): Record<string, unknown>[] {
+  if (!payload || typeof payload !== 'object') return [];
+  const root = payload as Record<string, unknown>;
+  if (Array.isArray(root.clinePass)) {
+    return root.clinePass.filter(
+      (value): value is Record<string, unknown> => Boolean(value) && typeof value === 'object',
+    );
   }
-  return asResult(contributions, entitlementContributions);
+  // Fixture / OpenAI-shaped payloads used by unit tests.
+  return records(payload).filter((value) => {
+    const id = modelId(value);
+    return id ? isClinePassCatalogRow(value, id) : false;
+  });
+}
+
+/** Cline usage/API catalog: admit non-ClinePass models only. */
+export function parseClineCatalog(
+  payload: unknown,
+  surface: ProviderSurfaceDefinition,
+): ParsedLiveCatalog {
+  const observations = clineUsageCatalogRecords(payload).flatMap((value) => {
+    const observation = observationFromCatalogRow(value);
+    if (!observation || isClinePassCatalogRow(value, observation.modelId)) return [];
+    return [observation];
+  });
+  return asResult(projectLiveModelObservations(surface, observations));
+}
+
+/** ClinePass plan catalog: admit ClinePass models only through manifest projection. */
+export function parseClinePassCatalog(
+  payload: unknown,
+  surface: ProviderSurfaceDefinition,
+): ParsedLiveCatalog {
+  const observations = clinePassCatalogRecords(payload).flatMap((value) => {
+    const observation = observationFromCatalogRow(value);
+    if (!observation || !isClinePassCatalogRow(value, observation.modelId)) return [];
+    // Live rows often set name === id (`cline-pass/...`); drop that so projection keeps manifest labels.
+    if (observation.upstreamLabel?.toLowerCase() === observation.modelId.toLowerCase()) {
+      return [{ ...observation, upstreamLabel: undefined }];
+    }
+    return [observation];
+  });
+  return asResult(projectLiveModelObservations(surface, observations));
 }
 
 /**

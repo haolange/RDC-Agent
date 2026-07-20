@@ -62,6 +62,7 @@ export const useProviderConnectionActions = (
           testedProtocol: connectionDraft.protocol,
           testedAuthMode: connectionDraft.authMode,
           testedConnectionSignature: getConnectionDraftSignature(connectionDraft),
+          discoveryAccountId: result.discoveryAccountId ?? null,
           models: result.models,
         });
         await refreshLocalSettings(connectionDraft.providerId);
@@ -89,6 +90,7 @@ export const useProviderConnectionActions = (
         testedProtocol: connectionDraft.protocol,
         testedAuthMode: connectionDraft.authMode,
         testedConnectionSignature: getConnectionDraftSignature(connectionDraft),
+        discoveryAccountId: result.discoveryAccountId ?? null,
         models: result.models,
       });
     } catch (error) {

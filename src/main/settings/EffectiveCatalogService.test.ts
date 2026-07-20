@@ -594,21 +594,21 @@ describe('EffectiveCatalogService', () => {
         contextTiers: [{ id: 'default', entitlement: 'unknown' }],
       }],
       entitlement: {
-        detail: 'ClinePass model group',
+        detail: 'Account plan entitlement',
         models: [{
           modelId: 'model-a',
-          contextTiers: [{ id: 'default', label: 'ClinePass', entitlement: 'granted' }],
+          contextTiers: [{ id: 'default', label: 'Plan', entitlement: 'granted' }],
         }],
       },
     }));
 
     const reloaded = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:01.000Z') });
     const accountA = reloaded.getSnapshot(request()).models[0];
-    expect(accountA.contextTiers[0]).toMatchObject({ label: 'ClinePass', entitlement: 'granted' });
+    expect(accountA.contextTiers[0]).toMatchObject({ label: 'Plan', entitlement: 'granted' });
     expect(accountA.provenance).toContainEqual(expect.objectContaining({
       field: 'contextTiers.default.entitlement',
       source: 'entitlement',
-      detail: 'ClinePass model group',
+      detail: 'Account plan entitlement',
     }));
     const accountB = reloaded.getSnapshot(request({ accountId: 'account-b' })).models[0];
     expect(accountB.contextTiers[0].label).toBe('Default');

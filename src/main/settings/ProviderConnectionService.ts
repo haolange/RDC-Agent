@@ -39,6 +39,7 @@ import {
 } from './EffectiveModelResolver';
 import {
   parseClineCatalog,
+  parseClinePassCatalog,
   parseFreeModelCatalog,
   parseKimiCodeCatalog,
   parseOpenCodeGoCatalog,
@@ -64,6 +65,8 @@ const MANIFEST_PROJECTED_CATALOG_PARSERS: Readonly<Record<string, ManifestProjec
   'kimi-code-catalog': parseKimiCodeCatalog,
   'opencode-go-catalog': parseOpenCodeGoCatalog,
   'openrouter-catalog': parseOpenRouterAccountCatalog,
+  'cline-catalog': parseClineCatalog,
+  'cline-pass-catalog': parseClinePassCatalog,
 };
 
 const REQUEST_TIMEOUT_MS = 20000;
@@ -191,6 +194,7 @@ type ProviderDiscoveryStrategy =
   | 'opencode-go-catalog'
   | 'openrouter-catalog'
   | 'cline-catalog'
+  | 'cline-pass-catalog'
   | 'freemodel-catalog'
   | 'gitlab-duo-direct-access'
   | 'sap-ai-core-deployments';
@@ -201,7 +205,7 @@ function resolveDiscoveryStrategy(
 ): ProviderDiscoveryStrategy | null {
   if (!discovery) return null;
   const parserId = discovery.kind === 'custom-parser' ? discovery.parserId : undefined;
-  if (parserId === 'kimi-code-catalog' || parserId === 'openrouter-catalog' || parserId === 'opencode-go-catalog' || parserId === 'cline-catalog' || parserId === 'google-vertex-models'
+  if (parserId === 'kimi-code-catalog' || parserId === 'openrouter-catalog' || parserId === 'opencode-go-catalog' || parserId === 'cline-catalog' || parserId === 'cline-pass-catalog' || parserId === 'google-vertex-models'
     || parserId === 'gitlab-duo-direct-access' || parserId === 'sap-ai-core-deployments') return parserId;
   if (parserId === 'freemodel-catalog') return parserId;
   if (parserId === 'google-ai-studio' || parserId === 'azure-deployment' || parserId === 'ollama-tags') return parserId;
@@ -409,6 +413,24 @@ export const resolveCodingPlanModelsUrl = (baseUrl: string): string => {
   return `${trimmed}/v1/models`;
 };
 
+/**
+ * Cline does not expose OpenAI-style `/models`. Usage lists live at
+ * `/ai/cline/models`; ClinePass plan models live at `/ai/cline/recommended-models`.
+ */
+export const resolveClineCatalogUrl = (
+  baseUrl: string,
+  catalog: 'usage' | 'pass',
+): string => {
+  const trimmed = baseUrl.trim().replace(/\/+$/, '');
+  return catalog === 'pass'
+    ? `${trimmed}/ai/cline/recommended-models`
+    : `${trimmed}/ai/cline/models`;
+};
+
+/** Account probe for Cline API keys; catalog endpoints do not validate credentials. */
+export const resolveClineCredentialProbeUrl = (baseUrl: string): string =>
+  `${baseUrl.trim().replace(/\/+$/, '')}/users/me`;
+
 export const resolveGoogleVertexOpenAiBaseUrl = (baseUrl: string): string => {
   const trimmed = baseUrl.trim().replace(/\/+$/u, '');
   const match = trimmed.match(/^(https:\/\/[^/]+)\/v1\/projects\/([^/]+)\/locations\/([^/]+)\/publishers\/google$/u);
@@ -607,6 +629,29 @@ export function resolveProviderConnectionDraft(
   return { apiKey, baseUrl, values };
 }
 
+/**
+ * Account key for writing Test discovery into Effective Catalog.
+ * Uncommitted draft secrets on an already-configured provider must not overwrite
+ * the live account's discovery cache.
+ */
+export function resolveTestDiscoveryAccountId(
+  provider: Pick<LlmProviderEntry, 'id' | 'activeAccountId' | 'isConfigured' | 'connectionSchema'>,
+  request: Pick<LlmProviderDraftRequest, 'apiKey' | 'connectionValues'> = {},
+): string {
+  const anonymousId = `anonymous:${provider.id}`;
+  const liveAccountId = provider.activeAccountId?.trim() || anonymousId;
+  const primarySecretFieldId = resolvePrimaryConnectionSecretFieldId(provider.connectionSchema);
+  const hasDraftPrimarySecret = Boolean(request.apiKey?.trim());
+  const hasDraftOtherSecret = (provider.connectionSchema?.fields ?? [])
+    .filter((field) => field.kind === 'secret' && field.id !== primarySecretFieldId)
+    .some((field) => Boolean(request.connectionValues?.[field.id]?.trim()));
+  const testingUncommittedSecret = hasDraftPrimarySecret || hasDraftOtherSecret;
+  if (testingUncommittedSecret && provider.isConfigured && provider.activeAccountId?.trim()) {
+    return anonymousId;
+  }
+  return liveAccountId;
+}
+
 export class ProviderConnectionService {
   constructor() {
     providerAccountAuthService.setCatalogPublisher(async (providerId, discovery) => {
@@ -682,9 +727,20 @@ export class ProviderConnectionService {
         connection.baseUrl,
         connection.values,
       );
+      const discoveryAccountId = resolveTestDiscoveryAccountId(provider, request);
+      // Reuse the discovery payload already fetched — do not hit the catalog HTTP again.
+      await refreshEffectiveCatalogDiscovery(
+        provider,
+        discovery.models,
+        discovery.contributions,
+        discovery.entitlementContributions,
+        undefined,
+        discoveryAccountId,
+      );
       return {
         success: true,
         provider,
+        discoveryAccountId,
         ...discovery,
       };
     } catch (error) {
@@ -752,9 +808,12 @@ export class ProviderConnectionService {
           throw new ProviderConnectionError(status.error || status.message || 'Account provider is not connected');
         }
         const nextProvider = settingsService.getAll().llm.providers.find((entry) => entry.id === provider.id);
+        const discoveryAccountId = nextProvider?.activeAccountId?.trim()
+          || `anonymous:${provider.id}`;
         return {
           success: true,
           provider: nextProvider,
+          discoveryAccountId,
           models: nextProvider?.models ?? [],
         };
       }
@@ -774,17 +833,23 @@ export class ProviderConnectionService {
         provider.authMode,
       );
       const nextProvider = nextSettings.llm.providers.find((entry) => entry.id === provider.id);
+      const discoveryAccountId = nextProvider
+        ? resolveTestDiscoveryAccountId(nextProvider, {})
+        : `anonymous:${provider.id}`;
       if (nextProvider) {
         await refreshEffectiveCatalogDiscovery(
           nextProvider,
           models,
           discovery.contributions,
           discovery.entitlementContributions,
+          undefined,
+          discoveryAccountId,
         );
       }
       return {
         success: true,
         provider: nextProvider,
+        discoveryAccountId,
         ...discovery,
       };
     } catch (error) {
@@ -991,9 +1056,6 @@ export class ProviderConnectionService {
       : provider.recommendedModels;
     const manifestProjectedParser = MANIFEST_PROJECTED_CATALOG_PARSERS[strategy];
     if (manifestProjectedParser) {
-      const url = strategy === 'kimi-code-catalog'
-        ? resolveCodingPlanModelsUrl(baseUrl)
-        : appendPath(baseUrl, '/models');
       const headers = strategy === 'kimi-code-catalog'
         ? {
             Authorization: 'Bearer ' + apiKey,
@@ -1001,22 +1063,21 @@ export class ProviderConnectionService {
             ...resolveProviderConnectionHeaders(provider.connectionSchema, connectionValues),
           }
         : this.createHeaders(provider, apiKey, connectionValues);
+      // Cline catalog list endpoints are public; probe /users/me so fake keys fail closed.
+      if (strategy === 'cline-catalog' || strategy === 'cline-pass-catalog') {
+        await getJson(resolveClineCredentialProbeUrl(baseUrl), { method: 'GET', headers });
+      }
+      const url = strategy === 'kimi-code-catalog'
+        ? resolveCodingPlanModelsUrl(baseUrl)
+        : strategy === 'cline-catalog'
+          ? resolveClineCatalogUrl(baseUrl, 'usage')
+          : strategy === 'cline-pass-catalog'
+            ? resolveClineCatalogUrl(baseUrl, 'pass')
+            : appendPath(baseUrl, '/models');
       const parsed = manifestProjectedParser(
         await getJson(url, { method: 'GET', headers }),
         definition,
       );
-      return {
-        models: requireModels(parsed.models),
-        contributions: parsed.contributions,
-        entitlementContributions: parsed.entitlementContributions,
-      };
-    }
-    if (strategy === 'cline-catalog') {
-      const payload = await getJson(appendPath(baseUrl, '/models'), {
-        method: 'GET',
-        headers: this.createHeaders(provider, apiKey, connectionValues),
-      });
-      const parsed = parseClineCatalog(payload);
       return {
         models: requireModels(parsed.models),
         contributions: parsed.contributions,

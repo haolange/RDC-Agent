@@ -14,6 +14,7 @@ function toCatalogEntry(provider: ReturnType<typeof createProviderEntryFromCatal
   return {
     id: provider.id,
     protocol: provider.protocol,
+    routeCount: provider.routeCount,
     authMode: provider.authMode,
     authModeOptions: provider.authModeOptions,
     authModeAvailability: provider.authModeAvailability,

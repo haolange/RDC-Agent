@@ -37,7 +37,7 @@
     "fields": [
       {
         "id": "V0_API_KEY",
-        "label": "V0 Api Key",
+        "label": "v0 API Key",
         "kind": "secret",
         "required": true,
         "environmentVariable": "V0_API_KEY"
