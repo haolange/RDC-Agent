@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "wafer.ai",
-  "name": "Wafer",
+  "name": "Wafer Pass",
   "npm": "@ai-sdk/openai-compatible",
   "env": [
     "WAFER_API_KEY"

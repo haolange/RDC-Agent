@@ -195,6 +195,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
         <ProviderConnectModelList
           provider={connectionProvider}
           models={connectionDraft.models}
+          discoveryAccountId={connectionHasFreshTest ? connectionDraft.discoveryAccountId : null}
           expandedModelId={expandedModelId}
           disabled={connectionDraft.busy !== 'idle'}
           onToggleExpanded={handleToggleModelCapability}

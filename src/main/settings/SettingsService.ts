@@ -1022,6 +1022,7 @@ function sanitizeUserProvider(
     activeAccountId,
     authAccountIds,
     protocol,
+    routeCount: builtinFallback.routeCount,
     authMode,
     authModeOptions: builtinFallback.authModeOptions,
     authModeAvailability: builtinFallback.authModeAvailability,

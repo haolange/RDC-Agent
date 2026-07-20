@@ -28,8 +28,8 @@ export const createSettingsApi = (): SettingsApi => ({
     ipcRenderer.invoke('settings:getProviderCatalog'),
   getEffectiveModel: (agentId): ReturnType<SettingsApi['getEffectiveModel']> =>
     ipcRenderer.invoke('settings:getEffectiveModel', agentId),
-  getEffectiveCatalog: (providerId): ReturnType<SettingsApi['getEffectiveCatalog']> =>
-    ipcRenderer.invoke('settings:getEffectiveCatalog', providerId),
+  getEffectiveCatalog: (providerId, accountId): ReturnType<SettingsApi['getEffectiveCatalog']> =>
+    ipcRenderer.invoke('settings:getEffectiveCatalog', providerId, accountId),
   getProviderSecret: (providerId): ReturnType<SettingsApi['getProviderSecret']> =>
     ipcRenderer.invoke('settings:getProviderSecret', providerId),
   importAgentManifest: (filePath): ReturnType<SettingsApi['importAgentManifest']> =>

@@ -55,9 +55,13 @@ export interface ContextTierRow {
 export function snapshotMatchesProvider(
   snapshot: EffectiveCatalogSnapshot,
   provider: Pick<LlmProviderEntry, 'id' | 'activeAccountId' | 'protocol'>,
+  discoveryAccountId?: string | null,
 ): boolean {
+  const accountId = discoveryAccountId?.trim()
+    || provider.activeAccountId
+    || `anonymous:${provider.id}`;
   return snapshot.providerId === provider.id
-    && snapshot.accountId === (provider.activeAccountId ?? `anonymous:${provider.id}`)
+    && snapshot.accountId === accountId
     && snapshot.protocol === provider.protocol;
 }
 

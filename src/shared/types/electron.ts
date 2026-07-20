@@ -255,7 +255,7 @@ export interface ElectronAPI {
     get: () => Promise<AppSettings>;
     getProviderCatalog: () => Promise<LlmProviderCatalogResponse>;
     getEffectiveModel: (agentId: string) => Promise<EffectiveModel | null>;
-    getEffectiveCatalog: (providerId: string) => Promise<EffectiveCatalogSnapshot | null>;
+    getEffectiveCatalog: (providerId: string, accountId?: string) => Promise<EffectiveCatalogSnapshot | null>;
     getProviderSecret: (providerId: string) => Promise<string>;
     importAgentManifest: (filePath: string) => Promise<AppSettings>;
     saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;

@@ -1,0 +1,12 @@
+{
+  "recommended": [
+    { "id": "anthropic/claude-sonnet-4.6", "name": "anthropic/claude-sonnet-4.6", "tags": [] }
+  ],
+  "free": [
+    { "id": "free/example", "name": "free/example", "tags": ["free"] }
+  ],
+  "clinePass": [
+    { "id": "cline-pass/qwen3.7-max", "name": "cline-pass/qwen3.7-max", "description": "Qwen Max", "tags": [] },
+    { "id": "cline-pass/glm-5.2", "name": "cline-pass/glm-5.2", "description": "Top open weights model", "tags": [] }
+  ]
+}

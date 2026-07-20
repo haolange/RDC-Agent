@@ -223,6 +223,7 @@ export function createProviderEntryFromCatalog(id: string): LlmProviderEntry {
   return {
     id,
     protocol: route.protocol,
+    routeCount: surface.routes.length,
     authMode,
     authModeOptions: toAuthModeOptions(surface),
     authModeAvailability,

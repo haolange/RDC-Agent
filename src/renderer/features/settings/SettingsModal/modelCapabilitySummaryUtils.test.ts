@@ -161,6 +161,11 @@ describe('modelCapabilitySummaryUtils', () => {
     };
     expect(snapshotMatchesProvider(snapshot, { id: 'provider-a', activeAccountId: 'account-a', protocol: 'AnthropicMessages' })).toBe(true);
     expect(snapshotMatchesProvider(snapshot, { id: 'provider-a', activeAccountId: 'account-b', protocol: 'AnthropicMessages' })).toBe(false);
+    expect(snapshotMatchesProvider(
+      snapshot,
+      { id: 'provider-a', activeAccountId: 'account-b', protocol: 'AnthropicMessages' },
+      'account-a',
+    )).toBe(true);
   });
 
   it('summarizes the winning field-level provenance', () => {

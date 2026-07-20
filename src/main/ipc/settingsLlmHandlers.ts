@@ -57,6 +57,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     if (snapshot) context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);
   };
   ipcMain.handle('llm:testProviderDraft', async (_event, request: LlmProviderDraftRequest) => {
+    // refreshEffectiveCatalogDiscovery already emits via EffectiveCatalogService.subscribe.
     return providerConnectionService.testProviderDraft(request);
   });
 
@@ -77,6 +78,8 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const result = await providerConnectionService.refreshProviderModels(providerId);
     if (result.success) {
       context.applyCurrentLlmConfig();
+      // Account Test already published via catalogPublisher; rebroadcast live account snapshot.
+      // Api-key refresh also emitted via subscribe; broadcast keeps agent options in sync.
       await broadcastCatalog(providerId);
     }
     return result;
@@ -161,9 +164,9 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     }
   });
 
-  ipcMain.handle('settings:getEffectiveCatalog', async (_event, providerId: string) => {
+  ipcMain.handle('settings:getEffectiveCatalog', async (_event, providerId: string, accountId?: string) => {
     await loadProviderSurface(providerId);
-    return resolveEffectiveCatalog(providerId, settingsService.getAll());
+    return resolveEffectiveCatalog(providerId, settingsService.getAll(), undefined, accountId);
   });
 
   ipcMain.handle('settings:getProviderSecret', async (_event, providerId: string) => {

@@ -140,6 +140,7 @@ export const PROVIDER_DISCOVERY_POLICY_IDS = [
   'anthropic-candidate-validation',
   'azure-deployment',
   'cline-catalog',
+  'cline-pass-catalog',
   'freemodel-catalog',
   'gitlab-duo-direct-access',
   'google-ai-studio',

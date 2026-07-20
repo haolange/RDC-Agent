@@ -229,7 +229,13 @@ function userContribution(provider: LlmProviderEntry): CatalogLayerContribution 
   if (configuredModels.length === 0) return undefined;
   const userManaged = provider.catalogOwnership === 'user-managed';
   const surface = getLoadedProviderSurface(provider.id);
-  const userRouteOptions = surface && surface.routes.length > 1
+  // Only additive user-managed surfaces may expose the full surface route matrix as
+  // per-model options (e.g. Custom OpenAI Endpoint). Authoritative live catalogs such
+  // as OpenRouter must not inherit the whole surface protocol enum.
+  const userRouteOptions = userManaged
+    && surface
+    && surface.routes.length > 1
+    && surface.discovery.authority === 'additive'
     ? surface.routes.map((route) => ({
         id: route.id,
         label: route.protocol,
@@ -308,12 +314,17 @@ export function resolveEffectiveCatalog(
   providerId: string,
   settings: AppSettings,
   requestedModelId?: string,
+  accountIdOverride?: string,
 ): EffectiveCatalogSnapshot | null {
   const provider = settings.llm.providers.find((entry) => entry.id === providerId);
   if (!provider) {
     return null;
   }
-  return effectiveCatalogService.getSnapshot(buildEffectiveCatalogRequest(provider, requestedModelId));
+  const request = buildEffectiveCatalogRequest(provider, requestedModelId);
+  if (accountIdOverride && accountIdOverride !== request.accountId) {
+    return effectiveCatalogService.getSnapshot({ ...request, accountId: accountIdOverride });
+  }
+  return effectiveCatalogService.getSnapshot(request);
 }
 
 export function buildEffectiveCatalogRequest(
@@ -364,8 +375,12 @@ export function refreshEffectiveCatalogDiscovery(
   contributions?: CatalogModelContribution[],
   entitlementContributions?: CatalogModelContribution[],
   detail?: string,
+  accountIdOverride?: string,
 ): Promise<EffectiveCatalogSnapshot> {
-  const request = buildEffectiveCatalogRequest(provider);
+  const baseRequest = buildEffectiveCatalogRequest(provider);
+  const request = accountIdOverride && accountIdOverride !== baseRequest.accountId
+    ? { ...baseRequest, accountId: accountIdOverride }
+    : baseRequest;
   const projection = getLoadedProviderSurface(provider.id)?.discoveredModelProjection;
   const projectedContributions = (contributions ?? toDiscoveryModelContributions(models)).map((model) => ({
     ...model,

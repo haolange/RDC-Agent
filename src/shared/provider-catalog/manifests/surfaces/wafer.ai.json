@@ -11,16 +11,16 @@
   "authSchemaId": "declarative-api-key",
   "discoveryPolicyId": "openai-compatible",
   "vendorId": "wafer.ai",
-  "label": "Wafer",
+  "label": "Wafer Pass",
   "status": "stable",
   "availability": {
     "state": "unknown"
   },
-  "category": "compatible-access",
-  "surfaceKind": "compatible-api",
+  "category": "coding-token-plan",
+  "surfaceKind": "plan",
   "serviceOperator": "wafer.ai",
-  "endpointClass": "third-party-gateway",
-  "endpointOwnership": "third-party",
+  "endpointClass": "coding-plan",
+  "endpointOwnership": "service-operator",
   "catalogOwnership": "user-managed",
   "factSources": [
     {
@@ -37,7 +37,7 @@
     "fields": [
       {
         "id": "WAFER_API_KEY",
-        "label": "Wafer Api Key",
+        "label": "Wafer Pass API Key",
         "kind": "secret",
         "required": true,
         "environmentVariable": "WAFER_API_KEY"

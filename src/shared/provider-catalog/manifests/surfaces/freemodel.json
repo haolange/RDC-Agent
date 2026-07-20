@@ -39,7 +39,7 @@
     "fields": [
       {
         "id": "FREEMODEL_API_KEY",
-        "label": "Freemodel Api Key",
+        "label": "FreeModel API Key",
         "kind": "secret",
         "required": true,
         "environmentVariable": "FREEMODEL_API_KEY"

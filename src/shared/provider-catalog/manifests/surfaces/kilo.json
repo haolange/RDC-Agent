@@ -37,7 +37,7 @@
     "fields": [
       {
         "id": "KILO_API_KEY",
-        "label": "Kilo Api Key",
+        "label": "Kilo API Key",
         "kind": "secret",
         "required": true,
         "environmentVariable": "KILO_API_KEY"

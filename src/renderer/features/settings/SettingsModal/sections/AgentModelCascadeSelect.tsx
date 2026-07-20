@@ -67,26 +67,25 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
       return;
     }
     const modalRect = root.closest('.settings-modal')?.getBoundingClientRect();
-    const editorRect = root.closest('.settings-manifest-editor')?.getBoundingClientRect();
-    const statusRect = root.closest('.settings-manifest-editor')?.querySelector('.settings-agent-autosave-status')?.getBoundingClientRect();
     const viewportPadding = 16;
     const menuGap = 8;
+    // Prefer a taller popover so provider/model lists need less scrolling; still clamp to the modal.
+    const preferredMaxHeight = Math.min(560, Math.floor(window.innerHeight * 0.62));
     const boundaryLeft = Math.max(viewportPadding, modalRect?.left ?? viewportPadding);
     const boundaryRight = Math.min(window.innerWidth - viewportPadding, modalRect?.right ?? window.innerWidth - viewportPadding);
     const boundaryTop = Math.max(viewportPadding, modalRect?.top ?? viewportPadding);
+    // Use the modal/viewport floor for height — do not shrink to the autosave strip.
     const boundaryBottom = Math.min(
       window.innerHeight - viewportPadding,
       modalRect?.bottom ?? window.innerHeight - viewportPadding,
-      editorRect?.bottom ?? window.innerHeight - viewportPadding,
-      statusRect?.top ?? window.innerHeight - viewportPadding,
     );
     const availableLeft = boundaryLeft + menuGap;
     const availableRight = boundaryRight - menuGap;
     const menuWidth = Math.max(0, Math.min(544, availableRight - availableLeft));
-    const preferredHeight = Math.max(48, Math.min(368, boundaryBottom - boundaryTop));
+    const preferredHeight = Math.max(48, Math.min(preferredMaxHeight, boundaryBottom - boundaryTop));
     const spaceBelow = Math.max(0, boundaryBottom - rect.bottom - menuGap);
     const spaceAbove = Math.max(0, rect.top - boundaryTop - menuGap);
-    const placeAbove = spaceBelow < 160 && spaceAbove > spaceBelow;
+    const placeAbove = spaceBelow < 220 && spaceAbove > spaceBelow;
     const availableHeight = Math.max(48, Math.min(preferredHeight, placeAbove ? spaceAbove : spaceBelow));
     const left = Math.min(
       Math.max(availableLeft, rect.left),
@@ -189,7 +188,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
         </small>
       ) : null}
       <div className="settings-model-cascade-menu" role="listbox">
-        <div className="settings-model-provider-list">
+        <div className="settings-model-provider-list scrollbar-thin">
           {displayGroups.map((group) => (
             <button
               key={group.providerId}
@@ -203,7 +202,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
             </button>
           ))}
         </div>
-        <div className="settings-model-submenu">
+        <div className="settings-model-submenu scrollbar-thin">
           {activeGroup?.options.map((option) => {
             const accessibleLabel = agentModelOptionAccessibleLabel(option, t('settings.modelUnavailable'));
             return (

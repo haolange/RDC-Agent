@@ -71,6 +71,7 @@ export type BuiltinLlmProviderId =
   | 'ollama-cloud'
   | 'opencode-go'
   | 'cline'
+  | 'cline-pass'
   | 'nous';
 export type LlmProviderId = BuiltinLlmProviderId | (string & {});
 
@@ -332,6 +333,8 @@ export interface LlmProviderEntry {
   /** Account identities retained per auth surface; `activeAccountId` projects the selected mode. */
   authAccountIds?: Partial<Record<LlmProviderAuthMode, string>>;
   protocol: LlmProviderProtocol;
+  /** Number of compiled surface routes; >1 means multi-protocol. */
+  routeCount?: number;
   authMode: LlmProviderAuthMode;
   authModeOptions?: LlmProviderAuthMode[];
   authModeAvailability?: Partial<Record<LlmProviderAuthMode, LlmProviderAvailability>>;
@@ -418,6 +421,8 @@ export interface LlmProviderProtocolDescriptor {
 export interface LlmProviderCatalogEntry {
   id: LlmProviderId;
   protocol: LlmProviderProtocol;
+  /** Number of compiled surface routes; >1 means multi-protocol. */
+  routeCount?: number;
   authMode: LlmProviderAuthMode;
   authModeOptions?: LlmProviderAuthMode[];
   authModeAvailability?: Partial<Record<LlmProviderAuthMode, LlmProviderAvailability>>;
@@ -533,6 +538,12 @@ export interface LlmProviderConnectionResult {
   success: boolean;
   provider?: LlmProviderEntry;
   models: LlmProviderModel[];
+  /**
+   * Credential-scoped Effective Catalog account key written by this Test/Refresh.
+   * When testing uncommitted secrets on an already-configured provider, this is
+   * `anonymous:{providerId}` so the live account cache is not overwritten.
+   */
+  discoveryAccountId?: string;
   discoveryDiagnostic?: {
     status: 'matched' | 'no-supported-models';
     discoveredModelCount: number;

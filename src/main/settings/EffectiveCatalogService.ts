@@ -647,8 +647,10 @@ export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): Effecti
           ...(model.unavailableReason ? { unavailableReason: model.unavailableReason } : {}),
         }];
     const preferredRouteOption = model.preferredRouteOptionId
-      ? routeOptions.find((option) => option.id === model.preferredRouteOptionId)
+      ? routeOptions.find((option) => option.id === model.preferredRouteOptionId
+        && option.availability !== 'unavailable')
       : undefined;
+    const preferredRouteOptionId = preferredRouteOption ? model.preferredRouteOptionId : undefined;
     const projectedRoute = preferredRouteOption?.route ?? model.route;
     const projected = {
       ...model,
@@ -657,15 +659,24 @@ export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): Effecti
       presencePolicy: model.presencePolicy ?? 'discovered',
       route: cloneJson(projectedRoute),
       routeRevision: preferredRouteOption?.routeRevision
-        ?? (model.preferredRouteOptionId
-          ? revisionFor({ preferredRouteOptionId: model.preferredRouteOptionId, routeOptions })
-          : routeRevision(model.route)),
+        ?? routeRevision(model.route),
       routeOptions,
+      ...(preferredRouteOptionId
+        ? { preferredRouteOptionId }
+        : { preferredRouteOptionId: undefined }),
       contextTiers: model.contextTiers.map((tier) => cloneJson(tier)),
       controls: cloneJson(model.controls),
       executionBindings: model.executionBindings?.map((binding) => cloneJson(binding)),
       provenance: model.provenance.map((evidence) => ({ ...evidence })),
     };
+    if (model.preferredRouteOptionId && !preferredRouteOptionId) {
+      projected.provenance.push({
+        field: 'preferredRouteOptionId',
+        source: 'catalog',
+        observedAt: new Date().toISOString(),
+        detail: `Cleared unavailable preferred route ${model.preferredRouteOptionId}`,
+      });
+    }
     if (request.providerAvailability?.state === 'unavailable') {
       projected.availability = 'unavailable';
       projected.unavailableReason = request.providerAvailability.reason ?? 'Provider runtime is unavailable.';

@@ -59,6 +59,10 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
       .join(' ');
     const statusClassName = unavailable ? 'unavailable' : connected ? 'configured' : 'pending';
     const protocolLabel = getProviderProtocolLabel(provider.protocol);
+    const multiProtocol = (provider.routeCount ?? 1) > 1;
+    const protocolMetaValue = multiProtocol
+      ? t('settings.providerProtocolMulti', { protocol: protocolLabel, count: provider.routeCount ?? 0 })
+      : protocolLabel;
     const showProtocolMeta = provider.authMode !== 'account';
     const statusSummary = unavailable
       ? t('settings.providerUnavailable')
@@ -92,9 +96,9 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
             </span>
             {statusSummary ? <span className="settings-provider-item-meta">{statusSummary}</span> : null}
             {showProtocolMeta ? (
-              <span className="settings-provider-protocol-meta" title={protocolLabel}>
+              <span className="settings-provider-protocol-meta" title={protocolMetaValue}>
                 <span className="settings-provider-protocol-meta-label">{t('settings.providerProtocol')}</span>
-                <span className="settings-provider-protocol-meta-value">{protocolLabel}</span>
+                <span className="settings-provider-protocol-meta-value">{protocolMetaValue}</span>
               </span>
             ) : null}
           </span>

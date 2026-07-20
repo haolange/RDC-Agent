@@ -68,7 +68,18 @@ Electron Vite 构建调用同一编译器，产出轻量 summary index 和按 su
 
 `serviceOperator`、`endpointOwnership`、`endpointClass`、`surfaceKind`、`protocolOwner` 与 catalog ownership 独立保存，禁止互相推导。
 
-协议选择只来自 model-level `routeOptions`。多协议模型显示 enum，单协议显示只读值，不支持的组合禁用并 fail-closed。偏好按 provider surface + account + model 保存 `preferredRouteOptionId`。LongCat 属于兼容接入，并显式提供 OpenAI Chat 与 Anthropic Messages；Vertex 属于 Cloud，Vertex Gemini、Vertex Anthropic 与精确获准的 OpenAI-compatible route 分开声明。Vertex Gemini 只有从 OpenAI-compatible `/models` 实际发现的模型才投影该兼容 route；Vertex Anthropic 从原生 Model Garden publisher catalog 发现候选，项目 entitlement 未经验证时保持 `unknown`，禁止借 Gemini OpenAI endpoint 伪造 Claude 可用性。
+协议选择只来自 model-level `routeOptions`。多协议模型显示 enum，单协议显示只读值，不支持的组合禁用并 fail-closed。偏好按 provider surface + account + model 保存 `preferredRouteOptionId`。Provider 列表行对 `routes.length > 1` 的 surface 只摘要「多协议 · 默认 {protocol}」，不提供 Provider 级协议切换。LongCat 属于兼容接入，并显式提供 OpenAI Chat 与 Anthropic Messages；Vertex 属于 Cloud，Vertex Gemini、Vertex Anthropic 与精确获准的 OpenAI-compatible route 分开声明。Vertex Gemini 只有从 OpenAI-compatible `/models` 实际发现的模型才投影该兼容 route；Vertex Anthropic 从原生 Model Garden publisher catalog 发现候选，项目 entitlement 未经验证时保持 `unknown`，禁止借 Gemini OpenAI endpoint 伪造 Claude 可用性。
+
+## Plan 拆分判据
+
+Coding/Token Plan 与 Compatible Access 按**产品表面**拆分，不按公司品牌或 wire 格式：
+
+- 独立订阅 / coding-plan 产品，且具备独立 surface（或独立目录权威 / 模型命名空间）时，必须作为单独 `coding-token-plan` entry（例如 OpenCode Go、ClinePass、Wafer Pass、Kimi Coding Plan）。
+- 同一厂商的按量兼容网关保留在 Compatible Access（例如 OpenCode Zen、Cline usage/API）。
+- Cline 不提供 OpenAI 风格 `/models`：usage 目录为 `/ai/cline/models`，ClinePass 目录为 `/ai/cline/recommended-models` 的 `clinePass` 桶；连接测试必须先用 `/users/me` 校验 API Key（目录接口本身不鉴权）。
+- 仅有单一 OpenAI 兼容网关、没有独立 plan 入口或目录权威的产品（如 Kilo、Poe、iFlow、v0、FreeModel）留在 Compatible Access，不得为了“看起来像订阅”而伪造 plan surface。
+- NanoGPT 是 `nano-gpt.com` 第三方聚合 API（Compatible Access），与 Karpathy 教学仓库 `nanoGPT` 无关。
+- Plan surface 的 live discovery 必须走 `parser -> LiveModelObservation -> liveProjection`；禁止在 parser 里写死产品标签、route 或 tier。
 
 ## Controls 与 Execution Bindings
 
@@ -135,6 +146,8 @@ Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolic
 只有新 wire protocol、请求签名、OAuth/device/refresh、非标准动态目录或外部进程集成才新增 TS 行为。GitLab Duo 与 SAP AI Core 使用专用 adapter；标准 OpenAI-compatible surface 复用统一 adapter，但不能把原生/混合 surface 强压成兼容协议。
 
 最终操作 URL 按 operation builder 构建并逐 route 测试，禁止重复追加 `/chat/completions`、`/responses` 或 Anthropic `/v1`。所有 stable surface 必须具有 adapter、auth schema、endpoint、Connection Test 与 operation URL；无凭据显示 `Unconfigured`，不得显示假 `Available`。
+
+Connection Test、Connect 与已配置 Refresh 共用同一条 credential-scoped discovery 写入路径（`refreshEffectiveCatalogDiscovery` → Effective Catalog）。Test 成功必须就地写入已发现的 contributions 并广播，禁止为徽章另开 renderer 假状态；未提交的替换密钥写入 `anonymous:{providerId}`，不得覆盖 live `activeAccountId`。Settings 模型行徽章只反映 catalog `availability`：有新鲜缓存显示 OK；无缓存或 `refreshing` 显示加载中，禁止先闪「未验证」。
 
 ## 验证门禁
 

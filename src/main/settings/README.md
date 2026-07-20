@@ -51,7 +51,7 @@ Provider definition 的公开维度是：
 
 ## Plan / Route Boundary
 
-Provider catalog 中的 coding / token plan entries 必须作为独立 provider entry 保留，并归入 `coding-token-plan`。
+Provider catalog 中的 coding / token plan entries 必须作为独立 provider entry 保留，并归入 `coding-token-plan`。ClinePass、OpenCode Go、Wafer Pass 等订阅 plan 不得折叠进 Compatible Access 的 entitlement overlay。NanoGPT 指 `nano-gpt.com` 兼容网关，不是 Karpathy 教学仓库。
 
 Plan agent 是独立 profile，用于研究、提问、计划 artifact 与 handoff。Settings 生成或保存 Plan route 时必须 fail-closed：provider/model 不存在、未启用、未配置或不可用时，route 写为空值，不得静默回退到默认模型。
 

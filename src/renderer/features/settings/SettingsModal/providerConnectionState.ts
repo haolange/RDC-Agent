@@ -141,6 +141,7 @@ export function createProviderConnectionDraft(provider: LlmProviderEntry): Provi
     testedProtocol: provider.protocol,
     testedAuthMode: provider.authMode,
     testedConnectionSignature: '',
+    discoveryAccountId: null,
     models,
     accountStatus: provider.authMode === 'account' && provider.configuredAuthMode === 'account' && provider.isConfigured
       ? {
