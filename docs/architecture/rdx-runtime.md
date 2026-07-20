@@ -28,7 +28,7 @@ RDX Runtime 是 RDC-Agent 的资源解析、Prompt 构建与运行期可观测�
 
 - `.agent.md` 是 Agent Profile 的唯一来源，使用 YAML frontmatter + Markdown。
 - Skill 使用 `<skill-id>/SKILL.md` 与可选的 `scripts/`、`references/`、`assets/`。
-- Profile `skills` 在首次 LLM 调用前完整 preload；其余 Skill 只进入 metadata catalog，并通过 `skill_read` 渐进加载。
+- Progressive Skill：非空 metadata catalog 一律注入短索引（`SkillCatalogBudget`）；`.agent.md` `skills`、composer `$skill-id`、以及 session-scoped `/skills` 武装在首次 LLM 调用前全文 preload（缺失 fail-closed）；其余 Skill 经 core `skills` / `skill_read` 渐进加载。禁止 lean/standard harness 档位。
 - MCP 由 scoped `.mcp.json` 与 effective Agent 的 `mcp-servers` 决定，Project 切换时重新 reconcile。
 - Hook 使用 `.hook.yml`、结构化 command/args、`shell: false`、timeout 与 `block | warn` failure policy。
 - Project Hook 按 `project + content hash` 授信，内容变化或资源删除自动撤销授信。
@@ -46,7 +46,7 @@ Scoped Runtime Resolution
 
 `PromptPlan` 的每个 segment 都保存 kind、scope、path、hash、precedence、content 与 token estimate。`RequestEnvelopeBuilder` 负责 provider-neutral 的完整合并；Provider Adapter 只映射 wire protocol。
 
-每次 `llm_turn` 保存脱敏 `RequestEnvelopeSnapshot`，包含 effective instructions、messages、tools、resource provenance、provider/model/protocol、usage 与 redaction metadata。Credential、capture binary 和 provider protected payload 不落盘；protected payload 只保留 hash 与脱敏原因。Request Inspector 的唯一产品入口位于 Settings > Diagnostics；它是代码层调试能力，不得挂到默认 Session/Trace 右侧面板，也不得嵌入 Work Process 消息流。该入口同时投影冻结的 execution identity、continuation replay、derived-context 与 prompt-cache 编译结果。
+每次 `llm_turn` 保存脱敏 `RequestEnvelopeSnapshot`，包含 effective instructions、messages、tools、resource provenance、provider/model/protocol、usage 与 redaction metadata。Credential、capture binary 和 provider protected payload 不落盘；protected payload 只保留 hash 与脱敏原因。快照经 `RequestSnapshotStore` 落盘，并由 `rdx-runtime:listSnapshots` / `getSnapshot` 提供给日后专用 Debug View（Copilot Chat Debug View 级）消费；当前无 Settings Diagnostics 产品入口，也不得挂到默认 Session/Trace 右侧面板或嵌入 Work Process 消息流。快照是 provider-neutral 脱敏信封，不是 Work Process loop meta，也不是 Terminal runtime log。
 
 ## Context Usage 计量
 

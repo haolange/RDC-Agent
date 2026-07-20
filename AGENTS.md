@@ -48,7 +48,7 @@
 - 涉及页面结构、面板布局、状态展示、样式引用或视觉资源路径时，必须确认属于明确的产品变更；如果不是，应保持现有效果不变。
 - 修复结构问题时，不要顺手做与任务无关的视觉改版、布局重排或交互重定义。
 - 涉及 `src/renderer` 的改动，除检查类型和功能外，还要检查界面入口是否完整、关键面板是否可渲染、现有交互是否可达。
-- Settings 内 Agents / Skills / Tools / Hooks 的 scoped 编辑条不展示装饰性 “RDX Runtime” kicker；User | Project 独占作用域行且横向 `1fr 1fr` 拉满均分。Skills/MCP/Hooks/Policy 内容区为 Import + New 列表与右侧详情编辑器；Agents 不在 scope 条上放 New（仅 Agents 工具栏 Import + New Agent）。Workspace「RDX Runtime 根目录」与 Control Panel「RDX 运行时上下文」职责不同，不得一并删除。
+- Settings 内 Agents / Skills / Tools / Hooks / Policy 为同级导航；scoped 编辑条不展示装饰性 “RDX Runtime” kicker；User | Project 独占作用域行且横向 `1fr 1fr` 拉满均分。Skills/MCP/Hooks/Policy 内容区为 Import + New 列表与右侧详情编辑器；Agents 不在 scope 条上放 New（仅 Agents 工具栏 Import + New Agent）。禁止恢复 Settings「诊断信息 / Diagnostics」导航；禁止把 Request Inspector 挂到 Work Process 或右侧默认 Session/Trace 面板。Workspace「RDX Runtime 根目录」与 Control Panel「RDX 运行时上下文」职责不同，不得一并删除。
 
 ## 设计系统约束（agent 写 CSS 必读）
 
@@ -116,6 +116,7 @@
 - Agent Runtime 的用户资源根固定为 `~/.rdx`，项目资源根固定为 `<project-root>/.rdx`。不得新增可配置 workspace root、旧目录 fallback、双写或静默迁移。
 - Project Scope 必须覆盖 agents、skills、MCP、hooks、policies、knowledge 和 memory；RDX CLI action 与 secret 仍属于本机边界，不能由项目覆盖。
 - Prompt 调用链必须经 `PromptPlan -> RequestEnvelope -> provider adapter`。新增上下文来源时必须提供 scope、source、hash、precedence 和脱敏策略。
+- Progressive Skill 面：非空 skill 短索引由 `SkillCatalogBudget` 注入；强制 preload 仅来自 `.agent.md` `skills`、composer `$skill` 与 session-scoped `/skills` 武装；`skills`/`skill_read` 保持 `core`。禁止恢复 lean/standard/`harness` 档位 UI 或整段省略 catalog。
 - Provider 输出必须先获得稳定 `ProviderOutputRef`；同一 source ref 只能归属 `thinking`、`text`、`tool_call` 之一。kind collision、start 前 delta、close 后 delta、terminal 后语义事件必须 fail-closed，禁止按文本相同/相似做跨通道去重或 UI 隐藏。
 - 普通 assistant text 永远不能合成为 thinking。commentary/final 仅由 canonical `outputPhase` 决定；只有 `final_answer` 可写 assistant 正文和 final trace，正常结束但无 canonical final 必须报诊断，禁止用 thinking/commentary fallback。
 - Provider/Model 事实只能写入 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth 与 discovery。禁止恢复 TS preset、factory 推导、名称/后缀/上游 SDK 包元数据/hostname 猜测或 renderer 静态 Catalog。

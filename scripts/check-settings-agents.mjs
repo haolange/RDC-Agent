@@ -152,12 +152,26 @@ async function main() {
   const skillsAgentsWrapperPath = path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/SkillsAgentsSettings.tsx');
   assert(!fs.existsSync(skillsAgentsWrapperPath), 'Skills and Agents settings must not keep the combined wrapper component.');
   assert(settingsModalTypes.includes("'skills'") && settingsModalTypes.includes("'agents'"), 'Settings sections should expose Skills and Agents as independent pages.');
+  assert(settingsModalTypes.includes("'policy'"), 'Settings sections should expose Policy as a peer page.');
+  assert(!settingsModalTypes.includes("'diagnostics'"), 'Settings sections must not restore Diagnostics navigation.');
   assert(!settingsModalTypes.includes('skillsAgents'), 'Settings sections must not expose the old Skills & Agents combined page.');
   assert(settingsModalSource.includes("activeSection === 'skills'"), 'Settings modal should render Skills as an independent page.');
   assert(settingsModalSource.includes("activeSection === 'agents'"), 'Settings modal should render Agents as an independent page.');
+  assert(settingsModalSource.includes("activeSection === 'policy'"), 'Settings modal should render Policy as an independent page.');
+  assert(settingsModalSource.includes('PolicySettings'), 'Settings modal should render the Policy settings section.');
+  assert(!settingsModalSource.includes('DeveloperDiagnosticsSettings'), 'Settings modal must not render Developer Diagnostics.');
   assert(!settingsModalSource.includes('SkillsAgentsSettings'), 'Settings modal must not render the old combined Skills & Agents wrapper.');
   assert(!settingsModalCss.includes('settings-page-skills-agents'), 'Settings CSS must not keep the old combined Skills & Agents page selector.');
   assert(!settingsModalCss.includes('settings-skills-agents-tabs'), 'Settings CSS must not keep the old Skills/Agents segmented tab selector.');
+  assert(!settingsModalCss.includes('settings-page-diagnostics'), 'Settings CSS must not keep Diagnostics page selectors.');
+  assert(
+    fs.existsSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/PolicySettings.tsx')),
+    'PolicySettings.tsx peer section is required.',
+  );
+  assert(
+    !fs.existsSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/DeveloperDiagnosticsSettings.tsx')),
+    'DeveloperDiagnosticsSettings must remain removed.',
+  );
   assert(agentsSettings.includes('settings.agentManifestTitle'), 'Agents settings should render manifest management.');
   assert(!agentsSettings.includes('settings.patterns'), 'Agents settings must not expose internal pattern configuration.');
   assert(!agentsSettings.includes('rdxCliInvoker'), 'Agents settings must not expose the internal CLI invoker name.');

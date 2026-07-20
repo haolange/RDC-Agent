@@ -8,7 +8,7 @@ import type {
   LlmProviderProtocol,
 } from '@shared/types/settings';
 
-export type SettingsSection = 'general' | 'workspace' | 'models' | 'skills' | 'agents' | 'tools' | 'hooks' | 'diagnostics';
+export type SettingsSection = 'general' | 'workspace' | 'models' | 'skills' | 'agents' | 'tools' | 'hooks' | 'policy';
 
 export type ProviderConnectionBusyState = 'idle' | 'testing' | 'saving';
 
@@ -34,6 +34,8 @@ export interface ProviderConnectionDraft {
   testedProtocol: ProviderProtocol;
   testedAuthMode: LlmProviderAuthMode;
   testedConnectionSignature: string;
+  /** Effective Catalog account key from the latest successful Test/Refresh in this dialog. */
+  discoveryAccountId: string | null;
   models: LlmProviderModel[];
   accountStatus?: LlmProviderAccountStatus;
   accountLoginMode: LlmProviderAccountLoginMode;

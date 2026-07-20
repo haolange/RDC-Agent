@@ -40,6 +40,30 @@ describe('RdxRuntimeService', () => {
     } finally { fs.rmSync(project, { recursive: true, force: true }); }
   });
 
+  it('aggregates resource and untrusted project-hook diagnostics into overview', () => {
+    const project = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-runtime-diagnostics-'));
+    const trustPath = path.join(userData, 'hook-trust.json');
+    const hooks = new HookEngine(trustPath);
+    const hookService = new RdxRuntimeService(hooks);
+    try {
+      const invalidPolicyPath = path.join(home, 'policies', 'broken.policy.yml');
+      fs.mkdirSync(path.dirname(invalidPolicyPath), { recursive: true });
+      fs.writeFileSync(invalidPolicyPath, '\n', 'utf8');
+      hookService.upsert({
+        kind: 'hook',
+        scope: 'project',
+        projectRoot: project,
+        id: 'untrusted',
+        content: 'id: untrusted\nenabled: true\nevent: tool.before-call\ncommand: node\nargs: []\ntimeoutMs: 1000\nfailurePolicy: warn',
+      });
+      const overview = hookService.overview(project);
+      expect(overview.diagnostics.some((entry) => entry.startsWith('policy/user/broken:'))).toBe(true);
+      expect(overview.diagnostics).toEqual(expect.arrayContaining([
+        'hook/project/untrusted: project hook is not trusted',
+      ]));
+    } finally { fs.rmSync(project, { recursive: true, force: true }); }
+  });
+
   it('revokes project hook trust when the hook resource is deleted', () => {
     const project = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-runtime-hook-'));
     const trustPath = path.join(userData, 'hook-trust.json');

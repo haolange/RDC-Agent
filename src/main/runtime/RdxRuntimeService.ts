@@ -72,15 +72,27 @@ export class RdxRuntimeService {
     const user = appPathService.getUserRdxPaths();
     const project = projectRoot ? appPathService.getProjectRdxPaths(projectRoot) : undefined;
     const hooks = this.hooks.load(user.hooksPath, projectRoot).map((hook) => ({ id: hook.definition.id, scope: hook.scope, sourcePath: hook.sourcePath, sourceHash: hook.sourceHash, enabled: hook.definition.enabled, event: hook.definition.event, trusted: hook.trust.trusted, failurePolicy: hook.definition.failurePolicy }));
+    const resources = this.list(projectRoot);
+    const diagnostics: string[] = [];
+    for (const resource of resources) {
+      for (const diagnostic of resource.diagnostics) {
+        diagnostics.push(`${resource.kind}/${resource.scope}/${resource.id}: ${diagnostic}`);
+      }
+    }
+    for (const hook of hooks) {
+      if (hook.scope === 'project' && !hook.trusted) {
+        diagnostics.push(`hook/project/${hook.id}: project hook is not trusted`);
+      }
+    }
     return {
       userRoot: user.userRdxRoot,
       ...(projectRoot ? { projectRoot } : {}),
       userPaths: { ...user },
       ...(project ? { projectPaths: { ...project } } : {}),
-      resources: this.list(projectRoot), hooks,
+      resources, hooks,
       knowledge: { userPath: user.knowledgePath, ...(project ? { projectPath: project.knowledgePath } : {}) },
       memory: { userPath: user.memoryPath, ...(project ? { projectPath: project.memoryPath } : {}) },
-      diagnostics: [],
+      diagnostics,
     };
   }
 

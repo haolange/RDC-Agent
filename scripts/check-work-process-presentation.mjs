@@ -983,6 +983,27 @@ assert(
   'Request Inspector must not mount in the default Trace right panel',
 );
 assert(
+  !fs.existsSync('src/renderer/features/debugger/RequestDiagnostics'),
+  'RequestDiagnostics frontend must remain removed until a dedicated Debug View ships',
+);
+assert(
+  !fs.existsSync('src/renderer/features/settings/SettingsModal/sections/DeveloperDiagnosticsSettings.tsx'),
+  'Settings Diagnostics page must remain removed',
+);
+assert(
+  !readSource('src/renderer/features/settings/SettingsModal/types.ts').includes("'diagnostics'"),
+  'SettingsSection must not restore diagnostics',
+);
+assert(
+  readSource('src/renderer/features/settings/SettingsModal/types.ts').includes("'policy'"),
+  'SettingsSection must include peer policy navigation',
+);
+assert(
+  readSource('src/renderer/features/settings/SettingsModal/useSettingsModal.ts').includes("id: 'policy'")
+    && !readSource('src/renderer/features/settings/SettingsModal/useSettingsModal.ts').includes("id: 'diagnostics'"),
+  'Settings nav must list Policy and must not list Diagnostics',
+);
+assert(
   !readSource('src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx').includes('RdxRuntimeContextPanel'),
   'Trace Context must not stack RdxRuntimeContextPanel under SessionContextPanel',
 );
