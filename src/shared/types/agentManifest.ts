@@ -1,9 +1,6 @@
 import type { LlmProviderId } from './settings';
 import type { ModeIconKey } from './layout';
 
-/** `.agent.md` frontmatter 的显式 harness 偏好；缺省时由模型事实启发式决定。 */
-export type AgentHarnessPreference = 'lean' | 'standard';
-
 export interface AgentHandoffDefinition {
   label: string;
   agent: string;
@@ -36,8 +33,6 @@ export interface AgentManifestDefinition {
   enabled: boolean;
   /** 工具执行轮数上限；未设置时由 runtime 按 profile 默认值决定。 */
   maxTurns?: number;
-  /** Harness 丰俭偏好；未设置时按模型窗口/reasoning 启发式决定。 */
-  harness?: AgentHarnessPreference;
   updatedAt?: string;
 }
 

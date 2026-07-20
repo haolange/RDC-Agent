@@ -132,9 +132,6 @@ const parseAgentMarkdownContent = (
     maxTurns: typeof frontmatter['max-turns'] === 'number' && frontmatter['max-turns'] > 0
       ? frontmatter['max-turns']
       : undefined,
-    harness: frontmatter.harness === 'lean' || frontmatter.harness === 'standard'
-      ? frontmatter.harness
-      : undefined,
     updatedAt,
   };
 };
@@ -160,7 +157,6 @@ const serializeAgentMarkdown = (definition: AgentManifestDraft): string => {
     'user-invocable': definition.userInvocable,
     enabled: definition.enabled,
     ...(definition.maxTurns ? { 'max-turns': definition.maxTurns } : {}),
-    ...(definition.harness ? { harness: definition.harness } : {}),
     tools: definition.tools,
     skills: definition.skills,
     'mcp-servers': definition.mcpServers,

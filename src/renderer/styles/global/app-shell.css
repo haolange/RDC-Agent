@@ -474,6 +474,11 @@
   color: rgb(var(--color-primary-200));
 }
 
+.composer-attachment-chip.skill .composer-attachment-chip-icon {
+  background: color-mix(in srgb, var(--token-context-skills) 18%, transparent);
+  color: var(--token-context-skills);
+}
+
 .composer-attachment-chip-copy {
   display: flex;
   flex-direction: column;

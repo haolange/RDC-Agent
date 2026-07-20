@@ -118,6 +118,8 @@ function main() {
     'BUILTIN_AGENT_TOOL_TIERS must not contain unknown tool ids',
   );
   assert(BUILTIN_AGENT_TOOL_TIERS.tool_search === 'core', 'tool_search must stay core (discovery entry)');
+  assert(BUILTIN_AGENT_TOOL_TIERS.skills === 'core', 'skills must stay core (Progressive Skill discovery)');
+  assert(BUILTIN_AGENT_TOOL_TIERS.skill_read === 'core', 'skill_read must stay core (Progressive Skill load)');
   assert(BUILTIN_AGENT_TOOL_TIERS.read_file === 'core', 'read_file must stay core');
   for (const orphan of ['delete_file', 'move_file', 'copy_file', 'notebook_edit', 'memory_write', 'memory_delete']) {
     assert(

@@ -36,12 +36,16 @@ export function useComposerSend(options: {
   setPromptValue: (value: string) => void;
   pendingAttachments: PendingAttachmentDraft[];
   setPendingAttachments: Dispatch<SetStateAction<PendingAttachmentDraft[]>>;
+  pendingSkillIds: string[];
+  setPendingSkillIds: Dispatch<SetStateAction<string[]>>;
+  armPendingSkill: (skillId: string) => void;
 }) {
   const {
     showNotice, t, currentMode, selectedAgentId, setSelectedAgentId, setCurrentMode, openSettings, currentProject,
     currentSession, currentRun, selectedDeviceEntry,
     hasActiveDebugRun, hasActiveConversationTurn, promptValue,
     setPromptValue, pendingAttachments, setPendingAttachments,
+    pendingSkillIds, setPendingSkillIds, armPendingSkill,
   } = options;
   const [isPromptSending, setIsPromptSending] = useState(false);
   const activeRequestIdRef = useRef<string | null>(null);
@@ -93,6 +97,7 @@ export function useComposerSend(options: {
           upsertConversationMessages,
           openSettings,
           showNotice,
+          armPendingSkill,
         });
         if (handled) {
           if (shouldClearSubmittedPrompt(promptValueRef.current, trimmed)) setPromptValue('');
@@ -109,6 +114,7 @@ export function useComposerSend(options: {
         electronAPI,
         trimmed,
         pendingAttachments,
+        pendingSkillIds,
         currentMode,
         currentProject,
         currentSession,
@@ -117,6 +123,7 @@ export function useComposerSend(options: {
         selectedDeviceEntry,
         setPromptValue,
         setPendingAttachments,
+        setPendingSkillIds,
         setConversationMessages,
         setBranchState,
         setConversationSnapshot,
@@ -136,6 +143,7 @@ export function useComposerSend(options: {
       setIsPromptSending(false);
     }
   }, [
+    armPendingSkill,
     currentProject,
     currentMode,
     currentRun,
@@ -144,6 +152,7 @@ export function useComposerSend(options: {
     hasActiveDebugRun,
     isComposerBusy,
     pendingAttachments,
+    pendingSkillIds,
     promptValue,
     selectedDeviceEntry,
     selectedAgentId,
@@ -153,6 +162,7 @@ export function useComposerSend(options: {
     setConversationMessages, setBranchState, setConversationSnapshot,
     setCurrentRun, setCurrentSession,
     setPendingAttachments,
+    setPendingSkillIds,
     setPromptValue,
     setTracePresentation,
     setRuns,

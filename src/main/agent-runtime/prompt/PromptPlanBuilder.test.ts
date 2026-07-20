@@ -31,13 +31,13 @@ describe('PromptPlanBuilder', () => {
     expect(plan.systemPrompt).not.toContain('# Available Skills');
   });
 
-  it('includes the skill catalog for standard harness and omits it for lean without declared skills', async () => {
+  it('includes the skill catalog for large and small windows when non-empty', async () => {
     const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
     const baseProfile = {
       id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdx/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', models: [], icon: 'message-orbit', disableModelInvocation: false, userInvocable: true, tools: ['read_file'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
     } satisfies AgentManifestDefinition;
-    const buildWith = (profile: AgentManifestDefinition, contextWindowTokens?: number) => new PromptPlanBuilder().build({
-      profile,
+    const buildWith = (contextWindowTokens?: number) => new PromptPlanBuilder().build({
+      profile: baseProfile,
       scopedInstructions: { sources: [], totalBytes: 0, diagnostics: [] },
       preloadedSkills: [],
       skillCatalog: [{ id: 'debug', name: 'debug', description: 'Debug workflows', allowedTools: [], scope: 'builtin', sourcePath: 'skill://debug', sourceHash: 'h', effectiveStatus: 'effective' }],
@@ -48,20 +48,9 @@ describe('PromptPlanBuilder', () => {
       ...(contextWindowTokens !== undefined ? { contextWindowTokens } : {}),
     });
 
-    // Standard（默认启发）：catalog 段存在。
-    const standardPlan = buildWith(baseProfile, 200_000);
-    expect(standardPlan.segments.some((segment) => segment.kind === 'skill-catalog')).toBe(true);
-
-    // Lean（小窗口启发 + 未声明 skills）：catalog 段省略。
-    const leanPlan = buildWith(baseProfile, 32_000);
-    expect(leanPlan.segments.some((segment) => segment.kind === 'skill-catalog')).toBe(false);
-
-    // 显式 harness: standard 覆盖启发式。
-    const explicitStandard = buildWith({ ...baseProfile, harness: 'standard' }, 32_000);
-    expect(explicitStandard.segments.some((segment) => segment.kind === 'skill-catalog')).toBe(true);
-
-    // Lean 但声明了 skills：catalog 保留（发现路径不断）。
-    const leanDeclared = buildWith({ ...baseProfile, skills: ['debug'], harness: 'lean' }, 200_000);
-    expect(leanDeclared.segments.some((segment) => segment.kind === 'skill-catalog')).toBe(true);
+    expect(buildWith(200_000).segments.some((segment) => segment.kind === 'skill-catalog')).toBe(true);
+    expect(buildWith(32_000).segments.some((segment) => segment.kind === 'skill-catalog')).toBe(true);
+    expect(buildWith(32_000).systemPrompt).toContain('# Available Skills');
   });
 });
+

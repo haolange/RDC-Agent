@@ -154,25 +154,6 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                 t={t}
               />
             </div>
-            <div className="settings-input-row">
-              <span className="settings-field-label">{t('settings.agentHarness')}</span>
-              <select
-                className="input"
-                value={selectedAgent.harness ?? ''}
-                aria-label={t('settings.agentHarness')}
-                title={t('settings.agentHarnessHint')}
-                onChange={(event) => {
-                  const value = event.currentTarget.value;
-                  onUpdateAgent({
-                    harness: value === 'lean' || value === 'standard' ? value : undefined,
-                  });
-                }}
-              >
-                <option value="">{t('settings.agentHarnessAuto')}</option>
-                <option value="standard">{t('settings.agentHarnessStandard')}</option>
-                <option value="lean">{t('settings.agentHarnessLean')}</option>
-              </select>
-            </div>
             <div className="settings-agent-flags">
               <label className="settings-checkbox-row">
                 <input type="checkbox" checked={selectedAgent.enabled} onChange={(event) => onUpdateAgent({ enabled: event.currentTarget.checked })} />

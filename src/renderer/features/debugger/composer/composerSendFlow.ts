@@ -23,6 +23,7 @@ export async function sendComposerConversationTurn(options: {
   electronAPI: NonNullable<Window['electronAPI']>;
   trimmed: string;
   pendingAttachments: PendingAttachmentDraft[];
+  pendingSkillIds: string[];
   currentMode: AgentMode;
   currentProject: ProjectRecord | null;
   currentSession: SessionRecord | null;
@@ -31,6 +32,7 @@ export async function sendComposerConversationTurn(options: {
   selectedDeviceEntry: { id: string } | undefined;
   setPromptValue: (value: string) => void;
   setPendingAttachments: (value: PendingAttachmentDraft[]) => void;
+  setPendingSkillIds: (value: string[]) => void;
   setConversationMessages: (messages: ConversationMessage[]) => void;
   setBranchState: (branchState: ConversationBranchState | null) => void;
   setConversationSnapshot?: (
@@ -51,6 +53,7 @@ export async function sendComposerConversationTurn(options: {
     electronAPI,
     trimmed,
     pendingAttachments,
+    pendingSkillIds,
     currentMode,
     currentProject,
     currentSession,
@@ -59,6 +62,7 @@ export async function sendComposerConversationTurn(options: {
     selectedDeviceEntry,
     setPromptValue,
     setPendingAttachments,
+    setPendingSkillIds,
     setConversationMessages,
     setBranchState,
     setConversationSnapshot,
@@ -75,10 +79,12 @@ export async function sendComposerConversationTurn(options: {
 
   const sentPrompt = trimmed;
   const sentAttachments = [...pendingAttachments];
+  const sentSkillIds = [...pendingSkillIds];
   const requestId = createConversationRequestId();
   setActiveRequestId(requestId);
   setPromptValue('');
   setPendingAttachments([]);
+  setPendingSkillIds([]);
   useSessionStore.getState().setPreparedTurnContext(null);
   useSessionStore.getState().setConversationPreparationPhase('preparing');
 
@@ -104,6 +110,7 @@ export async function sendComposerConversationTurn(options: {
       agentId: selectedAgentId || null,
       message: sentPrompt,
       attachments: toConversationAttachmentInputs(sentAttachments),
+      preloadSkillIds: sentSkillIds,
       turnControls,
       configurationCommit: {
         agentId: selectedAgentId,
@@ -118,6 +125,7 @@ export async function sendComposerConversationTurn(options: {
     if (result.status === 'rejected') {
       setPromptValue(sentPrompt);
       setPendingAttachments(sentAttachments);
+      setPendingSkillIds(sentSkillIds);
       setActiveRequestId(null);
       useSessionStore.getState().setPreparedTurnContext(null);
       useSessionStore.getState().setConversationPreparationPhase('idle');
@@ -155,6 +163,7 @@ export async function sendComposerConversationTurn(options: {
   } catch (error) {
     setPromptValue(sentPrompt);
     setPendingAttachments(sentAttachments);
+    setPendingSkillIds(sentSkillIds);
     setActiveRequestId(null);
     useSessionStore.getState().setPreparedTurnContext(null);
     useSessionStore.getState().setConversationPreparationPhase('idle');

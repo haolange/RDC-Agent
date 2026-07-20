@@ -9,6 +9,7 @@ import { useSessionStore } from '../../../stores/sessionStore';
 import { useDeviceStore } from '../../../stores/deviceStore';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useComposerAttachments } from './useComposerAttachments';
+import { useComposerPendingSkills } from './useComposerPendingSkills';
 import { useComposerSend } from './useComposerSend';
 import { useScopedPromptDraft } from './useScopedPromptDraft';
 import { buildComposerPresentation } from './composerPresentation';
@@ -66,6 +67,10 @@ export function useComposer(options: {
     leftToggleDisabled,
     toggleLeftSidebar,
   });
+  const pendingSkills = useComposerPendingSkills({
+    currentProject,
+    currentSession,
+  });
   const selectedAgent = userInvocableAgents.find((agent) => agent.id === selectedAgentId) ?? userInvocableAgents[0];
   const selectedContextWindowTokens = useSelectedContextWindowTokens();
   const currentModeConfig: ModeConfig = AGENT_MODES.find((mode) => mode.id === currentMode) ?? {
@@ -97,6 +102,9 @@ export function useComposer(options: {
     setPromptValue,
     pendingAttachments: attachments.pendingAttachments,
     setPendingAttachments: attachments.setPendingAttachments,
+    pendingSkillIds: pendingSkills.pendingSkillIds,
+    setPendingSkillIds: pendingSkills.setPendingSkillIds,
+    armPendingSkill: pendingSkills.armPendingSkill,
   });
 
   const hasMessageContent = Boolean(promptValue.trim());
@@ -157,6 +165,8 @@ export function useComposer(options: {
     setPromptValue,
     pendingAttachments: attachments.pendingAttachments,
     setPendingAttachments: attachments.setPendingAttachments,
+    pendingSkillIds: pendingSkills.pendingSkillIds,
+    removePendingSkill: pendingSkills.removePendingSkill,
     modeMenuOpen,
     setModeMenuOpen,
     promptInputRef,

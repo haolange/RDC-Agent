@@ -28,3 +28,8 @@ export {
   normalizeAskUserQuestions,
 } from './askUser';
 export { buildToolResultPreview } from './toolResultPreview';
+export {
+  extractDollarSkillRefs,
+  mergeTurnPreloadSkillIds,
+} from './turnSkillRefs';
+
