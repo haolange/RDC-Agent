@@ -109,8 +109,10 @@
 
 - 不要把构建输出、测试输出、日志、workspace 本地数据、缓存文件或临时调试文件提交到源码目录或根目录。
 - 源码依赖统一使用 `pnpm@11.7.0`；`pnpm-workspace.yaml` 将 store 固定到 `~/.cache/rdc-agent/pnpm-store`。不得新增 npm/Yarn lockfile、npm fallback、盘符根目录 store 或第二套启动路径。
-- `node_modules/`、`out/`、`release/` 和 launcher prepare state 只属于源码开发/构建期；发布包不得包含 pnpm、lockfile、源码 launcher 或开发缓存。
-- 不要在仓库根目录留下临时脚本、一次性测试文件、零字节垃圾文件或含义不明的实验文件名。
+- `node_modules/`、`out/`、`release/`、Electron 下载缓存和 launcher prepare state 只属于本机开发/构建期，永不入库；发布包不得包含 pnpm、lockfile、源码 launcher 或开发缓存。`pnpm-lock.yaml` 必须留在仓库以保证可复现安装。
+- 根目录非隐藏文件由 `pnpm run check:repository-hygiene` 的允许名单强制约束；禁止根临时脚本、日志、零字节垃圾文件或含义不明的实验文件名。新增根文件前必须先更新该门禁。
+- 禁止恢复 `cli/` 独立入口、Playwright `e2e/` 目录或 `docs/handover/`。UI/UX 验收走 `pnpm run start:agent-browser`；探索结论沉到 `DESIGN.md` 或正式 `docs/*` 主题，不另开 handover。
+- `designs/` 只保留可交互的 `rdc-agent-design-system`；评审原型落地后删除，不长期双轨。
 - 新增目录、脚本和文档时，命名应表达稳定职责，不使用临时性、讨论式或个人化命名。
 - 不允许提交 mojibake/乱码文案。若终端显示异常，先用文件搜索或十六进制/编辑器确认真实字节，再决定是否修复。
 - Agent Runtime 的用户资源根固定为 `~/.rdx`，项目资源根固定为 `<project-root>/.rdx`。不得新增可配置 workspace root、旧目录 fallback、双写或静默迁移。

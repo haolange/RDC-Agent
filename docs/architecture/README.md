@@ -16,4 +16,3 @@
 ## 对照资料
 
 - `codepilot-comparison.md`：外部架构对照与迁移边界，不作为运行时事实来源。
-- `framework-improvement-notes.md`：历史收敛记录，不作为当前产品契约。

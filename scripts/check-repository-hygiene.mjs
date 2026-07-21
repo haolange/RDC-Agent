@@ -46,6 +46,61 @@ const forbiddenTracked = tracked.filter((file) => existsSync(path.join(repoRoot,
   || /\.(?:log|tmp|temp|tsbuildinfo)$/.test(file)));
 if (forbiddenTracked.length > 0) fail(`Generated/runtime files are tracked:\n${forbiddenTracked.join('\n')}`);
 
+const forbiddenPaths = ['cli', 'e2e', 'docs/handover'];
+for (const relativePath of forbiddenPaths) {
+  const absolute = path.join(repoRoot, relativePath);
+  const trackedHits = tracked.filter((file) => file === relativePath || file.startsWith(`${relativePath}/`));
+  if (trackedHits.length > 0) {
+    fail(`Forbidden path is tracked (remove and do not reintroduce):\n${trackedHits.join('\n')}`);
+  }
+  if (existsSync(absolute)) {
+    fail(`Forbidden path exists in the working tree: ${relativePath}`);
+  }
+}
+
+const rootLogFiles = readdirSync(repoRoot).filter((entry) => {
+  const absolute = path.join(repoRoot, entry);
+  return statSync(absolute).isFile() && /\.log$/i.test(entry);
+});
+if (rootLogFiles.length > 0) {
+  fail(`Root log files are not allowed:\n${rootLogFiles.join('\n')}`);
+}
+
+const allowedRootFiles = new Set([
+  'AGENTS.md',
+  'DESIGN.md',
+  'README.md',
+  'LICENSE',
+  'package.json',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  'tsconfig.json',
+  'electron-builder.json',
+  'electron.vite.config.ts',
+  'vite.renderer.config.ts',
+  'vitest.config.ts',
+]);
+const unexpectedRootFiles = readdirSync(repoRoot).filter((entry) => {
+  if (entry.startsWith('.')) return false;
+  const absolute = path.join(repoRoot, entry);
+  return statSync(absolute).isFile() && !allowedRootFiles.has(entry);
+});
+if (unexpectedRootFiles.length > 0) {
+  fail(`Unexpected root files (update the hygiene allowlist only for deliberate additions):\n${unexpectedRootFiles.join('\n')}`);
+}
+
+const designsRoot = path.join(repoRoot, 'designs');
+if (existsSync(designsRoot)) {
+  const designEntries = readdirSync(designsRoot).filter((entry) => {
+    const absolute = path.join(designsRoot, entry);
+    return !entry.startsWith('.') && statSync(absolute).isDirectory();
+  });
+  const unexpectedDesigns = designEntries.filter((entry) => entry !== 'rdc-agent-design-system');
+  if (unexpectedDesigns.length > 0) {
+    fail(`designs/ may only contain rdc-agent-design-system; remove review prototypes:\n${unexpectedDesigns.join('\n')}`);
+  }
+}
+
 for (const lockfile of ['package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock']) {
   if (existsSync(path.join(repoRoot, lockfile))) fail(`Non-pnpm lockfile is present: ${lockfile}`);
 }
@@ -75,7 +130,6 @@ if ('preview' in (packageJson.scripts ?? {})) fail('Legacy preview script must n
 const operationalFiles = [
   '.github/workflows/ci.yml',
   'README.md',
-  'e2e/playwright.config.ts',
   'src/main/agent-runtime/permissions/AgentPermissionPolicy.ts',
   'src/main/commands/builtins/test.ts',
   'src/main/settings/README.md',
