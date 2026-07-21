@@ -52,9 +52,10 @@ export function deriveComposeAccentVars(
   };
 
   const thumbL = isLight ? 48 : 62;
+  /* Keep the Max rail neutral/translucent so the pixel field stays readable. */
   const maxTrack = isLight
-    ? mixRgb({ r: 230, g: 232, b: 238 }, base, 0.12)
-    : mixRgb({ r: 52, g: 52, b: 59 }, base, 0.18);
+    ? mixRgb({ r: 230, g: 232, b: 238 }, base, 0.08)
+    : mixRgb({ r: 40, g: 40, b: 46 }, base, 0.1);
   const maxFrom = mixRgb(base, isLight ? { r: 120, g: 120, b: 130 } : { r: 116, g: 111, b: 124 }, 0.45);
   const maxMid = mixRgb(base, isLight ? { r: 160, g: 160, b: 175 } : { r: 157, g: 148, b: 173 }, 0.35);
   const maxTo = mixRgb(base, isLight ? { r: 200, g: 200, b: 210 } : { r: 200, g: 192, b: 212 }, 0.4);
@@ -71,7 +72,7 @@ export function deriveComposeAccentVars(
     '--composer-effort-track': isLight
       ? 'color-mix(in srgb, var(--token-border-muted) 80%, transparent)'
       : 'color-mix(in srgb, var(--token-border-muted) 80%, transparent)',
-    '--composer-effort-max-track': `rgb(${rgbToCssTriplet(maxTrack)} / 0.9)`,
+    '--composer-effort-max-track': `rgb(${rgbToCssTriplet(maxTrack)} / 0.38)`,
     '--composer-effort-max-from': rgbToHex(maxFrom),
     '--composer-effort-max-mid': rgbToHex(maxMid),
     '--composer-effort-max-to': rgbToHex(maxTo),

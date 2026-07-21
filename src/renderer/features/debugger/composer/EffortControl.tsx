@@ -88,6 +88,7 @@ export const EffortControl: React.FC<{
   const {
     maxTimeline,
     showMaxTrack,
+    exitingMaxPhase,
     resetMaxVisual,
     applyCommittedLevelVisual,
     completeMaxTimeline,
@@ -266,6 +267,7 @@ export const EffortControl: React.FC<{
           displayIndex={displayIndex}
           isDragging={isDragging}
           showMaxTrack={showMaxTrack}
+          exitingMaxPhase={exitingMaxPhase}
           maxTimeline={maxTimeline}
           thumbRatio={thumbRatio}
           onMaxTimelineComplete={completeMaxTimeline}
