@@ -4,9 +4,13 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
+  background: var(--token-bg-app);
+}
+
+html[data-resolved-theme='light'] .debugger-page {
   background:
-    radial-gradient(circle at top, rgb(var(--color-accent-500) / 0.04), transparent 24%),
-    rgb(var(--color-bg-0));
+    radial-gradient(circle at top, rgb(var(--color-accent-500) / 0.02), transparent 26%),
+    var(--token-bg-app);
 }
 
 .debugger-inline-error {
@@ -771,7 +775,7 @@
 
 .composer-effort-pill.is-level-max .composer-effort-pill-label,
 .composer-effort-pill.is-level-max .composer-effort-pill-icon {
-  color: var(--token-effort-max-mid);
+  color: var(--composer-effort-max-mid, var(--token-effort-max-mid));
 }
 
 .composer-effort-pill-modes {
@@ -798,10 +802,11 @@
   white-space: nowrap;
 }
 
+.composer-effort-pill-mode[data-mode='one-million-context'],
 .composer-effort-pill-mode[data-mode='fast'] {
-  border-color: color-mix(in srgb, var(--token-border-focus) 64%, var(--token-border-muted));
-  background: color-mix(in srgb, var(--token-border-focus) 16%, var(--token-bg-raised));
-  color: var(--token-text-heading);
+  border-color: color-mix(in srgb, var(--composer-mode-accent) 64%, var(--token-border-muted));
+  background: color-mix(in srgb, var(--composer-mode-accent) 22%, var(--token-bg-raised));
+  color: var(--composer-mode-accent);
 }
 
 .composer-effort-pill-caret {
@@ -903,23 +908,23 @@
 
 .composer-effort-slider.is-level-on,
 .composer-effort-slider.is-level-minimal {
-  --composer-effort-track-fill: var(--token-effort-fill-1);
+  --composer-effort-track-fill: var(--composer-effort-fill-1, var(--token-effort-fill-1));
 }
 
 .composer-effort-slider.is-level-low {
-  --composer-effort-track-fill: var(--token-effort-fill-2);
+  --composer-effort-track-fill: var(--composer-effort-fill-2, var(--token-effort-fill-2));
 }
 
 .composer-effort-slider.is-level-medium {
-  --composer-effort-track-fill: var(--token-effort-fill-3);
+  --composer-effort-track-fill: var(--composer-effort-fill-3, var(--token-effort-fill-3));
 }
 
 .composer-effort-slider.is-level-high {
-  --composer-effort-track-fill: var(--token-effort-fill-4);
+  --composer-effort-track-fill: var(--composer-effort-fill-4, var(--token-effort-fill-4));
 }
 
 .composer-effort-slider.is-level-xhigh {
-  --composer-effort-track-fill: var(--token-effort-fill-5);
+  --composer-effort-track-fill: var(--composer-effort-fill-5, var(--token-effort-fill-5));
 }
 
 .composer-effort-slider.is-dragging {
@@ -945,8 +950,12 @@
 
 /* Top-tier Max visual: translucent dark-gray rail + lavender pixel field */
 .composer-effort-slider.is-max-visual .composer-effort-slider-track {
-  border-color: color-mix(in srgb, var(--token-border-muted) 70%, var(--token-effort-max-mid));
-  background: var(--token-effort-max-track);
+  border-color: color-mix(
+    in srgb,
+    var(--token-border-muted) 70%,
+    var(--composer-effort-max-mid, var(--token-effort-max-mid))
+  );
+  background: var(--composer-effort-max-track, var(--token-effort-max-track));
   background-image: none;
   box-shadow: none;
   /* Forbid dark↔solid purple crossfade — that reads as opacity decay instead of energy retreat. */
@@ -1073,8 +1082,12 @@
 }
 
 .composer-effort-slider.is-max-visual .composer-effort-slider-thumb {
-  border-color: color-mix(in srgb, var(--token-effort-max-to) 52%, var(--token-border-strong));
-  background: var(--token-effort-max-thumb);
+  border-color: color-mix(
+    in srgb,
+    var(--composer-effort-max-to, var(--token-effort-max-to)) 52%,
+    var(--token-border-strong)
+  );
+  background: var(--composer-effort-max-thumb, var(--token-effort-max-thumb));
 }
 
 .composer-effort-slider.is-disabled .composer-effort-slider-thumb {
@@ -1184,8 +1197,8 @@
 }
 
 .composer-effort-toggle.active {
-  border-color: var(--token-border-focus);
-  background: var(--token-border-focus);
+  border-color: var(--composer-mode-accent);
+  background: var(--composer-mode-accent);
 }
 
 .composer-effort-toggle.active::after {

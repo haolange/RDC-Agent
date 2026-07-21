@@ -314,7 +314,6 @@ body {
   background: var(--token-bg-panel);
 }
 
-.chat-send-button.primary,
 .user-menu-settings-button {
   background: rgb(var(--color-accent-600));
   border-color: rgb(var(--color-accent-600));
@@ -322,7 +321,6 @@ body {
   box-shadow: none;
 }
 
-.chat-send-button.primary:hover:not(:disabled),
 .user-menu-settings-button:hover {
   background: rgb(var(--color-accent-500));
   box-shadow: none;

@@ -1,6 +1,7 @@
 import React from 'react';
 import type { AgentMode } from '@shared/types/layout';
-import { AGENT_COLORS } from '@shared/constants/agents';
+import { resolveAgentDisplay } from '@shared/constants/agents';
+import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useI18n, type TranslationKey } from '../../i18n';
 import { ModeGlyph } from '../../ui/ModeGlyph';
@@ -35,6 +36,7 @@ const HERO_COPY: Record<EmptyVariant, { title: TranslationKey; subtitle: Transla
 export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode }) => {
   const { t } = useI18n();
   const currentProject = useProjectStore((state) => state.currentProject);
+  const agentDefinitions = useAppSettingsStore((state) => state.settings.agents.definitions);
 
   const variant: EmptyVariant = currentProject ? 'session-empty' : 'no-project';
 
@@ -60,7 +62,7 @@ export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode
               key={toolMode}
               className={`empty-workbench-tool-card mode-${toolMode}`}
               data-testid={`empty-workbench-tool-${toolMode}`}
-              style={{ ['--empty-card-accent' as string]: AGENT_COLORS[toolMode] }}
+              style={{ ['--empty-card-accent' as string]: resolveAgentDisplay(toolMode, agentDefinitions).accent }}
             >
               <span className="empty-workbench-tool-core" aria-hidden="true">
                 <ModeGlyph

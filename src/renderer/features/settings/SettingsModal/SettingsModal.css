@@ -4107,6 +4107,41 @@
   min-height: var(--btn-height-sm);
 }
 
+.settings-agent-accent-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  min-height: var(--btn-height-sm);
+  border: 1px solid rgb(var(--color-border-subtle));
+  border-radius: var(--radius-md);
+  background: rgb(var(--color-bg-2));
+}
+
+.settings-agent-accent-field .settings-field-label {
+  font-size: var(--text-xs);
+  color: rgb(var(--color-text-tertiary));
+}
+
+.settings-agent-accent-field input[type='color'] {
+  width: 28px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgb(var(--color-border-subtle));
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+}
+
+.settings-agent-accent-hex {
+  width: 5.5rem;
+  border: 0;
+  background: transparent;
+  color: rgb(var(--color-text-primary));
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
 .settings-page-agents .settings-agent-icon-popover {
   top: calc(100% + var(--space-2));
   right: 0;

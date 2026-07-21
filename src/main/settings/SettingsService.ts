@@ -2,16 +2,13 @@ import fs from 'fs';
 import path from 'path';
 import { createHash, randomUUID } from 'crypto';
 import type {
-  AppLanguage,
   AppRuntimePaths,
   AppSettings,
   AppSettingsPatch,
-  AppTheme,
   AgentPermissionMode,
   AgentPermissionSettings,
   AgentRuntimeSettings,
   RuntimeResourceCatalog,
-  FontScale,
   LayoutPreferences,
   LlmAgentRoute,
   LlmProviderAuthMode,
@@ -43,6 +40,12 @@ import type {
 } from '@shared/types/agentManifest';
 import type { LLMConfig, LLMProviderConfig } from '@shared/types/llm';
 import { DEFAULT_MODEL_ROUTING, isSafeAgentProfileId } from '@shared/types/agent';
+import { createDefaultChromeThemes } from '@shared/theme/presets';
+import {
+  createDefaultUiPreferences,
+  mergeUiPreferences,
+  sanitizeUiPreferences,
+} from '@shared/theme/uiPreferences';
 import {
   LEFT_SIDEBAR_COLLAPSED_WIDTH,
   LEFT_SIDEBAR_DEFAULT_WIDTH,
@@ -129,7 +132,7 @@ interface NormalizedPersistedSettings {
   };
 }
 
-export const SETTINGS_SCHEMA_VERSION = 4;
+export const SETTINGS_SCHEMA_VERSION = 6;
 
 type ProviderCredentialView = 'runtime' | 'storage-metadata';
 
@@ -151,9 +154,6 @@ const RIGHT_DEFAULTS = {
   collapsedWidth: RIGHT_PANEL_COLLAPSED_WIDTH,
 };
 
-const VALID_THEMES: AppTheme[] = ['dark', 'light', 'system'];
-const VALID_LANGUAGES: AppLanguage[] = ['zh-CN', 'en'];
-const VALID_FONT_SCALES: FontScale[] = ['small', 'medium', 'large'];
 const VALID_PERMISSION_MODES: AgentPermissionMode[] = ['default', 'auto-review', 'full-access', 'custom'];
 const EMPTY_PATHS: AppRuntimePaths = {
   userRdxRoot: '',
@@ -171,14 +171,7 @@ const EMPTY_PATHS: AppRuntimePaths = {
   secretsPath: '',
 };
 
-const DEFAULT_APPEARANCE: UiPreferences = {
-  theme: 'dark',
-  language: 'zh-CN',
-  fontScale: 'medium',
-  composerMarkdown: false,
-  usePointerCursors: false,
-  contextBreakdownExpanded: false,
-};
+const DEFAULT_APPEARANCE: UiPreferences = createDefaultUiPreferences();
 
 const DEFAULT_LAYOUT: LayoutPreferences = {
   leftSidebar: {
@@ -1288,22 +1281,20 @@ export class SettingsService {
       warnings.push('No configured provider available for Debugger mode.');
     }
 
+    const previousSchemaVersion = typeof candidate.schemaVersion === 'number' ? candidate.schemaVersion : 0;
+    const appearance = sanitizeUiPreferences(
+      candidate.appearance,
+      sanitizeUiPreferences(fallback.appearance, DEFAULT_APPEARANCE),
+    );
+    // Schema 6: clear Appearance chrome pollution from dual-theme bring-up and restore RDC defaults.
+    if (previousSchemaVersion < 6) {
+      appearance.chromeThemes = createDefaultChromeThemes();
+      fixes.push('Reset appearance.chromeThemes to RDC preset defaults (schema 6)');
+    }
+
     const nextSettings: PersistedSettingsPayload = {
       schemaVersion: SETTINGS_SCHEMA_VERSION,
-      appearance: {
-        theme: pickEnum(candidate.appearance?.theme, VALID_THEMES, fallback.appearance?.theme ?? 'dark'),
-        language: pickEnum(candidate.appearance?.language, VALID_LANGUAGES, fallback.appearance?.language ?? 'zh-CN'),
-        fontScale: pickEnum(candidate.appearance?.fontScale, VALID_FONT_SCALES, fallback.appearance?.fontScale ?? 'medium'),
-        composerMarkdown: typeof candidate.appearance?.composerMarkdown === 'boolean'
-          ? candidate.appearance.composerMarkdown
-          : (fallback.appearance?.composerMarkdown ?? DEFAULT_APPEARANCE.composerMarkdown),
-        usePointerCursors: typeof candidate.appearance?.usePointerCursors === 'boolean'
-          ? candidate.appearance.usePointerCursors
-          : (fallback.appearance?.usePointerCursors ?? DEFAULT_APPEARANCE.usePointerCursors),
-        contextBreakdownExpanded: typeof candidate.appearance?.contextBreakdownExpanded === 'boolean'
-          ? candidate.appearance.contextBreakdownExpanded
-          : (fallback.appearance?.contextBreakdownExpanded ?? DEFAULT_APPEARANCE.contextBreakdownExpanded),
-      },
+      appearance,
       layout: {
         leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
         rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
@@ -1343,20 +1334,10 @@ export class SettingsService {
       apiKey: '',
     }));
     return {
-      appearance: {
-        theme: pickEnum(candidate.appearance?.theme, VALID_THEMES, fallback.appearance?.theme ?? 'dark'),
-        language: pickEnum(candidate.appearance?.language, VALID_LANGUAGES, fallback.appearance?.language ?? 'zh-CN'),
-        fontScale: pickEnum(candidate.appearance?.fontScale, VALID_FONT_SCALES, fallback.appearance?.fontScale ?? 'medium'),
-        composerMarkdown: typeof candidate.appearance?.composerMarkdown === 'boolean'
-          ? candidate.appearance.composerMarkdown
-          : (fallback.appearance?.composerMarkdown ?? DEFAULT_APPEARANCE.composerMarkdown),
-        usePointerCursors: typeof candidate.appearance?.usePointerCursors === 'boolean'
-          ? candidate.appearance.usePointerCursors
-          : (fallback.appearance?.usePointerCursors ?? DEFAULT_APPEARANCE.usePointerCursors),
-        contextBreakdownExpanded: typeof candidate.appearance?.contextBreakdownExpanded === 'boolean'
-          ? candidate.appearance.contextBreakdownExpanded
-          : (fallback.appearance?.contextBreakdownExpanded ?? DEFAULT_APPEARANCE.contextBreakdownExpanded),
-      },
+      appearance: sanitizeUiPreferences(
+        candidate.appearance,
+        sanitizeUiPreferences(fallback.appearance, DEFAULT_APPEARANCE),
+      ),
       layout: {
         leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
         rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
@@ -1583,32 +1564,10 @@ export class SettingsService {
 
     const nextPersisted: PersistedSettingsPayload = {
       schemaVersion: SETTINGS_SCHEMA_VERSION,
-      appearance: {
-        theme: pickEnum(
-          patch.appearance?.theme ?? currentPersisted.appearance?.theme,
-          VALID_THEMES,
-          DEFAULT_APPEARANCE.theme,
-        ),
-        language: pickEnum(
-          patch.appearance?.language ?? currentPersisted.appearance?.language,
-          VALID_LANGUAGES,
-          DEFAULT_APPEARANCE.language,
-        ),
-        fontScale: pickEnum(
-          patch.appearance?.fontScale ?? currentPersisted.appearance?.fontScale,
-          VALID_FONT_SCALES,
-          DEFAULT_APPEARANCE.fontScale,
-        ),
-        composerMarkdown: typeof (patch.appearance?.composerMarkdown ?? currentPersisted.appearance?.composerMarkdown) === 'boolean'
-          ? Boolean(patch.appearance?.composerMarkdown ?? currentPersisted.appearance?.composerMarkdown)
-          : DEFAULT_APPEARANCE.composerMarkdown,
-        usePointerCursors: typeof (patch.appearance?.usePointerCursors ?? currentPersisted.appearance?.usePointerCursors) === 'boolean'
-          ? Boolean(patch.appearance?.usePointerCursors ?? currentPersisted.appearance?.usePointerCursors)
-          : DEFAULT_APPEARANCE.usePointerCursors,
-        contextBreakdownExpanded: typeof (patch.appearance?.contextBreakdownExpanded ?? currentPersisted.appearance?.contextBreakdownExpanded) === 'boolean'
-          ? Boolean(patch.appearance?.contextBreakdownExpanded ?? currentPersisted.appearance?.contextBreakdownExpanded)
-          : DEFAULT_APPEARANCE.contextBreakdownExpanded,
-      },
+      appearance: mergeUiPreferences(
+        sanitizeUiPreferences(currentPersisted.appearance, DEFAULT_APPEARANCE),
+        patch.appearance,
+      ),
       layout: {
         leftSidebar: sanitizeSidebar(
           {

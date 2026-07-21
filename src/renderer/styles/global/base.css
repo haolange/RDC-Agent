@@ -12,6 +12,30 @@ html {
   color-scheme: dark;
 }
 
+html[data-resolved-theme='light'] {
+  color-scheme: light;
+}
+
+html[data-reduce-motion='on'] *,
+html[data-reduce-motion='on'] *::before,
+html[data-reduce-motion='on'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-reduce-motion='system'] *,
+  html[data-reduce-motion='system'] *::before,
+  html[data-reduce-motion='system'] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 html, body, #root {
   height: 100%;
   width: 100%;
@@ -23,11 +47,15 @@ body {
   font-size: var(--text-base);
   line-height: var(--leading-normal);
   color: rgb(var(--color-text-primary));
-  background:
-    radial-gradient(circle at top, rgb(var(--color-primary-600) / 0.06), transparent 24%),
-    radial-gradient(circle at 78% 8%, rgb(var(--color-accent-500) / 0.05), transparent 18%),
-    rgb(var(--color-bg-0));
+  background: var(--token-bg-app);
   transition: background var(--transition-base), color var(--transition-base);
+}
+
+html[data-resolved-theme='light'] body {
+  background:
+    radial-gradient(circle at top, rgb(var(--color-primary-600) / 0.04), transparent 24%),
+    radial-gradient(circle at 78% 8%, rgb(var(--color-accent-500) / 0.03), transparent 18%),
+    var(--token-bg-app);
 }
 
 button,

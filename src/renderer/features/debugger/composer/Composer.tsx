@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ModeGlyph } from '../../../ui/ModeGlyph';
 import { ContextUsageIndicator } from '../../../patterns/ContextUsageIndicator';
 import type { AgentMode } from '@shared/types/layout';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
+import type { ResolvedTheme } from '@shared/types/settings';
+import { deriveComposeAccentVars } from '@shared/theme/composeAccent';
 import { formatBytes } from '../../../services/attachmentHelpers';
 import { useI18n } from '../../../i18n';
 import { useLayoutStore } from '../../../stores/layoutStore';
@@ -33,6 +35,9 @@ export const Composer: React.FC<ComposerProps> = ({
 }) => {
   const { t } = useI18n();
   const composerMarkdown = useAppSettingsStore((state) => state.settings.appearance.composerMarkdown);
+  const appearanceTheme = useAppSettingsStore((state) => state.settings.appearance.theme);
+  const systemTheme = useAppSettingsStore((state) => state.systemTheme);
+  const resolvedTheme: ResolvedTheme = appearanceTheme === 'system' ? systemTheme : appearanceTheme;
   const activeAgentId = useConversationStore((state) => {
     const activeMsg = state.conversationMessages.find(
       (m) => m.role === 'assistant' && (m.status === 'streaming' || m.status === 'draft'),
@@ -85,12 +90,16 @@ export const Composer: React.FC<ComposerProps> = ({
   } = composer;
   const selectedAgentDefinition = userInvocableAgents.find((agent) => agent.id === selectedAgentId);
   const selectedAgentCapability = getAgentCapability(selectedAgentId, userInvocableAgents);
+  const composeAccentStyle = useMemo(
+    () => deriveComposeAccentVars(currentModeConfig.accentColor, resolvedTheme) as React.CSSProperties,
+    [currentModeConfig.accentColor, resolvedTheme],
+  );
 
   if (pendingToolApproval) {
     return (
       <div
         className="composer-shell composer-shell-tool-approval"
-        style={{ ['--composer-mode-accent' as string]: currentModeConfig.accentColor }}
+        style={composeAccentStyle}
       >
         <ToolApprovalRequestPanel request={pendingToolApproval} />
       </div>
@@ -101,7 +110,7 @@ export const Composer: React.FC<ComposerProps> = ({
     return (
       <div
         className="composer-shell composer-shell-user-input"
-        style={{ ['--composer-mode-accent' as string]: currentModeConfig.accentColor }}
+        style={composeAccentStyle}
       >
         <UserInputRequestPanel request={pendingUserInput} />
       </div>
@@ -111,7 +120,7 @@ export const Composer: React.FC<ComposerProps> = ({
   return (
     <div
       className={`composer-shell ${isComposerBusy ? 'is-running' : ''}`}
-      style={{ ['--composer-mode-accent' as string]: currentModeConfig.accentColor }}
+      style={composeAccentStyle}
     >
       {(pendingAttachments.length > 0 || pendingSkillIds.length > 0) && (
         <div className="composer-attachments" data-testid="composer-attachments">

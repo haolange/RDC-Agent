@@ -30,6 +30,7 @@
     "check:provider-system": "node scripts/check-provider-system.mjs",
     "check:provider-catalog": "vitest run src/shared/provider-catalog/compiler.test.ts",
     "check:settings-agents": "node scripts/check-settings-agents.mjs",
+    "check:appearance": "node scripts/check-appearance.mjs",
     "check:repository-hygiene": "node scripts/check-repository-hygiene.mjs",
     "check:scoped-resources": "vitest run src/main/runtime/ScopedResourceResolver.test.ts src/main/runtime/RdxRuntimeService.test.ts",
     "check:project-instructions": "vitest run src/main/runtime/ScopedInstructionResolver.test.ts",

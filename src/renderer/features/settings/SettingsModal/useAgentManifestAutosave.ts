@@ -27,6 +27,7 @@ export const serializeAgentManifestDraft = (draft: AgentManifestDraft): string =
   target: draft.target,
   models: draft.models,
   icon: draft.icon,
+  accent: draft.accent,
   disableModelInvocation: draft.disableModelInvocation,
   userInvocable: draft.userInvocable,
   tools: draft.tools,

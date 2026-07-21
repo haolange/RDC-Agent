@@ -8,8 +8,41 @@ import type { ReasoningSelection } from './modelCapability';
 
 export type AppTheme = 'dark' | 'light' | 'system';
 export type ResolvedTheme = 'dark' | 'light';
+export type ThemeVariant = ResolvedTheme;
 export type AppLanguage = 'zh-CN' | 'en';
 export type FontScale = 'small' | 'medium' | 'large';
+export type ReduceMotionPreference = 'system' | 'on' | 'off';
+export type ThemePresetId =
+  | 'rdc'
+  | 'absolutely'
+  | 'ayu'
+  | 'catppuccin'
+  | 'dracula'
+  | 'everforest'
+  | 'github'
+  | 'gruvbox'
+  | 'linear';
+
+export interface ThemeChromeFonts {
+  ui: string | null;
+  code: string | null;
+}
+
+/** Per-variant Appearance chrome (Light and Dark are independent). */
+export interface ThemeChromeConfig {
+  presetId: ThemePresetId;
+  accent: string;
+  surface: string;
+  ink: string;
+  /** 0–100; default 45. Raises ink/surface separation. */
+  contrast: number;
+  fonts: ThemeChromeFonts;
+}
+
+export interface ChromeThemesConfig {
+  light: ThemeChromeConfig;
+  dark: ThemeChromeConfig;
+}
 export type BuiltinLlmProviderId =
   | 'openrouter'
   | 'openai'
@@ -234,6 +267,10 @@ export interface UiPreferences {
   usePointerCursors: boolean;
   /** UI memory: whether Context breakdown popover details are expanded. Driven by popover toggle only. */
   contextBreakdownExpanded: boolean;
+  /** Reduce UI motion: match OS, force on, or force off. */
+  reduceMotion: ReduceMotionPreference;
+  /** Independent Light / Dark chrome themes for Settings → Appearance. */
+  chromeThemes: ChromeThemesConfig;
 }
 
 export interface ProfileSettings {

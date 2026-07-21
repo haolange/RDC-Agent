@@ -128,6 +128,30 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
             onChange={(icon) => onUpdateAgent({ icon })}
             t={t}
           />
+          <label className="settings-agent-accent-field" title={t('settings.agentAccentHelp')}>
+            <span className="settings-field-label">{t('settings.agentAccent')}</span>
+            <input
+              type="color"
+              data-testid="settings-agent-accent"
+              value={/^#[0-9a-fA-F]{6}$/.test(selectedAgent.accent) ? selectedAgent.accent : '#33d1ff'}
+              onChange={(event) => onUpdateAgent({ accent: event.target.value.toLowerCase() })}
+              aria-label={t('settings.agentAccent')}
+            />
+            <input
+              type="text"
+              className="settings-agent-accent-hex"
+              value={selectedAgent.accent ?? ''}
+              spellCheck={false}
+              onChange={(event) => {
+                const next = event.target.value.trim();
+                if (/^#[0-9a-fA-F]{6}$/.test(next)) onUpdateAgent({ accent: next.toLowerCase() });
+              }}
+              onBlur={(event) => {
+                const next = event.target.value.trim();
+                if (/^#[0-9a-fA-F]{6}$/.test(next)) onUpdateAgent({ accent: next.toLowerCase() });
+              }}
+            />
+          </label>
           <button type="button" className="button button-ghost" onClick={onDuplicateAgent}>
             {t('settings.duplicateAgent')}
           </button>

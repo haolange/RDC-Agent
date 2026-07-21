@@ -18,6 +18,7 @@ const definition = (agentId: string, model: string): AgentManifestDefinition => 
   target: 'rdc-agent',
   models: [model],
   icon: 'message-orbit',
+    accent: '#33d1ff',
   disableModelInvocation: false,
   userInvocable: true,
   tools: [],

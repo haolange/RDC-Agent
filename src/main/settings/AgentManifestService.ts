@@ -14,8 +14,19 @@ import type {
 import type { AppRuntimePaths, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import type { EffectiveAgentProfile, ScopedResourceCandidate } from '@shared/types/rdxRuntime';
-import { AGENT_DESCRIPTIONS, AGENT_DISPLAY_NAMES, AGENT_MODE_MAP, AGENT_ROLES, isAgentIconPreset } from '@shared/constants/agents';
+import {
+  AGENT_DESCRIPTIONS,
+  AGENT_DISPLAY_NAMES,
+  AGENT_MODE_MAP,
+  AGENT_ROLES,
+  AGENT_SEED_ACCENTS,
+  isAgentIconPreset,
+} from '@shared/constants/agents';
+import { COMPOSE_ACCENT_FALLBACK, normalizeAgentAccent } from '@shared/theme/composeAccent';
 import { canonicalAgentModelId, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
+
+const normalizeManifestAccent = (value: unknown, fallback: string): string =>
+  normalizeAgentAccent(value, fallback);
 import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
 
@@ -116,6 +127,10 @@ const parseAgentMarkdownContent = (
     target: typeof frontmatter.target === 'string' ? frontmatter.target.trim() : 'rdc-agent',
     models: readStringArray(frontmatter.model),
     icon: isAgentIconPreset(frontmatter.icon) ? frontmatter.icon : AGENT_MODE_MAP[fallbackId]?.icon ?? 'message-orbit',
+    accent: normalizeManifestAccent(
+      frontmatter.accent,
+      AGENT_SEED_ACCENTS[fallbackId as AgentId] ?? COMPOSE_ACCENT_FALLBACK,
+    ),
     disableModelInvocation: readBoolean(frontmatter['disable-model-invocation'], false),
     userInvocable: readBoolean(frontmatter['user-invocable'], true),
     tools: readStringArray(frontmatter.tools),
@@ -153,6 +168,7 @@ const serializeAgentMarkdown = (definition: AgentManifestDraft): string => {
     target: definition.target || 'rdc-agent',
     model: definition.models,
     icon: isAgentIconPreset(definition.icon) ? definition.icon : 'message-orbit',
+    accent: normalizeManifestAccent(definition.accent, COMPOSE_ACCENT_FALLBACK),
     'disable-model-invocation': definition.disableModelInvocation,
     'user-invocable': definition.userInvocable,
     enabled: definition.enabled,
@@ -203,6 +219,7 @@ const createSeedDefinition = (
     target: 'rdc-agent',
     models: model ? [model] : [],
     icon: AGENT_MODE_MAP[agentId]?.icon ?? 'message-orbit',
+    accent: AGENT_SEED_ACCENTS[agentId] ?? COMPOSE_ACCENT_FALLBACK,
     disableModelInvocation: false,
     userInvocable: true,
     tools,

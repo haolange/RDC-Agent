@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import type { AppSettings } from '@shared/types/settings';
 import { useSettingsModal } from './useSettingsModal';
 import { GeneralSettings } from './sections/GeneralSettings';
+import { AppearanceSettings } from './sections/AppearanceSettings';
 import { WorkspaceSettings } from './sections/WorkspaceSettings';
 import { ModelsSettings } from './sections/ModelsSettings';
 import { AgentsSettings } from './sections/AgentsSettings';
@@ -63,6 +64,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     setFontScale,
     setComposerMarkdown,
     setUsePointerCursors,
+    setReduceMotion,
+    setChromeTheme,
     connectionProvider,
     openProviderConnection,
     updateConnectionDraft,
@@ -151,14 +154,23 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                   onAccountDraftChange={setAccountDraft}
                   onAvatarSelect={handleAvatarSelect}
                   onAccountSave={handleAccountSave}
-                  onThemeChange={setTheme}
                   onLanguageChange={setLanguage}
-                  onFontScaleChange={setFontScale}
-                  onComposerMarkdownChange={setComposerMarkdown}
-                  onUsePointerCursorsChange={setUsePointerCursors}
                   globalInstructionsDraft={globalInstructionsDraft}
                   onGlobalInstructionsDraftChange={setGlobalInstructionsDraft}
                   onSavePersonalization={handleSavePersonalization}
+                  t={t}
+                />
+              )}
+
+              {activeSection === 'appearance' && (
+                <AppearanceSettings
+                  settings={settings}
+                  onThemeChange={setTheme}
+                  onFontScaleChange={setFontScale}
+                  onComposerMarkdownChange={setComposerMarkdown}
+                  onUsePointerCursorsChange={setUsePointerCursors}
+                  onReduceMotionChange={setReduceMotion}
+                  onChromeThemeChange={setChromeTheme}
                   t={t}
                 />
               )}
