@@ -30,6 +30,8 @@ description: General executable RDC/RDX debugging agent.
 argument-hint: Describe the goal, symptom, capture, or artifact to inspect.
 target: rdc-agent
 model: github-copilot:gpt-4.1
+icon: crosshair-bug
+accent: "#33d1ff"
 enabled: true
 user-invocable: true
 disable-model-invocation: false
@@ -68,6 +70,8 @@ Supported frontmatter fields are:
 - `argument-hint`
 - `target`
 - `model`
+- `icon`（图标预设）
+- `accent`（`#RRGGBB`；驱动 Composer 边框流光、边缘泛光与 Effort 滑条色；Settings → Agents 可编辑）
 - `enabled`
 - `user-invocable`
 - `disable-model-invocation`

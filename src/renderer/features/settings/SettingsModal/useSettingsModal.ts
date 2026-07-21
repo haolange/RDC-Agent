@@ -34,6 +34,8 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const setFontScale = useAppSettingsStore((state) => state.setFontScale);
   const setComposerMarkdown = useAppSettingsStore((state) => state.setComposerMarkdown);
   const setUsePointerCursors = useAppSettingsStore((state) => state.setUsePointerCursors);
+  const setReduceMotion = useAppSettingsStore((state) => state.setReduceMotion);
+  const setChromeTheme = useAppSettingsStore((state) => state.setChromeTheme);
   const updateProfile = useAppSettingsStore((state) => state.updateProfile);
   const patchSettings = useAppSettingsStore((state) => state.patchSettings);
   const saveProvider = useAppSettingsStore((state) => state.saveProvider);
@@ -98,6 +100,7 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
 
   const sections: Array<{ id: typeof modalState.activeSection; label: string }> = useMemo(() => [
     { id: 'general', label: t('settings.general') },
+    { id: 'appearance', label: t('settings.appearance') },
     { id: 'workspace', label: t('settings.workspace') },
     { id: 'models', label: t('settings.models') },
     { id: 'skills', label: t('settings.skills') },
@@ -149,6 +152,8 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     setFontScale,
     setComposerMarkdown,
     setUsePointerCursors,
+    setReduceMotion,
+    setChromeTheme,
     ...actions,
     ...providerConnection,
   };

@@ -15,6 +15,7 @@ const draft = (id: string, model: string): AgentManifestDraft => ({
   target: 'rdc-agent',
   models: [model],
   icon: 'spark',
+    accent: '#33d1ff',
   disableModelInvocation: false,
   userInvocable: true,
   tools: [],
@@ -40,6 +41,8 @@ describe('agent manifest scoped autosave helpers', () => {
     expect(getChangedAgentManifestDrafts([runtimeDecorated], [saved])).toEqual([]);
     expect(getChangedAgentManifestDrafts([{ ...runtimeDecorated, models: ['deepseek/c'] }], [saved]))
       .toEqual([expect.objectContaining({ models: ['deepseek/c'] })]);
+    expect(getChangedAgentManifestDrafts([{ ...runtimeDecorated, accent: '#ff6a00' }], [saved]))
+      .toEqual([expect.objectContaining({ accent: '#ff6a00' })]);
   });
 
   it('rolls back only the failed agent and preserves unrelated optimistic edits', () => {

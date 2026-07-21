@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AgentMode, ModeConfig } from '@shared/types/layout';
-import { AGENT_MODES } from '@shared/constants/agents';
+import { AGENT_MODES, resolveAgentDisplay } from '@shared/constants/agents';
+import { COMPOSE_ACCENT_FALLBACK } from '@shared/theme/composeAccent';
 import { useI18n } from '../../../i18n';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useLayoutStore } from '../../../stores/layoutStore';
@@ -41,9 +42,8 @@ export function useComposer(options: {
   const conversationMessages = useConversationStore((state) => state.conversationMessages);
   const currentMode = useLayoutStore((state) => state.currentMode);
   const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
-  const userInvocableAgents = useAppSettingsStore((state) =>
-    state.settings.agents.definitions.filter((agent) => agent.enabled && agent.userInvocable),
-  );
+  const agentDefinitions = useAppSettingsStore((state) => state.settings.agents.definitions);
+  const userInvocableAgents = agentDefinitions.filter((agent) => agent.enabled && agent.userInvocable);
   const [selectedAgentId, setSelectedAgentId] = useState(userInvocableAgents[0]?.id ?? 'ask');
 
   const devices = useDeviceStore((state) => state.devices);
@@ -73,14 +73,18 @@ export function useComposer(options: {
   });
   const selectedAgent = userInvocableAgents.find((agent) => agent.id === selectedAgentId) ?? userInvocableAgents[0];
   const selectedContextWindowTokens = useSelectedContextWindowTokens();
-  const currentModeConfig: ModeConfig = AGENT_MODES.find((mode) => mode.id === currentMode) ?? {
-    id: selectedAgent?.id ?? currentMode,
-    label: selectedAgent?.name ?? currentMode,
-    icon: 'message-orbit',
-    description: selectedAgent?.description ?? 'Agent profile',
-    accentColor: '#33d1ff',
-    disabled: false,
-  };
+  const agentAccent = resolveAgentDisplay(selectedAgent?.id ?? selectedAgentId, agentDefinitions).accent;
+  const builtinMode = AGENT_MODES.find((mode) => mode.id === currentMode);
+  const currentModeConfig: ModeConfig = builtinMode
+    ? { ...builtinMode, accentColor: selectedAgent?.accent ?? agentAccent }
+    : {
+        id: selectedAgent?.id ?? currentMode,
+        label: selectedAgent?.name ?? currentMode,
+        icon: selectedAgent?.icon ?? 'message-orbit',
+        description: selectedAgent?.description ?? 'Agent profile',
+        accentColor: selectedAgent?.accent ?? agentAccent ?? COMPOSE_ACCENT_FALLBACK,
+        disabled: false,
+      };
   const currentModeLabel = selectedAgent?.name ?? currentModeConfig.label;
 
   const send = useComposerSend({

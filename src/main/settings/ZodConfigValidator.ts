@@ -3,13 +3,44 @@
  */
 import { z } from 'zod';
 
+const HexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
+const ThemePresetIdSchema = z.enum([
+  'rdc',
+  'absolutely',
+  'ayu',
+  'catppuccin',
+  'dracula',
+  'everforest',
+  'github',
+  'gruvbox',
+  'linear',
+]);
+
+const ThemeChromeSchema = z.object({
+  presetId: ThemePresetIdSchema,
+  accent: HexColorSchema,
+  surface: HexColorSchema,
+  ink: HexColorSchema,
+  contrast: z.number().min(0).max(100),
+  fonts: z.object({
+    ui: z.string().nullable(),
+    code: z.string().nullable(),
+  }),
+}).passthrough();
+
 const UiPreferencesSchema = z.object({
   theme: z.enum(['dark', 'light', 'system']).optional().default('dark'),
-  language: z.string().optional().default('en'),
+  language: z.enum(['zh-CN', 'en']).optional().default('zh-CN'),
   fontScale: z.enum(['small', 'medium', 'large']).optional().default('medium'),
   composerMarkdown: z.boolean().optional().default(false),
   usePointerCursors: z.boolean().optional().default(false),
   contextBreakdownExpanded: z.boolean().optional().default(false),
+  reduceMotion: z.enum(['system', 'on', 'off']).optional().default('system'),
+  chromeThemes: z.object({
+    light: ThemeChromeSchema,
+    dark: ThemeChromeSchema,
+  }).optional(),
 }).passthrough();
 
 const AgentPermissionSchema = z.object({

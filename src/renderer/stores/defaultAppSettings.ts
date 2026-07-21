@@ -5,6 +5,7 @@ import {
   TERMINAL_DEFAULT_HEIGHT,
 } from '@shared/constants/layout';
 import { DEFAULT_MODEL_ROUTING } from '@shared/types/agent';
+import { createDefaultUiPreferences } from '@shared/theme/uiPreferences';
 
 const createEmptyAgentRoutes = (): LlmAgentRoute[] =>
   Object.keys(DEFAULT_MODEL_ROUTING).map((agentId) => ({
@@ -23,14 +24,7 @@ const createEmptyRdxAction = () => ({
 });
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  appearance: {
-    theme: 'dark',
-    language: 'zh-CN',
-    fontScale: 'medium',
-    composerMarkdown: false,
-    usePointerCursors: false,
-    contextBreakdownExpanded: false,
-  },
+  appearance: createDefaultUiPreferences(),
   layout: {
     leftSidebar: { collapsed: false, width: LEFT_SIDEBAR_DEFAULT_WIDTH, expandedWidth: LEFT_SIDEBAR_DEFAULT_WIDTH },
     rightPanel: { collapsed: false, width: RIGHT_PANEL_DEFAULT_WIDTH, expandedWidth: RIGHT_PANEL_DEFAULT_WIDTH },

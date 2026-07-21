@@ -19,6 +19,13 @@ export const SettingsNavIcon: React.FC<SettingsNavIconProps> = ({ section }) => 
             <circle cx="11" cy="17" r="1.5" />
           </>
         );
+      case 'appearance':
+        return (
+          <>
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" />
+          </>
+        );
       case 'workspace':
         return (
           <>

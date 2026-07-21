@@ -216,9 +216,14 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  /* Flat shell fill — empty-state breath lives only on .empty-workbench-prompt. */
+  background: var(--token-bg-app);
+}
+
+html[data-resolved-theme='light'] .app-main {
   background:
-    radial-gradient(circle at 50% 0%, rgb(var(--color-accent-500) / 0.035), transparent 30%),
-    rgb(var(--color-bg-0) / 0.18);
+    radial-gradient(circle at 50% 0%, rgb(var(--color-accent-500) / 0.018), transparent 28%),
+    var(--token-bg-app);
 }
 
 .app-mode-placeholder {

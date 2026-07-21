@@ -9,7 +9,7 @@ describe('PromptPlanBuilder', () => {
   it('builds a provenance-carrying plan without memory injection or hardcoded capabilities', async () => {
     const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
     const profile = {
-      id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdx/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', models: [], icon: 'message-orbit', disableModelInvocation: false, userInvocable: true, tools: ['read_file'], skills: ['debug'], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
+      id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdx/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', models: [], icon: 'message-orbit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['read_file'], skills: ['debug'], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
     } satisfies AgentManifestDefinition;
     const skillPath = path.join(process.cwd(), 'resources', 'agent-runtime', 'skills', 'debug', 'SKILL.md');
     const plan = new PromptPlanBuilder().build({
@@ -34,7 +34,7 @@ describe('PromptPlanBuilder', () => {
   it('includes the skill catalog for large and small windows when non-empty', async () => {
     const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
     const baseProfile = {
-      id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdx/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', models: [], icon: 'message-orbit', disableModelInvocation: false, userInvocable: true, tools: ['read_file'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
+      id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdx/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', models: [], icon: 'message-orbit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['read_file'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
     } satisfies AgentManifestDefinition;
     const buildWith = (contextWindowTokens?: number) => new PromptPlanBuilder().build({
       profile: baseProfile,

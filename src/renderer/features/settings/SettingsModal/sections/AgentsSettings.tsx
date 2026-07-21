@@ -55,6 +55,7 @@ const createNewAgent = (existing: AgentManifestDraft[]): AgentManifestDraft => {
     target: 'rdc-agent',
     models: [],
     icon: 'spark',
+    accent: '#33d1ff',
     disableModelInvocation: false,
     userInvocable: false,
     tools: [],

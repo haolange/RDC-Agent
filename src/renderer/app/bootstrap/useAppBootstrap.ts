@@ -7,6 +7,7 @@ import {
   hydrateMessagesWithActionEvents,
   mapActionEventToTimelineEntry,
 } from '../../services/conversationTimeline';
+import { applyChromeTheme } from '../theme/applyChromeTheme';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useConversationStore } from '../../stores/conversationStore';
 import { useEvidenceStore } from '../../stores/evidenceStore';
@@ -52,10 +53,7 @@ export function useAppBootstrap(options: {
 
   useEffect(() => {
     document.documentElement.lang = settings.appearance.language;
-    document.documentElement.dataset.theme = settings.appearance.theme;
-    document.documentElement.dataset.resolvedTheme = resolvedTheme;
-    document.documentElement.dataset.fontScale = settings.appearance.fontScale;
-    document.documentElement.dataset.pointerCursors = settings.appearance.usePointerCursors ? 'true' : 'false';
+    applyChromeTheme(settings.appearance, resolvedTheme);
   }, [resolvedTheme, settings.appearance]);
 
   useEffect(() => {

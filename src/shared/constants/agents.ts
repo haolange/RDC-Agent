@@ -2,6 +2,7 @@ import type { AgentCategory, AgentId, AgentRole, WriteScope } from '../types/age
 import type { AgentManifestDefinition } from '../types/agentManifest';
 import type { ModeConfig } from '../types/layout';
 import { DEFAULT_MODEL_ROUTING, TOP_LEVEL_AGENT_IDS, isTopLevelAgentId } from '../types/agent';
+import { COMPOSE_ACCENT_FALLBACK, normalizeAgentAccent } from '../theme/composeAccent';
 
 export { DEFAULT_MODEL_ROUTING, isTopLevelAgentId };
 
@@ -58,7 +59,8 @@ export const AGENT_NOTE_FILES: Record<AgentId, string> = {
 
 export const DEFAULT_TOKEN_TTL_SECONDS = 1800;
 
-export const AGENT_COLORS: Record<AgentId, string> = {
+/** Seed accents written into new builtin `.agent.md` files only — not runtime authority. */
+export const AGENT_SEED_ACCENTS: Record<AgentId, string> = {
   ask: '#38c6f4',
   plan: '#8d8bff',
   edit: '#33d1ff',
@@ -73,7 +75,7 @@ export const AGENT_MODES: ModeConfig[] = [
     label: 'Ask',
     icon: 'message-orbit',
     description: 'Read-only clarification and guidance',
-    accentColor: AGENT_COLORS.ask,
+    accentColor: AGENT_SEED_ACCENTS.ask,
     disabled: false,
   },
   {
@@ -81,7 +83,7 @@ export const AGENT_MODES: ModeConfig[] = [
     label: 'Plan',
     icon: 'route-plan',
     description: 'Research, questions, handoff, and implementation planning',
-    accentColor: AGENT_COLORS.plan,
+    accentColor: AGENT_SEED_ACCENTS.plan,
     disabled: false,
   },
   {
@@ -89,7 +91,7 @@ export const AGENT_MODES: ModeConfig[] = [
     label: 'Edit',
     icon: 'pencil-edit',
     description: 'General implementation agent',
-    accentColor: AGENT_COLORS.edit,
+    accentColor: AGENT_SEED_ACCENTS.edit,
     disabled: false,
   },
   {
@@ -97,7 +99,7 @@ export const AGENT_MODES: ModeConfig[] = [
     label: 'Debugger',
     icon: 'crosshair-bug',
     description: 'Executable RDC/RenderDoc debugging agent',
-    accentColor: AGENT_COLORS.debugger,
+    accentColor: AGENT_SEED_ACCENTS.debugger,
     disabled: false,
   },
   {
@@ -105,7 +107,7 @@ export const AGENT_MODES: ModeConfig[] = [
     label: 'Analyzer',
     icon: 'waveform-gauge',
     description: 'Executable analysis and evidence agent',
-    accentColor: AGENT_COLORS.analyzer,
+    accentColor: AGENT_SEED_ACCENTS.analyzer,
     disabled: false,
   },
   {
@@ -113,7 +115,7 @@ export const AGENT_MODES: ModeConfig[] = [
     label: 'Optimizer',
     icon: 'spark-tuning',
     description: 'Executable optimization and validation agent',
-    accentColor: AGENT_COLORS.optimizer,
+    accentColor: AGENT_SEED_ACCENTS.optimizer,
     disabled: false,
   },
 ];
@@ -163,11 +165,11 @@ export interface AgentDisplayInfo {
 
 export function resolveAgentDisplay(agentId: string, definitions: AgentManifestDefinition[]): AgentDisplayInfo {
   const manifest = definitions.find((d) => d.id === agentId);
-  const builtinColor = AGENT_COLORS[agentId as AgentId];
+  const seed = AGENT_SEED_ACCENTS[agentId as AgentId] ?? COMPOSE_ACCENT_FALLBACK;
   return {
     name: manifest?.name ?? AGENT_DISPLAY_NAMES[agentId as AgentId] ?? agentId,
     glyph: (manifest?.name ?? AGENT_DISPLAY_NAMES[agentId as AgentId] ?? agentId).slice(0, 2).toUpperCase(),
     icon: manifest?.icon ?? AGENT_MODE_MAP[agentId]?.icon ?? 'message-orbit',
-    accent: builtinColor ?? '#33d1ff',
+    accent: normalizeAgentAccent(manifest?.accent, seed),
   };
 }

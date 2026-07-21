@@ -233,6 +233,16 @@ export type {
   LlmProviderProtocol,
   LlmProviderProtocolDescriptor,
   ResolvedTheme,
+  ThemeVariant,
+  ThemePresetId,
+  ThemeChromeConfig,
+  ThemeChromeFonts,
+  ChromeThemesConfig,
+  ReduceMotionPreference,
+  UiPreferences,
+  AppTheme,
+  AppLanguage,
+  FontScale,
 } from './settings';
 export type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
 export type { ToolCallResult, ToolCatalog, ToolRuntimeSummary, ToolTraceEntry } from './tool';

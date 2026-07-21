@@ -21,7 +21,7 @@ export type {
 } from './agentToolTokens';
 export {
   AGENT_CATEGORIES,
-  AGENT_COLORS,
+  AGENT_SEED_ACCENTS,
   AGENT_DESCRIPTIONS,
   AGENT_DISPLAY_NAMES,
   AGENT_MODE_MAP,

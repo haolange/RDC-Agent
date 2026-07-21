@@ -30,10 +30,14 @@ function readCssColor(el: HTMLElement, name: string, fallbackName: string): stri
 
 function readFieldColors(el: HTMLElement): FieldColors {
   return {
-    from: readCssColor(el, '--token-effort-max-from', '--token-effort-fill-5'),
-    mid: readCssColor(el, '--token-effort-max-mid', '--token-effort-fill-4'),
-    to: readCssColor(el, '--token-effort-max-to', '--token-effort-fill-4'),
-    sparkle: readCssColor(el, '--token-effort-max-sparkle', '--token-text-inverse'),
+    from: readCssColor(el, '--composer-effort-max-from', '--token-effort-max-from')
+      || readCssColor(el, '--token-effort-fill-5', '--composer-effort-fill-5'),
+    mid: readCssColor(el, '--composer-effort-max-mid', '--token-effort-max-mid')
+      || readCssColor(el, '--token-effort-fill-4', '--composer-effort-fill-4'),
+    to: readCssColor(el, '--composer-effort-max-to', '--token-effort-max-to')
+      || readCssColor(el, '--token-effort-fill-4', '--composer-effort-fill-4'),
+    sparkle: readCssColor(el, '--composer-effort-max-sparkle', '--token-effort-max-sparkle')
+      || readCssColor(el, '--token-text-inverse', '--composer-effort-max-sparkle'),
   };
 }
 

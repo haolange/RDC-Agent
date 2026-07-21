@@ -50,6 +50,8 @@ function agentDraft(overrides) {
     argumentHint: overrides.argumentHint ?? 'Describe the task for this custom profile',
     target: 'rdc-agent',
     models: overrides.models ?? [],
+    icon: overrides.icon ?? 'spark',
+    accent: overrides.accent ?? '#33d1ff',
     disableModelInvocation: false,
     userInvocable: overrides.userInvocable ?? true,
     tools: overrides.tools ?? ['read'],
@@ -70,7 +72,9 @@ name: ${options.name ?? 'Custom Browser Use Agent'}
 description: ${options.description ?? 'A custom user-invocable profile for regression checks.'}
 argument-hint: Describe the custom browser-use task
 target: rdc-agent
-${modelLine}disable-model-invocation: false
+${modelLine}icon: spark
+accent: "#33d1ff"
+disable-model-invocation: false
 user-invocable: true
 enabled: true
 tools:

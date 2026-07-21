@@ -20,6 +20,8 @@ export interface AgentManifestDefinition {
   target: string;
   models: string[];
   icon: ModeIconKey;
+  /** Compose accent (#RRGGBB). Drives composer shell glow and Effort slider. */
+  accent: string;
   disableModelInvocation: boolean;
   userInvocable: boolean;
   tools: string[];

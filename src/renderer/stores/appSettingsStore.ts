@@ -133,6 +133,27 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   setUsePointerCursors: async (usePointerCursors) => {
     await get().patchSettings({ appearance: { usePointerCursors } });
   },
+  setReduceMotion: async (reduceMotion) => {
+    await get().patchSettings({ appearance: { reduceMotion } });
+  },
+  setChromeTheme: async (variant, chrome) => {
+    const current = get().settings.appearance.chromeThemes;
+    await get().patchSettings({
+      appearance: {
+        chromeThemes: {
+          ...current,
+          [variant]: {
+            ...current[variant],
+            ...chrome,
+            fonts: {
+              ...current[variant].fonts,
+              ...(chrome.fonts ?? {}),
+            },
+          },
+        },
+      },
+    });
+  },
   setContextBreakdownExpanded: async (contextBreakdownExpanded) => {
     await get().patchSettings({ appearance: { contextBreakdownExpanded } });
   },
