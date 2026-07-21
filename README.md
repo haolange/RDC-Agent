@@ -76,7 +76,7 @@ pnpm run check:repository-hygiene
 pnpm run build
 ```
 
-Windows 可直接运行 `scripts/start-rdc-agent.cmd`；macOS/Linux 使用 `sh scripts/start-rdc-agent.sh`。对应的 `*-dev` 与 `start-browser-session*` 包装器都进入同一个跨平台 launcher。追加 `--prepare-only` 可完成条件式依赖同步、Electron 运行时检查和构建；`--force-prepare` 用于强制恢复依赖与构建。非标准 Node 安装可通过绝对路径环境变量 `RDC_AGENT_NODE` 指定。
+Windows 可直接运行 `scripts/start-rdc-agent.cmd`；macOS/Linux 使用 `sh scripts/start-rdc-agent.sh`。二者经 `run-rdc-launcher` 进入同一个 `launch-rdc-agent.mjs`。开发热更、浏览器真实会话等模式用 `pnpm run start:human:dev` / `pnpm run start:agent-browser`（或 `scripts/run-rdc-launcher.* --mode ...`）。追加 `--prepare-only` 可完成条件式依赖同步、Electron 运行时检查和构建；`--force-prepare` 用于强制恢复依赖与构建。非标准 Node 安装可通过绝对路径环境变量 `RDC_AGENT_NODE` 指定。
 
 这些入口只服务于源码开发。`pnpm run pack` / `pnpm run dist` 生成的发布包包含应用运行依赖，但不包含 pnpm、lockfile、源码 launcher 或开发缓存；最终用户直接运行 exe、app、AppImage 或安装包。
 
