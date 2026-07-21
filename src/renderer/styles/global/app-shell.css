@@ -210,6 +210,13 @@
 }
 
 .app-main {
+  /* One outer rail for page shell, Local utilities, and composer — avoids
+     content-rail vs rail-max displacement at the right seam. */
+  --workbench-outer-rail-inset: 18px;
+  --workbench-outer-rail-width: min(
+    var(--workbench-rail-max-width, 100%),
+    calc(100% - (2 * var(--workbench-outer-rail-inset)))
+  );
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -282,7 +289,7 @@ html[data-resolved-theme='light'] .app-main {
   top: var(--workbench-top-utility-offset);
   left: 50%;
   transform: translateX(-50%);
-  width: min(var(--workbench-rail-max-width, 100%), calc(100% - 36px));
+  width: var(--workbench-outer-rail-width);
   z-index: 4;
   display: flex;
   align-items: center;
@@ -293,7 +300,7 @@ html[data-resolved-theme='light'] .app-main {
 
 .main-page-shell {
   flex: 1;
-  width: min(var(--workbench-rail-max-width, 100%), 100%);
+  width: var(--workbench-outer-rail-width);
   margin-inline: auto;
   min-height: 0;
   display: flex;
@@ -383,17 +390,11 @@ html[data-resolved-theme='light'] .app-main {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  width: min(
-    calc(
-      var(--workbench-content-rail-width, 1080px)
-      + var(--workbench-content-rail-gutter)
-      + var(--workbench-content-rail-gutter)
-    ),
-    100%
-  );
+  width: var(--workbench-outer-rail-width);
   margin-inline: auto;
   justify-content: stretch;
-  padding: 10px var(--workbench-content-rail-gutter) 16px;
+  /* Horizontal inset is already baked into --workbench-outer-rail-width. */
+  padding: 10px 0 16px;
   border-top: none;
   background: transparent;
   overflow: visible;
@@ -527,6 +528,18 @@ html[data-resolved-theme='light'] .app-main {
   padding: 2px 2px 0;
 }
 
+/* Plain textarea and Markdown surface share one geometry contract (72–180). */
+.composer-input-row > .composer-textarea,
+.composer-input-row > .composer-markdown-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  height: 72px;
+  min-height: 72px;
+  max-height: 180px;
+  box-sizing: border-box;
+}
+
 .composer-attach-button {
   width: var(--control-height-md);
   min-width: var(--control-height-md);
@@ -562,7 +575,8 @@ html[data-resolved-theme='light'] .app-main {
   padding: 4px 0 6px;
   resize: none;
   line-height: 1.55;
-  font-size: var(--text-md);
+  /* Keep in lockstep with ComposerMarkdownInput; responsive-theme also pins --text-base. */
+  font-size: var(--text-base);
 }
 
 .composer-toolbar-group {

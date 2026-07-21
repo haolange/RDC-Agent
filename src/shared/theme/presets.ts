@@ -33,8 +33,10 @@ export const THEME_PRESET_CATALOG: readonly ThemePresetDefinition[] = [
   {
     id: 'absolutely',
     label: 'Absolutely',
-    light: chrome('absolutely', '#cc7d5e', '#f5f5f7', '#2d2d2e', 45),
-    dark: chrome('absolutely', '#cc7d5e', '#202028', '#f5f5f7', 45),
+    light: chrome('absolutely', '#cc7d5e', '#f5f5f5', '#2a2a2a', 45),
+    // Dark: Anthropic mid charcoal on shell (bg-1 ≈ #282826). Do not chase bg-0 by
+    // inflating surface — that washes sidebars/composer into light gray.
+    dark: chrome('absolutely', '#cc7d5e', '#282826', '#e8e8e6', 45),
   },
   {
     id: 'ayu',

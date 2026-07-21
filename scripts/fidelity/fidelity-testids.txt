@@ -27,6 +27,9 @@ composer-effort-slider
 composer-footer-bar
 composer-markdown-input
 composer-markdown-preview
+composer-markdown-toolbar
+composer-markdown-tab-write
+composer-markdown-tab-preview
 composer-mode-pill
 composer-permission-pill
 composer-tool-approval-panel

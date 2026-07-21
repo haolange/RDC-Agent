@@ -2,8 +2,9 @@
   --chat-top-hard-stop-height: var(--workbench-chat-top-hard-stop-height, 92px);
   --chat-top-transition-height: var(--workbench-chat-top-transition-height, 72px);
   --chat-top-safe-zone: calc(var(--chat-top-hard-stop-height) + var(--chat-top-transition-height));
-  --chat-inline-padding: var(--workbench-content-rail-gutter, 16px);
-  --chat-transcript-width: var(--workbench-content-rail-width, 1080px);
+  /* Match composer: page-shell already applies the outer rail inset. */
+  --chat-inline-padding: 0px;
+  --chat-transcript-width: 100%;
   display: flex;
   flex-direction: column;
   flex: 1;

@@ -42,10 +42,11 @@ export function deriveComposeAccentVars(
   const hsl = rgbToHsl(base);
   const isLight = resolvedTheme === 'light';
 
+  // Ordinary tiers (exclude Max): low = lighter/softer, high = deeper/stronger.
   const fill = (level: number) => {
     const l = isLight
       ? 86 - level * 8
-      : 42 + level * 7;
+      : 72 - level * 7;
     const s = Math.min(100, hsl.s * (0.85 + level * 0.04));
     return `hsl(${Math.round(hsl.h)} ${Math.round(s)}% ${Math.round(l)}%)`;
   };
