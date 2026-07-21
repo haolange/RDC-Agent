@@ -148,7 +148,7 @@
 - scoped resource、project instruction、prompt snapshot、skill、hook 或 memory policy 改动后，必须执行相应专项 contract check；缺少时应在同一改动中补齐。
 - 入口、构建或窗口逻辑改动后，再补 `pnpm run build` 或等价打包检查。
 - 发布配置改动后执行 `pnpm run pack`，并确认 unpacked 产物不包含开发期包管理器、lockfile、launcher 和缓存状态。
-- 浏览器真实会话使用 `pnpm run start:agent-browser`；Windows 也可用 `scripts/start-browser-session.cmd`，macOS/Linux 使用对应 `.sh`，然后用 Codex 内置浏览器打开主进程输出的 `/app`。
+- 浏览器真实会话使用 `pnpm run start:agent-browser`（或 `scripts/run-rdc-launcher.* --mode browser`），然后用 Codex 内置浏览器打开主进程输出的 `/app`。
 - 人类开发入口使用 `pnpm run start:human:dev`，源码构建入口使用 `pnpm run start:human`；平台包装器只转发到共享 launcher，依赖与 build 由指纹条件式准备，发布模式直接双击 exe / app 包。
 - Provider 体系契约验证使用 `pnpm run check:provider-system`。
 - Provider Catalog strict manifest 与编译语义验证使用 `pnpm run check:provider-catalog`。
