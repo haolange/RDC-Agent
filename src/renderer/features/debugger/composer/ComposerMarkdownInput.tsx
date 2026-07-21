@@ -1,39 +1,56 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useLayoutEffect, useMemo, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown } from '@codemirror/lang-markdown';
 import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { Prec, type Extension } from '@codemirror/state';
 import { indentWithTab } from '@codemirror/commands';
-import { useI18n } from '../../../i18n';
 import { MessageMarkdown } from '../AgentChat/MessageMarkdown';
 import './ComposerMarkdownInput.css';
 
 export type ComposerMarkdownMode = 'write' | 'preview';
+
+const PROMPT_MIN_HEIGHT = 72;
+const PROMPT_MAX_HEIGHT = 180;
+const PROMPT_VERTICAL_PAD = 10; /* 4px top + 6px bottom, matches .composer-textarea */
 
 interface ComposerMarkdownInputProps {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
   placeholder: string;
+  mode: ComposerMarkdownMode;
   disabled?: boolean;
 }
 
 const composerEditorTheme = EditorView.theme({
   '&': {
+    width: '100%',
+    height: '100%',
     backgroundColor: 'transparent',
     color: 'var(--token-text-body)',
-    fontSize: 'var(--text-base)',
+    /* Inherit host (= .composer-textarea → --text-base); never --text-md. */
+    fontSize: 'inherit',
+    lineHeight: 'inherit',
   },
   '.cm-content': {
     fontFamily: 'var(--font-sans)',
     caretColor: 'var(--token-accent-primary)',
     padding: '0',
-    minHeight: '24px',
+    width: '100%',
+    fontSize: 'inherit',
+    lineHeight: 'inherit',
+    boxSizing: 'border-box',
+  },
+  '.cm-line': {
+    padding: '0',
   },
   '.cm-scroller': {
     fontFamily: 'inherit',
-    lineHeight: '1.55',
+    fontSize: 'inherit',
+    lineHeight: 'inherit',
     overflow: 'auto',
+    width: '100%',
+    height: '100%',
   },
   '.cm-gutters': {
     display: 'none',
@@ -53,6 +70,8 @@ const composerEditorTheme = EditorView.theme({
   '.cm-placeholder': {
     color: 'var(--token-text-caption)',
     fontStyle: 'normal',
+    fontSize: 'inherit',
+    lineHeight: 'inherit',
   },
   '.tok-header': { color: 'var(--token-text-heading)', fontWeight: 'var(--font-semibold)' },
   '.tok-strong': { color: 'var(--token-text-heading)', fontWeight: 'var(--font-semibold)' },
@@ -75,16 +94,35 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
   onChange,
   onSend,
   placeholder,
+  mode,
   disabled = false,
 }) => {
-  const { t } = useI18n();
-  const [mode, setMode] = useState<ComposerMarkdownMode>('write');
+  const hostRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (disabled && mode === 'preview') {
-      setMode('write');
+  const syncHostHeight = () => {
+    const host = hostRef.current;
+    if (!host) {
+      return;
     }
-  }, [disabled, mode]);
+    // Mirror useComposer: collapse first so scrollHeight is content-driven, not
+    // floored by a previously expanded clientHeight.
+    host.style.height = `${PROMPT_MIN_HEIGHT}px`;
+    const contentEl =
+      mode === 'preview'
+        ? (host.querySelector('.composer-markdown-preview') as HTMLElement | null)
+        : (host.querySelector('.cm-content') as HTMLElement | null);
+    const contentHeight = contentEl?.scrollHeight ?? PROMPT_MIN_HEIGHT - PROMPT_VERTICAL_PAD;
+    const next = Math.min(
+      Math.max(contentHeight + PROMPT_VERTICAL_PAD, PROMPT_MIN_HEIGHT),
+      PROMPT_MAX_HEIGHT,
+    );
+    host.style.height = `${next}px`;
+  };
+
+  // Same growth contract as useComposer textarea resize (72–180).
+  useLayoutEffect(() => {
+    syncHostHeight();
+  }, [value, mode]);
 
   const extensions = useMemo((): Extension[] => [
       markdown(),
@@ -104,38 +142,51 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
         ]),
       ),
       EditorView.editable.of(!disabled),
-    ], [disabled, onSend, placeholder]);
+      EditorView.updateListener.of((update) => {
+        if (!update.docChanged && !update.viewportChanged) {
+          return;
+        }
+        if (mode !== 'write') {
+          return;
+        }
+        syncHostHeight();
+      }),
+    ], [disabled, mode, onSend, placeholder]);
 
   return (
-    <div className="composer-markdown-input" data-testid="composer-markdown-input" data-mode={mode}>
-      <div className="composer-markdown-toolbar" role="tablist" aria-label={t('settings.composerMarkdown')}>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'write'}
-          className={`button button-ghost composer-markdown-tab ${mode === 'write' ? 'is-active' : ''}`}
-          onClick={() => setMode('write')}
-          disabled={disabled}
-        >
-          {t('composer.markdownWrite')}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === 'preview'}
-          className={`button button-ghost composer-markdown-tab ${mode === 'preview' ? 'is-active' : ''}`}
-          onClick={() => setMode('preview')}
-          disabled={disabled}
-        >
-          {t('composer.markdownPreview')}
-        </button>
-      </div>
-
-      {mode === 'preview' ? (
+    <div
+      ref={hostRef}
+      className="composer-markdown-input"
+      data-testid="composer-markdown-input"
+      data-mode={mode}
+    >
+      <div className="composer-markdown-stage">
         <div
-          className="composer-markdown-preview scrollbar-thin"
+          className={`composer-markdown-pane composer-markdown-editor-pane ${mode === 'write' ? 'is-active' : 'is-inactive'}`}
+          aria-hidden={mode !== 'write'}
+        >
+          <CodeMirror
+            className="composer-markdown-editor"
+            value={value}
+            height="100%"
+            basicSetup={{
+              lineNumbers: false,
+              foldGutter: false,
+              highlightActiveLine: false,
+              highlightActiveLineGutter: false,
+              bracketMatching: true,
+            }}
+            extensions={extensions}
+            onChange={onChange}
+            editable={!disabled && mode === 'write'}
+            aria-label={placeholder}
+          />
+        </div>
+        <div
+          className={`composer-markdown-pane composer-markdown-preview scrollbar-thin ${mode === 'preview' ? 'is-active' : 'is-inactive'}`}
           data-testid="composer-markdown-preview"
-          aria-label={t('composer.markdownPreview')}
+          aria-label={placeholder}
+          aria-hidden={mode !== 'preview'}
         >
           {value.trim() ? (
             <MessageMarkdown content={value} />
@@ -143,25 +194,7 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
             <p className="composer-markdown-preview-empty">{placeholder}</p>
           )}
         </div>
-      ) : (
-        <CodeMirror
-          className="composer-markdown-editor"
-          value={value}
-          height="auto"
-          maxHeight="180px"
-          basicSetup={{
-            lineNumbers: false,
-            foldGutter: false,
-            highlightActiveLine: false,
-            highlightActiveLineGutter: false,
-            bracketMatching: true,
-          }}
-          extensions={extensions}
-          onChange={onChange}
-          editable={!disabled}
-          aria-label={placeholder}
-        />
-      )}
+      </div>
     </div>
   );
 };

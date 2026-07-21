@@ -181,6 +181,97 @@ function resolveElectronExecutable() {
   }
 }
 
+function resolveElectronPackageRoot() {
+  const require = createRequire(path.join(repoRoot, 'package.json'));
+  try {
+    return path.dirname(require.resolve('electron/package.json'));
+  } catch {
+    return null;
+  }
+}
+
+function electronPlatformExecutableRelativePath() {
+  switch (process.platform) {
+    case 'darwin':
+      return path.join('Electron.app', 'Contents', 'MacOS', 'Electron');
+    case 'win32':
+      return 'electron.exe';
+    case 'linux':
+      return 'electron';
+    default:
+      fail(`Electron builds are not available on platform: ${process.platform}.`);
+  }
+}
+
+async function installElectronBinaryWithSystemTar() {
+  const electronRoot = resolveElectronPackageRoot();
+  if (!electronRoot) {
+    fail('The electron package is missing from node_modules; cannot recover the platform binary.');
+  }
+
+  const electronRequire = createRequire(path.join(electronRoot, 'package.json'));
+  let downloadArtifact;
+  let version;
+  let checksums;
+  try {
+    ({ downloadArtifact } = electronRequire('@electron/get'));
+    ({ version } = electronRequire('./package.json'));
+    checksums = electronRequire('./checksums.json');
+  } catch (error) {
+    fail(`Electron recovery deps are unavailable (${error instanceof Error ? error.message : String(error)}).`);
+  }
+
+  const zipPath = await downloadArtifact({
+    version,
+    artifactName: 'electron',
+    platform: process.platform,
+    arch: process.arch,
+    checksums,
+  });
+  if (!zipPath || !existsSync(zipPath)) {
+    fail(`Electron download did not produce a zip artifact (version ${version}).`);
+  }
+
+  const distPath = path.join(electronRoot, 'dist');
+  const platformPath = electronPlatformExecutableRelativePath();
+  rmSync(distPath, { recursive: true, force: true });
+  mkdirSync(distPath, { recursive: true });
+
+  const tarResult = runSync('tar', ['-xf', zipPath, '-C', distPath], { capture: true });
+  if (tarResult.status !== 0) {
+    fail(`System tar failed to extract Electron ${version} from ${zipPath}.${tarResult.output ? `\n${tarResult.output}` : ''}`);
+  }
+
+  writeFileSync(path.join(electronRoot, 'path.txt'), platformPath, 'utf8');
+  const executablePath = path.join(distPath, platformPath);
+  if (!existsSync(executablePath)) {
+    fail(`Electron extraction completed without ${platformPath} under ${distPath}.`);
+  }
+  return executablePath;
+}
+
+async function ensureElectronRuntime(pnpm, { force = false } = {}) {
+  let electronExecutable = force ? null : resolveElectronExecutable();
+  if (electronExecutable) return electronExecutable;
+
+  console.log('[RDC-Agent] Rebuilding the Electron platform runtime...');
+  runPnpm(pnpm, ['rebuild', 'electron']);
+  electronExecutable = resolveElectronExecutable();
+  if (electronExecutable) return electronExecutable;
+
+  // Node >=24.16 can leave electron's extract-zip install hung/exited-0 without path.txt.
+  console.log('[RDC-Agent] Electron binary still missing after rebuild; recovering with download + system tar...');
+  await installElectronBinaryWithSystemTar();
+  electronExecutable = resolveElectronExecutable();
+  if (!electronExecutable) {
+    fail(
+      `Electron runtime is unavailable after rebuild and tar recovery (Node: ${process.execPath}, pnpm: ${pnpm.label}). `
+      + 'If Node is >=24.16.0, confirm package.json overrides pin yauzl@3.3.1 and re-run with --force-prepare.',
+    );
+  }
+  return electronExecutable;
+}
+
 function readJson(filePath) {
   try {
     return JSON.parse(readFileSync(filePath, 'utf8'));
@@ -254,7 +345,7 @@ function criticalDependencyPaths() {
   ];
 }
 
-function ensureDependencies(pnpm, storePath, forcePrepare) {
+async function ensureDependencies(pnpm, storePath, forcePrepare) {
   const fingerprint = dependencyFingerprint(storePath);
   const state = readJson(dependencyStatePath);
   const installedStore = modulesStorePath();
@@ -281,12 +372,7 @@ function ensureDependencies(pnpm, storePath, forcePrepare) {
 
   let electronExecutable = resolveElectronExecutable();
   if (forcePrepare || !electronExecutable) {
-    console.log('[RDC-Agent] Rebuilding the Electron platform runtime...');
-    runPnpm(pnpm, ['rebuild', 'electron']);
-    electronExecutable = resolveElectronExecutable();
-  }
-  if (!electronExecutable) {
-    fail(`Electron runtime is unavailable after pnpm rebuild (Node: ${process.execPath}, pnpm: ${pnpm.label}, store: ${storePath}, lockfile: ${path.join(repoRoot, 'pnpm-lock.yaml')}).`);
+    electronExecutable = await ensureElectronRuntime(pnpm, { force: forcePrepare });
   }
 
   const resultingStore = modulesStorePath();
@@ -416,7 +502,7 @@ async function main() {
 
   const pnpm = resolvePnpm();
   const storePath = resolvePnpmStore(pnpm);
-  const dependencyState = ensureDependencies(pnpm, storePath, forcePrepare);
+  const dependencyState = await ensureDependencies(pnpm, storePath, forcePrepare);
   const effectiveMode = mode === 'prepare-only' ? 'desktop' : mode;
   const env = modeEnvironment(effectiveMode, rebuildSettingsOnly);
   const mainEntry = path.join(repoRoot, 'out', 'main', 'index.js');

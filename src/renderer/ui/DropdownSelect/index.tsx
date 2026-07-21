@@ -31,6 +31,7 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
   dataTestId,
   ariaLabel,
   variant = 'field',
+  menuAlign = 'start',
   minMenuWidth = DEFAULT_MIN_MENU_WIDTH,
   className = '',
   triggerClassName = '',
@@ -45,6 +46,8 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
     left: VIEWPORT_MARGIN,
     top: VIEWPORT_MARGIN,
     width: minMenuWidth,
+    caretX: 20,
+    placement: 'bottom' as 'bottom' | 'top',
     ready: false,
   });
 
@@ -72,6 +75,8 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
         left: VIEWPORT_MARGIN,
         top: VIEWPORT_MARGIN,
         width: minMenuWidth,
+        caretX: 20,
+        placement: 'bottom',
         ready: true,
       });
       return;
@@ -88,15 +93,25 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
     const maxTop = viewportHeight - menuHeight - VIEWPORT_MARGIN;
     const preferredTop = triggerRect.bottom + ANCHOR_GAP;
     const fallbackTop = triggerRect.top - menuHeight - ANCHOR_GAP;
-    const topCandidate = preferredTop <= maxTop ? preferredTop : fallbackTop;
+    const opensBelow = preferredTop <= maxTop;
+    const topCandidate = opensBelow ? preferredTop : fallbackTop;
+    const preferredLeft = menuAlign === 'end'
+      ? triggerRect.right - width
+      : triggerRect.left;
+    const left = clamp(preferredLeft, VIEWPORT_MARGIN, maxLeft);
+    const tipAnchorX = menuAlign === 'end'
+      ? triggerRect.right - 16
+      : triggerRect.left + Math.min(20, triggerRect.width / 2);
 
     setMenuPosition({
-      left: clamp(triggerRect.left, VIEWPORT_MARGIN, maxLeft),
+      left,
       top: clamp(topCandidate, VIEWPORT_MARGIN, maxTop),
       width,
+      caretX: clamp(tipAnchorX - left, 14, width - 14),
+      placement: opensBelow ? 'bottom' : 'top',
       ready: true,
     });
-  }, [minMenuWidth]);
+  }, [menuAlign, minMenuWidth]);
 
   const closeMenu = useCallback(() => {
     setOpen(false);
@@ -234,6 +249,7 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
 
   const triggerLabel = selectedOption?.label ?? placeholder;
   const triggerAriaLabel = ariaLabel ?? triggerLabel;
+  const triggerSwatchColor = selectedOption?.swatchColor;
 
   return (
     <div className={rootClassName}>
@@ -245,6 +261,7 @@ export const DropdownSelect: React.FC<DropdownSelectProps> = ({
         dataTestId={dataTestId}
         triggerAriaLabel={triggerAriaLabel}
         triggerLabel={triggerLabel}
+        swatchColor={triggerSwatchColor}
         hasSelection={Boolean(selectedOption)}
         triggerClassName={triggerClassName}
         onClick={() => setOpen((current) => !current)}

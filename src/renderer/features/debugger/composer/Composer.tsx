@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ModeGlyph } from '../../../ui/ModeGlyph';
 import { ContextUsageIndicator } from '../../../patterns/ContextUsageIndicator';
 import type { AgentMode } from '@shared/types/layout';
@@ -18,7 +18,8 @@ import { ToolApprovalRequestPanel, usePendingToolApprovalRequest } from './ToolA
 import { UserInputRequestPanel, usePendingUserInputRequest } from './UserInputRequestPanel';
 import { SlashCommandPopover } from './SlashCommandPopover';
 import { useSlashCommand } from './useSlashCommand';
-import { ComposerMarkdownInput } from './ComposerMarkdownInput';
+import { ComposerMarkdownInput, type ComposerMarkdownMode } from './ComposerMarkdownInput';
+import { ComposerMarkdownModeTabs } from './ComposerMarkdownModeTabs';
 
 export interface ComposerProps {
   composer: ComposerController;
@@ -35,6 +36,7 @@ export const Composer: React.FC<ComposerProps> = ({
 }) => {
   const { t } = useI18n();
   const composerMarkdown = useAppSettingsStore((state) => state.settings.appearance.composerMarkdown);
+  const [markdownMode, setMarkdownMode] = useState<ComposerMarkdownMode>('write');
   const appearanceTheme = useAppSettingsStore((state) => state.settings.appearance.theme);
   const systemTheme = useAppSettingsStore((state) => state.systemTheme);
   const resolvedTheme: ResolvedTheme = appearanceTheme === 'system' ? systemTheme : appearanceTheme;
@@ -95,6 +97,12 @@ export const Composer: React.FC<ComposerProps> = ({
     [currentModeConfig.accentColor, resolvedTheme],
   );
 
+  useEffect(() => {
+    if (!composerMarkdown || isComposerBusy) {
+      setMarkdownMode('write');
+    }
+  }, [composerMarkdown, isComposerBusy]);
+
   if (pendingToolApproval) {
     return (
       <div
@@ -119,9 +127,16 @@ export const Composer: React.FC<ComposerProps> = ({
 
   return (
     <div
-      className={`composer-shell ${isComposerBusy ? 'is-running' : ''}`}
+      className={`composer-shell ${isComposerBusy ? 'is-running' : ''}${composerMarkdown ? ' has-markdown-mode' : ''}`}
       style={composeAccentStyle}
     >
+      {composerMarkdown ? (
+        <ComposerMarkdownModeTabs
+          mode={markdownMode}
+          onModeChange={setMarkdownMode}
+          disabled={isComposerBusy}
+        />
+      ) : null}
       {(pendingAttachments.length > 0 || pendingSkillIds.length > 0) && (
         <div className="composer-attachments" data-testid="composer-attachments">
           {pendingSkillIds.map((skillId) => (
@@ -169,6 +184,7 @@ export const Composer: React.FC<ComposerProps> = ({
             onChange={setPromptValue}
             onSend={() => void handlePromptSend()}
             placeholder={promptPlaceholder}
+            mode={markdownMode}
             disabled={isComposerBusy}
           />
         ) : (

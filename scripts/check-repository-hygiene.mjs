@@ -110,6 +110,9 @@ for (const required of ['pnpm-lock.yaml', 'pnpm-workspace.yaml']) {
 const workspaceConfig = read('pnpm-workspace.yaml');
 if (!/^storeDir: ~\/.cache\/rdc-agent\/pnpm-store$/m.test(workspaceConfig)) fail('pnpm-workspace.yaml must enforce the per-user pnpm store.');
 if (!/^preferOffline: true$/m.test(workspaceConfig)) fail('pnpm-workspace.yaml must prefer the local pnpm store.');
+if (!/^ {2}yauzl: 3\.3\.1$/m.test(workspaceConfig)) {
+  fail('pnpm-workspace.yaml must override yauzl to 3.3.1 so Electron install works on Node >=24.16.');
+}
 
 const packageJson = JSON.parse(read('package.json'));
 if (packageJson.packageManager !== 'pnpm@11.7.0') fail('packageManager must be pnpm@11.7.0.');

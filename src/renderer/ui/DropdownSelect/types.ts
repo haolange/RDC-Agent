@@ -3,6 +3,8 @@ export interface DropdownOption {
   label: string;
   disabled?: boolean;
   testId?: string;
+  /** When set, renders a leading Aa swatch in the option (and on the trigger when selected). */
+  swatchColor?: string;
 }
 
 export interface DropdownSelectProps {
@@ -15,6 +17,8 @@ export interface DropdownSelectProps {
   dataTestId: string;
   ariaLabel?: string;
   variant?: 'field' | 'inline';
+  /** Menu edge aligned to the trigger: `start` = left, `end` = right (extends left when wider). */
+  menuAlign?: 'start' | 'end';
   minMenuWidth?: number;
   className?: string;
   triggerClassName?: string;

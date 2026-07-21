@@ -108,8 +108,8 @@
 
   .main-input-bar {
     --workbench-content-rail-gutter: 14px;
-    width: 100%;
-    padding: 10px var(--workbench-content-rail-gutter) 14px;
+    width: var(--workbench-outer-rail-width, 100%);
+    padding: 10px 0 14px;
   }
 
   .composer-shell {
@@ -153,6 +153,10 @@
 
   .composer-textarea {
     min-height: 52px;
+    font-size: var(--text-base);
+  }
+
+  .composer-markdown-input {
     font-size: var(--text-base);
   }
 
@@ -277,7 +281,8 @@ body {
 }
 
 .main-input-bar {
-  padding: 10px var(--workbench-content-rail-gutter, 16px) 14px;
+  /* Keep shared outer-rail width; do not re-introduce horizontal gutter inset. */
+  padding: 10px 0 14px;
 }
 
 .composer-shell {
@@ -301,6 +306,10 @@ body {
 
 .composer-textarea {
   min-height: 58px;
+  font-size: var(--text-base);
+}
+
+.composer-markdown-input {
   font-size: var(--text-base);
 }
 

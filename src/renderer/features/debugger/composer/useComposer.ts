@@ -160,8 +160,11 @@ export function useComposer(options: {
     const textarea = promptInputRef.current;
     if (!textarea) return;
 
+    // Keep parity with .composer-textarea min-height (72) so enabling Composer
+    // Markdown (overlay capsule) never looks like a shell resize.
     textarea.style.height = '0px';
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
+    const next = Math.min(Math.max(textarea.scrollHeight, 72), 180);
+    textarea.style.height = `${next}px`;
   }, [currentMode, promptValue]);
 
   return {

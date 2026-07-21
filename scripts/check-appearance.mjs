@@ -70,6 +70,16 @@ const composeLight = deriveComposeAccentVars('#33d1ff', 'light');
 assert(composeDark['--composer-mode-accent'] === '#33d1ff', 'compose accent preserved');
 assert(composeDark['--composer-effort-fill-3'], 'compose effort fills derived');
 assert(composeLight['--composer-effort-max-track'], 'light compose max track derived');
+const effortFillLightness = (value) => {
+  const match = String(value).match(/hsl\(\s*[\d.]+\s+[\d.]+%\s+([\d.]+)%\s*\)/i);
+  return match ? Number(match[1]) : NaN;
+};
+const darkFill1L = effortFillLightness(composeDark['--composer-effort-fill-1']);
+const darkFill5L = effortFillLightness(composeDark['--composer-effort-fill-5']);
+const lightFill1L = effortFillLightness(composeLight['--composer-effort-fill-1']);
+const lightFill5L = effortFillLightness(composeLight['--composer-effort-fill-5']);
+assert(darkFill1L > darkFill5L, 'dark ordinary effort fills deepen with level (exclude Max): low light → high deep');
+assert(lightFill1L > lightFill5L, 'light ordinary effort fills deepen with level (exclude Max): low light → high deep');
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 assert(!fs.existsSync(path.join(repoRoot, 'src/renderer/styles/themes/oklch-themes.css')), 'legacy oklch-themes.css must be removed');
@@ -89,5 +99,42 @@ assert(agentsMd.includes('禁止恢复 translucent'), 'AGENTS.md must forbid tra
 const designMd = fs.readFileSync(path.join(repoRoot, 'DESIGN.md'), 'utf8');
 assert(designMd.includes('rdx-theme-v1'), 'DESIGN.md must document rdx-theme-v1');
 assert(designMd.includes('chromeThemes'), 'DESIGN.md must document chromeThemes');
+assert(designMd.includes('unified'), 'DESIGN.md must document unified preset trigger');
+
+const appearanceSource = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AppearanceSettings.tsx'),
+  'utf8',
+);
+assert(!appearanceSource.includes('appearance-preset-swatch'), 'Appearance must not keep a side-mounted preset Aa sibling');
+assert(appearanceSource.includes('swatchColor'), 'Appearance preset options must supply swatchColor');
+assert(appearanceSource.includes('minMenuWidth={280}'), 'Appearance preset menu must set a wide minMenuWidth');
+assert(appearanceSource.includes('menuAlign="end"'), 'Appearance preset menu must right-align to the trigger');
+
+const dropdownTypes = fs.readFileSync(path.join(repoRoot, 'src/renderer/ui/DropdownSelect/types.ts'), 'utf8');
+assert(dropdownTypes.includes('swatchColor'), 'DropdownOption must support swatchColor');
+assert(dropdownTypes.includes('menuAlign'), 'DropdownSelect must support menuAlign');
+
+const dropdownCss = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/ui/DropdownSelect/DropdownSelect.css'),
+  'utf8',
+);
+const dropdownPrimitives = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/ui/DropdownSelect/DropdownSelectPrimitives.tsx'),
+  'utf8',
+);
+assert(
+  /\.dropdown-select-menu\s*\{[^}]*backdrop-filter:\s*blur\(/s.test(dropdownCss),
+  'DropdownSelect menu must use frosted-glass blur by default',
+);
+assert(
+  dropdownCss.includes('dropdown-select-menu-caret'),
+  'DropdownSelect menu must include a caret tip bridging the trigger',
+);
+assert(
+  dropdownPrimitives.includes('dropdown-select-menu-caret'),
+  'DropdownSelect menu markup must render the caret tip',
+);
+assert(dropdownPrimitives.includes('dropdown-select-option-check-icon'), 'DropdownSelect selected state must use a checkmark icon');
+assert(!dropdownPrimitives.includes('●'), 'DropdownSelect must not use a bullet as the selected marker');
 
 console.log('check:appearance passed');

@@ -139,9 +139,12 @@ composer-effort-toggle-status
 composer-footer-bar
 composer-input-row
 composer-markdown-editor
+composer-markdown-editor-pane
 composer-markdown-input
+composer-markdown-pane
 composer-markdown-preview
 composer-markdown-preview-empty
+composer-markdown-stage
 composer-markdown-tab
 composer-markdown-toolbar
 composer-permission-menu

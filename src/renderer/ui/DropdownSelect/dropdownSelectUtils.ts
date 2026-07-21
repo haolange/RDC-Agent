@@ -1,8 +1,10 @@
 import type { DropdownOption } from './types';
 
 export const VIEWPORT_MARGIN = 16;
-export const ANCHOR_GAP = 8;
-export const DEFAULT_MIN_MENU_WIDTH = 180;
+/** Gap between trigger and menu; filled by the caret tip for a tight junction. */
+export const ANCHOR_GAP = 6;
+export const MENU_CARET_SIZE = 7;
+export const DEFAULT_MIN_MENU_WIDTH = 240;
 
 export const clamp = (value: number, min: number, max: number): number => {
   if (max < min) {

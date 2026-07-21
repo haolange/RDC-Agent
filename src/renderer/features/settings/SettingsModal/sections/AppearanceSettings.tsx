@@ -179,9 +179,13 @@ function ChromeThemeCard(props: {
     () => THEME_PRESET_CATALOG.map((preset) => ({
       value: preset.id,
       label: preset.label,
+      // Selected row + trigger follow live chrome accent; other rows keep catalog accents.
+      swatchColor: preset.id === props.chrome.presetId
+        ? props.chrome.accent
+        : preset[props.variant].accent,
       testId: `appearance-preset-option-${props.variant}-${preset.id}`,
     })),
-    [props.variant],
+    [props.chrome.accent, props.chrome.presetId, props.variant],
   );
 
   const handlePreset = (presetId: ThemePresetId) => {
@@ -233,13 +237,6 @@ function ChromeThemeCard(props: {
                 : props.t('settings.appearanceCopyTheme')}
           </button>
           <div className="appearance-preset-picker">
-            <span
-              className="appearance-preset-swatch"
-              style={{ background: props.chrome.accent }}
-              aria-hidden="true"
-            >
-              Aa
-            </span>
             <DropdownSelect
               value={props.chrome.presetId}
               options={presetOptions}
@@ -247,6 +244,8 @@ function ChromeThemeCard(props: {
               dataTestId={`appearance-preset-${props.variant}`}
               ariaLabel={props.t('settings.appearancePreset')}
               variant="inline"
+              menuAlign="end"
+              minMenuWidth={280}
               className="appearance-preset-dropdown"
               triggerClassName="appearance-preset-trigger"
               menuClassName="settings-select-menu appearance-preset-menu"

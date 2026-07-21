@@ -1,6 +1,10 @@
 storeDir: ~/.cache/rdc-agent/pnpm-store
 preferOffline: true
 
+# electron@42 install.js -> extract-zip -> yauzl@2 hangs on Node >=24.16; pin the upstream fix.
+overrides:
+  yauzl: 3.3.1
+
 allowBuilds:
   '@swc/core': true
   electron-winstaller: true
