@@ -3,6 +3,7 @@ import { diagnoseManifestToolTokens } from '@shared/constants/agentToolTokens';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { ColorField } from '../../../../ui/ColorField';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { AutosizeTextarea } from '../AutosizeTextarea';
 import { AgentCapabilityPicker, type AgentCapabilityGroup } from './AgentCapabilityPicker';
@@ -115,7 +116,13 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
     <div className="settings-manifest-editor" data-testid="settings-agent-manifest-editor">
       <div className="settings-manifest-editor-head">
         <div className="settings-agent-editor-title">
-          <span className="settings-agent-editor-icon" aria-hidden="true">
+          <span
+            className="settings-agent-editor-icon"
+            aria-hidden="true"
+            style={{
+              '--settings-agent-accent': selectedAgent.accent || '#33d1ff',
+            } as React.CSSProperties}
+          >
             <ModeGlyph mode={selectedAgent.id} icon={selectedAgent.icon ?? 'message-orbit'} size={20} strokeWidth={1.9} />
           </span>
           <div className="settings-agent-editor-copy">
@@ -123,35 +130,6 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           </div>
         </div>
         <div className="settings-manifest-editor-actions">
-          <AgentIconPresetPicker
-            value={selectedAgent.icon ?? 'message-orbit'}
-            onChange={(icon) => onUpdateAgent({ icon })}
-            t={t}
-          />
-          <label className="settings-agent-accent-field" title={t('settings.agentAccentHelp')}>
-            <span className="settings-field-label">{t('settings.agentAccent')}</span>
-            <input
-              type="color"
-              data-testid="settings-agent-accent"
-              value={/^#[0-9a-fA-F]{6}$/.test(selectedAgent.accent) ? selectedAgent.accent : '#33d1ff'}
-              onChange={(event) => onUpdateAgent({ accent: event.target.value.toLowerCase() })}
-              aria-label={t('settings.agentAccent')}
-            />
-            <input
-              type="text"
-              className="settings-agent-accent-hex"
-              value={selectedAgent.accent ?? ''}
-              spellCheck={false}
-              onChange={(event) => {
-                const next = event.target.value.trim();
-                if (/^#[0-9a-fA-F]{6}$/.test(next)) onUpdateAgent({ accent: next.toLowerCase() });
-              }}
-              onBlur={(event) => {
-                const next = event.target.value.trim();
-                if (/^#[0-9a-fA-F]{6}$/.test(next)) onUpdateAgent({ accent: next.toLowerCase() });
-              }}
-            />
-          </label>
           <button type="button" className="button button-ghost" onClick={onDuplicateAgent}>
             {t('settings.duplicateAgent')}
           </button>
@@ -169,6 +147,31 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
             </div>
           </div>
           <div className="settings-manifest-form-grid">
+            <div
+              className="settings-agent-look-strip"
+              data-testid="settings-agent-look"
+              style={{
+                '--settings-agent-accent': selectedAgent.accent || '#33d1ff',
+              } as React.CSSProperties}
+            >
+              <div className="settings-agent-look-field">
+                <span className="settings-field-label settings-agent-look-label">{t('settings.agentIcon')}</span>
+                <AgentIconPresetPicker
+                  value={selectedAgent.icon ?? 'message-orbit'}
+                  onChange={(icon) => onUpdateAgent({ icon })}
+                  t={t}
+                />
+              </div>
+              <ColorField
+                className="settings-agent-accent-color"
+                layout="inline"
+                label={t('settings.agentAccent')}
+                value={selectedAgent.accent ?? '#33d1ff'}
+                testId="settings-agent-accent"
+                onChange={(accent) => onUpdateAgent({ accent })}
+              />
+              <p className="settings-agent-look-hint">{t('settings.agentAccentHelp')}</p>
+            </div>
             <div className="settings-input-row settings-model-route-row">
               <span className="settings-field-label">{t('settings.modelFieldLabel')}</span>
               <AgentModelCascadeSelect

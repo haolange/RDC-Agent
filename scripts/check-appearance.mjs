@@ -113,6 +113,25 @@ assert(!appearanceSource.includes('appearance-preset-swatch'), 'Appearance must 
 assert(appearanceSource.includes('swatchColor'), 'Appearance preset options must supply swatchColor');
 assert(appearanceSource.includes('minMenuWidth={280}'), 'Appearance preset menu must set a wide minMenuWidth');
 assert(appearanceSource.includes('menuAlign="end"'), 'Appearance preset menu must right-align to the trigger');
+assert(appearanceSource.includes("from '../../../../ui/ColorField'"), 'Appearance must use shared ColorField');
+assert(!appearanceSource.includes('function ColorField'), 'Appearance must not inline a private ColorField');
+assert(fs.existsSync(path.join(repoRoot, 'src/renderer/ui/ColorField.tsx')), 'shared ColorField component must exist');
+assert(fs.existsSync(path.join(repoRoot, 'src/renderer/ui/ColorField.css')), 'shared ColorField styles must exist');
+const colorFieldSource = fs.readFileSync(path.join(repoRoot, 'src/renderer/ui/ColorField.tsx'), 'utf8');
+const colorFieldCss = fs.readFileSync(path.join(repoRoot, 'src/renderer/ui/ColorField.css'), 'utf8');
+assert(colorFieldSource.includes("layout?: 'grid' | 'inline'"), 'ColorField must support grid and inline layouts');
+assert(colorFieldCss.includes('.color-field-swatch'), 'ColorField must expose a round swatch');
+assert(colorFieldCss.includes('.color-field-native'), 'ColorField must hide the native color input');
+assert(colorFieldCss.includes('.color-field--inline'), 'ColorField must define inline layout for Agents look strip');
+assert(!colorFieldCss.includes('--color-bg-'), 'ColorField CSS must use semantic tokens, not primitive --color-bg-*');
+assert(
+  /\.color-field-hex\s*\{[^}]*width:\s*9\.5ch/.test(colorFieldCss),
+  'ColorField hex input must stay compact (#RRGGBB width), not stretch full rail',
+);
+assert(
+  !/\.color-field-hex\s*\{[^}]*width:\s*100%/.test(colorFieldCss),
+  'ColorField hex must not use width: 100%',
+);
 
 const dropdownTypes = fs.readFileSync(path.join(repoRoot, 'src/renderer/ui/DropdownSelect/types.ts'), 'utf8');
 assert(dropdownTypes.includes('swatchColor'), 'DropdownOption must support swatchColor');

@@ -262,7 +262,6 @@
   gap: var(--space-3);
 }
 
-.appearance-color-field,
 .appearance-text-field,
 .appearance-contrast-field {
   display: grid;
@@ -271,42 +270,6 @@
   gap: var(--space-3);
 }
 
-.appearance-color-control {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-}
-
-.appearance-color-swatch {
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  border-radius: var(--radius-full);
-  border: 2px solid color-mix(in srgb, var(--token-text-heading) 18%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #000 18%, transparent);
-  cursor: pointer;
-  padding: 0;
-  background: transparent;
-}
-
-.appearance-color-swatch:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--token-border-focus) 18%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, #000 18%, transparent);
-}
-
-.appearance-color-native {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.appearance-hex-input,
 .appearance-text-field .input,
 .appearance-import-input {
   width: 100%;
@@ -356,7 +319,6 @@
     border-top: 1px solid color-mix(in srgb, var(--ap-ink) 14%, transparent);
   }
 
-  .appearance-color-field,
   .appearance-text-field,
   .appearance-contrast-field {
     grid-template-columns: 1fr;

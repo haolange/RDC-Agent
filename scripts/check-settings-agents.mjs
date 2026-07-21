@@ -367,6 +367,28 @@ async function main() {
     }
   }
 
+  const agentEditorSource = fs.readFileSync(
+    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AgentManifestEditor.tsx'),
+    'utf8',
+  );
+  assert(agentEditorSource.includes("from '../../../../ui/ColorField'"), 'Agents accent must use shared ColorField');
+  assert(agentEditorSource.includes('data-testid="settings-agent-accent"') || agentEditorSource.includes('testId="settings-agent-accent"'), 'Agents accent must keep a stable test id');
+  assert(agentEditorSource.includes('settings-agent-look-strip'), 'Agents Icon+Accent must live in a compact look strip');
+  assert(agentEditorSource.includes('layout="inline"'), 'Agents accent ColorField must use inline layout');
+  assert(!agentEditorSource.includes('settings-agent-accent-field'), 'Agents must not keep the legacy toolbar accent field markup');
+  assert(!agentEditorSource.includes('settings-agent-identity-controls'), 'legacy stacked identity-controls row must be removed');
+  assert(!settingsModalCss.includes('.settings-agent-accent-field'), 'legacy Agents accent CSS must be removed');
+  assert(!settingsModalCss.includes('.settings-agent-accent-hex'), 'legacy Agents accent hex CSS must be removed');
+  assert(
+    settingsModalCss.includes('.settings-page-agents .settings-agent-look-strip'),
+    'Agents look strip styles must exist',
+  );
+  assert(
+    settingsModalCss.includes('.settings-page-agents .settings-agent-flags')
+      && settingsModalCss.includes('border-radius: var(--radius-full)'),
+    'Agents flags must render as compact pills',
+  );
+
   console.log('[settings-agents] OK');
 }
 

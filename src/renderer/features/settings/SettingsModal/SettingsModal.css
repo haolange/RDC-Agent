@@ -3472,12 +3472,11 @@
 }
 
 .settings-agent-icon-picker {
-  display: grid;
-  grid-template-columns: minmax(5rem, auto) minmax(0, 1fr);
+  position: relative;
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) 0 var(--space-4);
-  border-bottom: 1px solid var(--token-border-muted);
+  padding: 0;
+  border: 0;
 }
 
 .settings-agent-icon-option {
@@ -3937,6 +3936,10 @@
   padding: var(--space-4);
 }
 
+.settings-page-agents .settings-agent-route-panel .settings-manifest-form-grid {
+  gap: var(--space-3);
+}
+
 .settings-page-agents .settings-model-route-row {
   grid-template-columns: minmax(5rem, auto) minmax(0, 1fr);
   gap: var(--space-3);
@@ -3947,16 +3950,28 @@
   background: transparent;
 }
 
+.settings-page-agents .settings-model-route-row > .settings-field-label {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
 .settings-page-agents .settings-agent-flags {
-  display: grid;
-  flex-direction: column;
-  gap: var(--space-3);
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  grid-template-columns: none;
 }
 
 .settings-page-agents .settings-agent-flags .settings-checkbox-row {
-  min-height: var(--space-12);
-  border-radius: var(--radius-md);
+  flex: 0 0 auto;
+  width: auto;
+  min-height: var(--btn-height-sm);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
 }
 
 .settings-page-agents .settings-advanced-panel {
@@ -4095,51 +4110,107 @@
   justify-content: flex-end;
 }
 
-.settings-page-agents .settings-agent-icon-picker {
-  position: relative;
-  display: inline-flex;
-  padding: 0;
-  border: 0;
-}
-
 .settings-agent-icon-trigger {
   gap: var(--space-2);
   min-height: var(--btn-height-sm);
 }
 
-.settings-agent-accent-field {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-2);
-  min-height: var(--btn-height-sm);
-  border: 1px solid rgb(var(--color-border-subtle));
-  border-radius: var(--radius-md);
-  background: rgb(var(--color-bg-2));
-}
-
-.settings-agent-accent-field .settings-field-label {
-  font-size: var(--text-xs);
-  color: rgb(var(--color-text-tertiary));
-}
-
-.settings-agent-accent-field input[type='color'] {
-  width: 28px;
-  height: 22px;
-  padding: 0;
-  border: 1px solid rgb(var(--color-border-subtle));
-  border-radius: var(--radius-sm);
+.settings-page-agents .settings-agent-look-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3) var(--space-5);
+  width: 100%;
+  margin: 0;
+  padding: 0 0 var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--token-border-muted);
+  border-radius: 0;
   background: transparent;
-  cursor: pointer;
 }
 
-.settings-agent-accent-hex {
-  width: 5.5rem;
+.settings-page-agents .settings-agent-look-field {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.settings-page-agents .settings-agent-look-label {
+  margin: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.settings-page-agents .settings-agent-look-hint {
+  flex: 1 1 100%;
+  order: 3;
+  margin: calc(var(--space-1) * -1) 0 0;
+  max-width: 40rem;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.settings-page-agents .settings-agent-look-strip .settings-agent-icon-trigger {
+  min-height: 32px;
+  height: 32px;
+  padding-inline: var(--space-3);
+  border-radius: var(--radius-full);
+}
+
+.settings-page-agents .settings-agent-accent-color {
+  width: auto;
+  max-width: max-content;
+}
+
+.settings-page-agents .settings-agent-accent-color .color-field-control {
+  box-sizing: border-box;
+  min-height: 32px;
+  height: 32px;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-1);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--token-bg-shell) 72%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--token-elevation-edge) 55%, transparent);
+}
+
+.settings-page-agents .settings-agent-accent-color .color-field-swatch {
+  width: 22px;
+  height: 22px;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, #000 22%, transparent),
+    0 0 12px color-mix(in srgb, var(--settings-agent-accent, currentColor) 34%, transparent);
+}
+
+.settings-page-agents .settings-agent-accent-color .color-field-hex {
+  height: calc(var(--btn-height-sm) - 4px);
+  padding-inline: var(--space-1) var(--space-2);
   border: 0;
   background: transparent;
-  color: rgb(var(--color-text-primary));
-  font-family: var(--font-mono);
+  box-shadow: none;
   font-size: var(--text-xs);
+}
+
+.settings-page-agents .settings-agent-accent-color .color-field-hex:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.settings-page-agents .settings-agent-accent-color .color-field-control:focus-within {
+  border-color: var(--token-border-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--token-border-focus) 18%, transparent);
+}
+
+.settings-page-agents .settings-agent-editor-icon {
+  color: var(--settings-agent-accent, var(--token-text-heading));
+  background: color-mix(in srgb, var(--settings-agent-accent, var(--token-border-focus)) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--settings-agent-accent, var(--token-border-focus)) 34%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--settings-agent-accent, transparent) 22%, transparent);
 }
 
 .settings-page-agents .settings-agent-icon-popover {
@@ -4178,10 +4249,6 @@
 
 .settings-page-agents .settings-agent-route-panel .settings-manifest-form-grid {
   grid-template-columns: 1fr;
-}
-
-.settings-page-agents .settings-model-route-row > .settings-field-label {
-  font-size: var(--text-base);
 }
 
 .settings-agent-autosave-status {
@@ -4892,12 +4959,15 @@
 }
 
 @media (max-width: 64rem) {
-  .settings-agent-icon-picker,
   .settings-model-route-row,
-  .settings-agent-flags,
   .settings-manifest-card,
   .settings-manifest-layout {
     grid-template-columns: 1fr;
+  }
+
+  .settings-page-agents .settings-agent-look-hint {
+    flex-basis: 100%;
+    max-width: none;
   }
 
   .settings-manifest-actions {
