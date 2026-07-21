@@ -37,8 +37,7 @@ build/
 __pycache__
 *.pyc
 
-# E2E test artifacts
-e2e/fixtures/*.rdc
+# Local test / browser artifacts
 test-results/
 playwright-report/
 

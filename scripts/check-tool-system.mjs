@@ -71,7 +71,6 @@ function main() {
     for (const file of walkSourceFiles(root)) {
       const relative = path.relative(repoRoot, file).replace(/\\/g, '/');
       if (relative === 'src/shared/constants/agentToolTokens.ts') continue;
-      if (relative.startsWith('docs/handover/')) continue;
       const source = fs.readFileSync(file, 'utf8');
       if (
         /name:\s*['"]search_codebase['"]/.test(source)

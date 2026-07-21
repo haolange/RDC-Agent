@@ -1,0 +1,39 @@
+# Local install / build / pack outputs (never index)
+node_modules/
+out/
+dist/
+release/
+build/
+coverage/
+
+# Tool and bundler caches
+.cache/
+.vite/
+.electron-vite/
+.turbo/
+.eslintcache
+*.tsbuildinfo
+
+# Logs and scratch
+*.log
+*.tmp
+*.temp
+*.bak
+*.orig
+tmp/
+browser-session-tmp/
+logs/
+test-results/
+playwright-report/
+
+# IDE / local tool metadata
+.codex/
+.qoder/
+.idea/
+.vscode/
+.vs/
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
