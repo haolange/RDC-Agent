@@ -1067,9 +1067,17 @@ assert(
   'Work Process status dot must not hang left of the prose edge',
 );
 assert(
-  /\.work-process-steps\s*\{[^}]*padding:\s*0\s+0\s+0\s+var\(--space-4\)/.test(cssSource)
-    || /\.work-process-steps\s*\{[^}]*padding-left:\s*var\(--space-4\)/.test(cssSource),
-  'loop turns should nest under the header status dot with space-4 indent',
+  /\.work-process-steps\s*\{[^}]*padding:\s*0\s+0\s+0\s+var\(--space-3\)/.test(cssSource)
+    || /\.work-process-steps\s*\{[^}]*padding-left:\s*var\(--space-3\)/.test(cssSource),
+  'loop turns should nest under the header status dot with space-3 indent',
+);
+assert(
+  /\.work-process\s*\{[^}]*padding-inline-end:\s*var\(--space-3\)/.test(cssSource),
+  'Work Process should keep a CoT-only padding-inline-end gutter',
+);
+assert(
+  !/\.conversation-bubble-assistant\s*\{[^}]*padding-inline-end:\s*var\(--space-3\)/.test(cssSource),
+  'assistant final answer must not inherit the CoT-only padding-inline-end gutter',
 );
 assert(
   /\.work-process-step\s*\{[^}]*grid-template-columns:\s*8px\s+minmax\(0,\s*1fr\)/.test(cssSource),

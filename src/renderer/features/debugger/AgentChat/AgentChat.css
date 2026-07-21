@@ -727,6 +727,10 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 .work-process {
   position: relative;
   width: 100%;
+  /* CoT-only right gutter: keep tool cards / thinking off the scrollbar seam.
+     Final answer prose stays full-bleed and is not padded here. */
+  padding-inline-end: var(--space-3);
+  box-sizing: border-box;
   overflow: visible;
   border: 0;
   border-radius: 0;
@@ -877,7 +881,7 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   gap: 0;
   margin: 0;
   /* Nest loop turns under the header status dot so hierarchy stays readable. */
-  padding: 0 0 0 var(--space-4);
+  padding: 0 0 0 var(--space-3);
   list-style: none;
 }
 

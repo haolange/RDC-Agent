@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import type {
   AppSettings,
   AppTheme,
@@ -11,6 +11,7 @@ import type {
 import { THEME_PRESET_CATALOG, getPresetChrome } from '@shared/theme/presets';
 import { parseRdxThemeV1, serializeRdxThemeV1 } from '@shared/theme/rdxThemeV1';
 import type { useI18n } from '../../../../i18n';
+import { ColorField } from '../../../../ui/ColorField';
 import { DropdownSelect } from '../../../../ui/DropdownSelect';
 import { Switch } from '../../../../ui/Switch';
 import './AppearanceSettings.css';
@@ -101,66 +102,6 @@ function AppearanceChromePreview(props: {
         <div className="appearance-preview-cta" aria-hidden="true">Accent</div>
       </div>
     </div>
-  );
-}
-
-function ColorField(props: {
-  label: string;
-  value: string;
-  onChange: (hex: string) => void;
-  testId: string;
-}) {
-  const colorInputRef = useRef<HTMLInputElement>(null);
-  const [draft, setDraft] = useState(props.value);
-
-  useEffect(() => {
-    setDraft(props.value);
-  }, [props.value]);
-
-  const commitHex = (raw: string) => {
-    const next = raw.trim().toLowerCase();
-    if (/^#[0-9a-f]{6}$/.test(next)) props.onChange(next);
-  };
-
-  return (
-    <label className="appearance-color-field">
-      <span className="settings-field-label">{props.label}</span>
-      <span className="appearance-color-control">
-        <button
-          type="button"
-          className="appearance-color-swatch"
-          style={{ background: props.value }}
-          data-testid={`${props.testId}-swatch`}
-          aria-label={props.label}
-          onClick={() => colorInputRef.current?.click()}
-        />
-        <input
-          ref={colorInputRef}
-          type="color"
-          className="appearance-color-native"
-          value={/^#[0-9a-fA-F]{6}$/.test(props.value) ? props.value : '#33d1ff'}
-          data-testid={props.testId}
-          onChange={(event) => props.onChange(event.target.value.toLowerCase())}
-          tabIndex={-1}
-          aria-hidden="true"
-        />
-        <input
-          type="text"
-          className="appearance-hex-input input"
-          value={draft}
-          spellCheck={false}
-          data-testid={`${props.testId}-hex`}
-          onChange={(event) => {
-            const next = event.target.value;
-            setDraft(next);
-            commitHex(next);
-          }}
-          onBlur={() => {
-            if (!/^#[0-9a-fA-F]{6}$/.test(draft.trim())) setDraft(props.value);
-          }}
-        />
-      </span>
-    </label>
   );
 }
 

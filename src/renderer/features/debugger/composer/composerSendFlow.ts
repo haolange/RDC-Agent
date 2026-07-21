@@ -5,9 +5,12 @@ import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
+import { useConversationStore } from '../../../stores/conversationStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 import {
   applyConversationTurnResult,
+  buildOptimisticConversationTurn,
+  removeOptimisticConversationMessages,
   syncE2EConversationState,
   toConversationMode,
   toConversationAttachmentInputs,
@@ -81,12 +84,31 @@ export async function sendComposerConversationTurn(options: {
   const sentAttachments = [...pendingAttachments];
   const sentSkillIds = [...pendingSkillIds];
   const requestId = createConversationRequestId();
+  const optimistic = buildOptimisticConversationTurn({
+    requestId,
+    trimmed: sentPrompt,
+    currentMode,
+    currentProject,
+    currentSession,
+    currentRun,
+    pendingAttachments: sentAttachments,
+    selectedAgentId,
+  });
+
+  const rollbackOptimistic = () => {
+    setConversationMessages(removeOptimisticConversationMessages(
+      useConversationStore.getState().allConversationMessages,
+      optimistic.optimisticIds,
+    ));
+  };
+
   setActiveRequestId(requestId);
   setPromptValue('');
   setPendingAttachments([]);
   setPendingSkillIds([]);
   useSessionStore.getState().setPreparedTurnContext(null);
   useSessionStore.getState().setConversationPreparationPhase('preparing');
+  upsertConversationMessages([optimistic.userMessage, optimistic.assistantDraftMessage]);
 
   try {
     const agentCommit = await useAppSettingsStore.getState().flushAgentDefinitionSaves(selectedAgentId);
@@ -123,6 +145,7 @@ export async function sendComposerConversationTurn(options: {
     });
 
     if (result.status === 'rejected') {
+      rollbackOptimistic();
       setPromptValue(sentPrompt);
       setPendingAttachments(sentAttachments);
       setPendingSkillIds(sentSkillIds);
@@ -132,6 +155,9 @@ export async function sendComposerConversationTurn(options: {
       showNotice(result.error.message || failedSummary);
       return;
     }
+
+    // Drop optimistic placeholders before applying authoritative turn messages.
+    rollbackOptimistic();
 
     const turn = result.turn;
     useSessionStore.getState().setPreparedTurnContext(result.preparedContext);
@@ -161,6 +187,7 @@ export async function sendComposerConversationTurn(options: {
       setBranchState,
     });
   } catch (error) {
+    rollbackOptimistic();
     setPromptValue(sentPrompt);
     setPendingAttachments(sentAttachments);
     setPendingSkillIds(sentSkillIds);
