@@ -9,6 +9,7 @@ import {
 } from './effortControlParts';
 import { EFFORT_THUMB_WIDTH_PX, thumbInsetPercent } from './effortSliderGeometry';
 import type { MaxVisualTimeline } from './maxVisual';
+import type { ExitingMaxPhase } from './useMaxVisualController';
 import { EffortMaxField } from './EffortMaxField';
 import { Button } from '../../../ui/Button';
 
@@ -29,6 +30,7 @@ export const EffortControlPopup: React.FC<{
   displayIndex: number;
   isDragging: boolean;
   showMaxTrack: boolean;
+  exitingMaxPhase: ExitingMaxPhase;
   maxTimeline: MaxVisualTimeline;
   thumbRatio: number;
   thumbStyle: React.CSSProperties;
@@ -67,6 +69,7 @@ export const EffortControlPopup: React.FC<{
   displayIndex,
   isDragging,
   showMaxTrack,
+  exitingMaxPhase,
   maxTimeline,
   thumbRatio,
   thumbStyle,
@@ -112,8 +115,9 @@ export const EffortControlPopup: React.FC<{
       <div className={`composer-effort-slider-section ${hasAdjustableReasoning ? '' : 'is-disabled'}`}>
         <div
           ref={trackRef}
-          className={`composer-effort-slider is-level-${displayLevel}${hasAdjustableReasoning ? '' : ' is-disabled'}${isDragging ? ' is-dragging' : ''}${showMaxTrack ? ' is-max-visual' : ''} is-max-phase-${maxTimeline.phase}`}
+          className={`composer-effort-slider is-level-${displayLevel}${hasAdjustableReasoning ? '' : ' is-disabled'}${isDragging ? ' is-dragging' : ''}${showMaxTrack ? ' is-max-visual' : ''}${exitingMaxPhase !== 'off' ? ` is-exiting-max is-exiting-max-${exitingMaxPhase}` : ''} is-max-phase-${maxTimeline.phase}`}
           data-testid="composer-effort-slider"
+          data-exiting-max={exitingMaxPhase}
           data-max-phase={maxTimeline.phase}
           data-max-progress="0.000"
           data-max-stops-opacity={maxTimeline.fromStopsOpacity.toFixed(3)}

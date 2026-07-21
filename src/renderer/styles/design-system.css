@@ -268,8 +268,8 @@
   /* Max-tier pixel field palette (dark rail + growing cells); not a track fill gradient */
   /* Max: translucent dark-gray rail + soft lavender pixel cloud (reference grow frames).
      Pixel hues stay near effort purple family so High→Max brightness does not jump. */
-  /* Light Max rail: soft graphite, not dark-only aesthetics */
-  --token-effort-max-track:    color-mix(in srgb, var(--token-bg-overlay) 40%, #d8dbe2);
+  /* Light Max rail: soft graphite, translucent so the pixel field stays readable */
+  --token-effort-max-track:    color-mix(in srgb, transparent 58%, color-mix(in srgb, var(--token-bg-overlay) 40%, #d8dbe2));
   --token-effort-max-from:     color-mix(in srgb, var(--token-effort-fill-5) 28%, #9a93a8);
   --token-effort-max-mid:      color-mix(in srgb, var(--token-effort-fill-4) 32%, #b4abc4);
   --token-effort-max-to:       color-mix(in srgb, var(--token-effort-fill-4) 24%, #d2cadc);
@@ -796,7 +796,7 @@
   --token-effort-fill-5:       hsl(265 62% 40%);
   --token-effort-thumb:        hsl(265 58% 48%);
   --token-effort-track:        color-mix(in srgb, var(--token-border-muted) 72%, transparent);
-  --token-effort-max-track:    color-mix(in srgb, var(--token-bg-overlay) 60%, #292930);
+  --token-effort-max-track:    color-mix(in srgb, transparent 62%, color-mix(in srgb, var(--token-bg-overlay) 60%, #292930));
   --token-effort-max-from:     color-mix(in srgb, var(--token-effort-fill-5) 18%, #6a6474);
   --token-effort-max-mid:      color-mix(in srgb, var(--token-effort-fill-4) 22%, #958aa8);
   --token-effort-max-to:       color-mix(in srgb, var(--token-effort-fill-4) 16%, #c0b6cf);

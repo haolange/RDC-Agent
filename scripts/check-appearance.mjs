@@ -80,6 +80,10 @@ const lightFill1L = effortFillLightness(composeLight['--composer-effort-fill-1']
 const lightFill5L = effortFillLightness(composeLight['--composer-effort-fill-5']);
 assert(darkFill1L > darkFill5L, 'dark ordinary effort fills deepen with level (exclude Max): low light → high deep');
 assert(lightFill1L > lightFill5L, 'light ordinary effort fills deepen with level (exclude Max): low light → high deep');
+assert(
+  /\/\s*0\.(3|4)\d*\s*\)/.test(String(composeDark['--composer-effort-max-track'])),
+  'dark Max rail stays translucent so the pixel field remains readable',
+);
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 assert(!fs.existsSync(path.join(repoRoot, 'src/renderer/styles/themes/oklch-themes.css')), 'legacy oklch-themes.css must be removed');

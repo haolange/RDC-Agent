@@ -943,9 +943,30 @@ html[data-resolved-theme='light'] .debugger-page {
   border: 1px solid color-mix(in srgb, var(--token-border-focus) 52%, var(--token-border-muted));
   background: var(--composer-effort-track-fill);
   overflow: hidden;
-  /* Background must snap — animating dark Max rail ↔ solid fill reads as opacity fade. */
+  /* Ordinary drag must stay snappy — no fill damping here. */
   transition: border-color var(--transition-fast);
   pointer-events: none;
+}
+
+/*
+ * Leave-Max handoff (Max field already idle — Canvas untouched):
+ * hold = one painted frame still on Max rail (transition:none), then
+ * settle = enable transition and switch to ordinary fill so it eases in.
+ */
+.composer-effort-slider.is-exiting-max-hold:not(.is-dragging):not(.is-max-visual) .composer-effort-slider-track {
+  border-color: color-mix(
+    in srgb,
+    var(--token-border-muted) 70%,
+    var(--composer-effort-max-mid, var(--token-effort-max-mid))
+  );
+  background: var(--composer-effort-max-track, var(--token-effort-max-track));
+  transition: none;
+}
+
+.composer-effort-slider.is-exiting-max-settle:not(.is-dragging):not(.is-max-visual) .composer-effort-slider-track {
+  transition:
+    background 384ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 384ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Top-tier Max visual: translucent dark-gray rail + lavender pixel field */
@@ -958,7 +979,7 @@ html[data-resolved-theme='light'] .debugger-page {
   background: var(--composer-effort-max-track, var(--token-effort-max-track));
   background-image: none;
   box-shadow: none;
-  /* Forbid dark↔solid purple crossfade — that reads as opacity decay instead of energy retreat. */
+  /* Snap rail on enter / while Max is live — never animate the rail against field energy. */
   transition: none;
 }
 
@@ -1079,6 +1100,28 @@ html[data-resolved-theme='light'] .debugger-page {
     border-color var(--transition-fast),
     opacity var(--transition-fast);
   pointer-events: none;
+}
+
+.composer-effort-slider.is-exiting-max-hold:not(.is-dragging):not(.is-max-visual) .composer-effort-slider-thumb {
+  border-color: color-mix(
+    in srgb,
+    var(--composer-effort-max-to, var(--token-effort-max-to)) 52%,
+    var(--token-border-strong)
+  );
+  background: var(--composer-effort-max-thumb, var(--token-effort-max-thumb));
+  transition:
+    left var(--transition-base),
+    transform var(--transition-base),
+    opacity var(--transition-fast);
+}
+
+.composer-effort-slider.is-exiting-max-settle:not(.is-dragging):not(.is-max-visual) .composer-effort-slider-thumb {
+  transition:
+    left var(--transition-base),
+    transform var(--transition-base),
+    background 384ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 384ms cubic-bezier(0.4, 0, 0.2, 1),
+    opacity var(--transition-fast);
 }
 
 .composer-effort-slider.is-max-visual .composer-effort-slider-thumb {
