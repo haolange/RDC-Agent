@@ -23,8 +23,7 @@ export type WriteScope =
   | 'workspace_notes'
   | 'session_signoff'
   | 'workspace_reports'
-  | 'session_artifacts'
-  | 'knowledge_library';
+  | 'session_artifacts';
 
 export interface AgentState {
   agentId: AgentRole;

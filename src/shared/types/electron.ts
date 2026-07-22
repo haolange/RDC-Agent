@@ -66,6 +66,7 @@ import type {
   TraceSessionResult,
 } from './trace';
 import type { HookEvent, RdxRuntimeOverview, RequestEnvelopeSnapshot, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from './rdxRuntime';
+import type { KnowledgeCardDetail, KnowledgeCardSummary, KnowledgeSpace } from './knowledge';
 
 /** Memory 面板列表项摘要（对应 MemoryRecord 的精简视图）。 */
 export interface MemorySummary {
@@ -196,6 +197,12 @@ export interface ElectronAPI {
     get: (scope: 'user' | 'project', name: string, projectRoot?: string) => Promise<{ memory: MemoryDetail | null }>;
     write: (request: MemoryWriteRequest) => Promise<{ success: boolean; name: string; error?: string }>;
     delete: (scope: 'user' | 'project', name: string, confirmed: boolean, projectRoot?: string) => Promise<{ success: boolean; error?: string }>;
+  };
+
+  knowledge: {
+    listSpaces: () => Promise<{ spaces: KnowledgeSpace[] }>;
+    listCards: (spaceId: string) => Promise<{ cards: KnowledgeCardSummary[] }>;
+    getCard: (spaceId: string, relativePath: string) => Promise<{ card: KnowledgeCardDetail | null }>;
   };
 
   rdxRuntime: {

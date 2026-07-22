@@ -3,6 +3,7 @@ import { DebuggerPage } from '../pages/Debugger';
 import { UserMenu } from '../shell/UserMenu';
 import { TitleBar } from '../shell/TitleBar';
 import { SettingsModal } from '../features/settings/SettingsModal';
+import { KnowledgeCenterModal } from '../features/knowledge/KnowledgeCenterModal';
 import { useComposer } from '../features/debugger/composer/useComposer';
 import { CommandPalette } from '../patterns/CommandPalette';
 import { NotificationToast } from '../features/notifications/NotificationToast';
@@ -29,6 +30,7 @@ const App: React.FC = () => {
   const [shellNotice, setShellNotice] = useState<string | null>(null);
   const [userMenuAnchor, setUserMenuAnchor] = useState<DOMRect | null>(null);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [knowledgeCenterOpen, setKnowledgeCenterOpen] = useState(false);
   const [runtimeTestMode, setRuntimeTestMode] = useState<boolean | null>(null);
 
   const currentProject = useProjectStore((state) => state.currentProject);
@@ -184,6 +186,7 @@ const App: React.FC = () => {
           showMainPromptBar={Boolean(currentProject)}
           mainPage={<DebuggerPage mode={currentMode} />}
           t={t}
+          onOpenKnowledgeCenter={() => setKnowledgeCenterOpen(true)}
           onUserMenuOpen={(event) => setUserMenuAnchor(event.currentTarget.getBoundingClientRect())}
           onToggleTerminal={() => toggleTerminalOpen()}
           onStartDrag={layout.startDragging}
@@ -207,6 +210,11 @@ const App: React.FC = () => {
           open={settingsModalOpen}
           settings={settings}
           onClose={() => setSettingsModalOpen(false)}
+        />
+
+        <KnowledgeCenterModal
+          open={knowledgeCenterOpen}
+          onClose={() => setKnowledgeCenterOpen(false)}
         />
 
         <CommandPalette

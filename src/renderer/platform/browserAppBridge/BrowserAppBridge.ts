@@ -86,6 +86,11 @@ class BrowserAppBridgeClient {
       write: (request) => this.invoke('memory:write', request),
       delete: (scope, name, confirmed, projectRoot) => this.invoke('memory:delete', scope, name, confirmed, projectRoot),
     },
+    knowledge: {
+      listSpaces: () => this.invoke('knowledge:listSpaces'),
+      listCards: (spaceId) => this.invoke('knowledge:listCards', spaceId),
+      getCard: (spaceId, relativePath) => this.invoke('knowledge:getCard', spaceId, relativePath),
+    },
     rdxRuntime: {
       getOverview: (projectRoot) => this.invoke('rdx-runtime:overview', projectRoot),
       validateResource: (request) => this.invoke('rdx-runtime:validate', request),
