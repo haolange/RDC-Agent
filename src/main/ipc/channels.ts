@@ -116,6 +116,11 @@ export const IPC_HANDLER_DOMAINS = {
     'memory:write',
     'memory:delete',
   ],
+  knowledge: [
+    'knowledge:listSpaces',
+    'knowledge:listCards',
+    'knowledge:getCard',
+  ],
   command: [
     'command:list',
     'command:execute',

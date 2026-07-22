@@ -16,6 +16,7 @@ import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
 import { sessionResumeService } from '../sessions/SessionResumeService';
 import { registerAgentHandlers } from './agentHandlers';
 import { registerMemoryHandlers } from './memoryHandlers';
+import { registerKnowledgeHandlers } from './knowledgeHandlers';
 import { registerCaptureDeviceHandlers } from './captureDeviceHandlers';
 import { registerCommandHandlers } from './commandHandlers';
 import { registerConversationHandlers } from './conversationHandlers';
@@ -272,6 +273,7 @@ export function registerIPCHandlers(): void {
   registerCaptureDeviceHandlers(context);
   registerAgentHandlers(context);
   registerMemoryHandlers(context);
+  registerKnowledgeHandlers(context);
   registerCommandHandlers();
   registerToolEvidenceHandlers(context);
   registerSettingsLlmHandlers(context);

@@ -52,9 +52,11 @@ Scoped Runtime Resolution
 
 Composer 的 context usage 环与弹窗由 `RunContextUsageSummary` 驱动：窗口占用率与本 run In/Out 来自 provider 上报的真实 usage。弹窗 Actual / Last actual 为同行三栏：`Tokens`（In / Out / Total）、`Cache`、`Reasoning`。Cache 统计范围是当前 Agent Run（不是跨 session 累计，也不是 Token Economy 压缩节省）：`cacheSavedTokens` = 累计 hit；`lastTurnCacheHitRate` / `cumulativeCacheHitRate` = `hit / (hit + miss)`（百分数，分母为 0 时缺省）；命中/未命中为 token 计数。归一化在 provider usage 出口完成：优先原生 `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`，否则 `hit = cacheRead`、`miss = max(input − hit, 0)`；无原生且无 cacheRead 时不产出 hit/miss。UI 固定三栏，Cache / Reasoning 缺遥测时显示 `—`（不造假 0 / 0%）。wire 层仍可保留 `cacheReadTokens` / `cacheWriteTokens` 供诊断，主展示不再用 Cache read 双轨。分类 breakdown（system_prompt、memory_files、skills、system_tools、mcp_tools、mcp_tools_deferred、builtin_tools_deferred、subagent_definitions、summarized_conversation、conversation、free）为 chars/4 估算，按 provider `inputTokens` 缩放对齐。`memory_files` 段覆盖 RDX.md scoped instruction 链；`mcp_tools_deferred` / `builtin_tools_deferred` 段仅计未激活 deferred schema 的估算量，不参与缩放、不占用堆叠条与 free 计算。Debug 与 Composer/Ask 路径均经 `PromptPlanBuilder` 产出可拆分的 metrics。最新快照随 session 落盘至 `<sessionDir>/usage.json`（subagent 隔离 session 不落盘），应用重启或内存 miss 时回读并按 stale 灰显；不做旧字段迁移或猜数回填，读不到即视为无数据。
 
-## Memory 与 Reasoning
+## Memory、Knowledge 与 Reasoning
 
 Memory 只有 `memory_search`、`memory_read`、`memory_write`、`memory_delete` 四个 scoped tool。Write 需要明确用户意图或批准，Delete 需要确认；没有自动抽取、turn counter、consolidation 或全索引 Prompt 注入。
+
+Knowledge Center 是 scoped `knowledge/` 的只读浏览面：`knowledge:listSpaces` / `listCards` / `getCard` 枚举 User 与全部已注册 Project 的 markdown 卡片，供左侧边栏入口打开的模态查看。不提供 write/regenerate/prompt 注入；生成引擎另立设计。
 
 Reasoning 使用 `raw | summary | opaque | none | unknown`。语义来自 Provider/Model contract，不从 OpenAI/Anthropic compatibility protocol 推断。App-managed 且有文档证据的 DeepSeek / Kimi / GLM / MiniMax / MiMo 等解析为 `raw`；真正未核实的第三方路由才是 `unknown`。Work Process 顶层用「工作中 / 工作过程」，loop thinking 用「正在思考 / 已思考 · {duration}」（前置 quiet icon，不用「深度思考」），不展示「语义未验证」。commentary 渲染为 markdown 散文（`proseText`），永不顶 thinking 槽；最终答案仅在 assistant message body 中以 full-bleed prose 呈现，不用 raised bubble。
 
@@ -66,4 +68,4 @@ Reasoning 使用 `raw | summary | opaque | none | unknown`。语义来自 Provid
 - Hook trust / revoke / test
 - Request snapshot list / detail
 
-Memory 使用独立 scoped preload domain。Renderer 不获得任意 tool execute、任意 shell、Secret 或 provider protected payload 接口。
+Memory 与 Knowledge 使用独立 scoped preload domain（`memory` / `knowledge`）。Renderer 不获得任意 tool execute、任意 shell、Secret 或 provider protected payload 接口。

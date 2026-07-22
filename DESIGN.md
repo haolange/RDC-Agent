@@ -115,7 +115,7 @@ Hooks are deterministic lifecycle commands stored as `.hook.yml`; they are not h
 
 Memory is explicit and scope-aware. The runtime exposes search, read, write, and delete operations for User and Project memory. Writes require explicit user intent or an interactive approval and deletes require confirmation. Conversation turns never trigger extraction or consolidation, and no memory index is automatically injected into a prompt.
 
-`knowledge/` is a top-level scoped resource location only in this architecture wave. It has no prescribed case, invariant, workflow, retrieval, ranking, or prompt-injection schema. A future Knowledge Engine must be designed as a separate runtime capability rather than reactivating automatic memory behavior.
+`knowledge/` is a top-level scoped resource location for markdown knowledge cards under `~/.rdx/knowledge` and `<project-root>/.rdx/knowledge`. The Knowledge Center is a browse-only product surface: sidebar entry above the user footer opens a larger Settings-like modal with frosted backdrop, lists User space plus every registered project space, and reads `.md` cards through a dedicated `knowledge` IPC domain. It does not generate cards, write cards, regenerate from git, inject knowledge into prompts, or host Memory / Repo Wiki tabs. A future Knowledge Engine (authoring, regenerate, ranking, retrieval) must be designed as a separate runtime capability rather than reactivating automatic memory behavior.
 
 ## Prompt and Request Contract
 

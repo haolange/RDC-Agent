@@ -10,7 +10,9 @@ export type {
   DialogApi,
   EventSubscriptionApi,
   EvidenceApi,
+  KnowledgeApi,
   LlmApi,
+  MemoryApi,
   PlatformApi,
   ProjectApi,
   RawChannelSubscriptionApi,
@@ -194,6 +196,12 @@ export type {
   StructuredHandoffKind,
   StructuredHandoffResourceRef,
 } from './semanticContext';
+export type {
+  KnowledgeCardDetail,
+  KnowledgeCardSummary,
+  KnowledgeSpace,
+  KnowledgeSpaceKind,
+} from './knowledge';
 export type {
   CaptureDescriptor,
   ContextSnapshot,

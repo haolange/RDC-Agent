@@ -31,6 +31,7 @@ export interface WorkbenchShellProps {
   showMainPromptBar: boolean;
   mainPage: ReactNode;
   t: (key: TranslationKey, params?: Record<string, string | number>) => string;
+  onOpenKnowledgeCenter: () => void;
   onUserMenuOpen: (event: React.MouseEvent<HTMLButtonElement>) => void;
   onToggleTerminal: () => void;
   onStartDrag: (side: DragSide, startWidth: number) => (event: React.PointerEvent<HTMLDivElement>) => void;
@@ -56,6 +57,7 @@ export function WorkbenchShell({
   showMainPromptBar,
   mainPage,
   t,
+  onOpenKnowledgeCenter,
   onUserMenuOpen,
   onToggleTerminal,
   onStartDrag,
@@ -83,6 +85,26 @@ export function WorkbenchShell({
         </nav>
         {!effectiveLeftCollapsed && (
           <div className="app-sidebar-footer" data-testid="sidebar-footer">
+            <button
+              type="button"
+              className="footer-entry sidebar-footer-entry sidebar-knowledge-trigger"
+              data-testid="sidebar-knowledge-center-trigger"
+              onClick={onOpenKnowledgeCenter}
+              title={t('knowledgeCenter.title')}
+              aria-label={t('knowledgeCenter.title')}
+            >
+              <span className="footer-entry-main">
+                <span className="sidebar-knowledge-icon" aria-hidden="true">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15z" />
+                  </svg>
+                </span>
+                <span className="footer-entry-copy">
+                  <span className="footer-entry-title">{t('knowledgeCenter.title')}</span>
+                </span>
+              </span>
+            </button>
             <button
               type="button"
               className="footer-entry footer-user-trigger sidebar-user-trigger sidebar-footer-entry"

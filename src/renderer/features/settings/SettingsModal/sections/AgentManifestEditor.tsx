@@ -142,11 +142,9 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
       <div className="settings-manifest-editor-body scrollbar-thin">
         <section className="settings-agent-route-panel">
           <div className="settings-section-header">
-            <div>
-              <div className="settings-section-title">{t('settings.agentRouteAvailability')}</div>
-            </div>
+            <div className="settings-section-title">{t('settings.agentRouteAvailability')}</div>
           </div>
-          <div className="settings-manifest-form-grid">
+          <div className="settings-agent-route-body">
             <div
               className="settings-agent-look-strip"
               data-testid="settings-agent-look"
@@ -154,7 +152,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                 '--settings-agent-accent': selectedAgent.accent || '#33d1ff',
               } as React.CSSProperties}
             >
-              <div className="settings-agent-look-field">
+              <div className="settings-agent-route-row settings-agent-look-icon-row">
                 <span className="settings-field-label settings-agent-look-label">{t('settings.agentIcon')}</span>
                 <AgentIconPresetPicker
                   value={selectedAgent.icon ?? 'message-orbit'}
@@ -162,17 +160,20 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                   t={t}
                 />
               </div>
-              <ColorField
-                className="settings-agent-accent-color"
-                layout="inline"
-                label={t('settings.agentAccent')}
-                value={selectedAgent.accent ?? '#33d1ff'}
-                testId="settings-agent-accent"
-                onChange={(accent) => onUpdateAgent({ accent })}
-              />
+              <div className="settings-agent-route-row settings-agent-look-accent-row">
+                <ColorField
+                  className="settings-agent-accent-color"
+                  layout="inline"
+                  label={t('settings.agentAccent')}
+                  value={selectedAgent.accent ?? '#33d1ff'}
+                  testId="settings-agent-accent"
+                  onChange={(accent) => onUpdateAgent({ accent })}
+                />
+              </div>
               <p className="settings-agent-look-hint">{t('settings.agentAccentHelp')}</p>
             </div>
-            <div className="settings-input-row settings-model-route-row">
+
+            <div className="settings-agent-route-row settings-model-route-row">
               <span className="settings-field-label">{t('settings.modelFieldLabel')}</span>
               <AgentModelCascadeSelect
                 value={selectedModel}
@@ -181,19 +182,23 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                 t={t}
               />
             </div>
-            <div className="settings-agent-flags">
-              <label className="settings-checkbox-row">
-                <input type="checkbox" checked={selectedAgent.enabled} onChange={(event) => onUpdateAgent({ enabled: event.currentTarget.checked })} />
-                <span>{t('settings.agentEnabled')}</span>
-              </label>
-              <label className="settings-checkbox-row">
-                <input type="checkbox" checked={selectedAgent.userInvocable} onChange={(event) => onUpdateAgent({ userInvocable: event.currentTarget.checked })} />
-                <span>{t('settings.userInvocable')}</span>
-              </label>
-              <label className="settings-checkbox-row">
-                <input type="checkbox" checked={selectedAgent.disableModelInvocation} onChange={(event) => onUpdateAgent({ disableModelInvocation: event.currentTarget.checked })} />
-                <span>{t('settings.disableModelInvocation')}</span>
-              </label>
+
+            <div className="settings-agent-route-row settings-agent-availability-row">
+              <span className="settings-field-label">{t('settings.agentAvailability')}</span>
+              <div className="settings-agent-flags">
+                <label className="settings-checkbox-row compact">
+                  <input type="checkbox" checked={selectedAgent.enabled} onChange={(event) => onUpdateAgent({ enabled: event.currentTarget.checked })} />
+                  <span>{t('settings.agentEnabled')}</span>
+                </label>
+                <label className="settings-checkbox-row compact">
+                  <input type="checkbox" checked={selectedAgent.userInvocable} onChange={(event) => onUpdateAgent({ userInvocable: event.currentTarget.checked })} />
+                  <span>{t('settings.userInvocable')}</span>
+                </label>
+                <label className="settings-checkbox-row compact">
+                  <input type="checkbox" checked={selectedAgent.disableModelInvocation} onChange={(event) => onUpdateAgent({ disableModelInvocation: event.currentTarget.checked })} />
+                  <span>{t('settings.disableModelInvocation')}</span>
+                </label>
+              </div>
             </div>
           </div>
         </section>
