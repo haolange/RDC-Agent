@@ -265,7 +265,7 @@ function createDeferredVisibleStep(row: WorkProcessRow): WorkProcessRow {
         ? { ...row.approval, message: '', metaLines: [] }
         : undefined,
       sourcePills: undefined,
-      browseLink: undefined,
+      pageChip: undefined,
     };
   }
   if (row.type === 'userInput') {

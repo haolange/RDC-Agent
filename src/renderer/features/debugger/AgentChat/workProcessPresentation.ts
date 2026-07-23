@@ -1139,7 +1139,14 @@ export const extractWebToolPresentation = (
   parsedResult: unknown,
 ): {
   sourcePills?: Array<{ domain: string; url?: string; title?: string }>;
-  browseLink?: { label: string; url: string };
+  pageChip?: {
+    domain: string;
+    url: string;
+    pathLabel?: string;
+    title?: string;
+    status?: number;
+    bytes?: number;
+  };
 } => {
   const normalized = normalizeToolName(toolName);
   const record = toRecord(parsedResult);
@@ -1164,15 +1171,44 @@ export const extractWebToolPresentation = (
     return sourcePills.length > 0 ? { sourcePills } : {};
   }
 
-  if (normalized === 'web_fetch') {
+  if (normalized === 'web_fetch' || details?.kind === 'fetch') {
     const url = stringifyPreview(
       details?.url
       ?? record?.url
       ?? readNestedValue(record ?? {}, ['data', 'details', 'url']),
     );
-    if (url) {
-      return { browseLink: { label: resolveUrlHostname(url), url } };
+    if (!url) return {};
+    const domain = resolveUrlHostname(url);
+    if (!domain) return {};
+    let pathLabel: string | undefined;
+    try {
+      const parsed = new URL(url);
+      const combined = `${parsed.pathname || '/'}${parsed.search || ''}`;
+      if (combined && combined !== '/') {
+        pathLabel = combined.length > 48 ? `${combined.slice(0, 47)}…` : combined;
+      }
+    } catch {
+      pathLabel = undefined;
     }
+    const statusRaw = details?.status ?? record?.status ?? readNestedValue(record ?? {}, ['data', 'details', 'status']);
+    const bytesRaw = details?.bytes ?? record?.bytes ?? readNestedValue(record ?? {}, ['data', 'details', 'bytes']);
+    const title = stringifyPreview(
+      details?.title
+      ?? record?.title
+      ?? readNestedValue(record ?? {}, ['data', 'details', 'title']),
+    ) || undefined;
+    const status = typeof statusRaw === 'number' && Number.isFinite(statusRaw) ? statusRaw : undefined;
+    const bytes = typeof bytesRaw === 'number' && Number.isFinite(bytesRaw) ? bytesRaw : undefined;
+    return {
+      pageChip: {
+        domain,
+        url,
+        ...(pathLabel ? { pathLabel } : {}),
+        ...(title ? { title } : {}),
+        ...(status !== undefined ? { status } : {}),
+        ...(bytes !== undefined ? { bytes } : {}),
+      },
+    };
   }
 
   return {};

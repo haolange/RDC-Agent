@@ -123,6 +123,12 @@ export interface ElectronAPI {
     }>;
   };
 
+  web: {
+    resolveFavicon: (domain: string) => Promise<{
+      dataUrl: string | null;
+    }>;
+  };
+
   conversation: {
     sendMessage: (request: ConversationSendRequest) => Promise<ConversationSendResult>;
     rewriteFromMessage: (request: ConversationRewriteFromMessageRequest) => Promise<ConversationTurnResult>;

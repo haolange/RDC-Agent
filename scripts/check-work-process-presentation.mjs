@@ -649,6 +649,60 @@ assert(webSearchRow.previewLines.includes('Provider: DuckDuckGo HTML'), 'web_sea
 assert(webSearchRow.previewLines.includes('https://renderdoc.org/'), 'web_search preview should include first result URL');
 assert(Array.isArray(webSearchRow.sourcePills) && webSearchRow.sourcePills.length > 0, 'web_search should expose source pills');
 assert(webSearchRow.sourcePills.some((pill) => pill.domain === 'renderdoc.org'), 'web_search source pill should include result domain');
+assert(webSearchRow.sourcePills.every((pill) => pill.domain), 'web_search source pills must carry domain labels');
+assert(!webSearchRow.pageChip, 'web_search must not use web_fetch pageChip');
+
+const webFetchPresentation = buildWorkProcessPresentation({
+  status: 'complete',
+  updatedAt: now + 9200,
+  blocks: [
+    {
+      id: 'runtime-loop-web-fetch',
+      kind: 'llm_turn',
+      title: 'LLM turn',
+      status: 'complete',
+      result: { text: 'Fetch the page.', status: 'complete', toolCallIds: ['tool-web-fetch'] },
+      toolCalls: [
+        {
+          id: 'tool-web-fetch',
+          toolName: 'web_fetch',
+          status: 'complete',
+          argsPreview: JSON.stringify({ url: 'https://www.example.com/docs/guide' }),
+          resultPreview: JSON.stringify({
+            ok: true,
+            data: {
+              content: [{ type: 'text', text: 'URL: https://www.example.com/docs/guide\nTitle: Example Guide\nStatus: 200 OK' }],
+              details: {
+                kind: 'fetch',
+                url: 'https://www.example.com/docs/guide',
+                status: 200,
+                statusText: 'OK',
+                bytes: 2048,
+                truncated: false,
+                title: 'Example Guide',
+              },
+            },
+          }),
+          startedAt: now + 8000,
+          completedAt: now + 8050,
+        },
+      ],
+      startedAt: now + 8000,
+      completedAt: now + 8050,
+    },
+  ],
+});
+const webFetchRow = flattenRows(webFetchPresentation.rows).find((row) => row.type === 'tool' && row.toolName === 'web_fetch');
+assert(webFetchRow?.verb === '已抓取', 'web_fetch should use Fetched/已抓取 verb');
+assert(webFetchRow?.icon === 'webFetch', 'web_fetch should use dedicated webFetch icon');
+assert(webFetchRow?.pageChip?.domain === 'www.example.com', 'web_fetch should expose pageChip domain');
+assert(webFetchRow?.pageChip?.url === 'https://www.example.com/docs/guide', 'web_fetch pageChip should keep url');
+assert(webFetchRow?.pageChip?.pathLabel === '/docs/guide', 'web_fetch pageChip should expose pathLabel');
+assert(webFetchRow?.pageChip?.status === 200, 'web_fetch pageChip should expose status');
+assert(webFetchRow?.pageChip?.bytes === 2048, 'web_fetch pageChip should expose bytes');
+assert(webFetchRow?.pageChip?.title === 'Example Guide', 'web_fetch pageChip should expose title');
+assert(!webFetchRow?.sourcePills?.length, 'web_fetch must not reuse search source pills');
+assert(webFetchRow?.icon !== webSearchRow?.icon, 'web_fetch and web_search icons must differ');
 
 const bashEnvelopePresentation = buildWorkProcessPresentation({
   status: 'complete',

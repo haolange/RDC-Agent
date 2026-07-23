@@ -2,7 +2,7 @@ export { Badge, type BadgeProps, type BadgeTone } from './Badge';
 export { Button, type ButtonProps, type ButtonVariant } from './Button';
 export { ConfirmationDialog, type ConfirmationDialogProps } from './ConfirmationDialog';
 export { ActiveSignalText, type ActiveSignalTone } from './ActiveSignalText';
-export { FaviconImage, resolveFaviconUrl } from './FaviconImage';
+export { FaviconImage } from './FaviconImage';
 export { DropdownSelect } from './DropdownSelect';
 export { ModeGlyph } from './ModeGlyph';
 export { ProfileAvatar } from './ProfileAvatar';

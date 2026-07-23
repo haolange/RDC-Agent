@@ -17,6 +17,7 @@ import { createProjectApi, createRunApi, createSessionApi } from './api/projectS
 import { createRuntimeLogApi, createTerminalApi } from './api/runtime';
 import { createLlmApi, createSettingsApi } from './api/settings';
 import { createAppMetaApi, createAppShellApi, createDialogApi, createWindowControlsApi } from './api/shell';
+import { createWebApi } from './api/web';
 import { createEvidenceApi, createMcpApi, createToolApi } from './api/toolEvidence';
 import { createWorkflowApi } from './api/workflow';
 import { createTraceApi } from './api/trace';
@@ -32,6 +33,7 @@ const electronAPI = {
 
   appMeta: createAppMetaApi(),
   appShell: createAppShellApi(),
+  web: createWebApi(),
   conversation: createConversationApi(),
   command: createCommandApi(),
 

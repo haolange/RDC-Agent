@@ -9,23 +9,46 @@ import type { ThinkingArtifact } from '@shared/types/reasoning';
 
 export type WorkProcessRowStatus = 'pending' | 'running' | 'complete' | 'error';
 
+/** Per-builtin Work Process header glyph. Each catalog tool maps to a unique key. */
 export type WorkProcessIconKey =
-  | 'brain'
-  | 'search'
-  | 'file'
-  | 'edit'
+  | 'fileRead'
+  | 'fileWrite'
+  | 'fileEdit'
+  | 'fileDelete'
+  | 'fileMove'
+  | 'fileCopy'
+  | 'fileGlob'
+  | 'codeSearch'
+  | 'notebookEdit'
+  | 'webFetch'
+  | 'webSearch'
   | 'terminal'
-  | 'globe'
-  | 'git'
-  | 'memory'
-  | 'task'
+  | 'gitStatus'
+  | 'gitDiff'
+  | 'gitLog'
+  | 'gitAdd'
+  | 'gitUnstage'
+  | 'gitCommit'
   | 'question'
+  | 'toolSearch'
   | 'handoff'
-  | 'spark'
+  | 'planArtifact'
+  | 'memorySearch'
+  | 'memoryRead'
+  | 'memoryWrite'
+  | 'memoryDelete'
+  | 'skillsList'
+  | 'skillRead'
   | 'plug'
   | 'monitor'
-  | 'tool'
-  | 'warning';
+  | 'brain'
+  | 'taskCreate'
+  | 'taskUpdate'
+  | 'taskGet'
+  | 'taskList'
+  | 'taskStop'
+  | 'spark'
+  | 'tool';
 
 export type WorkProcessToolGroupKind =
   | 'explore'
@@ -106,7 +129,15 @@ export type WorkProcessRow =
     diagnosticCaption?: string;
     approval?: WorkProcessToolApproval;
     sourcePills?: Array<{ domain: string; url?: string; title?: string }>;
-    browseLink?: { label: string; url: string };
+    /** Single-page chip for web_fetch (distinct from search source pills). */
+    pageChip?: {
+      domain: string;
+      url: string;
+      pathLabel?: string;
+      title?: string;
+      status?: number;
+      bytes?: number;
+    };
   }
   | {
     type: 'toolAggregate';
