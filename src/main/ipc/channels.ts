@@ -13,6 +13,9 @@ export const IPC_HANDLER_DOMAINS = {
     'app:openPath',
     'app:copyText',
   ],
+  web: [
+    'web:resolveFavicon',
+  ],
   conversation: [
     'conversation:sendMessage',
     'conversation:rewriteFromMessage',

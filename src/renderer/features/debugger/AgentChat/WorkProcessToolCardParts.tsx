@@ -8,13 +8,20 @@ import { useWorkProcessLabel } from './workProcessUseLabel';
 
 export type ToolRowModel = Extract<WorkProcessRow, { type: 'tool' }>;
 
+const formatBytes = (bytes: number): string => {
+  if (!Number.isFinite(bytes) || bytes < 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10_240 ? 1 : 0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
 const SourcePills: React.FC<{ pills: NonNullable<ToolRowModel['sourcePills']> }> = ({ pills }) => (
   <div className="work-process-source-pills" data-testid="work-process-source-pills">
     {pills.map((pill) => {
       const content = (
         <>
           <FaviconImage domain={pill.domain} />
-          <span>{pill.title || pill.domain}</span>
+          <span>{pill.domain}</span>
         </>
       );
       return pill.url ? (
@@ -25,17 +32,50 @@ const SourcePills: React.FC<{ pills: NonNullable<ToolRowModel['sourcePills']> }>
           target="_blank"
           rel="noreferrer noopener"
           title={pill.title || pill.url}
+          onClick={(event) => event.stopPropagation()}
         >
           {content}
         </a>
       ) : (
-        <span key={pill.domain} className="work-process-source-pill" title={pill.title}>
+        <span key={pill.domain} className="work-process-source-pill" title={pill.title || pill.domain}>
           {content}
         </span>
       );
     })}
   </div>
 );
+
+/** Singular destination row: same pill grammar as search, but one focus chip + soft meta. */
+const WebPageDestination: React.FC<{ chip: NonNullable<ToolRowModel['pageChip']> }> = ({ chip }) => {
+  const statusLabel = typeof chip.status === 'number' ? String(chip.status) : '';
+  const bytesLabel = typeof chip.bytes === 'number' ? formatBytes(chip.bytes) : '';
+  const tooltip = [chip.title, chip.url].filter(Boolean).join('\n');
+
+  return (
+    <div className="work-process-web-destination" data-testid="work-process-web-page-chip">
+      <a
+        className="work-process-source-pill is-destination"
+        href={chip.url}
+        target="_blank"
+        rel="noreferrer noopener"
+        title={tooltip || chip.url}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <FaviconImage domain={chip.domain} />
+        <span>{chip.domain}</span>
+      </a>
+      {chip.pathLabel ? (
+        <span className="work-process-meta-chip is-path" title={chip.pathLabel}>{chip.pathLabel}</span>
+      ) : null}
+      {statusLabel ? (
+        <span className="work-process-meta-chip" title={`HTTP ${statusLabel}`}>{statusLabel}</span>
+      ) : null}
+      {bytesLabel ? (
+        <span className="work-process-meta-chip" title={bytesLabel}>{bytesLabel}</span>
+      ) : null}
+    </div>
+  );
+};
 
 const CopyPathButton: React.FC<{ path: string }> = ({ path }) => {
   const { language } = useI18n();
@@ -77,7 +117,7 @@ const resolveBodyText = (row: ToolRowModel): string => {
   if (row.family === 'git') return row.commandText?.trim() || row.target || row.previewLines[0] || '';
   if (row.family === 'search') return row.target || row.previewLines[0] || '';
   if (row.family === 'web') {
-    if (row.browseLink) return row.browseLink.label;
+    if (row.pageChip) return row.pageChip.domain;
     return row.target || row.previewLines[0] || '';
   }
   return row.pathChip?.trim() || row.target || row.previewLines[0] || '';
@@ -94,22 +134,17 @@ const resolveCollapsedSampleLines = (row: ToolRowModel): string[] => {
 export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   const bodyText = resolveBodyText(row);
   const sampleLines = resolveCollapsedSampleLines(row);
-  if (!bodyText && sampleLines.length === 0 && !row.sourcePills?.length && !row.browseLink) return null;
+  if (!bodyText && sampleLines.length === 0 && !row.sourcePills?.length && !row.pageChip) return null;
 
   if (row.family === 'web') {
+    const fetchTitle = row.pageChip?.title?.trim();
     return (
       <div className="work-process-tool-card-body family-web">
-        {row.browseLink ? (
-          <a
-            className="work-process-tool-card-link"
-            href={row.browseLink.url}
-            target="_blank"
-            rel="noreferrer noopener"
-            onClick={(event) => event.stopPropagation()}
-          >
-            {row.browseLink.label}
-          </a>
-        ) : bodyText ? (
+        {row.pageChip && fetchTitle ? (
+          <span className="work-process-tool-card-body-text is-summary" title={fetchTitle}>{fetchTitle}</span>
+        ) : null}
+        {row.pageChip ? <WebPageDestination chip={row.pageChip} /> : null}
+        {!row.pageChip && bodyText ? (
           <span className="work-process-tool-card-body-text">{bodyText}</span>
         ) : null}
         {row.sourcePills?.length ? <SourcePills pills={row.sourcePills} /> : null}
@@ -198,9 +233,10 @@ export const FamilyDetail: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   }
 
   if (row.family === 'web') {
-    if (!row.sourcePills?.length && lines.length <= 1) return null;
+    if (!row.sourcePills?.length && !row.pageChip && lines.length <= 1) return null;
     return (
       <div className="work-process-tool-card-detail family-web" data-testid="work-process-tool-preview">
+        {row.pageChip ? <WebPageDestination chip={row.pageChip} /> : null}
         {lines.length > 1 ? (
           <pre className="work-process-tool-card-preview">{lines.slice(1).join('\n')}</pre>
         ) : null}

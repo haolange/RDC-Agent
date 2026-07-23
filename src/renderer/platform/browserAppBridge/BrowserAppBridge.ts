@@ -49,6 +49,9 @@ class BrowserAppBridgeClient {
       openPath: (targetPath) => this.invoke('app:openPath', targetPath),
       copyText: (text) => this.invoke('app:copyText', text),
     },
+    web: {
+      resolveFavicon: (domain) => this.invoke('web:resolveFavicon', domain),
+    },
     conversation: {
       sendMessage: (request) => this.invoke('conversation:sendMessage', request),
       rewriteFromMessage: (request) => this.invoke('conversation:rewriteFromMessage', request),

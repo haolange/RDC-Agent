@@ -226,6 +226,15 @@ assert(buildToolAggregateSummary(aggregateTools).includes('读取了'), 'tool ag
 const PLAN_REQUIRED_TOOLS = [...workbenchToolIds, 'mcp__filesystem__read_file'];
 const allTools = [...new Set(PLAN_REQUIRED_TOOLS)];
 
+const builtinIconEntries = builtinIds
+  .filter((id) => id !== 'ask_user')
+  .map((id) => [id, WORK_PROCESS_TOOL_DISPLAY_CATALOG[id]?.icon]);
+for (const [id, icon] of builtinIconEntries) {
+  assert(icon && icon !== 'tool', `${id} must map to a semantic Work Process icon`);
+}
+const builtinIcons = builtinIconEntries.map(([, icon]) => icon);
+assert(new Set(builtinIcons).size === builtinIcons.length, `builtin Work Process icons must be unique, got duplicates among: ${builtinIcons.join(', ')}`);
+
 for (const toolName of allTools) {
   const fixture = FIXTURES[toolName];
   assert(fixture, `missing fixture for ${toolName}`);
@@ -287,6 +296,21 @@ for (const toolName of allTools) {
     assert(row.bodyText && row.bodyText.includes('src/main/index.ts'), 'read_file body should keep the path');
     assert(row.bodyText.includes('12 lines'), `read_file body should include totalLines, got "${row.bodyText}"`);
     assert(row.previewLines.some((line) => line.includes('export')), 'read_file preview should include file content');
+  }
+
+  if (toolName === 'web_search') {
+    assert(Array.isArray(row.sourcePills) && row.sourcePills.length > 0, 'web_search should expose source pills');
+    assert(row.sourcePills.every((pill) => pill.domain), 'web_search pills must include domain');
+    assert(!row.pageChip, 'web_search must not expose pageChip');
+    assert(row.icon === 'webSearch', 'web_search icon key must be webSearch');
+  }
+
+  if (toolName === 'web_fetch') {
+    assert(row.pageChip?.domain === 'example.com', `web_fetch should expose pageChip domain, got ${JSON.stringify(row.pageChip)}`);
+    assert(row.pageChip?.status === 200, 'web_fetch pageChip should include status');
+    assert(!row.sourcePills?.length, 'web_fetch must not reuse source pills');
+    assert(row.icon === 'webFetch', 'web_fetch icon key must be webFetch');
+    assert(row.verb === '已抓取', `web_fetch verb should be 已抓取, got "${row.verb}"`);
   }
 }
 

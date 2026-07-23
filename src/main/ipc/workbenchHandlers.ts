@@ -24,6 +24,7 @@ import { registerProjectSessionHandlers } from './projectSessionHandlers';
 import { registerRuntimeTerminalHandlers } from './runtimeTerminalHandlers';
 import { registerSettingsLlmHandlers } from './settingsLlmHandlers';
 import { registerShellHandlers } from './shellHandlers';
+import { registerWebHandlers } from './webHandlers';
 import { buildSessionOutputs } from './sessionOutputs';
 import { registerToolEvidenceHandlers } from './toolEvidenceHandlers';
 import { registerWorkflowHandlers } from './workflowHandlers';
@@ -266,6 +267,7 @@ export function registerIPCHandlers(): void {
   registerToolTraceBridge();
   preloadLlmConfig();
   registerShellHandlers();
+  registerWebHandlers();
   registerConversationHandlers(context);
   registerWorkflowHandlers(context);
   registerProjectSessionHandlers(context);
