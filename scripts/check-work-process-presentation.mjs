@@ -735,7 +735,7 @@ const webFetchPresentation = buildWorkProcessPresentation({
   ],
 });
 const webFetchRow = flattenRows(webFetchPresentation.rows).find((row) => row.type === 'tool' && row.toolName === 'web_fetch');
-assert(webFetchRow?.verb === '已抓取', 'web_fetch should use Fetched/已抓取 verb');
+assert(webFetchRow?.verb === '已抓取', 'web_fetch should use Fetched page/已抓取 verb');
 assert(webFetchRow?.icon === 'webFetch', 'web_fetch should use dedicated webFetch icon');
 assert(webFetchRow?.pageChip?.domain === 'www.example.com', 'web_fetch should expose pageChip domain');
 assert(webFetchRow?.pageChip?.url === 'https://www.example.com/docs/guide', 'web_fetch pageChip should keep url');
