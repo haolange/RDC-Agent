@@ -166,7 +166,7 @@ Tools must be declared with name, permission level, input schema, result summary
 - workflow: `ask_user`, `task_create`, `task_update`, `task_get`, `task_list`, `task_stop`, `agent_handoff`, `subagent`, `plan_artifact`;
 - discovery: `tool_search`, `skills`, `skill_read` (all `core` so Progressive Skill discovery does not depend on a prior `tool_search` hop);
 - context: `memory_search`, `memory_read`, `memory_write`, `memory_delete`, `mcp`;
-- RDC/RDX: `rdx_context`, plus Settings-managed capture open/preview/close, remote connection, and RDX shell actions.
+- RDC/RDX: `rdx_context`, plus Settings-managed `openCapture` / `openRemoteCapture` / `connectRemote` / `openPreview` / `closeRuntime` shell actions.
 
 Manifest-facing tokens expand through `CANONICAL_TOOL_TOKEN_EXPANSIONS`. The `task` token expands to `task_create`, `task_update`, `task_get`, `task_list`, and `task_stop`; `file-manage` expands to `delete_file`, `move_file`, `copy_file`, and `notebook_edit`; `memory-write` expands to `memory_write` and `memory_delete`. Removed tokens such as `todo` and `search_codebase` are rejected via `REJECTED_TOOL_TOKENS` with no silent fallback. Catalog includes `subagent`, `tool_search`, and `task_stop`.
 
@@ -188,6 +188,15 @@ Primitive tool correctness constraints apply in every permission mode, including
 This repository does not vendor an RDX toolchain. RDX and RenderDoc capabilities must come from user-configured external CLI actions in Settings. Do not hardcode CLI paths, catalog paths, shell commands, or repository fallbacks in `src/main`, `src/preload`, `src/renderer`, or packaging configuration.
 
 The only UI entrance for opening a `.rdc` into a session is the session context panel. Project-level surfaces may browse, import, and refresh project captures, but must not provide a hidden or duplicate open action. An opened `.rdc` is owned by the app session that opened it via `ownerSessionId`; RDX replay `sessionId` remains a runtime identifier and must not be used as the app-session owner. Session UI and agent context injection must fail closed when `ownerSessionId` does not match the current app session, so a new or switched session never inherits another session's opened capture.
+
+Capture Open is gated by the global Replay Device selection (DeviceSelector), not by filename heuristics:
+
+| Replay Device | Shell action | Correct use |
+| --- | --- | --- |
+| Local | `openCapture` | PC-local captures that RenderDoc can replay on this machine |
+| Android (connected) | `connectRemote` then `openRemoteCapture` (`capture open --remote-id`) | Android GPU captures that require remote replay |
+
+Local + Android-origin capture must fail closed with a structured diagnostic that tells the user to switch Replay Device; never silent-fallback to remote. Remote Open must not hardcode `rd.capture.*` tool names in main — only Settings-configured shell actions through `ShellInvocationService`. Failures surface `message` plus available `classification` / `fix_hint` / RenderDoc status; missing action configuration points to Settings → Tools.
 
 ## UI / UX Boundary
 

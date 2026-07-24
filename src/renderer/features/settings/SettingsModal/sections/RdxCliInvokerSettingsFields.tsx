@@ -19,26 +19,41 @@ interface RdxCliInvokerSettingsFieldsProps {
   t: Translate;
 }
 
-const RDX_ACTIONS: Array<{ id: RdxActionId; labelKey: TranslationKey; hintKey: TranslationKey }> = [
+const RDX_ACTIONS: Array<{
+  id: RdxActionId;
+  labelKey: TranslationKey;
+  hintKey: TranslationKey;
+  argsPlaceholder: string;
+}> = [
   {
     id: 'openCapture',
     labelKey: 'settings.rdxActionOpenCapture',
     hintKey: 'settings.rdxActionOpenCaptureHint',
+    argsPlaceholder: '--non-interactive --daemon-context {{inputId}} --json capture open --file {{capturePath}} --frame-index 0',
+  },
+  {
+    id: 'openRemoteCapture',
+    labelKey: 'settings.rdxActionOpenRemoteCapture',
+    hintKey: 'settings.rdxActionOpenRemoteCaptureHint',
+    argsPlaceholder: '--non-interactive --daemon-context {{remoteContextId}} --json capture open --file {{capturePath}} --remote-id {{remoteId}} --frame-index 0',
   },
   {
     id: 'connectRemote',
     labelKey: 'settings.rdxActionConnectRemote',
     hintKey: 'settings.rdxActionConnectRemoteHint',
+    argsPlaceholder: '--non-interactive --daemon-context {{deviceId}} --json call rd.remote.connect --args-json {"options":{"transport":"adb_android","device_serial":"{{deviceSerial}}"}} --format json',
   },
   {
     id: 'openPreview',
     labelKey: 'settings.rdxActionOpenPreview',
     hintKey: 'settings.rdxActionOpenPreviewHint',
+    argsPlaceholder: '--non-interactive --daemon-context {{contextId}} --json session preview on --session-id {{replaySessionId}}',
   },
   {
     id: 'closeRuntime',
     labelKey: 'settings.rdxActionCloseRuntime',
     hintKey: 'settings.rdxActionCloseRuntimeHint',
+    argsPlaceholder: '--non-interactive --daemon-context {{contextId}} --json context clear',
   },
 ];
 
@@ -209,7 +224,7 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
                     <input
                       className="input settings-rdx-cli-input"
                       value={argsText}
-                      placeholder="capture open --file {{capturePath}} --json"
+                      placeholder={entry.argsPlaceholder}
                       onChange={(event) => patchRdxActionDraft(entry.id, {
                         args: event.currentTarget.value.split(/\s+/).map((value) => value.trim()).filter(Boolean),
                       })}

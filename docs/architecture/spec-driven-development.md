@@ -27,7 +27,7 @@ Catalog/runtime summary configuration reads `settings.tooling.rdxCli`:
 - `catalogPath`
 - `jsonMode`
 
-Open `.rdc`, connect remote, preview, and close runtime read `settings.tooling.rdxActions`. If the CLI/action configuration is disabled or incomplete, execution fails closed with an explicit diagnostic. There is no repository-path fallback.
+Open `.rdc` (`openCapture` / `openRemoteCapture`), connect remote, preview, and close runtime read `settings.tooling.rdxActions`. If the CLI/action configuration is disabled or incomplete, execution fails closed with an explicit diagnostic. There is no repository-path fallback.
 
 ## Catalog Contract
 

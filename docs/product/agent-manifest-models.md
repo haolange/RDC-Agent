@@ -127,4 +127,4 @@ Removed tokens `todo` and `search_codebase` are rejected (`REJECTED_TOOL_TOKENS`
 
 ## RDX Shell Actions
 
-Open `.rdc`、connect remote、preview、close runtime are Settings-managed shell actions under `settings.tooling.rdxActions`. The main process executes configured shell actions through `ShellInvocationService`, parses JSON output, and stores stable `RdxRuntimeContext` for later agent/tool use.
+Open `.rdc`（local `openCapture` / remote `openRemoteCapture`）、connect remote、preview、close runtime are Settings-managed shell actions under `settings.tooling.rdxActions`. The main process executes configured shell actions through `ShellInvocationService`, parses JSON output, and stores stable `RdxRuntimeContext` for later agent/tool use.

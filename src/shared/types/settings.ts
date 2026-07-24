@@ -291,7 +291,12 @@ export interface RdxCliInvokerSettings {
   jsonMode: RdxCliJsonMode;
 }
 
-export type RdxActionId = 'openCapture' | 'connectRemote' | 'closeRuntime' | 'openPreview';
+export type RdxActionId =
+  | 'openCapture'
+  | 'openRemoteCapture'
+  | 'connectRemote'
+  | 'closeRuntime'
+  | 'openPreview';
 
 export interface RdxShellActionSettings {
   enabled: boolean;
