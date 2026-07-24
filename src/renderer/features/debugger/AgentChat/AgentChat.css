@@ -1704,19 +1704,6 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   padding-bottom: 0;
 }
 
-.work-process-reasoning-indicator {
-  padding-bottom: var(--space-2);
-}
-
-.work-process-reasoning-indicator-text {
-  width: 100%;
-  margin: 0;
-  padding-left: calc(var(--space-4) + var(--space-2));
-  color: var(--token-text-caption);
-  font-size: var(--text-xs);
-  line-height: 1.5;
-}
-
 .work-process-thinking-state {
   display: block;
   width: 100%;

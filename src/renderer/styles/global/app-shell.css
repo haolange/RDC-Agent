@@ -871,12 +871,12 @@ html[data-resolved-theme='light'] .app-main {
   min-width: 0;
 }
 
-.context-breakdown-meter-eyebrow {
-  color: var(--token-text-placeholder);
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.context-breakdown-preparing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 var(--space-5) var(--space-4);
+  min-width: 0;
 }
 
 .context-breakdown-run-columns {

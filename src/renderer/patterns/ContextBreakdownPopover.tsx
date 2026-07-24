@@ -33,11 +33,10 @@ const MeterStat: React.FC<{ label: string; value: string }> = ({ label, value })
   </div>
 );
 
+/** Flat Tokens | Cache | Reasoning strip under Actual / Last actual hero (phase lives in hero only). */
 const ContextRunMeterBand: React.FC<{
   usage: RunContextUsageSummary;
-  phaseLabel: string;
-  showWindowPercent?: boolean;
-}> = ({ usage, phaseLabel, showWindowPercent = false }) => {
+}> = ({ usage }) => {
   const { t } = useI18n();
   const cacheReady = hasCacheTelemetry(usage);
   const saved = cacheReady ? (usage.cacheSavedTokens ?? usage.cacheHitTokens) : undefined;
@@ -47,25 +46,16 @@ const ContextRunMeterBand: React.FC<{
     ? formatTokenCount(usage.reasoningTokens)
     : METER_UNAVAILABLE;
 
-  // Hero already shows Actual; keep eyebrow only for Last actual under Current request.
-  const showEyebrow = showWindowPercent || /last/i.test(phaseLabel);
-
   return (
     <div
       className="context-breakdown-run-meter"
       data-testid="context-breakdown-run-meter"
       data-columns="3"
     >
-      {showEyebrow ? (
-        <div className="context-breakdown-meter-eyebrow">{phaseLabel}</div>
-      ) : null}
       <div className="context-breakdown-run-columns">
         <section className="context-breakdown-run-col" data-col="tokens" aria-label={t('contextBreakdown.tokensColumn')}>
           <h3 className="context-breakdown-run-col-title">{t('contextBreakdown.tokensColumn')}</h3>
           <div className="context-breakdown-meter-stats">
-            {showWindowPercent ? (
-              <MeterStat label={t('contextBreakdown.windowUsed')} value={`${usage.usagePercent}%`} />
-            ) : null}
             <MeterStat label={t('contextBreakdown.inputLabel')} value={formatTokenCount(usage.inputTokens)} />
             <MeterStat label={t('contextBreakdown.outputLabel')} value={formatTokenCount(usage.outputTokens)} />
             <MeterStat label={t('contextBreakdown.totalLabel')} value={formatTokenCount(usage.totalTokens)} />
@@ -117,8 +107,9 @@ export const ContextBreakdownPopover: React.FC<{
   const setContextBreakdownExpanded = useAppSettingsStore(
     (state) => state.setContextBreakdownExpanded,
   );
+  // One phase owns the popover narrative: Preparing | Current request | Actual | Last actual.
   const showPrepared = phase === 'current' && prepared !== null;
-  const showActualAsPrimary = !showPrepared && usage !== null;
+  const showActualAsPrimary = (phase === 'actual' || phase === 'idle') && usage !== null;
   const windowTokens = showPrepared
     ? prepared.promptBudgetTokens
     : showActualAsPrimary
@@ -171,12 +162,17 @@ export const ContextBreakdownPopover: React.FC<{
         </div>
 
         {phase === 'preparing' ? (
-          <div className="context-breakdown-status is-pending" role="status">
-            {t('contextBreakdown.preparing')}
+          <div className="context-breakdown-preparing" data-testid="context-breakdown-preparing">
+            <div className="context-breakdown-status is-pending" role="status">
+              {t('contextBreakdown.preparing')}
+            </div>
+            {selectedContextWindowTokens ? (
+              <span className="context-breakdown-run-stat">
+                {t('contextBreakdown.selectedWindow')} {formatTokenCount(selectedContextWindowTokens)}
+              </span>
+            ) : null}
           </div>
-        ) : null}
-
-        {!showPrepared && !showActualAsPrimary ? (
+        ) : !showPrepared && !showActualAsPrimary ? (
           <div className="context-breakdown-empty-state">
             <p className="context-breakdown-empty">{t('contextBreakdown.noUsageYet')}</p>
             {selectedContextWindowTokens ? (
@@ -238,18 +234,7 @@ export const ContextBreakdownPopover: React.FC<{
         )}
 
         {hasRunTotals && showActualAsPrimary && usage ? (
-          <ContextRunMeterBand
-            usage={usage}
-            phaseLabel={phase === 'actual' ? t('contextBreakdown.actual') : t('contextBreakdown.lastActual')}
-          />
-        ) : null}
-
-        {usage && showPrepared ? (
-          <ContextRunMeterBand
-            usage={usage}
-            phaseLabel={t('contextBreakdown.lastActual')}
-            showWindowPercent
-          />
+          <ContextRunMeterBand usage={usage} />
         ) : null}
 
         {breakdown.length > 0 ? (

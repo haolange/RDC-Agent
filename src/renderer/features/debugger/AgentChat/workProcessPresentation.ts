@@ -255,7 +255,6 @@ const getLoopProjectionDeps = () => ({
   resolveResponseThinking,
   isNonFinalStopReason,
   normalizeThinkingDedupKey,
-  createReasoningIndicatorRow,
   createApprovalRow,
   createDiagnosticRow,
   shouldSkipBlock,
@@ -305,18 +304,6 @@ export const buildWorkProcessPresentation = (
     important,
   };
 };
-
-const createReasoningIndicatorRow = (
-  block: ConversationWorkBlock,
-  state: Extract<ConversationReasoningState, 'opaque' | 'hidden'>,
-): Extract<WorkProcessRow, { type: 'reasoningIndicator' }> => ({
-  type: 'reasoningIndicator',
-  id: `reasoning-indicator-${block.id}`,
-  status: block.status,
-  state,
-  duration: formatDurationMs(block.startedAt, block.completedAt),
-  loopId: block.id,
-});
 
 const groupProcessRows = (rows: WorkProcessRow[]): WorkProcessRow[] => rows;
 

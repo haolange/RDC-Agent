@@ -140,8 +140,13 @@ requireCssContract(
 requireCssContract(
   contextBreakdownPopover.includes("t('contextBreakdown.currentRequest')")
     && contextBreakdownPopover.includes("t('contextBreakdown.lastActual')")
-    && contextBreakdownPopover.includes('prepared.compactionApplied'),
-  'Context popover must separate prepared Current request from Last actual and disclose applied compaction.',
+    && contextBreakdownPopover.includes('prepared.compactionApplied')
+    && contextBreakdownPopover.includes("phase === 'actual' || phase === 'idle'")
+    && contextBreakdownPopover.includes("data-testid=\"context-breakdown-preparing\"")
+    && !contextBreakdownPopover.includes('showWindowPercent')
+    && !contextBreakdownPopover.includes('context-breakdown-meter-eyebrow')
+    && (contextBreakdownPopover.match(/data-testid="context-breakdown-run-meter"/g) || []).length === 1,
+  'Context popover must keep one phase authority: Preparing without Last actual hero/meter, Current request without a stacked historical meter, and a single Tokens/Cache/Reasoning strip under Actual/Last actual (no repeated phase eyebrow).',
 );
 requireCssContract(
   interactionPerformanceProbe.includes("get(PERFORMANCE_QUERY_KEY) !== '1') return")

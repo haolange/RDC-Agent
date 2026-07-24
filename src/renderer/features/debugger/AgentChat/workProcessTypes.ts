@@ -1,7 +1,6 @@
 import type {
   ConversationLoopOutputPhase,
   ConversationLoopStopReason,
-  ConversationReasoningState,
   ConversationDiagnosticSeverity,
   ConversationWorkBlock,
 } from '@shared/types/conversation';
@@ -221,14 +220,6 @@ export type WorkProcessRow =
     visibleSteps: WorkProcessRow[];
     outputPhase?: ConversationLoopOutputPhase;
     stopReason?: ConversationLoopStopReason;
-    loopId: string;
-  }
-  | {
-    type: 'reasoningIndicator';
-    id: string;
-    status: WorkProcessRowStatus;
-    state: Extract<ConversationReasoningState, 'opaque' | 'hidden'>;
-    duration: string;
     loopId: string;
   };
 
