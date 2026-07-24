@@ -27,9 +27,9 @@
     {
       "id": "rdc-agent:kimi-coding-plan:0",
       "sourceKind": "rdc-agent",
-      "sourceRevision": "kimi-code-catalog-v1",
-      "observedAt": "2026-07-17",
-      "refreshedAt": "2026-07-17T00:00:00+08:00",
+      "sourceRevision": "kimi-code-catalog-v2-always-on",
+      "observedAt": "2026-07-23",
+      "refreshedAt": "2026-07-23T00:00:00+08:00",
       "surface": "kimi-coding-plan",
       "accountScope": "credential-scoped",
       "plan": "Kimi Coding Plan"
@@ -193,13 +193,16 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "unknown",
+          "kind": "always-on",
           "supportsOff": false,
           "levels": [],
-          "defaultState": "provider-managed",
+          "defaultState": "known",
           "defaultSelection": "on",
+          "lockedSelection": "on",
           "wireProfile": {
-            "kind": "none"
+            "kind": "anthropic",
+            "on": "max",
+            "onMode": "enabled"
           }
         }
       },
@@ -588,13 +591,16 @@
           "defaultValue": false
         },
         "reasoning": {
-          "kind": "unknown",
+          "kind": "always-on",
           "supportsOff": false,
           "levels": [],
-          "defaultState": "provider-managed",
+          "defaultState": "known",
           "defaultSelection": "on",
+          "lockedSelection": "on",
           "wireProfile": {
-            "kind": "none"
+            "kind": "anthropic",
+            "on": "max",
+            "onMode": "enabled"
           }
         }
       },
@@ -642,7 +648,52 @@
       }
     }
   ],
-  "protocolOverrides": [],
+  "protocolOverrides": [
+    {
+      "modelId": "kimi-for-coding",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "always-on",
+            "supportsOff": false,
+            "levels": [],
+            "defaultState": "known",
+            "defaultSelection": "on",
+            "lockedSelection": "on",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "max",
+              "onMode": "thinking-enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:kimi-coding-plan:0"
+    },
+    {
+      "modelId": "kimi-for-coding-highspeed",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "always-on",
+            "supportsOff": false,
+            "levels": [],
+            "defaultState": "known",
+            "defaultSelection": "on",
+            "lockedSelection": "on",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "max",
+              "onMode": "thinking-enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:kimi-coding-plan:0"
+    }
+  ],
   "recommendedModels": [
     "kimi-for-coding"
   ],

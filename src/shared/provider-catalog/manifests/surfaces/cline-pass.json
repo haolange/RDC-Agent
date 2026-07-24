@@ -24,9 +24,9 @@
     {
       "id": "rdc-agent:cline-pass:0",
       "sourceKind": "rdc-agent",
-      "sourceRevision": "cline-pass-v1",
-      "observedAt": "2026-07-20",
-      "refreshedAt": "2026-07-20T00:00:00+08:00",
+      "sourceRevision": "cline-pass-v2-live-2026-07-23",
+      "observedAt": "2026-07-23",
+      "refreshedAt": "2026-07-23T00:00:00+08:00",
       "surface": "cline-pass",
       "accountScope": "credential-scoped"
     }
@@ -350,14 +350,15 @@
         {
           "id": "default",
           "label": "Default",
-          "maxPromptTokens": 128000,
+          "maxPromptTokens": 1000000,
+          "maxTotalTokens": 1000000,
           "activation": {
             "kind": "implicit"
           },
           "entitlement": "unknown"
         }
       ],
-      "defaultBudgetTokens": 128000,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -382,8 +383,11 @@
           "fixedValue": false
         },
         "context1m": {
-          "state": "unsupported",
-          "fixedValue": false
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "unknown",
+          "tierId": "default",
+          "label": "Max mode"
         },
         "reasoning": {
           "kind": "unknown",
@@ -418,14 +422,15 @@
         {
           "id": "default",
           "label": "Default",
-          "maxPromptTokens": 128000,
+          "maxPromptTokens": 1000000,
+          "maxTotalTokens": 1000000,
           "activation": {
             "kind": "implicit"
           },
           "entitlement": "unknown"
         }
       ],
-      "defaultBudgetTokens": 128000,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -450,8 +455,11 @@
           "fixedValue": false
         },
         "context1m": {
-          "state": "unsupported",
-          "fixedValue": false
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "unknown",
+          "tierId": "default",
+          "label": "Max mode"
         },
         "reasoning": {
           "kind": "unknown",
@@ -622,14 +630,15 @@
         {
           "id": "default",
           "label": "Default",
-          "maxPromptTokens": 200000,
+          "maxPromptTokens": 1000000,
+          "maxTotalTokens": 1000000,
           "activation": {
             "kind": "implicit"
           },
           "entitlement": "unknown"
         }
       ],
-      "defaultBudgetTokens": 200000,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -654,8 +663,11 @@
           "fixedValue": false
         },
         "context1m": {
-          "state": "unsupported",
-          "fixedValue": false
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "unknown",
+          "tierId": "default",
+          "label": "Max mode"
         },
         "reasoning": {
           "kind": "unknown",
@@ -690,7 +702,8 @@
         {
           "id": "default",
           "label": "Default",
-          "maxPromptTokens": 256000,
+          "maxPromptTokens": 1000000,
+          "maxTotalTokens": 1000000,
           "activation": {
             "kind": "implicit"
           },
@@ -722,8 +735,11 @@
           "fixedValue": false
         },
         "context1m": {
-          "state": "unsupported",
-          "fixedValue": false
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "unknown",
+          "tierId": "default",
+          "label": "Max mode"
         },
         "reasoning": {
           "kind": "unknown",

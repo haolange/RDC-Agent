@@ -129,12 +129,12 @@ describe('live Provider Catalog parsers', () => {
     });
     expect(contribution.controls?.reasoning).toMatchObject({ kind: 'unknown', supportsOff: false });
   });
-  it('preserves OpenCode Go per-model protocols', () => {
+  it('preserves OpenCode Go per-model protocols for dynamically admitted rows', () => {
     const parsed = parseOpenCodeGoCatalog(fixture('opencode-go.json'));
     expect(Object.fromEntries(parsed.contributions.map((model) => [model.modelId, model.route?.protocol]))).toEqual({
       'glm-4.7': 'OpenAICompatibleChatCompletions',
       'gpt-5.4': 'OpenAIResponses',
-      'minimax-m2.5': 'AnthropicMessages',
+      'anthropic-probe': 'AnthropicMessages',
     });
     expect(parsed.contributions.every((model) => model.route?.source === 'catalog')).toBe(true);
   });
@@ -206,12 +206,19 @@ describe('live Provider Catalog parsers', () => {
           protocol: 'OpenAICompatibleChatCompletions',
           baseUrl: 'https://api.cline.bot/api/v1',
         }),
-        // recommended-models rows do not carry context; keep catalog-observation entitlement unknown.
+        // Live description advertises 1M; keep catalog-observation entitlement unknown until granted.
         contextTiers: [expect.objectContaining({
           id: 'default',
-          maxPromptTokens: 256000,
+          maxPromptTokens: 1_000_000,
           entitlement: 'unknown',
         })],
+        controls: expect.objectContaining({
+          context1m: expect.objectContaining({
+            state: 'fixed',
+            fixedValue: true,
+            entitlement: 'unknown',
+          }),
+        }),
       }),
     ]));
   });

@@ -98,13 +98,20 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     });
   });
 
-  it('keeps Kimi catalog controls provider-managed before live discovery', () => {
+  it('keeps Kimi for Coding always-on reasoning on the selected OpenAI-compatible route', () => {
     const openAiKimi = mergeEffectiveCatalog(buildEffectiveCatalogRequest(
       provider('kimi-coding-plan', 'OpenAICompatibleChatCompletions'),
     )).find((model) => model.modelId === 'kimi-for-coding');
     expect(openAiKimi).toMatchObject({
       route: { protocol: 'OpenAICompatibleChatCompletions' },
-      controls: { reasoning: { kind: 'unknown', wireProfile: { kind: 'none' } } },
+      controls: {
+        reasoning: {
+          kind: 'always-on',
+          supportsOff: false,
+          lockedSelection: 'on',
+          wireProfile: { kind: 'openai-compatible', on: 'max', onMode: 'thinking-enabled' },
+        },
+      },
       routeOptions: [
         { id: 'AnthropicMessages', route: { protocol: 'AnthropicMessages' } },
         { id: 'OpenAICompatibleChatCompletions', route: { protocol: 'OpenAICompatibleChatCompletions' } },
@@ -172,15 +179,21 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     });
   });
 
-  it('tombstones absent Kimi account models and fails closed when HighSpeed is absent', () => {
+  it('tombstones absent Kimi account models and keeps Fast selectable but denied without HighSpeed', () => {
     const kimi = provider('kimi-coding-plan', 'AnthropicMessages');
     const discovery = applyDiscoveryAuthority(kimi, [{
       modelId: 'kimi-for-coding',
       availability: 'available',
       controls: {
-        fast: { state: 'unsupported', fixedValue: false },
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'denied' },
       },
-      executionBindings: [],
+      executionBindings: [{
+        id: 'fast:kimi-for-coding-highspeed',
+        when: { fast: true },
+        actions: [{ kind: 'model-switch', targetModelId: 'kimi-for-coding-highspeed' }],
+        entitlement: 'denied',
+        unavailableReason: 'Execution target kimi-for-coding-highspeed is unavailable.',
+      }],
     }]);
     expect(discovery).toEqual([
       expect.objectContaining({ modelId: 'kimi-for-coding', availability: 'available' }),
@@ -198,7 +211,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       availability: 'unavailable',
     });
     expect(models.find((model) => model.modelId === 'kimi-for-coding')?.controls.fast)
-      .toEqual({ state: 'unsupported', fixedValue: false });
+      .toEqual({ state: 'selectable', defaultValue: false, entitlement: 'denied' });
   });
   it('keeps the maintained MiniMax highspeed target when discovery validates only the base', () => {
     const minimax = provider('minimax-global', 'AnthropicMessages');

@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   buildInitialTurnControls,
+  hasSelectableFastMode,
   hasSelectableOneMillionContext,
+  hasStructuralFastMode,
+  hasStructuralOneMillionContext,
+  isFastModeDenied,
+  isFastModeUnverified,
+  isOneMillionContextDenied,
   isOneMillionContextUnverified,
   sanitizeTurnControls,
 } from './turnControlsUtils';
@@ -156,5 +162,43 @@ describe('turnControlsUtils', () => {
         index === 1 ? { ...tier, entitlement: 'denied' as const } : tier
       )),
     })).toBe(false);
+  });
+
+  it('keeps structural Fast/Max visible when entitlement is denied or unverified', () => {
+    const deniedFast = {
+      ...levelsCapability,
+      controls: {
+        ...levelsCapability.controls,
+        fast: { state: 'selectable' as const, defaultValue: false, entitlement: 'denied' as const },
+        context1m: { state: 'selectable' as const, defaultValue: false, entitlement: 'denied' as const, tierId: 'max' },
+      },
+    };
+    expect(hasStructuralFastMode(deniedFast)).toBe(true);
+    expect(hasSelectableFastMode(deniedFast)).toBe(false);
+    expect(isFastModeDenied(deniedFast)).toBe(true);
+    expect(hasStructuralOneMillionContext(deniedFast)).toBe(true);
+    expect(isOneMillionContextDenied(deniedFast)).toBe(true);
+
+    const unverifiedFast = {
+      ...levelsCapability,
+      controls: {
+        ...levelsCapability.controls,
+        fast: { state: 'selectable' as const, defaultValue: false, entitlement: 'unknown' as const },
+      },
+    };
+    expect(hasStructuralFastMode(unverifiedFast)).toBe(true);
+    expect(hasSelectableFastMode(unverifiedFast)).toBe(false);
+    expect(isFastModeUnverified(unverifiedFast)).toBe(true);
+
+    const unsupported = {
+      ...levelsCapability,
+      controls: {
+        ...levelsCapability.controls,
+        fast: { state: 'unsupported' as const, fixedValue: false },
+        context1m: { state: 'unsupported' as const, fixedValue: false },
+      },
+    };
+    expect(hasStructuralFastMode(unsupported)).toBe(false);
+    expect(hasStructuralOneMillionContext(unsupported)).toBe(false);
   });
 });
