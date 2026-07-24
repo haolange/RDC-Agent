@@ -44,6 +44,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     },
     rdxActions: {
       openCapture: createEmptyRdxAction(),
+      openRemoteCapture: createEmptyRdxAction(),
       connectRemote: createEmptyRdxAction(),
       closeRuntime: createEmptyRdxAction(),
       openPreview: createEmptyRdxAction(),

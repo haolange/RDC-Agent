@@ -102,7 +102,7 @@
 ## RDX CLI Invoker 边界
 
 - 本仓库不保留内置 RDX tool 副本，不把任何 tool bridge、MCP server 或仓库资源目录作为默认执行链；RenderDoc/RDX 能力必须来自系统安装或用户配置的外部 CLI。
-- Open `.rdc`、connect remote、preview、close runtime 等垂直入口必须经 Settings 中配置的 RDX shell action 进入 `ShellInvocationService`；不得在主进程、preload、renderer 或打包配置中写死 CLI 命令、catalog 路径或仓库 fallback。
+- Open `.rdc`（local `openCapture` / remote `openRemoteCapture`）、connect remote、preview、close runtime 等垂直入口必须经 Settings 中配置的 RDX shell action 进入 `ShellInvocationService`；不得在主进程、preload、renderer 或打包配置中写死 CLI 命令、catalog 路径或仓库 fallback。
 - 新增 RDX CLI 配置项时必须同步 `src/shared/types/settings.ts`、`SettingsService` sanitize、Settings UI 和文档；不得在调用点硬编码命令、catalog 路径或环境变量。
 - renderer/preload 不暴露任意 tool execute 入口；UI 只读取 catalog、runtime summary 和 trace projection，实际执行由主进程根据 workflow/runtime policy 调用配置的 CLI。
 

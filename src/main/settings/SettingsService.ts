@@ -216,6 +216,7 @@ const createDefaultRdxAction = (): RdxShellActionSettings => ({
 
 const DEFAULT_RDX_ACTIONS: RdxActionSettingsMap = {
   openCapture: createDefaultRdxAction(),
+  openRemoteCapture: createDefaultRdxAction(),
   connectRemote: createDefaultRdxAction(),
   closeRuntime: createDefaultRdxAction(),
   openPreview: createDefaultRdxAction(),
@@ -314,6 +315,10 @@ function sanitizeRdxActionsSettings(value: unknown): RdxActionSettingsMap {
   const candidate = value && typeof value === 'object' ? value as Partial<Record<RdxActionId, unknown>> : {};
   return {
     openCapture: sanitizeRdxShellActionSettings(candidate.openCapture, DEFAULT_RDX_ACTIONS.openCapture),
+    openRemoteCapture: sanitizeRdxShellActionSettings(
+      candidate.openRemoteCapture,
+      DEFAULT_RDX_ACTIONS.openRemoteCapture,
+    ),
     connectRemote: sanitizeRdxShellActionSettings(candidate.connectRemote, DEFAULT_RDX_ACTIONS.connectRemote),
     closeRuntime: sanitizeRdxShellActionSettings(candidate.closeRuntime, DEFAULT_RDX_ACTIONS.closeRuntime),
     openPreview: sanitizeRdxShellActionSettings(candidate.openPreview, DEFAULT_RDX_ACTIONS.openPreview),

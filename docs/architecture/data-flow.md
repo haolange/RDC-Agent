@@ -36,14 +36,18 @@ sequenceDiagram
 sequenceDiagram
   participant UI as Renderer
   participant IPC as Main IPC
-  participant Session as RdxRuntimeContextService
+  participant Session as RdxSessionService
   participant Action as RdxShellActionService
   participant Shell as ShellInvocationService
   participant CLI as System-installed RDX CLI
 
   UI->>IPC: capture:openProjectInput / context:openHumanPreview
-  IPC->>Session: run configured action
-  Session->>Action: openCapture / connectRemote / openPreview / closeRuntime
+  IPC->>Session: openProjectInput or preview
+  alt Local Replay Device
+    Session->>Action: openCapture
+  else Android Replay Device
+    Session->>Action: connectRemote via ReplayDeviceService then openRemoteCapture
+  end
   Action->>Shell: command + args + cwd + env
   Shell->>CLI: configured shell command
   CLI-->>Shell: stdout / stderr / exit code
@@ -53,7 +57,9 @@ sequenceDiagram
   IPC-->>UI: context:changed and opened capture state
 ```
 
-RDX command details are Settings data under `settings.tooling.rdxActions`. The repository does not hardcode RDX CLI tool names, command args, cwd, env, or fallback repository paths in renderer/preload call sites.
+RDX command details are Settings data under `settings.tooling.rdxActions` (`openCapture`, `openRemoteCapture`, `connectRemote`, `openPreview`, `closeRuntime`). The repository does not hardcode RDX CLI tool names, command args, cwd, env, or fallback repository paths in renderer/preload/main call sites for these vertical UI actions.
+
+Local Open uses `capture open --file {{capturePath}}`. Remote Open uses the same facade with `--remote-id {{remoteId}}` after `connectRemote` prepares a live handle. Failures must expose structured diagnostics (`message`, optional `classification` / `fix_hint`) rather than truncated CLI stderr alone.
 
 ## Trace Projection
 
@@ -77,11 +83,4 @@ sequenceDiagram
 
 Settings are persisted by `SettingsService`, sanitized before write, and exposed to renderer through settings IPC.
 
-Relevant settings groups:
-
-- `settings.agents.definitions`: loaded from effective `.agent.md` profiles such as Ask, Plan, Edit, Debugger, Analyzer, and Optimizer. The manifest is also the sole persisted Agent/provider/model route truth.
-- `settings.llm.agentRoutes`: read-only runtime projection derived from effective manifests; it is never written to settings or used as a fallback truth.
-- `settings.tooling.rdxActions`: configured shell actions for RDX runtime context.
-- `settings.tooling.rdxCli`: optional catalog/runtime summary configuration.
-
-Renderer code can read settings, catalog, runtime summary, trace, and context projections. Actual shell execution is owned by main process services.
+Renderer Settings editors never invent provider/model facts; Effective Catalog and connection state come from main. Secret material stays in main-process opaque storage.

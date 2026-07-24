@@ -20,32 +20,20 @@ interface OpenProjectInputOptions {
   setContextSnapshot: (snapshot: ContextSnapshot | null) => void;
   setOpenedCapture: (openedCapture: OpenedCaptureState | null) => void;
   setErrorMessage: (message: string | null) => void;
+  setStatusMessage?: (message: string | null) => void;
+  setSelectedInputId?: (inputId: string) => void;
   t: (key: TranslationKey, params?: Record<string, string | number>) => string;
   onStart?: () => void;
   onComplete?: () => void;
 }
 
-export const createOpeningState = (
-  input: ProjectInputRecord,
-  projectId: string,
-  ownerSessionId: string | null,
-  device: ReplayDeviceEntry,
-): OpenedCaptureState => ({
-  projectId,
-  ownerSessionId,
-  inputId: input.inputId,
-  filePath: input.filePath,
-  captureId: input.inputId,
-  sessionId: '',
-  contextId: '',
-  replaySessionId: '',
-  backend: device.type === 'android' ? 'remote' : 'local',
-  deviceId: device.id,
-  deviceLabel: device.label,
-  status: 'opening',
-  openedAt: Date.now(),
-  preview: null,
-});
+const isLocalReplayUnsupportedError = (message: string | null | undefined): boolean => (
+  Boolean(message?.includes('LOCAL_REPLAY_UNSUPPORTED'))
+);
+
+const stripLocalReplayUnsupportedMarker = (message: string): string => (
+  message.replace(/^LOCAL_REPLAY_UNSUPPORTED\s*/i, '').trim()
+);
 
 export async function openProjectInput(options: OpenProjectInputOptions): Promise<void> {
   const {
@@ -58,6 +46,8 @@ export async function openProjectInput(options: OpenProjectInputOptions): Promis
     setContextSnapshot,
     setOpenedCapture,
     setErrorMessage,
+    setStatusMessage,
+    setSelectedInputId,
     t,
     onStart,
     onComplete,
@@ -77,14 +67,18 @@ export async function openProjectInput(options: OpenProjectInputOptions): Promis
     await getElectronApi()?.capture.clearOpenedState();
     setContextSnapshot(null);
     setCaptures([]);
-    setOpenedCapture(createOpeningState(input, currentProject.projectId, ownerSessionId, selectedDeviceEntry));
+    // Keep the picker mounted while opening — optimistic OpenedState swaps the panel and
+    // drops selection/error when the open fails.
+    setOpenedCapture(null);
+    setSelectedInputId?.(input.inputId);
     setErrorMessage(null);
+    setStatusMessage?.(null);
 
     if (
       selectedDeviceEntry.type === 'android'
       && !['connected', 'online'].includes(selectedDeviceEntry.status)
     ) {
-      setErrorMessage(t('control.captureRemoteConnecting'));
+      setStatusMessage?.(t('control.captureRemoteConnecting'));
     }
 
     const result = await getElectronApi()!.capture.openProjectInput({
@@ -94,6 +88,8 @@ export async function openProjectInput(options: OpenProjectInputOptions): Promis
       filePath: input.filePath,
       replayDeviceId: selectedDeviceEntry.id,
     });
+
+    setStatusMessage?.(null);
 
     if (result.success) {
       setOpenedCapture(result.openedCapture ?? null);
@@ -106,10 +102,29 @@ export async function openProjectInput(options: OpenProjectInputOptions): Promis
     }
 
     setOpenedCapture(null);
-    setErrorMessage(result.error ?? t('control.captureOpenFailed'));
+    setSelectedInputId?.(input.inputId);
+    const rawError = result.error ?? t('control.captureOpenFailed');
+    if (selectedDeviceEntry.type === 'local' && isLocalReplayUnsupportedError(rawError)) {
+      const detail = stripLocalReplayUnsupportedMarker(rawError);
+      setErrorMessage(detail
+        ? `${t('control.captureLocalReplayUnsupported')}\n${detail}`
+        : t('control.captureLocalReplayUnsupported'));
+      return;
+    }
+    setErrorMessage(rawError);
   } catch (error) {
     setOpenedCapture(null);
-    setErrorMessage(error instanceof Error ? error.message : t('control.captureOpenFailed'));
+    setSelectedInputId?.(input.inputId);
+    setStatusMessage?.(null);
+    const message = error instanceof Error ? error.message : t('control.captureOpenFailed');
+    if (selectedDeviceEntry.type === 'local' && isLocalReplayUnsupportedError(message)) {
+      const detail = stripLocalReplayUnsupportedMarker(message);
+      setErrorMessage(detail
+        ? `${t('control.captureLocalReplayUnsupported')}\n${detail}`
+        : t('control.captureLocalReplayUnsupported'));
+      return;
+    }
+    setErrorMessage(message);
   } finally {
     onComplete?.();
   }

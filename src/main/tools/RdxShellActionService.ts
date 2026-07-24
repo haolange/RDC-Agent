@@ -9,6 +9,14 @@ export interface RdxShellActionVariables {
   [key: string]: string | number | boolean | null | undefined;
 }
 
+export interface RdxActionDiagnostic {
+  message: string;
+  classification?: string;
+  fixHint?: string;
+  failedStep?: string;
+  renderdocStatus?: string;
+}
+
 export interface RdxShellActionResult {
   ok: boolean;
   actionId: RdxActionId;
@@ -17,12 +25,14 @@ export interface RdxShellActionResult {
   stderr: string;
   exitCode: number;
   error?: string;
+  diagnostic?: RdxActionDiagnostic;
 }
 
 interface ParsedActionPayload {
   data: Record<string, unknown>;
   ok?: boolean;
   error?: string;
+  diagnostic?: RdxActionDiagnostic;
 }
 
 const substitute = (value: string, variables: RdxShellActionVariables): string => (
@@ -36,15 +46,97 @@ const isRecord = (value: unknown): value is Record<string, unknown> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 );
 
-const readErrorMessage = (value: unknown): string | undefined => {
-  if (typeof value === 'string' && value.trim()) {
-    return value;
-  }
-  if (isRecord(value)) {
-    const message = value.message ?? value.error_message ?? value.code;
-    return typeof message === 'string' && message.trim() ? message : undefined;
+const readStringField = (source: Record<string, unknown>, keys: string[]): string | undefined => {
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
   }
   return undefined;
+};
+
+const readNestedRecord = (source: Record<string, unknown>, keys: string[]): Record<string, unknown> | undefined => {
+  for (const key of keys) {
+    const value = source[key];
+    if (isRecord(value)) {
+      return value;
+    }
+  }
+  return undefined;
+};
+
+export const formatRdxActionDiagnostic = (diagnostic: RdxActionDiagnostic): string => {
+  const parts = [diagnostic.message.trim()].filter(Boolean);
+  if (diagnostic.failedStep) {
+    parts.push(`step=${diagnostic.failedStep}`);
+  }
+  if (diagnostic.classification) {
+    parts.push(`classification=${diagnostic.classification}`);
+  }
+  if (diagnostic.renderdocStatus) {
+    parts.push(`renderdoc=${diagnostic.renderdocStatus}`);
+  }
+  if (diagnostic.fixHint) {
+    parts.push(diagnostic.fixHint);
+  }
+  return parts.join(' · ');
+};
+
+export const isLocalReplayUnsupportedDiagnostic = (
+  diagnostic: RdxActionDiagnostic | undefined,
+  fallbackMessage?: string,
+): boolean => {
+  const haystack = [
+    diagnostic?.message,
+    diagnostic?.classification,
+    diagnostic?.fixHint,
+    diagnostic?.failedStep,
+    diagnostic?.renderdocStatus,
+    fallbackMessage,
+  ].filter(Boolean).join(' ').toLowerCase();
+
+  if (!haystack) {
+    return false;
+  }
+
+  return diagnostic?.classification === 'rdc_invalid_or_unsupported'
+    || haystack.includes('rdc_invalid_or_unsupported')
+    || haystack.includes('opencapture')
+    || (haystack.includes('open_replay') && haystack.includes('failed'));
+};
+
+const parseErrorDiagnostic = (value: unknown): RdxActionDiagnostic | undefined => {
+  if (typeof value === 'string' && value.trim()) {
+    return { message: value.trim() };
+  }
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const message = readStringField(value, ['message', 'error_message', 'code']) ?? 'RDX tool call failed.';
+  const details = readNestedRecord(value, ['details']);
+  const sourceDetails = details
+    ? readNestedRecord(details, ['source_error_details', 'sourceErrorDetails'])
+    : undefined;
+  const renderdocStatus = sourceDetails
+    ? readNestedRecord(sourceDetails, ['renderdoc_status', 'renderdocStatus'])
+    : undefined;
+
+  return {
+    message,
+    classification: readStringField(value, ['classification'])
+      ?? (details ? readStringField(details, ['classification']) : undefined),
+    fixHint: readStringField(value, ['fix_hint', 'fixHint'])
+      ?? (details ? readStringField(details, ['fix_hint', 'fixHint']) : undefined)
+      ?? (sourceDetails ? readStringField(sourceDetails, ['fix_hint', 'fixHint']) : undefined),
+    failedStep: details
+      ? readStringField(details, ['failed_step', 'failedStep', 'stage'])
+      : undefined,
+    renderdocStatus: renderdocStatus
+      ? readStringField(renderdocStatus, ['status_text', 'statusText', 'result_code_name', 'resultCodeName'])
+      : undefined,
+  };
 };
 
 const parseJsonPayload = (stdout: string): ParsedActionPayload => {
@@ -73,13 +165,15 @@ const parseJsonPayload = (stdout: string): ParsedActionPayload => {
     ) {
       data.context_id = envelopeContextId;
     }
+    const diagnostic = parsed.ok ? undefined : parseErrorDiagnostic(parsed.error);
     return {
       data: {
         ...data,
         _rdxEnvelope: parsed,
       },
       ok: parsed.ok,
-      error: parsed.ok ? undefined : readErrorMessage(parsed.error),
+      error: diagnostic ? formatRdxActionDiagnostic(diagnostic) : undefined,
+      diagnostic,
     };
   }
 
@@ -94,7 +188,7 @@ class RdxShellActionService {
   ): Promise<RdxShellActionResult> {
     const action = settingsService.getAll().tooling.rdxActions[actionId];
     if (!isActionConfigured(action)) {
-      const message = `RDX action "${actionId}" is not configured.`;
+      const message = `RDX action "${actionId}" is not configured. Configure it in Settings → Tools → RDX shell actions.`;
       runtimeLogService.log({
         scope: 'app',
         namespace: 'context',
@@ -111,6 +205,11 @@ class RdxShellActionService {
         stderr: message,
         exitCode: 2,
         error: message,
+        diagnostic: {
+          message,
+          classification: 'action_not_configured',
+          fixHint: 'Open Settings → Tools and enable the RDX shell action with a valid command.',
+        },
       };
     }
 
@@ -144,6 +243,7 @@ class RdxShellActionService {
     let data: Record<string, unknown> = {};
     let payloadOk: boolean | undefined;
     let payloadError: string | undefined;
+    let diagnostic: RdxActionDiagnostic | undefined;
     let parseError: string | undefined;
     if (result.stdout.trim()) {
       try {
@@ -151,6 +251,7 @@ class RdxShellActionService {
         data = parsedPayload.data;
         payloadOk = parsedPayload.ok;
         payloadError = parsedPayload.error;
+        diagnostic = parsedPayload.diagnostic;
       } catch (error) {
         parseError = error instanceof Error ? error.message : String(error);
       }
@@ -162,6 +263,9 @@ class RdxShellActionService {
       : parseError
         ?? payloadError
         ?? (result.stderr.trim() || result.stdout.trim() || `RDX action "${actionId}" exited with ${result.exitCode}.`);
+    const resolvedDiagnostic = ok
+      ? undefined
+      : diagnostic ?? (error ? { message: error } : undefined);
 
     runtimeLogService.log({
       scope: 'app',
@@ -176,6 +280,7 @@ class RdxShellActionService {
         exitCode: result.exitCode,
         stdout: result.stdout,
         stderr: result.stderr,
+        diagnostic: resolvedDiagnostic,
       },
     });
 
@@ -187,6 +292,7 @@ class RdxShellActionService {
       stderr: result.stderr,
       exitCode: result.exitCode,
       error,
+      diagnostic: resolvedDiagnostic,
     };
   }
 }

@@ -90,6 +90,7 @@ const defaultRdxAction = () => ({
 function cloneRdxActions(actions?: Partial<RdxActionSettingsMap>): RdxActionSettingsMap {
   return {
     openCapture: cloneRdxAction(actions?.openCapture ?? defaultRdxAction()),
+    openRemoteCapture: cloneRdxAction(actions?.openRemoteCapture ?? defaultRdxAction()),
     connectRemote: cloneRdxAction(actions?.connectRemote ?? defaultRdxAction()),
     closeRuntime: cloneRdxAction(actions?.closeRuntime ?? defaultRdxAction()),
     openPreview: cloneRdxAction(actions?.openPreview ?? defaultRdxAction()),

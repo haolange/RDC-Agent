@@ -8,7 +8,7 @@ export { getSessionContextSummary } from './sessionContextFormatters';
 
 export const SessionContextPanel: React.FC = () => {
   const vm = useSessionContextPanel();
-  const { t, activeOpenedCapture, currentRun, errorMessage } = vm;
+  const { t, activeOpenedCapture, currentRun, errorMessage, statusMessage } = vm;
 
   return (
     <div className="session-context-panel" data-testid="session-context-panel">
@@ -20,7 +20,16 @@ export const SessionContextPanel: React.FC = () => {
         </div>
       )}
 
-      {errorMessage && <div className="capture-library-error" role="alert">{errorMessage}</div>}
+      {statusMessage ? (
+        <div className="capture-library-status" role="status" aria-live="polite">
+          {statusMessage}
+        </div>
+      ) : null}
+      {errorMessage ? (
+        <div className="capture-library-error" role="alert" data-testid="session-context-open-error">
+          {errorMessage}
+        </div>
+      ) : null}
       {currentRun && (
         <div className="capture-library-run-lock" role="status" aria-live="polite">
           {t('control.captureSwitchLocked')}

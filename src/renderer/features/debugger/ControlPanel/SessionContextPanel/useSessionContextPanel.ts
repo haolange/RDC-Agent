@@ -29,6 +29,7 @@ export function useSessionContextPanel() {
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [selectedInputId, setSelectedInputId] = useState<string>('');
 
   const selectedDeviceEntry = useMemo(
@@ -58,7 +59,18 @@ export function useSessionContextPanel() {
   useEffect(() => {
     setSelectedInputId('');
     setErrorMessage(null);
+    setStatusMessage(null);
   }, [currentProject?.projectId, currentSession?.sessionId]);
+
+  const replayDeviceSummary = useMemo(() => {
+    if (!selectedDeviceEntry) {
+      return t('control.sessionContextDeviceUnknown');
+    }
+    if (selectedDeviceEntry.type === 'local') {
+      return t('control.sessionContextReplayDeviceLocal');
+    }
+    return selectedDeviceEntry.label;
+  }, [selectedDeviceEntry, t]);
 
   useEffect(() => {
     if (activeOpenedCapture?.inputId && projectInputs.some((entry) => entry.inputId === activeOpenedCapture.inputId)) {
@@ -87,6 +99,8 @@ export function useSessionContextPanel() {
       setContextSnapshot,
       setOpenedCapture,
       setErrorMessage,
+      setStatusMessage,
+      setSelectedInputId,
       t,
       onStart: () => setOpeningId(inputId),
       onComplete: () => setOpeningId(null),
@@ -112,6 +126,7 @@ export function useSessionContextPanel() {
     setContextSnapshot(null);
     setCaptures([]);
     setErrorMessage(null);
+    setStatusMessage(null);
   };
 
   const handleOpenHumanPreview = async () => {
@@ -175,8 +190,11 @@ export function useSessionContextPanel() {
     captureOptions,
     openingId,
     errorMessage,
+    statusMessage,
     selectedInputId,
     setSelectedInputId,
+    selectedDeviceEntry,
+    replayDeviceSummary,
     handleOpen,
     handleRefresh,
     handleClear,
