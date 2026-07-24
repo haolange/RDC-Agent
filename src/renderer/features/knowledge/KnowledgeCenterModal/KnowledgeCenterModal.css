@@ -346,39 +346,6 @@
   color: var(--token-status-error, var(--token-text-body));
 }
 
-.sidebar-knowledge-trigger {
-  min-height: 44px;
-  padding: var(--space-3) var(--space-3);
-  justify-content: flex-start;
-  cursor: pointer;
-  color: var(--token-text-heading);
-  font: inherit;
-  text-align: left;
-}
-
-.sidebar-knowledge-trigger .footer-entry-main {
-  gap: var(--space-3);
-}
-
-.sidebar-knowledge-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 auto;
-  border-radius: var(--radius-md);
-  color: var(--token-text-body);
-}
-
-.sidebar-knowledge-trigger:hover .sidebar-knowledge-icon {
-  color: var(--token-border-focus);
-}
-
-.sidebar-knowledge-trigger .footer-entry-title {
-  font-size: var(--text-sm);
-}
-
 @media (max-width: 960px) {
   .knowledge-center {
     width: min(100%, calc(100vw - var(--space-4)));

@@ -55,6 +55,13 @@ assert(vars['--color-accent-500'], 'compiler emits accent-500');
 assert(vars['--color-bg-1'], 'compiler emits surface bg-1');
 assert(vars['--color-text-primary'], 'compiler emits ink');
 assert(vars['--font-sans'], 'compiler emits ui font');
+assert(vars['--color-surface-overlay'], 'compiler emits surface-overlay for popover chrome');
+const lightVars = compileThemeChrome(createDefaultChromeThemes().light, 'light');
+assert(lightVars['--color-surface-overlay'], 'light compiler emits surface-overlay');
+assert(
+  vars['--color-surface-overlay'] !== lightVars['--color-surface-overlay'],
+  'dark/light surface-overlay must differ with chrome surface',
+);
 
 const encoded = serializeRdxThemeV1(chrome, 'dark');
 assert(encoded.startsWith(RDX_THEME_V1_PREFIX), 'export uses rdx-theme-v1 prefix');

@@ -174,7 +174,11 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   width: min(var(--chat-transcript-width), 100%);
   max-width: 100%;
   margin: 0;
+  /* Shared inline gutters: user bubble, Work Process, and final answer share one column
+     and stay off the rail/scrollbar seams. Do not reintroduce WP-only padding. */
   padding: 0;
+  padding-inline: var(--space-3);
+  box-sizing: border-box;
   list-style: none;
   display: flex;
   flex-direction: column;
@@ -727,9 +731,6 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 .work-process {
   position: relative;
   width: 100%;
-  /* CoT-only right gutter: keep tool cards / thinking off the scrollbar seam.
-     Final answer prose stays full-bleed and is not padded here. */
-  padding-inline-end: var(--space-3);
   box-sizing: border-box;
   overflow: visible;
   border: 0;

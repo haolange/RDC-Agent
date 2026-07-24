@@ -56,6 +56,10 @@ export function compileThemeChrome(
     variant === 'light' ? 'rgb(255 255 255 / 0.94)' : 'rgb(var(--color-bg-2))';
   vars['--surface-active'] = 'rgb(var(--color-accent-500) / 0.1)';
   vars['--color-border-focus'] = 'rgb(var(--color-accent-500))';
+  // Popover / Context Usage overlay chrome follows Appearance surface (not a fixed slate).
+  vars['--color-surface-overlay'] = rgbToCssTriplet(
+    variant === 'light' ? surfaces['3'] : surfaces['2'],
+  );
 
   if (variant === 'light') {
     vars['--color-border-subtle'] = '20 30 44 / 0.1';

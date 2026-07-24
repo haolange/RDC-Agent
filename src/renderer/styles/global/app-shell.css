@@ -384,7 +384,6 @@ html[data-resolved-theme='light'] .app-main {
 }
 
 .main-input-bar {
-  --workbench-content-rail-gutter: 16px;
   position: relative;
   z-index: var(--z-sticky);
   display: flex;
@@ -709,13 +708,15 @@ html[data-resolved-theme='light'] .app-main {
   gap: 0;
   width: auto;
   max-width: none;
-  max-height: min(78vh, 720px);
+  /* Soft viewport cap; only the whole panel scrolls — never a nested legend scroller. */
+  max-height: min(90vh, 880px);
   padding: 0;
   border: 1px solid var(--token-border-default);
   border-radius: var(--radius-xl);
   background: var(--token-bg-overlay);
   box-shadow: var(--token-shadow-popover);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* Header */
@@ -1030,9 +1031,8 @@ html[data-resolved-theme='light'] .app-main {
 .context-breakdown-details {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  flex: 1 1 auto;
-  overflow: hidden;
+  flex: 0 0 auto;
+  overflow: visible;
 }
 
 .context-breakdown-runtime {
@@ -1094,9 +1094,8 @@ html[data-resolved-theme='light'] .app-main {
   margin: 0;
   padding: var(--space-2) 0 var(--space-4);
   list-style: none;
-  overflow-y: auto;
-  min-height: 0;
-  flex: 1 1 auto;
+  overflow: visible;
+  flex: 0 0 auto;
 }
 
 .context-breakdown-group-header {

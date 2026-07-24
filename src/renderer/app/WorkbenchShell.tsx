@@ -21,7 +21,6 @@ export interface WorkbenchShellProps {
   isTerminalOpen: boolean;
   bothSidebarsCollapsed: boolean;
   workbenchRailMaxWidth: string;
-  workbenchContentRailWidth: string;
   shellNotice: string | null;
   activityAlertSeverity: 'error' | 'warning' | 'running' | null;
   nickname: string;
@@ -47,7 +46,6 @@ export function WorkbenchShell({
   isTerminalOpen,
   bothSidebarsCollapsed,
   workbenchRailMaxWidth,
-  workbenchContentRailWidth,
   shellNotice,
   activityAlertSeverity,
   nickname,
@@ -72,7 +70,6 @@ export function WorkbenchShell({
         ['--left-resize-handle-width' as string]: `${effectiveLeftCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH}px`,
         ['--right-resize-handle-width' as string]: `${!isRightRailVisible || effectiveRightCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH}px`,
         ['--workbench-rail-max-width' as string]: workbenchRailMaxWidth,
-        ['--workbench-content-rail-width' as string]: workbenchContentRailWidth,
         ['--workbench-inline-mode' as string]: bothSidebarsCollapsed ? 'dual-collapsed' : 'sidebar-open',
       }}
     >
@@ -101,7 +98,7 @@ export function WorkbenchShell({
                   </svg>
                 </span>
                 <span className="footer-entry-copy">
-                  <span className="footer-entry-title">{t('knowledgeCenter.title')}</span>
+                  <span className="footer-entry-title">{t('knowledgeCenter.sidebarLabel')}</span>
                 </span>
               </span>
             </button>

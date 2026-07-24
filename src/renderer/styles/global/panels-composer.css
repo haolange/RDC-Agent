@@ -381,6 +381,63 @@
   align-self: center;
 }
 
+/*
+ * Sidebar footer text column: icon/avatar share one 32px leading track so
+ * Knowledge title and CGBull start on the same vertical edge (reference chip vs profile).
+ */
+.app-sidebar-footer .footer-entry-main {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: 12px;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+}
+
+.app-sidebar-footer .sidebar-knowledge-icon,
+.app-sidebar-footer .footer-entry-avatar {
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  justify-self: stretch;
+}
+
+/* Knowledge Center: flatter chip than the user card; same title type and text edge. */
+.footer-entry.sidebar-knowledge-trigger {
+  min-height: 40px;
+  padding: 4px 14px;
+  border-radius: 12px;
+  justify-content: flex-start;
+  cursor: pointer;
+  color: var(--token-text-heading);
+  font: inherit;
+  text-align: left;
+}
+
+.sidebar-knowledge-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: var(--token-text-body);
+}
+
+.sidebar-knowledge-icon svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.sidebar-knowledge-trigger:hover .sidebar-knowledge-icon {
+  color: var(--token-border-focus);
+}
+
+.sidebar-knowledge-trigger .footer-entry-title {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  line-height: 1.15;
+}
+
 .sidebar-user-trigger {
   min-height: 58px;
   padding: 12px 14px;
