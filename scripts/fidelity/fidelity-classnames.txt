@@ -227,14 +227,12 @@ context-breakdown-hero-row
 context-breakdown-hero-tokens
 context-breakdown-hero-usage
 context-breakdown-label
-context-breakdown-last-actual
 context-breakdown-legend
 context-breakdown-pct-large
+context-breakdown-preparing
 context-breakdown-projection-meta
 context-breakdown-row
-context-breakdown-run-label
 context-breakdown-run-stat
-context-breakdown-run-totals
 context-breakdown-status
 context-breakdown-summary-caption
 context-breakdown-swatch
@@ -375,11 +373,9 @@ is-appear
 is-blocked
 is-completed
 is-error
-is-fallback
 is-history
 is-level-
 is-loading
-is-open
 is-pending
 is-stopped
 is-summary
@@ -988,7 +984,6 @@ work-process-caret
 work-process-child-diagnostic
 work-process-child-duration
 work-process-child-message
-work-process-child-reasoning-indicator
 work-process-child-summary
 work-process-child-target
 work-process-child-text
@@ -1005,8 +1000,6 @@ work-process-narrative-stream
 work-process-path-chip
 work-process-prose
 work-process-rail-marker
-work-process-reasoning-indicator
-work-process-reasoning-indicator-text
 work-process-row-caret
 work-process-row-pre
 work-process-section
@@ -1062,7 +1055,6 @@ work-process-tool-card-detail
 work-process-tool-card-expand
 work-process-tool-card-header
 work-process-tool-card-icon
-work-process-tool-card-link
 work-process-tool-card-list
 work-process-tool-card-list-item
 work-process-tool-card-meta

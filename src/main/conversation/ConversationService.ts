@@ -72,6 +72,7 @@ import { storageAdapter } from '../sessions/StorageAdapter';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { canonicalizeSessionContextTurnEntry, sessionContextJournal } from './SessionContextJournal';
+import { shouldProjectDiagnosticToWorkProcess } from './workProcessDiagnosticPolicy';
 import type { DerivedContextView } from '@shared/types/semanticContext';
 import type { Message as AgentRuntimeMessage } from '../agent-runtime/core/types';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
@@ -1870,10 +1871,33 @@ export class ConversationService {
                 const summary = typeof payload.message === 'string' && payload.message
                   ? payload.message
                   : 'Received runtime diagnostic.';
-                if (payload.code === 'MODEL_THINKING_STARTED' || payload.code === 'MODEL_THINKING_COMPLETED') {
+                if (!shouldProjectDiagnosticToWorkProcess(payload.code)) {
+                  // Recovery / thinking-lifecycle telemetry stays in Agent Activity only.
+                  const isRecovery = typeof payload.code === 'string'
+                    && payload.code.startsWith('error_recovery_');
+                  if (isRecovery) {
+                    runtimeLogService.log({
+                      scope: sessionId ? 'session' : 'app',
+                      namespace: 'agent',
+                      severity: payload.severity === 'error'
+                        ? 'error'
+                        : payload.severity === 'warning'
+                          ? 'warning'
+                          : 'info',
+                      title: payload.phase === 'started' ? 'Provider recovery' : 'Provider recovery complete',
+                      summary,
+                      sessionId,
+                      projectId: input.context.projectId,
+                      runId: isActiveRun(input.context.currentRun) ? input.context.currentRun.runId : null,
+                      raw: {
+                        code: payload.code,
+                        phase: payload.phase,
+                        surface: 'runtime-log',
+                      },
+                    });
+                  }
                   return;
                 }
-                const isRecovery = typeof payload.code === 'string' && payload.code.startsWith('error_recovery_');
                 const blockStatus = payload.phase === 'started'
                   ? 'running'
                   : payload.severity === 'error'
@@ -1886,7 +1910,7 @@ export class ConversationService {
                     diagnosticSeverity: payload.severity === 'error' || payload.severity === 'warning'
                       ? payload.severity
                       : 'info',
-                    title: isRecovery ? '错误恢复' : 'Runtime diagnostic',
+                    title: 'Runtime diagnostic',
                     summary,
                     completedAt: blockStatus === 'running' ? undefined : nowMs(),
                   }),

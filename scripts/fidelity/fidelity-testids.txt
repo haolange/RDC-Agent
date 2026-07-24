@@ -148,7 +148,6 @@ trace-progress-item
 work-process
 work-process-approval
 work-process-block
-work-process-reasoning-indicator
 work-process-section
 work-process-source-pills
 work-process-task

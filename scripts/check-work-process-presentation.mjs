@@ -528,8 +528,50 @@ const opaquePresentation = buildWorkProcessPresentation({
     },
   ],
 });
-assert(!opaquePresentation.rows.find((row) => row.type === 'section'), 'opaque provider state should not render a section row');
-assert(opaquePresentation.rows.some((row) => row.type === 'reasoningIndicator'), 'opaque provider state should render a reasoning indicator');
+assert(opaquePresentation.rows.length === 0, 'opaque final_answer without visible evidence must stay answer-body-only');
+assert(!opaquePresentation.rows.some((row) => row.type === 'section'), 'opaque provider state should not render a section row');
+assert(!opaquePresentation.rows.some((row) => row.type === 'reasoningIndicator'), 'opaque/hidden must never render a CoT placeholder indicator');
+
+const opaqueToolPresentation = buildWorkProcessPresentation({
+  status: 'complete',
+  updatedAt: now + 9980,
+  blocks: [
+    {
+      id: 'runtime-loop-opaque-tool',
+      kind: 'llm_turn',
+      title: 'LLM turn',
+      status: 'complete',
+      result: {
+        status: 'complete',
+        toolCallIds: ['tool-opaque-search'],
+        stopReason: 'tool_use',
+        outputPhase: 'commentary',
+      },
+      thinking: {
+        kind: 'opaque',
+        source: 'openai-responses-encrypted',
+        visibility: 'hidden',
+      },
+      thinkingStatus: 'complete',
+      toolCalls: [
+        {
+          id: 'tool-opaque-search',
+          toolName: 'web_search',
+          status: 'complete',
+          argsPreview: JSON.stringify({ query: 'GPU news' }),
+          resultPreview: JSON.stringify({ ok: true, data: { results: [{ url: 'https://example.com' }] } }),
+          startedAt: now + 370,
+          completedAt: now + 390,
+        },
+      ],
+      startedAt: now + 360,
+      completedAt: now + 390,
+    },
+  ],
+});
+const opaqueToolRows = flattenRows(opaqueToolPresentation.rows);
+assert(opaqueToolRows.some((row) => row.type === 'tool' && row.toolName === 'web_search'), 'opaque + tools must still surface real tool evidence');
+assert(!opaqueToolRows.some((row) => row.type === 'reasoningIndicator'), 'opaque + tools must not insert a CoT placeholder');
 
 const approvalPresentation = buildWorkProcessPresentation({
   status: 'running',
@@ -865,7 +907,6 @@ const componentSource = [
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcess.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessSectionRow.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/ToolAggregateRow.tsx', 'utf8'),
-  fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessReasoningIndicatorRow.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/workProcessRowRenderer.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessRows.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessRowParts.tsx', 'utf8'),
@@ -939,6 +980,12 @@ assert(presentationSource.includes('WORK_PROCESS_TOOL_DISPLAY_CATALOG'), 'tool d
 assert(!presentationSource.includes("type: 'toolGroup'"), 'presentation must not expose toolGroup shells');
 assert(!presentationSource.includes("type: 'response'"), 'presentation must not expose a Reply response boundary row');
 assert(!presentationSource.includes('createResponseRow'), 'answer-only loops must not route through createResponseRow');
+assert(!presentationSource.includes('createReasoningIndicatorRow'), 'opaque/hidden must not project CoT placeholder rows');
+assert(!presentationSource.includes("type: 'reasoningIndicator'"), 'presentation must not expose reasoningIndicator rows');
+assert(!componentSource.includes('WorkProcessReasoningIndicatorRow'), 'component must not render CoT placeholder indicator');
+assert(!componentSource.includes('work-process-reasoning-indicator'), 'component must not mount CoT placeholder DOM');
+assert(!i18nSource.includes('workProcessInternalReasoning'), 'i18n must not keep opaque CoT placeholder copy');
+assert(!cssSource.includes('.work-process-reasoning-indicator'), 'CSS must not keep CoT placeholder styles');
 assert(presentationSource.includes('getToolFamily'), 'tool projection should map tools onto unified card families');
 assert(presentationSource.includes('actionCount'), 'presentation should expose actionCount for top-level transcript meta');
 assert(presentationSource.includes("normalized.startsWith('mcp__')"), 'dynamic MCP wildcard should have a semantic display path');
@@ -1010,6 +1057,25 @@ assert(
 assert(
   !readSource('src/main/conversation/ConversationService.ts').includes('.slice(0, 800)'),
   'ConversationService must not blind-slice resultPreview JSON at 800 chars',
+);
+const conversationServiceSource = readSource('src/main/conversation/ConversationService.ts');
+const diagnosticPolicySource = readSource('src/main/conversation/workProcessDiagnosticPolicy.ts');
+assert(
+  conversationServiceSource.includes('shouldProjectDiagnosticToWorkProcess'),
+  'ConversationService must gate Work Process diagnostic projection',
+);
+assert(
+  diagnosticPolicySource.includes("code.startsWith('error_recovery_')")
+    && diagnosticPolicySource.includes('return false'),
+  'error_recovery_* must be excluded from Work Process narrative',
+);
+assert(
+  !conversationServiceSource.includes("title: isRecovery ? '错误恢复'"),
+  'recovery diagnostics must not receive a Work Process title',
+);
+assert(
+  !conversationServiceSource.includes('错误恢复成功，继续生成回复'),
+  'recovery completion copy must not be hard-coded into ConversationService Work Process projection',
 );
 assert(!componentSource.includes('setRawOpen(true);\n      setPreviewOpen(true);'), 'failed tools must not force-open preview and raw together on error');
 assert(componentSource.includes('<details'), 'thinking should render as a user-collapsible top disclosure');

@@ -9,7 +9,6 @@ import {
   ToolRow,
   UserInputRow,
 } from './WorkProcessRows';
-import { WorkProcessReasoningIndicatorRow } from './WorkProcessReasoningIndicatorRow';
 import { WorkProcessSectionRow } from './WorkProcessSectionRow';
 import { ToolAggregateRow } from './ToolAggregateRow';
 
@@ -22,9 +21,6 @@ export function createWorkProcessRowRenderer() {
     if (row.type === 'diagnostic') return <DiagnosticRow key={row.id} row={row} />;
     if (row.type === 'subagent') return <SubagentRow key={row.id} row={row} />;
     if (row.type === 'task') return <TaskRow key={row.id} row={row} />;
-    if (row.type === 'reasoningIndicator') {
-      return <WorkProcessReasoningIndicatorRow key={row.id} row={row} />;
-    }
     if (row.type === 'section') {
       return (
         <WorkProcessSectionRow
