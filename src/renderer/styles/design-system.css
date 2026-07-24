@@ -76,6 +76,7 @@
   /* Semantic surface aliases — consumed by component CSS */
   --color-surface-raised: var(--color-bg-3);
   --color-surface-subtle: var(--color-bg-2);
+  /* Fallback only; runtime Appearance chrome overwrites via compileThemeChrome. */
   --color-surface-overlay: 16 18 22;
 
   /* Spacing Scale - 4px base */
@@ -242,6 +243,7 @@
   /* Semantic surface aliases — light theme overrides */
   --color-surface-raised: var(--color-bg-3);
   --color-surface-subtle: var(--color-bg-1);
+  /* Fallback only; runtime Appearance chrome overwrites via compileThemeChrome. */
   --color-surface-overlay: 242 245 249;
 
   /* Light elevation: cooler, softer shadows + a crisp white top edge */

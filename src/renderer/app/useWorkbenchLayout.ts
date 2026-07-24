@@ -3,8 +3,6 @@ import { useLayoutStore } from '../stores/layoutStore';
 import { useProjectStore } from '../stores/projectStore';
 import {
   getResponsiveMinMainWidth,
-  getWorkbenchContentRailWidth,
-  getWorkbenchRailMaxWidth,
   resolveResponsiveSidebarState,
   resolveSidebarWidths,
 } from '../shell/layoutGeometry';
@@ -14,6 +12,7 @@ import {
   LEFT_SIDEBAR_MIN_WIDTH,
   RIGHT_PANEL_MAX_WIDTH,
   RIGHT_PANEL_MIN_WIDTH,
+  WORKBENCH_CHAT_RAIL_MAX_WIDTH,
 } from '@shared/constants/layout';
 
 type DragSide = 'left' | 'right';
@@ -185,16 +184,7 @@ export function useWorkbenchLayout() {
     bothSidebarsCollapsed,
     leftToggleDisabled: leftAutoCollapsed,
     rightToggleDisabled: !isRightRailVisible || rightAutoCollapsed,
-    workbenchRailMaxWidth: getWorkbenchRailMaxWidth(
-      effectiveLeftCollapsed,
-      effectiveRightCollapsed,
-      isRightRailVisible,
-    ),
-    workbenchContentRailWidth: getWorkbenchContentRailWidth(
-      effectiveLeftCollapsed,
-      effectiveRightCollapsed,
-      isRightRailVisible,
-    ),
+    workbenchRailMaxWidth: WORKBENCH_CHAT_RAIL_MAX_WIDTH,
     resolvedWidths,
     startDragging,
   };

@@ -43,8 +43,8 @@ html[data-resolved-theme='light'] .debugger-page {
   padding: 0;
 }
 
-.chat-messages > .plan-intake-panel-timeline {
-  width: min(var(--workbench-content-rail-width, 1080px), 100%);
+.chat-messages > .plan-inplace-panel-timeline {
+  width: min(var(--workbench-outer-rail-width, 100%), 100%);
   max-width: 100%;
   margin: 0;
 }

@@ -176,7 +176,6 @@ const App: React.FC = () => {
           isTerminalOpen={isTerminalOpen}
           bothSidebarsCollapsed={layout.bothSidebarsCollapsed}
           workbenchRailMaxWidth={layout.workbenchRailMaxWidth}
-          workbenchContentRailWidth={layout.workbenchContentRailWidth}
           shellNotice={shellNotice}
           activityAlertSeverity={activityAlertSeverity}
           nickname={nickname}

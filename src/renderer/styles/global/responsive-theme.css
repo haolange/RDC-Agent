@@ -107,7 +107,6 @@
   }
 
   .main-input-bar {
-    --workbench-content-rail-gutter: 14px;
     width: var(--workbench-outer-rail-width, 100%);
     padding: 10px 0 14px;
   }

@@ -5,7 +5,10 @@ import {
   LEFT_SIDEBAR_MIN_WIDTH,
   RIGHT_PANEL_COLLAPSED_WIDTH,
   RIGHT_PANEL_MIN_WIDTH,
+  WORKBENCH_CHAT_RAIL_MAX_WIDTH,
 } from '@shared/constants/layout';
+
+export { WORKBENCH_CHAT_RAIL_MAX_WIDTH };
 
 type SidebarState = {
   leftCollapsed: boolean;
@@ -42,46 +45,6 @@ export const getResponsiveMinMainWidth = (containerWidth: number): number => {
     return 360;
   }
   return APP_MIN_MAIN_WIDTH;
-};
-
-export const getWorkbenchRailMaxWidth = (
-  leftCollapsed: boolean,
-  rightCollapsed: boolean,
-  rightVisible: boolean,
-): string => {
-  if (!rightVisible) {
-    return leftCollapsed ? 'min(1400px, 94%)' : 'min(1520px, 100%)';
-  }
-
-  if (leftCollapsed && rightCollapsed) {
-    return 'min(1440px, 84%)';
-  }
-
-  if (leftCollapsed || rightCollapsed) {
-    return 'min(1320px, 88%)';
-  }
-
-  return 'min(1440px, 100%)';
-};
-
-export const getWorkbenchContentRailWidth = (
-  leftCollapsed: boolean,
-  rightCollapsed: boolean,
-  rightVisible: boolean,
-): string => {
-  if (!rightVisible) {
-    return '1180px';
-  }
-
-  if (leftCollapsed && rightCollapsed) {
-    return '1280px';
-  }
-
-  if (leftCollapsed || rightCollapsed) {
-    return '1180px';
-  }
-
-  return '1080px';
 };
 
 const getResizeHandleAllowance = (
