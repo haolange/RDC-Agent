@@ -24,6 +24,11 @@ import { EffortControlPopup } from './EffortControlPopup';
 import {
   hasSelectableFastMode,
   hasSelectableOneMillionContext,
+  hasStructuralFastMode,
+  hasStructuralOneMillionContext,
+  isFastModeDenied,
+  isFastModeUnverified,
+  isOneMillionContextDenied,
   isOneMillionContextUnverified,
   oneMillionContextTokens,
 } from './turnControlsUtils';
@@ -119,10 +124,12 @@ export const EffortControl: React.FC<{
   const tooltipLabel = t(reasoningUnverified ? 'composer.effort.unverified' : EFFORT_LABEL_KEYS[displayLevel]);
   const oneMillionTokens = oneMillionContextTokens(capability);
   const oneMillionCapability = capability?.resolvedControls?.context1m ?? null;
+  const oneMillionVisible = hasStructuralOneMillionContext(capability);
   const oneMillionAvailable = hasSelectableOneMillionContext(capability);
   const oneMillionUnverified = isOneMillionContextUnverified(capability);
+  const fastVisible = hasStructuralFastMode(capability);
   const fastAvailable = hasSelectableFastMode(capability);
-  const fastUnverified = capability?.controls.fast.state === 'selectable' && capability.controls.fast.entitlement === 'unknown';
+  const fastUnverified = isFastModeUnverified(capability);
   const statusPresentation = capabilityStatusPresentation(capabilityState);
   const capabilityStateLabel = statusPresentation.labelKey ? t(statusPresentation.labelKey) : undefined;
   const capabilityStateDetail = statusPresentation.detailKey ? t(statusPresentation.detailKey) : undefined;
@@ -132,7 +139,7 @@ export const EffortControl: React.FC<{
       ? t('composer.effort.fixed')
       : oneMillionUnverified
         ? t('composer.effort.unverified')
-        : capability?.controls.context1m.state === 'selectable' && capability.controls.context1m.entitlement === 'denied'
+        : isOneMillionContextDenied(capability)
           ? t('composer.effort.currentAccountUnavailable')
           : undefined;
   const fastModelStatusLabel = !capabilityReady
@@ -141,7 +148,7 @@ export const EffortControl: React.FC<{
       ? t('composer.effort.fixed')
       : fastUnverified
         ? t('composer.effort.unverified')
-        : capability?.controls.fast.state === 'selectable' && capability.controls.fast.entitlement === 'denied'
+        : isFastModeDenied(capability)
           ? t('composer.effort.currentAccountUnavailable')
           : undefined;
   const oneMillionContextBadgeLabel = oneMillionTokens
@@ -275,8 +282,10 @@ export const EffortControl: React.FC<{
           tooltipStyle={tooltipStyle}
           tooltipLabel={tooltipLabel}
           trackWidthPx={trackWidthPx}
+          oneMillionContextVisible={oneMillionVisible}
           oneMillionContextAvailable={capabilityReady && oneMillionAvailable}
           oneMillionContextStatusLabel={oneMillionContextStatusLabel}
+          fastModelVisible={fastVisible}
           fastModelAvailable={capabilityReady && fastAvailable}
           fastModelStatusLabel={fastModelStatusLabel}
           oneMillionContextMode={turnControls.maxContextMode}

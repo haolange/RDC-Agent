@@ -1090,7 +1090,7 @@
         },
         "reasoning": {
           "kind": "levels",
-          "supportsOff": false,
+          "supportsOff": true,
           "levels": [
             "high",
             "max"
@@ -1104,6 +1104,7 @@
               "max": "max"
             },
             "onMode": "enabled",
+            "offMode": "disabled",
             "onBudgetTokens": 4096
           }
         }
@@ -1819,7 +1820,7 @@
         "controls": {
           "reasoning": {
             "kind": "levels",
-            "supportsOff": false,
+            "supportsOff": true,
             "levels": [
               "high",
               "max"
@@ -1832,7 +1833,8 @@
                 "high": "high",
                 "max": "max"
               },
-              "onMode": "thinking-enabled"
+              "onMode": "thinking-enabled",
+              "offMode": "thinking-disabled"
             }
           }
         }

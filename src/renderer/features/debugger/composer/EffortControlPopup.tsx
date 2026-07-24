@@ -37,8 +37,10 @@ export const EffortControlPopup: React.FC<{
   tooltipStyle: React.CSSProperties;
   tooltipLabel: string;
   trackWidthPx: number;
+  oneMillionContextVisible: boolean;
   oneMillionContextAvailable: boolean;
   oneMillionContextStatusLabel?: string;
+  fastModelVisible: boolean;
   fastModelAvailable: boolean;
   fastModelStatusLabel?: string;
   oneMillionContextMode: boolean;
@@ -76,8 +78,10 @@ export const EffortControlPopup: React.FC<{
   tooltipStyle,
   tooltipLabel,
   trackWidthPx,
+  oneMillionContextVisible,
   oneMillionContextAvailable,
   oneMillionContextStatusLabel,
+  fastModelVisible,
   fastModelAvailable,
   fastModelStatusLabel,
   oneMillionContextMode,
@@ -190,22 +194,28 @@ export const EffortControlPopup: React.FC<{
       </div>
     ) : null}
 
-    <div className="composer-effort-popup-divider" aria-hidden="true" />
+    {oneMillionContextVisible || fastModelVisible ? (
+      <div className="composer-effort-popup-divider" aria-hidden="true" />
+    ) : null}
 
-    <EffortOneMillionContextSwitchRow
-      label={t('composer.effort.oneMillionContext')}
-      statusLabel={oneMillionContextStatusLabel}
-      available={oneMillionContextAvailable}
-      active={oneMillionContextMode}
-      onToggle={onToggleOneMillionContext}
-    />
+    {oneMillionContextVisible ? (
+      <EffortOneMillionContextSwitchRow
+        label={t('composer.effort.oneMillionContext')}
+        statusLabel={oneMillionContextStatusLabel}
+        available={oneMillionContextAvailable}
+        active={oneMillionContextMode}
+        onToggle={onToggleOneMillionContext}
+      />
+    ) : null}
 
-    <EffortFastModeSwitchRow
-      label={t('composer.effort.fastModel')}
-      statusLabel={fastModelStatusLabel}
-      available={fastModelAvailable}
-      active={fastModel}
-      onToggle={onToggleFastModel}
-    />
+    {fastModelVisible ? (
+      <EffortFastModeSwitchRow
+        label={t('composer.effort.fastModel')}
+        statusLabel={fastModelStatusLabel}
+        available={fastModelAvailable}
+        active={fastModel}
+        onToggle={onToggleFastModel}
+      />
+    ) : null}
   </div>
 );

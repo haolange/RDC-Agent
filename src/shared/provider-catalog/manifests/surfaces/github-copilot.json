@@ -163,7 +163,7 @@
       "modelId": "claude-opus-4.6",
       "label": "claude-opus-4.6",
       "aliases": [],
-      "availability": "available",
+      "availability": "unavailable",
       "contextTiers": [
         {
           "id": "default",
@@ -227,7 +227,8 @@
           }
         }
       },
-      "factSourceId": "user-observation:github-copilot:2026-07-14"
+      "factSourceId": "user-observation:github-copilot:2026-07-14",
+      "unavailableReason": "Unavailable for the observed GitHub Copilot subscription tier."
     },
     {
       "modelId": "claude-opus-4.8",
@@ -266,10 +267,8 @@
       },
       "controls": {
         "fast": {
-          "state": "selectable",
-          "defaultValue": false,
-          "entitlement": "granted",
-          "label": "Fast"
+          "state": "unsupported",
+          "fixedValue": false
         },
         "context1m": {
           "state": "fixed",
@@ -301,21 +300,6 @@
           }
         }
       },
-      "executionBindings": [
-        {
-          "id": "fast:model-switch",
-          "when": {
-            "fast": true
-          },
-          "actions": [
-            {
-              "kind": "model-switch",
-              "targetModelId": "claude-opus-4.8-fast"
-            }
-          ],
-          "entitlement": "granted"
-        }
-      ],
       "factSourceId": "user-observation:github-copilot:2026-07-14"
     },
     {
@@ -345,12 +329,9 @@
         "state": "unknown"
       },
       "selection": {
-        "pickerVisibility": "internal",
-        "relatedPrimaryModelIds": [
-          "claude-opus-4.8"
-        ]
+        "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "account-entitled",
       "route": {
         "protocol": "OpenAICompatibleChatCompletions",
         "baseUrl": "https://api.githubcopilot.com",

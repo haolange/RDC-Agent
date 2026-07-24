@@ -28,9 +28,9 @@
     {
       "id": "rdc-agent:opencode-go:0",
       "sourceKind": "rdc-agent",
-      "sourceRevision": "opencode-go-kimi-k3-v1",
-      "observedAt": "2026-07-17",
-      "refreshedAt": "2026-07-17T00:00:00+08:00",
+      "sourceRevision": "opencode-go-live-2026-07-23",
+      "observedAt": "2026-07-23",
+      "refreshedAt": "2026-07-23T00:00:00+08:00",
       "surface": "opencode-go",
       "accountScope": "credential-scoped"
     }
@@ -88,6 +88,207 @@
     }
   },
   "models": [
+    {
+      "modelId": "minimax-m3",
+      "label": "MiniMax M3",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "minimax-m2.7",
+      "label": "MiniMax M2.7",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "minimax-m2.5",
+      "label": "MiniMax M2.5",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
     {
       "modelId": "kimi-k3",
       "label": "Kimi K3",
@@ -178,6 +379,1279 @@
         "context": {
           "observedTierId": "max",
           "maxTierId": "max",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "kimi-k2.7-code",
+      "label": "Kimi K2.7 Code",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "kimi-k2.6",
+      "label": "Kimi K2.6",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "kimi-k2.5",
+      "label": "Kimi K2.5",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "glm-5.2",
+      "label": "GLM-5.2",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "glm-5.1",
+      "label": "GLM-5.1",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "glm-5",
+      "label": "GLM-5",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "deepseek-v4-pro",
+      "label": "DeepSeek V4 Pro",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "deepseek-v4-flash",
+      "label": "DeepSeek V4 Flash",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "qwen3.7-max",
+      "label": "Qwen3.7 Max",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "qwen3.7-plus",
+      "label": "Qwen3.7 Plus",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "qwen3.6-plus",
+      "label": "Qwen3.6 Plus",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "qwen3.5-plus",
+      "label": "Qwen3.5 Plus",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "mimo-v2-pro",
+      "label": "MiMo V2 Pro",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "mimo-v2-omni",
+      "label": "MiMo V2 Omni",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "mimo-v2.5-pro",
+      "label": "MiMo V2.5 Pro",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "mimo-v2.5",
+      "label": "MiMo V2.5",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "hy3",
+      "label": "HY3",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "hy3-preview",
+      "label": "HY3 Preview",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
+    },
+    {
+      "modelId": "grok-4.5",
+      "label": "Grok 4.5",
+      "aliases": [],
+      "availability": "unknown",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 0,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://opencode.ai/zen/go/v1",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:opencode-go:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
           "entitlementAuthority": "catalog-observation"
         },
         "capabilities": [

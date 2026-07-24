@@ -289,6 +289,16 @@
       "contextTiers": [
         {
           "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 500000,
+          "maxTotalTokens": 500000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        },
+        {
+          "id": "max",
           "label": "Native 1M window",
           "maxPromptTokens": 1000000,
           "maxTotalTokens": 1000000,
@@ -298,7 +308,7 @@
           "entitlement": "granted"
         }
       ],
-      "defaultBudgetTokens": 1000000,
+      "defaultBudgetTokens": 500000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -323,10 +333,11 @@
           "fixedValue": false
         },
         "context1m": {
-          "state": "fixed",
-          "fixedValue": true,
+          "state": "selectable",
+          "defaultValue": false,
           "entitlement": "granted",
-          "tierId": "default"
+          "tierId": "max",
+          "label": "Max mode"
         },
         "reasoning": {
           "kind": "unknown",
@@ -338,6 +349,21 @@
           }
         }
       },
+      "executionBindings": [
+        {
+          "id": "context:max",
+          "when": {
+            "context1m": true
+          },
+          "actions": [
+            {
+              "kind": "client-tier",
+              "tierId": "max"
+            }
+          ],
+          "entitlement": "granted"
+        }
+      ],
       "factSourceId": "user-observation:grok-account:2026-07-14"
     },
     {
