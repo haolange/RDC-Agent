@@ -11,7 +11,7 @@ vi.mock('electron', () => ({
   safeStorage: { isEncryptionAvailable: () => false, decryptString: () => '', encryptString: (value: string) => Buffer.from(value) },
 }));
 
-import { mergeEffectiveCatalog } from './EffectiveCatalogService';
+import { mergeEffectiveCatalog } from './effectiveCatalogMerge';
 import { buildEffectiveCatalogRequest } from './EffectiveModelResolver';
 import { resolveContextTierChoices } from '@shared/utils/contextTiers';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';

@@ -1,4 +1,4 @@
-import type { CatalogModelContribution } from './EffectiveCatalogService';
+import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import type { ModelManifest } from '@shared/provider-catalog/modelManifestSchema';
 import type { CapabilityState, ModelRoute, ProviderSurfaceDefinition } from '@shared/types/providerCapability';
 import type {

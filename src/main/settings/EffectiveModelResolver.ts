@@ -2,7 +2,7 @@ import type {
   CatalogLayerContribution,
   CatalogModelContribution,
   EffectiveCatalogRequest,
-} from './EffectiveCatalogService';
+} from './effectiveCatalogTypes';
 import { effectiveCatalogService } from './EffectiveCatalogService';
 import type {
   EffectiveCatalogSnapshot,

@@ -1,6 +1,6 @@
 /**
  * Security contract suite — Bridge auth, secret isolation, MCP trust.
- * Extends existing unit tests; this file is the Phase 7 matrix entrypoint.
+ * Phase 7 matrix entry; deeper cases live beside bridgeSecurity / McpTrustService.
  */
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -59,6 +59,21 @@ describe('securityContract: browser bridge', () => {
     const allowed = new Set(['http://127.0.0.1:7788']);
     expect(isOriginAllowed('http://evil.example', allowed)).toBe(false);
     expect(isOriginAllowed('http://127.0.0.1:7788', allowed)).toBe(true);
+  });
+
+  it('allows hasProviderSecret but permanently denies getProviderSecret', async () => {
+    const { isBridgeChannelAllowed } = await import('../../browserAppBridge/bridgeSecurity');
+    expect(isBridgeChannelDenied('settings:getProviderSecret')).toBe(true);
+    expect(isBridgeChannelAllowed('settings:getProviderSecret')).toBe(false);
+    expect(isBridgeChannelDenied('settings:hasProviderSecret')).toBe(false);
+    expect(isBridgeChannelAllowed('settings:hasProviderSecret')).toBe(true);
+  });
+
+  it('issues unique bearer tokens per call', () => {
+    const a = createBridgeBearerToken();
+    const b = createBridgeBearerToken();
+    expect(a).not.toBe(b);
+    expect(tokensMatch(a, b)).toBe(false);
   });
 });
 

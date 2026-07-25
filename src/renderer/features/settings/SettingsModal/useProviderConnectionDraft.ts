@@ -112,8 +112,7 @@ export const useProviderConnectionDraft = ({
       window.clearInterval(timer);
     };
   }, [
-    connectionDraft?.accountStatus?.state,
-    connectionDraft?.providerId,
+    connectionDraft,
     connectionProvider?.authMode,
     open,
     reloadSettings,

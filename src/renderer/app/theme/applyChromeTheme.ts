@@ -1,16 +1,15 @@
 import type { ResolvedTheme, ThemeChromeConfig, UiPreferences } from '@shared/types/settings';
 import { compileThemeChrome } from '@shared/theme/compiler';
 
-const CHROME_STYLE_ATTR = 'data-rdx-chrome-theme';
+let chromeSheet: CSSStyleSheet | null = null;
 
-function ensureChromeStyleElement(): HTMLStyleElement {
-  let el = document.head.querySelector<HTMLStyleElement>(`style[${CHROME_STYLE_ATTR}]`);
-  if (!el) {
-    el = document.createElement('style');
-    el.setAttribute(CHROME_STYLE_ATTR, 'true');
-    document.head.appendChild(el);
+function ensureChromeSheet(): CSSStyleSheet | null {
+  if (typeof document === 'undefined') return null;
+  if (!chromeSheet) {
+    chromeSheet = new CSSStyleSheet();
+    document.adoptedStyleSheets = [...document.adoptedStyleSheets, chromeSheet];
   }
-  return el;
+  return chromeSheet;
 }
 
 export function resolveActiveChrome(
@@ -22,7 +21,11 @@ export function resolveActiveChrome(
     : appearance.chromeThemes.dark;
 }
 
-/** Apply compiled Appearance chrome onto documentElement via a single style tag. */
+/**
+ * Apply compiled Appearance chrome onto documentElement.
+ * Uses a constructable stylesheet so CSP may keep `style-src 'self'` /
+ * `style-src-attr 'none'` (no `<style>` textContent or inline style attributes).
+ */
 export function applyChromeTheme(
   appearance: UiPreferences,
   resolvedTheme: ResolvedTheme,
@@ -32,8 +35,13 @@ export function applyChromeTheme(
   const declarations = Object.entries(vars)
     .map(([key, value]) => `${key}: ${value};`)
     .join('\n  ');
-  const style = ensureChromeStyleElement();
-  style.textContent = `:root {\n  ${declarations}\n}`;
+
+  const sheet = ensureChromeSheet();
+  if (sheet) {
+    sheet.replaceSync(
+      `:root {\n  color-scheme: ${resolvedTheme};\n  ${declarations}\n}`,
+    );
+  }
 
   document.documentElement.dataset.chromePreset = chrome.presetId;
   document.documentElement.dataset.resolvedTheme = resolvedTheme;
@@ -41,5 +49,4 @@ export function applyChromeTheme(
   document.documentElement.dataset.fontScale = appearance.fontScale;
   document.documentElement.dataset.pointerCursors = appearance.usePointerCursors ? 'true' : 'false';
   document.documentElement.dataset.reduceMotion = appearance.reduceMotion;
-  document.documentElement.style.colorScheme = resolvedTheme;
 }

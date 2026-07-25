@@ -32,8 +32,8 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   );
 
   useEffect(() => {
+    const previouslyFocused = previouslyFocusedRef.current;
     return () => {
-      const previouslyFocused = previouslyFocusedRef.current;
       if (previouslyFocused?.isConnected) previouslyFocused.focus();
     };
   }, []);

@@ -353,6 +353,8 @@ export class ProcessSupervisor {
         timer.unref?.();
       }),
     ]);
+    // Bounded shutdown must leave an empty registry even if a platform kill races.
+    this.registry.clear();
   }
 
   /** Soft reset after joinAll so tests / restarts can spawn again. */

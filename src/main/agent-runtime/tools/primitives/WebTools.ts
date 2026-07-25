@@ -273,7 +273,8 @@ async function readResponseBodyLimited(
   const chunks: Uint8Array[] = [];
   let total = 0;
   let truncated = false;
-  while (true) {
+  // Streaming read until done or budget exhausted.
+  for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     if (!value) continue;

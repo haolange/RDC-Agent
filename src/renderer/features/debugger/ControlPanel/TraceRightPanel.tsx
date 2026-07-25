@@ -173,7 +173,7 @@ export const TraceRightPanel: React.FC = () => {
       done: historyTasks.length,
       blocked: currentTasks.filter((task) => task.status === 'blocked').length,
     };
-  }, [rightPanel?.progress.current, rightPanel?.progress.history]);
+  }, [rightPanel?.progress]);
   const focusTask = useCallback((taskId: string) => focusWorkProcessTask(taskId), []);
   const visibleContextGroups = useMemo(
     () =>

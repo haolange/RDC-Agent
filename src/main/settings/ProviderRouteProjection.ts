@@ -1,7 +1,7 @@
 import type {
   CatalogLayerContribution,
   CatalogModelContribution,
-} from './EffectiveCatalogService';
+} from './effectiveCatalogTypes';
 import type {
   ModelRoute,
   ProviderProtocolOverride,

@@ -103,25 +103,51 @@ assert(mainTsx.includes('styles/global.css'), 'main.tsx imports global.css');
 const types = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/types.ts'), 'utf8');
 assert(types.includes("'appearance'"), 'SettingsSection includes appearance');
 
+const applyChromeThemeSource = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/app/theme/applyChromeTheme.ts'),
+  'utf8',
+);
+assert(applyChromeThemeSource.includes('adoptedStyleSheets'), 'applyChromeTheme must use constructable stylesheets');
+assert(applyChromeThemeSource.includes('replaceSync'), 'applyChromeTheme must replaceSync chrome CSS vars');
+assert(!applyChromeThemeSource.includes("createElement('style')"), 'applyChromeTheme must not inject <style> textContent under CSP');
+assert(!applyChromeThemeSource.includes('.style.colorScheme'), 'applyChromeTheme must not set inline style attributes under style-src-attr none');
+assert(applyChromeThemeSource.includes('color-scheme:'), 'applyChromeTheme must declare color-scheme inside the constructable sheet');
+
 const agentsMd = fs.readFileSync(path.join(repoRoot, 'AGENTS.md'), 'utf8');
 assert(agentsMd.includes('Appearance'), 'AGENTS.md must document Appearance');
 assert(agentsMd.includes('禁止恢复 translucent'), 'AGENTS.md must forbid translucent sidebar');
 
 const designMd = fs.readFileSync(path.join(repoRoot, 'DESIGN.md'), 'utf8');
-assert(designMd.includes('rdx-theme-v1'), 'DESIGN.md must document rdx-theme-v1');
-assert(designMd.includes('chromeThemes'), 'DESIGN.md must document chromeThemes');
-assert(designMd.includes('unified'), 'DESIGN.md must document unified preset trigger');
+assert(designMd.includes('docs/ui/'), 'DESIGN.md must point Appearance/UI authority to docs/ui/');
+assert(designMd.includes('style-src'), 'DESIGN.md must document CSP style-src for Appearance chrome');
+assert(
+  designMd.includes('schema 6') || designMd.includes('schemaVersion') || designMd.includes('chromeThemes'),
+  'DESIGN.md must document Appearance chrome persistence / schema reset boundary',
+);
+
+const designSystemMd = fs.readFileSync(path.join(repoRoot, 'docs/ui/design-system.md'), 'utf8');
+assert(designSystemMd.includes('rdx-theme-v1'), 'docs/ui/design-system.md must document rdx-theme-v1');
+assert(designSystemMd.includes('chromeThemes'), 'docs/ui/design-system.md must document chromeThemes');
+
+const workbenchUiMd = fs.readFileSync(path.join(repoRoot, 'docs/ui/workbench-and-transcript.md'), 'utf8');
+assert(workbenchUiMd.includes('Appearance') || workbenchUiMd.includes('chrome'), 'workbench UI doc must reference Appearance chrome');
 
 const appearanceSource = fs.readFileSync(
   path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AppearanceSettings.tsx'),
   'utf8',
 );
+const appearanceChromeParts = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AppearanceChromeParts.tsx'),
+  'utf8',
+);
 assert(!appearanceSource.includes('appearance-preset-swatch'), 'Appearance must not keep a side-mounted preset Aa sibling');
-assert(appearanceSource.includes('swatchColor'), 'Appearance preset options must supply swatchColor');
-assert(appearanceSource.includes('minMenuWidth={280}'), 'Appearance preset menu must set a wide minMenuWidth');
-assert(appearanceSource.includes('menuAlign="end"'), 'Appearance preset menu must right-align to the trigger');
-assert(appearanceSource.includes("from '../../../../ui/ColorField'"), 'Appearance must use shared ColorField');
-assert(!appearanceSource.includes('function ColorField'), 'Appearance must not inline a private ColorField');
+assert(!appearanceChromeParts.includes('appearance-preset-swatch'), 'Chrome parts must not keep a side-mounted preset Aa sibling');
+assert(appearanceChromeParts.includes('swatchColor'), 'Appearance preset options must supply swatchColor');
+assert(appearanceChromeParts.includes('minMenuWidth={280}'), 'Appearance preset menu must set a wide minMenuWidth');
+assert(appearanceChromeParts.includes('menuAlign="end"'), 'Appearance preset menu must right-align to the trigger');
+assert(appearanceChromeParts.includes("from '../../../../ui/ColorField'"), 'Appearance must use shared ColorField');
+assert(!appearanceChromeParts.includes('function ColorField'), 'Appearance must not inline a private ColorField');
+assert(appearanceSource.includes('ChromeThemeCard'), 'Appearance page must compose ChromeThemeCard');
 assert(fs.existsSync(path.join(repoRoot, 'src/renderer/ui/ColorField.tsx')), 'shared ColorField component must exist');
 assert(fs.existsSync(path.join(repoRoot, 'src/renderer/ui/ColorField.css')), 'shared ColorField styles must exist');
 const colorFieldSource = fs.readFileSync(path.join(repoRoot, 'src/renderer/ui/ColorField.tsx'), 'utf8');
@@ -139,6 +165,7 @@ assert(
   !/\.color-field-hex\s*\{[^}]*width:\s*100%/.test(colorFieldCss),
   'ColorField hex must not use width: 100%',
 );
+assert(colorFieldSource.includes('useDynStyle') || colorFieldSource.includes('assignDynStyle'), 'ColorField must use constructable dyn styles');
 
 const dropdownTypes = fs.readFileSync(path.join(repoRoot, 'src/renderer/ui/DropdownSelect/types.ts'), 'utf8');
 assert(dropdownTypes.includes('swatchColor'), 'DropdownOption must support swatchColor');

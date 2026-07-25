@@ -1,12 +1,25 @@
 /**
  * Concurrency contract — dual session turns, temporary path isolation.
+ * Phase 7 matrix entry for TurnCoordinator / path root isolation.
  */
 import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtemp, writeFile, rm } from 'fs/promises';
 import os from 'os';
 import path from 'path';
+import type { AgentEvent } from '@shared/types/agentRuntime';
 import { TurnCoordinator } from '../../workflow/debugger/TurnCoordinator';
 import { safeResolvePath } from '../../agent-runtime/tools/primitives/_shared';
+
+function makeEvent(id: string, sessionId: string): AgentEvent {
+  return {
+    id,
+    type: 'assistant.delta',
+    timestamp: Date.now(),
+    sessionId,
+    agentId: 'ask',
+    payload: { text: id },
+  } as AgentEvent;
+}
 
 describe('concurrencyContract: dual session turns', () => {
   it('keeps independent active turns per session', async () => {
@@ -27,6 +40,24 @@ describe('concurrencyContract: dual session turns', () => {
     await a.abortAndJoin({ reason: 'user_stop' });
     expect(coordinator.getActive('session-b')).toBe(b);
     await b.abortAndJoin({ reason: 'user_stop' });
+  });
+
+  it('replaces the active turn when the same session begins again', async () => {
+    const coordinator = new TurnCoordinator();
+    const first = await coordinator.beginTurn({
+      sessionKey: 'session-edit',
+      turnId: 't-1',
+      eventSink: { sessionId: 'session-edit' },
+    });
+    const second = await coordinator.beginTurn({
+      sessionKey: 'session-edit',
+      turnId: 't-2',
+      eventSink: { sessionId: 'session-edit' },
+    });
+    expect(coordinator.getActive('session-edit')).toBe(second);
+    expect(second.generation).toBeGreaterThan(first.generation);
+    expect(first.emitEvent(makeEvent('stale', 'session-edit'), first.generation)).toBe(false);
+    await second.abortAndJoin({ reason: 'user_stop' });
   });
 });
 

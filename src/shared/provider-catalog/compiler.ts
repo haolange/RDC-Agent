@@ -435,7 +435,6 @@ function validateSurface(
     'cloud-platform': ['cloud', 'cloud-hosted', 'cloud-platform'],
     'coding-token-plan': ['plan', 'coding-plan', 'service-operator'],
     local: ['local', 'local-service', 'local'],
-    image: ['media', 'first-party', 'service-operator'],
   } as const;
   const categoryShape = surface.category === 'compatible-access'
     ? undefined
@@ -454,10 +453,6 @@ function validateSurface(
       'user-endpoint:user',
     ])).has(`${surface.endpointClass}:${surface.endpointOwnership}`)) {
     errors.push(`${surface.id} has an invalid explicit compatible-access ownership shape`);
-  }
-  if (surface.category === 'image'
-    && !surface.capabilities?.some((capability) => capability === 'image-generation' || capability === 'video-generation')) {
-    errors.push(`${surface.id} is categorized as image without a media capability`);
   }
   if (!profile) errors.push(`${surface.id} references unknown profile ${surface.profileId}`);
   if (!authSchemas.has(surface.authSchemaId)) errors.push(`${surface.id} references unknown auth schema ${surface.authSchemaId}`);

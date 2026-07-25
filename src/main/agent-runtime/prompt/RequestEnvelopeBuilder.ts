@@ -5,7 +5,7 @@ import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 
 const SECRET_KEY = /(?:api[-_]?key|authorization|password|secret|access[-_]?token|refresh[-_]?token)/i;
 const PROTECTED_KEY = /^(?:encryptedContent|signature|thoughtSignature|redactedContent|opaqueState|reasoningContent|raw)$/i;
-const SECRET_ASSIGNMENT = /((?:api[-_ ]?key|authorization|password|secret|access[-_ ]?token|refresh[-_ ]?token)\s*[:=]\s*)(?:\"[^\"\r\n]*\"|'[^'\r\n]*'|[^\r\n,;]+)/gi;
+const SECRET_ASSIGNMENT = /((?:api[-_ ]?key|authorization|password|secret|access[-_ ]?token|refresh[-_ ]?token)\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\r\n,;]+)/gi;
 const BEARER_TOKEN = /\bBearer\s+[A-Za-z0-9._~+/=-]{8,}/gi;
 const PREFIXED_SECRET = /\b(?:sk|rk|xai|ghp|github_pat|sk-ant)-[A-Za-z0-9_-]{12,}\b/gi;
 const GOOGLE_API_KEY = /\bAIza[A-Za-z0-9_-]{20,}\b/g;

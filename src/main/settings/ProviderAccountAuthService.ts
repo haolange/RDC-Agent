@@ -1,5 +1,3 @@
-import { createHash, randomBytes, randomUUID } from 'crypto';
-import { createServer, type Server } from 'http';
 import { shell } from 'electron';
 import type {
   LlmProviderAccountDiagnostic,
@@ -10,100 +8,59 @@ import type {
   LlmProviderId,
   LlmProviderModel,
 } from '@shared/types/settings';
-import { SUPER_GROK_OAUTH_REDIRECT_URI } from '@shared/constants/llm';
-import { COPILOT_EDITOR_HEADERS, COPILOT_WIRE_HEADERS } from './CopilotWire';
-import { CLAUDE_ACCOUNT_WIRE_HEADERS } from './ClaudeWire';
-import { parseCopilotModelCatalog } from './CopilotBilling';
-import { isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 import { settingsService } from './SettingsService';
 import { oauthRefreshManager } from './OAuthRefreshManager';
+import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
+import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import {
-  getProviderModelDefinitions,
-  getLoadedProviderSurface,
-  loadProviderSurface,
-} from '../provider-catalog/ProviderCatalogRegistry';
+  discoverChatGptCatalog,
+  exchangeChatGptCode,
+  refreshChatGptBundle,
+  startChatGptCallbackServer,
+  startChatGptLogin,
+} from './oauth/chatGptAccountOAuth';
 import {
-  mergeParsedLiveCatalogs,
-  parseChatGptAccountCatalog,
-  parseClaudeAccountCatalog,
-  parseGrokAccountCatalog,
-  parseGrokBuilderCatalog,
-  parseOpenRouterAccountCatalog,
-} from './LiveProviderCatalogParsers';
-import type { CatalogModelContribution } from './EffectiveCatalogService';
-import { runtimeLogService } from '../runtime/RuntimeLogService';
+  discoverClaudeCatalog,
+  exchangeClaudeCode,
+  refreshClaudeBundle,
+  startClaudeLogin,
+} from './oauth/claudeAccountOAuth';
 import {
-  buildOpenRouterAuthorizationUrl,
-  buildOpenRouterExchange,
-  createPkcePair,
-  parseOpenRouterExchange,
-} from './LiveProviderOAuthContracts';
-
-const REQUEST_TIMEOUT_MS = 20000;
-const CHATGPT_CALLBACK_PORT = 1455;
-const CHATGPT_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
-const CLAUDE_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
-const GITHUB_COPILOT_CLIENT_ID = 'Iv1.b507a08c87ecfe98';
-const GROK_OPENID_CONFIGURATION_URL = 'https://auth.x.ai/.well-known/openid-configuration';
-const GROK_OAUTH_CLIENT_ID = 'b1a00492-073a-47ea-816f-4c329264a828';
-const GROK_OAUTH_REQUESTED_SCOPES = ['openid', 'profile', 'email', 'offline_access', 'grok-cli:access', 'api:access'] as const;
-const GROK_BUILD_API_BASE_URL = 'https://cli-chat-proxy.grok.com/v1';
-const XAI_API_BASE_URL = 'https://api.x.ai/v1';
-const CHATGPT_CATALOG_CLIENT_VERSION = '1.0.0';
-const NOUS_PORTAL_BASE_URL = 'https://portal.nousresearch.com';
-const NOUS_INFERENCE_BASE_URL = 'https://inference-api.nousresearch.com/v1';
-const NOUS_OAUTH_CLIENT_ID = 'hermes-cli';
-const NOUS_OAUTH_SCOPE = 'inference:invoke';
-
-type AccountProviderId =
-  | 'claude-account'
-  | 'chatgpt-account'
-  | 'github-copilot'
-  | 'grok-account'
-  | 'nous'
-  | 'openrouter';
-
-interface OAuthFlowState {
-  providerId: AccountProviderId;
-  flowId: string;
-  state: string;
-  codeVerifier?: string;
-  authUrl?: string;
-  verificationUri?: string;
-  userCode?: string;
-  deviceCode?: string;
-  intervalSeconds?: number;
-  clientId?: string;
-  authorizationMode?: LlmProviderAccountLoginMode;
-  requestedScopes?: string;
-  redirectUri?: string;
-  tokenEndpoint?: string;
-  userinfoEndpoint?: string;
-  resourceUrl?: string;
-  expiresAt: number;
-  server?: Server;
-  error?: string;
-  diagnostic?: LlmProviderAccountDiagnostic;
-}
-
-interface OAuthSecretBundle {
-  providerId: AccountProviderId;
-  accessToken?: string;
-  refreshToken?: string;
-  apiKey?: string;
-  copilotToken?: string;
-  copilotApiBaseUrl?: string;
-  copilotModelBilling?: Record<string, unknown>;
-  idToken?: string;
-  authorizationMode?: LlmProviderAccountLoginMode;
-  requestedScopes?: string;
-  redirectUri?: string;
-  accountId?: string;
-  expiresAt?: string;
-  accountLabel?: string;
-  planLabel?: string;
-  resourceUrl?: string;
-}
+  discoverCopilotCatalog,
+  pollGitHubDevice,
+  refreshCopilotBundle,
+  startGitHubCopilotLogin,
+} from './oauth/copilotAccountOAuth';
+import {
+  discoverGrokCatalog,
+  exchangeGrokCode,
+  pollGrokDevice,
+  refreshGrokBundle,
+  revokeGrokBundle,
+  startGrokBrowserLogin,
+  startGrokDeviceLogin,
+} from './oauth/grokAccountOAuth';
+import {
+  createGrokOAuthStartupDiagnostic,
+  renderGrokOAuthDiagnosticMessage,
+  resolveGrokOAuthDiagnostic,
+} from './oauth/grokOAuth';
+import {
+  discoverNousCatalog,
+  pollNousDevice,
+  refreshNousBundle,
+  startNousLogin,
+} from './oauth/nousAccountOAuth';
+import {
+  discoverOpenRouterCatalog,
+  exchangeOpenRouterCode,
+  startOpenRouterCallbackServer,
+  startOpenRouterLogin,
+} from './oauth/openRouterAccountOAuth';
+import { GROK_OAUTH_CLIENT_ID } from './oauth/oauthConstants';
+import { parseProviderError, shouldOpenSystemBrowser } from './oauth/oauthHttp';
+import type { AccountProviderId, OAuthFlowState, OAuthSecretBundle } from './oauth/oauthTypes';
+import { isAccountProviderId } from './oauth/oauthTypes';
 
 export interface AccountCatalogDiscovery {
   models: LlmProviderModel[];
@@ -117,319 +74,12 @@ type AccountCatalogPublisher = (
   discovery: AccountCatalogDiscovery,
 ) => Promise<void>;
 
-interface GrokOAuthMetadata {
-  authorizationEndpoint: string;
-  deviceAuthorizationEndpoint: string;
-  tokenEndpoint: string;
-  userinfoEndpoint: string;
-  revocationEndpoint: string;
-  scopesSupported: string[];
-  grantTypesSupported: string[];
-  codeChallengeMethodsSupported: string[];
-  tokenEndpointAuthMethodsSupported: string[];
-}
-
-const isAccountProviderId = (providerId: LlmProviderId): providerId is AccountProviderId =>
-  providerId === 'claude-account'
-  || providerId === 'chatgpt-account'
-  || providerId === 'github-copilot'
-  || providerId === 'grok-account'
-  || providerId === 'nous'
-  || providerId === 'openrouter';
-
-const isTestMode = (): boolean => process.env.RDC_AGENT_TEST_MODE === '1';
-const shouldOpenSystemBrowser = (): boolean => !isTestMode() && process.env.RDC_AGENT_HEADLESS !== '1';
-
-const base64Url = (buffer: Buffer): string =>
-  buffer.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-const createPkce = (): { verifier: string; challenge: string } => {
-  const verifier = base64Url(randomBytes(32));
-  const challenge = base64Url(createHash('sha256').update(verifier).digest());
-  return { verifier, challenge };
-};
-
-const appendParams = (baseUrl: string, params: Record<string, string>): string => {
-  const url = new URL(baseUrl);
-  for (const [key, value] of Object.entries(params)) {
-    url.searchParams.set(key, value);
-  }
-  return url.toString();
-};
-
-const readString = (value: unknown): string | undefined =>
-  typeof value === 'string' && value.trim() ? value.trim() : undefined;
-
-const readStringArray = (value: unknown): string[] => (
-  Array.isArray(value)
-    ? value.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
-    : []
-);
-
-const parseGrokOAuthMetadata = (payload: unknown): GrokOAuthMetadata => {
-  const record = payload && typeof payload === 'object' && !Array.isArray(payload)
-    ? payload as Record<string, unknown>
-    : {};
-  const metadata: GrokOAuthMetadata = {
-    authorizationEndpoint: readString(record.authorization_endpoint) ?? '',
-    deviceAuthorizationEndpoint: readString(record.device_authorization_endpoint) ?? '',
-    tokenEndpoint: readString(record.token_endpoint) ?? '',
-    userinfoEndpoint: readString(record.userinfo_endpoint) ?? '',
-    revocationEndpoint: readString(record.revocation_endpoint) ?? '',
-    scopesSupported: readStringArray(record.scopes_supported),
-    grantTypesSupported: readStringArray(record.grant_types_supported),
-    codeChallengeMethodsSupported: readStringArray(record.code_challenge_methods_supported),
-    tokenEndpointAuthMethodsSupported: readStringArray(record.token_endpoint_auth_methods_supported),
-  };
-  if (!metadata.authorizationEndpoint || !metadata.deviceAuthorizationEndpoint || !metadata.tokenEndpoint || !metadata.userinfoEndpoint || !metadata.revocationEndpoint) {
-    throw new Error('xAI OAuth metadata is missing required browser, device, token, userinfo, or revocation endpoints.');
-  }
-  if (metadata.grantTypesSupported.length > 0) {
-    if (!metadata.grantTypesSupported.includes('authorization_code')) {
-      throw new Error('xAI OAuth metadata does not advertise browser authorization-code support.');
-    }
-    if (!metadata.grantTypesSupported.includes('urn:ietf:params:oauth:grant-type:device_code')) {
-      throw new Error('xAI OAuth metadata does not advertise device authorization support.');
-    }
-  }
-  if (metadata.codeChallengeMethodsSupported.length > 0 && !metadata.codeChallengeMethodsSupported.includes('S256')) {
-    throw new Error('xAI OAuth metadata does not advertise PKCE S256 support.');
-  }
-  if (metadata.tokenEndpointAuthMethodsSupported.length > 0 && !metadata.tokenEndpointAuthMethodsSupported.includes('none')) {
-    throw new Error('xAI OAuth metadata does not advertise public-client token exchange support.');
-  }
-  return metadata;
-};
-
-const fetchGrokOAuthMetadata = async (): Promise<GrokOAuthMetadata> => {
-  const payload = await fetchJson(GROK_OPENID_CONFIGURATION_URL, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-    },
-  });
-  return parseGrokOAuthMetadata(payload);
-};
-
-const resolveGrokOAuthScope = (metadata: GrokOAuthMetadata): string => {
-  const supported = new Set(metadata.scopesSupported);
-  const requested = GROK_OAUTH_REQUESTED_SCOPES.filter((scope) => (
-    supported.size === 0 || supported.has(scope)
-  ));
-  const missing = GROK_OAUTH_REQUESTED_SCOPES.filter((scope) => (
-    supported.size > 0 && !supported.has(scope)
-  ));
-  if (requested.length === 0 || missing.includes('grok-cli:access')) {
-    throw new Error(
-      'xAI OAuth metadata does not support the required Grok Build scope. Missing scopes: '
-      + (missing.join(', ') || 'unknown')
-      + '.',
-    );
-  }
-  return requested.join(' ');
-};
-
-const readOAuthError = (payload: unknown): { error?: string; detail?: string } => {
-  const record = payload && typeof payload === 'object' && !Array.isArray(payload)
-    ? payload as Record<string, unknown>
-    : {};
-  return {
-    error: readString(record.error),
-    detail: readString(record.error_description) ?? readString(record.message),
-  };
-};
-
-const SUPER_GROK_OAUTH_CHECKLIST = [
-  'Use a SuperGrok or X Premium Plus account with Grok Build access.',
-  'Allow the requested Grok Build and API scopes in the browser.',
-  'Copy the one-time code shown by xAI back into RDC Agent before it expires.',
-];
-
-const createGrokOAuthDiagnostic = (
-  stage: LlmProviderAccountDiagnostic['stage'],
-  summary: string,
-  options: Partial<Omit<LlmProviderAccountDiagnostic, 'stage' | 'summary'>> = {},
-): LlmProviderAccountDiagnostic => ({
-  stage,
-  summary,
-  detail: options.detail,
-  providerError: options.providerError,
-  requestedScopes: options.requestedScopes,
-  redirectUri: options.redirectUri,
-  checklist: options.checklist ?? SUPER_GROK_OAUTH_CHECKLIST,
-});
-
-const renderGrokOAuthDiagnosticMessage = (diagnostic: LlmProviderAccountDiagnostic): string => [
-  diagnostic.summary,
-  diagnostic.requestedScopes ? 'Requested scopes: ' + diagnostic.requestedScopes + '.' : '',
-  diagnostic.redirectUri ? 'Redirect URI: ' + diagnostic.redirectUri + '.' : '',
-  diagnostic.providerError ? 'Provider error: ' + diagnostic.providerError + '.' : '',
-  diagnostic.detail ? 'Detail: ' + diagnostic.detail + '.' : '',
-].filter(Boolean).join(' ');
-
-const createGrokOAuthFailureDiagnostic = (
-  stage: LlmProviderAccountDiagnostic['stage'],
-  operation: string,
-  payload: unknown,
-  scope?: string,
-  redirectUri?: string,
-): LlmProviderAccountDiagnostic => {
-  const { error, detail } = readOAuthError(payload);
-  return createGrokOAuthDiagnostic(
-    stage,
-    'Super Grok OAuth ' + operation + ' failed. Check the xAI public OAuth Client ID, redirect URI, and allowed scopes.',
-    {
-      providerError: error || parseProviderError(payload),
-      detail,
-      requestedScopes: scope,
-      redirectUri,
-    },
-  );
-};
-
-
-class GrokOAuthDiagnosticError extends Error {
-  constructor(readonly diagnostic: LlmProviderAccountDiagnostic) {
-    super(renderGrokOAuthDiagnosticMessage(diagnostic));
-  }
-}
-
-const createGrokOAuthStartupDiagnostic = (
-  error: unknown,
-  mode: LlmProviderAccountLoginMode,
-  scope?: string,
-  redirectUri?: string,
-): LlmProviderAccountDiagnostic => {
-  const message = parseProviderError(error);
-  const stage: LlmProviderAccountDiagnostic['stage'] = message.startsWith('xAI OAuth metadata') ? 'metadata' : 'authorization';
-  if (message.startsWith('Super Grok OAuth ') || message.startsWith('xAI OAuth metadata')) {
-    return createGrokOAuthDiagnostic(stage, message, { requestedScopes: scope, redirectUri });
-  }
-  return createGrokOAuthDiagnostic(
-    stage,
-    'Super Grok OAuth ' + mode + ' authorization failed. Check the xAI public OAuth Client ID, xAI OAuth metadata network access, redirect URI, and allowed scopes.',
-    { detail: message, requestedScopes: scope, redirectUri },
-  );
-};
-
-const resolveGrokOAuthDiagnostic = (
-  error: unknown,
-  mode: LlmProviderAccountLoginMode,
-  scope?: string,
-  redirectUri?: string,
-): LlmProviderAccountDiagnostic => (
-  error instanceof GrokOAuthDiagnosticError
-    ? error.diagnostic
-    : createGrokOAuthStartupDiagnostic(error, mode, scope, redirectUri)
-);
-
-
-const parseJwtPayload = (token?: string): Record<string, unknown> | null => {
-  const payload = token?.split('.')[1];
-  if (!payload) {
-    return null;
-  }
-  try {
-    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const decoded = Buffer.from(normalized, 'base64').toString('utf8');
-    const parsed = JSON.parse(decoded) as unknown;
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-      ? parsed as Record<string, unknown>
-      : null;
-  } catch {
-    return null;
-  }
-};
-
-const extractChatGptAccountId = (idToken?: string): string | undefined => {
-  const claims = parseJwtPayload(idToken);
-  if (!claims) {
-    return undefined;
-  }
-
-  const authClaim = claims['https://api.openai.com/auth'];
-  const authRecord = authClaim && typeof authClaim === 'object' && !Array.isArray(authClaim)
-    ? authClaim as Record<string, unknown>
-    : {};
-  const organizations = Array.isArray(claims.organizations) ? claims.organizations : [];
-  const firstOrganization = organizations[0] && typeof organizations[0] === 'object'
-    ? organizations[0] as Record<string, unknown>
-    : {};
-
-  return readString(authRecord.chatgpt_account_id)
-    ?? readString(authRecord.account_id)
-    ?? readString(claims['https://api.openai.com/auth.chatgpt_account_id'])
-    ?? readString(claims.chatgpt_account_id)
-    ?? readString(claims.account_id)
-    ?? readString(firstOrganization.id);
-};
-
-const isAgentRoutableAccountModel = (modelId: string): boolean => {
-  return isAdmittedDiscoveredModel(modelId);
-};
-
-const parseProviderError = (error: unknown): string => {
-  if (error instanceof DOMException && error.name === 'AbortError') {
-    return 'Connection test timed out.';
-  }
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return 'Provider connection failed.';
-};
-
-const wait = (milliseconds: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, milliseconds));
-
 const canRefreshBundle = (bundle: OAuthSecretBundle): boolean => {
   if (bundle.providerId === 'grok-account') {
     return Boolean(bundle.refreshToken);
   }
   return Boolean(bundle.refreshToken || (bundle.providerId === 'github-copilot' && bundle.accessToken));
 };
-
-const fetchJson = async (url: string, init: RequestInit): Promise<unknown> => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, {
-      ...init,
-      signal: controller.signal,
-    });
-    const text = await response.text();
-    const payload = text ? JSON.parse(text) as unknown : {};
-    if (!response.ok) {
-      const message = payload && typeof payload === 'object' && typeof (payload as { error?: unknown }).error === 'string'
-        ? (payload as { error: string }).error
-        : `HTTP ${response.status}`;
-      throw new Error(message);
-    }
-    return payload;
-  } finally {
-    clearTimeout(timeout);
-  }
-};
-
-const fetchOAuthJson = async (url: string, init: RequestInit): Promise<unknown> => {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    const response = await fetch(url, {
-      ...init,
-      signal: controller.signal,
-    });
-    const text = await response.text();
-    const payload = text ? JSON.parse(text) as unknown : {};
-    if (!response.ok && !(payload && typeof payload === 'object' && typeof (payload as { error?: unknown }).error === 'string')) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    return payload;
-  } finally {
-    clearTimeout(timeout);
-  }
-};
-
-const createFormBody = (params: Record<string, string>): string => new URLSearchParams(params).toString();
 
 function pendingAuthorizationMessage(
   providerId: LlmProviderId,
@@ -460,66 +110,128 @@ export class ProviderAccountAuthService {
     if (!isAccountProviderId(providerId)) {
       return this.status(providerId, 'Provider does not support account login.');
     }
-    if (providerId === 'claude-account') {
-      return this.startClaudeLogin();
-    }
-    if (providerId === 'chatgpt-account') {
-      return this.startChatGptLogin();
-    }
-    if (providerId === 'github-copilot') {
-      return this.startGitHubCopilotLogin();
-    }
-    if (providerId === 'grok-account') {
-      return this.startGrokLogin(request.accountLoginMode);
-    }
-    if (providerId === 'nous') {
-      return this.startNousLogin();
-    }
-    if (providerId === 'openrouter') {
-      return this.startOpenRouterLogin();
+    try {
+      if (providerId === 'claude-account') {
+        startClaudeLogin((flow) => this.setFlow(flow));
+        void this.openExternal(this.findFlow(providerId)?.authUrl);
+        return this.status(providerId);
+      }
+      if (providerId === 'chatgpt-account') {
+        await startChatGptLogin(
+          (flow) => this.setFlow(flow),
+          (flow) => startChatGptCallbackServer(
+            flow,
+            async (flowId, code) => {
+              const status = await this.finishLoginInternal('chatgpt-account', flowId, code);
+              return { connected: status.connected, error: status.error, message: status.message };
+            },
+            (flow) => this.closeFlowServer(flow),
+            (flowId) => this.pendingFlows.delete(flowId),
+          ),
+          (url) => this.openExternal(url),
+        );
+        return this.status(providerId);
+      }
+      if (providerId === 'github-copilot') {
+        await startGitHubCopilotLogin(
+          (flow) => this.setFlow(flow),
+          (url) => this.openExternal(url),
+          async (bundle) => { await this.persistAccount(providerId, bundle); },
+          (flow, message) => { flow.error = message; },
+        );
+        return this.status(providerId);
+      }
+      if (providerId === 'grok-account') {
+        const mode: LlmProviderAccountLoginMode = request.accountLoginMode === 'device' ? 'device' : 'browser';
+        if (mode === 'device') {
+          await startGrokDeviceLogin(
+            GROK_OAUTH_CLIENT_ID,
+            (flow) => this.setFlow(flow),
+            (url) => this.openExternal(url),
+            async (bundle) => { await this.persistAccount(providerId, bundle); },
+            (flow, message, diagnostic) => { flow.error = message; flow.diagnostic = diagnostic; },
+          );
+        } else {
+          await startGrokBrowserLogin(GROK_OAUTH_CLIENT_ID, (flow) => this.setFlow(flow), (url) => this.openExternal(url));
+          void this.openExternal(this.findFlow(providerId)?.authUrl);
+        }
+        return this.status(providerId);
+      }
+      if (providerId === 'nous') {
+        await startNousLogin(
+          (flow) => this.setFlow(flow),
+          (url) => this.openExternal(url),
+          async (bundle) => { await this.persistAccount(providerId, bundle); },
+          (flow, message) => { flow.error = message; },
+        );
+        return this.status(providerId);
+      }
+      if (providerId === 'openrouter') {
+        const flow = await startOpenRouterLogin(
+          (nextFlow) => this.setFlow(nextFlow),
+          (nextFlow, challenge) => startOpenRouterCallbackServer(
+            nextFlow,
+            challenge,
+            async (flowId, code) => {
+              const status = await this.finishLoginInternal('openrouter', flowId, code);
+              return { connected: status.connected, error: status.error, message: status.message };
+            },
+            (nextFlow) => this.closeFlowServer(nextFlow),
+            (flowId) => this.pendingFlows.delete(flowId),
+          ),
+        );
+        void this.openExternal(flow.authUrl);
+        return this.status(providerId);
+      }
+    } catch (error) {
+      if (providerId === 'grok-account') {
+        const diagnostic = resolveGrokOAuthDiagnostic(error, request.accountLoginMode === 'device' ? 'device' : 'browser');
+        return this.status(providerId, renderGrokOAuthDiagnosticMessage(diagnostic), 'failed', diagnostic);
+      }
+      return this.status(providerId, parseProviderError(error), 'failed');
     }
     return this.status(providerId, 'Provider does not support account login.', 'failed');
   }
 
   async finishLogin(request: LlmProviderAccountLoginFinishRequest): Promise<LlmProviderAccountStatus> {
-    if (!isAccountProviderId(request.providerId)) {
-      return this.status(request.providerId, 'Provider does not support account login.');
+    return this.finishLoginInternal(request.providerId, request.flowId ?? '', request.code?.trim() ?? '');
+  }
+
+  private async finishLoginInternal(
+    providerId: LlmProviderId,
+    flowId: string,
+    code: string,
+  ): Promise<LlmProviderAccountStatus> {
+    if (!isAccountProviderId(providerId)) {
+      return this.status(providerId, 'Provider does not support account login.');
     }
-    const flow = this.findFlow(request.providerId, request.flowId);
+    const flow = this.findFlow(providerId, flowId || undefined);
     if (!flow) {
-      return this.status(request.providerId, 'Login flow expired or was not started.', 'failed');
+      return this.status(providerId, 'Login flow expired or was not started.', 'failed');
     }
 
     try {
-      if (request.providerId === 'claude-account') {
-        const bundle = await this.exchangeClaudeCode(flow, request.code?.trim() ?? '');
-        return await this.persistAccount(request.providerId, bundle);
+      let bundle: OAuthSecretBundle;
+      if (providerId === 'claude-account') {
+        bundle = await exchangeClaudeCode(flow, code);
+      } else if (providerId === 'chatgpt-account') {
+        bundle = await exchangeChatGptCode(flow, code);
+      } else if (providerId === 'github-copilot') {
+        bundle = await pollGitHubDevice(flow);
+      } else if (providerId === 'grok-account') {
+        bundle = flow.authorizationMode === 'browser'
+          ? await exchangeGrokCode(flow, code)
+          : await pollGrokDevice(flow);
+      } else if (providerId === 'nous') {
+        bundle = await pollNousDevice(flow);
+      } else if (providerId === 'openrouter') {
+        bundle = await exchangeOpenRouterCode(flow, code);
+      } else {
+        return this.status(providerId, 'Provider does not support account login.', 'failed');
       }
-      if (request.providerId === 'chatgpt-account') {
-        const bundle = await this.exchangeChatGptCode(flow, request.code?.trim() ?? '');
-        return await this.persistAccount(request.providerId, bundle);
-      }
-      if (request.providerId === 'github-copilot') {
-        const bundle = await this.pollGitHubDevice(flow);
-        return await this.persistAccount(request.providerId, bundle);
-      }
-      if (request.providerId === 'grok-account') {
-        const bundle = flow.authorizationMode === 'browser'
-          ? await this.exchangeGrokCode(flow, request.code?.trim() ?? '')
-          : await this.pollGrokDevice(flow);
-        return await this.persistAccount(request.providerId, bundle);
-      }
-      if (request.providerId === 'nous') {
-        const bundle = await this.pollNousDevice(flow);
-        return await this.persistAccount(request.providerId, bundle);
-      }
-      if (request.providerId === 'openrouter') {
-        const bundle = await this.exchangeOpenRouterCode(flow, request.code?.trim() ?? '');
-        return await this.persistAccount(request.providerId, bundle);
-      }
-      return this.status(request.providerId, 'Provider does not support account login.', 'failed');
+      return await this.persistAccount(providerId, bundle);
     } catch (error) {
-      if (request.providerId === 'grok-account') {
+      if (providerId === 'grok-account') {
         const diagnostic = createGrokOAuthStartupDiagnostic(
           error,
           flow.authorizationMode === 'device' ? 'device' : 'browser',
@@ -528,10 +240,10 @@ export class ProviderAccountAuthService {
         );
         flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
         flow.diagnostic = diagnostic;
-        return this.status(request.providerId, flow.error, 'failed', diagnostic);
+        return this.status(providerId, flow.error, 'failed', diagnostic);
       }
       flow.error = parseProviderError(error);
-      return this.status(request.providerId, flow.error, 'failed');
+      return this.status(providerId, flow.error, 'failed');
     }
   }
 
@@ -652,640 +364,11 @@ export class ProviderAccountAuthService {
       const bundle = providerId === 'grok-account' ? this.readBundle('grok-account') : null;
       this.clearFlows(providerId);
       if (bundle) {
-        void this.revokeGrokBundle(bundle);
+        void revokeGrokBundle(bundle);
       }
       settingsService.disconnectProvider(providerId, 'account');
     }
     return this.status(providerId);
-  }
-
-  private startClaudeLogin(): LlmProviderAccountStatus {
-    const { verifier, challenge } = createPkce();
-    const state = randomUUID();
-    const flow: OAuthFlowState = {
-      providerId: 'claude-account',
-      flowId: randomUUID(),
-      state,
-      codeVerifier: verifier,
-      authUrl: appendParams('https://claude.ai/oauth/authorize', {
-        code: 'true',
-        client_id: CLAUDE_CLIENT_ID,
-        response_type: 'code',
-        redirect_uri: 'https://console.anthropic.com/oauth/code/callback',
-        scope: 'org:create_api_key user:profile user:inference',
-        code_challenge: challenge,
-        code_challenge_method: 'S256',
-        state,
-      }),
-      expiresAt: Date.now() + 10 * 60 * 1000,
-    };
-    this.setFlow(flow);
-    void this.openExternal(flow.authUrl);
-    return this.status(flow.providerId);
-  }
-
-  private async startChatGptLogin(): Promise<LlmProviderAccountStatus> {
-    const { verifier, challenge } = createPkce();
-    const state = randomUUID();
-    const flow: OAuthFlowState = {
-      providerId: 'chatgpt-account',
-      flowId: randomUUID(),
-      state,
-      codeVerifier: verifier,
-      authUrl: appendParams('https://auth.openai.com/oauth/authorize', {
-        client_id: CHATGPT_CLIENT_ID,
-        response_type: 'code',
-        redirect_uri: `http://localhost:${CHATGPT_CALLBACK_PORT}/auth/callback`,
-        scope: 'openid profile email offline_access',
-        code_challenge: challenge,
-        code_challenge_method: 'S256',
-        state,
-        codex_cli_simplified_flow: 'true',
-        id_token_add_organizations: 'true',
-      }),
-      expiresAt: Date.now() + 10 * 60 * 1000,
-    };
-    this.setFlow(flow);
-    await this.startChatGptCallbackServer(flow);
-    void this.openExternal(flow.authUrl);
-    return this.status(flow.providerId);
-  }
-
-  private async startGitHubCopilotLogin(): Promise<LlmProviderAccountStatus> {
-    const payload = await fetchJson('https://github.com/login/device/code', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        client_id: GITHUB_COPILOT_CLIENT_ID,
-        scope: 'read:user',
-      }),
-    }) as {
-      device_code?: string;
-      user_code?: string;
-      verification_uri?: string;
-      expires_in?: number;
-      interval?: number;
-    };
-    const flow: OAuthFlowState = {
-      providerId: 'github-copilot',
-      flowId: randomUUID(),
-      state: randomUUID(),
-      deviceCode: payload.device_code,
-      userCode: payload.user_code,
-      verificationUri: payload.verification_uri,
-      intervalSeconds: payload.interval ?? 5,
-      expiresAt: Date.now() + (payload.expires_in ?? 900) * 1000,
-    };
-    this.setFlow(flow);
-    if (flow.verificationUri) {
-      void this.openExternal(flow.verificationUri);
-    }
-    void this.pollGitHubDevice(flow)
-      .then((bundle) => this.persistAccount('github-copilot', bundle))
-      .catch((error) => {
-        flow.error = parseProviderError(error);
-      });
-    return this.status(flow.providerId);
-  }
-
-  private async startNousLogin(): Promise<LlmProviderAccountStatus> {
-    const payload = await fetchOAuthJson(`${NOUS_PORTAL_BASE_URL}/api/oauth/device/code`, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: createFormBody({
-        client_id: NOUS_OAUTH_CLIENT_ID,
-        scope: NOUS_OAUTH_SCOPE,
-      }),
-    }) as {
-      device_code?: string;
-      user_code?: string;
-      verification_uri?: string;
-      verification_uri_complete?: string;
-      expires_in?: number;
-      interval?: number;
-      error?: string;
-      error_description?: string;
-    };
-    if (payload.error) {
-      throw new Error(payload.error_description ?? payload.error);
-    }
-    if (
-      !payload.device_code
-      || !payload.user_code
-      || !payload.verification_uri
-      || !payload.verification_uri_complete
-    ) {
-      throw new Error('Nous Portal did not return a complete device authorization payload.');
-    }
-    const flow: OAuthFlowState = {
-      providerId: 'nous',
-      flowId: randomUUID(),
-      state: randomUUID(),
-      deviceCode: payload.device_code,
-      userCode: payload.user_code,
-      verificationUri: payload.verification_uri,
-      authUrl: payload.verification_uri_complete,
-      intervalSeconds: payload.interval ?? 5,
-      clientId: NOUS_OAUTH_CLIENT_ID,
-      authorizationMode: 'device',
-      requestedScopes: NOUS_OAUTH_SCOPE,
-      tokenEndpoint: `${NOUS_PORTAL_BASE_URL}/api/oauth/token`,
-      resourceUrl: NOUS_INFERENCE_BASE_URL,
-      expiresAt: Date.now() + (payload.expires_in ?? 900) * 1000,
-    };
-    this.setFlow(flow);
-    void this.openExternal(flow.authUrl);
-    void this.pollNousDevice(flow)
-      .then((bundle) => this.persistAccount('nous', bundle))
-      .catch((error) => {
-        flow.error = parseProviderError(error);
-      });
-    return this.status(flow.providerId);
-  }
-
-  private async startGrokLogin(
-    accountLoginMode?: LlmProviderAccountLoginMode,
-  ): Promise<LlmProviderAccountStatus> {
-    const mode: LlmProviderAccountLoginMode = accountLoginMode === 'device' ? 'device' : 'browser';
-    return mode === 'device'
-      ? this.startGrokDeviceLogin(GROK_OAUTH_CLIENT_ID)
-      : this.startGrokBrowserLogin(GROK_OAUTH_CLIENT_ID);
-  }
-
-  private async startOpenRouterLogin(): Promise<LlmProviderAccountStatus> {
-    const { verifier, challenge } = createPkcePair();
-    const flow: OAuthFlowState = {
-      providerId: 'openrouter',
-      flowId: randomUUID(),
-      state: randomUUID(),
-      codeVerifier: verifier,
-      authorizationMode: 'browser',
-      expiresAt: Date.now() + 10 * 60 * 1000,
-    };
-    this.setFlow(flow);
-    try {
-      await this.startOpenRouterCallbackServer(flow, challenge);
-      void this.openExternal(flow.authUrl);
-      return this.status(flow.providerId);
-    } catch (error) {
-      this.clearFlows(flow.providerId);
-      return this.status(flow.providerId, parseProviderError(error), 'failed');
-    }
-  }
-
-  private async startGrokBrowserLogin(clientId: string): Promise<LlmProviderAccountStatus> {
-    let scope: string | undefined;
-    try {
-      const metadata = await fetchGrokOAuthMetadata();
-      scope = resolveGrokOAuthScope(metadata);
-      const { verifier, challenge } = createPkce();
-      const flow: OAuthFlowState = {
-        providerId: 'grok-account',
-        flowId: randomUUID(),
-        state: randomUUID(),
-        codeVerifier: verifier,
-        authUrl: '',
-        clientId,
-        authorizationMode: 'browser',
-        requestedScopes: scope,
-        redirectUri: SUPER_GROK_OAUTH_REDIRECT_URI,
-        tokenEndpoint: metadata.tokenEndpoint,
-        userinfoEndpoint: metadata.userinfoEndpoint,
-        expiresAt: Date.now() + 10 * 60 * 1000,
-      };
-      flow.authUrl = appendParams(metadata.authorizationEndpoint, {
-        client_id: clientId,
-        response_type: 'code',
-        redirect_uri: SUPER_GROK_OAUTH_REDIRECT_URI,
-        scope,
-        code_challenge: challenge,
-        code_challenge_method: 'S256',
-        state: flow.state,
-      });
-      this.setFlow(flow);
-      void this.openExternal(flow.authUrl);
-      return this.status(flow.providerId);
-    } catch (error) {
-      const diagnostic = resolveGrokOAuthDiagnostic(error, 'browser', scope, SUPER_GROK_OAUTH_REDIRECT_URI);
-      this.clearFlows('grok-account');
-      return this.status('grok-account', renderGrokOAuthDiagnosticMessage(diagnostic), 'failed', diagnostic);
-    }
-  }
-
-  private async startGrokDeviceLogin(clientId: string): Promise<LlmProviderAccountStatus> {
-    let scope: string | undefined;
-    try {
-      const metadata = await fetchGrokOAuthMetadata();
-      scope = resolveGrokOAuthScope(metadata);
-      const payload = await fetchOAuthJson(metadata.deviceAuthorizationEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: createFormBody({
-          client_id: clientId,
-          scope,
-        }),
-      }) as {
-        device_code?: string;
-        user_code?: string;
-        verification_uri?: string;
-        verification_uri_complete?: string;
-        expires_in?: number;
-        interval?: number;
-        error?: string;
-        error_description?: string;
-      };
-      if (payload.error) {
-        throw new GrokOAuthDiagnosticError(createGrokOAuthFailureDiagnostic('authorization', 'device authorization', payload, scope));
-      }
-      if (!payload.device_code || !payload.user_code || !payload.verification_uri) {
-        throw new Error('xAI OAuth did not return a complete device authorization payload.');
-      }
-      const flow: OAuthFlowState = {
-        providerId: 'grok-account',
-        flowId: randomUUID(),
-        state: randomUUID(),
-        deviceCode: payload.device_code,
-        userCode: payload.user_code,
-        verificationUri: payload.verification_uri,
-        authUrl: payload.verification_uri_complete ?? payload.verification_uri,
-        intervalSeconds: payload.interval ?? 5,
-        clientId,
-        authorizationMode: 'device',
-        requestedScopes: scope,
-        tokenEndpoint: metadata.tokenEndpoint,
-        userinfoEndpoint: metadata.userinfoEndpoint,
-        expiresAt: Date.now() + (payload.expires_in ?? 900) * 1000,
-      };
-      this.setFlow(flow);
-      void this.openExternal(flow.authUrl);
-      void this.pollGrokDevice(flow)
-        .then((bundle) => this.persistAccount('grok-account', bundle))
-        .catch((error) => {
-          const diagnostic = resolveGrokOAuthDiagnostic(error, 'device', flow.requestedScopes, flow.redirectUri);
-          flow.error = renderGrokOAuthDiagnosticMessage(diagnostic);
-          flow.diagnostic = diagnostic;
-        });
-      return this.status(flow.providerId);
-    } catch (error) {
-      const diagnostic = resolveGrokOAuthDiagnostic(error, 'device', scope);
-      return this.status('grok-account', renderGrokOAuthDiagnosticMessage(diagnostic), 'failed', diagnostic);
-    }
-  }
-
-  private async exchangeClaudeCode(flow: OAuthFlowState, code: string): Promise<OAuthSecretBundle> {
-    if (!code || !flow.codeVerifier) {
-      throw new Error('Authorization code is required.');
-    }
-    const payload = await fetchJson('https://platform.claude.com/v1/oauth/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'RDC-Agent',
-      },
-      body: JSON.stringify({
-        grant_type: 'authorization_code',
-        client_id: CLAUDE_CLIENT_ID,
-        code,
-        redirect_uri: 'https://console.anthropic.com/oauth/code/callback',
-        code_verifier: flow.codeVerifier,
-        state: flow.state,
-      }),
-    }) as { access_token?: string; refresh_token?: string; expires_in?: number; scope?: string };
-    if (!payload.access_token) {
-      throw new Error('Claude OAuth did not return an access token.');
-    }
-    return {
-      providerId: 'claude-account',
-      accessToken: payload.access_token,
-      refreshToken: payload.refresh_token,
-      expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
-      accountLabel: 'Claude Account',
-      planLabel: payload.scope,
-    };
-  }
-
-  private async exchangeChatGptCode(flow: OAuthFlowState, code: string): Promise<OAuthSecretBundle> {
-    if (!code || !flow.codeVerifier) {
-      throw new Error('Authorization code is required.');
-    }
-    const tokenPayload = await fetchJson('https://auth.openai.com/oauth/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'authorization_code',
-        client_id: CHATGPT_CLIENT_ID,
-        code,
-        redirect_uri: `http://localhost:${CHATGPT_CALLBACK_PORT}/auth/callback`,
-        code_verifier: flow.codeVerifier,
-      }).toString(),
-    }) as { access_token?: string; refresh_token?: string; id_token?: string; expires_in?: number };
-    if (!tokenPayload.access_token) {
-      throw new Error('OpenAI OAuth did not return an access token.');
-    }
-    return {
-      providerId: 'chatgpt-account',
-      accessToken: tokenPayload.access_token,
-      refreshToken: tokenPayload.refresh_token,
-      apiKey: tokenPayload.access_token,
-      idToken: tokenPayload.id_token,
-      accountId: extractChatGptAccountId(tokenPayload.id_token),
-      expiresAt: new Date(Date.now() + (tokenPayload.expires_in ?? 3600) * 1000).toISOString(),
-      accountLabel: 'ChatGPT Account',
-    };
-  }
-
-  private async pollGitHubDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle> {
-    if (!flow.deviceCode) {
-      throw new Error('GitHub device code is missing.');
-    }
-    let intervalSeconds = flow.intervalSeconds ?? 5;
-    let delayBeforePoll = !isTestMode();
-    for (;;) {
-      if (Date.now() > flow.expiresAt) {
-        throw new Error('GitHub authorization code expired.');
-      }
-      if (delayBeforePoll) {
-        await wait(intervalSeconds * 1000);
-      }
-      delayBeforePoll = true;
-      const payload = await fetchJson('https://github.com/login/oauth/access_token', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          client_id: GITHUB_COPILOT_CLIENT_ID,
-          device_code: flow.deviceCode,
-          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-        }),
-      }) as { access_token?: string; error?: string; interval?: number };
-      if (payload.error === 'authorization_pending') {
-        delete flow.error;
-        continue;
-      }
-      if (payload.error === 'slow_down') {
-        delete flow.error;
-        intervalSeconds += 5;
-        continue;
-      }
-      if (payload.error) {
-        throw new Error(payload.error);
-      }
-      if (!payload.access_token) {
-        throw new Error('GitHub OAuth did not return an access token.');
-      }
-      const copilot = await fetchJson('https://api.github.com/copilot_internal/v2/token', {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          Authorization: `token ${payload.access_token}`,
-          ...COPILOT_EDITOR_HEADERS,
-        },
-      }) as { token?: string; expires_at?: number; endpoints?: { api?: string } };
-      if (!copilot.token) {
-        throw new Error('GitHub Copilot did not return an API token.');
-      }
-      return {
-        providerId: 'github-copilot',
-        accessToken: payload.access_token,
-        copilotToken: copilot.token,
-        copilotApiBaseUrl: copilot.endpoints?.api ?? 'https://api.githubcopilot.com',
-        expiresAt: copilot.expires_at ? new Date(copilot.expires_at * 1000).toISOString() : undefined,
-        accountLabel: 'GitHub Copilot',
-      };
-    }
-  }
-
-  private async pollNousDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle> {
-    if (!flow.deviceCode || !flow.clientId || !flow.tokenEndpoint) {
-      throw new Error('Nous Portal device authorization is missing client, device code, or token endpoint.');
-    }
-    let intervalSeconds = flow.intervalSeconds ?? 5;
-    let delayBeforePoll = !isTestMode();
-    for (;;) {
-      if (Date.now() > flow.expiresAt) {
-        throw new Error('Nous Portal authorization code expired.');
-      }
-      if (delayBeforePoll) {
-        await wait(intervalSeconds * 1000);
-      }
-      delayBeforePoll = true;
-      const payload = await fetchOAuthJson(flow.tokenEndpoint, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: createFormBody({
-          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-          client_id: flow.clientId,
-          device_code: flow.deviceCode,
-        }),
-      }) as {
-        access_token?: string;
-        refresh_token?: string;
-        token_type?: string;
-        scope?: string;
-        expires_in?: number;
-        inference_base_url?: string;
-        error?: string;
-        error_description?: string;
-      };
-      if (payload.error === 'authorization_pending') {
-        delete flow.error;
-        continue;
-      }
-      if (payload.error === 'slow_down') {
-        delete flow.error;
-        intervalSeconds += 1;
-        continue;
-      }
-      if (payload.error) {
-        throw new Error(payload.error_description ?? payload.error);
-      }
-      if (!payload.access_token) {
-        throw new Error('Nous Portal OAuth did not return an access token.');
-      }
-      return {
-        providerId: 'nous',
-        accessToken: payload.access_token,
-        apiKey: payload.access_token,
-        refreshToken: payload.refresh_token,
-        authorizationMode: 'device',
-        requestedScopes: payload.scope ?? flow.requestedScopes ?? NOUS_OAUTH_SCOPE,
-        resourceUrl: readString(payload.inference_base_url) ?? flow.resourceUrl ?? NOUS_INFERENCE_BASE_URL,
-        expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
-        accountLabel: 'Nous Portal',
-        planLabel: payload.scope ?? NOUS_OAUTH_SCOPE,
-      };
-    }
-  }
-
-  private async exchangeOpenRouterCode(flow: OAuthFlowState, code: string): Promise<OAuthSecretBundle> {
-    if (!code || !flow.codeVerifier) {
-      throw new Error('OpenRouter authorization code is required.');
-    }
-    const request = buildOpenRouterExchange(code, flow.codeVerifier);
-    const payload = await fetchJson(request.url, {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(request.body),
-    });
-    const exchange = parseOpenRouterExchange(payload);
-    return {
-      providerId: 'openrouter',
-      apiKey: exchange.apiKey,
-      accountId: exchange.userId ?? `openrouter-${randomUUID()}`,
-      authorizationMode: 'browser',
-      redirectUri: flow.redirectUri,
-      accountLabel: exchange.userId ? `OpenRouter ${exchange.userId}` : 'OpenRouter Account',
-      planLabel: 'OAuth PKCE',
-    };
-  }
-
-  private async exchangeGrokCode(flow: OAuthFlowState, code: string): Promise<OAuthSecretBundle> {
-    if (!code || !flow.codeVerifier || !flow.clientId || !flow.redirectUri) {
-      throw new Error('Super Grok browser authorization requires the one-time code shown by xAI and an active PKCE login flow.');
-    }
-    const tokenEndpoint = flow.tokenEndpoint ?? (await fetchGrokOAuthMetadata()).tokenEndpoint;
-    const payload = await fetchOAuthJson(tokenEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: createFormBody({
-        grant_type: 'authorization_code',
-        client_id: flow.clientId,
-        code,
-        redirect_uri: flow.redirectUri,
-        code_verifier: flow.codeVerifier,
-      }),
-    }) as {
-      access_token?: string;
-      refresh_token?: string;
-      id_token?: string;
-      expires_in?: number;
-      error?: string;
-      error_description?: string;
-    };
-    if (payload.error) {
-      throw new GrokOAuthDiagnosticError(createGrokOAuthFailureDiagnostic('token', 'browser token exchange', payload, flow.requestedScopes, flow.redirectUri));
-    }
-    if (!payload.access_token) {
-      throw new Error('xAI OAuth did not return an access token.');
-    }
-    const account = await this.fetchGrokUserInfo(payload.access_token, flow.userinfoEndpoint);
-    return {
-      providerId: 'grok-account',
-      accessToken: payload.access_token,
-      apiKey: payload.access_token,
-      refreshToken: payload.refresh_token,
-      idToken: payload.id_token,
-      authorizationMode: 'browser',
-      requestedScopes: flow.requestedScopes,
-      redirectUri: flow.redirectUri,
-      accountId: account.accountId,
-      expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
-      accountLabel: account.accountLabel ?? 'Super Grok Account',
-      planLabel: 'Super Grok OAuth',
-    };
-  }
-
-  private async pollGrokDevice(flow: OAuthFlowState): Promise<OAuthSecretBundle> {
-    if (!flow.deviceCode || !flow.clientId) {
-      throw new Error('Super Grok device authorization is missing client or device code.');
-    }
-    let intervalSeconds = flow.intervalSeconds ?? 5;
-    let delayBeforePoll = !isTestMode();
-    for (;;) {
-      if (Date.now() > flow.expiresAt) {
-        throw new Error('Super Grok authorization code expired.');
-      }
-      if (delayBeforePoll) {
-        await wait(intervalSeconds * 1000);
-      }
-      delayBeforePoll = true;
-      const tokenEndpoint = flow.tokenEndpoint ?? (await fetchGrokOAuthMetadata()).tokenEndpoint;
-      const payload = await fetchOAuthJson(tokenEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: createFormBody({
-          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
-          client_id: flow.clientId,
-          device_code: flow.deviceCode,
-        }),
-      }) as {
-        access_token?: string;
-        refresh_token?: string;
-        id_token?: string;
-        expires_in?: number;
-        error?: string;
-        error_description?: string;
-      };
-      if (payload.error === 'authorization_pending') {
-        delete flow.error;
-        continue;
-      }
-      if (payload.error === 'slow_down') {
-        delete flow.error;
-        intervalSeconds += 5;
-        continue;
-      }
-      if (payload.error) {
-        throw new GrokOAuthDiagnosticError(createGrokOAuthFailureDiagnostic('token', 'device token polling', payload, flow.requestedScopes));
-      }
-      if (!payload.access_token) {
-        throw new Error('xAI OAuth did not return an access token.');
-      }
-      const account = await this.fetchGrokUserInfo(payload.access_token, flow.userinfoEndpoint);
-      return {
-        providerId: 'grok-account',
-        accessToken: payload.access_token,
-        apiKey: payload.access_token,
-        refreshToken: payload.refresh_token,
-        idToken: payload.id_token,
-        authorizationMode: 'device',
-        requestedScopes: flow.requestedScopes,
-        accountId: account.accountId,
-        expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
-        accountLabel: account.accountLabel ?? 'Super Grok Account',
-        planLabel: 'Super Grok OAuth',
-      };
-    }
-  }
-
-  private async fetchGrokUserInfo(accessToken: string, userinfoEndpoint?: string): Promise<{ accountId?: string; accountLabel?: string }> {
-    try {
-      const endpoint = userinfoEndpoint ?? (await fetchGrokOAuthMetadata()).userinfoEndpoint;
-      const payload = await fetchJson(endpoint, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      const record = payload && typeof payload === 'object' && !Array.isArray(payload)
-        ? payload as Record<string, unknown>
-        : {};
-      return {
-        accountId: readString(record.sub),
-        accountLabel: readString(record.email) ?? readString(record.name) ?? readString(record.preferred_username) ?? readString(record.sub),
-      };
-    } catch {
-      return {};
-    }
   }
 
   private async persistAccount(providerId: AccountProviderId, bundle: OAuthSecretBundle): Promise<LlmProviderAccountStatus> {
@@ -1345,367 +428,48 @@ export class ProviderAccountAuthService {
 
   private async performBundleRefresh(bundle: OAuthSecretBundle): Promise<OAuthSecretBundle> {
     if (bundle.providerId === 'github-copilot') {
-      if (!bundle.accessToken) {
-        return bundle;
-      }
-      const copilot = await fetchJson('https://api.github.com/copilot_internal/v2/token', {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          Authorization: `token ${bundle.accessToken}`,
-          ...COPILOT_EDITOR_HEADERS,
-        },
-      }) as { token?: string; expires_at?: number; endpoints?: { api?: string } };
-      if (!copilot.token) {
-        throw new Error('GitHub Copilot did not return an API token.');
-      }
-      return {
-        ...bundle,
-        copilotToken: copilot.token,
-        copilotApiBaseUrl: copilot.endpoints?.api ?? bundle.copilotApiBaseUrl ?? 'https://api.githubcopilot.com',
-        expiresAt: copilot.expires_at ? new Date(copilot.expires_at * 1000).toISOString() : bundle.expiresAt,
-      };
+      return refreshCopilotBundle(bundle);
     }
-
     if (bundle.providerId === 'grok-account') {
-      if (!bundle.refreshToken) {
-        return bundle;
-      }
-      const metadata = await fetchGrokOAuthMetadata();
-      const payload = await fetchOAuthJson(metadata.tokenEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: createFormBody({
-          grant_type: 'refresh_token',
-          client_id: GROK_OAUTH_CLIENT_ID,
-          refresh_token: bundle.refreshToken,
-        }),
-      }) as { access_token?: string; refresh_token?: string; id_token?: string; expires_in?: number; error?: string; error_description?: string };
-      if (payload.error) {
-        throw new GrokOAuthDiagnosticError(createGrokOAuthFailureDiagnostic('refresh', 'token refresh', payload, bundle.requestedScopes, bundle.redirectUri));
-      }
-      if (!payload.access_token) {
-        throw new Error('xAI OAuth refresh did not return an access token.');
-      }
-      return {
-        ...bundle,
-        accessToken: payload.access_token,
-        apiKey: payload.access_token,
-        idToken: payload.id_token ?? bundle.idToken,
-        refreshToken: payload.refresh_token ?? bundle.refreshToken,
-        expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
-      };
+      return refreshGrokBundle(bundle);
     }
-
-    if (!bundle.refreshToken) {
-      return bundle;
-    }
-
     if (bundle.providerId === 'nous') {
-      const payload = await fetchOAuthJson(`${NOUS_PORTAL_BASE_URL}/api/oauth/token`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'x-nous-refresh-token': bundle.refreshToken,
-        },
-        body: createFormBody({
-          grant_type: 'refresh_token',
-          client_id: NOUS_OAUTH_CLIENT_ID,
-        }),
-      }) as {
-        access_token?: string;
-        refresh_token?: string;
-        scope?: string;
-        expires_in?: number;
-        inference_base_url?: string;
-        error?: string;
-        error_description?: string;
-      };
-      if (payload.error) {
-        throw new Error(payload.error_description ?? payload.error);
-      }
-      if (!payload.access_token) {
-        throw new Error('Nous Portal OAuth refresh did not return an access token.');
-      }
-      return {
-        ...bundle,
-        accessToken: payload.access_token,
-        apiKey: payload.access_token,
-        refreshToken: payload.refresh_token ?? bundle.refreshToken,
-        requestedScopes: payload.scope ?? bundle.requestedScopes,
-        resourceUrl: readString(payload.inference_base_url) ?? bundle.resourceUrl ?? NOUS_INFERENCE_BASE_URL,
-        expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
-      };
+      return refreshNousBundle(bundle);
     }
-
     if (bundle.providerId === 'claude-account') {
-      const payload = await fetchJson('https://platform.claude.com/v1/oauth/token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'RDC-Agent',
-        },
-        body: JSON.stringify({
-          grant_type: 'refresh_token',
-          client_id: CLAUDE_CLIENT_ID,
-          refresh_token: bundle.refreshToken,
-        }),
-      }) as { access_token?: string; refresh_token?: string; expires_in?: number; scope?: string };
-      if (!payload.access_token) {
-        throw new Error('Claude OAuth refresh did not return an access token.');
-      }
-      return {
-        ...bundle,
-        accessToken: payload.access_token,
-        refreshToken: payload.refresh_token ?? bundle.refreshToken,
-        expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
-        planLabel: payload.scope ?? bundle.planLabel,
-      };
+      return refreshClaudeBundle(bundle);
     }
-
-    const payload = await fetchJson('https://auth.openai.com/oauth/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'refresh_token',
-        client_id: CHATGPT_CLIENT_ID,
-        refresh_token: bundle.refreshToken,
-      }).toString(),
-    }) as { access_token?: string; refresh_token?: string; id_token?: string; expires_in?: number };
-    if (!payload.access_token) {
-      throw new Error('OpenAI OAuth refresh did not return an access token.');
+    if (bundle.providerId === 'chatgpt-account') {
+      return refreshChatGptBundle(bundle);
     }
-    return {
-      ...bundle,
-      accessToken: payload.access_token,
-      apiKey: payload.access_token,
-      idToken: payload.id_token ?? bundle.idToken,
-      accountId: extractChatGptAccountId(payload.id_token) ?? bundle.accountId,
-      refreshToken: payload.refresh_token ?? bundle.refreshToken,
-      expiresAt: new Date(Date.now() + (payload.expires_in ?? 3600) * 1000).toISOString(),
-    };
+    return bundle;
   }
 
   private async discoverCatalog(bundle: OAuthSecretBundle): Promise<AccountCatalogDiscovery> {
     await loadProviderSurface(bundle.providerId);
-    if (bundle.providerId === 'github-copilot' && bundle.copilotToken) {
-      try {
-        const baseUrl = (bundle.copilotApiBaseUrl ?? 'https://api.githubcopilot.com').replace(/\/+$/, '');
-        const payload = await fetchJson(`${baseUrl}/models`, {
-          method: 'GET',
-          headers: {
-            Accept: 'application/json',
-            Authorization: `Bearer ${bundle.copilotToken}`,
-            ...COPILOT_WIRE_HEADERS,
-          },
-        });
-        const parsed = parseCopilotModelCatalog(payload, baseUrl);
-        const internalModelIds = new Set(getProviderModelDefinitions('github-copilot')
-          .filter((model) => model.selection.pickerVisibility === 'internal')
-          .map((model) => model.modelId));
-        const allModels = parsed.models.filter((model) => isAgentRoutableAccountModel(model.id));
-        const models = allModels.filter((model) => !internalModelIds.has(model.id));
-        if (models.length > 0) {
-          const retainedModelIds = new Set(allModels.map((model) => model.id));
-          bundle.copilotModelBilling = Object.fromEntries(
-            Object.entries(parsed.billingByModel).filter(([modelId]) => retainedModelIds.has(modelId)),
-          );
-          return {
-            models,
-            contributions: parsed.contributions.filter((model) => retainedModelIds.has(model.modelId)),
-          };
-        }
-      } catch (error) {
-        throw error;
-      }
-      delete bundle.copilotModelBilling;
+    if (bundle.providerId === 'github-copilot') {
+      return discoverCopilotCatalog(bundle);
     }
     if (bundle.providerId === 'chatgpt-account') {
-      const token = bundle.accessToken ?? bundle.apiKey;
-      if (!token) throw new Error('ChatGPT Account OAuth token is missing.');
-      try {
-        const payload = await fetchJson(
-          `https://chatgpt.com/backend-api/codex/models?client_version=${encodeURIComponent(CHATGPT_CATALOG_CLIENT_VERSION)}`,
-          {
-            method: 'GET',
-            headers: {
-              Accept: 'application/json',
-              Authorization: `Bearer ${token}`,
-              ...(bundle.accountId ? { 'chatgpt-account-id': bundle.accountId } : {}),
-            },
-          },
-        );
-        const parsed = parseChatGptAccountCatalog(payload);
-        if (parsed.models.length > 0) return parsed;
-        throw new Error('ChatGPT Codex catalog returned no agent-routable models.');
-      } catch (error) {
-        throw error;
-      }
+      return discoverChatGptCatalog(bundle);
     }
     if (bundle.providerId === 'claude-account') {
-      const token = bundle.accessToken;
-      if (!token) throw new Error('Claude Account OAuth token is missing.');
-      try {
-        const payload = await fetchJson('https://api.anthropic.com/v1/models', {
-          method: 'GET',
-          headers: {
-            Accept: 'application/json',
-            'x-api-key': token,
-            'anthropic-version': '2023-06-01',
-            ...CLAUDE_ACCOUNT_WIRE_HEADERS,
-          },
-        });
-        const parsed = parseClaudeAccountCatalog(payload);
-        if (parsed.models.length > 0) return parsed;
-        throw new Error('Claude Account catalog returned no agent-routable models.');
-      } catch (error) {
-        throw error;
-      }
+      return discoverClaudeCatalog(bundle);
     }
     if (bundle.providerId === 'grok-account') {
-      const token = bundle.accessToken ?? bundle.apiKey;
-      if (!token) throw new Error('Super Grok OAuth token is missing.');
-      const grokSurface = getLoadedProviderSurface('grok-account');
-      if (!grokSurface) throw new Error('Super Grok compiled surface is unavailable.');
-      const builderRoute = grokSurface.routes.find((route) => (
-        route.protocol === 'OpenAIResponses'
-      ));
-      const builderHeaders = {
-        Accept: 'application/json',
-        ...(builderRoute?.headers ?? {}),
-        Authorization: `Bearer ${token}`,
-      };
-      const apiHeaders = { Accept: 'application/json', Authorization: `Bearer ${token}` };
-      const [builderResult, apiResult] = await Promise.allSettled([
-        fetchJson(`${GROK_BUILD_API_BASE_URL}/models`, { method: 'GET', headers: builderHeaders })
-          .then((payload) => parseGrokBuilderCatalog(payload, grokSurface)),
-        fetchJson(`${XAI_API_BASE_URL}/models`, { method: 'GET', headers: apiHeaders }).then(parseGrokAccountCatalog),
-      ]);
-      const builder = builderResult.status === 'fulfilled'
-        ? builderResult.value
-        : { models: [], contributions: [], diagnostic: undefined };
-      const api = apiResult.status === 'fulfilled'
-        ? apiResult.value
-        : { models: [], contributions: [] };
-      const parsed = mergeParsedLiveCatalogs(api, builder);
-      const builderDiagnostic = builder.diagnostic
-        ? `envelope=${builder.diagnostic.envelopeKind}, candidates=${builder.diagnostic.candidateCount}, `
-          + `admitted=${builder.diagnostic.admittedCount}, filtered=${JSON.stringify(builder.diagnostic.filtered)}`
-        : 'envelope=unknown';
-
-      const sourceDetail = [
-        builderResult.status === 'rejected'
-          ? `Builder unavailable (${parseProviderError(builderResult.reason)})`
-          : `Builder returned ${builder.models.length} agent-routable model(s) (${builderDiagnostic})`,
-        apiResult.status === 'rejected'
-          ? `xAI API unavailable (${parseProviderError(apiResult.reason)})`
-          : `xAI API returned ${api.models.length} agent-routable model(s)`,
-      ].join('; ');
-      const partialCatalog = builderResult.status === 'rejected'
-        || apiResult.status === 'rejected'
-        || builder.models.length === 0
-        || api.models.length === 0;
-      if (partialCatalog && sourceDetail !== this.lastGrokCatalogSourceDiagnostic) {
-        runtimeLogService.log({
-          scope: 'app',
-          namespace: 'llm',
-          severity: parsed.models.length > 0 ? 'warning' : 'error',
-          title: 'Super Grok catalog source incomplete',
-          summary: parsed.models.length > 0
-            ? 'Using the models returned by the available live catalog surface.'
-            : 'Neither live catalog surface returned an agent-routable model.',
-          detail: sourceDetail,
-        });
-        this.lastGrokCatalogSourceDiagnostic = sourceDetail;
-      } else if (!partialCatalog) {
-        this.lastGrokCatalogSourceDiagnostic = undefined;
-      }
-      if (parsed.models.length === 0) {
-        throw new Error(`Super Grok Builder and API catalogs returned no agent-routable models. ${sourceDetail}`);
-      }
-      return { ...parsed, detail: sourceDetail };
+      return discoverGrokCatalog(
+        bundle,
+        this.lastGrokCatalogSourceDiagnostic,
+        (value) => { this.lastGrokCatalogSourceDiagnostic = value; },
+      );
     }
     if (bundle.providerId === 'nous') {
-      const token = bundle.accessToken ?? bundle.apiKey;
-      if (!token) throw new Error('Nous Portal OAuth token is missing.');
-      const baseUrl = (bundle.resourceUrl ?? NOUS_INFERENCE_BASE_URL).replace(/\/+$/u, '');
-      const payload = await fetchJson(`${baseUrl}/models`, {
-        method: 'GET',
-        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
-      });
-      const record = payload && typeof payload === 'object' && !Array.isArray(payload)
-        ? payload as Record<string, unknown>
-        : {};
-      const data = Array.isArray(record.data) ? record.data : [];
-      const seen = new Set<string>();
-      const models = data.flatMap((entry): LlmProviderModel[] => {
-        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return [];
-        const item = entry as Record<string, unknown>;
-        const id = readString(item.id);
-        if (
-          !id
-          || seen.has(id)
-          || id.toLowerCase().includes('hermes')
-          || !isAgentRoutableAccountModel(id)
-        ) return [];
-        seen.add(id);
-        return [{
-          id,
-          label: readString(item.name) ?? readString(item.display_name) ?? id,
-          enabled: true,
-        }];
-      });
-      if (models.length === 0) {
-        throw new Error('Nous Portal catalog returned no agent-routable models.');
-      }
-      return { models };
+      return discoverNousCatalog(bundle);
     }
     if (bundle.providerId === 'openrouter') {
-      if (!bundle.apiKey) throw new Error('OpenRouter OAuth API key is missing.');
-      const payload = await fetchJson('https://openrouter.ai/api/v1/models', {
-        method: 'GET',
-        headers: { Accept: 'application/json', Authorization: `Bearer ${bundle.apiKey}` },
-      });
-      const surface = getLoadedProviderSurface('openrouter');
-      if (!surface) throw new Error('OpenRouter compiled surface is unavailable.');
-      const parsed = parseOpenRouterAccountCatalog(payload, surface);
-      if (parsed.models.length === 0) {
-        throw new Error('OpenRouter OAuth catalog returned no agent-routable models.');
-      }
-      return parsed;
+      return discoverOpenRouterCatalog(bundle);
     }
     throw new Error(`Account provider ${bundle.providerId} has no live Catalog implementation.`);
-  }
-
-  private async revokeGrokBundle(bundle: OAuthSecretBundle): Promise<void> {
-    if (bundle.providerId !== 'grok-account') {
-      return;
-    }
-    const token = bundle.refreshToken ?? bundle.accessToken ?? bundle.apiKey;
-    if (!token) {
-      return;
-    }
-    try {
-      const metadata = await fetchGrokOAuthMetadata();
-      await fetchOAuthJson(metadata.revocationEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: createFormBody({
-          client_id: GROK_OAUTH_CLIENT_ID,
-          token,
-          token_type_hint: bundle.refreshToken ? 'refresh_token' : 'access_token',
-        }),
-      });
-    } catch {
-      // Local sign-out must still complete even if remote revocation is unavailable.
-    }
   }
 
   private readBundle(providerId: AccountProviderId): OAuthSecretBundle | null {
@@ -1753,111 +517,6 @@ export class ProviderAccountAuthService {
     if (server.listening) {
       server.close();
     }
-  }
-
-  private startOpenRouterCallbackServer(flow: OAuthFlowState, challenge: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      const callbackPath = `/oauth/openrouter/callback/${flow.flowId}`;
-      const server = createServer((request, response) => {
-        const baseUrl = flow.redirectUri ?? 'http://127.0.0.1';
-        const url = new URL(request.url ?? '/', baseUrl);
-        if (url.pathname !== callbackPath) {
-          response.writeHead(404, { 'Content-Type': 'text/plain' });
-          response.end('Not found.');
-          return;
-        }
-        const providerError = url.searchParams.get('error');
-        const code = url.searchParams.get('code') ?? '';
-        if (providerError || !code) {
-          flow.error = providerError
-            ? `OpenRouter authorization failed: ${providerError}`
-            : 'OpenRouter callback did not include an authorization code.';
-          response.writeHead(400, { 'Content-Type': 'text/plain' });
-          response.end(flow.error);
-          this.closeFlowServer(flow);
-          return;
-        }
-        void this.finishLogin({ providerId: flow.providerId, flowId: flow.flowId, code })
-          .then((status) => {
-            if (!status.connected) {
-              response.writeHead(500, { 'Content-Type': 'text/plain' });
-              response.end(status.error ?? status.message ?? 'OpenRouter sign-in failed.');
-              return;
-            }
-            response.writeHead(200, { 'Content-Type': 'text/html' });
-            response.end('<html><body>RDC Agent OpenRouter sign-in complete. You can return to the app.</body></html>');
-          })
-          .catch((error) => {
-            flow.error = parseProviderError(error);
-            response.writeHead(500, { 'Content-Type': 'text/plain' });
-            response.end(flow.error);
-          })
-          .finally(() => this.closeFlowServer(flow));
-      });
-      flow.server = server;
-      server.on('error', (error) => {
-        flow.error = parseProviderError(error);
-        this.closeFlowServer(flow);
-        this.pendingFlows.delete(flow.flowId);
-        if (!settled) {
-          settled = true;
-          reject(error);
-        }
-      });
-      server.listen(0, '127.0.0.1', () => {
-        const address = server.address();
-        if (!address || typeof address === 'string') {
-          reject(new Error('OpenRouter callback server did not expose a loopback port.'));
-          return;
-        }
-        flow.redirectUri = `http://127.0.0.1:${address.port}${callbackPath}`;
-        flow.authUrl = buildOpenRouterAuthorizationUrl(flow.redirectUri, challenge);
-        settled = true;
-        resolve();
-      });
-    });
-  }
-
-  private startChatGptCallbackServer(flow: OAuthFlowState): Promise<void> {
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      const server = createServer((request, response) => {
-        const url = new URL(request.url ?? '/', `http://localhost:${CHATGPT_CALLBACK_PORT}`);
-        if (url.pathname !== '/auth/callback' || url.searchParams.get('state') !== flow.state) {
-          response.writeHead(400, { 'Content-Type': 'text/plain' });
-          response.end('Invalid OAuth callback.');
-          return;
-        }
-        const code = url.searchParams.get('code') ?? '';
-        void this.finishLogin({ providerId: flow.providerId, flowId: flow.flowId, code })
-          .then(() => {
-            response.writeHead(200, { 'Content-Type': 'text/html' });
-            response.end('<html><body>RDC Agent sign-in complete. You can return to the app.</body></html>');
-          })
-          .catch((error) => {
-            response.writeHead(500, { 'Content-Type': 'text/plain' });
-            response.end(parseProviderError(error));
-          })
-          .finally(() => {
-            this.closeFlowServer(flow);
-          });
-      });
-      flow.server = server;
-      server.on('error', (error) => {
-        flow.error = parseProviderError(error);
-        this.closeFlowServer(flow);
-        this.pendingFlows.delete(flow.flowId);
-        if (!settled) {
-          settled = true;
-          reject(error);
-        }
-      });
-      server.listen(CHATGPT_CALLBACK_PORT, '127.0.0.1', () => {
-        settled = true;
-        resolve();
-      });
-    });
   }
 
   private async openExternal(url?: string): Promise<void> {

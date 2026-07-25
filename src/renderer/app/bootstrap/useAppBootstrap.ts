@@ -162,7 +162,7 @@ export function useAppBootstrap(options: {
 
     clearUsageSnapshot();
     return undefined;
-  }, [clearUsageSnapshot, currentRun?.runId, currentSession?.sessionId, hasActiveDebugRun, setCurrentRunUsage]);
+  }, [clearUsageSnapshot, currentRun?.runId, currentRunUsage?.runId, currentSession?.sessionId, hasActiveDebugRun, setCurrentRunUsage]);
 
   useProjectInputsBootstrap(runtimeTestMode);
   useSessionRestoreBootstrap(runtimeTestMode);
@@ -263,6 +263,6 @@ function useSessionRestoreBootstrap(runtimeTestMode: boolean | null): void {
       .catch(() => {
         useWorkflowStore.getState().setTracePresentation(null);
       });
-  }, [currentSession?.sessionId, runtimeTestMode]);
+  }, [currentSession, runtimeTestMode]);
 }
 

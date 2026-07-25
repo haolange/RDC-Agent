@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '../../../i18n';
+import { assignDynStyle } from '../../../lib/useDynStyle';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { ActiveSignalText } from '../../../ui/ActiveSignalText';
 import { Button } from '../../../ui/Button';
@@ -57,8 +58,8 @@ export const UserInputRequestPanel: React.FC<{
   const resizeTextarea = useCallback(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    textarea.style.height = 'auto';
-    textarea.style.height = `${textarea.scrollHeight}px`;
+    assignDynStyle(textarea, { height: 'auto' });
+    assignDynStyle(textarea, { height: `${textarea.scrollHeight}px` });
   }, []);
 
   useEffect(() => {

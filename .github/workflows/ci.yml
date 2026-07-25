@@ -29,6 +29,27 @@ jobs:
       - run: pnpm run typecheck
       - run: pnpm run lint
       - run: pnpm test
+      - run: pnpm run test:coverage
+      - run: pnpm run check:architecture
+      - run: pnpm run check:fidelity
+      - run: pnpm run check:shared-exports
+      - run: pnpm run check:work-process
+      - run: pnpm run check:work-process-tool-coverage
+      - run: pnpm run check:conversation-branch
+      - run: pnpm run check:reasoning-delivery
+      - run: pnpm run check:agent-runtime
+      - run: pnpm run check:tool-system
+      - run: pnpm run check:appearance
+      - run: pnpm run check:settings-agents
+      - run: pnpm run check:provider-system
+      - run: pnpm run check:provider-catalog
+      - run: pnpm run check:scoped-resources
+      - run: pnpm run check:project-instructions
+      - run: pnpm run check:prompt-plan-snapshot
+      - run: pnpm run check:skills
+      - run: pnpm run check:hooks
+      - run: pnpm run check:memory-policy
+      - run: pnpm run check:contracts
       - run: pnpm run build
 
   launcher-fresh-checkout:

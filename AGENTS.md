@@ -150,6 +150,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - Provider 输出必须先获得稳定 `ProviderOutputRef`；同一 source ref 只能归属 `thinking`、`text`、`tool_call` 之一。kind collision、start 前 delta、close 后 delta、terminal 后语义事件必须 fail-closed，禁止按文本相同/相似做跨通道去重或 UI 隐藏。
 - 普通 assistant text 永远不能合成为 thinking。commentary/final 仅由 canonical `outputPhase` 决定；只有 `final_answer` 可写 assistant 正文和 final trace，正常结束但无 canonical final 必须报诊断，禁止用 thinking/commentary fallback。
 - Provider/Model 事实只能写入 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth 与 discovery。禁止恢复 TS preset、factory 推导、名称/后缀/上游 SDK 包元数据/hostname 猜测或 renderer 静态 Catalog。
+- 禁止恢复 image/video 生成 runtime、`MediaRuntimeService`、catalog `image` category、`image-generation` / `video-generation` capability，或无调用方 `adapter-not-implemented` 伪服务；discovery 继续 fail-closed 剔除非 agent modality。用户附件 vision-input 不受此禁。
 - Fast、Reasoning Max、Max mode 与 variant 必须由 `ControlDefinition + ExecutionBinding` 编译；可选控件没有唯一可执行路径时 fail-closed。认证 secret/header 只能进入主进程 opaque credential lease，不得进入 manifest、Route、RequestPlan、IPC 或 Trace。
 - Memory 写入必须由明确用户意图或交互审批触发；禁止恢复轮次自动抽取、自动 consolidation 或全索引 prompt 注入。
 
@@ -165,11 +166,12 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 ## 验证建议
 
 - 开始实现前先写明本次验证方式；实现后按该方式验证并报告结果。无法运行的验证，必须说明原因和剩余风险。
-- `pnpm run test:coverage` 门禁覆盖 `src/main` + `src/shared`（node）；renderer 走浏览器真实会话与 `check:*`。
-- 代码改动后执行 `pnpm run typecheck`。
+- `pnpm run test:coverage` 门禁覆盖 node unit surface（`vitest.config.ts` exclude 后的 main/shared；lines/functions ≥75、branches ≥63）；集成面走 `check:contracts` + 浏览器真实会话；renderer 走 browser QA 与 `check:*`。
+- 代码改动后执行 `pnpm run typecheck` 与 `pnpm run lint`（`no-unused-vars` / `exhaustive-deps` 为 error）。
 - 依赖、入口、构建、发布配置或仓库目录治理改动后执行 `pnpm run check:repository-hygiene`。
-- renderer 结构或 UI 锚点改动后执行 `pnpm run check:architecture`（含 Orchestrator façade 行数门禁）、`pnpm run check:fidelity`、`pnpm run check:shared-exports`。
+- renderer 结构或 UI 锚点改动后执行 `pnpm run check:architecture`（含 Orchestrator façade &lt;800 与 `src/main` 单文件 ≤900）、`pnpm run check:fidelity`、`pnpm run check:shared-exports`。
 - Orchestrator / debugger 编排拆分后执行 `pnpm run check:orchestrator-facade`（`AgentOrchestrator.ts` 少于 800 行；禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext`）。
+- CI（`.github/workflows/ci.yml`）必须跑 hygiene / typecheck / lint / test / test:coverage / 全套关键 `check:*` / `check:contracts` / build；宣称完成不得只靠 commit message。
 - 覆盖率阈值改动或相关门禁回归执行 `pnpm run test:coverage`。
 - Work Process 投影、工具行文案/图标或 transcript UI 改动后执行 `pnpm run check:work-process`、`pnpm run check:work-process-tool-coverage`。
 - Work Process UI 验收必须覆盖：运行中顶层「工作中 / Working」与 Active Signal 文本能量扫光、完成后「工作过程 / Work process」+ meta、loop thinking 运行态默认展开（summary/raw/unknown 与 final-answer/收束 thinking 同一生命周期）与 Active Signal「正在思考 / Thinking」、完成后默认折叠「已思考 · {duration} / Thought for」+ 前置 quiet icon、用户对手动开合 sticky 覆盖自动策略、commentary 散文（markdown，不进 thinking 槽）、统一单披露 tool 卡片（header icon+动词 + **结果优先** 族 body：有结果时显示计数/路径样本等，运行中才回退 pattern/path/`$ cmd`；展开为族内容层 + 样式化 Raw 面板；默认不展开 Raw；无 verb/target 双轨 toggle、无 `toolGroup` 双层壳）或 ≥8 聚合摘要行、同 loop 连续 tool 外距 `--space-2`、thinking/commentary → 首个 tool 与相邻 loop section 顶距均为 `--space-3`（只比 tool 宽一档；与是否有 commentary 无关）、file/search/shell/git/web/generic 族模板一致、每个 builtin tool 唯一 header glyph（`mcp__*`→`plug`）、安静 loop 级轨道点、`web_search` 为 favicon+域名 source pills（title 仅 tooltip）、`web_fetch` 为 Fetched page/已抓取 + 异形 page chip（非 pill 条；favicon 仅经 main `web:resolveFavicon`→data URL，失败用字母 monogram 禁止全落 globe）、无 Reply 边界行（收束 thinking 归入普通折叠）、opaque/hidden 永不渲染 CoT 占位句（仅保留真实 tools/commentary/可见 thinking；answer-only 静默）、`error_recovery_*` 自动恢复遥测不进 Work Process 叙事（仅 Agent Activity / runtime log；禁止蓝字「错误恢复成功…」旁白）、Request Inspector 不出现在消息流也不在右侧默认会话/Trace 面板、真实事件驱动的逐条出现与短 CSS 入场（禁止假 stagger）、**assistant full-bleed**（最终答案与 Work Process 含 tool 卡片横跨外轨全宽并与 composer 对齐；page-shell / Local utilities / composer / transcript 共用 `--workbench-outer-rail-width`，禁止再用更窄的 content-rail 把 compose 挤歪；仅用户 prompt 使用 raised bubble、fit-content、右对齐；loop nest 用 `--space-3`；用户 bubble / Work Process / final answer 共用 `.conversation-thread` 的 `padding-inline: --space-3` 离开左右轨/滚动条缝（同一内容列，禁止 WP 独享 gutter））、**MessageMarkdown**（commentary 与最终答案：GFM、代码块 language+复制、KaTeX、Mermaid fail-closed；thinking/CoT 保持纯文本）、**Appearance**：Settings → Appearance 为权威入口；`composerMarkdown` / `usePointerCursors` 默认关；Effort 色跟 agent `accent`；`pnpm run check:appearance`。

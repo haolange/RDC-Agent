@@ -12,7 +12,7 @@ const MAX_FACTS_PER_GROUP = 12;
 const SECRET_NAME = /^(?:api[-_ ]?key|authorization|password|secret|access[-_ ]?token|refresh[-_ ]?token)$/i;
 const QUOTED_SECRET_ASSIGNMENT = /((?:["']?)(?:api[-_ ]?key|authorization|password|secret|access[-_ ]?token|refresh[-_ ]?token)(?:["']?)\s*[:=]\s*)(["'])[^"']+\2/gi;
 const SECRET_ASSIGNMENT = /(api[-_ ]?key|authorization|password|secret|access[-_ ]?token|refresh[-_ ]?token)\s*[:=]\s*[^\s,;]+/gi;
-const BEARER_TOKEN = /\bBearer\s+[A-Za-z0-9._~+\/-]+=*/gi;
+const BEARER_TOKEN = /\bBearer\s+[A-Za-z0-9._~+\x2f-]+=*/gi;
 const PREFIXED_API_TOKEN = /\b(?:sk|rk)-[A-Za-z0-9_-]{12,}\b/g;
 const JWT_TOKEN = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
 const URL_PATTERN = /https?:\/\/[^\s<>"')\]]+/gi;

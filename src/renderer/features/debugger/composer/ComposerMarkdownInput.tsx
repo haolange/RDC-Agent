@@ -1,9 +1,10 @@
-import React, { useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown } from '@codemirror/lang-markdown';
 import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { Prec, type Extension } from '@codemirror/state';
 import { indentWithTab } from '@codemirror/commands';
+import { assignDynStyle } from '../../../lib/useDynStyle';
 import { MessageMarkdown } from '../AgentChat/MessageMarkdown';
 import './ComposerMarkdownInput.css';
 
@@ -99,14 +100,14 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
 }) => {
   const hostRef = useRef<HTMLDivElement>(null);
 
-  const syncHostHeight = () => {
+  const syncHostHeight = useCallback(() => {
     const host = hostRef.current;
     if (!host) {
       return;
     }
     // Mirror useComposer: collapse first so scrollHeight is content-driven, not
     // floored by a previously expanded clientHeight.
-    host.style.height = `${PROMPT_MIN_HEIGHT}px`;
+    assignDynStyle(host, { height: `${PROMPT_MIN_HEIGHT}px` });
     const contentEl =
       mode === 'preview'
         ? (host.querySelector('.composer-markdown-preview') as HTMLElement | null)
@@ -116,13 +117,13 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
       Math.max(contentHeight + PROMPT_VERTICAL_PAD, PROMPT_MIN_HEIGHT),
       PROMPT_MAX_HEIGHT,
     );
-    host.style.height = `${next}px`;
-  };
+    assignDynStyle(host, { height: `${next}px` });
+  }, [mode]);
 
   // Same growth contract as useComposer textarea resize (72–180).
   useLayoutEffect(() => {
     syncHostHeight();
-  }, [value, mode]);
+  }, [value, mode, syncHostHeight]);
 
   const extensions = useMemo((): Extension[] => [
       markdown(),
@@ -151,7 +152,7 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
         }
         syncHostHeight();
       }),
-    ], [disabled, mode, onSend, placeholder]);
+    ], [disabled, mode, onSend, placeholder, syncHostHeight]);
 
   return (
     <div

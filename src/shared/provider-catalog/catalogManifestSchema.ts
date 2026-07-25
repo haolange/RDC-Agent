@@ -166,9 +166,8 @@ export const ProviderSurfaceManifestSchema = z.object({
     'coding-token-plan',
     'compatible-access',
     'local',
-    'image',
   ]),
-  surfaceKind: z.enum(['account', 'native-api', 'cloud', 'plan', 'compatible-api', 'local', 'media']),
+  surfaceKind: z.enum(['account', 'native-api', 'cloud', 'plan', 'compatible-api', 'local']),
   serviceOperator: z.string().min(1),
   endpointClass: z.enum([
     'first-party',
@@ -206,8 +205,6 @@ export const ProviderSurfaceManifestSchema = z.object({
     'prompt-cache',
     'vision-input',
     'model-discovery',
-    'image-generation',
-    'video-generation',
   ])).optional(),
   routes: z.array(ProviderSurfaceRouteSchema).min(1),
   discovery: z.object({

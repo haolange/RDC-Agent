@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { assignDynStyle } from '../../../lib/useDynStyle';
 import {
   clampMaxProgress,
   maxFieldNoise,
@@ -111,7 +112,7 @@ function syncVisualHost(
 ): void {
   const stopsOpacity = clampMaxProgress(frame.stopsOpacity);
   const clipRatio = clampMaxProgress(emitterRatio);
-  host.style.setProperty('--composer-effort-stops-opacity', stopsOpacity.toFixed(3));
+  assignDynStyle(host, { '--composer-effort-stops-opacity': stopsOpacity.toFixed(3) });
   host.dataset.maxPhase = frame.phase;
   host.dataset.maxProgress = frame.progress.toFixed(3);
   host.dataset.maxStopsOpacity = stopsOpacity.toFixed(3);
@@ -166,8 +167,7 @@ export const EffortMaxField: React.FC<{
       if (canvas.width !== bitmapWidth || canvas.height !== bitmapHeight) {
         canvas.width = bitmapWidth;
         canvas.height = bitmapHeight;
-        canvas.style.width = `${width}px`;
-        canvas.style.height = `${height}px`;
+        assignDynStyle(canvas, { width: `${width}px`, height: `${height}px` });
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       }
       const emitterRatio = clampMaxProgress(thumbRef.current);
@@ -203,7 +203,7 @@ export const EffortMaxField: React.FC<{
     return () => {
       resizeObserver.disconnect();
       themeObserver.disconnect();
-      host.style.setProperty('--composer-effort-stops-opacity', '1');
+      assignDynStyle(host, { '--composer-effort-stops-opacity': '1' });
       paintRef.current = () => null;
     };
   }, [fieldActive]);

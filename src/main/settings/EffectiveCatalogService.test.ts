@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { EffectiveCatalogRequest } from './EffectiveCatalogService';
+import type { EffectiveCatalogRequest } from './effectiveCatalogTypes';
 
 const electronMock = vi.hoisted(() => ({ root: '' }));
 vi.mock('electron', () => ({
@@ -64,7 +64,7 @@ describe('EffectiveCatalogService', () => {
   });
 
   it('merges every layer by field and records winning field evidence', async () => {
-    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const [model] = mergeEffectiveCatalog(request({
       discovery: {
         source: 'discovery',
@@ -132,7 +132,7 @@ describe('EffectiveCatalogService', () => {
   });
 
   it('keeps a catalog-owned Max tier structural when billing reports a lower default threshold', async () => {
-    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const [model] = mergeEffectiveCatalog(request({
       catalog: {
         ...request().catalog,
@@ -179,7 +179,7 @@ describe('EffectiveCatalogService', () => {
   });
 
   it('projects field-level fact sources onto every affected leaf', async () => {
-    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const [model] = mergeEffectiveCatalog(request({
       catalog: {
         source: 'catalog',
@@ -218,7 +218,7 @@ describe('EffectiveCatalogService', () => {
   });
 
   it('projects an exact user route option without allowing provider-wide route mutation', async () => {
-    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const [model] = mergeEffectiveCatalog(request({
       catalog: {
         ...request().catalog,
@@ -246,7 +246,7 @@ describe('EffectiveCatalogService', () => {
   });
 
   it('replaces discriminated capability unions atomically across kinds', async () => {
-    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const [model] = mergeEffectiveCatalog(request({
       discovery: {
         source: 'discovery',
@@ -297,7 +297,7 @@ describe('EffectiveCatalogService', () => {
   });
 
   it('applies exact overlays only to admitted Catalog or live-discovered model ids', async () => {
-    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const [model] = mergeEffectiveCatalog(request({
       discovery: {
         source: 'discovery',
@@ -331,7 +331,7 @@ describe('EffectiveCatalogService', () => {
   });
 
   it('does not let persisted app-managed preferences create models absent from the live catalog', async () => {
-    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const models = mergeEffectiveCatalog(request({
       catalog: {
         source: 'catalog',
@@ -358,7 +358,8 @@ describe('EffectiveCatalogService', () => {
   });
 
   it('removes historical media-output entries from discovery and persisted catalog state', async () => {
-    const { EffectiveCatalogService, mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
     const cleanModels = mergeEffectiveCatalog(request({
       catalog: { source: 'catalog', observedAt: '2026-01-01T00:00:00.000Z', models: [] },
       discovery: {
@@ -403,7 +404,7 @@ describe('EffectiveCatalogService', () => {
   });
 
   it('rekeys punctuation-equivalent live ids while preserving the Catalog id as a proven alias', async () => {
-    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const [model] = mergeEffectiveCatalog(request({
       catalog: {
         source: 'catalog',
@@ -433,7 +434,7 @@ describe('EffectiveCatalogService', () => {
   });
 
   it('lets live evidence narrow but never promote a manifest-level explicit denial', async () => {
-    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const [model] = mergeEffectiveCatalog(request({
       catalog: {
         source: 'catalog',
@@ -475,7 +476,7 @@ describe('EffectiveCatalogService', () => {
   });
 
   it('merges every deterministic optional-layer combination with last present leaf provenance', async () => {
-    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const layers = [
       ['discovery', 'discovery'],
       ['overlay', 'overlay'],
@@ -513,7 +514,7 @@ describe('EffectiveCatalogService', () => {
   });
 
   it('allows full user-managed overrides', async () => {
-    const { mergeEffectiveCatalog } = await import('./EffectiveCatalogService');
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const [model] = mergeEffectiveCatalog(request({
       catalogOwnership: 'user-managed',
       user: {

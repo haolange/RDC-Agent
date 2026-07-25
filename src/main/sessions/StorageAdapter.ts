@@ -3,29 +3,14 @@
  * 统一管理 userData 下的项目、会话、运行记录与全局 knowledge。
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '@shared/utils/jsonl';
-import { readYaml, writeYaml } from '@shared/utils/yaml';
-import {
-  generateEventId,
-  generateRunId,
-  generateShortId,
-  nowIso,
-  nowMs,
-  sanitizeToken,
-} from '@shared/utils/id';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
-import { sanitizeStoredWorkTrace } from '../conversation/ConversationWorkTrace';
 import type {
   Blocker,
-  ReasoningSummary,
   WorkflowStage,
   WorkflowState,
 } from '@shared/types/workflow';
-import { normalizeWorkflowStage } from '@shared/constants/stages';
 import type {
   CaptureDescriptor,
   ExecutableAppMode,
@@ -36,357 +21,103 @@ import type {
   SessionAttachmentRecord,
   SessionRecord,
 } from '@shared/types/session';
-import { appPathService } from '../runtime/AppPathService';
-import type {
-  PersistedRunRecord,
-  ProjectRegistry,
-  SelectionState,
-  SessionEvidenceRecord,
-} from './storageTypes';
+import type { PersistedRunRecord, SessionEvidenceRecord } from './storageTypes';
 import type { SessionContextTurnEntry } from '../conversation/SessionContextJournal';
+import { StorageIo } from './StorageIo';
+import { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
+import { SessionRecordStore } from './SessionRecordStore';
+import { ConversationHistoryStore } from './ConversationHistoryStore';
+import { SessionContextStore } from './SessionContextStore';
+import type {
+  ConversationHistoryCacheEntry,
+  ExistingConversationTurnCommit,
+  StagedConversationSessionCommit,
+} from './storageCommitTypes';
+import type { StorageHost } from './storageHost';
 
-interface ConversationTurnCommitJournal {
-  schemaVersion: '1';
-  requestId: string;
-  turnId: string;
-  phase: 'prepared' | 'committing' | 'committed';
-  beforeHistory: ConversationMessage[];
-  beforeBranch: ConversationBranchState | null;
-  beforeAttachments: SessionAttachmentRecord[];
-  afterHistory?: ConversationMessage[];
-  afterBranch?: ConversationBranchState | null;
-  afterAttachments: SessionAttachmentRecord[];
-  importedPaths: string[];
-}
+export type {
+  ExistingConversationTurnCommit,
+  StagedConversationSessionCommit,
+} from './storageCommitTypes';
 
-interface ConversationTerminalCommitJournal {
-  schemaVersion: '1';
-  requestId: string;
-  turnId: string;
-  phase: 'prepared' | 'committing' | 'committed';
-  beforeHistory: ConversationMessage[];
-  beforeBranch: ConversationBranchState | null;
-  beforeContext: SessionContextTurnEntry[];
-  afterHistory: ConversationMessage[];
-  afterBranch: ConversationBranchState | null;
-  afterContext: SessionContextTurnEntry[];
-}
-
-interface ConversationDeltaRecord {
-  op: 'delta';
-  id: string;
-  patch: Partial<ConversationMessage>;
-  updatedAt: number;
-}
-
-interface ConversationHistoryCacheEntry {
-  mtimeMs: number;
-  size: number;
-  messages: ConversationMessage[];
-  rawRecordCount: number;
-}
-
-const CONVERSATION_COMPACTION_DELTA_THRESHOLD = 24;
-
-export interface ExistingConversationTurnCommit {
-  session: SessionRecord;
-  requestId: string;
-  turnId: string;
-  attachments: SessionAttachmentRecord[];
-  beforeHistory: ConversationMessage[];
-  beforeBranch: ConversationBranchState | null;
-}
-
-export interface StagedConversationSessionCommit {
-  session: SessionRecord;
-  requestId: string;
-  turnId: string;
-  stagingPath: string;
-  finalPath: string;
-  attachments: SessionAttachmentRecord[];
-}
-
-export class StorageAdapter {
-  private dataRootPath = '';
-  private projectsRootPath = '';
-  private globalKnowledgePath = '';
-  private registryPath = '';
-  private selectionPath = '';
-  private readonly turnCommitSessionIds = new Set<string>();
-  private readonly terminalCommitSessionIds = new Set<string>();
-  private readonly conversationHistoryCache = new Map<string, ConversationHistoryCacheEntry>();
-  private readonly conversationPendingDeltaCounts = new Map<string, number>();
+export class StorageAdapter implements StorageHost {
+  readonly io = new StorageIo();
+  dataRootPath = '';
+  projectsRootPath = '';
+  globalKnowledgePath = '';
+  registryPath = '';
+  selectionPath = '';
+  readonly turnCommitSessionIds = new Set<string>();
+  readonly terminalCommitSessionIds = new Set<string>();
+  readonly conversationHistoryCache = new Map<string, ConversationHistoryCacheEntry>();
+  readonly conversationPendingDeltaCounts = new Map<string, number>();
+  projects: ProjectWorkspaceStore;
+  sessions: SessionRecordStore;
+  history: ConversationHistoryStore;
+  context: SessionContextStore;
 
   constructor() {
-    this.syncRuntimePaths();
+    this.projects = new ProjectWorkspaceStore(this);
+    this.sessions = new SessionRecordStore(this);
+    this.history = new ConversationHistoryStore(this);
+    this.context = new SessionContextStore(this);
+    this.projects.syncRuntimePaths();
   }
 
   getWorkspacePath(): string {
-    this.syncRuntimePaths();
-    return this.dataRootPath;
+    return this.projects.getWorkspacePath();
   }
 
   getGlobalKnowledgePath(): string {
-    this.syncRuntimePaths();
-    return this.globalKnowledgePath;
+    return this.projects.getGlobalKnowledgePath();
   }
 
   async initializeWorkspace(): Promise<void> {
-    this.syncRuntimePaths();
-    this.ensureDir(this.dataRootPath);
-    this.ensureDir(this.projectsRootPath);
-    this.ensureRegistry();
-    this.ensureSelection();
-    this.ensureDir(this.globalKnowledgePath);
-    this.recoverConversationTurnCommits();
+    return this.projects.initializeWorkspace();
   }
 
   listProjects(): ProjectRecord[] {
-    return this.readRegistry().projects
-      .slice()
-      .sort((a, b) => b.updatedAt - a.updatedAt);
+    return this.projects.listProjects();
   }
 
   createProject(rootPath: string): ProjectRecord {
-    const normalizedRootPath = path.resolve(rootPath);
-    if (!fs.existsSync(normalizedRootPath) || !fs.statSync(normalizedRootPath).isDirectory()) {
-      throw new Error(`Project root is not a directory: ${normalizedRootPath}`);
-    }
-
-    const registry = this.readRegistry();
-    const existing = registry.projects.find((project) => project.rootPath === normalizedRootPath);
-    if (existing) {
-      this.setCurrentProjectId(existing.projectId);
-      return existing;
-    }
-
-    const projectName = path.basename(normalizedRootPath) || normalizedRootPath;
-    const slug = this.createUniqueProjectSlug(projectName, registry.projects);
-    const { resourcePath, knowledgePath, inputsPath } = this.ensureProjectResourceLayout(normalizedRootPath);
-    const inputs = this.collectProjectInputs(inputsPath);
-
-    const timestamp = nowMs();
-    const project: ProjectRecord = {
-      projectId: `proj_${generateShortId()}`,
-      name: projectName,
-      rootPath: normalizedRootPath,
-      slug,
-      resourcePath,
-      knowledgePath,
-      inputsPath,
-      inputs,
-      inputsUpdatedAt: timestamp,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-
-    registry.projects.push(project);
-    this.writeRegistry(registry);
-    this.ensureDir(this.getProjectDataPath(project));
-    this.ensureDir(this.getProjectSessionsRoot(project));
-    this.writeProjectMetadata(project);
-    this.setCurrentProjectId(project.projectId);
-
-    return project;
+    return this.projects.createProject(rootPath);
   }
 
   renameProject(projectId: string, newName: string): ProjectRecord {
-    const registry = this.readRegistry();
-    const target = registry.projects.find((project) => project.projectId === projectId);
-    if (!target) {
-      throw new Error(`Project not found: ${projectId}`);
-    }
-
-    target.name = newName;
-    target.updatedAt = nowMs();
-    
-    this.writeRegistry(registry);
-    this.writeProjectMetadata(target);
-    
-    return target;
+    return this.projects.renameProject(projectId, newName);
   }
 
   removeProject(projectId: string): void {
-    const registry = this.readRegistry();
-    const target = registry.projects.find((project) => project.projectId === projectId);
-    if (!target) return;
-
-    registry.projects = registry.projects.filter((project) => project.projectId !== projectId);
-    this.writeRegistry(registry);
-
-    const projectPath = this.getProjectDataPath(target);
-    if (fs.existsSync(projectPath)) {
-      fs.rmSync(projectPath, { recursive: true, force: true });
-    }
-
-    const selection = this.readSelection();
-    if (selection.projectId === projectId) {
-      selection.projectId = null;
-      selection.sessionId = null;
-      this.writeSelection(selection);
-    }
+    return this.projects.removeProject(projectId);
   }
 
   removeSession(sessionId: string): void {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) return;
-
-    const runIds = this.listRuns(sessionId).map((run) => run.runId);
-    this.removeSessionSideChannels(sessionId, runIds);
-
-    if (fs.existsSync(location.sessionPath)) {
-      fs.rmSync(location.sessionPath, { recursive: true, force: true });
-    }
-
-    const selection = this.readSelection();
-    if (selection.sessionId === sessionId) {
-      selection.sessionId = null;
-      this.writeSelection(selection);
-    }
-
-    // 删除会话后，若 lastSessionId 仍指向被删会话，收敛到剩余会话之首或置空，
-    // 避免 registry.lastSessionId 与实际会话列表脱节导致 sidebar 显示 stale。
-    const projectId = location.project.projectId;
-    const wasLastSession = location.project.lastSessionId === sessionId;
-    if (wasLastSession) {
-      const remaining = this.listSessions(projectId);
-      this.touchProject(projectId, remaining[0]?.sessionId ?? null);
-    } else {
-      this.touchProject(projectId);
-    }
-  }
-
-  /**
-   * Clear app-state side channels that are keyed by session/run but live outside the session directory.
-   * Does not touch ~/.rdx or project .rdx.
-   */
-  private removeSessionSideChannels(sessionId: string, runIds: string[]): void {
-    const paths = appPathService.getAppStatePaths();
-    const safeSessionId = sessionId.replace(/[^\w.-]/g, '_');
-    const sideDirs = [
-      path.join(paths.tasksPath, safeSessionId),
-      path.join(paths.llmCallsPath, safeSessionId),
-    ];
-    for (const dir of sideDirs) {
-      if (fs.existsSync(dir)) {
-        fs.rmSync(dir, { recursive: true, force: true });
-      }
-    }
-
-    const tracesRunsDir = path.join(paths.tracesPath, 'runs');
-    const tracesEventsDir = path.join(paths.tracesPath, 'events');
-    for (const runId of runIds) {
-      const safeRunId = runId.replace(/[^\w.-]/g, '_');
-      for (const filePath of [
-        path.join(tracesRunsDir, `${safeRunId}.json`),
-        path.join(tracesRunsDir, `${runId}.json`),
-        path.join(tracesEventsDir, `${safeRunId}.jsonl`),
-        path.join(tracesEventsDir, `${runId}.jsonl`),
-      ]) {
-        if (fs.existsSync(filePath)) {
-          fs.rmSync(filePath, { force: true });
-        }
-      }
-    }
+    return this.sessions.removeSession(sessionId);
   }
 
   getProjectById(projectId: string): ProjectRecord | null {
-    return this.readRegistry().projects.find((project) => project.projectId === projectId) || null;
+    return this.projects.getProjectById(projectId);
   }
 
   listProjectInputs(projectId: string): ProjectInputRecord[] {
-    const project = this.getProjectById(projectId);
-    if (!project) return [];
-    return this.refreshProjectInputs(projectId);
+    return this.projects.listProjectInputs(projectId);
   }
 
   refreshProjectInputs(projectId: string): ProjectInputRecord[] {
-    const project = this.getProjectById(projectId);
-    if (!project) return [];
-
-    const normalizedProject = this.normalizeProjectRecord(project);
-    const inputs = this.collectProjectInputs(normalizedProject.inputsPath);
-    const nextProject: ProjectRecord = {
-      ...normalizedProject,
-      inputs,
-      inputsUpdatedAt: nowMs(),
-    };
-    this.persistProject(nextProject);
-    return nextProject.inputs;
+    return this.projects.refreshProjectInputs(projectId);
   }
 
   importProjectInputs(projectId: string, filePaths: string[]): ProjectInputRecord[] {
-    const project = this.getProjectById(projectId);
-    if (!project) {
-      throw new Error(`Project not found: ${projectId}`);
-    }
-
-    const normalizedProject = this.normalizeProjectRecord(project);
-    this.ensureDir(normalizedProject.inputsPath);
-
-    for (const filePath of filePaths) {
-      const sourcePath = path.resolve(filePath);
-      if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
-        continue;
-      }
-      if (path.extname(sourcePath).toLowerCase() !== '.rdc') {
-        continue;
-      }
-
-      const targetPath = this.resolveImportedInputPath(normalizedProject.inputsPath, path.basename(sourcePath));
-      fs.copyFileSync(sourcePath, targetPath);
-    }
-
-    return this.refreshProjectInputs(projectId);
+    return this.projects.importProjectInputs(projectId, filePaths);
   }
 
   listSessions(projectId: string): SessionRecord[] {
-    const project = this.getProjectById(projectId);
-    if (!project) return [];
-    return this.reconcileProjectSessionTitles(project)
-      .sort((a, b) => b.updatedAt - a.updatedAt);
+    return this.sessions.listSessions(projectId);
   }
 
   createSession(projectId: string, title?: string, goal: string = ''): SessionRecord {
-    const project = this.getProjectById(projectId);
-    if (!project) {
-      throw new Error(`Project not found: ${projectId}`);
-    }
-
-    const timestamp = nowMs();
-    const session: SessionRecord = {
-      sessionId: `sess_${generateShortId()}`,
-      projectId,
-      title: this.normalizeSessionTitle(projectId, title),
-      goal,
-      sessionPath: '',
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-
-    const sessionPath = path.join(this.ensureProjectSessionsRoot(project), session.sessionId);
-    session.sessionPath = sessionPath;
-    this.ensureDir(sessionPath);
-    this.ensureDir(path.join(sessionPath, 'attachments'));
-    this.ensureDir(path.join(sessionPath, 'timeline'));
-    this.ensureDir(path.join(sessionPath, 'runs'));
-    this.writeJson(path.join(sessionPath, 'session.json'), session);
-    if (!fs.existsSync(path.join(sessionPath, 'action_chain.jsonl'))) {
-      fs.writeFileSync(path.join(sessionPath, 'action_chain.jsonl'), '', 'utf-8');
-    }
-    if (!fs.existsSync(path.join(sessionPath, 'conversation.jsonl'))) {
-      fs.writeFileSync(path.join(sessionPath, 'conversation.jsonl'), '', 'utf-8');
-    }
-    if (!fs.existsSync(path.join(sessionPath, 'attachments.json'))) {
-      this.writeJson(path.join(sessionPath, 'attachments.json'), [] satisfies SessionAttachmentRecord[]);
-    }
-    this.syncSessionEvidence(session.sessionId, session.projectId);
-
-    this.touchProject(project.projectId, session.sessionId, timestamp);
-    this.setCurrentProjectId(projectId);
-    this.setCurrentSessionId(session.sessionId);
-
-    return session;
+    return this.sessions.createSession(projectId, title, goal);
   }
 
   beginStagedConversationSession(
@@ -396,41 +127,7 @@ export class StorageAdapter {
     requestId: string,
     turnId: string,
   ): StagedConversationSessionCommit {
-    const project = this.getProjectById(projectId);
-    if (!project) throw new Error(`Project not found: ${projectId}`);
-    const timestamp = nowMs();
-    const sessionId = `sess_${generateShortId()}`;
-    const sessionsRoot = this.ensureProjectSessionsRoot(project);
-    const finalPath = path.join(sessionsRoot, sessionId);
-    const stagingPath = path.join(
-      sessionsRoot,
-      `.turn-staging-${sanitizeToken(requestId).slice(0, 48) || generateShortId()}-${sessionId}`,
-    );
-    if (fs.existsSync(stagingPath)) fs.rmSync(stagingPath, { recursive: true, force: true });
-    this.ensureDir(path.join(stagingPath, 'attachments'));
-    this.ensureDir(path.join(stagingPath, 'timeline'));
-    this.ensureDir(path.join(stagingPath, 'runs'));
-    const session: SessionRecord = {
-      sessionId,
-      projectId,
-      title: this.normalizeSessionTitle(projectId, title),
-      goal: '',
-      sessionPath: finalPath,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-    try {
-      const attachments = this.copyAttachmentsForTurn(
-        session,
-        sourceAttachmentPaths,
-        path.join(stagingPath, 'attachments'),
-        path.join(finalPath, 'attachments'),
-      );
-      return { session, requestId, turnId, stagingPath, finalPath, attachments };
-    } catch (error) {
-      fs.rmSync(stagingPath, { recursive: true, force: true });
-      throw error;
-    }
+    return this.sessions.beginStagedConversationSession(projectId, title, sourceAttachmentPaths, requestId, turnId);
   }
 
   commitStagedConversationSession(
@@ -438,26 +135,11 @@ export class StorageAdapter {
     history: ConversationMessage[],
     branchState: ConversationBranchState | null,
   ): SessionRecord {
-    if (!fs.existsSync(commit.stagingPath) || fs.existsSync(commit.finalPath)) {
-      throw new Error('Staged conversation session is no longer commit-ready.');
-    }
-    this.writeJsonAtomic(path.join(commit.stagingPath, 'session.json'), commit.session);
-    this.writeJsonlAtomic(path.join(commit.stagingPath, 'conversation.jsonl'), history);
-    this.writeJsonAtomic(path.join(commit.stagingPath, 'attachments.json'), commit.attachments);
-    this.writeUtf8Atomic(path.join(commit.stagingPath, 'action_chain.jsonl'), '');
-    if (branchState) {
-      this.writeJsonAtomic(path.join(commit.stagingPath, 'conversation-branches.json'), branchState);
-    }
-    fs.renameSync(commit.stagingPath, commit.finalPath);
-    this.syncSessionEvidence(commit.session.sessionId, commit.session.projectId);
-    this.touchProject(commit.session.projectId, commit.session.sessionId, commit.session.updatedAt);
-    this.setCurrentProjectId(commit.session.projectId);
-    this.setCurrentSessionId(commit.session.sessionId);
-    return commit.session;
+    return this.sessions.commitStagedConversationSession(commit, history, branchState);
   }
 
   rollbackStagedConversationSession(commit: StagedConversationSessionCommit): void {
-    if (fs.existsSync(commit.stagingPath)) fs.rmSync(commit.stagingPath, { recursive: true, force: true });
+    return this.sessions.rollbackStagedConversationSession(commit);
   }
 
   beginExistingConversationTurnCommit(
@@ -466,46 +148,7 @@ export class StorageAdapter {
     requestId: string,
     turnId: string,
   ): ExistingConversationTurnCommit {
-    if (this.turnCommitSessionIds.has(sessionId)) {
-      throw new Error(`Conversation turn commit is already active for session ${sessionId}.`);
-    }
-    this.recoverSessionTurnCommit(sessionId);
-    const session = this.readSession(sessionId);
-    if (!session) throw new Error(`Session not found: ${sessionId}`);
-    const beforeHistory = this.readConversationHistory(sessionId);
-    const beforeBranch = this.readConversationBranchState(sessionId);
-    const beforeAttachments = this.readSessionAttachments(sessionId);
-    const attachmentsDir = this.getSessionAttachmentsDir(sessionId);
-    const attachments = this.planAttachmentsForTurn(session, sourceAttachmentPaths, attachmentsDir);
-    const afterAttachments = beforeAttachments.concat(attachments);
-    const journal: ConversationTurnCommitJournal = {
-      schemaVersion: '1',
-      requestId,
-      turnId,
-      phase: 'prepared',
-      beforeHistory,
-      beforeBranch,
-      beforeAttachments,
-      afterAttachments,
-      importedPaths: attachments.map((entry) => entry.filePath),
-    };
-    this.writeJsonAtomic(this.getConversationTurnCommitJournalPath(session.sessionPath), journal);
-    this.turnCommitSessionIds.add(sessionId);
-    try {
-      for (let index = 0; index < sourceAttachmentPaths.length; index += 1) {
-        const sourcePath = path.resolve(sourceAttachmentPaths[index]!);
-        const targetPath = attachments[index]!.filePath;
-        const temporaryPath = `${targetPath}.${process.pid}.${generateShortId()}.tmp`;
-        fs.copyFileSync(sourcePath, temporaryPath);
-        fs.renameSync(temporaryPath, targetPath);
-      }
-      this.writeJsonAtomic(this.getSessionAttachmentsManifestPath(sessionId), afterAttachments);
-      return { session, requestId, turnId, attachments, beforeHistory, beforeBranch };
-    } catch (error) {
-      this.turnCommitSessionIds.delete(sessionId);
-      this.recoverSessionTurnCommit(sessionId);
-      throw error;
-    }
+    return this.history.beginExistingConversationTurnCommit(sessionId, sourceAttachmentPaths, requestId, turnId);
   }
 
   commitExistingConversationTurn(
@@ -513,101 +156,35 @@ export class StorageAdapter {
     history: ConversationMessage[],
     branchState: ConversationBranchState | null,
   ): void {
-    const journalPath = this.getConversationTurnCommitJournalPath(commit.session.sessionPath);
-    const journal = this.readJson<ConversationTurnCommitJournal>(journalPath);
-    if (!journal || journal.requestId !== commit.requestId || journal.turnId !== commit.turnId) {
-      throw new Error('Conversation turn commit journal is missing or belongs to another turn.');
-    }
-    const committing: ConversationTurnCommitJournal = {
-      ...journal,
-      phase: 'committing',
-      afterHistory: history,
-      afterBranch: branchState,
-    };
-    this.writeJsonAtomic(journalPath, committing);
-    try {
-      this.applyConversationTurnJournal(commit.session, committing, true);
-      this.writeJsonAtomic(journalPath, { ...committing, phase: 'committed' });
-      fs.rmSync(journalPath, { force: true });
-      this.updateSession(commit.session.sessionId, {});
-    } catch (error) {
-      throw error;
-    } finally {
-      this.turnCommitSessionIds.delete(commit.session.sessionId);
-    }
+    return this.history.commitExistingConversationTurn(commit, history, branchState);
   }
 
   rollbackExistingConversationTurn(commit: ExistingConversationTurnCommit): void {
-    try {
-      this.recoverSessionTurnCommit(commit.session.sessionId, true);
-    } finally {
-      this.turnCommitSessionIds.delete(commit.session.sessionId);
-    }
+    return this.history.rollbackExistingConversationTurn(commit);
   }
 
   readSession(sessionId: string): SessionRecord | null {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) return null;
-    const sessions = this.reconcileProjectSessionTitles(location.project);
-    return sessions.find((session) => session.sessionId === sessionId) ?? null;
+    return this.sessions.readSession(sessionId);
   }
 
   updateSession(sessionId: string, patch: Partial<SessionRecord>): SessionRecord | null {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) return null;
-
-    const existing = this.readJson<SessionRecord>(path.join(location.sessionPath, 'session.json'));
-    if (!existing) return null;
-
-    const nextSession: SessionRecord = {
-      ...this.normalizeSessionRecord(existing, location.sessionPath),
-      ...patch,
-      sessionId: existing.sessionId,
-      projectId: existing.projectId,
-      sessionPath: location.sessionPath,
-      updatedAt: nowMs(),
-    };
-
-    this.writeJson(path.join(location.sessionPath, 'session.json'), nextSession);
-    this.touchProject(existing.projectId, nextSession.sessionId, nextSession.updatedAt);
-    return nextSession;
+    return this.sessions.updateSession(sessionId, patch);
   }
 
   listRuns(sessionId: string): RunSummary[] {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) return [];
-
-    const runsRoot = path.join(location.sessionPath, 'runs');
-    if (!fs.existsSync(runsRoot)) {
-      return [];
-    }
-
-    return fs.readdirSync(runsRoot, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => this.readPersistedRun(sessionId, entry.name))
-      .filter((run): run is PersistedRunRecord => run !== null)
-      .sort((a, b) => b.startedAt - a.startedAt)
-      .map((run) => this.toRunSummary(run));
+    return this.sessions.listRuns(sessionId);
   }
 
   getLatestRun(sessionId: string): RunSummary | null {
-    return this.listRuns(sessionId)[0] ?? null;
+    return this.sessions.getLatestRun(sessionId);
   }
 
   getCasePath(caseId: string): string {
-    const location = this.findSessionLocation(caseId);
-    if (!location) {
-      throw new Error(`Session not found for case lookup: ${caseId}`);
-    }
-    return location.sessionPath;
+    return this.sessions.getCasePath(caseId);
   }
 
   getRunPath(caseId: string, runId: string): string {
-    const location = this.findSessionLocation(caseId);
-    if (!location) {
-      throw new Error(`Session not found for run lookup: ${caseId}`);
-    }
-    return path.join(location.sessionPath, 'runs', runId);
+    return this.sessions.getRunPath(caseId, runId);
   }
 
   async createCase(input: {
@@ -616,55 +193,15 @@ export class StorageAdapter {
     userGoal: string;
     symptomSummary: string;
   }): Promise<string> {
-    const projectId = input.projectId || this.getCurrentProjectId();
-    if (!projectId) {
-      throw new Error('Project is required before creating a session.');
-    }
-
-    if (input.caseId) {
-      const existingSession = this.readSession(input.caseId);
-      if (existingSession) {
-        return existingSession.sessionId;
-      }
-    }
-
-    const session = this.createSession(
-      projectId,
-      input.userGoal || input.symptomSummary,
-      input.userGoal || input.symptomSummary,
-    );
-    return session.sessionId;
+    return this.sessions.createCase(input);
   }
 
   async readCase(caseId: string): Promise<Record<string, unknown> | null> {
-    const session = this.readSession(caseId);
-    if (!session) return null;
-
-    return {
-      case_id: session.sessionId,
-      project_id: session.projectId,
-      title: session.title,
-      user_goal: session.goal,
-      current_run: session.lastRunId ?? null,
-      created_at: new Date(session.createdAt).toISOString(),
-      updated_at: new Date(session.updatedAt).toISOString(),
-    };
+    return this.sessions.readCase(caseId);
   }
 
   async updateCase(caseId: string, data: Record<string, unknown>): Promise<void> {
-    const title = typeof data.title === 'string'
-      ? data.title
-      : typeof data.symptom_summary === 'string'
-        ? data.symptom_summary
-        : undefined;
-    const goal = typeof data.user_goal === 'string' ? data.user_goal : undefined;
-    const lastRunId = typeof data.current_run === 'string' ? data.current_run : undefined;
-
-    this.updateSession(caseId, {
-      title,
-      goal,
-      lastRunId,
-    });
+    return this.sessions.updateCase(caseId, data);
   }
 
   async createRun(input: {
@@ -679,319 +216,117 @@ export class StorageAdapter {
     backend?: 'local' | 'remote';
     status?: PersistedRunRecord['status'];
   }): Promise<{ runId: string; sessionId: string }> {
-    const sessionId = input.sessionId || input.caseId;
-    const session = this.readSession(sessionId);
-    if (!session) {
-      throw new Error(`Session not found: ${sessionId}`);
-    }
-
-    const runId = input.runId || generateRunId();
-    const runPath = this.getRunPath(sessionId, runId);
-    this.ensureDir(runPath);
-    this.ensureDir(path.join(runPath, 'artifacts'));
-    this.ensureDir(path.join(runPath, 'notes'));
-    this.ensureDir(path.join(runPath, 'reports'));
-    this.ensureDir(path.join(runPath, 'logs'));
-    this.ensureDir(path.join(runPath, 'screenshots'));
-    this.ensureDir(path.join(runPath, 'checkpoints'));
-
-    const captures = input.captures
-      ? input.captures
-      : input.capturePaths.map((filePath, index) => ({
-          id: `cap-${index}`,
-          filePath,
-          role: index === 0 ? ('primary' as const) : ('reference' as const),
-          backendHint: 'local' as const,
-          status: 'pending' as const,
-        }));
-
-    const backend = input.backend
-      || (captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local');
-    const startedAt = nowMs();
-    const persistedRun: PersistedRunRecord = {
-      runId,
-      turnId: input.turnId,
-      projectId: session.projectId,
-      sessionId,
-      caseId: sessionId,
-      mode: input.mode || 'debugger',
-      goal: input.goal || session.goal,
-      captures,
-      startedAt,
-      status: input.status || 'queued',
-      lastStage: 'preflight',
-      backend,
-      createdAt: startedAt,
-      updatedAt: startedAt,
-      runtime: {
-        backend,
-        entry_mode: 'cli',
-        context_id: null,
-        runtime_owner: null,
-        session_id: sessionId,
-        workflow_stage: 'preflight',
-      },
-    };
-
-    this.writeRunFiles(persistedRun);
-    writeYaml(path.join(runPath, 'capture_refs.yaml'), {
-      captures: captures.map((capture, index) => ({
-        capture_id: capture.id || `cap-${index}`,
-        capture_role: capture.role,
-        source_path: capture.filePath,
-      })),
-    });
-    writeYaml(path.join(runPath, 'notes', 'hypothesis_board.yaml'), {
-      hypothesis_board: {
-        session_id: sessionId,
-        entry_skill: 'debugger',
-        user_goal: persistedRun.goal,
-        intake_state: 'handoff_ready',
-        current_phase: 'intake',
-        current_task: '',
-        active_owner: 'debugger',
-        pending_requirements: [],
-        blocking_issues: [],
-        progress_summary: ['accepted intake complete'],
-        next_actions: ['run dispatch_readiness before specialist dispatch'],
-        last_updated: nowIso(),
-        hypotheses: [],
-      },
-    });
-
-    this.updateSession(sessionId, {
-      goal: persistedRun.goal,
-      lastRunId: runId,
-    });
-    this.syncSessionEvidence(sessionId, session.projectId);
-    this.touchProject(session.projectId, sessionId);
-    this.setCurrentProjectId(session.projectId);
-    this.setCurrentSessionId(sessionId);
-
-    return { runId, sessionId };
+    return this.sessions.createRun(input);
   }
 
   async readRun(caseId: string, runId: string): Promise<Record<string, unknown> | null> {
-    const run = this.readPersistedRun(caseId, runId);
-    return run ? run as unknown as Record<string, unknown> : null;
+    return this.sessions.readRun(caseId, runId);
   }
 
   async updateRun(caseId: string, runId: string, data: Record<string, unknown>): Promise<void> {
-    const existing = this.readPersistedRun(caseId, runId);
-    if (!existing) {
-      return;
-    }
-
-    const merged = this.deepMerge(
-      existing as unknown as Record<string, unknown>,
-      data,
-    ) as unknown as PersistedRunRecord;
-    const workflowStage = merged.runtime?.workflow_stage || existing.runtime.workflow_stage;
-    merged.runtime = {
-      ...existing.runtime,
-      ...(merged.runtime || {}),
-      workflow_stage: workflowStage,
-    };
-    merged.lastStage = workflowStage;
-    merged.updatedAt = nowMs();
-
-    if (workflowStage === 'finalize' && merged.status === 'running') {
-      merged.status = 'completed';
-      merged.finishedAt = merged.finishedAt || merged.updatedAt;
-    }
-
-    this.writeRunFiles(merged);
-    this.updateSession(caseId, {
-      lastRunId: runId,
-    });
-    this.syncSessionEvidence(caseId, existing.projectId);
+    return this.sessions.updateRun(caseId, runId, data);
   }
 
   async writeArtifact(caseId: string, runId: string, artifactName: string, data: unknown): Promise<string> {
-    const artifactPath = path.join(this.getRunPath(caseId, runId), 'artifacts', artifactName);
-    writeYaml(artifactPath, data);
-    return artifactPath;
+    return this.sessions.writeArtifact(caseId, runId, artifactName, data);
   }
 
   async readArtifact(caseId: string, runId: string, artifactName: string): Promise<Record<string, unknown> | null> {
-    const artifactPath = path.join(this.getRunPath(caseId, runId), 'artifacts', artifactName);
-    return readYaml<Record<string, unknown>>(artifactPath);
+    return this.sessions.readArtifact(caseId, runId, artifactName);
   }
 
   getActionChainPath(sessionId: string): string {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) {
-      throw new Error(`Session not found for action chain: ${sessionId}`);
-    }
-    return path.join(location.sessionPath, 'action_chain.jsonl');
+    return this.sessions.getActionChainPath(sessionId);
   }
 
   getConversationPath(sessionId: string): string {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) {
-      throw new Error(`Session not found for conversation history: ${sessionId}`);
-    }
-    return path.join(location.sessionPath, 'conversation.jsonl');
+    return this.history.getConversationPath(sessionId);
   }
 
   getConversationBranchStatePath(sessionId: string): string {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) {
-      throw new Error(`Session not found for conversation branches: ${sessionId}`);
-    }
-    return path.join(location.sessionPath, 'conversation-branches.json');
+    return this.history.getConversationBranchStatePath(sessionId);
   }
 
   readConversationBranchState(sessionId: string): import('@shared/types/conversationBranch').ConversationBranchState | null {
-    const filePath = this.getConversationBranchStatePath(sessionId);
-    if (!fs.existsSync(filePath)) {
-      return null;
-    }
-    return this.readJson<import('@shared/types/conversationBranch').ConversationBranchState>(filePath);
+    return this.history.readConversationBranchState(sessionId);
   }
 
   writeConversationBranchState(
     sessionId: string,
     state: import('@shared/types/conversationBranch').ConversationBranchState,
   ): void {
-    const filePath = this.getConversationBranchStatePath(sessionId);
-    const temporaryPath = `${filePath}.${process.pid}.tmp`;
-    this.ensureDir(path.dirname(filePath));
-    fs.writeFileSync(temporaryPath, JSON.stringify(state, null, 2), 'utf-8');
-    try {
-      fs.renameSync(temporaryPath, filePath);
-    } catch (error) {
-      if (fs.existsSync(temporaryPath)) fs.unlinkSync(temporaryPath);
-      throw error;
-    }
+    return this.history.writeConversationBranchState(sessionId, state);
   }
 
   clearConversationBranchState(sessionId: string): void {
-    const filePath = this.getConversationBranchStatePath(sessionId);
-    if (fs.existsSync(filePath)) fs.rmSync(filePath, { force: true });
+    return this.history.clearConversationBranchState(sessionId);
   }
 
   getSessionAttachmentsDir(sessionId: string): string {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) {
-      throw new Error(`Session not found for attachments: ${sessionId}`);
-    }
-    const attachmentsDir = path.join(location.sessionPath, 'attachments');
-    this.ensureDir(attachmentsDir);
-    return attachmentsDir;
+    return this.sessions.getSessionAttachmentsDir(sessionId);
   }
 
   getSessionAttachmentsManifestPath(sessionId: string): string {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) {
-      throw new Error(`Session not found for attachment manifest: ${sessionId}`);
-    }
-    return path.join(location.sessionPath, 'attachments.json');
+    return this.sessions.getSessionAttachmentsManifestPath(sessionId);
   }
 
   getSessionEvidencePath(sessionId: string): string {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) {
-      throw new Error(`Session not found for session evidence: ${sessionId}`);
-    }
-    return path.join(location.sessionPath, 'session_evidence.yaml');
+    return this.sessions.getSessionEvidencePath(sessionId);
   }
 
   writeSessionPlanArtifact(sessionId: string, content: string): string {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) {
-      throw new Error(`Session not found for plan artifact: ${sessionId}`);
-    }
-    const artifactsDir = path.join(location.sessionPath, 'artifacts');
-    this.ensureDir(artifactsDir);
-    const artifactPath = path.join(artifactsDir, 'plan.md');
-    fs.writeFileSync(artifactPath, content, 'utf8');
-    return artifactPath;
+    return this.sessions.writeSessionPlanArtifact(sessionId, content);
   }
 
-  /** Session 目录下的上下文用量快照路径。 */
   getSessionUsagePath(sessionId: string): string | null {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) return null;
-    return path.join(location.sessionPath, 'usage.json');
+    return this.context.getSessionUsagePath(sessionId);
   }
 
-  /** 读取落盘的 RunContextUsageSummary；文件缺失或损坏时返回 null。 */
   readSessionUsage(sessionId: string): RunContextUsageSummary | null {
-    if (sessionId.includes('::subagent::')) {
-      return null;
-    }
-    const usagePath = this.getSessionUsagePath(sessionId);
-    if (!usagePath) return null;
-    return this.readJson<RunContextUsageSummary>(usagePath);
+    return this.context.readSessionUsage(sessionId);
   }
 
-  /** 覆盖写入最新用量快照（小文件，不做迁移）。 */
   writeSessionUsage(sessionId: string, usage: RunContextUsageSummary): void {
-    if (sessionId.includes('::subagent::')) {
-      return;
-    }
-    const usagePath = this.getSessionUsagePath(sessionId);
-    if (!usagePath) {
-      throw new Error(`Session not found for usage snapshot: ${sessionId}`);
-    }
-    this.writeJson(usagePath, usage);
+    return this.context.writeSessionUsage(sessionId, usage);
   }
-
 
   writeSessionContextJournal(sessionId: string, entries: SessionContextTurnEntry[]): void {
-    this.writeJsonlAtomic(this.getSessionContextJournalPath(sessionId), entries);
+    return this.context.writeSessionContextJournal(sessionId, entries);
   }
 
   clearSessionContextState(sessionId: string): void {
-    this.writeSessionContextJournal(sessionId, []);
-    this.clearSessionDerivedContextView(sessionId);
+    return this.context.clearSessionContextState(sessionId);
   }
 
-
   getSessionDerivedContextViewPath(sessionId: string): string {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) throw new Error(`Session not found for derived context view: ${sessionId}`);
-    return path.join(location.sessionPath, 'context-view.json');
+    return this.context.getSessionDerivedContextViewPath(sessionId);
   }
 
   readSessionDerivedContextView(sessionId: string): import('@shared/types/semanticContext').DerivedContextView | null {
-    const viewPath = this.getSessionDerivedContextViewPath(sessionId);
-    return fs.existsSync(viewPath)
-      ? this.readJson<import('@shared/types/semanticContext').DerivedContextView>(viewPath)
-      : null;
+    return this.context.readSessionDerivedContextView(sessionId);
   }
 
   writeSessionDerivedContextView(
     sessionId: string,
     view: import('@shared/types/semanticContext').DerivedContextView,
   ): void {
-    if (view.scope !== 'session' || view.sessionId !== sessionId) {
-      throw new Error('Derived context view session ownership mismatch.');
-    }
-    this.writeJsonAtomic(this.getSessionDerivedContextViewPath(sessionId), view);
+    return this.context.writeSessionDerivedContextView(sessionId, view);
   }
 
   clearSessionDerivedContextView(sessionId: string): void {
-    fs.rmSync(this.getSessionDerivedContextViewPath(sessionId), { force: true });
+    return this.context.clearSessionDerivedContextView(sessionId);
   }
 
   getSessionContextJournalPath(sessionId: string): string {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) throw new Error(`Session not found for context journal: ${sessionId}`);
-    return path.join(location.sessionPath, 'session-context.jsonl');
+    return this.context.getSessionContextJournalPath(sessionId);
   }
 
   readSessionContextJournal(sessionId: string): SessionContextTurnEntry[] {
-    const journalPath = this.getSessionContextJournalPath(sessionId);
-    if (!fs.existsSync(journalPath)) return [];
-    const result = readJsonl<SessionContextTurnEntry>(journalPath);
-    assertNoJsonlDiagnostics(journalPath, result.diagnostics);
-    return result.records;
+    return this.context.readSessionContextJournal(sessionId);
   }
 
   appendSessionContextTurn(sessionId: string, entry: SessionContextTurnEntry): void {
-    appendJsonl(this.getSessionContextJournalPath(sessionId), entry);
+    return this.context.appendSessionContextTurn(sessionId, entry);
   }
 
   commitConversationTerminal(
@@ -1001,101 +336,15 @@ export class StorageAdapter {
     assistantMessage: ConversationMessage,
     contextEntry: SessionContextTurnEntry,
   ): void {
-    if (this.terminalCommitSessionIds.has(sessionId)) {
-      throw new Error(`Conversation terminal commit is already active for session ${sessionId}.`);
-    }
-    this.recoverSessionTurnCommit(sessionId);
-    this.recoverSessionTerminalCommit(sessionId);
-    const session = this.readSession(sessionId);
-    if (!session) throw new Error(`Session not found: ${sessionId}`);
-    if (
-      contextEntry.turnId !== turnId
-      || contextEntry.assistantMessageId !== assistantMessage.id
-      || assistantMessage.turnId !== turnId
-    ) {
-      throw new Error('Conversation terminal commit ownership mismatch.');
-    }
-
-    const beforeHistory = this.readConversationHistory(sessionId);
-    const beforeBranch = this.readConversationBranchState(sessionId);
-    const beforeContext = this.readSessionContextJournal(sessionId);
-    const duplicate = beforeContext.find((entry) => entry.turnId === turnId);
-    if (duplicate && JSON.stringify(duplicate) !== JSON.stringify(contextEntry)) {
-      throw new Error(`Conflicting session context entry for turn ${turnId}.`);
-    }
-    const afterHistory = beforeHistory.slice();
-    const assistantIndex = afterHistory.findIndex((message) => message.id === assistantMessage.id);
-    if (assistantIndex >= 0) afterHistory[assistantIndex] = assistantMessage;
-    else afterHistory.push(assistantMessage);
-    afterHistory.sort((left, right) => left.createdAt - right.createdAt);
-    const afterContext = duplicate ? beforeContext : beforeContext.concat(contextEntry);
-    const journal: ConversationTerminalCommitJournal = {
-      schemaVersion: '1',
-      requestId,
-      turnId,
-      phase: 'prepared',
-      beforeHistory,
-      beforeBranch,
-      beforeContext,
-      afterHistory,
-      afterBranch: beforeBranch,
-      afterContext,
-    };
-    const journalPath = this.getConversationTerminalCommitJournalPath(session.sessionPath);
-    this.writeJsonAtomic(journalPath, journal);
-    this.terminalCommitSessionIds.add(sessionId);
-    const committing: ConversationTerminalCommitJournal = { ...journal, phase: 'committing' };
-    try {
-      this.writeJsonAtomic(journalPath, committing);
-      this.applyConversationTerminalJournal(session, committing, true);
-      this.writeJsonAtomic(journalPath, { ...committing, phase: 'committed' });
-      fs.rmSync(journalPath, { force: true });
-      this.updateSession(sessionId, {});
-    } finally {
-      this.terminalCommitSessionIds.delete(sessionId);
-    }
+    return this.history.commitConversationTerminal(sessionId, requestId, turnId, assistantMessage, contextEntry);
   }
 
   readConversationHistory(sessionId: string): ConversationMessage[] {
-    const filePath = this.getConversationPath(sessionId);
-    const cached = this.readConversationHistoryCache(sessionId, filePath);
-    if (cached) {
-      return cached.messages.map((message) => ({ ...message }));
-    }
-
-    const rebuilt = this.rebuildConversationHistory(filePath);
-    this.writeConversationHistoryCache(sessionId, filePath, rebuilt.messages, rebuilt.rawRecordCount);
-    return rebuilt.messages.map((message) => ({ ...message }));
+    return this.history.readConversationHistory(sessionId);
   }
 
   appendConversationMessage(sessionId: string, message: ConversationMessage): void {
-    const filePath = this.getConversationPath(sessionId);
-    const existing = this.findCachedConversationMessage(sessionId, filePath, message.id);
-    if (!existing) {
-      appendJsonl(filePath, message);
-      this.applyConversationMessageToCache(sessionId, filePath, message);
-      this.conversationPendingDeltaCounts.set(sessionId, 0);
-      return;
-    }
-
-    const patch = this.diffConversationMessage(existing, message);
-    if (Object.keys(patch).length === 0) {
-      return;
-    }
-
-    const delta: ConversationDeltaRecord = {
-      op: 'delta',
-      id: message.id,
-      patch,
-      updatedAt: message.updatedAt ?? message.createdAt,
-    };
-    appendJsonl(filePath, delta);
-    this.applyConversationMessageToCache(sessionId, filePath, message);
-    const nextDeltaCount = (this.conversationPendingDeltaCounts.get(sessionId) ?? 0) + 1;
-    this.conversationPendingDeltaCounts.set(sessionId, nextDeltaCount);
-    if (nextDeltaCount >= CONVERSATION_COMPACTION_DELTA_THRESHOLD) {
-      this.compactConversationHistory(sessionId);
-    }
+    return this.history.appendConversationMessage(sessionId, message);
   }
 
   appendConversationDelta(
@@ -1103,136 +352,42 @@ export class StorageAdapter {
     messageId: string,
     patch: Partial<ConversationMessage>,
   ): void {
-    const filePath = this.getConversationPath(sessionId);
-    const normalizedPatch = { ...patch };
-    delete (normalizedPatch as { id?: string }).id;
-    if (Object.keys(normalizedPatch).length === 0) {
-      return;
-    }
-    const existing = this.findCachedConversationMessage(sessionId, filePath, messageId);
-    if (!existing) {
-      throw new Error(`Cannot append conversation delta for unknown message: ${messageId}`);
-    }
-    const nextMessage: ConversationMessage = {
-      ...existing,
-      ...normalizedPatch,
-      id: messageId,
-      updatedAt: typeof normalizedPatch.updatedAt === 'number'
-        ? normalizedPatch.updatedAt
-        : nowMs(),
-    };
-    const delta: ConversationDeltaRecord = {
-      op: 'delta',
-      id: messageId,
-      patch: normalizedPatch,
-      updatedAt: nextMessage.updatedAt ?? nowMs(),
-    };
-    appendJsonl(filePath, delta);
-    this.applyConversationMessageToCache(sessionId, filePath, nextMessage);
-    const nextDeltaCount = (this.conversationPendingDeltaCounts.get(sessionId) ?? 0) + 1;
-    this.conversationPendingDeltaCounts.set(sessionId, nextDeltaCount);
-    if (nextDeltaCount >= CONVERSATION_COMPACTION_DELTA_THRESHOLD) {
-      this.compactConversationHistory(sessionId);
-    }
+    return this.history.appendConversationDelta(sessionId, messageId, patch);
   }
 
   writeConversationHistory(sessionId: string, messages: ConversationMessage[]): void {
-    writeJsonl(this.getConversationPath(sessionId), messages);
-    this.invalidateConversationHistoryCache(sessionId);
-    this.conversationPendingDeltaCounts.set(sessionId, 0);
-    this.updateSession(sessionId, {});
+    return this.history.writeConversationHistory(sessionId, messages);
   }
 
   compactConversationHistory(sessionId: string): ConversationMessage[] {
-    const messages = this.readConversationHistory(sessionId);
-    this.writeJsonlAtomic(this.getConversationPath(sessionId), messages);
-    this.invalidateConversationHistoryCache(sessionId);
-    this.conversationPendingDeltaCounts.set(sessionId, 0);
-    return messages;
+    return this.history.compactConversationHistory(sessionId);
   }
 
   listSessionAttachments(sessionId: string): SessionAttachmentRecord[] {
-    return this.readSessionAttachments(sessionId)
-      .slice()
-      .sort((left, right) => left.createdAt - right.createdAt);
+    return this.history.listSessionAttachments(sessionId);
   }
 
   importSessionAttachments(sessionId: string, filePaths: string[]): SessionAttachmentRecord[] {
-    const session = this.readSession(sessionId);
-    if (!session) {
-      throw new Error(`Session not found: ${sessionId}`);
-    }
-
-    const attachmentsDir = this.getSessionAttachmentsDir(sessionId);
-    const existing = this.readSessionAttachments(sessionId);
-    const imported: SessionAttachmentRecord[] = [];
-
-    for (const filePath of filePaths) {
-      const sourcePath = path.resolve(filePath);
-      if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
-        continue;
-      }
-
-      const targetPath = this.resolveImportedFilePath(attachmentsDir, path.basename(sourcePath));
-      fs.copyFileSync(sourcePath, targetPath);
-      const stats = fs.statSync(targetPath);
-      imported.push({
-        attachmentId: `att_${generateShortId()}`,
-        sessionId,
-        projectId: session.projectId,
-        kind: this.inferAttachmentKind(targetPath),
-        fileName: path.basename(targetPath),
-        filePath: targetPath,
-        mimeType: this.inferMimeType(targetPath),
-        size: stats.size,
-        createdAt: stats.birthtimeMs || stats.ctimeMs || nowMs(),
-      });
-    }
-
-    if (imported.length > 0) {
-      this.writeSessionAttachments(sessionId, existing.concat(imported));
-      this.touchProject(session.projectId, session.sessionId);
-    }
-
-    return imported;
+    return this.history.importSessionAttachments(sessionId, filePaths);
   }
 
   rollbackImportedSessionAttachments(
     sessionId: string,
     attachments: SessionAttachmentRecord[],
   ): void {
-    if (attachments.length === 0) return;
-    const attachmentsDir = path.resolve(this.getSessionAttachmentsDir(sessionId));
-    const ids = new Set(attachments.map((entry) => entry.attachmentId));
-    for (const attachment of attachments) {
-      const resolvedPath = path.resolve(attachment.filePath);
-      if (resolvedPath.startsWith(`${attachmentsDir}${path.sep}`) && fs.existsSync(resolvedPath)) {
-        fs.unlinkSync(resolvedPath);
-      }
-    }
-    const remaining = this.readSessionAttachments(sessionId)
-      .filter((entry) => !ids.has(entry.attachmentId));
-    this.writeSessionAttachments(sessionId, remaining);
+    return this.history.rollbackImportedSessionAttachments(sessionId, attachments);
   }
 
   readSessionEvidence(sessionId: string): SessionEvidenceRecord | null {
-    return readYaml<SessionEvidenceRecord>(this.getSessionEvidencePath(sessionId));
+    return this.sessions.readSessionEvidence(sessionId);
   }
 
   async appendActionEvent(sessionId: string, event: ActionEvent): Promise<void> {
-    appendJsonl(this.getActionChainPath(sessionId), event);
-    this.updateSession(sessionId, {});
-    const session = this.readSession(sessionId);
-    if (session) {
-      this.syncSessionEvidence(sessionId, session.projectId);
-    }
+    return this.sessions.appendActionEvent(sessionId, event);
   }
 
   async readActionChain(sessionId: string): Promise<ActionEvent[]> {
-    const actionChainPath = this.getActionChainPath(sessionId);
-    const result = readJsonl<ActionEvent>(actionChainPath);
-    assertNoJsonlDiagnostics(actionChainPath, result.diagnostics);
-    return result.records;
+    return this.sessions.readActionChain(sessionId);
   }
 
   createActionEvent(input: {
@@ -1245,1022 +400,32 @@ export class StorageAdapter {
     turnId?: string;
     refs?: string[];
   }): ActionEvent {
-    return {
-      schema_version: '2',
-      event_id: generateEventId('evt'),
-      turn_id: input.turnId,
-      ts_ms: nowMs(),
-      run_id: input.runId,
-      session_id: input.sessionId,
-      agent_id: input.agentId,
-      event_type: input.eventType,
-      status: input.status,
-      duration_ms: 0,
-      refs: input.refs || [],
-      payload: input.payload,
-    };
+    return this.sessions.createActionEvent(input);
   }
 
   async getWorkflowState(caseId: string, runId: string): Promise<WorkflowState | null> {
-    const run = this.readPersistedRun(caseId, runId);
-    if (!run) return null;
-
-    return {
-      caseId,
-      runId,
-      sessionId: run.sessionId,
-      currentStage: run.runtime.workflow_stage,
-      previousStages: [],
-      entryMode: run.runtime.entry_mode,
-      backend: run.runtime.backend,
-      orchestrationMode: 'multi_agent',
-      coordinationMode: 'staged_handoff',
-      blockers: [],
-      lastUpdated: new Date(run.updatedAt).toISOString(),
-    };
+    return this.sessions.getWorkflowState(caseId, runId);
   }
 
   async updateWorkflowStage(caseId: string, runId: string, stage: WorkflowStage, blockers: Blocker[] = []): Promise<void> {
-    const run = this.readPersistedRun(caseId, runId);
-    if (!run) return;
-
-    run.runtime.workflow_stage = stage;
-    run.lastStage = stage;
-    run.updatedAt = nowMs();
-
-    if (stage === 'finalize') {
-      run.status = 'completed';
-      run.finishedAt = run.finishedAt || run.updatedAt;
-    }
-
-    this.writeRunFiles(run);
-
-    if (blockers.length > 0) {
-      const boardPath = path.join(this.getRunPath(caseId, runId), 'notes', 'hypothesis_board.yaml');
-      const board = readYaml<Record<string, unknown>>(boardPath) || {};
-      const hypothesisBoard = (board.hypothesis_board as Record<string, unknown>) || {};
-      hypothesisBoard.blocking_issues = blockers;
-      hypothesisBoard.last_updated = nowIso();
-      board.hypothesis_board = hypothesisBoard;
-      writeYaml(boardPath, board);
-    }
+    return this.sessions.updateWorkflowStage(caseId, runId, stage, blockers);
   }
 
   getCurrentProjectId(): string | null {
-    return this.readSelection().projectId;
+    return this.projects.getCurrentProjectId();
   }
 
   setCurrentProjectId(projectId: string | null): void {
-    const selection = this.readSelection();
-    selection.projectId = projectId;
-    if (!projectId) {
-      selection.sessionId = null;
-    } else if (selection.sessionId) {
-      const selectedSession = this.readSession(selection.sessionId);
-      if (!selectedSession || selectedSession.projectId !== projectId) {
-        selection.sessionId = null;
-      }
-    }
-    this.writeSelection(selection);
+    return this.projects.setCurrentProjectId(projectId);
   }
 
   async getCurrentSessionId(): Promise<string | null> {
-    return this.readSelection().sessionId;
+    return this.projects.getCurrentSessionId();
   }
 
   async setCurrentSessionId(sessionId: string | null): Promise<void> {
-    const selection = this.readSelection();
-    selection.sessionId = sessionId;
-    if (sessionId) {
-      const session = this.readSession(sessionId);
-      if (session) {
-        selection.projectId = session.projectId;
-      }
-    }
-    this.writeSelection(selection);
-  }
-
-  private syncSessionEvidence(sessionId: string, projectId: string): void {
-    const latestRun = this.getLatestRun(sessionId);
-    const actionChainPath = this.getActionChainPath(sessionId);
-    const actionEvents = fs.existsSync(actionChainPath)
-      ? (() => {
-        const result = readJsonl<ActionEvent>(actionChainPath);
-        assertNoJsonlDiagnostics(actionChainPath, result.diagnostics);
-        return result.records;
-      })()
-      : [];
-    const eventCounts = actionEvents.reduce<Record<string, number>>((acc, event) => {
-      acc[event.event_type] = (acc[event.event_type] || 0) + 1;
-      return acc;
-    }, {});
-    const activeBlockers = actionEvents
-      .filter((event) => event.event_type === 'blocker')
-      .map((event) => ({
-        code: String(event.payload.code || 'BLOCKER'),
-        reason: String(event.payload.reason || event.payload.message || 'Blocker'),
-        refs: Array.isArray(event.refs) ? event.refs : [],
-        detectedAt: new Date(event.ts_ms).toISOString(),
-      }));
-    const verificationSummary = actionEvents
-      .filter((event) => event.event_type === 'verification')
-      .slice(-5)
-      .map((event) => String(event.payload.summary || event.payload.verdict || event.payload.verification_kind || 'verification'));
-    const reasoningSummaries = actionEvents
-      .filter((event) => event.event_type === 'agent_summary')
-      .slice(-10)
-      .map((event, index) => ({
-        summaryId: `summary-${index}-${event.event_id}`,
-        stage: normalizeWorkflowStage(String(event.payload.stage || latestRun?.lastStage || 'investigate')),
-        agentId: String(event.agent_id) as ReasoningSummary['agentId'],
-        summary: String(event.payload.summary || event.payload.content || ''),
-        evidence: Array.isArray(event.payload.evidence) ? event.payload.evidence.map(String) : [],
-        nextStep: String(event.payload.next_step || event.payload.nextStep || ''),
-        confidence: typeof event.payload.confidence === 'number' ? event.payload.confidence : 0.5,
-        createdAt: new Date(event.ts_ms).toISOString(),
-      }));
-
-    const record: SessionEvidenceRecord = {
-      schema_version: '1',
-      session_id: sessionId,
-      project_id: projectId,
-      latest_run_id: latestRun?.runId || null,
-      latest_run_status: latestRun?.status || null,
-      latest_stage: latestRun?.lastStage || null,
-      updated_at: nowIso(),
-      event_counts: eventCounts,
-      active_blockers: activeBlockers,
-      verification_summary: verificationSummary,
-      reasoning_summaries: reasoningSummaries,
-      report_paths: latestRun?.reportPaths || null,
-    };
-
-    writeYaml(this.getSessionEvidencePath(sessionId), record);
-  }
-
-  private syncRuntimePaths(): void {
-    const paths = appPathService.getRuntimePaths();
-    this.dataRootPath = paths.appStateRoot;
-    this.projectsRootPath = paths.projectsPath;
-    this.globalKnowledgePath = paths.knowledgePath;
-    this.registryPath = path.join(this.projectsRootPath, 'registry.json');
-    this.selectionPath = path.join(this.projectsRootPath, 'selection.json');
-  }
-
-  private ensureRegistry(): void {
-    if (fs.existsSync(this.registryPath)) {
-      return;
-    }
-
-    this.writeJson(this.registryPath, {
-      schemaVersion: '1',
-      projects: [],
-    } satisfies ProjectRegistry);
-  }
-
-  private ensureSelection(): void {
-    if (fs.existsSync(this.selectionPath)) {
-      return;
-    }
-
-    this.writeJson(this.selectionPath, {
-      projectId: null,
-      sessionId: null,
-    } satisfies SelectionState);
-  }
-
-  private readRegistry(): ProjectRegistry {
-    const registry = this.readJson<ProjectRegistry>(this.registryPath) || {
-      schemaVersion: '1',
-      projects: [],
-    };
-    const normalizedProjects = registry.projects.map((project) => this.normalizeProjectRecord(project));
-    const changed = JSON.stringify(normalizedProjects) !== JSON.stringify(registry.projects);
-
-    if (changed) {
-      registry.projects = normalizedProjects;
-      this.writeRegistry(registry);
-    } else {
-      registry.projects = normalizedProjects;
-    }
-
-    return registry;
-  }
-
-  private writeRegistry(registry: ProjectRegistry): void {
-    this.writeJson(this.registryPath, registry);
-  }
-
-  private readSelection(): SelectionState {
-    return this.readJson<SelectionState>(this.selectionPath) || {
-      projectId: null,
-      sessionId: null,
-    };
-  }
-
-  private writeSelection(selection: SelectionState): void {
-    this.writeJson(this.selectionPath, selection);
-  }
-
-  private writeProjectMetadata(project: ProjectRecord): void {
-    const normalizedProject = this.normalizeProjectRecord(project);
-    this.ensureDir(this.getProjectDataPath(normalizedProject));
-    this.writeJson(path.join(this.getProjectDataPath(normalizedProject), 'project.json'), normalizedProject);
-    const projectPaths = appPathService.initializeProjectRdx(normalizedProject.rootPath);
-    writeYaml(projectPaths.projectMetadataPath, {
-      schema_version: '1',
-      name: normalizedProject.name,
-    });
-  }
-
-  private writeRunFiles(run: PersistedRunRecord): void {
-    const runPath = this.getRunPath(run.sessionId, run.runId);
-    this.ensureDir(runPath);
-    this.writeJson(path.join(runPath, 'run.json'), run);
-    writeYaml(path.join(runPath, 'run.yaml'), {
-      run_id: run.runId,
-      turn_id: run.turnId,
-      session_id: run.sessionId,
-      case_id: run.caseId,
-      project_id: run.projectId,
-      created_at: new Date(run.createdAt).toISOString(),
-      updated_at: new Date(run.updatedAt).toISOString(),
-      mode: run.mode,
-      goal: run.goal,
-      status: run.status,
-      last_stage: run.lastStage,
-      coordination_mode: 'staged_handoff',
-      orchestration_mode: 'multi_agent',
-      runtime: run.runtime,
-      captures: run.captures,
-    });
-  }
-
-  private touchProject(projectId: string, lastSessionId?: string | null, updatedAt: number = nowMs()): void {
-    const registry = this.readRegistry();
-    const nextProjects = registry.projects.map((project) => {
-      if (project.projectId !== projectId) return project;
-      const nextLastSessionId = lastSessionId === undefined
-        ? project.lastSessionId
-        : lastSessionId || undefined;
-      return {
-        ...project,
-        updatedAt,
-        lastSessionId: nextLastSessionId,
-      };
-    });
-
-    registry.projects = nextProjects;
-    this.writeRegistry(registry);
-
-    const project = registry.projects.find((item) => item.projectId === projectId);
-    if (project) {
-      this.writeProjectMetadata(project);
-    }
-  }
-
-  private getProjectDataPath(project: ProjectRecord | string): string {
-    const target = typeof project === 'string' ? this.getProjectById(project) : project;
-    if (!target) {
-      throw new Error(`Project not found: ${project}`);
-    }
-    return path.join(this.projectsRootPath, target.slug);
-  }
-
-  private getProjectSessionsRoot(project: ProjectRecord | string): string {
-    const target = typeof project === 'string' ? this.getProjectById(project) : project;
-    if (!target) {
-      throw new Error(`Project not found: ${project}`);
-    }
-    return path.join(appPathService.getAppStatePaths().sessionsPath, target.projectId);
-  }
-
-  private ensureProjectSessionsRoot(project: ProjectRecord | string): string {
-    const target = typeof project === 'string' ? this.getProjectById(project) : project;
-    if (!target) {
-      throw new Error(`Project not found: ${project}`);
-    }
-
-    const sessionsRoot = this.getProjectSessionsRoot(target);
-    this.ensureDir(sessionsRoot);
-
-    return sessionsRoot;
-  }
-
-  private findSessionLocation(sessionId: string): { project: ProjectRecord; sessionPath: string } | null {
-    for (const project of this.listProjects()) {
-      const sessionPath = path.join(this.ensureProjectSessionsRoot(project), sessionId);
-      if (fs.existsSync(path.join(sessionPath, 'session.json'))) {
-        return { project, sessionPath };
-      }
-    }
-    return null;
-  }
-
-  private normalizeSessionRecord(session: SessionRecord, sessionPath?: string): SessionRecord {
-    const resolvedSessionPath = sessionPath || this.findSessionLocation(session.sessionId)?.sessionPath || session.sessionPath;
-    return {
-      ...session,
-      sessionPath: resolvedSessionPath || '',
-    };
-  }
-
-  private readPersistedRun(sessionId: string, runId: string): PersistedRunRecord | null {
-    const runJsonPath = path.join(this.getRunPath(sessionId, runId), 'run.json');
-    const runJson = this.readJson<PersistedRunRecord>(runJsonPath);
-    if (runJson) {
-      runJson.lastStage = normalizeWorkflowStage(runJson.lastStage);
-      runJson.runtime.workflow_stage = normalizeWorkflowStage(runJson.runtime.workflow_stage);
-      return runJson;
-    }
-
-    const runYaml = readYaml<Record<string, unknown>>(path.join(this.getRunPath(sessionId, runId), 'run.yaml'));
-    if (!runYaml) {
-      return null;
-    }
-
-    return {
-      runId,
-      turnId: typeof runYaml.turn_id === 'string' ? runYaml.turn_id : undefined,
-      projectId: String(runYaml.project_id || ''),
-      sessionId,
-      caseId: String(runYaml.case_id || sessionId),
-      mode: (runYaml.mode as ExecutableAppMode) || 'debugger',
-      goal: String(runYaml.goal || ''),
-      captures: (runYaml.captures as CaptureDescriptor[]) || [],
-      startedAt: Date.parse(String(runYaml.created_at || nowIso())),
-      finishedAt: runYaml.finished_at ? Date.parse(String(runYaml.finished_at)) : undefined,
-      status: (runYaml.status as PersistedRunRecord['status']) || 'running',
-      lastStage: normalizeWorkflowStage(String(runYaml.last_stage || 'preflight')),
-      backend: ((runYaml.runtime as Record<string, unknown>)?.backend as 'local' | 'remote') || 'local',
-      createdAt: Date.parse(String(runYaml.created_at || nowIso())),
-      updatedAt: Date.parse(String(runYaml.updated_at || runYaml.created_at || nowIso())),
-      runtime: {
-        backend: ((runYaml.runtime as Record<string, unknown>)?.backend as 'local' | 'remote') || 'local',
-        entry_mode: (((runYaml.runtime as Record<string, unknown>)?.entry_mode as 'cli' | 'mcp') || 'cli'),
-        context_id: ((runYaml.runtime as Record<string, unknown>)?.context_id as string | null) || null,
-        runtime_owner: ((runYaml.runtime as Record<string, unknown>)?.runtime_owner as string | null) || null,
-        session_id: String((runYaml.runtime as Record<string, unknown>)?.session_id || sessionId),
-        workflow_stage: normalizeWorkflowStage((runYaml.runtime as Record<string, unknown>)?.workflow_stage as string | undefined),
-      },
-    };
-  }
-
-  private toRunSummary(run: PersistedRunRecord): RunSummary {
-    return {
-      runId: run.runId,
-      turnId: run.turnId,
-      projectId: run.projectId,
-      sessionId: run.sessionId,
-      caseId: run.caseId,
-      mode: run.mode,
-      goal: run.goal,
-      captures: run.captures,
-      startedAt: run.startedAt,
-      finishedAt: run.finishedAt,
-      stoppedAt: run.stoppedAt,
-      status: run.status,
-      stopReason: run.stopReason,
-      lastStage: run.lastStage,
-      backend: run.backend,
-      reportPaths: run.reportPaths,
-    };
-  }
-
-  private normalizeSessionTitle(projectId: string, title?: string): string {
-    const normalized = title?.trim();
-    if (normalized) {
-      return normalized.slice(0, 80);
-    }
-
-    const nextIndex = this.getNextDefaultSessionIndex(projectId);
-    return `new session ${nextIndex}`;
-  }
-
-  private getNextDefaultSessionIndex(projectId: string): number {
-    const sessions = this.listSessions(projectId);
-    const defaultTitlePattern = /^new session (\d+)$/i;
-    const usedIndexes = sessions
-      .map((session) => {
-        const match = session.title.trim().match(defaultTitlePattern);
-        return match ? Number.parseInt(match[1], 10) : null;
-      })
-      .filter((value): value is number => value !== null && Number.isInteger(value) && value >= 0);
-
-    if (usedIndexes.length === 0) {
-      return 0;
-    }
-
-    return Math.max(...usedIndexes) + 1;
-  }
-
-  private reconcileProjectSessionTitles(project: ProjectRecord): SessionRecord[] {
-    const storedSessions = this.readProjectSessions(project);
-    const normalizedSessions = storedSessions.map(({ session, sessionPath }) => (
-      this.normalizeSessionRecord(session, sessionPath)
-    ));
-    const autoGeneratedTitlePattern = /^new session (\d+)$/i;
-    const timestampTitlePattern = /^Session \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;
-    const autoSessions = normalizedSessions
-      .filter((session) => (
-        autoGeneratedTitlePattern.test(session.title.trim()) || timestampTitlePattern.test(session.title.trim())
-      ))
-      .sort((a, b) => {
-        if (a.createdAt !== b.createdAt) {
-          return a.createdAt - b.createdAt;
-        }
-        return a.sessionId.localeCompare(b.sessionId);
-      });
-
-    if (autoSessions.length === 0) {
-      return normalizedSessions;
-    }
-
-    const nextTitlesBySessionId = new Map<string, string>();
-    autoSessions.forEach((session, index) => {
-      nextTitlesBySessionId.set(session.sessionId, `new session ${index}`);
-    });
-
-    let didRewrite = false;
-    const rewrittenBySessionId = new Map<string, SessionRecord>();
-
-    for (const { sessionPath } of storedSessions) {
-      const session = normalizedSessions.find((entry) => entry.sessionPath === sessionPath);
-      if (!session) {
-        continue;
-      }
-
-      const nextTitle = nextTitlesBySessionId.get(session.sessionId);
-      if (nextTitle && session.title !== nextTitle) {
-        const rewrittenSession: SessionRecord = {
-          ...session,
-          title: nextTitle,
-        };
-        this.writeJson(path.join(sessionPath, 'session.json'), rewrittenSession);
-        rewrittenBySessionId.set(session.sessionId, rewrittenSession);
-        didRewrite = true;
-        continue;
-      }
-
-      rewrittenBySessionId.set(session.sessionId, session);
-    }
-
-    if (!didRewrite) {
-      return normalizedSessions;
-    }
-
-    return normalizedSessions.map((session) => rewrittenBySessionId.get(session.sessionId) ?? session);
-  }
-
-  private readProjectSessions(project: ProjectRecord): Array<{ session: SessionRecord; sessionPath: string }> {
-    const sessionsRoot = this.ensureProjectSessionsRoot(project);
-    if (!fs.existsSync(sessionsRoot)) {
-      return [];
-    }
-
-    return fs.readdirSync(sessionsRoot, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => {
-        const sessionPath = path.join(sessionsRoot, entry.name);
-        const session = this.readJson<SessionRecord>(path.join(sessionPath, 'session.json'));
-        return session ? { session, sessionPath } : null;
-      })
-      .filter((entry): entry is { session: SessionRecord; sessionPath: string } => entry !== null);
-  }
-
-  private createUniqueProjectSlug(projectName: string, existingProjects: ProjectRecord[]): string {
-    const baseSlug = sanitizeToken(projectName.toLowerCase()) || 'project';
-    const existingSlugs = new Set(existingProjects.map((project) => project.slug));
-    if (!existingSlugs.has(baseSlug)) {
-      return baseSlug;
-    }
-
-    let counter = 2;
-    while (existingSlugs.has(`${baseSlug}-${counter}`)) {
-      counter += 1;
-    }
-    return `${baseSlug}-${counter}`;
-  }
-
-  private ensureDir(dirPath: string): void {
-    if (!fs.existsSync(dirPath)) {
-      fs.mkdirSync(dirPath, { recursive: true });
-    }
-  }
-
-  private readJson<T>(filePath: string): T | null {
-    try {
-      if (!fs.existsSync(filePath)) {
-        return null;
-      }
-      return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T;
-    } catch (error) {
-      console.error(`Failed to read JSON file: ${filePath}`, error);
-      return null;
-    }
-  }
-
-  private writeJson(filePath: string, data: unknown): void {
-    this.ensureDir(path.dirname(filePath));
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
-  }
-
-  private writeUtf8Atomic(filePath: string, content: string): void {
-    this.ensureDir(path.dirname(filePath));
-    const temporaryPath = `${filePath}.${process.pid}.${generateShortId()}.tmp`;
-    fs.writeFileSync(temporaryPath, content, 'utf-8');
-    try {
-      fs.renameSync(temporaryPath, filePath);
-    } catch (error) {
-      if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
-      throw error;
-    }
-  }
-
-  private writeJsonAtomic(filePath: string, data: unknown): void {
-    this.writeUtf8Atomic(filePath, JSON.stringify(data, null, 2));
-  }
-
-  private writeJsonlAtomic(filePath: string, items: unknown[]): void {
-    const content = items.length > 0
-      ? `${items.map((item) => JSON.stringify(item)).join('\n')}\n`
-      : '';
-    this.writeUtf8Atomic(filePath, content);
-  }
-
-  private isConversationDeltaRecord(value: unknown): value is ConversationDeltaRecord {
-    if (!value || typeof value !== 'object') return false;
-    const record = value as Record<string, unknown>;
-    return record.op === 'delta'
-      && typeof record.id === 'string'
-      && !!record.patch
-      && typeof record.patch === 'object'
-      && typeof record.updatedAt === 'number';
-  }
-
-  private rebuildConversationHistory(filePath: string): {
-    messages: ConversationMessage[];
-    rawRecordCount: number;
-  } {
-    if (!fs.existsSync(filePath)) {
-      return { messages: [], rawRecordCount: 0 };
-    }
-    const result = readJsonl<ConversationMessage | ConversationDeltaRecord>(filePath);
-    assertNoJsonlDiagnostics(filePath, result.diagnostics);
-    const latestById = new Map<string, ConversationMessage>();
-
-    for (const record of result.records) {
-      if (this.isConversationDeltaRecord(record)) {
-        const existing = latestById.get(record.id);
-        if (!existing) continue;
-        latestById.set(record.id, {
-          ...existing,
-          ...record.patch,
-          id: existing.id,
-          updatedAt: record.updatedAt,
-        });
-        continue;
-      }
-
-      if (!record || typeof record !== 'object' || typeof (record as ConversationMessage).id !== 'string') {
-        continue;
-      }
-      const snapshot = record as ConversationMessage;
-      const existing = latestById.get(snapshot.id);
-      const existingUpdatedAt = existing?.updatedAt ?? existing?.createdAt ?? 0;
-      const nextUpdatedAt = snapshot.updatedAt ?? snapshot.createdAt;
-      if (!existing || nextUpdatedAt >= existingUpdatedAt) {
-        latestById.set(snapshot.id, snapshot);
-      }
-    }
-
-    const messages = Array.from(latestById.values())
-      .sort((left, right) => left.createdAt - right.createdAt)
-      .map((message) => ({
-        ...message,
-        workTrace: sanitizeStoredWorkTrace(message.workTrace ?? null),
-      }));
-
-    return { messages, rawRecordCount: result.records.length };
-  }
-
-  private readConversationHistoryCache(
-    sessionId: string,
-    filePath: string,
-  ): ConversationHistoryCacheEntry | null {
-    const cached = this.conversationHistoryCache.get(sessionId);
-    if (!cached) return null;
-    if (!fs.existsSync(filePath)) {
-      if (cached.size === 0 && cached.mtimeMs === 0) return cached;
-      return null;
-    }
-    const stats = fs.statSync(filePath);
-    if (stats.mtimeMs !== cached.mtimeMs || stats.size !== cached.size) {
-      return null;
-    }
-    return cached;
-  }
-
-  private writeConversationHistoryCache(
-    sessionId: string,
-    filePath: string,
-    messages: ConversationMessage[],
-    rawRecordCount: number,
-  ): void {
-    if (!fs.existsSync(filePath)) {
-      this.conversationHistoryCache.set(sessionId, {
-        mtimeMs: 0,
-        size: 0,
-        messages,
-        rawRecordCount,
-      });
-      return;
-    }
-    const stats = fs.statSync(filePath);
-    this.conversationHistoryCache.set(sessionId, {
-      mtimeMs: stats.mtimeMs,
-      size: stats.size,
-      messages,
-      rawRecordCount,
-    });
-  }
-
-  private invalidateConversationHistoryCache(sessionId: string): void {
-    this.conversationHistoryCache.delete(sessionId);
-  }
-
-  private applyConversationMessageToCache(
-    sessionId: string,
-    filePath: string,
-    message: ConversationMessage,
-  ): void {
-    const cached = this.conversationHistoryCache.get(sessionId);
-    let messages: ConversationMessage[];
-    let previousRawCount: number;
-    if (cached) {
-      messages = cached.messages.slice();
-      previousRawCount = cached.rawRecordCount;
-    } else {
-      const rebuilt = this.rebuildConversationHistory(filePath);
-      messages = rebuilt.messages.filter((entry) => entry.id !== message.id);
-      previousRawCount = Math.max(0, rebuilt.rawRecordCount - 1);
-    }
-    const index = messages.findIndex((entry) => entry.id === message.id);
-    const sanitized: ConversationMessage = {
-      ...message,
-      workTrace: sanitizeStoredWorkTrace(message.workTrace ?? null),
-    };
-    if (index >= 0) messages[index] = sanitized;
-    else messages.push(sanitized);
-    messages.sort((left, right) => left.createdAt - right.createdAt);
-    this.writeConversationHistoryCache(
-      sessionId,
-      filePath,
-      messages,
-      previousRawCount + 1,
-    );
-  }
-
-  private findCachedConversationMessage(
-    sessionId: string,
-    filePath: string,
-    messageId: string,
-  ): ConversationMessage | null {
-    const cached = this.readConversationHistoryCache(sessionId, filePath);
-    if (cached) {
-      return cached.messages.find((message) => message.id === messageId) ?? null;
-    }
-    const rebuilt = this.rebuildConversationHistory(filePath);
-    this.writeConversationHistoryCache(sessionId, filePath, rebuilt.messages, rebuilt.rawRecordCount);
-    return rebuilt.messages.find((message) => message.id === messageId) ?? null;
-  }
-
-  private diffConversationMessage(
-    previous: ConversationMessage,
-    next: ConversationMessage,
-  ): Partial<ConversationMessage> {
-    const patch: Partial<ConversationMessage> = {};
-    const keys = new Set([
-      ...Object.keys(previous),
-      ...Object.keys(next),
-    ]) as Set<keyof ConversationMessage>;
-    for (const key of keys) {
-      if (key === 'id') continue;
-      if (JSON.stringify(previous[key]) !== JSON.stringify(next[key])) {
-        (patch as Record<string, unknown>)[key] = next[key];
-      }
-    }
-    return patch;
-  }
-
-  private deepMerge<T extends Record<string, unknown>>(base: T, patch: Record<string, unknown>): T {
-    const output: Record<string, unknown> = { ...base };
-
-    for (const [key, value] of Object.entries(patch)) {
-      if (Array.isArray(value)) {
-        output[key] = value;
-        continue;
-      }
-
-      if (value && typeof value === 'object') {
-        const existingValue = output[key];
-        output[key] = this.deepMerge(
-          (existingValue && typeof existingValue === 'object' && !Array.isArray(existingValue)
-            ? existingValue
-            : {}) as Record<string, unknown>,
-          value as Record<string, unknown>,
-        );
-        continue;
-      }
-
-      output[key] = value;
-    }
-
-    return output as T;
-  }
-
-  private persistProject(project: ProjectRecord): void {
-    const registry = this.readRegistry();
-    registry.projects = registry.projects.map((entry) => entry.projectId === project.projectId ? project : entry);
-    this.writeRegistry(registry);
-    this.writeProjectMetadata(project);
-  }
-
-  private ensureProjectResourceLayout(rootPath: string): {
-    resourcePath: string;
-    knowledgePath: string;
-    inputsPath: string;
-  } {
-    const projectPaths = appPathService.initializeProjectRdx(rootPath);
-    return {
-      resourcePath: projectPaths.projectRdxRoot,
-      knowledgePath: projectPaths.knowledgePath,
-      inputsPath: projectPaths.inputsPath,
-    };
-  }
-
-  private normalizeProjectRecord(project: ProjectRecord): ProjectRecord {
-    const rootPath = path.resolve(project.rootPath);
-    const { resourcePath, knowledgePath, inputsPath } = this.ensureProjectResourceLayout(rootPath);
-    const inputs = this.collectProjectInputs(inputsPath);
-    return {
-      ...project,
-      rootPath,
-      resourcePath,
-      knowledgePath,
-      inputsPath,
-      inputs,
-      inputsUpdatedAt: project.inputsUpdatedAt || nowMs(),
-    };
-  }
-
-  private collectProjectInputs(inputsPath: string): ProjectInputRecord[] {
-    if (!fs.existsSync(inputsPath)) {
-      return [];
-    }
-
-    const records: ProjectInputRecord[] = [];
-    const walk = (dirPath: string) => {
-      for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
-        const fullPath = path.join(dirPath, entry.name);
-        if (entry.isDirectory()) {
-          walk(fullPath);
-          continue;
-        }
-        if (path.extname(entry.name).toLowerCase() !== '.rdc') {
-          continue;
-        }
-
-        const stats = fs.statSync(fullPath);
-        records.push({
-          inputId: this.createProjectInputId(inputsPath, fullPath),
-          fileName: path.basename(fullPath),
-          filePath: fullPath,
-          source: 'project_resource',
-          discoveredAt: stats.birthtimeMs || stats.ctimeMs || stats.mtimeMs,
-          lastModifiedAt: stats.mtimeMs,
-          size: stats.size,
-        });
-      }
-    };
-
-    walk(inputsPath);
-    return records.sort((a, b) => a.fileName.localeCompare(b.fileName));
-  }
-
-  private createProjectInputId(inputsPath: string, filePath: string): string {
-    const relativePath = path.relative(inputsPath, filePath).replace(/[\\/]+/g, '_');
-    const sanitized = sanitizeToken(relativePath.toLowerCase().replace(/\.rdc$/i, ''));
-    return `input_${sanitized || generateShortId()}`;
-  }
-
-  private resolveImportedInputPath(inputsPath: string, fileName: string): string {
-    const extension = path.extname(fileName);
-    const baseName = path.basename(fileName, extension);
-    let candidate = path.join(inputsPath, fileName);
-    let counter = 2;
-    while (fs.existsSync(candidate)) {
-      candidate = path.join(inputsPath, `${baseName}-${counter}${extension}`);
-      counter += 1;
-    }
-    return candidate;
-  }
-
-  private readSessionAttachments(sessionId: string): SessionAttachmentRecord[] {
-    return this.readJson<SessionAttachmentRecord[]>(this.getSessionAttachmentsManifestPath(sessionId)) ?? [];
-  }
-
-  private writeSessionAttachments(sessionId: string, attachments: SessionAttachmentRecord[]): void {
-    this.writeJsonAtomic(this.getSessionAttachmentsManifestPath(sessionId), attachments);
-  }
-
-  private getConversationTurnCommitJournalPath(sessionPath: string): string {
-    return path.join(sessionPath, 'turn-commit.json');
-  }
-
-  private getConversationTerminalCommitJournalPath(sessionPath: string): string {
-    return path.join(sessionPath, 'terminal-commit.json');
-  }
-
-  private planAttachmentsForTurn(
-    session: SessionRecord,
-    sourcePaths: string[],
-    logicalAttachmentsDir: string,
-  ): SessionAttachmentRecord[] {
-    const reserved = new Set<string>();
-    return sourcePaths.map((filePath) => {
-      const sourcePath = path.resolve(filePath);
-      if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
-        throw new Error(`Attachment is not a readable file: ${sourcePath}`);
-      }
-      const extension = path.extname(sourcePath);
-      const baseName = path.basename(sourcePath, extension);
-      let fileName = path.basename(sourcePath);
-      let targetPath = path.join(logicalAttachmentsDir, fileName);
-      let counter = 2;
-      while (fs.existsSync(targetPath) || reserved.has(targetPath.toLowerCase())) {
-        fileName = `${baseName}-${counter}${extension}`;
-        targetPath = path.join(logicalAttachmentsDir, fileName);
-        counter += 1;
-      }
-      reserved.add(targetPath.toLowerCase());
-      const stats = fs.statSync(sourcePath);
-      return {
-        attachmentId: `att_${generateShortId()}`,
-        sessionId: session.sessionId,
-        projectId: session.projectId,
-        kind: this.inferAttachmentKind(sourcePath),
-        fileName,
-        filePath: targetPath,
-        mimeType: this.inferMimeType(sourcePath),
-        size: stats.size,
-        createdAt: nowMs(),
-      };
-    });
-  }
-
-  private copyAttachmentsForTurn(
-    session: SessionRecord,
-    sourcePaths: string[],
-    physicalAttachmentsDir: string,
-    logicalAttachmentsDir: string,
-  ): SessionAttachmentRecord[] {
-    const planned = this.planAttachmentsForTurn(session, sourcePaths, logicalAttachmentsDir);
-    for (let index = 0; index < planned.length; index += 1) {
-      const targetPath = path.join(physicalAttachmentsDir, planned[index]!.fileName);
-      fs.copyFileSync(path.resolve(sourcePaths[index]!), targetPath);
-    }
-    return planned;
-  }
-
-  private recoverConversationTurnCommits(): void {
-    for (const project of this.readRegistry().projects) {
-      const sessionsRoot = this.ensureProjectSessionsRoot(project);
-      for (const entry of fs.readdirSync(sessionsRoot, { withFileTypes: true })) {
-        const entryPath = path.join(sessionsRoot, entry.name);
-        if (!entry.isDirectory()) continue;
-        if (entry.name.startsWith('.turn-staging-')) {
-          fs.rmSync(entryPath, { recursive: true, force: true });
-          continue;
-        }
-        const session = this.readJson<SessionRecord>(path.join(entryPath, 'session.json'));
-        if (session) {
-          this.recoverSessionTurnCommit(session.sessionId);
-          this.recoverSessionTerminalCommit(session.sessionId);
-        }
-      }
-    }
-  }
-
-  private recoverSessionTurnCommit(sessionId: string, forceRollback = false): void {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) return;
-    const journalPath = this.getConversationTurnCommitJournalPath(location.sessionPath);
-    const journal = this.readJson<ConversationTurnCommitJournal>(journalPath);
-    if (!journal) return;
-    const session = this.readJson<SessionRecord>(path.join(location.sessionPath, 'session.json'));
-    if (!session) return;
-    const shouldRollForward = !forceRollback
-      && (journal.phase === 'committing' || journal.phase === 'committed')
-      && Array.isArray(journal.afterHistory);
-    this.applyConversationTurnJournal(session, journal, shouldRollForward);
-    fs.rmSync(journalPath, { force: true });
-  }
-
-  private recoverSessionTerminalCommit(sessionId: string): void {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) return;
-    const journalPath = this.getConversationTerminalCommitJournalPath(location.sessionPath);
-    const journal = this.readJson<ConversationTerminalCommitJournal>(journalPath);
-    if (!journal) return;
-    const session = this.readJson<SessionRecord>(path.join(location.sessionPath, 'session.json'));
-    if (!session) return;
-    const shouldRollForward = journal.phase === 'committing' || journal.phase === 'committed';
-    this.applyConversationTerminalJournal(session, journal, shouldRollForward);
-    fs.rmSync(journalPath, { force: true });
-  }
-
-  private applyConversationTerminalJournal(
-    session: SessionRecord,
-    journal: ConversationTerminalCommitJournal,
-    useAfter: boolean,
-  ): void {
-    const history = useAfter ? journal.afterHistory : journal.beforeHistory;
-    const branch = useAfter ? journal.afterBranch : journal.beforeBranch;
-    const context = useAfter ? journal.afterContext : journal.beforeContext;
-    this.writeJsonlAtomic(path.join(session.sessionPath, 'conversation.jsonl'), history);
-    this.invalidateConversationHistoryCache(session.sessionId);
-    this.conversationPendingDeltaCounts.set(session.sessionId, 0);
-    const branchPath = path.join(session.sessionPath, 'conversation-branches.json');
-    if (branch) this.writeJsonAtomic(branchPath, branch);
-    else if (fs.existsSync(branchPath)) fs.rmSync(branchPath, { force: true });
-    this.writeJsonlAtomic(path.join(session.sessionPath, 'session-context.jsonl'), context);
-  }
-
-  private applyConversationTurnJournal(
-    session: SessionRecord,
-    journal: ConversationTurnCommitJournal,
-    useAfter: boolean,
-  ): void {
-    const history = useAfter ? journal.afterHistory : journal.beforeHistory;
-    const branch = useAfter ? journal.afterBranch : journal.beforeBranch;
-    const attachments = useAfter ? journal.afterAttachments : journal.beforeAttachments;
-    if (!history) throw new Error('Conversation turn journal does not contain a committed history snapshot.');
-    this.writeJsonlAtomic(path.join(session.sessionPath, 'conversation.jsonl'), history);
-    this.invalidateConversationHistoryCache(session.sessionId);
-    this.conversationPendingDeltaCounts.set(session.sessionId, 0);
-    const branchPath = path.join(session.sessionPath, 'conversation-branches.json');
-    if (branch) this.writeJsonAtomic(branchPath, branch);
-    else if (fs.existsSync(branchPath)) fs.rmSync(branchPath, { force: true });
-    this.writeJsonAtomic(path.join(session.sessionPath, 'attachments.json'), attachments);
-    if (!useAfter) {
-      const attachmentsRoot = path.resolve(path.join(session.sessionPath, 'attachments'));
-      for (const importedPath of journal.importedPaths) {
-        const resolvedPath = path.resolve(importedPath);
-        if (resolvedPath.startsWith(`${attachmentsRoot}${path.sep}`) && fs.existsSync(resolvedPath)) {
-          fs.rmSync(resolvedPath, { force: true });
-        }
-      }
-    }
-  }
-
-  private resolveImportedFilePath(dirPath: string, fileName: string): string {
-    const extension = path.extname(fileName);
-    const baseName = path.basename(fileName, extension);
-    let candidate = path.join(dirPath, fileName);
-    let counter = 2;
-    while (fs.existsSync(candidate)) {
-      candidate = path.join(dirPath, `${baseName}-${counter}${extension}`);
-      counter += 1;
-    }
-    return candidate;
-  }
-
-  private inferAttachmentKind(filePath: string): SessionAttachmentRecord['kind'] {
-    return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(filePath) ? 'image' : 'file';
-  }
-
-  private inferMimeType(filePath: string): string {
-    const extension = path.extname(filePath).toLowerCase();
-    const mimeByExtension: Record<string, string> = {
-      '.png': 'image/png',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.gif': 'image/gif',
-      '.webp': 'image/webp',
-      '.bmp': 'image/bmp',
-      '.svg': 'image/svg+xml',
-      '.pdf': 'application/pdf',
-      '.txt': 'text/plain',
-      '.md': 'text/markdown',
-      '.json': 'application/json',
-      '.zip': 'application/zip',
-      '.7z': 'application/x-7z-compressed',
-      '.log': 'text/plain',
-    };
-    return mimeByExtension[extension] || 'application/octet-stream';
+    return this.projects.setCurrentSessionId(sessionId);
   }
 }
-
 
 export const storageAdapter = new StorageAdapter();

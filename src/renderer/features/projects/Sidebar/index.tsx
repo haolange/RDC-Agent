@@ -34,7 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
     event.preventDefault();
     event.stopPropagation();
     setPendingRemoval({ kind: 'session', session });
-  }, [popovers.closeRenamePopover, selection]);
+  }, []);
 
   const handleRemoveKeyDown = useCallback((event: React.KeyboardEvent, session: SessionRecord) => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -42,7 +42,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
       event.stopPropagation();
       setPendingRemoval({ kind: 'session', session });
     }
-  }, [popovers.closeRenamePopover, selection]);
+  }, []);
 
   const confirmRemoval = useCallback(async () => {
     const target = pendingRemoval;
@@ -54,7 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
       await selection.handleRemoveProject(target.project);
     }
     setPendingRemoval(null);
-  }, [pendingRemoval, popovers.closeProjectMenu, popovers.closeRenamePopover, selection]);
+  }, [pendingRemoval, popovers, selection]);
 
   const handleProjectChevronClick = useCallback(async (event: React.SyntheticEvent, project: ProjectRecord) => {
     event.preventDefault();

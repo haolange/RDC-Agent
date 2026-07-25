@@ -78,10 +78,6 @@ const PROVIDER_CATEGORY_TRANSLATIONS = {
     label: 'settings.providerCategory.local.label',
     description: 'settings.providerCategory.local.description',
   },
-  image: {
-    label: 'settings.providerCategory.image.label',
-    description: 'settings.providerCategory.image.description',
-  },
 } as const satisfies Record<LlmProviderCategory, { label: TranslationKey; description: TranslationKey }>;
 
 export const getProviderCategoryTranslation = (category: LlmProviderCategory) => (

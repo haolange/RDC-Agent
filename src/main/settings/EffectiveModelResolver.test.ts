@@ -22,7 +22,7 @@ import {
   refreshEffectiveCatalogDiscovery,
   resolveEffectiveModelSelection,
 } from './EffectiveModelResolver';
-import { mergeEffectiveCatalog } from './EffectiveCatalogService';
+import { mergeEffectiveCatalog } from './effectiveCatalogMerge';
 import { getLoadedProviderSurface, loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { planModelRequest } from './RequestPlanner';
 import { parseKimiCodeCatalog as parseKimiCodeCatalogWithSurface } from './LiveProviderCatalogParsers';

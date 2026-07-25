@@ -25,6 +25,8 @@
 
 - 唯一全局入口：`src/renderer/main.tsx` → `styles/global.css` → `design-system.css`。
 - 禁止恢复 `styles/tokens/*` 或未接线的 `oklch-themes.css`。
+- 生产 CSP：`style-src 'self'`（无 `unsafe-inline`）+ `style-src-attr 'none'`。Appearance chrome（`applyChromeTheme`）与组件动态样式必须走 constructable stylesheet（`adoptedStyleSheets` / `useDynStyle` / `assignDynStyle`），禁止 `<style>.textContent` 或 `element.style` 注入。
+- Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThemes` 为 RDC 默认（清理历史污染）。
 
 ## 验证
 
@@ -33,4 +35,4 @@ pnpm run check:appearance
 pnpm run typecheck
 ```
 
-浏览器真实会话覆盖 Settings → Appearance、agent accent、Light/Dark、Compose Effort 染色边界（见 `AGENTS.md`）。
+浏览器真实会话覆盖 Settings → Appearance、agent accent、Light/Dark、Compose Effort 染色边界（见 `AGENTS.md`）。验收前须重启最新 `start:agent-browser`，并删除该 QA project 下全部 session 后新建隔离 session。

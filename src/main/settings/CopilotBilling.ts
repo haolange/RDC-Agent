@@ -4,7 +4,7 @@ import type {
   ModelRouteOption,
 } from '@shared/types/providerCapability';
 import type { LlmProviderModel } from '@shared/types/settings';
-import type { CatalogModelContribution } from './EffectiveCatalogService';
+import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
 
 export interface CopilotModelCapabilityMetadata {

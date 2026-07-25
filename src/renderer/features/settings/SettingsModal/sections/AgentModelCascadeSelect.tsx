@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentModelOption } from '@shared/types/agentManifest';
 import type { useI18n } from '../../../../i18n';
+import { assignDynStyle } from '../../../../lib/useDynStyle';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -95,10 +96,12 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
       ? Math.max(boundaryTop, rect.top - menuGap - availableHeight)
       : Math.min(rect.bottom + menuGap, Math.max(boundaryTop, boundaryBottom - availableHeight));
 
-    root.style.setProperty('--settings-model-menu-left', `${left}px`);
-    root.style.setProperty('--settings-model-menu-top', `${top}px`);
-    root.style.setProperty('--settings-model-menu-width', `${menuWidth}px`);
-    root.style.setProperty('--settings-model-menu-height', `${availableHeight}px`);
+    assignDynStyle(root, {
+      '--settings-model-menu-left': `${left}px`,
+      '--settings-model-menu-top': `${top}px`,
+      '--settings-model-menu-width': `${menuWidth}px`,
+      '--settings-model-menu-height': `${availableHeight}px`,
+    });
   }, []);
 
   const scheduleMenuPlacement = useCallback(() => {

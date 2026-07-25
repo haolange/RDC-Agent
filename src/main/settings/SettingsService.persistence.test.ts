@@ -583,4 +583,46 @@ describe('SettingsService provider persistence', () => {
       .toEqual(['deepseek:model-c']);
     saveSpy.mockRestore();
   });
+
+  it('schema 6 upgrade irreversibly resets chromeThemes to RDC defaults', async () => {
+    const { createDefaultChromeThemes } = await import('../../shared/theme/presets');
+    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const settingsPath = path.join(workspaceRoot, 'config.json');
+    const polluted = {
+      ...createDefaultChromeThemes().dark,
+      accent: '#ff0000',
+      surface: '#112233',
+      ink: '#abcdef',
+      presetId: 'dracula',
+    };
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    fs.writeFileSync(settingsPath, JSON.stringify({
+      schemaVersion: 5,
+      appearance: {
+        theme: 'dark',
+        chromeThemes: {
+          light: polluted,
+          dark: polluted,
+        },
+      },
+      llm: { providers: [] },
+    }, null, 2), 'utf8');
+
+    const { SettingsService, SETTINGS_SCHEMA_VERSION } = await import('./SettingsService');
+    const service = new SettingsService();
+    const runtime = service.initialize();
+    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+      schemaVersion: number;
+      appearance: { chromeThemes: { light: { accent: string; presetId: string }; dark: { accent: string; presetId: string } } };
+    };
+    const defaults = createDefaultChromeThemes();
+
+    expect(SETTINGS_SCHEMA_VERSION).toBe(6);
+    expect(persisted.schemaVersion).toBe(6);
+    expect(runtime.appearance.chromeThemes.dark.accent).toBe(defaults.dark.accent);
+    expect(runtime.appearance.chromeThemes.dark.presetId).toBe('rdc');
+    expect(persisted.appearance.chromeThemes.dark.accent).toBe(defaults.dark.accent);
+    expect(persisted.appearance.chromeThemes.light.presetId).toBe('rdc');
+    expect(persisted.appearance.chromeThemes.dark.accent).not.toBe('#ff0000');
+  });
 });
