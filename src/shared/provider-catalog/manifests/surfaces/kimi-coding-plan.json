@@ -587,8 +587,8 @@
           "fixedValue": false
         },
         "context1m": {
-          "state": "unknown",
-          "defaultValue": false
+          "state": "unsupported",
+          "fixedValue": false
         },
         "reasoning": {
           "kind": "always-on",

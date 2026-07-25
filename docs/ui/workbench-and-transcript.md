@@ -41,7 +41,7 @@ Active Signal：tokenized clipped-gradient 能量扫光；仅用于权威 runnin
 
 左：attach / agent / permission；右：effort / context usage / send-stop。Permission 不得挨着 send 伪装成执行动作。
 
-Effort：能力驱动 reasoning rail + `Max mode` + `Fast mode`。`unknown` → 中性 `Unverified / Provider managed`；`none` → 锁定 `Off`；wire `xhigh` 显示 `Extra`；产品最高档 `Max`。滑杆 inset 几何，松手 snap。Compose 色跟 agent `accent`（`--composer-effort-*`），禁止只用全局 `--token-border-focus`。
+Effort：能力驱动 reasoning rail + `Max mode` + `Fast mode`。关档文案统一 `Disabled` / `禁用`。`unknown` / `none` → 同关态外观并灰掉不可调；`always-on` / fixed → 锁定开；wire `xhigh` 显示 `Extra`；产品最高档 `Max`。Max/Fast entitlement 未知时关态灰掉且状态文案亦为 `Disabled`。滑杆 inset 几何，松手 snap。Compose 色跟 agent `accent`（`--composer-effort-*`），禁止只用全局 `--token-border-focus`。
 
 Context 环：面只显示 `%` / `—` / `…`；相位文案在 title/aria 与 breakdown。相位权威：Preparing / Current request ~ / Actual|Last actual。Actual 三栏 Tokens | Cache | Reasoning；缺遥测显示 `—`，禁止假 0。
 

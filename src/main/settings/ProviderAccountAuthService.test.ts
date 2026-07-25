@@ -688,21 +688,18 @@ describe('ProviderAccountAuthService Super Grok OAuth', () => {
     const discovery = await service.loadEffectiveCatalog('github-copilot');
 
     expect(discovery.models.map((model) => model.id)).toContain('claude-opus-4.8');
-    expect(discovery.models.map((model) => model.id)).not.toContain('claude-opus-4.8-fast');
     expect(discovery.contributions?.find((entry) => entry.modelId === 'claude-opus-4.8'))
       .not.toHaveProperty('executionBindings');
     expect(discovery.contributions?.find((entry) => entry.modelId === 'claude-opus-4.8-fast'))
       .not.toHaveProperty('selection');
     const catalogModels = getProviderModelDefinitions('github-copilot');
     expect(catalogModels.find((entry) => entry.modelId === 'claude-opus-4.8')).toMatchObject({
-      controls: { fast: { state: 'selectable' } },
-      executionBindings: [expect.objectContaining({
-        when: { fast: true },
-        actions: [{ kind: 'model-switch', targetModelId: 'claude-opus-4.8-fast' }],
-      })],
+      controls: { fast: { state: 'unsupported' } },
     });
+    expect(catalogModels.find((entry) => entry.modelId === 'claude-opus-4.8')?.executionBindings ?? [])
+      .toEqual([]);
     expect(catalogModels.find((entry) => entry.modelId === 'claude-opus-4.8-fast')).toMatchObject({
-      selection: { pickerVisibility: 'internal', relatedPrimaryModelIds: ['claude-opus-4.8'] },
+      selection: { pickerVisibility: 'primary' },
     });
     expect(fetchMock).toHaveBeenCalledWith(
       'https://api.githubcopilot.com/models',

@@ -132,10 +132,10 @@ export function buildContextTierRows(model: EffectiveModel | null, t: Translate)
 
 export function formatReasoningCapabilityValue(control: ReasoningControl | null, t: Translate): string {
   if (!control) return t('settings.providers.capability.unknown');
-  if (control.kind === 'unknown') return t('settings.providers.capability.unverified');
+  if (control.kind === 'unknown') return t('composer.effort.levelOff');
   const levels = getReasoningSelectionOrder(control);
   if (levels.length === 0 || (levels.length === 1 && levels[0] === 'off' && control.kind === 'none')) {
-    return t('settings.providers.capability.unsupported');
+    return t('composer.effort.levelOff');
   }
   const base = levels.map((level) => t(REASONING_LABEL_KEYS[level])).join(', ');
   return control.kind === 'always-on' ? t('settings.providers.capability.lockedValue', { value: base }) : base;
@@ -148,7 +148,7 @@ export function formatReasoningCapability(model: EffectiveModel | null, t: Trans
 export function formatFastControl(model: EffectiveModel | null, t: Translate): string {
   if (!model || model.controls.fast.state === 'unknown') return t('settings.providers.capability.unknown');
   if (model.controls.fast.state === 'unsupported') return t('settings.providers.capability.unsupported');
-  if (model.controls.fast.state === 'provider-managed') return t('composer.effort.providerManaged');
+  if (model.controls.fast.state === 'provider-managed') return t('composer.effort.levelOff');
   if (model.controls.fast.state === 'fixed') {
     const activation = t('settings.providers.capability.lockedValue', {
       value: t('settings.providers.capability.fastMode'),

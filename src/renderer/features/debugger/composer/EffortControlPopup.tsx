@@ -38,8 +38,6 @@ export const EffortControlPopup: React.FC<{
   capabilityRefreshing: boolean;
   capabilityRetryLabel: string;
   onRetryCapability: () => void;
-  reasoningUnverified: boolean;
-  reasoningStateLabel: string;
   hasAdjustableReasoning: boolean;
   displayLevel: ReasoningSelection;
   displayLevels: ReasoningSelection[];
@@ -79,8 +77,6 @@ export const EffortControlPopup: React.FC<{
   capabilityRefreshing,
   capabilityRetryLabel,
   onRetryCapability,
-  reasoningUnverified,
-  reasoningStateLabel,
   hasAdjustableReasoning,
   displayLevel,
   displayLevels,
@@ -143,11 +139,6 @@ export const EffortControlPopup: React.FC<{
           </Button>
         ) : null}
       </div>
-    ) : reasoningUnverified ? (
-      <div className="composer-effort-reasoning-state" data-testid="composer-effort-reasoning-unverified" role="status">
-        <span>{t('composer.effort.reasoning')}</span>
-        <strong>{reasoningStateLabel}</strong>
-      </div>
     ) : (
       <div className={`composer-effort-slider-section ${hasAdjustableReasoning ? '' : 'is-disabled'}`}>
         <div
@@ -201,7 +192,9 @@ export const EffortControlPopup: React.FC<{
             aria-valuemin={0}
             aria-valuemax={displayLevels.length - 1}
             aria-valuenow={displayIndex}
-            aria-valuetext={t(EFFORT_LABEL_KEYS[displayLevel])}
+            aria-valuetext={hasAdjustableReasoning
+              ? t(EFFORT_LABEL_KEYS[displayLevel])
+              : t('composer.effort.levelOff')}
             aria-disabled={!hasAdjustableReasoning}
             onKeyDown={onThumbKeyDown}
           />

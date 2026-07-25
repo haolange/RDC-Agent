@@ -30,8 +30,8 @@ const t = (key: string, params?: Record<string, string | number>): string => {
     'settings.providers.capability.activationRequest': 'Request parameter',
     'settings.providers.capability.sourceCatalog': 'catalog',
     'settings.providers.capability.sourceObserved': 'observed',
-    'composer.effort.providerManaged': 'Provider managed',
-    'composer.effort.levelOff': 'Off',
+    'composer.effort.providerManaged': 'Disabled',
+    'composer.effort.levelOff': 'Disabled',
     'composer.effort.levelOn': 'On',
     'composer.effort.levelLow': 'Low',
     'composer.effort.levelMedium': 'Medium',
@@ -98,24 +98,24 @@ describe('modelCapabilitySummaryUtils', () => {
   it('formats the revisioned EffectiveModel projection', () => {
     const chips = buildCapabilityChips(model(), t);
     expect(chips).toContainEqual(expect.objectContaining({ label: 'Context', value: '262.1k' }));
-    expect(chips).toContainEqual(expect.objectContaining({ label: 'Reasoning', value: 'Off, On' }));
+    expect(chips).toContainEqual(expect.objectContaining({ label: 'Reasoning', value: 'Disabled, On' }));
     expect(chips).toContainEqual(expect.objectContaining({ label: 'Fast', value: 'Model model-a-fast' }));
     expect(chips).toContainEqual(expect.objectContaining({ label: 'Tools', value: 'Supported' }));
   });
 
-  it('formats locked, provider-managed and unknown control semantics', () => {
+  it('formats locked, provider-managed and unknown control semantics as Disabled', () => {
     expect(formatFastControl(model({
       controls: { ...model().controls, fast: { state: 'fixed', fixedValue: true, entitlement: 'granted' } },
     }), t)).toBe('Fast (Locked)');
     expect(formatFastControl(model({
       controls: { ...model().controls, fast: { state: 'provider-managed', fixedValue: true } },
-    }), t)).toBe('Provider managed');
+    }), t)).toBe('Disabled');
     expect(formatReasoningCapability(model({
       controls: {
         ...model().controls,
         reasoning: { kind: 'unknown', supportsOff: false, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
       },
-    }), t)).toBe('Unverified');
+    }), t)).toBe('Disabled');
   });
 
   it('formats fixed always-on reasoning', () => {

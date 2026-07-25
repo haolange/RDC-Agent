@@ -211,12 +211,17 @@
           "tierId": "default"
         },
         "reasoning": {
-          "kind": "unknown",
+          "kind": "always-on",
           "supportsOff": false,
           "levels": [],
-          "defaultSelection": "off",
+          "defaultSelection": "on",
+          "lockedSelection": "on",
           "wireProfile": {
-            "kind": "none"
+            "kind": "openai-responses",
+            "on": "high",
+            "levels": {
+              "high": "high"
+            }
           }
         }
       },
@@ -270,12 +275,24 @@
           "tierId": "default"
         },
         "reasoning": {
-          "kind": "unknown",
+          "kind": "levels",
           "supportsOff": false,
-          "levels": [],
-          "defaultSelection": "off",
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "xhigh"
+          ],
+          "defaultSelection": "medium",
           "wireProfile": {
-            "kind": "none"
+            "kind": "openai-responses",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "xhigh": "xhigh"
+            }
           }
         }
       },
@@ -340,12 +357,22 @@
           "label": "Max mode"
         },
         "reasoning": {
-          "kind": "unknown",
-          "supportsOff": false,
-          "levels": [],
-          "defaultSelection": "off",
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "medium",
           "wireProfile": {
-            "kind": "none"
+            "kind": "openai-responses",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            }
           }
         }
       },
@@ -477,12 +504,17 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "unknown",
+          "kind": "always-on",
           "supportsOff": false,
           "levels": [],
-          "defaultSelection": "off",
+          "defaultSelection": "on",
+          "lockedSelection": "on",
           "wireProfile": {
-            "kind": "none"
+            "kind": "openai-responses",
+            "on": "high",
+            "levels": {
+              "high": "high"
+            }
           }
         }
       },
