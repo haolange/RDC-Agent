@@ -6,6 +6,10 @@ import {
   isBridgeChannelDenied,
   isOriginAllowed,
   resolveBridgeAllowedOrigins,
+  buildBridgeAuthCookie,
+  resolveBridgeCookieToken,
+  resolveBridgeQueryToken,
+  resolveProvidedBridgeToken,
   tokensMatch,
 } from './bridgeSecurity';
 
@@ -44,6 +48,43 @@ describe('browserAppBridge security', () => {
     expect(tokensMatch(token, 'deadbeef')).toBe(false);
     expect(tokensMatch(token, extractBearerToken(`Bearer ${token}`, null))).toBe(true);
     expect(tokensMatch(token, extractBearerToken(undefined, token))).toBe(true);
+  });
+
+  it('resolves printed /app rdcBridgeToken query before bare token', () => {
+    const printed = new URL('http://127.0.0.1:5127/app?rdcBridgeToken=abc123');
+    expect(resolveBridgeQueryToken(printed)).toBe('abc123');
+    const probe = new URL('http://127.0.0.1:5127/health?token=probe-token');
+    expect(resolveBridgeQueryToken(probe)).toBe('probe-token');
+    const both = new URL('http://127.0.0.1:5127/app?rdcBridgeToken=primary&token=secondary');
+    expect(resolveBridgeQueryToken(both)).toBe('primary');
+  });
+
+  it('reads bridge auth cookie set by /qa entry', () => {
+    expect(resolveBridgeCookieToken('rdcBridgeToken=abc%2F123; other=1')).toBe('abc/123');
+    expect(resolveBridgeCookieToken('other=1')).toBeNull();
+    expect(buildBridgeAuthCookie('secret')).toContain('rdcBridgeToken=secret');
+  });
+
+  it('resolves auth triad Bearer → query rdcBridgeToken|token → cookie', () => {
+    const url = new URL('http://127.0.0.1:5127/app');
+    expect(resolveProvidedBridgeToken({
+      authorizationHeader: 'Bearer from-header',
+      url,
+      cookieHeader: 'rdcBridgeToken=from-cookie',
+    })).toBe('from-header');
+
+    const withQuery = new URL('http://127.0.0.1:5127/app?rdcBridgeToken=from-query');
+    expect(resolveProvidedBridgeToken({
+      url: withQuery,
+      cookieHeader: 'rdcBridgeToken=from-cookie',
+    })).toBe('from-query');
+
+    expect(resolveProvidedBridgeToken({
+      url,
+      cookieHeader: 'rdcBridgeToken=from-cookie',
+    })).toBe('from-cookie');
+
+    expect(resolveProvidedBridgeToken({ url })).toBeNull();
   });
 
   it('denies terminal, secret, memory, mcp, approval, execute, and settings mutation channels', async () => {

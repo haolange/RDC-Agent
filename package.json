@@ -53,6 +53,7 @@
     "start:human:dev": "node scripts/launch-rdc-agent.mjs --mode desktop-dev",
     "start:agent-browser": "node scripts/launch-rdc-agent.mjs --mode browser",
     "start:agent-browser:dev": "node scripts/launch-rdc-agent.mjs --mode browser-dev",
+    "smoke:agent-browser": "node scripts/smoke-agent-browser-qa.mjs",
     "start:prepare": "node scripts/launch-rdc-agent.mjs --mode prepare-only",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -51,6 +51,11 @@ export function useComposerSend(options: {
   const activeRequestIdRef = useRef<string | null>(null);
   const promptValueRef = useRef(promptValue);
   promptValueRef.current = promptValue;
+  const lastSentPromptRef = useRef<{
+    prompt: string;
+    attachments: PendingAttachmentDraft[];
+    skillIds: string[];
+  } | null>(null);
 
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
   const setSessions = useProjectStore((state) => state.setSessions);
@@ -69,6 +74,10 @@ export function useComposerSend(options: {
     currentRun,
     setIsPromptSending,
     activeRequestIdRef,
+    setPromptValue,
+    setPendingAttachments,
+    setPendingSkillIds,
+    lastSentPromptRef,
   });
 
   const isComposerBusy = isPromptSending || hasActiveConversationTurn || hasActiveDebugRun;
@@ -109,6 +118,11 @@ export function useComposerSend(options: {
     }
 
     setIsPromptSending(true);
+    lastSentPromptRef.current = {
+      prompt: trimmed,
+      attachments: [...pendingAttachments],
+      skillIds: [...pendingSkillIds],
+    };
     try {
       await sendComposerConversationTurn({
         electronAPI,

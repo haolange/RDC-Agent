@@ -85,6 +85,62 @@ export function extractBearerToken(authorizationHeader: string | undefined, quer
   return fromQuery || null;
 }
 
+/** Prefer the printed /app query name; keep bare `token` for invoke/health probes. */
+export function resolveBridgeQueryToken(url: URL): string | null {
+  return url.searchParams.get('rdcBridgeToken') ?? url.searchParams.get('token');
+}
+
+/**
+ * Document / invoke auth resolution order for Browser QA:
+ * Bearer → query `rdcBridgeToken|token` → cookie `rdcBridgeToken`.
+ * Never accept only bare `token` while printing `rdcBridgeToken` (Phase 0 regression).
+ */
+export function resolveProvidedBridgeToken(input: {
+  authorizationHeader?: string;
+  url: URL;
+  cookieHeader?: string;
+}): string | null {
+  return extractBearerToken(
+    input.authorizationHeader,
+    resolveBridgeQueryToken(input.url),
+  ) ?? resolveBridgeCookieToken(input.cookieHeader);
+}
+
+/** Stable lists for docs / matrix tests (patterns are source of truth above). */
+export function listBridgeDeniedChannelPatterns(): readonly string[] {
+  return BRIDGE_DENIED_CHANNEL_PATTERNS.map((pattern) => pattern.source);
+}
+
+export function listBridgeAllowedChannelPatterns(): readonly string[] {
+  return BRIDGE_ALLOWED_CHANNEL_PATTERNS.map((pattern) => pattern.source);
+}
+
+const BRIDGE_COOKIE_NAME = 'rdcBridgeToken';
+
+/** Cookie used by short `/qa` entry so Glass/Simple Browser need not keep a long query string. */
+export function resolveBridgeCookieToken(cookieHeader: string | undefined): string | null {
+  if (!cookieHeader) return null;
+  for (const part of cookieHeader.split(';')) {
+    const trimmed = part.trim();
+    if (!trimmed.startsWith(`${BRIDGE_COOKIE_NAME}=`)) continue;
+    const raw = trimmed.slice(BRIDGE_COOKIE_NAME.length + 1).trim();
+    if (!raw) return null;
+    try {
+      return decodeURIComponent(raw) || null;
+    } catch {
+      return raw;
+    }
+  }
+  return null;
+}
+
+export function buildBridgeAuthCookie(token: string): string {
+  // QA-only localhost bridge: readable by renderer so /invoke can send Bearer.
+  return `${BRIDGE_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; SameSite=Lax`;
+}
+
+export { BRIDGE_COOKIE_NAME };
+
 export function tokensMatch(expected: string, provided: string | null): boolean {
   if (!provided) {
     return false;

@@ -4,6 +4,10 @@ import { Button } from '../../../ui/Button';
 import { ConfirmationDialog } from '../../../ui/ConfirmationDialog';
 import { useMemory } from './useMemory';
 import type { MemoryWriteRequest } from '@shared/types/electron';
+import {
+  BrowserQaDesktopOnlyNotice,
+  isBrowserQaDesktopOnlySurface,
+} from '../../../platform/BrowserQaDesktopOnlyNotice';
 import './MemoryPanel.css';
 
 const MEMORY_TYPES: Array<MemoryWriteRequest['type']> = ['user', 'feedback', 'project', 'reference'];
@@ -17,6 +21,7 @@ type MemoryDraft = Pick<MemoryWriteRequest, 'name' | 'description' | 'type' | 'c
  */
 export const MemoryPanel: React.FC = () => {
   const { t } = useI18n();
+  const desktopOnly = isBrowserQaDesktopOnlySurface();
   const { memories, selected, loading, error, scope, setScope, select, write, remove } = useMemory();
   const [editing, setEditing] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
@@ -68,6 +73,17 @@ export const MemoryPanel: React.FC = () => {
       setDeleteBusy(false);
     }
   };
+
+  if (desktopOnly) {
+    return (
+      <div className="memory-panel" data-testid="memory-panel">
+        <div className="memory-panel-header">
+          <span className="memory-panel-title">{t('memory.panelTitle')}</span>
+        </div>
+        <BrowserQaDesktopOnlyNotice kind="memory" testId="browser-qa-memory-desktop-only" />
+      </div>
+    );
+  }
 
   return (
     <div className="memory-panel" data-testid="memory-panel">

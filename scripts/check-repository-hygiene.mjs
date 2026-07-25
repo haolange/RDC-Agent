@@ -129,6 +129,20 @@ for (const [name, command] of Object.entries(canonicalScripts)) {
   if (packageJson.scripts?.[name] !== command) fail(`Script ${name} must route through the shared launcher.`);
 }
 if ('preview' in (packageJson.scripts ?? {})) fail('Legacy preview script must not bypass the shared launcher.');
+if (packageJson.scripts?.['smoke:agent-browser'] !== 'node scripts/smoke-agent-browser-qa.mjs') {
+  fail('smoke:agent-browser must point at scripts/smoke-agent-browser-qa.mjs (debug-only; not a release entry).');
+}
+if (!existsSync(path.join(repoRoot, 'scripts/smoke-agent-browser-qa.mjs'))) {
+  fail('Missing scripts/smoke-agent-browser-qa.mjs for Browser QA smoke.');
+}
+
+const launcherSource = read('scripts/launch-rdc-agent.mjs');
+if (!/RDC_AGENT_BROWSER_QA:\s*headless\s*\?\s*'1'\s*:\s*'0'/.test(launcherSource)) {
+  fail('launch-rdc-agent.mjs must set RDC_AGENT_BROWSER_QA only for browser/headless modes (not desktop/release defaults).');
+}
+if (/RDC_AGENT_BROWSER_QA:\s*'1'/.test(launcherSource) && !/headless\s*\?\s*'1'/.test(launcherSource)) {
+  fail('launch-rdc-agent.mjs must not hard-code RDC_AGENT_BROWSER_QA=1 for all modes.');
+}
 
 const operationalFiles = [
   '.github/workflows/ci.yml',
@@ -152,6 +166,12 @@ const builder = JSON.parse(read('electron-builder.json'));
 if (!builder.files?.includes('out/**/*')) fail('electron-builder.json must package out/**/* only as the compiled application input.');
 if (builder.files?.some((entry) => /^(?:scripts|node_modules|\.pnpm-store|pnpm-lock|\.npmrc)/.test(entry))) {
   fail('electron-builder files whitelist includes a development-only path.');
+}
+const builderText = JSON.stringify(builder);
+for (const forbidden of ['start:agent-browser', 'smoke:agent-browser', 'open-agent-browser-qa.html', 'RDC_AGENT_BROWSER_QA']) {
+  if (builderText.includes(forbidden)) {
+    fail(`electron-builder.json must not treat Browser QA (${forbidden}) as a packaged user entry.`);
+  }
 }
 for (const iconPath of ['resources/icons/icon.ico', 'resources/icons/icon.icns', 'resources/icons/icon.png']) {
   if (!existsSync(path.join(repoRoot, iconPath))) fail(`Release icon is missing: ${iconPath}`);

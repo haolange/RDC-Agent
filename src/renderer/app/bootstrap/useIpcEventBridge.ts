@@ -26,6 +26,7 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { resetWorkbenchStores } from '../../stores/storesReset';
+import { createConversationEventBatcher } from './conversationEventBatcher';
 
 export function useSyncCapturesFromSnapshot() {
   return useCallback((snapshot: ContextSnapshot) => {
@@ -83,6 +84,19 @@ export function useIpcEventBridge(options: {
       syncCapturesFromSnapshot(snapshot);
     });
 
+    const conversationEventBatcher = createConversationEventBatcher({
+      applyMessage: (event) => {
+        const conversation = useConversationStore.getState();
+        conversation.upsertConversationMessage(event.message);
+        if (event.type === 'message_completed' || event.type === 'message_errored') {
+          useSessionStore.getState().markConversationTurnTerminal(
+            event.turnId,
+            event.type === 'message_completed',
+          );
+        }
+      },
+    });
+
     const handleConversationEvent = (event: ConversationStreamEvent) => {
       const conversation = useConversationStore.getState();
       if (event.type === 'run_linked') {
@@ -101,13 +115,7 @@ export function useIpcEventBridge(options: {
         }
         return;
       }
-      conversation.upsertConversationMessage(event.message);
-      if (event.type === 'message_completed' || event.type === 'message_errored') {
-        useSessionStore.getState().markConversationTurnTerminal(
-          event.turnId,
-          event.type === 'message_completed',
-        );
-      }
+      conversationEventBatcher.handle(event);
     };
 
     electronAPI.conversation.onEvent(handleConversationEvent);
@@ -306,6 +314,7 @@ export function useIpcEventBridge(options: {
     electronAPI.on('window:maximized-changed', handleWindowStateChange);
 
     return () => {
+      conversationEventBatcher.dispose();
       unsubscribeRunUsageChanged();
       unsubscribeTraceProjectionChanged();
       unsubscribeContextChanged();

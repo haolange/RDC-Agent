@@ -1,0 +1,10 @@
+.browser-qa-desktop-only {
+  margin-block: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md, 8px);
+  background: var(--token-bg-muted);
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}

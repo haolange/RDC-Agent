@@ -7,8 +7,10 @@ import { URL } from 'url';
 import { invokeRegisteredIpcChannel } from '../ipc/invokeRegistry';
 import { rendererEventHub } from './rendererEventHub';
 import {
+  buildBridgeAuthCookie,
   createBridgeBearerToken,
-  extractBearerToken,
+  resolveBridgeQueryToken,
+  resolveProvidedBridgeToken,
   isBridgeChannelAllowed,
   isOriginAllowed,
   resolveBridgeAllowedOrigins,
@@ -123,8 +125,28 @@ function requireBridgeAuth(request: IncomingMessage, url: URL): boolean {
   if (!bridgeToken) {
     return false;
   }
-  const provided = extractBearerToken(request.headers.authorization, url.searchParams.get('token'));
+  // Document navigations have no Authorization header. Accept:
+  // 1) Bearer, 2) query rdcBridgeToken|token, 3) cookie from short /qa entry.
+  // Glass/Simple Browser often truncates long query tokens → 401 JSON "Pretty-print" white screen.
+  const provided = resolveProvidedBridgeToken({
+    authorizationHeader: request.headers.authorization,
+    url,
+    cookieHeader: request.headers.cookie,
+  });
   return tokensMatch(bridgeToken, provided);
+}
+
+function redirectWithBridgeCookie(
+  response: ServerResponse,
+  location: string,
+  token: string,
+): void {
+  response.writeHead(302, {
+    Location: location,
+    'Set-Cookie': buildBridgeAuthCookie(token),
+    'Cache-Control': 'no-store',
+  });
+  response.end();
 }
 
 async function checkDevRenderer(url: string): Promise<{ ok: boolean; url: string; error?: string }> {
@@ -246,6 +268,17 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
 
   const bridgeOrigin = bridgeUrl ?? 'http://127.0.0.1';
   const url = new URL(request.url, bridgeOrigin);
+
+  // Short QA entry: no token in the address bar (Glass truncates long query → JSON white screen).
+  if (url.pathname === '/qa' && (request.method === 'GET' || request.method === 'HEAD')) {
+    if (!bridgeToken) {
+      sendJson(response, 503, { success: false, error: 'Bridge token unavailable' }, requestOrigin);
+      return;
+    }
+    redirectWithBridgeCookie(response, `${bridgeOrigin}/app`, bridgeToken);
+    return;
+  }
+
   // Every non-preflight bridge surface requires the per-run bearer token.
   // /app without auth previously redirected with the token in Location (leak).
   const isPublicAsset = !options.devRendererUrl
@@ -253,6 +286,12 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
   if (!isPublicAsset && !requireBridgeAuth(request, url)) {
     sendJson(response, 401, { success: false, error: 'Unauthorized' }, requestOrigin);
     return;
+  }
+
+  // Persist query token into a cookie so a later clean /app navigation still authenticates.
+  const queryToken = resolveBridgeQueryToken(url);
+  if (queryToken && bridgeToken && tokensMatch(bridgeToken, queryToken)) {
+    response.setHeader('Set-Cookie', buildBridgeAuthCookie(bridgeToken));
   }
 
   if (url.pathname === '/api/settings/providers/catalog' && request.method === 'GET') {
@@ -405,8 +444,10 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
     __RDC_AGENT_BROWSER_BRIDGE_TOKEN__?: string;
   }).__RDC_AGENT_BROWSER_BRIDGE_TOKEN__ = bridgeToken;
 
+  const qaUrl = `${bridgeUrl}/qa`;
   const appUrl = `${bridgeUrl}/app?rdcBridgeToken=${encodeURIComponent(bridgeToken)}`;
-  console.log(`[BrowserAppBridge] Browser app session: ${appUrl}`);
+  console.log(`[BrowserAppBridge] Browser app session: ${qaUrl}`);
+  console.log(`[BrowserAppBridge] Direct /app URL (fallback): ${appUrl}`);
   return bridgeUrl;
 }
 

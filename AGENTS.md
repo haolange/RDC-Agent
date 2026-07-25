@@ -117,13 +117,14 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 
 ## 浏览器真实会话边界
 
-- agent 日常 UI/功能验证默认使用 headless 浏览器真实会话：设置 `RDC_AGENT_HEADLESS=1` 启动应用主进程，再用主进程输出的 `http://127.0.0.1:<port>/app` 打开同一套 renderer。
+- agent 日常 UI/功能验证默认使用 headless Browser QA：`pnpm run start:agent-browser`（`RDC_AGENT_HEADLESS=1` + `RDC_AGENT_BROWSER_QA=1`），再用主进程日志输出的 **`http://127.0.0.1:<port>/qa`** 打开同一套 renderer（`/qa` Set-Cookie 后进干净 `/app`）。**优先 `/qa`**；勿把截断的长 `?rdcBridgeToken=` URL 当验过了——白屏若是 Pretty-print JSON，即为 **401 Unauthorized**。
 - 浏览器真实会话通过 localhost bridge 连接真实 `main process`、workspace、settings、LLM runtime、事件流和已配置的 RDX CLI invoker；不得新增渲染层本地样本或演示场景作为验收入口。
-- Bridge 为 QA-only 安全边界（`bridgeSecurity`）：非 `RDC_AGENT_BROWSER_QA=1` 不得启动；敏感 channel 永久 deny；与桌面 preload 共享 handler registry，但 allowlist 更窄。
-- Electron 窗口仍通过 `preload -> IPC` 进入主进程；浏览器真实会话通过 `localhost bridge -> IPC handler registry` 进入主进程。两条路径必须共享同一套 main/runtime 能力。
+- Bridge 为 **debug-only** 安全边界（`bridgeSecurity`）：非 `RDC_AGENT_BROWSER_QA=1` 不得启动；**不进 release 默认路径**；敏感 channel 永久 deny；与桌面 preload 共享 handler registry，但 allowlist 更窄。矩阵见 `docs/architecture/browser-qa-surface.md`。
+- Electron 窗口仍通过 `preload -> IPC` 进入主进程；浏览器真实会话通过 `localhost bridge -> IPC handler registry` 进入主进程。两条路径必须共享同一套 main/runtime 能力（QA 工作台主路径对齐，非全 IPC 镜像）。
 - 涉及 UI/UX、布局、消息流、状态展示、样式、面板可达性的改动，优先用浏览器真实会话和内置浏览器点击/截图验证。
-- 产品级浏览器评审必须至少覆盖：Workbench 初始状态、Project/Session 入口、`.rdc` 导入或打开状态、Settings > Providers、Settings > Agents、桌面与窄屏视口、水平溢出检查、长路径/中文文件名显示、按钮 disabled/active 状态和前后端数据一致性。
-- Composer 性能回归使用同一真实 `/app?qaPerformance=1` 页面读取 `data-rdc-qa-performance`，以原生 Event Timing 的 click-to-next-paint p95 和 Long Task 为准；16 ms 以下未上报 entry 按阈值保守计入，不支持 Event Timing 时 fail-closed。不得用 Browser 工具调用往返时间或后台节流的 RAF cadence 替代 renderer 指标；默认 `/app` 不得安装该探针的 listener 或 observer。
+- 产品级浏览器评审必须至少覆盖：Workbench 初始状态、Project/Session 入口、`.rdc` 导入或打开状态、Settings > Providers、Settings > Agents、桌面与窄屏视口、水平溢出检查、长路径/中文文件名显示、按钮 disabled/active 状态和前后端数据一致性；deny 面（secret / MCP trust / `settings:set` / approval 等）须显式不可用，禁止静默像「坏了」。
+- Composer 性能回归：先经 `/qa` 进入后在同源加 `?qaPerformance=1`（或带有效鉴权打开 `/app?qaPerformance=1`），读取 `data-rdc-qa-performance`；以原生 Event Timing 的 click-to-next-paint p95 和 Long Task 为准；16 ms 以下未上报 entry 按阈值保守计入，不支持 Event Timing 时 fail-closed。不得用 Browser 工具调用往返时间或后台节流的 RAF cadence 替代 renderer 指标；默认 `/app` 不得安装该探针的 listener 或 observer。
+- 本地契约烟测：`pnpm run smoke:agent-browser`（失败 exit≠0；不并入默认 pack）。
 - 涉及 `src/main`、`src/preload`、窗口、IPC 注册、workspace 权限、RDX CLI invoker 或 `RenderDoc` 本地链路时，补真实启动检查或内置浏览器真实会话；禁止把 Playwright/Electron E2E 作为门禁。
 
 ## RDX CLI Invoker 边界
@@ -183,7 +184,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - 安全 / 并发 / 取消 / 存储故障 / provider wire 契约改动后执行：`vitest run src/main/testing/contracts`（及被触及的既有单测，如 `bridgeSecurity`、`jsonl`、`TurnCoordinator`、`ProcessSupervisor`、`DebuggerRuntimePolicy`）。
 - 入口、构建或窗口逻辑改动后，再补 `pnpm run build` 或等价打包检查。
 - 发布配置改动后执行 `pnpm run pack`，并确认 unpacked 产物不包含开发期包管理器、lockfile、launcher 和缓存状态。
-- 浏览器真实会话使用 `pnpm run start:agent-browser`（或 `scripts/run-rdc-launcher.* --mode browser`），然后用 Codex 内置浏览器打开主进程输出的 `/app`。Work Process / tool 卡片 UI 验收前必须先停旧进程再重启以加载最新前后端，并删除该 QA project 下全部 session 后新建隔离 session，避免跨 session/project 串台与脏数据。
+- 浏览器真实会话使用 `pnpm run start:agent-browser`（或 `scripts/run-rdc-launcher.* --mode browser`），然后用 Codex 内置浏览器打开主进程输出的 **`/qa`**（勿截断 token URL）。Work Process / tool 卡片 UI 验收前必须先停旧进程再重启以加载最新前后端，并删除该 QA project 下全部 session 后新建隔离 session，避免跨 session/project 串台与脏数据。涉及 Send/Stop/Edit-and-resend 或流式卡顿时额外验收：Preparing Stop 干净撤销、Running Stop 单调落停、Rewrite 提交即时切分支、流式期间窗口拖拽/滚动无明显整应用卡顿。
 - 人类开发入口使用 `pnpm run start:human:dev`，源码构建入口使用 `pnpm run start:human`；平台包装器只转发到共享 launcher，依赖与 build 由指纹条件式准备，发布模式直接双击 exe / app 包。
 - Provider 体系契约验证使用 `pnpm run check:provider-system`。
 - Provider Catalog strict manifest 与编译语义验证使用 `pnpm run check:provider-catalog`。

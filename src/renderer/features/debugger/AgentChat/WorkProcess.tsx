@@ -9,7 +9,7 @@ interface WorkProcessProps {
   trace: ConversationWorkTrace;
 }
 
-export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
+const WorkProcessInner: React.FC<WorkProcessProps> = ({ trace }) => {
   const { t } = useI18n();
   const presentation = useMemo(() => buildWorkProcessPresentation(trace), [trace]);
   const [expanded, setExpanded] = useState<boolean>(presentation.defaultExpanded);
@@ -79,5 +79,7 @@ export const WorkProcess: React.FC<WorkProcessProps> = ({ trace }) => {
     </section>
   );
 };
+
+export const WorkProcess = React.memo(WorkProcessInner);
 
 export default WorkProcess;

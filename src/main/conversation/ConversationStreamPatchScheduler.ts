@@ -30,10 +30,13 @@ interface ConversationStreamPatchSchedulerOptions {
 interface FlushPendingOptions {
   forcePersist?: boolean;
   publishTrace?: boolean;
+  /** When false, persist pending patches without broadcasting to the renderer. */
+  emit?: boolean;
 }
 
 const DEFAULT_TEXT_FLUSH_MS = 48;
-const DEFAULT_TRACE_FLUSH_MS = 48;
+/** Trace projection rebuild is expensive; keep UI responsive during streams. */
+const DEFAULT_TRACE_FLUSH_MS = 160;
 const DEFAULT_PERSIST_FLUSH_MS = 600;
 
 export class ConversationStreamPatchScheduler {
@@ -128,8 +131,9 @@ export class ConversationStreamPatchScheduler {
 
   flushPending(options: FlushPendingOptions = {}): void {
     if (this.closed) return;
-    this.flushText(Boolean(options.forcePersist));
-    this.flushTrace(Boolean(options.forcePersist), options.publishTrace ?? true);
+    const emit = options.emit ?? true;
+    this.flushText(Boolean(options.forcePersist), emit);
+    this.flushTrace(Boolean(options.forcePersist), options.publishTrace ?? true, emit);
   }
 
   close(): void {
@@ -146,7 +150,7 @@ export class ConversationStreamPatchScheduler {
     this.closed = true;
   }
 
-  private flushText(forcePersist: boolean): void {
+  private flushText(forcePersist: boolean, emit = true): void {
     if (this.textTimer) {
       this.clearTimer(this.textTimer);
       this.textTimer = null;
@@ -163,7 +167,7 @@ export class ConversationStreamPatchScheduler {
       options: {
         persist,
         publishTrace: false,
-        emit: true,
+        emit,
       },
     });
     if (persist) {
@@ -171,7 +175,7 @@ export class ConversationStreamPatchScheduler {
     }
   }
 
-  private flushTrace(forcePersist: boolean, publishTrace: boolean): void {
+  private flushTrace(forcePersist: boolean, publishTrace: boolean, emit = true): void {
     if (this.traceTimer) {
       this.clearTimer(this.traceTimer);
       this.traceTimer = null;
@@ -187,8 +191,8 @@ export class ConversationStreamPatchScheduler {
       patch,
       options: {
         persist,
-        publishTrace,
-        emit: true,
+        publishTrace: publishTrace && emit,
+        emit,
       },
     });
     if (persist) {

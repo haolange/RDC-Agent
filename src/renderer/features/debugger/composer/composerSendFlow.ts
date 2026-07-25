@@ -110,6 +110,28 @@ export async function sendComposerConversationTurn(options: {
   useSessionStore.getState().setConversationPreparationPhase('preparing');
   upsertConversationMessages([optimistic.userMessage, optimistic.assistantDraftMessage]);
 
+  const restoreComposerDraft = () => {
+    setPromptValue(sentPrompt);
+    setPendingAttachments(sentAttachments);
+    setPendingSkillIds(sentSkillIds);
+  };
+
+  const finishRevokedOrCancelled = (): boolean => {
+    if (!useConversationStore.getState().consumeRevokedRequest(requestId)) {
+      return false;
+    }
+    // Stop already performed a clean preparing revoke; stay idempotent.
+    setActiveRequestId(null);
+    useSessionStore.getState().setPreparedTurnContext(null);
+    useSessionStore.getState().setConversationPreparationPhase('idle');
+    return true;
+  };
+
+  const isRequestCancelledError = (error: unknown): boolean => {
+    const message = error instanceof Error ? error.message : String(error);
+    return message.includes('REQUEST_CANCELLED');
+  };
+
   try {
     const agentCommit = await useAppSettingsStore.getState().flushAgentDefinitionSaves(selectedAgentId);
     const providerId = agentCommit?.route?.providerId;
@@ -144,11 +166,21 @@ export async function sendComposerConversationTurn(options: {
       },
     });
 
+    if (finishRevokedOrCancelled()) {
+      return;
+    }
+
     if (result.status === 'rejected') {
+      if (result.error.code === 'REQUEST_CANCELLED') {
+        rollbackOptimistic();
+        restoreComposerDraft();
+        setActiveRequestId(null);
+        useSessionStore.getState().setPreparedTurnContext(null);
+        useSessionStore.getState().setConversationPreparationPhase('idle');
+        return;
+      }
       rollbackOptimistic();
-      setPromptValue(sentPrompt);
-      setPendingAttachments(sentAttachments);
-      setPendingSkillIds(sentSkillIds);
+      restoreComposerDraft();
       setActiveRequestId(null);
       useSessionStore.getState().setPreparedTurnContext(null);
       useSessionStore.getState().setConversationPreparationPhase('idle');
@@ -187,13 +219,17 @@ export async function sendComposerConversationTurn(options: {
       setBranchState,
     });
   } catch (error) {
+    if (finishRevokedOrCancelled()) {
+      return;
+    }
     rollbackOptimistic();
-    setPromptValue(sentPrompt);
-    setPendingAttachments(sentAttachments);
-    setPendingSkillIds(sentSkillIds);
+    restoreComposerDraft();
     setActiveRequestId(null);
     useSessionStore.getState().setPreparedTurnContext(null);
     useSessionStore.getState().setConversationPreparationPhase('idle');
+    if (isRequestCancelledError(error)) {
+      return;
+    }
     showNotice(error instanceof Error ? error.message : failedSummary);
   }
 }

@@ -7,11 +7,13 @@ import { useSessionStore } from '../../../stores/sessionStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import {
   applyConversationTurnResult,
+  removeOptimisticConversationMessages,
   syncE2EConversationState,
 } from '../composer/composerSendHelpers';
 import { useTurnControlsStore } from '../composer/useTurnControls';
 import { createConversationRequestId } from '../composer/composerSendFlow';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
+import { buildOptimisticRewriteSnapshot } from './optimisticRewriteSnapshot';
 
 export function isRewriteTurnStillCurrent(turnId: string, activeLeafBranchId?: string | null): boolean {
   const state = useConversationStore.getState();
@@ -47,6 +49,18 @@ export function useUserMessageRewrite(message: ConversationMessage) {
 
     const previousMessages = useConversationStore.getState().allConversationMessages;
     const previousBranchState = useConversationStore.getState().branchState;
+    const requestId = createConversationRequestId();
+    const optimistic = buildOptimisticRewriteSnapshot({
+      requestId,
+      sourceMessage: message,
+      nextContent,
+      allMessages: previousMessages,
+      branchState: previousBranchState,
+      agentId: pairedAssistant?.agentId ?? null,
+    });
+
+    setConversationSnapshot(optimistic.messages, optimistic.branchState);
+    useSessionStore.getState().setConversationPreparationPhase('preparing');
 
     try {
       const routeAgentId = pairedAssistant?.agentId ?? null;
@@ -54,7 +68,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         ? await useAppSettingsStore.getState().flushAgentDefinitionSaves(routeAgentId)
         : null;
       const result = await electronAPI.conversation.rewriteFromMessage({
-        requestId: createConversationRequestId(),
+        requestId,
         messageId: message.id,
         projectId: message.projectId ?? currentProject?.projectId ?? null,
         sessionId: message.sessionId,
@@ -77,6 +91,15 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         } : undefined,
       });
 
+      // Drop optimistic placeholders before applying authoritative rewrite messages.
+      const optimisticIds = optimistic.messages
+        .filter((entry) => entry.requestId === requestId)
+        .map((entry) => entry.id);
+      setConversationMessages(removeOptimisticConversationMessages(
+        useConversationStore.getState().allConversationMessages,
+        optimisticIds,
+      ));
+
       await applyConversationTurnResult({
         electronAPI,
         result,
@@ -91,6 +114,9 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         setConversationSnapshot,
         upsertConversationMessages,
       });
+
+      useSessionStore.getState().setPreparedTurnContext(result.preparedContext);
+      useSessionStore.getState().setConversationPreparationPhase('current');
 
       void syncE2EConversationState({
         electronAPI,
@@ -108,6 +134,8 @@ export function useUserMessageRewrite(message: ConversationMessage) {
       });
     } catch (error) {
       setConversationSnapshot(previousMessages, previousBranchState);
+      useSessionStore.getState().setPreparedTurnContext(null);
+      useSessionStore.getState().setConversationPreparationPhase('idle');
       throw error;
     }
   }, [

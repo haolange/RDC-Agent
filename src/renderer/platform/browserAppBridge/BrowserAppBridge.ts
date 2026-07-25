@@ -14,7 +14,7 @@ const BRIDGE_TOKEN_STORAGE_KEY = 'rdcBridgeToken';
 
 function bridgeCapabilityDenied(capability: string): Promise<never> {
   return Promise.reject(new Error(
-    `Browser bridge denies ${capability}; use the desktop Electron app for this capability.`,
+    `BROWSER_QA_DESKTOP_ONLY: ${capability} is unavailable in Browser QA. Use the desktop Electron app.`,
   ));
 }
 
@@ -28,6 +28,21 @@ function resolveBridgeOrigin(): string {
   return window.location.origin;
 }
 
+function readBridgeCookieToken(): string {
+  if (typeof document === 'undefined') return '';
+  const prefix = `${BRIDGE_TOKEN_STORAGE_KEY}=`;
+  for (const part of document.cookie.split(';')) {
+    const trimmed = part.trim();
+    if (!trimmed.startsWith(prefix)) continue;
+    try {
+      return decodeURIComponent(trimmed.slice(prefix.length)).trim();
+    } catch {
+      return trimmed.slice(prefix.length).trim();
+    }
+  }
+  return '';
+}
+
 function resolveBridgeToken(): string {
   const params = new URL(window.location.href).searchParams;
   const fromQuery = params.get('rdcBridgeToken')?.trim();
@@ -38,6 +53,15 @@ function resolveBridgeToken(): string {
       // sessionStorage may be unavailable; still use the query token for this page.
     }
     return fromQuery;
+  }
+  const fromCookie = readBridgeCookieToken();
+  if (fromCookie) {
+    try {
+      sessionStorage.setItem(BRIDGE_TOKEN_STORAGE_KEY, fromCookie);
+    } catch {
+      // ignore
+    }
+    return fromCookie;
   }
   try {
     return sessionStorage.getItem(BRIDGE_TOKEN_STORAGE_KEY)?.trim() || '';
