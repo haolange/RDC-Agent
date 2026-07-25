@@ -7,7 +7,8 @@
  *  - subscribe(): 订阅所有 AgentEvent。
  *
  * 该类是对 `agentLoop()` 的封装，负责：
- *  - 管理 messages / model / tools / systemPrompt 的可变状态；
+ *  - 管理 model / systemPrompt；tools 经 LoopRuntimeState 修订（COW）；
+ *  - messages 为 turn-scoped 执行缓冲（rehydrate/clear；canonical history 在磁盘）；
  *  - 把 EventStream 事件多播给所有订阅者；
  *  - 协调 abort 信号。
  */
@@ -32,12 +33,15 @@ import {
   agentLoop,
   type AgentContext,
   type AgentLoopConfig,
+  type LoopRuntimeState,
   type ToolExecutor,
   type TransformContextResult,
 } from './AgentLoop';
 
 /** Agent 事件订阅者签名。 */
 export type AgentEventSubscriber = (event: AgentEvent) => void;
+
+export type { LoopRuntimeState };
 
 /** Agent 当前持有的可变状态。 */
 export interface AgentState {
@@ -46,6 +50,18 @@ export interface AgentState {
   model: Model;
   tools?: ToolDefinition[];
   messages: AgentMessage[];
+}
+
+function createLoopRuntimeState(
+  tools: ToolDefinition[] = [],
+  activatedDeferredTools: ReadonlySet<string> = new Set(),
+  revision = 1,
+): LoopRuntimeState {
+  return {
+    revision,
+    activeTools: [...tools],
+    activatedDeferredTools: new Set(activatedDeferredTools),
+  };
 }
 
 /** Agent 构造选项。 */
@@ -102,6 +118,9 @@ function defaultConvertToLlm(messages: AgentMessage[]): Message[] {
 
 export class Agent {
   private _state: AgentState;
+  private _runtime: LoopRuntimeState;
+  /** Shared ref so AgentLoop re-reads tools each LLM round after COW revision bumps. */
+  private readonly _runtimeRef: { current: LoopRuntimeState };
   private _isStreaming = false;
   private _subscribers: AgentEventSubscriber[] = [];
   private _currentStream: EventStream<AgentEvent, Message[]> | null = null;
@@ -113,13 +132,16 @@ export class Agent {
     this._options = options;
     this._provider = options.provider;
     this._toolExecutor = options.toolExecutor;
+    const initialTools = options.initialState.tools ? [...options.initialState.tools] : [];
+    this._runtime = createLoopRuntimeState(initialTools);
+    this._runtimeRef = { current: this._runtime };
     this._state = {
       systemPrompt: options.initialState.systemPrompt,
       systemPromptSegments: options.initialState.systemPromptSegments
         ? options.initialState.systemPromptSegments.map((segment) => ({ ...segment }))
         : undefined,
       model: options.initialState.model,
-      tools: options.initialState.tools ? [...options.initialState.tools] : [],
+      tools: this._runtime.activeTools,
       messages: options.initialState.messages ? [...options.initialState.messages] : [],
     };
   }
@@ -143,7 +165,7 @@ export class Agent {
         ? this._state.systemPromptSegments.map((segment) => ({ ...segment }))
         : undefined,
       model: this._state.model,
-      tools: this._state.tools ? [...this._state.tools] : undefined,
+      tools: [...this._runtime.activeTools],
       messages: [...this._state.messages],
     };
   }
@@ -151,6 +173,15 @@ export class Agent {
   /** 获取消息历史。 */
   get messages(): ReadonlyArray<AgentMessage> {
     return this._state.messages;
+  }
+
+  /** 当前 LoopRuntimeState 快照（COW revision）。 */
+  get runtimeState(): Readonly<LoopRuntimeState> {
+    return {
+      revision: this._runtime.revision,
+      activeTools: [...this._runtime.activeTools],
+      activatedDeferredTools: new Set(this._runtime.activatedDeferredTools),
+    };
   }
 
   // -------------------------------------------------------------------
@@ -210,17 +241,31 @@ export class Agent {
   }
 
   /**
-   * 动态更新工具列表。
+   * 动态更新工具列表（COW）。
    *
-   * 原地改写同一数组引用，使正在运行的 AgentLoop `context.tools`
-   *（与 `_state.tools` 共享引用）在同 turn 内下一次 LLM 调用立刻可见。
+   * 不再原地 splice 共享数组；bump revision，下一轮 LLM 调用经 runtime ref 读取新 activeTools。
    */
   setTools(tools: ToolDefinition[]): void {
-    if (!this._state.tools) {
-      this._state.tools = [...tools];
-      return;
-    }
-    this._state.tools.splice(0, this._state.tools.length, ...tools);
+    this._runtime = createLoopRuntimeState(
+      tools,
+      this._runtime.activatedDeferredTools,
+      this._runtime.revision + 1,
+    );
+    this._runtimeRef.current = this._runtime;
+    this._state.tools = this._runtime.activeTools;
+  }
+
+  /**
+   * Deferred 激活：同步更新 activatedDeferredTools + activeTools，并 bump revision。
+   */
+  activateDeferredTools(activated: ReadonlySet<string>, activeTools: ToolDefinition[]): void {
+    this._runtime = createLoopRuntimeState(
+      activeTools,
+      activated,
+      this._runtime.revision + 1,
+    );
+    this._runtimeRef.current = this._runtime;
+    this._state.tools = this._runtime.activeTools;
   }
 
   /** 动态更新系统提示。 */
@@ -231,6 +276,19 @@ export class Agent {
   /** 追加消息到历史（不触发循环）。 */
   appendMessage(message: AgentMessage): void {
     this._state.messages.push(message);
+  }
+
+  /**
+   * Turn 开始：用磁盘权威 history 覆盖内存缓冲。
+   * Agent 不跨 turn 持有 canonical history。
+   */
+  rehydrateMessages(messages: AgentMessage[]): void {
+    this._state.messages = [...messages];
+  }
+
+  /** Turn 结束：清空内存 messages（持久化由 ConversationService 负责）。 */
+  clearMessages(): void {
+    this._state.messages = [];
   }
 
   // -------------------------------------------------------------------
@@ -244,7 +302,8 @@ export class Agent {
       systemPrompt: this._state.systemPrompt,
       systemPromptSegments: this._state.systemPromptSegments,
       messages: this._state.messages,
-      tools: this._state.tools,
+      tools: this._runtime.activeTools,
+      runtime: this._runtimeRef,
     };
 
     const config = this.createLoopConfig();

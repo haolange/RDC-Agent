@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import type {
   ConversationAttachmentInput,
   ConversationAnswerToolApprovalRequest,
@@ -56,7 +57,7 @@ import { agentToolApprovalRequestService } from '../agent-runtime/permissions/Ag
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
 import { traceService } from '../agent-trace/TraceService';
 import { replayDeviceService } from '../captures/ReplayDeviceService';
-import { rdxSessionService } from '../index';
+import { rdxSessionService } from '../sessions';
 import { settingsService } from '../settings/SettingsService';
 import { agentManifestService } from '../settings/AgentManifestService';
 import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService';
@@ -115,6 +116,17 @@ interface ConversationBranchTurnContext {
   variantIndex: number;
   parentBranchId: string;
   branchState: ConversationBranchState;
+}
+
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => `${JSON.stringify(key)}:${canonicalJson(child)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
 }
 
 function mergeThinkingPayload(
@@ -470,8 +482,10 @@ function createRequestFailedDiagnostic(route: AgentRoutePreflightOk, error: unkn
 }
 
 export class ConversationService {
+  private acceptingTurns = true;
   private activeTurns = new Map<string, ActiveConversationTurn>();
   private readonly preparingRequests = new Map<string, {
+    requestId: string;
     controller: AbortController;
     phase: 'preparing' | 'committing';
     scopeKey: string;
@@ -480,6 +494,7 @@ export class ConversationService {
     credentialLeaseTransferred: boolean;
   }>();
   private readonly sendRequests = new Map<string, Promise<ConversationTurnResult>>();
+  private readonly sendRequestFingerprints = new Map<string, string>();
   private readonly activeSendScopes = new Map<string, string>();
   /**
    * 待处理的 handoff（sessionId → {toProfile, prompt}）。
@@ -489,6 +504,22 @@ export class ConversationService {
    * 内存维护（不持久化），session 重启后丢失（handoff 是即时意图）。
    */
   private readonly pendingHandoffs = new Map<string, { toProfile: AgentRole; prompt: string }>();
+
+  stopAcceptingTurns(): void {
+    this.acceptingTurns = false;
+  }
+
+  async abortAllTurns(): Promise<void> {
+    for (const preparing of this.preparingRequests.values()) {
+      preparing.controller.abort();
+      preparing.cancelAfterCommit = true;
+    }
+    const active = Array.from(this.activeTurns.values());
+    for (const turn of active) {
+      turn.stop();
+    }
+    await Promise.allSettled(active.map((turn) => turn.stopped));
+  }
 
   async getHistory(sessionId: string): Promise<{
     messages: ConversationMessage[];
@@ -557,12 +588,16 @@ export class ConversationService {
   async cancelActiveTurn(
     request: ConversationCancelActiveTurnRequest = {},
   ): Promise<ConversationCancelActiveTurnResult> {
-    const preparing = request.requestId
-      ? this.preparingRequests.get(request.requestId)
+    const preparingEntry = request.requestId
+      ? Array.from(this.preparingRequests.entries()).find(([, entry]) => {
+        if (entry.requestId !== request.requestId) return false;
+        if (request.sessionId && !entry.scopeKey.includes(request.sessionId)) return false;
+        return true;
+      })
       : Array.from(this.preparingRequests.entries())
-          .find(([, entry]) => entry.phase === 'preparing')?.[1];
-    const preparingRequestId = request.requestId
-      ?? Array.from(this.preparingRequests.entries()).find(([, entry]) => entry === preparing)?.[0];
+          .find(([, entry]) => entry.phase === 'preparing');
+    const preparing = preparingEntry?.[1];
+    const preparingRequestId = preparing?.requestId;
     if (preparing && preparingRequestId) {
       if (preparing.phase === 'preparing') preparing.controller.abort();
       else preparing.cancelAfterCommit = true;
@@ -610,11 +645,88 @@ export class ConversationService {
     }
   }
 
-  private rememberSendRequest(requestId: string, pending: Promise<ConversationTurnResult>): void {
-    this.sendRequests.set(requestId, pending);
+  private getPreparingRequestByRequestId(requestId: string) {
+    for (const entry of this.preparingRequests.values()) {
+      if (entry.requestId === requestId) return entry;
+    }
+    return undefined;
+  }
+
+  private rememberSendRequest(
+    idempotencyKey: string,
+    fingerprint: string,
+    pending: Promise<ConversationTurnResult>,
+  ): void {
+    this.sendRequests.set(idempotencyKey, pending);
+    this.sendRequestFingerprints.set(idempotencyKey, fingerprint);
     if (this.sendRequests.size <= 256) return;
     const oldest = this.sendRequests.keys().next().value as string | undefined;
-    if (oldest && oldest !== requestId) this.sendRequests.delete(oldest);
+    if (oldest && oldest !== idempotencyKey) {
+      this.sendRequests.delete(oldest);
+      this.sendRequestFingerprints.delete(oldest);
+    }
+  }
+
+  private resolveIdempotencyScope(
+    input: ConversationContextInput | ConversationRewriteContextInput,
+  ): { scopeType: 'session' | 'project'; scopeId: string; scopeKey: string; idempotencyKey: string } {
+    const requestId = input.requestId?.trim();
+    if (!requestId) throw new Error('PREFLIGHT_FAILED: requestId is required.');
+    const sessionId = input.sessionId ?? input.fallbackSessionId ?? null;
+    if (sessionId) {
+      return {
+        scopeType: 'session',
+        scopeId: sessionId,
+        scopeKey: `session:${sessionId}`,
+        idempotencyKey: `session:${sessionId}:${requestId}`,
+      };
+    }
+    const projectId = input.projectId ?? input.fallbackProjectId ?? 'ephemeral';
+    return {
+      scopeType: 'project',
+      scopeId: projectId,
+      scopeKey: `project:${projectId}`,
+      idempotencyKey: `project:${projectId}:${requestId}`,
+    };
+  }
+
+  private computeRequestFingerprint(
+    input: ConversationContextInput | ConversationRewriteContextInput,
+  ): string {
+    const attachmentHashes = (input.attachments ?? [])
+      .map((attachment) => createHash('sha256')
+        .update(canonicalJson({
+          sourcePath: attachment.sourcePath,
+          fileName: attachment.fileName,
+          mimeType: attachment.mimeType ?? null,
+          size: attachment.size ?? null,
+        }))
+        .digest('hex'))
+      .sort();
+    const branchAnchor = 'messageId' in input && typeof input.messageId === 'string'
+      ? input.messageId
+      : null;
+    return createHash('sha256')
+      .update(canonicalJson({
+        sessionId: input.sessionId ?? input.fallbackSessionId ?? null,
+        projectId: input.projectId ?? input.fallbackProjectId ?? null,
+        message: input.message.trim(),
+        attachmentHashes,
+        agentId: input.agentId ?? null,
+        mode: input.mode,
+        turnControls: input.turnControls,
+        preloadSkillIds: [...(input.preloadSkillIds ?? [])].sort(),
+        branchAnchor,
+        configurationCommit: input.configurationCommit ?? null,
+      }))
+      .digest('hex');
+  }
+
+  private assertFingerprintMatch(idempotencyKey: string, fingerprint: string): void {
+    const existingFingerprint = this.sendRequestFingerprints.get(idempotencyKey);
+    if (existingFingerprint && existingFingerprint !== fingerprint) {
+      throw new Error('REQUEST_ID_CONFLICT: requestId already belongs to a different request fingerprint.');
+    }
   }
 
   private async findPersistedTurn(
@@ -681,23 +793,30 @@ export class ConversationService {
     input: ConversationContextInput | ConversationRewriteContextInput,
     operation: (requestId: string, controller: AbortController) => Promise<ConversationTurnResult>,
   ): Promise<ConversationTurnResult> {
+    if (!this.acceptingTurns) {
+      throw new Error('SHUTTING_DOWN: conversation service is no longer accepting turns.');
+    }
     const requestId = input.requestId?.trim();
     if (!requestId) throw new Error('PREFLIGHT_FAILED: requestId is required.');
-    const existing = this.sendRequests.get(requestId);
+    const { scopeKey, idempotencyKey } = this.resolveIdempotencyScope(input);
+    const fingerprint = this.computeRequestFingerprint(input);
+    this.assertFingerprintMatch(idempotencyKey, fingerprint);
+    const existing = this.sendRequests.get(idempotencyKey);
     if (existing) return existing;
     const persisted = await this.findPersistedTurn(input, requestId);
-    if (persisted) return persisted;
+    if (persisted) {
+      this.sendRequestFingerprints.set(idempotencyKey, fingerprint);
+      return persisted;
+    }
 
-    const scopeKey = input.sessionId ?? input.fallbackSessionId
-      ? `session:${input.sessionId ?? input.fallbackSessionId}`
-      : `project:${input.projectId ?? input.fallbackProjectId ?? 'ephemeral'}`;
     const scopeOwner = this.activeSendScopes.get(scopeKey);
     if (scopeOwner && scopeOwner !== requestId) {
       throw new Error('CONVERSATION_BUSY: another request is preparing for this conversation.');
     }
     const controller = new AbortController();
     this.activeSendScopes.set(scopeKey, requestId);
-    this.preparingRequests.set(requestId, {
+    this.preparingRequests.set(idempotencyKey, {
+      requestId,
       controller,
       phase: 'preparing',
       scopeKey,
@@ -706,16 +825,19 @@ export class ConversationService {
     });
     const pending = operation(requestId, controller)
       .finally(() => {
-        const requestState = this.preparingRequests.get(requestId);
+        const requestState = this.preparingRequests.get(idempotencyKey);
         if (requestState?.credentialHandle && !requestState.credentialLeaseTransferred) {
           agentOrchestrator.releaseProviderRuntimeCredentials(requestState.credentialHandle);
         }
-        this.preparingRequests.delete(requestId);
+        this.preparingRequests.delete(idempotencyKey);
         if (this.activeSendScopes.get(scopeKey) === requestId) this.activeSendScopes.delete(scopeKey);
       });
-    this.rememberSendRequest(requestId, pending);
+    this.rememberSendRequest(idempotencyKey, fingerprint, pending);
     void pending.catch(() => {
-      if (this.sendRequests.get(requestId) === pending) this.sendRequests.delete(requestId);
+      if (this.sendRequests.get(idempotencyKey) === pending) {
+        this.sendRequests.delete(idempotencyKey);
+        this.sendRequestFingerprints.delete(idempotencyKey);
+      }
     });
     return pending;
   }
@@ -794,6 +916,9 @@ export class ConversationService {
     if (turnsToStop.length > 0) {
       await Promise.allSettled(turnsToStop.map((turn) => turn.stopped));
     }
+    // Edit/resend rewrite: sync slot cache so next turn rehydrates from disk.
+    agentOrchestrator.syncSessionSlots(sessionId);
+    await agentOrchestrator.abortAndJoin(sessionId, { reason: 'edit_resend' }).catch(() => undefined);
 
     // Re-read after every stopped turn has fully left completeProfileTurn. Its
     // terminal flush may have appended a newer snapshot for the target branch.
@@ -871,6 +996,10 @@ export class ConversationService {
     if (activeTurns.length > 0) {
       await Promise.allSettled(activeTurns.map((turn) => turn.stopped));
     }
+    // Branch switch: discard in-memory agent slot cache; next turn rehydrates from disk.
+    agentOrchestrator.syncSessionSlots(input.sessionId);
+    await agentOrchestrator.abortAndJoin(input.sessionId, { reason: 'branch_switch' }).catch(() => undefined);
+
     const allMessages = storageAdapter.readConversationHistory(input.sessionId);
     const branchState = this.readRepairedBranchState(input.sessionId, allMessages);
     if (!branchState) {
@@ -1092,7 +1221,7 @@ export class ConversationService {
       }
     }
     const credentialHandle = await agentOrchestrator.refreshProviderRuntimeCredentials(routePreflight.providerId);
-    const credentialRequestState = this.preparingRequests.get(requestId);
+    const credentialRequestState = this.getPreparingRequestByRequestId(requestId);
     if (credentialRequestState) credentialRequestState.credentialHandle = credentialHandle;
     throwIfPreparationCancelled();
     routePreflight = resolveAgentRoutePreflight(conversationAgentId);
@@ -1194,7 +1323,7 @@ export class ConversationService {
       signal: preparationController.signal,
     });
     throwIfPreparationCancelled();
-    const requestState = this.preparingRequests.get(requestId);
+    const requestState = this.getPreparingRequestByRequestId(requestId);
     if (requestState) requestState.phase = 'committing';
 
     let workingSession = context.session;
@@ -1318,7 +1447,7 @@ export class ConversationService {
       traceSessionId,
       [userMessage, assistantDraftMessage],
     );
-    const cancelAfterCommit = this.preparingRequests.get(requestId)?.cancelAfterCommit === true;
+    const cancelAfterCommit = this.getPreparingRequestByRequestId(requestId)?.cancelAfterCommit === true;
     if (cancelAfterCommit) {
       assistantDraftMessage.status = 'stopped';
       assistantDraftMessage.updatedAt = nowMs();
@@ -1344,7 +1473,7 @@ export class ConversationService {
     this.publishConversationTrace(traceSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
 
     if (!cancelAfterCommit) {
-      const runningRequestState = this.preparingRequests.get(requestId);
+      const runningRequestState = this.getPreparingRequestByRequestId(requestId);
       if (runningRequestState) runningRequestState.credentialLeaseTransferred = true;
       void this.completeProfileTurn({
         context: {
