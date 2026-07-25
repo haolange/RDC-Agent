@@ -222,6 +222,19 @@ export interface RdxRuntimeOverview {
     trusted: boolean;
     failurePolicy: 'block' | 'warn';
   }>;
+  mcpServers: Array<{
+    id: string;
+    name: string;
+    scope: 'user' | 'project';
+    sourcePath?: string;
+    descriptorHash?: string;
+    trusted: boolean;
+    needsRetrust: boolean;
+    executableOverrideRejected?: boolean;
+    blockedReason?: string;
+    command?: string;
+    transport: string;
+  }>;
   knowledge: { userPath: string; projectPath?: string };
   memory: { userPath: string; projectPath?: string };
   diagnostics: string[];
@@ -245,5 +258,24 @@ export interface ScopedResourceImportRequest {
 export interface RestrictivePolicy {
   deniedTools?: string[];
   approval?: 'none' | 'destructive' | 'mutation' | 'all';
+  /** Optional per-tool approval floor; keys are normalized tool names. */
+  approvalFloorByTool?: Record<string, PolicyApprovalFloor>;
   limits?: Record<string, number>;
+}
+
+export type PolicyApprovalFloor = 'none' | 'auto_review' | 'user';
+
+/**
+ * 编译后的执行期 Policy（不可变快照）。
+ * `.policy.yml` 解析失败必须 fail-closed，不得静默忽略。
+ */
+export interface CompiledPolicy {
+  deniedTools: readonly string[];
+  approvalFloorByTool: Readonly<Record<string, PolicyApprovalFloor>>;
+  approval: 'none' | 'destructive' | 'mutation' | 'all';
+  maxTurns: number;
+  maxToolCalls: number;
+  maxSubagents: number;
+  maxChildDepth: number;
+  sourceFingerprint: string;
 }

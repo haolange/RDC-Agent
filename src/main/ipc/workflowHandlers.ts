@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import type { RunContextUsageSummary, RunSummary } from '@shared/types/session';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import { rdxSessionService } from '../index';
+import { rdxSessionService } from '../sessions';
 import { debuggerLlmService } from '../settings/DebuggerLlmService';
 import { runExecutionService } from '../workflow/debugger/RunExecutionService';
 import { debuggerRuntime } from '../workflow/debugger/DebuggerRuntime';

@@ -8,14 +8,14 @@
  * - run_in_background 未闭环前 fail-closed 拒绝。
  */
 
-import { spawn } from 'child_process';
-import type { AgentTool, AgentToolResult } from '../../agent/AgentTool';
+import type { AgentTool } from '../../agent/AgentTool';
 import { getWorkspaceRoot, truncateOutput } from './_shared';
 import {
   BASH_DEFAULT_TIMEOUT_MS,
   BASH_MAX_OUTPUT_BYTES,
   BASH_MAX_TIMEOUT_MS,
 } from './toolLimits';
+import { processSupervisor } from '../../../runtime/ProcessSupervisor';
 
 interface BashParams {
   command: string;
@@ -83,117 +83,90 @@ export const bashTool: AgentTool<BashParams, BashDetails> = {
     const shell = isWindows ? process.env.ComSpec || 'cmd.exe' : '/bin/sh';
     const shellArgs = isWindows ? ['/d', '/s', '/c', command] : ['-c', command];
 
-    return await new Promise<AgentToolResult<BashDetails>>((resolve) => {
-      let stdout = '';
-      let stderr = '';
-      let timedOut = false;
-      let aborted = false;
-      let outputCapped = false;
+    let outputCapped = false;
+    let stdout = '';
+    let stderr = '';
 
-      const child = spawn(shell, shellArgs, {
-        cwd,
-        env: process.env,
-        windowsHide: true,
-      });
-
-      const timer = setTimeout(() => {
-        timedOut = true;
-        try {
-          child.kill('SIGTERM');
-        } catch {
-          /* ignore */
-        }
-      }, timeoutMs);
-
-      const onAbort = (): void => {
-        aborted = true;
-        try {
-          child.kill('SIGTERM');
-        } catch {
-          /* ignore */
-        }
-      };
-      if (signal) {
-        if (signal.aborted) {
-          onAbort();
-        } else {
-          signal.addEventListener('abort', onAbort, { once: true });
-        }
-      }
-
-      const appendBounded = (current: string, chunk: Buffer | string): string => {
-        if (outputCapped) return current;
-        const next = current + (typeof chunk === 'string' ? chunk : chunk.toString('utf8'));
-        if (Buffer.byteLength(next, 'utf8') <= BASH_MAX_OUTPUT_BYTES * 2) {
-          return next;
-        }
-        outputCapped = true;
-        return truncateOutput(next, BASH_MAX_OUTPUT_BYTES * 2);
-      };
-
-      const emitUpdate = (): void => {
-        if (!onUpdate) return;
-        const text = combineOutput(stdout, stderr);
-        onUpdate({
-          content: [{ type: 'text', text: truncateOutput(text, BASH_MAX_OUTPUT_BYTES) }],
-        });
-      };
-
-      child.stdout?.on('data', (chunk: Buffer | string) => {
-        stdout = appendBounded(stdout, chunk);
-        emitUpdate();
-      });
-      child.stderr?.on('data', (chunk: Buffer | string) => {
-        stderr = appendBounded(stderr, chunk);
-        emitUpdate();
-      });
-
-      child.on('error', (err) => {
-        clearTimeout(timer);
-        if (signal) signal.removeEventListener('abort', onAbort);
-        const text = combineOutput(stdout, stderr) + `\n[spawn error] ${err.message}`;
-        const truncated = Buffer.byteLength(text, 'utf8') > BASH_MAX_OUTPUT_BYTES;
-        resolve({
-          content: [
-            { type: 'text', text: truncateOutput(text, BASH_MAX_OUTPUT_BYTES) },
-          ],
-          details: {
-            command,
-            exitCode: null,
-            signal: null,
-            durationMs: Date.now() - startedAt,
-            truncated,
-            cwd,
-          },
-        });
-      });
-
-      child.on('close', (code, sig) => {
-        clearTimeout(timer);
-        if (signal) signal.removeEventListener('abort', onAbort);
-        let combined = combineOutput(stdout, stderr);
-        if (timedOut) {
-          combined += `\n[timeout] command exceeded ${timeoutMs}ms`;
-        }
-        if (aborted) {
-          combined += `\n[aborted]`;
-        }
-        const truncated = Buffer.byteLength(combined, 'utf8') > BASH_MAX_OUTPUT_BYTES || outputCapped;
-        resolve({
-          content: [
-            { type: 'text', text: truncateOutput(combined, BASH_MAX_OUTPUT_BYTES) },
-          ],
-          details: {
-            command,
-            exitCode: code,
-            signal: sig,
-            durationMs: Date.now() - startedAt,
-            truncated,
-            cwd,
-          },
-        });
-      });
+    const supervised = processSupervisor.spawn('bash', shell, shellArgs, {
+      cwd,
+      env: process.env,
+      windowsHide: true,
+      isolateProcessGroup: !isWindows,
+      timeoutMs,
+      abortSignal: signal,
+      ringBufferBytes: BASH_MAX_OUTPUT_BYTES * 2,
     });
+
+    const appendBounded = (current: string, chunk: Buffer | string): string => {
+      if (outputCapped) return current;
+      const next = current + (typeof chunk === 'string' ? chunk : chunk.toString('utf8'));
+      if (Buffer.byteLength(next, 'utf8') <= BASH_MAX_OUTPUT_BYTES * 2) {
+        return next;
+      }
+      outputCapped = true;
+      return truncateOutput(next, BASH_MAX_OUTPUT_BYTES * 2);
+    };
+
+    const emitUpdate = (): void => {
+      if (!onUpdate) return;
+      const text = combineOutput(stdout, stderr);
+      onUpdate({
+        content: [{ type: 'text', text: truncateOutput(text, BASH_MAX_OUTPUT_BYTES) }],
+      });
+    };
+
+    supervised.child.stdout?.on('data', (chunk: Buffer | string) => {
+      stdout = appendBounded(stdout, chunk);
+      emitUpdate();
+    });
+    supervised.child.stderr?.on('data', (chunk: Buffer | string) => {
+      stderr = appendBounded(stderr, chunk);
+      emitUpdate();
+    });
+
+    const info = await supervised.exit;
+    stdout = supervised.stdout.toString() || stdout;
+    stderr = supervised.stderr.toString() || stderr;
+
+    if (info.reason === 'spawn_failed') {
+      const text = combineOutput(stdout, stderr) + `\n[spawn error] ${info.error?.message ?? 'spawn failed'}`;
+      const truncated = Buffer.byteLength(text, 'utf8') > BASH_MAX_OUTPUT_BYTES;
+      return {
+        content: [
+          { type: 'text', text: truncateOutput(text, BASH_MAX_OUTPUT_BYTES) },
+        ],
+        details: {
+          command,
+          exitCode: null,
+          signal: null,
+          durationMs: Date.now() - startedAt,
+          truncated,
+          cwd,
+        },
+      };
+    }
+
+    let combined = combineOutput(stdout, stderr);
+    if (info.reason === 'timeout') {
+      combined += `\n[timeout] command exceeded ${timeoutMs}ms`;
+    }
+    if (info.reason === 'abort') {
+      combined += `\n[aborted]`;
+    }
+    const truncated = Buffer.byteLength(combined, 'utf8') > BASH_MAX_OUTPUT_BYTES || outputCapped;
+    return {
+      content: [
+        { type: 'text', text: truncateOutput(combined, BASH_MAX_OUTPUT_BYTES) },
+      ],
+      details: {
+        command,
+        exitCode: info.code,
+        signal: info.signal,
+        durationMs: Date.now() - startedAt,
+        truncated,
+        cwd,
+      },
+    };
   },
 };
 

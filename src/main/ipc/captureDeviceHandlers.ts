@@ -1,7 +1,7 @@
 import { ipcMain } from 'electron';
 import type { OpenProjectInputRequest } from '@shared/types/session';
 import { replayDeviceService } from '../captures/ReplayDeviceService';
-import { rdxSessionService } from '../index';
+import { rdxSessionService } from '../sessions';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';

@@ -15,7 +15,7 @@
  * 上层若接入特定 MCP 服务器有特殊框架需求，可以在此基础上扩展。
  */
 
-import { spawn, type ChildProcess } from 'child_process';
+import type { ChildProcess } from 'child_process';
 
 import type { MCPConnectionStatus, MCPServerStatusSummary } from '@shared/types/mcp';
 import type {
@@ -25,6 +25,47 @@ import type {
   ToolDefinition,
 } from '../core/types';
 import { AgentTool, type AgentToolResult } from './AgentTool';
+import {
+  processSupervisor,
+  type SupervisedProcess,
+} from '../../runtime/ProcessSupervisor';
+
+const MCP_ENV_ALLOWLIST = [
+  'PATH',
+  'PATHEXT',
+  'SYSTEMROOT',
+  'SYSTEMDRIVE',
+  'WINDIR',
+  'TEMP',
+  'TMP',
+  'TMPDIR',
+  'HOME',
+  'USERPROFILE',
+  'APPDATA',
+  'LOCALAPPDATA',
+  'PROGRAMDATA',
+  'COMSPEC',
+  'LANG',
+  'LC_ALL',
+  'LC_CTYPE',
+  'TERM',
+] as const;
+
+function buildSparseMcpEnv(extra?: Record<string, string>): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const key of MCP_ENV_ALLOWLIST) {
+    const value = process.env[key];
+    if (value !== undefined) {
+      env[key] = value;
+    }
+  }
+  for (const [key, value] of Object.entries(extra ?? {})) {
+    if (key.trim()) {
+      env[key] = value;
+    }
+  }
+  return env;
+}
 
 // =====================================================================
 // 类型定义
@@ -63,6 +104,8 @@ interface MCPConnection {
   tools: MCPDiscoveredTool[];
   /** stdio 模式下的子进程。 */
   process?: ChildProcess;
+  /** ProcessSupervisor 句柄（stdio）。 */
+  supervised?: SupervisedProcess;
   /** stdio 模式下的 RPC 客户端。 */
   rpc?: StdioRpcClient;
   /** sse 模式下的 RPC 客户端。 */
@@ -499,10 +542,22 @@ export class MCPManager {
           `MCP stdio server "${config.name}" missing command`,
         );
       }
-      const proc = spawn(config.command, config.args ?? [], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env, ...(config.env ?? {}) },
-      });
+      const supervised = processSupervisor.spawn(
+        'mcp',
+        config.command,
+        config.args ?? [],
+        {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: buildSparseMcpEnv(config.env),
+          // MCP JSON-RPC 依赖 stdin/stdout；不使用 detached pgid。
+          isolateProcessGroup: false,
+        },
+      );
+      const proc = supervised.child;
+      if (!proc || !supervised.pid) {
+        const exit = await supervised.exit;
+        throw exit.error ?? new Error(`MCP stdio server "${config.name}" failed to spawn`);
+      }
       proc.stderr?.setEncoding('utf8');
       proc.stderr?.on('data', (chunk: string) => {
         // 把 server 端 stderr 透出到主进程 console，便于排查
@@ -514,6 +569,7 @@ export class MCPManager {
         config,
         tools: [],
         process: proc,
+        supervised,
         rpc,
       };
 
@@ -542,11 +598,7 @@ export class MCPManager {
         );
       } catch (err) {
         rpc.close();
-        try {
-          proc.kill();
-        } catch {
-          // ignore
-        }
+        supervised.abort('supervisor_kill');
         throw err;
       }
 
@@ -692,7 +744,9 @@ export class MCPManager {
     if (conn.rpcSse) {
       conn.rpcSse.close();
     }
-    if (conn.process) {
+    if (conn.supervised) {
+      conn.supervised.abort('supervisor_kill');
+    } else if (conn.process) {
       try {
         conn.process.kill();
       } catch {

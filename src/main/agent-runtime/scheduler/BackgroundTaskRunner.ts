@@ -16,8 +16,8 @@
  * - 通知幂等：`notified` 字段避免相同任务被多次注入。
  */
 
-import { spawn, type ChildProcess } from 'child_process';
 import { randomBytes } from 'crypto';
+import { processSupervisor, type SupervisedProcess } from '../../runtime/ProcessSupervisor';
 
 /** 后台任务状态机。 */
 export type BackgroundTaskStatus = 'running' | 'completed' | 'failed';
@@ -59,8 +59,8 @@ export class BackgroundTaskRunner {
   /** 任务表：bgTaskId → BackgroundTask。 */
   private readonly tasks = new Map<string, BackgroundTask>();
 
-  /** 子进程引用：bgTaskId → ChildProcess（用于 abort/kill）。 */
-  private readonly children = new Map<string, ChildProcess>();
+  /** 子进程引用：bgTaskId → SupervisedProcess（用于 abort/kill）。 */
+  private readonly children = new Map<string, SupervisedProcess>();
 
   /**
    * 启动一个后台任务。
@@ -84,20 +84,22 @@ export class BackgroundTaskRunner {
     };
     this.tasks.set(id, task);
 
-    let child: ChildProcess;
+    let supervised: SupervisedProcess;
     try {
-      child = spawn(command, {
+      supervised = processSupervisor.spawn('background', command, [], {
         cwd,
         shell: true,
         env: process.env,
         windowsHide: true,
+        isolateProcessGroup: false,
+        abortSignal: signal,
+        ringBufferBytes: MAX_OUTPUT_CHARS * 2,
       });
     } catch (err) {
-      // spawn 同步抛错（极少见，例如非法 cwd）：直接落到 failed。
       this.markFinished(id, 'failed', undefined, formatSpawnError(err));
       return id;
     }
-    this.children.set(id, child);
+    this.children.set(id, supervised);
 
     const appendOutput = (chunk: Buffer | string): void => {
       const text = typeof chunk === 'string' ? chunk : chunk.toString('utf8');
@@ -110,56 +112,33 @@ export class BackgroundTaskRunner {
           : next;
     };
 
-    child.stdout?.on('data', appendOutput);
-    child.stderr?.on('data', appendOutput);
+    supervised.child.stdout?.on('data', appendOutput);
+    supervised.child.stderr?.on('data', appendOutput);
 
-    const onAbort = (): void => {
-      try {
-        child.kill('SIGTERM');
-      } catch {
-        /* ignore */
-      }
-    };
-    if (signal) {
-      if (signal.aborted) {
-        onAbort();
-      } else {
-        signal.addEventListener('abort', onAbort, { once: true });
-      }
-    }
-
-    child.on('error', (err) => {
-      if (signal) signal.removeEventListener('abort', onAbort);
+    void supervised.exit.then((info) => {
       const current = this.tasks.get(id);
-      if (current) {
-        current.output += `\n[spawn error] ${err.message}`;
+      if (current && !current.output) {
+        current.output = supervised.stdout.toString() || supervised.stderr.toString();
         if (current.output.length > MAX_OUTPUT_CHARS) {
-          current.output = current.output.slice(
-            current.output.length - MAX_OUTPUT_CHARS,
-          );
+          current.output = current.output.slice(current.output.length - MAX_OUTPUT_CHARS);
         }
       }
-      this.markFinished(id, 'failed', undefined);
-    });
-
-    child.on('close', (code, sig) => {
-      if (signal) signal.removeEventListener('abort', onAbort);
-      const finalStatus: BackgroundTaskStatus =
-        code === 0 ? 'completed' : 'failed';
-      const exit = typeof code === 'number' ? code : undefined;
-      // 信号终止时附加说明，便于排查。
-      if (sig) {
-        const current = this.tasks.get(id);
+      if (info.reason === 'spawn_failed') {
         if (current) {
-          current.output += `\n[terminated by signal ${sig}]`;
-          if (current.output.length > MAX_OUTPUT_CHARS) {
-            current.output = current.output.slice(
-              current.output.length - MAX_OUTPUT_CHARS,
-            );
-          }
+          current.output += `\n[spawn error] ${info.error?.message ?? 'spawn failed'}`;
+        }
+        this.markFinished(id, 'failed', undefined);
+        return;
+      }
+      if (info.signal && current) {
+        current.output += `\n[terminated by signal ${info.signal}]`;
+        if (current.output.length > MAX_OUTPUT_CHARS) {
+          current.output = current.output.slice(current.output.length - MAX_OUTPUT_CHARS);
         }
       }
-      this.markFinished(id, finalStatus, exit);
+      const finalStatus: BackgroundTaskStatus =
+        info.code === 0 ? 'completed' : 'failed';
+      this.markFinished(id, finalStatus, typeof info.code === 'number' ? info.code : undefined);
     });
 
     return id;

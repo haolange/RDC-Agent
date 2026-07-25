@@ -1,15 +1,17 @@
 import { app, BrowserWindow } from 'electron';
-import { spawn, type ChildProcessWithoutNullStreams } from 'child_process';
+import type { ChildProcessWithoutNullStreams } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateShortId, nowMs } from '@shared/utils/id';
 import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
+import { processSupervisor, type SupervisedProcess } from './ProcessSupervisor';
 
 interface ShellTabState {
   record: TerminalTabRecord;
   process: ChildProcessWithoutNullStreams;
+  supervised: SupervisedProcess;
   cols: number;
   rows: number;
 }
@@ -71,15 +73,20 @@ export class TerminalSessionService {
     const cwd = resolveTerminalCwd(options?.cwd);
     const tabId = `term_${generateShortId()}`;
     const shellPath = resolvePowerShellPath();
-    const child = spawn(shellPath, ['-NoLogo'], {
+    const supervised = processSupervisor.spawn('terminal', shellPath, ['-NoLogo'], {
       cwd,
       stdio: 'pipe',
       windowsHide: true,
+      isolateProcessGroup: false,
       env: {
         ...process.env,
         TERM: 'xterm-256color',
       },
     });
+    const child = supervised.child as ChildProcessWithoutNullStreams;
+    if (!child?.stdout || !child?.stderr) {
+      throw new Error('Failed to start terminal shell process.');
+    }
 
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
@@ -99,6 +106,7 @@ export class TerminalSessionService {
     const tabState: ShellTabState = {
       record,
       process: child,
+      supervised,
       cols: DEFAULT_COLS,
       rows: DEFAULT_ROWS,
     };
@@ -157,8 +165,12 @@ export class TerminalSessionService {
     }
 
     if (tab.record.status === 'running') {
-      tab.process.stdin.write('exit\r\n');
-      tab.process.kill();
+      try {
+        tab.process.stdin.write('exit\r\n');
+      } catch {
+        // ignore
+      }
+      tab.supervised.abort('abort');
     }
 
     this.tabs.delete(tabId);

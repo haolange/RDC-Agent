@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { readJsonl, writeJsonl } from '@shared/utils/jsonl';
+import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '@shared/utils/jsonl';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 
 export class RunScopedStore {
@@ -30,7 +30,10 @@ export class RunScopedStore {
   }
 
   readJsonl<T>(sessionId: string, runId: string, relativePath: string): T[] {
-    return readJsonl<T>(this.resolveRunPath(sessionId, runId, relativePath));
+    const filePath = this.resolveRunPath(sessionId, runId, relativePath);
+    const result = readJsonl<T>(filePath);
+    assertNoJsonlDiagnostics(filePath, result.diagnostics);
+    return result.records;
   }
 
   writeJsonl<T>(sessionId: string, runId: string, relativePath: string, items: T[]): string {
@@ -40,9 +43,9 @@ export class RunScopedStore {
   }
 
   appendJsonl<T>(sessionId: string, runId: string, relativePath: string, item: T): string {
-    const items = this.readJsonl<T>(sessionId, runId, relativePath);
-    items.push(item);
-    return this.writeJsonl(sessionId, runId, relativePath, items);
+    const filePath = this.resolveRunPath(sessionId, runId, relativePath);
+    appendJsonl(filePath, item);
+    return filePath;
   }
 
   resolveRunPath(sessionId: string, runId: string, relativePath: string): string {

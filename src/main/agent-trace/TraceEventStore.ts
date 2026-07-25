@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import type { AgentRun, TraceEvent } from '@shared/types/agenticTrace';
-import { appendJsonl, readJsonl, writeJsonl } from '@shared/utils/jsonl';
+import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '@shared/utils/jsonl';
 import { generateEventId, nowIso } from '@shared/utils/id';
 
 export class TraceRunStore {
@@ -81,7 +81,10 @@ export class TraceEventStore {
   }
 
   getEvents(runId: string, afterSeq = 0): TraceEvent[] {
-    return readJsonl<TraceEvent>(this.eventsPath(runId))
+    const filePath = this.eventsPath(runId);
+    const result = readJsonl<TraceEvent>(filePath);
+    assertNoJsonlDiagnostics(filePath, result.diagnostics);
+    return result.records
       .filter((event) => event.seq > afterSeq)
       .sort((a, b) => a.seq - b.seq);
   }

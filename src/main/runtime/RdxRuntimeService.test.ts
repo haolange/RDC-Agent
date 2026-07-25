@@ -57,6 +57,7 @@ describe('RdxRuntimeService', () => {
         content: 'id: untrusted\nenabled: true\nevent: tool.before-call\ncommand: node\nargs: []\ntimeoutMs: 1000\nfailurePolicy: warn',
       });
       const overview = hookService.overview(project);
+      expect(overview.mcpServers).toEqual([]);
       expect(overview.diagnostics.some((entry) => entry.startsWith('policy/user/broken:'))).toBe(true);
       expect(overview.diagnostics).toEqual(expect.arrayContaining([
         'hook/project/untrusted: project hook is not trusted',
