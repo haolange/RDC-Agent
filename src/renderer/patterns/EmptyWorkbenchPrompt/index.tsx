@@ -1,9 +1,11 @@
 import React from 'react';
 import type { AgentMode } from '@shared/types/layout';
+import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import { resolveAgentDisplay } from '@shared/constants/agents';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useI18n, type TranslationKey } from '../../i18n';
+import { useDynStyle } from '../../lib/useDynStyle';
 import { ModeGlyph } from '../../ui/ModeGlyph';
 import './EmptyWorkbenchPrompt.css';
 
@@ -33,6 +35,37 @@ const HERO_COPY: Record<EmptyVariant, { title: TranslationKey; subtitle: Transla
   },
 };
 
+const EmptyToolCard: React.FC<{
+  toolMode: FocusMode;
+  agentDefinitions: AgentManifestDefinition[];
+  t: ReturnType<typeof useI18n>['t'];
+}> = ({ toolMode, agentDefinitions, t }) => {
+  const dynStyle = useDynStyle({
+    '--empty-card-accent': resolveAgentDisplay(toolMode, agentDefinitions).accent,
+  });
+
+  return (
+    <article
+      className={`empty-workbench-tool-card mode-${toolMode}`}
+      data-testid={`empty-workbench-tool-${toolMode}`}
+      {...dynStyle}
+    >
+      <span className="empty-workbench-tool-core" aria-hidden="true">
+        <ModeGlyph
+          mode={toolMode}
+          className="empty-workbench-tool-icon"
+          size={22}
+          strokeWidth={1.75}
+        />
+      </span>
+      <span className="empty-workbench-tool-copy">
+        <span className="empty-workbench-tool-title">{t(`mode.${toolMode}`)}</span>
+        <span className="empty-workbench-tool-subtitle">{t(CARD_LINE[toolMode])}</span>
+      </span>
+    </article>
+  );
+};
+
 export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode }) => {
   const { t } = useI18n();
   const currentProject = useProjectStore((state) => state.currentProject);
@@ -58,25 +91,12 @@ export const EmptyWorkbenchPrompt: React.FC<EmptyWorkbenchPromptProps> = ({ mode
 
         <div className="empty-workbench-tool-grid" aria-label={t('emptyWorkbench.toolsLabel')}>
           {FOCUS_MODES.map((toolMode: FocusMode) => (
-            <article
+            <EmptyToolCard
               key={toolMode}
-              className={`empty-workbench-tool-card mode-${toolMode}`}
-              data-testid={`empty-workbench-tool-${toolMode}`}
-              style={{ ['--empty-card-accent' as string]: resolveAgentDisplay(toolMode, agentDefinitions).accent }}
-            >
-              <span className="empty-workbench-tool-core" aria-hidden="true">
-                <ModeGlyph
-                  mode={toolMode}
-                  className="empty-workbench-tool-icon"
-                  size={22}
-                  strokeWidth={1.75}
-                />
-              </span>
-              <span className="empty-workbench-tool-copy">
-                <span className="empty-workbench-tool-title">{t(`mode.${toolMode}`)}</span>
-                <span className="empty-workbench-tool-subtitle">{t(CARD_LINE[toolMode])}</span>
-              </span>
-            </article>
+              toolMode={toolMode}
+              agentDefinitions={agentDefinitions}
+              t={t}
+            />
           ))}
         </div>
       </div>

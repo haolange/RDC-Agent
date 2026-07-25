@@ -4,6 +4,7 @@ import type { TerminalCreateTabRequest } from '@shared/types/terminal';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { terminalSessionService } from '../runtime/TerminalSessionService';
 import { IpcValidationError, parseIpcArgs } from './validation/IpcPayloadGuard';
+import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import {
   RuntimeLogListArgsSchema,
   TerminalCreateTabArgsSchema,
@@ -23,7 +24,8 @@ export function registerRuntimeTerminalHandlers(): void {
     };
   });
 
-  ipcMain.handle('terminal:listTabs', async () => {
+  ipcMain.handle('terminal:listTabs', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'terminal:listTabs', maxBytes: 1024 });
     return {
       tabs: terminalSessionService.listTabs(),
     };

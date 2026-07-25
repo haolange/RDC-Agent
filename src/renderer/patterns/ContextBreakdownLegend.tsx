@@ -5,7 +5,6 @@ import { formatTokenCount } from '@shared/utils/tokens';
 import {
   CONTEXT_BREAKDOWN_GROUPS,
   COUNT_SUFFIX_KEYS,
-  SEGMENT_COLOR_VAR,
   SEGMENT_LABEL_KEYS,
 } from './contextBreakdownMeta';
 
@@ -35,7 +34,7 @@ export const ContextBreakdownLegend: React.FC<{
       >
         <span
           className="context-breakdown-swatch"
-          style={{ background: SEGMENT_COLOR_VAR[entry.id] ?? 'var(--token-context-deferred)' }}
+          data-segment={entry.id}
           aria-hidden="true"
         />
         <span className="context-breakdown-label">{t(SEGMENT_LABEL_KEYS[entry.id])}</span>

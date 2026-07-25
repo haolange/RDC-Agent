@@ -5,16 +5,30 @@ import { rdxSessionService } from '../sessions';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
+import { parseIpcArgs } from './validation/IpcPayloadGuard';
+import { EmptyArgsSchema } from './validation/commonIpcSchemas';
+import {
+  CaptureOpenProjectInputArgsSchema,
+  CaptureSelectArgsSchema,
+  ContextOpenHumanPreviewArgsSchema,
+  DeviceActivateArgsSchema,
+} from './validation/captureDeviceSchemas';
 
 export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;
 
-  ipcMain.handle('context:get', async () => {
+  ipcMain.handle('context:get', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'context:get', maxBytes: 1024 });
     return rdxSessionService.snapshotContext();
   });
 
-  ipcMain.handle('context:openHumanPreview', async (_event, request?: { sessionId?: string }) => {
+  ipcMain.handle('context:openHumanPreview', async (_event, ...rawArgs: unknown[]) => {
     try {
+      const [request] = parseIpcArgs(ContextOpenHumanPreviewArgsSchema, rawArgs, {
+        label: 'context:openHumanPreview',
+        maxBytes: 4 * 1024,
+        padTo: 1,
+      });
       const contextSnapshot = await rdxSessionService.openHumanPreviewWindow(request);
       context.broadcastToRenderer('context:changed', contextSnapshot);
       const preview = contextSnapshot.humanPreview;
@@ -33,7 +47,8 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
     }
   });
 
-  ipcMain.handle('context:closeHumanPreview', async () => {
+  ipcMain.handle('context:closeHumanPreview', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'context:closeHumanPreview', maxBytes: 1024 });
     try {
       const contextSnapshot = await rdxSessionService.closeHumanPreviewWindow();
       context.broadcastToRenderer('context:changed', contextSnapshot);
@@ -52,14 +67,20 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
     }
   });
 
-  ipcMain.handle('capture:list', async () => {
+  ipcMain.handle('capture:list', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'capture:list', maxBytes: 1024 });
     return { captures: rdxSessionService.getCaptureDescriptors() };
   });
 
   ipcMain.handle(
     'capture:openProjectInput',
-    async (_event, request: Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string }) => {
+    async (_event, ...rawArgs: unknown[]) => {
+      let request: Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string } | undefined;
       try {
+        [request] = parseIpcArgs(CaptureOpenProjectInputArgsSchema, rawArgs, {
+          label: 'capture:openProjectInput',
+          maxBytes: 16 * 1024,
+        }) as [Omit<OpenProjectInputRequest, 'replayDevice'> & { replayDeviceId: string }];
         runtimeLogService.log({
           scope: state.currentSessionId ? 'session' : 'app',
           namespace: 'capture',
@@ -78,7 +99,7 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
           },
         });
         const input = storageAdapter.listProjectInputs(request.projectId)
-          .find((entry) => entry.inputId === request.inputId && entry.filePath === request.filePath);
+          .find((entry) => entry.inputId === request!.inputId && entry.filePath === request!.filePath);
         if (!input) {
           return { success: false, error: `Project input not found: ${request.inputId}` };
         }
@@ -128,25 +149,27 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
           title: 'Project input open failed',
           summary: err instanceof Error ? err.message : String(err),
           sessionId: state.currentSessionId,
-          projectId: request.projectId,
+          projectId: request?.projectId,
           runId: state.currentRunId,
-          raw: {
+          raw: request ? {
             inputId: request.inputId,
             ownerSessionId: request.ownerSessionId,
             replayDeviceId: request.replayDeviceId,
             filePath: request.filePath,
-          },
+          } : undefined,
         });
         return { success: false, error: err instanceof Error ? err.message : String(err) };
       }
     },
   );
 
-  ipcMain.handle('capture:getOpenedState', async () => {
+  ipcMain.handle('capture:getOpenedState', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'capture:getOpenedState', maxBytes: 1024 });
     return rdxSessionService.snapshotOpenedCapture();
   });
 
-  ipcMain.handle('capture:clearOpenedState', async () => {
+  ipcMain.handle('capture:clearOpenedState', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'capture:clearOpenedState', maxBytes: 1024 });
     await rdxSessionService.closeOrReplaceOpenedCapture();
     context.broadcastToRenderer('capture:openedStateChanged', null);
     context.broadcastToRenderer('context:changed', rdxSessionService.snapshotContext());
@@ -163,8 +186,12 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
     return { success: true };
   });
 
-  ipcMain.handle('capture:select', async (_event, captureId: string) => {
+  ipcMain.handle('capture:select', async (_event, ...rawArgs: unknown[]) => {
     try {
+      const [captureId] = parseIpcArgs(CaptureSelectArgsSchema, rawArgs, {
+        label: 'capture:select',
+        maxBytes: 4 * 1024,
+      });
       await rdxSessionService.switchActiveCapture(captureId);
       context.broadcastToRenderer('capture:statusChanged', { captureId, status: 'selected' });
       return { success: true };
@@ -173,15 +200,21 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
     }
   });
 
-  ipcMain.handle('device:list', async () => {
+  ipcMain.handle('device:list', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'device:list', maxBytes: 1024 });
     return replayDeviceService.listDevices();
   });
 
-  ipcMain.handle('device:refresh', async () => {
+  ipcMain.handle('device:refresh', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'device:refresh', maxBytes: 1024 });
     return replayDeviceService.refreshDevices();
   });
 
-  ipcMain.handle('device:activate', async (_event, deviceId: string) => {
+  ipcMain.handle('device:activate', async (_event, ...rawArgs: unknown[]) => {
+    const [deviceId] = parseIpcArgs(DeviceActivateArgsSchema, rawArgs, {
+      label: 'device:activate',
+      maxBytes: 4 * 1024,
+    });
     return replayDeviceService.activateDevice(deviceId);
   });
 }

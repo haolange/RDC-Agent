@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useDynStyle } from '../../../lib/useDynStyle';
 import type { TerminalDrawerViewModel } from './useTerminalDrawer';
 
 interface TerminalDrawerShellProps {
@@ -43,12 +44,16 @@ export const TerminalDrawerShell: React.FC<TerminalDrawerShellProps> = ({
     };
   }, [isOpen]);
 
+  const terminalDynStyle = useDynStyle({
+    '--runtime-terminal-height': `${terminalHeight}px`,
+  });
+
   return (
     <section
       className={`runtime-terminal-workspace ${isVisuallyOpen ? 'open' : ''} ${isResizing ? 'resizing' : ''}`}
       data-testid="runtime-terminal"
       aria-hidden={!isOpen}
-      style={{ ['--runtime-terminal-height' as string]: `${terminalHeight}px` }}
+      {...terminalDynStyle}
     >
       <div
         className="runtime-terminal-resize-handle"

@@ -12,6 +12,15 @@ import {
   TerminalWriteArgsSchema,
   WorkflowStopArgsSchema,
 } from './ipcSchemas';
+import { EmptyArgsSchema } from './commonIpcSchemas';
+import { ConversationSendMessageArgsSchema } from './conversationSchemas';
+import { ProjectSelectArgsSchema, ProjectInputsImportPathsArgsSchema } from './projectSessionSchemas';
+import { CaptureOpenProjectInputArgsSchema } from './captureDeviceSchemas';
+import { CommandExecuteArgsSchema } from './commandSchemas';
+import { KnowledgeGetCardArgsSchema } from './knowledgeSchemas';
+import { RdxRuntimeTrustMcpArgsSchema } from './rdxRuntimeSchemas';
+import { TraceGetEventsArgsSchema } from './traceSchemas';
+import { WebResolveFaviconArgsSchema } from './webSchemas';
 
 describe('parseIpcArgs', () => {
   it('rejects payloads that exceed maxBytes', () => {
@@ -74,6 +83,89 @@ describe('parseIpcArgs', () => {
   it('ipcId rejects path traversal characters', () => {
     expect(ipcId().safeParse('../x').success).toBe(false);
     expect(ipcId().safeParse('run_ok-1').success).toBe(true);
+  });
+
+  it('rejects unexpected args on empty channels', () => {
+    expect(() => parseIpcArgs(EmptyArgsSchema, ['surprise'], { label: 'project:list' }))
+      .toThrow(IpcValidationError);
+  });
+
+  it('rejects invalid project id format', () => {
+    expect(() => parseIpcArgs(ProjectSelectArgsSchema, ['../evil'], { label: 'project:select' }))
+      .toThrow(IpcValidationError);
+  });
+
+  it('rejects oversized import path arrays', () => {
+    const paths = Array.from({ length: 65 }, (_, i) => `D:/file-${i}.rdc`);
+    expect(() => parseIpcArgs(ProjectInputsImportPathsArgsSchema, ['proj_abc', paths], {
+      label: 'project:inputs:importPaths',
+    })).toThrow(IpcValidationError);
+  });
+
+  it('rejects conversation send with self-asserted approved field', () => {
+    expect(() => parseIpcArgs(ConversationSendMessageArgsSchema, [{
+      requestId: 'request-1',
+      mode: 'debugger',
+      message: 'hi',
+      turnControls: { reasoningLevel: 'medium', maxContextMode: false, fastModel: false },
+      approved: true,
+    }], { label: 'conversation:sendMessage' })).toThrow(/schema violation|unrecognized|strict/i);
+  });
+
+  it('rejects conversation send with invalid mode', () => {
+    expect(() => parseIpcArgs(ConversationSendMessageArgsSchema, [{
+      requestId: 'request-1',
+      mode: 'hacker',
+      message: 'hi',
+      turnControls: { reasoningLevel: 'medium', maxContextMode: false, fastModel: false },
+    }], { label: 'conversation:sendMessage' })).toThrow(IpcValidationError);
+  });
+
+  it('rejects capture open payload with path-traversal project id', () => {
+    expect(() => parseIpcArgs(CaptureOpenProjectInputArgsSchema, [{
+      projectId: '../x',
+      ownerSessionId: null,
+      inputId: 'input_a',
+      filePath: 'D:/a.rdc',
+      replayDeviceId: 'local',
+    }], { label: 'capture:openProjectInput' })).toThrow(IpcValidationError);
+  });
+
+  it('rejects command execute with empty input', () => {
+    expect(() => parseIpcArgs(CommandExecuteArgsSchema, [{ input: '' }], {
+      label: 'command:execute',
+    })).toThrow(IpcValidationError);
+  });
+
+  it('rejects knowledge getCard with empty relativePath', () => {
+    expect(() => parseIpcArgs(KnowledgeGetCardArgsSchema, ['user', ''], {
+      label: 'knowledge:getCard',
+    })).toThrow(IpcValidationError);
+  });
+
+  it('rejects rdx-runtime trustMcp with empty descriptorId', () => {
+    expect(() => parseIpcArgs(RdxRuntimeTrustMcpArgsSchema, ['D:/proj', ''], {
+      label: 'rdx-runtime:trustMcp',
+    })).toThrow(IpcValidationError);
+  });
+
+  it('rejects trace getEvents with negative afterSeq', () => {
+    expect(() => parseIpcArgs(TraceGetEventsArgsSchema, ['run_1', -1], {
+      label: 'trace:getEvents',
+    })).toThrow(IpcValidationError);
+  });
+
+  it('rejects oversized favicon domain', () => {
+    expect(() => parseIpcArgs(WebResolveFaviconArgsSchema, ['x'.repeat(300)], {
+      label: 'web:resolveFavicon',
+    })).toThrow(IpcValidationError);
+  });
+
+  it('accepts valid project select id', () => {
+    const [projectId] = parseIpcArgs(ProjectSelectArgsSchema, ['proj_ab12cd34'], {
+      label: 'project:select',
+    });
+    expect(projectId).toBe('proj_ab12cd34');
   });
 });
 

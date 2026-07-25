@@ -2,6 +2,7 @@
  * Buddy — 终端虚拟宠物 (ASCII art)。
  */
 import React, { useState, useEffect } from 'react';
+import './Buddy.css';
 
 const SPECIES: Record<string, { ascii: string; frames: string[] }> = {
   cat: { ascii: '🐱', frames: ['(^・ω・^)', '(=^ェ^=)', '(^・x・^)'] },
@@ -11,7 +12,6 @@ const SPECIES: Record<string, { ascii: string; frames: string[] }> = {
 };
 
 type Rarity = 'common' | 'rare' | 'legendary';
-const RARITY_COLORS: Record<Rarity, string> = { common: '#888', rare: '#4af', legendary: '#f80' };
 
 export const Buddy: React.FC = () => {
   const [species] = useState(() => Object.keys(SPECIES)[Math.floor(Math.random() * Object.keys(SPECIES).length)]);
@@ -38,11 +38,11 @@ export const Buddy: React.FC = () => {
   const currentFace = info?.frames[frame] ?? '(・_・)';
 
   return (
-    <div style={{
-      position: 'fixed', bottom: 20, right: 20, opacity: 0.7,
-      fontFamily: 'monospace', fontSize: 16, color: RARITY_COLORS[rarity],
-      zIndex: 1000, userSelect: 'none', cursor: 'pointer',
-    }} title={`${rarity} ${species}`}>
+    <div
+      className="buddy-pet"
+      data-rarity={rarity}
+      title={`${rarity} ${species}`}
+    >
       {rarity === 'legendary' && <span>✨</span>}
       {currentFace} {info.ascii}
     </div>

@@ -123,7 +123,8 @@ if (isHeadlessMode) {
 /**
  * Install deny-by-default permission handlers and production CSP.
  * script-src drops unsafe-inline (module scripts are file/URL based).
- * style-src keeps 'unsafe-inline' for React style attributes (partial; nonces do not cover style attrs).
+ * style-src is 'self' only; renderer dynamic values use constructable stylesheets
+ * (`useDynStyle`) so style attributes are unnecessary. style-src-attr 'none' makes that explicit.
  */
 function installRendererSecurityPolicy(): void {
   const ses = session.defaultSession;
@@ -136,12 +137,13 @@ function installRendererSecurityPolicy(): void {
   const scriptSrc = isDev
     ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://127.0.0.1:*"
     : "script-src 'self'";
-  // Partial: React / design-system may set inline style attributes; CSP nonces do not apply to them.
-  const styleSrc = "style-src 'self' 'unsafe-inline'";
+  const styleSrc = "style-src 'self'";
+  const styleSrcAttr = "style-src-attr 'none'";
   const csp = [
     "default-src 'self'",
     scriptSrc,
     styleSrc,
+    styleSrcAttr,
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
     "connect-src 'self' http://127.0.0.1:* https://openrouter.ai https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com",

@@ -1,25 +1,24 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { ReasoningSelection } from '@shared/types/modelCapability';
 import {
-  createActiveMaxTimeline,
-  createIdleMaxTimeline,
-  createReopenMaxTimeline,
-  createMaxTimeline,
   isMaxTierLevel,
-  MAX_VISUAL_EGRESS_MS,
   type MaxVisualPhase,
   type MaxVisualTimeline,
-  prefersReducedMotion,
-  resolveMaxVisualFrame,
   shouldStartMaxDragIngress,
 } from './maxVisual';
+import {
+  createMaxVisualExitController,
+  type ExitingMaxPhase,
+} from './maxVisualExitController';
+import {
+  buildEgressTimeline,
+  buildIngressTimeline,
+  createActiveMaxTimeline,
+  createIdleMaxTimeline,
+  visualNow,
+} from './maxVisualTimelineActions';
 
-function visualNow(): number {
-  return typeof performance === 'undefined' ? Date.now() : performance.now();
-}
-
-/** hold = freeze Max rail one frame; settle = ease ordinary fill in (CSS needs both). */
-export type ExitingMaxPhase = 'off' | 'hold' | 'settle';
+export type { ExitingMaxPhase } from './maxVisualExitController';
 
 export function useMaxVisualController(input: {
   open: boolean;
@@ -33,12 +32,20 @@ export function useMaxVisualController(input: {
   const timelineRef = useRef(initialTimeline.current);
   const revisionRef = useRef(0);
   const prevOpenRef = useRef(false);
-  const exitingMaxTimerRef = useRef<number | null>(null);
-  const exitingMaxRafRef = useRef<number | null>(null);
   const isDraggingRef = useRef(input.isDragging);
   /** Solid-fill CSS handoff only after a settled/near-full Max — not brief ingress skims. */
   const solidHandoffEligibleRef = useRef(false);
   isDraggingRef.current = input.isDragging;
+
+  const exitController = useMemo(
+    () => createMaxVisualExitController({
+      isDraggingRef,
+      solidHandoffEligibleRef,
+      timelineRef,
+      setExitingMaxPhase,
+    }),
+    [],
+  );
 
   const commitTimeline = useCallback((timeline: MaxVisualTimeline) => {
     timelineRef.current = timeline;
@@ -50,53 +57,8 @@ export function useMaxVisualController(input: {
     return revisionRef.current;
   }, []);
 
-  const clearExitingMax = useCallback(() => {
-    if (exitingMaxTimerRef.current !== null) {
-      window.clearTimeout(exitingMaxTimerRef.current);
-      exitingMaxTimerRef.current = null;
-    }
-    if (exitingMaxRafRef.current !== null) {
-      window.cancelAnimationFrame(exitingMaxRafRef.current);
-      exitingMaxRafRef.current = null;
-    }
-    setExitingMaxPhase('off');
-  }, []);
-
-  const beginExitingMax = useCallback(() => {
-    if (exitingMaxTimerRef.current !== null) {
-      window.clearTimeout(exitingMaxTimerRef.current);
-      exitingMaxTimerRef.current = null;
-    }
-    if (exitingMaxRafRef.current !== null) {
-      window.cancelAnimationFrame(exitingMaxRafRef.current);
-      exitingMaxRafRef.current = null;
-    }
-    // Rapid drag / brief Max skim: skip hold+settle so ordinary fill stays snappy.
-    if (isDraggingRef.current || !solidHandoffEligibleRef.current) {
-      solidHandoffEligibleRef.current = false;
-      setExitingMaxPhase('off');
-      return;
-    }
-    solidHandoffEligibleRef.current = false;
-    // Frame 1: keep Max rail color with transition disabled (browser won't ease otherwise).
-    setExitingMaxPhase('hold');
-    exitingMaxRafRef.current = window.requestAnimationFrame(() => {
-      exitingMaxRafRef.current = window.requestAnimationFrame(() => {
-        exitingMaxRafRef.current = null;
-        // If the user already raced back into Max/drag, abort the CSS handoff.
-        if (isDraggingRef.current || timelineRef.current.phase !== 'idle') {
-          setExitingMaxPhase('off');
-          return;
-        }
-        // Frame 2: enable transition and switch to ordinary fill.
-        setExitingMaxPhase('settle');
-        exitingMaxTimerRef.current = window.setTimeout(() => {
-          exitingMaxTimerRef.current = null;
-          setExitingMaxPhase('off');
-        }, MAX_VISUAL_EGRESS_MS);
-      });
-    });
-  }, []);
+  const clearExitingMax = exitController.clearExitingMax;
+  const beginExitingMax = exitController.beginExitingMax;
 
   const resetState = useCallback(() => {
     clearExitingMax();
@@ -104,73 +66,37 @@ export function useMaxVisualController(input: {
   }, [clearExitingMax, commitTimeline, nextRevision]);
 
   useEffect(() => () => {
-    if (exitingMaxTimerRef.current !== null) {
-      window.clearTimeout(exitingMaxTimerRef.current);
-    }
-    if (exitingMaxRafRef.current !== null) {
-      window.cancelAnimationFrame(exitingMaxRafRef.current);
-    }
-  }, []);
-
-  const currentFrame = useCallback((now: number) => (
-    resolveMaxVisualFrame(timelineRef.current, now, prefersReducedMotion())
-  ), []);
+    exitController.dispose();
+  }, [exitController]);
 
   const startIngress = useCallback((phase: Extract<MaxVisualPhase,
     'ingress-drag' | 'ingress-committed' | 'ingress-reopen'>) => {
-    const now = visualNow();
     clearExitingMax();
-    if (document.hidden) {
+    const built = buildIngressTimeline({
+      phase,
+      current: timelineRef.current,
+      nextRevision,
+    });
+    if (built === 'reset') {
       resetState();
       return;
     }
-    const current = timelineRef.current;
-    const fieldEpoch = phase === 'ingress-reopen' || current.phase === 'idle'
-      ? now
-      : current.fieldEpoch;
-    if (prefersReducedMotion() && phase !== 'ingress-drag') {
-      commitTimeline(createActiveMaxTimeline(nextRevision(), now, fieldEpoch));
-      return;
-    }
-    if (phase === 'ingress-reopen') {
-      commitTimeline(createReopenMaxTimeline(nextRevision(), now));
-      return;
-    }
-    const frame = currentFrame(now);
-    commitTimeline(createMaxTimeline({
-      phase,
-      revision: nextRevision(),
-      now,
-      fromEnergy: frame.energy,
-      formationEnergy: current.phase === 'egress' ? current.formationEnergy : frame.energy,
-      fieldMode: current.phase === 'egress' ? 'dissolve' : 'propagate',
-      fromStopsOpacity: frame.stopsOpacity,
-      fieldEpoch,
-    }));
-  }, [clearExitingMax, commitTimeline, currentFrame, nextRevision, resetState]);
+    commitTimeline(built);
+  }, [clearExitingMax, commitTimeline, nextRevision, resetState]);
 
   const startEgress = useCallback(() => {
-    const now = visualNow();
-    const current = timelineRef.current;
-    const frame = currentFrame(now);
-    if (frame.energy <= 0 || prefersReducedMotion()) {
+    const built = buildEgressTimeline({
+      current: timelineRef.current,
+      nextRevision,
+    });
+    if (built === 'reset') {
       solidHandoffEligibleRef.current = false;
       resetState();
       return;
     }
-    // Only a settled / nearly-full Max earns the post-egress solid ease-in.
-    solidHandoffEligibleRef.current = current.phase === 'active' || frame.energy >= 0.85;
-    commitTimeline(createMaxTimeline({
-      phase: 'egress',
-      revision: nextRevision(),
-      now,
-      fromEnergy: frame.energy,
-      formationEnergy: current.phase === 'egress' ? current.formationEnergy : frame.energy,
-      fieldMode: 'dissolve',
-      fromStopsOpacity: frame.stopsOpacity,
-      fieldEpoch: current.fieldEpoch,
-    }));
-  }, [commitTimeline, currentFrame, nextRevision, resetState]);
+    solidHandoffEligibleRef.current = built.solidHandoffEligible;
+    commitTimeline(built.timeline);
+  }, [commitTimeline, nextRevision, resetState]);
 
   const completeTimeline = useCallback((revision: number) => {
     const current = timelineRef.current;
@@ -214,11 +140,7 @@ export function useMaxVisualController(input: {
     if (!input.open || !input.isDragging) return;
     const currentPhase = timelineRef.current.phase;
     if (isMaxTier) {
-      // Re-entering Max cancels any leave-Max CSS handoff; do not clear while
-      // dragging on ordinary tiers or the settle never gets to paint.
       clearExitingMax();
-      // Ordinary-tier entry starts fully visible; a return from egress freezes the
-      // current stop opacity. Merely pressing an already-active Max must not reveal stops.
       if (shouldStartMaxDragIngress(currentPhase)) {
         startIngress('ingress-drag');
       }

@@ -352,8 +352,8 @@ describe('Provider Catalog compiler', () => {
     verify('github-copilot', [
       ['claude-sonnet-4.6', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'max'], 'medium'],
       ['claude-opus-4.6', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'max'], 'medium'],
-      ['claude-opus-4.8', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['claude-opus-4.8-fast', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
+      ['claude-opus-4.8', 1_000_000, 'fixed', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
+      ['claude-opus-4.8-fast', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium', 'internal'],
       ['claude-sonnet-5', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['claude-fable-5', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.4-mini', 128_000, 'unsupported', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh'], 'medium'],
@@ -371,9 +371,15 @@ describe('Provider Catalog compiler', () => {
       availability: 'unavailable',
       unavailableReason: expect.stringContaining('subscription'),
     });
-    expect(copilot?.models.find((model) => model.modelId === 'claude-opus-4.8')?.executionBindings).toBeUndefined();
+    expect(copilot?.models.find((model) => model.modelId === 'claude-opus-4.8')).toMatchObject({
+      controls: { fast: { state: 'selectable' } },
+      executionBindings: [expect.objectContaining({
+        when: { fast: true },
+        actions: [{ kind: 'model-switch', targetModelId: 'claude-opus-4.8-fast' }],
+      })],
+    });
     expect(copilot?.models.find((model) => model.modelId === 'claude-opus-4.8-fast')).toMatchObject({
-      selection: { pickerVisibility: 'primary' },
+      selection: { pickerVisibility: 'internal', relatedPrimaryModelIds: ['claude-opus-4.8'] },
       presencePolicy: 'account-entitled',
     });
 

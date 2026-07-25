@@ -1,0 +1,7 @@
+.mode-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  color: var(--mode-glyph-color, var(--token-text-heading));
+}

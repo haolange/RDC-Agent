@@ -53,17 +53,19 @@
 | `ProcessSupervisor` | `src/main/runtime/` | 子进程 spawn/joinAll；abort 后 registry 为空 |
 | `TurnCoordinator` / `TurnHandle` | `src/main/workflow/debugger/` | 每 session 活跃 turn；generation 丢弃迟到 event |
 | `ShutdownCoordinator` | `src/main/lifecycle/` | before-quit 限时 shutdownAll |
-| `EffectiveRuntimePlan` | `src/main/agent-runtime/` | prepareTurn 冻结；Prompt 与 Executor 共用 |
-| `bridgeSecurity` | `src/main/browserAppBridge/` | **仅** `RDC_AGENT_BROWSER_QA=1`；bearer + Origin + allowlist |
+| `EffectiveRuntimePlan` | `src/main/agent-runtime/` | `schemaVersion: 2`；`prepareTurn` 完整冻结；Prompt 与 Executor 共用 |
+| `AgentOrchestrator` | `src/main/workflow/debugger/AgentOrchestrator.ts` | façade 少于 800 行；职责外提；`pnpm run check:orchestrator-facade` |
+| `RdxRuntimeContextRegistry` | `src/main/sessions/` | **仅** per-session lease；禁止 `legacyGlobalMirror` / `getRdxRuntimeContext` |
+| `bridgeSecurity` | `src/main/browserAppBridge/` | **仅** `RDC_AGENT_BROWSER_QA=1`；bearer + Origin + allowlist；敏感 channel 永久 deny |
 | `McpTrustService` | `src/main/settings/` | project 不可覆盖 user executable；needsRetrust |
-| IPC Zod | `src/main/ipc/validation/` | `parseIpcArgs`；approvalToken 单次消费 |
+| IPC Zod | `src/main/ipc/validation/` | **全量** handler `parseIpcArgs`；approvalToken 单次消费 |
 | `BashAstAnalyzer` | `src/main/agent-runtime/permissions/` | 风险分类器**不是**安全边界；PermissionPolicy 才是 |
-| Secret / `safeStorage` | `src/main/settings/SecretStorageService.ts` | 不可用则 fail-closed；禁止明文 IPC |
-| Electron sandbox | BrowserWindow + preload | `sandbox:true`；permission deny-by-default；CSP `style-src` 仍含 unsafe-inline（6.1 partial） |
+| Secret / `safeStorage` | `src/main/settings/SecretStorageService.ts` | 不可用则 fail-closed；禁止明文 IPC；对外仅 `{ hasSecret, maskedPreview? }` |
+| Electron sandbox / CSP | BrowserWindow + preload | `sandbox:true`；permission deny-by-default；CSP：`style-src 'self'`（无 `unsafe-inline`）+ `style-src-attr 'none'`；动态样式走 constructable stylesheet（`useDynStyle`） |
 
 失败语义三分类见 `docs/contracts/failure-model.md`（Security fail-closed / Integrity degrade-safe / Availability recoverable）。多 skill 工具面：`allowedTools = ∩(skill_i) ∩ runtimeAllowlist`。
 
-Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`（security / concurrency / cancellation / storageFault / providerWireFixture）。
+Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`（security / concurrency / cancellation / storageFault / providerWireFixture）。覆盖率阈值门禁：`pnpm run test:coverage`。Orchestrator 行数契约：`pnpm run check:orchestrator-facade`（`check:architecture` 依赖链已接入）。
 
 ## UI / UX 约束
 
@@ -163,9 +165,12 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 ## 验证建议
 
 - 开始实现前先写明本次验证方式；实现后按该方式验证并报告结果。无法运行的验证，必须说明原因和剩余风险。
+- `pnpm run test:coverage` 门禁覆盖 `src/main` + `src/shared`（node）；renderer 走浏览器真实会话与 `check:*`。
 - 代码改动后执行 `pnpm run typecheck`。
 - 依赖、入口、构建、发布配置或仓库目录治理改动后执行 `pnpm run check:repository-hygiene`。
-- renderer 结构或 UI 锚点改动后执行 `pnpm run check:architecture`、`pnpm run check:fidelity`、`pnpm run check:shared-exports`。
+- renderer 结构或 UI 锚点改动后执行 `pnpm run check:architecture`（含 Orchestrator façade 行数门禁）、`pnpm run check:fidelity`、`pnpm run check:shared-exports`。
+- Orchestrator / debugger 编排拆分后执行 `pnpm run check:orchestrator-facade`（`AgentOrchestrator.ts` 少于 800 行；禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext`）。
+- 覆盖率阈值改动或相关门禁回归执行 `pnpm run test:coverage`。
 - Work Process 投影、工具行文案/图标或 transcript UI 改动后执行 `pnpm run check:work-process`、`pnpm run check:work-process-tool-coverage`。
 - Work Process UI 验收必须覆盖：运行中顶层「工作中 / Working」与 Active Signal 文本能量扫光、完成后「工作过程 / Work process」+ meta、loop thinking 运行态默认展开（summary/raw/unknown 与 final-answer/收束 thinking 同一生命周期）与 Active Signal「正在思考 / Thinking」、完成后默认折叠「已思考 · {duration} / Thought for」+ 前置 quiet icon、用户对手动开合 sticky 覆盖自动策略、commentary 散文（markdown，不进 thinking 槽）、统一单披露 tool 卡片（header icon+动词 + **结果优先** 族 body：有结果时显示计数/路径样本等，运行中才回退 pattern/path/`$ cmd`；展开为族内容层 + 样式化 Raw 面板；默认不展开 Raw；无 verb/target 双轨 toggle、无 `toolGroup` 双层壳）或 ≥8 聚合摘要行、同 loop 连续 tool 外距 `--space-2`、thinking/commentary → 首个 tool 与相邻 loop section 顶距均为 `--space-3`（只比 tool 宽一档；与是否有 commentary 无关）、file/search/shell/git/web/generic 族模板一致、每个 builtin tool 唯一 header glyph（`mcp__*`→`plug`）、安静 loop 级轨道点、`web_search` 为 favicon+域名 source pills（title 仅 tooltip）、`web_fetch` 为 Fetched page/已抓取 + 异形 page chip（非 pill 条；favicon 仅经 main `web:resolveFavicon`→data URL，失败用字母 monogram 禁止全落 globe）、无 Reply 边界行（收束 thinking 归入普通折叠）、opaque/hidden 永不渲染 CoT 占位句（仅保留真实 tools/commentary/可见 thinking；answer-only 静默）、`error_recovery_*` 自动恢复遥测不进 Work Process 叙事（仅 Agent Activity / runtime log；禁止蓝字「错误恢复成功…」旁白）、Request Inspector 不出现在消息流也不在右侧默认会话/Trace 面板、真实事件驱动的逐条出现与短 CSS 入场（禁止假 stagger）、**assistant full-bleed**（最终答案与 Work Process 含 tool 卡片横跨外轨全宽并与 composer 对齐；page-shell / Local utilities / composer / transcript 共用 `--workbench-outer-rail-width`，禁止再用更窄的 content-rail 把 compose 挤歪；仅用户 prompt 使用 raised bubble、fit-content、右对齐；loop nest 用 `--space-3`；用户 bubble / Work Process / final answer 共用 `.conversation-thread` 的 `padding-inline: --space-3` 离开左右轨/滚动条缝（同一内容列，禁止 WP 独享 gutter））、**MessageMarkdown**（commentary 与最终答案：GFM、代码块 language+复制、KaTeX、Mermaid fail-closed；thinking/CoT 保持纯文本）、**Appearance**：Settings → Appearance 为权威入口；`composerMarkdown` / `usePointerCursors` 默认关；Effort 色跟 agent `accent`；`pnpm run check:appearance`。
 - Appearance / chrome / compose accent 改动后执行 `pnpm run check:appearance`。Appearance UI 验收必须覆盖：System/Light/Dark 迷你窗口磁贴、双栏视觉预览（非 JSON/代码块）、Light/Dark 编辑卡跟随 App chrome、圆角色板+hex、可读预设下拉（统一 pill Aa+名称触发体、菜单右缘贴合并向左延伸、caret 衔接 tip、毛玻璃菜单、每项 Aa+勾选、足够宽度）、Import/Copy `rdx-theme-v1:`、Preferences；全局预览跟 chrome、Composer/Effort 仍跟 agent accent；Context Usage 弹层底色跟 chrome 编译的 `--color-surface-overlay` / `--token-bg-overlay`（分段色点仍用全局 `--token-context-*`）；不得残留验收脏色（如纯 `#ff0000`）或伪 `ThemePreview: ThemeConfig` 文案。

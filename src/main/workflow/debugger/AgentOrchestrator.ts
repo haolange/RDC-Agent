@@ -1,278 +1,137 @@
 /**
- * AgentOrchestrator — 把多个 AgentRole 映射到新 Agent Runtime 的
- * `Agent` 实例池。每个 AgentRole 持有一个 `Agent`，按需根据
- * 当前 settings/profile 重置 model 与 systemPrompt。
+ * AgentOrchestrator — façade over turn preparation, tool assembly, executor,
+ * turn runner, subagent runner, and prompt-plan helpers.
  *
  * 公共契约（不变）：
  *  - `sendMessage(agentId, content, runContext?, options?) → Promise<string>`
  *  - `sendProfileMessage(agentId, content, options?) -> Promise<string>`
  *  - `getAgentState`, `getAllAgentStates`, `configureAgent`, `applyLlmConfig`
+ *  - `prepareTurnContext`（委托 TurnPreparationService）
  *  - 状态广播仍走 `WorkflowProjectionPublisher`，事件名不变。
  *
- * 内部实现：
- *  - 调用 `Agent.prompt()` 触发新循环；
- *  - 订阅核心 `AgentEvent`，通过 `AgentEventBridge` 翻译为共享 `AgentEvent`，
- *    供 ConversationService / agent-trace 等老 API 复用。
- *  - Phase 4：状态登记委托 AgentSlotRegistry / McpConnectionCoordinator /
- *    DeferredToolActivationTracker / HandoffMailbox；TurnEventSink 由 TurnCoordinator 持有。
+ * Phase 4：状态登记委托 AgentSlotRegistry / McpConnectionCoordinator /
+ * DeferredToolActivationTracker / HandoffMailbox；TurnEventSink 由 TurnCoordinator 持有。
  */
 
 import type {
   AgentConfig,
-  AgentId,
   AgentMessage,
   AgentRole,
   AgentState,
 } from '@shared/types/agent';
-import { isTopLevelAgentId } from '@shared/types/agent';
-import {
-  AGENT_DESCRIPTIONS,
-  AGENT_DISPLAY_NAMES,
-} from '@shared/constants/agents';
-import type {
-  AgentEvent as SharedAgentEvent,
-  AgentRouteCapability,
-  AgentAssistantDeltaPayload,
-  AgentSubagentEventPayload,
-} from '@shared/types/agentRuntime';
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import type { LLMConfig } from '@shared/types/llm';
-import type {
-  ConversationTurnControls,
-  ResolvedReasoningSelection,
-} from '@shared/types/modelCapability';
-import { CONTEXT_COMPACTION_RATIO } from '@shared/types/modelCapability';
-import type { EffectiveModel, ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
-import type {
-  AppMode,
-  ContextUsageBreakdownEntry,
-  PreparedTurnContextSummary,
-} from '@shared/types/session';
+import type { AppMode } from '@shared/types/session';
 import type { LlmProviderId } from '@shared/types/settings';
 import type { WorkflowStage } from '@shared/types/workflow';
-import type { ConversationAskUserQuestion } from '@shared/types/conversation';
-import type { HookEvent } from '@shared/types/rdxRuntime';
-import type { PromptPlan } from '@shared/types/rdxRuntime';
-import type { CompiledPromptCache } from '@shared/types/semanticContext';
-import { normalizeAskUserQuestions } from '@shared/utils/askUser';
-import { generateEventId, nowIso, nowMs } from '@shared/utils/id';
-import { charsToTokens } from '@shared/utils/tokens';
-import { mergeTurnPreloadSkillIds } from '@shared/utils/turnSkillRefs';
-import { Agent } from '../../agent-runtime/agent/Agent';
-import { ContextManager } from '../../agent-runtime/agent/ContextManager';
-import { TokenizerService } from '../../agent-runtime/core/TokenizerService';
-import { turnPreparationWorkerPool } from '../../workers/TurnPreparationWorkerPool';
-import { promptPlanBuilder, requestEnvelopeBuilder, requestSnapshotStore, resolvePromptClock } from '../../agent-runtime/prompt';
-import { promptCacheCompiler } from '../../agent-runtime/prompt/PromptCacheCompiler';
-import { ErrorRecovery } from '../../agent-runtime/agent/ErrorRecovery';
-import { handoffController } from '../../agent-runtime/agent/HandoffController';
-import type { AgentTool, AgentToolResult, ToolExecutionContext } from '../../agent-runtime/agent/AgentTool';
-import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
-import type { ToolExecutor } from '../../agent-runtime/agent/AgentLoop';
-import { getWorkspaceRoot } from '../../agent-runtime/tools/primitives/_shared';
-import type {
-  AgentEvent as CoreAgentEvent,
-  StreamOptions,
-  ToolCall,
-  ToolDefinition,
-  ToolResultMessage,
-  UserMessage,
-  Message,
-} from '../../agent-runtime/core/types';
-import { sessionContextJournal } from '../../conversation/SessionContextJournal';
-import { createToolSearchTool, getPrimitiveTools } from '../../agent-runtime/tools';
 import {
-  encodeAgentModel,
-  configuredRuntimeProvider,
-} from '../../agent-runtime/providers/ConfiguredRuntimeProvider';
-import { requestPlanHeaders } from '../../agent-runtime/providers/requestPlanWire';
-import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
-import {
-  claimStructuredToolCallingEvidence,
-  describeRouteCapabilityDiagnostic,
-  resolveAgentRouteCapability,
-} from '../../agent-runtime/capabilities/RouteCapabilityResolver';
-import { createTaskTools, TaskRegistry, MemoryTaskStore, createSessionTaskStore } from '../../agent-runtime/tasks';
-import {
-  buildDiagnosticAgentEvent,
-  mentionsTextualToolCall,
-  translateCoreToSharedAgentEvent,
-  type AgentEventBridgeContext,
-} from '../../agent-runtime/AgentEventBridge';
-import { agentUserInputRequestService } from '../../agent-runtime/interactions/AgentUserInputRequestService';
-import { agentPermissionPolicyService } from '../../agent-runtime/permissions/AgentPermissionPolicy';
-import { agentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
-import {
-  compileEffectivePolicy,
-  isToolDeniedByPolicy,
-} from '../../agent-runtime/permissions/PolicyCompiler';
-import {
-  buildEffectiveRuntimePlan,
-  type EffectiveRuntimePlan,
-} from '../../agent-runtime/EffectiveRuntimePlan';
-import { ToolValidationError, toolValidator } from '../../agent-runtime/core/ToolValidator';
-import { runtimeLogService } from '../../runtime/RuntimeLogService';
-import { appPathService } from '../../runtime/AppPathService';
-import { scopedInstructionResolver } from '../../runtime/ScopedInstructionResolver';
-import { hookEngine } from '../../hooks/HookEngine';
-import { storageAdapter } from '../../sessions/StorageAdapter';
-import { getRdxRuntimeContext, assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
-import {
-  turnCoordinator,
-  type TurnHandle,
-  type AbortReason,
-  assertSubagentBudgetAllowsChild,
-  createSubagentBudgetState,
-  DEFAULT_SUBAGENT_BUDGET,
-  type SubagentResultStatus,
-} from './TurnCoordinator';
-import { AgentSlotRegistry, agentSlotKey, type AgentSlot } from './AgentSlotRegistry';
-import { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
-import { HandoffMailbox } from './HandoffMailbox';
-import { McpConnectionCoordinator } from './McpConnectionCoordinator';
-import { executionProfileService } from '../../settings/ExecutionProfileService';
-import { agentManifestService } from '../../settings/AgentManifestService';
-import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
-import { settingsService } from '../../settings/SettingsService';
-import { providerRuntimeCredentialService } from '../../settings/ProviderRuntimeCredentialService';
-import { freezeProviderRuntimeCredentials } from '../../settings/ProviderRuntimeCredentialLease';
-import {
-  planEffectiveModelRequest,
-  recordEffectivePlanSuccess,
-  recordObservedToolCallingSupport,
-  resolveEffectiveModel,
-} from '../../settings/EffectiveModelResolver';
-import { debuggerLlmService } from '../../settings/DebuggerLlmService';
-import { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
-import {
-  intersectSkillAllowedTools,
+  AGENT_DISPLAY_NAMES,
+  AgentSlotRegistry,
+  AgentTurnRunner,
+  CONTEXT_COMPACTION_RATIO,
+  countContinuationDecisions,
+  createProfileTestResponse,
+  createTestModeStub,
+  DeferredToolActivationTracker,
+  executionProfileService,
+  freezeProviderRuntimeCredentials,
+  generateEventId,
+  HandoffMailbox,
   isToolAllowedForAgent,
-  normalizeToolName,
+  isTopLevelAgentId,
+  McpConnectionCoordinator,
+  MemoryStore,
+  nowIso,
+  nowMs,
+  planEffectiveModelRequest,
+  PromptPlanForTurn,
+  providerRuntimeCredentialService,
   resolveAgentToolAllowlist,
-} from './DebuggerRuntimePolicy';
-import {
-  extractDeferredToolNamesFromToolSearchDetails,
-  isDeferredToolName,
-  isMcpPrefixedToolName,
-  partitionDeferredTools,
-} from './deferredTools';
+  resolveEffectiveModel,
+  RuntimeToolAssembly,
+  runtimeLogService,
+  appPathService,
+  sessionContextJournal,
+  settingsService,
+  storageAdapter,
+  streamTestModeStub,
+  SubagentRunner,
+  TokenizerService,
+  ToolExecutorFactory,
+  turnCoordinator,
+  TurnPreparationService,
+  workflowProjectionPublisher,
+  type AbortReason,
+  type AgentProfileTurnOptions,
+  type AgentTurnContext,
+  type AgentTurnOptions,
+  type PreparedAgentTurnContext,
+  type TurnHandle,
+} from './AgentOrchestrator.deps';
 
-// 进程内共享 tokenizer：编码器缓存跨 turn 复用，主线程回退路径与 worker 路径同精度。
-const orchestratorTokenizerService = new TokenizerService();
-
-interface AgentTurnContext {
-  runId?: string;
-  sessionId?: string;
-  stageId?: WorkflowStage;
-  turnId?: string;
-  projectRootPath?: string | null;
-  projectId?: string | null;
-}
-
-interface AgentTurnOptions {
-  signal?: AbortSignal;
-  onChunk?: (text: string) => void;
-  onEvent?: (event: SharedAgentEvent) => void;
-  reasoning?: ResolvedReasoningSelection;
-  turnControls?: ConversationTurnControls;
-  requestPlan?: RequestPlan;
-  userContent?: UserMessage['content'];
-  preloadSkillIds?: string[];
-}
-
-interface AgentProfileTurnOptions extends AgentTurnOptions {
-  sessionId?: string;
-  systemPrompt?: string;
-  maxTokens?: number;
-  temperature?: number;
-  turnId?: string;
-  routeAgentId?: AgentRole;
-  stage?: WorkflowStage | 'report';
-  /** 当前激活项目根目录，透传到工具执行上下文。 */
-  projectRootPath?: string | null;
-  /** 当前激活项目 id。 */
-  projectId?: string | null;
-  promptPlan?: PromptPlan;
-  visibleTurnIds?: string[];
-  activeBranchId?: string;
-  preparedTurn?: PreparedAgentTurnContext;
-  onTerminalContext?: (result: {
-    messages: Message[];
-    executionIdentity: ExecutionIdentity;
-    status: 'complete' | 'stopped' | 'error';
-    selectedTurnCount: number;
-    filteredArtifactCount: number;
-  }) => void;
-}
-
-interface ResolvedRuntimeTools {
-  definitions: ToolDefinition[];
-  toolMap: Map<string, AgentTool>;
-}
-
-interface PreparedAgentRuntime {
-  runtimeTools: ResolvedRuntimeTools;
-  activeToolDefinitions: ToolDefinition[];
-  routeCapability: AgentRouteCapability;
-  mcpConnectionErrors: string[];
-  credentialHandle: string;
-  promptCache: CompiledPromptCache;
-  effectivePlan: EffectiveRuntimePlan;
-}
-
-export interface PreparedAgentTurnContext {
-  summary: PreparedTurnContextSummary;
-  selectedModelId: string;
-  effectiveModel: EffectiveModel;
-  toolAllowlist: string[];
-  initialMessages: Message[];
-  contextDiagnostic: {
-    selectedTurnCount: number;
-    activeBranchId: string | null;
-    filteredArtifactCount: number;
-    replayedArtifactCount: number;
-    continuationDecisionCounts: Array<{ reason: string; count: number }>;
-    derivedContextStatus: 'none' | 'applied' | 'stale';
-    compactedTurnCount: number;
-    compactionState: 'prepared' | 'not-required';
-  };
-  runtime: PreparedAgentRuntime;
-}
-
-interface ToolExecutorRuntimeContext {
-  sessionId?: string | null;
-  turnId?: string;
-  eventContext?: AgentEventBridgeContext;
-  onEvent?: (event: SharedAgentEvent) => void;
-  /** 当前激活项目根目录，用于把工具执行 base 对齐到 project root 而非 process.cwd()。 */
-  projectRootPath?: string | null;
-  /** 当前激活项目 id（审计/事件关联）。 */
-  projectId?: string | null;
-  /** Turn 冻结的 EffectiveRuntimePlan；Prompt/Executor 共用 planId/fingerprint。 */
-  effectivePlan?: EffectiveRuntimePlan;
-}
-
-function countContinuationDecisions(
-  decisions: Array<{ reason: string }>,
-): Array<{ reason: string; count: number }> {
-  const counts = new Map<string, number>();
-  for (const decision of decisions) counts.set(decision.reason, (counts.get(decision.reason) ?? 0) + 1);
-  return [...counts].map(([reason, count]) => ({ reason, count }));
-}
-
-/**
- * AgentOrchestrator façade — sendMessage / sendProfileMessage 路由。
- * 状态与连接登记委托给 AgentSlotRegistry / McpConnectionCoordinator /
- * DeferredToolActivationTracker / HandoffMailbox；TurnEventSink 由 TurnCoordinator 持有（无双轨）。
- */
+export type { PreparedAgentTurnContext } from './AgentOrchestrator.deps';
 export class AgentOrchestrator {
   private readonly slots = new AgentSlotRegistry();
   private readonly mcp = new McpConnectionCoordinator();
   private readonly deferredActivation = new DeferredToolActivationTracker();
   private readonly handoffMailbox = new HandoffMailbox();
+  private readonly tokenizerService = new TokenizerService();
+  private readonly promptPlan = new PromptPlanForTurn();
+  private readonly tools: RuntimeToolAssembly;
+  private readonly toolExecutors: ToolExecutorFactory;
+  private readonly turnPrep: TurnPreparationService;
+  private readonly turnRunner: AgentTurnRunner;
+  private readonly subagents: SubagentRunner;
 
   constructor() {
     this.slots.initializeDefaults();
+    const getActiveTurn = (sessionId?: string | null) =>
+      turnCoordinator.getActive(this.sessionTurnKey(sessionId));
+
+    this.subagents = new SubagentRunner({
+      sendProfileMessage: (agentId, content, options) => this.sendProfileMessage(agentId, content, options),
+      systemPromptForAgent: (agentId, prompt) => this.promptPlan.systemPromptForAgent(agentId, prompt),
+      getActiveTurn,
+    });
+
+    this.tools = new RuntimeToolAssembly({
+      mcp: this.mcp,
+      handoffMailbox: this.handoffMailbox,
+      getActiveTurn,
+      getMemoryStore: (scope, projectRootPath) => this.getMemoryStore(scope, projectRootPath),
+      createSubagentTools: (parentAgentId, sessionId, turnHandle) =>
+        this.subagents.createSubagentTools(parentAgentId, sessionId, turnHandle),
+      getMcpServerStatusSummary: (projectRootPath, query) =>
+        this.mcp.getMcpServerStatusSummary(projectRootPath, query),
+    });
+
+    this.toolExecutors = new ToolExecutorFactory({
+      slots: this.slots,
+      deferredActivation: this.deferredActivation,
+      getActiveTurn,
+      resolveRuntimeTools: (...args) => this.tools.resolveRuntimeTools(...args),
+      isAllowedForRuntime: (...args) => this.tools.isAllowedForRuntime(...args),
+      matchesToolAllowlist: (...args) => this.tools.matchesToolAllowlist(...args),
+    });
+
+    this.turnPrep = new TurnPreparationService({
+      mcp: this.mcp,
+      deferredActivation: this.deferredActivation,
+      resolveRuntimeTools: (...args) => this.tools.resolveRuntimeTools(...args),
+      createToolSignature: (...args) => this.tools.createToolSignature(...args),
+    });
+
+    this.turnRunner = new AgentTurnRunner({
+      slots: this.slots,
+      mcp: this.mcp,
+      deferredActivation: this.deferredActivation,
+      handoffMailbox: this.handoffMailbox,
+      tokenizerService: this.tokenizerService,
+      sessionTurnKey: (sessionId) => this.sessionTurnKey(sessionId),
+      resolveRuntimeTools: (...args) => this.tools.resolveRuntimeTools(...args),
+      createToolSignature: (...args) => this.tools.createToolSignature(...args),
+      createToolExecutor: (...args) => this.toolExecutors.createToolExecutor(...args),
+    });
   }
 
   getAgentState(agentId: AgentRole): AgentState | null {
@@ -303,10 +162,6 @@ export class AgentOrchestrator {
     return isToolAllowedForAgent(toolName, agentId);
   }
 
-  /**
-   * 分支切换 / 重写后显式同步：丢弃该 session 的 slot 执行缓存。
-   * 下次 turn 从 conversation.jsonl 重新 rehydrate。
-   */
   syncSessionSlots(sessionId: string): void {
     this.slots.syncSession(sessionId);
     this.deferredActivation.clearSession(sessionId);
@@ -320,9 +175,9 @@ export class AgentOrchestrator {
     return this.slots.ensureAgentState(agentId);
   }
 
-  // -------------------------------------------------------------------
-  // Main entry points: workflow run turn / profile turn.
-  // -------------------------------------------------------------------
+  private sessionTurnKey(sessionId?: string | null): string {
+    return sessionId?.trim() || '__anon__';
+  }
 
   async sendMessage(
     agentId: AgentRole,
@@ -336,7 +191,7 @@ export class AgentOrchestrator {
     this.updateAgentStatus(agentId, 'thinking');
 
     try {
-      const stub = this.createTestModeStub(agentId, content);
+      const stub = createTestModeStub(agentId, content, this.getAgentDisplayName(agentId));
       let runtimeProfile = this.resolveRuntimeProfile(agentId, context?.stageId);
       if (!stub) {
         const credentialProviderId = runtimeProfile.providerId;
@@ -382,7 +237,7 @@ export class AgentOrchestrator {
       );
       const toolAllowlist = resolveAgentToolAllowlist(agentId, context?.stageId);
       // Debug 路径与 Composer/Ask 对齐：经 PromptPlanBuilder 拆分 system/memory_files/skills。
-      const promptPlan = this.buildPromptPlanForAgentTurn({
+      const promptPlan = this.promptPlan.buildPromptPlanForAgentTurn({
         agentId,
         projectRootPath: context?.projectRootPath ?? null,
         providerId: config.modelProvider,
@@ -398,10 +253,10 @@ export class AgentOrchestrator {
         throw new Error(`PROMPT_PLAN_UNAVAILABLE: ${agentId}`);
       }
       const systemPrompt = promptPlan?.systemPrompt
-        ?? this.systemPromptForAgent(agentId, config.systemPrompt);
+        ?? this.promptPlan.systemPromptForAgent(agentId, config.systemPrompt);
       const responseText = stub
-        ? await this.streamTestModeStub(stub, options)
-        : await this.runAgentTurn({
+        ? await streamTestModeStub(stub, options)
+        : await this.turnRunner.runAgentTurn({
           agentId,
           content,
           systemPrompt,
@@ -459,264 +314,8 @@ export class AgentOrchestrator {
     providerRuntimeCredentialService.release(credentialHandle);
   }
 
-  async prepareTurnContext(input: {
-    requestId: string;
-    credentialHandle: string;
-    turnId: string;
-    agentId: AgentRole;
-    content: UserMessage['content'];
-    imageTokenAdjustment: number;
-    providerId: string;
-    selectedModelId: string;
-    effectiveModel: EffectiveModel;
-    routeCapability: AgentRouteCapability;
-    requestPlan: RequestPlan;
-    turnControls: ConversationTurnControls;
-    promptPlan: PromptPlan;
-    toolAllowlist: string[];
-    projectRootPath: string | null;
-    sessionId: string | null;
-    visibleTurnIds: string[];
-    activeBranchId?: string | null;
-    signal?: AbortSignal;
-  }): Promise<PreparedAgentTurnContext> {
-    const throwIfCancelled = () => {
-      if (input.signal?.aborted) throw new Error('REQUEST_CANCELLED: request preparation was cancelled.');
-    };
-    throwIfCancelled();
-    const contextRoute = {
-      providerId: input.providerId,
-      modelId: input.requestPlan.effectiveModelId,
-      protocol: input.requestPlan.route.protocol,
-    };
-    const materialized = input.sessionId
-      ? sessionContextJournal.materialize(
-          input.sessionId,
-          input.visibleTurnIds,
-          input.requestPlan,
-          input.activeBranchId ?? undefined,
-        )
-      : {
-          messages: [],
-          selectedTurnCount: 0,
-          replayedArtifactCount: 0,
-          filteredArtifactCount: 0,
-          artifactDecisions: [],
-          derivedContextStatus: 'none' as const,
-          compactedTurnCount: 0,
-        };
-    throwIfCancelled();
-    const mcpConnectionErrors = await this.mcp.ensureConnections(input.agentId, input.projectRootPath);
-    throwIfCancelled();
-    const runtimeTools = this.resolveRuntimeTools(
-      input.agentId,
-      input.toolAllowlist,
-      'investigate',
-      input.sessionId,
-    );
-    const slotKey = agentSlotKey(input.sessionId, input.agentId);
-    const toolSignature = this.createToolSignature(runtimeTools.definitions);
-    const activation = this.deferredActivation.get(slotKey);
-    const activatedDeferredTools = activation?.toolSignature === toolSignature
-      ? activation.names
-      : new Set<string>();
-    const { injected, deferredMcp, deferredBuiltin } = partitionDeferredTools(
-      runtimeTools.definitions,
-      activatedDeferredTools,
-    );
-    const activeToolDefinitions = input.routeCapability.toolCallingMode === 'native-structured'
-      ? injected
-      : [];
-    const toolTokens = charsToTokens(JSON.stringify(activeToolDefinitions).length);
-    const fixedTokens = input.promptPlan.totalTokenEstimate + toolTokens;
-    const compactionThreshold = Math.floor(
-      input.requestPlan.contextBudgetTokens * CONTEXT_COMPACTION_RATIO,
-    );
-    const messageBudget = compactionThreshold - fixedTokens - input.imageTokenAdjustment;
-    if (messageBudget <= 0) {
-      throw new Error(
-        'PROMPT_OVERHEAD_EXCEEDS_BUDGET: System prompt, skills, and tool schemas exceed the selected model prompt budget.',
-      );
-    }
-
-    const userTimestamp = nowMs();
-    const userMessage: UserMessage = { role: 'user', content: input.content, timestamp: userTimestamp };
-    const messages = [...materialized.messages, userMessage];
-    const computation = await turnPreparationWorkerPool.run({
-      messages,
-      modelId: input.requestPlan.effectiveModelId,
-      messageBudget,
-      imageTokenAdjustment: input.imageTokenAdjustment,
-    }, input.signal);
-    throwIfCancelled();
-    const compactedMessages = computation.compactedMessages;
-    const beforeConversationTokens = computation.beforeConversationTokens;
-    const afterConversationTokens = computation.afterConversationTokens;
-    const uncompactedInputTokens = fixedTokens + beforeConversationTokens;
-    const preparedInputTokens = fixedTokens + afterConversationTokens;
-    const compactionApplied = computation.compactionApplied;
-    const effectiveContextView = computation.derivedContextView ?? materialized.derivedContextView;
-    const promptCache = promptCacheCompiler.compile({
-      promptPlan: input.promptPlan,
-      requestPlan: input.requestPlan,
-      tools: activeToolDefinitions,
-      ...(effectiveContextView ? { derivedContextView: effectiveContextView } : {}),
-    });
-    if (preparedInputTokens > input.requestPlan.contextBudgetTokens) {
-      throw new Error(
-        'CONTEXT_CANNOT_FIT: The request cannot fit after compaction. Remove attachments or select a larger context mode.',
-      );
-    }
-
-    const isMcp = (definition: ToolDefinition) => isMcpPrefixedToolName(definition.name);
-    const isSubagent = (definition: ToolDefinition) => definition.name === 'subagent';
-    const mcpDefinitions = activeToolDefinitions.filter(isMcp);
-    const subagentDefinitions = activeToolDefinitions.filter(isSubagent);
-    const systemDefinitions = activeToolDefinitions.filter((definition) => !isMcp(definition) && !isSubagent(definition));
-    const classified = computation.classification;
-    const metrics = input.promptPlan.metrics;
-    const breakdown: ContextUsageBreakdownEntry[] = [
-      { id: 'system_prompt', tokens: charsToTokens(metrics.systemPrompt) },
-      ...(metrics.scopedInstructions > 0
-        ? [{ id: 'memory_files' as const, tokens: charsToTokens(metrics.scopedInstructions) }]
-        : []),
-      ...(metrics.skills > 0
-        ? [{ id: 'skills' as const, tokens: charsToTokens(metrics.skills) }]
-        : []),
-      { id: 'system_tools', tokens: charsToTokens(JSON.stringify(systemDefinitions).length), count: systemDefinitions.length },
-      ...(mcpDefinitions.length > 0
-        ? [{ id: 'mcp_tools' as const, tokens: charsToTokens(JSON.stringify(mcpDefinitions).length), count: mcpDefinitions.length }]
-        : []),
-      ...(deferredMcp.length > 0
-        ? [{ id: 'mcp_tools_deferred' as const, tokens: charsToTokens(JSON.stringify(deferredMcp).length), count: deferredMcp.length }]
-        : []),
-      ...(deferredBuiltin.length > 0
-        ? [{ id: 'builtin_tools_deferred' as const, tokens: charsToTokens(JSON.stringify(deferredBuiltin).length), count: deferredBuiltin.length }]
-        : []),
-      ...(subagentDefinitions.length > 0
-        ? [{ id: 'subagent_definitions' as const, tokens: charsToTokens(JSON.stringify(subagentDefinitions).length), count: subagentDefinitions.length }]
-        : []),
-      ...(classified.summaryTokens > 0
-        ? [{ id: 'summarized_conversation' as const, tokens: classified.summaryTokens }]
-        : []),
-      { id: 'conversation', tokens: classified.conversationTokens + input.imageTokenAdjustment, count: classified.conversationCount },
-      { id: 'free', tokens: Math.max(0, input.requestPlan.contextBudgetTokens - preparedInputTokens) },
-    ];
-    requestEnvelopeBuilder.build({
-      promptPlan: input.promptPlan,
-      sessionId: input.sessionId ?? undefined,
-      turnId: input.turnId,
-      callIndex: 0,
-      route: contextRoute,
-      requestPlan: input.requestPlan,
-      messages: compactedMessages,
-      tools: activeToolDefinitions,
-      controls: { ...input.turnControls },
-      reasoning: input.routeCapability.reasoningContract,
-      cache: promptCache,
-    });
-    const lastPreparedMessage = compactedMessages.at(-1);
-    if (
-      lastPreparedMessage?.role !== 'user'
-      || JSON.stringify(lastPreparedMessage.content) !== JSON.stringify(input.content)
-    ) {
-      throw new Error('CONTEXT_CANNOT_FIT: preparation did not preserve the current user message.');
-    }
-    const initialMessages = compactedMessages.slice(0, -1);
-    const turnSettings = settingsService.getAll();
-    const profile = turnSettings.agents.definitions
-      .find((definition) => definition.id === input.agentId && definition.enabled);
-    const effectivePlan = buildEffectiveRuntimePlan({
-      agentId: input.agentId,
-      projectRootPath: input.projectRootPath,
-      projectId: null,
-      profile: profile ?? null,
-      toolAllowlist: input.toolAllowlist,
-      permissionSettings: turnSettings.agentRuntime.permissions,
-      routeCapability: input.routeCapability,
-      requestPlan: input.requestPlan,
-      promptPlan: input.promptPlan,
-      policy: compileEffectivePolicy(input.projectRootPath),
-    });
-    const summary: PreparedTurnContextSummary = {
-      requestId: input.requestId,
-      turnId: input.turnId,
-      route: {
-        providerId: input.providerId,
-        adapterId: input.requestPlan.adapterId,
-        selectedModelId: input.selectedModelId,
-        effectiveModelId: input.requestPlan.effectiveModelId,
-        protocol: input.requestPlan.route.protocol,
-        catalogRevision: input.requestPlan.catalogRevision,
-        routeRevision: input.requestPlan.routeRevision,
-        bindingIds: [...input.requestPlan.appliedBindingIds],
-      },
-      wirePatch: {
-        headers: requestPlanHeaders(input.requestPlan),
-        body: structuredClone(input.requestPlan.bodyPatch),
-      },
-      controls: { ...input.turnControls },
-      contextMode: input.requestPlan.contextMode,
-      preparedInputTokens,
-      uncompactedInputTokens,
-      promptBudgetTokens: input.requestPlan.contextBudgetTokens,
-      contextWindowTokens: input.requestPlan.contextWindowTokens,
-      usagePercent: Math.min(100, Math.round((preparedInputTokens / input.requestPlan.contextBudgetTokens) * 100)),
-      breakdown,
-      compactionApplied,
-      filteredArtifactCount: materialized.filteredArtifactCount,
-      derivedContext: {
-        status: materialized.derivedContextStatus,
-        compactedTurnCount: materialized.compactedTurnCount,
-      },
-      continuation: {
-        executionFingerprint: input.requestPlan.executionIdentity.fingerprint,
-        strategy: input.requestPlan.contextTransitionPlan.strategy,
-        replayedArtifactCount: materialized.replayedArtifactCount,
-        droppedArtifactCount: materialized.filteredArtifactCount,
-        decisionCounts: countContinuationDecisions(materialized.artifactDecisions),
-      },
-      cache: {
-        enabled: promptCache.enabled,
-        mode: promptCache.mode,
-        keyCarrier: promptCache.keyCarrier,
-        breakpointCarrier: promptCache.breakpointCarrier,
-        ttl: promptCache.ttl,
-        breakpoint: promptCache.breakpoint,
-        ...(promptCache.prefixFingerprint ? { keyFingerprint: promptCache.prefixFingerprint } : {}),
-        stableTokenEstimate: promptCache.stableTokenEstimate,
-        stableSegmentCount: promptCache.stableSegmentIds.length,
-        providerReported: promptCache.providerReported,
-        reason: promptCache.reason,
-      },
-      preparedAt: nowMs(),
-    };
-    return {
-      summary,
-      selectedModelId: input.selectedModelId,
-      effectiveModel: input.effectiveModel,
-      toolAllowlist: [...input.toolAllowlist],
-      initialMessages,
-      contextDiagnostic: {
-        selectedTurnCount: materialized.selectedTurnCount,
-        activeBranchId: input.activeBranchId ?? null,
-        filteredArtifactCount: materialized.filteredArtifactCount,
-        replayedArtifactCount: materialized.replayedArtifactCount,
-        continuationDecisionCounts: countContinuationDecisions(materialized.artifactDecisions),
-        derivedContextStatus: materialized.derivedContextStatus,
-        compactedTurnCount: materialized.compactedTurnCount,
-        compactionState: compactionApplied ? 'prepared' : 'not-required',
-      },
-      runtime: {
-        runtimeTools,
-        activeToolDefinitions,
-        routeCapability: input.routeCapability,
-        mcpConnectionErrors,
-        credentialHandle: input.credentialHandle,
-        promptCache,
-        effectivePlan,
-      },
-    };
+  async prepareTurnContext(input: Parameters<TurnPreparationService['prepareTurnContext']>[0]): Promise<PreparedAgentTurnContext> {
+    return this.turnPrep.prepareTurnContext(input);
   }
 
   async sendProfileMessage(
@@ -753,7 +352,7 @@ export class AgentOrchestrator {
       };
 
       if (process.env.RDC_AGENT_TEST_MODE === '1') {
-        const finalStub = await this.createProfileTestResponse(agentId, content, options);
+        const finalStub = await createProfileTestResponse(agentId, content, options);
         this.updateAgentStatus(agentId, 'complete');
         return finalStub;
       }
@@ -797,7 +396,7 @@ export class AgentOrchestrator {
       const contextTokenLimit = Math.floor(
         planning.plan.contextBudgetTokens * CONTEXT_COMPACTION_RATIO,
       );
-      const promptPlan = options?.promptPlan ?? this.buildPromptPlanForAgentTurn({
+      const promptPlan = options?.promptPlan ?? this.promptPlan.buildPromptPlanForAgentTurn({
         agentId,
         projectRootPath: options?.projectRootPath ?? null,
         providerId: routeProviderId,
@@ -841,7 +440,7 @@ export class AgentOrchestrator {
               compactedTurnCount: 0,
             };
 
-      const responseText = await this.runAgentTurn({
+      const responseText = await this.turnRunner.runAgentTurn({
         agentId,
         content,
         systemPrompt: promptPlan.systemPrompt,
@@ -915,453 +514,14 @@ export class AgentOrchestrator {
     }
   }
 
-  // -------------------------------------------------------------------
-  // Subagent（串行派生隔离 Context）
-  // -------------------------------------------------------------------
-
-  /**
-   * 派生子 agent 执行任务（串行，父阻塞等待）。
-   *
-   * 对标 claude-code AgentTool：独立 context/message thread、filtered tools、
-   * 独立 permission context。子 agent 事件桥接为 `subagent.*` 事件上抛父 trace。
-   * 结果回传 = 函数返回值（不用 mailbox/队列）。
-   *
-   * @returns 子 agent 最终 assistant 文本。
-   */
-  async runSubagent(input: {
-    parentAgentId: AgentRole;
-    parentToolCallId: string;
-    targetProfile: AgentRole;
-    task: string;
-    parentSessionId?: string | null;
-    parentOnEvent?: (event: SharedAgentEvent) => void;
-    projectRootPath?: string | null;
-    projectId?: string | null;
-    parentTurn?: TurnHandle | null;
-    signal?: AbortSignal | null;
-  }): Promise<{ text: string; status: SubagentResultStatus; subagentId: string }> {
-    const parentBudget = input.parentTurn?.subagentBudget ?? createSubagentBudgetState();
-    assertSubagentBudgetAllowsChild(parentBudget);
-    parentBudget.childrenSpawned += 1;
-
-    const subagentId = generateEventId('subagent');
-    // 子 agent 用独立 sessionId 段隔离 context/messages（不污染父线程持久化）。
-    const subagentSessionId = input.parentSessionId
-      ? `${input.parentSessionId}::subagent::${subagentId}`
-      : null;
-
-    const childAbort = new AbortController();
-    const parentSignal = input.signal ?? input.parentTurn?.signal ?? null;
-    const onParentAbort = () => {
-      try {
-        childAbort.abort();
-      } catch {
-        // ignore
-      }
-    };
-    if (parentSignal) {
-      if (parentSignal.aborted) onParentAbort();
-      else parentSignal.addEventListener('abort', onParentAbort, { once: true });
-    }
-
-    // 通知父 trace：子 agent 启动
-    input.parentOnEvent?.({
-      id: generateEventId('agent-event'),
-      type: 'subagent.started',
-      timestamp: nowMs(),
-      sessionId: input.parentSessionId ?? null,
-      agentId: input.parentAgentId,
-      payload: {
-        subagentId,
-        profile: input.targetProfile,
-        parentToolCallId: input.parentToolCallId,
-        text: input.task,
-      } satisfies AgentSubagentEventPayload,
-    });
-
-    // 组装子 agent system prompt（目标 profile instructions）
-    const definition = settingsService.getAll().agents.definitions
-      .find((d) => d.id === input.targetProfile && d.enabled);
-    const systemPrompt = definition?.instructions?.trim()
-      || this.systemPromptForAgent(input.targetProfile);
-
-    let resultText = '';
-    let resultStatus: SubagentResultStatus = 'complete';
-    const childBudget = createSubagentBudgetState(parentBudget.budget, parentBudget.depth + 1);
-    childBudget.aggregateToolCalls = parentBudget.aggregateToolCalls;
-    childBudget.wallStartedAt = parentBudget.wallStartedAt;
-
-    const unregisterProducer = input.parentTurn?.registerProducer({
-      id: subagentId,
-      abort: () => onParentAbort(),
-      join: async () => {
-        // Child turn join is awaited via sendProfileMessage completion below.
-      },
-    });
-
-    try {
-      if (childAbort.signal.aborted) {
-        throw new DOMException('Aborted', 'AbortError');
-      }
-      resultText = await this.sendProfileMessage(
-        input.targetProfile,
-        input.task,
-        {
-          sessionId: subagentSessionId ?? undefined,
-          stage: 'investigate',
-          projectRootPath: input.projectRootPath,
-          projectId: input.projectId,
-          systemPrompt,
-          signal: childAbort.signal,
-          onEvent: (event: SharedAgentEvent) => {
-            if (input.parentTurn && !input.parentTurn.isLive(input.parentTurn.generation)) {
-              return;
-            }
-            if (event.type === 'tool.started' || event.type === 'tool.completed' || event.type === 'tool.denied') {
-              parentBudget.aggregateToolCalls += 1;
-              childBudget.aggregateToolCalls = parentBudget.aggregateToolCalls;
-            }
-            const basePayload = {
-              subagentId,
-              profile: input.targetProfile,
-              parentToolCallId: input.parentToolCallId,
-            } satisfies Pick<AgentSubagentEventPayload, 'subagentId' | 'profile' | 'parentToolCallId'>;
-
-            if (event.type === 'assistant.delta') {
-              const delta = event.payload as AgentAssistantDeltaPayload;
-              if (delta.text) {
-                input.parentOnEvent?.({
-                  id: generateEventId('agent-event'),
-                  type: 'subagent.delta',
-                  timestamp: nowMs(),
-                  sessionId: input.parentSessionId ?? null,
-                  agentId: input.parentAgentId,
-                  payload: {
-                    ...basePayload,
-                    text: delta.text,
-                  } satisfies AgentSubagentEventPayload,
-                });
-              }
-              return;
-            }
-
-            if (event.type === 'tool.started') {
-              const payload = event.payload as { toolCallId?: string; toolName?: string };
-              input.parentOnEvent?.({
-                id: generateEventId('agent-event'),
-                type: 'subagent.delta',
-                timestamp: nowMs(),
-                sessionId: input.parentSessionId ?? null,
-                agentId: input.parentAgentId,
-                payload: {
-                  ...basePayload,
-                  child: {
-                    id: String(payload.toolCallId ?? generateEventId('subagent-tool')),
-                    kind: 'tool',
-                    title: payload.toolName ? `Tool: ${payload.toolName}` : 'Tool',
-                    status: 'running',
-                    toolName: payload.toolName,
-                  },
-                } satisfies AgentSubagentEventPayload,
-              });
-              return;
-            }
-
-            if (event.type === 'tool.completed' || event.type === 'tool.denied') {
-              const payload = event.payload as {
-                toolCallId?: string;
-                toolName?: string;
-                result?: { ok?: boolean; error?: { message?: string } };
-                reason?: string;
-              };
-              const failed = event.type === 'tool.denied' || payload.result?.ok === false;
-              const summary = failed
-                ? (payload.reason || payload.result?.error?.message || 'Tool failed')
-                : 'Tool completed';
-              input.parentOnEvent?.({
-                id: generateEventId('agent-event'),
-                type: 'subagent.delta',
-                timestamp: nowMs(),
-                sessionId: input.parentSessionId ?? null,
-                agentId: input.parentAgentId,
-                payload: {
-                  ...basePayload,
-                  child: {
-                    id: String(payload.toolCallId ?? generateEventId('subagent-tool')),
-                    kind: 'tool',
-                    title: payload.toolName ? `Tool: ${payload.toolName}` : 'Tool',
-                    status: failed ? 'error' : 'complete',
-                    toolName: payload.toolName,
-                    summary,
-                  },
-                } satisfies AgentSubagentEventPayload,
-              });
-            }
-          },
-        },
-      );
-      if (childAbort.signal.aborted) {
-        resultStatus = 'cancelled';
-      }
-    } catch (error) {
-      const aborted = childAbort.signal.aborted
-        || (error instanceof Error && (error.name === 'AbortError' || /abort|cancel/i.test(error.message)));
-      resultStatus = aborted ? 'cancelled' : 'failed';
-      resultText = error instanceof Error ? error.message : String(error);
-    } finally {
-      unregisterProducer?.();
-      if (parentSignal) {
-        parentSignal.removeEventListener('abort', onParentAbort);
-      }
-      // Propagate child budget usage back to parent.
-      parentBudget.aggregateToolCalls = Math.max(
-        parentBudget.aggregateToolCalls,
-        childBudget.aggregateToolCalls,
-      );
-    }
-
-    // 通知父 trace：子 agent 完成
-    input.parentOnEvent?.({
-      id: generateEventId('agent-event'),
-      type: 'subagent.completed',
-      timestamp: nowMs(),
-      sessionId: input.parentSessionId ?? null,
-      agentId: input.parentAgentId,
-      payload: {
-        subagentId,
-        profile: input.targetProfile,
-        parentToolCallId: input.parentToolCallId,
-        text: resultText,
-        status: resultStatus,
-      } satisfies AgentSubagentEventPayload,
-    });
-
-    return { text: resultText, status: resultStatus, subagentId };
+  async runSubagent(input: Parameters<SubagentRunner['runSubagent']>[0]): Promise<Awaited<ReturnType<SubagentRunner['runSubagent']>>> {
+    return this.subagents.runSubagent(input);
   }
 
-  /**
-   * 创建 subagent 工具（task / agent），注入父 agent 工具集。
-   *
-   * - `task`：派生通用 explore 子 agent（对标 claude-code Task 工具）。
-   * - `agent`：按指定 profile 派生子 agent。
-   */
-  createSubagentTools(parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
-    const orchestrator = this;
-    const capturedTurn = turnHandle ?? this.getActiveTurn(sessionId);
-    const runSubagentTool: AgentTool<
-      { task: string; profile?: string },
-      { subagentId: string; profile: string; status: string }
-    > = {
-      name: 'subagent',
-      label: 'Subagent',
-      description: 'Delegate a sub-task to an isolated sub-agent. The sub-agent runs to completion (serial, not parallel) and returns its final answer. Use profile to target a specific agent profile (defaults to "ask" read-only).',
-      parameters: {
-        type: 'object',
-        required: ['task'],
-        properties: {
-          task: { type: 'string', description: 'The task description for the sub-agent.' },
-          profile: { type: 'string', description: 'Target profile id. Defaults to "ask" (read-only).' },
-        },
-      },
-      permissionHint: 'readonly',
-      async execute(toolCallId, args, signal) {
-        const targetProfile = (typeof args.profile === 'string' && args.profile.trim() ? args.profile.trim() : 'ask') as AgentRole;
-        const turn = capturedTurn ?? orchestrator.getActiveTurn(sessionId);
-        const result = await orchestrator.runSubagent({
-          parentAgentId,
-          parentToolCallId: toolCallId,
-          targetProfile,
-          task: args.task,
-          parentSessionId: sessionId ?? null,
-          parentOnEvent: turn?.eventSink?.onEvent,
-          projectRootPath: turn?.eventSink?.projectRootPath ?? null,
-          projectId: turn?.eventSink?.projectId ?? null,
-          parentTurn: turn,
-          signal: signal ?? turn?.signal ?? null,
-        });
-        return {
-          content: [{ type: 'text', text: result.text || '(sub-agent returned empty output)' }],
-          details: { subagentId: result.subagentId, profile: targetProfile, status: result.status },
-        };
-      },
-    };
-
-    return [runSubagentTool];
+  createSubagentTools(parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null) {
+    return this.subagents.createSubagentTools(parentAgentId, sessionId, turnHandle);
   }
 
-  private getOrCreateAgentSlot(
-    agentId: AgentRole,
-    providerId: string,
-    modelId: string,
-    systemPrompt: string,
-    streamOptions: StreamOptions,
-    tools: ToolDefinition[] = [],
-    toolExecutor = this.createToolExecutor(agentId, [], undefined),
-    turnSignature = '',
-    sessionId?: string | null,
-    contextWindow?: number,
-    contextTokenLimit?: number,
-    promptPlan?: PromptPlan,
-    initialMessages: Message[] = [],
-    contextDiagnostic?: Record<string, unknown>,
-    /** 用于 slot cache key；默认与注入 tools 相同。应传入全部可用工具以稳定复用。 */
-    signatureTools?: ToolDefinition[],
-    routeCapabilityOverride?: AgentRouteCapability,
-    policyMaxTurns?: number,
-  ): AgentSlot {
-    if (!promptPlan) {
-      throw new Error('PromptPlan is required before creating an agent runtime slot.');
-    }
-    const slotKey = agentSlotKey(sessionId, agentId);
-    const toolSignature = this.createToolSignature(signatureTools ?? tools);
-    const activeContextWindow = contextWindow ?? streamOptions.requestPlan.contextWindowTokens;
-    const requestCompactionThreshold = contextTokenLimit
-      ?? Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
-    const fixedPromptTokens = promptPlan.totalTokenEstimate + charsToTokens(JSON.stringify(tools).length);
-    const resolvedContextTokenLimit = requestCompactionThreshold - fixedPromptTokens;
-    if (resolvedContextTokenLimit <= 0) {
-      throw new Error('PROMPT_OVERHEAD_EXCEEDS_BUDGET: system prompt and tool schemas leave no conversation budget.');
-    }
-    const existing = this.slots.getSlot(slotKey);
-    if (
-      existing
-      && existing.providerId === providerId
-      && existing.modelId === modelId
-      && existing.systemPrompt === systemPrompt
-      && existing.toolSignature === toolSignature
-      && existing.turnSignature === turnSignature
-      && existing.contextTokenLimit === resolvedContextTokenLimit
-      && !existing.agent.isStreaming
-    ) {
-      // 复用 slot：从磁盘权威 history rehydrate，再同步 tools（COW）。
-      existing.activatedDeferredTools = this.deferredActivation.resolveActivatedSet(slotKey, toolSignature);
-      this.slots.rehydrate(existing, initialMessages as import('../../agent-runtime/core/types').AgentMessage[]);
-      existing.agent.setTools(tools);
-      return existing;
-    }
-
-    // Every turn starts from the active branch materialized by the canonical
-    // session journal. The in-memory slot is only an execution cache.
-    const agentModel = encodeAgentModel(providerId, modelId, { contextWindow: activeContextWindow });
-    const routeProvider = settingsService.getAll().llm.providers.find((provider) => provider.id === providerId);
-    const reasoningContract = (routeCapabilityOverride ?? resolveAgentRouteCapability(
-      routeProvider,
-      modelId,
-      resolveEffectiveModel(providerId, modelId, settingsService.getAll()),
-    )).reasoningContract;
-
-    const contextManager = new ContextManager({
-      modelId,
-      contextTokenLimit: resolvedContextTokenLimit,
-      toolResultBudget: 200 * 1024,
-      keepRecentToolResults: 3,
-      tokenizer: orchestratorTokenizerService,
-    });
-
-    // ErrorRecovery：错误分类与恢复策略（retry/escalate_tokens/reactive_compact/continue/abort）。
-    // fallbackModel 暂省略（无 settings route fallback 配置时只做非 switch 恢复）。
-    const errorRecovery = new ErrorRecovery({ primaryModel: agentModel });
-
-    const agent = new Agent({
-      initialState: {
-        model: agentModel,
-        systemPrompt,
-        systemPromptSegments: promptPlan.segments,
-        tools,
-        messages: initialMessages,
-      },
-      provider: configuredRuntimeProvider,
-      toolExecutor,
-      streamOptions,
-      maxTurns: this.resolveMaxTurns(agentId, policyMaxTurns),
-      // transformContext：长对话接近窗口上限时自动压缩历史。
-      transformContext: (messages) => contextManager.compress(messages),
-      // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
-      errorRecovery,
-      onRequest: ({ model, context: requestContext, streamOptions: requestOptions }) => {
-        const callIndex = requestSnapshotStore.nextCallIndex(sessionId ?? undefined, turnSignature || undefined);
-        const snapshot = requestEnvelopeBuilder.build({
-          promptPlan,
-          sessionId: sessionId ?? undefined,
-          turnId: turnSignature || undefined,
-          callIndex,
-          route: {
-            providerId,
-            modelId: requestOptions.requestPlan.effectiveModelId,
-            protocol: requestOptions.requestPlan.route.protocol ?? routeProvider?.protocol ?? model.api,
-          },
-          requestPlan: requestOptions.requestPlan,
-          messages: requestContext.messages,
-          tools: requestContext.tools ?? [],
-          controls: {
-            temperature: requestOptions.temperature,
-            maxTokens: requestOptions.maxTokens,
-            topP: requestOptions.topP,
-            reasoningSelection: requestOptions.reasoning?.selection,
-            contextDiagnostic,
-          },
-          reasoning: reasoningContract,
-          cache: requestOptions.promptCache ?? streamOptions.promptCache ?? promptCacheCompiler.compile({
-            promptPlan,
-            requestPlan: requestOptions.requestPlan,
-            tools: requestContext.tools ?? [],
-          }),
-        });
-        requestSnapshotStore.write(snapshot);
-        return snapshot.id;
-      },
-      onResponse: (requestId, message) => {
-        if (!requestId) return;
-        recordEffectivePlanSuccess(providerId, modelId, settingsService.getAll(), streamOptions.requestPlan);
-        requestSnapshotStore.complete(requestId, sessionId ?? undefined, turnSignature || undefined, {
-          inputTokens: message.usage.inputTokens,
-          outputTokens: message.usage.outputTokens,
-          ...(typeof message.usage.cacheReadTokens === 'number'
-            ? { cacheReadTokens: message.usage.cacheReadTokens }
-            : {}),
-          ...(typeof message.usage.cacheWriteTokens === 'number'
-            ? { cacheWriteTokens: message.usage.cacheWriteTokens }
-            : {}),
-          ...(typeof message.usage.cacheHitTokens === 'number'
-            ? { cacheHitTokens: message.usage.cacheHitTokens }
-            : {}),
-          ...(typeof message.usage.cacheMissTokens === 'number'
-            ? { cacheMissTokens: message.usage.cacheMissTokens }
-            : {}),
-          ...(typeof message.usage.reasoningTokens === 'number'
-            ? { reasoningTokens: message.usage.reasoningTokens }
-            : {}),
-          estimated: false,
-        });
-      },
-    });
-
-    const slot: AgentSlot = {
-      agent,
-      contextManager,
-      providerId,
-      modelId,
-      systemPrompt,
-      toolSignature,
-      turnSignature,
-      contextTokenLimit: resolvedContextTokenLimit,
-      activatedDeferredTools: this.deferredActivation.resolveActivatedSet(slotKey, toolSignature),
-    };
-    this.slots.setSlot(slotKey, slot);
-    return slot;
-  }
-
-  private sessionTurnKey(sessionId?: string | null): string {
-    return sessionId?.trim() || '__anon__';
-  }
-
-  private getActiveTurn(sessionId?: string | null): TurnHandle | null {
-    return turnCoordinator.getActive(this.sessionTurnKey(sessionId));
-  }
-
-  /**
-   * Abort the active turn for a session and wait for producers to join.
-   */
   async abortAndJoin(
     sessionId: string | null | undefined,
     options?: { graceMs?: number; forceAfterMs?: number; reason?: AbortReason },
@@ -1380,58 +540,6 @@ export class AgentOrchestrator {
     turnCoordinator.endTurn(handle);
   }
 
-  /**
-   * 激活 deferred 工具（mcp__* 与 extended builtin）：写入激活集并更新
-   * Agent 注入列表，供同 turn 内下一次 LLM 调用使用。
-   */
-  private activateDeferredTools(toolNames: string[], sessionId?: string | null): void {
-    const activation = this.getActiveTurn(sessionId)?.deferredActivation ?? null;
-    if (!activation || toolNames.length === 0) {
-      return;
-    }
-    const slot = this.slots.getSlot(activation.slotKey);
-    if (!slot) {
-      return;
-    }
-    const { changed, injected } = this.deferredActivation.activate({
-      slotKey: activation.slotKey,
-      toolNames,
-      allDefinitions: activation.allDefinitions,
-      activatedSet: slot.activatedDeferredTools,
-    });
-    if (!changed) {
-      return;
-    }
-    // COW revision bump — next LLM round reads new activeTools via LoopRuntimeState.
-    slot.agent.activateDeferredTools(slot.activatedDeferredTools, injected);
-  }
-
-  /**
-   * 解析 Agent 的工具执行轮数上限。
-   *
-   * 优先用 `.agent.md` frontmatter 的 `max-turns`；
-   * 未配置时按 profile 默认：edit/debugger/optimizer=50，ask/plan/analyzer=25。
-   */
-  private resolveMaxTurns(agentId: AgentRole, policyMaxTurns?: number): number {
-    if (typeof policyMaxTurns === 'number' && Number.isFinite(policyMaxTurns) && policyMaxTurns > 0) {
-      const manifest = settingsService.getAll().agents.definitions
-        .find((definition) => definition.id === agentId && definition.enabled);
-      const profileMax = manifest?.maxTurns && manifest.maxTurns > 0
-        ? manifest.maxTurns
-        : (agentId === 'edit' || agentId === 'debugger' || agentId === 'optimizer' ? 50 : 25);
-      return Math.min(policyMaxTurns, profileMax);
-    }
-    const manifest = settingsService.getAll().agents.definitions
-      .find((definition) => definition.id === agentId && definition.enabled);
-    if (manifest?.maxTurns && manifest.maxTurns > 0) {
-      return manifest.maxTurns;
-    }
-    if (agentId === 'edit' || agentId === 'debugger' || agentId === 'optimizer') {
-      return 50;
-    }
-    return 25;
-  }
-
   private getMemoryStore(scope: 'user' | 'project', projectRootPath?: string | null): MemoryStore {
     if (scope === 'project') {
       if (!projectRootPath) throw new Error('Project scope memory requires an active project.');
@@ -1440,7 +548,6 @@ export class AgentOrchestrator {
     return new MemoryStore(appPathService.getUserRdxPaths().memoryPath);
   }
 
-  /** Memory 面板用：列出全部记忆摘要。 */
   async listMemoriesForUi(): Promise<Array<{ name: string; description: string; type: string; updatedAt: number }>> {
     try {
       const all = await this.getMemoryStore('user').listMemories();
@@ -1450,7 +557,6 @@ export class AgentOrchestrator {
     }
   }
 
-  /** Memory 面板用：读取单条记忆详情。 */
   async getMemoryForUi(name: string): Promise<{
     name: string; description: string; type: string; content: string; tags?: string[]; createdAt: number; updatedAt: number;
   } | null> {
@@ -1471,7 +577,6 @@ export class AgentOrchestrator {
     }
   }
 
-  /** Memory 面板用：写入记忆。 */
   async writeMemoryForUi(request: { name: string; description: string; type: 'user' | 'feedback' | 'project' | 'reference'; content: string; tags?: string[] }): Promise<{ success: boolean; name: string; error?: string }> {
     try {
       const record = await this.getMemoryStore('user').writeMemory(request);
@@ -1481,7 +586,6 @@ export class AgentOrchestrator {
     }
   }
 
-  /** Memory 面板用：删除记忆。 */
   async deleteMemoryForUi(name: string): Promise<{ success: boolean; error?: string }> {
     try {
       const deleted = await this.getMemoryStore('user').deleteMemory(name);
@@ -1491,13 +595,6 @@ export class AgentOrchestrator {
     }
   }
 
-  /**
-   * 消费待处理的 handoff 请求（agent_handoff 工具成功时设置）。
-   *
-   * ConversationService 在 profile turn 完成后调用：若有 pendingHandoff，
-   * emit handoff.requested 事件 + 持久化到 session，下次消息自动用新 profile。
-   * 读取后清除（一次性消费）。
-   */
   consumePendingHandoff(): {
     fromAgentId: AgentRole;
     toProfile: AgentRole;
@@ -1508,1460 +605,18 @@ export class AgentOrchestrator {
     return this.handoffMailbox.consume();
   }
 
-  private createToolSignature(tools: ToolDefinition[]): string {
-    return tools.map((tool) => tool.name).sort().join('|');
-  }
 
-  private resolveRuntimeTools(
-    agentId: AgentRole,
-    toolAllowlist: string[],
-    stage?: WorkflowStage | 'report',
-    sessionId?: string | null,
-    turnHandle?: TurnHandle | null,
-    projectId?: string | null,
-  ): ResolvedRuntimeTools {
-    const availableTools = new Map<string, AgentTool>();
-    for (const tool of getPrimitiveTools()) {
-      availableTools.set(normalizeToolName(tool.name), tool);
-    }
-    for (const tool of this.createTaskRuntimeTools(sessionId, turnHandle)) {
-      availableTools.set(normalizeToolName(tool.name), tool);
-    }
-    const rdxContextTool = this.createRdxContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);
-    availableTools.set(rdxContextTool.name, rdxContextTool);
-    for (const tool of this.createWorkbenchTools(agentId, sessionId, turnHandle)) {
-      availableTools.set(normalizeToolName(tool.name), tool);
-    }
-    for (const tool of this.mcp.getAgentTools()) {
-      availableTools.set(normalizeToolName(tool.name), tool);
-    }
-    // tool_search 只能发现 allowlist + runtime policy 过滤后的工具集，
-    // 否则模型会看到（并尝试调用）本轮被禁止的工具。
-    const toolSearchTool = createToolSearchTool(() =>
-      Array.from(availableTools.values()).filter((tool) =>
-        this.matchesToolAllowlist(tool.name, toolAllowlist)
-        && this.isAllowedForRuntime(agentId, tool.name, stage),
-      ),
-    );
-    availableTools.set(normalizeToolName(toolSearchTool.name), toolSearchTool);
-
-    const definitions: ToolDefinition[] = [];
-    const toolMap = new Map<string, AgentTool>();
-    for (const tool of availableTools.values()) {
-      if (!this.matchesToolAllowlist(tool.name, toolAllowlist)) continue;
-      if (!this.isAllowedForRuntime(agentId, tool.name, stage)) continue;
-      const normalized = normalizeToolName(tool.name);
-      if (!toolMap.has(normalized)) {
-        toolMap.set(normalized, tool);
-        definitions.push(toolToDefinition(tool));
-      }
-    }
-    return { definitions, toolMap };
-  }
-
-  private matchesToolAllowlist(toolName: string, toolAllowlist: string[]): boolean {
-    const normalizedToolName = normalizeToolName(toolName);
-    return toolAllowlist.some((entry) => {
-      const normalizedEntry = normalizeToolName(entry);
-      if (normalizedEntry === '*' || normalizedEntry === normalizedToolName) {
-        return true;
-      }
-      if (normalizedEntry.endsWith('.*') && normalizedToolName.startsWith(normalizedEntry.slice(0, -1))) {
-        return true;
-      }
-      if (normalizedEntry.endsWith('*') && normalizedToolName.startsWith(normalizedEntry.slice(0, -1))) {
-        return true;
-      }
-      return false;
-    });
-  }
-
-  private createToolExecutor(
-    agentId: AgentRole,
-    toolAllowlist: string[],
-    stage?: WorkflowStage | 'report',
-    sessionId?: string | null,
-    runtimeContext?: ToolExecutorRuntimeContext,
-  ): ToolExecutor {
-    const tools = this.resolveRuntimeTools(
-      agentId,
-      toolAllowlist,
-      stage,
-      sessionId,
-      this.getActiveTurn(sessionId),
-      runtimeContext?.projectId,
-    ).toolMap;
-    // Skill allowed-tools 收窄集（DESIGN Skills 条款：只收窄、不扩展）。
-    // 多 skill：allowedTools = ∩(skill_i) ∩ runtimeAllowlist（空声明不参与）。
-    let activeSkillAllowlist: Set<string> | null = null;
-    const applySkillNarrowing = (skillAllowedTools: string[]): void => {
-      if (skillAllowedTools.length === 0) return;
-      const narrowed = intersectSkillAllowedTools(toolAllowlist, skillAllowedTools);
-      if (activeSkillAllowlist === null) {
-        activeSkillAllowlist = new Set(narrowed);
-        return;
-      }
-      // failure-class: security — intersect skills; do not union.
-      activeSkillAllowlist = new Set(
-        [...activeSkillAllowlist].filter((name) => narrowed.includes(name)),
-      );
-    };
-    // .agent.md 声明的 preloaded skills：优先用 EffectiveRuntimePlan 冻结集，避免 turn 中途 settings 漂移。
-    const plan = runtimeContext?.effectivePlan;
-    const profileSkillIds = plan?.profileSkills
-      ?? settingsService.getAll().agents.definitions
-        .find((definition) => definition.id === agentId && definition.enabled)?.skills
-      ?? [];
-    for (const skillId of profileSkillIds) {
-      const preloaded = agentRuntimeConfigService.loadSkill(
-        skillId,
-        runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? undefined,
-      );
-      if (preloaded?.allowedTools?.length) {
-        applySkillNarrowing(preloaded.allowedTools);
-      }
-    }
-    const permissionSettings = plan?.permissionSettings;
-    const compiledPolicy = plan?.policy;
-    return {
-      execute: async (toolCall: ToolCall, signal?: AbortSignal, onUpdate?: (partialResult: unknown) => void) => {
-        const normalizedName = normalizeToolName(toolCall.name);
-        if (!this.isAllowedForRuntime(agentId, toolCall.name, stage) || !tools.has(normalizedName)) {
-          return this.createPolicyDeniedToolResult(toolCall, agentId);
-        }
-        if (
-          activeSkillAllowlist !== null
-          && !this.matchesToolAllowlist(normalizedName, Array.from(activeSkillAllowlist))
-        ) {
-          return this.createPolicyDeniedToolResult(
-            toolCall,
-            agentId,
-            `Tool "${toolCall.name}" is outside the allowed-tools set declared by the active skill.`,
-          );
-        }
-        if (compiledPolicy && isToolDeniedByPolicy(compiledPolicy, normalizedName)) {
-          return this.createPolicyDeniedToolResult(
-            toolCall,
-            agentId,
-            `POLICY_DENIED: tool "${toolCall.name}" is in deniedTools.`,
-          );
-        }
-        if (isDeferredToolName(normalizedName)) {
-          const activation = this.getActiveTurn(runtimeContext?.sessionId)?.deferredActivation ?? null;
-          const slot = activation ? this.slots.getSlot(activation.slotKey) : undefined;
-          if (!slot?.activatedDeferredTools.has(normalizedName)) {
-            return {
-              role: 'toolResult',
-              toolCallId: toolCall.id,
-              toolName: toolCall.name,
-              content: [{ type: 'text', text: 'TOOL_NOT_ACTIVATED: Use tool_search first.' }],
-              isError: true,
-              timestamp: Date.now(),
-            };
-          }
-        }
-        const tool = tools.get(normalizedName);
-        if (!tool) {
-          return this.createPolicyDeniedToolResult(toolCall, agentId);
-        }
-        let validatedArgs: Record<string, unknown>;
-        try {
-          validatedArgs = toolValidator.validate(toolToDefinition(tool), toolCall.arguments ?? {});
-        } catch (error) {
-          const message = error instanceof ToolValidationError
-            ? error.message
-            : error instanceof Error ? error.message : String(error);
-          return {
-            role: 'toolResult',
-            toolCallId: toolCall.id,
-            toolName: toolCall.name,
-            content: [{ type: 'text', text: `TOOL_SCHEMA_VIOLATION: ${message}` }],
-            isError: true,
-            timestamp: Date.now(),
-          };
-        }
-        const validatedToolCall: ToolCall = { ...toolCall, arguments: validatedArgs };
-        if (normalizedName === 'ask_user') {
-          return this.executeAskUserTool(validatedToolCall, agentId, runtimeContext, signal);
-        }
-        const permissionDecision = agentPermissionPolicyService.evaluate({
-          tool,
-          toolCall: validatedToolCall,
-          projectRootPath: runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? null,
-          ...(permissionSettings ? { permissionSettings } : {}),
-          ...(compiledPolicy ? { compiledPolicy } : {}),
-        });
-        if (permissionDecision.action === 'deny') {
-          return this.createPolicyDeniedToolResult(toolCall, agentId, permissionDecision.reason);
-        }
-        if (permissionDecision.action === 'ask_user') {
-          if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
-            return this.createApprovalRequiredToolResult(toolCall, agentId, permissionDecision.reason ?? 'Tool approval requires an active conversation turn.');
-          }
-          const approved = await agentToolApprovalRequestService.request({
-            agentId,
-            sessionId: runtimeContext.sessionId ?? null,
-            turnId: runtimeContext.turnId,
-            toolCallId: toolCall.id,
-            toolName: toolCall.name,
-            reason: permissionDecision.reason ?? `Tool "${toolCall.name}" requires approval.`,
-            risk: permissionDecision.risk,
-            context: runtimeContext.eventContext,
-            onEvent: runtimeContext.onEvent,
-            signal,
-          });
-          if (!approved) {
-            return this.createPolicyDeniedToolResult(toolCall, agentId, 'User denied this tool call.');
-          }
-        }
-        if (permissionDecision.action === 'auto_review') {
-          if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
-            return this.createPolicyDeniedToolResult(toolCall, agentId, 'Auto-review requires an active conversation turn.');
-          }
-          const approved = agentToolApprovalRequestService.autoReview({
-            agentId,
-            sessionId: runtimeContext.sessionId ?? null,
-            turnId: runtimeContext.turnId,
-            toolCallId: toolCall.id,
-            toolName: toolCall.name,
-            reason: permissionDecision.reason ?? `Tool "${toolCall.name}" requires review.`,
-            risk: permissionDecision.risk,
-            context: runtimeContext.eventContext,
-            onEvent: runtimeContext.onEvent,
-            signal,
-          });
-          if (!approved) {
-            return this.createPolicyDeniedToolResult(toolCall, agentId, 'Auto-review denied this tool call.');
-          }
-        }
-        try {
-          const projectRootPath = runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? null;
-          const beforeHooksAllowed = await this.triggerRuntimeHooks('tool.before-call', agentId, runtimeContext, {
-            toolName: toolCall.name,
-            toolCallId: toolCall.id,
-            arguments: validatedArgs,
-          });
-          if (!beforeHooksAllowed) {
-            return this.createPolicyDeniedToolResult(toolCall, agentId, 'A blocking lifecycle hook denied this tool call.');
-          }
-          const toolContext: ToolExecutionContext = {
-            workspaceRoot: projectRootPath ?? getWorkspaceRoot(),
-            projectRootPath,
-            projectId: runtimeContext?.projectId ?? plan?.projectId ?? null,
-            sessionId: runtimeContext?.sessionId ?? null,
-            temporaryAllowedPathRoots: permissionDecision.temporaryPathRoots,
-          };
-          const result = await tool.execute(
-            toolCall.id,
-            validatedArgs,
-            signal,
-            onUpdate,
-            toolContext,
-          );
-          await this.triggerRuntimeHooks('tool.after-call', agentId, runtimeContext, {
-            toolName: toolCall.name,
-            toolCallId: toolCall.id,
-            isError: result.isError === true,
-          });
-          // Deferred 激活：仅 tool_search 可激活；直接调用未激活 deferred → 上文已 fail-closed。
-          if (normalizedName === 'tool_search' && result.isError !== true) {
-            this.activateDeferredTools(
-              extractDeferredToolNamesFromToolSearchDetails(result.details),
-              runtimeContext?.sessionId,
-            );
-          }
-          // Skill 激活：skill_read 成功后按其 allowed-tools 收窄本 turn 工具面。
-          if (normalizedName === 'skill_read' && result.isError !== true) {
-            const skillId = (result.details as { skillId?: string } | undefined)?.skillId;
-            const skill = skillId
-              ? agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined)
-              : null;
-            if (skill?.allowedTools?.length) {
-              applySkillNarrowing(skill.allowedTools);
-            }
-          }
-          return this.agentToolResultToMessage(toolCall, result);
-        } catch (error) {
-          await this.triggerRuntimeHooks('tool.on-error', agentId, runtimeContext, {
-            toolName: toolCall.name,
-            toolCallId: toolCall.id,
-            error: error instanceof Error ? error.message : String(error),
-          });
-          return {
-            role: 'toolResult',
-            toolCallId: toolCall.id,
-            toolName: toolCall.name,
-            content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
-            isError: true,
-            timestamp: Date.now(),
-          };
-        }
-      },
-    };
-  }
-
-  private async triggerRuntimeHooks(
-    event: HookEvent,
-    agentId: AgentRole,
-    runtimeContext: ToolExecutorRuntimeContext | undefined,
-    payload: Record<string, unknown>,
-  ): Promise<boolean> {
-    const projectRoot = runtimeContext?.projectRootPath ?? undefined;
-    hookEngine.load(appPathService.getUserRdxPaths().hooksPath, projectRoot ?? undefined);
-    const results = await hookEngine.trigger(event, {
-      event,
-      agentId,
-      toolName: typeof payload.toolName === 'string' ? payload.toolName : undefined,
-      sessionId: runtimeContext?.sessionId ?? undefined,
-      projectRoot: projectRoot ?? undefined,
-      payload,
-    });
-    for (const result of results) {
-      if (!runtimeContext?.eventContext || !runtimeContext.onEvent) continue;
-      runtimeContext.onEvent(buildDiagnosticAgentEvent(runtimeContext.eventContext, {
-        code: `hook.${result.status}`,
-        severity: result.status === 'completed' ? 'info' : result.allowed ? 'warning' : 'error',
-        message: `Hook ${result.hookId}: ${result.status}`,
-        technicalMessage: JSON.stringify({
-          exitCode: result.exitCode,
-          reason: result.reason,
-          stdout: result.stdout,
-          stderr: result.stderr,
-        }),
-      }));
-    }
-    return results.every((result) => result.allowed);
-  }
-
-  private isAllowedForRuntime(
-    agentId: AgentRole,
-    toolName: string,
-    stage?: WorkflowStage | 'report',
-  ): boolean {
-    const workflowStage = stage === 'report' ? undefined : stage;
-    return isToolAllowedForAgent(toolName, agentId, workflowStage);
-  }
-
-  private async executeAskUserTool(
-    toolCall: ToolCall,
-    agentId: AgentRole,
-    runtimeContext: ToolExecutorRuntimeContext | undefined,
-    signal?: AbortSignal,
-  ): Promise<ToolResultMessage> {
-    try {
-      const args = toolCall.arguments ?? {};
-      const questions = normalizeAskUserQuestions(args);
-      if (questions.length === 0) {
-        throw new Error('ask_user requires at least one canonical questions[] entry with a prompt.');
-      }
-
-      if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
-        throw new Error('ask_user requires an active conversation interaction bridge.');
-      }
-
-      const answer = await agentUserInputRequestService.request({
-        agentId,
-        sessionId: runtimeContext.sessionId ?? null,
-        turnId: runtimeContext.turnId,
-        toolCallId: toolCall.id,
-        questions,
-        context: runtimeContext.eventContext,
-        onEvent: runtimeContext.onEvent,
-        signal,
-      });
-
-      return {
-        role: 'toolResult',
-        toolCallId: toolCall.id,
-        toolName: toolCall.name,
-        content: [{ type: 'text', text: answer }],
-        isError: false,
-        timestamp: Date.now(),
-      };
-    } catch (error) {
-      return {
-        role: 'toolResult',
-        toolCallId: toolCall.id,
-        toolName: toolCall.name,
-        content: [{ type: 'text', text: error instanceof Error ? error.message : String(error) }],
-        isError: true,
-        timestamp: Date.now(),
-      };
-    }
-  }
-
-  private createPolicyDeniedToolResult(toolCall: ToolCall, agentId: AgentRole, reason?: string): ToolResultMessage {
-    return {
-      role: 'toolResult',
-      toolCallId: toolCall.id,
-      toolName: toolCall.name,
-      content: [{
-        type: 'text',
-        text: reason || `Policy denied tool "${toolCall.name}" for ${agentId}.`,
-      }],
-      isError: true,
-      timestamp: Date.now(),
-    };
-  }
-
-  private createApprovalRequiredToolResult(
-    toolCall: ToolCall,
-    agentId: AgentRole,
-    reason: string,
-  ): ToolResultMessage {
-    return {
-      role: 'toolResult',
-      toolCallId: toolCall.id,
-      toolName: toolCall.name,
-      content: [{
-        type: 'text',
-        text: `Approval required for tool "${toolCall.name}" before it can run for ${agentId}. ${reason} No changes were made.`,
-      }],
-      isError: true,
-      timestamp: Date.now(),
-    };
-  }
-
-  private agentToolResultToMessage(toolCall: ToolCall, result: AgentToolResult): ToolResultMessage {
-    return {
-      role: 'toolResult',
-      toolCallId: toolCall.id,
-      toolName: toolCall.name,
-      content: result.content,
-      isError: result.isError === true,
-      details: result.details,
-      timestamp: Date.now(),
-    };
-  }
-
-  private createTaskRuntimeTools(sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
-    // subagent（sessionId 含 ::subagent:: 段）用 MemoryTaskStore，随子 context 结束回收；
-    // 顶层 agent 用会话级 FileTaskStore 落盘（${userData}/state/tasks/{sessionId}），供「进度」泳道按会话读取。
-    const resolvedSessionId = sessionId ?? turnHandle?.eventSink?.sessionId ?? null;
-    const isSubagent = resolvedSessionId?.includes('::subagent::') ?? false;
-    const store = isSubagent || !resolvedSessionId
-      ? new MemoryTaskStore()
-      : createSessionTaskStore(resolvedSessionId);
-    const registry = new TaskRegistry(store);
-    // 桥接 task 变更为 AgentEvent，激活 ConversationService 的 task.* 投影。
-    registry.onTaskChange = ({ type, task }) => {
-      const sink = turnHandle?.eventSink ?? this.getActiveTurn(resolvedSessionId)?.eventSink;
-      if (!sink?.onEvent) return;
-      if (turnHandle && !turnHandle.isLive(turnHandle.generation)) return;
-      sink.onEvent({
-        id: generateEventId('agent-event'),
-        type: type === 'created' ? 'task.created' : 'task.updated',
-        timestamp: nowMs(),
-        sessionId: sink.sessionId ?? null,
-        agentId: sink.agentId,
-        payload: {
-          taskId: task.id,
-          title: task.subject,
-          status: task.status,
-        },
-      });
-    };
-    return createTaskTools(registry);
-  }
-
-  private createRdxContextTool(sessionId?: string | null, projectId?: string | null): AgentTool<Record<string, never>, { available: boolean }> {
-    return {
-      name: 'rdx_context',
-      label: 'RDX Context',
-      description: 'Read the current stable RDX runtime context captured by configured shell actions.',
-      parameters: {
-        type: 'object',
-        properties: {},
-      },
-      permissionHint: 'readonly',
-      async execute() {
-        const lease = assertRdxContextLeaseOwnership({
-          sessionId,
-          projectId,
-        });
-        const runtimeContext = lease?.runtimeContext ?? (sessionId ? null : getRdxRuntimeContext());
-        if (!runtimeContext) {
-          return {
-            content: [{
-              type: 'text',
-              text: sessionId
-                ? 'No RDX runtime context lease is owned by this session.'
-                : 'No RDX runtime context is currently available.',
-            }],
-            details: { available: false },
-          };
-        }
-        return {
-          content: [{ type: 'text', text: JSON.stringify(runtimeContext, null, 2) }],
-          details: { available: true },
-        };
-      },
-    };
-  }
-
-  private createWorkbenchTools(agentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
-    return [
-      this.createAskUserTool(agentId),
-      this.createAgentHandoffTool(agentId, sessionId, turnHandle),
-      this.createMemorySearchTool(sessionId),
-      this.createMemoryReadTool(sessionId),
-      this.createMemoryWriteTool(),
-      this.createMemoryDeleteTool(),
-      this.createPlanArtifactTool(sessionId),
-      this.createSkillsCatalogTool(),
-      this.createSkillReadTool(agentId),
-      this.createMcpCatalogTool(),
-      ...this.createSubagentTools(agentId, sessionId, turnHandle),
-    ];
-  }
-
-  private createAskUserTool(agentId: AgentRole): AgentTool<
-    { questions?: unknown[] },
-    { agentId: AgentRole; questions: ConversationAskUserQuestion[] }
-  > {
-    return {
-      name: 'ask_user',
-      label: 'Ask User',
-      description: 'Ask the user for a decision or missing information. Use this when progress depends on user input.',
-      parameters: {
-        type: 'object',
-        required: ['questions'],
-        properties: {
-          questions: {
-            type: 'array',
-            minItems: 1,
-            description: 'Batch of user questions. A single question is represented as an array with one item.',
-            items: {
-              type: 'object',
-              required: ['prompt'],
-              properties: {
-                questionId: { type: 'string', description: 'Optional stable question id. Runtime generates one when omitted.' },
-                prompt: { type: 'string', description: 'The concise question to ask the user.' },
-                description: { type: 'string', description: 'Optional supporting context shown below the question title.' },
-                allowFreeform: { type: 'boolean', description: 'Whether the user may type a custom answer. Defaults to true.' },
-                options: {
-                  type: 'array',
-                  description: 'Optional mutually exclusive choices.',
-                  items: {
-                    type: 'object',
-                    required: ['label'],
-                    properties: {
-                      optionId: { type: 'string', description: 'Optional stable option id. Runtime generates one when omitted.' },
-                      label: { type: 'string', description: 'Short option label.' },
-                      description: { type: 'string', description: 'Optional one-line option detail.' },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-      permissionHint: 'readonly',
-      async execute(_toolCallId, args) {
-        const questions = normalizeAskUserQuestions(args);
-        return {
-          content: [{
-            type: 'text',
-            text: questions.length > 0
-              ? 'ask_user requires the conversation interaction bridge.'
-              : 'ask_user requires at least one canonical questions[] entry with a prompt.',
-          }],
-          isError: true,
-          details: { agentId, questions },
-        };
-      },
-    };
-  }
-
-  private createAgentHandoffTool(
-    agentId: AgentRole,
-    sessionId?: string | null,
-    turnHandle?: TurnHandle | null,
-  ): AgentTool<
-    { agent?: string; label?: string; prompt?: string },
-    { fromAgentId: AgentRole; toAgentId: string; label: string; prompt: string; valid: boolean }
-  > {
-    const orchestrator = this;
-    const capturedTurn = turnHandle ?? this.getActiveTurn(sessionId);
-    return {
-      name: 'agent_handoff',
-      label: 'Agent Handoff',
-      description: 'Request a handoff to another agent profile. The runtime validates the target against the current profile handoffs and prepares the receiving prompt. The actual profile switch is applied by the orchestrator after this turn.',
-      parameters: {
-        type: 'object',
-        required: ['agent'],
-        properties: {
-          agent: { type: 'string', description: 'Target agent profile id, such as edit, debugger, analyzer, or optimizer.' },
-          label: { type: 'string', description: 'Short handoff label. Defaults to the declared handoff label.' },
-          prompt: { type: 'string', description: 'Implementation or specialist prompt for the receiving agent. Defaults to the declared handoff prompt.' },
-        },
-      },
-      permissionHint: 'readonly',
-      async execute(_toolCallId, args) {
-        const toProfile = typeof args.agent === 'string' ? args.agent.trim() : '';
-        const resolved = handoffController.resolve(
-          agentId,
-          toProfile,
-          typeof args.prompt === 'string' ? args.prompt : undefined,
-          typeof args.label === 'string' ? args.label : undefined,
-        );
-        if (!resolved.valid || !resolved.request) {
-          return {
-            content: [{
-              type: 'text',
-              text: `Handoff rejected: ${resolved.reason ?? 'unknown reason'}`,
-            }],
-            isError: true,
-            details: { fromAgentId: agentId, toAgentId: toProfile, label: '', prompt: '', valid: false },
-          };
-        }
-        const { toProfile: target, label, prompt } = resolved.request;
-        const turn = capturedTurn ?? orchestrator.getActiveTurn(sessionId);
-        const handoff = {
-          fromAgentId: agentId,
-          toProfile: target as AgentRole,
-          prompt,
-          label,
-          sessionId: sessionId ?? turn?.eventSink?.sessionId ?? null,
-        };
-        if (turn) {
-          turn.pendingHandoff = handoff;
-        }
-        // 记录待处理 handoff，供 ConversationService turn 结束后 consume 实现 profile 切换。
-        orchestrator.handoffMailbox.deposit(handoff);
-        return {
-          content: [{
-            type: 'text',
-            text: `Handoff prepared from ${agentId} to ${target}: ${label}\n${prompt}`,
-          }],
-          details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: true },
-        };
-      },
-    };
-  }
-
-  private createPlanArtifactTool(sessionId?: string | null): AgentTool<
-    { title?: string; content?: string },
-    { sessionId: string | null; artifactPath?: string }
-  > {
-    return {
-      name: 'plan_artifact',
-      label: 'Write Plan Artifact',
-      description: 'Write or replace the current session plan artifact. This cannot edit arbitrary workspace files.',
-      parameters: {
-        type: 'object',
-        required: ['content'],
-        properties: {
-          title: { type: 'string', description: 'Optional plan title.' },
-          content: { type: 'string', description: 'Plan content to persist for this session.' },
-        },
-      },
-      permissionHint: 'session_mutation',
-      async execute(_toolCallId, args) {
-        if (!sessionId) {
-          return {
-            content: [{ type: 'text', text: 'No active session is available for a plan artifact.' }],
-            isError: true,
-            details: { sessionId: null },
-          };
-        }
-        const body = typeof args.content === 'string' ? args.content.trim() : '';
-        if (!body) {
-          return {
-            content: [{ type: 'text', text: 'Plan artifact content is required.' }],
-            isError: true,
-            details: { sessionId },
-          };
-        }
-        const title = typeof args.title === 'string' && args.title.trim()
-          ? args.title.trim()
-          : 'Agent Plan';
-        const artifactPath = storageAdapter.writeSessionPlanArtifact(sessionId, `# ${title}\n\n${body}\n`);
-        return {
-          content: [{ type: 'text', text: `Plan artifact saved: ${artifactPath}` }],
-          details: { sessionId, artifactPath },
-        };
-      },
-    };
-  }
-
-  private createMemorySearchTool(sessionId?: string | null): AgentTool<
-    { scope: 'user' | 'project'; query?: string; limit?: number },
-    { sessionId: string | null; scope: 'user' | 'project'; count: number }
-  > {
-    const resolveStore = this.getMemoryStore.bind(this);
-    return {
-      name: 'memory_search',
-      label: 'Search Memory',
-      description: 'Search explicitly saved memories in one declared scope. Memory is never injected automatically.',
-      parameters: { type: 'object', required: ['scope'], properties: {
-        scope: { type: 'string', enum: ['user', 'project'] },
-        query: { type: 'string' },
-        limit: { type: 'number' },
-      } },
-      permissionHint: 'readonly',
-      async execute(_id, args, _signal, _update, context) {
-        const records = await resolveStore(args.scope, context?.projectRootPath).searchMemories(args.query ?? '', args.limit ?? 20);
-        return { content: [{ type: 'text', text: records.length ? records.map((record) => `- ${record.name}: ${record.description}`).join('\n') : 'No matching memories were found.' }], details: { sessionId: sessionId ?? null, scope: args.scope, count: records.length } };
-      },
-    };
-  }
-
-  private createMemoryReadTool(sessionId?: string | null): AgentTool<
-    { scope: 'user' | 'project'; name: string },
-    { sessionId: string | null; scope: 'user' | 'project'; count: number }
-  > {
-    const resolveStore = this.getMemoryStore.bind(this);
-    return {
-      name: 'memory_read',
-      label: 'Read Memory',
-      description: 'Read one explicitly saved memory by exact name and scope.',
-      parameters: { type: 'object', required: ['scope', 'name'], properties: {
-        scope: { type: 'string', enum: ['user', 'project'] },
-        name: { type: 'string' },
-      } },
-      permissionHint: 'readonly',
-      async execute(_id, args, _signal, _update, context) {
-        const record = await resolveStore(args.scope, context?.projectRootPath).getMemory(args.name);
-        return { content: [{ type: 'text', text: record ? `# ${record.name}\n\n${record.description}\n\n${record.content}` : `No memory named "${args.name}" was found.` }], details: { sessionId: sessionId ?? null, scope: args.scope, count: record ? 1 : 0 } };
-      },
-    };
-  }
-
-  private createMemoryWriteTool(): AgentTool<
-    { scope: 'user' | 'project'; name: string; description: string; type: string; content: string; tags?: string[]; approved: boolean },
-    { scope: 'user' | 'project'; name: string; created: boolean }
-  > {
-    const resolveStore = this.getMemoryStore.bind(this);
-    const validTypes = new Set(['user', 'feedback', 'project', 'reference']);
-    return {
-      name: 'memory_write',
-      label: 'Write Memory',
-      description: 'Persist a memory only after explicit user intent or interactive approval. Scope must be declared.',
-      parameters: {
-        type: 'object',
-        required: ['scope', 'name', 'description', 'type', 'content', 'approved'],
-        properties: {
-          scope: { type: 'string', enum: ['user', 'project'] },
-          name: { type: 'string', description: 'Kebab-case memory name (unique key).' },
-          description: { type: 'string', description: 'One-line summary.' },
-          type: { type: 'string', description: 'user | feedback | project | reference' },
-          content: { type: 'string', description: 'Full Markdown body.' },
-          tags: { type: 'array', items: { type: 'string' } },
-          approved: { type: 'boolean', description: 'True only after the user explicitly requested or approved this write.' },
-        },
-      },
-      permissionHint: 'mutation',
-      async execute(_toolCallId, args, _signal, _update, context) {
-        if (args.approved !== true) {
-          return { content: [{ type: 'text', text: 'Memory write requires explicit user approval.' }], isError: true, details: { scope: args.scope, name: args.name, created: false } };
-        }
-        const type = validTypes.has(args.type) ? (args.type as 'user' | 'feedback' | 'project' | 'reference') : 'project';
-        const record = await resolveStore(args.scope, context?.projectRootPath).writeMemory({
-          name: args.name.trim(),
-          description: args.description.trim(),
-          type,
-          content: args.content,
-          tags: Array.isArray(args.tags) ? args.tags : undefined,
-        });
-        return {
-          content: [{ type: 'text', text: `Memory saved: ${record.name} (${record.type})` }],
-          details: { scope: args.scope, name: record.name, created: true },
-        };
-      },
-    };
-  }
-
-  private createMemoryDeleteTool(): AgentTool<
-    { scope: 'user' | 'project'; name: string; confirmed: boolean },
-    { scope: 'user' | 'project'; name: string; deleted: boolean }
-  > {
-    const resolveStore = this.getMemoryStore.bind(this);
-    return {
-      name: 'memory_delete',
-      label: 'Delete Memory',
-      description: 'Delete one scoped memory only after explicit confirmation.',
-      parameters: {
-        type: 'object',
-        required: ['scope', 'name', 'confirmed'],
-        properties: {
-          scope: { type: 'string', enum: ['user', 'project'] },
-          name: { type: 'string', description: 'Memory name to delete.' },
-          confirmed: { type: 'boolean' },
-        },
-      },
-      permissionHint: 'mutation',
-      async execute(_toolCallId, args, _signal, _update, context) {
-        if (args.confirmed !== true) {
-          return { content: [{ type: 'text', text: 'Memory deletion requires explicit confirmation.' }], isError: true, details: { scope: args.scope, name: args.name, deleted: false } };
-        }
-        const deleted = await resolveStore(args.scope, context?.projectRootPath).deleteMemory(args.name.trim());
-        return {
-          content: [{
-            type: 'text',
-            text: deleted ? `Memory deleted: ${args.name}` : `No memory named "${args.name}" was found.`,
-          }],
-          details: { scope: args.scope, name: args.name, deleted },
-        };
-      },
-    };
-  }
-
-  private createSkillsCatalogTool(): AgentTool<
-    { query?: string },
-    { count: number }
-  > {
-    return {
-      name: 'skills',
-      label: 'List Skills',
-      description: 'List reusable skills configured for the current workspace.',
-      parameters: {
-        type: 'object',
-        properties: {
-          query: { type: 'string', description: 'Optional case-insensitive filter.' },
-        },
-      },
-      permissionHint: 'readonly',
-      async execute(_toolCallId, args, _signal, _onUpdate, context) {
-        const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
-        const skills = agentRuntimeConfigService.listSkills(context?.projectRootPath ?? undefined)
-          .filter((skill) => !query || `${skill.id} ${skill.name} ${skill.label} ${skill.description}`.toLowerCase().includes(query));
-        const lines = skills.map((skill) => (
-          `${skill.id}: ${skill.label || skill.name} (${skill.source})`
-        ));
-        return {
-          content: [{ type: 'text', text: lines.length > 0 ? lines.join('\n') : 'No configured skills matched the query.' }],
-          details: { count: skills.length },
-        };
-      },
-    };
-  }
-
-  private createSkillReadTool(agentId: AgentRole): AgentTool<
-    { skill_id?: string },
-    { skillId: string; agentId: AgentRole }
-  > {
-    return {
-      name: 'skill_read',
-      label: 'Read Skill',
-      description: 'Load the full SKILL.md instructions for one discovered effective skill.',
-      parameters: {
-        type: 'object',
-        required: ['skill_id'],
-        properties: {
-          skill_id: { type: 'string', description: 'Skill id, for example rdc-context.' },
-        },
-      },
-      permissionHint: 'readonly',
-      async execute(_toolCallId, args, _signal, _onUpdate, context) {
-        const skillKey = typeof args.skill_id === 'string' ? args.skill_id.trim() : '';
-        if (!skillKey) {
-          return {
-            content: [{ type: 'text', text: 'skill_id is required.' }],
-            isError: true,
-            details: { skillId: '', agentId },
-          };
-        }
-
-        const skill = agentRuntimeConfigService.loadSkill(skillKey, context?.projectRootPath ?? undefined);
-        if (!skill) {
-          return {
-            content: [{ type: 'text', text: `Skill is not configured: ${skillKey}` }],
-            isError: true,
-            details: { skillId: skillKey, agentId },
-          };
-        }
-
-        return {
-          content: [{ type: 'text', text: skill.instructions }],
-          details: {
-            skillId: skill.id,
-            agentId,
-            name: skill.name,
-            description: skill.description,
-            sourcePath: skill.sourcePath,
-          },
-        };
-      },
-    };
-  }
-
-  /**
-   * Settings / IPC 与 mcp 目录工具共用：合并已配置 MCP 与运行时连接状态。
-   */
   getMcpServerStatusSummary(projectRootPath?: string | null, query?: string): MCPServerStatusSummary[] {
     return this.mcp.getMcpServerStatusSummary(projectRootPath, query);
-  }
-
-  private createMcpCatalogTool(): AgentTool<
-    { query?: string },
-    { count: number; servers: MCPServerStatusSummary[] }
-  > {
-    const orchestrator = this;
-    return {
-      name: 'mcp',
-      label: 'List MCP Services',
-      description: 'List MCP services configured for the current workspace, including connection status and tools.',
-      parameters: {
-        type: 'object',
-        properties: {
-          query: { type: 'string', description: 'Optional case-insensitive filter.' },
-        },
-      },
-      permissionHint: 'readonly',
-      async execute(_toolCallId, args, _signal, _onUpdate, context) {
-        const query = typeof args.query === 'string' ? args.query : undefined;
-        const servers = orchestrator.getMcpServerStatusSummary(context?.projectRootPath ?? null, query);
-        const lines = servers.map((server) => {
-          const toolNames = (server.tools ?? []).slice(0, 12);
-          const toolsLabel = toolNames.length > 0
-            ? toolNames.join(', ') + ((server.tools?.length ?? 0) > toolNames.length ? ', …' : '')
-            : '(none)';
-          const errorLine = server.lastError ? `\n  lastError: ${server.lastError}` : '';
-          return [
-            `${server.id}: ${server.name}`,
-            `  connectionStatus: ${server.connectionStatus}`,
-            `  toolCount: ${server.toolCount}`,
-            `  tools: ${toolsLabel}${errorLine}`,
-          ].join('\n');
-        });
-        return {
-          content: [{ type: 'text', text: lines.length > 0 ? lines.join('\n') : 'No configured MCP services matched the query.' }],
-          details: { count: servers.length, servers },
-        };
-      },
-    };
   }
 
   async disconnectAllMcpServers(): Promise<void> {
     await this.mcp.disconnectAll();
   }
 
-  // -------------------------------------------------------------------
-  // 单轮 Agent 执行
-  // -------------------------------------------------------------------
-
-  private async runAgentTurn(input: {
-    agentId: AgentRole;
-    content: string;
-    systemPrompt: string;
-    providerId: string;
-    modelId: string;
-    maxTokens?: number;
-    temperature?: number;
-    mode: AppMode;
-    stage?: WorkflowStage | 'report';
-    runId?: string;
-    sessionId?: string | null;
-    turnId?: string;
-    toolAllowlist: string[];
-    options?: AgentTurnOptions;
-    projectRootPath?: string | null;
-    projectId?: string | null;
-    /** Ask 路径由 ConversationService 传入的 prompt 分段字符数，用于细化 breakdown。 */
-    promptPlan: PromptPlan;
-    effectiveModel?: EffectiveModel;
-    credentialHandle?: string;
-    contextWindow?: number;
-    contextTokenLimit?: number;
-    initialMessages?: Message[];
-    contextDiagnostic?: Record<string, unknown>;
-    preparedRuntime?: PreparedAgentRuntime;
-    terminalContext?: (messages: Message[], status: 'complete' | 'stopped' | 'error') => void;
-  }): Promise<string> {
-    if (!input.providerId || !input.modelId) {
-      throw new Error('No provider/model route is configured for this agent.');
-    }
-
-    const requestPlan = input.options?.requestPlan;
-    if (!requestPlan) {
-      throw new Error('RequestPlan is required for every provider request.');
-    }
-    const runtimeSettings = input.effectiveModel ? null : settingsService.getAll();
-    const routeProvider = runtimeSettings?.llm.providers.find((entry) => entry.id === input.providerId);
-    const effectiveModel = input.effectiveModel
-      ?? (runtimeSettings ? resolveEffectiveModel(input.providerId, input.modelId, runtimeSettings) : null);
-    const routeCapability = input.preparedRuntime?.routeCapability
-      ?? resolveAgentRouteCapability(routeProvider, input.modelId, effectiveModel, requestPlan);
-    const mcpConnectionErrors = input.preparedRuntime?.mcpConnectionErrors
-      ?? await this.mcp.ensureConnections(input.agentId, input.projectRootPath);
-    const sessionKey = this.sessionTurnKey(input.sessionId);
-    const turnHandle = await turnCoordinator.beginTurn({
-      sessionKey,
-      turnId: input.turnId ?? generateEventId('turn'),
-      parentSignal: input.options?.signal,
-      subagentBudget: createSubagentBudgetState(DEFAULT_SUBAGENT_BUDGET),
-    });
-    const turnGeneration = turnHandle.generation;
-    turnHandle.eventSink = {
-      onEvent: (event) => {
-        if (!turnHandle.isLive(turnGeneration)) return;
-        input.options?.onEvent?.(event);
-      },
-      sessionId: input.sessionId ?? null,
-      projectRootPath: input.projectRootPath ?? null,
-      projectId: input.projectId ?? null,
-      agentId: input.agentId,
-    };
-
-    const runtimeTools = input.preparedRuntime?.runtimeTools
-      ?? this.resolveRuntimeTools(
-        input.agentId,
-        input.toolAllowlist,
-        input.stage,
-        input.sessionId,
-        turnHandle,
-        input.projectId,
-      );
-    const slotKey = agentSlotKey(input.sessionId, input.agentId);
-    const allToolSignature = this.createToolSignature(runtimeTools.definitions);
-    const activatedDeferredTools = this.deferredActivation.resolveActivatedSet(slotKey, allToolSignature);
-    const injectedToolDefinitions = input.preparedRuntime?.activeToolDefinitions
-      ?? partitionDeferredTools(runtimeTools.definitions, activatedDeferredTools).injected;
-    // native-structured：core 常驻注入，mcp__* 与 extended builtin 默认 deferred；
-    // 其它路由不注入工具 schema。
-    const activeToolDefinitions = routeCapability.toolCallingMode === 'native-structured'
-      ? injectedToolDefinitions
-      : [];
-    const activeToolAllowlist = activeToolDefinitions.map((tool) => tool.name);
-    const sharedEventContext: AgentEventBridgeContext = {
-      agentId: input.agentId,
-      runId: input.runId,
-      turnId: input.turnId,
-      sessionId: input.sessionId ?? null,
-      stage: input.stage,
-      mode: input.mode,
-      providerId: input.providerId,
-      modelId: input.modelId,
-      toolAllowlist: activeToolAllowlist,
-      routeCapability,
-    };
-    turnHandle.deferredActivation = {
-      slotKey,
-      allDefinitions: runtimeTools.definitions,
-    };
-    turnHandle.agentSlotKey = slotKey;
-    // native-structured：执行器用完整 allowlist，deferred 工具仍可经 tool_search 激活后执行。
-    // 其它路由：与注入列表一致（通常为空），保持既有行为。
-    const executorAllowlist = routeCapability.toolCallingMode === 'native-structured'
-      ? input.toolAllowlist
-      : activeToolAllowlist;
-    const effectivePlan = input.preparedRuntime?.effectivePlan ?? buildEffectiveRuntimePlan({
-      agentId: input.agentId,
-      projectRootPath: input.projectRootPath ?? null,
-      projectId: input.projectId ?? null,
-      toolAllowlist: input.toolAllowlist,
-      permissionSettings: settingsService.getAll().agentRuntime.permissions,
-      routeCapability,
-      requestPlan,
-      promptPlan: input.promptPlan,
-      policy: compileEffectivePolicy(input.projectRootPath),
-    });
-    const toolExecutor = this.createToolExecutor(input.agentId, executorAllowlist, input.stage, input.sessionId, {
-      sessionId: input.sessionId ?? null,
-      turnId: input.turnId,
-      eventContext: sharedEventContext,
-      onEvent: input.options?.onEvent,
-      projectRootPath: input.projectRootPath ?? null,
-      projectId: input.projectId ?? null,
-      effectivePlan,
-    });
-    const promptCache = input.preparedRuntime?.promptCache ?? promptCacheCompiler.compile({
-      promptPlan: input.promptPlan,
-      requestPlan,
-      tools: activeToolDefinitions,
-    });
-    const streamOptions: StreamOptions = {
-      maxTokens: input.maxTokens,
-      temperature: requestPlan.temperature,
-      reasoning: requestPlan.reasoningWire,
-      reasoningVisibility: requestPlan.reasoningWire.selection === 'off' ? 'none' : routeCapability.reasoningVisibility,
-      signal: input.options?.signal,
-      requestPlan,
-      promptCache,
-      credentialHandle: input.preparedRuntime?.credentialHandle ?? input.credentialHandle,
-    };
-    const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
-    if (mcpConnectionErrors.length > 0) {
-      input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
-        code: 'mcp_connection_failed',
-        severity: 'warning',
-        message: 'One or more configured MCP servers could not be connected. MCP tools are unavailable for this turn.',
-        technicalMessage: mcpConnectionErrors.join('\n'),
-      }));
-    }
-    if (routeDiagnostic) {
-      if (routeDiagnostic.surface === 'runtime-log') {
-        runtimeLogService.log({
-          scope: input.sessionId ? 'session' : 'app',
-          namespace: 'agent',
-          severity: routeDiagnostic.severity,
-          title: 'Model route capability',
-          summary: routeDiagnostic.message,
-          sessionId: input.sessionId,
-          projectId: input.projectId,
-          runId: input.runId,
-          raw: {
-            code: routeDiagnostic.code,
-            surface: routeDiagnostic.surface,
-            providerId: input.providerId,
-            modelId: effectiveModel?.modelId ?? input.modelId,
-            protocol: requestPlan.route.protocol,
-          },
-        });
-      } else {
-        input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
-          code: routeDiagnostic.code,
-          severity: routeDiagnostic.severity,
-          message: routeDiagnostic.message,
-          technicalMessage: JSON.stringify(routeCapability),
-        }));
-      }
-    }
-    const slot = this.getOrCreateAgentSlot(
-      input.agentId,
-      input.providerId,
-      input.modelId,
-      input.systemPrompt,
-      streamOptions,
-      activeToolDefinitions,
-      toolExecutor,
-      input.turnId ?? '',
-      input.sessionId,
-      input.contextWindow,
-      input.contextTokenLimit,
-      input.promptPlan,
-      input.initialMessages,
-      input.contextDiagnostic,
-      runtimeTools.definitions,
-      routeCapability,
-      effectivePlan.policy.maxTurns === Number.MAX_SAFE_INTEGER
-        ? undefined
-        : effectivePlan.policy.maxTurns,
-    );
-
-    const userMessage: UserMessage = {
-      role: 'user',
-      content: input.options?.userContent ?? input.content,
-      timestamp: nowMs(),
-    };
-
-    let responseText = '';
-    let sawStructuredToolCall = false;
-    const structuredToolCallingEvidenceGate = { recorded: false };
-    const unsubscribe = slot.agent.subscribe((event: CoreAgentEvent) => {
-      if (event.type === 'message_update') {
-        const ev = event.assistantMessageEvent;
-        if (ev.type === 'text_delta' && typeof ev.delta === 'string') {
-          input.options?.onChunk?.(ev.delta);
-        }
-        if (ev.type === 'toolcall_end') {
-          sawStructuredToolCall = true;
-          if (claimStructuredToolCallingEvidence(
-            ev.type,
-            routeCapability,
-            structuredToolCallingEvidenceGate,
-          )) {
-            try {
-              recordObservedToolCallingSupport(
-                input.providerId,
-                effectiveModel?.modelId ?? input.modelId,
-                settingsService.getAll(),
-                requestPlan.route.protocol,
-              );
-            } catch (error) {
-              runtimeLogService.log({
-                scope: input.sessionId ? 'session' : 'app',
-                namespace: 'agent',
-                severity: 'warning',
-                title: 'Tool capability evidence was not persisted',
-                summary: error instanceof Error ? error.message : String(error),
-                sessionId: input.sessionId,
-                projectId: input.projectId,
-                runId: input.runId,
-                raw: {
-                  providerId: input.providerId,
-                  modelId: effectiveModel?.modelId ?? input.modelId,
-                  protocol: requestPlan.route.protocol,
-                },
-              });
-            }
-          }
-        }
-      }
-      if (event.type === 'message_end' && event.message.role === 'assistant') {
-        responseText = event.message.content
-          .filter((block) => block.type === 'text')
-          .map((block) => (block as { text: string }).text)
-          .join('');
-        if (event.message.usage) {
-          // 按当前实际注入的工具定义计量（含本 turn 内新激活的 deferred 工具）；
-          // deferred 段仅计未激活 schema 估算，且仅在 >0 时加入。
-          const injectedDefs = slot.agent.state.tools ?? [];
-          const { deferredMcp: deferredMcpDefs, deferredBuiltin: deferredBuiltinDefs } = partitionDeferredTools(
-            runtimeTools.definitions,
-            slot.activatedDeferredTools,
-          );
-          const isMcpDef = (d: ToolDefinition) => isMcpPrefixedToolName(d.name);
-          const isSubagentDef = (d: ToolDefinition) => d.name === 'subagent';
-          const mcpDefs = injectedDefs.filter(isMcpDef);
-          const subagentDefs = injectedDefs.filter(isSubagentDef);
-          const systemDefs = injectedDefs.filter((d) => !isMcpDef(d) && !isSubagentDef(d));
-
-          const pm = input.promptPlan?.metrics;
-          const systemPromptChars = pm
-            ? pm.systemPrompt
-            : input.systemPrompt.length;
-          const rulesChars    = pm?.scopedInstructions ?? 0;
-          const skillsChars   = pm?.skills ?? 0;
-
-          // 压缩统计：在 message_end 时对当前 agent 的消息历史分类。
-          const compressionStats = slot.contextManager.classifyMessages(
-            slot.agent.messages as import('../../agent-runtime/core/types').AgentMessage[],
-          );
-
-          const precomputedBreakdown: ContextUsageBreakdownEntry[] = [
-            { id: 'system_prompt', tokens: charsToTokens(systemPromptChars) },
-            ...(rulesChars > 0 ? [{ id: 'memory_files' as const, tokens: charsToTokens(rulesChars) }] : []),
-            ...(skillsChars > 0 ? [{ id: 'skills' as const, tokens: charsToTokens(skillsChars) }] : []),
-            { id: 'system_tools',          tokens: charsToTokens(JSON.stringify(systemDefs).length),   count: systemDefs.length },
-            ...(mcpDefs.length > 0
-              ? [{
-                  id: 'mcp_tools' as const,
-                  tokens: charsToTokens(JSON.stringify(mcpDefs).length),
-                  count: mcpDefs.length,
-                }]
-              : []),
-            ...(deferredMcpDefs.length > 0
-              ? [{
-                  id: 'mcp_tools_deferred' as const,
-                  tokens: charsToTokens(JSON.stringify(deferredMcpDefs).length),
-                  count: deferredMcpDefs.length,
-                }]
-              : []),
-            ...(deferredBuiltinDefs.length > 0
-              ? [{
-                  id: 'builtin_tools_deferred' as const,
-                  tokens: charsToTokens(JSON.stringify(deferredBuiltinDefs).length),
-                  count: deferredBuiltinDefs.length,
-                }]
-              : []),
-            ...(subagentDefs.length > 0
-              ? [{
-                  id: 'subagent_definitions' as const,
-                  tokens: charsToTokens(JSON.stringify(subagentDefs).length),
-                  count: subagentDefs.length,
-                }]
-              : []),
-            ...(compressionStats.summaryTokens > 0
-              ? [{ id: 'summarized_conversation' as const, tokens: compressionStats.summaryTokens }]
-              : []),
-            { id: 'conversation', tokens: compressionStats.conversationTokens, count: compressionStats.conversationCount },
-          ];
-
-          debuggerLlmService.recordAgentTurnUsage({
-            runId: input.runId,
-            sessionId: input.sessionId,
-            providerId: input.providerId,
-            modelId: input.modelId,
-            inputTokens: event.message.usage.inputTokens,
-            outputTokens: event.message.usage.outputTokens,
-            ...(typeof event.message.usage.cacheReadTokens === 'number'
-              ? { cacheReadTokens: event.message.usage.cacheReadTokens }
-              : {}),
-            ...(typeof event.message.usage.cacheWriteTokens === 'number'
-              ? { cacheWriteTokens: event.message.usage.cacheWriteTokens }
-              : {}),
-            ...(typeof event.message.usage.cacheHitTokens === 'number'
-              ? { cacheHitTokens: event.message.usage.cacheHitTokens }
-              : {}),
-            ...(typeof event.message.usage.cacheMissTokens === 'number'
-              ? { cacheMissTokens: event.message.usage.cacheMissTokens }
-              : {}),
-            ...(typeof event.message.usage.reasoningTokens === 'number'
-              ? { reasoningTokens: event.message.usage.reasoningTokens }
-              : {}),
-            precomputedBreakdown,
-          });
-        }
-        if (!sawStructuredToolCall && !responseText.trim()) {
-          input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
-            code: 'empty_response_without_tool_call',
-            severity: 'warning',
-            message: 'Provider returned an empty assistant message without a structured tool call.',
-          }));
-        } else if (!sawStructuredToolCall && mentionsTextualToolCall(responseText)) {
-          input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
-            code: 'textual_tool_call_not_executed',
-            severity: 'warning',
-            message: 'The model wrote a textual tool call, but no structured provider tool call was returned. No tool was executed.',
-            technicalMessage: responseText.slice(0, 1200),
-          }));
-        }
-      }
-      const sharedEvent = translateCoreToSharedAgentEvent(event, sharedEventContext);
-      if (sharedEvent) {
-        if (turnHandle.isLive(turnGeneration)) {
-          turnHandle.eventSink?.onEvent?.(sharedEvent);
-        }
-      }
-    });
-
-    // abort 信号桥接到 Agent.abort()；同时注册为 turn producer。
-    const unregisterAgentProducer = turnHandle.registerProducer({
-      id: `agent:${slotKey}`,
-      abort: () => {
-        try {
-          slot.agent.abort();
-        } catch {
-          // ignore
-        }
-      },
-      join: async () => {
-        // Agent.prompt settles when abort completes; no extra wait here.
-      },
-    });
-    let abortListener: (() => void) | null = null;
-    if (input.options?.signal) {
-      if (input.options.signal.aborted) {
-        unsubscribe();
-        unregisterAgentProducer();
-        turnCoordinator.endTurn(turnHandle);
-        throw new DOMException('Aborted', 'AbortError');
-      }
-      abortListener = () => {
-        void turnHandle.abortAndJoin({ reason: 'user_stop' });
-      };
-      input.options.signal.addEventListener('abort', abortListener, { once: true });
-    }
-
-    const initialMessageCount = slot.agent.messages.length;
-    let terminalStatus: 'complete' | 'stopped' | 'error' = 'complete';
-    try {
-      // Agent.prompt 内部跑完整循环；返回值是新增的全部消息，
-      // 我们只在订阅里收集助手文本，最后返回 `responseText`。
-      await slot.agent.prompt(userMessage);
-      return responseText;
-    } catch (error) {
-      terminalStatus = input.options?.signal?.aborted || turnHandle.isAborted ? 'stopped' : 'error';
-      throw error;
-    } finally {
-      unsubscribe();
-      unregisterAgentProducer();
-      if (abortListener && input.options?.signal) {
-        input.options.signal.removeEventListener('abort', abortListener);
-      }
-      agentUserInputRequestService.cancelTurn(input.turnId);
-      agentToolApprovalRequestService.cancelTurn(input.turnId);
-      if (turnHandle.pendingHandoff) {
-        this.handoffMailbox.deposit(turnHandle.pendingHandoff);
-      }
-      // Terminal context first (ConversationService persists to conversation.jsonl),
-      // then flush in-memory slot messages — disk is the single source of truth.
-      input.terminalContext?.(slot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus);
-      this.slots.flush(slot);
-      turnCoordinator.endTurn(turnHandle);
-    }
-  }
-
-  private async streamTestModeStub(
-    stub: string,
-    options?: AgentTurnOptions,
-  ): Promise<string> {
-    const midpoint = Math.max(1, Math.ceil(stub.length / 2));
-    const firstChunk = stub.slice(0, midpoint);
-    const secondChunk = stub.slice(midpoint);
-    if (firstChunk) {
-      options?.onChunk?.(firstChunk);
-      await Promise.resolve();
-    }
-    if (secondChunk) {
-      options?.onChunk?.(secondChunk);
-      await Promise.resolve();
-    }
-    return stub;
-  }
-
-  // -------------------------------------------------------------------
-  // 辅助：profile / system prompt / status
-  // -------------------------------------------------------------------
-
   private resolveRuntimeProfile(agentId: AgentRole, stage?: WorkflowStage) {
     const settings = settingsService.getAll();
     return executionProfileService.resolveAgentRuntimeProfile(settings, stage || 'investigate', agentId);
-  }
-
-  /**
-   * 为 Debug `sendMessage` 构建 PromptPlan，输入与 ConversationService.sendProfileMessage 对齐，
-   * 使 breakdown 能拆出 memory_files / skills，并让实际 system prompt 与计量一致。
-   */
-  private buildPromptPlanForAgentTurn(input: {
-    agentId: AgentRole;
-    projectRootPath: string | null;
-    providerId: string;
-    modelId: string;
-    toolAllowlist: string[];
-    contextWindowTokens: number;
-    capability: EffectiveModel;
-    systemPrompt?: string;
-    messageText?: string;
-    preloadSkillIds?: string[];
-  }): PromptPlan | null {
-    const runtimeSettings = settingsService.getAll();
-    const definition = agentManifestService.getEffectiveProfiles(
-      runtimeSettings.paths,
-      runtimeSettings.llm.providers,
-      runtimeSettings.llm.agentRoutes,
-      input.projectRootPath ?? undefined,
-    ).find((profile) => profile.id === input.agentId && profile.enabled)
-      ?? runtimeSettings.agents.definitions.find((entry) => entry.id === input.agentId && entry.enabled)
-      ?? null;
-    if (!definition) {
-      return null;
-    }
-    const activeDefinition = input.systemPrompt
-      ? { ...definition, instructions: input.systemPrompt }
-      : definition;
-
-    const provider = runtimeSettings.llm.providers.find((entry) => entry.id === input.providerId);
-    const routeCapability = resolveAgentRouteCapability(provider, input.modelId, input.capability);
-    const activePaths = [input.projectRootPath].filter((value): value is string => Boolean(value));
-    const scopedInstructions = input.projectRootPath
-      ? scopedInstructionResolver.resolveForPaths({
-          userInstructionsPath: appPathService.getUserRdxPaths().instructionsPath,
-          projectRoot: input.projectRootPath,
-          activePaths,
-        })
-      : { sources: [], totalBytes: 0, diagnostics: [] };
-    const preloadSkillIds = mergeTurnPreloadSkillIds({
-      profileSkills: activeDefinition.skills,
-      messageText: input.messageText ?? '',
-      pendingSkillIds: input.preloadSkillIds,
-    });
-    const preloadedSkills = [];
-    for (const skillId of preloadSkillIds) {
-      const skill = agentRuntimeConfigService.loadSkill(skillId, input.projectRootPath ?? undefined);
-      if (!skill) {
-        throw new Error(`SKILL_UNAVAILABLE: skill is not configured: ${skillId}`);
-      }
-      preloadedSkills.push(skill);
-    }
-    const promptClock = resolvePromptClock();
-    return promptPlanBuilder.build({
-      profile: activeDefinition,
-      scopedInstructions,
-      preloadedSkills,
-      skillCatalog: agentRuntimeConfigService.listSkillMetadata(input.projectRootPath ?? undefined),
-      tools: input.toolAllowlist.map((toolName) => normalizeToolName(toolName)),
-      workDir: input.projectRootPath ?? '',
-      routeCapability,
-      effectiveModel: input.capability,
-      permissionSettings: runtimeSettings.agentRuntime.permissions,
-      currentDate: promptClock.currentDate,
-      timeZone: promptClock.timeZone,
-      contextWindowTokens: input.contextWindowTokens,
-    });
   }
 
   private modeForAgent(agentId: AgentRole): AppMode {
@@ -2969,17 +624,6 @@ export class AgentOrchestrator {
       return 'ask';
     }
     return isTopLevelAgentId(agentId) ? agentId as AppMode : 'edit';
-  }
-
-
-  private systemPromptForAgent(agentId: AgentRole, prompt?: string): string {
-    if (prompt) {
-      return prompt;
-    }
-    const topLevelAgentId: AgentId | null = isTopLevelAgentId(agentId) ? agentId : null;
-    return topLevelAgentId
-      ? `You are the ${AGENT_DISPLAY_NAMES[topLevelAgentId]}. ${AGENT_DESCRIPTIONS[topLevelAgentId]}`
-      : `You are ${agentId}. Follow the active .agent.md profile and report evidence clearly.`;
   }
 
   private getAgentDisplayName(agentId: AgentRole): string {
@@ -3074,147 +718,6 @@ export class AgentOrchestrator {
       timestamp: message.timestamp,
     });
     workflowProjectionPublisher.publishAgentMessage(message);
-  }
-
-  // -------------------------------------------------------------------
-  // 测试模式 / Stub
-  // -------------------------------------------------------------------
-
-  private createTestModeStub(agentId: AgentRole, content: string): string | null {
-    if (process.env.RDC_AGENT_TEST_MODE !== '1') {
-      return null;
-    }
-    let userMessage = content;
-    try {
-      const parsed = JSON.parse(content) as { effective_user_message?: string; user_message?: string };
-      userMessage = parsed.effective_user_message || parsed.user_message || content;
-    } catch {
-      userMessage = content;
-    }
-    if (userMessage.includes('__RDC_AGENT_E2E_FORCE_LLM_FAILURE__')) {
-      throw new Error('E2E forced profile LLM request failure');
-    }
-    const lower = userMessage.toLowerCase();
-    let stub = agentId === 'ask'
-      ? 'Ask is ready. I can inspect readonly context, search files or public pages, and explain next steps without starting a Debugger run.'
-      : `${this.getAgentDisplayName(agentId)} is ready. Describe the goal and I can use the configured tools for this turn.`;
-    if (/ue4|unreal/i.test(userMessage)) {
-      stub = 'UE4 is Unreal Engine 4, commonly involved in graphics debugging around materials, post-processing, shaders, and render passes.';
-    } else if (/hello|hi/i.test(userMessage)) {
-      stub = agentId === 'ask'
-        ? 'Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution.'
-        : 'Hello. I can run as a general executable agent using the tools enabled by this agent profile.';
-    } else if (/start|execute|debug|analy[sz]e/.test(lower)) {
-      stub = 'Received. I will handle this as a normal agent turn using the configured tools and runtime context.';
-    }
-    return stub;
-  }
-
-  private async createProfileTestResponse(
-    agentId: AgentRole,
-    content: string,
-    options?: AgentProfileTurnOptions,
-  ): Promise<string> {
-    let userMessage = content;
-    try {
-      const parsed = JSON.parse(content) as { effective_user_message?: string; user_message?: string };
-      userMessage = parsed.effective_user_message || parsed.user_message || content;
-    } catch {
-      userMessage = content;
-    }
-    if (userMessage.includes('__RDC_AGENT_E2E_FORCE_LLM_FAILURE__')) {
-      throw new Error('E2E forced profile LLM request failure');
-    }
-    const lower = userMessage.toLowerCase();
-    let stub = agentId === 'ask'
-      ? 'I can inspect readonly context, search files or public pages, explain boundaries, or guide you to open a .rdc capture without starting a Debugger run.'
-      : 'I can help scope the target and execute configured tools directly within this agent turn.';
-    if (/ue4|unreal/i.test(userMessage)) {
-      stub = 'UE4 is Unreal Engine 4. In RDC-Agent it is usually relevant to render pass, material, post-process, and shader debugging context.';
-    } else if (/hello|hi|你好|您好/i.test(userMessage)) {
-      stub = agentId === 'ask'
-        ? 'Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution.'
-        : 'Hello. I can run as a general executable agent using the tools enabled by this agent profile.';
-    } else if (/start|execute|debug|analy[sz]e/.test(lower)) {
-      stub = 'Received. I will handle this as a normal agent turn using the configured tools and runtime context.';
-    }
-    if (agentId === 'ask' && userMessage.includes('__RDC_AGENT_E2E_ASK_READONLY_TOOL__')) {
-      const toolCallId = generateEventId('e2e-tool');
-      this.emitProfileTestEvent('tool.started', {
-        toolCallId,
-        toolName: 'grep',
-        args: { pattern: 'ConversationService', path: 'src/main/conversation' },
-      }, options);
-      this.emitProfileTestEvent('tool.completed', {
-        toolCallId,
-        toolName: 'grep',
-        result: {
-          ok: true,
-          data: {
-            content: [
-              {
-                type: 'text',
-                text: 'src/main/conversation/ConversationService.ts: Ask readonly trace is visible.',
-              },
-            ],
-          },
-          artifacts: [],
-          duration_ms: 1,
-          trace_id: toolCallId,
-        },
-      }, options);
-      stub = 'I searched the workspace with grep and found the Ask conversation code path. No Debugger run was created.';
-    } else if (agentId === 'ask' && userMessage.includes('__RDC_AGENT_E2E_ASK_DENY_WRITE__')) {
-      const toolCallId = generateEventId('e2e-tool');
-      this.emitProfileTestEvent('tool.started', {
-        toolCallId,
-        toolName: 'write_file',
-        args: { path: 'should-not-exist.txt' },
-      }, options);
-      this.emitProfileTestEvent('tool.denied', {
-        toolCallId,
-        toolName: 'write_file',
-        reason: 'Policy denied: ask can only use readonly tools.',
-        result: {
-          ok: false,
-          data: {},
-          artifacts: [],
-          error: {
-            code: 'AGENT_TOOL_POLICY_DENIED',
-            message: 'Policy denied: ask can only use readonly tools.',
-            category: 'policy',
-          },
-          duration_ms: 1,
-          trace_id: toolCallId,
-        },
-      }, options);
-      stub = 'I cannot write files in Ask mode. Ask can inspect and search, but mutation requires the appropriate execution flow.';
-    }
-
-    const finalStub = stub;
-    if (options?.onChunk) {
-      const midpoint = Math.max(1, Math.ceil(finalStub.length / 2));
-      options.onChunk(finalStub.slice(0, midpoint));
-      await Promise.resolve();
-      options.onChunk(finalStub.slice(midpoint));
-    }
-    return finalStub;
-  }
-
-  private emitProfileTestEvent(
-    type: SharedAgentEvent['type'],
-    payload: SharedAgentEvent['payload'],
-    options?: AgentProfileTurnOptions,
-  ): void {
-    options?.onEvent?.({
-      id: generateEventId('agent-event'),
-      type,
-      timestamp: nowMs(),
-      turnId: options.turnId,
-      sessionId: options.sessionId ?? null,
-      stage: options.stage,
-      payload,
-    });
   }
 }
 

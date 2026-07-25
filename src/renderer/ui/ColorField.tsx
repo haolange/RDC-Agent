@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useDynStyle } from '../lib/useDynStyle';
 import './ColorField.css';
 
 export interface ColorFieldProps {
@@ -40,6 +41,7 @@ export function ColorField({
     layout === 'inline' ? 'color-field--inline' : 'color-field--grid',
     className,
   ].filter(Boolean).join(' ');
+  const swatchStyle = useDynStyle({ '--color-field-swatch-bg': value });
 
   return (
     <label className={classes}>
@@ -48,7 +50,7 @@ export function ColorField({
         <button
           type="button"
           className="color-field-swatch"
-          style={{ background: value }}
+          {...swatchStyle}
           data-testid={`${testId}-swatch`}
           aria-label={label}
           onClick={() => colorInputRef.current?.click()}

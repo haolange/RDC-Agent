@@ -11,6 +11,7 @@ import {
   isContextSnapshotOwnedBySession,
   isOpenedCaptureOwnedBySession,
 } from './sessionContextOwnership';
+import { useSessionHumanPreview } from './useSessionHumanPreview';
 
 export function useSessionContextPanel() {
   const { t } = useI18n();
@@ -27,7 +28,6 @@ export function useSessionContextPanel() {
   const devices = useDeviceStore((state) => state.devices);
 
   const [openingId, setOpeningId] = useState<string | null>(null);
-  const [previewBusy, setPreviewBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [selectedInputId, setSelectedInputId] = useState<string>('');
@@ -129,56 +129,15 @@ export function useSessionContextPanel() {
     setStatusMessage(null);
   };
 
-  const handleOpenHumanPreview = async () => {
-    const electronAPI = getElectronApi();
-    if (!electronAPI) return;
-    setPreviewBusy(true);
-    const result = await electronAPI.context.openHumanPreview({
-      sessionId: sessionContextSnapshot?.sessionId ?? activeOpenedCapture?.replaySessionId,
-    }).catch((error) => ({
-      success: false,
-      contextSnapshot: undefined,
-      error: error instanceof Error ? error.message : String(error),
-    }));
-    if (result.contextSnapshot) {
-      setContextSnapshot(result.contextSnapshot);
-    }
-    if (!result.success && result.error) {
-      setErrorMessage(result.error);
-    }
-    setPreviewBusy(false);
-  };
-
-  const handleCloseHumanPreview = async () => {
-    const electronAPI = getElectronApi();
-    if (!electronAPI) return;
-    setPreviewBusy(true);
-    const result = await electronAPI.context.closeHumanPreview()
-      .catch((error) => ({
-        success: false,
-        contextSnapshot: undefined,
-        error: error instanceof Error ? error.message : String(error),
-      }));
-    if (result.contextSnapshot) {
-      setContextSnapshot(result.contextSnapshot);
-    }
-    if (!result.success && result.error) {
-      setErrorMessage(result.error);
-    }
-    setPreviewBusy(false);
-  };
-
-  const humanPreview = sessionContextSnapshot?.humanPreview;
-  const previewSessionId = sessionContextSnapshot?.sessionId ?? activeOpenedCapture?.replaySessionId;
-  const previewDisabledReason = !sessionContextSnapshot?.contextId
-    ? t('control.humanPreviewMissingContext')
-    : !previewSessionId
-      ? t('control.humanPreviewMissingSession')
-      : !sessionContextSnapshot?.runtimeOwner || !sessionContextSnapshot?.ownerLeaseId
-        ? t('control.humanPreviewMissingOwner')
-        : '';
-  const canControlHumanPreview = !previewDisabledReason && !previewBusy;
-  const isHumanPreviewOpen = humanPreview?.status === 'open' || humanPreview?.status === 'opening';
+  const humanPreview = useSessionHumanPreview({
+    sessionContextSnapshot,
+    activeOpenedCaptureReplaySessionId: activeOpenedCapture?.replaySessionId,
+    setContextSnapshot,
+    setErrorMessage,
+    missingContextLabel: t('control.humanPreviewMissingContext'),
+    missingSessionLabel: t('control.humanPreviewMissingSession'),
+    missingOwnerLabel: t('control.humanPreviewMissingOwner'),
+  });
 
   return {
     t,
@@ -198,12 +157,12 @@ export function useSessionContextPanel() {
     handleOpen,
     handleRefresh,
     handleClear,
-    handleOpenHumanPreview,
-    handleCloseHumanPreview,
-    humanPreview,
-    previewDisabledReason,
-    canControlHumanPreview,
-    isHumanPreviewOpen,
+    handleOpenHumanPreview: humanPreview.handleOpenHumanPreview,
+    handleCloseHumanPreview: humanPreview.handleCloseHumanPreview,
+    humanPreview: humanPreview.humanPreview,
+    previewDisabledReason: humanPreview.previewDisabledReason,
+    canControlHumanPreview: humanPreview.canControlHumanPreview,
+    isHumanPreviewOpen: humanPreview.isHumanPreviewOpen,
   };
 }
 

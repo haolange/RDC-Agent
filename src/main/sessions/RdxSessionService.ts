@@ -27,7 +27,7 @@ import {
   rdxShellActionService,
   type RdxShellActionResult,
 } from '../tools/RdxShellActionService';
-import { setRdxRuntimeContext, setRdxRuntimeContextForSession, clearRdxContextLeases } from './RdxRuntimeContextRegistry';
+import { setRdxRuntimeContextForSession, clearRdxContextLeases } from './RdxRuntimeContextRegistry';
 
 interface PreviewLoadResult {
   preview: OpenedCapturePreview | null;
@@ -348,10 +348,9 @@ export class RdxSessionService {
     projectId?: string | null,
   ): void {
     this.runtimeContext = runtimeContext;
-    if (sessionId) {
+    // Lease registry is session-scoped only; empty sessionId is fail-closed (service-local summary only).
+    if (sessionId?.trim()) {
       setRdxRuntimeContextForSession(sessionId, runtimeContext, { projectId: projectId ?? null });
-    } else {
-      setRdxRuntimeContext(runtimeContext);
     }
     this.contextId = runtimeContext.contextId;
     this.runtimeOwner = runtimeContext.runtimeOwner;
@@ -792,10 +791,7 @@ export class RdxSessionService {
     this.runtimeContext = null;
     if (previousCapture?.ownerSessionId) {
       setRdxRuntimeContextForSession(previousCapture.ownerSessionId, null);
-    } else {
-      setRdxRuntimeContext(null);
-    }
-    if (!previousCapture) {
+    } else if (!previousCapture) {
       clearRdxContextLeases();
     }
     this.humanPreview = {

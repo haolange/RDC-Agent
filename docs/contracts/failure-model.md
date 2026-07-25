@@ -29,8 +29,11 @@
 | Browser Bridge 未 QA / 无 bearer / Origin / deny channel | Security | QA-only；fail-closed allowlist |
 | `safeStorage` 不可用 / secret IPC 明文 | Security | 禁止明文存储与跨层暴露 |
 | Project MCP 覆盖 user executable / 未 trust | Security | `needsRetrust` + `assertConnectAllowed` |
-| IPC Zod 非法 payload / approvalToken 重放 | Security | 敏感通道中间件 |
+| IPC Zod 非法 payload / approvalToken 重放 | Security | **全量** handler `parseIpcArgs`；单次消费 token |
 | Sandbox / permission deny-by-default | Security | Electron 面 |
+| CSP 绕过（`style-src`/`script-src` unsafe-inline、style attr） | Security | 生产无 unsafe-inline；`style-src-attr 'none'`；动态样式走 `useDynStyle` |
+| RDX context 无 session / lease 所有权不匹配 | Security | 仅 per-session lease；禁止 global mirror |
+| 在途 turn 读可变 Settings / 未冻结 plan | Integrity | `EffectiveRuntimePlan` schemaVersion 2 完整冻结 |
 | SSRF / private DNS（`web_fetch`/`web_search`） | Security | 每跳校验 + pin |
 | Attachment SVG 脚本 / 超限媒体 | Security | 拒绝 |
 | Policy 非法 / 弱于父级 | Security | `POLICY_INVALID` |

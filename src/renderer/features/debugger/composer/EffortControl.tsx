@@ -26,15 +26,14 @@ import {
   hasSelectableOneMillionContext,
   hasStructuralFastMode,
   hasStructuralOneMillionContext,
-  isFastModeDenied,
   isFastModeUnverified,
-  isOneMillionContextDenied,
   isOneMillionContextUnverified,
   oneMillionContextTokens,
 } from './turnControlsUtils';
 import { useMaxVisualController } from './useMaxVisualController';
 import { createEffortSliderHandlers } from './effortSliderHandlers';
 import { capabilityStatusPresentation } from './capabilityPresentation';
+import { buildEffortCapabilityStatusLabels } from './effortControlStatusLabels';
 import { useEffortPopupLayout } from './useEffortPopupLayout';
 
 export const EffortControl: React.FC<{
@@ -123,7 +122,6 @@ export const EffortControl: React.FC<{
   const effortLabel = t(reasoningUnverified ? 'composer.effort.providerManaged' : EFFORT_LABEL_KEYS[selectedLevel]);
   const tooltipLabel = t(reasoningUnverified ? 'composer.effort.unverified' : EFFORT_LABEL_KEYS[displayLevel]);
   const oneMillionTokens = oneMillionContextTokens(capability);
-  const oneMillionCapability = capability?.resolvedControls?.context1m ?? null;
   const oneMillionVisible = hasStructuralOneMillionContext(capability);
   const oneMillionAvailable = hasSelectableOneMillionContext(capability);
   const oneMillionUnverified = isOneMillionContextUnverified(capability);
@@ -133,24 +131,14 @@ export const EffortControl: React.FC<{
   const statusPresentation = capabilityStatusPresentation(capabilityState);
   const capabilityStateLabel = statusPresentation.labelKey ? t(statusPresentation.labelKey) : undefined;
   const capabilityStateDetail = statusPresentation.detailKey ? t(statusPresentation.detailKey) : undefined;
-  const oneMillionContextStatusLabel = !capabilityReady
-    ? capabilityStateLabel
-    : oneMillionCapability?.state === 'fixed'
-      ? t('composer.effort.fixed')
-      : oneMillionUnverified
-        ? t('composer.effort.unverified')
-        : isOneMillionContextDenied(capability)
-          ? t('composer.effort.currentAccountUnavailable')
-          : undefined;
-  const fastModelStatusLabel = !capabilityReady
-    ? capabilityStateLabel
-    : capability?.resolvedControls?.fast.state === 'fixed'
-      ? t('composer.effort.fixed')
-      : fastUnverified
-        ? t('composer.effort.unverified')
-        : isFastModeDenied(capability)
-          ? t('composer.effort.currentAccountUnavailable')
-          : undefined;
+  const { oneMillionContextStatusLabel, fastModelStatusLabel } = buildEffortCapabilityStatusLabels({
+    capability,
+    capabilityReady,
+    capabilityStateLabel,
+    oneMillionUnverified,
+    fastUnverified,
+    t,
+  });
   const oneMillionContextBadgeLabel = oneMillionTokens
     ? formatTokenCount(oneMillionTokens)
     : t('composer.effort.oneMillionContextBadge');
@@ -223,10 +211,6 @@ export const EffortControl: React.FC<{
     commitEffort,
   });
 
-  const popupStyle = { '--composer-effort-popup-shift-x': `${popupShift}px` } as React.CSSProperties;
-  const thumbStyle = { left: `${thumbPercent}%` } as React.CSSProperties;
-  const tooltipStyle = { left: `${tooltipLeftPercent}%` } as React.CSSProperties;
-
   return (
     <div ref={menuRef} className="composer-effort-menu">
       <button
@@ -259,7 +243,7 @@ export const EffortControl: React.FC<{
       {open ? (
         <EffortControlPopup
           popupRef={popupRef}
-          popupStyle={popupStyle}
+          popupShiftPx={popupShift}
           trackRef={trackRef}
           capabilityStateLabel={capabilityStateLabel}
           capabilityStateDetail={capabilityStateDetail}
@@ -278,8 +262,8 @@ export const EffortControl: React.FC<{
           maxTimeline={maxTimeline}
           thumbRatio={thumbRatio}
           onMaxTimelineComplete={completeMaxTimeline}
-          thumbStyle={thumbStyle}
-          tooltipStyle={tooltipStyle}
+          thumbPercent={thumbPercent}
+          tooltipLeftPercent={tooltipLeftPercent}
           tooltipLabel={tooltipLabel}
           trackWidthPx={trackWidthPx}
           oneMillionContextVisible={oneMillionVisible}

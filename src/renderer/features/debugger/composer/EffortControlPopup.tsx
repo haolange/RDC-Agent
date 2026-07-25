@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ReasoningSelection } from '@shared/types/modelCapability';
 import type { TranslationKey } from '../../../i18n';
+import { useDynStyle } from '../../../lib/useDynStyle';
 import {
   EFFORT_LABEL_KEYS,
   EffortFastModeSwitchRow,
@@ -13,9 +14,24 @@ import type { ExitingMaxPhase } from './useMaxVisualController';
 import { EffortMaxField } from './EffortMaxField';
 import { Button } from '../../../ui/Button';
 
+const EffortSliderStop: React.FC<{
+  level: ReasoningSelection;
+  isCurrent: boolean;
+  leftPercent: number;
+}> = ({ level, isCurrent, leftPercent }) => {
+  const dynStyle = useDynStyle({ left: `${leftPercent}%` });
+  return (
+    <div
+      className={`composer-effort-slider-stop${isCurrent ? ' is-current' : ''}`}
+      data-effort-level={level}
+      {...dynStyle}
+    />
+  );
+};
+
 export const EffortControlPopup: React.FC<{
   popupRef: React.RefObject<HTMLDivElement>;
-  popupStyle: React.CSSProperties;
+  popupShiftPx: number;
   trackRef: React.RefObject<HTMLDivElement>;
   capabilityStateLabel?: string;
   capabilityStateDetail?: string;
@@ -33,8 +49,8 @@ export const EffortControlPopup: React.FC<{
   exitingMaxPhase: ExitingMaxPhase;
   maxTimeline: MaxVisualTimeline;
   thumbRatio: number;
-  thumbStyle: React.CSSProperties;
-  tooltipStyle: React.CSSProperties;
+  thumbPercent: number;
+  tooltipLeftPercent: number;
   tooltipLabel: string;
   trackWidthPx: number;
   oneMillionContextVisible: boolean;
@@ -56,7 +72,7 @@ export const EffortControlPopup: React.FC<{
   onMaxTimelineComplete: (revision: number) => void;
 }> = ({
   popupRef,
-  popupStyle,
+  popupShiftPx,
   trackRef,
   capabilityStateLabel,
   capabilityStateDetail,
@@ -74,8 +90,8 @@ export const EffortControlPopup: React.FC<{
   exitingMaxPhase,
   maxTimeline,
   thumbRatio,
-  thumbStyle,
-  tooltipStyle,
+  thumbPercent,
+  tooltipLeftPercent,
   tooltipLabel,
   trackWidthPx,
   oneMillionContextVisible,
@@ -95,8 +111,25 @@ export const EffortControlPopup: React.FC<{
   onToggleOneMillionContext,
   onToggleFastModel,
   onMaxTimelineComplete,
-}) => (
-  <div ref={popupRef} className="composer-effort-popup" data-testid="composer-effort-popup" role="dialog" aria-label={t('composer.effort.popupTitle')} style={popupStyle}>
+}) => {
+  const popupDynStyle = useDynStyle({
+    '--composer-effort-popup-shift-x': `${popupShiftPx}px`,
+  });
+  const trackDynStyle = useDynStyle({
+    '--composer-effort-stops-opacity': String(maxTimeline.fromStopsOpacity),
+  });
+  const thumbDynStyle = useDynStyle({ left: `${thumbPercent}%` });
+  const tooltipDynStyle = useDynStyle({ left: `${tooltipLeftPercent}%` });
+
+  return (
+  <div
+    ref={popupRef}
+    className="composer-effort-popup"
+    data-testid="composer-effort-popup"
+    role="dialog"
+    aria-label={t('composer.effort.popupTitle')}
+    {...popupDynStyle}
+  >
     {capabilityStateLabel ? (
       <div className="composer-effort-capability-state" data-testid="composer-effort-capability-state" role="status">
         <div className="composer-effort-capability-state-copy">
@@ -128,7 +161,7 @@ export const EffortControlPopup: React.FC<{
           data-max-emitter-ratio={thumbRatio.toFixed(3)}
           data-max-field-energy={maxTimeline.fromEnergy.toFixed(3)}
           data-max-clip-ratio={thumbRatio.toFixed(3)}
-          style={{ '--composer-effort-stops-opacity': maxTimeline.fromStopsOpacity } as React.CSSProperties}
+          {...trackDynStyle}
           onPointerDown={onTrackPointerDown}
           onPointerMove={onTrackPointerMove}
           onPointerUp={onTrackPointerUp}
@@ -138,16 +171,15 @@ export const EffortControlPopup: React.FC<{
           {hasAdjustableReasoning ? (
             <div className="composer-effort-slider-stops" aria-hidden="true">
               {displayLevels.map((level, index) => (
-                <div
+                <EffortSliderStop
                   key={level}
-                  className={`composer-effort-slider-stop${level === displayLevel ? ' is-current' : ''}`}
-                  style={{
-                    left: `${thumbInsetPercent(
-                      getStopPosition(index, displayLevels.length),
-                      trackWidthPx,
-                      EFFORT_THUMB_WIDTH_PX,
-                    )}%`,
-                  }}
+                  level={level}
+                  isCurrent={level === displayLevel}
+                  leftPercent={thumbInsetPercent(
+                    getStopPosition(index, displayLevels.length),
+                    trackWidthPx,
+                    EFFORT_THUMB_WIDTH_PX,
+                  )}
                 />
               ))}
             </div>
@@ -163,7 +195,7 @@ export const EffortControlPopup: React.FC<{
 
           <div
             className={`composer-effort-slider-thumb${isDragging ? ' is-dragging' : ''}`}
-            style={thumbStyle}
+            {...thumbDynStyle}
             role="slider"
             tabIndex={hasAdjustableReasoning ? 0 : -1}
             aria-valuemin={0}
@@ -175,7 +207,7 @@ export const EffortControlPopup: React.FC<{
           />
 
           {isDragging ? (
-            <span className="composer-effort-slider-tooltip" style={tooltipStyle}>
+            <span className="composer-effort-slider-tooltip" {...tooltipDynStyle}>
               {tooltipLabel}
             </span>
           ) : null}
@@ -218,4 +250,5 @@ export const EffortControlPopup: React.FC<{
       />
     ) : null}
   </div>
-);
+  );
+};

@@ -7,6 +7,7 @@ import { runExecutionService } from '../workflow/debugger/RunExecutionService';
 import { debuggerRuntime } from '../workflow/debugger/DebuggerRuntime';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
+import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import {
   WorkflowGetRunUsageArgsSchema,
   WorkflowResumeArgsSchema,
@@ -16,7 +17,8 @@ import {
 export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;
 
-  ipcMain.handle('workflow:getState', async () => {
+  ipcMain.handle('workflow:getState', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'workflow:getState', maxBytes: 1024 });
     if (!state.currentSessionId) {
       return null;
     }
@@ -84,14 +86,16 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
     };
   });
 
-  ipcMain.handle('workflow:listRuns', async () => {
+  ipcMain.handle('workflow:listRuns', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'workflow:listRuns', maxBytes: 1024 });
     if (!state.currentSessionId) {
       return { runs: [] as RunSummary[] };
     }
     return { runs: storageAdapter.listRuns(state.currentSessionId) };
   });
 
-  ipcMain.handle('workflow:listActiveRuns', async () => {
+  ipcMain.handle('workflow:listActiveRuns', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'workflow:listActiveRuns', maxBytes: 1024 });
     return { runs: runExecutionService.listActiveRuns() };
   });
 }

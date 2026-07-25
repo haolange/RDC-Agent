@@ -20,11 +20,11 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 - BrowserWindow：`sandbox: true`。
 - Preload：仅 `contextBridge` + `ipcRenderer` 受控暴露。
 - Permission request：deny-by-default。
-- CSP：`script-src` 去掉 `unsafe-inline`；`style-src` 因 React style attributes 仍保留 `unsafe-inline`（partial，见升级计划 6.1 备注）。Nonce 不适用于动态 style attr。
+- CSP（生产）：`script-src 'self'`（**无** `unsafe-inline`）；`style-src 'self'`（**无** `unsafe-inline`）；`style-src-attr 'none'`。动态样式经 constructable stylesheet（`useDynStyle`）注入，禁止依赖 inline style attributes。
 
 ## IPC Schema（Zod）
 
-敏感通道经 `parseIpcArgs` 中间件（settings / terminal / workflow / memory 等）。非法 payload fail-closed。`approvalToken` 单次消费（`IpcApprovalTokenService`）。契约测试：`IpcPayloadGuard.test.ts`。
+**全量** IPC handler 经 `parseIpcArgs`（含 settings / terminal / workflow / memory / conversation / project / capture / shell / rdx-runtime / trace / web 等）。非法 payload fail-closed。`approvalToken` 单次消费（`IpcApprovalTokenService`）。契约测试：`IpcPayloadGuard.test.ts`。
 
 ## Browser Bridge（QA-only）
 
@@ -40,6 +40,13 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 - 对外查询仅 `{ hasSecret, maskedPreview? }`；不得返回明文。
 - 损坏条目 quarantine；文件权限 0600/ACL。
 - Credential 仅进入主进程 opaque lease，不进 manifest / Route / RequestPlan / IPC / Trace。
+
+## RDX Context Lease
+
+- 仅 per-session lease：`setRdxRuntimeContextForSession` / `getRdxContextLease` / `assertRdxContextLeaseOwnership`。
+- **禁止** RDX global mirror、`legacyGlobalMirror`、`getRdxRuntimeContext` 全局 API。
+- 工具读上下文前必须校验 lease 所有权；空 `sessionId` fail-closed（不写任何全局镜像）。
+- UI 无 session 摘要可经 `getMostRecentRdxContextLease`；工具路径仍须显式 `sessionId` + ownership assert。
 
 ## MCP Trust
 
@@ -64,5 +71,7 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 - `src/main/settings/SecretStorageService.test.ts`
 - `src/main/settings/AgentRuntimeConfigService.test.ts`（MCP trust）
 - `src/main/ipc/validation/IpcPayloadGuard.test.ts`
+- `src/main/sessions/RdxRuntimeContextRegistry.test.ts`
 - `src/main/agent-runtime/permissions/*`
 - `src/main/testing/contracts/securityContract.test.ts`（矩阵入口）
+- 门禁：`pnpm run check:orchestrator-facade`（禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext`）

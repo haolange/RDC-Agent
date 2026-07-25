@@ -4,11 +4,11 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!--
-      Baseline CSP (production script-src has no unsafe-inline).
-      Main process session.webRequest also installs the authoritative CSP header.
-      style-src keeps unsafe-inline for React style attributes (partial).
+      Baseline CSP for browser/headless /app. Electron also installs the same policy via
+      session.webRequest. style attributes are forbidden; dynamic values use constructable
+      stylesheets (useDynStyle).
     -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http://127.0.0.1:* https://openrouter.ai https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'none'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http://127.0.0.1:* https://openrouter.ai https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none';">
     <title>RdcAgent - RenderDoc Debug Agent</title>
   </head>
   <body>

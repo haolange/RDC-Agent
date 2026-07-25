@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import type { AgentMode, ModeConfig } from '@shared/types/layout';
+import { useRef, useState } from 'react';
+import type { ModeConfig } from '@shared/types/layout';
 import { AGENT_MODES, resolveAgentDisplay } from '@shared/constants/agents';
 import { COMPOSE_ACCENT_FALLBACK } from '@shared/theme/composeAccent';
 import { useI18n } from '../../../i18n';
@@ -15,6 +15,7 @@ import { useComposerSend } from './useComposerSend';
 import { useScopedPromptDraft } from './useScopedPromptDraft';
 import { buildComposerPresentation } from './composerPresentation';
 import { useSelectedContextWindowTokens } from './useSelectedContextWindowTokens';
+import { useComposerDomEffects } from './useComposerDomEffects';
 
 export function useComposer(options: {
   showNotice: (message: string) => void;
@@ -125,47 +126,18 @@ export function useComposer(options: {
     ? currentRun?.status === 'stopping' && !hasActiveConversationTurn && !send.isPromptSending
     : (!hasMessageContent && !hasPendingAttachments);
 
-  useEffect(() => {
-    const fallback = userInvocableAgents[0];
-    if (!fallback || userInvocableAgents.some((agent) => agent.id === selectedAgentId)) return;
-    setSelectedAgentId(fallback.id);
-    setCurrentMode(fallback.id as AgentMode);
-  }, [selectedAgentId, setCurrentMode, userInvocableAgents]);
-
-  useEffect(() => {
-    if (!modeMenuOpen) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (!modeMenuRef.current?.contains(target)) {
-        setModeMenuOpen(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setModeMenuOpen(false);
-      }
-    };
-
-    window.addEventListener('pointerdown', handlePointerDown);
-    window.addEventListener('keydown', handleEscape);
-    return () => {
-      window.removeEventListener('pointerdown', handlePointerDown);
-      window.removeEventListener('keydown', handleEscape);
-    };
-  }, [modeMenuOpen]);
-
-  useEffect(() => {
-    const textarea = promptInputRef.current;
-    if (!textarea) return;
-
-    // Keep parity with .composer-textarea min-height (72) so enabling Composer
-    // Markdown (overlay capsule) never looks like a shell resize.
-    textarea.style.height = '0px';
-    const next = Math.min(Math.max(textarea.scrollHeight, 72), 180);
-    textarea.style.height = `${next}px`;
-  }, [currentMode, promptValue]);
+  useComposerDomEffects({
+    modeMenuOpen,
+    setModeMenuOpen,
+    modeMenuRef,
+    promptInputRef,
+    currentMode,
+    promptValue,
+    selectedAgentId,
+    userInvocableAgents,
+    setSelectedAgentId,
+    setCurrentMode,
+  });
 
   return {
     promptValue,

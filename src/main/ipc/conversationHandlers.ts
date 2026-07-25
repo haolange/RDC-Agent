@@ -8,9 +8,23 @@ import type {
   ConversationSendRequest,
   ConversationSendResult,
 } from '@shared/types/conversation';
+import type { ConversationSwitchBranchRequest } from '@shared/types/conversationBranch';
 import { conversationService } from '../conversation/ConversationService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
+import { parseIpcArgs } from './validation/IpcPayloadGuard';
+import {
+  ConversationAnswerToolApprovalArgsSchema,
+  ConversationAnswerUserInputArgsSchema,
+  ConversationCancelActiveTurnArgsSchema,
+  ConversationClearHistoryArgsSchema,
+  ConversationCompactHistoryArgsSchema,
+  ConversationGetHistoryArgsSchema,
+  ConversationRewriteFromMessageArgsSchema,
+  ConversationSendMessageArgsSchema,
+  ConversationSwitchBranchArgsSchema,
+  ConversationUndoLastTurnArgsSchema,
+} from './validation/conversationSchemas';
 
 const PREFLIGHT_ERROR_CODES = new Set<ConversationPreflightErrorCode>([
   'REQUEST_CANCELLED',
@@ -58,8 +72,14 @@ function toRejectedSendResult(requestId: string, error: unknown): ConversationSe
 export function registerConversationHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;
 
-  ipcMain.handle('conversation:sendMessage', async (_event, request: ConversationSendRequest) => {
+  ipcMain.handle('conversation:sendMessage', async (_event, ...rawArgs: unknown[]) => {
+    let requestId = 'unknown';
     try {
+      const [request] = parseIpcArgs(ConversationSendMessageArgsSchema, rawArgs, {
+        label: 'conversation:sendMessage',
+        maxBytes: 2 * 1024 * 1024,
+      }) as [ConversationSendRequest];
+      requestId = request.requestId;
       const result = await conversationService.sendMessage({
         ...request,
         fallbackProjectId: state.currentProjectId,
@@ -85,11 +105,15 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
         preparedContext: result.preparedContext,
       } satisfies ConversationSendResult;
     } catch (error) {
-      return toRejectedSendResult(request.requestId, error);
+      return toRejectedSendResult(requestId, error);
     }
   });
 
-  ipcMain.handle('conversation:rewriteFromMessage', async (_event, request: ConversationRewriteFromMessageRequest) => {
+  ipcMain.handle('conversation:rewriteFromMessage', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(ConversationRewriteFromMessageArgsSchema, rawArgs, {
+      label: 'conversation:rewriteFromMessage',
+      maxBytes: 2 * 1024 * 1024,
+    }) as [ConversationRewriteFromMessageRequest];
     const result = await conversationService.rewriteFromMessage({
       ...request,
       fallbackProjectId: state.currentProjectId,
@@ -111,44 +135,64 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
     return result;
   });
 
-  ipcMain.handle('conversation:getHistory', async (_event, sessionId: string) => {
+  ipcMain.handle('conversation:getHistory', async (_event, ...rawArgs: unknown[]) => {
+    const [sessionId] = parseIpcArgs(ConversationGetHistoryArgsSchema, rawArgs, {
+      label: 'conversation:getHistory',
+      maxBytes: 4 * 1024,
+    });
     if (!sessionId) {
       return { messages: [], branchState: null };
     }
     return conversationService.getHistory(sessionId);
   });
 
-  ipcMain.handle('conversation:switchBranch', async (_event, request: import('@shared/types/conversationBranch').ConversationSwitchBranchRequest) => {
+  ipcMain.handle('conversation:switchBranch', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(ConversationSwitchBranchArgsSchema, rawArgs, {
+      label: 'conversation:switchBranch',
+      maxBytes: 4 * 1024,
+    }) as [ConversationSwitchBranchRequest];
     return conversationService.switchConversationBranch(request);
   });
 
-  ipcMain.handle('conversation:clearHistory', async (_event, sessionId: string) => {
-    if (!sessionId) {
-      return { success: false, messages: [], error: 'No session selected.' };
-    }
+  ipcMain.handle('conversation:clearHistory', async (_event, ...rawArgs: unknown[]) => {
     try {
+      const [sessionId] = parseIpcArgs(ConversationClearHistoryArgsSchema, rawArgs, {
+        label: 'conversation:clearHistory',
+        maxBytes: 4 * 1024,
+      });
+      if (!sessionId) {
+        return { success: false, messages: [], error: 'No session selected.' };
+      }
       return { success: true, messages: await conversationService.clearHistory(sessionId) };
     } catch (error) {
       return { success: false, messages: [], error: error instanceof Error ? error.message : String(error) };
     }
   });
 
-  ipcMain.handle('conversation:undoLastTurn', async (_event, sessionId: string) => {
-    if (!sessionId) {
-      return { success: false, messages: [], error: 'No session selected.' };
-    }
+  ipcMain.handle('conversation:undoLastTurn', async (_event, ...rawArgs: unknown[]) => {
     try {
+      const [sessionId] = parseIpcArgs(ConversationUndoLastTurnArgsSchema, rawArgs, {
+        label: 'conversation:undoLastTurn',
+        maxBytes: 4 * 1024,
+      });
+      if (!sessionId) {
+        return { success: false, messages: [], error: 'No session selected.' };
+      }
       return { success: true, messages: await conversationService.undoLastTurn(sessionId) };
     } catch (error) {
       return { success: false, messages: [], error: error instanceof Error ? error.message : String(error) };
     }
   });
 
-  ipcMain.handle('conversation:compactHistory', async (_event, sessionId: string) => {
-    if (!sessionId) {
-      return { success: false, messages: [], error: 'No session selected.' };
-    }
+  ipcMain.handle('conversation:compactHistory', async (_event, ...rawArgs: unknown[]) => {
     try {
+      const [sessionId] = parseIpcArgs(ConversationCompactHistoryArgsSchema, rawArgs, {
+        label: 'conversation:compactHistory',
+        maxBytes: 4 * 1024,
+      });
+      if (!sessionId) {
+        return { success: false, messages: [], error: 'No session selected.' };
+      }
       const compacted = await conversationService.compactHistory(sessionId);
       return { success: true, ...compacted };
     } catch (error) {
@@ -156,15 +200,28 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
     }
   });
 
-  ipcMain.handle('conversation:cancelActiveTurn', async (_event, request?: ConversationCancelActiveTurnRequest) => {
+  ipcMain.handle('conversation:cancelActiveTurn', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(ConversationCancelActiveTurnArgsSchema, rawArgs, {
+      label: 'conversation:cancelActiveTurn',
+      maxBytes: 4 * 1024,
+      padTo: 1,
+    }) as [ConversationCancelActiveTurnRequest | undefined];
     return conversationService.cancelActiveTurn(request);
   });
 
-  ipcMain.handle('conversation:answerUserInput', async (_event, request: ConversationAnswerUserInputRequest) => {
+  ipcMain.handle('conversation:answerUserInput', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(ConversationAnswerUserInputArgsSchema, rawArgs, {
+      label: 'conversation:answerUserInput',
+      maxBytes: 256 * 1024,
+    }) as [ConversationAnswerUserInputRequest];
     return conversationService.answerUserInput(request);
   });
 
-  ipcMain.handle('conversation:answerToolApproval', async (_event, request: ConversationAnswerToolApprovalRequest) => {
+  ipcMain.handle('conversation:answerToolApproval', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(ConversationAnswerToolApprovalArgsSchema, rawArgs, {
+      label: 'conversation:answerToolApproval',
+      maxBytes: 8 * 1024,
+    }) as [ConversationAnswerToolApprovalRequest];
     return conversationService.answerToolApproval(request);
   });
 }

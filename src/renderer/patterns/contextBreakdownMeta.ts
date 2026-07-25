@@ -15,21 +15,6 @@ export const CONTEXT_BREAKDOWN_ORDER: ContextUsageBreakdownId[] = [
   'free',
 ];
 
-/** Maps breakdown segment ids to Context-dedicated semantic color tokens. */
-export const SEGMENT_COLOR_VAR: Record<ContextUsageBreakdownId, string> = {
-  system_prompt: 'var(--token-context-system-prompt)',
-  memory_files: 'var(--token-context-memory-files)',
-  skills: 'var(--token-context-skills)',
-  system_tools: 'var(--token-context-system-tools)',
-  mcp_tools: 'var(--token-context-mcp-tools)',
-  mcp_tools_deferred: 'var(--token-context-deferred)',
-  builtin_tools_deferred: 'var(--token-context-deferred)',
-  subagent_definitions: 'var(--token-context-subagents)',
-  summarized_conversation: 'var(--token-context-summarized)',
-  conversation: 'var(--token-context-conversation)',
-  free: 'var(--token-context-free)',
-};
-
 export const CONTEXT_BREAKDOWN_GROUPS: {
   id: string;
   labelKey: TranslationKey;

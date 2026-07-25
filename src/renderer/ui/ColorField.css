@@ -38,10 +38,10 @@
   flex-shrink: 0;
   border-radius: var(--radius-full);
   border: 2px solid color-mix(in srgb, var(--token-text-heading) 18%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #000 18%, transparent);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.18);
   cursor: pointer;
   padding: 0;
-  background: transparent;
+  background: var(--color-field-swatch-bg, transparent);
   transition:
     transform var(--transition-fast),
     box-shadow var(--transition-fast),
@@ -57,7 +57,7 @@
   outline: none;
   box-shadow:
     0 0 0 3px color-mix(in srgb, var(--token-border-focus) 18%, transparent),
-    inset 0 0 0 1px color-mix(in srgb, #000 18%, transparent);
+    inset 0 0 0 1px rgb(0 0 0 / 0.18);
 }
 
 .color-field-native {

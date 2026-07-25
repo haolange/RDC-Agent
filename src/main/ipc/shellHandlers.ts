@@ -3,6 +3,13 @@ import path from 'path';
 import { app, BrowserWindow, clipboard, dialog, ipcMain, nativeTheme, shell, type IpcMainInvokeEvent } from 'electron';
 
 import { appPathService } from '../runtime/AppPathService';
+import { parseIpcArgs } from './validation/IpcPayloadGuard';
+import { EmptyArgsSchema } from './validation/commonIpcSchemas';
+import {
+  AppCopyTextArgsSchema,
+  AppGetAvatarDataUrlArgsSchema,
+  AppOpenPathArgsSchema,
+} from './validation/shellSchemas';
 
 const AVATAR_MIME_BY_EXTENSION: Record<string, string> = {
   '.png': 'image/png',
@@ -60,7 +67,8 @@ function getSenderWindow(event: IpcMainInvokeEvent): BrowserWindow | null {
 }
 
 export function registerShellHandlers(): void {
-  ipcMain.handle('dialog:selectRdcFiles', async () => {
+  ipcMain.handle('dialog:selectRdcFiles', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectRdcFiles', maxBytes: 1024 });
     const result = await dialog.showOpenDialog({
       filters: [{ name: 'RenderDoc Capture', extensions: ['rdc'] }],
       properties: ['openFile', 'multiSelections'],
@@ -68,25 +76,29 @@ export function registerShellHandlers(): void {
     return result.canceled ? null : result.filePaths;
   });
 
-  ipcMain.handle('dialog:selectFiles', async () => {
+  ipcMain.handle('dialog:selectFiles', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectFiles', maxBytes: 1024 });
     const result = await dialog.showOpenDialog({
       properties: ['openFile', 'multiSelections'],
     });
     return result.canceled ? null : result.filePaths;
   });
 
-  ipcMain.handle('dialog:selectDirectory', async () => {
+  ipcMain.handle('dialog:selectDirectory', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'dialog:selectDirectory', maxBytes: 1024 });
     const result = await dialog.showOpenDialog({
       properties: ['openDirectory', 'createDirectory'],
     });
     return result.canceled ? null : result.filePaths[0];
   });
 
-  ipcMain.handle('window:minimize', async (event) => {
+  ipcMain.handle('window:minimize', async (event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'window:minimize', maxBytes: 1024 });
     getSenderWindow(event)?.minimize();
   });
 
-  ipcMain.handle('window:toggleMaximize', async (event) => {
+  ipcMain.handle('window:toggleMaximize', async (event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'window:toggleMaximize', maxBytes: 1024 });
     const window = getSenderWindow(event);
     if (!window) return false;
 
@@ -99,15 +111,18 @@ export function registerShellHandlers(): void {
     return true;
   });
 
-  ipcMain.handle('window:close', async (event) => {
+  ipcMain.handle('window:close', async (event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'window:close', maxBytes: 1024 });
     getSenderWindow(event)?.close();
   });
 
-  ipcMain.handle('window:isMaximized', async (event) => {
+  ipcMain.handle('window:isMaximized', async (event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'window:isMaximized', maxBytes: 1024 });
     return getSenderWindow(event)?.isMaximized() ?? false;
   });
 
-  ipcMain.handle('app:getMeta', async () => {
+  ipcMain.handle('app:getMeta', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'app:getMeta', maxBytes: 1024 });
     return {
       version: app.getVersion(),
       productName: app.getName(),
@@ -116,7 +131,8 @@ export function registerShellHandlers(): void {
     };
   });
 
-  ipcMain.handle('app:selectAvatar', async () => {
+  ipcMain.handle('app:selectAvatar', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'app:selectAvatar', maxBytes: 1024 });
     const result = await dialog.showOpenDialog({
       filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'] }],
       properties: ['openFile'],
@@ -133,7 +149,11 @@ export function registerShellHandlers(): void {
     }
   });
 
-  ipcMain.handle('app:getAvatarDataUrl', async (_event, avatarPath: string) => {
+  ipcMain.handle('app:getAvatarDataUrl', async (_event, ...rawArgs: unknown[]) => {
+    const [avatarPath] = parseIpcArgs(AppGetAvatarDataUrlArgsSchema, rawArgs, {
+      label: 'app:getAvatarDataUrl',
+      maxBytes: 8 * 1024,
+    });
     if (!avatarPath) {
       return null;
     }
@@ -146,22 +166,34 @@ export function registerShellHandlers(): void {
     }
   });
 
-  ipcMain.handle('app:openPath', async (_event, targetPath: string) => {
-    if (!targetPath) return { success: false, error: 'path is required' };
+  ipcMain.handle('app:openPath', async (_event, ...rawArgs: unknown[]) => {
     try {
-      const stats = fs.existsSync(targetPath) ? fs.statSync(targetPath) : null;
-      if (stats?.isDirectory()) {
-        await shell.openPath(targetPath);
-      } else {
+      const [targetPath] = parseIpcArgs(AppOpenPathArgsSchema, rawArgs, {
+        label: 'app:openPath',
+        maxBytes: 8 * 1024,
+      });
+      if (!targetPath) return { success: false, error: 'path is required' };
+      try {
+        const stats = fs.existsSync(targetPath) ? fs.statSync(targetPath) : null;
+        if (stats?.isDirectory()) {
+          await shell.openPath(targetPath);
+        } else {
+          shell.showItemInFolder(targetPath);
+        }
+      } catch {
         shell.showItemInFolder(targetPath);
       }
-    } catch {
-      shell.showItemInFolder(targetPath);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) };
     }
-    return { success: true };
   });
 
-  ipcMain.handle('app:copyText', async (_event, text: string) => {
+  ipcMain.handle('app:copyText', async (_event, ...rawArgs: unknown[]) => {
+    const [text] = parseIpcArgs(AppCopyTextArgsSchema, rawArgs, {
+      label: 'app:copyText',
+      maxBytes: 2 * 1024 * 1024,
+    });
     clipboard.writeText(text ?? '');
     return { success: true };
   });

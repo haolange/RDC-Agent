@@ -21,6 +21,7 @@ import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
+import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import {
   SettingsGetEffectiveCatalogArgsSchema,
   SettingsHasProviderSecretArgsSchema,
@@ -29,6 +30,15 @@ import {
   SettingsSetArgsSchema,
   SettingsAgentIdArgsSchema,
 } from './validation/ipcSchemas';
+import {
+  LlmModelCapabilityProbeArgsSchema,
+  LlmProviderAccountLoginFinishArgsSchema,
+  LlmProviderAccountLoginStartArgsSchema,
+  LlmProviderDraftArgsSchema,
+  LlmProviderIdArgsSchema,
+  SettingsSaveAgentDefinitionArgsSchema,
+  SettingsSaveProviderDefinitionArgsSchema,
+} from './validation/settingsLlmSchemas';
 
 export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void {
   effectiveCatalogService.setDiscoveryLoaderResolver((request) => (
@@ -65,16 +75,28 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     const snapshot = resolveEffectiveCatalog(providerId, settingsService.getAll());
     if (snapshot) context.broadcastToRenderer('llm:effectiveCatalogChanged', snapshot);
   };
-  ipcMain.handle('llm:testProviderDraft', async (_event, request: LlmProviderDraftRequest) => {
+  ipcMain.handle('llm:testProviderDraft', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(LlmProviderDraftArgsSchema, rawArgs, {
+      label: 'llm:testProviderDraft',
+      maxBytes: 256 * 1024,
+    }) as [LlmProviderDraftRequest];
     // refreshEffectiveCatalogDiscovery already emits via EffectiveCatalogService.subscribe.
     return providerConnectionService.testProviderDraft(request);
   });
 
-  ipcMain.handle('llm:testModelCapability', async (_event, request: LlmModelCapabilityProbeRequest) => {
+  ipcMain.handle('llm:testModelCapability', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(LlmModelCapabilityProbeArgsSchema, rawArgs, {
+      label: 'llm:testModelCapability',
+      maxBytes: 8 * 1024,
+    }) as [LlmModelCapabilityProbeRequest];
     return providerCapabilityProbeService.test(request);
   });
 
-  ipcMain.handle('llm:connectProvider', async (_event, request: LlmProviderDraftRequest) => {
+  ipcMain.handle('llm:connectProvider', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(LlmProviderDraftArgsSchema, rawArgs, {
+      label: 'llm:connectProvider',
+      maxBytes: 256 * 1024,
+    }) as [LlmProviderDraftRequest];
     const result = await providerConnectionService.connectProvider(request);
     if (result.success) {
       context.applyCurrentLlmConfig();
@@ -83,7 +105,11 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return result;
   });
 
-  ipcMain.handle('llm:refreshProviderModels', async (_event, providerId: LlmProviderId) => {
+  ipcMain.handle('llm:refreshProviderModels', async (_event, ...rawArgs: unknown[]) => {
+    const [providerId] = parseIpcArgs(LlmProviderIdArgsSchema, rawArgs, {
+      label: 'llm:refreshProviderModels',
+      maxBytes: 4 * 1024,
+    }) as [LlmProviderId];
     const result = await providerConnectionService.refreshProviderModels(providerId);
     if (result.success) {
       context.applyCurrentLlmConfig();
@@ -94,7 +120,11 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return result;
   });
 
-  ipcMain.handle('llm:disconnectProvider', async (_event, providerId: LlmProviderId) => {
+  ipcMain.handle('llm:disconnectProvider', async (_event, ...rawArgs: unknown[]) => {
+    const [providerId] = parseIpcArgs(LlmProviderIdArgsSchema, rawArgs, {
+      label: 'llm:disconnectProvider',
+      maxBytes: 4 * 1024,
+    }) as [LlmProviderId];
     const result = providerConnectionService.disconnectProvider(providerId);
     if (result.success) {
       context.applyCurrentLlmConfig();
@@ -103,11 +133,19 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return result;
   });
 
-  ipcMain.handle('llm:startProviderAccountLogin', async (_event, request: LlmProviderAccountLoginStartRequest) => {
+  ipcMain.handle('llm:startProviderAccountLogin', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(LlmProviderAccountLoginStartArgsSchema, rawArgs, {
+      label: 'llm:startProviderAccountLogin',
+      maxBytes: 8 * 1024,
+    }) as [LlmProviderAccountLoginStartRequest];
     return providerConnectionService.startProviderAccountLogin(request);
   });
 
-  ipcMain.handle('llm:getProviderAccountStatus', async (_event, providerId: LlmProviderId) => {
+  ipcMain.handle('llm:getProviderAccountStatus', async (_event, ...rawArgs: unknown[]) => {
+    const [providerId] = parseIpcArgs(LlmProviderIdArgsSchema, rawArgs, {
+      label: 'llm:getProviderAccountStatus',
+      maxBytes: 4 * 1024,
+    }) as [LlmProviderId];
     const result = providerConnectionService.getProviderAccountStatus(providerId);
     if (result.connected) {
       context.applyCurrentLlmConfig();
@@ -115,7 +153,11 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return result;
   });
 
-  ipcMain.handle('llm:finishProviderAccountLogin', async (_event, request: LlmProviderAccountLoginFinishRequest) => {
+  ipcMain.handle('llm:finishProviderAccountLogin', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(LlmProviderAccountLoginFinishArgsSchema, rawArgs, {
+      label: 'llm:finishProviderAccountLogin',
+      maxBytes: 32 * 1024,
+    }) as [LlmProviderAccountLoginFinishRequest];
     const result = await providerConnectionService.finishProviderAccountLogin(request);
     if (result.connected) {
       context.applyCurrentLlmConfig();
@@ -124,14 +166,19 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return result;
   });
 
-  ipcMain.handle('llm:logoutProviderAccount', async (_event, providerId: LlmProviderId) => {
+  ipcMain.handle('llm:logoutProviderAccount', async (_event, ...rawArgs: unknown[]) => {
+    const [providerId] = parseIpcArgs(LlmProviderIdArgsSchema, rawArgs, {
+      label: 'llm:logoutProviderAccount',
+      maxBytes: 4 * 1024,
+    }) as [LlmProviderId];
     const result = providerConnectionService.logoutProviderAccount(providerId);
     context.applyCurrentLlmConfig();
     await broadcastCatalog(providerId);
     return result;
   });
 
-  ipcMain.handle('settings:get', async () => {
+  ipcMain.handle('settings:get', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'settings:get', maxBytes: 1024 });
     const paths = appPathService.getRuntimePaths();
     return withEffectiveAgentModelOptions(settingsService.getAll({
       userRdxRoot: paths.userRdxRoot,
@@ -148,7 +195,8 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     }));
   });
 
-  ipcMain.handle('settings:getProviderCatalog', async () => {
+  ipcMain.handle('settings:getProviderCatalog', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'settings:getProviderCatalog', maxBytes: 1024 });
     return settingsService.getProviderCatalog();
   });
 
@@ -207,7 +255,11 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return withEffectiveAgentModelOptions(settingsService.getAll(paths));
   });
 
-  ipcMain.handle('settings:saveAgentDefinition', async (_event, request: AgentDefinitionSaveRequest) => {
+  ipcMain.handle('settings:saveAgentDefinition', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(SettingsSaveAgentDefinitionArgsSchema, rawArgs, {
+      label: 'settings:saveAgentDefinition',
+      maxBytes: 2 * 1024 * 1024,
+    }) as unknown as [AgentDefinitionSaveRequest];
     return settingsService.saveAgentDefinition(request);
   });
 
@@ -219,7 +271,11 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return settingsService.getAgentDefinitionCommit(agentId);
   });
 
-  ipcMain.handle('settings:saveProviderDefinition', async (_event, request: ProviderDefinitionSaveRequest) => {
+  ipcMain.handle('settings:saveProviderDefinition', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(SettingsSaveProviderDefinitionArgsSchema, rawArgs, {
+      label: 'settings:saveProviderDefinition',
+      maxBytes: 2 * 1024 * 1024,
+    }) as unknown as [ProviderDefinitionSaveRequest];
     const result = await settingsService.saveProviderDefinition(request);
     if (result.status !== 'committed' || !result.provider) return result;
     context.applyCurrentLlmConfig();
