@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const electronMock = vi.hoisted(() => ({
   userDataRoot: '',
-  encryptionAvailable: false,
+  encryptionAvailable: true,
 }));
 
 vi.mock('electron', () => ({
@@ -15,10 +15,14 @@ vi.mock('electron', () => ({
   },
   safeStorage: {
     isEncryptionAvailable: () => electronMock.encryptionAvailable,
-    decryptString: () => {
-      throw new Error('safeStorage unavailable');
+    decryptString: (buffer: Buffer) => {
+      const text = buffer.toString('utf8');
+      if (!text.startsWith('enc:')) {
+        throw new Error('safeStorage unavailable');
+      }
+      return text.slice(4);
     },
-    encryptString: (value: string) => Buffer.from(value, 'utf8'),
+    encryptString: (value: string) => Buffer.from(`enc:${value}`, 'utf8'),
   },
 }));
 
@@ -34,7 +38,7 @@ describe('SettingsService provider persistence', () => {
     process.env.RDC_AGENT_USER_DATA = userDataRoot;
     process.env.RDC_AGENT_HOME = path.join(userDataRoot, '.rdx');
     electronMock.userDataRoot = userDataRoot;
-    electronMock.encryptionAvailable = false;
+    electronMock.encryptionAvailable = true;
     vi.resetModules();
   });
 

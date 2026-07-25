@@ -1,7 +1,8 @@
-import { spawn, type ChildProcess } from 'child_process';
+import os from 'os';
 import path from 'path';
-import { generateEventId, nowMs } from '@shared/utils/id';
+import { nowMs } from '@shared/utils/id';
 import type { CLIResult } from '@shared/types/tool';
+import { processSupervisor, type SupervisedProcess } from '../runtime/ProcessSupervisor';
 
 export interface ShellInvocationRequest {
   command: string;
@@ -13,8 +14,19 @@ export interface ShellInvocationRequest {
   abortSignal?: AbortSignal;
 }
 
+export function resolveExitCode(code: number | null, signal: NodeJS.Signals | null): number {
+  if (code !== null && code !== undefined) {
+    return code;
+  }
+  if (signal) {
+    const signalNumber = os.constants.signals[signal];
+    return 128 + (typeof signalNumber === 'number' ? signalNumber : 0);
+  }
+  return 1;
+}
+
 export class ShellInvocationService {
-  private activeProcesses = new Map<string, { process: ChildProcess; runId?: string }>();
+  private activeProcesses = new Map<string, { supervised: SupervisedProcess; runId?: string }>();
 
   async invoke(request: ShellInvocationRequest): Promise<CLIResult> {
     const startTime = nowMs();
@@ -28,109 +40,66 @@ export class ShellInvocationService {
       };
     }
 
-    return new Promise((resolve) => {
-      const needsShell = process.platform === 'win32' && ['.bat', '.cmd'].includes(path.extname(command).toLowerCase());
-      const proc = spawn(command, request.args ?? [], {
-        cwd: request.cwd || undefined,
-        env: {
-          ...process.env,
-          ...request.env,
-          PYTHONIOENCODING: 'utf-8',
-        },
-        shell: needsShell,
-        windowsHide: true,
-      });
-      const procId = generateEventId('proc');
-      this.activeProcesses.set(procId, { process: proc, runId: request.runId });
+    const needsShell = process.platform === 'win32' && ['.bat', '.cmd'].includes(path.extname(command).toLowerCase());
+    const supervised = processSupervisor.spawn('shell', command, request.args ?? [], {
+      cwd: request.cwd || undefined,
+      env: {
+        ...process.env,
+        ...request.env,
+        PYTHONIOENCODING: 'utf-8',
+      },
+      shell: needsShell,
+      windowsHide: true,
+      timeoutMs: request.timeoutMs,
+      abortSignal: request.abortSignal,
+      isolateProcessGroup: process.platform !== 'win32',
+    });
 
-      let stdout = '';
-      let stderr = '';
-      let timeoutId: NodeJS.Timeout | null = null;
-      let settled = false;
+    const procId = supervised.id;
+    this.activeProcesses.set(procId, { supervised, runId: request.runId });
 
-      const abortHandler = () => {
-        try {
-          proc.kill();
-        } catch {
-          // noop
-        }
-      };
+    try {
+      const info = await supervised.exit;
+      const stdout = supervised.stdout.toString();
+      const stderr = supervised.stderr.toString();
 
-      const finalize = (result: CLIResult) => {
-        if (settled) return;
-        settled = true;
-        if (timeoutId) clearTimeout(timeoutId);
-        this.activeProcesses.delete(procId);
-        request.abortSignal?.removeEventListener('abort', abortHandler);
-        resolve(result);
-      };
-
-      if (request.timeoutMs) {
-        timeoutId = setTimeout(() => {
-          abortHandler();
-          finalize({
-            exitCode: 124,
-            stdout,
-            stderr: stderr || `Process timeout after ${request.timeoutMs}ms`,
-            duration_ms: nowMs() - startTime,
-          });
-        }, request.timeoutMs);
-      }
-
-      if (request.abortSignal) {
-        if (request.abortSignal.aborted) {
-          abortHandler();
-        } else {
-          request.abortSignal.addEventListener('abort', abortHandler, { once: true });
-        }
-      }
-
-      proc.stdout?.on('data', (data) => {
-        stdout += data.toString('utf-8');
-      });
-
-      proc.stderr?.on('data', (data) => {
-        stderr += data.toString('utf-8');
-      });
-
-      proc.on('close', (code) => {
-        finalize({
-          exitCode: code ?? 0,
-          stdout,
-          stderr,
-          duration_ms: nowMs() - startTime,
-        });
-      });
-
-      proc.on('error', (error) => {
-        finalize({
+      if (info.reason === 'spawn_failed') {
+        return {
           exitCode: 2,
           stdout,
-          stderr: error instanceof Error ? error.message : String(error),
+          stderr: info.error?.message || stderr || 'spawn failed',
           duration_ms: nowMs() - startTime,
-        });
-      });
-    });
+        };
+      }
+      if (info.reason === 'timeout') {
+        return {
+          exitCode: 124,
+          stdout,
+          stderr: stderr || `Process timeout after ${request.timeoutMs}ms`,
+          duration_ms: nowMs() - startTime,
+        };
+      }
+      return {
+        exitCode: resolveExitCode(info.code, info.signal),
+        stdout,
+        stderr,
+        duration_ms: nowMs() - startTime,
+      };
+    } finally {
+      this.activeProcesses.delete(procId);
+    }
   }
 
   abortRun(runId: string): void {
-    for (const { process, runId: activeRunId } of this.activeProcesses.values()) {
+    for (const { supervised, runId: activeRunId } of this.activeProcesses.values()) {
       if (activeRunId !== runId) continue;
-      try {
-        process.kill();
-      } catch {
-        // noop
-      }
+      supervised.abort('abort');
     }
   }
 
   terminateAll(): void {
     for (const active of this.activeProcesses.values()) {
-      try {
-        active.process.kill();
-      } catch {
-        // noop
-      }
+      active.supervised.abort('supervisor_kill');
     }
     this.activeProcesses.clear();
   }

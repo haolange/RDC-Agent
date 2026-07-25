@@ -440,10 +440,19 @@ function modeEnvironment(mode, rebuildSettingsOnly) {
     ...runtimeEnvironment,
     NODE_ENV: development ? 'development' : 'production',
     RDC_AGENT_HEADLESS: headless ? '1' : '0',
+    RDC_AGENT_BROWSER_QA: headless ? '1' : '0',
     RDC_AGENT_TEST_MODE: '0',
     RDC_AGENT_REBUILD_SETTINGS_ONLY: rebuildSettingsOnly ? '1' : '0',
   };
   delete env.ELECTRON_RENDERER_URL;
+  if (headless && !env.RDC_AGENT_USER_DATA?.trim()) {
+    const runId = `${Date.now().toString(36)}-${process.pid}`;
+    env.RDC_AGENT_QA_RUN_ID = env.RDC_AGENT_QA_RUN_ID?.trim() || runId;
+    const appData = process.env.APPDATA
+      || process.env.XDG_CONFIG_HOME
+      || path.join(os.homedir(), process.platform === 'darwin' ? 'Library/Application Support' : '.config');
+    env.RDC_AGENT_USER_DATA = path.join(appData, 'rdc-agent', `qa-${env.RDC_AGENT_QA_RUN_ID}`);
+  }
   if (env.RDC_AGENT_USER_DATA?.trim()) mkdirSync(path.resolve(env.RDC_AGENT_USER_DATA), { recursive: true });
   return env;
 }

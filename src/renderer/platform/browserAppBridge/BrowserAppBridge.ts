@@ -10,6 +10,14 @@ type BrowserBridgeWindow = Window & {
 
 type EventCallback = (...args: unknown[]) => void;
 
+const BRIDGE_TOKEN_STORAGE_KEY = 'rdcBridgeToken';
+
+function bridgeCapabilityDenied(capability: string): Promise<never> {
+  return Promise.reject(new Error(
+    `Browser bridge denies ${capability}; use the desktop Electron app for this capability.`,
+  ));
+}
+
 function resolveBridgeOrigin(): string {
   const explicitOrigin = new URL(window.location.href).searchParams.get('rdcBridgeOrigin');
   if (explicitOrigin) {
@@ -18,6 +26,24 @@ function resolveBridgeOrigin(): string {
   // browser-dev：Vite 已同源代理 /invoke|/events|/health，缺 query 时也走本页 origin。
   // 生产 browser 会话：页面由 bridge `/app` 直出，origin 即 bridge。
   return window.location.origin;
+}
+
+function resolveBridgeToken(): string {
+  const params = new URL(window.location.href).searchParams;
+  const fromQuery = params.get('rdcBridgeToken')?.trim();
+  if (fromQuery) {
+    try {
+      sessionStorage.setItem(BRIDGE_TOKEN_STORAGE_KEY, fromQuery);
+    } catch {
+      // sessionStorage may be unavailable; still use the query token for this page.
+    }
+    return fromQuery;
+  }
+  try {
+    return sessionStorage.getItem(BRIDGE_TOKEN_STORAGE_KEY)?.trim() || '';
+  } catch {
+    return '';
+  }
 }
 
 function detectPlatform(): NodeJS.Platform {
@@ -30,6 +56,7 @@ function detectPlatform(): NodeJS.Platform {
 
 class BrowserAppBridgeClient {
   private readonly bridgeOrigin = resolveBridgeOrigin();
+  private readonly bridgeToken = resolveBridgeToken();
   private readonly listeners = new Map<string, Set<EventCallback>>();
   private eventSource: EventSource | null = null;
   private readonly platform = detectPlatform();
@@ -57,7 +84,7 @@ class BrowserAppBridgeClient {
       rewriteFromMessage: (request) => this.invoke('conversation:rewriteFromMessage', request),
       cancelActiveTurn: (request) => this.invoke('conversation:cancelActiveTurn', request),
       answerUserInput: (request) => this.invoke('conversation:answerUserInput', request),
-      answerToolApproval: (request) => this.invoke('conversation:answerToolApproval', request),
+      answerToolApproval: () => bridgeCapabilityDenied('conversation:answerToolApproval'),
       getHistory: (sessionId) => this.invoke('conversation:getHistory', sessionId),
       switchBranch: (request) => this.invoke('conversation:switchBranch', request),
       clearHistory: (sessionId) => this.invoke('conversation:clearHistory', sessionId),
@@ -84,10 +111,10 @@ class BrowserAppBridgeClient {
       configure: (agentId, config) => this.invoke('agent:configure', agentId, config),
     },
     memory: {
-      list: (scope, projectRoot) => this.invoke('memory:list', scope, projectRoot),
-      get: (scope, name, projectRoot) => this.invoke('memory:get', scope, name, projectRoot),
-      write: (request) => this.invoke('memory:write', request),
-      delete: (scope, name, confirmed, projectRoot) => this.invoke('memory:delete', scope, name, confirmed, projectRoot),
+      list: () => bridgeCapabilityDenied('memory:*'),
+      get: () => bridgeCapabilityDenied('memory:*'),
+      write: () => bridgeCapabilityDenied('memory:*'),
+      delete: () => bridgeCapabilityDenied('memory:*'),
     },
     knowledge: {
       listSpaces: () => this.invoke('knowledge:listSpaces'),
@@ -101,22 +128,24 @@ class BrowserAppBridgeClient {
       importResource: (request) => this.invoke('rdx-runtime:import', request),
       deleteResource: (kind, scope, id, projectRoot) => this.invoke('rdx-runtime:delete', kind, scope, id, projectRoot),
       revealResource: (sourcePath) => this.invoke('rdx-runtime:reveal', sourcePath),
-      trustHook: (projectRoot, hookId) => this.invoke('rdx-runtime:trustHook', projectRoot, hookId),
-      revokeHook: (projectRoot, hookId) => this.invoke('rdx-runtime:revokeHook', projectRoot, hookId),
-      testHook: (event, projectRoot, hookId) => this.invoke('rdx-runtime:testHook', event, projectRoot, hookId),
+      trustHook: () => bridgeCapabilityDenied('rdx-runtime:trustHook'),
+      revokeHook: () => bridgeCapabilityDenied('rdx-runtime:revokeHook'),
+      testHook: () => bridgeCapabilityDenied('rdx-runtime:testHook'),
+      trustMcp: () => bridgeCapabilityDenied('rdx-runtime:trustMcp'),
+      revokeMcp: () => bridgeCapabilityDenied('rdx-runtime:revokeMcp'),
       listRequestSnapshots: (sessionId, turnId) => this.invoke('rdx-runtime:listSnapshots', sessionId, turnId),
       getRequestSnapshot: (sessionId, turnId, snapshotId) => this.invoke('rdx-runtime:getSnapshot', sessionId, turnId, snapshotId),
     },
     command: {
       list: (category?) => this.invoke('command:list', category),
-      execute: (request) => this.invoke('command:execute', request),
+      execute: () => bridgeCapabilityDenied('command:execute'),
     },
     tool: {
       getCatalog: () => this.invoke('tool:getCatalog'),
       getRuntimeSummary: () => this.invoke('tool:getRuntimeSummary'),
     },
     mcp: {
-      getStatusSummary: () => this.invoke('mcp:getStatusSummary'),
+      getStatusSummary: () => bridgeCapabilityDenied('mcp:*'),
     },
     evidence: {
       getChain: () => this.invoke('evidence:getChain'),
@@ -138,13 +167,13 @@ class BrowserAppBridgeClient {
       getProviderCatalog: () => this.invoke('settings:getProviderCatalog') as Promise<LlmProviderCatalogResponse>,
       getEffectiveModel: (agentId) => this.invoke('settings:getEffectiveModel', agentId) as Promise<EffectiveModel | null>,
       getEffectiveCatalog: (providerId, accountId) => this.invoke('settings:getEffectiveCatalog', providerId, accountId) as Promise<EffectiveCatalogSnapshot | null>,
-      getProviderSecret: (providerId) => this.invoke('settings:getProviderSecret', providerId),
+      hasProviderSecret: (providerId) => this.invoke('settings:hasProviderSecret', providerId),
       importAgentManifest: (filePath) => this.invoke('settings:importAgentManifest', filePath),
       saveAgentDefinition: (request) => this.invoke('settings:saveAgentDefinition', request),
       getAgentDefinitionCommit: (agentId) => this.invoke('settings:getAgentDefinitionCommit', agentId),
       saveProviderDefinition: (request) => this.invoke('settings:saveProviderDefinition', request),
       getProviderDefinitionCommit: (providerId) => this.invoke('settings:getProviderDefinitionCommit', providerId),
-      set: (settings) => this.invoke('settings:set', settings),
+      set: () => bridgeCapabilityDenied('settings:set'),
     },
     project: {
       list: () => this.invoke('project:list'),
@@ -185,12 +214,12 @@ class BrowserAppBridgeClient {
       list: (request) => this.invoke('runtimeLog:list', request),
     },
     terminal: {
-      listTabs: () => this.invoke('terminal:listTabs'),
-      createTab: (request) => this.invoke('terminal:createTab', request),
-      closeTab: (tabId) => this.invoke('terminal:closeTab', tabId),
-      activateTab: (tabId) => this.invoke('terminal:activateTab', tabId),
-      write: (tabId, data) => this.invoke('terminal:write', tabId, data),
-      resize: (tabId, cols, rows) => this.invoke('terminal:resize', tabId, cols, rows),
+      listTabs: () => bridgeCapabilityDenied('terminal:*'),
+      createTab: () => bridgeCapabilityDenied('terminal:*'),
+      closeTab: () => bridgeCapabilityDenied('terminal:*'),
+      activateTab: () => bridgeCapabilityDenied('terminal:*'),
+      write: () => bridgeCapabilityDenied('terminal:*'),
+      resize: () => bridgeCapabilityDenied('terminal:*'),
     },
     capture: {
       list: () => this.invoke('capture:list'),
@@ -252,10 +281,14 @@ class BrowserAppBridgeClient {
   };
 
   private async invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
+    if (!this.bridgeToken) {
+      throw new Error('Browser bridge token is missing; open the /app URL printed by the headless main process.');
+    }
     const response = await fetch(`${this.bridgeOrigin}/invoke`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.bridgeToken}`,
       },
       body: JSON.stringify({ channel, args }),
     });
@@ -290,7 +323,12 @@ class BrowserAppBridgeClient {
 
   private ensureEventSource(): void {
     if (this.eventSource) return;
-    this.eventSource = new EventSource(`${this.bridgeOrigin}/events`);
+    if (!this.bridgeToken) {
+      throw new Error('Browser bridge token is missing; open the /app URL printed by the headless main process.');
+    }
+    const eventsUrl = new URL('/events', this.bridgeOrigin);
+    eventsUrl.searchParams.set('token', this.bridgeToken);
+    this.eventSource = new EventSource(eventsUrl.toString());
     this.eventSource.onmessage = (event) => {
       const payload = JSON.parse(event.data) as { channel: string; args?: unknown[] };
       const channelListeners = this.listeners.get(payload.channel);

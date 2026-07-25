@@ -71,7 +71,7 @@ export const IPC_HANDLER_DOMAINS = {
     'settings:getProviderCatalog',
     'settings:getEffectiveModel',
     'settings:getEffectiveCatalog',
-    'settings:getProviderSecret',
+    'settings:hasProviderSecret',
     'settings:importAgentManifest',
     'settings:saveAgentDefinition',
     'settings:getAgentDefinitionCommit',

@@ -220,6 +220,8 @@ export interface ElectronAPI {
     revealResource: (sourcePath: string) => Promise<{ success: boolean; error?: string }>;
     trustHook: (projectRoot: string, hookId: string) => Promise<RdxRuntimeOverview>;
     revokeHook: (projectRoot: string, hookId: string) => Promise<RdxRuntimeOverview>;
+    trustMcp: (projectRoot: string, descriptorId: string) => Promise<RdxRuntimeOverview>;
+    revokeMcp: (projectRoot: string, descriptorId: string) => Promise<RdxRuntimeOverview>;
     testHook: (event: HookEvent, projectRoot?: string, hookId?: string) => Promise<unknown>;
     listRequestSnapshots: (sessionId: string, turnId?: string) => Promise<RequestEnvelopeSnapshot[]>;
     getRequestSnapshot: (sessionId: string, turnId: string, snapshotId: string) => Promise<RequestEnvelopeSnapshot | null>;
@@ -269,7 +271,7 @@ export interface ElectronAPI {
     getProviderCatalog: () => Promise<LlmProviderCatalogResponse>;
     getEffectiveModel: (agentId: string) => Promise<EffectiveModel | null>;
     getEffectiveCatalog: (providerId: string, accountId?: string) => Promise<EffectiveCatalogSnapshot | null>;
-    getProviderSecret: (providerId: string) => Promise<string>;
+    hasProviderSecret: (providerId: string) => Promise<{ hasSecret: boolean; maskedPreview?: string }>;
     importAgentManifest: (filePath: string) => Promise<AppSettings>;
     saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
     getAgentDefinitionCommit: (agentId: string) => Promise<AgentDefinitionCommitSnapshot | null>;
