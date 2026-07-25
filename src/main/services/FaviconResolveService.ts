@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { assertPublicHttpUrl } from '../agent-runtime/net/assertPublicHttpUrl';
+import { assertPublicHttpUrl, fetchPinnedPublic } from '../agent-runtime/net/assertPublicHttpUrl';
 import { appPathService } from '../runtime/AppPathService';
 
 const MAX_FAVICON_BYTES = 64 * 1024;
@@ -116,9 +116,9 @@ async function fetchPublicBytes(rawUrl: string): Promise<{ bytes: Uint8Array; mi
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
-    let currentUrl = await assertPublicHttpUrl(rawUrl);
+    let current = await assertPublicHttpUrl(rawUrl);
     for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-      const response = await fetch(currentUrl, {
+      const response = await fetchPinnedPublic(current, {
         redirect: 'manual',
         signal: controller.signal,
         headers: {
@@ -129,7 +129,7 @@ async function fetchPublicBytes(rawUrl: string): Promise<{ bytes: Uint8Array; mi
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get('location');
         if (!location) return null;
-        currentUrl = await assertPublicHttpUrl(new URL(location, currentUrl).toString());
+        current = await assertPublicHttpUrl(new URL(location, current.href).toString());
         continue;
       }
       if (!response.ok) return null;
@@ -195,21 +195,34 @@ async function discoverIconUrls(domain: string): Promise<string[]> {
   ];
 
   try {
-    const pageUrl = await assertPublicHttpUrl(`${httpsOrigin}/`);
+    let page = await assertPublicHttpUrl(`${httpsOrigin}/`);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const response = await fetch(pageUrl, {
-        redirect: 'follow',
+      let response = await fetchPinnedPublic(page, {
+        redirect: 'manual',
         signal: controller.signal,
         headers: {
           Accept: 'text/html,application/xhtml+xml',
           'User-Agent': 'RDC-Agent/FaviconResolve',
         },
       });
+      for (let hop = 0; hop < MAX_REDIRECTS && response.status >= 300 && response.status < 400; hop += 1) {
+        const location = response.headers.get('location');
+        if (!location) break;
+        page = await assertPublicHttpUrl(new URL(location, page.href).toString());
+        response = await fetchPinnedPublic(page, {
+          redirect: 'manual',
+          signal: controller.signal,
+          headers: {
+            Accept: 'text/html,application/xhtml+xml',
+            'User-Agent': 'RDC-Agent/FaviconResolve',
+          },
+        });
+      }
       if (response.ok) {
         const text = (await response.text()).slice(0, 80_000);
-        const fromHtml = parseIconHrefFromHtml(text, response.url || pageUrl);
+        const fromHtml = parseIconHrefFromHtml(text, page.href);
         candidates.unshift(...fromHtml);
       }
     } finally {

@@ -24,7 +24,12 @@ module.exports = {
   rules: {
     'no-undef': 'off',
     'no-unused-vars': 'off',
-    '@typescript-eslint/no-unused-vars': 'off',
-    'react-hooks/exhaustive-deps': 'off',
+    // Phase 5: restore as warn first; tighten to error after debt clears.
+    '@typescript-eslint/no-unused-vars': ['warn', {
+      argsIgnorePattern: '^_',
+      varsIgnorePattern: '^_',
+      caughtErrorsIgnorePattern: '^_',
+    }],
+    'react-hooks/exhaustive-deps': 'warn',
   },
 };

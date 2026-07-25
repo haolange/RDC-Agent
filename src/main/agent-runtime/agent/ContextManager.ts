@@ -146,16 +146,34 @@ export class ContextManager {
       if (!messagesEqual(result, beforeFull)) stages.push('full');
     }
 
+    const afterTokens = this.estimateTokens(result);
+    if (afterTokens > tokenLimit) {
+      // Last-resort degrade: drop non-tail messages that are not the latest user turn.
+      const degraded = this.degradeToFit(result, tokenLimit);
+      result = degraded.messages;
+      if (degraded.stages.length > 0) {
+        stages.push(...degraded.stages);
+        derivedContextView = degraded.view ?? derivedContextView;
+      }
+    }
+
+    const finalTokens = this.estimateTokens(result);
+    if (finalTokens > tokenLimit) {
+      throw new Error(
+        `CONTEXT_CANNOT_FIT: compacted context still exceeds budget (${finalTokens} > ${tokenLimit} tokens). `
+          + 'Remove attachments or select a larger context mode.',
+      );
+    }
+
     const semanticStages = stages.filter((stage) =>
-      stage === 'snip' || stage === 'micro' || stage === 'full',
+      stage === 'snip' || stage === 'micro' || stage === 'full' || stage === 'degrade',
     );
     if (semanticStages.length === 0) return { messages: result };
 
     const afterCount = result.length;
-    const afterTokens = this.estimateTokens(result);
     const summary = 'Context compacted (' + semanticStages.join(', ') + '): '
       + beforeCount + ' -> ' + afterCount + ' messages, approximately '
-      + beforeTokens + ' -> ' + afterTokens + ' tokens.';
+      + beforeTokens + ' -> ' + finalTokens + ' tokens.';
     return {
       messages: result,
       summary,
@@ -344,6 +362,51 @@ export class ContextManager {
       messages: [compacted.message, ...tail],
       view: compacted.view,
     };
+  }
+
+  /**
+   * Hard fail-closed degrade: keep the latest user message + minimal tail.
+   * If even that cannot fit the RequestPlan budget, callers receive CONTEXT_CANNOT_FIT.
+   */
+  private degradeToFit(
+    messages: AgentMessage[],
+    tokenLimit: number,
+  ): { messages: AgentMessage[]; stages: string[]; view?: DerivedContextView } {
+    if (messages.length === 0) return { messages: [], stages: [] };
+    let lastUserIndex = -1;
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      if (messages[i].role === 'user' && !(messages[i] as UserMessage).derivedContext) {
+        lastUserIndex = i;
+        break;
+      }
+    }
+    const keepFrom = lastUserIndex >= 0 ? lastUserIndex : Math.max(0, messages.length - 1);
+    const tail = messages.slice(keepFrom);
+    if (this.estimateTokens(tail) <= tokenLimit) {
+      const source = messages.slice(0, keepFrom);
+      const compacted = source.length > 0 ? this.buildCompactionView(source) : null;
+      if (compacted && this.estimateTokens([compacted.message, ...tail]) <= tokenLimit) {
+        return {
+          messages: [compacted.message, ...tail],
+          stages: ['degrade'],
+          view: compacted.view,
+        };
+      }
+      return { messages: tail, stages: ['degrade'] };
+    }
+    // Strip images from the surviving user message as a final degrade step.
+    const stripped = tail.map((message) => {
+      if (message.role !== 'user') return message;
+      const user = message as UserMessage;
+      if (typeof user.content === 'string') return user;
+      return {
+        ...user,
+        content: user.content
+          .filter((block): block is TextContent => block.type === 'text')
+          .map((block) => ({ type: 'text' as const, text: block.text })),
+      };
+    });
+    return { messages: stripped, stages: ['degrade'] };
   }
 
   private buildCompactionView(

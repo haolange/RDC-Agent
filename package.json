@@ -1,8 +1,16 @@
 {
   "name": "rdc-agent",
-  "version": "1.0.0",
-  "description": "RenderDoc Debug Agent - Vertical Framework",
+  "version": "0.6.0",
+  "description": "RDC-Agent — Electron desktop app for RenderDoc .rdc capture analysis with agentic Debugger/Ask workflows",
   "author": "RDC-Agent Contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/haolange/RDC-Agent.git"
+  },
+  "homepage": "https://github.com/haolange/RDC-Agent",
+  "bugs": {
+    "url": "https://github.com/haolange/RDC-Agent/issues"
+  },
   "main": "out/main/index.js",
   "packageManager": "pnpm@11.7.0",
   "engines": {
@@ -91,6 +99,7 @@
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "@vitejs/plugin-react": "^5.1.4",
+    "@vitest/coverage-v8": "^4.1.10",
     "@vitest/runner": "^4.1.8",
     "electron": "^42.2.0",
     "electron-builder": "^26.8.1",

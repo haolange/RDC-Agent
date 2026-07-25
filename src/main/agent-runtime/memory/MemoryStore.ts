@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
@@ -6,7 +6,38 @@ export type MemoryType = 'user' | 'feedback' | 'project' | 'reference';
 export interface MemoryRecord { id: string; name: string; description: string; type: MemoryType; content: string; tags?: string[]; createdAt: number; updatedAt: number; }
 export interface WriteMemoryInput { name: string; description: string; type: MemoryType; content: string; tags?: string[]; }
 
-const slugify = (value: string): string => value.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+const hashSlug = (value: string): string => createHash('sha256').update(value).digest('hex');
+
+/**
+ * Unicode-aware slugify: keep letters/numbers across scripts (\p{L}\p{N}),
+ * collapse separators, and fall back to a short hash when the result is empty.
+ */
+export const slugify = (value: string): string => {
+  const normalized = value.normalize('NFKC').trim().toLowerCase();
+  const slug = normalized
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  if (slug.length > 0) {
+    return slug.length > 80 ? `${slug.slice(0, 64)}-${hashSlug(normalized).slice(0, 8)}` : slug;
+  }
+  return `mem-${hashSlug(normalized || value).slice(0, 16)}`;
+};
+
+/** Resolve a unique slug when an existing file already owns a colliding slug for a different source name. */
+export const resolveSlugCollision = async (
+  baseSlug: string,
+  sourceName: string,
+  exists: (slug: string) => Promise<boolean>,
+): Promise<string> => {
+  if (!(await exists(baseSlug))) return baseSlug;
+  const candidate = `${baseSlug.slice(0, 64)}-${hashSlug(sourceName).slice(0, 8)}`;
+  if (!(await exists(candidate))) return candidate;
+  let n = 2;
+  while (await exists(`${candidate}-${n}`)) n += 1;
+  return `${candidate}-${n}`;
+};
+
 const parseFrontmatter = (source: string): { meta: Record<string, unknown>; body: string } => {
   const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) return { meta: {}, body: source.trim() };
@@ -28,27 +59,48 @@ export class MemoryStore {
   getMemoryDir(): string { return this.memoryDir; }
 
   async writeMemory(input: WriteMemoryInput): Promise<MemoryRecord> {
-    const name = slugify(input.name);
-    if (!name) throw new Error('Memory name must contain at least one ASCII letter or digit.');
-    if (!input.description.trim() || !input.content.trim()) throw new Error('Memory description and content are required.');
+    const sourceName = input.name.trim();
+    if (!sourceName) throw new Error('Memory name is required.');
+    if (!input.description.trim() || !input.content.trim()) {
+      throw new Error('Memory description and content are required.');
+    }
     await fs.mkdir(this.memoryDir, { recursive: true });
-    const existing = await this.getMemory(name);
+    const baseSlug = slugify(sourceName);
+    const existing = await this.getMemory(baseSlug);
+    const name = existing
+      ? baseSlug
+      : await resolveSlugCollision(baseSlug, sourceName, async (slug) => {
+          try {
+            await fs.access(path.join(this.memoryDir, `${slug}.md`));
+            return true;
+          } catch {
+            return false;
+          }
+        });
+    const prior = name === baseSlug ? existing : await this.getMemory(name);
     const now = Date.now();
-    const record: MemoryRecord = { id: existing?.id ?? `mem_${now}_${randomBytes(4).toString('hex')}`, name, description: input.description.trim(), type: input.type, content: input.content.trim(), tags: input.tags?.map((tag) => tag.trim()).filter(Boolean), createdAt: existing?.createdAt ?? now, updatedAt: now };
+    const record: MemoryRecord = {
+      id: prior?.id ?? `mem_${now}_${randomBytes(4).toString('hex')}`,
+      name,
+      description: input.description.trim(),
+      type: input.type,
+      content: input.content.trim(),
+      tags: input.tags?.map((tag) => tag.trim()).filter(Boolean),
+      createdAt: prior?.createdAt ?? now,
+      updatedAt: now,
+    };
     await fs.writeFile(path.join(this.memoryDir, `${name}.md`), serialize(record), 'utf8');
     return record;
   }
 
   async deleteMemory(name: string): Promise<boolean> {
     const slug = slugify(name);
-    if (!slug) return false;
     try { await fs.unlink(path.join(this.memoryDir, `${slug}.md`)); return true; }
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; }
   }
 
   async getMemory(name: string): Promise<MemoryRecord | null> {
     const slug = slugify(name);
-    if (!slug) return null;
     try {
       const { meta, body } = parseFrontmatter(await fs.readFile(path.join(this.memoryDir, `${slug}.md`), 'utf8'));
       const candidateType = String(meta.type ?? 'reference');

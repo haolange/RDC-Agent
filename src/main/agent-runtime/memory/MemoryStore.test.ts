@@ -18,6 +18,30 @@ describe('MemoryStore explicit scoped storage', () => {
     expect(await store.getMemory('user-preference')).toMatchObject({ content: 'Use Chinese.' });
   });
 
+  it('slugifies Chinese names with Unicode letters and hash-fallback for emoji-only', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-memory-cjk-'));
+    roots.push(root);
+    const store = new MemoryStore(root);
+    const cjk = await store.writeMemory({
+      name: '用户偏好',
+      description: '语言',
+      type: 'user',
+      content: '使用中文。',
+    });
+    expect(cjk.name).toBe('用户偏好');
+    expect(await readdir(root)).toContain('用户偏好.md');
+    expect(await store.getMemory('用户偏好')).toMatchObject({ content: '使用中文。' });
+
+    const emoji = await store.writeMemory({
+      name: '🎉🎉',
+      description: 'emoji',
+      type: 'reference',
+      content: 'party',
+    });
+    expect(emoji.name.startsWith('mem-')).toBe(true);
+    expect(await store.getMemory(emoji.name)).toMatchObject({ content: 'party' });
+  });
+
   it('keeps user and project stores physically isolated', async () => {
     const userRoot = await mkdtemp(path.join(os.tmpdir(), 'rdx-user-memory-'));
     const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'rdx-project-memory-'));

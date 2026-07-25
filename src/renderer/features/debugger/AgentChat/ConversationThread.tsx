@@ -1,8 +1,12 @@
-import React, { useMemo } from 'react';
+import React, { useCallback } from 'react';
 import type { AgentMode } from '@shared/types/layout';
-import { compareConversationMessages } from '@shared/conversation/conversationBranchResolver';
-import { useConversationStore } from '../../../stores/conversationStore';
+import type { ConversationMessage } from '@shared/types/conversation';
+import {
+  selectOrderedConversationMessages,
+  useConversationStore,
+} from '../../../stores/conversationStore';
 import { EmptyWorkbenchPrompt } from '../../../patterns/EmptyWorkbenchPrompt';
+import { VirtualMessageList } from '../VirtualMessageList';
 import { MessageBubble } from './MessageBubble';
 
 interface ConversationThreadProps {
@@ -10,11 +14,12 @@ interface ConversationThreadProps {
 }
 
 export const ConversationThread: React.FC<ConversationThreadProps> = ({ mode }) => {
-  const messages = useConversationStore((state) => state.conversationMessages);
+  // Write-side sort already applied in conversationStore; selector stays shallow-stable.
+  const orderedMessages = useConversationStore(selectOrderedConversationMessages);
 
-  const orderedMessages = useMemo(
-    () => messages.slice().sort(compareConversationMessages),
-    [messages],
+  const renderMessage = useCallback(
+    (message: ConversationMessage) => <MessageBubble message={message} />,
+    [],
   );
 
   if (orderedMessages.length === 0) {
@@ -29,22 +34,12 @@ export const ConversationThread: React.FC<ConversationThreadProps> = ({ mode }) 
   }
 
   return (
-    <ol
+    <VirtualMessageList
+      messages={orderedMessages}
+      renderMessage={renderMessage}
       className="conversation-thread"
       data-testid="conversation-thread"
-      data-message-count={orderedMessages.length}
-    >
-      {orderedMessages.map((message) => (
-        <li
-          key={message.id}
-          className="conversation-thread-item"
-          data-message-role={message.role}
-          data-message-status={message.status ?? 'complete'}
-        >
-          <MessageBubble message={message} />
-        </li>
-      ))}
-    </ol>
+    />
   );
 };
 

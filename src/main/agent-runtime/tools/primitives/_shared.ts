@@ -96,31 +96,44 @@ export function safeResolvePath(input: string, root?: string, context?: ToolExec
   return resolved;
 }
 
-/** 把 AbortSignal 转为 Promise（在 abort 时 reject）。 */
-export function abortPromise(signal?: AbortSignal): Promise<never> {
-  return new Promise((_, reject) => {
+/** AbortSignal → Promise，返回可 dispose 的句柄以防 listener 泄漏。 */
+export function abortPromise(signal?: AbortSignal): {
+  promise: Promise<never>;
+  dispose: () => void;
+} {
+  let onAbort: (() => void) | null = null;
+  const dispose = (): void => {
+    if (signal && onAbort) {
+      signal.removeEventListener('abort', onAbort);
+      onAbort = null;
+    }
+  };
+  const promise = new Promise<never>((_, reject) => {
     if (!signal) return;
     if (signal.aborted) {
       reject(new Error('Aborted'));
       return;
     }
-    const onAbort = (): void => {
-      signal.removeEventListener('abort', onAbort);
+    onAbort = (): void => {
+      dispose();
       reject(new Error('Aborted'));
     };
     signal.addEventListener('abort', onAbort, { once: true });
   });
+  return { promise, dispose };
 }
 
-/** Slice a UTF-8 string so the result is at most `maxBytes` bytes. */
+/** Slice a UTF-8 string so the result is at most `maxBytes` bytes (O(N) via Buffer). */
 export function sliceUtf8Bytes(text: string, maxBytes: number): string {
   if (maxBytes <= 0) return '';
-  if (Buffer.byteLength(text, 'utf8') <= maxBytes) return text;
-  let end = Math.min(text.length, maxBytes);
-  while (end > 0 && Buffer.byteLength(text.slice(0, end), 'utf8') > maxBytes) {
+  const buf = Buffer.from(text, 'utf8');
+  if (buf.byteLength <= maxBytes) return text;
+  let end = maxBytes;
+  // Walk back to a codepoint boundary (not a continuation byte 10xxxxxx).
+  while (end > 0 && (buf[end] & 0xc0) === 0x80) {
     end -= 1;
   }
-  return text.slice(0, end);
+  return buf.subarray(0, end).toString('utf8');
 }
 
 /** 截断超长输出，保留前后部分并标注被截断的字节数（UTF-8 字节硬顶）。 */

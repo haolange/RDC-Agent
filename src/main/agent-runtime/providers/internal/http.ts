@@ -8,11 +8,26 @@ export interface ProviderStreamTimeoutOptions {
 
 export interface ProviderStreamReadOptions extends ProviderStreamTimeoutOptions {
   providerApi: string;
+  /** Max incomplete-line buffer bytes before fail-closed. Default 8 MiB. */
+  maxBufferBytes?: number;
 }
 
 export const DEFAULT_PROVIDER_FIRST_CHUNK_TIMEOUT_MS = 20_000;
 export const DEFAULT_PROVIDER_STREAM_IDLE_TIMEOUT_MS = 60_000;
 export const DEFAULT_PROVIDER_REQUEST_TIMEOUT_MS = 300_000;
+export const DEFAULT_PROVIDER_MAX_BUFFER_BYTES = 8 * 1024 * 1024;
+
+export class ProviderStreamBufferError extends Error {
+  readonly providerApi: string;
+  readonly maxBufferBytes: number;
+
+  constructor(providerApi: string, maxBufferBytes: number) {
+    super(`[${providerApi}] provider stream buffer exceeded ${maxBufferBytes} bytes`);
+    this.name = 'ProviderStreamBufferError';
+    this.providerApi = providerApi;
+    this.maxBufferBytes = maxBufferBytes;
+  }
+}
 
 interface ResolvedProviderTimeouts {
   firstChunkTimeoutMs: number;
@@ -72,6 +87,7 @@ export async function* parseSSE(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   const timeouts = resolveProviderTimeouts(options);
+  const maxBufferBytes = options.maxBufferBytes ?? DEFAULT_PROVIDER_MAX_BUFFER_BYTES;
   let buffer = '';
   let hasReadChunk = false;
 
@@ -90,6 +106,11 @@ export async function* parseSSE(
         break;
       }
       buffer += decoder.decode(value, { stream: true });
+      if (Buffer.byteLength(buffer, 'utf8') > maxBufferBytes) {
+        const error = new ProviderStreamBufferError(options.providerApi, maxBufferBytes);
+        void reader.cancel(error).catch(() => undefined);
+        throw error;
+      }
       const lines = buffer.split('\n');
       buffer = lines.pop() ?? '';
 
@@ -128,6 +149,7 @@ export async function* parseJsonLines(
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   const timeouts = resolveProviderTimeouts(options);
+  const maxBufferBytes = options.maxBufferBytes ?? DEFAULT_PROVIDER_MAX_BUFFER_BYTES;
   let buffer = '';
   let hasReadChunk = false;
 
@@ -146,6 +168,11 @@ export async function* parseJsonLines(
         break;
       }
       buffer += decoder.decode(value, { stream: true });
+      if (Buffer.byteLength(buffer, 'utf8') > maxBufferBytes) {
+        const error = new ProviderStreamBufferError(options.providerApi, maxBufferBytes);
+        void reader.cancel(error).catch(() => undefined);
+        throw error;
+      }
       const lines = buffer.split('\n');
       buffer = lines.pop() ?? '';
 

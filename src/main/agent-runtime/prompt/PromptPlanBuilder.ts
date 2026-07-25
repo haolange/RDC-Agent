@@ -5,7 +5,15 @@ import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import type { AgentPermissionSettings } from '@shared/types/settings';
-import type { PromptPlan, PromptSegment, ScopedInstructionResolution, SkillLoadResult, SkillMetadata } from '@shared/types/rdxRuntime';
+import type {
+  EffectiveAgentProfile,
+  PromptPlan,
+  PromptSegment,
+  ResourceScope,
+  ScopedInstructionResolution,
+  SkillLoadResult,
+  SkillMetadata,
+} from '@shared/types/rdxRuntime';
 import { charsToTokens } from '@shared/utils/tokens';
 import { generateEventId } from '@shared/utils/id';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
@@ -14,7 +22,8 @@ import { resolveSkillCatalogBudget } from '../capabilities/SkillCatalogBudget';
 const CORE_FILES = ['identity-collaboration.md', 'agent-loop.md', 'tool-evidence.md', 'completion.md'];
 
 export interface PromptPlanInput {
-  profile: AgentManifestDefinition;
+  /** Prefer EffectiveAgentProfile so provenance.scope is marked correctly. */
+  profile: EffectiveAgentProfile | (AgentManifestDefinition & { provenance?: EffectiveAgentProfile['provenance'] });
   scopedInstructions: ScopedInstructionResolution;
   preloadedSkills: SkillLoadResult[];
   skillCatalog: SkillMetadata[];
@@ -26,6 +35,25 @@ export interface PromptPlanInput {
   currentDate: string;
   timeZone: string;
   contextWindowTokens?: number;
+}
+
+function resolveProfileProvenance(profile: PromptPlanInput['profile']): {
+  scope: ResourceScope;
+  sourcePath: string;
+  sourceHash: string;
+} {
+  if (profile.provenance) {
+    return {
+      scope: profile.provenance.scope,
+      sourcePath: profile.provenance.sourcePath,
+      sourceHash: profile.provenance.sourceHash,
+    };
+  }
+  return {
+    scope: 'user',
+    sourcePath: profile.filePath,
+    sourceHash: hashScopedResource(profile),
+  };
 }
 
 export class PromptPlanBuilder {
@@ -68,7 +96,15 @@ export class PromptPlanBuilder {
       `Description: ${input.profile.description}`,
       input.profile.instructions,
     ].filter(Boolean).join('\n\n');
-    push({ id: `agent:${input.profile.id}`, kind: 'agent-profile', scope: 'user', sourcePath: input.profile.filePath, sourceHash: hashScopedResource(input.profile), content: profileContent });
+    const provenance = resolveProfileProvenance(input.profile);
+    push({
+      id: `agent:${input.profile.id}`,
+      kind: 'agent-profile',
+      scope: provenance.scope,
+      sourcePath: provenance.sourcePath,
+      sourceHash: provenance.sourceHash,
+      content: profileContent,
+    });
 
     input.scopedInstructions.sources.forEach((source) => push({
       id: source.id,

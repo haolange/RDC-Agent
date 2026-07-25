@@ -86,6 +86,14 @@ function registerShutdownDisposables(): void {
     },
   });
   shutdownCoordinator.register({
+    id: 'shell.terminate-all',
+    phase: 'terminate_processes',
+    dispose: async () => {
+      const { shellInvocationService } = await import('./tools/ShellInvocationService');
+      shellInvocationService.terminateAll();
+    },
+  });
+  shutdownCoordinator.register({
     id: 'bridge.stop',
     phase: 'terminate_processes',
     dispose: async () => {
@@ -444,13 +452,32 @@ function setupMenu(): void {
           {
             label: 'Documentation',
             click: () => {
-              shell.openExternal('https://github.com/rdc-agent/docs');
+              shell.openExternal('https://github.com/haolange/RDC-Agent#readme');
             },
           },
           {
             label: 'Report Issue',
             click: () => {
-              shell.openExternal('https://github.com/rdc-agent/issues');
+              shell.openExternal('https://github.com/haolange/RDC-Agent/issues');
+            },
+          },
+          { type: 'separator' },
+          {
+            label: 'About RDC-Agent',
+            click: () => {
+              const version = app.getVersion();
+              const detail = [
+                `Version: ${version}`,
+                `Electron: ${process.versions.electron ?? 'N/A'}`,
+                `Node: ${process.versions.node ?? 'N/A'}`,
+                `Chrome: ${process.versions.chrome ?? 'N/A'}`,
+              ].join('\n');
+              void dialog.showMessageBox({
+                type: 'info',
+                title: 'About RDC-Agent',
+                message: 'RDC-Agent',
+                detail,
+              });
             },
           },
         ],
@@ -461,7 +488,43 @@ function setupMenu(): void {
     return;
   }
 
-  Menu.setApplicationMenu(null);
+  // Non-darwin: still expose Help with real repo links (no placeholder URLs).
+  Menu.setApplicationMenu(Menu.buildFromTemplate([
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'Documentation',
+          click: () => {
+            shell.openExternal('https://github.com/haolange/RDC-Agent#readme');
+          },
+        },
+        {
+          label: 'Report Issue',
+          click: () => {
+            shell.openExternal('https://github.com/haolange/RDC-Agent/issues');
+          },
+        },
+        { type: 'separator' },
+        {
+          label: 'About RDC-Agent',
+          click: () => {
+            const version = app.getVersion();
+            void dialog.showMessageBox({
+              type: 'info',
+              title: 'About RDC-Agent',
+              message: 'RDC-Agent',
+              detail: [
+                `Version: ${version}`,
+                `Electron: ${process.versions.electron ?? 'N/A'}`,
+                `Node: ${process.versions.node ?? 'N/A'}`,
+              ].join('\n'),
+            });
+          },
+        },
+      ],
+    },
+  ]));
 }
 
 // App lifecycle.

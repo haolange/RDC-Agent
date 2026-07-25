@@ -61,6 +61,20 @@ interface ConversationState {
   reset: () => void;
 }
 
+/** Visible branch messages — already sorted on the write side. */
+export const selectOrderedConversationMessages = (
+  state: ConversationState,
+): ConversationMessage[] => state.conversationMessages;
+
+export const selectConversationMessageCount = (state: ConversationState): number =>
+  state.conversationMessages.length;
+
+export const selectLatestMessageActivityAt = (state: ConversationState): number =>
+  state.conversationMessages.reduce<number>((max, message) => {
+    const candidate = message.updatedAt ?? message.createdAt;
+    return candidate > max ? candidate : max;
+  }, 0);
+
 export const useConversationStore = create<ConversationState>((set) => ({
   allConversationMessages: [],
   conversationMessages: [],
