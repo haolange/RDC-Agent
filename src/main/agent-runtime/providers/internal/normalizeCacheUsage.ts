@@ -59,12 +59,15 @@ export interface ProviderUsageDraft {
   totalTokens?: number;
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
+  cacheWriteLongTokens?: number;
   reasoningTokens?: number;
   promptCacheHitTokens?: number;
   promptCacheMissTokens?: number;
   cost?: {
     input: number;
     output: number;
+    cacheRead?: number;
+    cacheWrite?: number;
     total: number;
   };
 }
@@ -89,6 +92,7 @@ export function finalizeProviderUsage(draft: ProviderUsageDraft): import('../../
     totalTokens: totalTokens ?? (rest.inputTokens + rest.outputTokens),
     ...(rest.cacheReadTokens !== undefined ? { cacheReadTokens: rest.cacheReadTokens } : {}),
     ...(rest.cacheWriteTokens !== undefined ? { cacheWriteTokens: rest.cacheWriteTokens } : {}),
+    ...(rest.cacheWriteLongTokens !== undefined ? { cacheWriteLongTokens: rest.cacheWriteLongTokens } : {}),
     ...(rest.reasoningTokens !== undefined ? { reasoningTokens: rest.reasoningTokens } : {}),
     ...(rest.cost !== undefined ? { cost: rest.cost } : {}),
     ...normalized,
@@ -100,4 +104,23 @@ export function cacheHitRatePercent(hit: number, miss: number): number | undefin
   const denom = hit + miss;
   if (denom <= 0) return undefined;
   return Math.min(100, Math.max(0, Math.round((hit / denom) * 100)));
+}
+
+/**
+ * Splits Anthropic cache_creation_input_tokens into standard (5m) and long-lived (1h) writes.
+ * When the provider reports a `cache_creation.ephemeral_1h` breakdown, the 1h portion is
+ * surfaced as `cacheWriteLongTokens` and the remainder stays in `cacheWriteTokens`.
+ */
+export function splitAnthropicCacheWrite(
+  totalCacheWrite: number,
+  longLivedWrite: number | undefined,
+): { cacheWriteTokens: number; cacheWriteLongTokens?: number } {
+  if (!isFiniteToken(longLivedWrite) || longLivedWrite === 0) {
+    return { cacheWriteTokens: totalCacheWrite };
+  }
+  const long = Math.min(longLivedWrite, totalCacheWrite);
+  return {
+    cacheWriteTokens: totalCacheWrite,
+    cacheWriteLongTokens: long,
+  };
 }

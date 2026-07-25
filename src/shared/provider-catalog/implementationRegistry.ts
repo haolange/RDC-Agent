@@ -3,11 +3,14 @@ import type { LlmProviderProtocol } from '../types/settings';
 export type ProviderOperationBuilderId =
   | 'anthropic-messages'
   | 'azure-chat-completions'
+  | 'azure-openai-responses'
+  | 'bedrock-converse-stream'
   | 'gitlab-agentic-chat'
   | 'google-interactions'
   | 'google-gemini'
   | 'google-vertex-anthropic'
   | 'google-vertex-gemini'
+  | 'mistral-conversations'
   | 'ollama-chat-completions'
   | 'openai-chat-completions'
   | 'openai-responses'
@@ -36,6 +39,16 @@ export const PROVIDER_ADAPTER_IMPLEMENTATIONS = {
     operationBuilderId: 'azure-chat-completions',
     transport: 'http',
   },
+  'azure-openai-responses': {
+    protocols: ['AzureOpenAIResponses'],
+    operationBuilderId: 'azure-openai-responses',
+    transport: 'http',
+  },
+  'bedrock-converse-stream': {
+    protocols: ['BedrockConverseStream'],
+    operationBuilderId: 'bedrock-converse-stream',
+    transport: 'http',
+  },
   'gitlab-duo': {
     protocols: ['GitLabDuo'],
     operationBuilderId: 'gitlab-agentic-chat',
@@ -59,6 +72,11 @@ export const PROVIDER_ADAPTER_IMPLEMENTATIONS = {
   'google-vertex-gemini': {
     protocols: ['GoogleVertexGemini'],
     operationBuilderId: 'google-vertex-gemini',
+    transport: 'http',
+  },
+  'mistral-conversations': {
+    protocols: ['MistralConversations'],
+    operationBuilderId: 'mistral-conversations',
     transport: 'http',
   },
   'ollama-openai-compatible': {

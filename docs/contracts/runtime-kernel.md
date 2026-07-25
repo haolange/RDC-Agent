@@ -56,6 +56,50 @@ Scoped Runtime Resolution
 
 仅显式 thinking block 可创建 `ThinkingArtifact`；普通 assistant text 永不合成 thinking。仅 `outputPhase='commentary'` 写 Work Process commentary；仅 `final_answer` 写正文与 final trace。正常结束但无 canonical final → fail-closed。
 
+## Provider 错误模型契约
+
+`src/shared/types/providerErrors.ts` 定义统一错误分类：
+
+```typescript
+type ProviderErrorCode =
+  | 'provider_unknown' | 'auth_unconfigured' | 'auth_expired'
+  | 'auth_scope_denied' | 'model_source' | 'rate_limit'
+  | 'quota_exceeded' | 'network' | 'timeout'
+  | 'context_overflow' | 'stream_protocol' | 'aborted' | 'unknown';
+
+interface ProviderErrorInfo {
+  code: ProviderErrorCode;
+  retryable: boolean;
+  httpStatus?: number;
+  message: string;
+  details?: Record<string, unknown>;
+}
+```
+
+**Retryable 分类**：`rate_limit`、`network`、`timeout` 始终可重试；`stream_protocol` 视具体模式（“stream ended without message_stop”“you can retry your request” 可重试，其余不可）；其余均不可重试。
+
+分类器（`errorClassifier.ts`）为纯函数，无副作用；优先级：Abort → HTTP status → 消息模式 → 流协议 → fallback `unknown`。
+
+## 诊断契约（Diagnostics）
+
+`AssistantMessage.diagnostics` 在流失败时附加诊断条目：
+
+```typescript
+interface AssistantMessageDiagnostic {
+  type: string;              // 诊断类型标识
+  timestamp: number;         // Unix 毫秒时间戳
+  error?: {
+    name?: string;
+    message: string;
+    stack?: string;
+    code?: string | number;  // HTTP status 或业务码
+  };
+  details?: Record<string, unknown>;  // 结构化补充信息
+}
+```
+
+`isRetryableAssistantError(message)` 遍历 `diagnostics` 并对每个 `error` 调用 `classifyProviderError`，任一 retryable 则整条消息可重试。诊断信息不进入 IPC / renderer / Trace，仅供主进程重试决策与脱敏日志使用。
+
 ## Tools 与 Permission（执行侧）
 
 Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（36 ids）。Manifest token 经 `CANONICAL_TOOL_TOKEN_EXPANSIONS` 展开；`REJECTED_TOOL_TOKENS` 拒绝无静默 fallback。

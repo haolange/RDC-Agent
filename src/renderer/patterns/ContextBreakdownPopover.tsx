@@ -3,9 +3,10 @@ import type { ContextUsageBreakdownId, PreparedTurnContextSummary, RunContextUsa
 import { useI18n } from '../i18n';
 import { useDynStyle } from '../lib/useDynStyle';
 import { formatTokenCount } from '@shared/utils/tokens';
+import { formatUsdCost } from '@shared/utils/cost';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { ContextBreakdownLegend } from './ContextBreakdownLegend';
-import { ContextRunMeterBand } from './ContextRunMeterBand';
+import { ContextRunMeterBand, MeterStat } from './ContextRunMeterBand';
 import {
   CONTEXT_BREAKDOWN_ORDER,
   SEGMENT_LABEL_KEYS,
@@ -172,6 +173,32 @@ export const ContextBreakdownPopover: React.FC<{
 
         {hasRunTotals && showActualAsPrimary && usage ? (
           <ContextRunMeterBand usage={usage} />
+        ) : null}
+
+        {showActualAsPrimary && usage && (usage.cost || typeof usage.cumulativeCost === 'number') ? (
+          <div className="context-breakdown-run-meter" data-testid="context-breakdown-cost">
+            <h3 className="context-breakdown-run-col-title">{t('contextBreakdown.costColumn')}</h3>
+            <div className="context-breakdown-meter-stats">
+              {usage.cost ? (
+                <MeterStat label={t('contextBreakdown.costThisTurn')} value={formatUsdCost(usage.cost.total)} />
+              ) : null}
+              {typeof usage.cumulativeCost === 'number' ? (
+                <MeterStat label={t('contextBreakdown.costThisRun')} value={formatUsdCost(usage.cumulativeCost)} />
+              ) : null}
+              {usage.cost ? (
+                <>
+                  <MeterStat label={t('contextBreakdown.costInput')} value={formatUsdCost(usage.cost.input)} />
+                  <MeterStat label={t('contextBreakdown.costOutput')} value={formatUsdCost(usage.cost.output)} />
+                  {typeof usage.cost.cacheRead === 'number' && usage.cost.cacheRead > 0 ? (
+                    <MeterStat label={t('contextBreakdown.costCacheRead')} value={formatUsdCost(usage.cost.cacheRead)} />
+                  ) : null}
+                  {typeof usage.cost.cacheWrite === 'number' && usage.cost.cacheWrite > 0 ? (
+                    <MeterStat label={t('contextBreakdown.costCacheWrite')} value={formatUsdCost(usage.cost.cacheWrite)} />
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          </div>
         ) : null}
 
         {breakdown.length > 0 ? (

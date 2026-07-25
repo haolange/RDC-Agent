@@ -150,7 +150,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - Progressive Skill 面：非空 skill 短索引由 `SkillCatalogBudget` 注入；强制 preload 仅来自 `.agent.md` `skills`、composer `$skill` 与 session-scoped `/skills` 武装；`skills`/`skill_read` 保持 `core`。禁止恢复 lean/standard/`harness` 档位 UI 或整段省略 catalog。
 - Provider 输出必须先获得稳定 `ProviderOutputRef`；同一 source ref 只能归属 `thinking`、`text`、`tool_call` 之一。kind collision、start 前 delta、close 后 delta、terminal 后语义事件必须 fail-closed，禁止按文本相同/相似做跨通道去重或 UI 隐藏。
 - 普通 assistant text 永远不能合成为 thinking。commentary/final 仅由 canonical `outputPhase` 决定；只有 `final_answer` 可写 assistant 正文和 final trace，正常结束但无 canonical final 必须报诊断，禁止用 thinking/commentary fallback。
-- Provider/Model 事实只能写入 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth 与 discovery。禁止恢复 TS preset、factory 推导、名称/后缀/上游 SDK 包元数据/hostname 猜测或 renderer 静态 Catalog。
+- Provider/Model 基线事实只能写入 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth、discovery 与 user-override。Manifest 是**基线真值**，Discovery 是**候选验证**，用户覆盖（`models.json`）是**显式覆盖，自带 provenance**，三者合并为 EffectiveCatalog。用户覆盖禁止触及 route.protocol、authSchemaId、adapterId、compatibilityGroup、carrier 等安全/延续性字段。禁止恢复 TS preset、factory 推导、名称/后缀/上游 SDK 包元数据/hostname 猜测或 renderer 静态 Catalog。
 - 禁止恢复 image/video 生成 runtime、`MediaRuntimeService`、catalog `image` category、`image-generation` / `video-generation` capability，或无调用方 `adapter-not-implemented` 伪服务；discovery 继续 fail-closed 剔除非 agent modality。用户附件 vision-input 不受此禁。
 - Fast、Reasoning Max、Max mode 与 variant 必须由 `ControlDefinition + ExecutionBinding` 编译；可选控件没有唯一可执行路径时 fail-closed。认证 secret/header 只能进入主进程 opaque credential lease，不得进入 manifest、Route、RequestPlan、IPC 或 Trace。
 - Memory 写入必须由明确用户意图或交互审批触发；禁止恢复轮次自动抽取、自动 consolidation 或全索引 prompt 注入。
@@ -187,7 +187,8 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - 浏览器真实会话使用 `pnpm run start:agent-browser`（或 `scripts/run-rdc-launcher.* --mode browser`），然后用 Codex 内置浏览器打开主进程输出的 **`/qa`**（勿截断 token URL）。Work Process / tool 卡片 UI 验收前必须先停旧进程再重启以加载最新前后端，并删除该 QA project 下全部 session 后新建隔离 session，避免跨 session/project 串台与脏数据。涉及 Send/Stop/Edit-and-resend 或流式卡顿时额外验收：Preparing Stop 干净撤销、Running Stop 单调落停、Rewrite 提交即时切分支、流式期间窗口拖拽/滚动无明显整应用卡顿。
 - 人类开发入口使用 `pnpm run start:human:dev`，源码构建入口使用 `pnpm run start:human`；平台包装器只转发到共享 launcher，依赖与 build 由指纹条件式准备，发布模式直接双击 exe / app 包。
 - Provider 体系契约验证使用 `pnpm run check:provider-system`。
-- Provider Catalog strict manifest 与编译语义验证使用 `pnpm run check:provider-catalog`。
+- Provider Catalog strict manifest 与编译语义验证使用 `pnpm run check:provider-catalog`。Catalog schema、manifest 字段、identity 覆盖或 route/binding 改动后必须执行。
+- HAL adapter 的 reasoning level 映射必须经 `ProviderReasoningMapper` 统一处理：manifest `reasoningEfforts` → wire effort 参数；新增 adapter 时确认 reasoning 投递路径经 `check:reasoning-delivery` 验证。
 - Builtin 工具目录、manifest token 展开与 `REJECTED_TOOL_TOKENS` 契约验证使用 `pnpm run check:tool-system`。
 - Settings Agents 路由契约验证使用 `pnpm run check:settings-agents`。
 - 产品级本地验收通过真实浏览器会话完成，并指向真实 project 和 `.rdc`；RDX/RenderDoc 失败必须 fail-closed 并显示诊断。

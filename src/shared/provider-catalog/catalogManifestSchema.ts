@@ -210,6 +210,14 @@ export const ProviderSurfaceManifestSchema = z.object({
   discovery: z.object({
     authority: z.enum(['authoritative-list', 'candidate-validation', 'additive', 'entitlement-overlay']),
     strategy: DiscoveryStrategySchema,
+    admission: z.object({
+      allowProviders: z.array(z.string().min(1)).optional(),
+      denyPatterns: z.array(z.string().min(1)).optional(),
+      requireCapabilities: z.array(z.string().min(1)).optional(),
+      requireContextWindow: z.boolean().optional(),
+      excludeDeprecated: z.boolean().optional(),
+      excludeExperimental: z.boolean().optional(),
+    }).strict().optional(),
   }).strict(),
   discoveredModelProjection: z.object({
     fast: BooleanControlDefinitionSchema.optional(),

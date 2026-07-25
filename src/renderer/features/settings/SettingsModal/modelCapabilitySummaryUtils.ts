@@ -15,6 +15,7 @@ import {
 import type { LlmProviderEntry } from '@shared/types/settings';
 import { contextTierWindowTokens, resolveContextTierChoices } from '@shared/utils/contextTiers';
 import { formatTokenCount } from '@shared/utils/tokens';
+import { formatPricePerMillion } from '@shared/utils/cost';
 import type { useI18n } from '../../../i18n';
 import { getProviderProtocolLabel } from './utils';
 
@@ -50,6 +51,29 @@ export interface ContextTierRow {
   activation: string;
   cost: string | null;
   tone: CapabilityChip['tone'];
+}
+
+export interface ModelPricingRow {
+  id: string;
+  label: string;
+  value: string;
+}
+
+export function buildPricingRows(model: EffectiveModel | null, t: Translate): ModelPricingRow[] {
+  if (!model?.cost) return [];
+  const suffix = t('settings.providers.capability.perMillionTokens');
+  const price = (value: number): string => `${formatPricePerMillion(value)} ${suffix}`;
+  const rows: ModelPricingRow[] = [
+    { id: 'input', label: t('settings.providers.capability.pricingInput'), value: price(model.cost.input) },
+    { id: 'output', label: t('settings.providers.capability.pricingOutput'), value: price(model.cost.output) },
+  ];
+  if (typeof model.cost.cacheRead === 'number') {
+    rows.push({ id: 'cacheRead', label: t('settings.providers.capability.pricingCacheRead'), value: price(model.cost.cacheRead) });
+  }
+  if (typeof model.cost.cacheWrite === 'number') {
+    rows.push({ id: 'cacheWrite', label: t('settings.providers.capability.pricingCacheWrite'), value: price(model.cost.cacheWrite) });
+  }
+  return rows;
 }
 
 export function snapshotMatchesProvider(

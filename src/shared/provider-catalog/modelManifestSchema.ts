@@ -46,6 +46,7 @@ export const ProviderProtocolSchema = z.enum([
   'AnthropicMessages',
   'OpenRouterChatCompletions',
   'AzureOpenAIChatCompletions',
+  'AzureOpenAIResponses',
   'GoogleInteractions',
   'GoogleGemini',
   'GoogleVertexGemini',
@@ -54,6 +55,8 @@ export const ProviderProtocolSchema = z.enum([
   'SapAiCoreOrchestration',
   'SapAiCoreFoundationModels',
   'OllamaOpenAICompatibleChatCompletions',
+  'MistralConversations',
+  'BedrockConverseStream',
 ]);
 
 const OpenAiEffortSchema = z.enum(['minimal', 'low', 'medium', 'high', 'xhigh', 'max']);
@@ -454,6 +457,13 @@ export const ExecutionBindingSchema = z.object({
   unavailableReason: z.string().optional(),
 }).strict();
 
+export const ModelCostSchema = z.object({
+  input: z.number(),
+  output: z.number(),
+  cacheRead: z.number().optional(),
+  cacheWrite: z.number().optional(),
+}).strict();
+
 export const ModelManifestSchema = z.object({
   modelId: z.string().min(1),
   label: z.string().min(1),
@@ -468,6 +478,7 @@ export const ModelManifestSchema = z.object({
   contextTiers: z.array(ContextTierSchema).min(1),
   defaultBudgetTokens: z.number().int().nonnegative(),
   cacheContract: ProviderCacheContractSchema.optional(),
+  cost: ModelCostSchema.optional(),
   controls: ModelControlsSchema,
   executionBindings: z.array(ExecutionBindingSchema).optional(),
   liveProjection: ModelLiveProjectionSchema.optional(),
@@ -498,6 +509,7 @@ export const ModelManifestPatchSchema = z.object({
   contextTiers: z.array(ContextTierSchema).optional(),
   defaultBudgetTokens: z.number().int().nonnegative().optional(),
   cacheContract: ProviderCacheContractSchema.optional(),
+  cost: ModelCostSchema.optional(),
   controls: ModelControlsPatchSchema.optional(),
   executionBindings: z.array(ExecutionBindingSchema).optional(),
   toolCalling: CapabilityStateSchema.optional(),
@@ -520,5 +532,6 @@ export type SemanticContextContract = z.infer<typeof SemanticContextContractSche
 export type ProviderContractBundle = z.infer<typeof ProviderContractBundleSchema>;
 export type ProviderContractBundlePatch = z.infer<typeof ProviderContractBundlePatchSchema>;
 export type ModelPresencePolicy = ModelManifest['presencePolicy'];
+export type ModelCost = z.infer<typeof ModelCostSchema>;
 export type ModelManifest = z.infer<typeof ModelManifestSchema>;
 export type ModelLiveProjection = z.infer<typeof ModelLiveProjectionSchema>;

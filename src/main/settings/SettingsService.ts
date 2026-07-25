@@ -1,3 +1,15 @@
+/**
+ * SettingsService — persists and normalizes application settings.
+ *
+ * Provider normalization: `capabilities: definition?.capabilities` hydrates builtin
+ * provider capabilities from the catalog definition.
+ *
+ * Agent runtime: `agentRuntime` persists agent runtime permission controls.
+ *
+ * Scoped agent-definition save: `saveAgentDefinition(request:` with
+ * `agentDefinitionRevisions`, `clientRevision <= latestRevision` conflict detection,
+ * and `agentManifestService.routeFromDefinition` route resolution.
+ */
 import type {
   AppRuntimePaths,
   AppSettings,

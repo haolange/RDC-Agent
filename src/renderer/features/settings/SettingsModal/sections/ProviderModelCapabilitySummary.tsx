@@ -14,9 +14,10 @@ import {
   buildCapabilityChips,
   buildCapabilityEvidenceSummary,
   buildContextTierRows,
+  buildPricingRows,
   getReasoningLabelKey,
 } from '../modelCapabilitySummaryUtils';
-import { getProviderProtocolLabel } from '../utils';
+import { getProviderProtocolLabel, buildRouteOptionMeta } from '../utils';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -45,6 +46,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
   const [probeResult, setProbeResult] = useState<LlmModelCapabilityProbeResult | null>(null);
   const chips = buildCapabilityChips(effectiveModel, t);
   const tiers = buildContextTierRows(effectiveModel, t);
+  const pricing = buildPricingRows(effectiveModel, t);
   const reasoningUnverified = effectiveModel?.controls.reasoning.kind === 'unknown';
   const reasoningDefaultUnverified = reasoningUnverified
     || effectiveModel?.controls.reasoning.defaultState === 'unknown'
@@ -59,16 +61,13 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
     ?? effectiveRouteOption?.id
     ?? routeOptions[0]?.id
     ?? '';
-  const routeOptionMeta = (option: NonNullable<EffectiveModel['routeOptions']>[number]): string => {
-    let endpoint = option.endpointOwner ?? provider.serviceOperator;
-    if (!option.endpointOwner && option.route.baseUrl) {
-      try { endpoint = new URL(option.route.baseUrl).host; } catch { /* retain the explicit service operator */ }
-    }
-    const wireOwner = option.protocolOwner
-      ? t('settings.providers.capability.protocolOwner', { owner: option.protocolOwner })
-      : '';
-    return [wireOwner, endpoint, option.authMode ?? provider.authMode].filter(Boolean).join(' · ');
-  };
+  const routeOptionMeta = (option: NonNullable<EffectiveModel['routeOptions']>[number]): string => (
+    buildRouteOptionMeta(
+      option,
+      provider.serviceOperator,
+      (owner) => t('settings.providers.capability.protocolOwner', { owner }),
+    )
+  );
   const contextChoices = effectiveModel ? resolveContextTierChoices(effectiveModel) : null;
   const probeModes: LlmModelCapabilityProbeMode[] = effectiveModel ? [
     'default',
@@ -115,9 +114,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
       {loading ? (
         <div className="settings-model-capability-note">{t('settings.providers.capability.loading')}</div>
       ) : loadFailed ? (
-        <div className="settings-model-capability-note settings-model-capability-note--error">
-          {t('settings.providers.capability.loadFailed')}
-        </div>
+        <div className="settings-model-capability-note settings-model-capability-note--error">{t('settings.providers.capability.loadFailed')}</div>
       ) : effectiveModel ? (
         <>
           <div className="settings-model-capability-grid">
@@ -129,9 +126,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
             ))}
           </div>
           {effectiveModel.toolCalling.state === 'unknown' ? (
-            <div className="settings-model-capability-note" data-testid="settings-provider-tool-calling-unverified">
-              {t('settings.providers.capability.toolCallingUnverifiedHint')}
-            </div>
+            <div className="settings-model-capability-note" data-testid="settings-provider-tool-calling-unverified">{t('settings.providers.capability.toolCallingUnverifiedHint')}</div>
           ) : null}
 
           <div className="settings-model-capability-tiers" data-testid={`settings-provider-model-tiers-${model.id}`}>
@@ -148,6 +143,18 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
               </div>
             ))}
           </div>
+
+          {pricing.length > 0 ? (
+            <div className="settings-model-capability-tiers" data-testid={`settings-provider-model-pricing-${model.id}`}>
+              <span className="settings-model-capability-section-label">{t('settings.providers.capability.pricing')}</span>
+              {pricing.map((row) => (
+                <div key={row.id} className="settings-model-capability-tier" data-tone="default">
+                  <span className="settings-model-capability-tier-main"><strong>{row.label}</strong></span>
+                  <span className="settings-model-capability-tier-meta">{row.value}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
           <div className="settings-model-preferences" data-testid={`settings-provider-model-preferences-${model.id}`}>
             <div className="settings-model-preferences-heading">

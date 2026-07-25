@@ -17,8 +17,11 @@ import { providerAccountAuthService } from '../../settings/ProviderAccountAuthSe
 import { CLAUDE_ACCOUNT_WIRE_HEADERS } from '../../settings/ClaudeWire';
 import { COPILOT_WIRE_HEADERS } from '../../settings/CopilotWire';
 import { AnthropicProvider } from './AnthropicProvider';
+import { AzureOpenAIResponsesProvider } from './AzureOpenAIResponsesProvider';
+import { BedrockConverseProvider } from './BedrockConverseProvider';
 import { GeminiProvider } from './GeminiProvider';
 import { GoogleInteractionsProvider } from './GoogleInteractionsProvider';
+import { MistralProvider } from './MistralProvider';
 import { OllamaProvider } from './OllamaProvider';
 import { OpenAICompatibleProvider } from './OpenAICompatibleProvider';
 import { OpenAIResponsesProvider } from './OpenAIResponsesProvider';
@@ -79,6 +82,10 @@ function toRuntimeApi(protocol: LlmProviderProtocol): Model['api'] {
   switch (protocol) {
     case 'AnthropicMessages':
       return 'anthropic-messages';
+    case 'AzureOpenAIResponses':
+      return 'azure-openai-responses';
+    case 'BedrockConverseStream':
+      return 'bedrock-converse-stream';
     case 'GoogleInteractions':
       return 'google-interactions';
     case 'GoogleGemini':
@@ -89,6 +96,8 @@ function toRuntimeApi(protocol: LlmProviderProtocol): Model['api'] {
       return 'google-vertex-anthropic';
     case 'GitLabDuo':
       return 'gitlab-duo';
+    case 'MistralConversations':
+      return 'mistral-conversations';
     case 'SapAiCoreOrchestration':
       return 'sap-ai-core-orchestration';
     case 'SapAiCoreFoundationModels':
@@ -188,6 +197,25 @@ function createProviderStrategy(
         authorization: 'none',
         headers: { ...connectionHeaders, 'api-key': provider.apiKey },
         query: { 'api-version': '2024-10-21' },
+      });
+    case 'azure-openai-responses':
+      return new AzureOpenAIResponsesProvider({
+        apiKey: provider.apiKey,
+        baseUrl: provider.baseUrl,
+        headers: connectionHeaders,
+      });
+    case 'bedrock-converse-stream':
+      return new BedrockConverseProvider({
+        baseUrl: provider.baseUrl,
+        region: connectionValues?.AWS_REGION,
+        headers: connectionHeaders,
+        ...(requestAuthorizer ? { requestAuthorizer } : {}),
+      });
+    case 'mistral-conversations':
+      return new MistralProvider({
+        apiKey: provider.apiKey,
+        baseUrl: provider.baseUrl,
+        headers: connectionHeaders,
       });
     case 'openai-responses':
       return new OpenAIResponsesProvider({

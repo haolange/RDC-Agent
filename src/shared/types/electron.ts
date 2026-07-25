@@ -25,6 +25,7 @@ import type {
 } from './conversation';
 import type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from './device';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from './providerCapability';
+import type { ModelsOverride } from '../provider-catalog/modelsOverrideSchema';
 import type { RuntimeLogEntry, RuntimeLogScope } from './runtimeLog';
 import type {
   AppSettings,
@@ -286,6 +287,8 @@ export interface ElectronAPI {
     getAgentDefinitionCommit: (agentId: string) => Promise<AgentDefinitionCommitSnapshot | null>;
     saveProviderDefinition: (request: ProviderDefinitionSaveRequest) => Promise<ProviderDefinitionSaveResult>;
     getProviderDefinitionCommit: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;
+    getModelsOverride: () => Promise<ModelsOverride>;
+    setModelsOverride: (overrides: ModelsOverride) => Promise<ModelsOverride>;
     set: (settings: AppSettingsPatch) => Promise<AppSettings>;
   };
 

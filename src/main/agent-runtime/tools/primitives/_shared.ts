@@ -269,3 +269,25 @@ export function isPathExisting(absolutePath: string): boolean {
     return false;
   }
 }
+
+/**
+ * Execute a callback with scoped temporary path access.
+ * The allowed roots are only valid for the duration of the callback.
+ */
+export async function withTemporaryPathAccess<T>(
+  context: ToolExecutionContext | undefined,
+  allowedRoots: string[],
+  callback: (scopedContext: ToolExecutionContext | undefined) => Promise<T>,
+): Promise<T> {
+  if (!context) {
+    return callback(context);
+  }
+  const scopedContext: ToolExecutionContext = {
+    ...context,
+    temporaryAllowedPathRoots: [
+      ...(context.temporaryAllowedPathRoots ?? []),
+      ...allowedRoots,
+    ],
+  };
+  return callback(scopedContext);
+}

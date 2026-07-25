@@ -1,5 +1,6 @@
 import type { LlmProviderId } from './settings';
 import type { ModeIconKey } from './layout';
+import type { ModelCost } from '../provider-catalog/modelManifestSchema';
 
 export interface AgentHandoffDefinition {
   label: string;
@@ -51,6 +52,10 @@ export interface AgentModelOption {
   configured: boolean;
   status: 'ready' | 'provider-unavailable' | 'model-disabled' | 'model-unavailable' | 'model-unverified' | 'missing';
   disabledReason?: string;
+  /** 每百万 token 定价（美元）；模型无定价信息时缺省。 */
+  cost?: ModelCost;
+  /** 来自 models.json 的用户自定义 / 覆盖模型。 */
+  custom?: boolean;
 }
 
 export interface AgentManifestSettings {

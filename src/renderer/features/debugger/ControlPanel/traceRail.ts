@@ -21,7 +21,9 @@ export function shouldShowTraceRightRail(
     || rightPanel.progress.history.length > 0
     || rightPanel.artifacts.current.length > 0
     || rightPanel.artifacts.previous.length > 0
-    || (rightPanel.context.groups?.length ?? 0) > 0
+    // buildRightPanel always materializes the four kind groups; only treat the context
+    // lane as populated when at least one group carries real records.
+    || (rightPanel.context.groups ?? []).some((group) => group.all.length > 0)
   );
 }
 

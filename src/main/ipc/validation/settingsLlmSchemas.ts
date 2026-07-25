@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
+import { ModelsOverrideSchema } from '@shared/provider-catalog/modelsOverrideSchema';
 
 const LlmProviderAuthModeSchema = z.enum(['none', 'api-key', 'local', 'account', 'environment']);
 
@@ -60,4 +61,10 @@ export const SettingsSaveProviderDefinitionArgsSchema = z.tuple([
     provider: z.record(z.string().max(200), z.unknown()),
     clientRevision: ClientRevisionSchema,
   }).strict(),
+]);
+
+export const SettingsGetModelsOverrideArgsSchema = z.tuple([]);
+
+export const SettingsSetModelsOverrideArgsSchema = z.tuple([
+  ModelsOverrideSchema,
 ]);

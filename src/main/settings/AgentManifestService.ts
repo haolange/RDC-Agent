@@ -545,6 +545,10 @@ export class AgentManifestService {
                 ? 'Model has no verified positive context budget and cannot be executed safely.'
                 : 'Model availability has not been verified for this account and route.'
               : undefined;
+      // models.json user overrides are the only layer that carries sourceKind 'user'.
+      const isUserOverride = model.provenance.some((evidence) => (
+        evidence.source === 'user' && evidence.sourceKind === 'user'
+      ));
       return {
         canonicalId,
         providerId: provider.id,
@@ -554,6 +558,8 @@ export class AgentManifestService {
         configured: status === 'ready',
         status,
         ...(disabledReason ? { disabledReason } : {}),
+        ...(model.cost ? { cost: model.cost } : {}),
+        ...(isUserOverride ? { custom: true } : {}),
       };
     };
 

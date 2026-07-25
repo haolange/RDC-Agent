@@ -18,7 +18,7 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 2. **冻结执行**：`EffectiveRuntimePlan`（`schemaVersion: 2`，含 `planId` / fingerprint 与完整工具/策略面）在 `prepareTurn` 冻结；Prompt 与 Executor 共用；在途 turn 不读可变 Settings。
 3. **主进程权威**：权限、secret、MCP trust、Shell、RDX CLI、IPC 校验均在 `src/main`；preload / renderer / Browser Bridge 只暴露受控面。
 4. **Scope 固定**：用户资源 `~/.rdx`，项目资源 `<project-root>/.rdx`；无配置 workspace root、无旧目录 fallback、无静默迁移。
-5. **Provider 事实外置**：模型/协议/控件事实只在 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth、discovery。
+5. **Provider 事实分层**：Manifest 是**基线真值**（baseline truth），Discovery 是**候选验证**（candidate validation），用户覆盖（`models.json`）是**显式覆盖，自带 provenance**（explicit override with provenance），三者合并为 EffectiveCatalog。模型/协议/控件基线事实只在 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth、discovery 与 user-override。用户覆盖禁止触及 route.protocol、authSchemaId、adapterId、compatibilityGroup、carrier 等安全/延续性字段。
 6. **可取消与可回收**：Turn 经 `TurnCoordinator`；子进程经 `ProcessSupervisor`；应用退出经 `ShutdownCoordinator`；abort 必须 join，迟到 event 按 generation 丢弃。Conversation Stop 相位语义：`preparing` 干净撤销（不留 journal/lease/optimistic 残渣）；`committing`/`running` 单调落停（禁止 UI 回跳 `streaming` / 发送前态）。Renderer 对 monotonic-stopped turn/request 丢弃迟到 `draft|streaming` patch，与 main generation 守卫对齐。流式 `conversation:event` 在 renderer 按帧合并；trace 投影流式期节流。
 7. **失败有分类**：安全类 fail-closed；完整性 degrade-safe；可用性 recoverable。分类权威见 `docs/contracts/failure-model.md`。
 8. **无 legacy 双轨**：新结构替代旧结构时直接收敛；默认不保留兼容 shim。

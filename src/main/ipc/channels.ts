@@ -77,6 +77,8 @@ export const IPC_HANDLER_DOMAINS = {
     'settings:getAgentDefinitionCommit',
     'settings:saveProviderDefinition',
     'settings:getProviderDefinitionCommit',
+    'settings:getModelsOverride',
+    'settings:setModelsOverride',
     'settings:set',
     'llm:testProviderDraft',
     'llm:testModelCapability',

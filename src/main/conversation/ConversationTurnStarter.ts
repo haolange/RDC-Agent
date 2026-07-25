@@ -16,7 +16,6 @@ import { planEffectiveModelRequest, resolveEffectiveModel } from '../settings/Ef
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 import { traceService } from '../agent-trace/TraceService';
 import { createDefaultBranchState, resolveVisibleConversationMessages } from './ConversationBranchResolver';
 import { createDraftWorkTrace, finalizeTrace } from './ConversationWorkTrace';
@@ -371,7 +370,11 @@ export async function startProfileTurn(
       [userMessage, assistantDraftMessage],
     );
   }
-  workflowProjectionPublisher.publishTraceProjectionChanged(traceSessionId, tracePresentation);
+  // The turn-start projection is published by host.publishConversationTrace below: for a
+  // persisted session it resolves the full traceService.getSession projection (including the
+  // buildRightPanel progress/artifacts/context payload). Publishing the lightweight
+  // conversation-only presentation here first would overwrite the previous turn's full
+  // projection and blank the right-rail sections until the full projection arrives.
   host.publishConversationTrace(traceSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
 
   if (!cancelAfterCommit) {

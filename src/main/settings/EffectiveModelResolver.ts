@@ -4,6 +4,8 @@ import type {
   EffectiveCatalogRequest,
 } from './effectiveCatalogTypes';
 import { effectiveCatalogService } from './EffectiveCatalogService';
+import { modelsOverrideService } from './ModelsOverrideService';
+import type { ModelOverride, CustomModel } from '@shared/provider-catalog/modelsOverrideSchema';
 import type {
   EffectiveCatalogSnapshot,
   EffectiveModel,
@@ -310,6 +312,99 @@ export function applyDiscoveryAuthority(
   return completed;
 }
 
+function userOverrideContribution(provider: LlmProviderEntry): CatalogLayerContribution | undefined {
+  let overrides;
+  try {
+    overrides = modelsOverrideService.getOverrides();
+  } catch {
+    return undefined;
+  }
+  const providerOverride = overrides.providers[provider.id];
+  if (!providerOverride) return undefined;
+  const observedAt = new Date().toISOString();
+  const models: CatalogModelContribution[] = [];
+  for (const [modelId, override] of Object.entries(providerOverride.modelOverrides ?? {})) {
+    models.push(modelOverrideToContribution(modelId, override));
+  }
+  for (const custom of providerOverride.models ?? []) {
+    models.push(customModelToContribution(custom, provider));
+  }
+  if (models.length === 0) return undefined;
+  return {
+    source: 'user',
+    sourceKind: 'user',
+    observedAt,
+    detail: 'User model overrides (models.json)',
+    models,
+  };
+}
+
+function modelOverrideToContribution(modelId: string, override: ModelOverride): CatalogModelContribution {
+  const contribution: CatalogModelContribution = { modelId };
+  if (override.contextWindow !== undefined) {
+    contribution.defaultBudgetTokens = override.contextWindow;
+  }
+  if (override.cost) {
+    contribution.cost = { ...override.cost };
+  }
+  if (override.status === 'deprecated') {
+    contribution.availability = 'unavailable';
+    contribution.unavailableReason = 'Marked deprecated by user override (models.json).';
+  }
+  if (override.reasoning !== undefined) {
+    contribution.controls = {
+      reasoning: override.reasoning
+        ? { kind: 'unknown', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } }
+        : { kind: 'none', supportsOff: false, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+    };
+  }
+  if (override.input) {
+    contribution.visionInput = override.input.includes('image')
+      ? { state: 'supported' }
+      : { state: 'unsupported', reason: 'User override: image input not declared.' };
+  }
+  return contribution;
+}
+
+function customModelToContribution(custom: CustomModel, provider: LlmProviderEntry): CatalogModelContribution {
+  return {
+    modelId: custom.id,
+    label: custom.name,
+    aliases: [],
+    enabled: true,
+    availability: 'available',
+    presencePolicy: 'discovered',
+    defaultBudgetTokens: custom.contextWindow,
+    route: {
+      protocol: provider.protocol,
+      baseUrl: custom.baseUrl,
+      source: 'user',
+    },
+    contextTiers: [{
+      id: 'default',
+      label: 'Default',
+      maxPromptTokens: custom.contextWindow,
+      maxOutputTokens: custom.maxTokens,
+      activation: { kind: 'implicit' },
+      entitlement: 'unknown',
+    }],
+    controls: {
+      fast: { state: 'unknown', defaultValue: false },
+      context1m: { state: 'unsupported', fixedValue: false },
+      reasoning: custom.reasoning
+        ? { kind: 'unknown', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } }
+        : { kind: 'none', supportsOff: false, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+    },
+    toolCalling: { state: 'unknown' },
+    visionInput: custom.input.includes('image')
+      ? { state: 'supported' }
+      : { state: 'unsupported' },
+    structuredOutput: { state: 'unknown' },
+    ...(custom.cost ? { cost: { ...custom.cost } } : {}),
+    custom: true,
+  };
+}
+
 export function resolveEffectiveCatalog(
   providerId: string,
   settings: AppSettings,
@@ -359,6 +454,7 @@ export function buildEffectiveCatalogRequest(
     overlay,
     entitlement: copilotEntitlementContribution(provider),
     user: userContribution(provider),
+    userOverride: userOverrideContribution(provider),
     providerAvailability: provider.status === 'unavailable'
       ? {
           state: 'unavailable',

@@ -13,6 +13,7 @@ import type {
   CatalogJsonPrimitive,
   CatalogJsonValue,
   ExecutionBinding,
+  ModelCost,
   ModelManifest,
   ModelModeAction as CatalogModelModeAction,
   ModelPresencePolicy,
@@ -195,6 +196,7 @@ export interface EffectiveModel {
   visionInput: CapabilityState;
   structuredOutput: CapabilityState;
   fixedTemperature?: number;
+  cost?: ModelCost;
   quota?: { exhaustedUntil?: string; note?: string };
   provenance: CapabilityEvidence[];
 }

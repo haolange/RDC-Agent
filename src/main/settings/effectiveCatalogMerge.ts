@@ -326,9 +326,10 @@ function applyLayer(
       )
     ));
     const matchedKey = matched?.[0];
-    if (!matched && layer.source === 'user' && request.catalogOwnership !== 'user-managed') {
+    if (!matched && layer.source === 'user' && request.catalogOwnership !== 'user-managed' && !patch.custom) {
       // Persisted app-managed rows are preferences only. They may update a model
       // admitted by the compiled Catalog or discovery, but must never manufacture members.
+      // Custom models from models.json user overrides are exempt.
       continue;
     }
     if (
@@ -351,6 +352,7 @@ function applyLayer(
       modelId: _modelId,
       availability,
       unavailableReason,
+      custom: _custom,
       ...ordinaryFields
     } = patch;
     const patchLayer: CatalogLayerContribution = factSource
@@ -475,6 +477,7 @@ export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): Effecti
     ...observedLayers,
     request.maintainedSurface,
     user,
+    request.userOverride,
   ]) {
     applyLayer(models, request, layer);
   }

@@ -99,6 +99,38 @@
     "strategy": {
       "kind": "custom-parser",
       "parserId": "openrouter-catalog"
+    },
+    "admission": {
+      "allowProviders": [
+        "openai",
+        "anthropic",
+        "google",
+        "meta-llama",
+        "deepseek",
+        "qwen",
+        "mistralai",
+        "x-ai",
+        "moonshotai",
+        "kimi",
+        "thudm"
+      ],
+      "denyPatterns": [
+        ":free$",
+        "^huggingfaceh4/",
+        "^gryphe/",
+        "^sao10k/",
+        "^undi95/",
+        "^cognitivecomputations/",
+        "^mancer/",
+        "^nousresearch/hermes",
+        "-deprecated$",
+        "-legacy$",
+        "-experimental$"
+      ],
+      "requireCapabilities": ["toolCalling"],
+      "requireContextWindow": true,
+      "excludeDeprecated": true,
+      "excludeExperimental": true
     }
   },
   "models": [

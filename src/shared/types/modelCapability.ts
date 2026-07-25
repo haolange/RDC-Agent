@@ -167,6 +167,79 @@ export function resolveOnSelection(control: ReasoningControl): ReasoningSelectio
   return 'on';
 }
 
+// =====================================================================
+// HAL Reasoning Level Mapping (user-facing 6-level system)
+// =====================================================================
+
+/** HAL reasoning level names (user-facing 6-level system). */
+export type HalReasoningLevel = 'off' | 'low' | 'medium' | 'high' | 'extra' | 'max';
+
+export const HAL_REASONING_LEVELS: readonly HalReasoningLevel[] = [
+  'off',
+  'low',
+  'medium',
+  'high',
+  'extra',
+  'max',
+];
+
+/** Map canonical wire name → HAL display name. */
+export function halReasoningLevelFromCanonical(
+  level: NamedReasoningLevel | 'off',
+): HalReasoningLevel {
+  if (level === 'off') return 'off';
+  if (level === 'minimal') return 'low';
+  if (level === 'xhigh') return 'extra';
+  return level; // low, medium, high, max are same
+}
+
+/** Map HAL display name → canonical wire name. */
+export function canonicalFromHalReasoningLevel(
+  level: HalReasoningLevel,
+): NamedReasoningLevel | 'off' {
+  if (level === 'off') return 'off';
+  if (level === 'low') return 'minimal';
+  if (level === 'extra') return 'xhigh';
+  return level; // medium, high, max are same
+}
+
+/** Get supported reasoning levels for a model based on its ReasoningControl. */
+export function getSupportedReasoningLevels(
+  control: ReasoningControl,
+): HalReasoningLevel[] {
+  if (control.kind === 'none' || control.kind === 'unknown') return [];
+  if (control.kind === 'toggle') return ['off', 'low'];
+  if (control.kind === 'always-on') {
+    const locked = control.lockedSelection;
+    if (locked && locked !== 'off' && locked !== 'on' && isNamedReasoningLevel(locked)) {
+      return [halReasoningLevelFromCanonical(locked)];
+    }
+    return ['low'];
+  }
+  // kind === 'levels'
+  if (control.levels.length === 0) {
+    return control.supportsOff ? ['off'] : [];
+  }
+  const halLevels = control.levels.map(halReasoningLevelFromCanonical);
+  return control.supportsOff ? ['off', ...halLevels] : [...halLevels];
+}
+
+/** Clamp a requested HAL level to the nearest supported level. */
+export function clampReasoningLevel(
+  control: ReasoningControl,
+  requested: HalReasoningLevel,
+): HalReasoningLevel {
+  const supported = getSupportedReasoningLevels(control);
+  if (supported.length === 0) return 'off';
+  if (supported.includes(requested)) return requested;
+  // Find nearest lower supported level
+  const reqIdx = HAL_REASONING_LEVELS.indexOf(requested);
+  for (let i = reqIdx - 1; i >= 0; i--) {
+    if (supported.includes(HAL_REASONING_LEVELS[i])) return HAL_REASONING_LEVELS[i];
+  }
+  return supported[0];
+}
+
 export function clampReasoningSelection(
   reasoningSelection: unknown,
   control: ReasoningControl | null | undefined,

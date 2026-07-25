@@ -6,8 +6,10 @@ import {
 } from '@shared/provider-catalog/implementationRegistry';
 import type { LlmProviderProtocol } from '@shared/types/settings';
 import { buildAnthropicMessagesUrl } from './AnthropicProvider';
+import { buildAzureResponsesUrl } from './AzureOpenAIResponsesProvider';
 import { buildGeminiStreamUrl } from './GeminiProvider';
 import { buildGoogleInteractionsUrl } from './GoogleInteractionsProvider';
+import { buildMistralChatCompletionsUrl } from './MistralProvider';
 import { buildChatCompletionsUrl } from './OpenAICompatibleProvider';
 import { buildOpenAIResponsesUrl } from './OpenAIResponsesProvider';
 
@@ -48,6 +50,10 @@ function buildOperationUrl(
   switch (operationBuilderId) {
     case 'anthropic-messages':
       return buildAnthropicMessagesUrl(baseUrl, input.modelId);
+    case 'azure-openai-responses':
+      return buildAzureResponsesUrl(baseUrl, '2024-10-21');
+    case 'bedrock-converse-stream':
+      return buildBedrockConverseStreamUrl(baseUrl, input.modelId, input.connectionValues);
     case 'google-vertex-anthropic':
       return buildAnthropicMessagesUrl(baseUrl, input.modelId, 'vertex');
     case 'google-interactions':
@@ -58,6 +64,8 @@ function buildOperationUrl(
       return buildGeminiStreamUrl(baseUrl, input.modelId, 'catalog-contract-token', 'vertex');
     case 'azure-chat-completions':
       return buildChatCompletionsUrl(baseUrl, { 'api-version': '2024-10-21' });
+    case 'mistral-conversations':
+      return buildMistralChatCompletionsUrl(baseUrl);
     case 'ollama-chat-completions':
     case 'openai-chat-completions':
     case 'openrouter-chat-completions':
@@ -89,6 +97,21 @@ export function buildSapAiCoreOperationUrl(
 ): string {
   const operation = api === 'orchestration' ? 'v2/completion' : 'chat/completions';
   return `${requireBaseUrl(aiApiUrl)}/inference/deployments/${encodeURIComponent(deploymentId)}/${operation}`;
+}
+
+export function buildBedrockConverseStreamUrl(
+  baseUrl: string,
+  modelId: string,
+  connectionValues?: Readonly<Record<string, string>>,
+): string {
+  const trimmed = requireBaseUrl(baseUrl);
+  if (trimmed.includes('bedrock-runtime')) {
+    const encodedModelId = encodeURIComponent(modelId);
+    return `${trimmed}/model/${encodedModelId}/converse-stream`;
+  }
+  const region = connectionValues?.AWS_REGION ?? process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? 'us-east-1';
+  const encodedModelId = encodeURIComponent(modelId);
+  return `https://bedrock-runtime.${region}.amazonaws.com/model/${encodedModelId}/converse-stream`;
 }
 
 function requireDeploymentId(input: ProviderOperationInput): string {

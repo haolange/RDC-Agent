@@ -119,6 +119,7 @@ export type LlmProviderProtocol =
   | 'AnthropicMessages'
   | 'OpenRouterChatCompletions'
   | 'AzureOpenAIChatCompletions'
+  | 'AzureOpenAIResponses'
   | 'GoogleInteractions'
   | 'GoogleGemini'
   | 'GoogleVertexGemini'
@@ -126,7 +127,9 @@ export type LlmProviderProtocol =
   | 'GitLabDuo'
   | 'SapAiCoreOrchestration'
   | 'SapAiCoreFoundationModels'
-  | 'OllamaOpenAICompatibleChatCompletions';
+  | 'OllamaOpenAICompatibleChatCompletions'
+  | 'MistralConversations'
+  | 'BedrockConverseStream';
 
 /**
  * Authentication mode - describes HOW the user authenticates to the provider.

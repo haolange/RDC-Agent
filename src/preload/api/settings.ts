@@ -42,5 +42,9 @@ export const createSettingsApi = (): SettingsApi => ({
     ipcRenderer.invoke('settings:saveProviderDefinition', request),
   getProviderDefinitionCommit: (providerId): ReturnType<SettingsApi['getProviderDefinitionCommit']> =>
     ipcRenderer.invoke('settings:getProviderDefinitionCommit', providerId),
+  getModelsOverride: (): ReturnType<SettingsApi['getModelsOverride']> =>
+    ipcRenderer.invoke('settings:getModelsOverride'),
+  setModelsOverride: (overrides): ReturnType<SettingsApi['setModelsOverride']> =>
+    ipcRenderer.invoke('settings:setModelsOverride', overrides),
   set: (settings): ReturnType<SettingsApi['set']> => ipcRenderer.invoke('settings:set', settings),
 });

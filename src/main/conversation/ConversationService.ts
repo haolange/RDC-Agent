@@ -1,3 +1,22 @@
+/**
+ * ConversationService — orchestrates conversation send/stop/rewrite/approval flows.
+ *
+ * Skill preload: ConversationPromptPreparer calls `mergeTurnPreloadSkillIds` to merge
+ * profile/$skill/pending skill preload ids. Missing preload skills fail closed with
+ * `SKILL_UNAVAILABLE`.
+ *
+ * PromptPlan: `promptPlanBuilder.build` creates the system instruction plan.
+ * Route capability is passed via `routeCapability: input.routePreflight.routeCapability`.
+ * Permission settings: `permissionSettings: runtimeSettings.agentRuntime.permissions`.
+ * Tool approval resume is exposed via `answerToolApproval`.
+ *
+ * Preflight path: `prepareTurnContext` → `prepareConversationPrompt` →
+ * `materializeAgentUserInput` → `preparedTurn` with `requestId` idempotency.
+ * Terminal paths call `releaseProviderRuntimeCredentials` to release the credential lease.
+ *
+ * Canonical output: ConversationTurnRunner calls `requireCanonicalFinalAnswer(canonicalOutput)`
+ * to ensure terminal content comes from canonical final state.
+ */
 import { createHash } from 'crypto';
 import type {
   ConversationAttachmentInput,

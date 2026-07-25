@@ -229,6 +229,13 @@ export interface RunContextUsageSummary {
   cumulativeCacheHitRate?: number;
   /** 本 run 累计 reasoning tokens；provider 未上报时缺省。 */
   reasoningTokens?: number;
+  /**
+   * 最近一次 LLM call 的成本明细（美元）。
+   * 仅当模型有定价信息（manifest / models.json）时出现；无定价时缺省。
+   */
+  cost?: { input: number; output: number; cacheRead?: number; cacheWrite?: number; total: number };
+  /** 本 run 累计成本（美元）；无定价遥测时缺省。 */
+  cumulativeCost?: number;
 }
 
 export interface PreparedTurnContextSummary {

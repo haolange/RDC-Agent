@@ -639,6 +639,7 @@ export class AgentTurnRunner {
             ...(typeof event.message.usage.reasoningTokens === 'number'
               ? { reasoningTokens: event.message.usage.reasoningTokens }
               : {}),
+            ...(event.message.usage.cost ? { cost: event.message.usage.cost } : {}),
             precomputedBreakdown,
           });
         }
