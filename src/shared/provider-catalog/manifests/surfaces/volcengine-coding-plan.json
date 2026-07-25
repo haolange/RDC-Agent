@@ -141,9 +141,8 @@
       ],
       "controls": {
         "fast": {
-          "state": "selectable",
-          "defaultValue": false,
-          "entitlement": "granted"
+          "state": "unsupported",
+          "fixedValue": false
         },
         "context1m": {
           "state": "unsupported",
@@ -173,21 +172,6 @@
           }
         }
       },
-      "executionBindings": [
-        {
-          "id": "fast:doubao-seed-2.0-lite",
-          "when": {
-            "fast": true
-          },
-          "actions": [
-            {
-              "kind": "model-switch",
-              "targetModelId": "doubao-seed-2.0-lite"
-            }
-          ],
-          "entitlement": "granted"
-        }
-      ],
       "factSourceId": "rdc-agent:volcengine-coding-plan:0"
     },
     {
@@ -251,9 +235,8 @@
       ],
       "controls": {
         "fast": {
-          "state": "selectable",
-          "defaultValue": false,
-          "entitlement": "granted"
+          "state": "unsupported",
+          "fixedValue": false
         },
         "context1m": {
           "state": "unsupported",
@@ -283,21 +266,6 @@
           }
         }
       },
-      "executionBindings": [
-        {
-          "id": "fast:doubao-seed-2.0-lite",
-          "when": {
-            "fast": true
-          },
-          "actions": [
-            {
-              "kind": "model-switch",
-              "targetModelId": "doubao-seed-2.0-lite"
-            }
-          ],
-          "entitlement": "granted"
-        }
-      ],
       "factSourceId": "rdc-agent:volcengine-coding-plan:0"
     },
     {
@@ -468,26 +436,13 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "levels",
-          "supportsOff": true,
-          "levels": [
-            "minimal",
-            "low",
-            "medium",
-            "high"
-          ],
-          "defaultSelection": "medium",
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
           "wireProfile": {
-            "kind": "anthropic",
-            "on": "medium",
-            "levels": {
-              "low": "low",
-              "medium": "medium",
-              "high": "high"
-            },
-            "onMode": "enabled",
-            "onBudgetTokens": 4096,
-            "offMode": "disabled"
+            "kind": "none"
           }
         }
       },
@@ -564,15 +519,13 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "always-on",
+          "kind": "unknown",
           "supportsOff": false,
           "levels": [],
+          "defaultState": "provider-managed",
           "defaultSelection": "on",
-          "lockedSelection": "on",
           "wireProfile": {
-            "kind": "anthropic",
-            "on": "high",
-            "onMode": "enabled"
+            "kind": "none"
           }
         }
       },
@@ -649,15 +602,13 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "always-on",
+          "kind": "unknown",
           "supportsOff": false,
           "levels": [],
+          "defaultState": "provider-managed",
           "defaultSelection": "on",
-          "lockedSelection": "on",
           "wireProfile": {
-            "kind": "anthropic",
-            "on": "high",
-            "onMode": "enabled"
+            "kind": "none"
           }
         }
       },
@@ -734,15 +685,15 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "toggle",
-          "supportsOff": true,
+          "kind": "always-on",
+          "supportsOff": false,
           "levels": [],
           "defaultSelection": "on",
+          "lockedSelection": "on",
           "wireProfile": {
             "kind": "anthropic",
             "on": "high",
-            "onMode": "enabled",
-            "offMode": "disabled"
+            "onMode": "enabled"
           }
         }
       },
@@ -836,15 +787,15 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "toggle",
-          "supportsOff": true,
+          "kind": "always-on",
+          "supportsOff": false,
           "levels": [],
           "defaultSelection": "on",
+          "lockedSelection": "on",
           "wireProfile": {
             "kind": "anthropic",
             "on": "high",
-            "onMode": "enabled",
-            "offMode": "disabled"
+            "onMode": "enabled"
           }
         }
       },
@@ -919,15 +870,13 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "toggle",
-          "supportsOff": true,
+          "kind": "unknown",
+          "supportsOff": false,
           "levels": [],
+          "defaultState": "provider-managed",
           "defaultSelection": "on",
           "wireProfile": {
-            "kind": "anthropic",
-            "on": "high",
-            "onMode": "enabled",
-            "offMode": "disabled"
+            "kind": "none"
           }
         }
       },
@@ -1002,15 +951,13 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "toggle",
-          "supportsOff": true,
+          "kind": "unknown",
+          "supportsOff": false,
           "levels": [],
+          "defaultState": "provider-managed",
           "defaultSelection": "on",
           "wireProfile": {
-            "kind": "anthropic",
-            "on": "high",
-            "onMode": "enabled",
-            "offMode": "disabled"
+            "kind": "none"
           }
         }
       },
@@ -1180,15 +1127,13 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "toggle",
-          "supportsOff": true,
+          "kind": "unknown",
+          "supportsOff": false,
           "levels": [],
+          "defaultState": "provider-managed",
           "defaultSelection": "on",
           "wireProfile": {
-            "kind": "anthropic",
-            "on": "high",
-            "onMode": "enabled",
-            "offMode": "disabled"
+            "kind": "none"
           }
         }
       },
@@ -1263,15 +1208,13 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "toggle",
-          "supportsOff": true,
+          "kind": "unknown",
+          "supportsOff": false,
           "levels": [],
+          "defaultState": "provider-managed",
           "defaultSelection": "on",
           "wireProfile": {
-            "kind": "anthropic",
-            "on": "high",
-            "onMode": "enabled",
-            "offMode": "disabled"
+            "kind": "none"
           }
         }
       },
@@ -1290,10 +1233,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "granted",
+          "maxTotalTokens": 1000000
         }
       ],
-      "defaultBudgetTokens": 256000,
+      "defaultBudgetTokens": 1000000,
       "toolCalling": {
         "state": "supported"
       },
@@ -1348,7 +1292,7 @@
         },
         "reasoning": {
           "kind": "levels",
-          "supportsOff": true,
+          "supportsOff": false,
           "levels": [
             "high",
             "max"
@@ -1361,8 +1305,7 @@
               "high": "high",
               "max": "max"
             },
-            "onMode": "enabled",
-            "offMode": "disabled"
+            "onMode": "enabled"
           }
         }
       },
@@ -1381,10 +1324,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "granted",
+          "maxTotalTokens": 1000000
         }
       ],
-      "defaultBudgetTokens": 256000,
+      "defaultBudgetTokens": 1000000,
       "toolCalling": {
         "state": "supported"
       },
@@ -1439,7 +1383,7 @@
         },
         "reasoning": {
           "kind": "levels",
-          "supportsOff": true,
+          "supportsOff": false,
           "levels": [
             "high",
             "max"
@@ -1452,8 +1396,7 @@
               "high": "high",
               "max": "max"
             },
-            "onMode": "enabled",
-            "offMode": "disabled"
+            "onMode": "enabled"
           }
         }
       },

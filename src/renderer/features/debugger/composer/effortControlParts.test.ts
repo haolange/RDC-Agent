@@ -143,18 +143,19 @@ describe('effortControlParts', () => {
     expect(presentation.label).not.toContain('Max mode');
   });
 
-  it('projects unverified Max mode entitlement visibly and into the switch accessible name', () => {
+  it('projects unavailable Max mode entitlement as Disabled in the switch accessible name', () => {
     const markup = renderToStaticMarkup(React.createElement(EffortOneMillionContextSwitchRow, {
       label: 'Max mode',
-      statusLabel: 'Unverified',
-      available: true,
+      statusLabel: 'Disabled',
+      available: false,
       active: false,
       onToggle: () => undefined,
     }));
 
     expect(markup).toContain('composer-effort-toggle-status');
-    expect(markup).toContain('Unverified');
-    expect(markup).toContain('aria-label="Max mode · Unverified"');
+    expect(markup).toContain('Disabled');
+    expect(markup).toContain('aria-label="Max mode · Disabled"');
+    expect(markup).toContain('disabled=""');
   });
 
   it('renders fixed Max mode as active and disabled instead of flashing off', () => {

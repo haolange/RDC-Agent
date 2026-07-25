@@ -200,7 +200,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
                 >
                   <option value="">
                     {reasoningDefaultUnverified
-                      ? t('settings.providers.capability.unverified')
+                      ? t('composer.effort.levelOff')
                       : t('settings.providers.capability.providerDefault', { value: t(getReasoningLabelKey(defaultReasoning)) })}
                   </option>
                   {reasoningOptions.map((selection) => (

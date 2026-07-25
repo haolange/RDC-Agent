@@ -267,9 +267,8 @@
       },
       "controls": {
         "fast": {
-          "state": "selectable",
-          "defaultValue": false,
-          "entitlement": "granted"
+          "state": "unsupported",
+          "fixedValue": false
         },
         "context1m": {
           "state": "fixed",
@@ -301,21 +300,6 @@
           }
         }
       },
-      "executionBindings": [
-        {
-          "id": "fast:claude-opus-4.8-fast",
-          "when": {
-            "fast": true
-          },
-          "actions": [
-            {
-              "kind": "model-switch",
-              "targetModelId": "claude-opus-4.8-fast"
-            }
-          ],
-          "entitlement": "granted"
-        }
-      ],
       "factSourceId": "user-observation:github-copilot:2026-07-14"
     },
     {
@@ -345,10 +329,7 @@
         "state": "unknown"
       },
       "selection": {
-        "pickerVisibility": "internal",
-        "relatedPrimaryModelIds": [
-          "claude-opus-4.8"
-        ]
+        "pickerVisibility": "primary"
       },
       "presencePolicy": "account-entitled",
       "route": {
@@ -2140,6 +2121,7 @@
     "claude-sonnet-4.6",
     "claude-opus-4.6",
     "claude-opus-4.8",
+    "claude-opus-4.8-fast",
     "claude-sonnet-5",
     "claude-fable-5",
     "gpt-5.4-mini",

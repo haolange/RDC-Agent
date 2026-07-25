@@ -65,8 +65,12 @@ export const EffortControl: React.FC<{
     [reasoningControl],
   );
   const displayLevelsKey = displayLevels.join('|');
-  const reasoningUnverified = !reasoningControl || reasoningControl.kind === 'unknown';
-  const hasAdjustableReasoning = displayLevels.length > 1 && reasoningControl?.kind !== 'always-on';
+  const reasoningLockedDisabled = !reasoningControl
+    || reasoningControl.kind === 'unknown'
+    || reasoningControl.kind === 'none';
+  const hasAdjustableReasoning = !reasoningLockedDisabled
+    && displayLevels.length > 1
+    && reasoningControl?.kind !== 'always-on';
 
   const selectedLevel = resolveSelectedLevel(
     turnControls.reasoningLevel,
@@ -119,8 +123,12 @@ export const EffortControl: React.FC<{
     if (pointerFrameRef.current) window.cancelAnimationFrame(pointerFrameRef.current);
   }, []);
 
-  const effortLabel = t(reasoningUnverified ? 'composer.effort.providerManaged' : EFFORT_LABEL_KEYS[selectedLevel]);
-  const tooltipLabel = t(reasoningUnverified ? 'composer.effort.unverified' : EFFORT_LABEL_KEYS[displayLevel]);
+  const effortLabel = t(
+    reasoningLockedDisabled ? 'composer.effort.levelOff' : EFFORT_LABEL_KEYS[selectedLevel],
+  );
+  const tooltipLabel = t(
+    reasoningLockedDisabled ? 'composer.effort.levelOff' : EFFORT_LABEL_KEYS[displayLevel],
+  );
   const oneMillionTokens = oneMillionContextTokens(capability);
   const oneMillionVisible = hasStructuralOneMillionContext(capability);
   const oneMillionAvailable = hasSelectableOneMillionContext(capability);
@@ -170,7 +178,7 @@ export const EffortControl: React.FC<{
 
   const trackObserveKey = [
     capabilityStateLabel ?? '',
-    reasoningUnverified ? '1' : '0',
+    reasoningLockedDisabled ? '1' : '0',
     hasAdjustableReasoning ? '1' : '0',
   ].join('|');
   const { popupShift, trackWidthPx } = useEffortPopupLayout({
@@ -250,8 +258,6 @@ export const EffortControl: React.FC<{
           capabilityRefreshing={statusPresentation.refreshing}
           capabilityRetryLabel={t('composer.effort.capabilityRetry')}
           onRetryCapability={retryCapability}
-          reasoningUnverified={reasoningUnverified}
-          reasoningStateLabel={t('composer.effort.providerManaged')}
           hasAdjustableReasoning={hasAdjustableReasoning}
           displayLevel={displayLevel}
           displayLevels={displayLevels}

@@ -114,11 +114,13 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "unknown",
-          "supportsOff": false,
-          "levels": [],
-          "defaultState": "provider-managed",
-          "defaultSelection": "on",
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "high",
+            "max"
+          ],
+          "defaultSelection": "high",
           "wireProfile": {
             "kind": "none"
           }
@@ -182,11 +184,14 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "unknown",
+          "kind": "levels",
           "supportsOff": false,
-          "levels": [],
-          "defaultState": "provider-managed",
-          "defaultSelection": "on",
+          "levels": [
+            "low",
+            "high",
+            "max"
+          ],
+          "defaultSelection": "high",
           "wireProfile": {
             "kind": "none"
           }
@@ -250,11 +255,11 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "unknown",
+          "kind": "always-on",
           "supportsOff": false,
           "levels": [],
-          "defaultState": "provider-managed",
           "defaultSelection": "on",
+          "lockedSelection": "on",
           "wireProfile": {
             "kind": "none"
           }
@@ -318,10 +323,9 @@
           "fixedValue": false
         },
         "reasoning": {
-          "kind": "unknown",
-          "supportsOff": false,
+          "kind": "toggle",
+          "supportsOff": true,
           "levels": [],
-          "defaultState": "provider-managed",
           "defaultSelection": "on",
           "wireProfile": {
             "kind": "none"
@@ -390,11 +394,13 @@
           "label": "Max mode"
         },
         "reasoning": {
-          "kind": "unknown",
+          "kind": "levels",
           "supportsOff": false,
-          "levels": [],
-          "defaultState": "provider-managed",
-          "defaultSelection": "on",
+          "levels": [
+            "high",
+            "max"
+          ],
+          "defaultSelection": "high",
           "wireProfile": {
             "kind": "none"
           }
@@ -462,11 +468,13 @@
           "label": "Max mode"
         },
         "reasoning": {
-          "kind": "unknown",
+          "kind": "levels",
           "supportsOff": false,
-          "levels": [],
-          "defaultState": "provider-managed",
-          "defaultSelection": "on",
+          "levels": [
+            "high",
+            "max"
+          ],
+          "defaultSelection": "high",
           "wireProfile": {
             "kind": "none"
           }
@@ -774,14 +782,14 @@
         {
           "id": "default",
           "label": "Default",
-          "maxPromptTokens": 256000,
+          "maxPromptTokens": 128000,
           "activation": {
             "kind": "implicit"
           },
           "entitlement": "unknown"
         }
       ],
-      "defaultBudgetTokens": 256000,
+      "defaultBudgetTokens": 128000,
       "toolCalling": {
         "state": "unknown"
       },

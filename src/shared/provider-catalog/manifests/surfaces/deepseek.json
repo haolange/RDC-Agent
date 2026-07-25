@@ -154,14 +154,14 @@
           "id": "default",
           "label": "Default",
           "maxTotalTokens": 1000000,
-          "maxOutputTokens": 384000,
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "granted",
+          "maxPromptTokens": 1000000
         }
       ],
-      "defaultBudgetTokens": 616000,
+      "defaultBudgetTokens": 1000000,
       "toolCalling": {
         "state": "supported"
       },
@@ -216,7 +216,7 @@
         },
         "reasoning": {
           "kind": "levels",
-          "supportsOff": true,
+          "supportsOff": false,
           "levels": [
             "high",
             "max"
@@ -229,8 +229,7 @@
               "high": "high",
               "max": "max"
             },
-            "onMode": "enabled",
-            "offMode": "disabled"
+            "onMode": "enabled"
           }
         }
       },
@@ -246,14 +245,14 @@
           "id": "default",
           "label": "Default",
           "maxTotalTokens": 1000000,
-          "maxOutputTokens": 384000,
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "granted"
+          "entitlement": "granted",
+          "maxPromptTokens": 1000000
         }
       ],
-      "defaultBudgetTokens": 616000,
+      "defaultBudgetTokens": 1000000,
       "toolCalling": {
         "state": "supported"
       },
@@ -308,7 +307,7 @@
         },
         "reasoning": {
           "kind": "levels",
-          "supportsOff": true,
+          "supportsOff": false,
           "levels": [
             "high",
             "max"
@@ -321,8 +320,7 @@
               "high": "high",
               "max": "max"
             },
-            "onMode": "enabled",
-            "offMode": "disabled"
+            "onMode": "enabled"
           }
         }
       },

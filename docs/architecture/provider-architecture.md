@@ -9,7 +9,7 @@
 - `EffectiveModel` 是能力真值；`RequestPlan` 是一次请求的冻结执行真值。Adapter 不得重算 Fast、Max、1M、route、temperature 或 context budget。
 - Conversation/Agent 调用不得注入隐藏的默认 	emperature；只有 manifest/route 明确固定的值或调用方显式选择才进入 RequestPlan，否则省略并交由 Provider 管理。
 - 认证秘密不进入 manifest、`EffectiveModel`、`RequestPlan`、IPC、renderer、会话、journal 或 Trace。
-- 未证实字段保持 `unknown / Provider managed / Unverified`；不得补写 256K、按后缀关联 variant，或按 provider 名、上游 SDK 包元数据、endpoint hostname 推断分类与协议。
+- 未证实字段保持 `unknown`（Composer UI 呈现为灰掉的 `Disabled` / `禁用`，不发明档位）；不得补写 256K、按后缀关联 variant，或按 provider 名、上游 SDK 包元数据、endpoint hostname 推断分类与协议。
 - 当前账号 discovery、policy 和 entitlement 只能收窄账号可用性，不能把 manifest 中已证实的结构能力改成全局不支持。
 
 ## Manifest 分层
@@ -136,7 +136,7 @@ Preflight 失败或取消不得留下 Session、Turn、branch、attachment、jou
 - Kimi Coding Plan：稳定基础入口为 `kimi-for-coding`；账户目录精确返回 `k3` 时才增加 `Kimi K3`，highspeed 仅作为内部 Fast target。禁止显示或接纳 `Kimi K2.7 Code` / `kimi-k2.7-code`。K3 reasoning、Context Max mode 与 Fast 分别服从该 surface 的 live contract，不从名称或其他 Moonshot surface 推断。
 - GLM-5.2：固定 1M、High/Max、默认 High、无 Off/Fast；不同协议使用不同 wire profile。
 - DeepSeek Pro/Flash：固定 1M、Off/High/Max、默认 High。
-- Grok 4.20 non-reasoning、reasoning、multi-agent 是三个独立模型；multi-agent 为 Provider managed，不提供 reasoning toggle。Grok 4.3 是固定 1M 的 Max mode，Grok 4.5 Super Grok OAuth 不继承 direct xAI API 的 Priority Fast，Grok Build 0.1 为 256K。
+- Grok 4.20 non-reasoning、reasoning、multi-agent 是三个独立模型；multi-agent 推理控件 fail-closed（UI=`Disabled`），不提供 reasoning toggle。Grok 4.3 是固定 1M 的 Max mode，Grok 4.5 Super Grok OAuth 不继承 direct xAI API 的 Priority Fast，Grok Build 0.1 为 256K。
 - canonical wire 保留 `xhigh`，产品统一显示 `Extra`；不存在 Ultra 档位。
 
 ## Adapter 边界

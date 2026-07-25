@@ -61,7 +61,7 @@
 2. **单个 scoped 资源文件损坏**：Integrity — 该资源 `invalid`，其它资源继续列出。
 3. **用户主动取消 turn**：Availability — abort-and-join 后允许下一 turn，不把 session 标为不可信。
 4. **Mermaid/KaTeX 渲染失败**：Integrity/Availability（UI）— 该块 fail-closed 展示错误，不影响整条消息其它块。
-5. **Reasoning `unknown`**：不是 Security 拒绝发送；UI 显示中性 `未验证 / Provider managed`，控件不发明档位。
+5. **Reasoning `unknown`**：不是 Security 拒绝发送；UI 呈现与关档相同的 `Disabled` / `禁用`（灰掉不可调），控件不发明档位。
 
 代码注释应使用 `// failure-class: security|integrity|availability` 标注意图（仅在边界函数处，避免噪声）。
 

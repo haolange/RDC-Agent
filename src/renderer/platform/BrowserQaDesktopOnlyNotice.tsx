@@ -1,11 +1,11 @@
 import React from 'react';
-import { useI18n } from '../i18n';
+import { useI18n, type TranslationKey } from '../i18n';
 import { isBrowserAppBridge } from './browserAppBridge/BrowserAppBridge';
 import './BrowserQaDesktopOnlyNotice.css';
 
 type NoticeKind = 'settingsWrite' | 'secret' | 'mcpTrust' | 'memory' | 'generic';
 
-const KIND_KEYS: Record<NoticeKind, string> = {
+const KIND_KEYS: Record<NoticeKind, TranslationKey> = {
   settingsWrite: 'browserQa.desktopOnlySettingsWrite',
   secret: 'browserQa.desktopOnlySecret',
   mcpTrust: 'browserQa.desktopOnlyMcpTrust',

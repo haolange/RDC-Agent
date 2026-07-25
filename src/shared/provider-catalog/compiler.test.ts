@@ -352,8 +352,8 @@ describe('Provider Catalog compiler', () => {
     verify('github-copilot', [
       ['claude-sonnet-4.6', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'max'], 'medium'],
       ['claude-opus-4.6', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'max'], 'medium'],
-      ['claude-opus-4.8', 1_000_000, 'fixed', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['claude-opus-4.8-fast', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium', 'internal'],
+      ['claude-opus-4.8', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
+      ['claude-opus-4.8-fast', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['claude-sonnet-5', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['claude-fable-5', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.4-mini', 128_000, 'unsupported', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh'], 'medium'],
@@ -372,24 +372,22 @@ describe('Provider Catalog compiler', () => {
       unavailableReason: expect.stringContaining('subscription'),
     });
     expect(copilot?.models.find((model) => model.modelId === 'claude-opus-4.8')).toMatchObject({
-      controls: { fast: { state: 'selectable' } },
-      executionBindings: [expect.objectContaining({
-        when: { fast: true },
-        actions: [{ kind: 'model-switch', targetModelId: 'claude-opus-4.8-fast' }],
-      })],
+      controls: { fast: { state: 'unsupported' } },
     });
+    expect(copilot?.models.find((model) => model.modelId === 'claude-opus-4.8')?.executionBindings ?? [])
+      .toEqual([]);
     expect(copilot?.models.find((model) => model.modelId === 'claude-opus-4.8-fast')).toMatchObject({
-      selection: { pickerVisibility: 'internal', relatedPrimaryModelIds: ['claude-opus-4.8'] },
+      selection: { pickerVisibility: 'primary' },
       presencePolicy: 'account-entitled',
     });
 
     verify('grok-account', [
       ['grok-4.20-0309-non-reasoning', 1_000_000, 'fixed', 'unsupported', 'unknown', false, [], 'off'],
-      ['grok-4.20-0309-reasoning', 1_000_000, 'fixed', 'unsupported', 'unknown', false, [], 'off'],
-      ['grok-4.20-multi-agent-0309', 1_000_000, 'fixed', 'unsupported', 'unknown', false, [], 'off'],
-      ['grok-4.3', 500_000, 'selectable', 'unsupported', 'unknown', false, [], 'off'],
+      ['grok-4.20-0309-reasoning', 1_000_000, 'fixed', 'unsupported', 'always-on', false, [], 'on'],
+      ['grok-4.20-multi-agent-0309', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
+      ['grok-4.3', 500_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high'], 'medium'],
       ['grok-4.5', 500_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high'], 'medium'],
-      ['grok-build-0.1', 256_000, 'unsupported', 'unsupported', 'unknown', false, [], 'off'],
+      ['grok-build-0.1', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on'],
     ]);
     const grokSurface = catalog.surfaces.get('grok-account')?.surface;
     expect(grokSurface?.routes).toEqual(expect.arrayContaining([
@@ -400,8 +398,8 @@ describe('Provider Catalog compiler', () => {
     ]));
 
     verify('deepseek', [
-      ['deepseek-v4-pro', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
-      ['deepseek-v4-flash', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
+      ['deepseek-v4-pro', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
+      ['deepseek-v4-flash', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
     ]);
     const deepseek = catalog.surfaces.get('deepseek')?.surface;
     expect(deepseek?.discovery).toMatchObject({ authority: 'candidate-validation', strategy: { kind: 'json-catalog' } });
@@ -412,18 +410,28 @@ describe('Provider Catalog compiler', () => {
       ['kimi-for-coding', 256_000, 'unsupported', 'selectable', 'always-on', false, [], 'on'],
       ['k3', 256_000, 'selectable', 'unsupported', 'unknown', false, [], 'on'],
       ['k3[1m]', 1_000_000, 'fixed', 'unsupported', 'unknown', false, [], 'on', 'internal'],
-      ['kimi-for-coding-highspeed', 256_000, 'unknown', 'unsupported', 'always-on', false, [], 'on', 'internal'],
+      ['kimi-for-coding-highspeed', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on', 'internal'],
     ]);
 
     verify('volcengine-coding-plan', [
       ['doubao-seed-2.0-lite', 131_072, 'unsupported', 'unsupported', 'levels', true, ['minimal', 'low', 'medium', 'high'], 'medium'],
-      ['doubao-seed-2.0-pro', 131_072, 'unsupported', 'selectable', 'levels', true, ['minimal', 'low', 'medium', 'high'], 'medium'],
-      ['doubao-seed-2.0-code', 131_072, 'unsupported', 'selectable', 'levels', true, ['minimal', 'low', 'medium', 'high'], 'medium'],
+      ['doubao-seed-2.0-pro', 131_072, 'unsupported', 'unsupported', 'levels', true, ['minimal', 'low', 'medium', 'high'], 'medium'],
+      ['doubao-seed-2.0-code', 131_072, 'unsupported', 'unsupported', 'levels', true, ['minimal', 'low', 'medium', 'high'], 'medium'],
       ['glm-5.2', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
-      ['deepseek-v4-pro', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
-      ['deepseek-v4-flash', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
-      ['kimi-k2.7-code', 256_000, 'unsupported', 'selectable', 'toggle', true, [], 'on'],
-      ['kimi-k2.7-code-highspeed', 256_000, 'unsupported', 'unsupported', 'toggle', true, [], 'on', 'internal'],
+      ['deepseek-v4-pro', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
+      ['deepseek-v4-flash', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
+      ['kimi-k2.7-code', 256_000, 'unsupported', 'selectable', 'always-on', false, [], 'on'],
+      ['kimi-k2.7-code-highspeed', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on', 'internal'],
+    ]);
+
+    verify('cline-pass', [
+      ['cline-pass/glm-5.2', 200_000, 'unsupported', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
+      ['cline-pass/kimi-k3', 256_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'high', 'max'], 'high'],
+      ['cline-pass/kimi-k2.7-code', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on'],
+      ['cline-pass/kimi-k2.6', 256_000, 'unsupported', 'unsupported', 'toggle', true, [], 'on'],
+      ['cline-pass/deepseek-v4-pro', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
+      ['cline-pass/deepseek-v4-flash', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
+      ['cline-pass/qwen3.7-plus', 128_000, 'unsupported', 'unsupported', 'unknown', false, [], 'on'],
     ]);
     const volcengine = catalog.surfaces.get('volcengine-coding-plan')?.surface;
     expect(volcengine?.models.find((model) => model.modelId === 'kimi-k2.7-code')).toMatchObject({
