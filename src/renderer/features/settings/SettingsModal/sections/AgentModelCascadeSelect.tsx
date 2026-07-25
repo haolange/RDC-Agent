@@ -43,14 +43,15 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
       current.push(option);
       map.set(option.providerId, current);
     }
+    // Keep every projected provider group. Unconfigured rows stay disabled in the model column;
+    // hiding whole groups made catalogs look "incomplete" next to Providers.
     return Array.from(map.entries())
       .map(([providerId, providerOptions]) => ({
         providerId,
         label: providerOptions[0]?.providerLabel || providerId,
         options: providerOptions,
-      }))
-      .filter((group) => group.options.some((option) => option.configured || option.canonicalId === value));
-  }, [options, value]);
+      }));
+  }, [options]);
   const selected = options.find((option) => option.canonicalId === value);
   const invalidSelection = isAgentModelSelectionInvalid(value, options);
   const displayGroups = groups;

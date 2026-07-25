@@ -3,6 +3,9 @@ import { ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
 
 const LlmProviderAuthModeSchema = z.enum(['none', 'api-key', 'local', 'account', 'environment']);
 
+/** Matches renderer `Date.now() * 1000` revision clocks (safe-integer domain). */
+const ClientRevisionSchema = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+
 export const LlmProviderDraftArgsSchema = z.tuple([
   z.object({
     providerId: ipcNonEmptyString(200, 'providerId'),
@@ -11,7 +14,8 @@ export const LlmProviderDraftArgsSchema = z.tuple([
     baseUrl: ipcString(2048, 'baseUrl').optional(),
     protocol: ipcString(64, 'protocol').optional(),
     connectionValues: z.record(z.string().max(200), ipcString(16_000, 'connectionValue')).optional(),
-    modelPreferences: z.array(z.record(z.string().max(200), z.unknown())).max(512).optional(),
+    // Large catalogs (OpenRouter etc.) routinely exceed 512; keep a hard cap for IPC DoS only.
+    modelPreferences: z.array(z.record(z.string().max(200), z.unknown())).max(10_000).optional(),
   }).strict(),
 ]);
 
@@ -47,13 +51,13 @@ export const LlmProviderAccountLoginFinishArgsSchema = z.tuple([
 export const SettingsSaveAgentDefinitionArgsSchema = z.tuple([
   z.object({
     draft: z.record(z.string().max(200), z.unknown()),
-    clientRevision: z.number().int().nonnegative().max(1_000_000_000),
+    clientRevision: ClientRevisionSchema,
   }).strict(),
 ]);
 
 export const SettingsSaveProviderDefinitionArgsSchema = z.tuple([
   z.object({
     provider: z.record(z.string().max(200), z.unknown()),
-    clientRevision: z.number().int().nonnegative().max(1_000_000_000),
+    clientRevision: ClientRevisionSchema,
   }).strict(),
 ]);
