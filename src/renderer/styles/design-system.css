@@ -733,6 +733,10 @@
   border-radius: var(--radius-card);
 }
 
+.ui-skeleton--card-stack {
+  margin-bottom: var(--space-2);
+}
+
 /* ─── Semantic Token Layer ─────────────────────────────────────────────────
  *
  *  Three-layer token architecture:

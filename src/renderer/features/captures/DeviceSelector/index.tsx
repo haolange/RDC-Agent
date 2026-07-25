@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useDeviceStore } from '../../../stores/deviceStore';
 import type { ReplayDeviceEntry } from '@shared/types/device';
+import { useDynStyle } from '../../../lib/useDynStyle';
 import {
   DeviceStatusIcon,
   DeviceTypeIcon,
@@ -9,13 +10,84 @@ import {
   StatusText,
   type DeviceSelectorVariant,
 } from './DeviceSelectorParts';
-import { useDeviceDropdownPosition } from './useDeviceDropdownPosition';
+import {
+  useDeviceDropdownPosition,
+  type DeviceDropdownPosition,
+} from './useDeviceDropdownPosition';
 import './DeviceSelector.css';
 
 interface DeviceSelectorProps {
   variant?: DeviceSelectorVariant;
   collapsed?: boolean;
 }
+
+const DeviceSelectorDropdown: React.FC<{
+  menuRef: React.Ref<HTMLDivElement>;
+  variant: DeviceSelectorVariant;
+  collapsed: boolean;
+  dropdownTestId: string;
+  dropdownPosition: DeviceDropdownPosition;
+  devices: ReplayDeviceEntry[];
+  selectedDevice: string;
+  onSelect: (device: ReplayDeviceEntry) => void;
+}> = ({
+  menuRef,
+  variant,
+  collapsed,
+  dropdownTestId,
+  dropdownPosition,
+  devices,
+  selectedDevice,
+  onSelect,
+}) => {
+  const dynStyle = useDynStyle({
+    left: `${dropdownPosition.left}px`,
+    top: `${dropdownPosition.top}px`,
+    width: `${dropdownPosition.width}px`,
+    visibility: dropdownPosition.ready ? 'visible' : 'hidden',
+  });
+
+  return (
+    <div
+      ref={menuRef}
+      className={`device-selector-dropdown variant-${variant} placement-${dropdownPosition.placement} ${collapsed ? 'collapsed' : ''}`}
+      data-testid={dropdownTestId}
+      role="listbox"
+      {...dynStyle}
+    >
+      {devices.map((device) => {
+        const selectable = device.type === 'local' || device.status === 'connected' || device.status === 'online';
+        const bootstrapSummary = getBootstrapSummary(device);
+        return (
+          <button
+            key={device.id}
+            className={`device-selector-option ${device.id === selectedDevice ? 'selected' : ''}`}
+            onClick={() => onSelect(device)}
+            role="option"
+            aria-selected={device.id === selectedDevice}
+          >
+            <div className="device-selector-option-main">
+              <div className="device-option-leading">
+                <DeviceTypeIcon type={device.type} />
+                <div className="device-option-copy">
+                  <span className="device-option-name">{device.label}</span>
+                  <span className="device-option-detail">{device.detailText ?? (device.type === 'local' ? 'Local replay ready' : 'Ready')}</span>
+                </div>
+              </div>
+              <div className="device-option-trailing">
+                <DeviceStatusIcon device={device} />
+                <span className={`device-option-status ${device.status}`}>{StatusText[device.status]}</span>
+              </div>
+            </div>
+            {device.serial && <div className="device-option-meta">{device.serial}</div>}
+            {bootstrapSummary && <div className="device-option-bootstrap">{bootstrapSummary}</div>}
+            {!selectable && device.lastError && <div className="device-option-error">{device.lastError}</div>}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
 
 export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
   variant = 'sidebar',
@@ -147,49 +219,16 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
         </button>
       </div>
       {isOpen && createPortal(
-        <div
-          ref={menuRef}
-          className={`device-selector-dropdown variant-${variant} placement-${dropdownPosition.placement} ${collapsed ? 'collapsed' : ''}`}
-          data-testid={dropdownTestId}
-          role="listbox"
-          style={{
-            left: dropdownPosition.left,
-            top: dropdownPosition.top,
-            width: dropdownPosition.width,
-            visibility: dropdownPosition.ready ? 'visible' : 'hidden',
-          }}
-        >
-          {devices.map((device) => {
-            const selectable = device.type === 'local' || device.status === 'connected' || device.status === 'online';
-            const bootstrapSummary = getBootstrapSummary(device);
-            return (
-              <button
-                key={device.id}
-                className={`device-selector-option ${device.id === selectedDevice ? 'selected' : ''}`}
-                onClick={() => void handleSelect(device)}
-                role="option"
-                aria-selected={device.id === selectedDevice}
-              >
-                <div className="device-selector-option-main">
-                  <div className="device-option-leading">
-                    <DeviceTypeIcon type={device.type} />
-                    <div className="device-option-copy">
-                      <span className="device-option-name">{device.label}</span>
-                      <span className="device-option-detail">{device.detailText ?? (device.type === 'local' ? 'Local replay ready' : 'Ready')}</span>
-                    </div>
-                  </div>
-                  <div className="device-option-trailing">
-                    <DeviceStatusIcon device={device} />
-                    <span className={`device-option-status ${device.status}`}>{StatusText[device.status]}</span>
-                  </div>
-                </div>
-                {device.serial && <div className="device-option-meta">{device.serial}</div>}
-                {bootstrapSummary && <div className="device-option-bootstrap">{bootstrapSummary}</div>}
-                {!selectable && device.lastError && <div className="device-option-error">{device.lastError}</div>}
-              </button>
-            );
-          })}
-        </div>,
+        <DeviceSelectorDropdown
+          menuRef={menuRef}
+          variant={variant}
+          collapsed={collapsed}
+          dropdownTestId={dropdownTestId}
+          dropdownPosition={dropdownPosition}
+          devices={devices}
+          selectedDevice={selectedDevice}
+          onSelect={(device) => void handleSelect(device)}
+        />,
         document.body,
       )}
     </div>

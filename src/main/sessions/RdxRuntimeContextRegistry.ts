@@ -16,8 +16,6 @@ export interface RdxContextLease {
 }
 
 const leasesBySession = new Map<string, RdxContextLease>();
-/** @deprecated Prefer per-session lease; kept only as last-writer mirror for UI summary without session. */
-let legacyGlobalMirror: RdxRuntimeContext | null = null;
 let versionSeq = 0;
 
 function computeCaptureHash(runtimeContext: RdxRuntimeContext): string | null {
@@ -30,54 +28,42 @@ function computeCaptureHash(runtimeContext: RdxRuntimeContext): string | null {
   return createHash('sha256').update(captureKey).digest('hex').slice(0, 16);
 }
 
+function cloneRuntimeContext(runtimeContext: RdxRuntimeContext): RdxRuntimeContext {
+  return {
+    ...runtimeContext,
+    raw: runtimeContext.raw ? { ...runtimeContext.raw } : undefined,
+  };
+}
+
+/**
+ * Bind or clear a per-session RDX context lease.
+ * Empty sessionId is fail-closed (returns null; does not write any global mirror).
+ */
 export function setRdxRuntimeContextForSession(
   sessionId: string,
   runtimeContext: RdxRuntimeContext | null,
   options?: { projectId?: string | null },
 ): RdxContextLease | null {
-  if (!sessionId) {
-    setRdxRuntimeContext(runtimeContext);
+  const trimmed = sessionId.trim();
+  if (!trimmed) {
     return null;
   }
   if (!runtimeContext) {
-    leasesBySession.delete(sessionId);
-    if (legacyGlobalMirror) {
-      // Clear mirror only when no other leases remain.
-      if (leasesBySession.size === 0) {
-        legacyGlobalMirror = null;
-      }
-    }
+    leasesBySession.delete(trimmed);
     return null;
   }
   versionSeq += 1;
   const lease: RdxContextLease = {
     contextId: runtimeContext.contextId,
     version: versionSeq,
-    ownerSessionId: sessionId,
+    ownerSessionId: trimmed,
     ownerProjectId: options?.projectId ?? null,
     captureHash: computeCaptureHash(runtimeContext),
-    runtimeContext: { ...runtimeContext, raw: runtimeContext.raw ? { ...runtimeContext.raw } : undefined },
+    runtimeContext: cloneRuntimeContext(runtimeContext),
     updatedAt: Date.now(),
   };
-  leasesBySession.set(sessionId, lease);
-  legacyGlobalMirror = lease.runtimeContext;
+  leasesBySession.set(trimmed, lease);
   return lease;
-}
-
-/**
- * Legacy global setter — used by RdxSessionService until callers pass sessionId.
- * When sessionId is unknown, stores only the mirror (tools requiring ownership fail-closed).
- */
-export function setRdxRuntimeContext(runtimeContext: RdxRuntimeContext | null): void {
-  legacyGlobalMirror = runtimeContext
-    ? { ...runtimeContext, raw: runtimeContext.raw ? { ...runtimeContext.raw } : undefined }
-    : null;
-}
-
-export function getRdxRuntimeContext(): RdxRuntimeContext | null {
-  return legacyGlobalMirror
-    ? { ...legacyGlobalMirror, raw: legacyGlobalMirror.raw ? { ...legacyGlobalMirror.raw } : undefined }
-    : null;
 }
 
 export function getRdxContextLease(sessionId: string | null | undefined): RdxContextLease | null {
@@ -86,11 +72,24 @@ export function getRdxContextLease(sessionId: string | null | undefined): RdxCon
   if (!lease) return null;
   return {
     ...lease,
-    runtimeContext: {
-      ...lease.runtimeContext,
-      raw: lease.runtimeContext.raw ? { ...lease.runtimeContext.raw } : undefined,
-    },
+    runtimeContext: cloneRuntimeContext(lease.runtimeContext),
   };
+}
+
+/**
+ * UI / no-session summary helper: pick the most recently updated lease.
+ * Tools must still use assertRdxContextLeaseOwnership with an explicit sessionId.
+ */
+export function getMostRecentRdxContextLease(): RdxContextLease | null {
+  let latest: RdxContextLease | null = null;
+  for (const sessionId of listRdxContextLeaseSessionIds()) {
+    const lease = getRdxContextLease(sessionId);
+    if (!lease) continue;
+    if (!latest || lease.updatedAt > latest.updatedAt) {
+      latest = lease;
+    }
+  }
+  return latest;
 }
 
 /**
@@ -120,7 +119,6 @@ export function assertRdxContextLeaseOwnership(input: {
 
 export function clearRdxContextLeases(): void {
   leasesBySession.clear();
-  legacyGlobalMirror = null;
   versionSeq = 0;
 }
 

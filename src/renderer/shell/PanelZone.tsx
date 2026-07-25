@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useDynStyle } from '../lib/useDynStyle';
 
 export interface PanelZoneProps {
   side: 'left' | 'right';
@@ -18,11 +19,12 @@ export function PanelZone({
   children,
 }: PanelZoneProps) {
   const sideClass = side === 'left' ? 'app-sidebar-left' : 'app-sidebar-right';
+  const dynStyle = useDynStyle(collapsed ? {} : { width: `${width}px` });
   return (
     <aside
       data-testid={testId}
       className={`${sideClass} ${collapsed ? 'collapsed' : ''} ${className}`.trim()}
-      style={collapsed ? undefined : { width }}
+      {...dynStyle}
     >
       {children}
     </aside>

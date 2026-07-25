@@ -6,6 +6,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { ConversationMessage } from '@shared/types/conversation';
+import { useDynStyle } from '../../lib/useDynStyle';
 
 const VIRTUALIZE_THRESHOLD = 48;
 
@@ -17,6 +18,36 @@ interface Props {
   className?: string;
   'data-testid'?: string;
 }
+
+const VirtualSpacer: React.FC<{ height: number }> = ({ height }) => {
+  const dynStyle = useDynStyle({ height: `${height}px` });
+  return (
+    <li
+      aria-hidden="true"
+      className="conversation-thread-spacer"
+      {...dynStyle}
+    />
+  );
+};
+
+const VirtualMessageItem: React.FC<{
+  msg: ConversationMessage;
+  index: number;
+  estimateHeight: number;
+  renderMessage: (msg: ConversationMessage, index: number) => React.ReactNode;
+}> = ({ msg, index, estimateHeight, renderMessage }) => {
+  const dynStyle = useDynStyle({ 'min-height': `${estimateHeight}px` });
+  return (
+    <li
+      className="conversation-thread-item"
+      data-message-role={msg.role}
+      data-message-status={msg.status ?? 'complete'}
+      {...dynStyle}
+    >
+      {renderMessage(msg, index)}
+    </li>
+  );
+};
 
 export const VirtualMessageList: React.FC<Props> = ({
   messages,
@@ -73,6 +104,13 @@ export const VirtualMessageList: React.FC<Props> = ({
     updateRange();
   }, [messages.length, updateRange]);
 
+  const totalHeight = messages.length * estimateHeight;
+  const listDynStyle = useDynStyle(
+    messages.length > VIRTUALIZE_THRESHOLD
+      ? { height: `${totalHeight}px` }
+      : {},
+  );
+
   if (messages.length <= VIRTUALIZE_THRESHOLD) {
     return (
       <ol
@@ -96,57 +134,33 @@ export const VirtualMessageList: React.FC<Props> = ({
     );
   }
 
-  const totalHeight = messages.length * estimateHeight;
   const offsetY = range.start * estimateHeight;
   const visible = messages.slice(range.start, range.end);
+  const trailingHeight = Math.max(0, totalHeight - offsetY - visible.length * estimateHeight);
 
   return (
     <ol
       ref={listRef}
-      className={className}
+      className={`${className ?? ''} conversation-thread-virtual`.trim()}
       data-testid={testId}
       data-message-count={messages.length}
       data-virtualized="true"
-      style={{ position: 'relative', height: totalHeight, gap: 0 }}
+      {...listDynStyle}
     >
-      <li
-        aria-hidden="true"
-        className="conversation-thread-spacer"
-        style={{
-          display: 'block',
-          height: offsetY,
-          margin: 0,
-          padding: 0,
-          listStyle: 'none',
-          pointerEvents: 'none',
-        }}
-      />
+      <VirtualSpacer height={offsetY} />
       {visible.map((msg, i) => {
         const index = range.start + i;
         return (
-          <li
+          <VirtualMessageItem
             key={msg.id}
-            className="conversation-thread-item"
-            data-message-role={msg.role}
-            data-message-status={msg.status ?? 'complete'}
-            style={{ minHeight: estimateHeight }}
-          >
-            {renderMessage(msg, index)}
-          </li>
+            msg={msg}
+            index={index}
+            estimateHeight={estimateHeight}
+            renderMessage={renderMessage}
+          />
         );
       })}
-      <li
-        aria-hidden="true"
-        className="conversation-thread-spacer"
-        style={{
-          display: 'block',
-          height: Math.max(0, totalHeight - offsetY - visible.length * estimateHeight),
-          margin: 0,
-          padding: 0,
-          listStyle: 'none',
-          pointerEvents: 'none',
-        }}
-      />
+      <VirtualSpacer height={trailingHeight} />
     </ol>
   );
 };

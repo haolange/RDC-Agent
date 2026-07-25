@@ -21,6 +21,7 @@ import {
 } from './providerDefinitionSettings';
 import type { AgentPermissionMode, AppSettings } from '@shared/types/settings';
 import type { AppSettingsState } from './appSettingsStoreState';
+import { createAppSettingsAppearanceActions } from './appSettingsAppearanceActions';
 
 export { nextAgentDefinitionClientRevision } from './agentDefinitionSettings';
 
@@ -118,45 +119,7 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
     set({ settings: nextSettings, hydrated: true });
     return nextSettings;
   },
-  setTheme: async (theme) => {
-    await get().patchSettings({ appearance: { theme } });
-  },
-  setLanguage: async (language) => {
-    await get().patchSettings({ appearance: { language } });
-  },
-  setFontScale: async (fontScale) => {
-    await get().patchSettings({ appearance: { fontScale } });
-  },
-  setComposerMarkdown: async (composerMarkdown) => {
-    await get().patchSettings({ appearance: { composerMarkdown } });
-  },
-  setUsePointerCursors: async (usePointerCursors) => {
-    await get().patchSettings({ appearance: { usePointerCursors } });
-  },
-  setReduceMotion: async (reduceMotion) => {
-    await get().patchSettings({ appearance: { reduceMotion } });
-  },
-  setChromeTheme: async (variant, chrome) => {
-    const current = get().settings.appearance.chromeThemes;
-    await get().patchSettings({
-      appearance: {
-        chromeThemes: {
-          ...current,
-          [variant]: {
-            ...current[variant],
-            ...chrome,
-            fonts: {
-              ...current[variant].fonts,
-              ...(chrome.fonts ?? {}),
-            },
-          },
-        },
-      },
-    });
-  },
-  setContextBreakdownExpanded: async (contextBreakdownExpanded) => {
-    await get().patchSettings({ appearance: { contextBreakdownExpanded } });
-  },
+  ...createAppSettingsAppearanceActions(get),
   updateProfile: async (profile) => {
     await get().patchSettings({ profile });
   },

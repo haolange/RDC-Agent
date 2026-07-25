@@ -3,12 +3,23 @@ import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 import { runExecutionService } from '../workflow/debugger/RunExecutionService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import type { WorkbenchIpcContext } from './workbenchContext';
+import { parseIpcArgs } from './validation/IpcPayloadGuard';
+import { EmptyArgsSchema } from './validation/commonIpcSchemas';
+import {
+  AgentConfigureArgsSchema,
+  AgentGetStateArgsSchema,
+  AgentSendMessageArgsSchema,
+} from './validation/agentSchemas';
 
 export function registerAgentHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;
 
-  ipcMain.handle('agent:sendMessage', async (_event, agentId: string, content: string) => {
+  ipcMain.handle('agent:sendMessage', async (_event, ...rawArgs: unknown[]) => {
     try {
+      const [agentId, content] = parseIpcArgs(AgentSendMessageArgsSchema, rawArgs, {
+        label: 'agent:sendMessage',
+        maxBytes: 512 * 1024,
+      });
       let runContext: { caseId?: string; runId?: string; sessionId?: string; projectId?: string; projectRootPath?: string | null } | undefined;
 
       if (state.currentSessionId) {
@@ -45,16 +56,25 @@ export function registerAgentHandlers(context: WorkbenchIpcContext): void {
     }
   });
 
-  ipcMain.handle('agent:getState', async (_event, agentId: string) => {
+  ipcMain.handle('agent:getState', async (_event, ...rawArgs: unknown[]) => {
+    const [agentId] = parseIpcArgs(AgentGetStateArgsSchema, rawArgs, {
+      label: 'agent:getState',
+      maxBytes: 4 * 1024,
+    });
     return agentOrchestrator.getAgentState(agentId as any);
   });
 
-  ipcMain.handle('agent:getAllStates', async () => {
+  ipcMain.handle('agent:getAllStates', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'agent:getAllStates', maxBytes: 1024 });
     return agentOrchestrator.getAllAgentStates();
   });
 
-  ipcMain.handle('agent:configure', async (_event, agentId: string, config: unknown) => {
+  ipcMain.handle('agent:configure', async (_event, ...rawArgs: unknown[]) => {
     try {
+      const [agentId, config] = parseIpcArgs(AgentConfigureArgsSchema, rawArgs, {
+        label: 'agent:configure',
+        maxBytes: 64 * 1024,
+      });
       agentOrchestrator.configureAgent(agentId as any, config as any);
       return { success: true };
     } catch (error) {

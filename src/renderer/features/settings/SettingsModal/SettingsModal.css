@@ -4236,7 +4236,7 @@
   width: 22px;
   height: 22px;
   box-shadow:
-    0 0 0 1px color-mix(in srgb, #000 22%, transparent),
+    0 0 0 1px rgb(0 0 0 / 0.22),
     0 0 12px color-mix(in srgb, var(--settings-agent-accent, currentColor) 34%, transparent);
 }
 

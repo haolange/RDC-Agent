@@ -176,11 +176,6 @@ export async function fetchPinnedPublic(
   });
 }
 
-/** @deprecated Prefer `pinned.href` from assertPublicHttpUrl; kept for string-only call sites. */
-export async function assertPublicHttpUrlString(rawUrl: string): Promise<string> {
-  return (await assertPublicHttpUrl(rawUrl)).href;
-}
-
 function isPrivateIp(value: string): boolean {
   const ipVersion = net.isIP(value);
   if (ipVersion === 4) {

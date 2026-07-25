@@ -93,9 +93,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ collapsed = false }) => {
 
           {selection.isLoading ? (
             <div className="session-list project-list">
-              <div className="ui-skeleton ui-skeleton--card" style={{ height: '56px', marginBottom: 'var(--space-2)' }} />
-              <div className="ui-skeleton ui-skeleton--card" style={{ height: '56px', marginBottom: 'var(--space-2)' }} />
-              <div className="ui-skeleton ui-skeleton--card" style={{ height: '56px' }} />
+              <div className="ui-skeleton ui-skeleton--card ui-skeleton--card-stack" />
+              <div className="ui-skeleton ui-skeleton--card ui-skeleton--card-stack" />
+              <div className="ui-skeleton ui-skeleton--card" />
             </div>
           ) : selection.projects.length > 0 ? (
             <div className="project-stack">

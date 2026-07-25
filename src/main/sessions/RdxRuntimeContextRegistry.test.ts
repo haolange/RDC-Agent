@@ -4,7 +4,8 @@ import {
   getRdxContextLease,
   assertRdxContextLeaseOwnership,
   clearRdxContextLeases,
-  getRdxRuntimeContext,
+  getMostRecentRdxContextLease,
+  listRdxContextLeaseSessionIds,
 } from './RdxRuntimeContextRegistry';
 import type { RdxRuntimeContext } from '@shared/types/session';
 
@@ -45,6 +46,21 @@ describe('RdxRuntimeContextRegistry leases', () => {
     const a = setRdxRuntimeContextForSession('s1', ctx('c1'));
     const b = setRdxRuntimeContextForSession('s1', ctx('c1', { captureId: 'cap-2' }));
     expect(b!.version).toBeGreaterThan(a!.version);
-    expect(getRdxRuntimeContext()?.contextId).toBe('c1');
+    expect(getMostRecentRdxContextLease()?.contextId).toBe('c1');
+  });
+
+  it('fail-closes empty sessionId without writing a lease', () => {
+    expect(setRdxRuntimeContextForSession('', ctx('c1'))).toBeNull();
+    expect(setRdxRuntimeContextForSession('   ', ctx('c2'))).toBeNull();
+    expect(listRdxContextLeaseSessionIds()).toEqual([]);
+    expect(getMostRecentRdxContextLease()).toBeNull();
+  });
+
+  it('returns the most recently updated lease for UI summary', async () => {
+    setRdxRuntimeContextForSession('s1', ctx('c1'));
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    setRdxRuntimeContextForSession('s2', ctx('c2'));
+    expect(getMostRecentRdxContextLease()?.contextId).toBe('c2');
+    expect(listRdxContextLeaseSessionIds().sort()).toEqual(['s1', 's2']);
   });
 });

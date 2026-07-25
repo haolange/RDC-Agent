@@ -1,0 +1,724 @@
+/**
+ * AgentTurnRunner — runAgentTurn + agent slot creation/reuse.
+ */
+
+import type { AgentRole } from '@shared/types/agent';
+import type { AgentRouteCapability } from '@shared/types/agentRuntime';
+import type { AppMode, ContextUsageBreakdownEntry } from '@shared/types/session';
+import type { WorkflowStage } from '@shared/types/workflow';
+import type { PromptPlan } from '@shared/types/rdxRuntime';
+import type { EffectiveModel } from '@shared/types/providerCapability';
+import { CONTEXT_COMPACTION_RATIO } from '@shared/types/modelCapability';
+import { generateEventId, nowMs } from '@shared/utils/id';
+import { charsToTokens } from '@shared/utils/tokens';
+import { Agent } from '../../agent-runtime/agent/Agent';
+import { ContextManager } from '../../agent-runtime/agent/ContextManager';
+import { TokenizerService } from '../../agent-runtime/core/TokenizerService';
+import { ErrorRecovery } from '../../agent-runtime/agent/ErrorRecovery';
+import type { ToolExecutor } from '../../agent-runtime/agent/AgentLoop';
+import {
+  requestEnvelopeBuilder,
+  requestSnapshotStore,
+} from '../../agent-runtime/prompt';
+import { promptCacheCompiler } from '../../agent-runtime/prompt/PromptCacheCompiler';
+import {
+  encodeAgentModel,
+  configuredRuntimeProvider,
+} from '../../agent-runtime/providers/ConfiguredRuntimeProvider';
+import {
+  claimStructuredToolCallingEvidence,
+  describeRouteCapabilityDiagnostic,
+  resolveAgentRouteCapability,
+} from '../../agent-runtime/capabilities/RouteCapabilityResolver';
+import {
+  buildDiagnosticAgentEvent,
+  mentionsTextualToolCall,
+  translateCoreToSharedAgentEvent,
+  type AgentEventBridgeContext,
+} from '../../agent-runtime/AgentEventBridge';
+import {
+  buildEffectiveRuntimePlan,
+} from '../../agent-runtime/EffectiveRuntimePlan';
+import { compileEffectivePolicy } from '../../agent-runtime/permissions/PolicyCompiler';
+import { agentUserInputRequestService } from '../../agent-runtime/interactions/AgentUserInputRequestService';
+import { agentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
+import type {
+  AgentEvent as CoreAgentEvent,
+  Message,
+  StreamOptions,
+  ToolDefinition,
+  UserMessage,
+} from '../../agent-runtime/core/types';
+import { runtimeLogService } from '../../runtime/RuntimeLogService';
+import {
+  recordEffectivePlanSuccess,
+  recordObservedToolCallingSupport,
+  resolveEffectiveModel,
+} from '../../settings/EffectiveModelResolver';
+import { debuggerLlmService } from '../../settings/DebuggerLlmService';
+import { settingsService } from '../../settings/SettingsService';
+import {
+  turnCoordinator,
+  createSubagentBudgetState,
+  DEFAULT_SUBAGENT_BUDGET,
+} from './TurnCoordinator';
+import { agentSlotKey, type AgentSlot, type AgentSlotRegistry } from './AgentSlotRegistry';
+import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
+import type { HandoffMailbox } from './HandoffMailbox';
+import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
+import {
+  isMcpPrefixedToolName,
+  partitionDeferredTools,
+} from './deferredTools';
+import type {
+  AgentTurnOptions,
+  PreparedAgentRuntime,
+  ResolvedRuntimeTools,
+  ToolExecutorRuntimeContext,
+} from './orchestratorTypes';
+
+export interface AgentTurnRunnerDeps {
+  slots: AgentSlotRegistry;
+  mcp: McpConnectionCoordinator;
+  deferredActivation: DeferredToolActivationTracker;
+  handoffMailbox: HandoffMailbox;
+  tokenizerService: TokenizerService;
+  sessionTurnKey: (sessionId?: string | null) => string;
+  resolveRuntimeTools: (
+    agentId: AgentRole,
+    toolAllowlist: string[],
+    stage?: WorkflowStage | 'report',
+    sessionId?: string | null,
+    turnHandle?: import('./TurnCoordinator').TurnHandle | null,
+    projectId?: string | null,
+  ) => ResolvedRuntimeTools;
+  createToolSignature: (tools: ToolDefinition[]) => string;
+  createToolExecutor: (
+    agentId: AgentRole,
+    toolAllowlist: string[],
+    stage?: WorkflowStage | 'report',
+    sessionId?: string | null,
+    runtimeContext?: ToolExecutorRuntimeContext,
+  ) => ToolExecutor;
+}
+
+export class AgentTurnRunner {
+  constructor(private readonly deps: AgentTurnRunnerDeps) {}
+
+  resolveMaxTurns(agentId: AgentRole, policyMaxTurns?: number): number {
+    if (typeof policyMaxTurns === 'number' && Number.isFinite(policyMaxTurns) && policyMaxTurns > 0) {
+      const manifest = settingsService.getAll().agents.definitions
+        .find((definition) => definition.id === agentId && definition.enabled);
+      const profileMax = manifest?.maxTurns && manifest.maxTurns > 0
+        ? manifest.maxTurns
+        : (agentId === 'edit' || agentId === 'debugger' || agentId === 'optimizer' ? 50 : 25);
+      return Math.min(policyMaxTurns, profileMax);
+    }
+    const manifest = settingsService.getAll().agents.definitions
+      .find((definition) => definition.id === agentId && definition.enabled);
+    if (manifest?.maxTurns && manifest.maxTurns > 0) {
+      return manifest.maxTurns;
+    }
+    if (agentId === 'edit' || agentId === 'debugger' || agentId === 'optimizer') {
+      return 50;
+    }
+    return 25;
+  }
+
+  getOrCreateAgentSlot(
+    agentId: AgentRole,
+    providerId: string,
+    modelId: string,
+    systemPrompt: string,
+    streamOptions: StreamOptions,
+    tools: ToolDefinition[] = [],
+    toolExecutor = this.deps.createToolExecutor(agentId, [], undefined),
+    turnSignature = '',
+    sessionId?: string | null,
+    contextWindow?: number,
+    contextTokenLimit?: number,
+    promptPlan?: PromptPlan,
+    initialMessages: Message[] = [],
+    contextDiagnostic?: Record<string, unknown>,
+    /** 用于 slot cache key；默认与注入 tools 相同。应传入全部可用工具以稳定复用。 */
+    signatureTools?: ToolDefinition[],
+    routeCapabilityOverride?: AgentRouteCapability,
+    policyMaxTurns?: number,
+  ): AgentSlot {
+    if (!promptPlan) {
+      throw new Error('PromptPlan is required before creating an agent runtime slot.');
+    }
+    const slotKey = agentSlotKey(sessionId, agentId);
+    const toolSignature = this.deps.createToolSignature(signatureTools ?? tools);
+    const activeContextWindow = contextWindow ?? streamOptions.requestPlan.contextWindowTokens;
+    const requestCompactionThreshold = contextTokenLimit
+      ?? Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
+    const fixedPromptTokens = promptPlan.totalTokenEstimate + charsToTokens(JSON.stringify(tools).length);
+    const resolvedContextTokenLimit = requestCompactionThreshold - fixedPromptTokens;
+    if (resolvedContextTokenLimit <= 0) {
+      throw new Error('PROMPT_OVERHEAD_EXCEEDS_BUDGET: system prompt and tool schemas leave no conversation budget.');
+    }
+    const existing = this.deps.slots.getSlot(slotKey);
+    if (
+      existing
+      && existing.providerId === providerId
+      && existing.modelId === modelId
+      && existing.systemPrompt === systemPrompt
+      && existing.toolSignature === toolSignature
+      && existing.turnSignature === turnSignature
+      && existing.contextTokenLimit === resolvedContextTokenLimit
+      && !existing.agent.isStreaming
+    ) {
+      // 复用 slot：从磁盘权威 history rehydrate，再同步 tools（COW）。
+      existing.activatedDeferredTools = this.deps.deferredActivation.resolveActivatedSet(slotKey, toolSignature);
+      this.deps.slots.rehydrate(existing, initialMessages as import('../../agent-runtime/core/types').AgentMessage[]);
+      existing.agent.setTools(tools);
+      return existing;
+    }
+
+    // Every turn starts from the active branch materialized by the canonical
+    // session journal. The in-memory slot is only an execution cache.
+    const agentModel = encodeAgentModel(providerId, modelId, { contextWindow: activeContextWindow });
+    const routeProvider = settingsService.getAll().llm.providers.find((provider) => provider.id === providerId);
+    const reasoningContract = (routeCapabilityOverride ?? resolveAgentRouteCapability(
+      routeProvider,
+      modelId,
+      resolveEffectiveModel(providerId, modelId, settingsService.getAll()),
+    )).reasoningContract;
+
+    const contextManager = new ContextManager({
+      modelId,
+      contextTokenLimit: resolvedContextTokenLimit,
+      toolResultBudget: 200 * 1024,
+      keepRecentToolResults: 3,
+      tokenizer: this.deps.tokenizerService,
+    });
+
+    // ErrorRecovery：错误分类与恢复策略（retry/escalate_tokens/reactive_compact/continue/abort）。
+    // fallbackModel 暂省略（无 settings route fallback 配置时只做非 switch 恢复）。
+    const errorRecovery = new ErrorRecovery({ primaryModel: agentModel });
+
+    const agent = new Agent({
+      initialState: {
+        model: agentModel,
+        systemPrompt,
+        systemPromptSegments: promptPlan.segments,
+        tools,
+        messages: initialMessages,
+      },
+      provider: configuredRuntimeProvider,
+      toolExecutor,
+      streamOptions,
+      maxTurns: this.resolveMaxTurns(agentId, policyMaxTurns),
+      // transformContext：长对话接近窗口上限时自动压缩历史。
+      transformContext: (messages) => contextManager.compress(messages),
+      // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
+      errorRecovery,
+      onRequest: ({ model, context: requestContext, streamOptions: requestOptions }) => {
+        const callIndex = requestSnapshotStore.nextCallIndex(sessionId ?? undefined, turnSignature || undefined);
+        const snapshot = requestEnvelopeBuilder.build({
+          promptPlan,
+          sessionId: sessionId ?? undefined,
+          turnId: turnSignature || undefined,
+          callIndex,
+          route: {
+            providerId,
+            modelId: requestOptions.requestPlan.effectiveModelId,
+            protocol: requestOptions.requestPlan.route.protocol ?? routeProvider?.protocol ?? model.api,
+          },
+          requestPlan: requestOptions.requestPlan,
+          messages: requestContext.messages,
+          tools: requestContext.tools ?? [],
+          controls: {
+            temperature: requestOptions.temperature,
+            maxTokens: requestOptions.maxTokens,
+            topP: requestOptions.topP,
+            reasoningSelection: requestOptions.reasoning?.selection,
+            contextDiagnostic,
+          },
+          reasoning: reasoningContract,
+          cache: requestOptions.promptCache ?? streamOptions.promptCache ?? promptCacheCompiler.compile({
+            promptPlan,
+            requestPlan: requestOptions.requestPlan,
+            tools: requestContext.tools ?? [],
+          }),
+        });
+        requestSnapshotStore.write(snapshot);
+        return snapshot.id;
+      },
+      onResponse: (requestId, message) => {
+        if (!requestId) return;
+        recordEffectivePlanSuccess(providerId, modelId, settingsService.getAll(), streamOptions.requestPlan);
+        requestSnapshotStore.complete(requestId, sessionId ?? undefined, turnSignature || undefined, {
+          inputTokens: message.usage.inputTokens,
+          outputTokens: message.usage.outputTokens,
+          ...(typeof message.usage.cacheReadTokens === 'number'
+            ? { cacheReadTokens: message.usage.cacheReadTokens }
+            : {}),
+          ...(typeof message.usage.cacheWriteTokens === 'number'
+            ? { cacheWriteTokens: message.usage.cacheWriteTokens }
+            : {}),
+          ...(typeof message.usage.cacheHitTokens === 'number'
+            ? { cacheHitTokens: message.usage.cacheHitTokens }
+            : {}),
+          ...(typeof message.usage.cacheMissTokens === 'number'
+            ? { cacheMissTokens: message.usage.cacheMissTokens }
+            : {}),
+          ...(typeof message.usage.reasoningTokens === 'number'
+            ? { reasoningTokens: message.usage.reasoningTokens }
+            : {}),
+          estimated: false,
+        });
+      },
+    });
+
+    const slot: AgentSlot = {
+      agent,
+      contextManager,
+      providerId,
+      modelId,
+      systemPrompt,
+      toolSignature,
+      turnSignature,
+      contextTokenLimit: resolvedContextTokenLimit,
+      activatedDeferredTools: this.deps.deferredActivation.resolveActivatedSet(slotKey, toolSignature),
+    };
+    this.deps.slots.setSlot(slotKey, slot);
+    return slot;
+  }
+
+  async runAgentTurn(input: {
+    agentId: AgentRole;
+    content: string;
+    systemPrompt: string;
+    providerId: string;
+    modelId: string;
+    maxTokens?: number;
+    temperature?: number;
+    mode: AppMode;
+    stage?: WorkflowStage | 'report';
+    runId?: string;
+    sessionId?: string | null;
+    turnId?: string;
+    toolAllowlist: string[];
+    options?: AgentTurnOptions;
+    projectRootPath?: string | null;
+    projectId?: string | null;
+    /** Ask 路径由 ConversationService 传入的 prompt 分段字符数，用于细化 breakdown。 */
+    promptPlan: PromptPlan;
+    effectiveModel?: EffectiveModel;
+    credentialHandle?: string;
+    contextWindow?: number;
+    contextTokenLimit?: number;
+    initialMessages?: Message[];
+    contextDiagnostic?: Record<string, unknown>;
+    preparedRuntime?: PreparedAgentRuntime;
+    terminalContext?: (messages: Message[], status: 'complete' | 'stopped' | 'error') => void;
+  }): Promise<string> {
+    if (!input.providerId || !input.modelId) {
+      throw new Error('No provider/model route is configured for this agent.');
+    }
+
+    const requestPlan = input.options?.requestPlan;
+    if (!requestPlan) {
+      throw new Error('RequestPlan is required for every provider request.');
+    }
+    const runtimeSettings = input.effectiveModel ? null : settingsService.getAll();
+    const routeProvider = runtimeSettings?.llm.providers.find((entry) => entry.id === input.providerId);
+    const effectiveModel = input.effectiveModel
+      ?? (runtimeSettings ? resolveEffectiveModel(input.providerId, input.modelId, runtimeSettings) : null);
+    const routeCapability = input.preparedRuntime?.routeCapability
+      ?? resolveAgentRouteCapability(routeProvider, input.modelId, effectiveModel, requestPlan);
+    const mcpConnectionErrors = input.preparedRuntime?.mcpConnectionErrors
+      ?? await this.deps.mcp.ensureConnections(input.agentId, input.projectRootPath);
+    const sessionKey = this.deps.sessionTurnKey(input.sessionId);
+    const turnHandle = await turnCoordinator.beginTurn({
+      sessionKey,
+      turnId: input.turnId ?? generateEventId('turn'),
+      parentSignal: input.options?.signal,
+      subagentBudget: createSubagentBudgetState(DEFAULT_SUBAGENT_BUDGET),
+    });
+    const turnGeneration = turnHandle.generation;
+    turnHandle.eventSink = {
+      onEvent: (event) => {
+        if (!turnHandle.isLive(turnGeneration)) return;
+        input.options?.onEvent?.(event);
+      },
+      sessionId: input.sessionId ?? null,
+      projectRootPath: input.projectRootPath ?? null,
+      projectId: input.projectId ?? null,
+      agentId: input.agentId,
+    };
+
+    const runtimeTools = input.preparedRuntime?.runtimeTools
+      ?? this.deps.resolveRuntimeTools(
+        input.agentId,
+        input.toolAllowlist,
+        input.stage,
+        input.sessionId,
+        turnHandle,
+        input.projectId,
+      );
+    const slotKey = agentSlotKey(input.sessionId, input.agentId);
+    const allToolSignature = this.deps.createToolSignature(runtimeTools.definitions);
+    const activatedDeferredTools = this.deps.deferredActivation.resolveActivatedSet(slotKey, allToolSignature);
+    const injectedToolDefinitions = input.preparedRuntime?.activeToolDefinitions
+      ?? partitionDeferredTools(runtimeTools.definitions, activatedDeferredTools).injected;
+    // native-structured：core 常驻注入，mcp__* 与 extended builtin 默认 deferred；
+    // 其它路由不注入工具 schema。
+    const activeToolDefinitions = routeCapability.toolCallingMode === 'native-structured'
+      ? injectedToolDefinitions
+      : [];
+    const activeToolAllowlist = activeToolDefinitions.map((tool) => tool.name);
+    const sharedEventContext: AgentEventBridgeContext = {
+      agentId: input.agentId,
+      runId: input.runId,
+      turnId: input.turnId,
+      sessionId: input.sessionId ?? null,
+      stage: input.stage,
+      mode: input.mode,
+      providerId: input.providerId,
+      modelId: input.modelId,
+      toolAllowlist: activeToolAllowlist,
+      routeCapability,
+    };
+    turnHandle.deferredActivation = {
+      slotKey,
+      allDefinitions: runtimeTools.definitions,
+    };
+    turnHandle.agentSlotKey = slotKey;
+    // Prefer turn-frozen plan from prepareTurnContext. Fallback builds once when absent
+    // (e.g. subagent / legacy path); never re-read settings for execution when plan exists.
+    const preparedPlan = input.preparedRuntime?.effectivePlan;
+    const effectivePlan = preparedPlan ?? (() => {
+      const fallbackSettings = settingsService.getAll();
+      const profile = fallbackSettings.agents.definitions
+        .find((definition) => definition.id === input.agentId && definition.enabled);
+      return buildEffectiveRuntimePlan({
+        agentId: input.agentId,
+        projectRootPath: input.projectRootPath ?? null,
+        projectId: input.projectId ?? null,
+        profile: profile ?? null,
+        toolAllowlist: input.toolAllowlist,
+        permissionSettings: fallbackSettings.agentRuntime.permissions,
+        routeCapability,
+        requestPlan,
+        promptPlan: input.promptPlan,
+        policy: compileEffectivePolicy(input.projectRootPath),
+        visibleToolNames: activeToolDefinitions.map((definition) => definition.name),
+        activatedDeferredTools,
+        skillIntersection: null,
+        mcpDescriptorHash: null,
+      });
+    })();
+    // native-structured：执行器用 plan 冻结 allowlist；其它路由与注入列表一致。
+    const executorAllowlist = routeCapability.toolCallingMode === 'native-structured'
+      ? [...effectivePlan.toolAllowlist]
+      : activeToolAllowlist;
+    const toolExecutor = this.deps.createToolExecutor(input.agentId, executorAllowlist, input.stage, input.sessionId, {
+      sessionId: input.sessionId ?? null,
+      turnId: input.turnId,
+      eventContext: sharedEventContext,
+      onEvent: input.options?.onEvent,
+      projectRootPath: effectivePlan.projectRootPath ?? input.projectRootPath ?? null,
+      projectId: effectivePlan.projectId ?? input.projectId ?? null,
+      effectivePlan,
+    });
+    const promptCache = input.preparedRuntime?.promptCache ?? promptCacheCompiler.compile({
+      promptPlan: input.promptPlan,
+      requestPlan,
+      tools: activeToolDefinitions,
+    });
+    const streamOptions: StreamOptions = {
+      maxTokens: input.maxTokens,
+      temperature: requestPlan.temperature,
+      reasoning: requestPlan.reasoningWire,
+      reasoningVisibility: requestPlan.reasoningWire.selection === 'off' ? 'none' : routeCapability.reasoningVisibility,
+      signal: input.options?.signal,
+      requestPlan,
+      promptCache,
+      credentialHandle: input.preparedRuntime?.credentialHandle ?? input.credentialHandle,
+    };
+    const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
+    if (mcpConnectionErrors.length > 0) {
+      input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
+        code: 'mcp_connection_failed',
+        severity: 'warning',
+        message: 'One or more configured MCP servers could not be connected. MCP tools are unavailable for this turn.',
+        technicalMessage: mcpConnectionErrors.join('\n'),
+      }));
+    }
+    if (routeDiagnostic) {
+      if (routeDiagnostic.surface === 'runtime-log') {
+        runtimeLogService.log({
+          scope: input.sessionId ? 'session' : 'app',
+          namespace: 'agent',
+          severity: routeDiagnostic.severity,
+          title: 'Model route capability',
+          summary: routeDiagnostic.message,
+          sessionId: input.sessionId,
+          projectId: input.projectId,
+          runId: input.runId,
+          raw: {
+            code: routeDiagnostic.code,
+            surface: routeDiagnostic.surface,
+            providerId: input.providerId,
+            modelId: effectiveModel?.modelId ?? input.modelId,
+            protocol: requestPlan.route.protocol,
+          },
+        });
+      } else {
+        input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
+          code: routeDiagnostic.code,
+          severity: routeDiagnostic.severity,
+          message: routeDiagnostic.message,
+          technicalMessage: JSON.stringify(routeCapability),
+        }));
+      }
+    }
+    const slot = this.getOrCreateAgentSlot(
+      input.agentId,
+      input.providerId,
+      input.modelId,
+      input.systemPrompt,
+      streamOptions,
+      activeToolDefinitions,
+      toolExecutor,
+      input.turnId ?? '',
+      input.sessionId,
+      input.contextWindow,
+      input.contextTokenLimit,
+      input.promptPlan,
+      input.initialMessages,
+      input.contextDiagnostic,
+      runtimeTools.definitions,
+      routeCapability,
+      effectivePlan.policy.maxTurns === Number.MAX_SAFE_INTEGER
+        ? undefined
+        : effectivePlan.policy.maxTurns,
+    );
+
+    const userMessage: UserMessage = {
+      role: 'user',
+      content: input.options?.userContent ?? input.content,
+      timestamp: nowMs(),
+    };
+
+    let responseText = '';
+    let sawStructuredToolCall = false;
+    const structuredToolCallingEvidenceGate = { recorded: false };
+    const unsubscribe = slot.agent.subscribe((event: CoreAgentEvent) => {
+      if (event.type === 'message_update') {
+        const ev = event.assistantMessageEvent;
+        if (ev.type === 'text_delta' && typeof ev.delta === 'string') {
+          input.options?.onChunk?.(ev.delta);
+        }
+        if (ev.type === 'toolcall_end') {
+          sawStructuredToolCall = true;
+          if (claimStructuredToolCallingEvidence(
+            ev.type,
+            routeCapability,
+            structuredToolCallingEvidenceGate,
+          )) {
+            try {
+              recordObservedToolCallingSupport(
+                input.providerId,
+                effectiveModel?.modelId ?? input.modelId,
+                settingsService.getAll(),
+                requestPlan.route.protocol,
+              );
+            } catch (error) {
+              runtimeLogService.log({
+                scope: input.sessionId ? 'session' : 'app',
+                namespace: 'agent',
+                severity: 'warning',
+                title: 'Tool capability evidence was not persisted',
+                summary: error instanceof Error ? error.message : String(error),
+                sessionId: input.sessionId,
+                projectId: input.projectId,
+                runId: input.runId,
+                raw: {
+                  providerId: input.providerId,
+                  modelId: effectiveModel?.modelId ?? input.modelId,
+                  protocol: requestPlan.route.protocol,
+                },
+              });
+            }
+          }
+        }
+      }
+      if (event.type === 'message_end' && event.message.role === 'assistant') {
+        responseText = event.message.content
+          .filter((block) => block.type === 'text')
+          .map((block) => (block as { text: string }).text)
+          .join('');
+        if (event.message.usage) {
+          // 按当前实际注入的工具定义计量（含本 turn 内新激活的 deferred 工具）；
+          // deferred 段仅计未激活 schema 估算，且仅在 >0 时加入。
+          const injectedDefs = slot.agent.state.tools ?? [];
+          const { deferredMcp: deferredMcpDefs, deferredBuiltin: deferredBuiltinDefs } = partitionDeferredTools(
+            runtimeTools.definitions,
+            slot.activatedDeferredTools,
+          );
+          const isMcpDef = (d: ToolDefinition) => isMcpPrefixedToolName(d.name);
+          const isSubagentDef = (d: ToolDefinition) => d.name === 'subagent';
+          const mcpDefs = injectedDefs.filter(isMcpDef);
+          const subagentDefs = injectedDefs.filter(isSubagentDef);
+          const systemDefs = injectedDefs.filter((d) => !isMcpDef(d) && !isSubagentDef(d));
+
+          const pm = input.promptPlan?.metrics;
+          const systemPromptChars = pm
+            ? pm.systemPrompt
+            : input.systemPrompt.length;
+          const rulesChars    = pm?.scopedInstructions ?? 0;
+          const skillsChars   = pm?.skills ?? 0;
+
+          // 压缩统计：在 message_end 时对当前 agent 的消息历史分类。
+          const compressionStats = slot.contextManager.classifyMessages(
+            slot.agent.messages as import('../../agent-runtime/core/types').AgentMessage[],
+          );
+
+          const precomputedBreakdown: ContextUsageBreakdownEntry[] = [
+            { id: 'system_prompt', tokens: charsToTokens(systemPromptChars) },
+            ...(rulesChars > 0 ? [{ id: 'memory_files' as const, tokens: charsToTokens(rulesChars) }] : []),
+            ...(skillsChars > 0 ? [{ id: 'skills' as const, tokens: charsToTokens(skillsChars) }] : []),
+            { id: 'system_tools',          tokens: charsToTokens(JSON.stringify(systemDefs).length),   count: systemDefs.length },
+            ...(mcpDefs.length > 0
+              ? [{
+                  id: 'mcp_tools' as const,
+                  tokens: charsToTokens(JSON.stringify(mcpDefs).length),
+                  count: mcpDefs.length,
+                }]
+              : []),
+            ...(deferredMcpDefs.length > 0
+              ? [{
+                  id: 'mcp_tools_deferred' as const,
+                  tokens: charsToTokens(JSON.stringify(deferredMcpDefs).length),
+                  count: deferredMcpDefs.length,
+                }]
+              : []),
+            ...(deferredBuiltinDefs.length > 0
+              ? [{
+                  id: 'builtin_tools_deferred' as const,
+                  tokens: charsToTokens(JSON.stringify(deferredBuiltinDefs).length),
+                  count: deferredBuiltinDefs.length,
+                }]
+              : []),
+            ...(subagentDefs.length > 0
+              ? [{
+                  id: 'subagent_definitions' as const,
+                  tokens: charsToTokens(JSON.stringify(subagentDefs).length),
+                  count: subagentDefs.length,
+                }]
+              : []),
+            ...(compressionStats.summaryTokens > 0
+              ? [{ id: 'summarized_conversation' as const, tokens: compressionStats.summaryTokens }]
+              : []),
+            { id: 'conversation', tokens: compressionStats.conversationTokens, count: compressionStats.conversationCount },
+          ];
+
+          debuggerLlmService.recordAgentTurnUsage({
+            runId: input.runId,
+            sessionId: input.sessionId,
+            providerId: input.providerId,
+            modelId: input.modelId,
+            inputTokens: event.message.usage.inputTokens,
+            outputTokens: event.message.usage.outputTokens,
+            ...(typeof event.message.usage.cacheReadTokens === 'number'
+              ? { cacheReadTokens: event.message.usage.cacheReadTokens }
+              : {}),
+            ...(typeof event.message.usage.cacheWriteTokens === 'number'
+              ? { cacheWriteTokens: event.message.usage.cacheWriteTokens }
+              : {}),
+            ...(typeof event.message.usage.cacheHitTokens === 'number'
+              ? { cacheHitTokens: event.message.usage.cacheHitTokens }
+              : {}),
+            ...(typeof event.message.usage.cacheMissTokens === 'number'
+              ? { cacheMissTokens: event.message.usage.cacheMissTokens }
+              : {}),
+            ...(typeof event.message.usage.reasoningTokens === 'number'
+              ? { reasoningTokens: event.message.usage.reasoningTokens }
+              : {}),
+            precomputedBreakdown,
+          });
+        }
+        if (!sawStructuredToolCall && !responseText.trim()) {
+          input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
+            code: 'empty_response_without_tool_call',
+            severity: 'warning',
+            message: 'Provider returned an empty assistant message without a structured tool call.',
+          }));
+        } else if (!sawStructuredToolCall && mentionsTextualToolCall(responseText)) {
+          input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
+            code: 'textual_tool_call_not_executed',
+            severity: 'warning',
+            message: 'The model wrote a textual tool call, but no structured provider tool call was returned. No tool was executed.',
+            technicalMessage: responseText.slice(0, 1200),
+          }));
+        }
+      }
+      const sharedEvent = translateCoreToSharedAgentEvent(event, sharedEventContext);
+      if (sharedEvent) {
+        if (turnHandle.isLive(turnGeneration)) {
+          turnHandle.eventSink?.onEvent?.(sharedEvent);
+        }
+      }
+    });
+
+    // abort 信号桥接到 Agent.abort()；同时注册为 turn producer。
+    const unregisterAgentProducer = turnHandle.registerProducer({
+      id: `agent:${slotKey}`,
+      abort: () => {
+        try {
+          slot.agent.abort();
+        } catch {
+          // ignore
+        }
+      },
+      join: async () => {
+        // Agent.prompt settles when abort completes; no extra wait here.
+      },
+    });
+    let abortListener: (() => void) | null = null;
+    if (input.options?.signal) {
+      if (input.options.signal.aborted) {
+        unsubscribe();
+        unregisterAgentProducer();
+        turnCoordinator.endTurn(turnHandle);
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      abortListener = () => {
+        void turnHandle.abortAndJoin({ reason: 'user_stop' });
+      };
+      input.options.signal.addEventListener('abort', abortListener, { once: true });
+    }
+
+    const initialMessageCount = slot.agent.messages.length;
+    let terminalStatus: 'complete' | 'stopped' | 'error' = 'complete';
+    try {
+      // Agent.prompt 内部跑完整循环；返回值是新增的全部消息，
+      // 我们只在订阅里收集助手文本，最后返回 `responseText`。
+      await slot.agent.prompt(userMessage);
+      return responseText;
+    } catch (error) {
+      terminalStatus = input.options?.signal?.aborted || turnHandle.isAborted ? 'stopped' : 'error';
+      throw error;
+    } finally {
+      unsubscribe();
+      unregisterAgentProducer();
+      if (abortListener && input.options?.signal) {
+        input.options.signal.removeEventListener('abort', abortListener);
+      }
+      agentUserInputRequestService.cancelTurn(input.turnId);
+      agentToolApprovalRequestService.cancelTurn(input.turnId);
+      if (turnHandle.pendingHandoff) {
+        this.deps.handoffMailbox.deposit(turnHandle.pendingHandoff);
+      }
+      // Terminal context first (ConversationService persists to conversation.jsonl),
+      // then flush in-memory slot messages — disk is the single source of truth.
+      input.terminalContext?.(slot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus);
+      this.deps.slots.flush(slot);
+      turnCoordinator.endTurn(turnHandle);
+    }
+  }
+}

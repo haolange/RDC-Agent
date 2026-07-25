@@ -18,11 +18,13 @@
 
 | 模块 | 职责 |
 | --- | --- |
-| `EffectiveRuntimePlan` | `prepareTurn` 冻结 planId/fingerprint；Prompt 与 Executor 共用 |
+| `EffectiveRuntimePlan` | `schemaVersion: 2`；`prepareTurn` **完整冻结** planId/fingerprint + tools/skill∩/deferred/MCP/permission/policy/route/request+prompt fingerprints；Prompt 与 Executor 共用；在途 turn 不读可变 Settings |
+| `AgentOrchestrator` | façade（少于 800 行）；turn 准备 / tool 装配 / executor / runner 职责外提；门禁 `check:orchestrator-facade` |
 | `TurnCoordinator` / `TurnHandle` | 每 session 活跃 turn；eventSink、deferred、producers、generation |
 | `ProcessSupervisor` | spawn/joinAll；POSIX pgid；Windows `taskkill /T`；ring buffer |
 | `ShutdownCoordinator` | `running → … → exited`；before-quit 限时 `shutdownAll` |
 | `AgentSlotRegistry` / `McpConnectionCoordinator` / `DeferredToolActivationTracker` / `HandoffMailbox` | 自 Orchestrator 拆出的协作单元 |
+| `RdxRuntimeContextRegistry` | 仅 per-session RDX context lease；无 global mirror |
 | `LoopRuntimeState` | Agent 工具面 COW；每轮读 `runtime.current` |
 
 Conversation 单一真相：turn 开始 `rehydrate(fromDisk)`；结束 flush 并清空 slot messages；分支切换 / rewrite 显式 `syncSessionSlots`。
@@ -80,13 +82,18 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 无内置 RDX toolchain。Open capture / remote / preview / close 只走 Settings shell action → `ShellInvocationService`。已打开 `.rdc` 由 `ownerSessionId` 拥有；不匹配 fail-closed。Local + Android-origin capture 不得静默 fallback remote。
 
+RDX runtime context 仅绑定 per-session lease（`RdxRuntimeContextRegistry`）。禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext` 全局 API；工具路径经 `assertRdxContextLeaseOwnership`。
+
 ## Model Capability（摘要）
 
 `EffectiveCatalogService` 是唯一能力权威。Composer 跟已提交 Agent route revision，不跟乐观 Settings 投影。Context 计量相位：`Preparing` → `Current request ~` → `Actual` / idle `Last actual`。缩窗只在 send preflight 派生压缩视图。完整 UI 计量与控件语义见 `docs/ui/workbench-and-transcript.md`。
 
 ## 相关源码
 
-- `src/main/workflow/debugger/` — Orchestrator、TurnCoordinator、DeferredTools
+- `src/main/workflow/debugger/` — Orchestrator façade、TurnCoordinator、DeferredTools
+- `src/main/agent-runtime/EffectiveRuntimePlan.ts` — schemaVersion 2 冻结 plan
+- `src/main/sessions/RdxRuntimeContextRegistry.ts` — per-session RDX lease
 - `src/main/runtime/ProcessSupervisor.ts`、`src/main/lifecycle/ShutdownCoordinator.ts`
 - `src/main/agent-runtime/` — prompt、providers、permissions、tools
 - `src/main/conversation/` — Conversation、journal、Work Process 策略
+- 门禁：`pnpm run check:orchestrator-facade`（挂于 `check:architecture`）

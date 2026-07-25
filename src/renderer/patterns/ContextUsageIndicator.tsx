@@ -67,10 +67,8 @@ export const ContextUsageIndicator: React.FC<{
             cx="18"
             cy="18"
             r={radius}
-            style={{
-              strokeDasharray: `${circumference} ${circumference}`,
-              strokeDashoffset: dashOffset,
-            }}
+            strokeDasharray={`${circumference} ${circumference}`}
+            strokeDashoffset={dashOffset}
           />
         </svg>
         <span className="composer-usage-value">

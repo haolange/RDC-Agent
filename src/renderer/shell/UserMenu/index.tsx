@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { createPortal } from 'react-dom';
 import type { AppLanguage, AppSettings, AppTheme, FontScale } from '@shared/types/settings';
 import { useI18n } from '../../i18n';
+import { useDynStyle } from '../../lib/useDynStyle';
 import { ProfileAvatar } from '../../ui/ProfileAvatar';
 import './UserMenu.css';
 
@@ -131,6 +132,12 @@ export const UserMenu: React.FC<UserMenuProps> = ({
     settings.profile.nickname,
   ]);
 
+  const menuDynStyle = useDynStyle({
+    left: `${position.left}px`,
+    top: `${position.top}px`,
+    visibility: position.ready ? 'visible' : 'hidden',
+  });
+
   if (!open) return null;
 
   return createPortal(
@@ -142,11 +149,7 @@ export const UserMenu: React.FC<UserMenuProps> = ({
         role="dialog"
         aria-modal="false"
         aria-label={t('sidebar.userSettings')}
-        style={{
-          left: position.left,
-          top: position.top,
-          visibility: position.ready ? 'visible' : 'hidden',
-        }}
+        {...menuDynStyle}
       >
         <div className="user-menu-header">
           <ProfileAvatar

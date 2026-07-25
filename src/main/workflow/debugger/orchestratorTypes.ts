@@ -1,0 +1,123 @@
+/**
+ * Shared types for AgentOrchestrator façade and sibling turn services.
+ */
+
+import type { AgentRole } from '@shared/types/agent';
+import type { AgentRouteCapability, AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
+import type {
+  ConversationTurnControls,
+  ResolvedReasoningSelection,
+} from '@shared/types/modelCapability';
+import type { EffectiveModel, ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
+import type { PreparedTurnContextSummary } from '@shared/types/session';
+import type { WorkflowStage } from '@shared/types/workflow';
+import type { PromptPlan } from '@shared/types/rdxRuntime';
+import type { CompiledPromptCache } from '@shared/types/semanticContext';
+import type { EffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
+import type { AgentEventBridgeContext } from '../../agent-runtime/AgentEventBridge';
+import type {
+  Message,
+  ToolDefinition,
+  UserMessage,
+} from '../../agent-runtime/core/types';
+import type { AgentTool } from '../../agent-runtime/agent/AgentTool';
+
+export interface AgentTurnContext {
+  runId?: string;
+  sessionId?: string;
+  stageId?: WorkflowStage;
+  turnId?: string;
+  projectRootPath?: string | null;
+  projectId?: string | null;
+}
+
+export interface AgentTurnOptions {
+  signal?: AbortSignal;
+  onChunk?: (text: string) => void;
+  onEvent?: (event: SharedAgentEvent) => void;
+  reasoning?: ResolvedReasoningSelection;
+  turnControls?: ConversationTurnControls;
+  requestPlan?: RequestPlan;
+  userContent?: UserMessage['content'];
+  preloadSkillIds?: string[];
+}
+
+export interface AgentProfileTurnOptions extends AgentTurnOptions {
+  sessionId?: string;
+  systemPrompt?: string;
+  maxTokens?: number;
+  temperature?: number;
+  turnId?: string;
+  routeAgentId?: AgentRole;
+  stage?: WorkflowStage | 'report';
+  /** 当前激活项目根目录，透传到工具执行上下文。 */
+  projectRootPath?: string | null;
+  /** 当前激活项目 id。 */
+  projectId?: string | null;
+  promptPlan?: PromptPlan;
+  visibleTurnIds?: string[];
+  activeBranchId?: string;
+  preparedTurn?: PreparedAgentTurnContext;
+  onTerminalContext?: (result: {
+    messages: Message[];
+    executionIdentity: ExecutionIdentity;
+    status: 'complete' | 'stopped' | 'error';
+    selectedTurnCount: number;
+    filteredArtifactCount: number;
+  }) => void;
+}
+
+export interface ResolvedRuntimeTools {
+  definitions: ToolDefinition[];
+  toolMap: Map<string, AgentTool>;
+}
+
+export interface PreparedAgentRuntime {
+  runtimeTools: ResolvedRuntimeTools;
+  activeToolDefinitions: ToolDefinition[];
+  routeCapability: AgentRouteCapability;
+  mcpConnectionErrors: string[];
+  credentialHandle: string;
+  promptCache: CompiledPromptCache;
+  effectivePlan: EffectiveRuntimePlan;
+}
+
+export interface PreparedAgentTurnContext {
+  summary: PreparedTurnContextSummary;
+  selectedModelId: string;
+  effectiveModel: EffectiveModel;
+  toolAllowlist: string[];
+  initialMessages: Message[];
+  contextDiagnostic: {
+    selectedTurnCount: number;
+    activeBranchId: string | null;
+    filteredArtifactCount: number;
+    replayedArtifactCount: number;
+    continuationDecisionCounts: Array<{ reason: string; count: number }>;
+    derivedContextStatus: 'none' | 'applied' | 'stale';
+    compactedTurnCount: number;
+    compactionState: 'prepared' | 'not-required';
+  };
+  runtime: PreparedAgentRuntime;
+}
+
+export interface ToolExecutorRuntimeContext {
+  sessionId?: string | null;
+  turnId?: string;
+  eventContext?: AgentEventBridgeContext;
+  onEvent?: (event: SharedAgentEvent) => void;
+  /** 当前激活项目根目录，用于把工具执行 base 对齐到 project root 而非 process.cwd()。 */
+  projectRootPath?: string | null;
+  /** 当前激活项目 id（审计/事件关联）。 */
+  projectId?: string | null;
+  /** Turn 冻结的 EffectiveRuntimePlan；Prompt/Executor 共用 planId/fingerprint。 */
+  effectivePlan?: EffectiveRuntimePlan;
+}
+
+export function countContinuationDecisions(
+  decisions: Array<{ reason: string }>,
+): Array<{ reason: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const decision of decisions) counts.set(decision.reason, (counts.get(decision.reason) ?? 0) + 1);
+  return [...counts].map(([reason, count]) => ({ reason, count }));
+}

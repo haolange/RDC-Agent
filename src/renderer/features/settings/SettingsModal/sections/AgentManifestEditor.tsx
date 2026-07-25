@@ -3,6 +3,7 @@ import { diagnoseManifestToolTokens } from '@shared/constants/agentToolTokens';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { useDynStyle } from '../../../../lib/useDynStyle';
 import { ColorField } from '../../../../ui/ColorField';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { AutosizeTextarea } from '../AutosizeTextarea';
@@ -111,6 +112,9 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
     ? t('settings.saving')
     : agentManifestSaveMessage;
   const showSaveStatus = agentManifestSaveState === 'saving' || Boolean(agentManifestSaveMessage);
+  const agentAccentStyle = useDynStyle({
+    '--settings-agent-accent': selectedAgent.accent || '#33d1ff',
+  });
 
   return (
     <div className="settings-manifest-editor" data-testid="settings-agent-manifest-editor">
@@ -119,9 +123,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           <span
             className="settings-agent-editor-icon"
             aria-hidden="true"
-            style={{
-              '--settings-agent-accent': selectedAgent.accent || '#33d1ff',
-            } as React.CSSProperties}
+            {...agentAccentStyle}
           >
             <ModeGlyph mode={selectedAgent.id} icon={selectedAgent.icon ?? 'message-orbit'} size={20} strokeWidth={1.9} />
           </span>
@@ -148,9 +150,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
             <div
               className="settings-agent-look-strip"
               data-testid="settings-agent-look"
-              style={{
-                '--settings-agent-accent': selectedAgent.accent || '#33d1ff',
-              } as React.CSSProperties}
+              {...agentAccentStyle}
             >
               <div className="settings-agent-route-row settings-agent-look-icon-row">
                 <span className="settings-field-label settings-agent-look-label">{t('settings.agentIcon')}</span>

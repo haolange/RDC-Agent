@@ -1,12 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ModeGlyph } from '../../../ui/ModeGlyph';
 import { ContextUsageIndicator } from '../../../patterns/ContextUsageIndicator';
-import type { AgentMode } from '@shared/types/layout';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { ResolvedTheme } from '@shared/types/settings';
 import { deriveComposeAccentVars } from '@shared/theme/composeAccent';
-import { formatBytes } from '../../../services/attachmentHelpers';
 import { useI18n } from '../../../i18n';
+import { useDynStyle } from '../../../lib/useDynStyle';
 import { useLayoutStore } from '../../../stores/layoutStore';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useProjectStore } from '../../../stores/projectStore';
@@ -20,6 +18,8 @@ import { SlashCommandPopover } from './SlashCommandPopover';
 import { useSlashCommand } from './useSlashCommand';
 import { ComposerMarkdownInput, type ComposerMarkdownMode } from './ComposerMarkdownInput';
 import { ComposerMarkdownModeTabs } from './ComposerMarkdownModeTabs';
+import { ComposerAgentMenu } from './ComposerAgentMenu';
+import { ComposerAttachmentChips } from './ComposerAttachmentChips';
 
 export interface ComposerProps {
   composer: ComposerController;
@@ -92,10 +92,11 @@ export const Composer: React.FC<ComposerProps> = ({
   } = composer;
   const selectedAgentDefinition = userInvocableAgents.find((agent) => agent.id === selectedAgentId);
   const selectedAgentCapability = getAgentCapability(selectedAgentId, userInvocableAgents);
-  const composeAccentStyle = useMemo(
-    () => deriveComposeAccentVars(currentModeConfig.accentColor, resolvedTheme) as React.CSSProperties,
+  const composeAccentVars = useMemo(
+    () => deriveComposeAccentVars(currentModeConfig.accentColor, resolvedTheme),
     [currentModeConfig.accentColor, resolvedTheme],
   );
+  const composeAccentStyle = useDynStyle({ ...composeAccentVars });
 
   useEffect(() => {
     if (!composerMarkdown || isComposerBusy) {
@@ -107,7 +108,7 @@ export const Composer: React.FC<ComposerProps> = ({
     return (
       <div
         className="composer-shell composer-shell-tool-approval"
-        style={composeAccentStyle}
+        {...composeAccentStyle}
       >
         <ToolApprovalRequestPanel request={pendingToolApproval} />
       </div>
@@ -118,7 +119,7 @@ export const Composer: React.FC<ComposerProps> = ({
     return (
       <div
         className="composer-shell composer-shell-user-input"
-        style={composeAccentStyle}
+        {...composeAccentStyle}
       >
         <UserInputRequestPanel request={pendingUserInput} />
       </div>
@@ -128,7 +129,7 @@ export const Composer: React.FC<ComposerProps> = ({
   return (
     <div
       className={`composer-shell ${isComposerBusy ? 'is-running' : ''}${composerMarkdown ? ' has-markdown-mode' : ''}`}
-      style={composeAccentStyle}
+      {...composeAccentStyle}
     >
       {composerMarkdown ? (
         <ComposerMarkdownModeTabs
@@ -137,46 +138,15 @@ export const Composer: React.FC<ComposerProps> = ({
           disabled={isComposerBusy}
         />
       ) : null}
-      {(pendingAttachments.length > 0 || pendingSkillIds.length > 0) && (
-        <div className="composer-attachments" data-testid="composer-attachments">
-          {pendingSkillIds.map((skillId) => (
-            <div key={`skill-${skillId}`} className="composer-attachment-chip skill" data-testid="composer-skill-chip">
-              <span className="composer-attachment-chip-icon" aria-hidden="true">SKL</span>
-              <span className="composer-attachment-chip-copy">
-                <span className="composer-attachment-chip-name">${skillId}</span>
-                <span className="composer-attachment-chip-meta">{t('app.armedSkillMeta')}</span>
-              </span>
-              <button
-                type="button"
-                className="composer-attachment-chip-remove"
-                onClick={() => removePendingSkill(skillId)}
-                aria-label={t('app.removeArmedSkill', { skillId })}
-              >
-                x
-              </button>
-            </div>
-          ))}
-          {pendingAttachments.map((attachment) => (
-            <div key={attachment.id} className={`composer-attachment-chip ${attachment.kind}`}>
-              <span className="composer-attachment-chip-icon" aria-hidden="true">
-                {attachment.kind === 'image' ? 'IMG' : 'FILE'}
-              </span>
-              <span className="composer-attachment-chip-copy">
-                <span className="composer-attachment-chip-name">{attachment.fileName}</span>
-                <span className="composer-attachment-chip-meta">{formatBytes(attachment.size)}</span>
-              </span>
-              <button
-                type="button"
-                className="composer-attachment-chip-remove"
-                onClick={() => handlePendingAttachmentRemove(attachment.id)}
-                aria-label={t('app.removeAttachment', { fileName: attachment.fileName })}
-              >
-                x
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      <ComposerAttachmentChips
+        pendingSkillIds={pendingSkillIds}
+        pendingAttachments={pendingAttachments}
+        removePendingSkill={removePendingSkill}
+        handlePendingAttachmentRemove={handlePendingAttachmentRemove}
+        armedSkillMeta={t('app.armedSkillMeta')}
+        removeArmedSkillLabel={(skillId) => t('app.removeArmedSkill', { skillId })}
+        removeAttachmentLabel={(fileName) => t('app.removeAttachment', { fileName })}
+      />
       <div className="composer-input-row">
         {composerMarkdown ? (
           <ComposerMarkdownInput
@@ -224,65 +194,21 @@ export const Composer: React.FC<ComposerProps> = ({
               <path d="M5 12h14" />
             </svg>
           </button>
-          <div ref={modeMenuRef} className="composer-agent-menu">
-            <button
-              type="button"
-              className={`composer-agent-pill ${modeMenuOpen ? 'open' : ''}`}
-              data-testid="composer-mode-pill"
-              onClick={() => setModeMenuOpen((current) => !current)}
-              aria-haspopup="menu"
-              aria-expanded={modeMenuOpen}
-              title={selectedAgentCapability || currentModeLabel}
-            >
-              <span className="composer-agent-pill-icon" aria-hidden="true">
-                <ModeGlyph mode={currentMode} icon={selectedAgentDefinition?.icon ?? currentModeConfig.icon} size={16} strokeWidth={2} />
-              </span>
-              <span className="composer-agent-pill-label">{currentModeLabel}</span>
-              <span className="composer-agent-pill-caret" aria-hidden="true">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </span>
-            </button>
-            {modeMenuOpen && (
-              <div className="composer-agent-menu-popup" role="menu">
-                {userInvocableAgents.map((agent) => {
-                  const agentMode: AgentMode = agent.id;
-                  return (
-                    <button
-                      key={agent.id}
-                      type="button"
-                      className={`composer-agent-menu-item ${selectedAgentId === agent.id ? 'active' : ''}`}
-                      data-testid={`mode-menu-item-${agent.id}`}
-                      role="menuitemradio"
-                      aria-checked={selectedAgentId === agent.id}
-                      onClick={() => {
-                        setSelectedAgentId(agent.id);
-                        setCurrentMode(agentMode);
-                        setModeMenuOpen(false);
-                      }}
-                    >
-                      <span className="composer-agent-menu-item-copy">
-                        <span className="composer-agent-menu-item-icon" aria-hidden="true">
-                          <ModeGlyph mode={agentMode} icon={agent.icon ?? undefined} size={16} strokeWidth={2} />
-                        </span>
-                        <span className="composer-agent-menu-item-label">{agent.name}</span>
-                        {activeAgentId === agent.id ? (
-                          <span className="composer-agent-status-dot is-active" aria-label="Active" />
-                        ) : null}
-                      </span>
-                      {agent.description ? (
-                        <span className="composer-agent-menu-item-tooltip" role="tooltip">
-                          {agent.description}
-                        </span>
-                      ) : null}
-                      {selectedAgentId === agent.id ? <span className="composer-agent-menu-item-check">✓</span> : null}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+          <ComposerAgentMenu
+            modeMenuRef={modeMenuRef}
+            modeMenuOpen={modeMenuOpen}
+            setModeMenuOpen={setModeMenuOpen}
+            currentMode={currentMode}
+            currentModeConfig={currentModeConfig}
+            currentModeLabel={currentModeLabel}
+            selectedAgentId={selectedAgentId}
+            selectedAgentDefinition={selectedAgentDefinition}
+            selectedAgentCapability={selectedAgentCapability}
+            userInvocableAgents={userInvocableAgents}
+            activeAgentId={activeAgentId}
+            setSelectedAgentId={setSelectedAgentId}
+            setCurrentMode={setCurrentMode}
+          />
           <PermissionModeSelector />
         </div>
         <div className="composer-toolbar-group composer-toolbar-group-right">

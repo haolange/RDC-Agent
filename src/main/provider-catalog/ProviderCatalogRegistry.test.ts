@@ -12,7 +12,7 @@ describe('ProviderCatalogRegistry lazy loading', () => {
     __testing.reset();
 
     const summaries = listProviderSummaries();
-    expect(summaries).toHaveLength(181);
+    expect(summaries).toHaveLength(182);
     expect(__testing.getLoadedSurfaceIds()).toEqual([]);
     expect(getLoadedProviderSurface('kimi-coding-plan')).toBeNull();
 
@@ -31,7 +31,8 @@ describe('ProviderCatalogRegistry lazy loading', () => {
   it('keeps account-entitled summaries unknown until a live account catalog confirms them', () => {
     __testing.reset();
     const models = getProviderModelSummaries('github-copilot');
-    expect(models.find((model) => model.id === 'claude-opus-4.6')?.availability).toBe('unknown');
+    // Catalog-marked unavailable stays unavailable; available + account-entitled surfaces as unknown until live discovery.
+    expect(models.find((model) => model.id === 'claude-opus-4.6')?.availability).toBe('unavailable');
     expect(models.find((model) => model.id === 'claude-opus-4.8')?.availability).toBe('unknown');
   });
 });

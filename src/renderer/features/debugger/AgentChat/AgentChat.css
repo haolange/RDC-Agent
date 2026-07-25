@@ -193,6 +193,19 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   justify-content: stretch;
 }
 
+.conversation-thread-virtual {
+  position: relative;
+  gap: 0;
+}
+
+.conversation-thread-spacer {
+  display: block;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  pointer-events: none;
+}
+
 .conversation-thread-item {
   width: 100%;
   margin: 0;

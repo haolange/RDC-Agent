@@ -7,7 +7,7 @@ import type { RequestPlan } from '@shared/types/providerCapability';
 import type { ToolDefinition } from './core/types';
 import { compileEffectivePolicy, emptyCompiledPolicy } from './permissions/PolicyCompiler';
 
-export const EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION = 1 as const;
+export const EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION = 2 as const;
 
 export interface EffectiveRuntimePlan {
   schemaVersion: typeof EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION;
@@ -18,8 +18,21 @@ export interface EffectiveRuntimePlan {
   agentId: string;
   profileSkills: readonly string[];
   toolAllowlist: readonly string[];
+  /**
+   * Frozen `∩(skill_i.allowedTools) ∩ toolAllowlist` at prepareTurn.
+   * `null` means no skill declared a non-empty allowed-tools set (no narrowing layer).
+   */
+  skillIntersection: readonly string[] | null;
+  /** Names of tools injected into the provider request for this turn. */
+  visibleToolNames: readonly string[];
+  /** Deferred tools already activated for this turn (serialized ReadonlySet). */
+  activatedDeferredTools: readonly string[];
+  /** Aggregate hash of enabled MCP descriptors; null when none enabled. */
+  mcpDescriptorHash: string | null;
   permissionSettings: AgentPermissionSettings;
   policy: CompiledPolicy;
+  /** Stable hash of CompiledPolicy (independent of sourceFingerprint field naming). */
+  policyFingerprint: string;
   routeCapability: AgentRouteCapability;
   requestPlanFingerprint: string;
   promptPlanFingerprint: string;
@@ -39,14 +52,48 @@ export interface BuildEffectiveRuntimePlanInput {
   promptPlan: Pick<PromptPlan, 'systemPrompt'> | { systemPrompt: string };
   /** Optional precompiled policy (tests); otherwise load .policy.yml fail-closed. */
   policy?: CompiledPolicy;
+  /** Frozen skill ∩ allowlist; omit to leave null (no narrowing). */
+  skillIntersection?: readonly string[] | null;
+  /** Injected tool names visible to the provider this turn. */
+  visibleToolNames?: readonly string[];
+  /** Activated deferred tool names (Set or array). */
+  activatedDeferredTools?: ReadonlySet<string> | readonly string[];
+  /** Aggregate MCP descriptor hash, or null when no MCP servers enabled. */
+  mcpDescriptorHash?: string | null;
+}
+
+export function policyFingerprintOf(policy: CompiledPolicy): string {
+  return stableHash([
+    policy.deniedTools,
+    policy.approvalFloorByTool,
+    policy.approval,
+    policy.maxTurns,
+    policy.maxToolCalls,
+    policy.maxSubagents,
+    policy.maxChildDepth,
+    policy.sourceFingerprint,
+  ]);
 }
 
 function stableHash(parts: unknown[]): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 24);
 }
 
+function freezeStringList(values: readonly string[] | undefined): readonly string[] {
+  return Object.freeze([...(values ?? [])]);
+}
+
+function serializeActivatedDeferred(
+  value: ReadonlySet<string> | readonly string[] | undefined,
+): readonly string[] {
+  if (!value) return Object.freeze([]);
+  const list = Array.isArray(value) ? [...value] : [...value];
+  list.sort();
+  return Object.freeze(list);
+}
+
 /**
- * Turn 开始时解析一次：profile skills / tools / permissions / policy。
+ * Turn 开始时解析一次：profile skills / tools / permissions / policy / MCP / deferred。
  * Prompt 与 Tool Executor 必须引用同一 planId/fingerprint。
  */
 export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput): EffectiveRuntimePlan {
@@ -62,8 +109,15 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     allowedCommandPrefixes: [...input.permissionSettings.allowedCommandPrefixes],
     deniedCommandPrefixes: [...input.permissionSettings.deniedCommandPrefixes],
   };
-  const profileSkills = Object.freeze([...(input.profile?.skills ?? [])]);
-  const toolAllowlist = Object.freeze([...input.toolAllowlist]);
+  const profileSkills = freezeStringList(input.profile?.skills ?? []);
+  const toolAllowlist = freezeStringList(input.toolAllowlist);
+  const skillIntersection = input.skillIntersection === undefined || input.skillIntersection === null
+    ? null
+    : freezeStringList(input.skillIntersection);
+  const visibleToolNames = freezeStringList(input.visibleToolNames);
+  const activatedDeferredTools = serializeActivatedDeferred(input.activatedDeferredTools);
+  const mcpDescriptorHash = input.mcpDescriptorHash ?? null;
+  const policyFingerprint = policyFingerprintOf(policy);
   const requestPlanFingerprint = input.requestPlan.executionIdentity.fingerprint;
   const promptPlanFingerprint = stableHash([input.promptPlan.systemPrompt]);
   const fingerprint = stableHash([
@@ -73,8 +127,12 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     input.projectId ?? null,
     profileSkills,
     toolAllowlist,
+    skillIntersection,
+    visibleToolNames,
+    activatedDeferredTools,
+    mcpDescriptorHash,
     permissionSettings,
-    policy,
+    policyFingerprint,
     input.routeCapability.toolCallingMode,
     requestPlanFingerprint,
     promptPlanFingerprint,
@@ -88,8 +146,13 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     agentId: input.agentId,
     profileSkills,
     toolAllowlist,
+    skillIntersection,
+    visibleToolNames,
+    activatedDeferredTools,
+    mcpDescriptorHash,
     permissionSettings,
     policy,
+    policyFingerprint,
     routeCapability: input.routeCapability,
     requestPlanFingerprint,
     promptPlanFingerprint,

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useI18n } from '../../../i18n';
+import { useDynStyle } from '../../../lib/useDynStyle';
 import type {
   ProjectMenuPopoverState,
   ProjectRenamePopoverState,
@@ -28,6 +29,25 @@ interface RenamePopoverPanelsProps {
   onRemoveProject: () => void;
 }
 
+const PositionedSurface: React.FC<{
+  className: string;
+  x: number;
+  y: number;
+  surfaceRef: React.Ref<HTMLDivElement>;
+  children: React.ReactNode;
+}> = ({ className, x, y, surfaceRef, children }) => {
+  const dynStyle = useDynStyle({
+    top: `${y}px`,
+    left: `${x}px`,
+  });
+
+  return (
+    <div ref={surfaceRef} className={className} {...dynStyle}>
+      {children}
+    </div>
+  );
+};
+
 export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
   isBusy,
   renamePopover,
@@ -54,10 +74,11 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
   return (
     <>
       {renamePopover && (
-        <div
-          ref={renamePopoverRef}
+        <PositionedSurface
+          surfaceRef={renamePopoverRef}
           className="session-rename-popover"
-          style={{ top: renamePopover.y, left: renamePopover.x }}
+          x={renamePopover.x}
+          y={renamePopover.y}
         >
           <div className="session-rename-popover-title">{t('sidebar.renameSessionTitle')}</div>
           <input
@@ -97,13 +118,14 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
               {t('sidebar.save')}
             </button>
           </div>
-        </div>
+        </PositionedSurface>
       )}
       {projectMenuPopover && (
-        <div
-          ref={projectMenuRef}
+        <PositionedSurface
+          surfaceRef={projectMenuRef}
           className="sidebar-context-menu"
-          style={{ top: projectMenuPopover.y, left: projectMenuPopover.x }}
+          x={projectMenuPopover.x}
+          y={projectMenuPopover.y}
         >
           <button
             type="button"
@@ -156,14 +178,15 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             </svg>
             <span>{t('sidebar.removeProject') || 'Delete'}</span>
           </button>
-        </div>
+        </PositionedSurface>
       )}
 
       {projectRenamePopover && (
-        <div
-          ref={projectRenameRef}
+        <PositionedSurface
+          surfaceRef={projectRenameRef}
           className="session-rename-popover"
-          style={{ top: projectRenamePopover.y, left: projectRenamePopover.x }}
+          x={projectRenamePopover.x}
+          y={projectRenamePopover.y}
         >
           <div className="session-rename-popover-title">{t('sidebar.renameProjectTitle') || 'Rename Project'}</div>
           <input
@@ -203,7 +226,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
               {t('sidebar.save') || 'Save'}
             </button>
           </div>
-        </div>
+        </PositionedSurface>
       )}
     </>
   );

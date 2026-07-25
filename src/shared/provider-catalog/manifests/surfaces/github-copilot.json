@@ -267,8 +267,9 @@
       },
       "controls": {
         "fast": {
-          "state": "unsupported",
-          "fixedValue": false
+          "state": "selectable",
+          "defaultValue": false,
+          "entitlement": "granted"
         },
         "context1m": {
           "state": "fixed",
@@ -300,6 +301,21 @@
           }
         }
       },
+      "executionBindings": [
+        {
+          "id": "fast:claude-opus-4.8-fast",
+          "when": {
+            "fast": true
+          },
+          "actions": [
+            {
+              "kind": "model-switch",
+              "targetModelId": "claude-opus-4.8-fast"
+            }
+          ],
+          "entitlement": "granted"
+        }
+      ],
       "factSourceId": "user-observation:github-copilot:2026-07-14"
     },
     {
@@ -329,7 +345,10 @@
         "state": "unknown"
       },
       "selection": {
-        "pickerVisibility": "primary"
+        "pickerVisibility": "internal",
+        "relatedPrimaryModelIds": [
+          "claude-opus-4.8"
+        ]
       },
       "presencePolicy": "account-entitled",
       "route": {

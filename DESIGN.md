@@ -13,7 +13,7 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 ## Architecture Principles
 
 1. **单一真相**：Session / Conversation / branch / journal 是会话历史权威；Agent slot 是执行配置与缓存，不是私有历史。
-2. **冻结执行**：`EffectiveRuntimePlan`（含 `planId` / fingerprint）在 `prepareTurn` 冻结；Prompt 与 Executor 共用；在途 turn 不读可变 Settings。
+2. **冻结执行**：`EffectiveRuntimePlan`（`schemaVersion: 2`，含 `planId` / fingerprint 与完整工具/策略面）在 `prepareTurn` 冻结；Prompt 与 Executor 共用；在途 turn 不读可变 Settings。
 3. **主进程权威**：权限、secret、MCP trust、Shell、RDX CLI、IPC 校验均在 `src/main`；preload / renderer / Browser Bridge 只暴露受控面。
 4. **Scope 固定**：用户资源 `~/.rdx`，项目资源 `<project-root>/.rdx`；无配置 workspace root、无旧目录 fallback、无静默迁移。
 5. **Provider 事实外置**：模型/协议/控件事实只在 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth、discovery。
@@ -27,8 +27,9 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 | --- | --- |
 | 产品边界与本文件不变量 | 本文件 |
 | Runtime / Prompt / Provider / Tool / Session 契约 | [`docs/contracts/runtime-kernel.md`](docs/contracts/runtime-kernel.md) |
-| 权限、Bridge、Secret、MCP trust、Sandbox、IPC | [`docs/contracts/permissions.md`](docs/contracts/permissions.md) |
+| 权限、Bridge、Secret、MCP trust、Sandbox、CSP、IPC | [`docs/contracts/permissions.md`](docs/contracts/permissions.md) |
 | Fail-closed 三分类与标注点 | [`docs/contracts/failure-model.md`](docs/contracts/failure-model.md) |
+| Orchestrator façade 行数 / 职责外提 | 本文件 Invariant + `pnpm run check:orchestrator-facade` |
 | Profiles / Skills / Hooks / Memory / RDX 产品规格 | [`docs/product/`](docs/product/) |
 | Workbench / Work Process / Appearance / Design System | [`docs/ui/`](docs/ui/) |
 | 模块地图与数据流 | [`docs/architecture/`](docs/architecture/) |
@@ -49,13 +50,18 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 - **MCP project**：同 ID 不可覆盖 user 的 command/args/url/env；变更需 `needsRetrust` + 显式 trust。
 - **RDX**：无内置 CLI 副本；Open `.rdc` 等垂直入口只走 Settings 配置的 shell action。
 - **Capture 所有权**：`ownerSessionId` 不匹配则 fail-closed；不得跨 session 继承已打开 capture。
+- **Orchestrator façade**：`AgentOrchestrator.ts` 保持 façade（**少于 800 行**）；turn 准备、tool 装配、executor、turn/subagent runner、prompt-plan 等职责外提到协作单元；门禁 `pnpm run check:orchestrator-facade`（亦挂在 `check:architecture`）。
+- **CSP**：生产 `script-src` 无 `unsafe-inline`；`style-src 'self'`（无 `unsafe-inline`）；`style-src-attr 'none'`；动态样式经 constructable stylesheet（`useDynStyle`），禁止依赖 inline style attributes。
+- **IPC Zod**：全部 IPC handler 经 `parseIpcArgs`；非法 payload fail-closed；`approvalToken` 单次消费。
+- **RDX context lease**：仅 per-session lease（`setRdxRuntimeContextForSession` / `getRdxContextLease` / `assertRdxContextLeaseOwnership`）；**禁止** RDX global mirror、`legacyGlobalMirror`、`getRdxRuntimeContext` 全局 API。
+- **EffectiveRuntimePlan**：`schemaVersion: 2`；在 `prepareTurn` **完整冻结**（`planId` / fingerprint / tools / skill ∩ / deferred / MCP hash / permission / policy / route / request+prompt fingerprints）；Prompt 与 Executor 共用；在途 turn 不读可变 Settings。
 
 ## Document Index
 
 ### Contracts
 
 - [`docs/contracts/runtime-kernel.md`](docs/contracts/runtime-kernel.md) — Agent loop、Prompt/Request、Reasoning、Tools、Session、Model capability
-- [`docs/contracts/permissions.md`](docs/contracts/permissions.md) — Permission mode、Sandbox、IPC Zod、Bridge、Secret、MCP trust、Shell
+- [`docs/contracts/permissions.md`](docs/contracts/permissions.md) — Permission mode、Sandbox、CSP、IPC Zod 全量、Bridge、Secret、RDX lease、MCP trust、Shell
 - [`docs/contracts/failure-model.md`](docs/contracts/failure-model.md) — Security / Integrity / Availability
 
 ### Product
@@ -77,4 +83,4 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 
 ## Verification Gate（摘要）
 
-代码改动至少：`pnpm run typecheck`。按改动面追加 `check:architecture`、`check:fidelity`、`check:shared-exports`、`check:agent-runtime`、`check:provider-system`、`check:provider-catalog`、`check:tool-system`、`check:work-process*`、`check:reasoning-delivery`、`check:appearance`、`check:settings-agents`、`check:repository-hygiene`、相关 vitest contract 套件。UI/工作流用 `pnpm run start:agent-browser` 真实会话验收。完整命令与 UI 验收清单见 `AGENTS.md`。
+代码改动至少：`pnpm run typecheck`。按改动面追加 `check:architecture`（含 `check:orchestrator-facade`）、`check:orchestrator-facade`、`check:fidelity`、`check:shared-exports`、`check:agent-runtime`、`check:provider-system`、`check:provider-catalog`、`check:tool-system`、`check:work-process*`、`check:reasoning-delivery`、`check:appearance`、`check:settings-agents`、`check:repository-hygiene`、`test:coverage`（覆盖率阈值门禁）、相关 vitest contract 套件。UI/工作流用 `pnpm run start:agent-browser` 真实会话验收。完整命令与 UI 验收清单见 `AGENTS.md`。

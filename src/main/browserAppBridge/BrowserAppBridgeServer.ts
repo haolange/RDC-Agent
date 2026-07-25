@@ -201,10 +201,26 @@ function serveStatic(response: ServerResponse, rendererRoot: string, requestPath
     return;
   }
 
-  response.writeHead(200, {
+  const headers: Record<string, string> = {
     'Cache-Control': 'no-store',
     'Content-Type': contentTypes[extname(filePath)] ?? 'application/octet-stream',
-  });
+  };
+  // Defense-in-depth for browser/headless /app: match Electron production CSP.
+  if (extname(filePath) === '.html') {
+    headers['Content-Security-Policy'] = [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self'",
+      "style-src-attr 'none'",
+      "img-src 'self' data: blob:",
+      "font-src 'self' data:",
+      "connect-src 'self' http://127.0.0.1:* https://openrouter.ai https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "frame-ancestors 'none'",
+    ].join('; ');
+  }
+  response.writeHead(200, headers);
   createReadStream(filePath).pipe(response);
 }
 

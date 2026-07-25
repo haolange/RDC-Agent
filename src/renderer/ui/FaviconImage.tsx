@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { getElectronApi } from '../platform/getElectronApi';
 
 interface FaviconImageProps {
   domain: string;
@@ -32,7 +31,7 @@ export const FaviconImage: React.FC<FaviconImageProps> = ({
       };
     }
 
-    void getElectronApi()?.web.resolveFavicon(cleaned)
+    void window.electronAPI?.web.resolveFavicon(cleaned)
       .then((result) => {
         if (cancelled) return;
         setDataUrl(result?.dataUrl ?? null);

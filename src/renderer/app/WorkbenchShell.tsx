@@ -8,6 +8,7 @@ import { Composer } from '../features/debugger/composer/Composer';
 import type { ComposerController } from '../features/debugger/composer/useComposer';
 import type { TranslationKey } from '../i18n';
 import { APP_RESIZE_HANDLE_WIDTH } from '@shared/constants/layout';
+import { useDynStyle } from '../lib/useDynStyle';
 
 type DragSide = 'left' | 'right';
 
@@ -60,18 +61,20 @@ export function WorkbenchShell({
   onToggleTerminal,
   onStartDrag,
 }: WorkbenchShellProps) {
+  const shellDynStyle = useDynStyle({
+    '--left-sidebar-width': `${resolvedWidths.left}px`,
+    '--right-panel-width': `${resolvedWidths.right}px`,
+    '--left-resize-handle-width': `${effectiveLeftCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH}px`,
+    '--right-resize-handle-width': `${!isRightRailVisible || effectiveRightCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH}px`,
+    '--workbench-rail-max-width': workbenchRailMaxWidth,
+    '--workbench-inline-mode': bothSidebarsCollapsed ? 'dual-collapsed' : 'sidebar-open',
+  });
+
   return (
     <div
       ref={appBodyRef}
       className={`app-body ${isResizing ? 'is-resizing' : ''}`}
-      style={{
-        ['--left-sidebar-width' as string]: `${resolvedWidths.left}px`,
-        ['--right-panel-width' as string]: `${resolvedWidths.right}px`,
-        ['--left-resize-handle-width' as string]: `${effectiveLeftCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH}px`,
-        ['--right-resize-handle-width' as string]: `${!isRightRailVisible || effectiveRightCollapsed ? 0 : APP_RESIZE_HANDLE_WIDTH}px`,
-        ['--workbench-rail-max-width' as string]: workbenchRailMaxWidth,
-        ['--workbench-inline-mode' as string]: bothSidebarsCollapsed ? 'dual-collapsed' : 'sidebar-open',
-      }}
+      {...shellDynStyle}
     >
       <aside
         className={`app-sidebar-left ${effectiveLeftCollapsed ? 'collapsed' : ''}`}

@@ -3,11 +3,15 @@ import { storageAdapter } from '../sessions/StorageAdapter';
 import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 import type { WorkbenchIpcContext } from './workbenchContext';
+import { parseIpcArgs } from './validation/IpcPayloadGuard';
+import { EmptyArgsSchema } from './validation/commonIpcSchemas';
+import { EvidenceGetEventsArgsSchema } from './validation/toolEvidenceSchemas';
 
 export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;
 
-  ipcMain.handle('tool:getCatalog', async () => {
+  ipcMain.handle('tool:getCatalog', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'tool:getCatalog', maxBytes: 1024 });
     try {
       return await rdxCliInvokerService.loadCatalog();
     } catch {
@@ -15,11 +19,13 @@ export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void
     }
   });
 
-  ipcMain.handle('tool:getRuntimeSummary', async () => {
+  ipcMain.handle('tool:getRuntimeSummary', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'tool:getRuntimeSummary', maxBytes: 1024 });
     return rdxCliInvokerService.getRuntimeSummary();
   });
 
-  ipcMain.handle('mcp:getStatusSummary', async () => {
+  ipcMain.handle('mcp:getStatusSummary', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'mcp:getStatusSummary', maxBytes: 1024 });
     const projectId = state.currentProjectId ?? storageAdapter.getCurrentProjectId();
     const projectRoot = projectId
       ? storageAdapter.getProjectById(projectId)?.rootPath ?? null
@@ -27,7 +33,8 @@ export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void
     return agentOrchestrator.getMcpServerStatusSummary(projectRoot);
   });
 
-  ipcMain.handle('evidence:getChain', async () => {
+  ipcMain.handle('evidence:getChain', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'evidence:getChain', maxBytes: 1024 });
     const sessionId = await storageAdapter.getCurrentSessionId();
     if (!sessionId) {
       return { sessionId: '', runId: '', events: [], isValid: true };
@@ -43,7 +50,12 @@ export function registerToolEvidenceHandlers(context: WorkbenchIpcContext): void
     };
   });
 
-  ipcMain.handle('evidence:getEvents', async (_event, eventType?: string) => {
+  ipcMain.handle('evidence:getEvents', async (_event, ...rawArgs: unknown[]) => {
+    const [eventType] = parseIpcArgs(EvidenceGetEventsArgsSchema, rawArgs, {
+      label: 'evidence:getEvents',
+      maxBytes: 4 * 1024,
+      padTo: 1,
+    });
     const sessionId = await storageAdapter.getCurrentSessionId();
     if (!sessionId) return [];
 

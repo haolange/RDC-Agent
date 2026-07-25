@@ -857,8 +857,62 @@ html[data-resolved-theme='light'] .app-main {
 .context-breakdown-bar-segment {
   height: 100%;
   min-width: 0;
+  width: var(--context-segment-width, 0%);
   border-radius: var(--radius-sm);
   transition: width var(--transition-fast);
+  background: var(--token-context-deferred);
+}
+
+.context-breakdown-bar-segment[data-segment='system_prompt'],
+.context-breakdown-swatch[data-segment='system_prompt'] {
+  background: var(--token-context-system-prompt);
+}
+
+.context-breakdown-bar-segment[data-segment='memory_files'],
+.context-breakdown-swatch[data-segment='memory_files'] {
+  background: var(--token-context-memory-files);
+}
+
+.context-breakdown-bar-segment[data-segment='skills'],
+.context-breakdown-swatch[data-segment='skills'] {
+  background: var(--token-context-skills);
+}
+
+.context-breakdown-bar-segment[data-segment='system_tools'],
+.context-breakdown-swatch[data-segment='system_tools'] {
+  background: var(--token-context-system-tools);
+}
+
+.context-breakdown-bar-segment[data-segment='mcp_tools'],
+.context-breakdown-swatch[data-segment='mcp_tools'] {
+  background: var(--token-context-mcp-tools);
+}
+
+.context-breakdown-bar-segment[data-segment='mcp_tools_deferred'],
+.context-breakdown-bar-segment[data-segment='builtin_tools_deferred'],
+.context-breakdown-swatch[data-segment='mcp_tools_deferred'],
+.context-breakdown-swatch[data-segment='builtin_tools_deferred'] {
+  background: var(--token-context-deferred);
+}
+
+.context-breakdown-bar-segment[data-segment='subagent_definitions'],
+.context-breakdown-swatch[data-segment='subagent_definitions'] {
+  background: var(--token-context-subagents);
+}
+
+.context-breakdown-bar-segment[data-segment='summarized_conversation'],
+.context-breakdown-swatch[data-segment='summarized_conversation'] {
+  background: var(--token-context-summarized);
+}
+
+.context-breakdown-bar-segment[data-segment='conversation'],
+.context-breakdown-swatch[data-segment='conversation'] {
+  background: var(--token-context-conversation);
+}
+
+.context-breakdown-bar-segment[data-segment='free'],
+.context-breakdown-swatch[data-segment='free'] {
+  background: var(--token-context-free);
 }
 
 /* Actual / Last actual — flat metric band (no nested panels): group · label/value cells */
@@ -1143,6 +1197,7 @@ html[data-resolved-theme='light'] .app-main {
   width: 10px;
   height: 10px;
   border-radius: 2px;
+  background: var(--token-context-deferred);
 }
 
 .context-breakdown-label {

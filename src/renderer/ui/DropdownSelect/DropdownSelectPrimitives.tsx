@@ -1,13 +1,15 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { useDynStyle } from '../../lib/useDynStyle';
 import { normalizeTestIdSegment } from './dropdownSelectUtils';
 import type { DropdownOption } from './types';
 
 function AaSwatch(props: { color: string; className?: string }) {
+  const dynStyle = useDynStyle({ '--dropdown-swatch-bg': props.color });
   return (
     <span
       className={['dropdown-select-swatch', props.className].filter(Boolean).join(' ')}
-      style={{ background: props.color }}
+      {...dynStyle}
       aria-hidden="true"
     >
       Aa
@@ -116,7 +118,7 @@ interface DropdownSelectMenuProps {
   onCommitSelection: (nextValue: string) => void;
 }
 
-export const DropdownSelectMenu: React.FC<DropdownSelectMenuProps> = ({
+const DropdownSelectMenuPortal: React.FC<DropdownSelectMenuProps> = ({
   menuRef,
   variant,
   dataTestId,
@@ -130,7 +132,16 @@ export const DropdownSelectMenu: React.FC<DropdownSelectMenuProps> = ({
   menuPosition,
   onActiveIndexChange,
   onCommitSelection,
-}) => createPortal(
+}) => {
+  const dynStyle = useDynStyle({
+    left: `${menuPosition.left}px`,
+    top: `${menuPosition.top}px`,
+    width: `${menuPosition.width}px`,
+    '--dropdown-caret-x': `${menuPosition.caretX}px`,
+    visibility: menuPosition.ready ? 'visible' : 'hidden',
+  });
+
+  return (
   <div
     ref={menuRef}
     className={[
@@ -143,13 +154,7 @@ export const DropdownSelectMenu: React.FC<DropdownSelectMenuProps> = ({
     data-placement={menuPosition.placement}
     role="listbox"
     aria-label={triggerAriaLabel}
-    style={{
-      left: menuPosition.left,
-      top: menuPosition.top,
-      width: menuPosition.width,
-      ['--dropdown-caret-x']: `${menuPosition.caretX}px`,
-      visibility: menuPosition.ready ? 'visible' : 'hidden',
-    } as React.CSSProperties}
+    {...dynStyle}
   >
     <span className="dropdown-select-menu-caret" aria-hidden="true" />
     <div className="dropdown-select-menu-panel">
@@ -204,6 +209,10 @@ export const DropdownSelectMenu: React.FC<DropdownSelectMenuProps> = ({
         })
       )}
     </div>
-  </div>,
-  document.body,
+  </div>
+  );
+};
+
+export const DropdownSelectMenu: React.FC<DropdownSelectMenuProps> = (props) => (
+  createPortal(<DropdownSelectMenuPortal {...props} />, document.body)
 );

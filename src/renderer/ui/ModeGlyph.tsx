@@ -1,6 +1,8 @@
 import React from 'react';
 import type { AgentMode, ModeIconKey } from '@shared/types/layout';
 import { getAgentModeConfig } from '@shared/constants/agents';
+import { useDynStyle } from '../lib/useDynStyle';
+import './ModeGlyph.css';
 
 interface ModeGlyphProps {
   mode: AgentMode;
@@ -160,17 +162,12 @@ export const ModeGlyph: React.FC<ModeGlyphProps> = ({
   const modeConfig = getAgentModeConfig(mode) ?? FALLBACK_MODE_CONFIG;
   const resolvedIcon = icon ?? modeConfig.icon;
   const resolvedAccent = accentColor ?? modeConfig.accentColor;
+  const dynStyle = useDynStyle({ '--mode-glyph-color': resolvedAccent });
 
   return (
     <span
-      className={className}
-      style={{
-        color: resolvedAccent,
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        lineHeight: 0,
-      }}
+      className={['mode-glyph', className].filter(Boolean).join(' ')}
+      {...dynStyle}
       aria-hidden="true"
     >
       <svg
