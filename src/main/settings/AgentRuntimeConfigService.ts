@@ -10,6 +10,11 @@ import type { MCPTransport } from '@shared/types/mcp';
 import type { ScopedResourceCandidate, SkillLoadResult, SkillMetadata } from '@shared/types/rdxRuntime';
 import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
+import {
+  mcpDescriptorHash,
+  mcpTrustService,
+  projectOverridesUserExecutable,
+} from './McpTrustService';
 
 const MCP_TRANSPORTS = new Set<MCPTransport>(['stdio', 'sse', 'streamable-http']);
 
@@ -117,24 +122,104 @@ export class AgentRuntimeConfigService {
 
   listMcpServers(projectRoot?: string): AgentRuntimeMcpDescriptor[] {
     this.ensureScaffold();
-    const candidates: Array<ScopedResourceCandidate<AgentRuntimeMcpDescriptor>> = [];
-    const addDirectory = (root: string, scope: 'user' | 'project') => {
+    const userDescriptors = new Map<string, AgentRuntimeMcpDescriptor>();
+    const projectDescriptors = new Map<string, AgentRuntimeMcpDescriptor>();
+
+    const loadDirectory = (
+      root: string,
+      scope: 'user' | 'project',
+      target: Map<string, AgentRuntimeMcpDescriptor>,
+    ) => {
       if (!fs.existsSync(root)) return;
       fs.readdirSync(root).filter((entry) => entry.endsWith('.mcp.json')).forEach((entry) => {
         const sourcePath = path.join(root, entry);
         const value = readJsonFile<AgentRuntimeMcpDescriptor>(sourcePath);
-        if (value?.id && MCP_TRANSPORTS.has(value.transport)) candidates.push({ id: value.id, kind: 'mcp', scope, sourcePath, value, enabled: value.enabledByDefault });
+        if (!value?.id || !MCP_TRANSPORTS.has(value.transport)) return;
+        target.set(value.id, {
+          ...value,
+          scope,
+          sourcePath,
+          enabledByDefault: value.enabledByDefault !== false,
+        });
       });
     };
-    addDirectory(appPathService.getUserRdxPaths().mcpPath, 'user');
-    if (projectRoot) addDirectory(appPathService.getProjectRdxPaths(projectRoot).mcpPath, 'project');
-    return scopedResourceResolver.resolve(candidates).resources.map((resource) => ({
-      ...resource.value,
-      enabledByDefault: resource.enabled,
-      scope: resource.provenance.scope,
-      sourcePath: resource.provenance.sourcePath,
-      sourceHash: resource.provenance.sourceHash,
-    }));
+
+    loadDirectory(appPathService.getUserRdxPaths().mcpPath, 'user', userDescriptors);
+    if (projectRoot) {
+      loadDirectory(appPathService.getProjectRdxPaths(projectRoot).mcpPath, 'project', projectDescriptors);
+    }
+
+    const ids = new Set([...userDescriptors.keys(), ...projectDescriptors.keys()]);
+    const resolved: AgentRuntimeMcpDescriptor[] = [];
+
+    const withMcpTrustMetadata = (descriptor: AgentRuntimeMcpDescriptor): AgentRuntimeMcpDescriptor => {
+      const descriptorHash = mcpDescriptorHash(descriptor);
+      if (descriptor.scope !== 'project' || !projectRoot) {
+        return { ...descriptor, descriptorHash, needsRetrust: false };
+      }
+      const projectRealpath = mcpTrustService.resolveProjectRealpath(projectRoot);
+      const trusted = mcpTrustService.isTrusted(projectRealpath, descriptor.id, descriptorHash);
+      return {
+        ...descriptor,
+        descriptorHash,
+        projectRealpath,
+        needsRetrust: !trusted,
+        ...(trusted ? {} : {
+          blockedReason: `Project MCP "${descriptor.id}" needs trust for projectRealpath+descriptorHash before connect.`,
+        }),
+      };
+    };
+
+    for (const id of Array.from(ids).sort()) {
+      const user = userDescriptors.get(id);
+      const project = projectDescriptors.get(id);
+
+      if (user && project) {
+        if (projectOverridesUserExecutable(user, project)) {
+          resolved.push(withMcpTrustMetadata({
+            ...user,
+            scope: 'user',
+            sourcePath: user.sourcePath,
+            sourceHash: mcpDescriptorHash(user),
+            executableOverrideRejected: true,
+            blockedReason: `Project MCP "${id}" cannot override user command/args/url/env.`,
+            enabledByDefault: project.enabledByDefault === false ? false : user.enabledByDefault,
+          }));
+          continue;
+        }
+        resolved.push(withMcpTrustMetadata({
+          ...user,
+          name: project.name || user.name,
+          description: project.description ?? user.description,
+          enabledByDefault: project.enabledByDefault,
+          scope: 'user',
+          sourcePath: user.sourcePath,
+          sourceHash: mcpDescriptorHash(user),
+        }));
+        continue;
+      }
+
+      if (project) {
+        const descriptorHash = mcpDescriptorHash(project);
+        resolved.push(withMcpTrustMetadata({
+          ...project,
+          scope: 'project',
+          sourceHash: descriptorHash,
+          descriptorHash,
+        }));
+        continue;
+      }
+
+      if (user) {
+        resolved.push(withMcpTrustMetadata({
+          ...user,
+          scope: 'user',
+          sourceHash: mcpDescriptorHash(user),
+        }));
+      }
+    }
+
+    return resolved;
   }
 
 }

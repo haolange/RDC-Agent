@@ -169,9 +169,9 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return resolveEffectiveCatalog(providerId, settingsService.getAll(), undefined, accountId);
   });
 
-  ipcMain.handle('settings:getProviderSecret', async (_event, providerId: string) => {
+  ipcMain.handle('settings:hasProviderSecret', async (_event, providerId: string) => {
     const paths = appPathService.getRuntimePaths();
-    return settingsService.getProviderSecret(providerId, paths.userRdxRoot);
+    return settingsService.hasProviderSecret(providerId, paths.userRdxRoot);
   });
 
   ipcMain.handle('settings:importAgentManifest', async (_event, filePath: string) => {

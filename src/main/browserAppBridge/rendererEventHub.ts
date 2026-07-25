@@ -19,14 +19,17 @@ export const rendererEventHub = {
     }
   },
 
-  connect(response: ServerResponse): () => void {
-    response.writeHead(200, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Private-Network': 'true',
+  connect(response: ServerResponse, allowedOrigin?: string): () => void {
+    const headers: Record<string, string> = {
       'Cache-Control': 'no-store',
       'Content-Type': 'text/event-stream; charset=utf-8',
-      'Connection': 'keep-alive',
-    });
+      Connection: 'keep-alive',
+    };
+    if (allowedOrigin) {
+      headers['Access-Control-Allow-Origin'] = allowedOrigin;
+      headers.Vary = 'Origin';
+    }
+    response.writeHead(200, headers);
     response.write('retry: 1000\n\n');
     clients.add(response);
 

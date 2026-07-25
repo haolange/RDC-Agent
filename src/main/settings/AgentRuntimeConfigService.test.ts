@@ -66,7 +66,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     expect(service.listSkillMetadata(project).every((skill) => !('instructions' in skill))).toBe(true);
   });
 
-  it('resolves same-id project MCP over user MCP with source provenance', async () => {
+  it('rejects same-id project MCP executable overrides of user command/args/url/env', async () => {
     const userMcp = path.join(process.env.RDC_AGENT_HOME!, 'mcp');
     const project = path.join(root, 'project');
     const projectMcp = path.join(project, '.rdx', 'mcp');
@@ -76,11 +76,46 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     fs.writeFileSync(path.join(projectMcp, 'docs.mcp.json'), JSON.stringify({ id: 'docs', name: 'Project Docs', description: '', transport: 'stdio', command: 'project', enabledByDefault: true }));
 
     const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
+    const { mcpTrustService } = await import('./McpTrustService');
     const service = new AgentRuntimeConfigService();
-    expect(service.listMcpServers(project).find((server) => server.id === 'docs')).toMatchObject({
-      name: 'Project Docs',
-      scope: 'project',
-      command: 'project',
+    const docs = service.listMcpServers(project).find((server) => server.id === 'docs');
+    expect(docs).toMatchObject({
+      name: 'User Docs',
+      scope: 'user',
+      command: 'user',
+      executableOverrideRejected: true,
     });
+    expect(docs?.command).not.toBe('project');
+    expect(() => mcpTrustService.assertConnectAllowed(docs!, project)).not.toThrow();
+  });
+
+  it('marks project-only MCP as needing trust before connect', async () => {
+    const project = path.join(root, 'project');
+    const projectMcp = path.join(project, '.rdx', 'mcp');
+    fs.mkdirSync(projectMcp, { recursive: true });
+    fs.writeFileSync(path.join(projectMcp, 'local.mcp.json'), JSON.stringify({
+      id: 'local',
+      name: 'Local',
+      description: '',
+      transport: 'stdio',
+      command: 'node',
+      enabledByDefault: true,
+    }));
+
+    const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
+    const { mcpTrustService } = await import('./McpTrustService');
+    const service = new AgentRuntimeConfigService();
+    const local = service.listMcpServers(project).find((server) => server.id === 'local');
+    expect(local).toMatchObject({
+      scope: 'project',
+      needsRetrust: true,
+      command: 'node',
+    });
+    expect(() => mcpTrustService.assertConnectAllowed(local!, project)).toThrow(/needs trust/);
+
+    mcpTrustService.trust(project, local!.id, local!.descriptorHash!);
+    const trusted = service.listMcpServers(project).find((server) => server.id === 'local');
+    expect(trusted?.needsRetrust).toBe(false);
+    expect(() => mcpTrustService.assertConnectAllowed(trusted!, project)).not.toThrow();
   });
 });

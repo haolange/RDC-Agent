@@ -1475,6 +1475,19 @@ export class SettingsService {
     return getResolvedProviderSecret(provider.id, provider.secretRef, workspaceRoot);
   }
 
+  /** Renderer-safe secret presence probe. Never returns plaintext. */
+  hasProviderSecret(
+    providerId: string,
+    workspaceRoot = appPathService.getUserRdxRoot(),
+  ): { hasSecret: boolean; maskedPreview?: string } {
+    const plaintext = this.getProviderSecret(providerId, workspaceRoot);
+    if (!plaintext) {
+      return { hasSecret: false };
+    }
+    const maskedPreview = secretStorageService.maskSecretPreview(plaintext);
+    return maskedPreview ? { hasSecret: true, maskedPreview } : { hasSecret: true };
+  }
+
   /** Main-process only. Never expose this hydrated map through settings IPC. */
   getProviderConnectionValues(
     providerId: string,

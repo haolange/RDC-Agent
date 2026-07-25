@@ -9,6 +9,7 @@ import { ModelsSettings } from './sections/ModelsSettings';
 import { AgentsSettings } from './sections/AgentsSettings';
 import { ToolsSettings } from './sections/ToolsSettings';
 import { McpStatusDashboard } from './sections/McpStatusDashboard';
+import { McpTrustPanel } from './sections/McpTrustPanel';
 import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
 import { SettingsNavIcon } from './SettingsNavIcon';
 import { useRdxRuntimeOverview } from './useRdxRuntimeOverview';
@@ -221,6 +222,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
               {activeSection === 'tools' && (
                 <section className="settings-page settings-page-tools">
                 <RuntimeScopePanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} kinds={['mcp']} onChanged={runtime.setOverview} />
+                <McpTrustPanel overview={runtime.overview} onChanged={runtime.setOverview} />
                 <McpStatusDashboard />
                 <ToolsSettings
                   rdxCliDraft={rdxCliDraft}

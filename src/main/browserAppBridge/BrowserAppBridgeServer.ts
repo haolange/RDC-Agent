@@ -6,6 +6,14 @@ import { extname, join, normalize, resolve } from 'path';
 import { URL } from 'url';
 import { invokeRegisteredIpcChannel } from '../ipc/invokeRegistry';
 import { rendererEventHub } from './rendererEventHub';
+import {
+  createBridgeBearerToken,
+  extractBearerToken,
+  isBridgeChannelAllowed,
+  isOriginAllowed,
+  resolveBridgeAllowedOrigins,
+  tokensMatch,
+} from './bridgeSecurity';
 import { EFFECTIVE_CATALOG_SCHEMA_VERSION } from '../settings/EffectiveCatalogService';
 import {
   MODELS_DEV_IDENTITY_COUNT,
@@ -47,6 +55,8 @@ interface BrowserHealthMetadata {
 
 let server: Server | null = null;
 let bridgeUrl: string | null = null;
+let bridgeToken: string | null = null;
+let allowedOrigins = new Set<string>();
 let healthMetadata: BrowserHealthMetadata | null = null;
 
 const contentTypes: Record<string, string> = {
@@ -89,17 +99,32 @@ function resolveHealthMetadata(options: BridgeOptions): BrowserHealthMetadata {
   };
 }
 
-function setCors(response: ServerResponse): void {
-  response.setHeader('Access-Control-Allow-Origin', '*');
-  response.setHeader('Access-Control-Allow-Headers', 'content-type');
+function setCors(response: ServerResponse, requestOrigin: string | undefined): void {
+  if (requestOrigin && allowedOrigins.has(requestOrigin)) {
+    response.setHeader('Access-Control-Allow-Origin', requestOrigin);
+    response.setHeader('Vary', 'Origin');
+  }
+  response.setHeader('Access-Control-Allow-Headers', 'content-type, authorization');
   response.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-  response.setHeader('Access-Control-Allow-Private-Network', 'true');
 }
 
-function sendJson(response: ServerResponse, statusCode: number, payload: unknown): void {
-  setCors(response);
+function sendJson(
+  response: ServerResponse,
+  statusCode: number,
+  payload: unknown,
+  requestOrigin?: string,
+): void {
+  setCors(response, requestOrigin);
   response.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
   response.end(JSON.stringify(payload));
+}
+
+function requireBridgeAuth(request: IncomingMessage, url: URL): boolean {
+  if (!bridgeToken) {
+    return false;
+  }
+  const provided = extractBearerToken(request.headers.authorization, url.searchParams.get('token'));
+  return tokensMatch(bridgeToken, provided);
 }
 
 async function checkDevRenderer(url: string): Promise<{ ok: boolean; url: string; error?: string }> {
@@ -144,9 +169,15 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   return text ? JSON.parse(text) : {};
 }
 
-function redirectToDevRenderer(response: ServerResponse, rendererUrl: string, bridgeOrigin: string): void {
+function redirectToDevRenderer(
+  response: ServerResponse,
+  rendererUrl: string,
+  bridgeOrigin: string,
+  token: string,
+): void {
   const target = new URL(rendererUrl);
   target.searchParams.set('rdcBridgeOrigin', bridgeOrigin);
+  target.searchParams.set('rdcBridgeToken', token);
   response.writeHead(302, {
     Location: target.toString(),
     'Cache-Control': 'no-store',
@@ -178,13 +209,20 @@ function serveStatic(response: ServerResponse, rendererRoot: string, requestPath
 }
 
 async function handleRequest(options: BridgeOptions, request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const requestOrigin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined;
+
   if (!request.url) {
-    sendJson(response, 400, { success: false, error: 'Missing URL' });
+    sendJson(response, 400, { success: false, error: 'Missing URL' }, requestOrigin);
+    return;
+  }
+
+  if (requestOrigin && !isOriginAllowed(requestOrigin, allowedOrigins)) {
+    sendJson(response, 403, { success: false, error: 'Origin not allowed' }, undefined);
     return;
   }
 
   if (request.method === 'OPTIONS') {
-    setCors(response);
+    setCors(response, requestOrigin);
     response.writeHead(204);
     response.end();
     return;
@@ -192,10 +230,18 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
 
   const bridgeOrigin = bridgeUrl ?? 'http://127.0.0.1';
   const url = new URL(request.url, bridgeOrigin);
+  // Every non-preflight bridge surface requires the per-run bearer token.
+  // /app without auth previously redirected with the token in Location (leak).
+  const isPublicAsset = !options.devRendererUrl
+    && (url.pathname.startsWith('/assets/') || url.pathname === '/favicon.ico');
+  if (!isPublicAsset && !requireBridgeAuth(request, url)) {
+    sendJson(response, 401, { success: false, error: 'Unauthorized' }, requestOrigin);
+    return;
+  }
 
   if (url.pathname === '/api/settings/providers/catalog' && request.method === 'GET') {
     const catalog = await invokeRegisteredIpcChannel('settings:getProviderCatalog');
-    sendJson(response, 200, catalog);
+    sendJson(response, 200, catalog, requestOrigin);
     return;
   }
 
@@ -210,7 +256,7 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
       bridgeUrl,
       renderer,
       ...healthMetadata,
-    });
+    }, requestOrigin);
     return;
   }
 
@@ -219,24 +265,31 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
       .then(async (body) => {
         const payload = body as { channel?: unknown; args?: unknown };
         if (typeof payload.channel !== 'string') {
-          sendJson(response, 400, { success: false, error: 'channel must be a string' });
+          sendJson(response, 400, { success: false, error: 'channel must be a string' }, requestOrigin);
+          return;
+        }
+        if (!isBridgeChannelAllowed(payload.channel)) {
+          sendJson(response, 403, {
+            success: false,
+            error: `Channel not allowed on browser bridge: ${payload.channel}`,
+          }, requestOrigin);
           return;
         }
         const args = Array.isArray(payload.args) ? payload.args : [];
         const result = await invokeRegisteredIpcChannel(payload.channel, args);
-        sendJson(response, 200, { success: true, result });
+        sendJson(response, 200, { success: true, result }, requestOrigin);
       })
       .catch((error) => {
         sendJson(response, 500, {
           success: false,
           error: error instanceof Error ? error.message : String(error),
-        });
+        }, requestOrigin);
       });
     return;
   }
 
   if (url.pathname === '/events' && request.method === 'GET') {
-    rendererEventHub.connect(response);
+    rendererEventHub.connect(response, requestOrigin && allowedOrigins.has(requestOrigin) ? requestOrigin : undefined);
     return;
   }
 
@@ -248,10 +301,14 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
           success: false,
           error: 'Dev renderer is not reachable',
           renderer,
-        });
+        }, requestOrigin);
         return;
       }
-      redirectToDevRenderer(response, options.devRendererUrl, bridgeOrigin);
+      if (!bridgeToken) {
+        sendJson(response, 503, { success: false, error: 'Bridge token unavailable' }, requestOrigin);
+        return;
+      }
+      redirectToDevRenderer(response, options.devRendererUrl, bridgeOrigin, bridgeToken);
       return;
     }
     serveStatic(response, options.rendererRoot, url.pathname);
@@ -263,7 +320,16 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
     return;
   }
 
-  sendJson(response, 404, { success: false, error: 'Not found' });
+  sendJson(response, 404, { success: false, error: 'Not found' }, requestOrigin);
+}
+
+export function shouldStartBrowserAppBridge(): boolean {
+  // Desktop must never start the bridge. Browser QA is an explicit opt-in.
+  return process.env.RDC_AGENT_BROWSER_QA === '1';
+}
+
+export function getBrowserAppBridgeToken(): string | null {
+  return bridgeToken;
 }
 
 export async function startBrowserAppBridge(options: BridgeOptions): Promise<string> {
@@ -271,15 +337,22 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
     return bridgeUrl;
   }
 
+  if (!shouldStartBrowserAppBridge()) {
+    throw new Error('Browser app bridge starts only when RDC_AGENT_BROWSER_QA=1');
+  }
+
   const preferredPort = options.preferredPort ?? Number(process.env.RDC_AGENT_BROWSER_BRIDGE_PORT || 5127);
   healthMetadata = resolveHealthMetadata(options);
+  bridgeToken = process.env.RDC_AGENT_BROWSER_BRIDGE_TOKEN?.trim() || createBridgeBearerToken();
+  process.env.RDC_AGENT_BROWSER_BRIDGE_TOKEN = bridgeToken;
 
   server = createServer((request, response) => {
     void handleRequest(options, request, response).catch((error) => {
+      const requestOrigin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined;
       sendJson(response, 500, {
         success: false,
         error: error instanceof Error ? error.message : String(error),
-      });
+      }, requestOrigin);
     });
   });
 
@@ -307,8 +380,17 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
   const address = server.address();
   const port = typeof address === 'object' && address ? address.port : preferredPort;
   bridgeUrl = `http://127.0.0.1:${port}`;
-  (globalThis as typeof globalThis & { __RDC_AGENT_BROWSER_BRIDGE_URL__?: string }).__RDC_AGENT_BROWSER_BRIDGE_URL__ = bridgeUrl;
-  console.log(`[BrowserAppBridge] Browser app session: ${bridgeUrl}/app`);
+  allowedOrigins = resolveBridgeAllowedOrigins(bridgeUrl, options.devRendererUrl);
+  (globalThis as typeof globalThis & {
+    __RDC_AGENT_BROWSER_BRIDGE_URL__?: string;
+    __RDC_AGENT_BROWSER_BRIDGE_TOKEN__?: string;
+  }).__RDC_AGENT_BROWSER_BRIDGE_URL__ = bridgeUrl;
+  (globalThis as typeof globalThis & {
+    __RDC_AGENT_BROWSER_BRIDGE_TOKEN__?: string;
+  }).__RDC_AGENT_BROWSER_BRIDGE_TOKEN__ = bridgeToken;
+
+  const appUrl = `${bridgeUrl}/app?rdcBridgeToken=${encodeURIComponent(bridgeToken)}`;
+  console.log(`[BrowserAppBridge] Browser app session: ${appUrl}`);
   return bridgeUrl;
 }
 
@@ -316,8 +398,11 @@ export async function stopBrowserAppBridge(): Promise<void> {
   const activeServer = server;
   server = null;
   bridgeUrl = null;
+  bridgeToken = null;
+  allowedOrigins = new Set();
   healthMetadata = null;
   delete (globalThis as typeof globalThis & { __RDC_AGENT_BROWSER_BRIDGE_URL__?: string }).__RDC_AGENT_BROWSER_BRIDGE_URL__;
+  delete (globalThis as typeof globalThis & { __RDC_AGENT_BROWSER_BRIDGE_TOKEN__?: string }).__RDC_AGENT_BROWSER_BRIDGE_TOKEN__;
   if (!activeServer) {
     return;
   }
