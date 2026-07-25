@@ -5,7 +5,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { appendJsonl, readJsonl, writeJsonl } from '@shared/utils/jsonl';
+import { appendJsonl, assertNoJsonlDiagnostics, readJsonl, writeJsonl } from '@shared/utils/jsonl';
 import { readYaml, writeYaml } from '@shared/utils/yaml';
 import {
   generateEventId,
@@ -72,6 +72,22 @@ interface ConversationTerminalCommitJournal {
   afterContext: SessionContextTurnEntry[];
 }
 
+interface ConversationDeltaRecord {
+  op: 'delta';
+  id: string;
+  patch: Partial<ConversationMessage>;
+  updatedAt: number;
+}
+
+interface ConversationHistoryCacheEntry {
+  mtimeMs: number;
+  size: number;
+  messages: ConversationMessage[];
+  rawRecordCount: number;
+}
+
+const CONVERSATION_COMPACTION_DELTA_THRESHOLD = 24;
+
 export interface ExistingConversationTurnCommit {
   session: SessionRecord;
   requestId: string;
@@ -98,6 +114,8 @@ export class StorageAdapter {
   private selectionPath = '';
   private readonly turnCommitSessionIds = new Set<string>();
   private readonly terminalCommitSessionIds = new Set<string>();
+  private readonly conversationHistoryCache = new Map<string, ConversationHistoryCacheEntry>();
+  private readonly conversationPendingDeltaCounts = new Map<string, number>();
 
   constructor() {
     this.syncRuntimePaths();
@@ -966,7 +984,10 @@ export class StorageAdapter {
 
   readSessionContextJournal(sessionId: string): SessionContextTurnEntry[] {
     const journalPath = this.getSessionContextJournalPath(sessionId);
-    return fs.existsSync(journalPath) ? readJsonl<SessionContextTurnEntry>(journalPath) : [];
+    if (!fs.existsSync(journalPath)) return [];
+    const result = readJsonl<SessionContextTurnEntry>(journalPath);
+    assertNoJsonlDiagnostics(journalPath, result.diagnostics);
+    return result.records;
   }
 
   appendSessionContextTurn(sessionId: string, entry: SessionContextTurnEntry): void {
@@ -1036,33 +1057,98 @@ export class StorageAdapter {
   }
 
   readConversationHistory(sessionId: string): ConversationMessage[] {
-    const snapshots = readJsonl<ConversationMessage>(this.getConversationPath(sessionId));
-    const latestById = new Map<string, ConversationMessage>();
-
-    for (const snapshot of snapshots) {
-      const existing = latestById.get(snapshot.id);
-      const existingUpdatedAt = existing?.updatedAt ?? existing?.createdAt ?? 0;
-      const nextUpdatedAt = snapshot.updatedAt ?? snapshot.createdAt;
-      if (!existing || nextUpdatedAt >= existingUpdatedAt) {
-        latestById.set(snapshot.id, snapshot);
-      }
+    const filePath = this.getConversationPath(sessionId);
+    const cached = this.readConversationHistoryCache(sessionId, filePath);
+    if (cached) {
+      return cached.messages.map((message) => ({ ...message }));
     }
 
-    return Array.from(latestById.values())
-      .sort((left, right) => left.createdAt - right.createdAt)
-      .map((message) => ({
-        ...message,
-        workTrace: sanitizeStoredWorkTrace(message.workTrace ?? null),
-      }));
+    const rebuilt = this.rebuildConversationHistory(filePath);
+    this.writeConversationHistoryCache(sessionId, filePath, rebuilt.messages, rebuilt.rawRecordCount);
+    return rebuilt.messages.map((message) => ({ ...message }));
   }
 
   appendConversationMessage(sessionId: string, message: ConversationMessage): void {
-    appendJsonl(this.getConversationPath(sessionId), message);
+    const filePath = this.getConversationPath(sessionId);
+    const existing = this.findCachedConversationMessage(sessionId, filePath, message.id);
+    if (!existing) {
+      appendJsonl(filePath, message);
+      this.applyConversationMessageToCache(sessionId, filePath, message);
+      this.conversationPendingDeltaCounts.set(sessionId, 0);
+      return;
+    }
+
+    const patch = this.diffConversationMessage(existing, message);
+    if (Object.keys(patch).length === 0) {
+      return;
+    }
+
+    const delta: ConversationDeltaRecord = {
+      op: 'delta',
+      id: message.id,
+      patch,
+      updatedAt: message.updatedAt ?? message.createdAt,
+    };
+    appendJsonl(filePath, delta);
+    this.applyConversationMessageToCache(sessionId, filePath, message);
+    const nextDeltaCount = (this.conversationPendingDeltaCounts.get(sessionId) ?? 0) + 1;
+    this.conversationPendingDeltaCounts.set(sessionId, nextDeltaCount);
+    if (nextDeltaCount >= CONVERSATION_COMPACTION_DELTA_THRESHOLD) {
+      this.compactConversationHistory(sessionId);
+    }
+  }
+
+  appendConversationDelta(
+    sessionId: string,
+    messageId: string,
+    patch: Partial<ConversationMessage>,
+  ): void {
+    const filePath = this.getConversationPath(sessionId);
+    const normalizedPatch = { ...patch };
+    delete (normalizedPatch as { id?: string }).id;
+    if (Object.keys(normalizedPatch).length === 0) {
+      return;
+    }
+    const existing = this.findCachedConversationMessage(sessionId, filePath, messageId);
+    if (!existing) {
+      throw new Error(`Cannot append conversation delta for unknown message: ${messageId}`);
+    }
+    const nextMessage: ConversationMessage = {
+      ...existing,
+      ...normalizedPatch,
+      id: messageId,
+      updatedAt: typeof normalizedPatch.updatedAt === 'number'
+        ? normalizedPatch.updatedAt
+        : nowMs(),
+    };
+    const delta: ConversationDeltaRecord = {
+      op: 'delta',
+      id: messageId,
+      patch: normalizedPatch,
+      updatedAt: nextMessage.updatedAt ?? nowMs(),
+    };
+    appendJsonl(filePath, delta);
+    this.applyConversationMessageToCache(sessionId, filePath, nextMessage);
+    const nextDeltaCount = (this.conversationPendingDeltaCounts.get(sessionId) ?? 0) + 1;
+    this.conversationPendingDeltaCounts.set(sessionId, nextDeltaCount);
+    if (nextDeltaCount >= CONVERSATION_COMPACTION_DELTA_THRESHOLD) {
+      this.compactConversationHistory(sessionId);
+    }
   }
 
   writeConversationHistory(sessionId: string, messages: ConversationMessage[]): void {
     writeJsonl(this.getConversationPath(sessionId), messages);
+    this.invalidateConversationHistoryCache(sessionId);
+    this.conversationPendingDeltaCounts.set(sessionId, 0);
     this.updateSession(sessionId, {});
+  }
+
+  compactConversationHistory(sessionId: string): ConversationMessage[] {
+    const messages = this.readConversationHistory(sessionId);
+    this.writeJsonlAtomic(this.getConversationPath(sessionId), messages);
+    this.invalidateConversationHistoryCache(sessionId);
+    this.conversationPendingDeltaCounts.set(sessionId, 0);
+    return messages;
   }
 
   listSessionAttachments(sessionId: string): SessionAttachmentRecord[] {
@@ -1144,7 +1230,9 @@ export class StorageAdapter {
 
   async readActionChain(sessionId: string): Promise<ActionEvent[]> {
     const actionChainPath = this.getActionChainPath(sessionId);
-    return readJsonl<ActionEvent>(actionChainPath);
+    const result = readJsonl<ActionEvent>(actionChainPath);
+    assertNoJsonlDiagnostics(actionChainPath, result.diagnostics);
+    return result.records;
   }
 
   createActionEvent(input: {
@@ -1254,8 +1342,13 @@ export class StorageAdapter {
 
   private syncSessionEvidence(sessionId: string, projectId: string): void {
     const latestRun = this.getLatestRun(sessionId);
-    const actionEvents = fs.existsSync(this.getActionChainPath(sessionId))
-      ? readJsonl<ActionEvent>(this.getActionChainPath(sessionId))
+    const actionChainPath = this.getActionChainPath(sessionId);
+    const actionEvents = fs.existsSync(actionChainPath)
+      ? (() => {
+        const result = readJsonl<ActionEvent>(actionChainPath);
+        assertNoJsonlDiagnostics(actionChainPath, result.diagnostics);
+        return result.records;
+      })()
       : [];
     const eventCounts = actionEvents.reduce<Record<string, number>>((acc, event) => {
       acc[event.event_type] = (acc[event.event_type] || 0) + 1;
@@ -1695,6 +1788,171 @@ export class StorageAdapter {
     this.writeUtf8Atomic(filePath, content);
   }
 
+  private isConversationDeltaRecord(value: unknown): value is ConversationDeltaRecord {
+    if (!value || typeof value !== 'object') return false;
+    const record = value as Record<string, unknown>;
+    return record.op === 'delta'
+      && typeof record.id === 'string'
+      && !!record.patch
+      && typeof record.patch === 'object'
+      && typeof record.updatedAt === 'number';
+  }
+
+  private rebuildConversationHistory(filePath: string): {
+    messages: ConversationMessage[];
+    rawRecordCount: number;
+  } {
+    if (!fs.existsSync(filePath)) {
+      return { messages: [], rawRecordCount: 0 };
+    }
+    const result = readJsonl<ConversationMessage | ConversationDeltaRecord>(filePath);
+    assertNoJsonlDiagnostics(filePath, result.diagnostics);
+    const latestById = new Map<string, ConversationMessage>();
+
+    for (const record of result.records) {
+      if (this.isConversationDeltaRecord(record)) {
+        const existing = latestById.get(record.id);
+        if (!existing) continue;
+        latestById.set(record.id, {
+          ...existing,
+          ...record.patch,
+          id: existing.id,
+          updatedAt: record.updatedAt,
+        });
+        continue;
+      }
+
+      if (!record || typeof record !== 'object' || typeof (record as ConversationMessage).id !== 'string') {
+        continue;
+      }
+      const snapshot = record as ConversationMessage;
+      const existing = latestById.get(snapshot.id);
+      const existingUpdatedAt = existing?.updatedAt ?? existing?.createdAt ?? 0;
+      const nextUpdatedAt = snapshot.updatedAt ?? snapshot.createdAt;
+      if (!existing || nextUpdatedAt >= existingUpdatedAt) {
+        latestById.set(snapshot.id, snapshot);
+      }
+    }
+
+    const messages = Array.from(latestById.values())
+      .sort((left, right) => left.createdAt - right.createdAt)
+      .map((message) => ({
+        ...message,
+        workTrace: sanitizeStoredWorkTrace(message.workTrace ?? null),
+      }));
+
+    return { messages, rawRecordCount: result.records.length };
+  }
+
+  private readConversationHistoryCache(
+    sessionId: string,
+    filePath: string,
+  ): ConversationHistoryCacheEntry | null {
+    const cached = this.conversationHistoryCache.get(sessionId);
+    if (!cached) return null;
+    if (!fs.existsSync(filePath)) {
+      if (cached.size === 0 && cached.mtimeMs === 0) return cached;
+      return null;
+    }
+    const stats = fs.statSync(filePath);
+    if (stats.mtimeMs !== cached.mtimeMs || stats.size !== cached.size) {
+      return null;
+    }
+    return cached;
+  }
+
+  private writeConversationHistoryCache(
+    sessionId: string,
+    filePath: string,
+    messages: ConversationMessage[],
+    rawRecordCount: number,
+  ): void {
+    if (!fs.existsSync(filePath)) {
+      this.conversationHistoryCache.set(sessionId, {
+        mtimeMs: 0,
+        size: 0,
+        messages,
+        rawRecordCount,
+      });
+      return;
+    }
+    const stats = fs.statSync(filePath);
+    this.conversationHistoryCache.set(sessionId, {
+      mtimeMs: stats.mtimeMs,
+      size: stats.size,
+      messages,
+      rawRecordCount,
+    });
+  }
+
+  private invalidateConversationHistoryCache(sessionId: string): void {
+    this.conversationHistoryCache.delete(sessionId);
+  }
+
+  private applyConversationMessageToCache(
+    sessionId: string,
+    filePath: string,
+    message: ConversationMessage,
+  ): void {
+    const cached = this.conversationHistoryCache.get(sessionId);
+    let messages: ConversationMessage[];
+    let previousRawCount: number;
+    if (cached) {
+      messages = cached.messages.slice();
+      previousRawCount = cached.rawRecordCount;
+    } else {
+      const rebuilt = this.rebuildConversationHistory(filePath);
+      messages = rebuilt.messages.filter((entry) => entry.id !== message.id);
+      previousRawCount = Math.max(0, rebuilt.rawRecordCount - 1);
+    }
+    const index = messages.findIndex((entry) => entry.id === message.id);
+    const sanitized: ConversationMessage = {
+      ...message,
+      workTrace: sanitizeStoredWorkTrace(message.workTrace ?? null),
+    };
+    if (index >= 0) messages[index] = sanitized;
+    else messages.push(sanitized);
+    messages.sort((left, right) => left.createdAt - right.createdAt);
+    this.writeConversationHistoryCache(
+      sessionId,
+      filePath,
+      messages,
+      previousRawCount + 1,
+    );
+  }
+
+  private findCachedConversationMessage(
+    sessionId: string,
+    filePath: string,
+    messageId: string,
+  ): ConversationMessage | null {
+    const cached = this.readConversationHistoryCache(sessionId, filePath);
+    if (cached) {
+      return cached.messages.find((message) => message.id === messageId) ?? null;
+    }
+    const rebuilt = this.rebuildConversationHistory(filePath);
+    this.writeConversationHistoryCache(sessionId, filePath, rebuilt.messages, rebuilt.rawRecordCount);
+    return rebuilt.messages.find((message) => message.id === messageId) ?? null;
+  }
+
+  private diffConversationMessage(
+    previous: ConversationMessage,
+    next: ConversationMessage,
+  ): Partial<ConversationMessage> {
+    const patch: Partial<ConversationMessage> = {};
+    const keys = new Set([
+      ...Object.keys(previous),
+      ...Object.keys(next),
+    ]) as Set<keyof ConversationMessage>;
+    for (const key of keys) {
+      if (key === 'id') continue;
+      if (JSON.stringify(previous[key]) !== JSON.stringify(next[key])) {
+        (patch as Record<string, unknown>)[key] = next[key];
+      }
+    }
+    return patch;
+  }
+
   private deepMerge<T extends Record<string, unknown>>(base: T, patch: Record<string, unknown>): T {
     const output: Record<string, unknown> = { ...base };
 
@@ -1931,6 +2189,8 @@ export class StorageAdapter {
     const branch = useAfter ? journal.afterBranch : journal.beforeBranch;
     const context = useAfter ? journal.afterContext : journal.beforeContext;
     this.writeJsonlAtomic(path.join(session.sessionPath, 'conversation.jsonl'), history);
+    this.invalidateConversationHistoryCache(session.sessionId);
+    this.conversationPendingDeltaCounts.set(session.sessionId, 0);
     const branchPath = path.join(session.sessionPath, 'conversation-branches.json');
     if (branch) this.writeJsonAtomic(branchPath, branch);
     else if (fs.existsSync(branchPath)) fs.rmSync(branchPath, { force: true });
@@ -1947,6 +2207,8 @@ export class StorageAdapter {
     const attachments = useAfter ? journal.afterAttachments : journal.beforeAttachments;
     if (!history) throw new Error('Conversation turn journal does not contain a committed history snapshot.');
     this.writeJsonlAtomic(path.join(session.sessionPath, 'conversation.jsonl'), history);
+    this.invalidateConversationHistoryCache(session.sessionId);
+    this.conversationPendingDeltaCounts.set(session.sessionId, 0);
     const branchPath = path.join(session.sessionPath, 'conversation-branches.json');
     if (branch) this.writeJsonAtomic(branchPath, branch);
     else if (fs.existsSync(branchPath)) fs.rmSync(branchPath, { force: true });

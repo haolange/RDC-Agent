@@ -3,37 +3,197 @@
  */
 
 import { app, BrowserWindow, dialog, Menu, shell } from 'electron';
+import * as fs from 'fs';
 import * as path from 'path';
+import { randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 
 import { registerIPCHandlers, setMainWindow, initializeIpcState, stopAllActiveRuns } from './ipc/handlers';
 import { storageAdapter } from './sessions/StorageAdapter';
+import { rdxSessionService } from './sessions';
 import { settingsService } from './settings/SettingsService';
 import { rdxCliInvokerService } from './tools/RdxCliInvokerService';
-import { RdxSessionService } from './sessions/RdxSessionService';
 import { replayDeviceService } from './captures/ReplayDeviceService';
 import { runtimeLogService } from './runtime/RuntimeLogService';
+import { terminalSessionService } from './runtime/TerminalSessionService';
 import { rendererEventHub } from './browserAppBridge/rendererEventHub';
-import { startBrowserAppBridge, stopBrowserAppBridge } from './browserAppBridge/BrowserAppBridgeServer';
+import {
+  shouldStartBrowserAppBridge,
+  startBrowserAppBridge,
+  stopBrowserAppBridge,
+} from './browserAppBridge/BrowserAppBridgeServer';
+import { shutdownCoordinator } from './lifecycle/ShutdownCoordinator';
+import { conversationService } from './conversation/ConversationService';
+import { agentOrchestrator } from './workflow/debugger/AgentOrchestrator';
+import { processSupervisor } from './runtime/ProcessSupervisor';
+import { turnCoordinator } from './workflow/debugger/TurnCoordinator';
 
-// Shared RDX runtime context service for IPC handlers.
-export const rdxSessionService = new RdxSessionService();
+// Re-export for callers that historically imported from main entry.
+export { rdxSessionService } from './sessions';
+
+const SHUTDOWN_TIMEOUT_MS = 8_000;
+let shutdownStarted = false;
+
+function registerShutdownDisposables(): void {
+  shutdownCoordinator.register({
+    id: 'conversation.stop-accepting',
+    phase: 'stop_accepting_turns',
+    dispose: () => {
+      conversationService.stopAcceptingTurns();
+    },
+  });
+  shutdownCoordinator.register({
+    id: 'conversation.abort-all',
+    phase: 'abort_all',
+    dispose: async () => {
+      await conversationService.abortAllTurns();
+      await turnCoordinator.abortAll('app_shutdown');
+    },
+  });
+  shutdownCoordinator.register({
+    id: 'runs.stop-all',
+    phase: 'join_producers',
+    dispose: async () => {
+      await stopAllActiveRuns();
+    },
+  });
+  shutdownCoordinator.register({
+    id: 'process-supervisor.join-all',
+    phase: 'terminate_processes',
+    dispose: async () => {
+      await processSupervisor.joinAll({ graceMs: 1_500, forceAfterMs: 4_000 });
+    },
+  });
+  shutdownCoordinator.register({
+    id: 'mcp.disconnect-all',
+    phase: 'terminate_processes',
+    dispose: async () => {
+      await agentOrchestrator.disconnectAllMcpServers();
+    },
+  });
+  shutdownCoordinator.register({
+    id: 'terminal.dispose-all',
+    phase: 'terminate_processes',
+    dispose: () => {
+      terminalSessionService.disposeAll();
+    },
+  });
+  shutdownCoordinator.register({
+    id: 'rdx.close-runtime',
+    phase: 'terminate_processes',
+    dispose: async () => {
+      await rdxSessionService.closeOrReplaceOpenedCapture();
+    },
+  });
+  shutdownCoordinator.register({
+    id: 'bridge.stop',
+    phase: 'terminate_processes',
+    dispose: async () => {
+      await stopBrowserAppBridge();
+    },
+  });
+  shutdownCoordinator.register({
+    id: 'replay.dispose',
+    phase: 'flush_storage',
+    dispose: () => {
+      replayDeviceService.dispose();
+    },
+  });
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const configuredUserDataPath = process.env.RDC_AGENT_USER_DATA?.trim();
-if (configuredUserDataPath) {
-  app.commandLine.appendSwitch('user-data-dir', configuredUserDataPath);
-  app.setPath('userData', configuredUserDataPath);
-} else {
-  app.setPath('userData', path.join(app.getPath('appData'), 'rdc-agent'));
-}
 
 // Development environment detection.
 const isDev = process.env.NODE_ENV === 'development' && process.env.RDC_AGENT_TEST_MODE !== '1';
 const isSettingsRebuildOnly = process.env.RDC_AGENT_REBUILD_SETTINGS_ONLY === '1';
 const isTestMode = process.env.RDC_AGENT_TEST_MODE === '1';
-const isHeadlessMode = process.env.RDC_AGENT_HEADLESS === '1';
+const isHeadlessMode = process.env.RDC_AGENT_HEADLESS === '1' || process.env.RDC_AGENT_BROWSER_QA === '1';
+if (isHeadlessMode) {
+  process.env.RDC_AGENT_HEADLESS = '1';
+}
+
+function resolveUserDataPath(): string {
+  const configured = process.env.RDC_AGENT_USER_DATA?.trim();
+  if (configured) {
+    return path.resolve(configured);
+  }
+  if (isHeadlessMode) {
+    const runId = process.env.RDC_AGENT_QA_RUN_ID?.trim() || randomBytes(8).toString('hex');
+    const qaRoot = path.join(app.getPath('appData'), 'rdc-agent', `qa-${runId}`);
+    process.env.RDC_AGENT_USER_DATA = qaRoot;
+    process.env.RDC_AGENT_QA_RUN_ID = runId;
+    return qaRoot;
+  }
+  return path.join(app.getPath('appData'), 'rdc-agent');
+}
+
+const userDataPath = resolveUserDataPath();
+fs.mkdirSync(userDataPath, { recursive: true });
+app.commandLine.appendSwitch('user-data-dir', userDataPath);
+app.setPath('userData', userDataPath);
+
+function acquireUserDataInstanceLock(targetUserDataPath: string): void {
+  const mode = isHeadlessMode ? 'browser-qa' : 'desktop';
+  const lockPath = path.join(targetUserDataPath, 'instance.lock');
+  const startTs = new Date().toISOString();
+  const payload = `${JSON.stringify({
+    pid: process.pid,
+    mode,
+    startTs,
+    headless: isHeadlessMode,
+  })}\n`;
+
+  const isProcessAlive = (pid: number): boolean => {
+    if (!Number.isInteger(pid) || pid <= 0) return false;
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Desktop still uses Electron's single-instance lock for UX; instance.lock
+  // additionally fail-closes shared userData between desktop and browser QA.
+  if (fs.existsSync(lockPath)) {
+    try {
+      const existing = JSON.parse(fs.readFileSync(lockPath, 'utf8')) as { pid?: number; mode?: string };
+      if (typeof existing.pid === 'number' && existing.pid !== process.pid && isProcessAlive(existing.pid)) {
+        console.error(
+          `[RDC-Agent] userData is already in use by pid ${existing.pid}`
+          + `${existing.mode ? ` (${existing.mode})` : ''}: ${targetUserDataPath}`,
+        );
+        app.exit(1);
+        return;
+      }
+    } catch {
+      // Stale or corrupt lock; replace below.
+    }
+  }
+
+  try {
+    fs.writeFileSync(lockPath, payload, { encoding: 'utf8', flag: 'w' });
+  } catch (error) {
+    console.error('[RDC-Agent] Failed to acquire userData instance.lock:', error);
+    app.exit(1);
+  }
+
+  const release = (): void => {
+    try {
+      if (fs.existsSync(lockPath)) {
+        const existing = JSON.parse(fs.readFileSync(lockPath, 'utf8')) as { pid?: number };
+        if (existing.pid === process.pid) {
+          fs.rmSync(lockPath, { force: true });
+        }
+      }
+    } catch {
+      // Best-effort unlock on shutdown.
+    }
+  };
+  process.once('exit', release);
+}
+
+acquireUserDataInstanceLock(userDataPath);
 
 // Browser QA is a second, headless surface over the real runtime. It must not
 // own the desktop lock, otherwise a later human launcher is redirected to an
@@ -333,44 +493,51 @@ app.whenReady().then(async () => {
 
   // Initialize main process services.
   await initializeServices();
-  const bridgeUrl = await startBrowserAppBridge({
-    devRendererUrl: isDev ? getDevRendererUrl() : null,
-    rendererRoot: path.join(__dirname, '../renderer'),
-    mainBundlePath: path.join(__dirname, 'index.js'),
-    appVersion: process.env.npm_package_version?.trim() || app.getVersion(),
-  });
-  runtimeLogService.log({
-    scope: 'app',
-    namespace: 'system',
-    severity: 'success',
-    title: 'Browser app session ready',
-    summary: `浏览器真实会话入口已启动：${bridgeUrl}/app`,
-    raw: { bridgeUrl },
-  });
-  
-  if (isHeadlessMode) {
-    headlessKeepAliveWindow = new BrowserWindow({
-      width: 1,
-      height: 1,
-      show: false,
-      skipTaskbar: true,
-      webPreferences: {
-        nodeIntegration: false,
-        contextIsolation: true,
-        sandbox: false,
-      },
+  if (shouldStartBrowserAppBridge()) {
+    const bridgeUrl = await startBrowserAppBridge({
+      devRendererUrl: isDev ? getDevRendererUrl() : null,
+      rendererRoot: path.join(__dirname, '../renderer'),
+      mainBundlePath: path.join(__dirname, 'index.js'),
+      appVersion: process.env.npm_package_version?.trim() || app.getVersion(),
     });
-    headlessKeepAliveWindow.loadURL('about:blank').catch(() => {
-      // The window only anchors the Electron lifecycle; a blank-load failure is non-fatal.
+    runtimeLogService.log({
+      scope: 'app',
+      namespace: 'system',
+      severity: 'success',
+      title: 'Browser app session ready',
+      summary: `浏览器真实会话入口已启动：${bridgeUrl}/app`,
+      raw: { bridgeUrl, userDataPath },
     });
-    headlessKeepAliveWindow.on('closed', () => {
-      headlessKeepAliveWindow = null;
-    });
-    headlessKeepAliveTimer = setInterval(() => {
-      // Keep Electron's main process alive when the browser session has no BrowserWindow.
-    }, 60_000);
-    console.log(`[BrowserAppBridge] Headless mode enabled. Open ${bridgeUrl}/app`);
-  } else {
+    if (isHeadlessMode) {
+      headlessKeepAliveWindow = new BrowserWindow({
+        width: 1,
+        height: 1,
+        show: false,
+        skipTaskbar: true,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          sandbox: false,
+        },
+      });
+      headlessKeepAliveWindow.loadURL('about:blank').catch(() => {
+        // The window only anchors the Electron lifecycle; a blank-load failure is non-fatal.
+      });
+      headlessKeepAliveWindow.on('closed', () => {
+        headlessKeepAliveWindow = null;
+      });
+      headlessKeepAliveTimer = setInterval(() => {
+        // Keep Electron's main process alive when the browser session has no BrowserWindow.
+      }, 60_000);
+      console.log(`[BrowserAppBridge] Headless mode enabled. Open the printed /app URL with token.`);
+    }
+  } else if (isHeadlessMode) {
+    console.error('[RDC-Agent] Headless mode requires the browser app bridge.');
+    app.exit(1);
+    return;
+  }
+
+  if (!isHeadlessMode) {
     createMainWindow();
   }
 
@@ -398,6 +565,13 @@ app.on('before-quit', (event) => {
     event.preventDefault();
     return;
   }
+  if (shutdownStarted || shutdownCoordinator.isShuttingDown()) {
+    event.preventDefault();
+    return;
+  }
+  shutdownStarted = true;
+  event.preventDefault();
+
   if (headlessKeepAliveWindow && !headlessKeepAliveWindow.isDestroyed()) {
     headlessKeepAliveWindow.destroy();
     headlessKeepAliveWindow = null;
@@ -406,13 +580,12 @@ app.on('before-quit', (event) => {
     clearInterval(headlessKeepAliveTimer);
     headlessKeepAliveTimer = null;
   }
-  void stopAllActiveRuns();
-  void stopBrowserAppBridge();
-  replayDeviceService.dispose();
-  if (isTestMode) {
-    const forceExitTimer = setTimeout(() => app.exit(0), 100);
-    forceExitTimer.unref?.();
-  }
+
+  registerShutdownDisposables();
+  const timeoutMs = isTestMode ? 100 : SHUTDOWN_TIMEOUT_MS;
+  void shutdownCoordinator.shutdownAll(timeoutMs, () => app.exit(0)).then(() => {
+    app.exit(0);
+  });
 });
 
 // Block navigation to unknown origins.

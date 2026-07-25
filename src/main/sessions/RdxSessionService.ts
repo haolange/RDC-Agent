@@ -27,7 +27,7 @@ import {
   rdxShellActionService,
   type RdxShellActionResult,
 } from '../tools/RdxShellActionService';
-import { setRdxRuntimeContext } from './RdxRuntimeContextRegistry';
+import { setRdxRuntimeContext, setRdxRuntimeContextForSession, clearRdxContextLeases } from './RdxRuntimeContextRegistry';
 
 interface PreviewLoadResult {
   preview: OpenedCapturePreview | null;
@@ -173,7 +173,7 @@ export class RdxSessionService {
       deviceId: replayDevice.id,
       deviceLabel: replayDevice.label,
     });
-    this.applyRuntimeContext(runtimeContext);
+    this.applyRuntimeContext(runtimeContext, request.ownerSessionId ?? null, request.projectId ?? null);
     const captureIndex = this.captures.findIndex((item) => item.id === capture.id);
     this.captures[captureIndex] = {
       ...this.captures[captureIndex],
@@ -342,9 +342,17 @@ export class RdxSessionService {
     };
   }
 
-  private applyRuntimeContext(runtimeContext: RdxRuntimeContext): void {
+  private applyRuntimeContext(
+    runtimeContext: RdxRuntimeContext,
+    sessionId?: string | null,
+    projectId?: string | null,
+  ): void {
     this.runtimeContext = runtimeContext;
-    setRdxRuntimeContext(runtimeContext);
+    if (sessionId) {
+      setRdxRuntimeContextForSession(sessionId, runtimeContext, { projectId: projectId ?? null });
+    } else {
+      setRdxRuntimeContext(runtimeContext);
+    }
     this.contextId = runtimeContext.contextId;
     this.runtimeOwner = runtimeContext.runtimeOwner;
     this.ownerLeaseId = runtimeContext.ownerLeaseId;
@@ -715,7 +723,14 @@ export class RdxSessionService {
     this.replayDevice = null;
     this.remoteStatus = 'disconnected';
     this.runtimeContext = null;
-    setRdxRuntimeContext(null);
+    if (previousCapture?.ownerSessionId) {
+      setRdxRuntimeContextForSession(previousCapture.ownerSessionId, null);
+    } else {
+      setRdxRuntimeContext(null);
+    }
+    if (!previousCapture) {
+      clearRdxContextLeases();
+    }
     this.humanPreview = {
       status: 'closed',
       updatedAt: Date.now(),
