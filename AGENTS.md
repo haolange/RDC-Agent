@@ -8,7 +8,8 @@
 
 ## 修改原则
 
-- 涉及 UI/UX、产品设计、架构边界、跨层契约、feature 拆分或验证策略时，必须先阅读 `DESIGN.md`，再阅读相关 `docs/architecture/*` 文档。
+- 涉及 UI/UX、产品设计、架构边界、跨层契约、feature 拆分或验证策略时，必须先阅读 `DESIGN.md`，再阅读相关 `docs/contracts/*` 与 `docs/architecture/*`。
+- **权威文件**：`DESIGN.md` 的 Architecture Principles / Authority Map；Appearance 与 token 执行摘要仍见下文「设计系统约束」。详细 UI 规格见 `docs/ui/workbench-and-transcript.md` 与 `docs/ui/design-system.md`。
 - 根目录只放仓库入口、总体说明和跨层约定，不要把具体 agent、stage 或 tool 的领域规则重复写到仓库根。
 - 仓库保持标准 Electron 应用布局，`Config`、`Saved`、`Intermediate`、`Binaries` 属于运行期或构建期概念，不要重新引入为仓库顶层源码目录。
 - 涉及主进程、预加载脚本、渲染层、共享类型时，优先保持一次改动内联动更新，避免只改单层造成契约漂移。
@@ -38,8 +39,31 @@
 - `src/renderer` 负责界面、交互、状态展示和用户入口。
 - `src/shared` 负责跨层共享的常量、类型与工具函数。
 - `docs/` 只放稳定设计说明、流程说明和使用文档，不要把运行时代码规则写回文档层。
-- `docs/` 下的正式文档应按稳定主题归类到 `product/`、`architecture/`、`workflows/`、`ui/`。
+- `docs/` 下的正式文档按稳定主题归类到 `contracts/`、`product/`、`architecture/`、`workflows/`、`ui/`。
+  - `contracts/`：runtime kernel、permissions、failure-model 等跨层契约（DESIGN 分拆权威）。
+  - 产品/架构冲突以 `DESIGN.md` 裁决，再同步 `docs/**`。
 - `resources/` 只放需要随应用分发或运行时依赖的资源；`scripts/` 只放可复用的开发脚本。
+
+## 运行时模块与安全边界（Phase 0–6）
+
+涉及下列模块时先读 `DESIGN.md` 与 `docs/contracts/*`，再改代码：
+
+| 模块 | 路径（示意） | 边界 |
+| --- | --- | --- |
+| `ProcessSupervisor` | `src/main/runtime/` | 子进程 spawn/joinAll；abort 后 registry 为空 |
+| `TurnCoordinator` / `TurnHandle` | `src/main/workflow/debugger/` | 每 session 活跃 turn；generation 丢弃迟到 event |
+| `ShutdownCoordinator` | `src/main/lifecycle/` | before-quit 限时 shutdownAll |
+| `EffectiveRuntimePlan` | `src/main/agent-runtime/` | prepareTurn 冻结；Prompt 与 Executor 共用 |
+| `bridgeSecurity` | `src/main/browserAppBridge/` | **仅** `RDC_AGENT_BROWSER_QA=1`；bearer + Origin + allowlist |
+| `McpTrustService` | `src/main/settings/` | project 不可覆盖 user executable；needsRetrust |
+| IPC Zod | `src/main/ipc/validation/` | `parseIpcArgs`；approvalToken 单次消费 |
+| `BashAstAnalyzer` | `src/main/agent-runtime/permissions/` | 风险分类器**不是**安全边界；PermissionPolicy 才是 |
+| Secret / `safeStorage` | `src/main/settings/SecretStorageService.ts` | 不可用则 fail-closed；禁止明文 IPC |
+| Electron sandbox | BrowserWindow + preload | `sandbox:true`；permission deny-by-default；CSP `style-src` 仍含 unsafe-inline（6.1 partial） |
+
+失败语义三分类见 `docs/contracts/failure-model.md`（Security fail-closed / Integrity degrade-safe / Availability recoverable）。多 skill 工具面：`allowedTools = ∩(skill_i) ∩ runtimeAllowlist`。
+
+Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`（security / concurrency / cancellation / storageFault / providerWireFixture）。
 
 ## UI / UX 约束
 
@@ -52,7 +76,7 @@
 
 ## 设计系统约束（agent 写 CSS 必读）
 
-**权威文件**：`DESIGN.md` 的 `## Design System` 与 Appearance 双体系章节。本节是该章节的快速执行摘要。
+**权威文件**：`DESIGN.md` Authority Map + `docs/ui/design-system.md` 与 Appearance 双体系章节。本节是快速执行摘要。
 
 ### Token 使用规则
 
@@ -93,6 +117,7 @@
 
 - agent 日常 UI/功能验证默认使用 headless 浏览器真实会话：设置 `RDC_AGENT_HEADLESS=1` 启动应用主进程，再用主进程输出的 `http://127.0.0.1:<port>/app` 打开同一套 renderer。
 - 浏览器真实会话通过 localhost bridge 连接真实 `main process`、workspace、settings、LLM runtime、事件流和已配置的 RDX CLI invoker；不得新增渲染层本地样本或演示场景作为验收入口。
+- Bridge 为 QA-only 安全边界（`bridgeSecurity`）：非 `RDC_AGENT_BROWSER_QA=1` 不得启动；敏感 channel 永久 deny；与桌面 preload 共享 handler registry，但 allowlist 更窄。
 - Electron 窗口仍通过 `preload -> IPC` 进入主进程；浏览器真实会话通过 `localhost bridge -> IPC handler registry` 进入主进程。两条路径必须共享同一套 main/runtime 能力。
 - 涉及 UI/UX、布局、消息流、状态展示、样式、面板可达性的改动，优先用浏览器真实会话和内置浏览器点击/截图验证。
 - 产品级浏览器评审必须至少覆盖：Workbench 初始状态、Project/Session 入口、`.rdc` 导入或打开状态、Settings > Providers、Settings > Agents、桌面与窄屏视口、水平溢出检查、长路径/中文文件名显示、按钮 disabled/active 状态和前后端数据一致性。
@@ -148,6 +173,7 @@
 - Provider/model/Composer control 改动的真实验收必须覆盖：`reasoning unknown` 显示中性 `未验证 / Provider managed`、`none` 才锁定 `Off`、canonical wire `xhigh` 统一显示 `Extra` 且产品最高档为 `Max`、上下文开关只叫 `Max mode / Max 模式`（reasoning 的 `Max` 不变）、固定 Max mode 开启且不可关闭、快速 A→B→C 只保留最新 revision、在途 turn 保持创建时冻结的 `RequestPlan`、切换和输入不触发 Context preview IPC、发送后计量相位依次为 `Preparing` / `Current request ~` / provider `Actual`（圆环环面只显示 `%` / `—` / `…`，阶段文案仅在 title/aria 与 Context breakdown 弹层；弹层保持相位单一权威：Preparing 不展示上一轮 Last actual hero/meter，Current request 不叠历史 Last actual 三栏带，Actual/idle Last actual 才有一条 Tokens | Cache | Reasoning flat strip 且不重复 uppercase phase eyebrow）、Actual / Last actual 为同行固定三栏 Tokens | Cache | Reasoning（Cache：省 tokens、最近一轮%、累计%、命中/未命中；缺遥测显示 `—`，禁止假 0 / 假 0%）、缩窗只在发送 preflight 内派生压缩视图而不提前改写历史。
 - Composer Effort 滑杆拖拽验收必须覆盖：白方块全程落在 track 内（inset 几何，无端点 transform 突变）、弹层拖拽无横向滚动条与布局跳动、松手仍 snap 到最近档位并短动画回位。
 - scoped resource、project instruction、prompt snapshot、skill、hook 或 memory policy 改动后，必须执行相应专项 contract check；缺少时应在同一改动中补齐。
+- 安全 / 并发 / 取消 / 存储故障 / provider wire 契约改动后执行：`vitest run src/main/testing/contracts`（及被触及的既有单测，如 `bridgeSecurity`、`jsonl`、`TurnCoordinator`、`ProcessSupervisor`、`DebuggerRuntimePolicy`）。
 - 入口、构建或窗口逻辑改动后，再补 `pnpm run build` 或等价打包检查。
 - 发布配置改动后执行 `pnpm run pack`，并确认 unpacked 产物不包含开发期包管理器、lockfile、launcher 和缓存状态。
 - 浏览器真实会话使用 `pnpm run start:agent-browser`（或 `scripts/run-rdc-launcher.* --mode browser`），然后用 Codex 内置浏览器打开主进程输出的 `/app`。Work Process / tool 卡片 UI 验收前必须先停旧进程再重启以加载最新前后端，并删除该 QA project 下全部 session 后新建隔离 session，避免跨 session/project 串台与脏数据。

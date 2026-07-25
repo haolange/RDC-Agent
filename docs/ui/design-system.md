@@ -2,11 +2,12 @@
 
 权威来源（按优先级）：
 
-1. [`DESIGN.md`](../../DESIGN.md) — Appearance 双体系、Composer Effort、产品验收
-2. [`AGENTS.md`](../../AGENTS.md) — token / 按钮 / Appearance 执行纪律
-3. [`src/renderer/styles/design-system.css`](../../src/renderer/styles/design-system.css) — primitive + semantic token 定义
-4. [`src/shared/theme/`](../../src/shared/theme/) — preset catalog、`ThemeChromeCompiler`、`rdx-theme-v1`、compose accent 派生
-5. [`designs/rdc-agent-design-system/Design System Preview.html`](../../designs/rdc-agent-design-system/Design%20System%20Preview.html) — 可交互预览
+1. [`DESIGN.md`](../../DESIGN.md) — 产品边界与不变量裁决
+2. [`workbench-and-transcript.md`](workbench-and-transcript.md) — Workbench / Composer Effort / transcript 产品规格
+3. [`AGENTS.md`](../../AGENTS.md) — token / 按钮 / Appearance 执行纪律
+4. [`src/renderer/styles/design-system.css`](../../src/renderer/styles/design-system.css) — primitive + semantic token 定义
+5. [`src/shared/theme/`](../../src/shared/theme/) — preset catalog、`ThemeChromeCompiler`、`rdx-theme-v1`、compose accent 派生
+6. [`designs/rdc-agent-design-system/Design System Preview.html`](../../designs/rdc-agent-design-system/Design%20System%20Preview.html) — 可交互预览
 
 ## 双体系（摘要）
 

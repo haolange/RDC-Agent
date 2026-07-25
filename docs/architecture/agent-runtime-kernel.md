@@ -1,6 +1,6 @@
 # Agent Runtime Kernel
 
-> 本文描述当前 Agent Runtime 的稳定设计边界与可验证契约。产品边界与验证门禁以根目录 `DESIGN.md` 为 SSOT。
+> 契约权威：[`docs/contracts/runtime-kernel.md`](../contracts/runtime-kernel.md) 与根目录 `DESIGN.md`。本文保留实现向边界与模块说明；冲突时先改 contracts / DESIGN，再同步本文。
 
 The agent runtime owns agent turns, tool mediation policy, deterministic events, provider routing, approval events, and final run status.
 
