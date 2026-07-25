@@ -139,6 +139,19 @@ describe('live Provider Catalog parsers', () => {
     expect(parsed.contributions.every((model) => model.route?.source === 'catalog')).toBe(true);
   });
 
+  it('projects compiled OpenCode Go budgets for live ids even when upstream omits context_window', () => {
+    const parsed = parseOpenCodeGoCatalog({ data: [
+      { id: 'minimax-m3' },
+      { id: 'glm-5.2' },
+      { id: 'kimi-k3', context_length: 1_000_000 },
+    ] });
+    expect(parsed.contributions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ modelId: 'minimax-m3', defaultBudgetTokens: 256_000, availability: 'available' }),
+      expect.objectContaining({ modelId: 'glm-5.2', defaultBudgetTokens: 200_000, availability: 'available' }),
+      expect.objectContaining({ modelId: 'kimi-k3', defaultBudgetTokens: 256_000, availability: 'available' }),
+    ]));
+  });
+
   it('projects Kimi K3 only from exact OpenCode Go and OpenRouter live rows', () => {
     const openCode = parseOpenCodeGoCatalog({ data: [{
       id: 'kimi-k3',

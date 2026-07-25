@@ -403,6 +403,37 @@ describe('EffectiveCatalogService', () => {
     expect(persisted.discoveries).toEqual({});
   });
 
+  it('keeps compiled positive budgets when a context-less discovery row reports zero', async () => {
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
+    const [model] = mergeEffectiveCatalog(request({
+      catalog: {
+        source: 'catalog',
+        observedAt: '2026-01-01T00:00:00.000Z',
+        models: [{
+          modelId: 'minimax-m3',
+          label: 'MiniMax M3',
+          availability: 'unknown',
+          defaultBudgetTokens: 256_000,
+        }],
+      },
+      discovery: {
+        source: 'discovery',
+        observedAt: '2026-01-02T00:00:00.000Z',
+        models: [{
+          modelId: 'minimax-m3',
+          label: 'MiniMax M3',
+          availability: 'available',
+          defaultBudgetTokens: 0,
+        }],
+      },
+    }));
+    expect(model).toMatchObject({
+      modelId: 'minimax-m3',
+      availability: 'available',
+      defaultBudgetTokens: 256_000,
+    });
+  });
+
   it('rekeys punctuation-equivalent live ids while preserving the Catalog id as a proven alias', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const [model] = mergeEffectiveCatalog(request({

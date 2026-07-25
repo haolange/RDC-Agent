@@ -195,6 +195,24 @@ function projectContext(
   };
 }
 
+/** Prefer compiled budget; otherwise take live-observed / projected tier capacity. */
+function resolveProjectedDefaultBudget(
+  model: ModelManifest,
+  observation: LiveModelObservation,
+  contextTiers: ReadonlyArray<{ id: string; maxPromptTokens?: number }> | undefined,
+): number {
+  if (model.defaultBudgetTokens > 0) return model.defaultBudgetTokens;
+  const observed = observation.contextWindowTokens;
+  if (typeof observed === 'number' && observed > 0) return observed;
+  const tiers = contextTiers ?? model.contextTiers;
+  const observedTierId = model.liveProjection?.context?.observedTierId;
+  const tier = (observedTierId ? tiers.find((entry) => entry.id === observedTierId) : undefined)
+    ?? tiers.find((entry) => typeof entry.maxPromptTokens === 'number' && entry.maxPromptTokens > 0);
+  return typeof tier?.maxPromptTokens === 'number' && tier.maxPromptTokens > 0
+    ? tier.maxPromptTokens
+    : model.defaultBudgetTokens;
+}
+
 function projectCompiledModel(
   surface: ProviderSurfaceDefinition,
   model: ModelManifest,
@@ -218,6 +236,8 @@ function projectCompiledModel(
   const fastBinding = executionBindings?.find((binding) => (
     binding.when.fast === true && binding.actions.some((action) => action.kind === 'model-switch')
   ));
+  const contextTiers = context.contextTiers ?? model.contextTiers;
+  const defaultBudgetTokens = resolveProjectedDefaultBudget(model, observation, contextTiers);
   return {
     modelId: model.modelId,
     label: model.label,
@@ -231,8 +251,9 @@ function projectCompiledModel(
     presencePolicy: model.presencePolicy,
     availability: observation.availability ?? 'available',
     unavailableReason: observation.unavailableReason,
-    contextTiers: context.contextTiers ?? model.contextTiers,
-    defaultBudgetTokens: model.defaultBudgetTokens,
+    contextTiers,
+    // Omit zero so a context-less live row cannot erase a compiled positive budget on merge.
+    ...(defaultBudgetTokens > 0 ? { defaultBudgetTokens } : {}),
     controls: {
       ...model.controls,
       ...context.controls,

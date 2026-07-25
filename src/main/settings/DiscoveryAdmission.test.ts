@@ -9,6 +9,8 @@ describe('discovery admission', () => {
     ['nested embedding type', { id: 'vector-v2', capabilities: { type: 'embeddings' } }, false, 'modality'],
     ['audio output', { id: 'voice-v2', output_modalities: ['audio'] }, false, 'modality'],
     ['video generation', { id: 'grok-imagine-video-1.5', output_modalities: ['video'] }, false, 'deny-pattern'],
+    ['video modality without name match', { id: 'vendor-media-v2', modality: 'video' }, false, 'modality'],
+    ['multimodal chat with video in id', { id: 'llava-video-7b', modality: 'text' }, true, undefined],
     ['vision chat', { id: 'vision-image-chat', input_modalities: ['text', 'image'], output_modalities: ['text'] }, true, undefined],
     ['image generation', { id: 'gpt-image-1', input_modalities: ['text', 'image'], output_modalities: ['image'] }, false, 'deny-pattern'],
     ['vision chat input', { id: 'vision-chat', input_modalities: ['text', 'image'], output_modalities: ['text'] }, true, undefined],

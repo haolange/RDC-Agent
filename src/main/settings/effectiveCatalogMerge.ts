@@ -382,9 +382,19 @@ function applyLayer(
           ...(availability !== undefined ? { availability } : {}),
           ...(unavailableReason !== undefined ? { unavailableReason } : {}),
         };
-    const ordinaryPatch = rekeyFromDiscovery
+    const ordinaryPatch: Record<string, unknown> = rekeyFromDiscovery
       ? { ...ordinaryFields, ...availabilityPatch }
       : { ...ordinaryFields, ...availabilityPatch, ...(aliases !== undefined ? { aliases } : {}) };
+    // Live rows without a measured window must not clobber compiled/manifest budgets (Agents picker
+    // requires defaultBudgetTokens > 0; OpenCode Go /models returns ids only).
+    if (
+      layer.source === 'discovery'
+      && typeof ordinaryPatch.defaultBudgetTokens === 'number'
+      && ordinaryPatch.defaultBudgetTokens <= 0
+      && model.defaultBudgetTokens > 0
+    ) {
+      delete ordinaryPatch.defaultBudgetTokens;
+    }
     if (rekeyFromDiscovery) {
       const previousId = model.modelId;
       model.modelId = patch.modelId;

@@ -28,9 +28,9 @@
     {
       "id": "rdc-agent:opencode-go:0",
       "sourceKind": "rdc-agent",
-      "sourceRevision": "opencode-go-live-2026-07-23",
+      "sourceRevision": "opencode-go-live-2026-07-25-budgets",
       "observedAt": "2026-07-23",
-      "refreshedAt": "2026-07-23T00:00:00+08:00",
+      "refreshedAt": "2026-07-25T00:00:00+08:00",
       "surface": "opencode-go",
       "accountScope": "credential-scoped"
     }
@@ -100,10 +100,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 256000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -167,10 +168,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 204800
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 204800,
       "toolCalling": {
         "state": "unknown"
       },
@@ -234,10 +236,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 204800
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 204800,
       "toolCalling": {
         "state": "unknown"
       },
@@ -400,10 +403,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 256000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -467,10 +471,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 256000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -534,10 +539,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 256000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -601,10 +607,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 200000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 200000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -668,10 +675,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 131072
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 131072,
       "toolCalling": {
         "state": "unknown"
       },
@@ -735,10 +743,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 131072
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 131072,
       "toolCalling": {
         "state": "unknown"
       },
@@ -802,10 +811,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 256000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -869,10 +879,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 256000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -936,10 +947,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 256000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -1003,10 +1015,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 256000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -1070,10 +1083,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 256000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -1137,10 +1151,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 256000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -1204,10 +1219,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 128000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 128000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -1271,10 +1287,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 128000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 128000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -1338,10 +1355,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 128000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 128000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -1405,10 +1423,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 128000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 128000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -1472,10 +1491,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 128000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 128000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -1539,10 +1559,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 128000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 128000,
       "toolCalling": {
         "state": "unknown"
       },
@@ -1606,10 +1627,11 @@
           "activation": {
             "kind": "implicit"
           },
-          "entitlement": "unknown"
+          "entitlement": "unknown",
+          "maxPromptTokens": 500000
         }
       ],
-      "defaultBudgetTokens": 0,
+      "defaultBudgetTokens": 500000,
       "toolCalling": {
         "state": "unknown"
       },

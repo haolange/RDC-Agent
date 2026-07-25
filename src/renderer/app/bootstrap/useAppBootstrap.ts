@@ -164,6 +164,15 @@ export function useAppBootstrap(options: {
     return undefined;
   }, [clearUsageSnapshot, currentRun?.runId, currentRunUsage?.runId, currentSession?.sessionId, hasActiveDebugRun, setCurrentRunUsage]);
 
+  useEffect(() => {
+    const electronAPI = window.electronAPI;
+    if (!electronAPI?.events?.onEffectiveCatalogChanged) return undefined;
+    // Agents modelOptions are projected only on settings:get; keep them fresh after discovery.
+    return electronAPI.events.onEffectiveCatalogChanged(() => {
+      void useAppSettingsStore.getState().reloadSettings().catch(() => undefined);
+    });
+  }, []);
+
   useProjectInputsBootstrap(runtimeTestMode);
   useSessionRestoreBootstrap(runtimeTestMode);
 }
