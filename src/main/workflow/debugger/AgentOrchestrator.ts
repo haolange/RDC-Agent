@@ -13,32 +13,26 @@
  *  - 调用 `Agent.prompt()` 触发新循环；
  *  - 订阅核心 `AgentEvent`，通过 `AgentEventBridge` 翻译为共享 `AgentEvent`，
  *    供 ConversationService / agent-trace 等老 API 复用。
+ *  - Phase 4：状态登记委托 AgentSlotRegistry / McpConnectionCoordinator /
+ *    DeferredToolActivationTracker / HandoffMailbox；TurnEventSink 由 TurnCoordinator 持有。
  */
 
-import * as path from 'path';
 import type {
-  AgentCategory,
   AgentConfig,
   AgentId,
   AgentMessage,
   AgentRole,
   AgentState,
-  WriteScope,
 } from '@shared/types/agent';
 import { isTopLevelAgentId } from '@shared/types/agent';
 import {
-  AGENT_CATEGORIES,
   AGENT_DESCRIPTIONS,
   AGENT_DISPLAY_NAMES,
-  AGENT_ROLES,
-  AGENT_WRITE_SCOPES,
-  DEFAULT_MODEL_ROUTING,
 } from '@shared/constants/agents';
 import type {
   AgentEvent as SharedAgentEvent,
   AgentRouteCapability,
   AgentAssistantDeltaPayload,
-  AgentRuntimeMcpDescriptor,
   AgentSubagentEventPayload,
 } from '@shared/types/agentRuntime';
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
@@ -87,7 +81,6 @@ import type {
 } from '../../agent-runtime/core/types';
 import { sessionContextJournal } from '../../conversation/SessionContextJournal';
 import { createToolSearchTool, getPrimitiveTools } from '../../agent-runtime/tools';
-import { MCPManager, type MCPServerConfig } from '../../agent-runtime/agent/MCPManager';
 import {
   encodeAgentModel,
   configuredRuntimeProvider,
@@ -109,13 +102,34 @@ import {
 import { agentUserInputRequestService } from '../../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentPermissionPolicyService } from '../../agent-runtime/permissions/AgentPermissionPolicy';
 import { agentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
-import { withTemporaryPathAccess } from '../../agent-runtime/tools';
+import {
+  compileEffectivePolicy,
+  isToolDeniedByPolicy,
+} from '../../agent-runtime/permissions/PolicyCompiler';
+import {
+  buildEffectiveRuntimePlan,
+  type EffectiveRuntimePlan,
+} from '../../agent-runtime/EffectiveRuntimePlan';
+import { ToolValidationError, toolValidator } from '../../agent-runtime/core/ToolValidator';
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import { appPathService } from '../../runtime/AppPathService';
 import { scopedInstructionResolver } from '../../runtime/ScopedInstructionResolver';
 import { hookEngine } from '../../hooks/HookEngine';
 import { storageAdapter } from '../../sessions/StorageAdapter';
-import { getRdxRuntimeContext } from '../../sessions/RdxRuntimeContextRegistry';
+import { getRdxRuntimeContext, assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
+import {
+  turnCoordinator,
+  type TurnHandle,
+  type AbortReason,
+  assertSubagentBudgetAllowsChild,
+  createSubagentBudgetState,
+  DEFAULT_SUBAGENT_BUDGET,
+  type SubagentResultStatus,
+} from './TurnCoordinator';
+import { AgentSlotRegistry, agentSlotKey, type AgentSlot } from './AgentSlotRegistry';
+import { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
+import { HandoffMailbox } from './HandoffMailbox';
+import { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import { executionProfileService } from '../../settings/ExecutionProfileService';
 import { agentManifestService } from '../../settings/AgentManifestService';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
@@ -191,21 +205,6 @@ interface AgentProfileTurnOptions extends AgentTurnOptions {
   }) => void;
 }
 
-/** 单个 AgentRole 在内部维护的运行态。 */
-interface AgentSlot {
-  agent: Agent;
-  contextManager: ContextManager;
-  providerId: string;
-  modelId: string;
-  systemPrompt: string;
-  /** 按全部可用工具名计算；激活集是 slot 内状态，不参与 signature。 */
-  toolSignature: string;
-  turnSignature: string;
-  contextTokenLimit: number;
-  /** 本 slot 已激活、可注入 prompt 的 deferred 工具名（mcp__* 与 extended builtin）。 */
-  activatedDeferredTools: Set<string>;
-}
-
 interface ResolvedRuntimeTools {
   definitions: ToolDefinition[];
   toolMap: Map<string, AgentTool>;
@@ -218,6 +217,7 @@ interface PreparedAgentRuntime {
   mcpConnectionErrors: string[];
   credentialHandle: string;
   promptCache: CompiledPromptCache;
+  effectivePlan: EffectiveRuntimePlan;
 }
 
 export interface PreparedAgentTurnContext {
@@ -248,6 +248,8 @@ interface ToolExecutorRuntimeContext {
   projectRootPath?: string | null;
   /** 当前激活项目 id（审计/事件关联）。 */
   projectId?: string | null;
+  /** Turn 冻结的 EffectiveRuntimePlan；Prompt/Executor 共用 planId/fingerprint。 */
+  effectivePlan?: EffectiveRuntimePlan;
 }
 
 function countContinuationDecisions(
@@ -258,138 +260,39 @@ function countContinuationDecisions(
   return [...counts].map(([reason, count]) => ({ reason, count }));
 }
 
+/**
+ * AgentOrchestrator façade — sendMessage / sendProfileMessage 路由。
+ * 状态与连接登记委托给 AgentSlotRegistry / McpConnectionCoordinator /
+ * DeferredToolActivationTracker / HandoffMailbox；TurnEventSink 由 TurnCoordinator 持有（无双轨）。
+ */
 export class AgentOrchestrator {
-  private agentStates: Map<AgentRole, AgentState> = new Map();
-  private agentConfigs: Map<AgentRole, AgentConfig> = new Map();
-  private agentSlots: Map<string, AgentSlot> = new Map();
-  private readonly mcpManager = new MCPManager();
-  private readonly connectedMcpServerIds = new Set<string>();
-  private readonly failedMcpServers = new Map<string, string>();
-  private activeMcpProjectRoot: string | null = null;
-  /**
-   * 当前 turn 的事件下沉（subagent 工具执行时读取，把子 agent 事件桥接到父 trace）。
-   * 单进程串行，无并发问题；runAgentTurn 设置，turn 结束清理。
-   */
-  private currentTurnEventSink: {
-    onEvent?: (event: SharedAgentEvent) => void;
-    sessionId?: string | null;
-    projectRootPath?: string | null;
-    projectId?: string | null;
-    agentId?: AgentRole;
-  } | null = null;
-  /**
-   * 当前 turn 的 deferred 工具激活上下文（mcp__* 与 extended builtin 同机制）。
-   * 工具执行器可能来自复用 slot 的旧闭包，因此经实例字段查找，而非闭包捕获。
-   */
-  private currentTurnDeferredActivation: {
-    slotKey: string;
-    allDefinitions: ToolDefinition[];
-  } | null = null;
-  /**
-   * Deferred 工具激活集：按 session+agent 的 slotKey 持久化。
-   * toolSignature（全部可用工具名）变化时重置；turnSignature 变化不重置。
-   */
-  private activatedDeferredBySlotKey = new Map<string, { toolSignature: string; names: Set<string> }>();
-  /**
-   * 待处理的 handoff 请求（agent_handoff 工具成功时设置，
-   * ConversationService turn 结束后 consume，实现 session 级 profile 切换）。
-   */
-  private pendingHandoff: {
-    fromAgentId: AgentRole;
-    toProfile: AgentRole;
-    prompt: string;
-    label: string;
-    sessionId?: string | null;
-  } | null = null;
+  private readonly slots = new AgentSlotRegistry();
+  private readonly mcp = new McpConnectionCoordinator();
+  private readonly deferredActivation = new DeferredToolActivationTracker();
+  private readonly handoffMailbox = new HandoffMailbox();
 
   constructor() {
-    this.initializeAgents();
-  }
-
-  private initializeAgents(): void {
-    for (const role of AGENT_ROLES) {
-      this.ensureAgentState(role);
-      this.agentConfigs.set(role, this.createDefaultAgentConfig(role));
-    }
-  }
-
-  private ensureAgentState(agentId: AgentRole): AgentState {
-    const existing = this.agentStates.get(agentId);
-    if (existing) {
-      return existing;
-    }
-    const state: AgentState = {
-      agentId,
-      status: 'idle',
-      lastActivity: nowIso(),
-    };
-    this.agentStates.set(agentId, state);
-    return state;
-  }
-
-  private createDefaultAgentConfig(agentId: AgentRole): AgentConfig {
-    const fallbackAgentId: AgentId = isTopLevelAgentId(agentId) ? agentId : 'edit';
-    const defaultRouting = DEFAULT_MODEL_ROUTING[fallbackAgentId];
-    return {
-      agentId,
-      systemPrompt: '',
-      modelProvider: defaultRouting.provider,
-      modelName: defaultRouting.model,
-      temperature: 0.7,
-      maxTokens: 4096,
-      category: this.getAgentCategory(agentId),
-      writeScope: this.getAgentWriteScopes(agentId),
-    };
-  }
-
-  private getOrCreateAgentConfig(agentId: AgentRole): AgentConfig {
-    this.ensureAgentState(agentId);
-    const existing = this.agentConfigs.get(agentId);
-    if (existing) {
-      return existing;
-    }
-    const config = this.createDefaultAgentConfig(agentId);
-    this.agentConfigs.set(agentId, config);
-    return config;
-  }
-
-  private getAgentCategory(role: AgentRole): AgentCategory {
-    return isTopLevelAgentId(role) ? AGENT_CATEGORIES[role] : 'general';
-  }
-
-  private getAgentWriteScopes(role: AgentRole): WriteScope[] {
-    return isTopLevelAgentId(role) ? AGENT_WRITE_SCOPES[role] : ['workspace_notes'];
+    this.slots.initializeDefaults();
   }
 
   getAgentState(agentId: AgentRole): AgentState | null {
-    return this.agentStates.get(agentId) || null;
+    return this.slots.getAgentState(agentId);
   }
 
   getAllAgentStates(): AgentState[] {
-    return Array.from(this.agentStates.values());
+    return this.slots.getAllAgentStates();
   }
 
   configureAgent(agentId: AgentRole, config: Partial<AgentConfig>): void {
-    const existing = this.getOrCreateAgentConfig(agentId);
-    this.agentConfigs.set(agentId, { ...existing, ...config });
+    this.slots.configureAgent(agentId, config);
   }
 
   getAgentConfig(agentId: AgentRole): AgentConfig | null {
-    return this.agentConfigs.get(agentId) || null;
+    return this.slots.getAgentConfig(agentId);
   }
 
   applyLlmConfig(config: LLMConfig): void {
-    const routeMap = new Map(config.agentRoutes.map((route) => [route.agentId, route]));
-    for (const [agentId, agentConfig] of this.agentConfigs.entries()) {
-      const fallbackAgentId: AgentId = isTopLevelAgentId(agentId) ? agentId : 'edit';
-      const fallback = DEFAULT_MODEL_ROUTING[fallbackAgentId];
-      const route = routeMap.get(agentId);
-      this.agentConfigs.set(agentId, {
-        ...agentConfig,
-        modelProvider: route ? route.providerId : fallback.provider,
-        modelName: route ? route.modelId : fallback.model,
-      });
-    }
+    this.slots.applyLlmConfig(config);
   }
 
   getToolsForRole(agentId: AgentRole): string[] {
@@ -398,6 +301,23 @@ export class AgentOrchestrator {
 
   isToolAllowedForRole(toolName: string, agentId: AgentRole): boolean {
     return isToolAllowedForAgent(toolName, agentId);
+  }
+
+  /**
+   * 分支切换 / 重写后显式同步：丢弃该 session 的 slot 执行缓存。
+   * 下次 turn 从 conversation.jsonl 重新 rehydrate。
+   */
+  syncSessionSlots(sessionId: string): void {
+    this.slots.syncSession(sessionId);
+    this.deferredActivation.clearSession(sessionId);
+  }
+
+  private getOrCreateAgentConfig(agentId: AgentRole): AgentConfig {
+    return this.slots.getOrCreateAgentConfig(agentId);
+  }
+
+  private ensureAgentState(agentId: AgentRole): AgentState {
+    return this.slots.ensureAgentState(agentId);
   }
 
   // -------------------------------------------------------------------
@@ -586,7 +506,7 @@ export class AgentOrchestrator {
           compactedTurnCount: 0,
         };
     throwIfCancelled();
-    const mcpConnectionErrors = await this.ensureMcpConnections(input.agentId, input.projectRootPath);
+    const mcpConnectionErrors = await this.mcp.ensureConnections(input.agentId, input.projectRootPath);
     throwIfCancelled();
     const runtimeTools = this.resolveRuntimeTools(
       input.agentId,
@@ -594,9 +514,9 @@ export class AgentOrchestrator {
       'investigate',
       input.sessionId,
     );
-    const slotKey = this.agentSlotKey(input.sessionId, input.agentId);
+    const slotKey = agentSlotKey(input.sessionId, input.agentId);
     const toolSignature = this.createToolSignature(runtimeTools.definitions);
-    const activation = this.activatedDeferredBySlotKey.get(slotKey);
+    const activation = this.deferredActivation.get(slotKey);
     const activatedDeferredTools = activation?.toolSignature === toolSignature
       ? activation.names
       : new Set<string>();
@@ -703,6 +623,21 @@ export class AgentOrchestrator {
       throw new Error('CONTEXT_CANNOT_FIT: preparation did not preserve the current user message.');
     }
     const initialMessages = compactedMessages.slice(0, -1);
+    const turnSettings = settingsService.getAll();
+    const profile = turnSettings.agents.definitions
+      .find((definition) => definition.id === input.agentId && definition.enabled);
+    const effectivePlan = buildEffectiveRuntimePlan({
+      agentId: input.agentId,
+      projectRootPath: input.projectRootPath,
+      projectId: null,
+      profile: profile ?? null,
+      toolAllowlist: input.toolAllowlist,
+      permissionSettings: turnSettings.agentRuntime.permissions,
+      routeCapability: input.routeCapability,
+      requestPlan: input.requestPlan,
+      promptPlan: input.promptPlan,
+      policy: compileEffectivePolicy(input.projectRootPath),
+    });
     const summary: PreparedTurnContextSummary = {
       requestId: input.requestId,
       turnId: input.turnId,
@@ -779,6 +714,7 @@ export class AgentOrchestrator {
         mcpConnectionErrors,
         credentialHandle: input.credentialHandle,
         promptCache,
+        effectivePlan,
       },
     };
   }
@@ -1001,12 +937,32 @@ export class AgentOrchestrator {
     parentOnEvent?: (event: SharedAgentEvent) => void;
     projectRootPath?: string | null;
     projectId?: string | null;
-  }): Promise<string> {
+    parentTurn?: TurnHandle | null;
+    signal?: AbortSignal | null;
+  }): Promise<{ text: string; status: SubagentResultStatus; subagentId: string }> {
+    const parentBudget = input.parentTurn?.subagentBudget ?? createSubagentBudgetState();
+    assertSubagentBudgetAllowsChild(parentBudget);
+    parentBudget.childrenSpawned += 1;
+
     const subagentId = generateEventId('subagent');
     // 子 agent 用独立 sessionId 段隔离 context/messages（不污染父线程持久化）。
     const subagentSessionId = input.parentSessionId
       ? `${input.parentSessionId}::subagent::${subagentId}`
       : null;
+
+    const childAbort = new AbortController();
+    const parentSignal = input.signal ?? input.parentTurn?.signal ?? null;
+    const onParentAbort = () => {
+      try {
+        childAbort.abort();
+      } catch {
+        // ignore
+      }
+    };
+    if (parentSignal) {
+      if (parentSignal.aborted) onParentAbort();
+      else parentSignal.addEventListener('abort', onParentAbort, { once: true });
+    }
 
     // 通知父 trace：子 agent 启动
     input.parentOnEvent?.({
@@ -1030,9 +986,23 @@ export class AgentOrchestrator {
       || this.systemPromptForAgent(input.targetProfile);
 
     let resultText = '';
-    let resultStatus: 'complete' | 'failed' | 'cancelled' = 'complete';
+    let resultStatus: SubagentResultStatus = 'complete';
+    const childBudget = createSubagentBudgetState(parentBudget.budget, parentBudget.depth + 1);
+    childBudget.aggregateToolCalls = parentBudget.aggregateToolCalls;
+    childBudget.wallStartedAt = parentBudget.wallStartedAt;
+
+    const unregisterProducer = input.parentTurn?.registerProducer({
+      id: subagentId,
+      abort: () => onParentAbort(),
+      join: async () => {
+        // Child turn join is awaited via sendProfileMessage completion below.
+      },
+    });
 
     try {
+      if (childAbort.signal.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
       resultText = await this.sendProfileMessage(
         input.targetProfile,
         input.task,
@@ -1042,7 +1012,15 @@ export class AgentOrchestrator {
           projectRootPath: input.projectRootPath,
           projectId: input.projectId,
           systemPrompt,
+          signal: childAbort.signal,
           onEvent: (event: SharedAgentEvent) => {
+            if (input.parentTurn && !input.parentTurn.isLive(input.parentTurn.generation)) {
+              return;
+            }
+            if (event.type === 'tool.started' || event.type === 'tool.completed' || event.type === 'tool.denied') {
+              parentBudget.aggregateToolCalls += 1;
+              childBudget.aggregateToolCalls = parentBudget.aggregateToolCalls;
+            }
             const basePayload = {
               subagentId,
               profile: input.targetProfile,
@@ -1122,9 +1100,24 @@ export class AgentOrchestrator {
           },
         },
       );
+      if (childAbort.signal.aborted) {
+        resultStatus = 'cancelled';
+      }
     } catch (error) {
-      resultStatus = 'failed';
+      const aborted = childAbort.signal.aborted
+        || (error instanceof Error && (error.name === 'AbortError' || /abort|cancel/i.test(error.message)));
+      resultStatus = aborted ? 'cancelled' : 'failed';
       resultText = error instanceof Error ? error.message : String(error);
+    } finally {
+      unregisterProducer?.();
+      if (parentSignal) {
+        parentSignal.removeEventListener('abort', onParentAbort);
+      }
+      // Propagate child budget usage back to parent.
+      parentBudget.aggregateToolCalls = Math.max(
+        parentBudget.aggregateToolCalls,
+        childBudget.aggregateToolCalls,
+      );
     }
 
     // 通知父 trace：子 agent 完成
@@ -1143,7 +1136,7 @@ export class AgentOrchestrator {
       } satisfies AgentSubagentEventPayload,
     });
 
-    return resultText;
+    return { text: resultText, status: resultStatus, subagentId };
   }
 
   /**
@@ -1152,8 +1145,9 @@ export class AgentOrchestrator {
    * - `task`：派生通用 explore 子 agent（对标 claude-code Task 工具）。
    * - `agent`：按指定 profile 派生子 agent。
    */
-  createSubagentTools(parentAgentId: AgentRole, sessionId?: string | null): AgentTool[] {
+  createSubagentTools(parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
     const orchestrator = this;
+    const capturedTurn = turnHandle ?? this.getActiveTurn(sessionId);
     const runSubagentTool: AgentTool<
       { task: string; profile?: string },
       { subagentId: string; profile: string; status: string }
@@ -1170,21 +1164,24 @@ export class AgentOrchestrator {
         },
       },
       permissionHint: 'readonly',
-      async execute(toolCallId, args, _signal) {
+      async execute(toolCallId, args, signal) {
         const targetProfile = (typeof args.profile === 'string' && args.profile.trim() ? args.profile.trim() : 'ask') as AgentRole;
+        const turn = capturedTurn ?? orchestrator.getActiveTurn(sessionId);
         const result = await orchestrator.runSubagent({
           parentAgentId,
           parentToolCallId: toolCallId,
           targetProfile,
           task: args.task,
           parentSessionId: sessionId ?? null,
-          parentOnEvent: orchestrator.currentTurnEventSink?.onEvent,
-          projectRootPath: orchestrator.currentTurnEventSink?.projectRootPath ?? null,
-          projectId: orchestrator.currentTurnEventSink?.projectId ?? null,
+          parentOnEvent: turn?.eventSink?.onEvent,
+          projectRootPath: turn?.eventSink?.projectRootPath ?? null,
+          projectId: turn?.eventSink?.projectId ?? null,
+          parentTurn: turn,
+          signal: signal ?? turn?.signal ?? null,
         });
         return {
-          content: [{ type: 'text', text: result || '(sub-agent returned empty output)' }],
-          details: { subagentId: toolCallId, profile: targetProfile, status: 'complete' },
+          content: [{ type: 'text', text: result.text || '(sub-agent returned empty output)' }],
+          details: { subagentId: result.subagentId, profile: targetProfile, status: result.status },
         };
       },
     };
@@ -1210,11 +1207,12 @@ export class AgentOrchestrator {
     /** 用于 slot cache key；默认与注入 tools 相同。应传入全部可用工具以稳定复用。 */
     signatureTools?: ToolDefinition[],
     routeCapabilityOverride?: AgentRouteCapability,
+    policyMaxTurns?: number,
   ): AgentSlot {
     if (!promptPlan) {
       throw new Error('PromptPlan is required before creating an agent runtime slot.');
     }
-    const slotKey = this.agentSlotKey(sessionId, agentId);
+    const slotKey = agentSlotKey(sessionId, agentId);
     const toolSignature = this.createToolSignature(signatureTools ?? tools);
     const activeContextWindow = contextWindow ?? streamOptions.requestPlan.contextWindowTokens;
     const requestCompactionThreshold = contextTokenLimit
@@ -1224,7 +1222,7 @@ export class AgentOrchestrator {
     if (resolvedContextTokenLimit <= 0) {
       throw new Error('PROMPT_OVERHEAD_EXCEEDS_BUDGET: system prompt and tool schemas leave no conversation budget.');
     }
-    const existing = this.agentSlots.get(slotKey);
+    const existing = this.slots.getSlot(slotKey);
     if (
       existing
       && existing.providerId === providerId
@@ -1235,8 +1233,9 @@ export class AgentOrchestrator {
       && existing.contextTokenLimit === resolvedContextTokenLimit
       && !existing.agent.isStreaming
     ) {
-      // 复用 slot 时按当前激活集同步注入列表（保留 activatedDeferredTools）。
-      existing.activatedDeferredTools = this.resolveActivatedDeferredSet(slotKey, toolSignature);
+      // 复用 slot：从磁盘权威 history rehydrate，再同步 tools（COW）。
+      existing.activatedDeferredTools = this.deferredActivation.resolveActivatedSet(slotKey, toolSignature);
+      this.slots.rehydrate(existing, initialMessages as import('../../agent-runtime/core/types').AgentMessage[]);
       existing.agent.setTools(tools);
       return existing;
     }
@@ -1274,7 +1273,7 @@ export class AgentOrchestrator {
       provider: configuredRuntimeProvider,
       toolExecutor,
       streamOptions,
-      maxTurns: this.resolveMaxTurns(agentId),
+      maxTurns: this.resolveMaxTurns(agentId, policyMaxTurns),
       // transformContext：长对话接近窗口上限时自动压缩历史。
       transformContext: (messages) => contextManager.compress(messages),
       // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
@@ -1346,60 +1345,65 @@ export class AgentOrchestrator {
       toolSignature,
       turnSignature,
       contextTokenLimit: resolvedContextTokenLimit,
-      activatedDeferredTools: this.resolveActivatedDeferredSet(slotKey, toolSignature),
+      activatedDeferredTools: this.deferredActivation.resolveActivatedSet(slotKey, toolSignature),
     };
-    this.agentSlots.set(slotKey, slot);
+    this.slots.setSlot(slotKey, slot);
     return slot;
   }
 
+  private sessionTurnKey(sessionId?: string | null): string {
+    return sessionId?.trim() || '__anon__';
+  }
+
+  private getActiveTurn(sessionId?: string | null): TurnHandle | null {
+    return turnCoordinator.getActive(this.sessionTurnKey(sessionId));
+  }
+
   /**
-   * 解析（或重置）slot 的 deferred 工具激活集（mcp__* 与 extended builtin）。
-   * 仅在全部可用工具 signature 变化时清空；跨 turn 复用同一 Set。
+   * Abort the active turn for a session and wait for producers to join.
    */
-  private resolveActivatedDeferredSet(slotKey: string, toolSignature: string): Set<string> {
-    const existing = this.activatedDeferredBySlotKey.get(slotKey);
-    if (existing && existing.toolSignature === toolSignature) {
-      return existing.names;
+  async abortAndJoin(
+    sessionId: string | null | undefined,
+    options?: { graceMs?: number; forceAfterMs?: number; reason?: AbortReason },
+  ): Promise<void> {
+    const key = this.sessionTurnKey(sessionId);
+    const handle = turnCoordinator.getActive(key);
+    if (!handle) {
+      await turnCoordinator.abortSession(key, options?.reason ?? 'user_stop');
+      return;
     }
-    const names = new Set<string>();
-    this.activatedDeferredBySlotKey.set(slotKey, { toolSignature, names });
-    return names;
+    await handle.abortAndJoin({
+      graceMs: options?.graceMs,
+      forceAfterMs: options?.forceAfterMs,
+      reason: options?.reason ?? 'user_stop',
+    });
+    turnCoordinator.endTurn(handle);
   }
 
   /**
    * 激活 deferred 工具（mcp__* 与 extended builtin）：写入激活集并更新
    * Agent 注入列表，供同 turn 内下一次 LLM 调用使用。
    */
-  private activateDeferredTools(toolNames: string[]): void {
-    const activation = this.currentTurnDeferredActivation;
+  private activateDeferredTools(toolNames: string[], sessionId?: string | null): void {
+    const activation = this.getActiveTurn(sessionId)?.deferredActivation ?? null;
     if (!activation || toolNames.length === 0) {
       return;
     }
-    const slot = this.agentSlots.get(activation.slotKey);
+    const slot = this.slots.getSlot(activation.slotKey);
     if (!slot) {
       return;
     }
-    const available = new Set(activation.allDefinitions.map((def) => def.name));
-    let changed = false;
-    for (const name of toolNames) {
-      if (!isDeferredToolName(name) || !available.has(name)) {
-        continue;
-      }
-      if (!slot.activatedDeferredTools.has(name)) {
-        slot.activatedDeferredTools.add(name);
-        changed = true;
-      }
-    }
+    const { changed, injected } = this.deferredActivation.activate({
+      slotKey: activation.slotKey,
+      toolNames,
+      allDefinitions: activation.allDefinitions,
+      activatedSet: slot.activatedDeferredTools,
+    });
     if (!changed) {
       return;
     }
-    const { injected } = partitionDeferredTools(activation.allDefinitions, slot.activatedDeferredTools);
-    slot.agent.setTools(injected);
-  }
-
-  /** Execution-cache key; canonical session history remains agent-neutral. */
-  private agentSlotKey(sessionId: string | null | undefined, agentId: AgentRole): string {
-    return sessionId ? `${sessionId}::${agentId}` : `__no_session__::${agentId}`;
+    // COW revision bump — next LLM round reads new activeTools via LoopRuntimeState.
+    slot.agent.activateDeferredTools(slot.activatedDeferredTools, injected);
   }
 
   /**
@@ -1408,7 +1412,15 @@ export class AgentOrchestrator {
    * 优先用 `.agent.md` frontmatter 的 `max-turns`；
    * 未配置时按 profile 默认：edit/debugger/optimizer=50，ask/plan/analyzer=25。
    */
-  private resolveMaxTurns(agentId: AgentRole): number {
+  private resolveMaxTurns(agentId: AgentRole, policyMaxTurns?: number): number {
+    if (typeof policyMaxTurns === 'number' && Number.isFinite(policyMaxTurns) && policyMaxTurns > 0) {
+      const manifest = settingsService.getAll().agents.definitions
+        .find((definition) => definition.id === agentId && definition.enabled);
+      const profileMax = manifest?.maxTurns && manifest.maxTurns > 0
+        ? manifest.maxTurns
+        : (agentId === 'edit' || agentId === 'debugger' || agentId === 'optimizer' ? 50 : 25);
+      return Math.min(policyMaxTurns, profileMax);
+    }
     const manifest = settingsService.getAll().agents.definitions
       .find((definition) => definition.id === agentId && definition.enabled);
     if (manifest?.maxTurns && manifest.maxTurns > 0) {
@@ -1493,9 +1505,7 @@ export class AgentOrchestrator {
     label: string;
     sessionId?: string | null;
   } | null {
-    const handoff = this.pendingHandoff;
-    this.pendingHandoff = null;
-    return handoff;
+    return this.handoffMailbox.consume();
   }
 
   private createToolSignature(tools: ToolDefinition[]): string {
@@ -1507,20 +1517,22 @@ export class AgentOrchestrator {
     toolAllowlist: string[],
     stage?: WorkflowStage | 'report',
     sessionId?: string | null,
+    turnHandle?: TurnHandle | null,
+    projectId?: string | null,
   ): ResolvedRuntimeTools {
     const availableTools = new Map<string, AgentTool>();
     for (const tool of getPrimitiveTools()) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
-    for (const tool of this.createTaskRuntimeTools()) {
+    for (const tool of this.createTaskRuntimeTools(sessionId, turnHandle)) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
-    const rdxContextTool = this.createRdxContextTool();
+    const rdxContextTool = this.createRdxContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);
     availableTools.set(rdxContextTool.name, rdxContextTool);
-    for (const tool of this.createWorkbenchTools(agentId, sessionId)) {
+    for (const tool of this.createWorkbenchTools(agentId, sessionId, turnHandle)) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
-    for (const tool of this.mcpManager.getAgentTools()) {
+    for (const tool of this.mcp.getAgentTools()) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
     // tool_search 只能发现 allowlist + runtime policy 过滤后的工具集，
@@ -1571,7 +1583,14 @@ export class AgentOrchestrator {
     sessionId?: string | null,
     runtimeContext?: ToolExecutorRuntimeContext,
   ): ToolExecutor {
-    const tools = this.resolveRuntimeTools(agentId, toolAllowlist, stage, sessionId).toolMap;
+    const tools = this.resolveRuntimeTools(
+      agentId,
+      toolAllowlist,
+      stage,
+      sessionId,
+      this.getActiveTurn(sessionId),
+      runtimeContext?.projectId,
+    ).toolMap;
     // Skill allowed-tools 收窄集（DESIGN Skills 条款：只收窄、不扩展）。
     // skill_read 激活声明了 allowed-tools 的 skill 后，本 turn 后续工具调用
     // 只能命中「激活 skill 允许集 ∪ 元工具豁免」。多 skill 取并集。
@@ -1582,18 +1601,23 @@ export class AgentOrchestrator {
       if (activeSkillAllowlist === null) activeSkillAllowlist = new Set(narrowed);
       else for (const name of narrowed) activeSkillAllowlist.add(name);
     };
-    // .agent.md 声明的 preloaded skills 在 turn 开始即生效收窄。
-    const manifestDefinition = settingsService.getAll().agents.definitions
-      .find((definition) => definition.id === agentId && definition.enabled);
-    for (const skillId of manifestDefinition?.skills ?? []) {
+    // .agent.md 声明的 preloaded skills：优先用 EffectiveRuntimePlan 冻结集，避免 turn 中途 settings 漂移。
+    const plan = runtimeContext?.effectivePlan;
+    const profileSkillIds = plan?.profileSkills
+      ?? settingsService.getAll().agents.definitions
+        .find((definition) => definition.id === agentId && definition.enabled)?.skills
+      ?? [];
+    for (const skillId of profileSkillIds) {
       const preloaded = agentRuntimeConfigService.loadSkill(
         skillId,
-        runtimeContext?.projectRootPath ?? undefined,
+        runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? undefined,
       );
       if (preloaded?.allowedTools?.length) {
         applySkillNarrowing(preloaded.allowedTools);
       }
     }
+    const permissionSettings = plan?.permissionSettings;
+    const compiledPolicy = plan?.policy;
     return {
       execute: async (toolCall: ToolCall, signal?: AbortSignal, onUpdate?: (partialResult: unknown) => void) => {
         const normalizedName = normalizeToolName(toolCall.name);
@@ -1610,14 +1634,58 @@ export class AgentOrchestrator {
             `Tool "${toolCall.name}" is outside the allowed-tools set declared by the active skill.`,
           );
         }
+        if (compiledPolicy && isToolDeniedByPolicy(compiledPolicy, normalizedName)) {
+          return this.createPolicyDeniedToolResult(
+            toolCall,
+            agentId,
+            `POLICY_DENIED: tool "${toolCall.name}" is in deniedTools.`,
+          );
+        }
+        if (isDeferredToolName(normalizedName)) {
+          const activation = this.getActiveTurn(runtimeContext?.sessionId)?.deferredActivation ?? null;
+          const slot = activation ? this.slots.getSlot(activation.slotKey) : undefined;
+          if (!slot?.activatedDeferredTools.has(normalizedName)) {
+            return {
+              role: 'toolResult',
+              toolCallId: toolCall.id,
+              toolName: toolCall.name,
+              content: [{ type: 'text', text: 'TOOL_NOT_ACTIVATED: Use tool_search first.' }],
+              isError: true,
+              timestamp: Date.now(),
+            };
+          }
+        }
         const tool = tools.get(normalizedName);
         if (!tool) {
           return this.createPolicyDeniedToolResult(toolCall, agentId);
         }
-        if (normalizedName === 'ask_user') {
-          return this.executeAskUserTool(toolCall, agentId, runtimeContext, signal);
+        let validatedArgs: Record<string, unknown>;
+        try {
+          validatedArgs = toolValidator.validate(toolToDefinition(tool), toolCall.arguments ?? {});
+        } catch (error) {
+          const message = error instanceof ToolValidationError
+            ? error.message
+            : error instanceof Error ? error.message : String(error);
+          return {
+            role: 'toolResult',
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            content: [{ type: 'text', text: `TOOL_SCHEMA_VIOLATION: ${message}` }],
+            isError: true,
+            timestamp: Date.now(),
+          };
         }
-        const permissionDecision = agentPermissionPolicyService.evaluate({ tool, toolCall, projectRootPath: runtimeContext?.projectRootPath ?? null });
+        const validatedToolCall: ToolCall = { ...toolCall, arguments: validatedArgs };
+        if (normalizedName === 'ask_user') {
+          return this.executeAskUserTool(validatedToolCall, agentId, runtimeContext, signal);
+        }
+        const permissionDecision = agentPermissionPolicyService.evaluate({
+          tool,
+          toolCall: validatedToolCall,
+          projectRootPath: runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? null,
+          ...(permissionSettings ? { permissionSettings } : {}),
+          ...(compiledPolicy ? { compiledPolicy } : {}),
+        });
         if (permissionDecision.action === 'deny') {
           return this.createPolicyDeniedToolResult(toolCall, agentId, permissionDecision.reason);
         }
@@ -1662,11 +1730,11 @@ export class AgentOrchestrator {
           }
         }
         try {
-          const projectRootPath = runtimeContext?.projectRootPath ?? null;
+          const projectRootPath = runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? null;
           const beforeHooksAllowed = await this.triggerRuntimeHooks('tool.before-call', agentId, runtimeContext, {
             toolName: toolCall.name,
             toolCallId: toolCall.id,
-            arguments: toolCall.arguments,
+            arguments: validatedArgs,
           });
           if (!beforeHooksAllowed) {
             return this.createPolicyDeniedToolResult(toolCall, agentId, 'A blocking lifecycle hook denied this tool call.');
@@ -1674,25 +1742,28 @@ export class AgentOrchestrator {
           const toolContext: ToolExecutionContext = {
             workspaceRoot: projectRootPath ?? getWorkspaceRoot(),
             projectRootPath,
-            projectId: runtimeContext?.projectId ?? null,
+            projectId: runtimeContext?.projectId ?? plan?.projectId ?? null,
             sessionId: runtimeContext?.sessionId ?? null,
+            temporaryAllowedPathRoots: permissionDecision.temporaryPathRoots,
           };
-          const result = await withTemporaryPathAccess(
-            permissionDecision.temporaryPathRoots,
-            () => tool.execute(toolCall.id, toolCall.arguments, signal, onUpdate, toolContext),
+          const result = await tool.execute(
+            toolCall.id,
+            validatedArgs,
+            signal,
+            onUpdate,
+            toolContext,
           );
           await this.triggerRuntimeHooks('tool.after-call', agentId, runtimeContext, {
             toolName: toolCall.name,
             toolCallId: toolCall.id,
             isError: result.isError === true,
           });
-          // Deferred 激活：直接调用未注入的 mcp__* / extended builtin 时 fail-open
-          // 执行并激活；tool_search 命中的 deferred 工具视为已发现，
-          // schema 随下次请求注入。
-          if (isDeferredToolName(normalizedName)) {
-            this.activateDeferredTools([normalizedName]);
-          } else if (normalizedName === 'tool_search' && result.isError !== true) {
-            this.activateDeferredTools(extractDeferredToolNamesFromToolSearchDetails(result.details));
+          // Deferred 激活：仅 tool_search 可激活；直接调用未激活 deferred → 上文已 fail-closed。
+          if (normalizedName === 'tool_search' && result.isError !== true) {
+            this.activateDeferredTools(
+              extractDeferredToolNamesFromToolSearchDetails(result.details),
+              runtimeContext?.sessionId,
+            );
           }
           // Skill 激活：skill_read 成功后按其 allowed-tools 收窄本 turn 工具面。
           if (normalizedName === 'skill_read' && result.isError !== true) {
@@ -1858,19 +1929,20 @@ export class AgentOrchestrator {
     };
   }
 
-  private createTaskRuntimeTools(): AgentTool[] {
+  private createTaskRuntimeTools(sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
     // subagent（sessionId 含 ::subagent:: 段）用 MemoryTaskStore，随子 context 结束回收；
     // 顶层 agent 用会话级 FileTaskStore 落盘（${userData}/state/tasks/{sessionId}），供「进度」泳道按会话读取。
-    const sessionId = this.currentTurnEventSink?.sessionId ?? null;
-    const isSubagent = sessionId?.includes('::subagent::') ?? false;
-    const store = isSubagent || !sessionId
+    const resolvedSessionId = sessionId ?? turnHandle?.eventSink?.sessionId ?? null;
+    const isSubagent = resolvedSessionId?.includes('::subagent::') ?? false;
+    const store = isSubagent || !resolvedSessionId
       ? new MemoryTaskStore()
-      : createSessionTaskStore(sessionId);
+      : createSessionTaskStore(resolvedSessionId);
     const registry = new TaskRegistry(store);
     // 桥接 task 变更为 AgentEvent，激活 ConversationService 的 task.* 投影。
     registry.onTaskChange = ({ type, task }) => {
-      const sink = this.currentTurnEventSink;
+      const sink = turnHandle?.eventSink ?? this.getActiveTurn(resolvedSessionId)?.eventSink;
       if (!sink?.onEvent) return;
+      if (turnHandle && !turnHandle.isLive(turnHandle.generation)) return;
       sink.onEvent({
         id: generateEventId('agent-event'),
         type: type === 'created' ? 'task.created' : 'task.updated',
@@ -1887,7 +1959,7 @@ export class AgentOrchestrator {
     return createTaskTools(registry);
   }
 
-  private createRdxContextTool(): AgentTool<Record<string, never>, { available: boolean }> {
+  private createRdxContextTool(sessionId?: string | null, projectId?: string | null): AgentTool<Record<string, never>, { available: boolean }> {
     return {
       name: 'rdx_context',
       label: 'RDX Context',
@@ -1898,10 +1970,19 @@ export class AgentOrchestrator {
       },
       permissionHint: 'readonly',
       async execute() {
-        const runtimeContext = getRdxRuntimeContext();
+        const lease = assertRdxContextLeaseOwnership({
+          sessionId,
+          projectId,
+        });
+        const runtimeContext = lease?.runtimeContext ?? (sessionId ? null : getRdxRuntimeContext());
         if (!runtimeContext) {
           return {
-            content: [{ type: 'text', text: 'No RDX runtime context is currently available.' }],
+            content: [{
+              type: 'text',
+              text: sessionId
+                ? 'No RDX runtime context lease is owned by this session.'
+                : 'No RDX runtime context is currently available.',
+            }],
             details: { available: false },
           };
         }
@@ -1913,10 +1994,10 @@ export class AgentOrchestrator {
     };
   }
 
-  private createWorkbenchTools(agentId: AgentRole, sessionId?: string | null): AgentTool[] {
+  private createWorkbenchTools(agentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
     return [
       this.createAskUserTool(agentId),
-      this.createAgentHandoffTool(agentId),
+      this.createAgentHandoffTool(agentId, sessionId, turnHandle),
       this.createMemorySearchTool(sessionId),
       this.createMemoryReadTool(sessionId),
       this.createMemoryWriteTool(),
@@ -1925,7 +2006,7 @@ export class AgentOrchestrator {
       this.createSkillsCatalogTool(),
       this.createSkillReadTool(agentId),
       this.createMcpCatalogTool(),
-      ...this.createSubagentTools(agentId, sessionId),
+      ...this.createSubagentTools(agentId, sessionId, turnHandle),
     ];
   }
 
@@ -1988,11 +2069,16 @@ export class AgentOrchestrator {
     };
   }
 
-  private createAgentHandoffTool(agentId: AgentRole): AgentTool<
+  private createAgentHandoffTool(
+    agentId: AgentRole,
+    sessionId?: string | null,
+    turnHandle?: TurnHandle | null,
+  ): AgentTool<
     { agent?: string; label?: string; prompt?: string },
     { fromAgentId: AgentRole; toAgentId: string; label: string; prompt: string; valid: boolean }
   > {
     const orchestrator = this;
+    const capturedTurn = turnHandle ?? this.getActiveTurn(sessionId);
     return {
       name: 'agent_handoff',
       label: 'Agent Handoff',
@@ -2026,14 +2112,19 @@ export class AgentOrchestrator {
           };
         }
         const { toProfile: target, label, prompt } = resolved.request;
-        // 记录待处理 handoff，供 ConversationService turn 结束后 consume 实现 profile 切换。
-        orchestrator.pendingHandoff = {
+        const turn = capturedTurn ?? orchestrator.getActiveTurn(sessionId);
+        const handoff = {
           fromAgentId: agentId,
           toProfile: target as AgentRole,
           prompt,
           label,
-          sessionId: orchestrator.currentTurnEventSink?.sessionId ?? null,
+          sessionId: sessionId ?? turn?.eventSink?.sessionId ?? null,
         };
+        if (turn) {
+          turn.pendingHandoff = handoff;
+        }
+        // 记录待处理 handoff，供 ConversationService turn 结束后 consume 实现 profile 切换。
+        orchestrator.handoffMailbox.deposit(handoff);
         return {
           content: [{
             type: 'text',
@@ -2295,27 +2386,7 @@ export class AgentOrchestrator {
    * Settings / IPC 与 mcp 目录工具共用：合并已配置 MCP 与运行时连接状态。
    */
   getMcpServerStatusSummary(projectRootPath?: string | null, query?: string): MCPServerStatusSummary[] {
-    const normalizedQuery = query?.trim().toLowerCase() ?? '';
-    const configured = agentRuntimeConfigService.listMcpServers(projectRootPath ?? undefined)
-      .filter((server) => !normalizedQuery
-        || `${server.id} ${server.name} ${server.description}`.toLowerCase().includes(normalizedQuery));
-    const runtimeById = new Map(
-      this.mcpManager.getServerStatusSummary().map((entry) => [entry.id, entry]),
-    );
-    return configured.map((server) => {
-      const runtime = runtimeById.get(server.id) ?? runtimeById.get(server.name);
-      const summary: MCPServerStatusSummary = {
-        id: server.id,
-        name: server.name,
-        connectionStatus: runtime?.connectionStatus ?? 'unknown',
-        toolCount: runtime?.toolCount ?? 0,
-        tools: runtime?.tools ?? [],
-      };
-      if (runtime?.lastError) {
-        summary.lastError = runtime.lastError;
-      }
-      return summary;
-    });
+    return this.mcp.getMcpServerStatusSummary(projectRootPath, query);
   }
 
   private createMcpCatalogTool(): AgentTool<
@@ -2358,55 +2429,8 @@ export class AgentOrchestrator {
     };
   }
 
-  private getEnabledMcpDescriptors(agentId: AgentRole, projectRootPath?: string | null): AgentRuntimeMcpDescriptor[] {
-    const settings = settingsService.getAll();
-    const manifest = settings.agents.definitions.find((entry) => entry.id === agentId && entry.enabled);
-    const enabledIds = new Set(manifest?.mcpServers ?? []);
-    if (enabledIds.size === 0) {
-      return [];
-    }
-    return agentRuntimeConfigService.listMcpServers(projectRootPath ?? undefined)
-      .filter((server) => enabledIds.has(server.id) || enabledIds.has(server.name));
-  }
-
-  private async ensureMcpConnections(agentId: AgentRole, projectRootPath?: string | null): Promise<string[]> {
-    const errors: string[] = [];
-    const nextProjectRoot = projectRootPath ? path.resolve(projectRootPath) : null;
-    if (this.activeMcpProjectRoot !== nextProjectRoot) {
-      await this.mcpManager.disconnectAll();
-      this.connectedMcpServerIds.clear();
-      this.failedMcpServers.clear();
-      this.activeMcpProjectRoot = nextProjectRoot;
-    }
-    for (const descriptor of this.getEnabledMcpDescriptors(agentId, projectRootPath)) {
-      if (this.connectedMcpServerIds.has(descriptor.id)) {
-        continue;
-      }
-      if (this.failedMcpServers.has(descriptor.id)) {
-        errors.push(`${descriptor.id}: ${this.failedMcpServers.get(descriptor.id)}`);
-        continue;
-      }
-      try {
-        await this.mcpManager.connect(this.toMcpServerConfig(descriptor));
-        this.connectedMcpServerIds.add(descriptor.id);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.failedMcpServers.set(descriptor.id, message);
-        errors.push(`${descriptor.id}: ${message}`);
-      }
-    }
-    return errors;
-  }
-
-  private toMcpServerConfig(descriptor: AgentRuntimeMcpDescriptor): MCPServerConfig {
-    return {
-      name: descriptor.id,
-      type: descriptor.transport,
-      command: descriptor.command,
-      args: descriptor.args,
-      url: descriptor.url,
-      env: descriptor.env,
-    };
+  async disconnectAllMcpServers(): Promise<void> {
+    await this.mcp.disconnectAll();
   }
 
   // -------------------------------------------------------------------
@@ -2456,12 +2480,38 @@ export class AgentOrchestrator {
     const routeCapability = input.preparedRuntime?.routeCapability
       ?? resolveAgentRouteCapability(routeProvider, input.modelId, effectiveModel, requestPlan);
     const mcpConnectionErrors = input.preparedRuntime?.mcpConnectionErrors
-      ?? await this.ensureMcpConnections(input.agentId, input.projectRootPath);
+      ?? await this.mcp.ensureConnections(input.agentId, input.projectRootPath);
+    const sessionKey = this.sessionTurnKey(input.sessionId);
+    const turnHandle = await turnCoordinator.beginTurn({
+      sessionKey,
+      turnId: input.turnId ?? generateEventId('turn'),
+      parentSignal: input.options?.signal,
+      subagentBudget: createSubagentBudgetState(DEFAULT_SUBAGENT_BUDGET),
+    });
+    const turnGeneration = turnHandle.generation;
+    turnHandle.eventSink = {
+      onEvent: (event) => {
+        if (!turnHandle.isLive(turnGeneration)) return;
+        input.options?.onEvent?.(event);
+      },
+      sessionId: input.sessionId ?? null,
+      projectRootPath: input.projectRootPath ?? null,
+      projectId: input.projectId ?? null,
+      agentId: input.agentId,
+    };
+
     const runtimeTools = input.preparedRuntime?.runtimeTools
-      ?? this.resolveRuntimeTools(input.agentId, input.toolAllowlist, input.stage, input.sessionId);
-    const slotKey = this.agentSlotKey(input.sessionId, input.agentId);
+      ?? this.resolveRuntimeTools(
+        input.agentId,
+        input.toolAllowlist,
+        input.stage,
+        input.sessionId,
+        turnHandle,
+        input.projectId,
+      );
+    const slotKey = agentSlotKey(input.sessionId, input.agentId);
     const allToolSignature = this.createToolSignature(runtimeTools.definitions);
-    const activatedDeferredTools = this.resolveActivatedDeferredSet(slotKey, allToolSignature);
+    const activatedDeferredTools = this.deferredActivation.resolveActivatedSet(slotKey, allToolSignature);
     const injectedToolDefinitions = input.preparedRuntime?.activeToolDefinitions
       ?? partitionDeferredTools(runtimeTools.definitions, activatedDeferredTools).injected;
     // native-structured：core 常驻注入，mcp__* 与 extended builtin 默认 deferred；
@@ -2482,23 +2532,27 @@ export class AgentOrchestrator {
       toolAllowlist: activeToolAllowlist,
       routeCapability,
     };
-    // 设置当前 turn 事件下沉，供 subagent 工具桥接子事件到父 trace。
-    this.currentTurnEventSink = {
-      onEvent: input.options?.onEvent,
-      sessionId: input.sessionId ?? null,
-      projectRootPath: input.projectRootPath ?? null,
-      projectId: input.projectId ?? null,
-      agentId: input.agentId,
-    };
-    this.currentTurnDeferredActivation = {
+    turnHandle.deferredActivation = {
       slotKey,
       allDefinitions: runtimeTools.definitions,
     };
-    // native-structured：执行器用完整 allowlist，deferred 工具仍可执行。
+    turnHandle.agentSlotKey = slotKey;
+    // native-structured：执行器用完整 allowlist，deferred 工具仍可经 tool_search 激活后执行。
     // 其它路由：与注入列表一致（通常为空），保持既有行为。
     const executorAllowlist = routeCapability.toolCallingMode === 'native-structured'
       ? input.toolAllowlist
       : activeToolAllowlist;
+    const effectivePlan = input.preparedRuntime?.effectivePlan ?? buildEffectiveRuntimePlan({
+      agentId: input.agentId,
+      projectRootPath: input.projectRootPath ?? null,
+      projectId: input.projectId ?? null,
+      toolAllowlist: input.toolAllowlist,
+      permissionSettings: settingsService.getAll().agentRuntime.permissions,
+      routeCapability,
+      requestPlan,
+      promptPlan: input.promptPlan,
+      policy: compileEffectivePolicy(input.projectRootPath),
+    });
     const toolExecutor = this.createToolExecutor(input.agentId, executorAllowlist, input.stage, input.sessionId, {
       sessionId: input.sessionId ?? null,
       turnId: input.turnId,
@@ -2506,6 +2560,7 @@ export class AgentOrchestrator {
       onEvent: input.options?.onEvent,
       projectRootPath: input.projectRootPath ?? null,
       projectId: input.projectId ?? null,
+      effectivePlan,
     });
     const promptCache = input.preparedRuntime?.promptCache ?? promptCacheCompiler.compile({
       promptPlan: input.promptPlan,
@@ -2576,6 +2631,9 @@ export class AgentOrchestrator {
       input.contextDiagnostic,
       runtimeTools.definitions,
       routeCapability,
+      effectivePlan.policy.maxTurns === Number.MAX_SAFE_INTEGER
+        ? undefined
+        : effectivePlan.policy.maxTurns,
     );
 
     const userMessage: UserMessage = {
@@ -2739,18 +2797,37 @@ export class AgentOrchestrator {
       }
       const sharedEvent = translateCoreToSharedAgentEvent(event, sharedEventContext);
       if (sharedEvent) {
-        input.options?.onEvent?.(sharedEvent);
+        if (turnHandle.isLive(turnGeneration)) {
+          turnHandle.eventSink?.onEvent?.(sharedEvent);
+        }
       }
     });
 
-    // abort 信号桥接到 Agent.abort()
+    // abort 信号桥接到 Agent.abort()；同时注册为 turn producer。
+    const unregisterAgentProducer = turnHandle.registerProducer({
+      id: `agent:${slotKey}`,
+      abort: () => {
+        try {
+          slot.agent.abort();
+        } catch {
+          // ignore
+        }
+      },
+      join: async () => {
+        // Agent.prompt settles when abort completes; no extra wait here.
+      },
+    });
     let abortListener: (() => void) | null = null;
     if (input.options?.signal) {
       if (input.options.signal.aborted) {
         unsubscribe();
+        unregisterAgentProducer();
+        turnCoordinator.endTurn(turnHandle);
         throw new DOMException('Aborted', 'AbortError');
       }
-      abortListener = () => slot.agent.abort();
+      abortListener = () => {
+        void turnHandle.abortAndJoin({ reason: 'user_stop' });
+      };
       input.options.signal.addEventListener('abort', abortListener, { once: true });
     }
 
@@ -2762,18 +2839,24 @@ export class AgentOrchestrator {
       await slot.agent.prompt(userMessage);
       return responseText;
     } catch (error) {
-      terminalStatus = input.options?.signal?.aborted ? 'stopped' : 'error';
+      terminalStatus = input.options?.signal?.aborted || turnHandle.isAborted ? 'stopped' : 'error';
       throw error;
     } finally {
       unsubscribe();
+      unregisterAgentProducer();
       if (abortListener && input.options?.signal) {
         input.options.signal.removeEventListener('abort', abortListener);
       }
       agentUserInputRequestService.cancelTurn(input.turnId);
       agentToolApprovalRequestService.cancelTurn(input.turnId);
-      this.currentTurnEventSink = null;
-      this.currentTurnDeferredActivation = null;
+      if (turnHandle.pendingHandoff) {
+        this.handoffMailbox.deposit(turnHandle.pendingHandoff);
+      }
+      // Terminal context first (ConversationService persists to conversation.jsonl),
+      // then flush in-memory slot messages — disk is the single source of truth.
       input.terminalContext?.(slot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus);
+      this.slots.flush(slot);
+      turnCoordinator.endTurn(turnHandle);
     }
   }
 

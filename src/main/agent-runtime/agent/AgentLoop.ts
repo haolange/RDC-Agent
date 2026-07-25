@@ -81,12 +81,24 @@ export interface AgentLoopConfig {
   onResponse?: (requestId: string | undefined, message: AssistantMessage) => Promise<void> | void;
 }
 
-/** Agent 上下文（可变；agentLoop 会原地修改 messages）。 */
+/** Agent 上下文（messages 可在 loop 内增长；tools 经 runtime revision COW）。 */
 export interface AgentContext {
   systemPrompt?: string;
   systemPromptSegments?: Context['systemPromptSegments'];
   messages: AgentMessage[];
   tools?: ToolDefinition[];
+  /**
+   * LoopRuntimeState 引用：每轮 LLM 调用读取 current.activeTools。
+   * Deferred 激活 bump revision 后，下一轮自动用新工具集。
+   */
+  runtime?: { current: LoopRuntimeState };
+}
+
+/** Turn / loop 内工具与 deferred 激活的修订状态（不可变快照；更新时整体替换）。 */
+export interface LoopRuntimeState {
+  revision: number;
+  activeTools: ToolDefinition[];
+  activatedDeferredTools: ReadonlySet<string>;
 }
 
 /** AgentTool 执行器接口（具体实现见 Tool 子系统）。 */
@@ -523,12 +535,12 @@ async function streamAssistantResponse(
   // 2. 转换为 LLM Message[]
   const llmMessages = config.convertToLlm(messages);
 
-  // 3. 构建 LLM Context
+  // 3. 构建 LLM Context（tools 优先读 runtime.current，支持 deferred COW revision）
   const llmContext: Context = {
     systemPrompt: context.systemPrompt,
     systemPromptSegments: context.systemPromptSegments,
     messages: llmMessages,
-    tools: context.tools,
+    tools: context.runtime?.current.activeTools ?? context.tools,
   };
 
   // 4. 解析 API key（优先动态获取）
