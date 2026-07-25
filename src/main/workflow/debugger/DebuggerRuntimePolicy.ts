@@ -263,6 +263,33 @@ export function intersectSkillAllowedTools(
   return Array.from(result);
 }
 
+/**
+ * 多 skill 激活时工具面：
+ * `allowedTools = ∩(skill_i) ∩ runtimeAllowlist`
+ *（DESIGN / docs/product/scoped-runtime-resources.md）。
+ *
+ * - 空声明 skill 不参与收窄；
+ * - 若没有任何 skill 声明非空 allowed-tools，返回 null（表示不启用 skill 收窄层）；
+ * - 非 null 时调用方应把结果当作最终 skill allowlist（已含元工具豁免）。
+ */
+export function combineActiveSkillAllowlists(
+  runtimeAllowlist: readonly string[],
+  skillAllowedToolsList: readonly (readonly string[])[],
+): string[] | null {
+  let active: Set<string> | null = null;
+  for (const skillAllowed of skillAllowedToolsList) {
+    if (skillAllowed.length === 0) continue;
+    const narrowed = intersectSkillAllowedTools(runtimeAllowlist, skillAllowed);
+    if (active === null) {
+      active = new Set(narrowed);
+      continue;
+    }
+    // failure-class: security — multi-skill must intersect, never union.
+    active = new Set([...active].filter((name) => narrowed.includes(name)));
+  }
+  return active ? Array.from(active) : null;
+}
+
 function isDeniedAskTool(originalToolName: string, normalizedToolName: string): boolean {
   if (ASK_DENIED_TOOLS.has(originalToolName) || ASK_DENIED_TOOLS.has(normalizedToolName)) {
     return true;

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  combineActiveSkillAllowlists,
   diagnoseManifestToolTokens,
   expandCanonicalToolToken,
   intersectSkillAllowedTools,
@@ -58,5 +59,35 @@ describe('intersectSkillAllowedTools', () => {
     const result = intersectSkillAllowedTools(runtime, ['mcp__renderdoc__inspect']);
     expect(result).toContain('mcp__renderdoc__inspect');
     expect(result).not.toContain('bash');
+  });
+});
+
+describe('combineActiveSkillAllowlists', () => {
+  const runtime = ['read_file', 'grep', 'glob', 'bash', 'edit_file', 'tool_search', 'ask_user', 'skill_read'];
+
+  it('returns null when no skill declares a non-empty allowlist', () => {
+    expect(combineActiveSkillAllowlists(runtime, [[], []])).toBeNull();
+  });
+
+  it('intersects multiple skill allowlists with the runtime allowlist', () => {
+    const combined = combineActiveSkillAllowlists(runtime, [
+      ['read', 'search'],
+      ['read_file', 'bash'],
+    ]);
+    expect(combined).not.toBeNull();
+    expect(combined).toEqual(expect.arrayContaining(['read_file', 'tool_search', 'ask_user']));
+    expect(combined).not.toContain('grep');
+    expect(combined).not.toContain('bash');
+    expect(combined).not.toContain('edit_file');
+  });
+
+  it('ignores empty skill declarations while intersecting the rest', () => {
+    const combined = combineActiveSkillAllowlists(runtime, [
+      [],
+      ['read'],
+      ['read_file', 'grep'],
+    ]);
+    expect(combined).toContain('read_file');
+    expect(combined).not.toContain('grep');
   });
 });

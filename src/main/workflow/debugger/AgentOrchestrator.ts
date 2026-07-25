@@ -1592,14 +1592,19 @@ export class AgentOrchestrator {
       runtimeContext?.projectId,
     ).toolMap;
     // Skill allowed-tools 收窄集（DESIGN Skills 条款：只收窄、不扩展）。
-    // skill_read 激活声明了 allowed-tools 的 skill 后，本 turn 后续工具调用
-    // 只能命中「激活 skill 允许集 ∪ 元工具豁免」。多 skill 取并集。
+    // 多 skill：allowedTools = ∩(skill_i) ∩ runtimeAllowlist（空声明不参与）。
     let activeSkillAllowlist: Set<string> | null = null;
     const applySkillNarrowing = (skillAllowedTools: string[]): void => {
       if (skillAllowedTools.length === 0) return;
       const narrowed = intersectSkillAllowedTools(toolAllowlist, skillAllowedTools);
-      if (activeSkillAllowlist === null) activeSkillAllowlist = new Set(narrowed);
-      else for (const name of narrowed) activeSkillAllowlist.add(name);
+      if (activeSkillAllowlist === null) {
+        activeSkillAllowlist = new Set(narrowed);
+        return;
+      }
+      // failure-class: security — intersect skills; do not union.
+      activeSkillAllowlist = new Set(
+        [...activeSkillAllowlist].filter((name) => narrowed.includes(name)),
+      );
     };
     // .agent.md 声明的 preloaded skills：优先用 EffectiveRuntimePlan 冻结集，避免 turn 中途 settings 漂移。
     const plan = runtimeContext?.effectivePlan;
