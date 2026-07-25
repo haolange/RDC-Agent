@@ -10,6 +10,7 @@ import type {
   ModelRoute,
   ProviderAvailability,
 } from '@shared/types/providerCapability';
+import type { ModelCost } from '@shared/provider-catalog/modelManifestSchema';
 import type {
   LlmProviderCatalogOwnership,
   LlmProviderProtocol,
@@ -47,7 +48,10 @@ export interface CatalogModelContribution {
   visionInput?: CapabilityState;
   structuredOutput?: CapabilityState;
   fixedTemperature?: number;
+  cost?: ModelCost;
   quota?: EffectiveModel['quota'];
+  /** Marker for user-defined custom models from models.json. */
+  custom?: boolean;
   factSource?: {
     sourceKind?: CapabilityEvidence['sourceKind'];
     observedAt?: string;
@@ -95,6 +99,8 @@ export interface EffectiveCatalogRequest {
   observed?: CatalogLayerContribution | CatalogLayerContribution[];
   maintainedSurface?: CatalogLayerContribution;
   user?: CatalogLayerContribution;
+  /** User-level model overrides from models.json (highest merge priority). */
+  userOverride?: CatalogLayerContribution;
   providerAvailability?: ProviderAvailability & { observedAt: string };
 }
 

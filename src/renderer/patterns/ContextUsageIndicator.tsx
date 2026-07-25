@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 import { ContextBreakdownPopover } from './ContextBreakdownPopover';
 import { formatTokenCount } from '@shared/utils/tokens';
+import { formatUsdCost } from '@shared/utils/cost';
 import { useI18n } from '../i18n';
 
 type PreparationPhase = 'idle' | 'preparing' | 'current' | 'actual';
@@ -30,7 +31,7 @@ export const ContextUsageIndicator: React.FC<{
     : showPrepared
       ? `${t('contextBreakdown.currentRequest')} ~${formatTokenCount(prepared.preparedInputTokens)} / ${formatTokenCount(prepared.promptBudgetTokens)}`
       : usage
-        ? `${phase === 'actual' ? t('contextBreakdown.actual') : t('contextBreakdown.lastActual')} ${normalizedPercent}%${windowTokens ? ` · ${formatTokenCount(windowTokens)}` : ''}`
+        ? `${phase === 'actual' ? t('contextBreakdown.actual') : t('contextBreakdown.lastActual')} ${normalizedPercent}%${windowTokens ? ` · ${formatTokenCount(windowTokens)}` : ''}${typeof usage.cumulativeCost === 'number' ? ` · ${formatUsdCost(usage.cumulativeCost)}` : ''}`
         : `${t('contextBreakdown.noUsageYet')}${windowTokens ? ` · ${formatTokenCount(windowTokens)}` : ''}`;
   const ariaLabel = phase === 'preparing'
     ? t('contextBreakdown.preparing')

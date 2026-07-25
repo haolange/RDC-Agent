@@ -17,7 +17,7 @@ function formatMeterPercent(value: number | undefined): string {
   return typeof value === 'number' ? `${value}%` : METER_UNAVAILABLE;
 }
 
-const MeterStat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+export const MeterStat: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div className={`context-breakdown-meter-stat${value === METER_UNAVAILABLE ? ' is-empty' : ''}`}>
     <span className="context-breakdown-meter-stat-label">{label}</span>
     <span className="context-breakdown-meter-stat-value">{value}</span>

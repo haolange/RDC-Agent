@@ -14,6 +14,15 @@ import { settingsService } from './SettingsService';
 
 export type LlmAuditStage = WorkflowStage | 'plan' | 'report';
 
+/** 一次 LLM call 的成本明细（美元）。 */
+export interface LlmUsageCost {
+  input: number;
+  output: number;
+  cacheRead?: number;
+  cacheWrite?: number;
+  total: number;
+}
+
 export interface RunLlmExecutionSummary {
   providerId: string;
   modelId: string;
@@ -30,6 +39,10 @@ export interface RunLlmExecutionSummary {
   lastTurnCacheHitTokens?: number;
   lastTurnCacheMissTokens?: number;
   totalReasoningTokens?: number;
+  /** 本 run 累计成本（美元）；无定价遥测时缺省。 */
+  totalCost?: number;
+  /** 最近一次 LLM call 的成本明细；无该轮定价遥测时缺省。 */
+  lastTurnCost?: LlmUsageCost;
   lastOccupiedTokens?: number;
   lastPromptBreakdown?: ContextUsageBreakdownEntry[] | null;
   lastSnapshotAt?: number | null;
@@ -119,6 +132,7 @@ export class DebuggerLlmService {
     cacheHitTokens?: number;
     cacheMissTokens?: number;
     reasoningTokens?: number;
+    cost?: LlmUsageCost;
     precomputedBreakdown: ContextUsageBreakdownEntry[];
   }): void {
     const key = params.runId ?? params.sessionId;
@@ -161,6 +175,13 @@ export class DebuggerLlmService {
     }
     if (typeof params.reasoningTokens === 'number') {
       existing.totalReasoningTokens = (existing.totalReasoningTokens ?? 0) + params.reasoningTokens;
+    }
+    if (params.cost) {
+      existing.totalCost = (existing.totalCost ?? 0) + params.cost.total;
+      existing.lastTurnCost = params.cost;
+    } else {
+      // 最近一次 call 无成本遥测——仅清除 last-turn，保留 run 累计。
+      existing.lastTurnCost = undefined;
     }
     existing.lastOccupiedTokens = params.inputTokens;
     existing.lastPromptBreakdown = params.precomputedBreakdown;
@@ -224,6 +245,10 @@ export class DebuggerLlmService {
       ...(cumulativeRate !== undefined ? { cumulativeCacheHitRate: cumulativeRate } : {}),
       ...(positiveTokenOrOmit(summary.totalReasoningTokens) !== undefined
         ? { reasoningTokens: positiveTokenOrOmit(summary.totalReasoningTokens) }
+        : {}),
+      ...(summary.lastTurnCost ? { cost: summary.lastTurnCost } : {}),
+      ...(typeof summary.totalCost === 'number' && summary.totalCost > 0
+        ? { cumulativeCost: summary.totalCost }
         : {}),
     };
   }

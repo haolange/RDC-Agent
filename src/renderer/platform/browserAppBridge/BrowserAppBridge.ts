@@ -198,6 +198,8 @@ class BrowserAppBridgeClient {
       getAgentDefinitionCommit: (agentId) => this.invoke('settings:getAgentDefinitionCommit', agentId),
       saveProviderDefinition: (request) => this.invoke('settings:saveProviderDefinition', request),
       getProviderDefinitionCommit: (providerId) => this.invoke('settings:getProviderDefinitionCommit', providerId),
+      getModelsOverride: () => this.invoke('settings:getModelsOverride'),
+      setModelsOverride: () => bridgeCapabilityDenied('settings:setModelsOverride'),
       set: () => bridgeCapabilityDenied('settings:set'),
     },
     project: {

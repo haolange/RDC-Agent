@@ -38,7 +38,11 @@ import {
   LlmProviderIdArgsSchema,
   SettingsSaveAgentDefinitionArgsSchema,
   SettingsSaveProviderDefinitionArgsSchema,
+  SettingsGetModelsOverrideArgsSchema,
+  SettingsSetModelsOverrideArgsSchema,
 } from './validation/settingsLlmSchemas';
+import type { ModelsOverride } from '@shared/provider-catalog/modelsOverrideSchema';
+import { modelsOverrideService } from '../settings/ModelsOverrideService';
 
 export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void {
   effectiveCatalogService.setDiscoveryLoaderResolver((request) => (
@@ -324,5 +328,27 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     if (!patch.llm) return settledSettings;
     for (const providerId of changedProviderIds) await broadcastCatalog(providerId);
     return withEffectiveAgentModelOptions(settledSettings);
+  });
+
+  ipcMain.handle('settings:getModelsOverride', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(SettingsGetModelsOverrideArgsSchema, rawArgs, {
+      label: 'settings:getModelsOverride',
+      maxBytes: 1024,
+    });
+    return modelsOverrideService.getOverrides();
+  });
+
+  ipcMain.handle('settings:setModelsOverride', async (_event, ...rawArgs: unknown[]) => {
+    const [overrides] = parseIpcArgs(SettingsSetModelsOverrideArgsSchema, rawArgs, {
+      label: 'settings:setModelsOverride',
+      maxBytes: 512 * 1024,
+    }) as [ModelsOverride];
+    const saved = modelsOverrideService.setOverrides(overrides);
+    // Rebroadcast affected provider catalogs so renderer picks up changes.
+    const affectedProviderIds = Object.keys(saved.providers);
+    for (const providerId of affectedProviderIds) {
+      await broadcastCatalog(providerId);
+    }
+    return saved;
   });
 }

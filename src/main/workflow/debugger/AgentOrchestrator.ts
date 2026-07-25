@@ -11,6 +11,22 @@
  *
  * Phase 4：状态登记委托 AgentSlotRegistry / McpConnectionCoordinator /
  * DeferredToolActivationTracker / HandoffMailbox；TurnEventSink 由 TurnCoordinator 持有。
+ *
+ * Provider path: LLM streaming is delegated to AgentTurnRunner which uses
+ * `configuredRuntimeProvider` (the HAL adapter registry entry point).
+ *
+ * Tool gating: AgentTurnRunner calls `resolveAgentRouteCapability` to determine
+ * `activeToolDefinitions` based on route capability. `describeRouteCapabilityDiagnostic`
+ * emits diagnostics for text-only or disabled routes. `recordObservedToolCallingSupport`
+ * persists structured tool evidence. Diagnostics include `textual_tool_call_not_executed`
+ * and `empty_response_without_tool_call` normalization.
+ *
+ * Permission: Tools are mediated via `agentPermissionPolicyService.evaluate` and
+ * `agentToolApprovalRequestService.request` / `agentToolApprovalRequestService.autoReview`.
+ * External path access uses `withTemporaryPathAccess` scoped to tool execution.
+ *
+ * PromptPlan is required before creating an agent runtime slot.
+ * RequestEnvelope snapshots are created via `requestEnvelopeBuilder.build`.
  */
 
 import type {

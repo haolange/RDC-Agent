@@ -1,9 +1,84 @@
 import type { Context } from '../core/types';
+import type { ProviderCacheContract } from '@shared/provider-catalog/modelManifestSchema';
 
 export interface PartitionedSystemPrompt {
   combinedText?: string;
   stableText?: string;
   volatileText?: string;
+}
+
+// =====================================================================
+// Cache retention abstraction
+// =====================================================================
+
+/** High-level cache retention tier derived from the provider cache contract TTL. */
+export type CacheRetention = 'none' | 'short' | 'long';
+
+/** Anthropic-specific cache_control wire payload. */
+export interface AnthropicCacheControlWire {
+  type: 'ephemeral';
+  ttl?: '5m' | '1h';
+}
+
+/** OpenAI-specific prompt cache wire fields. */
+export interface OpenAICacheWire {
+  promptCacheKey?: string;
+  promptCacheRetention?: '24h';
+}
+
+/**
+ * Derives the high-level cache retention tier from the contract TTL.
+ * - 'none' → no cache markers should be emitted
+ * - 'short' → standard ephemeral cache (Anthropic 5m / OpenAI default)
+ * - 'long' → long-lived cache (Anthropic 1h TTL / OpenAI 24h retention)
+ */
+export function resolveCacheRetention(ttl: ProviderCacheContract['ttl']): CacheRetention {
+  switch (ttl) {
+    case 'none':
+      return 'none';
+    case 'one-hour':
+    case 'twenty-four-hours':
+      return 'long';
+    default:
+      // five-minutes, thirty-minutes, provider-managed, unknown
+      return 'short';
+  }
+}
+
+/**
+ * Produces the Anthropic cache_control wire payload for the given retention.
+ * - 'none' → undefined (no cache marker)
+ * - 'short' → `{ type: 'ephemeral' }` (default 5m TTL)
+ * - 'long' → `{ type: 'ephemeral', ttl: '1h' }`
+ */
+export function anthropicCacheControlForRetention(
+  retention: CacheRetention,
+): AnthropicCacheControlWire | undefined {
+  switch (retention) {
+    case 'none':
+      return undefined;
+    case 'long':
+      return { type: 'ephemeral', ttl: '1h' };
+    case 'short':
+      return { type: 'ephemeral' };
+  }
+}
+
+/**
+ * Produces OpenAI prompt cache wire fields for the given retention.
+ * - 'none' → empty (no cache fields)
+ * - 'short' → prompt_cache_key only (standard implicit caching)
+ * - 'long' → prompt_cache_key + prompt_cache_retention: '24h'
+ */
+export function openAICacheWireForRetention(
+  retention: CacheRetention,
+  requestKey?: string,
+): OpenAICacheWire {
+  if (retention === 'none') return {};
+  return {
+    ...(requestKey ? { promptCacheKey: requestKey } : {}),
+    ...(retention === 'long' ? { promptCacheRetention: '24h' as const } : {}),
+  };
 }
 
 /**

@@ -256,6 +256,7 @@ export class AssistantStreamBuilder {
       cost: partial.cost ?? this.usage.cost,
       cacheReadTokens: partial.cacheReadTokens ?? this.usage.cacheReadTokens,
       cacheWriteTokens: partial.cacheWriteTokens ?? this.usage.cacheWriteTokens,
+      cacheWriteLongTokens: partial.cacheWriteLongTokens ?? this.usage.cacheWriteLongTokens,
       cacheHitTokens: partial.cacheHitTokens ?? this.usage.cacheHitTokens,
       cacheMissTokens: partial.cacheMissTokens ?? this.usage.cacheMissTokens,
       reasoningTokens: partial.reasoningTokens ?? this.usage.reasoningTokens,

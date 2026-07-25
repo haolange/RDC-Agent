@@ -1,5 +1,6 @@
 import type { CompiledPromptCache, DerivedContextMessageRef } from '@shared/types/semanticContext';
 import type { PromptSegment } from '@shared/types/rdxRuntime';
+import type { AssistantMessageDiagnostic } from '@shared/types/providerErrors';
 
 /**
  * Internal types for the provider/runtime boundary.
@@ -83,6 +84,8 @@ export interface AssistantMessage {
   stopReason: StopReason;
   /** Opaque provider-managed continuation state. Never projected to renderer or IPC. */
   providerState?: ProviderStateRef;
+  /** Diagnostic entries attached on failure for error classification. */
+  diagnostics?: AssistantMessageDiagnostic[];
   /** Unix 毫秒时间戳。 */
   timestamp: number;
 }
@@ -127,6 +130,8 @@ export interface Usage {
   cacheReadTokens?: number;
   /** Provider 上报的 cache write / creation tokens；未提供时缺省。 */
   cacheWriteTokens?: number;
+  /** Long-lived cache write tokens (e.g. Anthropic 1h TTL); subset of cacheWriteTokens. */
+  cacheWriteLongTokens?: number;
   /**
    * Normalized cache hit tokens for this request (native or derived from cacheRead).
    * Omitted when the provider reported no cache telemetry.
@@ -143,6 +148,8 @@ export interface Usage {
   cost?: {
     input: number;
     output: number;
+    cacheRead?: number;
+    cacheWrite?: number;
     total: number;
   };
 }

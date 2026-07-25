@@ -149,6 +149,100 @@ Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolic
 
 Connection Test、Connect 与已配置 Refresh 共用同一条 credential-scoped discovery 写入路径（`refreshEffectiveCatalogDiscovery` → Effective Catalog）。Test 成功必须就地写入已发现的 contributions 并广播，禁止为徽章另开 renderer 假状态；未提交的替换密钥写入 `anonymous:{providerId}`，不得覆盖 live `activeAccountId`。Settings 模型行徽章只反映 catalog `availability`：有新鲜缓存显示 OK；无缓存或 `refreshing` 显示加载中，禁止先闪「未验证」。
 
+## HAL Adapter 实现注册
+
+实现注册表（`src/shared/provider-catalog/implementationRegistry.ts`）当前包含 **16 个** adapter：
+
+| adapterId | 协议 | transport |
+| --- | --- | --- |
+| `anthropic-messages` | AnthropicMessages | http |
+| `azure-openai-chat` | AzureOpenAIChatCompletions | http |
+| `azure-openai-responses` | AzureOpenAIResponses | http |
+| `bedrock-converse-stream` | BedrockConverseStream | http |
+| `gitlab-duo` | GitLabDuo | sdk |
+| `google-interactions` | GoogleInteractions | http |
+| `google-gemini` | GoogleGemini | http |
+| `google-vertex-anthropic` | GoogleVertexAnthropic | http |
+| `google-vertex-gemini` | GoogleVertexGemini | http |
+| `mistral-conversations` | MistralConversations | http |
+| `ollama-openai-compatible` | OllamaOpenAICompatibleChatCompletions | http |
+| `openai-compatible` | OpenAICompatibleChatCompletions | http |
+| `openai-responses` | OpenAIResponses | http |
+| `openrouter-chat` | OpenRouterChatCompletions | http |
+| `sap-ai-core-foundation-models` | SapAiCoreFoundationModels | sdk |
+| `sap-ai-core-orchestration` | SapAiCoreOrchestration | sdk |
+
+Phase 7 新增的三个 HAL adapter：
+
+- **Mistral Conversations**（`MistralProvider.ts`）：适配 Mistral Conversations API 协议，支持 `conversation_id` 续接与 SSE 流式。
+- **Azure OpenAI Responses**（`AzureOpenAIResponsesProvider.ts`）：适配 Azure OpenAI Responses API，支持 API version 查询参数、deployment 路径与 Azure AD 认证。
+- **Bedrock Converse Stream**（`BedrockConverseProvider.ts`）：适配 AWS Bedrock Converse Stream API，使用 SigV4 签名、`cachePoint` 缓存标记与原生 SSE 事件流解析。
+
+## 成本计算（Cost Calculation）
+
+`Usage.cost` 由 `src/main/agent-runtime/providers/internal/costCalculator.ts` 的 `calculateUsageCost()` 在流结束时计算。定价来源为 `Model.cost`（manifest / models.json 声明的每百万 token 美元价格）：
+
+```text
+cost.input  = (model.cost.input  / 1M) × usage.inputTokens
+cost.output = (model.cost.output / 1M) × usage.outputTokens
+cost.cacheRead  = (model.cost.cacheRead / 1M) × cacheReadTokens
+cost.cacheWrite = (model.cost.cacheWrite / 1M) × shortWrite
+               + (model.cost.input × 2 / 1M) × longWrite   // Anthropic 1h TTL = 2× input
+cost.total  = input + output + cacheRead + cacheWrite
+```
+
+无定价信息时返回 `undefined`，UI 不显示成本字段。
+
+## 统一错误模型（Error Model）
+
+`src/shared/types/providerErrors.ts` 定义 `ProviderErrorCode` 联合类型，`src/main/agent-runtime/providers/internal/errorClassifier.ts` 实现分类逻辑：
+
+| ProviderErrorCode | 含义 | retryable |
+| --- | --- | --- |
+| `provider_unknown` | Provider 未注册/未找到 | ✗ |
+| `auth_unconfigured` | 凭据未配置 | ✗ |
+| `auth_expired` | 凭据过期/无效 | ✗ |
+| `auth_scope_denied` | 权限/scope 不足 | ✗ |
+| `model_source` | 模型不存在（404） | ✗ |
+| `rate_limit` | 速率限制（429） | ✓ |
+| `quota_exceeded` | 配额/余额耗尽 | ✗ |
+| `network` | 网络连接错误（5xx） | ✓ |
+| `timeout` | 请求超时 | ✓ |
+| `context_overflow` | 上下文超长 | ✗ |
+| `stream_protocol` | 流协议违规 | 视情况 |
+| `aborted` | 用户取消 | ✗ |
+| `unknown` | 未分类 | ✗ |
+
+分类优先级：Abort → HTTP status → 消息模式匹配 → 流协议 → fallback `unknown`。`isRetryableAssistantError()` 检查 `AssistantMessage.diagnostics` 判定是否可自动重试。
+
+## models.json 用户覆盖（3 层真值合并）
+
+Effective Catalog 的模型事实来自三层合并（优先级递增）：
+
+1. **Manifest 基线**（`src/shared/provider-catalog/manifests`）：编译期确定的结构能力、协议、route、controls、bindings。
+2. **Discovery 投影**（live catalog）：账号级 live discovery 贡献的可用性、上下文窗口、reasoning metadata；只能收窄或补充，不能覆盖 manifest 结构能力。
+3. **用户覆盖**（`~/.rdx/models.json`，由 `ModelsOverrideService` 管理）：最高合并优先级，自带 provenance；可覆盖定价、上下文窗口、显示名等非安全字段。**禁止**触及 `route.protocol`、`authSchemaId`、`adapterId`、`compatibilityGroup`、`carrier` 等安全/延续性字段。
+
+合并冲突记录 provenance，不静默覆盖。`EffectiveModelResolver` 在 `userOverrideContribution()` 中执行合并。
+
+## Prompt Cache 契约（Cache Retention）
+
+`src/main/agent-runtime/providers/promptCacheWire.ts` 定义统一缓存抽象：
+
+```text
+CacheRetention = 'none' | 'short' | 'long'
+```
+
+由 manifest `ProviderCacheContract.ttl` 经 `resolveCacheRetention()` 派生：
+
+| TTL 声明 | CacheRetention | Anthropic wire | OpenAI wire |
+| --- | --- | --- | --- |
+| `none` | `none` | 无 cache_control | 无 cache 字段 |
+| `five-minutes` / `thirty-minutes` / `provider-managed` / `unknown` | `short` | `{ type: 'ephemeral' }` | `prompt_cache_key` |
+| `one-hour` / `twenty-four-hours` | `long` | `{ type: 'ephemeral', ttl: '1h' }` | `prompt_cache_key` + `prompt_cache_retention: '24h'` |
+
+Bedrock 使用 `cachePoint: { type: 'default' }` 标记 stable prefix。`partitionSystemPrompt()` 将 PromptPlan segments 按 stable/volatile 分割，stable 前缀锚定缓存断点；不匹配时 fail-closed（`PROMPT_PLAN_CONTEXT_MISMATCH`）。
+
 ## 验证门禁
 
 - `pnpm run check:provider-catalog`：strict schema、166 identity、确定 hash、route/control/binding/secret-free 语义。

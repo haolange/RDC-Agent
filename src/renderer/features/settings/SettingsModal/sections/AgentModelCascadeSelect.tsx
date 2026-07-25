@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AgentModelOption } from '@shared/types/agentManifest';
+import { formatPricePerMillion } from '@shared/utils/cost';
 import type { useI18n } from '../../../../i18n';
 import { assignDynStyle } from '../../../../lib/useDynStyle';
 
@@ -227,7 +228,17 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
                   setOpen(false);
                 }}
               >
-                <span>{option.modelLabel}</span>
+                <span className="settings-model-option-label">{option.modelLabel}</span>
+                {option.custom ? (
+                  <span className="settings-model-option-custom" data-testid={`settings-model-option-custom-${option.canonicalId}`}>
+                    {t('settings.modelCustomBadge')}
+                  </span>
+                ) : null}
+                {option.cost ? (
+                  <span className="settings-model-option-cost">
+                    {formatPricePerMillion(option.cost.input)} / {formatPricePerMillion(option.cost.output)}
+                  </span>
+                ) : null}
               </button>
             );
           })}

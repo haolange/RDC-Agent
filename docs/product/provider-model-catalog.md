@@ -6,6 +6,49 @@
 > 同名模型在不同 Provider surface 上的 Fast / 1M / 推理控件彼此独立，不可跨 surface 抄写。  
 > 官方文档不可全信；需与 live discovery / 本机 probe / 交叉来源三角验证后再升级事实。
 
+## 实现注册表（Implementation Registry）
+
+当前 `implementationRegistry.ts` 包含 **16 个 adapter**，支持以下协议：
+
+| 协议 | adapterId | 新增于 |
+| --- | --- | --- |
+| AnthropicMessages | `anthropic-messages` | — |
+| AzureOpenAIChatCompletions | `azure-openai-chat` | — |
+| AzureOpenAIResponses | `azure-openai-responses` | HAL Phase 7 |
+| BedrockConverseStream | `bedrock-converse-stream` | HAL Phase 7 |
+| GitLabDuo | `gitlab-duo` | — |
+| GoogleInteractions | `google-interactions` | — |
+| GoogleGemini | `google-gemini` | — |
+| GoogleVertexAnthropic | `google-vertex-anthropic` | — |
+| GoogleVertexGemini | `google-vertex-gemini` | — |
+| MistralConversations | `mistral-conversations` | HAL Phase 7 |
+| OllamaOpenAICompatibleChatCompletions | `ollama-openai-compatible` | — |
+| OpenAICompatibleChatCompletions | `openai-compatible` | — |
+| OpenAIResponses | `openai-responses` | — |
+| OpenRouterChatCompletions | `openrouter-chat` | — |
+| SapAiCoreFoundationModels | `sap-ai-core-foundation-models` | — |
+| SapAiCoreOrchestration | `sap-ai-core-orchestration` | — |
+
+## 成本/定价字段（Cost/Pricing）
+
+Model manifest 可声明每百万 token 美元定价（`cost` 字段）：
+
+```json
+{
+  "cost": {
+    "input": 3.0,
+    "output": 15.0,
+    "cacheRead": 0.30,
+    "cacheWrite": 3.75
+  }
+}
+```
+
+- `input` / `output`：每百万 token 的美元价格。
+- `cacheRead`：缓存读取折扣价（可选）。
+- `cacheWrite`：缓存写入价格（可选；Anthropic 1h TTL 按 2× input 计算）。
+- 无 `cost` 字段时 UI 不显示成本；用户可经 `models.json` 覆盖定价。
+
 ## ChatGPT Account
 
 | Name                  | Context Window | 1M Max      | Fast Mode                      | 推理等级                                         | 状态   |

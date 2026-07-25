@@ -43,7 +43,6 @@ export function useAppBootstrap(options: {
   const currentProject = useProjectStore((state) => state.currentProject);
   const currentSession = useProjectStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
-  const currentRunUsage = useSessionStore((state) => state.currentRunUsage);
 
   const setConversationSnapshot = useConversationStore((state) => state.setConversationSnapshot);
   const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
@@ -137,9 +136,11 @@ export function useAppBootstrap(options: {
       return;
     }
 
-    // Active debug run: pull by runId.
+    // Active debug run: pull by runId. The IPC push path (useIpcEventBridge) is the
+    // steady-state write source; this pull only supplements at init and run/session
+    // switch. Dedup against the store so an inbound push never triggers a clear-refetch loop.
     if (hasActiveDebugRun && currentRun?.runId) {
-      if (navigator.webdriver && currentRunUsage?.runId === currentRun.runId) {
+      if (useSessionStore.getState().currentRunUsage?.runId === currentRun.runId) {
         return;
       }
       clearUsageSnapshot();
@@ -152,6 +153,9 @@ export function useAppBootstrap(options: {
 
     // Ask mode (no active debug run): pull by sessionId if available.
     if (!hasActiveDebugRun && currentSession?.sessionId) {
+      if (useSessionStore.getState().currentRunUsage?.runId === currentSession.sessionId) {
+        return;
+      }
       clearUsageSnapshot();
       let cancelled = false;
       void electronAPI.workflow.getRunUsage(undefined, currentSession.sessionId)
@@ -162,7 +166,7 @@ export function useAppBootstrap(options: {
 
     clearUsageSnapshot();
     return undefined;
-  }, [clearUsageSnapshot, currentRun?.runId, currentRunUsage?.runId, currentSession?.sessionId, hasActiveDebugRun, setCurrentRunUsage]);
+  }, [clearUsageSnapshot, currentRun?.runId, currentSession?.sessionId, hasActiveDebugRun, setCurrentRunUsage]);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
