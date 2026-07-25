@@ -675,17 +675,25 @@ export class RdxSessionService {
   }
 
   private async teardownRuntime(): Promise<void> {
-    if (this.runtimeContext) {
+    const previousContext = this.runtimeContext;
+    const { appPathService } = await import('../runtime/AppPathService');
+    const leakMarkerPath = path.join(appPathService.getUserRdxPaths().userRdxRoot, 'rdx-runtime-leak.json');
+
+    let closeOk = true;
+
+    // Stage 1: graceful close via configured shell action
+    if (previousContext) {
       const result = await rdxShellActionService.runAction('closeRuntime', {
-        contextId: this.runtimeContext.contextId,
-        runtimeOwner: this.runtimeContext.runtimeOwner,
-        ownerLeaseId: this.runtimeContext.ownerLeaseId,
-        replaySessionId: this.runtimeContext.replaySessionId,
-        captureFileId: this.runtimeContext.captureFileId,
-        captureId: this.runtimeContext.captureId,
+        contextId: previousContext.contextId,
+        runtimeOwner: previousContext.runtimeOwner,
+        ownerLeaseId: previousContext.ownerLeaseId,
+        replaySessionId: previousContext.replaySessionId,
+        captureFileId: previousContext.captureFileId,
+        captureId: previousContext.captureId,
       }, {
         env: this.buildRuntimeContextEnv(),
       });
+      closeOk = result.ok;
       if (!result.ok) {
         runtimeLogService.log({
           scope: 'app',
@@ -696,10 +704,7 @@ export class RdxSessionService {
           raw: result,
         });
       }
-      return;
-    }
-
-    if (this.humanPreview.status !== 'closed') {
+    } else if (this.humanPreview.status !== 'closed') {
       await this.closeHumanPreviewWindow().catch((error) => {
         runtimeLogService.log({
           scope: 'app',
@@ -709,6 +714,68 @@ export class RdxSessionService {
           summary: error instanceof Error ? error.message : String(error),
         });
       });
+      return;
+    } else {
+      return;
+    }
+
+    // Stage 2: grace wait for external RDX daemon / child to exit
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
+
+    // Stage 3: force-terminate supervised shell children
+    try {
+      const { shellInvocationService } = await import('../tools/ShellInvocationService');
+      shellInvocationService.terminateAll();
+    } catch (error) {
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'context',
+        severity: 'warning',
+        title: 'RDX force terminate warning',
+        summary: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    // Stage 4: leak marker when graceful close failed (diagnostics / later GC)
+    if (!closeOk && previousContext) {
+      try {
+        fs.mkdirSync(path.dirname(leakMarkerPath), { recursive: true });
+        fs.writeFileSync(
+          leakMarkerPath,
+          JSON.stringify({
+            markedAt: new Date().toISOString(),
+            contextId: previousContext.contextId,
+            runtimeOwner: previousContext.runtimeOwner,
+            ownerLeaseId: previousContext.ownerLeaseId,
+            stage: 'force-after-wait',
+          }, null, 2),
+          'utf8',
+        );
+        runtimeLogService.log({
+          scope: 'app',
+          namespace: 'context',
+          severity: 'warning',
+          title: 'RDX runtime leak marker written',
+          summary: `Context ${previousContext.contextId} close failed; leak marker persisted.`,
+          raw: { leakMarkerPath },
+        });
+      } catch (error) {
+        runtimeLogService.log({
+          scope: 'app',
+          namespace: 'context',
+          severity: 'warning',
+          title: 'RDX leak marker write failed',
+          summary: error instanceof Error ? error.message : String(error),
+        });
+      }
+    } else {
+      try {
+        if (fs.existsSync(leakMarkerPath)) {
+          fs.unlinkSync(leakMarkerPath);
+        }
+      } catch {
+        // ignore cleanup failures
+      }
     }
   }
 

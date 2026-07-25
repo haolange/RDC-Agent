@@ -1,5 +1,5 @@
 import type { AgentTool } from '../../agent/AgentTool';
-import { assertPublicHttpUrl } from '../../net/assertPublicHttpUrl';
+import { assertPublicHttpUrl, fetchPinnedPublic } from '../../net/assertPublicHttpUrl';
 import { truncateOutput } from './_shared';
 import { WEB_MAX_REDIRECTS, WEB_MAX_RESPONSE_BYTES } from './toolLimits';
 
@@ -219,14 +219,14 @@ async function searchPublicWeb(query: string, signal?: AbortSignal): Promise<{
 }
 
 async function requestPublicText(rawUrl: string, signal?: AbortSignal, accept = '*/*'): Promise<PublicTextResponse> {
-  let currentUrl = await assertPublicHttpUrl(rawUrl);
+  let current = await assertPublicHttpUrl(rawUrl);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(new Error(`Timed out after ${REQUEST_TIMEOUT_MS}ms`)), REQUEST_TIMEOUT_MS);
   const abort = (): void => controller.abort(signal?.reason ?? new Error('Request aborted'));
   signal?.addEventListener('abort', abort, { once: true });
   try {
     for (let hop = 0; hop <= WEB_MAX_REDIRECTS; hop += 1) {
-      const response = await fetch(currentUrl, {
+      const response = await fetchPinnedPublic(current, {
         redirect: 'manual',
         signal: controller.signal,
         headers: {
@@ -237,15 +237,15 @@ async function requestPublicText(rawUrl: string, signal?: AbortSignal, accept = 
       if (response.status >= 300 && response.status < 400) {
         const location = response.headers.get('location');
         if (!location) {
-          throw new Error(`Redirect missing Location header from ${currentUrl}`);
+          throw new Error(`Redirect missing Location header from ${current.href}`);
         }
-        const next = new URL(location, currentUrl).toString();
-        currentUrl = await assertPublicHttpUrl(next);
+        const next = new URL(location, current.href).toString();
+        current = await assertPublicHttpUrl(next);
         continue;
       }
       const { bytes, text, truncated } = await readResponseBodyLimited(response, MAX_RESPONSE_BYTES);
       return {
-        finalUrl: currentUrl,
+        finalUrl: current.href,
         status: response.status,
         statusText: response.statusText,
         bytes,
@@ -255,7 +255,7 @@ async function requestPublicText(rawUrl: string, signal?: AbortSignal, accept = 
     }
     throw new Error(`Too many redirects (>${WEB_MAX_REDIRECTS}) starting from ${rawUrl}`);
   } catch (error) {
-    throw createNetworkError(currentUrl, error);
+    throw createNetworkError(current.href, error);
   } finally {
     clearTimeout(timeoutId);
     signal?.removeEventListener('abort', abort);

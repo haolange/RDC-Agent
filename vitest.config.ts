@@ -12,6 +12,13 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
+      // Phase 5 baseline thresholds — raise gradually as suites expand.
+      // Impact: `pnpm run test:coverage` fails when below; default `pnpm test` is unaffected.
+      thresholds: {
+        lines: 60,
+        functions: 60,
+        branches: 50,
+      },
     },
   },
   resolve: {

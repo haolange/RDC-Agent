@@ -1,6 +1,10 @@
 import React, { useEffect, useRef } from 'react';
 import type { AgentMode } from '@shared/types/layout';
-import { useConversationStore } from '../../../stores/conversationStore';
+import {
+  selectConversationMessageCount,
+  selectLatestMessageActivityAt,
+  useConversationStore,
+} from '../../../stores/conversationStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { ConversationThread } from './ConversationThread';
 import './AgentChat.css';
@@ -9,19 +13,12 @@ import './markdown-code.css';
 const STICKY_SCROLL_THRESHOLD = 96;
 
 export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
-  const messages = useConversationStore((state) => state.conversationMessages);
+  const messageCount = useConversationStore(selectConversationMessageCount);
+  const latestMessageActivityAt = useConversationStore(selectLatestMessageActivityAt);
   const workflowState = useWorkflowStore((state) => state.workflowState);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldStickToBottomRef = useRef(true);
-  const messageCount = messages.length;
   const isEmpty = messageCount === 0;
-
-  // Track the latest message updatedAt so streaming patches re-trigger the
-  // sticky scroll effect even when the message count stays the same.
-  const latestMessageActivityAt = messages.reduce<number>((max, message) => {
-    const candidate = message.updatedAt ?? message.createdAt;
-    return candidate > max ? candidate : max;
-  }, 0);
 
   useEffect(() => {
     if (navigator.webdriver) {

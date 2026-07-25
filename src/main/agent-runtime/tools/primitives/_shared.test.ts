@@ -5,11 +5,39 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   assertTextReadable,
   safeResolvePath,
+  sliceUtf8Bytes,
   truncateOutput,
+  abortPromise,
 } from './_shared';
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
+
+describe('sliceUtf8Bytes', () => {
+  it('truncates on codepoint boundaries in O(N) buffer path', () => {
+    const text = '测'.repeat(100);
+    const out = sliceUtf8Bytes(text, 10);
+    expect(Buffer.byteLength(out, 'utf8')).toBeLessThanOrEqual(10);
+    expect(out.length).toBeGreaterThan(0);
+  });
+});
+
+describe('abortPromise', () => {
+  it('exposes dispose to remove the abort listener', () => {
+    const controller = new AbortController();
+    const handle = abortPromise(controller.signal);
+    handle.dispose();
+    controller.abort();
+    // Promise must not reject after dispose (listener removed).
+    return Promise.race([
+      handle.promise.then(
+        () => { throw new Error('should not resolve'); },
+        () => { throw new Error('should not reject after dispose'); },
+      ),
+      new Promise<void>((resolve) => setTimeout(resolve, 20)),
+    ]);
+  });
+});
 
 describe('truncateOutput', () => {
   it('keeps Buffer.byteLength within maxBytes for multi-byte text', () => {

@@ -16,6 +16,7 @@
  */
 
 import type { ChildProcess } from 'child_process';
+import { z } from 'zod';
 
 import type { MCPConnectionStatus, MCPServerStatusSummary } from '@shared/types/mcp';
 import type {
@@ -125,6 +126,32 @@ interface JsonRpcResponse {
   params?: unknown;
 }
 
+const MAX_MCP_BUFFER_BYTES = 1 * 1024 * 1024;
+
+const JsonRpcResponseSchema = z.object({
+  jsonrpc: z.literal('2.0'),
+  id: z.union([z.number(), z.string()]).optional(),
+  result: z.unknown().optional(),
+  error: z.object({
+    code: z.number(),
+    message: z.string(),
+    data: z.unknown().optional(),
+  }).optional(),
+  method: z.string().optional(),
+  params: z.unknown().optional(),
+});
+
+function parseJsonRpcResponse(line: string): JsonRpcResponse | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  const parsed = JsonRpcResponseSchema.safeParse(raw);
+  return parsed.success ? (parsed.data as JsonRpcResponse) : null;
+}
+
 class StdioRpcClient {
   private nextId = 1;
   private buffer = '';
@@ -143,16 +170,18 @@ class StdioRpcClient {
 
   private onData(chunk: string): void {
     this.buffer += chunk;
+    if (Buffer.byteLength(this.buffer, 'utf8') > MAX_MCP_BUFFER_BYTES) {
+      this.onClose(new Error(`MCP stdio buffer exceeded ${MAX_MCP_BUFFER_BYTES} bytes`));
+      return;
+    }
     let idx: number;
     while ((idx = this.buffer.indexOf('\n')) >= 0) {
       const line = this.buffer.slice(0, idx).trim();
       this.buffer = this.buffer.slice(idx + 1);
       if (!line) continue;
-      let msg: JsonRpcResponse;
-      try {
-        msg = JSON.parse(line) as JsonRpcResponse;
-      } catch {
-        // 非 JSON 行（一些 server 可能输出诊断日志），跳过
+      const msg = parseJsonRpcResponse(line);
+      if (!msg) {
+        // 非 JSON / 非法 JSON-RPC 行（诊断日志），跳过
         continue;
       }
       if (typeof msg.id === 'number' && this.pending.has(msg.id)) {
@@ -285,6 +314,9 @@ class SseRpcClient {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
+        if (Buffer.byteLength(buffer, 'utf8') > MAX_MCP_BUFFER_BYTES) {
+          throw new Error(`MCP SSE buffer exceeded ${MAX_MCP_BUFFER_BYTES} bytes`);
+        }
 
         const lines = buffer.split('\n');
         buffer = lines.pop() ?? ''; // 保留未完成行
@@ -322,11 +354,9 @@ class SseRpcClient {
   }
 
   private processEvent(data: string): void {
-    let msg: JsonRpcResponse;
-    try {
-      msg = JSON.parse(data) as JsonRpcResponse;
-    } catch {
-      return; // 非 JSON 事件，跳过
+    const msg = parseJsonRpcResponse(data);
+    if (!msg) {
+      return; // 非 JSON / 非法 JSON-RPC 事件，跳过
     }
     if (typeof msg.id === 'number' && this.pending.has(msg.id)) {
       const entry = this.pending.get(msg.id)!;
@@ -374,7 +404,11 @@ class SseRpcClient {
         throw new Error(`SSE POST ${res.status} ${res.statusText}`);
       }
       // SSE 模式下，响应也可能通过 POST 返回（或通过事件流）
-      const body = (await res.json()) as JsonRpcResponse;
+      const rawBody = await res.json();
+      const body = parseJsonRpcResponse(JSON.stringify(rawBody));
+      if (!body) {
+        throw new Error('MCP HTTP returned invalid JSON-RPC');
+      }
       if (body.error) {
         throw new Error(
           `MCP error ${body.error.code}: ${body.error.message}`,
@@ -994,7 +1028,11 @@ export class MCPManager {
       if (!res.ok) {
         throw new Error(`MCP HTTP ${res.status} ${res.statusText}`);
       }
-      const body = (await res.json()) as JsonRpcResponse;
+      const rawBody = await res.json();
+      const body = parseJsonRpcResponse(JSON.stringify(rawBody));
+      if (!body) {
+        throw new Error('MCP HTTP returned invalid JSON-RPC');
+      }
       if (body.error) {
         throw new Error(
           `MCP error ${body.error.code}: ${body.error.message}`,
@@ -1038,12 +1076,16 @@ export class MCPManager {
           const { done, value } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
+          if (Buffer.byteLength(buffer, 'utf8') > MAX_MCP_BUFFER_BYTES) {
+            throw new Error(`MCP streamable-http buffer exceeded ${MAX_MCP_BUFFER_BYTES} bytes`);
+          }
           const lines = buffer.split('\n');
           buffer = lines.pop() ?? '';
           for (const line of lines) {
             const trimmed = line.trim();
             if (!trimmed) continue;
-            const msg = JSON.parse(trimmed) as JsonRpcResponse;
+            const msg = parseJsonRpcResponse(trimmed);
+            if (!msg) continue;
             if (msg.error) {
               throw new Error(`MCP error ${msg.error.code}: ${msg.error.message}`);
             }
@@ -1054,12 +1096,19 @@ export class MCPManager {
         }
         // 处理最后剩余的
         if (buffer.trim()) {
-          const msg = JSON.parse(buffer.trim()) as JsonRpcResponse;
+          const msg = parseJsonRpcResponse(buffer.trim());
+          if (!msg) {
+            throw new Error('MCP streamable-http returned invalid JSON-RPC');
+          }
           return msg.result;
         }
       }
       // fallback: 非流式 JSON 响应
-      const body = (await res.json()) as JsonRpcResponse;
+      const rawBody = await res.json();
+      const body = parseJsonRpcResponse(JSON.stringify(rawBody));
+      if (!body) {
+        throw new Error('MCP streamable-http returned invalid JSON-RPC');
+      }
       if (body.error) {
         throw new Error(`MCP error ${body.error.code}: ${body.error.message}`);
       }

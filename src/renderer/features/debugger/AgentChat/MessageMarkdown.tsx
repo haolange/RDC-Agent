@@ -86,7 +86,7 @@ const markdownComponents: Components = {
  * Raw HTML stays disabled (react-markdown default). External links open in a
  * new window. Mermaid and KaTeX are opt-in via fenced / math syntax.
  */
-export const MessageMarkdown: React.FC<MessageMarkdownProps> = ({ content }) => {
+const MessageMarkdownInner: React.FC<MessageMarkdownProps> = ({ content }) => {
   const normalized = useMemo(() => normalizeAssistantMarkdown(content), [content]);
 
   return (
@@ -104,5 +104,7 @@ export const MessageMarkdown: React.FC<MessageMarkdownProps> = ({ content }) => 
     </div>
   );
 };
+
+export const MessageMarkdown = React.memo(MessageMarkdownInner);
 
 export default MessageMarkdown;

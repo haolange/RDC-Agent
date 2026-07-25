@@ -43,16 +43,37 @@ export class RdxRuntimeService {
       for (const kind of ['agent', 'skill', 'mcp', 'hook', 'policy'] as ScopedResourceKind[]) {
         const root = this.rootFor(kind, scope, projectRoot);
         if (!fs.existsSync(root)) continue;
-        if (kind === 'skill') {
-          for (const entry of fs.readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
-            const sourcePath = path.join(root, entry.name, 'SKILL.md');
-            if (fs.existsSync(sourcePath)) documents.push(this.readDocument(kind, scope, entry.name, sourcePath));
+        try {
+          if (kind === 'skill') {
+            for (const entry of fs.readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory())) {
+              const sourcePath = path.join(root, entry.name, 'SKILL.md');
+              if (!fs.existsSync(sourcePath)) continue;
+              documents.push(this.readDocumentSafe(kind, scope, entry.name, sourcePath));
+            }
+            continue;
           }
-          continue;
-        }
-        const extension = EXTENSIONS[kind]!;
-        for (const entry of fs.readdirSync(root).filter((entry) => entry.endsWith(extension)).sort()) {
-          documents.push(this.readDocument(kind, scope, entry.slice(0, -extension.length), path.join(root, entry)));
+          const extension = EXTENSIONS[kind]!;
+          for (const entry of fs.readdirSync(root).filter((entry) => entry.endsWith(extension)).sort()) {
+            documents.push(this.readDocumentSafe(
+              kind,
+              scope,
+              entry.slice(0, -extension.length),
+              path.join(root, entry),
+            ));
+          }
+        } catch (error) {
+          documents.push({
+            id: `_root_${kind}`,
+            kind,
+            scope,
+            sourcePath: root,
+            sourceHash: hashScopedResource(root),
+            effectiveStatus: 'invalid',
+            content: '',
+            diagnostics: [
+              `Failed to list ${kind} root: ${error instanceof Error ? error.message : String(error)}`,
+            ],
+          });
         }
       }
     }
@@ -221,6 +242,30 @@ export class RdxRuntimeService {
     const target = kind === 'skill' ? path.join(root, id) : path.join(root, `${id}${EXTENSIONS[kind]}`);
     assertInside(root, target);
     fs.rmSync(target, { recursive: kind === 'skill', force: true });
+  }
+
+  private readDocumentSafe(
+    kind: ScopedResourceKind,
+    scope: 'user' | 'project',
+    id: string,
+    sourcePath: string,
+  ): ScopedResourceDocument {
+    try {
+      return this.readDocument(kind, scope, id, sourcePath);
+    } catch (error) {
+      return {
+        id,
+        kind,
+        scope,
+        sourcePath,
+        sourceHash: hashScopedResource(`unreadable:${sourcePath}`),
+        effectiveStatus: 'invalid',
+        content: '',
+        diagnostics: [
+          `Failed to read ${kind}/${id}: ${error instanceof Error ? error.message : String(error)}`,
+        ],
+      };
+    }
   }
 
   private readDocument(kind: ScopedResourceKind, scope: 'user' | 'project', id: string, sourcePath: string): ScopedResourceDocument {
