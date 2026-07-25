@@ -2,6 +2,7 @@
  * ID Generation Utilities - ID生成工具
  */
 
+import { randomBytes } from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -35,11 +36,10 @@ export function generateCaseId(): string {
 }
 
 /**
- * 生成Run ID
+ * 生成 Run ID（≥56 bits entropy via crypto.randomBytes）。
  */
 export function generateRunId(): string {
-  const random = Math.random().toString(36).slice(2, 6);
-  return `run_${random}`;
+  return `run_${randomBytes(8).toString('hex')}`;
 }
 
 /**
@@ -77,28 +77,21 @@ export function generateCaptureId(role: string, index: number): string {
   return `cap-${role}-${String(index).padStart(3, '0')}`;
 }
 
+export function isAlphanumeric(value: string): boolean {
+  return /^[a-zA-Z0-9]$/.test(value);
+}
+
 /**
  * 清理Token字符串
  */
 export function sanitizeToken(value: string): string {
   const text = value
     .split('')
-    .map(ch => (ch.isAlphanumeric() || ch === '_' || ch === '-' ? ch : '-'))
+    .map((ch) => (isAlphanumeric(ch) || ch === '_' || ch === '-' ? ch : '-'))
     .join('')
     .replace(/^-+|-+$/g, '');
   return text || 'unknown';
 }
-
-// 扩展String原型用于sanitizeToken
-declare global {
-  interface String {
-    isAlphanumeric(): boolean;
-  }
-}
-
-String.prototype.isAlphanumeric = function(this: string): boolean {
-  return /^[a-zA-Z0-9]$/.test(this);
-};
 
 /**
  * 获取当前时间戳（毫秒）

@@ -9,11 +9,21 @@ export {
   generateSessionId,
   generateShortId,
   generateTokenId,
+  isAlphanumeric,
   nowIso,
   nowMs,
   sanitizeToken,
 } from './id';
-export { appendJsonl, countJsonl, filterJsonl, readJsonl, writeJsonl } from './jsonl';
+export {
+  appendJsonl,
+  assertNoJsonlDiagnostics,
+  countJsonl,
+  filterJsonl,
+  readJsonl,
+  writeJsonl,
+  type JsonlDiagnostic,
+  type JsonlReadResult,
+} from './jsonl';
 export { parseYaml, readYaml, stringifyYaml, writeYaml } from './yaml';
 export {
   canonicalAgentModelId,

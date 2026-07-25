@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../index', () => ({
+vi.mock('../sessions', () => ({
   rdxSessionService: { snapshotOpenedCapture: vi.fn(() => null) },
 }));
 
