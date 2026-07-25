@@ -148,8 +148,6 @@ export function useComposerSend(options: {
     currentMode,
     currentRun,
     currentSession,
-    hasActiveConversationTurn,
-    hasActiveDebugRun,
     isComposerBusy,
     pendingAttachments,
     pendingSkillIds,

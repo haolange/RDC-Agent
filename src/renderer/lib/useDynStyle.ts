@@ -4,6 +4,7 @@ export type DynStyleDecls = Record<string, string | number | undefined | null>;
 
 const registry = new Map<string, string>();
 let sheet: CSSStyleSheet | null = null;
+let imperativeSeq = 0;
 
 function ensureSheet(): CSSStyleSheet | null {
   if (typeof document === 'undefined') return null;
@@ -17,7 +18,10 @@ function ensureSheet(): CSSStyleSheet | null {
 function flush(): void {
   const active = ensureSheet();
   if (!active) return;
-  const css = Array.from(registry, ([id, body]) => `[data-dyn-style="${id}"]{${body}}`).join('\n');
+  const css = Array.from(registry, ([id, body]) => {
+    const attr = id.startsWith('imp') ? 'data-imp-dyn-style' : 'data-dyn-style';
+    return `[${attr}="${id}"]{${body}}`;
+  }).join('\n');
   active.replaceSync(css);
 }
 
@@ -46,4 +50,32 @@ export function useDynStyle(decls: DynStyleDecls): { 'data-dyn-style': string } 
   }, [id, body]);
 
   return { 'data-dyn-style': id };
+}
+
+/**
+ * Imperative counterpart for DOM measurements (textarea autosize, canvas host sizing).
+ * Attaches/reuses `data-dyn-style` on the element and updates the shared constructable sheet.
+ */
+export function assignDynStyle(el: HTMLElement, decls: DynStyleDecls): void {
+  let id = el.getAttribute('data-imp-dyn-style');
+  if (!id) {
+    id = `imp${++imperativeSeq}`;
+    el.setAttribute('data-imp-dyn-style', id);
+  }
+  const body = toDecl(decls);
+  if (!body) {
+    registry.delete(id);
+  } else {
+    registry.set(id, body);
+  }
+  flush();
+}
+
+/** Clear imperative dyn-style registration for an element (does not remove React dyn-style). */
+export function clearDynStyle(el: HTMLElement): void {
+  const id = el.getAttribute('data-imp-dyn-style');
+  if (!id) return;
+  registry.delete(id);
+  el.removeAttribute('data-imp-dyn-style');
+  flush();
 }

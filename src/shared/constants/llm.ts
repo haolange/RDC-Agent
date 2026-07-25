@@ -38,11 +38,6 @@ export const LLM_PROVIDER_CATEGORY_DEFINITIONS: LlmProviderCategoryDescriptor[] 
     label: 'Local Model Service',
     description: 'Local runtimes and localhost services with selectable chat or Responses protocols.',
   },
-  {
-    id: 'image',
-    label: 'Image Capability',
-    description: 'Image-generation capability entries. This catalog currently keeps them fail-closed.',
-  },
 ];
 
 export const LLM_PROVIDER_PROTOCOL_DEFINITIONS: LlmProviderProtocolDescriptor[] = [

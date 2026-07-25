@@ -31,7 +31,7 @@ describe('StructuredHandoffBuilder', () => {
     const messages: AgentMessage[] = [
       {
         role: 'user',
-        content: 'Goal: inspect the capture. Must not leak api_key=\"secret-value\" or Authorization: Bearer bearer-secret. TODO: verify output.',
+        content: 'Goal: inspect the capture. Must not leak api_key="secret-value" or Authorization: Bearer bearer-secret. TODO: verify output.',
         timestamp: 1,
       },
       assistant(),

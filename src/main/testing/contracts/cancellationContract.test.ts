@@ -1,5 +1,6 @@
 /**
  * Cancellation contract — abort leaves no live process and drops late events.
+ * Phase 7 matrix entry for ProcessSupervisor / TurnHandle generation guards.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ProcessSupervisor } from '../../runtime/ProcessSupervisor';
@@ -42,6 +43,25 @@ describe('cancellationContract: process abort', () => {
     const info = await supervised.join(5_000);
     expect(info.reason).toBe('abort');
     expect(supervisor.size).toBe(0);
+  });
+
+  it('abortAll clears every active session turn', async () => {
+    const coordinator = new TurnCoordinator();
+    const a = await coordinator.beginTurn({
+      sessionKey: 'cancel-a',
+      turnId: 't-a',
+      eventSink: { sessionId: 'cancel-a' },
+    });
+    const b = await coordinator.beginTurn({
+      sessionKey: 'cancel-b',
+      turnId: 't-b',
+      eventSink: { sessionId: 'cancel-b' },
+    });
+    expect(coordinator.getActive('cancel-a')).toBe(a);
+    expect(coordinator.getActive('cancel-b')).toBe(b);
+    await coordinator.abortAll('user_stop');
+    expect(coordinator.getActive('cancel-a')).toBeNull();
+    expect(coordinator.getActive('cancel-b')).toBeNull();
   });
 });
 

@@ -1,0 +1,4 @@
+{"model":"fixture-model","message":{"role":"assistant","content":"Hello "},"done":false}
+{"model":"fixture-model","message":{"role":"assistant","content":"world"},"done":false}
+{"model":"fixture-model","message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"read_file","arguments":{"path":"README.md"}}}]},"done":false}
+{"model":"fixture-model","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop","prompt_eval_count":10,"eval_count":8}

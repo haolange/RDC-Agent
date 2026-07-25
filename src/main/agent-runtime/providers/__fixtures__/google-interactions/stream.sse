@@ -1,0 +1,26 @@
+event: interaction.created
+data: {"event_type":"interaction.created","interaction":{"id":"int_fixture","status":"in_progress"}}
+
+event: step.start
+data: {"event_type":"step.start","index":0,"step":{"type":"text","content":[{"type":"text","text":""}]}}
+
+event: step.delta
+data: {"event_type":"step.delta","index":0,"delta":{"type":"text","content":{"type":"text","text":"Hello world"}}}
+
+event: step.stop
+data: {"event_type":"step.stop","index":0}
+
+event: step.start
+data: {"event_type":"step.start","index":1,"step":{"type":"function_call","id":"call_fixture_1","name":"read_file"}}
+
+event: step.delta
+data: {"event_type":"step.delta","index":1,"delta":{"type":"arguments_delta","arguments":"{\"path\":\"README.md\"}"}}
+
+event: step.stop
+data: {"event_type":"step.stop","index":1}
+
+event: interaction.requires_action
+data: {"event_type":"interaction.requires_action","interaction":{"id":"int_fixture","status":"requires_action","usage":{"total_input_tokens":11,"total_output_tokens":7,"total_tokens":18}}}
+
+event: done
+data: [DONE]

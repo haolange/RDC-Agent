@@ -1,0 +1,15 @@
+export const REQUEST_TIMEOUT_MS = 20000;
+export const CHATGPT_CALLBACK_PORT = 1455;
+export const CHATGPT_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
+export const CLAUDE_CLIENT_ID = '9d1c250a-e61b-44d9-88ed-5944d1962f5e';
+export const GITHUB_COPILOT_CLIENT_ID = 'Iv1.b507a08c87ecfe98';
+export const GROK_OPENID_CONFIGURATION_URL = 'https://auth.x.ai/.well-known/openid-configuration';
+export const GROK_OAUTH_CLIENT_ID = 'b1a00492-073a-47ea-816f-4c329264a828';
+export const GROK_OAUTH_REQUESTED_SCOPES = ['openid', 'profile', 'email', 'offline_access', 'grok-cli:access', 'api:access'] as const;
+export const GROK_BUILD_API_BASE_URL = 'https://cli-chat-proxy.grok.com/v1';
+export const XAI_API_BASE_URL = 'https://api.x.ai/v1';
+export const CHATGPT_CATALOG_CLIENT_VERSION = '1.0.0';
+export const NOUS_PORTAL_BASE_URL = 'https://portal.nousresearch.com';
+export const NOUS_INFERENCE_BASE_URL = 'https://inference-api.nousresearch.com/v1';
+export const NOUS_OAUTH_CLIENT_ID = 'hermes-cli';
+export const NOUS_OAUTH_SCOPE = 'inference:invoke';

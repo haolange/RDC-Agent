@@ -1,6 +1,6 @@
 /**
  * Storage fault contract — corrupted JSONL surfaces diagnostics (Integrity).
- * Extends src/shared/utils/jsonl.test.ts coverage as the Phase 7 suite entry.
+ * Phase 7 matrix entry; complements src/shared/utils/jsonl.test.ts.
  */
 import fs from 'fs';
 import os from 'os';
@@ -39,5 +39,23 @@ describe('storageFaultContract: corrupted JSONL', () => {
     const result = readJsonl<{ n: number }>(filePath);
     expect(result.diagnostics).toEqual([]);
     expect(result.records.map((r) => r.n)).toEqual([1, 2]);
+  });
+
+  it('treats a missing file as empty with no diagnostics', () => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-storage-missing-'));
+    const filePath = path.join(root, 'absent.jsonl');
+    const result = readJsonl<{ id: string }>(filePath);
+    expect(result.records).toEqual([]);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('reports a trailing truncated JSON line as integrity diagnostics', () => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-storage-trunc-'));
+    const filePath = path.join(root, 'trunc.jsonl');
+    fs.writeFileSync(filePath, '{"id":"ok"}\n{"id":', 'utf8');
+    const result = readJsonl<{ id: string }>(filePath);
+    expect(result.records.map((r) => r.id)).toEqual(['ok']);
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]?.line).toBe(2);
   });
 });

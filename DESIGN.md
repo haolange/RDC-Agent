@@ -6,6 +6,8 @@
 
 RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDoc `.rdc`。它应能作为日常 agent 工作台完成阅读、规划、编辑、搜索、工具调用、handoff、memory 与 subagent 编排，同时保留 capture 打开、replay 上下文、RDX actions、诊断与 RenderDoc 调查等垂直能力。
 
+**不做** image/video 生成 runtime、media provider 目录面或 `MediaRuntimeService` 类骨架；discovery 对非 agent modality（含 image/video output）保持 fail-closed 剔除。用户附件 vision-input（读图）仍属 agent chat 能力，与生成 media 无关。
+
 产品不是固定模式向导。Ask、Plan、Edit、Debugger、Analyzer、Optimizer 是 agent profiles（指令、工具、审批策略、handoff、可见性不同）。仅 `user-invocable` 的 profile 出现在 composer orchestrator 菜单。Plan 不是硬编码 `AppMode`，而是可研究、提问、写 plan artifact、调用允许的 subagent 并 handoff 实现的 `.agent.md` profile。
 
 唯一运行时路径是 agent loop：解析 profile / model route / policy / tools → 调用 LLM → 执行已批准工具 → 回灌结果 → 产出 final answer。Renderer 不得伪造推理阶段；隐藏 CoT 永不作为 UI 内容展示或持久化。
@@ -51,7 +53,7 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 - **RDX**：无内置 CLI 副本；Open `.rdc` 等垂直入口只走 Settings 配置的 shell action。
 - **Capture 所有权**：`ownerSessionId` 不匹配则 fail-closed；不得跨 session 继承已打开 capture。
 - **Orchestrator façade**：`AgentOrchestrator.ts` 保持 façade（**少于 800 行**）；turn 准备、tool 装配、executor、turn/subagent runner、prompt-plan 等职责外提到协作单元；门禁 `pnpm run check:orchestrator-facade`（亦挂在 `check:architecture`）。
-- **CSP**：生产 `script-src` 无 `unsafe-inline`；`style-src 'self'`（无 `unsafe-inline`）；`style-src-attr 'none'`；动态样式经 constructable stylesheet（`useDynStyle`），禁止依赖 inline style attributes。
+- **CSP**：生产 `script-src` 无 `unsafe-inline`；`style-src 'self'`（无 `unsafe-inline`）；`style-src-attr 'none'`；动态样式经 constructable stylesheet（`useDynStyle` / `assignDynStyle` / Appearance `applyChromeTheme`），禁止依赖 inline style attributes 或 `<style>` textContent 注入。Appearance chrome 权威见 [`docs/ui/design-system.md`](docs/ui/design-system.md)；`chromeThemes` 由 Settings `schemaVersion` **6** 起在升级时硬重置为 RDC 默认（不可逆，清历史污染）。
 - **IPC Zod**：全部 IPC handler 经 `parseIpcArgs`；非法 payload fail-closed；`approvalToken` 单次消费。
 - **RDX context lease**：仅 per-session lease（`setRdxRuntimeContextForSession` / `getRdxContextLease` / `assertRdxContextLeaseOwnership`）；**禁止** RDX global mirror、`legacyGlobalMirror`、`getRdxRuntimeContext` 全局 API。
 - **EffectiveRuntimePlan**：`schemaVersion: 2`；在 `prepareTurn` **完整冻结**（`planId` / fingerprint / tools / skill ∩ / deferred / MCP hash / permission / policy / route / request+prompt fingerprints）；Prompt 与 Executor 共用；在途 turn 不读可变 Settings。
@@ -83,4 +85,10 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 
 ## Verification Gate（摘要）
 
-代码改动至少：`pnpm run typecheck`。按改动面追加 `check:architecture`（含 `check:orchestrator-facade`）、`check:orchestrator-facade`、`check:fidelity`、`check:shared-exports`、`check:agent-runtime`、`check:provider-system`、`check:provider-catalog`、`check:tool-system`、`check:work-process*`、`check:reasoning-delivery`、`check:appearance`、`check:settings-agents`、`check:repository-hygiene`、`test:coverage`（覆盖率阈值门禁）、相关 vitest contract 套件。UI/工作流用 `pnpm run start:agent-browser` 真实会话验收。完整命令与 UI 验收清单见 `AGENTS.md`。
+**宣称完成必须以门禁与浏览器证据为准**，不得仅靠 commit message。
+
+本地 / CI（`.github/workflows/ci.yml` `build` job）必跑：`check:repository-hygiene` → `typecheck` → `lint` → `test` → `test:coverage`（unit surface：lines/functions ≥75、branches ≥63；集成面走 contracts + browser QA）→ `check:architecture`（含 Orchestrator &lt;800 与 main 单文件 ≤900）→ `check:fidelity` / `check:shared-exports` / `check:work-process*` / `check:conversation-branch` / `check:reasoning-delivery` / `check:agent-runtime` / `check:tool-system` / `check:appearance` / `check:settings-agents` / `check:provider-system` / `check:provider-catalog` / `check:scoped-resources` / `check:project-instructions` / `check:prompt-plan-snapshot` / `check:skills` / `check:hooks` / `check:memory-policy` / `check:contracts` → `build`。三 OS `pack` 仍为必绿并行 job。
+
+UI/工作流用 `pnpm run start:agent-browser` 真实会话验收（先停旧进程、删光 QA project 全部 session、再新建隔离 session）。完整清单见 `AGENTS.md`。
+
+Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThemes` 为 RDC 默认（清理历史污染）。

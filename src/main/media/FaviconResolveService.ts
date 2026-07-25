@@ -87,7 +87,7 @@ async function readLimitedBytes(response: Response, maxBytes: number): Promise<U
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
-  while (true) {
+  for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
     if (!value) continue;

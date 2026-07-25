@@ -154,6 +154,7 @@ export function useAgentManifestAutosave({
     messageRef.current('');
     const timer = window.setTimeout(() => void executeRef.current(changed, revision), 300);
     return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- draftSnapshot serializes agentManifestDrafts for deep change detection
   }, [draftSnapshot, open]);
 
   useEffect(() => {
@@ -166,5 +167,6 @@ export function useAgentManifestAutosave({
       }
     }
     wasOpenRef.current = open;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- draftSnapshot serializes agentManifestDrafts for deep change detection
   }, [draftSnapshot, open]);
 }

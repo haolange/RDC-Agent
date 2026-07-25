@@ -34,7 +34,7 @@ export const SlashCommandPopover: React.FC<SlashCommandPopoverProps> = ({
       setCommands(result.commands);
     };
     void loadCommands();
-  }, []);
+  }, [api?.command]);
 
   const filtered = commands.filter(
     (c) =>

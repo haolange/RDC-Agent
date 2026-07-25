@@ -70,7 +70,7 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
       cancelled = true;
       unsubscribe?.();
     };
-  }, [catalogAccountId, provider.activeAccountId, provider.id, provider.protocol]);
+  }, [catalogAccountId, provider]);
 
   const resolvedModels = useMemo(
     () => projectProviderModels(provider.catalogOwnership, models, snapshot),

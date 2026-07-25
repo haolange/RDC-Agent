@@ -1,6 +1,7 @@
 import { useEffect, type RefObject } from 'react';
 import type { AgentMode } from '@shared/types/layout';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
+import { assignDynStyle } from '../../../lib/useDynStyle';
 
 export function useComposerDomEffects(input: {
   modeMenuOpen: boolean;
@@ -64,8 +65,8 @@ export function useComposerDomEffects(input: {
 
     // Keep parity with .composer-textarea min-height (72) so enabling Composer
     // Markdown (overlay capsule) never looks like a shell resize.
-    textarea.style.height = '0px';
+    assignDynStyle(textarea, { height: '0px' });
     const next = Math.min(Math.max(textarea.scrollHeight, 72), 180);
-    textarea.style.height = `${next}px`;
+    assignDynStyle(textarea, { height: `${next}px` });
   }, [currentMode, promptInputRef, promptValue]);
 }

@@ -1,6 +1,6 @@
 /**
  * Reusable IPC payload validation middleware (Zod + size / count / length limits).
- * Prefer wiring sensitive channels first; remaining handlers can adopt the same helper later.
+ * All IPC handlers must validate args through `parseIpcArgs` (fail-closed).
  */
 import { z, type ZodTypeAny } from 'zod';
 

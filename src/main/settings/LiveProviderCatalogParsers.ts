@@ -1,4 +1,4 @@
-import type { CatalogModelContribution } from './EffectiveCatalogService';
+import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import type { CapabilityState, ProviderSurfaceDefinition } from '@shared/types/providerCapability';
 import type {
   NamedReasoningLevel,

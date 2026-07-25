@@ -15,6 +15,7 @@ const removedPaths = [
   'src/main/settings/CanonicalProviderFacts.ts',
   'src/main/settings/CanonicalProviderWireFacts.ts',
   'src/main/settings/ModelsDevProviderRegistry.ts',
+  'src/main/settings/MediaRuntimeService.ts',
 ];
 for (const relativePath of removedPaths) {
   const absolutePath = path.join(repoRoot, relativePath);
@@ -34,7 +35,35 @@ const forbiddenSymbols = [
   'SeedModelDefinition',
   'CapabilityConstraint',
   'model-variant',
+  'MediaRuntimeService',
+  'adapter-not-implemented',
 ];
+/** Product forbids media-generation capability surfaces; discovery deny globs may still mention them. */
+const settingsTypes = fs.readFileSync(path.join(repoRoot, 'src/shared/types/settings.ts'), 'utf8');
+if (settingsTypes.includes("'image-generation'") || settingsTypes.includes("'video-generation'")) {
+  fail('settings.ts must not declare image/video generation capabilities');
+}
+if (/export type LlmProviderCategory\s*=[\s\S]*?\|\s*'image'/.test(settingsTypes)) {
+  fail('settings.ts must not include LlmProviderCategory image');
+}
+const catalogSchema = fs.readFileSync(path.join(repoRoot, 'src/shared/provider-catalog/catalogManifestSchema.ts'), 'utf8');
+if (catalogSchema.includes("'image-generation'") || catalogSchema.includes("'video-generation'")) {
+  fail('catalogManifestSchema must not declare image/video generation capabilities');
+}
+if (/category:\s*z\.enum\(\[[\s\S]*?'image'/.test(catalogSchema)) {
+  fail('catalogManifestSchema must not allow category image');
+}
+if (/surfaceKind:\s*z\.enum\(\[[\s\S]*?'media'/.test(catalogSchema)) {
+  fail('catalogManifestSchema must not allow surfaceKind media');
+}
+const compilerSource = fs.readFileSync(path.join(repoRoot, 'src/shared/provider-catalog/compiler.ts'), 'utf8');
+if (/image:\s*\[\s*'media'/.test(compilerSource) || compilerSource.includes("'image-generation'")) {
+  fail('compiler must not compile image/media generation category shapes');
+}
+const llmConstants = fs.readFileSync(path.join(repoRoot, 'src/shared/constants/llm.ts'), 'utf8');
+if (/id:\s*'image'/.test(llmConstants)) {
+  fail('llm.ts must not expose catalog category image');
+}
 const scanRoots = ['src', 'scripts'];
 const extensions = new Set(['.ts', '.tsx', '.mjs', '.cjs']);
 const visit = (directory) => {

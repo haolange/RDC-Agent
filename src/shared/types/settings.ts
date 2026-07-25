@@ -157,8 +157,7 @@ export type LlmProviderCategory =
   | 'cloud-platform'
   | 'coding-token-plan'
   | 'compatible-access'
-  | 'local'
-  | 'image';
+  | 'local';
 
 export type LlmProviderCatalogOwnership = 'app-managed' | 'provider-managed' | 'user-managed';
 
@@ -227,7 +226,8 @@ export interface LlmProviderCatalogProvenance {
 /**
  * Provider capability declaration - feature flags that downstream code can
  * consult before attempting capability-gated behaviour (e.g. requesting tool
- * calls, structured outputs, image generation, etc.).
+ * calls, structured outputs, vision input, etc.).
+ * Image/video generation is out of product scope and must not appear here.
  */
 export type LlmProviderCapability =
   | 'chat'
@@ -236,9 +236,7 @@ export type LlmProviderCapability =
   | 'reasoning'
   | 'prompt-cache'
   | 'vision-input'
-  | 'model-discovery'
-  | 'image-generation'
-  | 'video-generation';
+  | 'model-discovery';
 export type LlmProviderConnectionStatus = 'unconfigured' | 'verified' | 'failed' | 'unavailable';
 export type LlmProviderModelAvailability = 'available' | 'unavailable' | 'unknown';
 export interface SidebarLayoutPreference {

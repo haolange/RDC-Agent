@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useI18n } from '../../../i18n';
+import { assignDynStyle } from '../../../lib/useDynStyle';
 
 interface UserMessageEditFormProps {
   value: string;
@@ -27,10 +28,12 @@ export const UserMessageEditForm: React.FC<UserMessageEditFormProps> = ({
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    textarea.style.height = 'auto';
+    assignDynStyle(textarea, { height: 'auto', 'overflow-y': 'hidden' });
     const nextHeight = Math.min(textarea.scrollHeight, 260);
-    textarea.style.height = `${nextHeight}px`;
-    textarea.style.overflowY = textarea.scrollHeight > 260 ? 'auto' : 'hidden';
+    assignDynStyle(textarea, {
+      height: `${nextHeight}px`,
+      'overflow-y': textarea.scrollHeight > 260 ? 'auto' : 'hidden',
+    });
   }, [value]);
 
   useEffect(() => {

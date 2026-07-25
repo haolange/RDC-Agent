@@ -238,7 +238,7 @@ describe('typed provider connection resolution', () => {
 describe('coding-plan Anthropic discovery routing', () => {
   it('routes volcengine-coding-plan discovery through validateCodingPlanModels for both protocols', () => {
     const source = fs.readFileSync(
-      path.join(__dirname, 'ProviderConnectionService.ts'),
+      path.join(__dirname, 'ProviderModelDiscovery.ts'),
       'utf8',
     );
     expect(source).toMatch(

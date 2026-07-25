@@ -6,7 +6,7 @@ export interface AppShellProps {
   overlays?: ReactNode;
 }
 
-/** Layout shell skeleton — wiring happens in app/App during Phase 3. */
+/** Layout chrome shell; application wiring lives in `app/App`. */
 export function AppShell({ titleBar, body, overlays }: AppShellProps) {
   return (
     <div className="app-container">

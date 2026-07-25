@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'fs';
+import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { parseIpcArgs } from './IpcPayloadGuard';
 import { AgentConfigureArgsSchema, AgentGetStateArgsSchema, AgentSendMessageArgsSchema } from './agentSchemas';
@@ -9,7 +11,26 @@ import {
 } from './settingsLlmSchemas';
 import { EvidenceGetEventsArgsSchema } from './toolEvidenceSchemas';
 
+const HANDLERS_DIR = path.join(__dirname, '..');
+const HANDLER_FILES = readdirSync(HANDLERS_DIR)
+  .filter((name) => name.endsWith('Handlers.ts') && !name.includes('.test.'))
+  .sort();
+
 describe('IPC schema coverage', () => {
+  it('enumerates every IPC handler module and requires parseIpcArgs wiring', () => {
+    expect(HANDLER_FILES.length).toBeGreaterThan(10);
+    const compositionRoots = new Set(['workbenchHandlers.ts', 'handlers.ts']);
+    for (const file of HANDLER_FILES) {
+      const source = readFileSync(path.join(HANDLERS_DIR, file), 'utf8');
+      if (compositionRoots.has(file)) {
+        continue;
+      }
+      expect(source.includes('parseIpcArgs'), `${file} must validate via parseIpcArgs`).toBe(true);
+      // Channels must go through ipcMain.handle + parseIpcArgs (not unvalidated listeners).
+      expect(source.includes('ipcMain.handle'), `${file} should register via ipcMain.handle`).toBe(true);
+    }
+  });
+
   it('accepts and rejects agent channel args', () => {
     expect(parseIpcArgs(AgentSendMessageArgsSchema, ['ask', 'hello'])).toEqual(['ask', 'hello']);
     expect(() => parseIpcArgs(AgentSendMessageArgsSchema, ['', 'hello'])).toThrow();

@@ -11,10 +11,8 @@ import type {
   LlmProviderEntry,
 } from '@shared/types/settings';
 import { resolveContextTierChoices } from '@shared/utils/contextTiers';
-import {
-  effectiveCatalogService,
-  type CatalogModelContribution,
-} from './EffectiveCatalogService';
+import { effectiveCatalogService } from './EffectiveCatalogService';
+import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import {
   planEffectiveModelCapabilityProbe,
   recordEffectivePlanSuccess,

@@ -292,6 +292,20 @@ if (!exists('src/renderer/features/settings/SettingsModal/sections/PolicySetting
   fail('PolicySettings peer section is required.');
 }
 
+// Main-process single-file soft budget (Orchestrator keeps a stricter <800 gate).
+const MAIN_LINE_BUDGET = 900;
+const mainTsFiles = walk(path.join(repoRoot, 'src/main'), [], /\.ts$/).filter((filePath) => {
+  const relativePath = path.relative(repoRoot, filePath).replace(/\\/g, '/');
+  return !relativePath.includes('.test.') && !relativePath.endsWith('.d.ts');
+});
+for (const filePath of mainTsFiles) {
+  const relativePath = path.relative(repoRoot, filePath).replace(/\\/g, '/');
+  const lines = countLines(filePath);
+  if (lines > MAIN_LINE_BUDGET) {
+    fail(`${relativePath} exceeds main line budget (${lines} > ${MAIN_LINE_BUDGET}); split without legacy shims.`);
+  }
+}
+
 if (process.exitCode) {
   process.exit(process.exitCode);
 }

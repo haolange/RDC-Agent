@@ -14,7 +14,7 @@ import {
   resolveBridgeAllowedOrigins,
   tokensMatch,
 } from './bridgeSecurity';
-import { EFFECTIVE_CATALOG_SCHEMA_VERSION } from '../settings/EffectiveCatalogService';
+import { EFFECTIVE_CATALOG_SCHEMA_VERSION } from '../settings/effectiveCatalogTypes';
 import {
   MODELS_DEV_IDENTITY_COUNT,
   MODELS_DEV_SNAPSHOT_SHA256,
@@ -24,7 +24,7 @@ import {
   getProviderCatalogRevision,
   listProviderSummaries,
 } from '../provider-catalog/ProviderCatalogRegistry';
-import { SETTINGS_SCHEMA_VERSION } from '../settings/SettingsService';
+import { SETTINGS_SCHEMA_VERSION } from '../settings/settingsDefaults';
 
 type BridgeOptions = {
   devRendererUrl: string | null;

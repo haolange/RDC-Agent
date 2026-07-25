@@ -1,5 +1,5 @@
 import { isAdmittedDiscoveredModel } from './DiscoveryAdmission';
-import type { CatalogModelContribution } from './EffectiveCatalogService';
+import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import type {
   CapabilityState,
   DiscoveryCapabilityMapping,
