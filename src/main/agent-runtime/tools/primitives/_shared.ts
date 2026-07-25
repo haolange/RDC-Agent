@@ -14,24 +14,6 @@ import * as path from 'path';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
 import { BINARY_SAMPLE_BYTES, TEXT_FILE_MAX_BYTES } from './toolLimits';
 
-let temporaryAllowedPathRoots: string[] = [];
-
-export async function withTemporaryPathAccess<T>(
-  roots: string[],
-  run: () => Promise<T>,
-): Promise<T> {
-  const previous = temporaryAllowedPathRoots;
-  temporaryAllowedPathRoots = [
-    ...previous,
-    ...roots.map((root) => normalizeInputPath(root)),
-  ];
-  try {
-    return await run();
-  } finally {
-    temporaryAllowedPathRoots = previous;
-  }
-}
-
 /**
  * 获取 workspace 根目录（绝对路径）。
  * 优先使用执行上下文中的 project root，使工具相对当前激活项目解析路径。
@@ -63,11 +45,17 @@ export function isWithinRoot(target: string, root: string): boolean {
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 }
 
-function assertInsideAllowedRoots(target: string, workspaceRoot: string, input: string): void {
+function assertInsideAllowedRoots(
+  target: string,
+  workspaceRoot: string,
+  input: string,
+  context?: ToolExecutionContext,
+): void {
   const rel = path.relative(workspaceRoot, target);
   const insideWorkspace = rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
   if (insideWorkspace) return;
-  if (temporaryAllowedPathRoots.some((root) => isWithinRoot(target, root))) return;
+  const temporaryRoots = context?.temporaryAllowedPathRoots ?? [];
+  if (temporaryRoots.some((root) => isWithinRoot(target, root))) return;
   throw new Error(`路径 "${input}" 超出 workspace (${workspaceRoot})`);
 }
 
@@ -101,10 +89,10 @@ export function safeResolvePath(input: string, root?: string, context?: ToolExec
     ? path.resolve(expandedInput)
     : path.resolve(workspaceRoot, expandedInput);
 
-  assertInsideAllowedRoots(lexical, workspaceRoot, input);
+  assertInsideAllowedRoots(lexical, workspaceRoot, input, context);
 
   const resolved = realpathExistingAncestor(lexical);
-  assertInsideAllowedRoots(resolved, workspaceRoot, input);
+  assertInsideAllowedRoots(resolved, workspaceRoot, input, context);
   return resolved;
 }
 

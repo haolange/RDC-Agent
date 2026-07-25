@@ -20,6 +20,8 @@ export interface ToolExecutionContext {
   projectRootPath: string | null;
   projectId: string | null;
   sessionId: string | null;
+  /** Per-call temporary path roots; never module-global. */
+  temporaryAllowedPathRoots?: readonly string[];
 }
 
 export interface AgentToolSpec {

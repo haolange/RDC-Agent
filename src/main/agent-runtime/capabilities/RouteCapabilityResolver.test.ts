@@ -134,17 +134,17 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
       .toBe('unknown');
   });
 
-  it('fails open for unknown tools but marks the route unverified', () => {
+  it('fails closed for unknown tools (text-only, not native-structured)', () => {
     const capability = resolveAgentRouteCapability(provider, 'model-a', model());
     expect(capability).toMatchObject({
-      toolCallingMode: 'native-structured',
-      toolCallingUnverified: true,
+      toolCallingMode: 'text-only',
+      toolCallingUnverified: false,
     });
     expect(describeRouteCapabilityDiagnostic(capability, 3)).toEqual({
-      code: 'route_tool_calling_unverified',
-      severity: 'info',
-      message: expect.stringContaining('Tools remain enabled'),
-      surface: 'runtime-log',
+      code: 'route_tool_calling_unsupported',
+      severity: 'warning',
+      message: expect.stringContaining('explicitly does not support'),
+      surface: 'work-process',
     });
   });
 
@@ -209,7 +209,10 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
   });
 
   it('claims observed evidence only once for a structured adapter tool-call end event', () => {
-    const capability = resolveAgentRouteCapability(provider, 'model-a', model());
+    const capability = {
+      ...resolveAgentRouteCapability(provider, 'model-a', model({ toolCalling: { state: 'supported' } })),
+      toolCallingUnverified: true,
+    };
     const gate = { recorded: false };
     expect(claimStructuredToolCallingEvidence('text_delta', capability, gate)).toBe(false);
     expect(claimStructuredToolCallingEvidence('toolcall_end', capability, gate)).toBe(true);
@@ -219,11 +222,12 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
 
   it('does not treat text-only tool-shaped output as capability evidence', () => {
     const capability = resolveAgentRouteCapability(provider, 'model-a', model());
+    expect(capability.toolCallingUnverified).toBe(false);
     expect(claimStructuredToolCallingEvidence('message_end', capability, { recorded: false })).toBe(false);
   });
 
   it.each([
-    ['unknown', 'native-structured', true, 'disabled', 'prompt-fallback'],
+    ['unknown', 'text-only', false, 'disabled', 'prompt-fallback'],
     ['supported', 'native-structured', false, 'native', 'native'],
     ['unsupported', 'text-only', false, 'disabled', 'prompt-fallback'],
   ] as const)('applies the shared unknown policy table for %s', (state, tools, unverified, vision, structured) => {

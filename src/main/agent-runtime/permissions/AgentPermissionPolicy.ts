@@ -1,10 +1,15 @@
 import * as os from 'os';
 import * as path from 'path';
 import type { AgentPermissionMode, AgentPermissionSettings } from '@shared/types/settings';
+import type { CompiledPolicy } from '@shared/types/rdxRuntime';
 import type { AgentTool } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
 import { settingsService } from '../../settings/SettingsService';
 import { matchBashHardDeny } from '../tools/primitives/bashHardDeny';
+import {
+  isToolDeniedByPolicy,
+  resolvePolicyApprovalFloor,
+} from './PolicyCompiler';
 
 export type AgentPermissionDecisionAction = 'allow' | 'ask_user' | 'auto_review' | 'deny';
 
@@ -20,6 +25,10 @@ export interface AgentPermissionDecisionInput {
   toolCall: ToolCall;
   /** 当前激活项目根目录；权限边界以它为准，回退固定 User Scope。 */
   projectRootPath?: string | null;
+  /** Turn 冻结的权限快照；缺省时才读 settingsService（兼容旧调用）。 */
+  permissionSettings?: AgentPermissionSettings;
+  /** Turn 冻结的 CompiledPolicy；缺省视为空策略。 */
+  compiledPolicy?: CompiledPolicy;
 }
 
 const READ_ONLY_FILE_TOOLS = new Set(['read_file', 'glob', 'grep']);
@@ -210,15 +219,21 @@ function request(
 
 export class AgentPermissionPolicyService {
   evaluate(input: AgentPermissionDecisionInput): AgentPermissionDecision {
-    const settings = settingsService.getAll();
-    const permissions = settings.agentRuntime.permissions;
+    const settings = input.permissionSettings
+      ? null
+      : settingsService.getAll();
+    const permissions = input.permissionSettings ?? settings!.agentRuntime.permissions;
     const mode = permissions.mode;
     const toolName = normalizeToolName(input.toolCall.name);
     const workspaceRoot = path.resolve(
       input.projectRootPath
-      || settings.paths.userRdxRoot
+      || settings?.paths.userRdxRoot
       || process.cwd(),
     );
+
+    if (input.compiledPolicy && isToolDeniedByPolicy(input.compiledPolicy, toolName)) {
+      return denied(`Policy deniedTools blocked tool "${input.toolCall.name}".`, 'high');
+    }
 
     // Catastrophic bash patterns are hard-denied in every mode, including full-access.
     if (toolName === 'bash') {
@@ -226,6 +241,20 @@ export class AgentPermissionPolicyService {
       const hardDeny = matchBashHardDeny(command);
       if (hardDeny) {
         return denied(`Shell command hard-denied (matched "${hardDeny}").`, 'high');
+      }
+    }
+
+    if (input.compiledPolicy) {
+      const floor = resolvePolicyApprovalFloor(
+        input.compiledPolicy,
+        toolName,
+        input.tool.permissionHint,
+      );
+      if (floor === 'user' && mode !== 'full-access') {
+        return request(mode, `Compiled policy requires approval for tool "${input.toolCall.name}".`, 'high');
+      }
+      if (floor === 'auto_review' && mode !== 'full-access') {
+        return { action: 'auto_review', reason: `Compiled policy requires auto-review for tool "${input.toolCall.name}".`, risk: 'medium', temporaryPathRoots: [] };
       }
     }
 

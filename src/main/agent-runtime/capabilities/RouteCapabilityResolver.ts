@@ -79,8 +79,13 @@ export function resolveAgentRouteCapability(
   const supportsStreaming = activeContracts.streaming.transport !== 'unknown';
   let toolCallingMode: ToolCallingMode = 'text-only';
   const toolState = effectiveModel.toolCalling.state;
-  if (toolState !== 'unsupported' && NATIVE_TOOL_PROTOCOLS.has(activeRoute.protocol)) toolCallingMode = 'native-structured';
-  else if (!supportsStreaming) toolCallingMode = 'disabled';
+  // Fail-closed: only explicit `supported` enables native tool calling.
+  // `unknown` stays text-only (no optimistic native-structured).
+  if (toolState === 'supported' && NATIVE_TOOL_PROTOCOLS.has(activeRoute.protocol)) {
+    toolCallingMode = 'native-structured';
+  } else if (!supportsStreaming) {
+    toolCallingMode = 'disabled';
+  }
   const reasoningContract = resolveProviderReasoningContract(provider, effectiveModel, requestPlan);
   const reasoningDelivery = reasoningContractToDelivery(reasoningContract);
   return {
@@ -92,7 +97,7 @@ export function resolveAgentRouteCapability(
     reasoningContract,
     supportsStreaming,
     supportsToolResults: toolCallingMode === 'native-structured',
-    toolCallingUnverified: toolCallingMode === 'native-structured' && toolState === 'unknown',
+    toolCallingUnverified: false,
     visionInputMode: effectiveModel.visionInput.state === 'supported' ? 'native' : 'disabled',
     structuredOutputMode: effectiveModel.structuredOutput.state === 'supported' ? 'native' : 'prompt-fallback',
   };
