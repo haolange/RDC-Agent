@@ -19,7 +19,7 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 3. **主进程权威**：权限、secret、MCP trust、Shell、RDX CLI、IPC 校验均在 `src/main`；preload / renderer / Browser Bridge 只暴露受控面。
 4. **Scope 固定**：用户资源 `~/.rdx`，项目资源 `<project-root>/.rdx`；无配置 workspace root、无旧目录 fallback、无静默迁移。
 5. **Provider 事实外置**：模型/协议/控件事实只在 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth、discovery。
-6. **可取消与可回收**：Turn 经 `TurnCoordinator`；子进程经 `ProcessSupervisor`；应用退出经 `ShutdownCoordinator`；abort 必须 join，迟到 event 按 generation 丢弃。
+6. **可取消与可回收**：Turn 经 `TurnCoordinator`；子进程经 `ProcessSupervisor`；应用退出经 `ShutdownCoordinator`；abort 必须 join，迟到 event 按 generation 丢弃。Conversation Stop 相位语义：`preparing` 干净撤销（不留 journal/lease/optimistic 残渣）；`committing`/`running` 单调落停（禁止 UI 回跳 `streaming` / 发送前态）。Renderer 对 monotonic-stopped turn/request 丢弃迟到 `draft|streaming` patch，与 main generation 守卫对齐。流式 `conversation:event` 在 renderer 按帧合并；trace 投影流式期节流。
 7. **失败有分类**：安全类 fail-closed；完整性 degrade-safe；可用性 recoverable。分类权威见 `docs/contracts/failure-model.md`。
 8. **无 legacy 双轨**：新结构替代旧结构时直接收敛；默认不保留兼容 shim。
 
@@ -48,7 +48,7 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 - **Capability unknown**：`toolCalling.state === unknown` → text-only；仅 `supported` 才 `native-structured`。
 - **输出通道**：`ProviderOutputRef` 一经声明永久归属 `thinking` | `text` | `tool_call` 之一；普通 assistant text 永不合成 thinking；仅 `final_answer` 写正文。
 - **Secret**：`safeStorage` 不可用则 fail-closed；secret 不得进入 renderer / IPC 明文 / Trace / RequestPlan。
-- **Browser Bridge**：仅 `RDC_AGENT_BROWSER_QA=1`；bearer + Origin + channel allowlist；与桌面 preload 路径共享 handler registry。
+- **Browser Bridge（debug-only）**：仅 `RDC_AGENT_BROWSER_QA=1`（launcher `browser`/`browser-dev`）；权威入口 `/qa`（cookie → `/app`）；鉴权 Bearer | query `rdcBridgeToken|token` | cookie；与桌面 preload 共享 handler registry，allowlist 更窄；**不进 release 默认路径**。权限矩阵见 [`docs/contracts/permissions.md`](docs/contracts/permissions.md) 与 [`docs/architecture/browser-qa-surface.md`](docs/architecture/browser-qa-surface.md)。
 - **MCP project**：同 ID 不可覆盖 user 的 command/args/url/env；变更需 `needsRetrust` + 显式 trust。
 - **RDX**：无内置 CLI 副本；Open `.rdc` 等垂直入口只走 Settings 配置的 shell action。
 - **Capture 所有权**：`ownerSessionId` 不匹配则 fail-closed；不得跨 session 继承已打开 capture。
@@ -81,6 +81,7 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 ### Architecture / Workflows
 
 - [`docs/architecture/README.md`](docs/architecture/README.md)
+- [`docs/architecture/browser-qa-surface.md`](docs/architecture/browser-qa-surface.md) — Browser QA 与桌面 channel 矩阵（debug-only）
 - [`docs/workflows/README.md`](docs/workflows/README.md)
 
 ## Verification Gate（摘要）

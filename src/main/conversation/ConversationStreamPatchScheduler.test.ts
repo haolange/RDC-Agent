@@ -41,6 +41,28 @@ describe('ConversationStreamPatchScheduler', () => {
     vi.useRealTimers();
   });
 
+  it('can flush pending patches without emitting to the renderer', () => {
+    vi.useFakeTimers();
+    const commits: ConversationStreamPatchCommit[] = [];
+    const scheduler = new ConversationStreamPatchScheduler({
+      now: () => 3_000,
+      commit: (commit) => commits.push(commit),
+      textFlushMs: 48,
+      traceFlushMs: 48,
+    });
+
+    scheduler.queueText({ status: 'streaming', content: 'partial' });
+    scheduler.queueTrace({ workTrace: { status: 'running', blocks: [], updatedAt: 3_000 } });
+    scheduler.flushPending({ forcePersist: true, publishTrace: false, emit: false });
+
+    expect(commits).toHaveLength(2);
+    expect(commits.every((commit) => commit.options.emit === false)).toBe(true);
+    expect(commits.every((commit) => commit.options.publishTrace === false)).toBe(true);
+
+    scheduler.close();
+    vi.useRealTimers();
+  });
+
   it('forces pending text and trace patches before terminal commits', () => {
     vi.useFakeTimers();
     const commits: ConversationStreamPatchCommit[] = [];

@@ -104,6 +104,8 @@ export async function completeProfileTurn(
   let streamScheduler: ConversationStreamPatchScheduler | null = null;
   let conversationPersistenceError: Error | null = null;
   let deferredTerminalEventType: ConversationStreamEvent['type'] | null = null;
+  let lastTracePublishedAt = 0;
+  const TRACE_PUBLISH_MIN_INTERVAL_MS = 160;
   const terminalContext: { value: {
     messages: AgentRuntimeMessage[];
     executionIdentity: ExecutionIdentity;
@@ -158,7 +160,15 @@ export async function completeProfileTurn(
       } as ConversationStreamEvent);
     }
     if (options.publishTrace) {
-      host.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
+      const now = nowMs();
+      const isTerminal = type === 'message_completed' || type === 'message_errored'
+        || patch.status === 'stopped'
+        || patch.status === 'complete'
+        || patch.status === 'error';
+      if (isTerminal || now - lastTracePublishedAt >= TRACE_PUBLISH_MIN_INTERVAL_MS) {
+        lastTracePublishedAt = now;
+        host.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
+      }
     }
   };
 
@@ -218,7 +228,9 @@ export async function completeProfileTurn(
     stop: () => {
       if (!abortController.signal.aborted) {
         try {
-          streamScheduler?.flushPending({ forcePersist: true, publishTrace: true });
+          // Persist pending deltas without broadcasting streaming patches; the
+          // terminal stopped commit is the single authoritative UI transition.
+          streamScheduler?.flushPending({ forcePersist: true, publishTrace: false, emit: false });
         } catch (error) {
           console.error('[ConversationService] stop flush failed:', error);
         }

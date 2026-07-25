@@ -47,6 +47,8 @@ Context 环：面只显示 `%` / `—` / `…`；相位文案在 title/aria 与 
 
 Send 不因打字/改模型触发 Context preview IPC。在途 turn 冻结创建时 `RequestPlan`。
 
+Stop：Preparing 一次干净撤销（prompt 回填、无 stopped↔streaming 闪烁）；Turn 已开始后单调落停（按钮与 Work Process 不回跳运行态）。Edit and resend 提交后立即离开编辑态并 optimistic 切入新分支 draft，再进入工作过程。
+
 Stacking：`composer < modal backdrop < modal < tooltip < notification`。
 
 ## Transcript Markdown

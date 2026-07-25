@@ -501,12 +501,14 @@ export class ConversationService {
     for (const activeTurn of turnsToStop) {
       activeTurn.stop();
     }
-    if (turnsToStop.length > 0) {
-      await Promise.allSettled(turnsToStop.map((turn) => turn.stopped));
-    }
-    // Edit/resend rewrite: sync slot cache so next turn rehydrates from disk.
+    // Overlap producer abort with turn exit; sync slots before rehydrate.
     agentOrchestrator.syncSessionSlots(sessionId);
-    await agentOrchestrator.abortAndJoin(sessionId, { reason: 'edit_resend' }).catch(() => undefined);
+    await Promise.all([
+      turnsToStop.length > 0
+        ? Promise.allSettled(turnsToStop.map((turn) => turn.stopped))
+        : Promise.resolve([]),
+      agentOrchestrator.abortAndJoin(sessionId, { reason: 'edit_resend' }).catch(() => undefined),
+    ]);
 
     // Re-read after every stopped turn has fully left completeProfileTurn. Its
     // terminal flush may have appended a newer snapshot for the target branch.

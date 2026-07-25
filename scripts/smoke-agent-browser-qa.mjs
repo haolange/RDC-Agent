@@ -1,0 +1,191 @@
+#!/usr/bin/env node
+/**
+ * Browser QA smoke (debug-only). Not part of default release pack.
+ *
+ * Usage:
+ *   1) pnpm run start:agent-browser   # leave running
+ *   2) pnpm run smoke:agent-browser
+ *
+ * Optional env:
+ *   RDC_AGENT_SMOKE_BRIDGE_URL=http://127.0.0.1:5127
+ *   RDC_AGENT_SMOKE_START=1  — spawn start:agent-browser and wait for /qa log line
+ */
+
+import { spawn } from 'node:child_process';
+import { createInterface } from 'node:readline';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, '..');
+const DEFAULT_BASE = process.env.RDC_AGENT_SMOKE_BRIDGE_URL?.trim() || 'http://127.0.0.1:5127';
+const START = process.env.RDC_AGENT_SMOKE_START === '1';
+const TIMEOUT_MS = Number(process.env.RDC_AGENT_SMOKE_TIMEOUT_MS || 120_000);
+
+function fail(message) {
+  console.error(`[smoke:agent-browser] ${message}`);
+  process.exitCode = 1;
+}
+
+function ok(message) {
+  console.log(`[smoke:agent-browser] ${message}`);
+}
+
+async function fetchRaw(url, init = {}) {
+  const response = await fetch(url, { redirect: 'manual', ...init });
+  const contentType = response.headers.get('content-type') || '';
+  const text = await response.text();
+  return { response, contentType, text };
+}
+
+async function assertQaSurface(baseUrl) {
+  const qa = await fetchRaw(`${baseUrl}/qa`);
+  if (qa.response.status !== 302) {
+    fail(`GET /qa expected 302, got ${qa.response.status}`);
+    return null;
+  }
+  const setCookie = qa.response.headers.get('set-cookie') || '';
+  if (!setCookie.includes('rdcBridgeToken=')) {
+    fail('GET /qa missing Set-Cookie rdcBridgeToken');
+    return null;
+  }
+  ok('GET /qa → 302 + Set-Cookie');
+
+  const cookie = setCookie.split(';')[0] || '';
+  const location = qa.response.headers.get('location') || '/app';
+  const appUrl = new URL(location, baseUrl).toString();
+  const app = await fetchRaw(appUrl, { headers: { Cookie: cookie } });
+  if (app.response.status !== 200 || !/text\/html/i.test(app.contentType)) {
+    fail(`GET /app with cookie expected HTML 200, got ${app.response.status} ${app.contentType}`);
+    return null;
+  }
+  if (app.text.trimStart().startsWith('{')) {
+    fail('GET /app returned JSON instead of HTML (auth failed / white screen)');
+    return null;
+  }
+  ok('GET /app with cookie → HTML');
+
+  const unauth = await fetchRaw(`${baseUrl}/app`);
+  if (unauth.response.status !== 401 || !/application\/json/i.test(unauth.contentType)) {
+    fail(`GET /app without auth expected 401 JSON, got ${unauth.response.status} ${unauth.contentType}`);
+    return null;
+  }
+  ok('GET /app without auth → 401 JSON');
+
+  const tokenMatch = /rdcBridgeToken=([^;]+)/.exec(cookie);
+  const token = tokenMatch ? decodeURIComponent(tokenMatch[1]) : '';
+  if (!token) {
+    fail('Could not parse bridge token from Set-Cookie');
+    return null;
+  }
+
+  const invoke = await fetchRaw(`${baseUrl}/invoke`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Cookie: cookie,
+    },
+    body: JSON.stringify({ channel: 'app:getMeta', args: [] }),
+  });
+  if (invoke.response.status !== 200) {
+    fail(`POST /invoke app:getMeta expected 200, got ${invoke.response.status}: ${invoke.text.slice(0, 200)}`);
+    return null;
+  }
+  let payload;
+  try {
+    payload = JSON.parse(invoke.text);
+  } catch {
+    fail('POST /invoke response is not JSON');
+    return null;
+  }
+  if (payload?.success === false) {
+    fail(`POST /invoke failed: ${payload.error || invoke.text.slice(0, 200)}`);
+    return null;
+  }
+  ok('POST /invoke app:getMeta → success');
+  return true;
+}
+
+async function waitForBridgeFromChild() {
+  const child = spawn(
+    process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
+    ['run', 'start:agent-browser'],
+    {
+      cwd: repoRoot,
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: process.platform === 'win32',
+    },
+  );
+
+  let baseUrl = null;
+  const deadline = Date.now() + TIMEOUT_MS;
+
+  const onLine = (line) => {
+    const match = /Browser app session:\s*(https?:\/\/127\.0\.0\.1:\d+)\/qa/i.exec(line);
+    if (match) {
+      baseUrl = match[1];
+    }
+  };
+
+  for (const stream of [child.stdout, child.stderr]) {
+    const rl = createInterface({ input: stream });
+    rl.on('line', (line) => {
+      console.log(line);
+      onLine(line);
+    });
+  }
+
+  while (!baseUrl && Date.now() < deadline) {
+    if (child.exitCode != null) {
+      fail(`start:agent-browser exited early with code ${child.exitCode}`);
+      return { child, baseUrl: null };
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+
+  if (!baseUrl) {
+    child.kill();
+    fail(`Timed out waiting for BrowserAppBridge /qa log (${TIMEOUT_MS}ms)`);
+    return { child, baseUrl: null };
+  }
+  return { child, baseUrl };
+}
+
+async function main() {
+  let child = null;
+  let baseUrl = DEFAULT_BASE.replace(/\/$/, '');
+
+  try {
+    if (START) {
+      const started = await waitForBridgeFromChild();
+      child = started.child;
+      if (!started.baseUrl) return;
+      baseUrl = started.baseUrl;
+    } else {
+      try {
+        const probe = await fetch(`${baseUrl}/qa`, { redirect: 'manual' });
+        if (probe.status !== 302 && probe.status !== 401 && probe.status !== 200) {
+          fail(`Bridge not reachable at ${baseUrl} (status ${probe.status}). Start with pnpm run start:agent-browser, or set RDC_AGENT_SMOKE_START=1.`);
+          return;
+        }
+      } catch (error) {
+        fail(`Bridge not reachable at ${baseUrl}: ${error instanceof Error ? error.message : String(error)}. Start with pnpm run start:agent-browser, or set RDC_AGENT_SMOKE_START=1.`);
+        return;
+      }
+    }
+
+    const passed = await assertQaSurface(baseUrl);
+    if (passed) {
+      ok(`PASS (${baseUrl})`);
+    }
+  } finally {
+    if (child && child.exitCode == null) {
+      child.kill();
+    }
+  }
+}
+
+await main();
+if (process.exitCode) process.exit(process.exitCode);

@@ -108,11 +108,14 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
     if (!nextContent || isSubmittingEdit) return;
     setIsSubmittingEdit(true);
     setEditError('');
+    // Close the editor immediately; optimistic rewrite snapshot drives the UI.
+    setIsEditing(false);
 
     try {
       await rewriteMessage(nextContent);
-      setIsEditing(false);
     } catch (error) {
+      setDraft(nextContent);
+      setIsEditing(true);
       setEditError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsSubmittingEdit(false);
@@ -227,7 +230,7 @@ const SystemBubble: React.FC<{ message: ConversationMessage }> = ({ message }) =
   </article>
 );
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
+const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ message }) => {
   if (message.role === 'user') {
     return <UserBubble message={message} />;
   }
@@ -236,5 +239,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message }) => {
   }
   return <SystemBubble message={message} />;
 };
+
+export const MessageBubble = React.memo(MessageBubbleInner);
 
 export default MessageBubble;

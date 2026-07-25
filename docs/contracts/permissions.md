@@ -26,13 +26,18 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 
 **全量** IPC handler 经 `parseIpcArgs`（含 settings / terminal / workflow / memory / conversation / project / capture / shell / rdx-runtime / trace / web 等）。非法 payload fail-closed。`approvalToken` 单次消费（`IpcApprovalTokenService`）。契约测试：`IpcPayloadGuard.test.ts`。
 
-## Browser Bridge（QA-only）
+## Browser Bridge（QA-only / debug-only）
 
-- 仅当 `RDC_AGENT_BROWSER_QA=1` 启动 Bridge。
-- 256-bit bearer；全路径鉴权；精确 Origin；channel allowlist fail-closed。
-- 拒绝 terminal 写、secret 读写、memory、mcp 状态、command execute、approval、settings 变更、MCP trust 等危险通道。
+- **定位**：Debug / QA 验收辅助面；**不进 release 包默认运行路径**。仅 `pnpm run start:agent-browser`（或 launcher `--mode browser|browser-dev`）在 `RDC_AGENT_BROWSER_QA=1` 时启动；桌面 `desktop` / 发布 exe **不得**默认打开 Bridge。
+- 同 renderer、异传输：桌面 `preload → IPC` 与 Browser QA `BrowserAppBridge → /invoke` 共用 handler registry；不是第二套 UI。
+- **权威入口**：`http://127.0.0.1:<port>/qa`（`Set-Cookie: rdcBridgeToken` → 302 干净 `/app`）。启动日志主打 `/qa`；长 query `/app?rdcBridgeToken=…` 仅为 fallback。
+- **鉴权三元组**（`resolveProvidedBridgeToken`）：Bearer **或** query `rdcBridgeToken|token` **或** cookie `rdcBridgeToken`。禁止恢复「只认 `token`、打印 `rdcBridgeToken`」双轨。截断/无凭证 → **401 JSON**（`Content-Type: application/json`），勿当「已打开 Workbench」。
+- 精确 Origin allowlist；channel allowlist fail-closed；未注册 / 未 allow / 命中 deny → 403。
+- **永久 deny**（桌面专用）：`terminal:*`、`memory:*`、`approval:*`、`hook:*`、`mcp:*`、`settings:set`、`settings:getProviderSecret`、`command:execute`、RDX hook/MCP trust、`conversation:answerToolApproval` 等（见 `bridgeSecurity.ts`）。
+- **QA 工作台主路径 allow**：`app` / `project` / `session` / `conversation`（send/rewrite/cancel/history…）/ `workflow` / `trace` / `settings` 读与 Agents 写（`saveAgentDefinition` 等）/ `agent` / `capture` 等；完整矩阵见 [`docs/architecture/browser-qa-surface.md`](../architecture/browser-qa-surface.md)。
 - Headless userData 默认 `qa-<runId>`；`instance.lock`；冲突实例 fail-closed。
-- 实现：`src/main/browserAppBridge/bridgeSecurity.ts`。
+- Smoke：`pnpm run smoke:agent-browser`（假定 bridge 已起或脚本拉起；**不**并入默认 release pack）。
+- 实现：`src/main/browserAppBridge/bridgeSecurity.ts`、`BrowserAppBridgeServer.ts`；测试：`bridgeSecurity.test.ts`、`BrowserAppBridgeServer.contract.test.ts`。
 
 ## Secret Isolation
 
