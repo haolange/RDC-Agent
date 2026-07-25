@@ -64,4 +64,32 @@ describe('safeResolvePath', () => {
     await writeFile(file, 'export {}\n', 'utf8');
     expect(safeResolvePath('src/a.ts', root)).toBe(path.resolve(file));
   });
+
+  it('allows temporary roots only from the current ToolExecutionContext', async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-ws-'));
+    const external = await mkdtemp(path.join(os.tmpdir(), 'rdx-ext-'));
+    roots.push(workspace, external);
+    const externalFile = path.join(external, 'notes.txt');
+    await writeFile(externalFile, 'ok', 'utf8');
+
+    expect(() => safeResolvePath(externalFile, workspace)).toThrow(/超出 workspace/);
+
+    const allowed = safeResolvePath(externalFile, workspace, {
+      workspaceRoot: workspace,
+      projectRootPath: workspace,
+      projectId: null,
+      sessionId: null,
+      temporaryAllowedPathRoots: [external],
+    });
+    expect(allowed).toBe(path.resolve(externalFile));
+
+    // Concurrent call without the temporary root must still fail (no global leak).
+    expect(() => safeResolvePath(externalFile, workspace, {
+      workspaceRoot: workspace,
+      projectRootPath: workspace,
+      projectId: null,
+      sessionId: null,
+      temporaryAllowedPathRoots: [],
+    })).toThrow(/超出 workspace/);
+  });
 });

@@ -9,7 +9,7 @@ export { globTool } from './GlobTool';
 export { grepTool } from './GrepTool';
 export { gitAddTool, gitCommitTool, gitDiffTool, gitLogTool, gitStatusTool, gitUnstageTool } from './GitTool';
 export { webFetchTool, webSearchTool } from './WebTools';
-export { withTemporaryPathAccess, assertTextReadable, truncateOutput } from './_shared';
+export { assertTextReadable, truncateOutput } from './_shared';
 export { matchBashHardDeny } from './bashHardDeny';
 export * from './toolLimits';
 

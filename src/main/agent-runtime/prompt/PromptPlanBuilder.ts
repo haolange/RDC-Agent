@@ -124,7 +124,7 @@ export class PromptPlanBuilder {
       `Agent id: ${input.profile.id}`,
       `Model route: ${input.routeCapability.providerId}/${input.routeCapability.modelId}`,
       `Tool calling: ${input.routeCapability.toolCallingMode}`,
-      `Tool calling evidence: ${input.routeCapability.toolCallingUnverified ? 'unverified (fail-open)' : 'verified'}`,
+      `Tool calling evidence: ${input.routeCapability.toolCallingUnverified ? 'unverified' : 'verified'}`,
       `Vision input: ${input.routeCapability.visionInputMode}`,
       `Structured output: ${input.routeCapability.structuredOutputMode}`,
       ...(input.routeCapability.structuredOutputMode === 'prompt-fallback'

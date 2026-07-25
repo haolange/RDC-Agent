@@ -5,6 +5,7 @@ import type { AgentPermissionMode } from '@shared/types/settings';
 import type { AgentTool } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
 import { AgentPermissionPolicyService } from './AgentPermissionPolicy';
+import { compilePolicyFromRestrictive } from './PolicyCompiler';
 
 const { mockSettings } = vi.hoisted(() => ({
   mockSettings: {
@@ -252,5 +253,22 @@ describe('AgentPermissionPolicyService hard deny and path extract', () => {
 
     expect(decision.action).toBe('ask_user');
     expect(decision.reason).toContain('delete_file');
+  });
+
+  it('denies tools listed in compiledPolicy.deniedTools even in full-access', () => {
+    const compiledPolicy = compilePolicyFromRestrictive({ deniedTools: ['bash'] });
+    const decision = service.evaluate({
+      tool: bashTool,
+      toolCall: {
+        type: 'toolCall',
+        id: 'tc-bash',
+        name: 'bash',
+        arguments: { command: 'pwd' },
+      },
+      projectRootPath: workspaceRoot,
+      compiledPolicy,
+    });
+    expect(decision.action).toBe('deny');
+    expect(decision.reason).toMatch(/deniedTools/i);
   });
 });
