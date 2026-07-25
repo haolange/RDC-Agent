@@ -1,11 +1,11 @@
 ﻿import { BrowserWindow } from 'electron';
-import { spawn } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { rdxShellActionService } from '../tools/RdxShellActionService';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
+import { processSupervisor } from '../runtime/ProcessSupervisor';
 import type {
   AndroidBootstrapMetadata,
   ReplayDeviceEntry,
@@ -787,37 +787,21 @@ export class ReplayDeviceService {
 
   private async runAdbCommand(args: string[]): Promise<string[]> {
     const adbPath = resolveAdbExecutable();
-
-    return new Promise((resolve, reject) => {
-      const proc = spawn(adbPath, args, {
-        windowsHide: true,
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-
-      let stdout = '';
-      let stderr = '';
-
-      proc.stdout.on('data', (chunk) => {
-        stdout += chunk.toString('utf-8');
-      });
-
-      proc.stderr.on('data', (chunk) => {
-        stderr += chunk.toString('utf-8');
-      });
-
-      proc.on('error', (error) => {
-        reject(error);
-      });
-
-      proc.on('close', (code) => {
-        if (code !== 0) {
-          reject(new Error(stderr.trim() || `adb exited with code ${code ?? -1}.`));
-          return;
-        }
-
-        resolve(stdout.split(/\r?\n/));
-      });
+    const supervised = processSupervisor.spawn('replay', adbPath, args, {
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      isolateProcessGroup: false,
     });
+    const info = await supervised.exit;
+    const stdout = supervised.stdout.toString();
+    const stderr = supervised.stderr.toString();
+    if (info.reason === 'spawn_failed') {
+      throw info.error ?? new Error(stderr.trim() || 'adb spawn failed');
+    }
+    if (info.code !== 0) {
+      throw new Error(stderr.trim() || `adb exited with code ${info.code ?? -1}.`);
+    }
+    return stdout.split(/\r?\n/);
   }
 
   private updateDevice(device: ReplayDeviceEntry): void {

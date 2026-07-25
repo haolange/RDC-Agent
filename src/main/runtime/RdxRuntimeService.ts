@@ -5,6 +5,8 @@ import type { RdxRuntimeOverview, RestrictivePolicy, ScopedResourceDocument, Sco
 import { appPathService } from './AppPathService';
 import { hashScopedResource, scopedResourceResolver } from './ScopedResourceResolver';
 import { hookEngine } from '../hooks/HookEngine';
+import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService';
+import { mcpTrustService } from '../settings/McpTrustService';
 
 const EXTENSIONS: Partial<Record<ScopedResourceKind, string>> = {
   agent: '.agent.md', mcp: '.mcp.json', hook: '.hook.yml', policy: '.policy.yml', memory: '.md', knowledge: '.md',
@@ -72,6 +74,19 @@ export class RdxRuntimeService {
     const user = appPathService.getUserRdxPaths();
     const project = projectRoot ? appPathService.getProjectRdxPaths(projectRoot) : undefined;
     const hooks = this.hooks.load(user.hooksPath, projectRoot).map((hook) => ({ id: hook.definition.id, scope: hook.scope, sourcePath: hook.sourcePath, sourceHash: hook.sourceHash, enabled: hook.definition.enabled, event: hook.definition.event, trusted: hook.trust.trusted, failurePolicy: hook.definition.failurePolicy }));
+    const mcpServers = agentRuntimeConfigService.listMcpServers(projectRoot).map((server) => ({
+      id: server.id,
+      name: server.name,
+      scope: server.scope === 'project' ? 'project' as const : 'user' as const,
+      ...(server.sourcePath ? { sourcePath: server.sourcePath } : {}),
+      ...(server.descriptorHash ? { descriptorHash: server.descriptorHash } : {}),
+      trusted: server.scope === 'project' ? !server.needsRetrust : true,
+      needsRetrust: Boolean(server.needsRetrust),
+      ...(server.executableOverrideRejected ? { executableOverrideRejected: true } : {}),
+      ...(server.blockedReason ? { blockedReason: server.blockedReason } : {}),
+      ...(server.command ? { command: server.command } : {}),
+      transport: server.transport,
+    }));
     const resources = this.list(projectRoot);
     const diagnostics: string[] = [];
     for (const resource of resources) {
@@ -84,16 +99,47 @@ export class RdxRuntimeService {
         diagnostics.push(`hook/project/${hook.id}: project hook is not trusted`);
       }
     }
+    for (const server of mcpServers) {
+      if (server.blockedReason) {
+        diagnostics.push(`mcp/${server.scope}/${server.id}: ${server.blockedReason}`);
+      } else if (server.needsRetrust) {
+        diagnostics.push(`mcp/project/${server.id}: project MCP needs trust before connect`);
+      }
+    }
     return {
       userRoot: user.userRdxRoot,
       ...(projectRoot ? { projectRoot } : {}),
       userPaths: { ...user },
       ...(project ? { projectPaths: { ...project } } : {}),
-      resources, hooks,
+      resources, hooks, mcpServers,
       knowledge: { userPath: user.knowledgePath, ...(project ? { projectPath: project.knowledgePath } : {}) },
       memory: { userPath: user.memoryPath, ...(project ? { projectPath: project.memoryPath } : {}) },
       diagnostics,
     };
+  }
+
+  trustProjectMcp(projectRoot: string, descriptorId: string): RdxRuntimeOverview {
+    const descriptor = agentRuntimeConfigService.listMcpServers(projectRoot).find((entry) => entry.id === descriptorId);
+    if (!descriptor) {
+      throw new Error(`MCP descriptor not found: ${descriptorId}`);
+    }
+    if (descriptor.executableOverrideRejected) {
+      throw new Error(descriptor.blockedReason || `Project MCP "${descriptorId}" cannot override user executable fields.`);
+    }
+    if (descriptor.scope !== 'project') {
+      throw new Error(`MCP "${descriptorId}" is not a project-scoped descriptor requiring trust.`);
+    }
+    const descriptorHash = descriptor.descriptorHash || '';
+    if (!descriptorHash) {
+      throw new Error(`MCP "${descriptorId}" is missing descriptorHash.`);
+    }
+    mcpTrustService.trust(projectRoot, descriptorId, descriptorHash);
+    return this.overview(projectRoot);
+  }
+
+  revokeProjectMcp(projectRoot: string, descriptorId: string): RdxRuntimeOverview {
+    mcpTrustService.revoke(projectRoot, descriptorId);
+    return this.overview(projectRoot);
   }
 
   validate(request: ScopedResourceWriteRequest): string[] {

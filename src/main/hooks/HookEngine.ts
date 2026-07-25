@@ -1,10 +1,10 @@
-import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import YAML from 'yaml';
 import type { HookDefinition, HookEvent, HookTrustState, ScopedResourceCandidate } from '@shared/types/rdxRuntime';
 import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
+import { processSupervisor } from '../runtime/ProcessSupervisor';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_OUTPUT_BYTES = 64 * 1024;
@@ -150,59 +150,60 @@ export class HookEngine {
     return agentMatch && toolMatch;
   }
 
-  private run(hook: LoadedHook, context: HookContext): Promise<HookExecutionResult> {
-    return new Promise((resolve) => {
-      const definition = hook.definition;
-      const env = { ...process.env } as Record<string, string | undefined>;
-      for (const [targetName, sourceName] of Object.entries(definition.env ?? {})) env[targetName] = process.env[sourceName];
-      const child = spawn(definition.command, definition.args, {
-        shell: false,
-        cwd: definition.cwd ? path.resolve(context.projectRoot ?? process.cwd(), definition.cwd) : context.projectRoot ?? process.cwd(),
-        env,
-        stdio: ['pipe', 'pipe', 'pipe'],
-        windowsHide: true,
-      });
-      let stdout = '';
-      let stderr = '';
-      let settled = false;
-      const append = (current: string, chunk: Buffer): string => Buffer.from(`${current}${chunk.toString()}`, 'utf8').subarray(0, MAX_OUTPUT_BYTES).toString('utf8');
-      child.stdout.on('data', (chunk: Buffer) => { stdout = append(stdout, chunk); });
-      child.stderr.on('data', (chunk: Buffer) => { stderr = append(stderr, chunk); });
-      const finish = (result: HookExecutionResult) => {
-        if (settled) return;
-        settled = true;
-        resolve(result);
-      };
-      const timer = setTimeout(() => {
-        child.kill();
-        finish({
-          hookId: definition.id,
-          allowed: definition.failurePolicy === 'warn',
-          status: 'timed-out',
-          stdout,
-          stderr,
-          reason: `Hook timed out after ${definition.timeoutMs}ms.`,
-        });
-      }, definition.timeoutMs);
-      child.on('error', (error) => {
-        clearTimeout(timer);
-        finish({ hookId: definition.id, allowed: definition.failurePolicy === 'warn', status: 'failed', stdout, stderr, reason: error.message });
-      });
-      child.on('close', (code) => {
-        clearTimeout(timer);
-        const succeeded = code === 0;
-        finish({
-          hookId: definition.id,
-          allowed: succeeded || definition.failurePolicy === 'warn',
-          status: succeeded ? 'completed' : 'failed',
-          exitCode: code,
-          stdout,
-          stderr,
-          ...(!succeeded ? { reason: `Hook exited with code ${code}.` } : {}),
-        });
-      });
-      child.stdin.end(JSON.stringify(context));
+  private async run(hook: LoadedHook, context: HookContext): Promise<HookExecutionResult> {
+    const definition = hook.definition;
+    const env = { ...process.env } as Record<string, string | undefined>;
+    for (const [targetName, sourceName] of Object.entries(definition.env ?? {})) env[targetName] = process.env[sourceName];
+    const supervised = processSupervisor.spawn('hook', definition.command, definition.args, {
+      shell: false,
+      cwd: definition.cwd ? path.resolve(context.projectRoot ?? process.cwd(), definition.cwd) : context.projectRoot ?? process.cwd(),
+      env,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+      isolateProcessGroup: false,
+      timeoutMs: definition.timeoutMs,
+      ringBufferBytes: MAX_OUTPUT_BYTES,
     });
+    const child = supervised.child;
+    try {
+      child.stdin?.end(JSON.stringify(context));
+    } catch {
+      // ignore broken stdin
+    }
+    const info = await supervised.exit;
+    const stdout = supervised.stdout.toString().slice(0, MAX_OUTPUT_BYTES);
+    const stderr = supervised.stderr.toString().slice(0, MAX_OUTPUT_BYTES);
+    if (info.reason === 'timeout') {
+      return {
+        hookId: definition.id,
+        allowed: definition.failurePolicy === 'warn',
+        status: 'timed-out',
+        stdout,
+        stderr,
+        reason: `Hook timed out after ${definition.timeoutMs}ms.`,
+      };
+    }
+    if (info.reason === 'spawn_failed') {
+      return {
+        hookId: definition.id,
+        allowed: definition.failurePolicy === 'warn',
+        status: 'failed',
+        stdout,
+        stderr,
+        reason: info.error?.message ?? 'Hook spawn failed.',
+      };
+    }
+    const code = info.code;
+    const succeeded = code === 0;
+    return {
+      hookId: definition.id,
+      allowed: succeeded || definition.failurePolicy === 'warn',
+      status: succeeded ? 'completed' : 'failed',
+      exitCode: code,
+      stdout,
+      stderr,
+      ...(!succeeded ? { reason: `Hook exited with code ${code}.` } : {}),
+    };
   }
 
   private trustKey(projectRoot: string, hookId: string): string {

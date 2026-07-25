@@ -35,6 +35,12 @@ export function registerRdxRuntimeHandlers(): void {
     hookEngine.revokeProjectHook(projectRoot, hookId);
     return rdxRuntimeService.overview(projectRoot);
   });
+  ipcMain.handle('rdx-runtime:trustMcp', (_event, projectRoot: string, descriptorId: string) => {
+    return rdxRuntimeService.trustProjectMcp(projectRoot, descriptorId);
+  });
+  ipcMain.handle('rdx-runtime:revokeMcp', (_event, projectRoot: string, descriptorId: string) => {
+    return rdxRuntimeService.revokeProjectMcp(projectRoot, descriptorId);
+  });
   ipcMain.handle('rdx-runtime:testHook', (_event, hookEvent: HookEvent, projectRoot?: string, hookId?: string) => {
     const overview = rdxRuntimeService.overview(projectRoot);
     const context = { event: hookEvent, projectRoot, payload: { test: true, hookId, overviewHash: overview.resources.length } };

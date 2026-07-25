@@ -344,6 +344,13 @@ export interface AgentRuntimeMcpDescriptor {
   scope?: 'builtin' | 'user' | 'project';
   sourcePath?: string;
   sourceHash?: string;
+  /** Project MCP requires hash-bound trust before connect. */
+  needsRetrust?: boolean;
+  /** Same-id project attempted to change user executable fields. */
+  executableOverrideRejected?: boolean;
+  projectRealpath?: string;
+  descriptorHash?: string;
+  blockedReason?: string;
 }
 
 export interface AgentRuntimeCatalog {
