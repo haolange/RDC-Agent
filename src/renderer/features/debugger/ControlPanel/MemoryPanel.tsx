@@ -8,6 +8,8 @@ import './MemoryPanel.css';
 
 const MEMORY_TYPES: Array<MemoryWriteRequest['type']> = ['user', 'feedback', 'project', 'reference'];
 
+type MemoryDraft = Pick<MemoryWriteRequest, 'name' | 'description' | 'type' | 'content' | 'tags'>;
+
 /**
  * Memory 面板：列出/新建/编辑/删除工作区持久记忆。
  *
@@ -19,9 +21,7 @@ export const MemoryPanel: React.FC = () => {
   const [editing, setEditing] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  const [draft, setDraft] = useState<MemoryWriteRequest>({
-    scope,
-    approved: true,
+  const [draft, setDraft] = useState<MemoryDraft>({
     name: '',
     description: '',
     type: 'project',
@@ -29,7 +29,7 @@ export const MemoryPanel: React.FC = () => {
   });
 
   const startNew = () => {
-    setDraft({ scope, approved: true, name: '', description: '', type: 'project', content: '' });
+    setDraft({ name: '', description: '', type: 'project', content: '' });
     setEditing(true);
   };
 
@@ -37,8 +37,6 @@ export const MemoryPanel: React.FC = () => {
     if (!selected) return;
     setDraft({
       name: selected.name,
-      scope,
-      approved: true,
       description: selected.description,
       type: selected.type,
       content: selected.content,

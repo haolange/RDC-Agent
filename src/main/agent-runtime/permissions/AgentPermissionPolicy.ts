@@ -7,10 +7,21 @@ import type { ToolCall } from '../core/types';
 import { settingsService } from '../../settings/SettingsService';
 import { matchBashHardDeny } from '../tools/primitives/bashHardDeny';
 import {
+  bashAstAnalyzer,
+  matchesDeniedCommandPrefix,
+} from './BashAstAnalyzer';
+import {
   isToolDeniedByPolicy,
   resolvePolicyApprovalFloor,
 } from './PolicyCompiler';
 
+/**
+ * Agent permission risk classifier for tool / shell calls.
+ *
+ * This is NOT a security boundary. Hard deny lists, OS permissions, Electron
+ * sandbox, and IPC schema validation provide enforcement; this service only
+ * classifies risk and routes allow / ask_user / auto_review / deny decisions.
+ */
 export type AgentPermissionDecisionAction = 'allow' | 'ask_user' | 'auto_review' | 'deny';
 
 export interface AgentPermissionDecision {
@@ -182,8 +193,8 @@ function commandUsesExternalPath(command: string, workspaceRoot: string, roots: 
 }
 
 function isCommandDeniedByRule(command: string, permissions: AgentPermissionSettings): boolean {
-  const normalized = command.trim().toLowerCase();
-  return permissions.deniedCommandPrefixes.some((prefix) => normalized.startsWith(prefix.trim().toLowerCase()));
+  if (!command.trim()) return false;
+  return permissions.deniedCommandPrefixes.some((prefix) => matchesDeniedCommandPrefix(command, prefix));
 }
 
 function isCommandAllowedByRule(command: string, permissions: AgentPermissionSettings): boolean {
@@ -218,6 +229,10 @@ function request(
 }
 
 export class AgentPermissionPolicyService {
+  /**
+   * Classify tool-call risk and return an allow / ask / review / deny decision.
+   * Risk classifier only — callers must not treat this as a sandbox.
+   */
   evaluate(input: AgentPermissionDecisionInput): AgentPermissionDecision {
     const settings = input.permissionSettings
       ? null
@@ -242,6 +257,11 @@ export class AgentPermissionPolicyService {
       if (hardDeny) {
         return denied(`Shell command hard-denied (matched "${hardDeny}").`, 'high');
       }
+      // Structural / AST risk classifier (not a security boundary).
+      const analysis = bashAstAnalyzer.analyze(command);
+      if (analysis.risk === 'critical') {
+        return denied(`Shell risk classifier denied: ${analysis.reason}`, 'high');
+      }
     }
 
     if (input.compiledPolicy) {
@@ -262,8 +282,8 @@ export class AgentPermissionPolicyService {
       return { action: 'allow', risk: 'low', temporaryPathRoots: ['*'] };
     }
 
-    if (isCommandDeniedByRule(extractStringArg(input.toolCall, 'command'), permissions)) {
-      return denied('Custom policy denied this command prefix.');
+    if (toolName === 'bash' && isCommandDeniedByRule(extractStringArg(input.toolCall, 'command'), permissions)) {
+      return denied('Custom policy denied this command prefix (word-boundary match).');
     }
 
     const configuredReadableRoots = permissions.readableRoots.map(resolveConfiguredRoot);
@@ -293,7 +313,8 @@ export class AgentPermissionPolicyService {
       if (isCommandAllowedByRule(command, permissions)) {
         return { action: 'allow', risk: 'low', temporaryPathRoots: [] };
       }
-      if (isDangerousCommand(command)) {
+      const analysis = bashAstAnalyzer.analyze(command);
+      if (analysis.risk === 'high' || isDangerousCommand(command)) {
         return request(mode, `Shell command requires review: ${command}`, 'high');
       }
       if (commandUsesExternalPath(command, workspaceRoot, configuredReadableRoots)) {

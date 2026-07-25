@@ -111,6 +111,7 @@ class BrowserAppBridgeClient {
       configure: (agentId, config) => this.invoke('agent:configure', agentId, config),
     },
     memory: {
+      issueApprovalToken: () => bridgeCapabilityDenied('memory:*'),
       list: () => bridgeCapabilityDenied('memory:*'),
       get: () => bridgeCapabilityDenied('memory:*'),
       write: () => bridgeCapabilityDenied('memory:*'),

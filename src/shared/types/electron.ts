@@ -84,16 +84,24 @@ export interface MemoryDetail extends MemorySummary {
   createdAt: number;
 }
 
-/** Memory 写入请求（对应 MemoryStore.writeMemory 入参）。 */
+/** Memory 写入请求（对应 MemoryStore.writeMemory 入参）。审批必须用 Main 发放的 approvalToken。 */
 export interface MemoryWriteRequest {
   scope: 'user' | 'project';
   projectRoot?: string;
-  approved: boolean;
+  approvalToken: string;
   name: string;
   description: string;
   type: 'user' | 'feedback' | 'project' | 'reference';
   content: string;
   tags?: string[];
+}
+
+/** Main 发放的敏感操作 approvalToken 请求。 */
+export interface MemoryApprovalTokenRequest {
+  action: 'memory.write' | 'memory.delete';
+  scope: 'user' | 'project';
+  name?: string;
+  projectRoot?: string;
 }
 
 export interface ElectronAPI {
@@ -199,10 +207,11 @@ export interface ElectronAPI {
   };
 
   memory: {
+    issueApprovalToken: (request: MemoryApprovalTokenRequest) => Promise<{ token?: string; error?: string }>;
     list: (scope: 'user' | 'project', projectRoot?: string) => Promise<{ memories: MemorySummary[] }>;
     get: (scope: 'user' | 'project', name: string, projectRoot?: string) => Promise<{ memory: MemoryDetail | null }>;
     write: (request: MemoryWriteRequest) => Promise<{ success: boolean; name: string; error?: string }>;
-    delete: (scope: 'user' | 'project', name: string, confirmed: boolean, projectRoot?: string) => Promise<{ success: boolean; error?: string }>;
+    delete: (scope: 'user' | 'project', name: string, approvalToken: string, projectRoot?: string) => Promise<{ success: boolean; error?: string }>;
   };
 
   knowledge: {

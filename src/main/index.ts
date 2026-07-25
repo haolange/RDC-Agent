@@ -2,7 +2,7 @@
  * Electron Main Process Entry
  */
 
-import { app, BrowserWindow, dialog, Menu, shell } from 'electron';
+import { app, BrowserWindow, dialog, Menu, session, shell } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomBytes } from 'crypto';
@@ -118,6 +118,43 @@ const isTestMode = process.env.RDC_AGENT_TEST_MODE === '1';
 const isHeadlessMode = process.env.RDC_AGENT_HEADLESS === '1' || process.env.RDC_AGENT_BROWSER_QA === '1';
 if (isHeadlessMode) {
   process.env.RDC_AGENT_HEADLESS = '1';
+}
+
+/**
+ * Install deny-by-default permission handlers and production CSP.
+ * script-src drops unsafe-inline (module scripts are file/URL based).
+ * style-src keeps 'unsafe-inline' for React style attributes (partial; nonces do not cover style attrs).
+ */
+function installRendererSecurityPolicy(): void {
+  const ses = session.defaultSession;
+
+  ses.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false);
+  });
+  ses.setPermissionCheckHandler(() => false);
+
+  const scriptSrc = isDev
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' http://127.0.0.1:*"
+    : "script-src 'self'";
+  // Partial: React / design-system may set inline style attributes; CSP nonces do not apply to them.
+  const styleSrc = "style-src 'self' 'unsafe-inline'";
+  const csp = [
+    "default-src 'self'",
+    scriptSrc,
+    styleSrc,
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self' http://127.0.0.1:* https://openrouter.ai https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "frame-ancestors 'none'",
+  ].join('; ');
+
+  ses.webRequest.onHeadersReceived((details, callback) => {
+    const responseHeaders = { ...details.responseHeaders };
+    responseHeaders['Content-Security-Policy'] = [csp];
+    callback({ responseHeaders });
+  });
 }
 
 function resolveUserDataPath(): string {
@@ -329,7 +366,7 @@ function createMainWindow(): void {
       preload: path.join(__dirname, '../preload/index.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false,
+      sandbox: true,
     },
     // Window chrome.
     frame: false,
@@ -529,6 +566,7 @@ function setupMenu(): void {
 
 // App lifecycle.
 app.whenReady().then(async () => {
+  installRendererSecurityPolicy();
   const settings = settingsService.initialize();
   if (isSettingsRebuildOnly) {
     console.log('[SettingsRebuildOnly]', JSON.stringify({
@@ -580,7 +618,7 @@ app.whenReady().then(async () => {
         webPreferences: {
           nodeIntegration: false,
           contextIsolation: true,
-          sandbox: false,
+          sandbox: true,
         },
       });
       headlessKeepAliveWindow.loadURL('about:blank').catch(() => {

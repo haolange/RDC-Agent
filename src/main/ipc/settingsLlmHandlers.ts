@@ -20,6 +20,15 @@ import { providerCapabilityProbeService } from '../settings/ProviderCapabilityPr
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import type { WorkbenchIpcContext } from './workbenchContext';
+import { parseIpcArgs } from './validation/IpcPayloadGuard';
+import {
+  SettingsGetEffectiveCatalogArgsSchema,
+  SettingsHasProviderSecretArgsSchema,
+  SettingsImportAgentManifestArgsSchema,
+  SettingsProviderIdArgsSchema,
+  SettingsSetArgsSchema,
+  SettingsAgentIdArgsSchema,
+} from './validation/ipcSchemas';
 
 export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void {
   effectiveCatalogService.setDiscoveryLoaderResolver((request) => (
@@ -143,8 +152,13 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return settingsService.getProviderCatalog();
   });
 
-  ipcMain.handle('settings:getEffectiveModel', async (_event, agentId: string) => {
+  ipcMain.handle('settings:getEffectiveModel', async (_event, ...rawArgs: unknown[]) => {
+    let agentId = 'unknown';
     try {
+      [agentId] = parseIpcArgs(SettingsAgentIdArgsSchema, rawArgs, {
+        label: 'settings:getEffectiveModel',
+        maxBytes: 4 * 1024,
+      });
       const settings = settingsService.getAll();
       const route = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
       if (!route?.providerId || !route.modelId) return null;
@@ -164,17 +178,30 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     }
   });
 
-  ipcMain.handle('settings:getEffectiveCatalog', async (_event, providerId: string, accountId?: string) => {
+  ipcMain.handle('settings:getEffectiveCatalog', async (_event, ...rawArgs: unknown[]) => {
+    const [providerId, accountId] = parseIpcArgs(SettingsGetEffectiveCatalogArgsSchema, rawArgs, {
+      label: 'settings:getEffectiveCatalog',
+      maxBytes: 4 * 1024,
+      padTo: 2,
+    });
     await loadProviderSurface(providerId);
     return resolveEffectiveCatalog(providerId, settingsService.getAll(), undefined, accountId);
   });
 
-  ipcMain.handle('settings:hasProviderSecret', async (_event, providerId: string) => {
+  ipcMain.handle('settings:hasProviderSecret', async (_event, ...rawArgs: unknown[]) => {
+    const [providerId] = parseIpcArgs(SettingsHasProviderSecretArgsSchema, rawArgs, {
+      label: 'settings:hasProviderSecret',
+      maxBytes: 4 * 1024,
+    });
     const paths = appPathService.getRuntimePaths();
     return settingsService.hasProviderSecret(providerId, paths.userRdxRoot);
   });
 
-  ipcMain.handle('settings:importAgentManifest', async (_event, filePath: string) => {
+  ipcMain.handle('settings:importAgentManifest', async (_event, ...rawArgs: unknown[]) => {
+    const [filePath] = parseIpcArgs(SettingsImportAgentManifestArgsSchema, rawArgs, {
+      label: 'settings:importAgentManifest',
+      maxBytes: 8 * 1024,
+    });
     const paths = appPathService.getRuntimePaths();
     await agentManifestService.importFile(paths, filePath);
     return withEffectiveAgentModelOptions(settingsService.getAll(paths));
@@ -184,7 +211,11 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return settingsService.saveAgentDefinition(request);
   });
 
-  ipcMain.handle('settings:getAgentDefinitionCommit', async (_event, agentId: string) => {
+  ipcMain.handle('settings:getAgentDefinitionCommit', async (_event, ...rawArgs: unknown[]) => {
+    const [agentId] = parseIpcArgs(SettingsAgentIdArgsSchema, rawArgs, {
+      label: 'settings:getAgentDefinitionCommit',
+      maxBytes: 4 * 1024,
+    });
     return settingsService.getAgentDefinitionCommit(agentId);
   });
 
@@ -203,7 +234,11 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return { ...result, catalogRevision, lastSuccessful };
   });
 
-  ipcMain.handle('settings:getProviderDefinitionCommit', async (_event, providerId: string) => {
+  ipcMain.handle('settings:getProviderDefinitionCommit', async (_event, ...rawArgs: unknown[]) => {
+    const [providerId] = parseIpcArgs(SettingsProviderIdArgsSchema, rawArgs, {
+      label: 'settings:getProviderDefinitionCommit',
+      maxBytes: 4 * 1024,
+    });
     const commit = await settingsService.getProviderDefinitionCommit(providerId);
     if (!commit) return null;
     await loadProviderSurface(providerId);
@@ -213,7 +248,11 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     return { ...commit, catalogRevision };
   });
 
-  ipcMain.handle('settings:set', async (_event, settings: unknown) => {
+  ipcMain.handle('settings:set', async (_event, ...rawArgs: unknown[]) => {
+    const [settings] = parseIpcArgs(SettingsSetArgsSchema, rawArgs, {
+      label: 'settings:set',
+      maxBytes: 2 * 1024 * 1024,
+    });
     const patch = settings as AppSettingsPatch;
     const previousSettings = settingsService.getAll();
     const nextSettings = settingsService.setAll(patch, appPathService.getRuntimePaths());
