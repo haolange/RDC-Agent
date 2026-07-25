@@ -16,7 +16,7 @@ export interface MemoryState {
   setScope: (scope: 'user' | 'project') => void;
   refresh: () => Promise<void>;
   select: (name: string | null) => Promise<void>;
-  write: (request: MemoryWriteRequest) => Promise<{ success: boolean; error?: string }>;
+  write: (request: Omit<MemoryWriteRequest, 'approvalToken' | 'scope' | 'projectRoot'>) => Promise<{ success: boolean; error?: string }>;
   remove: (name: string) => Promise<{ success: boolean; error?: string }>;
 }
 
@@ -55,8 +55,22 @@ export function useMemory(): MemoryState {
     }
   }, [projectRoot, scope]);
 
-  const write = useCallback(async (request: MemoryWriteRequest) => {
-    const result = await window.electronAPI.memory.write({ ...request, scope, projectRoot, approved: true });
+  const write = useCallback(async (request: Omit<MemoryWriteRequest, 'approvalToken' | 'scope' | 'projectRoot'>) => {
+    const tokenResult = await window.electronAPI.memory.issueApprovalToken({
+      action: 'memory.write',
+      scope,
+      name: request.name,
+      projectRoot,
+    });
+    if (!tokenResult.token) {
+      return { success: false, error: tokenResult.error || 'Failed to issue memory write approvalToken.' };
+    }
+    const result = await window.electronAPI.memory.write({
+      ...request,
+      scope,
+      projectRoot,
+      approvalToken: tokenResult.token,
+    });
     if (result.success) {
       await refresh();
     }
@@ -64,7 +78,16 @@ export function useMemory(): MemoryState {
   }, [projectRoot, refresh, scope]);
 
   const remove = useCallback(async (name: string) => {
-    const result = await window.electronAPI.memory.delete(scope, name, true, projectRoot);
+    const tokenResult = await window.electronAPI.memory.issueApprovalToken({
+      action: 'memory.delete',
+      scope,
+      name,
+      projectRoot,
+    });
+    if (!tokenResult.token) {
+      return { success: false, error: tokenResult.error || 'Failed to issue memory delete approvalToken.' };
+    }
+    const result = await window.electronAPI.memory.delete(scope, name, tokenResult.token, projectRoot);
     if (result.success) {
       setSelected(null);
       await refresh();

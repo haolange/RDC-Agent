@@ -114,6 +114,7 @@ export const IPC_HANDLER_DOMAINS = {
     'agent:configure',
   ],
   memory: [
+    'memory:issueApprovalToken',
     'memory:list',
     'memory:get',
     'memory:write',

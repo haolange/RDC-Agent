@@ -1,5 +1,8 @@
 /**
  * Electron Preload Script
+ *
+ * Sandbox-compatible: only contextBridge + ipcRenderer (+ process.platform).
+ * Do not import Node builtins (fs/path/child_process) here.
  */
 
 import { contextBridge } from 'electron';
