@@ -1,8 +1,6 @@
 ﻿import React, { useState } from 'react';
 import { useI18n } from '../../../i18n';
-import { useCaptureStore } from '../../../stores/captureStore';
 import { useProjectStore } from '../../../stores/projectStore';
-import { useSessionStore } from '../../../stores/sessionStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { CaptureLibrary } from './CaptureLibrary';
 import { CollapsibleSection } from './CollapsibleSection';
@@ -61,8 +59,6 @@ export const ControlPanel: React.FC = () => {
   const currentProject = useProjectStore((state) => state.currentProject);
   const currentSession = useProjectStore((state) => state.currentSession);
   const rightRailTarget = useProjectStore((state) => state.rightRailTarget);
-  const currentRun = useSessionStore((state) => state.currentRun);
-  const openedCapture = useCaptureStore((state) => state.openedCapture);
 
   const rightRailMode: RightRailMode = !currentProject
     ? 'hidden'
@@ -75,11 +71,9 @@ export const ControlPanel: React.FC = () => {
   }
 
   if (rightRailMode === 'session') {
-    const sessionRailKey = [
-      currentSession?.sessionId ?? 'no-session',
-      currentRun?.runId ?? 'no-run',
-      openedCapture?.inputId ?? 'no-capture',
-    ].join(':');
+    // Key only by sessionId: remount resets session-scoped panel expansion/local UI.
+    // Do NOT include runId/capture — those change every turn/open and would remount the rail.
+    const sessionRailKey = currentSession?.sessionId ?? 'no-session';
     return <SessionControlPanel key={sessionRailKey} />;
   }
 

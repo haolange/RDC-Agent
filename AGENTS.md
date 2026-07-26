@@ -56,6 +56,7 @@
 | `EffectiveRuntimePlan` | `src/main/agent-runtime/` | `schemaVersion: 2`；`prepareTurn` 完整冻结；Prompt 与 Executor 共用 |
 | `AgentOrchestrator` | `src/main/workflow/debugger/AgentOrchestrator.ts` | façade 少于 800 行；职责外提；`pnpm run check:orchestrator-facade` |
 | `RdxRuntimeContextRegistry` | `src/main/sessions/` | **仅** per-session lease；禁止 `legacyGlobalMirror` / `getRdxRuntimeContext` |
+| Session Projection | `src/renderer/stores/sessionProjectionStore.ts` + `sessionEventGate` | 仅投影 `currentSession`；IPC 事件须 gate；后台 cache；Composer restore / Stop monotonic 绑 session+`requestId`；`pnpm run check:session-projection` |
 | `bridgeSecurity` | `src/main/browserAppBridge/` | **仅** `RDC_AGENT_BROWSER_QA=1`；bearer + Origin + allowlist；敏感 channel 永久 deny |
 | `McpTrustService` | `src/main/settings/` | project 不可覆盖 user executable；needsRetrust |
 | IPC Zod | `src/main/ipc/validation/` | **全量** handler `parseIpcArgs`；approvalToken 单次消费 |
@@ -172,6 +173,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - 依赖、入口、构建、发布配置或仓库目录治理改动后执行 `pnpm run check:repository-hygiene`。
 - renderer 结构或 UI 锚点改动后执行 `pnpm run check:architecture`（含 Orchestrator façade &lt;800 与 `src/main` 单文件 ≤900）、`pnpm run check:fidelity`、`pnpm run check:shared-exports`。
 - Orchestrator / debugger 编排拆分后执行 `pnpm run check:orchestrator-facade`（`AgentOrchestrator.ts` 少于 800 行；禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext`）。
+- Session 切换、IPC 投影、Composer draft 恢复、Stop/Rewrite 或多 session 并行 UI 改动后执行 `pnpm run check:session-projection`；Browser QA 须覆盖：新建/切换 session 无 composer 串台、后台 turn 不污染 active transcript/trace、Rewrite+立即 Stop 单调落停、Preparing Stop 干净撤销本 session 草稿；每次先删尽 QA project sessions 再新建隔离 session。
 - CI（`.github/workflows/ci.yml`）必须跑 hygiene / typecheck / lint / test / test:coverage / 全套关键 `check:*` / `check:contracts` / build；宣称完成不得只靠 commit message。
 - 覆盖率阈值改动或相关门禁回归执行 `pnpm run test:coverage`。
 - Work Process 投影、工具行文案/图标或 transcript UI 改动后执行 `pnpm run check:work-process`、`pnpm run check:work-process-tool-coverage`。

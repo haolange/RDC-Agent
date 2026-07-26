@@ -29,10 +29,6 @@ artifact-search-icon
 artifact-toolbar
 artifact-tree
 artifact-tree-chevron
-artifact-tree-group
-artifact-tree-group-count
-artifact-tree-group-header
-artifact-tree-group-label
 artifact-tree-leaf
 artifact-tree-leaf-bullet
 artifact-tree-leaf-list

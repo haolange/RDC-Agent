@@ -1,5 +1,7 @@
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useSessionStore } from '../../../stores/sessionStore';
+import { useSessionProjectionStore } from '../../../stores/sessionProjectionStore';
+import { applySessionSwitchHygiene } from '../../../app/bootstrap/sessionSwitchHygiene';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { RightRailTarget } from './types';
 import type { ProjectSelectionLoaderOpsContext } from './projectSelectionLoaderOps';
@@ -127,7 +129,11 @@ export async function handleSessionCreateOp(
       return;
     }
 
-    useSessionStore.getState().clearUsageSnapshot();
+    const previousSessionId = ctx.getCurrentSession()?.sessionId ?? null;
+    applySessionSwitchHygiene({
+      previousSessionId,
+      nextSessionId: result.session.sessionId,
+    });
     ctx.setCurrentProject(targetProject);
     ctx.setCurrentSession(result.session);
     ctx.setRightRailTarget('session');
@@ -196,6 +202,8 @@ export async function handleSessionRemoveOp(
       return;
     }
 
+    useSessionProjectionStore.getState().evictSession(session.sessionId);
+
     const nextSessions = await ctx.loadProjectSessionList(session.projectId);
     if (!ctx.isLatestSelectionRequest(requestId)) {
       return;
@@ -209,6 +217,10 @@ export async function handleSessionRemoveOp(
       }
 
       const nextSession = result.nextSession ?? nextSessions[0] ?? null;
+      applySessionSwitchHygiene({
+        previousSessionId: session.sessionId,
+        nextSessionId: nextSession?.sessionId ?? null,
+      });
       ctx.setCurrentSession(nextSession);
       if (nextSession) {
         ctx.setRightRailTarget('session');

@@ -64,7 +64,8 @@ export const SettingsHasProviderSecretArgsSchema = z.tuple([
 
 export const SettingsGetEffectiveCatalogArgsSchema = z.tuple([
   ipcNonEmptyString(200, 'providerId'),
-  ipcString(200, 'accountId').optional(),
+  // Electron / browser bridge structured-clone turns omitted optional args into null.
+  ipcString(200, 'accountId').nullish(),
 ]);
 
 export const SettingsImportAgentManifestArgsSchema = z.tuple([

@@ -237,7 +237,12 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       padTo: 2,
     });
     await loadProviderSurface(providerId);
-    return resolveEffectiveCatalog(providerId, settingsService.getAll(), undefined, accountId);
+    return resolveEffectiveCatalog(
+      providerId,
+      settingsService.getAll(),
+      undefined,
+      accountId ?? undefined,
+    );
   });
 
   ipcMain.handle('settings:hasProviderSecret', async (_event, ...rawArgs: unknown[]) => {

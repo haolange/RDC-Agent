@@ -16,6 +16,11 @@ import {
   toConversationAttachmentInputs,
 } from './composerSendHelpers';
 import { useTurnControlsStore } from './useTurnControls';
+import {
+  restoreLastSentIfCurrentSession,
+  useComposerSessionContextStore,
+} from './composerSessionContext';
+import { useProjectStore } from '../../../stores/projectStore';
 
 export function createConversationRequestId(): string {
   return globalThis.crypto?.randomUUID?.()
@@ -48,7 +53,6 @@ export async function sendComposerConversationTurn(options: {
   setCurrentRun: (run: RunSummary | null) => void;
   setRuns: (runs: RunSummary[]) => void;
   setTracePresentation: (presentation: AgentRunPresentation | null) => void;
-  setActiveRequestId: (requestId: string | null) => void;
   showNotice: (message: string) => void;
   failedSummary: string;
 }): Promise<void> {
@@ -75,7 +79,6 @@ export async function sendComposerConversationTurn(options: {
     setCurrentRun,
     setRuns,
     setTracePresentation,
-    setActiveRequestId,
     showNotice,
     failedSummary,
   } = options;
@@ -84,6 +87,7 @@ export async function sendComposerConversationTurn(options: {
   const sentAttachments = [...pendingAttachments];
   const sentSkillIds = [...pendingSkillIds];
   const requestId = createConversationRequestId();
+  const owningSessionId = currentSession?.sessionId ?? null;
   const optimistic = buildOptimisticConversationTurn({
     requestId,
     trimmed: sentPrompt,
@@ -102,7 +106,13 @@ export async function sendComposerConversationTurn(options: {
     ));
   };
 
-  setActiveRequestId(requestId);
+  useComposerSessionContextStore.getState().beginTurn({
+    sessionId: owningSessionId ?? 'no-session',
+    projectId: currentProject?.projectId ?? null,
+    requestId,
+    optimisticTurnId: optimistic.assistantDraftMessage.turnId,
+    realTurnId: null,
+  });
   setPromptValue('');
   setPendingAttachments([]);
   setPendingSkillIds([]);
@@ -111,9 +121,20 @@ export async function sendComposerConversationTurn(options: {
   upsertConversationMessages([optimistic.userMessage, optimistic.assistantDraftMessage]);
 
   const restoreComposerDraft = () => {
-    setPromptValue(sentPrompt);
-    setPendingAttachments(sentAttachments);
-    setPendingSkillIds(sentSkillIds);
+    const activeSessionId = useProjectStore.getState().currentSession?.sessionId ?? null;
+    if (owningSessionId && activeSessionId !== owningSessionId) {
+      return;
+    }
+    const restored = restoreLastSentIfCurrentSession(activeSessionId ?? owningSessionId, (lastSent) => {
+      setPromptValue(lastSent.prompt);
+      setPendingAttachments(lastSent.attachments);
+      setPendingSkillIds(lastSent.skillIds);
+    });
+    if (!restored) {
+      setPromptValue(sentPrompt);
+      setPendingAttachments(sentAttachments);
+      setPendingSkillIds(sentSkillIds);
+    }
   };
 
   const finishRevokedOrCancelled = (): boolean => {
@@ -121,7 +142,7 @@ export async function sendComposerConversationTurn(options: {
       return false;
     }
     // Stop already performed a clean preparing revoke; stay idempotent.
-    setActiveRequestId(null);
+    useComposerSessionContextStore.getState().clearActiveTurn();
     useSessionStore.getState().setPreparedTurnContext(null);
     useSessionStore.getState().setConversationPreparationPhase('idle');
     return true;
@@ -174,14 +195,14 @@ export async function sendComposerConversationTurn(options: {
       if (result.error.code === 'REQUEST_CANCELLED') {
         rollbackOptimistic();
         restoreComposerDraft();
-        setActiveRequestId(null);
+        useComposerSessionContextStore.getState().clearActiveTurn();
         useSessionStore.getState().setPreparedTurnContext(null);
         useSessionStore.getState().setConversationPreparationPhase('idle');
         return;
       }
       rollbackOptimistic();
       restoreComposerDraft();
-      setActiveRequestId(null);
+      useComposerSessionContextStore.getState().clearActiveTurn();
       useSessionStore.getState().setPreparedTurnContext(null);
       useSessionStore.getState().setConversationPreparationPhase('idle');
       showNotice(result.error.message || failedSummary);
@@ -192,6 +213,7 @@ export async function sendComposerConversationTurn(options: {
     rollbackOptimistic();
 
     const turn = result.turn;
+    useComposerSessionContextStore.getState().setRealTurnId(turn.userMessage.turnId);
     useSessionStore.getState().setPreparedTurnContext(result.preparedContext);
     useSessionStore.getState().setConversationPreparationPhase('current');
 
@@ -224,7 +246,7 @@ export async function sendComposerConversationTurn(options: {
     }
     rollbackOptimistic();
     restoreComposerDraft();
-    setActiveRequestId(null);
+    useComposerSessionContextStore.getState().clearActiveTurn();
     useSessionStore.getState().setPreparedTurnContext(null);
     useSessionStore.getState().setConversationPreparationPhase('idle');
     if (isRequestCancelledError(error)) {

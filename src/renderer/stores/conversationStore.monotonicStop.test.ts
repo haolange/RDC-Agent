@@ -62,4 +62,37 @@ describe('conversationStore monotonic stop', () => {
     expect(store.consumeRevokedRequest('req-1')).toBe(true);
     expect(useConversationStore.getState().consumeRevokedRequest('req-1')).toBe(false);
   });
+
+  it('rejects late streaming patches by requestId after rewrite stop', () => {
+    const store = useConversationStore.getState();
+    store.upsertConversationMessage(baseAssistant({
+      id: 'assistant-opt',
+      turnId: 'optimistic-turn-req-9',
+      requestId: 'req-9',
+      status: 'streaming',
+      updatedAt: 1,
+    }));
+    store.markRequestMonotonicallyStopped('req-9');
+    store.markTurnMonotonicallyStopped('optimistic-turn-req-9');
+    store.updateAssistantMessageByTurnId('optimistic-turn-req-9', (message) => ({
+      ...message,
+      status: 'stopped',
+      updatedAt: 2,
+    }));
+
+    // Simulate IPC reconcile replacing optimistic turn with real turn id.
+    store.migrateMonotonicStoppedTurn('optimistic-turn-req-9', 'turn-real-9');
+    store.upsertConversationMessage(baseAssistant({
+      id: 'assistant-real',
+      turnId: 'turn-real-9',
+      requestId: 'req-9',
+      status: 'streaming',
+      updatedAt: 100,
+      content: 'late after rewrite stop',
+    }));
+
+    const late = useConversationStore.getState().allConversationMessages.find((m) => m.id === 'assistant-real');
+    expect(late).toBeUndefined();
+  });
 });
+

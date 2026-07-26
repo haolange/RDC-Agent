@@ -23,10 +23,12 @@ import { useDeviceStore } from '../../stores/deviceStore';
 import { useEvidenceStore } from '../../stores/evidenceStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionStore } from '../../stores/sessionStore';
+import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { resetWorkbenchStores } from '../../stores/storesReset';
 import { createConversationEventBatcher } from './conversationEventBatcher';
+import { isActiveSessionEvent } from './sessionEventGate';
 
 export function useSyncCapturesFromSnapshot() {
   return useCallback((snapshot: ContextSnapshot) => {
@@ -46,6 +48,10 @@ export function useSyncCapturesFromSnapshot() {
   }, []);
 }
 
+function resolveMessageSessionId(message: { sessionId?: string | null }): string | null {
+  return message.sessionId ?? null;
+}
+
 export function useIpcEventBridge(options: {
   syncCapturesFromSnapshot: (snapshot: ContextSnapshot) => void;
   showNotice: (message: string) => void;
@@ -59,10 +65,13 @@ export function useIpcEventBridge(options: {
   const addActionEvent = useEvidenceStore((state) => state.addActionEvent);
   const setWorkflowState = useWorkflowStore((state) => state.setWorkflowState);
   const setReasoningSummaries = useConversationStore((state) => state.setReasoningSummaries);
+  const activeSessionId = useProjectStore((state) => state.currentSession?.sessionId ?? null);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
+
+    const projection = () => useSessionProjectionStore.getState();
 
     const unsubscribeRunUsageChanged = electronAPI.events.onRunUsageChanged((summary) => {
       const { currentRun } = useSessionStore.getState();
@@ -76,6 +85,10 @@ export function useIpcEventBridge(options: {
     });
 
     const unsubscribeTraceProjectionChanged = electronAPI.events.onTraceProjectionChanged((payload) => {
+      if (!isActiveSessionEvent(payload.sessionId)) {
+        projection().projectTrace(payload.sessionId, payload.presentation);
+        return;
+      }
       useWorkflowStore.getState().setTracePresentation(payload.presentation);
     });
 
@@ -86,6 +99,13 @@ export function useIpcEventBridge(options: {
 
     const conversationEventBatcher = createConversationEventBatcher({
       applyMessage: (event) => {
+        const sessionId = resolveMessageSessionId(event.message) ?? event.sessionId;
+        if (!isActiveSessionEvent(sessionId)) {
+          if (sessionId) {
+            projection().projectConversationMessage(sessionId, event.message);
+          }
+          return;
+        }
         const conversation = useConversationStore.getState();
         conversation.upsertConversationMessage(event.message);
         if (event.type === 'message_completed' || event.type === 'message_errored') {
@@ -98,6 +118,13 @@ export function useIpcEventBridge(options: {
     });
 
     const handleConversationEvent = (event: ConversationStreamEvent) => {
+      if (!isActiveSessionEvent(event.sessionId)) {
+        if (event.type === 'message_patched' || event.type === 'message_completed' || event.type === 'message_errored') {
+          projection().projectConversationMessage(event.sessionId, event.message);
+        }
+        return;
+      }
+
       const conversation = useConversationStore.getState();
       if (event.type === 'run_linked') {
         conversation.patchAssistantMessageByTurnId(event.turnId, { runId: event.runId });
@@ -123,6 +150,22 @@ export function useIpcEventBridge(options: {
     const unsubscribeToolExecutionComplete = electronAPI.events.onToolExecutionComplete((rawTrace) => {
       const trace = rawTrace as ToolTraceEntry;
       const conversation = useConversationStore.getState();
+      const message = trace.turnId
+        ? conversation.allConversationMessages.find(
+          (entry) => entry.turnId === trace.turnId && entry.role === 'assistant',
+        )
+        : undefined;
+      const sessionId = message?.sessionId ?? null;
+      if (sessionId && !isActiveSessionEvent(sessionId)) {
+        // Background tool rows stay in the owning session projection via message patches.
+        return;
+      }
+      // Without a resolvable session, only apply when the turn exists on the active transcript.
+      if (!sessionId && trace.turnId) {
+        const onActive = conversation.conversationMessages.some((entry) => entry.turnId === trace.turnId);
+        if (!onActive) return;
+      }
+
       const lastEntry = conversation.timeline[conversation.timeline.length - 1];
       if (lastEntry?.id !== trace.traceId) {
         conversation.addTimelineEntry({
@@ -134,23 +177,34 @@ export function useIpcEventBridge(options: {
         });
       }
       if (trace.turnId) {
-        conversation.updateAssistantMessageByTurnId(trace.turnId, (message) => applyToolTraceToMessage(message, trace));
+        conversation.updateAssistantMessageByTurnId(trace.turnId, (entry) => applyToolTraceToMessage(entry, trace));
       }
     });
 
     /** 类型守卫：判断 IPC 入站对象是否符合 agent:message 的最小契约。 */
     const isAgentMessagePayload = (
       value: unknown,
-    ): value is { id?: string; agentRole?: AgentTimelineEntry['agentRole']; content?: string } => {
+    ): value is { id?: string; agentRole?: AgentTimelineEntry['agentRole']; content?: string; sessionId?: string } => {
       if (!value || typeof value !== 'object') return false;
       const obj = value as Record<string, unknown>;
       if (obj.id !== undefined && typeof obj.id !== 'string') return false;
       if (obj.content !== undefined && typeof obj.content !== 'string') return false;
+      if (obj.sessionId !== undefined && typeof obj.sessionId !== 'string') return false;
       return true;
     };
 
     const unsubscribeAgentMessage = electronAPI.events.onAgentMessage((rawMsg) => {
       if (!isAgentMessagePayload(rawMsg)) {
+        return;
+      }
+      if (rawMsg.sessionId !== undefined && !isActiveSessionEvent(rawMsg.sessionId)) {
+        projection().projectTimelineEntry(rawMsg.sessionId, {
+          id: rawMsg.id || Date.now().toString(),
+          type: 'agent',
+          agentRole: rawMsg.agentRole,
+          content: rawMsg.content ?? '',
+          timestamp: Date.now(),
+        });
         return;
       }
       const entry: AgentTimelineEntry = {
@@ -172,6 +226,10 @@ export function useIpcEventBridge(options: {
 
     const unsubscribeAgentStatusChanged = electronAPI.events.onAgentStatusChanged((rawState) => {
       if (isAgentStatePayload(rawState)) {
+        const sessionId = (rawState as AgentState & { sessionId?: string }).sessionId;
+        if (sessionId !== undefined && !isActiveSessionEvent(sessionId)) {
+          return;
+        }
         useAgentStore.getState().updateAgentState(rawState);
       }
     });
@@ -185,6 +243,10 @@ export function useIpcEventBridge(options: {
 
     const unsubscribeEvidenceEventAdded = electronAPI.events.onEvidenceEventAdded((rawEvent) => {
       const event = rawEvent as ActionEvent;
+      const sessionId = event.session_id;
+      if (!isActiveSessionEvent(sessionId)) {
+        return;
+      }
       addActionEvent(event);
       const entry = mapActionEventToTimelineEntry(event);
       if (entry) {
@@ -197,6 +259,10 @@ export function useIpcEventBridge(options: {
 
     const unsubscribeWorkflowStateChanged = electronAPI.events.onWorkflowStateChanged((rawState) => {
       const state = rawState as WorkflowState;
+      if (!isActiveSessionEvent(state.sessionId)) {
+        projection().projectWorkflow(state.sessionId, state);
+        return;
+      }
       setWorkflowState(state);
       setReasoningSummaries(state.reasoningSummaries ?? []);
       const currentProject = useProjectStore.getState().currentProject;
@@ -225,6 +291,7 @@ export function useIpcEventBridge(options: {
 
         electronAPI.evidence.getChain()
           .then((result) => {
+            if (!isActiveSessionEvent(currentSession.sessionId)) return;
             useEvidenceStore.getState().setActionEvents(result.events ?? []);
             const timeline = (result.events ?? [])
               .map((event) => mapActionEventToTimelineEntry(event as ActionEvent))
@@ -249,6 +316,9 @@ export function useIpcEventBridge(options: {
         lastStage?: string;
         stopReason?: string;
       };
+      if (!isActiveSessionEvent(payload.sessionId)) {
+        return;
+      }
       const session = useSessionStore.getState();
       const current = session.currentRun;
       if (current?.runId === payload.runId) {
@@ -336,5 +406,16 @@ export function useIpcEventBridge(options: {
       electronAPI.off('settings:open', handleSettingsOpen);
       electronAPI.off('window:maximized-changed', handleWindowStateChange);
     };
-  }, [addActionEvent, setReasoningSummaries, setSettingsModalOpen, setSystemTheme, setWindowMaximized, setWorkflowState, showNotice, syncCapturesFromSnapshot, t]);
+  }, [
+    activeSessionId,
+    addActionEvent,
+    setReasoningSummaries,
+    setSettingsModalOpen,
+    setSystemTheme,
+    setWindowMaximized,
+    setWorkflowState,
+    showNotice,
+    syncCapturesFromSnapshot,
+    t,
+  ]);
 }

@@ -1,4 +1,4 @@
-import { useCallback, type MutableRefObject, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { RunSummary, SessionRecord } from '@shared/types/session';
 import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
@@ -6,66 +6,35 @@ import { useSessionStore } from '../../../stores/sessionStore';
 import { useConversationStore } from '../../../stores/conversationStore';
 import type { useI18n } from '../../../i18n';
 import { removeOptimisticConversationMessages } from './composerSendHelpers';
+import {
+  restoreLastSentIfCurrentSession,
+  useComposerSessionContextStore,
+} from './composerSessionContext';
+import { stopWorkTrace } from './stopWorkTrace';
+
+export { stopWorkTrace };
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
 const ACTIVE_ASSISTANT_STATUSES = new Set<ConversationMessage['status']>(['draft', 'streaming']);
-
-export const stopWorkTrace = (message: ConversationMessage): ConversationMessage => {
-  const stoppedAt = Date.now();
-  if (!message.workTrace) {
-    return {
-      ...message,
-      status: 'stopped',
-      updatedAt: stoppedAt,
-    };
-  }
-
-  return {
-    ...message,
-    status: 'stopped',
-    updatedAt: stoppedAt,
-    workTrace: {
-      ...message.workTrace,
-      status: 'stopped',
-      summary: message.workTrace.summary || 'Request stopped.',
-      updatedAt: stoppedAt,
-      blocks: (message.workTrace.blocks ?? []).map((block) => (
-        block.status === 'running'
-          ? { ...block, status: 'complete', completedAt: stoppedAt }
-          : block
-      )),
-    },
-  };
-};
 
 export function useComposerStop(options: {
   showNotice: (message: string) => void;
   t: Translate;
   currentSession: SessionRecord | null;
   currentRun: RunSummary | null;
-  setIsPromptSending: (sending: boolean) => void;
-  activeRequestIdRef: MutableRefObject<string | null>;
   setPromptValue?: (value: string) => void;
   setPendingAttachments?: Dispatch<SetStateAction<PendingAttachmentDraft[]>>;
   setPendingSkillIds?: Dispatch<SetStateAction<string[]>>;
-  lastSentPromptRef?: MutableRefObject<{
-    prompt: string;
-    attachments: PendingAttachmentDraft[];
-    skillIds: string[];
-  } | null>;
 }) {
   const {
     showNotice,
     t,
     currentSession,
     currentRun,
-    setIsPromptSending,
-    activeRequestIdRef,
     setPromptValue,
     setPendingAttachments,
     setPendingSkillIds,
-    lastSentPromptRef,
   } = options;
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
 
@@ -74,8 +43,14 @@ export function useComposerStop(options: {
     if (!electronAPI) return;
 
     try {
-      setIsPromptSending(false);
-      const requestId = activeRequestIdRef.current;
+      useComposerSessionContextStore.getState().setIsPromptSending(false);
+      const activeTurn = useComposerSessionContextStore.getState().activeTurn;
+      const requestId = (
+        activeTurn
+        && activeTurn.sessionId === currentSession?.sessionId
+          ? activeTurn.requestId
+          : null
+      );
       const conversation = useConversationStore.getState();
       const activeAssistant = conversation.conversationMessages
         .slice()
@@ -86,18 +61,29 @@ export function useComposerStop(options: {
           && (!currentSession?.sessionId || message.sessionId === currentSession.sessionId)
         ));
 
-      // Committed/streaming turns can stop optimistically; preparing waits on phase.
+      // Optimistic stop for both preparing (optimistic-turn-*) and committed streaming turns.
+      if (activeAssistant) {
+        if (requestId) conversation.markRequestMonotonicallyStopped(requestId);
+        if (activeAssistant.requestId) {
+          conversation.markRequestMonotonicallyStopped(activeAssistant.requestId);
+        }
+        conversation.markTurnMonotonicallyStopped(activeAssistant.turnId);
+        if (activeTurn?.optimisticTurnId) {
+          conversation.markTurnMonotonicallyStopped(activeTurn.optimisticTurnId);
+        }
+        conversation.updateAssistantMessageByTurnId(activeAssistant.turnId, stopWorkTrace);
+      } else if (requestId) {
+        conversation.markRequestMonotonicallyStopped(requestId);
+        if (activeTurn?.optimisticTurnId) {
+          conversation.markTurnMonotonicallyStopped(activeTurn.optimisticTurnId);
+        }
+      }
+
       const clearlyPastPreparing = Boolean(
         activeAssistant
         && !activeAssistant.turnId.startsWith('optimistic-turn-'),
       );
-      if (clearlyPastPreparing && activeAssistant) {
-        if (requestId) conversation.markRequestMonotonicallyStopped(requestId);
-        conversation.markTurnMonotonicallyStopped(activeAssistant.turnId);
-        conversation.updateAssistantMessageByTurnId(activeAssistant.turnId, stopWorkTrace);
-      }
 
-      // Phase from main is authoritative: preparing → revoke; committing/running → monotonic stop.
       const cancelPromise = electronAPI.conversation.cancelActiveTurn({
         requestId: requestId ?? undefined,
         sessionId: currentSession?.sessionId,
@@ -111,28 +97,35 @@ export function useComposerStop(options: {
 
       const cancelResult = await cancelPromise;
 
-      if (cancelResult.success && cancelResult.phase === 'preparing' && requestId) {
-        conversation.markRequestRevoked(requestId);
-        const optimisticIds = conversation.allConversationMessages
-          .filter((message) => message.requestId === requestId)
-          .map((message) => message.id);
-        useConversationStore.getState().setConversationMessages(
-          removeOptimisticConversationMessages(
-            useConversationStore.getState().allConversationMessages,
-            optimisticIds,
-          ),
-        );
-        const lastSent = lastSentPromptRef?.current;
-        if (lastSent && setPromptValue && setPendingAttachments && setPendingSkillIds) {
-          setPromptValue(lastSent.prompt);
-          setPendingAttachments(lastSent.attachments);
-          setPendingSkillIds(lastSent.skillIds);
+      if (cancelResult.success && cancelResult.phase === 'preparing') {
+        const revokedRequestId = requestId
+          ?? cancelResult.cancelledRequestId
+          ?? activeAssistant?.requestId
+          ?? null;
+        if (revokedRequestId) {
+          conversation.markRequestRevoked(revokedRequestId);
+          const optimisticIds = conversation.allConversationMessages
+            .filter((message) => message.requestId === revokedRequestId)
+            .map((message) => message.id);
+          useConversationStore.getState().setConversationMessages(
+            removeOptimisticConversationMessages(
+              useConversationStore.getState().allConversationMessages,
+              optimisticIds,
+            ),
+          );
+        }
+        if (setPromptValue && setPendingAttachments && setPendingSkillIds) {
+          restoreLastSentIfCurrentSession(currentSession?.sessionId, (lastSent) => {
+            setPromptValue(lastSent.prompt);
+            setPendingAttachments(lastSent.attachments);
+            setPendingSkillIds(lastSent.skillIds);
+          });
         }
         useSessionStore.getState().setPreparedTurnContext(null);
         useSessionStore.getState().setConversationPreparationPhase('idle');
-        activeRequestIdRef.current = null;
+        useComposerSessionContextStore.getState().clearActiveTurn();
         if (workflowStopPromise) {
-          await workflowStopPromise.catch(() => undefined);
+          void workflowStopPromise.catch(() => undefined);
         }
         showNotice(t('app.stopRunSent'));
         return;
@@ -149,8 +142,12 @@ export function useComposerStop(options: {
         ))
         ?? (activeAssistant && ACTIVE_ASSISTANT_STATUSES.has(activeAssistant.status) ? activeAssistant : null);
 
-      if (requestId) {
-        latestConversation.markRequestMonotonicallyStopped(requestId);
+      const stopRequestId = requestId
+        ?? cancelResult.cancelledRequestId
+        ?? latestActiveAssistant?.requestId
+        ?? null;
+      if (stopRequestId) {
+        latestConversation.markRequestMonotonicallyStopped(stopRequestId);
       }
       if (latestActiveAssistant) {
         latestConversation.markTurnMonotonicallyStopped(latestActiveAssistant.turnId);
@@ -161,31 +158,30 @@ export function useComposerStop(options: {
       }
 
       if (cancelResult.success) {
-        activeRequestIdRef.current = null;
+        useComposerSessionContextStore.getState().clearActiveTurn();
       }
 
-      const workflowResult = workflowStopPromise ? await workflowStopPromise : null;
-      const failures = [
-        cancelResult.success ? null : cancelResult,
-        workflowResult && !workflowResult.success ? workflowResult : null,
-      ].filter((entry): entry is { success: boolean; error?: string } => Boolean(entry));
+      // Do not block notice on workflow stop latency.
+      if (workflowStopPromise) {
+        void workflowStopPromise.catch(() => undefined);
+      }
 
-      if (failures.length > 0 && failures.some((failure) => failure.error && !failure.error.includes('No active conversation'))) {
-        showNotice(failures.find((failure) => failure.error)?.error ?? t('app.stopRunFailed'));
-        return;
+      if (!cancelResult.success) {
+        const error = cancelResult.error;
+        if (error && !error.includes('No active conversation')) {
+          showNotice(error);
+          return;
+        }
       }
       showNotice(t('app.stopRunSent'));
     } catch (error) {
-      setIsPromptSending(false);
+      useComposerSessionContextStore.getState().setIsPromptSending(false);
       showNotice(error instanceof Error ? error.message : t('app.stopRunFailed'));
     }
   }, [
-    activeRequestIdRef,
     currentRun,
     currentSession?.sessionId,
-    lastSentPromptRef,
     setCurrentRun,
-    setIsPromptSending,
     setPendingAttachments,
     setPendingSkillIds,
     setPromptValue,

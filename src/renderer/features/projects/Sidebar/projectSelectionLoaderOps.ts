@@ -2,6 +2,8 @@ import { useCaptureStore } from '../../../stores/captureStore';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
+import { useWorkflowStore } from '../../../stores/workflowStore';
+import { applySessionSwitchHygiene } from '../../../app/bootstrap/sessionSwitchHygiene';
 import type { TranslationKey } from '../../../i18n';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type {
@@ -69,8 +71,13 @@ export async function selectSessionOp(
   options: SelectSessionOptions = {},
 ): Promise<boolean> {
   const rollbackState = options.rollbackState ?? captureSelectionSnapshot();
+  const previousSessionId = ctx.getCurrentSession()?.sessionId ?? null;
+
   if (options.optimisticSession) {
-    useSessionStore.getState().clearUsageSnapshot();
+    applySessionSwitchHygiene({
+      previousSessionId,
+      nextSessionId: options.optimisticSession.sessionId,
+    });
     ctx.setCurrentSession(options.optimisticSession);
     ctx.setRightRailTarget('session');
     ctx.setCurrentRun(null);
@@ -96,11 +103,20 @@ export async function selectSessionOp(
     return false;
   }
 
-  useSessionStore.getState().clearUsageSnapshot();
+  if (!options.optimisticSession || options.optimisticSession.sessionId !== result.session.sessionId) {
+    applySessionSwitchHygiene({
+      previousSessionId: options.optimisticSession?.sessionId ?? previousSessionId,
+      nextSessionId: result.session.sessionId,
+    });
+  }
   ctx.setCurrentSession(result.session);
   const history = await window.electronAPI.conversation.getHistory(result.session.sessionId).catch(() => null);
   if (history && ctx.isLatestSelectionRequest(options.requestId)) {
     useConversationStore.getState().setConversationSnapshot(history.messages ?? [], history.branchState ?? null);
+  }
+  const trace = await window.electronAPI.trace.getProjection(result.session.sessionId).catch(() => null);
+  if (trace?.presentation && ctx.isLatestSelectionRequest(options.requestId)) {
+    useWorkflowStore.getState().setTracePresentation(trace.presentation);
   }
   ctx.setRightRailTarget('session');
   ctx.setCurrentRun(result.currentRun ?? null);

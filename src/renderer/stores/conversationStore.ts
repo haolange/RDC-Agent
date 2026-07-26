@@ -96,7 +96,8 @@ interface ConversationState {
   ) => void;
   markTurnMonotonicallyStopped: (turnId: string) => void;
   markRequestMonotonicallyStopped: (requestId: string) => void;
-  clearMonotonicStoppedTurn: (turnId: string) => void;
+  /** Migrate monotonic turn guard from optimistic id to committed turn id. */
+  migrateMonotonicStoppedTurn: (fromTurnId: string, toTurnId: string) => void;
   markRequestRevoked: (requestId: string) => void;
   consumeRevokedRequest: (requestId: string) => boolean;
   addTimelineEntry: (entry: AgentTimelineEntry) => void;
@@ -234,9 +235,16 @@ export const useConversationStore = create<ConversationState>((set, get) => ({
       ? {}
       : { monotonicStoppedRequestIds: [...state.monotonicStoppedRequestIds, requestId] }
   )),
-  clearMonotonicStoppedTurn: (turnId) => set((state) => ({
-    monotonicStoppedTurnIds: state.monotonicStoppedTurnIds.filter((id) => id !== turnId),
-  })),
+  migrateMonotonicStoppedTurn: (fromTurnId, toTurnId) => set((state) => {
+    if (!state.monotonicStoppedTurnIds.includes(fromTurnId)) {
+      return {};
+    }
+    const withoutFrom = state.monotonicStoppedTurnIds.filter((id) => id !== fromTurnId);
+    if (withoutFrom.includes(toTurnId)) {
+      return { monotonicStoppedTurnIds: withoutFrom };
+    }
+    return { monotonicStoppedTurnIds: [...withoutFrom, toTurnId] };
+  }),
   markRequestRevoked: (requestId) => set((state) => (
     state.revokedRequestIds.includes(requestId)
       ? {}

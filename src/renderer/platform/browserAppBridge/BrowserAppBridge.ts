@@ -191,7 +191,11 @@ class BrowserAppBridgeClient {
       get: () => this.invoke<AppSettings>('settings:get'),
       getProviderCatalog: () => this.invoke('settings:getProviderCatalog') as Promise<LlmProviderCatalogResponse>,
       getEffectiveModel: (agentId) => this.invoke('settings:getEffectiveModel', agentId) as Promise<EffectiveModel | null>,
-      getEffectiveCatalog: (providerId, accountId) => this.invoke('settings:getEffectiveCatalog', providerId, accountId) as Promise<EffectiveCatalogSnapshot | null>,
+      getEffectiveCatalog: (providerId, accountId) => (
+        typeof accountId === 'string' && accountId.length > 0
+          ? this.invoke('settings:getEffectiveCatalog', providerId, accountId)
+          : this.invoke('settings:getEffectiveCatalog', providerId)
+      ) as Promise<EffectiveCatalogSnapshot | null>,
       hasProviderSecret: (providerId) => this.invoke('settings:hasProviderSecret', providerId),
       importAgentManifest: (filePath) => this.invoke('settings:importAgentManifest', filePath),
       saveAgentDefinition: (request) => this.invoke('settings:saveAgentDefinition', request),
