@@ -33,7 +33,7 @@ Open `.rdc` (`openCapture` / `openRemoteCapture`), connect remote, preview, and 
 
 The tool catalog is loaded from the configured `catalogPath`. Catalog metadata is exposed through `tool:getCatalog` and `tool:getRuntimeSummary`.
 
-Renderer code can display catalog/runtime status, but it cannot invoke arbitrary tools.
+Workbench right rail must **not** render a per-tool `rd.*` inventory. RDX capability status in UI comes from `tool:getRuntimeSummary` (CLI available / source / command / catalog present / namespace counts). Skills and Artifacts remain separate session panels. Renderer code cannot invoke arbitrary tools; execution stays on Settings shell actions / bash → `ShellInvocationService` → external CLI.
 
 ## Trace Contract
 

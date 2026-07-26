@@ -29,6 +29,7 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 | --- | --- |
 | 产品边界与本文件不变量 | 本文件 |
 | Runtime / Prompt / Provider / Tool / Session 契约 | [`docs/contracts/runtime-kernel.md`](docs/contracts/runtime-kernel.md) |
+| Session Projection（active UI / 后台 cache / Composer 恢复） | [`docs/contracts/session-projection.md`](docs/contracts/session-projection.md) |
 | 权限、Bridge、Secret、MCP trust、Sandbox、CSP、IPC | [`docs/contracts/permissions.md`](docs/contracts/permissions.md) |
 | Fail-closed 三分类与标注点 | [`docs/contracts/failure-model.md`](docs/contracts/failure-model.md) |
 | Orchestrator façade 行数 / 职责外提 | 本文件 Invariant + `pnpm run check:orchestrator-facade` |
@@ -56,6 +57,7 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 - **CSP**：生产 `script-src` 无 `unsafe-inline`；`style-src 'self'`（无 `unsafe-inline`）；`style-src-attr 'none'`；动态样式经 constructable stylesheet（`useDynStyle` / `assignDynStyle` / Appearance `applyChromeTheme`），禁止依赖 inline style attributes 或 `<style>` textContent 注入。Appearance chrome 权威见 [`docs/ui/design-system.md`](docs/ui/design-system.md)；`chromeThemes` 由 Settings `schemaVersion` **6** 起在升级时硬重置为 RDC 默认（不可逆，清历史污染）。
 - **IPC Zod**：全部 IPC handler 经 `parseIpcArgs`；非法 payload fail-closed；`approvalToken` 单次消费。
 - **RDX context lease**：仅 per-session lease（`setRdxRuntimeContextForSession` / `getRdxContextLease` / `assertRdxContextLeaseOwnership`）；**禁止** RDX global mirror、`legacyGlobalMirror`、`getRdxRuntimeContext` 全局 API。
+- **Session Projection**：主进程允许多 session 并行 turn；renderer 仅投影 `currentSession`；带 `sessionId` 的 IPC 流式/投影事件必须经 active-session gate，后台写入 `sessionProjectionStore`；Composer draft 恢复与 Stop/Rewrite monotonic 绑定 owning session/`requestId`。权威见 [`docs/contracts/session-projection.md`](docs/contracts/session-projection.md)；门禁 `pnpm run check:session-projection`。
 - **EffectiveRuntimePlan**：`schemaVersion: 2`；在 `prepareTurn` **完整冻结**（`planId` / fingerprint / tools / skill ∩ / deferred / MCP hash / permission / policy / route / request+prompt fingerprints）；Prompt 与 Executor 共用；在途 turn 不读可变 Settings。
 
 ## Document Index
@@ -63,6 +65,7 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 ### Contracts
 
 - [`docs/contracts/runtime-kernel.md`](docs/contracts/runtime-kernel.md) — Agent loop、Prompt/Request、Reasoning、Tools、Session、Model capability
+- [`docs/contracts/session-projection.md`](docs/contracts/session-projection.md) — Active Session Projection、IPC gate、Composer 恢复、Stop/Rewrite monotonic
 - [`docs/contracts/permissions.md`](docs/contracts/permissions.md) — Permission mode、Sandbox、CSP、IPC Zod 全量、Bridge、Secret、RDX lease、MCP trust、Shell
 - [`docs/contracts/failure-model.md`](docs/contracts/failure-model.md) — Security / Integrity / Availability
 

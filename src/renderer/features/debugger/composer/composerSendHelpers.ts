@@ -6,6 +6,9 @@ import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useProjectStore } from '../../../stores/projectStore';
+import { stopWorkTrace } from './stopWorkTrace';
+import { isActiveSessionEvent } from '../../../app/bootstrap/sessionEventGate';
+import { useSessionProjectionStore } from '../../../stores/sessionProjectionStore';
 
 const EXECUTABLE_APP_MODES = new Set<string>(['edit', 'debugger', 'analyzer', 'optimizer']);
 
@@ -169,6 +172,48 @@ export async function applyConversationTurnResult(options: {
     upsertConversationMessages,
   } = options;
   const refreshTasks: Array<Promise<void>> = [];
+  const requestId = result.userMessage.requestId
+    ?? result.assistantDraftMessage.requestId
+    ?? null;
+  const turnSessionId = result.session?.sessionId
+    ?? result.userMessage.sessionId
+    ?? result.assistantDraftMessage.sessionId
+    ?? null;
+  const conversationState = useConversationStore.getState();
+
+  // Preparing revoke already cleaned UI; do not re-apply streaming turn.
+  if (requestId && conversationState.revokedRequestIds.includes(requestId)) {
+    conversationState.consumeRevokedRequest(requestId);
+    return;
+  }
+
+  const requestStopped = Boolean(
+    requestId && conversationState.monotonicStoppedRequestIds.includes(requestId),
+  );
+
+  const forceStoppedMessages = (messages: ConversationMessage[]): ConversationMessage[] => {
+    if (!requestStopped) return messages;
+    return messages.map((message) => (
+      message.role === 'assistant'
+        && (message.status === 'draft' || message.status === 'streaming')
+        ? stopWorkTrace(message)
+        : message
+    ));
+  };
+
+  // Background session: never mutate active project/session selection or UI stores.
+  if (turnSessionId && !isActiveSessionEvent(turnSessionId)) {
+    for (const message of forceStoppedMessages(result.messages ?? [
+      result.userMessage,
+      result.assistantDraftMessage,
+    ])) {
+      useSessionProjectionStore.getState().projectConversationMessage(turnSessionId, message);
+    }
+    if (result.tracePresentation) {
+      useSessionProjectionStore.getState().projectTrace(turnSessionId, result.tracePresentation);
+    }
+    return;
+  }
 
   if (result.session?.projectId && currentProject?.projectId !== result.session.projectId) {
     refreshTasks.push(electronAPI.project.list().then((projectsResult) => {
@@ -190,7 +235,7 @@ export async function applyConversationTurnResult(options: {
     // Merge into the full store set so inactive branch siblings survive rewrite snapshots.
     // reconcileTurnMessages only refreshes overlapping ids; visible projection happens in the store.
     const allMessages = useConversationStore.getState().allConversationMessages;
-    const reconciled = reconcileTurnMessages(allMessages, result.messages);
+    const reconciled = forceStoppedMessages(reconcileTurnMessages(allMessages, result.messages));
     const reconciledIds = new Set(reconciled.map((message) => message.id));
     const merged = [
       ...allMessages.filter((message) => !reconciledIds.has(message.id)),
@@ -205,17 +250,24 @@ export async function applyConversationTurnResult(options: {
         setBranchState(result.branchState ?? null);
       }
     }
+    if (requestStopped && requestId) {
+      const realTurnId = result.assistantDraftMessage.turnId || result.userMessage.turnId;
+      const optimisticTurnId = `optimistic-turn-${requestId}`;
+      useConversationStore.getState().migrateMonotonicStoppedTurn(optimisticTurnId, realTurnId);
+      useConversationStore.getState().markTurnMonotonicallyStopped(realTurnId);
+      useConversationStore.getState().markRequestMonotonicallyStopped(requestId);
+    }
   } else {
-    upsertConversationMessages([
+    upsertConversationMessages(forceStoppedMessages([
       result.userMessage,
       result.assistantDraftMessage,
-    ]);
+    ]));
     if (result.branchState !== undefined) {
       setBranchState(result.branchState ?? null);
     }
   }
 
-  if (result.runUpdate) {
+  if (result.runUpdate && isActiveSessionEvent(result.runUpdate.sessionId)) {
     setCurrentRun(result.runUpdate);
     refreshTasks.push(electronAPI.run.list(result.runUpdate.sessionId).then((runsResult) => {
       setRuns(runsResult.runs ?? []);
@@ -223,7 +275,11 @@ export async function applyConversationTurnResult(options: {
   }
 
   if (result.tracePresentation) {
-    setTracePresentation(result.tracePresentation);
+    if (turnSessionId && !isActiveSessionEvent(turnSessionId)) {
+      useSessionProjectionStore.getState().projectTrace(turnSessionId, result.tracePresentation);
+    } else {
+      setTracePresentation(result.tracePresentation);
+    }
   }
 
   if (refreshTasks.length > 0) {

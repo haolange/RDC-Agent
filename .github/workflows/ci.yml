@@ -40,6 +40,7 @@ jobs:
       - run: pnpm run check:agent-runtime
       - run: pnpm run check:tool-system
       - run: pnpm run check:appearance
+      - run: pnpm run check:session-projection
       - run: pnpm run check:settings-agents
       - run: pnpm run check:provider-system
       - run: pnpm run check:provider-catalog

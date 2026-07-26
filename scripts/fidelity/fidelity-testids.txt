@@ -10,7 +10,6 @@ agent-chat
 app-sidebar-left
 app-sidebar-right
 artifact-tree
-artifact-tree-group-${group.key}
 capture-library
 capture-library-import
 capture-library-refresh

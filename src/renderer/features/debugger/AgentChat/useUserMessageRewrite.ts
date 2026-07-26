@@ -12,6 +12,7 @@ import {
 } from '../composer/composerSendHelpers';
 import { useTurnControlsStore } from '../composer/useTurnControls';
 import { createConversationRequestId } from '../composer/composerSendFlow';
+import { useComposerSessionContextStore } from '../composer/composerSessionContext';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { buildOptimisticRewriteSnapshot } from './optimisticRewriteSnapshot';
 
@@ -61,6 +62,13 @@ export function useUserMessageRewrite(message: ConversationMessage) {
 
     setConversationSnapshot(optimistic.messages, optimistic.branchState);
     useSessionStore.getState().setConversationPreparationPhase('preparing');
+    useComposerSessionContextStore.getState().beginTurn({
+      sessionId: message.sessionId ?? 'no-session',
+      projectId: message.projectId ?? currentProject?.projectId ?? null,
+      requestId,
+      optimisticTurnId: optimistic.optimisticTurnId,
+      realTurnId: null,
+    });
 
     try {
       const routeAgentId = pairedAssistant?.agentId ?? null;
@@ -91,6 +99,13 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         } : undefined,
       });
 
+      if (useConversationStore.getState().consumeRevokedRequest(requestId)) {
+        useComposerSessionContextStore.getState().clearActiveTurn();
+        useSessionStore.getState().setPreparedTurnContext(null);
+        useSessionStore.getState().setConversationPreparationPhase('idle');
+        return;
+      }
+
       // Drop optimistic placeholders before applying authoritative rewrite messages.
       const optimisticIds = optimistic.messages
         .filter((entry) => entry.requestId === requestId)
@@ -99,6 +114,8 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         useConversationStore.getState().allConversationMessages,
         optimisticIds,
       ));
+
+      useComposerSessionContextStore.getState().setRealTurnId(result.userMessage.turnId);
 
       await applyConversationTurnResult({
         electronAPI,
@@ -114,6 +131,12 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         setConversationSnapshot,
         upsertConversationMessages,
       });
+
+      if (useConversationStore.getState().monotonicStoppedRequestIds.includes(requestId)) {
+        useComposerSessionContextStore.getState().clearActiveTurn();
+        useSessionStore.getState().setConversationPreparationPhase('idle');
+        return;
+      }
 
       useSessionStore.getState().setPreparedTurnContext(result.preparedContext);
       useSessionStore.getState().setConversationPreparationPhase('current');
@@ -134,6 +157,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
       });
     } catch (error) {
       setConversationSnapshot(previousMessages, previousBranchState);
+      useComposerSessionContextStore.getState().clearActiveTurn();
       useSessionStore.getState().setPreparedTurnContext(null);
       useSessionStore.getState().setConversationPreparationPhase('idle');
       throw error;

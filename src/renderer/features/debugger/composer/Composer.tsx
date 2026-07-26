@@ -20,6 +20,7 @@ import { ComposerMarkdownInput, type ComposerMarkdownMode } from './ComposerMark
 import { ComposerMarkdownModeTabs } from './ComposerMarkdownModeTabs';
 import { ComposerAgentMenu } from './ComposerAgentMenu';
 import { ComposerAttachmentChips } from './ComposerAttachmentChips';
+import { buildComposerSessionScopeKey } from './composerSessionScope';
 
 export interface ComposerProps {
   composer: ComposerController;
@@ -47,7 +48,12 @@ export const Composer: React.FC<ComposerProps> = ({
     return activeMsg?.agentId ?? null;
   });
   const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
+  const currentProject = useProjectStore((state) => state.currentProject);
   const currentSession = useProjectStore((state) => state.currentSession);
+  const composerScopeKey = useMemo(
+    () => buildComposerSessionScopeKey(currentProject?.projectId, currentSession?.sessionId),
+    [currentProject?.projectId, currentSession?.sessionId],
+  );
   const pendingToolApproval = usePendingToolApprovalRequest();
   const pendingUserInput = usePendingUserInputRequest();
 
@@ -150,6 +156,7 @@ export const Composer: React.FC<ComposerProps> = ({
       <div className="composer-input-row">
         {composerMarkdown ? (
           <ComposerMarkdownInput
+            key={composerScopeKey}
             value={promptValue}
             onChange={setPromptValue}
             onSend={() => void handlePromptSend()}
@@ -159,6 +166,7 @@ export const Composer: React.FC<ComposerProps> = ({
           />
         ) : (
           <textarea
+            key={composerScopeKey}
             ref={promptInputRef}
             className="chat-input composer-textarea"
             name="debuggerPrompt"

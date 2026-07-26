@@ -1,72 +1,24 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import type { ToolCatalog } from '@shared/types/tool';
+import React, { useMemo, useState } from 'react';
 import type { Artifact } from '@shared/types/evidence';
-import { getElectronApi } from '../../../platform/getElectronApi';
 import { useEvidenceStore } from '../../../stores/evidenceStore';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import {
   ArtifactsSection,
   SkillsSection,
-  ToolsSection,
-  groupTools,
   type ArtifactEntry,
   type SkillEntry,
 } from './ArtifactTreeSections';
 
-type SectionKey = 'tools' | 'skills' | 'artifacts';
+type SectionKey = 'skills' | 'artifacts';
 
 export const ArtifactTree: React.FC = () => {
   const actionEvents = useEvidenceStore((state) => state.actionEvents);
   const availableSkills = useAppSettingsStore((state) => state.settings.resourceCatalog.availableSkills);
-  const [catalog, setCatalog] = useState<ToolCatalog | null>(null);
-  const [catalogError, setCatalogError] = useState<string | null>(null);
-  const [catalogLoading, setCatalogLoading] = useState(true);
   const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>({
-    tools: true,
     skills: true,
     artifacts: true,
   });
-  const [openToolGroups, setOpenToolGroups] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    let cancelled = false;
-    const electronAPI = getElectronApi();
-    if (!electronAPI) {
-      setCatalogError('Tool catalog unavailable');
-      setCatalogLoading(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    setCatalogLoading(true);
-    void electronAPI.tool
-      .getCatalog()
-      .then((result) => {
-        if (cancelled) return;
-        setCatalog(result);
-        setCatalogError(null);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setCatalogError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setCatalogLoading(false);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const toolGroups = useMemo(
-    () => (catalog?.tools ? groupTools(catalog.tools) : []),
-    [catalog],
-  );
-  const totalToolCount = catalog?.tools.length ?? 0;
   const skills = useMemo<SkillEntry[]>(() => (
     availableSkills.map((skill) => ({
       id: skill.id,
@@ -102,22 +54,8 @@ export const ArtifactTree: React.FC = () => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const toggleToolGroup = (key: string) => {
-    setOpenToolGroups((prev) => ({ ...prev, [key]: !(prev[key] ?? false) }));
-  };
-
   return (
     <div className="artifact-tree" data-testid="artifact-tree">
-      <ToolsSection
-        open={openSections.tools}
-        onToggle={() => toggleSection('tools')}
-        catalogLoading={catalogLoading}
-        catalogError={catalogError}
-        groups={toolGroups}
-        totalToolCount={totalToolCount}
-        openToolGroups={openToolGroups}
-        onToggleToolGroup={toggleToolGroup}
-      />
       <SkillsSection
         open={openSections.skills}
         onToggle={() => toggleSection('skills')}

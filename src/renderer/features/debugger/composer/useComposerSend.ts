@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { AgentMode } from '@shared/types/layout';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import { useConversationStore } from '../../../stores/conversationStore';
@@ -14,6 +14,7 @@ import {
   isConcurrentModelSwitchCommand,
   shouldClearSubmittedPrompt,
 } from './composerCommandConcurrency';
+import { useComposerSessionContextStore } from './composerSessionContext';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -47,15 +48,10 @@ export function useComposerSend(options: {
     setPromptValue, pendingAttachments, setPendingAttachments,
     pendingSkillIds, setPendingSkillIds, armPendingSkill,
   } = options;
-  const [isPromptSending, setIsPromptSending] = useState(false);
-  const activeRequestIdRef = useRef<string | null>(null);
+  const isPromptSending = useComposerSessionContextStore((state) => state.isPromptSending);
+  const setIsPromptSending = useComposerSessionContextStore((state) => state.setIsPromptSending);
   const promptValueRef = useRef(promptValue);
   promptValueRef.current = promptValue;
-  const lastSentPromptRef = useRef<{
-    prompt: string;
-    attachments: PendingAttachmentDraft[];
-    skillIds: string[];
-  } | null>(null);
 
   const setCurrentRun = useSessionStore((state) => state.setCurrentRun);
   const setSessions = useProjectStore((state) => state.setSessions);
@@ -72,13 +68,17 @@ export function useComposerSend(options: {
     t,
     currentSession,
     currentRun,
-    setIsPromptSending,
-    activeRequestIdRef,
     setPromptValue,
     setPendingAttachments,
     setPendingSkillIds,
-    lastSentPromptRef,
   });
+
+  useEffect(() => {
+    // Session switch already clears via hygiene; keep local busy false if session cleared mid-send.
+    if (!currentSession?.sessionId) {
+      setIsPromptSending(false);
+    }
+  }, [currentSession?.sessionId, setIsPromptSending]);
 
   const isComposerBusy = isPromptSending || hasActiveConversationTurn || hasActiveDebugRun;
 
@@ -118,11 +118,13 @@ export function useComposerSend(options: {
     }
 
     setIsPromptSending(true);
-    lastSentPromptRef.current = {
+    useComposerSessionContextStore.getState().setLastSent({
+      sessionId: currentSession?.sessionId ?? 'no-session',
+      projectId: currentProject?.projectId ?? null,
       prompt: trimmed,
       attachments: [...pendingAttachments],
       skillIds: [...pendingSkillIds],
-    };
+    });
     try {
       await sendComposerConversationTurn({
         electronAPI,
@@ -147,9 +149,6 @@ export function useComposerSend(options: {
         setCurrentRun,
         setRuns,
         setTracePresentation,
-        setActiveRequestId: (requestId) => {
-          activeRequestIdRef.current = requestId;
-        },
         showNotice,
         failedSummary: t('app.conversationRequestFailed'),
       });
@@ -173,6 +172,7 @@ export function useComposerSend(options: {
     openSettings,
     setConversationMessages, setBranchState, setConversationSnapshot,
     setCurrentRun, setCurrentSession,
+    setIsPromptSending,
     setPendingAttachments,
     setPendingSkillIds,
     setPromptValue,

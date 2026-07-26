@@ -9,6 +9,7 @@ import {
 import { IpcApprovalTokenService } from './IpcApprovalTokenService';
 import {
   MemoryWriteArgsSchema,
+  SettingsGetEffectiveCatalogArgsSchema,
   TerminalWriteArgsSchema,
   WorkflowStopArgsSchema,
 } from './ipcSchemas';
@@ -72,6 +73,20 @@ describe('parseIpcArgs', () => {
   it('accepts valid workflow stop id', () => {
     const [runId] = parseIpcArgs(WorkflowStopArgsSchema, ['run_ab12cd34'], { label: 'workflow:stop' });
     expect(runId).toBe('run_ab12cd34');
+  });
+
+  it('accepts getEffectiveCatalog with omitted or null accountId', () => {
+    const omitted = parseIpcArgs(SettingsGetEffectiveCatalogArgsSchema, ['openai'], {
+      label: 'settings:getEffectiveCatalog',
+      padTo: 2,
+    });
+    expect(omitted).toEqual(['openai', undefined]);
+
+    const nulled = parseIpcArgs(SettingsGetEffectiveCatalogArgsSchema, ['openai', null], {
+      label: 'settings:getEffectiveCatalog',
+      padTo: 2,
+    });
+    expect(nulled).toEqual(['openai', null]);
   });
 
   it('assertIpcPayloadBytes rejects non-serializable values', () => {
