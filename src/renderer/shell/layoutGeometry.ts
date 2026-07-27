@@ -34,21 +34,7 @@ const reduceOverflow = (
   };
 };
 
-export const getResponsiveMinMainWidth = (containerWidth: number): number => {
-  if (containerWidth <= 420) {
-    return 240;
-  }
-  if (containerWidth <= 720) {
-    return 280;
-  }
-  if (containerWidth <= 960) {
-    return 360;
-  }
-  if (containerWidth <= 1080) {
-    return 400;
-  }
-  return APP_MIN_MAIN_WIDTH;
-};
+export const getResponsiveMinMainWidth = (_containerWidth: number): number => APP_MIN_MAIN_WIDTH;
 
 const getResizeHandleAllowance = (
   leftCollapsed: boolean,

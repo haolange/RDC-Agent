@@ -23,6 +23,7 @@ import {
   stopBrowserAppBridge,
 } from './browserAppBridge/BrowserAppBridgeServer';
 import { shutdownCoordinator } from './lifecycle/ShutdownCoordinator';
+import { APP_MIN_MAIN_WIDTH } from '@shared/constants/layout';
 import { conversationService } from './conversation/ConversationService';
 import { agentOrchestrator } from './workflow/debugger/AgentOrchestrator';
 import { processSupervisor } from './runtime/ProcessSupervisor';
@@ -360,7 +361,7 @@ function createMainWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    minWidth: 360,
+    minWidth: APP_MIN_MAIN_WIDTH,
     minHeight: 640,
     title: 'RdcAgent - RenderDoc Debug Agent',
     show: false,
