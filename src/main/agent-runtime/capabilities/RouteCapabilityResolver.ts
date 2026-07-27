@@ -81,14 +81,10 @@ export function resolveAgentRouteCapability(
   let toolCallingUnverified = false;
   const toolState = effectiveModel.toolCalling.state;
   const isNativeProtocol = NATIVE_TOOL_PROTOCOLS.has(activeRoute.protocol);
-  // Providers with declared tool-calling capability in manifest resolve to
-  // native-structured even when effective model state is unknown (unverified).
-  const hasDeclaredToolCalling = provider.capabilities?.includes('tool-calling') === true;
+  // Unknown capability is fail-closed: manifest/provider hints never authorize
+  // native tool schemas until the EffectiveModel states explicit support.
   if (toolState === 'supported' && isNativeProtocol) {
     toolCallingMode = 'native-structured';
-  } else if (toolState === 'unknown' && isNativeProtocol && hasDeclaredToolCalling) {
-    toolCallingMode = 'native-structured';
-    toolCallingUnverified = true;
   } else if (!supportsStreaming) {
     toolCallingMode = 'disabled';
   }

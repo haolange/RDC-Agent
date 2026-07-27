@@ -236,6 +236,7 @@ const resolveResponseThinking = (
 const NOISY_TEXT_PATTERNS = [
   /agent loop/i,
   /model and tool loop/i,
+  /^context compacted\b/i,
   /final answer/i,
   /response complete/i,
   /reply completed/i,

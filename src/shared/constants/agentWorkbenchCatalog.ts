@@ -387,6 +387,15 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     approvalRequired: false,
   },
   {
+    id: 'output_register',
+    label: 'Publish Output',
+    permission: 'mutation',
+    inputSchema: { type: 'object', required: ['path'], properties: { path: { type: 'string' }, title: { type: 'string' }, kind: { type: 'string' } } },
+    resultSummary: 'Publishes one explicit project file as a user-visible session output.',
+    icon: 'file-export',
+    approvalRequired: false,
+  },
+  {
     id: 'skills',
     label: 'Skills',
     permission: 'readonly',

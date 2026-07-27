@@ -1,4 +1,5 @@
-﻿import type { AgentRun } from './base';
+import type { AgentRun } from './base';
+import type { SessionScope } from '../session';
 import type { TimelineProjection } from './projection';
 import type {
   BranchNavigatorViewModel,
@@ -7,6 +8,7 @@ import type {
 } from '../trace';
 
 export interface AgentRunPresentation {
+  projectId: string;
   sessionId: string;
   activeBranchId: string;
   mode: import('../session').AppMode;
@@ -23,8 +25,7 @@ export interface AgentRunViewModel {
   inspectorSelection?: string | null;
 }
 
-export interface TraceChangedPayload {
-  sessionId: string;
+export interface TraceChangedPayload extends SessionScope {
   presentation: AgentRunPresentation;
 }
 
@@ -33,8 +34,7 @@ export interface TraceEventAddedPayload {
   event: import('./events').TraceEvent;
 }
 
-export interface TraceProjectionChangedPayload {
-  runId: string;
+export interface TraceProjectionChangedPayload extends SessionScope {
   presentation: AgentRunPresentation;
 }
 

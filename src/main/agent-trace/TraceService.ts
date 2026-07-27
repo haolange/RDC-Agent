@@ -1,8 +1,5 @@
-import fs from 'fs';
-import path from 'path';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
-import type { ArtifactRecord } from '@shared/types/harness';
 import type { RunSummary, AppMode } from '@shared/types/session';
 import type {
   AgentRun,
@@ -12,20 +9,11 @@ import type {
 } from '@shared/types/agenticTrace';
 import type {
   PlanStatus,
-  ProgressTask,
-  ProgressTaskStatus,
-  RightPanelViewModel,
-  TraceArtifactRecord,
-  TraceContextRecord,
   RawAuditRef,
   TraceSessionResult,
 } from '@shared/types/trace';
 import { nowIso } from '@shared/utils/id';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import { artifactStore } from '../reports/ArtifactStore';
-import { contextService } from '../captures/ContextService';
-import { createSessionTaskStore } from '../agent-runtime/tasks/sessionTaskStore';
-import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
 import { traceStateStore } from '../workflow/debugger/TraceStateStore';
 import { appPathService } from '../runtime/AppPathService';
 import { TraceEventStore, TraceRunStore } from './TraceEventStore';
@@ -33,6 +21,7 @@ import { TraceEventEmitter } from './TraceEventEmitter';
 import { traceTreeBuilder } from './TraceTreeBuilder';
 import { projectionBuilder } from './ProjectionBuilder';
 import { agentProfileRegistry } from './manifests/AgentProfileRegistry';
+import { rightRailProjectionService } from './RightRailProjectionService';
 
 const toIso = (value: number | string | undefined, fallback = nowIso()): string => {
   if (typeof value === 'string') return value;
@@ -87,13 +76,6 @@ const mapRunPlanStatus = (run: RunSummary): PlanStatus => {
   if (run.status === 'completed') return 'executed';
   if (run.status === 'awaiting_approval') return 'awaiting_approval';
   return 'accepted';
-};
-
-const artifactTypeFromRecord = (record: ArtifactRecord): TraceArtifactRecord['type'] => {
-  if (record.kind === 'report') return 'report';
-  if (record.kind === 'screenshot') return 'visual_report';
-  if (record.kind === 'trace' || record.kind === 'data') return 'evidence_bundle';
-  return 'other';
 };
 
 interface AskTurn {
@@ -164,8 +146,6 @@ export class TraceService {
     state: ReturnType<typeof traceStateStore.read>,
   ): Promise<AgentRunPresentation> {
     const runViewModels: AgentRunViewModel[] = [];
-    const artifacts: TraceArtifactRecord[] = [];
-    const context: TraceContextRecord[] = [];
     const rawAuditRefs: RawAuditRef[] = events.slice(-20).map((event) => ({
       id: event.event_id,
       label: event.event_type,
@@ -180,7 +160,6 @@ export class TraceService {
     for (const run of runs) {
       const runEvents = events.filter((e) => e.run_id === run.runId).sort((a, b) => a.ts_ms - b.ts_ms);
       const planStatus = mapRunPlanStatus(run);
-      const branchId = state.activeBranchId || 'branch-main';
       const agentType = run.mode ?? 'debugger';
       mode = agentType;
       const profile = agentProfileRegistry.getForMode(agentType);
@@ -294,9 +273,6 @@ export class TraceService {
 
       runViewModels.push({ run: agentRun, timeline });
 
-      const traceExecutionId = `ws-${runId}-execution`;
-      artifacts.push(...this.mapArtifacts(sessionId, runId, branchId, traceExecutionId, runEvents));
-      context.push(...this.mapContext(sessionId, runId, branchId, traceExecutionId, run));
     }
 
     for (const turn of this.groupAskTurns(conversations)) {
@@ -363,16 +339,22 @@ export class TraceService {
       });
     }
 
-    const branchId = state.activeBranchId || 'branch-main';
-    const sessionPlan = this.mapSessionPlanArtifact(sessionId, branchId, `ws-${sessionId}-plan`);
-    if (sessionPlan && !artifacts.some((item) => item.type === 'plan' && item.path === sessionPlan.path)) {
-      artifacts.unshift(sessionPlan);
+    const projectId = storageAdapter.readSession(sessionId)?.projectId;
+    if (!projectId) {
+      throw new Error('Trace projection requires an owned project/session scope.');
     }
 
-    const progress = await this.mapSessionProgress(sessionId, branchId);
-    const rightPanel = this.buildRightPanel(progress, artifacts, context);
+    const branchId = state.activeBranchId || 'branch-main';
+    const rightPanel = await rightRailProjectionService.build({
+      sessionId,
+      branchId,
+      runs,
+      events,
+      mode,
+    });
 
     return {
+      projectId,
       sessionId,
       activeBranchId: state.activeBranchId || 'branch-main',
       mode,
@@ -417,208 +399,6 @@ export class TraceService {
     if (run.status !== 'completed') return null;
     return findCanonicalFinalAnswer(conversations, runId);
 
-  }
-
-  /**
-   * 会话级进度投影：读取当前会话的 TaskRegistry 任务（`${userData}/state/tasks/{sessionId}`），
-   * 映射为「进度」泳道所需的 ProgressTask。按创建时间排序生成计划序号；`pending` 且存在
-   * 未完成的上游依赖时判定为 `blocked`；`deleted` 任务不进入投影。
-   */
-  private async mapSessionProgress(sessionId: string, branchId: string): Promise<ProgressTask[]> {
-    let records: TaskRecord[];
-    try {
-      records = await createSessionTaskStore(sessionId).listTasks();
-    } catch {
-      return [];
-    }
-    const active = records.filter((record) => record.status !== 'deleted');
-    const byId = new Map(active.map((record) => [record.id, record] as const));
-    const completedIds = new Set(
-      active.filter((record) => record.status === 'completed').map((record) => record.id),
-    );
-    const ordered = [...active].sort(
-      (a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id),
-    );
-    return ordered.map((task, index) => {
-      const unresolvedBlockers = task.blockedBy
-        .map((id) => byId.get(id))
-        .filter((blocker): blocker is TaskRecord => Boolean(blocker) && !completedIds.has(blocker!.id));
-      const status: ProgressTaskStatus = task.status === 'completed'
-        ? 'completed'
-        : task.status === 'in_progress'
-          ? 'running'
-          : unresolvedBlockers.length > 0
-            ? 'blocked'
-            : 'pending';
-      return {
-        id: task.id,
-        sessionId,
-        traceLaneId: sessionId,
-        branchId,
-        title: task.subject,
-        status,
-        order: index,
-        createdAt: new Date(task.createdAt).toISOString(),
-        updatedAt: new Date(task.updatedAt).toISOString(),
-        completedAt: task.status === 'completed' ? new Date(task.updatedAt).toISOString() : undefined,
-        source: 'runtime',
-        activeForm: task.activeForm,
-        blockerSummary: unresolvedBlockers.length > 0
-          ? unresolvedBlockers.map((blocker) => blocker.subject).join('、')
-          : undefined,
-      };
-    });
-  }
-
-  /**
-   * 读取会话级 plan.md（由 plan_artifact 工具写入），供右侧产物泳道做会话内 markdown 预览。
-   */
-  private mapSessionPlanArtifact(
-    sessionId: string,
-    branchId: string,
-    traceLaneId: string,
-  ): TraceArtifactRecord | null {
-    try {
-      const session = storageAdapter.readSession(sessionId);
-      if (!session?.sessionPath) return null;
-      const planPath = path.join(session.sessionPath, 'artifacts', 'plan.md');
-      if (!fs.existsSync(planPath)) return null;
-      const stat = fs.statSync(planPath);
-      if (!stat.isFile()) return null;
-      const previewMarkdown = fs.readFileSync(planPath, 'utf8');
-      const updatedAt = toIso(stat.mtimeMs);
-      return {
-        id: `session-plan-${sessionId}`,
-        sessionId,
-        traceLaneId,
-        branchId,
-        type: 'plan',
-        status: 'ready',
-        displayName: 'plan.md',
-        path: planPath,
-        rawRef: `session-plan:${sessionId}`,
-        previewMarkdown,
-        createdAt: toIso(stat.birthtimeMs || stat.mtimeMs),
-        updatedAt,
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  private mapArtifacts(
-    sessionId: string,
-    runId: string,
-    branchId: string,
-    traceLaneId: string,
-    runEvents: ActionEvent[],
-  ): TraceArtifactRecord[] {
-    const registered = artifactStore.list(sessionId, runId).map<TraceArtifactRecord>((record) => ({
-      id: record.artifactId,
-      sessionId,
-      traceLaneId,
-      branchId,
-      sourceEventId: record.evidenceIds[0],
-      type: artifactTypeFromRecord(record),
-      status: 'ready',
-      displayName: record.title,
-      taskTitle: record.taskId,
-      path: record.filePath,
-      rawRef: `artifact:${record.artifactId}`,
-      createdAt: record.createdAt,
-      updatedAt: record.updatedAt,
-    }));
-    const reports = runEvents
-      .filter((e) => e.event_type === 'report_published')
-      .flatMap<TraceArtifactRecord>((event) => {
-        const records: TraceArtifactRecord[] = [];
-        for (const key of ['markdownPath', 'htmlPath', 'jsonPath']) {
-          const value = event.payload[key];
-          if (typeof value !== 'string' || !value.trim()) continue;
-          records.push({
-            id: `${event.event_id}-${key}`,
-            sessionId,
-            traceLaneId,
-            branchId,
-            sourceEventId: event.event_id,
-            type: key === 'htmlPath' ? 'visual_report' : 'report',
-            status: 'ready',
-            displayName: value.split(/[\\/]/).filter(Boolean).pop() || value,
-            path: value,
-            rawRef: `raw-${event.event_id}`,
-            createdAt: toIso(event.ts_ms),
-            updatedAt: toIso(event.ts_ms),
-          });
-        }
-        return records;
-      });
-    return [...registered, ...reports];
-  }
-
-  private mapContext(
-    sessionId: string,
-    runId: string,
-    branchId: string,
-    traceLaneId: string,
-    run: RunSummary,
-  ): TraceContextRecord[] {
-    const packets = contextService.listContextPackets(sessionId, runId);
-    const captureContext = run.captures.map<TraceContextRecord>((capture) => ({
-      id: `context-capture-${capture.id}`,
-      sessionId,
-      traceLaneId,
-      branchId,
-      kind: 'capture',
-      label: capture.filePath.split(/[\\/]/).filter(Boolean).pop() || capture.filePath,
-      summary: capture.filePath,
-      importance: 'decisive',
-      firstObservedAt: toIso(run.startedAt),
-      lastObservedAt: toIso(run.finishedAt ?? run.startedAt),
-      detailsRef: capture.filePath,
-    }));
-    const packetContext = packets.map<TraceContextRecord>((packet) => ({
-      id: `context-${packet.packetId}`,
-      sessionId,
-      traceLaneId,
-      branchId,
-      kind: packet.kind === 'capture' ? 'capture' : packet.kind === 'tool_result' ? 'source' : 'file',
-      label: packet.title,
-      summary: packet.summary,
-      importance: packet.evidenceIds.length > 0 ? 'cited' : packet.kind === 'plan' ? 'important' : 'normal',
-      firstObservedAt: packet.createdAt,
-      lastObservedAt: packet.createdAt,
-      sourceEventIds: packet.evidenceIds,
-      artifactIds: packet.artifactIds,
-      detailsRef: packet.refs[0],
-    }));
-    return [...captureContext, ...packetContext];
-  }
-
-  private buildRightPanel(
-    progress: ProgressTask[],
-    artifacts: TraceArtifactRecord[],
-    context: TraceContextRecord[],
-  ): RightPanelViewModel {
-    const planArtifacts = artifacts.filter((item) => item.type === 'plan');
-    const otherArtifacts = artifacts.filter((item) => item.type !== 'plan');
-    const recentOthers = otherArtifacts.slice(-6);
-    const previousOthers = otherArtifacts.slice(0, Math.max(0, otherArtifacts.length - 6));
-    return {
-      progress: {
-        current: progress.filter((t) => ['running', 'blocked', 'pending', 'reopened'].includes(t.status)),
-        history: progress.filter((t) => ['completed', 'cancelled'].includes(t.status)),
-      },
-      artifacts: {
-        current: [...planArtifacts, ...recentOthers],
-        previous: previousOthers,
-      },
-      context: {
-        groups: (['capture', 'file', 'source', 'capability'] as const).map((kind) => {
-          const all = context.filter((r) => r.kind === kind);
-          return { kind, important: all.filter((r) => r.importance !== 'normal'), all };
-        }),
-      },
-    };
   }
 
   private groupAskTurns(messages: ConversationMessage[]): AskTurn[] {

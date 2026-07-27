@@ -8,18 +8,18 @@ export const createDeviceApi = (): DeviceApi => ({
 });
 
 export const createCaptureApi = (): CaptureApi => ({
-  list: (): ReturnType<CaptureApi['list']> => ipcRenderer.invoke('capture:list'),
-  select: (captureId): ReturnType<CaptureApi['select']> => ipcRenderer.invoke('capture:select', captureId),
+  list: (scope): ReturnType<CaptureApi['list']> => ipcRenderer.invoke('capture:list', scope),
+  select: (request): ReturnType<CaptureApi['select']> => ipcRenderer.invoke('capture:select', request),
   openProjectInput: (request): ReturnType<CaptureApi['openProjectInput']> =>
     ipcRenderer.invoke('capture:openProjectInput', request),
-  getOpenedState: (): ReturnType<CaptureApi['getOpenedState']> => ipcRenderer.invoke('capture:getOpenedState'),
-  clearOpenedState: (): ReturnType<CaptureApi['clearOpenedState']> => ipcRenderer.invoke('capture:clearOpenedState'),
+  getOpenedState: (scope): ReturnType<CaptureApi['getOpenedState']> => ipcRenderer.invoke('capture:getOpenedState', scope),
+  clearOpenedState: (scope): ReturnType<CaptureApi['clearOpenedState']> => ipcRenderer.invoke('capture:clearOpenedState', scope),
 });
 
 export const createContextApi = (): ContextApi => ({
-  get: (): ReturnType<ContextApi['get']> => ipcRenderer.invoke('context:get'),
-  openHumanPreview: (request): ReturnType<ContextApi['openHumanPreview']> =>
-    ipcRenderer.invoke('context:openHumanPreview', request),
-  closeHumanPreview: (): ReturnType<ContextApi['closeHumanPreview']> =>
-    ipcRenderer.invoke('context:closeHumanPreview'),
+  get: (scope): ReturnType<ContextApi['get']> => ipcRenderer.invoke('context:get', scope),
+  openHumanPreview: (scope): ReturnType<ContextApi['openHumanPreview']> =>
+    ipcRenderer.invoke('context:openHumanPreview', scope),
+  closeHumanPreview: (scope): ReturnType<ContextApi['closeHumanPreview']> =>
+    ipcRenderer.invoke('context:closeHumanPreview', scope),
 });

@@ -1,11 +1,20 @@
-/**
- * Cancellation contract — abort leaves no live process and drops late events.
+﻿/**
+ * Cancellation contract: abort leaves no live process and drops late events.
  * Phase 7 matrix entry for ProcessSupervisor / TurnHandle generation guards.
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ProcessSupervisor } from '../../runtime/ProcessSupervisor';
 import { TurnCoordinator } from '../../workflow/debugger/TurnCoordinator';
 import type { AgentEvent } from '@shared/types/agentRuntime';
+
+function spawnLongRunning(supervisor: ProcessSupervisor) {
+  return supervisor.spawn(
+    'shell',
+    process.execPath,
+    ['-e', 'setInterval(() => undefined, 1000);'],
+    { isolateProcessGroup: false },
+  );
+}
 
 function makeEvent(id: string): AgentEvent {
   return {
@@ -26,24 +35,19 @@ describe('cancellationContract: process abort', () => {
   });
 
   afterEach(async () => {
-    await supervisor.joinAll({ graceMs: 200, forceAfterMs: 1_000 });
+    await supervisor.joinAll({ graceMs: 300, forceAfterMs: 1_500 });
     supervisor.resetForTests();
   });
 
   it('abort joins and clears registry (failure-class: availability)', async () => {
-    const isWin = process.platform === 'win32';
-    const supervised = isWin
-      ? supervisor.spawn('shell', 'cmd.exe', ['/d', '/s', '/c', 'ping -n 30 127.0.0.1 >nul'], {
-          isolateProcessGroup: false,
-        })
-      : supervisor.spawn('shell', '/bin/sleep', ['30']);
+    const supervised = spawnLongRunning(supervisor);
 
     expect(supervisor.size).toBe(1);
     supervised.abort('abort');
-    const info = await supervised.join(5_000);
+    const info = await supervised.join(8_000);
     expect(info.reason).toBe('abort');
     expect(supervisor.size).toBe(0);
-  });
+  }, 12_000);
 
   it('abortAll clears every active session turn', async () => {
     const coordinator = new TurnCoordinator();

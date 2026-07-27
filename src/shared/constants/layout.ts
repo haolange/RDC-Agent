@@ -8,6 +8,9 @@ export const RIGHT_PANEL_MIN_WIDTH = 280;
 export const RIGHT_PANEL_MAX_WIDTH = 520;
 export const RIGHT_PANEL_COLLAPSED_WIDTH = 0;
 
+/** The rail remains docked through compact desktop widths; the drawer is for genuinely narrow workspaces. */
+export const RIGHT_RAIL_DRAWER_BREAKPOINT = 920;
+
 export const APP_MIN_MAIN_WIDTH = 480;
 export const APP_RESIZE_HANDLE_WIDTH = 8;
 

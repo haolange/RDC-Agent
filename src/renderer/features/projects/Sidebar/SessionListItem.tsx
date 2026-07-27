@@ -29,20 +29,15 @@ export const SessionListItem: React.FC<SessionListItemProps> = ({
 
   return (
     <div
-      role="button"
-      tabIndex={0}
       className={`session-item session-subitem ${isSessionRailActive ? 'active' : ''}`}
-      onClick={() => void onActivate(project, session)}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          event.preventDefault();
-          void onActivate(project, session);
-        }
-      }}
       onContextMenu={(event) => onContextMenu(event, session)}
     >
       <div className="session-item-header">
-        <span className="session-item-leading">
+        <button
+          type="button"
+          className="session-item-select"
+          onClick={() => void onActivate(project, session)}
+        >
           <span className="session-item-gutter" aria-hidden="true">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="7" stroke="currentColor" strokeWidth="1.8" opacity="0.55" />
@@ -50,7 +45,7 @@ export const SessionListItem: React.FC<SessionListItemProps> = ({
             </svg>
           </span>
           <span className="session-item-title">{session.title}</span>
-        </span>
+        </button>
         <span className="session-item-actions">
           <button
             type="button"

@@ -133,7 +133,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - 本仓库不保留内置 RDX tool 副本，不把任何 tool bridge、MCP server 或仓库资源目录作为默认执行链；RenderDoc/RDX 能力必须来自系统安装或用户配置的外部 CLI。
 - Open `.rdc`（local `openCapture` / remote `openRemoteCapture`）、connect remote、preview、close runtime 等垂直入口必须经 Settings 中配置的 RDX shell action 进入 `ShellInvocationService`；不得在主进程、preload、renderer 或打包配置中写死 CLI 命令、catalog 路径或仓库 fallback。
 - 新增 RDX CLI 配置项时必须同步 `src/shared/types/settings.ts`、`SettingsService` sanitize、Settings UI 和文档；不得在调用点硬编码命令、catalog 路径或环境变量。
-- renderer/preload 不暴露任意 tool execute 入口；UI 只读取 catalog、runtime summary 和 trace projection，实际执行由主进程根据 workflow/runtime policy 调用配置的 CLI。
+- renderer/preload does not expose arbitrary tool execution. Right Rail UI reads only the main-owned trace projection and its session-scoped `.rdc` runtime context; it must not display CLI catalog, tool count, or namespace inventory. Actual execution remains in main process policy through the configured external CLI.
 
 ## 产物与命名治理
 
@@ -155,6 +155,14 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - 禁止恢复 image/video 生成 runtime、`MediaRuntimeService`、catalog `image` category、`image-generation` / `video-generation` capability，或无调用方 `adapter-not-implemented` 伪服务；discovery 继续 fail-closed 剔除非 agent modality。用户附件 vision-input 不受此禁。
 - Fast、Reasoning Max、Max mode 与 variant 必须由 `ControlDefinition + ExecutionBinding` 编译；可选控件没有唯一可执行路径时 fail-closed。认证 secret/header 只能进入主进程 opaque credential lease，不得进入 manifest、Route、RequestPlan、IPC 或 Trace。
 - Memory 写入必须由明确用户意图或交互审批触发；禁止恢复轮次自动抽取、自动 consolidation 或全索引 prompt 注入。
+
+
+## Right Rail single-track gate
+
+- The right rail is driven only by the main-owned `RightRailProjectionService` and its `RightPanelViewModel`. Renderer code must not rebuild Progress, Outputs, Context resources, or Capture state from action events, global capture state, working-directory scans, or tool catalogs. internal runtime identifiers are reserved for owner-scoped agent consumption, and raw diagnostic detail must not become sidebar inventory.
+- The selected Project rail is only the project-scoped `Import .rdc` surface and imported-input list; it must not read session runtime state. The selected Session rail is always `Progress / Outputs / Context / Capture`; Context contains task-used attachments, references, tools, and capabilities only, while Capture is always visible with an honest empty state when no input exists. Capture owns scoped `.rdc` selection, Replay Device, open, preview, refresh, copy, clear, and compact diagnostics. Do not restore Classic fallback, ArtifactTree, Working Directory, standalone Memory, per-tool `rd.*` inventory, CLI catalog summary, tool count, duplicate Skills catalog, or `session:outputs:list`.
+- Outputs only show explicit user output files. `output_register` is the canonical agent action: it may copy only a completed file inside the active project into the owning run, and it must reject inputs and escaping paths. Do not pin `plan.md`; do not expose `artifact_store`, `run_report`, or `action_output` source names in UI contracts.
+- Run `pnpm run check:right-rail` for UI/IPC changes. Browser QA must use the latest `start:agent-browser` `/qa` surface, delete QA project sessions first, create isolated sessions, and cover empty state, real Tasks, Outputs, project import, RDX owner/diagnostic behavior, cross project/session gates, narrow drawer, Escape/focus return, and Settings/bridge deny surfaces.
 
 ## 修改时的检查项
 

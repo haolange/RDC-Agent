@@ -19,6 +19,9 @@ export type ConversationMessageStatus = 'draft' | 'streaming' | 'complete' | 'er
 
 export type ConversationWorkBlockStatus = 'pending' | 'running' | 'complete' | 'error';
 
+/** Durable TaskRegistry lifecycle state carried by task work-trace blocks. */
+export type ConversationTaskStatus = 'pending' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
+
 export type ConversationDiagnosticSeverity = 'info' | 'warning' | 'error';
 
 export type ConversationWorkBlockKind =
@@ -111,6 +114,9 @@ export interface ConversationWorkBlock {
   title: string;
   stage?: string;
   status: ConversationWorkBlockStatus;
+  /** Present only for TaskRegistry-backed work blocks; never synthesized by the renderer. */
+  taskStatus?: ConversationTaskStatus;
+  taskStatusReason?: string;
   /** Non-loop summary text; LLM turn output lives in result and never contains provider thinking text. */
   summary?: string;
   /** Diagnostic blocks only: preserves runtime severity through storage and renderer projection. */
@@ -177,7 +183,6 @@ export interface ConversationErrorViewModel {
 
 export interface ConversationUiHints {
   highlightProjectPicker?: boolean;
-  highlightCaptureLibrary?: boolean;
   highlightSettingsRoute?: boolean;
 }
 

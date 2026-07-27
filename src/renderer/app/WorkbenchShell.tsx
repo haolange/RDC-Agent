@@ -9,6 +9,7 @@ import type { ComposerController } from '../features/debugger/composer/useCompos
 import type { TranslationKey } from '../i18n';
 import { APP_RESIZE_HANDLE_WIDTH } from '@shared/constants/layout';
 import { useDynStyle } from '../lib/useDynStyle';
+import { RightRailDrawer } from './RightRailDrawer';
 
 type DragSide = 'left' | 'right';
 
@@ -19,6 +20,9 @@ export interface WorkbenchShellProps {
   effectiveLeftCollapsed: boolean;
   effectiveRightCollapsed: boolean;
   isRightRailVisible: boolean;
+  isRightRailDrawerMode: boolean;
+  isRightRailDrawerOpen: boolean;
+  onCloseRightRailDrawer: () => void;
   isTerminalOpen: boolean;
   bothSidebarsCollapsed: boolean;
   workbenchRailMaxWidth: string;
@@ -44,6 +48,9 @@ export function WorkbenchShell({
   effectiveLeftCollapsed,
   effectiveRightCollapsed,
   isRightRailVisible,
+  isRightRailDrawerMode,
+  isRightRailDrawerOpen,
+  onCloseRightRailDrawer,
   isTerminalOpen,
   bothSidebarsCollapsed,
   workbenchRailMaxWidth,
@@ -61,6 +68,7 @@ export function WorkbenchShell({
   onToggleTerminal,
   onStartDrag,
 }: WorkbenchShellProps) {
+  const showDockedRightRail = isRightRailVisible && !isRightRailDrawerMode;
   const shellDynStyle = useDynStyle({
     '--left-sidebar-width': `${resolvedWidths.left}px`,
     '--right-panel-width': `${resolvedWidths.right}px`,
@@ -180,7 +188,7 @@ export function WorkbenchShell({
         <TerminalDrawer />
       </main>
 
-      {isRightRailVisible && (
+      {showDockedRightRail && (
         <>
           <div
             className={`panel-resize-handle panel-resize-handle-right ${effectiveRightCollapsed ? 'disabled' : ''}`}
@@ -194,13 +202,19 @@ export function WorkbenchShell({
           >
             <div
               className={`right-panel-body ${effectiveRightCollapsed ? 'collapsed' : ''}`}
-              data-testid="control-panel-scroll"
+              data-testid="right-rail-scroll"
             >
               <ControlPanel />
             </div>
           </aside>
         </>
       )}
+      {isRightRailVisible && isRightRailDrawerMode ? (
+        <RightRailDrawer open={isRightRailDrawerOpen} onClose={onCloseRightRailDrawer}>
+          <ControlPanel />
+        </RightRailDrawer>
+      ) : null}
+
     </div>
   );
 }

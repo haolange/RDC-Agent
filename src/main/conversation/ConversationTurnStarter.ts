@@ -4,7 +4,7 @@ import type {
   ConversationSendRequest,
   ConversationTurnResult,
 } from '@shared/types/conversation';
-import type { AppMode, SessionAttachmentRecord } from '@shared/types/session';
+import type { AppMode, ExecutableAppMode, SessionAttachmentRecord } from '@shared/types/session';
 import type { AgentRole } from '@shared/types/agent';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
@@ -51,6 +51,12 @@ export interface ConversationTurnStarterHost {
   ephemeralTraceSessionId(turnId: string): string;
   getPendingHandoff(sessionId: string): { toProfile: AgentRole; prompt: string } | undefined;
   deletePendingHandoff(sessionId: string): void;
+}
+
+function executableRunMode(agentId: AgentRole): ExecutableAppMode {
+  if (agentId === 'analyzer') return 'analyzer';
+  if (agentId === 'optimizer') return 'optimizer';
+  return 'debugger';
 }
 
 export async function startProfileTurn(
@@ -234,6 +240,7 @@ export async function startProfileTurn(
   let persistedHistoryBeforeCommit: ConversationMessage[] = [];
   let persistedBranchBeforeCommit: ConversationBranchState | null = null;
   let branchState: ConversationBranchState | null = null;
+  let turnRunId: string | null = null;
   let userMessage: ConversationMessage;
   let assistantDraftMessage: ConversationMessage;
   try {
@@ -325,6 +332,26 @@ export async function startProfileTurn(
         storageAdapter.commitExistingConversationTurn(existingTurnCommit, committedHistory, branchState);
       }
     }
+
+    // Every persisted conversation turn receives a durable run before the
+    // agent starts. This is the sole owner for explicit user Outputs; no
+    // renderer or action-payload fallback is allowed to invent an output.
+    if (workingSession) {
+      const createdRun = await storageAdapter.createRun({
+        caseId: workingSession.sessionId,
+        sessionId: workingSession.sessionId,
+        turnId,
+        capturePaths: [],
+        mode: executableRunMode(conversationAgentId),
+        goal: effectiveMessage,
+        status: 'running',
+      });
+      turnRunId = createdRun.runId;
+      userMessage = { ...userMessage, runId: turnRunId };
+      assistantDraftMessage = { ...assistantDraftMessage, runId: turnRunId };
+      storageAdapter.appendConversationMessage(workingSession.sessionId, userMessage);
+      storageAdapter.appendConversationMessage(workingSession.sessionId, assistantDraftMessage);
+    }
   } catch (error) {
     try {
       if (stagedSessionCommit) storageAdapter.rollbackStagedConversationSession(stagedSessionCommit);
@@ -384,6 +411,9 @@ export async function startProfileTurn(
       context: {
         ...context,
         session: workingSession,
+        currentRun: workingSession && turnRunId
+          ? storageAdapter.listRuns(workingSession.sessionId).find((run) => run.runId === turnRunId) ?? null
+          : context.currentRun,
       },
       requestedMode,
       requestedAgentId: conversationAgentId,

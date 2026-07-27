@@ -70,3 +70,9 @@ interface ActiveTurnContext {
 - 单元：`sessionEventGate`、composer restore session bind、monotonic requestId、projection cache activate。
 - 静态：`pnpm run check:session-projection`。
 - Browser QA：删尽 QA project sessions → 新建隔离 session → 多 session 串台 / Stop / Rewrite 矩阵（见 `AGENTS.md`）。
+
+## Right Rail scoped payloads
+
+Right Rail task resources and Capture state are scoped by the full `{ projectId, sessionId, payload }` envelope. `context:get`, `capture:getOpenedState`, preview, and clear requests require an explicit scope and return `null` when no owner scope exists. `context:changed`, `capture:openedStateChanged`, and session capture status updates use the same envelope. Renderer caches background payloads by owner session; only the active session hydrates Context resources and the always-visible Capture area, and late events from another session cannot overwrite either surface.
+
+Outputs use the same session-owned projection path. `output_register` writes an explicit run-scoped artifact record after copying one completed project file; a refresh for that session projects it into Outputs. No renderer-side path discovery or background-session artifact event may populate the active rail.

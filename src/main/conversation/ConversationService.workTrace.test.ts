@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   finalizeTrace,
   sanitizeStoredWorkTrace,
+  upsertWorkBlock,
   upsertRuntimeToolApproval,
   upsertRuntimeToolCall,
 } from './ConversationWorkTrace';
@@ -201,6 +202,27 @@ describe('ConversationService work trace tool approvals', () => {
       },
     });
     expect(stopped.blocks[0].toolCalls[0].approval?.resolvedAt).toEqual(expect.any(Number));
+  });
+
+  it('does not terminalize TaskRegistry lifecycle blocks when a turn completes', () => {
+    const trace = upsertWorkBlock(undefined, 'task-1', {
+      kind: 'command',
+      title: 'Wait for QA',
+      stage: 'task',
+      status: 'pending',
+      taskStatus: 'pending',
+      toolCalls: [],
+    });
+
+    const completed = finalizeTrace(trace, 'complete', 'Reply completed');
+
+    expect(completed.blocks[0]).toMatchObject({
+      id: 'task-1',
+      stage: 'task',
+      status: 'pending',
+      taskStatus: 'pending',
+    });
+    expect(completed.blocks[0].completedAt).toBeUndefined();
   });
 
   it('does not regress a completed tool call when approval resolution arrives late', () => {

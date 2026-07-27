@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../sessions', () => ({
-  rdxSessionService: { snapshotOpenedCapture: vi.fn(() => null) },
+  rdxSessionService: { snapshotOpenedCaptureForSession: vi.fn(() => null) },
 }));
 
 import type { ConversationMessage } from '@shared/types/conversation';

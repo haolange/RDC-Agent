@@ -99,12 +99,35 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
 
   setOpen: (open) => set({ isOpen: open }),
   toggleOpen: () => set((state) => ({ isOpen: !state.isOpen })),
-  setActiveContext: (context) => set((state) => ({
-    sessionId: Object.prototype.hasOwnProperty.call(context, 'sessionId') ? context.sessionId ?? null : state.sessionId,
-    projectId: Object.prototype.hasOwnProperty.call(context, 'projectId') ? context.projectId ?? null : state.projectId,
-    runId: Object.prototype.hasOwnProperty.call(context, 'runId') ? context.runId ?? null : state.runId,
+  setActiveContext: (context) => set((state) => {
+    const sessionId = Object.prototype.hasOwnProperty.call(context, 'sessionId')
+      ? context.sessionId ?? null
+      : state.sessionId;
+    const projectId = Object.prototype.hasOwnProperty.call(context, 'projectId')
+      ? context.projectId ?? null
+      : state.projectId;
+    const runId = Object.prototype.hasOwnProperty.call(context, 'runId')
+      ? context.runId ?? null
+      : state.runId;
+    const changed = sessionId !== state.sessionId
+      || projectId !== state.projectId
+      || runId !== state.runId;
+
+    return {
+      sessionId,
+      projectId,
+      runId,
+      entries: changed ? [] : state.entries,
+      expandedEntryIds: changed ? [] : state.expandedEntryIds,
+      isLoading: changed ? false : state.isLoading,
+    };
+  }),
+  setActiveSessionId: (sessionId) => set((state) => ({
+    sessionId,
+    entries: sessionId === state.sessionId ? state.entries : [],
+    expandedEntryIds: sessionId === state.sessionId ? state.expandedEntryIds : [],
+    isLoading: sessionId === state.sessionId ? state.isLoading : false,
   })),
-  setActiveSessionId: (sessionId) => set({ sessionId }),
   setScopeFilter: (scopeFilter) => set({ scopeFilter, expandedEntryIds: [] }),
   setNamespaceFilter: (namespaceFilter) => set({ namespaceFilter }),
   setSeverityFilter: (severityFilter) => set({ severityFilter }),
@@ -135,20 +158,42 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
     }
 
     const state = get();
-    const request = resolveRuntimeLogRequest(state.scopeFilter, state.sessionId);
+    const requestContext: TerminalContext = {
+      sessionId: state.sessionId,
+      projectId: state.projectId,
+      runId: state.runId,
+    };
+    const requestScopeFilter = state.scopeFilter;
+    const request = resolveRuntimeLogRequest(requestScopeFilter, requestContext.sessionId);
     set({ isLoading: true });
     try {
       const result = await electronAPI.runtimeLog.list(request);
+      const latest = get();
+      const requestIsCurrent = latest.scopeFilter === requestScopeFilter
+        && latest.sessionId === requestContext.sessionId
+        && latest.projectId === requestContext.projectId
+        && latest.runId === requestContext.runId;
+      if (!requestIsCurrent) {
+        return;
+      }
       const context = {
-        sessionId: get().sessionId,
-        projectId: get().projectId,
-        runId: get().runId,
+        sessionId: latest.sessionId,
+        projectId: latest.projectId,
+        runId: latest.runId,
       };
       set({
-        entries: (result.entries ?? []).filter((entry) => matchesScopeFilter(entry, get().scopeFilter, context)),
+        entries: (result.entries ?? []).filter((entry) => matchesScopeFilter(entry, requestScopeFilter, context)),
         isLoading: false,
       });
     } catch {
+      const latest = get();
+      const requestIsCurrent = latest.scopeFilter === requestScopeFilter
+        && latest.sessionId === requestContext.sessionId
+        && latest.projectId === requestContext.projectId
+        && latest.runId === requestContext.runId;
+      if (!requestIsCurrent) {
+        return;
+      }
       set({
         entries: [],
         isLoading: false,

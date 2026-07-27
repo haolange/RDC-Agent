@@ -231,8 +231,7 @@ body {
 
 .app-sidebar-left,
 .app-sidebar-right,
-.right-panel-body,
-.control-panel {
+.right-panel-body {
   background: rgb(var(--color-bg-1));
 }
 
@@ -386,7 +385,6 @@ select:focus-visible,
 :root[data-resolved-theme='light'] .app-sidebar-left,
 :root[data-resolved-theme='light'] .app-sidebar-right,
 :root[data-resolved-theme='light'] .right-panel-body,
-:root[data-resolved-theme='light'] .control-panel,
 :root[data-resolved-theme='light'] .composer-shell {
   background: rgb(var(--color-bg-1));
 }

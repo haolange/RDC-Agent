@@ -1,30 +1,21 @@
 import React from 'react';
 import type { ProgressTaskStatus } from '@shared/types/trace';
 
+const CheckIcon: React.FC = () => (
+  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m3.25 8.25 3 3 6.5-7" /></svg>
+);
+
+const CancelIcon: React.FC = () => (
+  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4.5 4.5 7 7m0-7-7 7" /></svg>
+);
+
+const BlockedIcon: React.FC = () => (
+  <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.25v5m0 3.5h.01" /></svg>
+);
+
 export const TraceProgressMarker: React.FC<{ status: ProgressTaskStatus; index: number }> = ({ status, index }) => {
-  if (status === 'completed') {
-    return (
-      <span className="trace-progress-marker is-completed" aria-hidden="true">
-        <svg viewBox="0 0 16 16" width="11" height="11">
-          <path d="M3.5 8.4 L6.6 11.4 L12.6 4.6" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </span>
-    );
-  }
-  if (status === 'blocked') {
-    return (
-      <span className="trace-progress-marker is-blocked" aria-hidden="true">
-        <svg viewBox="0 0 16 16" width="12" height="12">
-          <path d="M8 2 L14.5 13 L1.5 13 Z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-          <line x1="8" y1="6.4" x2="8" y2="9.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-          <circle cx="8" cy="11.1" r="0.7" fill="currentColor" />
-        </svg>
-      </span>
-    );
-  }
-  return (
-    <span className={`trace-progress-marker ${status === 'running' ? 'is-running' : 'is-pending'}`} aria-hidden="true">
-      <span className="trace-progress-index">{index}</span>
-    </span>
-  );
+  if (status === 'completed') return <span className="trace-progress-marker is-completed" aria-label="completed"><CheckIcon /></span>;
+  if (status === 'cancelled') return <span className="trace-progress-marker is-cancelled" aria-label="cancelled"><CancelIcon /></span>;
+  if (status === 'blocked') return <span className="trace-progress-marker is-blocked" aria-label="blocked"><BlockedIcon /></span>;
+  return <span className={`trace-progress-marker ${status === 'running' ? 'is-running' : 'is-pending'}`} aria-label={status}>{index}</span>;
 };

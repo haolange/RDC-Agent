@@ -3,6 +3,7 @@ import { useWorkflowStore } from '../../stores/workflowStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useComposerSessionContextStore } from '../../features/debugger/composer/composerSessionContext';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
+import { useCaptureStore } from '../../stores/captureStore';
 
 /**
  * Immediate UI hygiene when leaving or entering a session.
@@ -30,6 +31,7 @@ export function applySessionSwitchHygiene(options: {
   useConversationStore.getState().setReasoningSummaries([]);
   useWorkflowStore.getState().setTracePresentation(null);
   useWorkflowStore.getState().setWorkflowState(null);
+  useCaptureStore.getState().reset();
   useSessionStore.getState().clearUsageSnapshot();
   useSessionStore.getState().setPreparedTurnContext(null);
   useSessionStore.getState().setConversationPreparationPhase('idle');

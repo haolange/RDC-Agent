@@ -1,67 +1,29 @@
 import { create } from 'zustand';
 import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ConversationMessage } from '@shared/types/conversation';
-import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { WorkflowState } from '@shared/types/workflow';
-import type { ReasoningSummary } from '@shared/types/workflow';
-import { compareConversationMessages } from '@shared/conversation/conversationBranchResolver';
+import type { ContextSnapshot, OpenedCaptureState } from '@shared/types/session';
 import { useConversationStore } from './conversationStore';
 import { useWorkflowStore } from './workflowStore';
-
-export interface SessionProjection {
-  allMessages: ConversationMessage[];
-  branchState: ConversationBranchState | null;
-  timeline: AgentTimelineEntry[];
-  reasoningSummaries: ReasoningSummary[];
-  monotonicStoppedTurnIds: string[];
-  monotonicStoppedRequestIds: string[];
-  revokedRequestIds: string[];
-  workflowState: WorkflowState | null;
-  tracePresentation: AgentRunPresentation | null;
-  lastHydratedAt: number;
-}
-
-const emptyProjection = (): SessionProjection => ({
-  allMessages: [],
-  branchState: null,
-  timeline: [],
-  reasoningSummaries: [],
-  monotonicStoppedTurnIds: [],
-  monotonicStoppedRequestIds: [],
-  revokedRequestIds: [],
-  workflowState: null,
-  tracePresentation: null,
-  lastHydratedAt: 0,
-});
-
-const sortMessages = (messages: ConversationMessage[]): ConversationMessage[] =>
-  messages.slice().sort(compareConversationMessages);
-
-const upsertMessage = (
-  messages: ConversationMessage[],
-  next: ConversationMessage,
-): ConversationMessage[] => {
-  const byId = new Map(messages.map((message) => [message.id, message]));
-  const existing = byId.get(next.id);
-  const existingUpdatedAt = existing?.updatedAt ?? existing?.createdAt ?? 0;
-  const nextUpdatedAt = next.updatedAt ?? next.createdAt;
-  if (!existing || nextUpdatedAt >= existingUpdatedAt) {
-    byId.set(next.id, next);
-  }
-  return sortMessages(Array.from(byId.values()));
-};
+import { useCaptureStore } from './captureStore';
+import {
+  createEmptySessionProjection,
+  updateProjectionMessages,
+  updateSessionProjectionMap,
+} from './sessionProjectionModel';
+import { hydrateSessionProjection } from './sessionProjectionHydration';
 
 interface SessionProjectionStoreState {
-  bySessionId: Record<string, SessionProjection>;
-
-  ensure: (sessionId: string) => SessionProjection;
+  bySessionId: Record<string, import('./sessionProjectionModel').SessionProjection>;
+  ensure: (sessionId: string) => import('./sessionProjectionModel').SessionProjection;
   captureActiveSession: (sessionId: string) => void;
   projectConversationMessage: (sessionId: string, message: ConversationMessage) => void;
   projectTrace: (sessionId: string, presentation: AgentRunPresentation) => void;
+  projectContextSnapshot: (sessionId: string, snapshot: ContextSnapshot | null) => void;
+  projectOpenedCapture: (sessionId: string, openedCapture: OpenedCaptureState | null) => void;
   projectWorkflow: (sessionId: string, state: WorkflowState) => void;
   projectTimelineEntry: (sessionId: string, entry: AgentTimelineEntry) => void;
-  /** Hydrate active UI stores from cache. Returns true when cache existed. */
   activateSession: (sessionId: string) => boolean;
   evictSession: (sessionId: string) => void;
   reset: () => void;
@@ -73,10 +35,8 @@ export const useSessionProjectionStore = create<SessionProjectionStoreState>((se
   ensure: (sessionId) => {
     const existing = get().bySessionId[sessionId];
     if (existing) return existing;
-    const created = emptyProjection();
-    set((state) => ({
-      bySessionId: { ...state.bySessionId, [sessionId]: created },
-    }));
+    const created = createEmptySessionProjection();
+    set((state) => ({ bySessionId: { ...state.bySessionId, [sessionId]: created } }));
     return created;
   },
 
@@ -84,6 +44,7 @@ export const useSessionProjectionStore = create<SessionProjectionStoreState>((se
     if (!sessionId) return;
     const conversation = useConversationStore.getState();
     const workflow = useWorkflowStore.getState();
+    const capture = useCaptureStore.getState();
     set((state) => ({
       bySessionId: {
         ...state.bySessionId,
@@ -97,6 +58,8 @@ export const useSessionProjectionStore = create<SessionProjectionStoreState>((se
           revokedRequestIds: conversation.revokedRequestIds,
           workflowState: workflow.workflowState,
           tracePresentation: workflow.tracePresentation,
+          contextSnapshot: capture.contextSnapshot,
+          openedCapture: capture.openedCapture,
           lastHydratedAt: Date.now(),
         },
       },
@@ -105,104 +68,78 @@ export const useSessionProjectionStore = create<SessionProjectionStoreState>((se
 
   projectConversationMessage: (sessionId, message) => {
     if (!sessionId) return;
-    set((state) => {
-      const current = state.bySessionId[sessionId] ?? emptyProjection();
-      return {
-        bySessionId: {
-          ...state.bySessionId,
-          [sessionId]: {
-            ...current,
-            allMessages: upsertMessage(current.allMessages, message),
-            lastHydratedAt: Date.now(),
-          },
-        },
-      };
-    });
+    set((state) => ({
+      bySessionId: updateSessionProjectionMap(state.bySessionId, sessionId, (projection) => ({
+        ...projection,
+        allMessages: updateProjectionMessages(projection.allMessages, message),
+      })),
+    }));
   },
 
   projectTrace: (sessionId, presentation) => {
     if (!sessionId) return;
-    set((state) => {
-      const current = state.bySessionId[sessionId] ?? emptyProjection();
-      return {
-        bySessionId: {
-          ...state.bySessionId,
-          [sessionId]: {
-            ...current,
-            tracePresentation: presentation,
-            lastHydratedAt: Date.now(),
-          },
-        },
-      };
-    });
+    set((state) => ({
+      bySessionId: updateSessionProjectionMap(state.bySessionId, sessionId, (projection) => ({
+        ...projection,
+        tracePresentation: presentation,
+      })),
+    }));
+  },
+
+  projectContextSnapshot: (sessionId, snapshot) => {
+    if (!sessionId) return;
+    set((state) => ({
+      bySessionId: updateSessionProjectionMap(state.bySessionId, sessionId, (projection) => ({
+        ...projection,
+        contextSnapshot: snapshot,
+      })),
+    }));
+  },
+
+  projectOpenedCapture: (sessionId, openedCapture) => {
+    if (!sessionId) return;
+    set((state) => ({
+      bySessionId: updateSessionProjectionMap(state.bySessionId, sessionId, (projection) => ({
+        ...projection,
+        openedCapture,
+      })),
+    }));
   },
 
   projectWorkflow: (sessionId, workflowState) => {
     if (!sessionId) return;
-    set((state) => {
-      const current = state.bySessionId[sessionId] ?? emptyProjection();
-      return {
-        bySessionId: {
-          ...state.bySessionId,
-          [sessionId]: {
-            ...current,
-            workflowState,
-            reasoningSummaries: workflowState.reasoningSummaries ?? current.reasoningSummaries,
-            lastHydratedAt: Date.now(),
-          },
-        },
-      };
-    });
+    set((state) => ({
+      bySessionId: updateSessionProjectionMap(state.bySessionId, sessionId, (projection) => ({
+        ...projection,
+        workflowState,
+        reasoningSummaries: workflowState.reasoningSummaries ?? projection.reasoningSummaries,
+      })),
+    }));
   },
 
   projectTimelineEntry: (sessionId, entry) => {
     if (!sessionId) return;
-    set((state) => {
-      const current = state.bySessionId[sessionId] ?? emptyProjection();
-      if (current.timeline.some((item) => item.id === entry.id)) {
-        return state;
-      }
-      return {
-        bySessionId: {
-          ...state.bySessionId,
-          [sessionId]: {
-            ...current,
-            timeline: [...current.timeline, entry],
-            lastHydratedAt: Date.now(),
-          },
-        },
-      };
-    });
+    set((state) => ({
+      bySessionId: updateSessionProjectionMap(state.bySessionId, sessionId, (projection) => (
+        projection.timeline.some((item) => item.id === entry.id)
+          ? projection
+          : { ...projection, timeline: [...projection.timeline, entry] }
+      )),
+    }));
   },
 
   activateSession: (sessionId) => {
     const projection = get().bySessionId[sessionId];
-    if (!projection || projection.lastHydratedAt === 0) {
-      return false;
-    }
-    useConversationStore.setState({
-      timeline: projection.timeline,
-      reasoningSummaries: projection.reasoningSummaries,
-      monotonicStoppedTurnIds: projection.monotonicStoppedTurnIds,
-      monotonicStoppedRequestIds: projection.monotonicStoppedRequestIds,
-      revokedRequestIds: projection.revokedRequestIds,
-    });
-    useConversationStore.getState().setConversationSnapshot(
-      projection.allMessages,
-      projection.branchState,
-    );
-    useWorkflowStore.getState().setWorkflowState(projection.workflowState);
-    useWorkflowStore.getState().setTracePresentation(projection.tracePresentation);
-    return true;
+    return Boolean(projection && projection.lastHydratedAt && hydrateSessionProjection(projection));
   },
 
   evictSession: (sessionId) => {
     if (!sessionId) return;
     set((state) => {
       if (!(sessionId in state.bySessionId)) return state;
-      const next = { ...state.bySessionId };
-      delete next[sessionId];
-      return { bySessionId: next };
+      const bySessionId = { ...state.bySessionId };
+      delete bySessionId[sessionId];
+      return { bySessionId };
     });
   },
 

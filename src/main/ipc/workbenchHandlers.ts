@@ -25,7 +25,6 @@ import { registerRuntimeTerminalHandlers } from './runtimeTerminalHandlers';
 import { registerSettingsLlmHandlers } from './settingsLlmHandlers';
 import { registerShellHandlers } from './shellHandlers';
 import { registerWebHandlers } from './webHandlers';
-import { buildSessionOutputs } from './sessionOutputs';
 import { registerToolEvidenceHandlers } from './toolEvidenceHandlers';
 import { registerWorkflowHandlers } from './workflowHandlers';
 import { registerTraceHandlers } from './traceHandlers';
@@ -189,7 +188,6 @@ const context: WorkbenchIpcContext = {
   applyCurrentLlmConfig,
   setRunLifecycleState,
   selectCurrentProject,
-  buildSessionOutputs,
   initializeIpcState,
 };
 

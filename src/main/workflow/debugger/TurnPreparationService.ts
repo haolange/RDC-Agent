@@ -31,6 +31,7 @@ import {
 import {
   isMcpPrefixedToolName,
   partitionDeferredTools,
+  preactivateTaskLifecycleTools,
 } from './deferredTools';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
@@ -148,10 +149,8 @@ export class TurnPreparationService {
     );
     const slotKey = agentSlotKey(input.sessionId, input.agentId);
     const toolSignature = this.deps.createToolSignature(runtimeTools.definitions);
-    const activation = this.deps.deferredActivation.get(slotKey);
-    const activatedDeferredTools = activation?.toolSignature === toolSignature
-      ? activation.names
-      : new Set<string>();
+    const activatedDeferredTools = this.deps.deferredActivation.resolveActivatedSet(slotKey, toolSignature);
+    preactivateTaskLifecycleTools(runtimeTools.definitions, activatedDeferredTools);
     const { injected, deferredMcp, deferredBuiltin } = partitionDeferredTools(
       runtimeTools.definitions,
       activatedDeferredTools,

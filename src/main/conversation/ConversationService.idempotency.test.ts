@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../sessions', () => ({
-  rdxSessionService: { snapshotOpenedCapture: vi.fn(() => null) },
+  rdxSessionService: { snapshotOpenedCaptureForSession: vi.fn(() => null) },
 }));
 
 vi.mock('../sessions/StorageAdapter', () => ({

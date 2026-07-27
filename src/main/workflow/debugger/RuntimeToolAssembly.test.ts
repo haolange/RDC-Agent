@@ -18,6 +18,7 @@ vi.mock('../../sessions/RdxRuntimeContextRegistry', () => ({
 
 import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
 import { RuntimeToolAssembly } from './RuntimeToolAssembly';
+import { TurnHandle } from './TurnCoordinator';
 import type { HandoffMailbox } from './HandoffMailbox';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 
@@ -25,6 +26,7 @@ function createAssembly(): RuntimeToolAssembly {
   return new RuntimeToolAssembly({
     mcp: {
       getConnectedTools: () => [],
+      getAgentTools: () => [],
     } as unknown as McpConnectionCoordinator,
     handoffMailbox: {
       deposit: vi.fn(),
@@ -103,5 +105,13 @@ describe('RuntimeToolAssembly', () => {
     const assembly = createAssembly();
     const tools = assembly.createTaskRuntimeTools('parent::subagent::child');
     expect(tools.some((tool) => tool.name.includes('task') || tool.name === 'task_create' || tool.name.length > 0)).toBe(true);
+  });
+
+  it('grants explicit output publication with the canonical task capability', () => {
+    const assembly = createAssembly();
+    const handle = new TurnHandle({ sessionKey: 'session-a', turnId: 'turn-a', runId: 'run-a', generation: 1 });
+    const tools = assembly.resolveRuntimeTools('debugger', ['task'], undefined, 'session-a', handle, 'project-a');
+
+    expect(tools.toolMap.has('output_register')).toBe(true);
   });
 });

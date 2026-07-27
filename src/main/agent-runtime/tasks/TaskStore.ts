@@ -9,7 +9,7 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import type { TaskRecord } from './TaskRegistry';
+import type { TaskRecord, TaskStatus } from './TaskRegistry';
 
 /** 任务存储接口。 */
 export interface TaskStore {
@@ -119,9 +119,9 @@ function normalizeTaskRecord(parsed: Partial<TaskRecord>): TaskRecord | null {
     id: parsed.id,
     subject: parsed.subject,
     description: typeof parsed.description === 'string' ? parsed.description : '',
-    status: (parsed.status === 'in_progress' || parsed.status === 'completed' || parsed.status === 'deleted'
-      ? parsed.status
-      : 'pending'),
+    status: normalizeStatus(parsed.status),
+
+    statusReason: typeof parsed.statusReason === 'string' ? parsed.statusReason : undefined,
     owner: typeof parsed.owner === 'string' ? parsed.owner : undefined,
     blockedBy: Array.isArray(parsed.blockedBy) ? parsed.blockedBy.filter((x): x is string => typeof x === 'string') : [],
     blocks: Array.isArray(parsed.blocks) ? parsed.blocks.filter((x): x is string => typeof x === 'string') : [],
@@ -130,4 +130,13 @@ function normalizeTaskRecord(parsed: Partial<TaskRecord>): TaskRecord | null {
     createdAt: typeof parsed.createdAt === 'number' ? parsed.createdAt : Date.now(),
     updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : Date.now(),
   };
+}
+
+function normalizeStatus(status: unknown): TaskStatus {
+  if (status === 'in_progress' || status === 'blocked' || status === 'completed' || status === 'cancelled') {
+    return status;
+  }
+  // Persisted records from a retired terminal state remain terminal when read.
+  if (status === 'deleted') return 'cancelled';
+  return 'pending';
 }

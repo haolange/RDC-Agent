@@ -39,6 +39,24 @@ describe('TaskRegistry', () => {
     expect(listed[0]?.id).toBe(created.id);
   });
 
+  it('enforces one active task and requires a blocked reason', async () => {
+    const registry = await createRegistry();
+    const first = await registry.createTask('First');
+    const second = await registry.createTask('Second');
+
+    await registry.updateTask(first.id, { status: 'in_progress' });
+    await expect(registry.updateTask(second.id, { status: 'in_progress' })).rejects.toThrow(/in_progress/);
+    await expect(registry.updateTask(second.id, { status: 'blocked' })).rejects.toThrow(/statusReason/);
+
+    const blocked = await registry.updateTask(second.id, {
+      status: 'blocked',
+      statusReason: 'Waiting for a capture.',
+    });
+    expect(blocked.statusReason).toBe('Waiting for a capture.');
+
+    const cancelled = await registry.updateTask(second.id, { status: 'cancelled' });
+    expect(cancelled.statusReason).toBeUndefined();
+  });
   it('maintains bidirectional blockedBy / blocks links', async () => {
     const registry = await createRegistry();
     const upstream = await registry.createTask('Upstream');
@@ -69,13 +87,13 @@ describe('TaskRegistry', () => {
     const a = await registry.createTask('A');
     const b = await registry.createTask('B', { blockedBy: [a.id] });
 
-    await expect(registry.updateTask(a.id, { addBlockedBy: [b.id] })).rejects.toThrow(/依赖环/);
+    await expect(registry.updateTask(a.id, { addBlockedBy: [b.id] })).rejects.toThrow(/dependency cycle/);
   });
 
   it('rejects self-dependency cycles', async () => {
     const registry = await createRegistry();
     const a = await registry.createTask('A');
-    await expect(registry.updateTask(a.id, { addBlockedBy: [a.id] })).rejects.toThrow(/自身/);
+    await expect(registry.updateTask(a.id, { addBlockedBy: [a.id] })).rejects.toThrow(/cannot depend on itself/);
   });
 
   it('rejects cycles introduced via addBlocks', async () => {
@@ -83,7 +101,7 @@ describe('TaskRegistry', () => {
     const a = await registry.createTask('A');
     const b = await registry.createTask('B', { blockedBy: [a.id] });
 
-    await expect(registry.updateTask(b.id, { addBlocks: [a.id] })).rejects.toThrow(/依赖环/);
+    await expect(registry.updateTask(b.id, { addBlocks: [a.id] })).rejects.toThrow(/dependency cycle/);
   });
 
   it('rejects empty subject', async () => {

@@ -63,12 +63,10 @@ export function useRenamePopover({
 
     window.addEventListener('pointerdown', handlePointerDown);
     window.addEventListener('resize', handleDismiss);
-    window.addEventListener('scroll', handleDismiss, true);
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('pointerdown', handlePointerDown);
       window.removeEventListener('resize', handleDismiss);
-      window.removeEventListener('scroll', handleDismiss, true);
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [renamePopover, projectMenuPopover, projectRenamePopover, onCloseRename, onCloseProjectMenu, onCloseProjectRename]);

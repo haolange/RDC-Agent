@@ -115,6 +115,8 @@ export interface AbortAndJoinOptions {
 export class TurnHandle {
   readonly sessionKey: string;
   readonly turnId: string;
+  /** The owning workflow run. Tool-side outputs must never escape this run. */
+  readonly runId: string | null;
   readonly generation: number;
   readonly startedAt: number;
   readonly abortController: AbortController;
@@ -134,12 +136,14 @@ export class TurnHandle {
   constructor(input: {
     sessionKey: string;
     turnId: string;
+    runId?: string | null;
     generation: number;
     parentSignal?: AbortSignal | null;
     subagentBudget?: SubagentBudgetState;
   }) {
     this.sessionKey = input.sessionKey;
     this.turnId = input.turnId;
+    this.runId = input.runId ?? null;
     this.generation = input.generation;
     this.startedAt = Date.now();
     this.abortController = new AbortController();
@@ -257,6 +261,7 @@ export class TurnCoordinator {
   async beginTurn(input: {
     sessionKey: string;
     turnId: string;
+    runId?: string | null;
     parentSignal?: AbortSignal | null;
     eventSink?: TurnEventSink | null;
     subagentBudget?: SubagentBudgetState;
@@ -269,6 +274,7 @@ export class TurnCoordinator {
     const handle = new TurnHandle({
       sessionKey: input.sessionKey,
       turnId: input.turnId,
+      runId: input.runId,
       generation: this.generationSeq,
       parentSignal: input.parentSignal,
       subagentBudget: input.subagentBudget,

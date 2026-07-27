@@ -120,8 +120,13 @@ export async function handleSessionCreateOp(
   const requestId = ctx.beginSelectionRequest();
   ctx.setIsBusy(true);
   try {
-    const result = await window.electronAPI.session.create(targetProject.projectId);
+    const result = await window.electronAPI.session.create(targetProject.projectId).catch((error) => ({
+      success: false,
+      session: undefined,
+      error: error instanceof Error ? error.message : String(error),
+    }));
     if (!result.success || !result.session) {
+      ctx.setSidebarError(result.error || 'Unable to create a new session.');
       return;
     }
 

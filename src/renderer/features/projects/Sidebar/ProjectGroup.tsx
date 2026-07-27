@@ -61,16 +61,7 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
       className={`project-stack-item ${isCurrentProject ? 'current' : ''} ${isProjectRailActive ? 'active' : ''} ${isExpanded ? 'expanded' : ''}`}
     >
       <div
-        role="button"
-        tabIndex={0}
         className={`session-item project-item ${isProjectRailActive ? 'active' : ''}`}
-        onClick={() => void onProjectSelect(project)}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            void onProjectSelect(project);
-          }
-        }}
       >
         <div className="session-item-header">
           <span className="project-item-leading">
@@ -93,15 +84,19 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
                 <path d="M9 6l6 6-6 6" />
               </svg>
             </button>
-            <span
-              className="project-item-title-wrap"
+            <button
+              type="button"
+              className="session-item-select project-item-select"
               title={shouldShowProjectOriginName ? `${project.name} / ${projectOriginName}` : project.name}
+              onClick={() => void onProjectSelect(project)}
             >
-              <span className="project-item-title">{project.name}</span>
-              {shouldShowProjectOriginName && (
-                <span className="project-item-origin-name">/ {projectOriginName}</span>
-              )}
-            </span>
+              <span className="project-item-title-wrap">
+                <span className="project-item-title">{project.name}</span>
+                {shouldShowProjectOriginName && (
+                  <span className="project-item-origin-name">/ {projectOriginName}</span>
+                )}
+              </span>
+            </button>
           </span>
           {isCurrentProject && (
             <span className="session-item-actions">

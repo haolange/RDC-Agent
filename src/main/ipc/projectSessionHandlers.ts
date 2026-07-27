@@ -3,7 +3,6 @@ import type {
   ProjectInputRecord,
   RunSummary,
   SessionAttachmentRecord,
-  SessionOutputRecord,
   SessionRecord,
 } from '@shared/types/session';
 import { runExecutionService } from '../workflow/debugger/RunExecutionService';
@@ -26,7 +25,6 @@ import {
   SessionCreateArgsSchema,
   SessionIdOnlyArgsSchema,
   SessionListArgsSchema,
-  SessionOutputsListArgsSchema,
   SessionRenameArgsSchema,
 } from './validation/projectSessionSchemas';
 
@@ -321,19 +319,6 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
     };
   });
 
-  ipcMain.handle('session:outputs:list', async (_event, ...rawArgs: unknown[]) => {
-    const [sessionId, runId] = parseIpcArgs(SessionOutputsListArgsSchema, rawArgs, {
-      label: 'session:outputs:list',
-      maxBytes: 4 * 1024,
-      padTo: 2,
-    });
-    if (!sessionId) {
-      return { outputs: [] as SessionOutputRecord[] };
-    }
-    return {
-      outputs: await context.buildSessionOutputs(sessionId, runId),
-    };
-  });
 
   ipcMain.handle('session:attachments:import', async (_event, ...rawArgs: unknown[]) => {
     try {

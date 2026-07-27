@@ -1,39 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { ContextSnapshot, OpenedCaptureState } from '@shared/types/session';
-import {
-  isContextSnapshotOwnedBySession,
-  isOpenedCaptureOwnedBySession,
-} from './sessionContextOwnership';
+import { isContextSnapshotOwnedBySession, isOpenedCaptureOwnedBySession } from './sessionCaptureOwnership';
 
 const openedCapture = {
-  projectId: 'project-a',
-  ownerSessionId: 'session-a',
-  inputId: 'input-a',
-  filePath: 'capture.rdc',
-  captureId: 'capture-a',
-  sessionId: 'rdx-replay-session',
-  contextId: 'context-a',
-  replaySessionId: 'rdx-replay-session',
-  backend: 'local',
-  deviceId: 'local',
-  deviceLabel: 'Local',
-  status: 'open',
-  openedAt: 1,
+  projectId: 'project-a', ownerSessionId: 'session-a', inputId: 'input-a', filePath: 'capture.rdc', captureId: 'capture-a', sessionId: 'rdx-replay-session', contextId: 'context-a', replaySessionId: 'rdx-replay-session', backend: 'local', deviceId: 'local', deviceLabel: 'Local', status: 'open', openedAt: 1,
 } satisfies OpenedCaptureState;
 
 const snapshot = {
-  contextId: 'context-a',
-  sessionId: 'rdx-replay-session',
-  ownerSessionId: 'session-a',
-  backend: 'local',
-  runtimeOwner: 'rdc-agent',
-  ownerLeaseId: 'lease-a',
-  captureDescriptors: [],
-  activeCapture: 'capture-a',
-  deviceLabel: 'Local',
+  contextId: 'context-a', sessionId: 'rdx-replay-session', ownerSessionId: 'session-a', backend: 'local', runtimeOwner: 'rdc-agent', ownerLeaseId: 'lease-a', captureDescriptors: [], activeCapture: 'capture-a', deviceLabel: 'Local',
 } satisfies ContextSnapshot;
 
-describe('session context ownership', () => {
+describe('session capture ownership', () => {
   it('accepts only the current app session owner', () => {
     expect(isOpenedCaptureOwnedBySession(openedCapture, 'project-a', 'session-a')).toBe(true);
     expect(isOpenedCaptureOwnedBySession(openedCapture, 'project-a', 'session-b')).toBe(false);

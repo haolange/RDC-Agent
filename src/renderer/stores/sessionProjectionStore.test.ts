@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { ConversationMessage } from '@shared/types/conversation';
 import { useConversationStore } from './conversationStore';
 import { useWorkflowStore } from './workflowStore';
+import { useCaptureStore } from './captureStore';
 import { useSessionProjectionStore } from './sessionProjectionStore';
 
 const message = (overrides: Partial<ConversationMessage> = {}): ConversationMessage => ({
@@ -21,6 +22,7 @@ describe('sessionProjectionStore', () => {
   beforeEach(() => {
     useConversationStore.getState().reset();
     useWorkflowStore.getState().reset();
+    useCaptureStore.getState().reset();
     useSessionProjectionStore.getState().reset();
   });
 
@@ -45,6 +47,32 @@ describe('sessionProjectionStore', () => {
     expect(useConversationStore.getState().conversationMessages[0]?.content).toBe('active');
   });
 
+  it('hydrates only the cached session context and opened capture', () => {
+    const contextSnapshot = {
+      contextId: 'context-a',
+      sessionId: 'session-a',
+      backend: 'local',
+      runtimeOwner: 'owner-a',
+      ownerLeaseId: 'lease-a',
+      activeCapture: 'capture-a',
+      deviceLabel: 'Local',
+      captureDescriptors: [{ id: 'capture-a', filePath: 'D:/a.rdc', role: 'primary', backendHint: 'local', status: 'open' }],
+    } as never;
+    const openedCapture = {
+      projectId: 'project-a',
+      ownerSessionId: 'session-a',
+      filePath: 'D:/a.rdc',
+      status: 'open',
+    } as never;
+    const projection = useSessionProjectionStore.getState();
+    projection.projectContextSnapshot('session-a', contextSnapshot);
+    projection.projectOpenedCapture('session-a', openedCapture);
+
+    expect(projection.activateSession('session-a')).toBe(true);
+    expect(useCaptureStore.getState().contextSnapshot?.contextId).toBe('context-a');
+    expect(useCaptureStore.getState().openedCapture?.projectId).toBe('project-a');
+    expect(useCaptureStore.getState().captures.map((capture) => capture.id)).toEqual(['capture-a']);
+  });
   it('evictSession removes cache', () => {
     useSessionProjectionStore.getState().projectConversationMessage('session-a', message());
     useSessionProjectionStore.getState().evictSession('session-a');

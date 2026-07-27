@@ -49,6 +49,7 @@ export function useAppBootstrap(options: {
   const setCurrentRunUsage = useSessionStore((state) => state.setCurrentRunUsage);
   const clearUsageSnapshot = useSessionStore((state) => state.clearUsageSnapshot);
   const setActiveTerminalContext = useTerminalStore((state) => state.setActiveContext);
+  const refreshTerminalEntries = useTerminalStore((state) => state.refreshEntries);
 
   useEffect(() => {
     document.documentElement.lang = settings.appearance.language;
@@ -92,7 +93,14 @@ export function useAppBootstrap(options: {
       projectId: currentProject?.projectId ?? null,
       runId: currentRun?.runId ?? null,
     });
-  }, [currentProject?.projectId, currentRun?.runId, currentSession?.sessionId, setActiveTerminalContext]);
+    void refreshTerminalEntries();
+  }, [
+    currentProject?.projectId,
+    currentRun?.runId,
+    currentSession?.sessionId,
+    refreshTerminalEntries,
+    setActiveTerminalContext,
+  ]);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
@@ -278,4 +286,3 @@ function useSessionRestoreBootstrap(runtimeTestMode: boolean | null): void {
       });
   }, [currentSession, runtimeTestMode]);
 }
-

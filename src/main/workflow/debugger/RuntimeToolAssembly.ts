@@ -15,10 +15,13 @@ import { createToolSearchTool, getPrimitiveTools } from '../../agent-runtime/too
 import { handoffController } from '../../agent-runtime/agent/HandoffController';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
 import { createTaskTools, TaskRegistry, MemoryTaskStore, createSessionTaskStore } from '../../agent-runtime/tasks';
+import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
 import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
 import { storageAdapter } from '../../sessions/StorageAdapter';
+import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import {
+  expandCanonicalToolToken,
   isToolAllowedForAgent,
   normalizeToolName,
 } from './DebuggerRuntimePolicy';
@@ -45,8 +48,8 @@ export class RuntimeToolAssembly {
 
   matchesToolAllowlist(toolName: string, toolAllowlist: string[]): boolean {
     const normalizedToolName = normalizeToolName(toolName);
-    return toolAllowlist.some((entry) => {
-      const normalizedEntry = normalizeToolName(entry);
+    return toolAllowlist.some((entry) => expandCanonicalToolToken(entry).some((expandedEntry) => {
+      const normalizedEntry = normalizeToolName(expandedEntry);
       if (normalizedEntry === '*' || normalizedEntry === normalizedToolName) {
         return true;
       }
@@ -57,7 +60,7 @@ export class RuntimeToolAssembly {
         return true;
       }
       return false;
-    });
+    }));
   }
 
   isAllowedForRuntime(
@@ -80,6 +83,9 @@ export class RuntimeToolAssembly {
     const registry = new TaskRegistry(store);
     // 桥接 task 变更为 AgentEvent，激活 ConversationService 的 task.* 投影。
     registry.onTaskChange = ({ type, task }) => {
+      if (resolvedSessionId && !isSubagent) {
+        traceProjectionRefreshService.schedule(resolvedSessionId);
+      }
       const sink = turnHandle?.eventSink ?? this.deps.getActiveTurn(resolvedSessionId)?.eventSink;
       if (!sink?.onEvent) return;
       if (turnHandle && !turnHandle.isLive(turnHandle.generation)) return;
@@ -93,6 +99,7 @@ export class RuntimeToolAssembly {
           taskId: task.id,
           title: task.subject,
           status: task.status,
+          statusReason: task.statusReason,
         },
       });
     };
@@ -556,6 +563,11 @@ export class RuntimeToolAssembly {
       this.createMemoryWriteTool(),
       this.createMemoryDeleteTool(),
       this.createPlanArtifactTool(sessionId),
+      createOutputRegistrationTool({
+        sessionId,
+        runId: turnHandle?.runId,
+        projectRootPath: turnHandle?.eventSink?.projectRootPath,
+      }) as unknown as AgentTool,
       this.createSkillsCatalogTool(),
       this.createSkillReadTool(agentId),
       this.createMcpCatalogTool(),

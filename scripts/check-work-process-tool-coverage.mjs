@@ -159,6 +159,12 @@ const FIXTURES = {
     argsPreview: JSON.stringify({ title: 'Plan', content: '# Plan' }),
     resultPreview: toolEnvelope('Plan artifact ready', { title: 'Plan' }),
   },
+  output_register: {
+    argsPreview: JSON.stringify({ path: 'qa-output.md', display_name: 'QA Output' }),
+    resultPreview: toolEnvelope('Published output: QA Output', {
+      path: 'qa-output.md', displayName: 'QA Output', sizeBytes: 1024,
+    }),
+  },
   tool_search: {
     argsPreview: JSON.stringify({ query: 'node_repl' }),
     resultPreview: toolEnvelope('node_repl.js', { total: 1, matches: [{ name: 'node_repl.js' }] }),

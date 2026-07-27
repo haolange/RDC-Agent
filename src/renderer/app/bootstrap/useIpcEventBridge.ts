@@ -6,7 +6,7 @@ import type { ReplayDeviceStatusChangedPayload } from '@shared/types/device';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { WorkflowState } from '@shared/types/workflow';
-import type { RunSummary, ContextSnapshot } from '@shared/types/session';
+import type { RunSummary, ContextSnapshot, SessionScopedPayload } from '@shared/types/session';
 import type { TranslationKey } from '../../i18n';
 import {
   applyActionEventToMessage,
@@ -28,11 +28,12 @@ import { useTerminalStore } from '../../stores/terminalStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { resetWorkbenchStores } from '../../stores/storesReset';
 import { createConversationEventBatcher } from './conversationEventBatcher';
-import { isActiveSessionEvent } from './sessionEventGate';
+import { isActiveSessionEvent, isActiveSessionScope } from './sessionEventGate';
 
 export function useSyncCapturesFromSnapshot() {
   return useCallback((snapshot: ContextSnapshot) => {
     if (!snapshot.captureDescriptors?.length) {
+      useCaptureStore.getState().setCaptures([]);
       return;
     }
 
@@ -85,17 +86,28 @@ export function useIpcEventBridge(options: {
     });
 
     const unsubscribeTraceProjectionChanged = electronAPI.events.onTraceProjectionChanged((payload) => {
-      if (!isActiveSessionEvent(payload.sessionId)) {
+      if (!isActiveSessionScope(payload)) {
         projection().projectTrace(payload.sessionId, payload.presentation);
         return;
       }
       useWorkflowStore.getState().setTracePresentation(payload.presentation);
     });
 
-    const unsubscribeContextChanged = electronAPI.events.onContextChanged((snapshot) => {
-      useCaptureStore.getState().setContextSnapshot(snapshot);
-      syncCapturesFromSnapshot(snapshot);
-    });
+
+    const projectScopedContext = (event: SessionScopedPayload<ContextSnapshot | null>) => {
+      projection().projectContextSnapshot(event.sessionId, event.payload);
+      if (!isActiveSessionScope(event)) return;
+      useCaptureStore.getState().setContextSnapshot(event.payload);
+      if (event.payload) syncCapturesFromSnapshot(event.payload);
+      else useCaptureStore.getState().setCaptures([]);
+    };
+
+    const projectScopedOpenedCapture = (event: SessionScopedPayload<ReturnType<typeof useCaptureStore.getState>['openedCapture']>) => {
+      projection().projectOpenedCapture(event.sessionId, event.payload);
+      if (isActiveSessionScope(event)) useCaptureStore.getState().setOpenedCapture(event.payload);
+    };
+
+    const unsubscribeContextChanged = electronAPI.events.onContextChanged(projectScopedContext);
 
     const conversationEventBatcher = createConversationEventBatcher({
       applyMessage: (event) => {
@@ -234,10 +246,12 @@ export function useIpcEventBridge(options: {
       }
     });
 
-    const unsubscribeCaptureStatusChanged = electronAPI.events.onCaptureStatusChanged(() => {
-      electronAPI.context.get().then((snapshot) => {
-        useCaptureStore.getState().setContextSnapshot(snapshot);
-        syncCapturesFromSnapshot(snapshot);
+    const unsubscribeCaptureStatusChanged = electronAPI.events.onCaptureStatusChanged((event) => {
+      const scoped = event as SessionScopedPayload<unknown>;
+      if (!isActiveSessionScope(scoped)) return;
+      electronAPI.context.get({ projectId: scoped.projectId, sessionId: scoped.sessionId }).then((snapshot) => {
+        const payload: SessionScopedPayload<ContextSnapshot | null> = { ...scoped, payload: snapshot };
+        projectScopedContext(payload);
       }).catch(() => undefined);
     });
 
@@ -343,8 +357,8 @@ export function useIpcEventBridge(options: {
       useProjectStore.getState().updateProjectInputs(payload.projectId, payload.inputs);
     });
 
-    const unsubscribeOpenedCaptureStateChanged = electronAPI.events.onOpenedCaptureStateChanged((state) => {
-      useCaptureStore.getState().setOpenedCapture(state);
+    const unsubscribeOpenedCaptureStateChanged = electronAPI.events.onOpenedCaptureStateChanged((event) => {
+      projectScopedOpenedCapture(event);
     });
 
     const unsubscribeRuntimeLogAppended = electronAPI.events.onRuntimeLogAppended((entry) => {
@@ -356,12 +370,17 @@ export function useIpcEventBridge(options: {
     });
 
     void useDeviceStore.getState().loadDevices();
-    void electronAPI.capture.getOpenedState()
-      .then((state) => useCaptureStore.getState().setOpenedCapture(state))
-      .catch(() => undefined);
-    void electronAPI.context.get()
-      .then((snapshot) => useCaptureStore.getState().setContextSnapshot(snapshot))
-      .catch(() => undefined);
+    const initialProject = useProjectStore.getState().currentProject;
+    const initialSession = useProjectStore.getState().currentSession;
+    if (initialProject && initialSession) {
+      const scope = { projectId: initialProject.projectId, sessionId: initialSession.sessionId };
+      void electronAPI.capture.getOpenedState(scope)
+        .then((payload) => projectScopedOpenedCapture({ ...scope, payload }))
+        .catch(() => undefined);
+      void electronAPI.context.get(scope)
+        .then((payload) => projectScopedContext({ ...scope, payload }))
+        .catch(() => undefined);
+    }
 
     const handleFileOpen = (paths: unknown) => {
       if (!Array.isArray(paths) || paths.length === 0) return;
