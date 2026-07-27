@@ -9,8 +9,13 @@ import type {
   RdxShellActionSettings,
   SidebarLayoutPreference,
   ToolingSettings,
+  WindowLayoutPreference,
 } from '@shared/types/settings';
 import {
+  APP_DEFAULT_WINDOW_HEIGHT,
+  APP_DEFAULT_WINDOW_WIDTH,
+  APP_MIN_WINDOW_HEIGHT,
+  APP_MIN_WINDOW_WIDTH,
   TERMINAL_MAX_HEIGHT,
   TERMINAL_MIN_HEIGHT,
 } from '@shared/constants/layout';
@@ -190,5 +195,28 @@ export function sanitizeTerminal(input: unknown, fallback = DEFAULT_LAYOUT.termi
       TERMINAL_MIN_HEIGHT,
       TERMINAL_MAX_HEIGHT,
     ),
+  };
+}
+
+export function sanitizeWindow(input: unknown, fallback = DEFAULT_LAYOUT.window): WindowLayoutPreference {
+  const candidate = (input ?? {}) as Partial<WindowLayoutPreference>;
+  const width = typeof candidate.width === 'number' && Number.isFinite(candidate.width)
+    ? Math.trunc(candidate.width)
+    : fallback.width;
+  const height = typeof candidate.height === 'number' && Number.isFinite(candidate.height)
+    ? Math.trunc(candidate.height)
+    : fallback.height;
+  const x = typeof candidate.x === 'number' && Number.isFinite(candidate.x)
+    ? Math.trunc(candidate.x)
+    : fallback.x;
+  const y = typeof candidate.y === 'number' && Number.isFinite(candidate.y)
+    ? Math.trunc(candidate.y)
+    : fallback.y;
+  return {
+    width: clamp(width, APP_MIN_WINDOW_WIDTH, Math.max(APP_MIN_WINDOW_WIDTH, APP_DEFAULT_WINDOW_WIDTH * 4)),
+    height: clamp(height, APP_MIN_WINDOW_HEIGHT, Math.max(APP_MIN_WINDOW_HEIGHT, APP_DEFAULT_WINDOW_HEIGHT * 4)),
+    x,
+    y,
+    isMaximized: typeof candidate.isMaximized === 'boolean' ? candidate.isMaximized : fallback.isMaximized,
   };
 }

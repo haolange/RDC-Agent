@@ -117,18 +117,19 @@
     border-radius: var(--composer-shell-radius);
   }
 
+  /* Composer footer stays a single horizontal row (Codex-like); never wrap left/right groups. */
   .composer-footer-bar {
-    align-items: flex-end;
-    flex-wrap: wrap;
+    align-items: center;
+    flex-wrap: nowrap;
   }
 
-  .composer-toolbar-group-left {
-    width: 100%;
-    flex: 1 1 100%;
+  .composer-toolbar-group-left,
+  .composer-toolbar-group-right {
+    width: auto;
+    flex-wrap: nowrap;
   }
 
   .composer-toolbar-group-right {
-    width: auto;
     flex: 0 0 auto;
     margin-left: auto;
     justify-content: flex-end;

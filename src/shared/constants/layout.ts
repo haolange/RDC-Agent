@@ -14,8 +14,18 @@ export const RIGHT_RAIL_DRAWER_BREAKPOINT = 920;
 export const APP_MIN_MAIN_WIDTH = 480;
 export const APP_RESIZE_HANDLE_WIDTH = 8;
 
-/** Composer-authoritative app floor when sidebars are collapsed or hidden. */
-export const APP_MIN_WINDOW_WIDTH = APP_MIN_MAIN_WIDTH;
+export const APP_DEFAULT_WINDOW_WIDTH = 1400;
+export const APP_DEFAULT_WINDOW_HEIGHT = 900;
+export const APP_MIN_WINDOW_HEIGHT = 640;
+
+/**
+ * Window floor: left rail at its layout min + composer main column + one resize handle.
+ * Right rail may auto-collapse / enter drawer before this floor is reached.
+ */
+export const APP_MIN_WINDOW_WIDTH =
+  LEFT_SIDEBAR_MIN_WIDTH
+  + APP_MIN_MAIN_WIDTH
+  + APP_RESIZE_HANDLE_WIDTH;
 
 /** Minimum width when both sidebars remain expanded at their layout mins. */
 export const APP_FULL_CHROME_MIN_WIDTH =

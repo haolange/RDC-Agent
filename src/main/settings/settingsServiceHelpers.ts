@@ -40,6 +40,7 @@ import {
   sanitizeAgentRuntimeSettings,
   sanitizeSidebar,
   sanitizeTerminal,
+  sanitizeWindow,
   sanitizeToolingSettings,
 } from './settingsSanitize';
 import {
@@ -216,6 +217,7 @@ export function rebuildPersistedSettings(
       leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
       rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
       terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal),
+      window: sanitizeWindow(candidate.layout?.window, fallback.layout?.window ?? DEFAULT_LAYOUT.window),
     },
     profile: {
       nickname: typeof candidate.profile?.nickname === 'string' && candidate.profile.nickname.trim()
@@ -259,6 +261,7 @@ export function normalizePersistedSettings(
       leftSidebar: sanitizeSidebar(candidate.layout?.leftSidebar, LEFT_DEFAULTS, fallback.layout?.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar),
       rightPanel: sanitizeSidebar(candidate.layout?.rightPanel, RIGHT_DEFAULTS, fallback.layout?.rightPanel ?? DEFAULT_LAYOUT.rightPanel),
       terminal: sanitizeTerminal(candidate.layout?.terminal, fallback.layout?.terminal ?? DEFAULT_LAYOUT.terminal),
+      window: sanitizeWindow(candidate.layout?.window, fallback.layout?.window ?? DEFAULT_LAYOUT.window),
     },
     profile: {
       nickname: typeof candidate.profile?.nickname === 'string' && candidate.profile.nickname.trim()

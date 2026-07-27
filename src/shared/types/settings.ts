@@ -252,10 +252,20 @@ export interface TerminalLayoutPreference {
   height: number;
 }
 
+/** Desktop BrowserWindow geometry. Restored on launch; ignored by Browser QA. */
+export interface WindowLayoutPreference {
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  isMaximized: boolean;
+}
+
 export interface LayoutPreferences {
   leftSidebar: SidebarLayoutPreference;
   rightPanel: SidebarLayoutPreference;
   terminal: TerminalLayoutPreference;
+  window: WindowLayoutPreference;
 }
 
 export interface UiPreferences {
@@ -535,6 +545,7 @@ export type AppSettingsPatch = Partial<{
     leftSidebar: Partial<SidebarLayoutPreference>;
     rightPanel: Partial<SidebarLayoutPreference>;
     terminal: Partial<TerminalLayoutPreference>;
+    window: Partial<WindowLayoutPreference>;
   }>;
   profile: Partial<ProfileSettings>;
   tooling: Partial<{

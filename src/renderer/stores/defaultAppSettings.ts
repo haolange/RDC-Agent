@@ -1,5 +1,7 @@
 import type { AppSettings, LlmAgentRoute } from '@shared/types/settings';
 import {
+  APP_DEFAULT_WINDOW_HEIGHT,
+  APP_DEFAULT_WINDOW_WIDTH,
   LEFT_SIDEBAR_DEFAULT_WIDTH,
   RIGHT_PANEL_DEFAULT_WIDTH,
   TERMINAL_DEFAULT_HEIGHT,
@@ -29,6 +31,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
     leftSidebar: { collapsed: false, width: LEFT_SIDEBAR_DEFAULT_WIDTH, expandedWidth: LEFT_SIDEBAR_DEFAULT_WIDTH },
     rightPanel: { collapsed: false, width: RIGHT_PANEL_DEFAULT_WIDTH, expandedWidth: RIGHT_PANEL_DEFAULT_WIDTH },
     terminal: { height: TERMINAL_DEFAULT_HEIGHT },
+    window: {
+      width: APP_DEFAULT_WINDOW_WIDTH,
+      height: APP_DEFAULT_WINDOW_HEIGHT,
+      x: 0,
+      y: 0,
+      isMaximized: false,
+    },
   },
   profile: { nickname: 'RDC Operator', avatarPath: '' },
   tooling: {

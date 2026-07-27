@@ -63,6 +63,7 @@ import {
   sanitizeRdxCliInvokerSettings,
   sanitizeSidebar,
   sanitizeTerminal,
+  sanitizeWindow,
 } from './settingsSanitize';
 import { SettingsAgentOps } from './SettingsAgentOps';
 import { SettingsProviderOps } from './SettingsProviderOps';
@@ -270,6 +271,13 @@ export class SettingsService {
             ...(patch.layout?.terminal ?? {}),
           },
           DEFAULT_LAYOUT.terminal,
+        ),
+        window: sanitizeWindow(
+          {
+            ...(currentPersisted.layout?.window ?? DEFAULT_LAYOUT.window),
+            ...(patch.layout?.window ?? {}),
+          },
+          DEFAULT_LAYOUT.window,
         ),
       },
       profile: {
