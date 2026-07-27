@@ -105,6 +105,7 @@
     minmax(0, 1fr)
     var(--right-resize-handle-width, 8px)
     var(--right-panel-width, 312px);
+  min-width: 30rem; /* APP_MIN_MAIN_WIDTH — composer floor; sidebars collapse below tri-pane */
   min-height: 0;
   overflow: hidden;
   transition: grid-template-columns 240ms cubic-bezier(0.2, 0.9, 0.2, 1);

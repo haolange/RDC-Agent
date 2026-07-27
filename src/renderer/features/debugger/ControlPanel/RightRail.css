@@ -33,8 +33,8 @@
 }
 
 .right-rail-section.is-empty {
-  max-inline-size: 22rem;
-  align-self: center;
+  flex: 0 0 auto;
+  inline-size: 100%;
 }
 
 .right-rail-section-heading {
@@ -54,6 +54,10 @@
 }
 
 .right-rail-section:not(.is-empty) .right-rail-section-content {
+  margin-top: var(--space-3);
+}
+
+.right-rail-section.is-empty .right-rail-section-content {
   margin-top: var(--space-3);
 }
 
@@ -459,8 +463,7 @@
 
 /* Project selection is intentionally a different, input-only surface. */
 .project-capture-rail {
-  inline-size: min(100%, 24rem);
-  align-self: center;
+  inline-size: 100%;
   gap: 0;
   padding: var(--space-5);
 }
@@ -536,7 +539,6 @@
 @media (max-width: 32rem) {
   .right-rail-section,
   .project-capture-rail { inline-size: 100%; }
-  .right-rail-section.is-empty { max-inline-size: none; }
   .right-rail-capture-controls { grid-template-columns: minmax(0, 1fr) auto; }
   .right-rail-capture-input-picker { grid-column: 1 / -1; }
   .right-rail-device-picker { grid-column: 1; }

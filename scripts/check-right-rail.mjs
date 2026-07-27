@@ -111,7 +111,7 @@ for (const required of ['RdxContextPanelViewModel', "'Open'", "'Preview'", "'Ref
 }
 
 const rightRailCss = read('src/renderer/features/debugger/ControlPanel/RightRail.css');
-for (const required of ['.right-rail-empty-state', '.right-rail-empty-visual', 'grid-template-rows:', 'font-size: var(--text-md)', 'font-size: var(--text-xl)', '.right-rail-capture-panel', '.project-capture-import-section', '.output-visual', '.context-visual', '.capture-visual']) {
+for (const required of ['.right-rail-empty-state', '.right-rail-empty-visual', 'grid-template-rows:', 'flex: 0 0 auto', 'font-size: var(--text-md)', 'font-size: var(--text-xl)', '.right-rail-capture-panel', '.project-capture-import-section', '.output-visual', '.context-visual', '.capture-visual']) {
   requireText(rightRailCss, required, `RightRail.css must retain ${required}`);
 }
 for (const forbidden of ['.control-panel', '.cp-section', '.capture-library', '.panel-action-btn', 'trace-plan-preview', 'is-plan', '.right-rail-details', '.right-rail-context-area-heading', '.right-rail-rdx-context']) {
