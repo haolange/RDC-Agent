@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent CoT Acceptance — Pseudo Play</title>
+  <link rel="stylesheet" href="shared/tokens.css" />
+  <link rel="stylesheet" href="shared/work-process.css" />
+</head>
+<body>
+  <div class="cot-shell" id="cot-shell">
+    <main class="cot-main">
+      <p class="cot-note">
+        <strong>伪执行主路径。</strong>
+        按时间轴注入 Thinking → Commentary → 多族 Tools → Plan/Task → Compact → Final。
+        对齐本库 Work Process：运行中「工作中」+ Active Signal；完成后「工作过程」+ meta；thinking 纯文本；commentary/final 走 Markdown。
+      </p>
+      <div class="conversation-thread">
+        <div class="conversation-thread-item">
+          <div class="conversation-bubble conversation-bubble-user" data-user-prompt>
+            检查当前 session 的 RDX 上下文归属，并给出下一步计划。
+          </div>
+        </div>
+        <div class="conversation-thread-item" id="wp-mount"></div>
+        <div class="conversation-thread-item hidden" id="final-mount"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="shared/icons.js"></script>
+  <script src="shared/i18n.js"></script>
+  <script src="shared/render.js"></script>
+  <script src="shared/mock-runtime.js"></script>
+  <script src="shared/shell.js"></script>
+  <script>
+    CotShell.ensureTheme();
+    CotI18n.setLocale(CotI18n.getLocale());
+
+    const player = CotMockRuntime.createPlayer({
+      mount: '#wp-mount',
+      finalMount: '#final-mount',
+      intervalMs: 650,
+      onTick({ playing }) {
+        const playBtn = document.querySelector('[data-play]');
+        if (playBtn) playBtn.textContent = playing ? CotI18n.t('pause') : CotI18n.t('play');
+      },
+    });
+
+    function remountChrome() {
+      CotShell.mountShell({
+        root: true,
+        active: 'index',
+        extraControls: `
+          <button type="button" class="cot-btn is-primary" data-play>${CotI18n.t('play')}</button>
+          <button type="button" class="cot-btn" data-replay>${CotI18n.t('replay')}</button>
+          <button type="button" class="cot-btn" data-jump>${CotI18n.t('jumpDone')}</button>
+        `,
+        onLocaleChange() {
+          const user = document.querySelector('[data-user-prompt]');
+          if (user) {
+            user.textContent = CotI18n.getLocale() === 'en'
+              ? 'Check RDX context ownership for this session and propose next steps.'
+              : '检查当前 session 的 RDX 上下文归属，并给出下一步计划。';
+          }
+          player.render();
+          wireControls();
+        },
+      });
+      wireControls();
+    }
+
+    function wireControls() {
+      document.querySelector('[data-play]')?.addEventListener('click', () => {
+        if (player.isPlaying()) player.pause();
+        else player.play();
+      });
+      document.querySelector('[data-replay]')?.addEventListener('click', () => player.replay());
+      document.querySelector('[data-jump]')?.addEventListener('click', () => player.jumpDone());
+    }
+
+    remountChrome();
+    player.play();
+  </script>
+</body>
+</html>
