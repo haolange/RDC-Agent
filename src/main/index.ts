@@ -23,11 +23,15 @@ import {
   stopBrowserAppBridge,
 } from './browserAppBridge/BrowserAppBridgeServer';
 import { shutdownCoordinator } from './lifecycle/ShutdownCoordinator';
-import { APP_MIN_MAIN_WIDTH } from '@shared/constants/layout';
+import { APP_MIN_WINDOW_HEIGHT, APP_MIN_WINDOW_WIDTH } from '@shared/constants/layout';
 import { conversationService } from './conversation/ConversationService';
 import { agentOrchestrator } from './workflow/debugger/AgentOrchestrator';
 import { processSupervisor } from './runtime/ProcessSupervisor';
 import { turnCoordinator } from './workflow/debugger/TurnCoordinator';
+import {
+  bindWindowLayoutPersistence,
+  resolveWindowCreationOptions,
+} from './window/windowLayoutPersistence';
 
 // Re-export for callers that historically imported from main entry.
 export { rdxSessionService } from './sessions';
@@ -358,11 +362,17 @@ function setupKeyboardShortcuts(window: BrowserWindow): void {
  * Create the main window.
  */
 function createMainWindow(): void {
+  const savedWindow = settingsService.getAll().layout.window;
+  const windowOptions = resolveWindowCreationOptions(savedWindow);
+
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    minWidth: APP_MIN_MAIN_WIDTH,
-    minHeight: 640,
+    width: windowOptions.width,
+    height: windowOptions.height,
+    ...(typeof windowOptions.x === 'number' && typeof windowOptions.y === 'number'
+      ? { x: windowOptions.x, y: windowOptions.y }
+      : {}),
+    minWidth: APP_MIN_WINDOW_WIDTH,
+    minHeight: APP_MIN_WINDOW_HEIGHT,
     title: 'RdcAgent - RenderDoc Debug Agent',
     show: false,
     webPreferences: {
@@ -390,13 +400,18 @@ function createMainWindow(): void {
 
   // Show after the window is ready.
   mainWindow.once('ready-to-show', () => {
-    mainWindow?.show();
+    if (!mainWindow) return;
+    if (windowOptions.isMaximized) {
+      mainWindow.maximize();
+    }
+    mainWindow.show();
   });
 
   mainWindow.on('maximize', emitWindowMaximizedState);
   mainWindow.on('unmaximize', emitWindowMaximizedState);
   mainWindow.on('enter-full-screen', emitWindowMaximizedState);
   mainWindow.on('leave-full-screen', emitWindowMaximizedState);
+  bindWindowLayoutPersistence(mainWindow);
 
   // Clear the main window reference after close.
   mainWindow.on('closed', () => {

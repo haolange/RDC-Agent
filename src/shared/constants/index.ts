@@ -35,8 +35,11 @@ export {
 } from './agents';
 export { BLOCKER_CODES, getBlockersByCategory, getBlockersBySeverity } from './blockers';
 export {
+  APP_DEFAULT_WINDOW_HEIGHT,
+  APP_DEFAULT_WINDOW_WIDTH,
   APP_FULL_CHROME_MIN_WIDTH,
   APP_MIN_MAIN_WIDTH,
+  APP_MIN_WINDOW_HEIGHT,
   APP_MIN_WINDOW_WIDTH,
   APP_RESIZE_HANDLE_WIDTH,
   LEFT_SIDEBAR_COLLAPSED_WIDTH,

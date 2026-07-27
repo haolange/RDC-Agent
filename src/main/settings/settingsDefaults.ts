@@ -15,6 +15,8 @@ import type {
 } from '@shared/types/settings';
 import { createDefaultUiPreferences } from '@shared/theme/uiPreferences';
 import {
+  APP_DEFAULT_WINDOW_HEIGHT,
+  APP_DEFAULT_WINDOW_WIDTH,
   LEFT_SIDEBAR_COLLAPSED_WIDTH,
   LEFT_SIDEBAR_DEFAULT_WIDTH,
   LEFT_SIDEBAR_MAX_WIDTH,
@@ -94,6 +96,13 @@ export const DEFAULT_LAYOUT: LayoutPreferences = {
   },
   terminal: {
     height: TERMINAL_DEFAULT_HEIGHT,
+  },
+  window: {
+    width: APP_DEFAULT_WINDOW_WIDTH,
+    height: APP_DEFAULT_WINDOW_HEIGHT,
+    x: 0,
+    y: 0,
+    isMaximized: false,
   },
 };
 
