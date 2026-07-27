@@ -415,6 +415,7 @@ export async function completeProfileTurn(
         input.rawMessage,
         {
           sessionId: input.context.session?.sessionId,
+          runId: isActiveRun(input.context.currentRun) ? input.context.currentRun.runId : undefined,
           turnId: assistantMessage.turnId,
           stage: 'investigate',
           projectRootPath: prepared.projectRootPath,
@@ -632,6 +633,24 @@ export async function completeProfileTurn(
       }
     }
     host.clearActiveTurn(assistantMessage.turnId, abortController);
+    const ownedRun = input.context.currentRun;
+    if (sessionId && isActiveRun(ownedRun)) {
+      const terminalRunStatus = assistantMessage.status === 'stopped'
+        ? 'cancelled'
+        : assistantMessage.status === 'error'
+          ? 'failed'
+          : 'completed';
+      try {
+        await storageAdapter.updateRun(sessionId, ownedRun.runId, {
+          status: terminalRunStatus,
+          finishedAt: nowMs(),
+          lastStage: 'finalize',
+          runtime: { workflow_stage: 'finalize' },
+        });
+      } catch (error) {
+        console.error(`[ConversationService] Failed to finalize run ${ownedRun.runId}:`, error);
+      }
+    }
     agentOrchestrator.releaseProviderRuntimeCredentials(input.preparedTurn.runtime.credentialHandle);
     settleStopped();
   }

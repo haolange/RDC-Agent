@@ -33,7 +33,7 @@ Open `.rdc` (`openCapture` / `openRemoteCapture`), connect remote, preview, and 
 
 The tool catalog is loaded from the configured `catalogPath`. Catalog metadata is exposed through `tool:getCatalog` and `tool:getRuntimeSummary`.
 
-Workbench right rail must **not** render a per-tool `rd.*` inventory. RDX capability status in UI comes from `tool:getRuntimeSummary` (CLI available / source / command / catalog present / namespace counts). Skills and Artifacts remain separate session panels. Renderer code cannot invoke arbitrary tools; execution stays on Settings shell actions / bash → `ShellInvocationService` → external CLI.
+Workbench right rail must **not** render a per-tool `rd.*` inventory, CLI catalog summary, tool count, or namespace counts. The session Capture area consumes the owner-session opened-capture and runtime context snapshot for `.rdc` selection, open/preview state, Replay Device, compact diagnostics, and Copy. contextId/replaySessionId/capture ids, lease/runtime owner, remoteId, and remote status remain owner-scoped agent data. Renderer code cannot invoke arbitrary tools; execution stays on Settings shell actions / bash -> `ShellInvocationService` -> external CLI.
 
 ## Trace Contract
 
@@ -59,7 +59,7 @@ Do not add call-site constants for commands, catalog paths, or environment varia
 | Shared type or settings schema | `pnpm run typecheck`, `pnpm run check:shared-exports` |
 | Renderer structure or anchors | `pnpm run typecheck`, `pnpm run check:architecture`, `pnpm run check:fidelity` |
 | Main IPC or invocation boundary | `pnpm run typecheck`, `pnpm run build`, shell smoke when available |
-| RDX CLI catalog/tooling config | `pnpm run typecheck`, catalog/runtime summary smoke |
+| RDX shell action config | `pnpm run typecheck`, scoped open/preview smoke when available |
 | Settings Agents routing | `pnpm run check:settings-agents` |
 | Product browser flow with real local inputs | `pnpm run start:agent-browser`, then inspect `/app` in the Codex in-app browser with real project and `.rdc` inputs |
 | Documentation only | Path and terminology scan |
@@ -72,3 +72,7 @@ Do not add call-site constants for commands, catalog paths, or environment varia
 - Do not expose generic execution from renderer/preload.
 - Do not keep stale docs that point to removed files or old IPC names.
 - Do not commit mojibake or unreadable encoded text; restore readable UTF-8 before merging.
+
+## Right Rail projection
+
+Workbench Right Rail has two target-specific forms: a selected Project shows only `Import .rdc` and project inputs; a selected Session shows `Progress / Outputs / Context / Capture`, with Capture always visible. It must not render a per-tool `rd.*` inventory, standalone Memory panel, duplicate Skills catalog, CLI catalog summary, tool count, or namespace counts. Context only presents real task resources: attachments, references, tools, and used capabilities. Capture presents an honest empty state when no project input exists; otherwise it presents owner-session `.rdc` selection/open/preview/refresh/copy/clear and Replay Device. contextId/replaySessionId/capture ids, lease/runtime owner, and remoteId/remote status remain owner-scoped runtime data for agent consumption rather than visible inventory. Diagnostics stay deduplicated and actionable. CLI unavailable is only a diagnostic for failed open/preview shell actions; the sidebar does not expose CLI catalog metadata. Renderer code cannot invoke arbitrary tools or reconstruct runtime state; execution stays on Settings shell actions / bash -> `ShellInvocationService` -> external CLI. Attachments and uploads are Task Context inputs; Outputs require explicit `output_register` publication of a completed project file into the owning run and use only user-facing source labels.

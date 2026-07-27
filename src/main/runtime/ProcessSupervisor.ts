@@ -114,9 +114,8 @@ interface RegistryEntry {
 function terminateTree(pid: number | undefined, signal: NodeJS.Signals = 'SIGTERM'): void {
   if (pid == null || pid <= 0) return;
   if (process.platform === 'win32') {
-    // /T = tree; /F only for hard kill
-    const force = signal === 'SIGKILL';
-    spawnSync('taskkill', ['/pid', String(pid), '/T', ...(force ? ['/F'] : [])], {
+    // taskkill has no graceful process-tree signal; /F is the only bounded abort.
+    spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], {
       windowsHide: true,
       stdio: 'ignore',
     });
@@ -252,6 +251,11 @@ export class ProcessSupervisor {
       if (entry.exitInfo) return;
       entry.forcedReason = reason;
       terminateTree(child.pid, 'SIGTERM');
+      try {
+        if (!child.killed) child.kill();
+      } catch {
+        // Parent already exited; the tree-kill path above remains authoritative.
+      }
       entry.killTimer = setTimeout(() => {
         terminateTree(child.pid, 'SIGKILL');
       }, DEFAULT_GRACE_MS);
@@ -277,8 +281,16 @@ export class ProcessSupervisor {
           exitPromise,
           new Promise<ProcessExitInfo>((resolve) => {
             const timer = setTimeout(() => {
-              abort('timeout');
-              void exitPromise.then(resolve);
+              if (!entry.exitInfo && !entry.forcedReason) abort('timeout');
+              const reason = entry.forcedReason ?? 'timeout';
+              const info: ProcessExitInfo = {
+                reason,
+                code: null,
+                signal: null,
+                durationMs: Date.now() - startedAt,
+              };
+              settle(info);
+              resolve(info);
             }, timeoutMs);
             timer.unref?.();
           }),

@@ -53,7 +53,6 @@ export const IPC_HANDLER_DOMAINS = {
     'session:select',
     'session:attachments:list',
     'session:attachments:import',
-    'session:outputs:list',
     'run:list',
   ],
   captureDevice: [

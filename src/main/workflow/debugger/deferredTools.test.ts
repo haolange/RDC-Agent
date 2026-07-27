@@ -8,6 +8,7 @@ import {
   isDeferredToolName,
   isMcpPrefixedToolName,
   partitionDeferredTools,
+  preactivateTaskLifecycleTools,
 } from './deferredTools';
 
 describe('isMcpPrefixedToolName', () => {
@@ -39,6 +40,22 @@ describe('isDeferredToolName', () => {
   });
 });
 
+describe('preactivateTaskLifecycleTools', () => {
+  it('activates creation and update only when the complete task capability is available', () => {
+    const activated = new Set<string>(['mcp__fs__read']);
+    preactivateTaskLifecycleTools([
+      { name: 'task_create' },
+      { name: 'task_update' },
+      { name: 'output_register' },
+      { name: 'task_list' },
+    ], activated);
+    expect([...activated]).toEqual(['mcp__fs__read', 'task_create', 'task_update', 'output_register']);
+
+    const incomplete = new Set<string>();
+    preactivateTaskLifecycleTools([{ name: 'task_create' }], incomplete);
+    expect(incomplete).toEqual(new Set());
+  });
+});
 describe('partitionDeferredTools', () => {
   const defs = [
     { name: 'read_file' },

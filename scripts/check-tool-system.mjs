@@ -40,8 +40,8 @@ function main() {
   const { WORK_PROCESS_TOOL_DISPLAY_CATALOG } = require('../src/renderer/features/debugger/AgentChat/workProcessToolCatalog.ts');
 
   assert(
-    BUILTIN_AGENT_TOOL_IDS.length === 36,
-    `BUILTIN_AGENT_TOOL_IDS.length must be 36, got ${BUILTIN_AGENT_TOOL_IDS.length}`,
+    BUILTIN_AGENT_TOOL_IDS.length === 37,
+    `BUILTIN_AGENT_TOOL_IDS.length must be 37, got ${BUILTIN_AGENT_TOOL_IDS.length}`,
   );
 
   const builtinSet = new Set(BUILTIN_AGENT_TOOL_IDS);
@@ -189,27 +189,43 @@ function main() {
     path.join(repoRoot, 'src/main/workflow/debugger/AgentOrchestrator.ts'),
     'utf8',
   );
-  assert(
-    orchestrator.includes('partitionDeferredTools'),
-    'AgentOrchestrator must use partitionDeferredTools for deferred loading',
+  const turnPreparationService = fs.readFileSync(
+    path.join(repoRoot, 'src/main/workflow/debugger/TurnPreparationService.ts'),
+    'utf8',
+  );
+  const runtimeToolAssembly = fs.readFileSync(
+    path.join(repoRoot, 'src/main/workflow/debugger/RuntimeToolAssembly.ts'),
+    'utf8',
+  );
+  const toolExecutorFactory = fs.readFileSync(
+    path.join(repoRoot, 'src/main/workflow/debugger/ToolExecutorFactory.ts'),
+    'utf8',
   );
   assert(
-    orchestrator.includes('mcp_tools_deferred'),
-    'AgentOrchestrator breakdown must emit mcp_tools_deferred',
+    orchestrator.includes('new RuntimeToolAssembly'),
+    'AgentOrchestrator must own the RuntimeToolAssembly collaboration boundary',
   );
   assert(
-    orchestrator.includes('builtin_tools_deferred'),
-    'AgentOrchestrator breakdown must emit builtin_tools_deferred',
+    turnPreparationService.includes('partitionDeferredTools'),
+    'TurnPreparationService must partition deferred tools before PromptPlan construction',
+  );
+  assert(
+    turnPreparationService.includes('mcp_tools_deferred'),
+    'TurnPreparationService breakdown must emit mcp_tools_deferred',
+  );
+  assert(
+    turnPreparationService.includes('builtin_tools_deferred'),
+    'TurnPreparationService breakdown must emit builtin_tools_deferred',
   );
   // tool_search must only discover the allowlist/runtime-policy filtered tool set.
   assert(
-    /createToolSearchTool\(\(\)\s*=>\s*\n?\s*Array\.from\(availableTools\.values\(\)\)\.filter/.test(orchestrator),
-    'tool_search closure must filter available tools by allowlist and runtime policy',
+    /createToolSearchTool\(\(\)\s*=>\s*\n?\s*Array\.from\(availableTools\.values\(\)\)\.filter/.test(runtimeToolAssembly),
+    'RuntimeToolAssembly tool_search closure must filter available tools by allowlist and runtime policy',
   );
-  // Skill allowed-tools narrowing must be wired into the tool executor.
+  // Skill allowed-tools narrowing must be wired into the executor, not the façade.
   assert(
-    orchestrator.includes('intersectSkillAllowedTools'),
-    'AgentOrchestrator must intersect skill allowed-tools with the runtime allowlist',
+    toolExecutorFactory.includes('intersectSkillAllowedTools'),
+    'ToolExecutorFactory must intersect skill allowed-tools with the runtime allowlist',
   );
 
   // Primitive tool convergence contracts.

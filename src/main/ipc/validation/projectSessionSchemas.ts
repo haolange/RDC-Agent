@@ -26,7 +26,9 @@ export const SessionListArgsSchema = OptionalProjectIdArgsSchema;
 
 export const SessionCreateArgsSchema = z.tuple([
   ipcId(128, 'projectId'),
-  ipcString(200, 'title').optional(),
+  // JSON bridge payloads serialize an omitted optional positional argument as
+  // null. Normalize that transport representation at the IPC boundary.
+  ipcString(200, 'title').nullable().optional().transform((title) => title ?? undefined),
 ]);
 
 export const SessionRenameArgsSchema = z.tuple([
@@ -38,10 +40,6 @@ export const SessionIdOnlyArgsSchema = z.tuple([
   ipcId(128, 'sessionId'),
 ]);
 
-export const SessionOutputsListArgsSchema = z.tuple([
-  ipcId(128, 'sessionId'),
-  ipcId(128, 'runId').optional(),
-]);
 
 export const SessionAttachmentsImportArgsSchema = z.tuple([
   ipcId(128, 'sessionId'),

@@ -44,6 +44,8 @@ export interface AgentTurnOptions {
 
 export interface AgentProfileTurnOptions extends AgentTurnOptions {
   sessionId?: string;
+  /** Durable run that owns user-visible outputs from this turn. */
+  runId?: string;
   systemPrompt?: string;
   maxTokens?: number;
   temperature?: number;
@@ -103,6 +105,7 @@ export interface PreparedAgentTurnContext {
 
 export interface ToolExecutorRuntimeContext {
   sessionId?: string | null;
+  runId?: string;
   turnId?: string;
   eventContext?: AgentEventBridgeContext;
   onEvent?: (event: SharedAgentEvent) => void;

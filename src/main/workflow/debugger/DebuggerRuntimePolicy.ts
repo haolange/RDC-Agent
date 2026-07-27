@@ -69,6 +69,8 @@ const RUNTIME_TOOL_ALIASES: Record<string, string> = {
   planArtifact: 'plan_artifact',
   artifact: 'plan_artifact',
   plan_artifact: 'plan_artifact',
+  output: 'output_register',
+  output_register: 'output_register',
   'vscode/memory': 'memory_read',
   skill: 'skills',
   skills: 'skills',
@@ -109,6 +111,7 @@ const ASK_DENIED_TOOLS = new Set([
   'memory_write',
   'memory_delete',
   'plan_artifact',
+  'output_register',
 ]);
 
 const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
@@ -129,6 +132,7 @@ const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
   'memory_write',
   'memory_delete',
   'plan_artifact',
+  'output_register',
   'skills',
   'skill_read',
   'mcp',

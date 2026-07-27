@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLayoutStore } from '../stores/layoutStore';
+import { useRightRailDrawer } from './useRightRailDrawer';
+import { useNarrowViewport } from './useNarrowViewport';
 import { useProjectStore } from '../stores/projectStore';
 import {
   getResponsiveMinMainWidth,
@@ -12,6 +14,7 @@ import {
   LEFT_SIDEBAR_MIN_WIDTH,
   RIGHT_PANEL_MAX_WIDTH,
   RIGHT_PANEL_MIN_WIDTH,
+  RIGHT_RAIL_DRAWER_BREAKPOINT,
   WORKBENCH_CHAT_RAIL_MAX_WIDTH,
 } from '@shared/constants/layout';
 
@@ -19,7 +22,7 @@ type DragSide = 'left' | 'right';
 type RightRailMode = 'hidden' | 'project' | 'session';
 
 export function useWorkbenchLayout() {
-  const [appBodyWidth, setAppBodyWidth] = useState(0);
+  const [appBodyWidth, setAppBodyWidth] = useState(() => (typeof window === 'undefined' ? 0 : Math.max(0, Math.round(window.innerWidth))));
   const [isResizing, setIsResizing] = useState(false);
   const appBodyRef = useRef<HTMLDivElement>(null);
   const dragStateRef = useRef<{ side: DragSide; startX: number; startWidth: number } | null>(null);
@@ -34,6 +37,7 @@ export function useWorkbenchLayout() {
   const setLeftSidebarWidth = useLayoutStore((state) => state.setLeftSidebarWidth);
   const setRightPanelWidth = useLayoutStore((state) => state.setRightPanelWidth);
   const persistLayout = useLayoutStore((state) => state.persistLayout);
+  const isRightRailDrawerViewport = useNarrowViewport(RIGHT_RAIL_DRAWER_BREAKPOINT);
 
   const rightRailMode: RightRailMode = !currentProject
     ? 'hidden'
@@ -58,7 +62,9 @@ export function useWorkbenchLayout() {
   const effectiveRightCollapsed = isRightRailVisible ? responsiveSidebarState.rightCollapsed : true;
   const bothSidebarsCollapsed = effectiveLeftCollapsed && (!isRightRailVisible || effectiveRightCollapsed);
   const leftAutoCollapsed = !leftSidebarCollapsed && effectiveLeftCollapsed;
-  const rightAutoCollapsed = isRightRailVisible && !rightPanelCollapsed && effectiveRightCollapsed;
+  const isRightRailAutoCollapsed = isRightRailVisible && !rightPanelCollapsed && effectiveRightCollapsed;
+  const isRightRailDrawerMode = isRightRailVisible && (isRightRailDrawerViewport || isRightRailAutoCollapsed);
+  const rightRailDrawer = useRightRailDrawer(isRightRailDrawerMode);
 
   const resolvedWidths = useMemo(
     () => resolveSidebarWidths(
@@ -183,7 +189,11 @@ export function useWorkbenchLayout() {
     effectiveRightCollapsed,
     bothSidebarsCollapsed,
     leftToggleDisabled: leftAutoCollapsed,
-    rightToggleDisabled: !isRightRailVisible || rightAutoCollapsed,
+    rightToggleDisabled: !isRightRailVisible,
+    isRightRailDrawerMode,
+    isRightRailDrawerOpen: rightRailDrawer.isOpen,
+    toggleRightRailDrawer: rightRailDrawer.toggle,
+    closeRightRailDrawer: rightRailDrawer.close,
     workbenchRailMaxWidth: WORKBENCH_CHAT_RAIL_MAX_WIDTH,
     resolvedWidths,
     startDragging,

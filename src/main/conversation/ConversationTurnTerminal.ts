@@ -75,7 +75,7 @@ export function publishTraceProjection(sessionId: string | null | undefined): vo
     void traceService.getSession(sessionId)
       .then((result) => {
         if (result.success && result.presentation) {
-          workflowProjectionPublisher.publishTraceProjectionChanged(sessionId, result.presentation);
+          workflowProjectionPublisher.publishTraceProjectionChanged({ projectId: result.presentation.projectId, sessionId: result.presentation.sessionId }, result.presentation);
         }
       })
       .catch((error) => {
@@ -96,7 +96,7 @@ export function publishConversationTrace(
 
     void traceService.buildConversationPresentation(traceSessionId, messages)
       .then((presentation) => {
-        workflowProjectionPublisher.publishTraceProjectionChanged(traceSessionId, presentation);
+        workflowProjectionPublisher.publishTraceProjectionChanged({ projectId: presentation.projectId, sessionId: presentation.sessionId }, presentation);
       });
   }
 

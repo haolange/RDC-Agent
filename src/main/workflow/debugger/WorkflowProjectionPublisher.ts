@@ -2,7 +2,7 @@ import { BrowserWindow } from 'electron';
 import type { AgentMessage, AgentState } from '@shared/types/agent';
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationStreamEvent } from '@shared/types/conversation';
-import type { RunContextUsageSummary, RunSummary } from '@shared/types/session';
+import type { RunContextUsageSummary, RunSummary, SessionScope } from '@shared/types/session';
 import type { WorkflowState } from '@shared/types/workflow';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import { rendererEventHub } from '../../browserAppBridge/rendererEventHub';
@@ -41,9 +41,9 @@ export class WorkflowProjectionPublisher {
     this.publish('workflow:runUsageChanged', usage);
   }
 
-  publishTraceProjectionChanged(sessionId: string, presentation: AgentRunPresentation): void {
+  publishTraceProjectionChanged(scope: SessionScope, presentation: AgentRunPresentation): void {
     this.publish('trace:projectionChanged', {
-      sessionId,
+      ...scope,
       presentation,
     });
   }

@@ -54,14 +54,15 @@ import type {
   RunContextUsageSummary,
   RunSummary,
   SessionAttachmentRecord,
-  SessionOutputRecord,
   SessionRecord,
+  SessionScope,
+  SessionScopedPayload,
 } from './session';
 import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
 import type { ToolCatalog, ToolRuntimeSummary } from './tool';
 import type { MCPServerStatusSummary } from './mcp';
 import type { CommandExecuteRequest, CommandListResult, CommandResult } from './command';
-import type { AgentRun, AgentRunPresentation, TraceEvent } from './agenticTrace';
+import type { AgentRun, TraceEvent, TraceProjectionChangedPayload } from './agenticTrace';
 import type {
   TraceBranchSwitchResult,
   TraceSessionResult,
@@ -371,11 +372,7 @@ export interface ElectronAPI {
         error?: string;
       }>;
     };
-    outputs: {
-      list: (sessionId: string, runId?: string) => Promise<{
-        outputs: SessionOutputRecord[];
-      }>;
-    };
+
   };
 
   run: {
@@ -398,8 +395,8 @@ export interface ElectronAPI {
   };
 
   capture: {
-    list: () => Promise<{ captures: CaptureDescriptor[] }>;
-    select: (captureId: string) => Promise<{
+    list: (scope: SessionScope) => Promise<{ captures: CaptureDescriptor[] }>;
+    select: (request: SessionScope & { captureId: string }) => Promise<{
       success: boolean;
       error?: string;
     }>;
@@ -408,25 +405,26 @@ export interface ElectronAPI {
     ) => Promise<{
       success: boolean;
       openedCapture?: OpenedCaptureState;
-      contextSnapshot?: ContextSnapshot;
+      contextSnapshot?: ContextSnapshot | null;
       error?: string;
     }>;
-    getOpenedState: () => Promise<OpenedCaptureState | null>;
-    clearOpenedState: () => Promise<{
+    getOpenedState: (scope: SessionScope) => Promise<OpenedCaptureState | null>;
+    clearOpenedState: (scope: SessionScope) => Promise<{
       success: boolean;
+      error?: string;
     }>;
   };
 
   context: {
-    get: () => Promise<ContextSnapshot>;
-    openHumanPreview: (request?: { sessionId?: string }) => Promise<{
+    get: (scope: SessionScope) => Promise<ContextSnapshot | null>;
+    openHumanPreview: (scope: SessionScope) => Promise<{
       success: boolean;
-      contextSnapshot?: ContextSnapshot;
+      contextSnapshot?: ContextSnapshot | null;
       error?: string;
     }>;
-    closeHumanPreview: () => Promise<{
+    closeHumanPreview: (scope: SessionScope) => Promise<{
       success: boolean;
-      contextSnapshot?: ContextSnapshot;
+      contextSnapshot?: ContextSnapshot | null;
       error?: string;
     }>;
   };
@@ -444,17 +442,17 @@ export interface ElectronAPI {
     onWorkflowStageChanged: (callback: (data: { stage: WorkflowStage; blockers: unknown[] }) => void) => () => void;
     onRunStatusChanged: (callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; lastStage?: string; stopReason?: string }) => void) => () => void;
     onRunUsageChanged: (callback: (summary: RunContextUsageSummary) => void) => () => void;
-    onTraceProjectionChanged: (callback: (payload: { sessionId: string; presentation: AgentRunPresentation }) => void) => () => void;
+    onTraceProjectionChanged: (callback: (payload: TraceProjectionChangedPayload) => void) => () => void;
     onEffectiveCatalogChanged: (callback: (snapshot: EffectiveCatalogSnapshot) => void) => () => void;
     onAgentMessage: (callback: (msg: unknown) => void) => () => void;
     onAgentStatusChanged: (callback: (state: AgentState) => void) => () => void;
     onToolExecutionComplete: (callback: (trace: unknown) => void) => () => void;
     onEvidenceEventAdded: (callback: (event: ActionEvent) => void) => () => void;
     onDeviceStatusChanged: (callback: (status: ReplayDeviceStatusChangedPayload) => void) => () => void;
-    onCaptureStatusChanged: (callback: (status: unknown) => void) => () => void;
-    onContextChanged: (callback: (snapshot: ContextSnapshot) => void) => () => void;
+    onCaptureStatusChanged: (callback: (status: SessionScopedPayload<unknown>) => void) => () => void;
+    onContextChanged: (callback: (snapshot: SessionScopedPayload<ContextSnapshot | null>) => void) => () => void;
     onProjectInputsChanged: (callback: (payload: { projectId: string; inputs: ProjectInputRecord[] }) => void) => () => void;
-    onOpenedCaptureStateChanged: (callback: (state: OpenedCaptureState | null) => void) => () => void;
+    onOpenedCaptureStateChanged: (callback: (state: SessionScopedPayload<OpenedCaptureState | null>) => void) => () => void;
     onRuntimeLogAppended: (callback: (entry: RuntimeLogEntry) => void) => () => void;
     onTerminalData: (callback: (event: TerminalDataEvent) => void) => () => void;
     onTerminalExit: (callback: (event: TerminalExitEvent) => void) => () => void;

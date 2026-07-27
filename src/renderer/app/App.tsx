@@ -19,7 +19,7 @@ import { useSessionStore } from '../stores/sessionStore';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useI18n } from '../i18n';
-import { isOpenedCaptureOwnedBySession } from '../features/debugger/ControlPanel/SessionContextPanel/sessionContextOwnership';
+import { isOpenedCaptureOwnedBySession } from '../lib/sessionCaptureOwnership';
 import type { ResolvedTheme } from '@shared/types/settings';
 
 const App: React.FC = () => {
@@ -71,11 +71,16 @@ const App: React.FC = () => {
     setShellNotice(message);
   }, []);
 
+  const applyAppearancePreference = useCallback((mutation: () => Promise<void>) => {
+    void mutation().catch((error: unknown) => {
+      showNotice(error instanceof Error ? error.message : 'Unable to update appearance preferences.');
+    });
+  }, [showNotice]);
+
   const syncCapturesFromSnapshot = useSyncCapturesFromSnapshot();
 
   const composer = useComposer({
     showNotice,
-    hasOpenedCaptureForCurrentProject,
     effectiveLeftCollapsed: layout.effectiveLeftCollapsed,
     leftToggleDisabled: layout.leftToggleDisabled,
     toggleLeftSidebar,
@@ -115,7 +120,16 @@ const App: React.FC = () => {
         : null;
 
   const leftPanelToggleLabel = layout.effectiveLeftCollapsed ? t('app.leftSidebarExpand') : t('app.leftSidebarCollapse');
-  const rightPanelToggleLabel = layout.effectiveRightCollapsed ? t('app.rightPanelExpand') : t('app.rightPanelCollapse');
+  const rightPanelToggleLabel = layout.isRightRailDrawerMode
+    ? (layout.isRightRailDrawerOpen ? t('app.rightPanelCollapse') : t('app.rightPanelExpand'))
+    : (layout.effectiveRightCollapsed ? t('app.rightPanelExpand') : t('app.rightPanelCollapse'));
+  const handleToggleRightRail = useCallback(() => {
+    if (layout.isRightRailDrawerMode) {
+      layout.toggleRightRailDrawer();
+      return;
+    }
+    void toggleRightPanel();
+  }, [layout, toggleRightPanel]);
 
   const handleWindowMinimize = useCallback(async () => {
     await window.electronAPI?.windowControls.minimize();
@@ -160,7 +174,7 @@ const App: React.FC = () => {
           windowRestoreLabel={t('app.windowRestore')}
           windowCloseLabel={t('app.windowClose')}
           onToggleLeft={() => void toggleLeftSidebar()}
-          onToggleRight={() => void toggleRightPanel()}
+          onToggleRight={handleToggleRightRail}
           onMinimize={handleWindowMinimize}
           onToggleMaximize={handleWindowToggleMaximize}
           onClose={handleWindowClose}
@@ -173,6 +187,9 @@ const App: React.FC = () => {
           effectiveLeftCollapsed={layout.effectiveLeftCollapsed}
           effectiveRightCollapsed={layout.effectiveRightCollapsed}
           isRightRailVisible={layout.isRightRailVisible}
+          isRightRailDrawerMode={layout.isRightRailDrawerMode}
+          isRightRailDrawerOpen={layout.isRightRailDrawerOpen}
+          onCloseRightRailDrawer={layout.closeRightRailDrawer}
           isTerminalOpen={isTerminalOpen}
           bothSidebarsCollapsed={layout.bothSidebarsCollapsed}
           workbenchRailMaxWidth={layout.workbenchRailMaxWidth}
@@ -200,9 +217,9 @@ const App: React.FC = () => {
             setUserMenuAnchor(null);
             setSettingsModalOpen(true);
           }}
-          onThemeChange={(theme) => void setTheme(theme)}
-          onLanguageChange={(language) => void setLanguage(language)}
-          onFontScaleChange={(fontScale) => void setFontScale(fontScale)}
+          onThemeChange={(theme) => applyAppearancePreference(() => setTheme(theme))}
+          onLanguageChange={(language) => applyAppearancePreference(() => setLanguage(language))}
+          onFontScaleChange={(fontScale) => applyAppearancePreference(() => setFontScale(fontScale))}
         />
 
         <SettingsModal

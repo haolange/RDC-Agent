@@ -155,6 +155,14 @@ const renderIconPath = (icon: WorkProcessIconKey): ReactElement => {
           <path d="M9 8h3" />
         </>
       );
+    case 'outputPublish':
+      return (
+        <>
+          <path d="M6 4h9l3 3v13H6V4Z" />
+          <path d="M15 4v3h3M9 13h6m-3-3v6" />
+          <path d="m15.5 16 1.5 1.5 3-3" />
+        </>
+      );
     case 'memorySearch':
       return (
         <>

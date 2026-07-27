@@ -13,6 +13,77 @@ function flattenWorkRows(rows: ReturnType<typeof buildWorkProcessPresentation>['
 }
 
 describe('buildWorkProcessPresentation', () => {
+  it('withholds runtime context-compaction counters from the human work trace', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'running',
+      updatedAt: now,
+      blocks: [{
+        id: 'compaction-commentary', kind: 'llm_turn', title: 'LLM turn', status: 'complete',
+        result: {
+          text: 'Context compacted (snip): 79 -> 52 messages, approximately 125287 -> 85642 tokens.',
+          status: 'complete', outputPhase: 'commentary', toolCallIds: [],
+        },
+        toolCalls: [], startedAt: now, completedAt: now + 10,
+      }],
+    });
+    expect(presentation.rows).toHaveLength(0);
+  });
+
+  it('keeps only the latest human-readable compaction summary', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'complete',
+      updatedAt: now + 20,
+      blocks: [
+        { id: 'compact-1', kind: 'compaction', title: 'Context compacted', summary: 'old counts', status: 'complete', toolCalls: [], startedAt: now, completedAt: now + 5 },
+        { id: 'compact-2', kind: 'compaction', title: 'Context compacted', summary: 'new counts', status: 'complete', toolCalls: [], startedAt: now + 10, completedAt: now + 15 },
+      ],
+    });
+    expect(presentation.rows).toEqual([expect.objectContaining({ id: 'compact-2', type: 'summary', text: 'Earlier work summarized' })]);
+  });
+
+  it('uses authoritative task event rows instead of duplicating task tool receipts', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'running',
+      updatedAt: now + 20,
+      blocks: [
+        {
+          id: 'task-create-loop', kind: 'llm_turn', title: 'LLM turn', status: 'complete',
+          result: { status: 'complete', outputPhase: 'commentary', toolCallIds: ['task-create'] },
+          toolCalls: [{
+            id: 'task-create', toolName: 'task_create', status: 'complete',
+            argsPreview: JSON.stringify({ subject: 'Inspect capture' }),
+            resultPreview: JSON.stringify({ taskId: 'task-1', subject: 'Inspect capture' }),
+            startedAt: now, completedAt: now + 10,
+          }],
+          startedAt: now, completedAt: now + 10,
+        },
+        {
+          id: 'task-1', kind: 'command', title: 'Inspect capture', summary: 'Inspect capture',
+          status: 'pending', toolCalls: [], startedAt: now + 10,
+        },
+      ],
+    });
+    const rows = flattenWorkRows(presentation.rows);
+    expect(rows.filter((row) => row.type === 'tool' && row.toolName === 'task_create')).toHaveLength(0);
+    expect(rows.filter((row) => row.type === 'task')).toEqual([expect.objectContaining({ taskId: 'task-1', title: 'Inspect capture' })]);
+  });
+
+  it('preserves the TaskRegistry lifecycle state and blocked reason in Work Process', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'complete',
+      updatedAt: now + 20,
+      blocks: [{
+        id: 'task-1', kind: 'command', title: 'Wait for QA', summary: 'Wait for QA',
+        stage: 'task', status: 'error', taskStatus: 'blocked', taskStatusReason: 'QA waiting',
+        toolCalls: [], startedAt: now,
+      }],
+    });
+    const row = flattenWorkRows(presentation.rows).find((entry) => entry.type === 'task');
+    expect(row).toEqual(expect.objectContaining({
+      taskId: 'task-1', taskStatus: 'blocked', taskStatusReason: 'QA waiting',
+    }));
+  });
+
   it('withholds unclassified streaming prose before tools arrive', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'running',

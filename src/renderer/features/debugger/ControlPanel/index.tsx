@@ -1,84 +1,20 @@
-﻿import React, { useState } from 'react';
-import { useI18n } from '../../../i18n';
+﻿import React from 'react';
 import { useProjectStore } from '../../../stores/projectStore';
-import { useWorkflowStore } from '../../../stores/workflowStore';
-import { CaptureLibrary } from './CaptureLibrary';
-import { CollapsibleSection } from './CollapsibleSection';
-import { ClassicSessionControlPanel } from './SessionControlPanel';
+import { ProjectCaptureImportPanel } from './ProjectCaptureImportPanel';
 import { TraceRightPanel } from './TraceRightPanel';
-import { shouldShowTraceRightRail } from './traceRail';
-import './ControlPanel.css';
-
-type RightRailMode = 'hidden' | 'project' | 'session';
-
-const ProjectControlPanel: React.FC = () => {
-  const { t } = useI18n();
-  const projectInputs = useProjectStore((state) => state.projectInputs);
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    captureLibrary: true,
-  });
-
-  const toggleSection = (sectionId: string) => {
-    setExpandedSections((prev) => ({
-      ...prev,
-      [sectionId]: !prev[sectionId],
-    }));
-  };
-
-  return (
-    <div className="control-panel">
-      <div className="cp-content scrollbar-thin">
-        <CollapsibleSection
-          id="captureLibrary"
-          title={t('control.captureLibrary')}
-          icon={(
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
-            </svg>
-          )}
-          isExpanded={expandedSections.captureLibrary}
-          onToggle={() => toggleSection('captureLibrary')}
-          badge={projectInputs.length}
-        >
-          <CaptureLibrary />
-        </CollapsibleSection>
-      </div>
-    </div>
-  );
-};
-
-const SessionControlPanel: React.FC = () => {
-  const presentation = useWorkflowStore((state) => state.tracePresentation);
-  if (shouldShowTraceRightRail(presentation)) {
-    return <TraceRightPanel />;
-  }
-  return <ClassicSessionControlPanel />;
-};
+import './RightRail.css';
 
 export const ControlPanel: React.FC = () => {
   const currentProject = useProjectStore((state) => state.currentProject);
   const currentSession = useProjectStore((state) => state.currentSession);
   const rightRailTarget = useProjectStore((state) => state.rightRailTarget);
 
-  const rightRailMode: RightRailMode = !currentProject
-    ? 'hidden'
-    : rightRailTarget === 'session' && currentSession
-      ? 'session'
-      : 'project';
-
-  if (rightRailMode === 'hidden') {
-    return null;
+  if (!currentProject) return null;
+  if (rightRailTarget !== 'session' || !currentSession) {
+    return <ProjectCaptureImportPanel key={`${currentProject.projectId}:project`} />;
   }
 
-  if (rightRailMode === 'session') {
-    // Key only by sessionId: remount resets session-scoped panel expansion/local UI.
-    // Do NOT include runId/capture — those change every turn/open and would remount the rail.
-    const sessionRailKey = currentSession?.sessionId ?? 'no-session';
-    return <SessionControlPanel key={sessionRailKey} />;
-  }
-
-  return <ProjectControlPanel />;
+  return <TraceRightPanel key={`${currentProject.projectId}:${currentSession.sessionId}`} />;
 };
 
 export default ControlPanel;
-

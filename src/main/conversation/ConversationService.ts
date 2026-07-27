@@ -626,7 +626,7 @@ export class ConversationService {
 
     const visibleMessages = resolveVisibleConversationMessages(allMessages, branchState);
     const tracePresentation = await traceService.buildConversationPresentation(input.sessionId, visibleMessages);
-    workflowProjectionPublisher.publishTraceProjectionChanged(input.sessionId, tracePresentation);
+    workflowProjectionPublisher.publishTraceProjectionChanged({ projectId: tracePresentation.projectId, sessionId: tracePresentation.sessionId }, tracePresentation);
     publishConversationTrace(input.sessionId, visibleMessages, input.sessionId, publishTraceProjection);
 
     return {
@@ -659,12 +659,10 @@ export class ConversationService {
         ?? storageAdapter.getLatestRun(resolvedSessionId)
       : null;
     const projectInputs = projectId ? storageAdapter.listProjectInputs(projectId) : [];
-    const openedCapture = rdxSessionService.snapshotOpenedCapture();
-    const activeOpenedCapture = openedCapture?.projectId === projectId
-      && openedCapture.status === 'open'
-      && openedCapture.ownerSessionId === resolvedSessionId
-      ? openedCapture
+    const openedCapture = projectId && resolvedSessionId
+      ? rdxSessionService.snapshotOpenedCaptureForSession({ projectId, sessionId: resolvedSessionId })
       : null;
+    const activeOpenedCapture = openedCapture?.status === 'open' ? openedCapture : null;
     const replayDevice = replayDeviceService.getDeviceById(input.replayDeviceId || 'local') ?? replayDeviceService.getDeviceById('local');
 
     return {

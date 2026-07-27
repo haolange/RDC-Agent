@@ -2493,23 +2493,32 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 
 .work-process-task {
   list-style: none;
-  display: flex;
+  display: grid;
+  grid-template-columns: var(--space-5) minmax(0, 1fr);
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-2);
-  font-size: var(--text-sm);
+  min-height: var(--space-6);
+  padding: var(--space-2) 0;
+  font-size: var(--text-base);
   color: var(--token-text-body);
-  border-radius: var(--radius-sm);
 }
 
 .work-process-task-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 16px;
-  height: 16px;
-  font-size: var(--text-sm);
-  line-height: 1;
+  width: var(--space-5);
+  height: var(--space-5);
+}
+
+.work-process-task-icon svg {
+  width: var(--space-4);
+  height: var(--space-4);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
 }
 
 .work-process-task-icon.task-pending {
@@ -2520,24 +2529,52 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   color: var(--token-status-info);
 }
 
+.work-process-task-icon.task-blocked {
+  color: var(--token-status-warning);
+}
+
 .work-process-task-icon.task-completed {
   color: var(--token-status-success);
 }
 
-.work-process-task-icon.task-failed {
-  color: var(--token-status-error);
+.work-process-task-icon.task-cancelled {
+  color: var(--token-text-caption);
 }
 
 .work-process-task-title {
-  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.work-process-task-status {
-  font-size: var(--text-xs);
+.work-process-task-content {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.work-process-task.task-completed .work-process-task-title {
   color: var(--token-text-caption);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.work-process-task.task-in_progress .work-process-task-title {
+  color: var(--token-text-strong);
+}
+
+.work-process-task:focus-visible {
+  outline: 1px solid var(--token-border-focus);
+  outline-offset: var(--space-1);
+}
+
+.work-process-task-status {
+  font-size: var(--text-sm);
+  color: var(--token-text-caption);
+  flex: 0 0 auto;
 }
 
 .work-process-task-status.status-error {
@@ -2547,9 +2584,3 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 .work-process-task-status.status-running {
   color: var(--token-status-info);
 }
-
-.work-process-task-duration {
-  font-size: var(--text-xs);
-  color: var(--token-text-caption);
-}
-

@@ -19,13 +19,12 @@ import { useComposerDomEffects } from './useComposerDomEffects';
 
 export function useComposer(options: {
   showNotice: (message: string) => void;
-  hasOpenedCaptureForCurrentProject: boolean;
   effectiveLeftCollapsed: boolean;
   leftToggleDisabled: boolean;
   toggleLeftSidebar: () => void | Promise<void>;
   openSettings: (section?: string) => void;
 }) {
-  const { showNotice, hasOpenedCaptureForCurrentProject, effectiveLeftCollapsed, leftToggleDisabled, toggleLeftSidebar, openSettings } = options;
+  const { showNotice, effectiveLeftCollapsed, leftToggleDisabled, toggleLeftSidebar, openSettings } = options;
   const { t, language } = useI18n();
 
   const [modeMenuOpen, setModeMenuOpen] = useState(false);
@@ -100,7 +99,6 @@ export function useComposer(options: {
     currentSession,
     currentRun,
     selectedDeviceEntry,
-    hasOpenedCaptureForCurrentProject,
     hasActiveDebugRun,
     hasActiveConversationTurn,
     promptValue,

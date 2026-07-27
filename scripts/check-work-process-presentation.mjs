@@ -945,7 +945,7 @@ assert(
 );
 assert(
   (() => {
-    const source = readSource('src/main/conversation/ConversationService.ts');
+    const source = readSource('src/main/conversation/ConversationTurnAgentEventHandler.ts');
     return source.includes('turnHadAskPause')
       && source.includes('resolveStreamingOutputPhase')
       && source.includes('syncVisibleResponseForStreaming')
@@ -1051,18 +1051,18 @@ assert(toolRowSource.includes('work-process-tool-card-body-list'), 'collapsed se
 assert(presentationSource.includes('bodyText:'), 'projection must emit bodyText for outcome-first cards');
 assert(fs.existsSync('src/shared/utils/toolResultPreview.ts'), 'tool result preview builder must exist');
 assert(
-  readSource('src/main/conversation/ConversationService.ts').includes('buildToolResultPreview'),
-  'ConversationService must write projection-friendly resultPreview',
+  readSource('src/main/conversation/ConversationTurnAgentEventHandler.ts').includes('buildToolResultPreview'),
+  'Conversation turn handler must write projection-friendly resultPreview',
 );
 assert(
-  !readSource('src/main/conversation/ConversationService.ts').includes('.slice(0, 800)'),
-  'ConversationService must not blind-slice resultPreview JSON at 800 chars',
+  !readSource('src/main/conversation/ConversationTurnAgentEventHandler.ts').includes('.slice(0, 800)'),
+  'Conversation turn handler must not blind-slice resultPreview JSON at 800 chars',
 );
-const conversationServiceSource = readSource('src/main/conversation/ConversationService.ts');
+const conversationEventHandlerSource = readSource('src/main/conversation/ConversationTurnAgentEventHandler.ts');
 const diagnosticPolicySource = readSource('src/main/conversation/workProcessDiagnosticPolicy.ts');
 assert(
-  conversationServiceSource.includes('shouldProjectDiagnosticToWorkProcess'),
-  'ConversationService must gate Work Process diagnostic projection',
+  conversationEventHandlerSource.includes('shouldProjectDiagnosticToWorkProcess'),
+  'Conversation turn handler must gate Work Process diagnostic projection',
 );
 assert(
   diagnosticPolicySource.includes("code.startsWith('error_recovery_')")
@@ -1070,12 +1070,12 @@ assert(
   'error_recovery_* must be excluded from Work Process narrative',
 );
 assert(
-  !conversationServiceSource.includes("title: isRecovery ? '错误恢复'"),
-  'recovery diagnostics must not receive a Work Process title',
+  !conversationEventHandlerSource.includes("title: isRecovery ? '错误恢复'"),
+  'recovery diagnostics must not receive a Work Process title in the event handler',
 );
 assert(
-  !conversationServiceSource.includes('错误恢复成功，继续生成回复'),
-  'recovery completion copy must not be hard-coded into ConversationService Work Process projection',
+  !conversationEventHandlerSource.includes('错误恢复成功，继续生成回复'),
+  'recovery completion copy must not be hard-coded into the Work Process event handler',
 );
 assert(!componentSource.includes('setRawOpen(true);\n      setPreviewOpen(true);'), 'failed tools must not force-open preview and raw together on error');
 assert(componentSource.includes('<details'), 'thinking should render as a user-collapsible top disclosure');
@@ -1093,14 +1093,15 @@ assert(!componentSource.includes("t('chat.workProcessViewSteps'"), 'section shou
 assert(!componentSource.includes('StepsListIcon'), 'legacy steps icon component should be removed');
 assert(!componentSource.includes('thinking-full'), 'component must not render full hidden CoT mode');
 assert(!componentSource.includes('RequestInspector'), 'Request Inspector must not embed in Work Process transcript');
+const traceRightPanelSource = readSource('src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx');
 assert(
-  !readSource('src/renderer/features/debugger/ControlPanel/SessionControlPanel.tsx').includes('RequestInspector'),
-  'Request Inspector must not mount in the default Session right panel',
+  !fs.existsSync('src/renderer/features/debugger/ControlPanel/SessionControlPanel.tsx'),
+  'Retired session right panel must not return.',
 );
 assert(
-  !readSource('src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx').includes('RequestInspector')
-    && !readSource('src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx').includes('TraceRequestInspectorSection'),
-  'Request Inspector must not mount in the default Trace right panel',
+  !traceRightPanelSource.includes('RequestInspector')
+    && !traceRightPanelSource.includes('TraceRequestInspectorSection'),
+  'Request Inspector must not mount in the default right rail.',
 );
 assert(
   !fs.existsSync('src/renderer/features/debugger/RequestDiagnostics'),
@@ -1124,8 +1125,8 @@ assert(
   'Settings nav must list Policy and must not list Diagnostics',
 );
 assert(
-  !readSource('src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx').includes('RdxRuntimeContextPanel'),
-  'Trace Context must not stack RdxRuntimeContextPanel under SessionContextPanel',
+  !traceRightPanelSource.includes('RdxRuntimeContextPanel'),
+  'Right rail must consume the unified RDX Context projection.',
 );
 
 assert(!componentSource.includes('work-process-tool-target is-toggle'), 'tool target dual-toggle disclosure must be removed');

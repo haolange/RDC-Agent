@@ -45,6 +45,17 @@ export interface SessionRecord {
   turnControls?: ConversationTurnControls;
 }
 
+/** Explicit project/session ownership for stateful RDX operations and events. */
+export interface SessionScope {
+  projectId: string;
+  sessionId: string;
+}
+
+/** Every mutable RDX event carries its owning session; unowned state is never projected. */
+export interface SessionScopedPayload<T> extends SessionScope {
+  payload: T;
+}
+
 export type SessionAttachmentKind = 'image' | 'file';
 
 export interface SessionAttachmentRecord {
@@ -59,21 +70,6 @@ export interface SessionAttachmentRecord {
   createdAt: number;
 }
 
-export type SessionOutputKind = 'attachment' | 'artifact' | 'report' | 'action_artifact';
-
-export interface SessionOutputRecord {
-  id: string;
-  kind: SessionOutputKind;
-  title: string;
-  fileName: string;
-  filePath: string;
-  source: string;
-  runId?: string;
-  mimeType?: string;
-  sizeBytes?: number;
-  createdAt?: number;
-  updatedAt?: number;
-}
 
 export interface RunReportPaths {
   reportsDir: string;
@@ -392,7 +388,7 @@ export interface OpenedCaptureState {
 
 export interface OpenProjectInputRequest {
   projectId: string;
-  ownerSessionId: string | null;
+  sessionId: string;
   inputId: string;
   filePath: string;
   replayDevice: ReplayDeviceEntry;

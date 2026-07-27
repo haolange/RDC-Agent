@@ -1,8 +1,8 @@
 import type { EventSubscriptionApi } from '@shared/types/electron-api';
 import type { RuntimeLogEntry } from '@shared/types/runtimeLog';
-import type { RunContextUsageSummary, OpenedCaptureState, ProjectInputRecord } from '@shared/types/session';
+import type { ContextSnapshot, RunContextUsageSummary, OpenedCaptureState, ProjectInputRecord, SessionScopedPayload } from '@shared/types/session';
 import type { TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '@shared/types/terminal';
-import type { AgentRunPresentation } from '@shared/types/agenticTrace';
+import type { TraceProjectionChangedPayload } from '@shared/types/agenticTrace';
 import { removeAllTrackedListeners, registerTrackedListener } from './listeners';
 
 export const createEventSubscriptionApi = (): EventSubscriptionApi => ({
@@ -16,7 +16,7 @@ export const createEventSubscriptionApi = (): EventSubscriptionApi => ({
     registerTrackedListener('workflow:runUsageChanged', (summary) => callback(summary as RunContextUsageSummary)),
   onTraceProjectionChanged: (callback): (() => void) =>
     registerTrackedListener('trace:projectionChanged', (payload) =>
-      callback(payload as { sessionId: string; presentation: AgentRunPresentation }),
+      callback(payload as TraceProjectionChangedPayload),
     ),
   onEffectiveCatalogChanged: (callback): (() => void) =>
     registerTrackedListener('llm:effectiveCatalogChanged', (snapshot) => callback(snapshot as Parameters<typeof callback>[0])),
@@ -30,15 +30,15 @@ export const createEventSubscriptionApi = (): EventSubscriptionApi => ({
   onDeviceStatusChanged: (callback): (() => void) =>
     registerTrackedListener('device:statusChanged', (status) => (callback as (value: unknown) => void)(status)),
   onCaptureStatusChanged: (callback): (() => void) =>
-    registerTrackedListener('capture:statusChanged', (status) => callback(status)),
+    registerTrackedListener('capture:statusChanged', (status) => callback(status as SessionScopedPayload<unknown>)),
   onContextChanged: (callback): (() => void) =>
-    registerTrackedListener('context:changed', (snapshot) => (callback as (value: unknown) => void)(snapshot)),
+    registerTrackedListener('context:changed', (snapshot) => callback(snapshot as SessionScopedPayload<ContextSnapshot | null>)),
   onProjectInputsChanged: (callback): (() => void) =>
     registerTrackedListener('project:inputsChanged', (payload) =>
       callback(payload as { projectId: string; inputs: ProjectInputRecord[] }),
     ),
   onOpenedCaptureStateChanged: (callback): (() => void) =>
-    registerTrackedListener('capture:openedStateChanged', (payload) => callback(payload as OpenedCaptureState | null)),
+    registerTrackedListener('capture:openedStateChanged', (payload) => callback(payload as SessionScopedPayload<OpenedCaptureState | null>)),
   onRuntimeLogAppended: (callback): (() => void) =>
     registerTrackedListener('runtime:logAppended', (payload) => callback(payload as RuntimeLogEntry)),
   onTerminalData: (callback): (() => void) =>

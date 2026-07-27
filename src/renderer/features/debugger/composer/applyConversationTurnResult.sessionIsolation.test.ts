@@ -80,6 +80,7 @@ describe('applyConversationTurnResult session isolation', () => {
     useWorkflowStore.getState().reset();
     useSessionProjectionStore.getState().reset();
     useProjectStore.setState({
+      rightRailTarget: 'project',
       currentSession: {
         sessionId: 'session-a',
         projectId: 'project-1',
@@ -119,6 +120,7 @@ describe('applyConversationTurnResult session isolation', () => {
 
     const assistant = useConversationStore.getState().conversationMessages.find((m) => m.role === 'assistant');
     expect(assistant?.status).toBe('stopped');
+    expect(useProjectStore.getState().rightRailTarget).toBe('session');
   });
 
   it('routes background session turn into projection cache', async () => {
@@ -159,5 +161,6 @@ describe('applyConversationTurnResult session isolation', () => {
     expect(
       useSessionProjectionStore.getState().bySessionId['session-a']?.allMessages.some((m) => m.id === 'assistant-1'),
     ).toBe(true);
+    expect(useProjectStore.getState().rightRailTarget).toBe('project');
   });
 });

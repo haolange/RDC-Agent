@@ -7,7 +7,7 @@ import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { stopWorkTrace } from './stopWorkTrace';
-import { isActiveSessionEvent } from '../../../app/bootstrap/sessionEventGate';
+import { getActiveSessionId, isActiveSessionEvent } from '../../../app/bootstrap/sessionEventGate';
 import { useSessionProjectionStore } from '../../../stores/sessionProjectionStore';
 
 const EXECUTABLE_APP_MODES = new Set<string>(['edit', 'debugger', 'analyzer', 'optimizer']);
@@ -202,7 +202,10 @@ export async function applyConversationTurnResult(options: {
   };
 
   // Background session: never mutate active project/session selection or UI stores.
-  if (turnSessionId && !isActiveSessionEvent(turnSessionId)) {
+  // With no active session (for example the synchronous handoff after a new-session
+  // creation), the result remains the only visible result and must be applied.
+  const activeSessionId = getActiveSessionId();
+  if (turnSessionId && activeSessionId && !isActiveSessionEvent(turnSessionId)) {
     for (const message of forceStoppedMessages(result.messages ?? [
       result.userMessage,
       result.assistantDraftMessage,
@@ -226,6 +229,10 @@ export async function applyConversationTurnResult(options: {
 
   if (result.session?.sessionId) {
     setCurrentSession(result.session);
+    // A composer turn can create the first session while the project rail is selected.
+    // The authoritative result now owns a session, so the rail must immediately show
+    // the session inspector instead of leaving the project import surface visible.
+    useProjectStore.getState().setRightRailTarget('session');
     refreshTasks.push(electronAPI.session.list(result.session.projectId).then((sessionsResult) => {
       setSessions(sessionsResult.sessions ?? []);
     }));

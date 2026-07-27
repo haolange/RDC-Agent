@@ -6,7 +6,7 @@
  *  - `task_update`：更新任务（状态 / 描述 / 依赖）；
  *  - `task_get`：读取单个任务详情；
  *  - `task_list`：列出全部任务；
- *  - `task_stop`：Stop/cancel by marking deleted（软删除，status=deleted）。
+ *  - `task_stop`：Stop/cancel by marking cancelled。
  *
  * 设计要点：
  *  - 所有工具都是 `readonly` 权限提示（任务存储是 agent 自管的私有目录，
@@ -27,8 +27,9 @@ import {
 const ALLOWED_STATUS: TaskStatus[] = [
   'pending',
   'in_progress',
+  'blocked',
   'completed',
-  'deleted',
+  'cancelled',
 ];
 
 /**
@@ -121,6 +122,7 @@ export function createTaskCreateTool(
 interface TaskUpdateParams {
   taskId: string;
   status?: TaskStatus;
+  statusReason?: string;
   subject?: string;
   description?: string;
   activeForm?: string;
@@ -150,8 +152,9 @@ export function createTaskUpdateTool(
         taskId: { type: 'string' },
         status: {
           type: 'string',
-          enum: ['pending', 'in_progress', 'completed', 'deleted'],
+          enum: ['pending', 'in_progress', 'blocked', 'completed', 'cancelled'],
         },
+        statusReason: { type: 'string' },
         subject: { type: 'string' },
         description: { type: 'string' },
         activeForm: { type: 'string' },
@@ -169,6 +172,7 @@ export function createTaskUpdateTool(
       const taskId = readString(params, 'taskId', true);
 
       const status = readEnum(params, 'status', ALLOWED_STATUS);
+      const statusReason = readString(params, 'statusReason', false);
       const subject = readString(params, 'subject', false);
       const description = readString(params, 'description', false);
       const activeForm = readString(params, 'activeForm', false);
@@ -182,6 +186,7 @@ export function createTaskUpdateTool(
 
       const updated = await registry.updateTask(taskId, {
         status,
+        statusReason,
         subject,
         description,
         activeForm,
@@ -303,14 +308,14 @@ interface TaskStopParams {
   taskId: string;
 }
 
-/** 构造 `task_stop` 工具 — Stop/cancel by marking deleted。 */
+/** 构造 `task_stop` 工具 — Stop/cancel by marking cancelled。 */
 export function createTaskStopTool(
   registry: TaskRegistry,
 ): AgentTool<TaskStopParams, { id: string }> {
   return {
     name: 'task_stop',
     label: 'Stop Task',
-    description: 'Stop/cancel by marking deleted',
+    description: 'Stop/cancel by marking cancelled',
     parameters: {
       type: 'object',
       properties: {
@@ -330,7 +335,7 @@ export function createTaskStopTool(
           details: { id: taskId },
         } satisfies AgentToolResult<{ id: string }>;
       }
-      await registry.updateTask(taskId, { status: 'deleted' });
+      await registry.updateTask(taskId, { status: 'cancelled' });
       return {
         content: [{ type: 'text', text: `Stopped ${taskId}: ${task.subject}` }],
         details: { id: taskId },
@@ -419,6 +424,7 @@ function formatTaskLine(task: TaskRecord): string {
 const STATUS_ICON: Record<TaskStatus, string> = {
   pending: '○',
   in_progress: '●',
+  blocked: '!',
   completed: '✓',
-  deleted: '✗',
+  cancelled: '×',
 };

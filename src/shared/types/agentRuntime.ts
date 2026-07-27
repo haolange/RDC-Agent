@@ -127,7 +127,8 @@ export interface AgentToolDeniedPayload extends AgentEventBasePayload {
 export interface AgentTaskEventPayload extends AgentEventBasePayload {
   taskId: string;
   title: string;
-  status?: string;
+  status?: 'pending' | 'in_progress' | 'blocked' | 'completed' | 'cancelled';
+  statusReason?: string;
   parentTaskId?: string;
 }
 

@@ -107,11 +107,7 @@ export function assertRdxContextLeaseOwnership(input: {
   if (!lease) return null;
   if (lease.ownerSessionId !== sessionId) return null;
   if (input.contextId && lease.contextId !== input.contextId) return null;
-  if (
-    input.projectId
-    && lease.ownerProjectId
-    && lease.ownerProjectId !== input.projectId
-  ) {
+  if (input.projectId !== undefined && lease.ownerProjectId !== input.projectId) {
     return null;
   }
   return getRdxContextLease(sessionId);

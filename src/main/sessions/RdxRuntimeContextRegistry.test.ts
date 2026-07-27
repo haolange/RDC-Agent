@@ -40,6 +40,9 @@ describe('RdxRuntimeContextRegistry leases', () => {
     expect(assertRdxContextLeaseOwnership({ sessionId: 'other' })).toBeNull();
     expect(assertRdxContextLeaseOwnership({ sessionId: 's1', contextId: 'wrong' })).toBeNull();
     expect(assertRdxContextLeaseOwnership({ sessionId: 's1', contextId: 'c1' })?.contextId).toBe('c1');
+    setRdxRuntimeContextForSession('scoped', ctx('scoped'), { projectId: 'project-a' });
+    expect(assertRdxContextLeaseOwnership({ sessionId: 'scoped', projectId: 'project-b' })).toBeNull();
+    expect(assertRdxContextLeaseOwnership({ sessionId: 'scoped', projectId: 'project-a' })?.contextId).toBe('scoped');
   });
 
   it('bumps version on update', () => {

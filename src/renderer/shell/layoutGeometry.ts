@@ -44,6 +44,9 @@ export const getResponsiveMinMainWidth = (containerWidth: number): number => {
   if (containerWidth <= 960) {
     return 360;
   }
+  if (containerWidth <= 1080) {
+    return 400;
+  }
   return APP_MIN_MAIN_WIDTH;
 };
 
@@ -93,10 +96,6 @@ export const resolveResponsiveSidebarState = (
   const minMainWidth = getResponsiveMinMainWidth(containerWidth);
   let nextLeftCollapsed = leftCollapsed;
   let nextRightCollapsed = rightVisible ? rightCollapsed : true;
-
-  if (containerWidth <= 720 && rightVisible) {
-    nextRightCollapsed = true;
-  }
 
   if (!canFitLayout(containerWidth, leftWidth, rightWidth, nextLeftCollapsed, nextRightCollapsed, minMainWidth, rightVisible)) {
     nextRightCollapsed = true;

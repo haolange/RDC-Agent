@@ -52,7 +52,7 @@ describe('TaskTools', () => {
 
     const stopped = await byName.task_stop!.execute('s1', { taskId });
     expect(textOf(stopped)).toContain('Stopped');
-    expect((await registry.getTask(taskId))?.status).toBe('deleted');
-    expect(byName.task_stop!.description).toContain('Stop/cancel by marking deleted');
+    expect((await registry.getTask(taskId))?.status).toBe('cancelled');
+    expect(byName.task_stop!.description).toContain('Stop/cancel by marking cancelled');
   });
 });

@@ -15,7 +15,11 @@ import {
 } from './ipcSchemas';
 import { EmptyArgsSchema } from './commonIpcSchemas';
 import { ConversationSendMessageArgsSchema } from './conversationSchemas';
-import { ProjectSelectArgsSchema, ProjectInputsImportPathsArgsSchema } from './projectSessionSchemas';
+import {
+  ProjectSelectArgsSchema,
+  ProjectInputsImportPathsArgsSchema,
+  SessionCreateArgsSchema,
+} from './projectSessionSchemas';
 import { CaptureOpenProjectInputArgsSchema } from './captureDeviceSchemas';
 import { CommandExecuteArgsSchema } from './commandSchemas';
 import { KnowledgeGetCardArgsSchema } from './knowledgeSchemas';
@@ -110,6 +114,13 @@ describe('parseIpcArgs', () => {
       .toThrow(IpcValidationError);
   });
 
+  it('normalizes a browser bridge null session title to an omitted title', () => {
+    expect(parseIpcArgs(SessionCreateArgsSchema, ['proj_abc123', null], {
+      label: 'session:create',
+      padTo: 2,
+    })).toEqual(['proj_abc123', undefined]);
+  });
+
   it('rejects oversized import path arrays', () => {
     const paths = Array.from({ length: 65 }, (_, i) => `D:/file-${i}.rdc`);
     expect(() => parseIpcArgs(ProjectInputsImportPathsArgsSchema, ['proj_abc', paths], {
@@ -139,6 +150,7 @@ describe('parseIpcArgs', () => {
   it('rejects capture open payload with path-traversal project id', () => {
     expect(() => parseIpcArgs(CaptureOpenProjectInputArgsSchema, [{
       projectId: '../x',
+      sessionId: 'session_a',
       ownerSessionId: null,
       inputId: 'input_a',
       filePath: 'D:/a.rdc',

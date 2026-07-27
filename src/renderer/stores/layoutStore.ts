@@ -46,23 +46,29 @@ const persistLayout = async (state: Pick<
   | 'rightPanelExpandedWidth'
   | 'terminalHeight'
 >): Promise<void> => {
-  await window.electronAPI.settings.set({
-    layout: {
-      leftSidebar: {
-        collapsed: state.leftSidebarCollapsed,
-        width: state.leftSidebarWidth,
-        expandedWidth: state.leftSidebarExpandedWidth,
+  const api = window.electronAPI;
+  if (!api) return;
+  try {
+    await api.settings.set({
+      layout: {
+        leftSidebar: {
+          collapsed: state.leftSidebarCollapsed,
+          width: state.leftSidebarWidth,
+          expandedWidth: state.leftSidebarExpandedWidth,
+        },
+        rightPanel: {
+          collapsed: state.rightPanelCollapsed,
+          width: state.rightPanelWidth,
+          expandedWidth: state.rightPanelExpandedWidth,
+        },
+        terminal: {
+          height: state.terminalHeight,
+        },
       },
-      rightPanel: {
-        collapsed: state.rightPanelCollapsed,
-        width: state.rightPanelWidth,
-        expandedWidth: state.rightPanelExpandedWidth,
-      },
-      terminal: {
-        height: state.terminalHeight,
-      },
-    },
-  });
+    });
+  } catch {
+    // Browser QA intentionally denies settings writes; keep this in-memory layout usable.
+  }
 };
 
 export const useLayoutStore = create<LayoutState>((set, get) => ({

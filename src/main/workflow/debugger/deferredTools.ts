@@ -22,6 +22,27 @@ export function isDeferredToolName(name: string): boolean {
   return isMcpPrefixedToolName(name) || getBuiltinToolTier(name) === 'extended';
 }
 
+/** Complex top-level work needs task lifecycle and its explicit output publisher before the first model request. */
+export const TASK_LIFECYCLE_TOOL_NAMES = ['task_create', 'task_update', 'output_register'] as const;
+
+/**
+ * Make task creation, status updates, and explicit output publication visible before the first model request
+ * when this runtime already grants the complete task capability. The set belongs
+ * to DeferredToolActivationTracker, so the turn and later tool rounds share it.
+ */
+export function preactivateTaskLifecycleTools(
+  definitions: readonly { name: string }[],
+  activatedNames: Set<string>,
+): void {
+  const available = new Set(definitions.map((definition) => definition.name));
+  if (!TASK_LIFECYCLE_TOOL_NAMES.every((name) => available.has(name))) {
+    return;
+  }
+  for (const name of TASK_LIFECYCLE_TOOL_NAMES) {
+    activatedNames.add(name);
+  }
+}
+
 export interface DeferredToolPartition<T> {
   /** 应注入 LLM 的定义：core 在前（原顺序），激活的 deferred 按激活顺序追加尾部。 */
   injected: T[];

@@ -32,6 +32,7 @@ export type WorkProcessIconKey =
   | 'toolSearch'
   | 'handoff'
   | 'planArtifact'
+  | 'outputPublish'
   | 'memorySearch'
   | 'memoryRead'
   | 'memoryWrite'
@@ -193,7 +194,8 @@ export type WorkProcessRow =
     taskId: string;
     status: WorkProcessRowStatus;
     title: string;
-    taskStatus: string;
+    taskStatus: import('@shared/types/conversation').ConversationTaskStatus;
+    taskStatusReason?: string;
     duration: string;
   }
   | {

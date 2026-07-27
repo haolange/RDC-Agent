@@ -335,6 +335,7 @@ export class AgentTurnRunner {
     const turnHandle = await turnCoordinator.beginTurn({
       sessionKey,
       turnId: input.turnId ?? generateEventId('turn'),
+      runId: input.runId,
       parentSignal: input.options?.signal,
       subagentBudget: createSubagentBudgetState(DEFAULT_SUBAGENT_BUDGET),
     });
@@ -350,15 +351,21 @@ export class AgentTurnRunner {
       agentId: input.agentId,
     };
 
-    const runtimeTools = input.preparedRuntime?.runtimeTools
-      ?? this.deps.resolveRuntimeTools(
-        input.agentId,
-        input.toolAllowlist,
-        input.stage,
-        input.sessionId,
-        turnHandle,
-        input.projectId,
-      );
+    const liveRuntimeTools = this.deps.resolveRuntimeTools(
+      input.agentId,
+      input.toolAllowlist,
+      input.stage,
+      input.sessionId,
+      turnHandle,
+      input.projectId,
+    );
+    // Preparation freezes the schemas sent to the provider before a staged
+    // conversation session has a durable run. Rebuild tool instances here so
+    // their closures receive the committed session/run ownership, while keeping
+    // the prepared definition set immutable for the request.
+    const runtimeTools = input.preparedRuntime
+      ? { definitions: input.preparedRuntime.runtimeTools.definitions, toolMap: liveRuntimeTools.toolMap }
+      : liveRuntimeTools;
     const slotKey = agentSlotKey(input.sessionId, input.agentId);
     const allToolSignature = this.deps.createToolSignature(runtimeTools.definitions);
     const activatedDeferredTools = this.deps.deferredActivation.resolveActivatedSet(slotKey, allToolSignature);
@@ -417,6 +424,7 @@ export class AgentTurnRunner {
       : activeToolAllowlist;
     const toolExecutor = this.deps.createToolExecutor(input.agentId, executorAllowlist, input.stage, input.sessionId, {
       sessionId: input.sessionId ?? null,
+      runId: input.runId,
       turnId: input.turnId,
       eventContext: sharedEventContext,
       onEvent: input.options?.onEvent,

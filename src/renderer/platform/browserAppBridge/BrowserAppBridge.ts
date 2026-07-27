@@ -234,9 +234,7 @@ class BrowserAppBridgeClient {
         list: (sessionId) => this.invoke('session:attachments:list', sessionId),
         import: (sessionId, filePaths) => this.invoke('session:attachments:import', sessionId, filePaths),
       },
-      outputs: {
-        list: (sessionId, runId) => this.invoke('session:outputs:list', sessionId, runId),
-      },
+
     },
     run: {
       list: (sessionId) => this.invoke('run:list', sessionId),
@@ -253,16 +251,16 @@ class BrowserAppBridgeClient {
       resize: () => bridgeCapabilityDenied('terminal:*'),
     },
     capture: {
-      list: () => this.invoke('capture:list'),
-      select: (captureId) => this.invoke('capture:select', captureId),
+      list: (scope) => this.invoke('capture:list', scope),
+      select: (request) => this.invoke('capture:select', request),
       openProjectInput: (request) => this.invoke('capture:openProjectInput', request),
-      getOpenedState: () => this.invoke('capture:getOpenedState'),
-      clearOpenedState: () => this.invoke('capture:clearOpenedState'),
+      getOpenedState: (scope) => this.invoke('capture:getOpenedState', scope),
+      clearOpenedState: (scope) => this.invoke('capture:clearOpenedState', scope),
     },
     context: {
-      get: () => this.invoke('context:get'),
-      openHumanPreview: (request) => this.invoke('context:openHumanPreview', request),
-      closeHumanPreview: () => this.invoke('context:closeHumanPreview'),
+      get: (scope) => this.invoke('context:get', scope),
+      openHumanPreview: (scope) => this.invoke('context:openHumanPreview', scope),
+      closeHumanPreview: (scope) => this.invoke('context:closeHumanPreview', scope),
     },
     trace: {
       getRun: (runId) => this.invoke('trace:getRun', runId),

@@ -466,7 +466,7 @@ export class AgentOrchestrator {
         temperature: planning.plan.temperature,
         mode: this.modeForAgent(agentId),
         stage: options?.stage ?? 'investigate',
-        runId: undefined,
+        runId: options?.runId,
         sessionId: options?.sessionId ?? null,
         turnId: options?.turnId,
         toolAllowlist,

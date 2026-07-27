@@ -15,7 +15,6 @@ import {
   shouldClearSubmittedPrompt,
 } from './composerCommandConcurrency';
 import { useComposerSessionContextStore } from './composerSessionContext';
-
 type Translate = ReturnType<typeof useI18n>['t'];
 
 export function useComposerSend(options: {
@@ -30,7 +29,6 @@ export function useComposerSend(options: {
   currentSession: SessionRecord | null;
   currentRun: RunSummary | null;
   selectedDeviceEntry: { id: string } | undefined;
-  hasOpenedCaptureForCurrentProject: boolean;
   hasActiveDebugRun: boolean;
   hasActiveConversationTurn: boolean;
   promptValue: string;

@@ -32,10 +32,7 @@ export const createSessionApi = (): SessionApi => ({
     import: (sessionId, filePaths): ReturnType<SessionApi['attachments']['import']> =>
       ipcRenderer.invoke('session:attachments:import', sessionId, filePaths),
   },
-  outputs: {
-    list: (sessionId, runId): ReturnType<SessionApi['outputs']['list']> =>
-      ipcRenderer.invoke('session:outputs:list', sessionId, runId),
-  },
+
 });
 
 export const createRunApi = (): RunApi => ({

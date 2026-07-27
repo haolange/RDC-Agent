@@ -1,6 +1,7 @@
 import React from 'react';
 import { useI18n } from '../../../i18n';
 import { useDynStyle } from '../../../lib/useDynStyle';
+import { Button } from '../../../ui/Button';
 import type {
   ProjectMenuPopoverState,
   ProjectRenamePopoverState,
@@ -101,22 +102,24 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             disabled={isBusy}
           />
           <div className="session-rename-popover-actions">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               className="session-rename-popover-button session-rename-popover-button-secondary"
               onClick={onCloseRename}
               disabled={isBusy}
             >
               {t('sidebar.cancel')}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
               className="session-rename-popover-button session-rename-popover-button-primary"
               onClick={() => void onCommitSessionRename()}
               disabled={isBusy}
             >
               {t('sidebar.save')}
-            </button>
+            </Button>
           </div>
         </PositionedSurface>
       )}
@@ -127,8 +130,9 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
           x={projectMenuPopover.x}
           y={projectMenuPopover.y}
         >
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             className="sidebar-context-menu-item"
             onClick={() => void onOpenExplorer()}
             title={t('sidebar.menuExplorer')}
@@ -137,9 +141,10 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
             </svg>
             <span>{t('sidebar.openInExplorer') || 'Explorer'}</span>
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             className="sidebar-context-menu-item"
             onClick={onStartProjectRename}
             title={t('sidebar.menuRename')}
@@ -149,9 +154,10 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
               <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
             </svg>
             <span>{t('sidebar.renameProject') || 'Rename'}</span>
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             className="sidebar-context-menu-item"
             onClick={() => void onSessionCreate()}
             title={t('sidebar.menuNewSession')}
@@ -162,10 +168,11 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
               <path d="M5 12h14" />
             </svg>
             <span>{t('sidebar.addSession') || 'New Session'}</span>
-          </button>
+          </Button>
           <div className="sidebar-context-menu-divider" />
-          <button
-            type="button"
+          <Button
+            variant="danger"
+            size="sm"
             className="sidebar-context-menu-item danger"
             onClick={() => void onRemoveProject()}
             title={t('sidebar.menuDelete')}
@@ -177,7 +184,7 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
               <path d="M19 6l-1 14H6L5 6" />
             </svg>
             <span>{t('sidebar.removeProject') || 'Delete'}</span>
-          </button>
+          </Button>
         </PositionedSurface>
       )}
 
@@ -209,22 +216,24 @@ export const RenamePopoverPanels: React.FC<RenamePopoverPanelsProps> = ({
             disabled={isBusy}
           />
           <div className="session-rename-popover-actions">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               className="session-rename-popover-button session-rename-popover-button-secondary"
               onClick={onCloseProjectRename}
               disabled={isBusy}
             >
               {t('sidebar.cancel') || 'Cancel'}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
               className="session-rename-popover-button session-rename-popover-button-primary"
               onClick={() => void onCommitProjectRename()}
               disabled={isBusy}
             >
               {t('sidebar.save') || 'Save'}
-            </button>
+            </Button>
           </div>
         </PositionedSurface>
       )}

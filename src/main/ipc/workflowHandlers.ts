@@ -1,4 +1,5 @@
 import { ipcMain } from 'electron';
+import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRefreshService';
 import type { RunContextUsageSummary, RunSummary } from '@shared/types/session';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { rdxSessionService } from '../sessions';
@@ -61,8 +62,19 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
         return { success: false, error: 'No active run.' };
       }
       const result = await debuggerRuntime.stopRun(targetRunId);
-      context.broadcastToRenderer('capture:openedStateChanged', null);
-      context.broadcastToRenderer('context:changed', rdxSessionService.snapshotContext());
+      const session = state.currentSessionId ? storageAdapter.readSession(state.currentSessionId) : null;
+      if (session) {
+        const scope = { projectId: session.projectId, sessionId: session.sessionId };
+        context.broadcastToRenderer('capture:openedStateChanged', {
+          ...scope,
+          payload: rdxSessionService.snapshotOpenedCaptureForSession(scope),
+        });
+        context.broadcastToRenderer('context:changed', {
+          ...scope,
+          payload: rdxSessionService.snapshotContextForSession(scope),
+        });
+        traceProjectionRefreshService.schedule(session.sessionId);
+      }
       return result;
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) };

@@ -4,10 +4,9 @@
 
 import fs from 'fs';
 import path from 'path';
-import { BrowserWindow, nativeImage } from 'electron';
+import { nativeImage } from 'electron';
 import { replayDeviceService } from '../captures/ReplayDeviceService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
-import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
 import type {
   CaptureDescriptor,
   ContextSnapshot,
@@ -18,6 +17,7 @@ import type {
   OpenedCapturePreviewError,
   OpenProjectInputRequest,
   RdxRuntimeContext,
+  SessionScope,
 } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import type { ToolCallResult } from '@shared/types/tool';
@@ -77,7 +77,7 @@ export class RdxSessionService {
       role: 'primary',
       backendHint: isRemoteReplay ? 'remote' : 'local',
       status: 'pending',
-      ownerSessionId: request.ownerSessionId ?? null,
+      ownerSessionId: request.sessionId,
     };
 
     this.captures = [capture];
@@ -173,7 +173,7 @@ export class RdxSessionService {
       deviceId: replayDevice.id,
       deviceLabel: replayDevice.label,
     });
-    this.applyRuntimeContext(runtimeContext, request.ownerSessionId ?? null, request.projectId ?? null);
+    this.applyRuntimeContext(runtimeContext, request.sessionId, request.projectId ?? null);
     const captureIndex = this.captures.findIndex((item) => item.id === capture.id);
     this.captures[captureIndex] = {
       ...this.captures[captureIndex],
@@ -188,14 +188,13 @@ export class RdxSessionService {
 
     const openedCapture = this.createOpenedCaptureState(
       request.projectId,
-      request.ownerSessionId ?? null,
+      request.sessionId,
       request.inputId,
       request.filePath,
       replayDevice,
       previewResult,
     );
     this.openedCapture = openedCapture;
-    this.broadcastContextChanged();
     return openedCapture;
   }
 
@@ -216,15 +215,16 @@ export class RdxSessionService {
     }
   }
 
-  async openHumanPreviewWindow(request: { sessionId?: string } = {}): Promise<ContextSnapshot> {
-    const replaySessionId = request.sessionId || this.snapshotContext().sessionId;
+  async openHumanPreviewWindow(scope: SessionScope): Promise<ContextSnapshot | null> {
+    if (!this.isOwnedBy(scope)) return null;
+    const replaySessionId = this.runtimeContext?.replaySessionId ?? this.openedCapture?.replaySessionId ?? '';
     if (!this.contextId || !this.runtimeOwner || !this.ownerLeaseId || !replaySessionId) {
       this.setHumanPreview({
         status: 'unavailable',
         sessionId: replaySessionId || undefined,
         lastError: 'Runtime context, owner lease, or replay session is not available.',
       });
-      return this.snapshotContext();
+      return this.snapshotContextForSession(scope);
     }
 
     this.setHumanPreview({
@@ -257,18 +257,18 @@ export class RdxSessionService {
         summary: message,
         raw: { result },
       });
-      return this.snapshotContext();
+      return this.snapshotContextForSession(scope);
     }
 
     this.setHumanPreview(this.extractHumanPreview({ data: result.data } as ToolCallResult, 'open', replaySessionId));
-    return this.snapshotContext();
+    return this.snapshotContextForSession(scope);
   }
 
-  async closeHumanPreviewWindow(): Promise<ContextSnapshot> {
+  async closeHumanPreviewWindow(scope: SessionScope): Promise<ContextSnapshot | null> {
+    if (!this.isOwnedBy(scope)) return null;
     this.setHumanPreview({ status: 'closed' });
-    return this.snapshotContext();
+    return this.snapshotContextForSession(scope);
   }
-
   async switchActiveCapture(captureId: string): Promise<void> {
     const capture = this.captures.find((item) => item.id === captureId);
     if (!capture) {
@@ -467,7 +467,7 @@ export class RdxSessionService {
       : undefined;
   }
 
-  snapshotContext(): ContextSnapshot {
+  private snapshotContext(): ContextSnapshot {
     const activeCapture = this.captures.find((capture) => capture.id === this.activeCaptureId);
     return {
       contextId: this.contextId ?? '',
@@ -485,14 +485,27 @@ export class RdxSessionService {
     };
   }
 
-  snapshotOpenedCapture(): OpenedCaptureState | null {
-    return this.openedCapture ? { ...this.openedCapture } : null;
+  snapshotContextForSession(scope: SessionScope): ContextSnapshot | null {
+    return this.isOwnedBy(scope) ? this.snapshotContext() : null;
   }
 
-  clearOpenedCapture(): void {
-    this.openedCapture = null;
+  snapshotOpenedCaptureForSession(scope: SessionScope): OpenedCaptureState | null {
+    return this.isOwnedBy(scope) && this.openedCapture ? { ...this.openedCapture } : null;
   }
 
+  async clearOpenedCaptureForSession(scope: SessionScope): Promise<boolean> {
+    if (!this.isOwnedBy(scope)) return false;
+    await this.closeOrReplaceOpenedCapture();
+    return true;
+  }
+
+  private isOwnedBy(scope: SessionScope): boolean {
+    return Boolean(
+      this.openedCapture
+      && this.openedCapture.projectId === scope.projectId
+      && this.openedCapture.ownerSessionId === scope.sessionId,
+    );
+  }
   getCaptureDescriptors(): CaptureDescriptor[] {
     return [...this.captures];
   }
@@ -514,19 +527,7 @@ export class RdxSessionService {
       ...patch,
       updatedAt: patch.updatedAt ?? Date.now(),
     };
-    this.broadcastContextChanged();
   }
-
-  private broadcastContextChanged(): void {
-    const snapshot = this.snapshotContext();
-    rendererEventHub.emit('context:changed', snapshot);
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) {
-        window.webContents.send('context:changed', snapshot);
-      }
-    }
-  }
-
   private extractHumanPreview(
     result: ToolCallResult,
     fallbackStatus: HumanPreviewSnapshot['status'],
@@ -704,15 +705,7 @@ export class RdxSessionService {
         });
       }
     } else if (this.humanPreview.status !== 'closed') {
-      await this.closeHumanPreviewWindow().catch((error) => {
-        runtimeLogService.log({
-          scope: 'app',
-          namespace: 'context',
-          severity: 'warning',
-          title: 'Human preview teardown warning',
-          summary: error instanceof Error ? error.message : String(error),
-        });
-      });
+      this.setHumanPreview({ status: 'closed' });
       return;
     } else {
       return;

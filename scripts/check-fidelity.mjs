@@ -87,6 +87,10 @@ const contextBreakdownPopover = fs.readFileSync(
   path.join(repoRoot, 'src/renderer/patterns/ContextBreakdownPopover.tsx'),
   'utf8',
 );
+const contextRunMeterBand = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/patterns/ContextRunMeterBand.tsx'),
+  'utf8',
+);
 const interactionPerformanceProbe = fs.readFileSync(
   path.join(repoRoot, 'src/renderer/platform/performance/InteractionPerformanceProbe.ts'),
   'utf8',
@@ -145,7 +149,7 @@ requireCssContract(
     && contextBreakdownPopover.includes("data-testid=\"context-breakdown-preparing\"")
     && !contextBreakdownPopover.includes('showWindowPercent')
     && !contextBreakdownPopover.includes('context-breakdown-meter-eyebrow')
-    && (contextBreakdownPopover.match(/data-testid="context-breakdown-run-meter"/g) || []).length === 1,
+    && (contextRunMeterBand.match(/data-testid="context-breakdown-run-meter"/g) || []).length === 1,
   'Context popover must keep one phase authority: Preparing without Last actual hero/meter, Current request without a stacked historical meter, and a single Tokens/Cache/Reasoning strip under Actual/Last actual (no repeated phase eyebrow).',
 );
 requireCssContract(

@@ -179,10 +179,13 @@ export function finalizeTrace(
   if (terminalBlockStatus) {
     const terminalAt = nowMs();
     nextTrace.blocks = nextTrace.blocks.map((block) => {
-      const blockStatus = block.status === 'pending' || block.status === 'running'
+      const isTaskLifecycleBlock = block.stage === 'task';
+      const blockStatus = !isTaskLifecycleBlock && (block.status === 'pending' || block.status === 'running')
         ? terminalBlockStatus
         : block.status;
-      const blockCompletedAt = block.completedAt ?? terminalAt;
+      const blockCompletedAt = isTaskLifecycleBlock
+        ? block.completedAt
+        : block.completedAt ?? terminalAt;
       const toolCalls = block.toolCalls.map((toolCall) => {
         const cloned = cloneToolCall(toolCall);
         const cancelPendingApproval = status === 'stopped' && cloned.approval?.status === 'pending'

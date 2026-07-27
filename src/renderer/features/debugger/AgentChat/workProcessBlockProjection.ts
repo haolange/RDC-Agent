@@ -65,12 +65,18 @@ export interface LoopProjectionDeps {
   countToolSteps: (rows: WorkProcessRow[]) => number;
 }
 
+const isTaskLifecycleTool = (toolName: string): boolean => /^task_(?:create|update|get|list|stop)$/u.test(toolName.trim());
+
 export function buildPresentationUnits(
   blocks: ConversationWorkBlock[],
   deps: LoopProjectionDeps,
   ctx: BlockProjectionContext,
 ): PresentationUnit[] {
   const units: PresentationUnit[] = [];
+  let latestCompactionId: string | undefined;
+  for (const block of blocks) {
+    if (block.kind === 'compaction') latestCompactionId = block.id;
+  }
 
   for (let blockIndex = 0; blockIndex < blocks.length; blockIndex += 1) {
     const block = blocks[blockIndex];
@@ -149,6 +155,7 @@ export function buildPresentationUnits(
     }
 
     if (block.kind === 'compaction') {
+      if (block.id !== latestCompactionId) continue;
       ctx.hasVisibleProcessEvidence = true;
       units.push({
         kind: 'standalone',
@@ -156,7 +163,9 @@ export function buildPresentationUnits(
           type: 'summary',
           id: block.id,
           status: block.status,
-          text: deps.getMeaningfulBlockSummary(block) || block.title || '上下文压缩',
+          // Token/message counts describe the runtime, not useful progress for the
+          // person reading the work trace. Raw compaction evidence remains in logs.
+          text: 'Earlier work summarized',
           detailLines: [],
           duration: formatDurationMs(block.startedAt, block.completedAt),
         }],
@@ -169,13 +178,13 @@ export function buildPresentationUnits(
       const summaryText = deps.getMeaningfulBlockSummary(block);
       if (summaryText) {
         ctx.hasVisibleProcessEvidence = true;
-        const taskStatus = block.status === 'error'
-          ? 'failed'
+        const taskStatus = block.taskStatus ?? (block.status === 'error'
+          ? 'cancelled'
           : block.status === 'running'
             ? 'in_progress'
             : block.status === 'pending'
               ? 'pending'
-              : 'completed';
+              : 'completed');
         units.push({
           kind: 'standalone',
           rows: [{
@@ -185,6 +194,7 @@ export function buildPresentationUnits(
             status: block.status,
             title: summaryText,
             taskStatus,
+            taskStatusReason: block.taskStatusReason,
             duration: formatDurationMs(block.startedAt, block.completedAt),
           }],
           loopIds: [block.id],
@@ -284,7 +294,13 @@ function projectLlmTurn(
   const outputPhase = deps.resolveOutputPhase(block, ctx.hasVisibleProcessEvidence);
   const reasoningState = deps.resolveReasoningState(block);
   const stopReason = block.result?.stopReason;
-  const steps = ctx.groupProcessRows(block.toolCalls.map((call) => ctx.createToolRow(call)));
+  // TaskRegistry mutations already arrive as authoritative command blocks. Rendering
+  // their raw tool receipt here as well created a second, JSON-like task history.
+  const steps = ctx.groupProcessRows(
+    block.toolCalls
+      .filter((call) => !isTaskLifecycleTool(call.toolName))
+      .map((call) => ctx.createToolRow(call)),
+  );
   const loopRows: WorkProcessRow[] = [];
 
   const isFinalAnswer = outputPhase === 'final_answer' && !deps.isNonFinalStopReason(stopReason);

@@ -525,6 +525,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                 taskId?: string;
                 title?: string;
                 status?: string;
+                statusReason?: string;
               };
               const taskId = typeof payload.taskId === 'string' && payload.taskId.trim()
                 ? payload.taskId.trim()
@@ -532,22 +533,31 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               const title = typeof payload.title === 'string' && payload.title.trim()
                 ? payload.title.trim()
                 : taskId;
-              const blockStatus: ConversationWorkBlock['status'] = payload.status === 'failed'
-                || payload.status === 'deleted'
-                ? 'error'
-                : payload.status === 'in_progress'
-                  ? 'running'
-                  : payload.status === 'pending'
-                    ? 'pending'
+              const taskStatus = payload.status === 'in_progress'
+                || payload.status === 'blocked'
+                || payload.status === 'completed'
+                || payload.status === 'cancelled'
+                ? payload.status
+                : 'pending';
+              const blockStatus: ConversationWorkBlock['status'] = taskStatus === 'in_progress'
+                ? 'running'
+                : taskStatus === 'pending'
+                  ? 'pending'
+                  : taskStatus === 'blocked' || taskStatus === 'cancelled'
+                    ? 'error'
                     : 'complete';
               commitAssistantMessage('message_patched', {
                 workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, taskId, {
                   kind: 'command',
                   title,
-                  stage: 'tool',
+                  stage: 'task',
                   status: blockStatus,
+                  taskStatus,
+                  taskStatusReason: typeof payload.statusReason === 'string' && payload.statusReason.trim()
+                    ? payload.statusReason.trim()
+                    : undefined,
                   summary: title,
-                  completedAt: blockStatus === 'running' || blockStatus === 'pending' ? undefined : nowMs(),
+                  completedAt: taskStatus === 'completed' || taskStatus === 'cancelled' ? nowMs() : undefined,
                 }),
               });
             }

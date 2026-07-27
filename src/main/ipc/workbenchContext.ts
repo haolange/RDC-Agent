@@ -1,6 +1,5 @@
 import type {
   RunSummary,
-  SessionOutputRecord,
   SessionRecord,
   ProjectRecord,
 } from '@shared/types/session';
@@ -38,6 +37,5 @@ export interface WorkbenchIpcContext {
   applyCurrentLlmConfig(): void;
   setRunLifecycleState(sessionId: string, runId: string, patch: RunLifecyclePatch): Promise<void>;
   selectCurrentProject(projectId: string | null): Promise<ProjectSelectionResult>;
-  buildSessionOutputs(sessionId: string, runId?: string): Promise<SessionOutputRecord[]>;
   initializeIpcState(): Promise<void>;
 }
