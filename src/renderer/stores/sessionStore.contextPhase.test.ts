@@ -123,4 +123,49 @@ describe('session context display phases', () => {
 
     expect(useSessionStore.getState().conversationPreparationPhase).toBe('current');
   });
+  it('keeps Last actual after terminal completion and marks restored usage stale only when requested', () => {
+    const store = useSessionStore.getState();
+    store.setPreparedTurnContext(prepared());
+    store.setConversationPreparationPhase('current');
+    store.setCurrentRunUsage(usage());
+    store.markConversationTurnTerminal('turn-1');
+
+    expect(useSessionStore.getState()).toMatchObject({
+      conversationPreparationPhase: 'idle',
+      currentRunUsage: expect.objectContaining({ runId: 'session-1' }),
+      lastKnownUsage: expect.objectContaining({ runId: 'session-1' }),
+      usageStale: false,
+    });
+
+    useSessionStore.getState().setCurrentRunUsage(usage({ snapshotAt: 120 }), true);
+    expect(useSessionStore.getState()).toMatchObject({
+      lastKnownUsage: expect.objectContaining({ snapshotAt: 120 }),
+      usageStale: true,
+    });
+  });
+  it('clears Last actual when the authoritative session read has no telemetry', () => {
+    const store = useSessionStore.getState();
+    store.setCurrentRunUsage(usage());
+    store.setCurrentRunUsage(null);
+
+    expect(useSessionStore.getState()).toMatchObject({
+      currentRunUsage: null,
+      lastKnownUsage: null,
+      usageStale: false,
+    });
+  });
+
+  it('drops a telemetry-free zero snapshot from a late session projection', () => {
+    const store = useSessionStore.getState();
+    store.setCurrentRunUsage(usage());
+    store.setCurrentRunUsage(usage({
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      occupiedTokens: 0,
+    }));
+
+    expect(useSessionStore.getState().lastKnownUsage).toBeNull();
+  });
+
 });

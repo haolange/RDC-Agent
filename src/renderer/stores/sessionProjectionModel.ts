@@ -5,6 +5,10 @@ import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { ContextSnapshot, OpenedCaptureState } from '@shared/types/session';
 import type { ReasoningSummary, WorkflowState } from '@shared/types/workflow';
 import { compareConversationMessages } from '@shared/conversation/conversationBranchResolver';
+import {
+  createEmptyContextUsageProjection,
+  type ContextUsageProjectionState,
+} from './contextUsageProjectionModel';
 
 export interface SessionProjection {
   allMessages: ConversationMessage[];
@@ -18,6 +22,8 @@ export interface SessionProjection {
   tracePresentation: AgentRunPresentation | null;
   contextSnapshot: ContextSnapshot | null;
   openedCapture: OpenedCaptureState | null;
+  activeRunId: string | null;
+  contextUsage: ContextUsageProjectionState;
   lastHydratedAt: number;
 }
 
@@ -33,6 +39,8 @@ export const createEmptySessionProjection = (): SessionProjection => ({
   tracePresentation: null,
   contextSnapshot: null,
   openedCapture: null,
+  activeRunId: null,
+  contextUsage: createEmptyContextUsageProjection(),
   lastHydratedAt: 0,
 });
 

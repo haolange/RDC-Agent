@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRefreshService';
-import type { RunContextUsageSummary, RunSummary } from '@shared/types/session';
+import type { RunSummary } from '@shared/types/session';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { rdxSessionService } from '../sessions';
 import { debuggerLlmService } from '../settings/DebuggerLlmService';
@@ -82,19 +82,17 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
   });
 
   ipcMain.handle('workflow:getRunUsage', async (_event, ...rawArgs: unknown[]) => {
-    const [runId, sessionId] = parseIpcArgs(WorkflowGetRunUsageArgsSchema, rawArgs, {
+    const [request] = parseIpcArgs(WorkflowGetRunUsageArgsSchema, rawArgs, {
       label: 'workflow:getRunUsage',
       maxBytes: 4 * 1024,
-      padTo: 2,
+      padTo: 1,
     });
-    const targetKey = runId ?? sessionId ?? state.currentRunId;
-    if (!targetKey) {
-      return { usage: null as RunContextUsageSummary | null };
+    if (!storageAdapter.readSession(request.sessionId)) {
+      return { usage: null, stale: false };
     }
 
-    const fallbackSessionId = sessionId ?? state.currentSessionId ?? null;
     return {
-      usage: debuggerLlmService.getRunContextUsage(targetKey, fallbackSessionId),
+      usage: debuggerLlmService.getSessionContextUsage(request),
     };
   });
 

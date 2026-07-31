@@ -3,10 +3,16 @@ import type { AgentTimelineEntry } from '@shared/types/agent';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { WorkflowState } from '@shared/types/workflow';
-import type { ContextSnapshot, OpenedCaptureState } from '@shared/types/session';
+import type { ContextSnapshot, OpenedCaptureState, RunContextUsageSummary } from '@shared/types/session';
 import { useConversationStore } from './conversationStore';
 import { useWorkflowStore } from './workflowStore';
 import { useCaptureStore } from './captureStore';
+import { useSessionStore } from './sessionStore';
+import {
+  acceptsContextUsage,
+  applyContextUsage,
+  markContextTurnTerminal,
+} from './contextUsageProjectionModel';
 import {
   createEmptySessionProjection,
   updateProjectionMessages,
@@ -19,6 +25,8 @@ interface SessionProjectionStoreState {
   ensure: (sessionId: string) => import('./sessionProjectionModel').SessionProjection;
   captureActiveSession: (sessionId: string) => void;
   projectConversationMessage: (sessionId: string, message: ConversationMessage) => void;
+  projectConversationTerminal: (sessionId: string, turnId: string, awaitLateUsage: boolean) => void;
+  projectRunUsage: (sessionId: string, usage: RunContextUsageSummary, activeRunId: string | null) => void;
   projectTrace: (sessionId: string, presentation: AgentRunPresentation) => void;
   projectContextSnapshot: (sessionId: string, snapshot: ContextSnapshot | null) => void;
   projectOpenedCapture: (sessionId: string, openedCapture: OpenedCaptureState | null) => void;
@@ -45,6 +53,7 @@ export const useSessionProjectionStore = create<SessionProjectionStoreState>((se
     const conversation = useConversationStore.getState();
     const workflow = useWorkflowStore.getState();
     const capture = useCaptureStore.getState();
+    const session = useSessionStore.getState();
     set((state) => ({
       bySessionId: {
         ...state.bySessionId,
@@ -60,6 +69,15 @@ export const useSessionProjectionStore = create<SessionProjectionStoreState>((se
           tracePresentation: workflow.tracePresentation,
           contextSnapshot: capture.contextSnapshot,
           openedCapture: capture.openedCapture,
+          activeRunId: session.currentRun?.runId ?? null,
+          contextUsage: {
+            currentRunUsage: session.currentRunUsage,
+            lastKnownUsage: session.lastKnownUsage,
+            usageStale: session.usageStale,
+            preparedTurnContext: session.preparedTurnContext,
+            conversationPreparationPhase: session.conversationPreparationPhase,
+            conversationTerminalTurnId: session.conversationTerminalTurnId,
+          },
           lastHydratedAt: Date.now(),
         },
       },
@@ -73,6 +91,31 @@ export const useSessionProjectionStore = create<SessionProjectionStoreState>((se
         ...projection,
         allMessages: updateProjectionMessages(projection.allMessages, message),
       })),
+    }));
+  },
+
+  projectConversationTerminal: (sessionId, turnId, awaitLateUsage) => {
+    if (!sessionId) return;
+    set((state) => ({
+      bySessionId: updateSessionProjectionMap(state.bySessionId, sessionId, (projection) => ({
+        ...projection,
+        contextUsage: markContextTurnTerminal(projection.contextUsage, turnId, awaitLateUsage),
+      })),
+    }));
+  },
+
+  projectRunUsage: (sessionId, usage, activeRunId) => {
+    if (!sessionId) return;
+    set((state) => ({
+      bySessionId: updateSessionProjectionMap(state.bySessionId, sessionId, (projection) => {
+        const expectedRunId = activeRunId ?? projection.activeRunId;
+        if (!acceptsContextUsage(projection.contextUsage, usage, expectedRunId)) return projection;
+        return {
+          ...projection,
+          activeRunId: expectedRunId,
+          contextUsage: applyContextUsage(projection.contextUsage, usage, false),
+        };
+      }),
     }));
   },
 

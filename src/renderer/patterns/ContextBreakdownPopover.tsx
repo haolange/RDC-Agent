@@ -42,13 +42,13 @@ export const ContextBreakdownPopover: React.FC<{
   onClose: () => void;
 }> = ({ prepared, phase, usage, selectedContextWindowTokens, stale, onClose }) => {
   const { t } = useI18n();
+  const closeButtonRef = React.useRef<HTMLButtonElement>(null);
   const detailsExpanded = useAppSettingsStore(
     (state) => state.settings.appearance.contextBreakdownExpanded,
   );
   const setContextBreakdownExpanded = useAppSettingsStore(
     (state) => state.setContextBreakdownExpanded,
   );
-  // One phase owns the popover narrative: Preparing | Current request | Actual | Last actual.
   const showPrepared = phase === 'current' && prepared !== null;
   const showActualAsPrimary = (phase === 'actual' || phase === 'idle') && usage !== null;
   const windowTokens = showPrepared
@@ -82,22 +82,40 @@ export const ContextBreakdownPopover: React.FC<{
       && entry.id !== 'mcp_tools_deferred'
       && entry.id !== 'builtin_tools_deferred',
   );
-  const hasRunTotals = Boolean(usage && (usage.inputTokens > 0 || usage.outputTokens > 0));
-  const derivedContextLabel = prepared?.derivedContext.status === 'applied'
-    ? t('contextBreakdown.derivedContextApplied')
-    : prepared?.derivedContext.status === 'stale'
-      ? t('contextBreakdown.derivedContextStale')
-      : t('contextBreakdown.derivedContextNone');
+
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    closeButtonRef.current?.focus();
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   return (
     <>
       <div className="context-breakdown-backdrop" onClick={onClose} aria-hidden="true" />
-      <div className="context-breakdown" role="dialog" aria-label={t('contextBreakdown.title')} data-testid="context-breakdown">
+      <div
+        className="context-breakdown"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('contextBreakdown.title')}
+        data-testid="context-breakdown"
+      >
         <div className="context-breakdown-header">
           <span className="context-breakdown-title">{t('contextBreakdown.title')}</span>
-          <button type="button" className="context-breakdown-close" onClick={onClose} aria-label={t('contextBreakdown.close')}>
+          <button
+            ref={closeButtonRef}
+            type="button"
+            className="context-breakdown-close"
+            onClick={onClose}
+            aria-label={t('contextBreakdown.close')}
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
             </svg>
           </button>
         </div>
@@ -152,17 +170,9 @@ export const ContextBreakdownPopover: React.FC<{
             </div>
             {showPrepared ? (
               <div className="context-breakdown-projection-meta">
-                <span>
-                  {t('contextBreakdown.completeWindow')} {formatTokenCount(prepared.contextWindowTokens)}
-                </span>
-                <span>
-                  {prepared.contextMode === 'one-million'
-                    ? t('contextBreakdown.oneMillionMode')
-                    : t('contextBreakdown.normalMode')}
-                </span>
-                {prepared.compactionApplied ? (
-                  <span className="is-warning">{t('contextBreakdown.compactionApplied')}</span>
-                ) : null}
+                <span>{t('contextBreakdown.completeWindow')} {formatTokenCount(prepared.contextWindowTokens)}</span>
+                <span>{prepared.contextMode === 'one-million' ? t('contextBreakdown.oneMillionMode') : t('contextBreakdown.normalMode')}</span>
+                {prepared.compactionApplied ? <span className="is-warning">{t('contextBreakdown.compactionApplied')}</span> : null}
                 {prepared.filteredArtifactCount > 0 ? (
                   <span>{t('contextBreakdown.filteredArtifacts', { count: prepared.filteredArtifactCount })}</span>
                 ) : null}
@@ -171,17 +181,15 @@ export const ContextBreakdownPopover: React.FC<{
           </div>
         )}
 
-        {hasRunTotals && showActualAsPrimary && usage ? (
-          <ContextRunMeterBand usage={usage} />
+        {showPrepared || showActualAsPrimary ? (
+          <ContextRunMeterBand usage={usage} prepared={showPrepared ? prepared : null} />
         ) : null}
 
         {showActualAsPrimary && usage && (usage.cost || typeof usage.cumulativeCost === 'number') ? (
           <div className="context-breakdown-run-meter" data-testid="context-breakdown-cost">
             <h3 className="context-breakdown-run-col-title">{t('contextBreakdown.costColumn')}</h3>
             <div className="context-breakdown-meter-stats">
-              {usage.cost ? (
-                <MeterStat label={t('contextBreakdown.costThisTurn')} value={formatUsdCost(usage.cost.total)} />
-              ) : null}
+              {usage.cost ? <MeterStat label={t('contextBreakdown.costThisTurn')} value={formatUsdCost(usage.cost.total)} /> : null}
               {typeof usage.cumulativeCost === 'number' ? (
                 <MeterStat label={t('contextBreakdown.costThisRun')} value={formatUsdCost(usage.cumulativeCost)} />
               ) : null}
@@ -207,9 +215,7 @@ export const ContextBreakdownPopover: React.FC<{
             className={`context-breakdown-details-toggle${detailsExpanded ? ' is-expanded' : ''}`}
             aria-expanded={detailsExpanded}
             aria-controls="context-breakdown-details"
-            aria-label={detailsExpanded
-              ? t('contextBreakdown.detailsCollapseAria')
-              : t('contextBreakdown.detailsExpandAria')}
+            aria-label={detailsExpanded ? t('contextBreakdown.detailsCollapseAria') : t('contextBreakdown.detailsExpandAria')}
             onClick={() => { void setContextBreakdownExpanded(!detailsExpanded); }}
           >
             <span className={`context-breakdown-details-chevron${detailsExpanded ? ' is-expanded' : ''}`} aria-hidden="true">
@@ -224,49 +230,6 @@ export const ContextBreakdownPopover: React.FC<{
         {breakdown.length > 0 && detailsExpanded ? (
           <div id="context-breakdown-details" className="context-breakdown-details">
             <ContextBreakdownLegend entries={orderedEntries} />
-            {showPrepared ? (
-              <div className="context-breakdown-runtime" data-testid="context-breakdown-runtime">
-                <div className="context-breakdown-runtime-row">
-                  <span className="context-breakdown-runtime-label">{t('contextBreakdown.continuationLabel')}</span>
-                  <span className="context-breakdown-runtime-value">
-                    <code>{prepared.continuation.strategy}</code>
-                    <span>{t('contextBreakdown.replayedArtifacts', { count: prepared.continuation.replayedArtifactCount })}</span>
-                    <span>{t('contextBreakdown.droppedArtifacts', { count: prepared.continuation.droppedArtifactCount })}</span>
-                  </span>
-                </div>
-                {prepared.continuation.decisionCounts.length > 0 ? (
-                  <div className="context-breakdown-runtime-row">
-                    <span className="context-breakdown-runtime-label">{t('contextBreakdown.replayDecisionsLabel')}</span>
-                    <span className="context-breakdown-runtime-value is-wrapping">
-                      {prepared.continuation.decisionCounts.map((entry) => (
-                        <code key={entry.reason}>{entry.reason} × {entry.count}</code>
-                      ))}
-                    </span>
-                  </div>
-                ) : null}
-                <div className="context-breakdown-runtime-row">
-                  <span className="context-breakdown-runtime-label">{t('contextBreakdown.derivedContextLabel')}</span>
-                  <span className={'context-breakdown-runtime-value status-' + prepared.derivedContext.status}>
-                    <span>{derivedContextLabel}</span>
-                    {prepared.derivedContext.compactedTurnCount > 0 ? (
-                      <span>{t('contextBreakdown.compactedTurns', { count: prepared.derivedContext.compactedTurnCount })}</span>
-                    ) : null}
-                  </span>
-                </div>
-                <div className="context-breakdown-runtime-row">
-                  <span className="context-breakdown-runtime-label">{t('contextBreakdown.cachePolicyLabel')}</span>
-                  <span className="context-breakdown-runtime-value is-wrapping">
-                    <code>{prepared.cache.enabled ? prepared.cache.mode : t('contextBreakdown.cacheDisabled')}</code>
-                    {prepared.cache.enabled ? <code>{prepared.cache.breakpoint} · {prepared.cache.ttl}</code> : null}
-                    <span>{t('contextBreakdown.cacheStablePrefix', {
-                      segments: prepared.cache.stableSegmentCount,
-                      tokens: formatTokenCount(prepared.cache.stableTokenEstimate),
-                    })}</span>
-                    {prepared.cache.providerReported ? <span>{t('contextBreakdown.providerTelemetry')}</span> : null}
-                  </span>
-                </div>
-              </div>
-            ) : null}
           </div>
         ) : null}
 

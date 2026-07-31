@@ -84,7 +84,6 @@ export const Composer: React.FC<ComposerProps> = ({
     preparedTurnContext,
     conversationPreparationPhase,
     selectedContextWindowTokens,
-    hasActiveDebugRun,
     isComposerBusy,
     promptPlaceholder,
     attachButtonLabel,
@@ -230,7 +229,7 @@ export const Composer: React.FC<ComposerProps> = ({
             prepared={preparedTurnContext}
             phase={conversationPreparationPhase}
             selectedContextWindowTokens={selectedContextWindowTokens}
-            stale={usageStale && !hasActiveDebugRun}
+            stale={usageStale}
           />
           <button
             type="button"

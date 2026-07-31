@@ -21,9 +21,9 @@ vi.mock('../../settings/SettingsService', () => ({
   },
 }));
 
-import { AgentTurnRunner } from './AgentTurnRunner';
+import { AgentTurnRunner, hasActualProviderUsage } from './AgentTurnRunner';
 import { TokenizerService } from '../../agent-runtime/core/TokenizerService';
-import type { ToolResultMessage } from '../../agent-runtime/core/types';
+import type { AssistantMessage, ToolResultMessage } from '../../agent-runtime/core/types';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
@@ -54,6 +54,25 @@ function createRunner(): AgentTurnRunner {
 }
 
 describe('AgentTurnRunner', () => {
+  it('does not treat an error terminal message with zero fallback usage as provider telemetry', () => {
+    const errorMessage: AssistantMessage = {
+      role: 'assistant',
+      content: [],
+      model: 'kimi-for-coding',
+      provider: 'kimi-coding-plan',
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      stopReason: 'error',
+      timestamp: 0,
+    };
+    const completedMessage: AssistantMessage = {
+      ...errorMessage,
+      stopReason: 'stop',
+    };
+
+    expect(hasActualProviderUsage(errorMessage)).toBe(false);
+    expect(hasActualProviderUsage(completedMessage)).toBe(true);
+  });
+
   it('resolveMaxTurns prefers finite policy capped by profile', () => {
     const runner = createRunner();
     expect(runner.resolveMaxTurns('ask', 100)).toBe(12);

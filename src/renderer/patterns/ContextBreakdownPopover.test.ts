@@ -125,7 +125,9 @@ describe('ContextBreakdownPopover phase authority', () => {
     );
     expect(html).toContain('contextBreakdown.currentRequest');
     expect(html).toContain('context-breakdown-hero');
-    expect(html).not.toContain('context-breakdown-run-meter');
+    expect(html).toContain('data-testid="context-breakdown-run-meter"');
+    expect(html).toContain('data-phase="current"');
+    expect(html.match(/>—</g)?.length).toBeGreaterThanOrEqual(5);
     expect(html).not.toContain('context-breakdown-meter-eyebrow');
     expect(html).not.toContain('contextBreakdown.lastActual');
   });
@@ -148,5 +150,8 @@ describe('ContextBreakdownPopover phase authority', () => {
     expect(html).toContain('contextBreakdown.tokensColumn');
     expect(html).toContain('contextBreakdown.cacheColumn');
     expect(html).toContain('contextBreakdown.reasoningLabel');
+    expect(html).not.toContain('context-breakdown-runtime');
+    expect(html).not.toContain('semantic-replay');
+    expect(html).not.toContain('stableTokenEstimate');
   });
 });

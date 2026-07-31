@@ -24,7 +24,6 @@ export function useAppBootstrap(options: {
   setRuntimeTestMode: (mode: boolean | null) => void;
   setWindowMaximized: (maximized: boolean) => void;
   resolvedTheme: ResolvedTheme;
-  hasActiveDebugRun: boolean;
 }): void {
   const {
     setIsLoading,
@@ -33,7 +32,6 @@ export function useAppBootstrap(options: {
     setRuntimeTestMode,
     setWindowMaximized,
     resolvedTheme,
-    hasActiveDebugRun,
   } = options;
 
   const settings = useAppSettingsStore((state) => state.settings);
@@ -46,7 +44,6 @@ export function useAppBootstrap(options: {
 
   const setConversationSnapshot = useConversationStore((state) => state.setConversationSnapshot);
   const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
-  const setCurrentRunUsage = useSessionStore((state) => state.setCurrentRunUsage);
   const clearUsageSnapshot = useSessionStore((state) => state.clearUsageSnapshot);
   const setActiveTerminalContext = useTerminalStore((state) => state.setActiveContext);
   const refreshTerminalEntries = useTerminalStore((state) => state.refreshEntries);
@@ -139,42 +136,24 @@ export function useAppBootstrap(options: {
 
   useEffect(() => {
     const electronAPI = window.electronAPI;
-    if (!electronAPI) {
+    if (!electronAPI || !currentSession?.sessionId) {
       clearUsageSnapshot();
-      return;
+      return undefined;
     }
 
-    // Active debug run: pull by runId. The IPC push path (useIpcEventBridge) is the
-    // steady-state write source; this pull only supplements at init and run/session
-    // switch. Dedup against the store so an inbound push never triggers a clear-refetch loop.
-    if (hasActiveDebugRun && currentRun?.runId) {
-      if (useSessionStore.getState().currentRunUsage?.runId === currentRun.runId) {
-        return;
-      }
-      clearUsageSnapshot();
-      let cancelled = false;
-      void electronAPI.workflow.getRunUsage(currentRun.runId)
-        .then((result) => { if (!cancelled) setCurrentRunUsage(result.usage ?? null); })
-        .catch(() => { if (!cancelled) setCurrentRunUsage(null); });
-      return () => { cancelled = true; };
-    }
+    const sessionId = currentSession.sessionId;
+    const runId = currentRun?.runId;
+    let cancelled = false;
+    void electronAPI.workflow.getRunUsage({
+      sessionId,
+      ...(runId ? { runId } : {}),
+    }).then((result) => {
+      if (cancelled || useProjectStore.getState().currentSession?.sessionId !== sessionId) return;
+      useSessionStore.getState().setCurrentRunUsage(result.usage, result.stale);
+    }).catch(() => undefined);
 
-    // Ask mode (no active debug run): pull by sessionId if available.
-    if (!hasActiveDebugRun && currentSession?.sessionId) {
-      if (useSessionStore.getState().currentRunUsage?.runId === currentSession.sessionId) {
-        return;
-      }
-      clearUsageSnapshot();
-      let cancelled = false;
-      void electronAPI.workflow.getRunUsage(undefined, currentSession.sessionId)
-        .then((result) => { if (!cancelled) setCurrentRunUsage(result.usage ?? null); })
-        .catch(() => { if (!cancelled) setCurrentRunUsage(null); });
-      return () => { cancelled = true; };
-    }
-
-    clearUsageSnapshot();
-    return undefined;
-  }, [clearUsageSnapshot, currentRun?.runId, currentSession?.sessionId, hasActiveDebugRun, setCurrentRunUsage]);
+    return () => { cancelled = true; };
+  }, [clearUsageSnapshot, currentRun?.runId, currentSession?.sessionId]);
 
   useEffect(() => {
     const electronAPI = window.electronAPI;

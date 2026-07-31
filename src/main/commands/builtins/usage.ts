@@ -37,8 +37,8 @@ export const usageCommand: CommandDefinition = {
       'By status:',
       ...statusLines,
       '',
-      'Current-run token usage is available through workflow:getRunUsage while a run is active.',
-      'Historical token and API-call counts are not persisted per run yet.',
+      'Session-scoped token usage is available through workflow:getRunUsage({ sessionId, runId? }).',
+      'The latest session usage is retained as Last actual and may be restored from its usage snapshot.',
     ];
     return { success: true, message: lines.join('\n') };
   },

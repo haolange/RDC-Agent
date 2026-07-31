@@ -124,7 +124,7 @@ class BrowserAppBridgeClient {
       getState: () => this.invoke('workflow:getState'),
       resume: (sessionId) => this.invoke('workflow:resume', sessionId),
       stop: (runId) => this.invoke('workflow:stop', runId),
-      getRunUsage: (runId, sessionId) => this.invoke('workflow:getRunUsage', runId, sessionId),
+      getRunUsage: (request) => this.invoke('workflow:getRunUsage', request),
       listRuns: () => this.invoke('workflow:listRuns'),
       listActiveRuns: () => this.invoke('workflow:listActiveRuns'),
     },

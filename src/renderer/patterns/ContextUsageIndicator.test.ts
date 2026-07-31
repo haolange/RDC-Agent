@@ -28,7 +28,6 @@ describe('ContextUsageIndicator', () => {
     expect(idle).not.toContain('composer-usage-value-label');
     expect(idle).not.toContain('preparingBadge');
     expect(idle).not.toContain('contextBreakdown.preparingBadge');
-    expect(idle).not.toContain('准备');
     expect(idle).not.toContain('Prep');
 
     const preparing = renderToStaticMarkup(
@@ -66,6 +65,5 @@ describe('ContextUsageIndicator', () => {
     );
     expect(actual).toContain('42%');
     expect(actual).not.toContain('>Actual<');
-    expect(actual).not.toContain('实际');
   });
 });

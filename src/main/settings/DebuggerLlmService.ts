@@ -3,6 +3,8 @@ import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type {
   ContextUsageBreakdownEntry,
   ContextUsageBreakdownId,
+  RunContextUsageReadResult,
+  RunContextUsageRequest,
   RunContextUsageSummary,
 } from '@shared/types/session';
 import type { WorkflowStage } from '@shared/types/workflow';
@@ -90,6 +92,28 @@ function buildScaledBreakdown(
 function positiveTokenOrOmit(value: number | undefined): number | undefined {
   return typeof value === 'number' && value > 0 ? value : undefined;
 }
+function hasMaterialProviderUsageTelemetry(usage: {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  cacheHitTokens?: number;
+  cacheMissTokens?: number;
+  reasoningTokens?: number;
+  cost?: LlmUsageCost;
+}): boolean {
+  return [
+    usage.inputTokens,
+    usage.outputTokens,
+    usage.cacheReadTokens,
+    usage.cacheWriteTokens,
+    usage.cacheHitTokens,
+    usage.cacheMissTokens,
+    usage.reasoningTokens,
+    usage.cost?.total,
+  ].some((value) => typeof value === 'number' && value > 0);
+}
+
 
 function isSubagentSessionId(sessionId: string | null | undefined): boolean {
   return Boolean(sessionId && sessionId.includes('::subagent::'));
@@ -102,10 +126,14 @@ function isSubagentSessionId(sessionId: string | null | undefined): boolean {
  */
 export class DebuggerLlmService {
   private readonly runSummaries = new Map<string, RunLlmExecutionSummary>();
+  private readonly latestUsageKeysBySession = new Map<string, string>();
 
   resetRunSummary(runId: string): void {
+    const summary = this.runSummaries.get(runId);
     this.runSummaries.delete(runId);
-    this.broadcastRunUsage(runId);
+    if (summary?.sessionId && this.latestUsageKeysBySession.get(summary.sessionId) === runId) {
+      this.latestUsageKeysBySession.delete(summary.sessionId);
+    }
   }
 
   getRunSummary(runId: string): RunLlmExecutionSummary | null {
@@ -113,15 +141,36 @@ export class DebuggerLlmService {
     return summary ? { ...summary, routesUsed: summary.routesUsed.map((entry) => ({ ...entry })) } : null;
   }
 
-  getRunContextUsage(runId: string, fallbackSessionId?: string | null): RunContextUsageSummary | null {
-    const summary = this.runSummaries.get(runId);
-    return summary
-      ? this.toContextUsageSummary(runId, summary)
-      : this.readPersistedUsage(runId, fallbackSessionId);
+  getSessionContextUsage(request: RunContextUsageRequest): RunContextUsageReadResult {
+    if (isSubagentSessionId(request.sessionId)) {
+      return { usage: null, stale: false };
+    }
+
+    if (request.runId) {
+      const inMemory = this.runSummaries.get(request.runId);
+      if (inMemory?.sessionId === request.sessionId) {
+        return { usage: this.toContextUsageSummary(request.runId, inMemory), stale: false };
+      }
+      const persisted = this.readPersistedContextUsage(request.sessionId);
+      return {
+        usage: persisted?.runId === request.runId ? persisted : null,
+        stale: persisted?.runId === request.runId,
+      };
+    }
+
+    const latestKey = this.latestUsageKeysBySession.get(request.sessionId);
+    const inMemory = latestKey ? this.runSummaries.get(latestKey) : null;
+    if (latestKey && inMemory?.sessionId === request.sessionId) {
+      return { usage: this.toContextUsageSummary(latestKey, inMemory), stale: false };
+    }
+
+    const persisted = this.readPersistedContextUsage(request.sessionId);
+    return { usage: persisted, stale: persisted !== null };
   }
 
   recordAgentTurnUsage(params: {
     runId?: string;
+    turnId: string;
     sessionId?: string | null;
     providerId: string;
     modelId: string;
@@ -135,20 +184,20 @@ export class DebuggerLlmService {
     cost?: LlmUsageCost;
     precomputedBreakdown: ContextUsageBreakdownEntry[];
   }): void {
-    const key = params.runId ?? params.sessionId;
-    if (!key) return;
+    if (!params.sessionId || isSubagentSessionId(params.sessionId) || !hasMaterialProviderUsageTelemetry(params)) return;
+    const key = params.runId ?? params.turnId;
     const existing = this.runSummaries.get(key) ?? {
       providerId: params.providerId,
       modelId: params.modelId,
-      sessionId: params.sessionId ?? null,
+      sessionId: params.sessionId,
       successfulCallCount: 0,
       failedCallCount: 0,
       totalInputTokens: 0,
       totalOutputTokens: 0,
       routesUsed: [],
     };
-    existing.providerId ||= params.providerId;
-    existing.modelId ||= params.modelId;
+    existing.providerId = params.providerId;
+    existing.modelId = params.modelId;
     if (params.sessionId) existing.sessionId = params.sessionId;
     existing.successfulCallCount += 1;
     existing.totalInputTokens += params.inputTokens;
@@ -187,12 +236,18 @@ export class DebuggerLlmService {
     existing.lastPromptBreakdown = params.precomputedBreakdown;
     existing.lastSnapshotAt = Date.now();
     this.runSummaries.set(key, existing);
+    this.latestUsageKeysBySession.set(params.sessionId, key);
+    this.persistRunUsage(key, params.sessionId);
     this.broadcastRunUsage(key);
-    this.persistRunUsage(key, params.sessionId ?? existing.sessionId);
+  }
+
+  private readPersistedContextUsage(sessionId: string): RunContextUsageSummary | null {
+    const usage = storageAdapter.readSessionUsage(sessionId);
+    return usage && hasMaterialProviderUsageTelemetry(usage) ? usage : null;
   }
 
   private toContextUsageSummary(key: string, summary: RunLlmExecutionSummary): RunContextUsageSummary {
-    const turnControls = this.resolveSessionTurnControls(key, summary);
+    const turnControls = this.resolveSessionTurnControls(summary);
     const planning = planEffectiveModelRequest({
       providerId: summary.providerId,
       modelId: summary.modelId,
@@ -253,31 +308,32 @@ export class DebuggerLlmService {
     };
   }
 
-  private readPersistedUsage(key: string, fallbackSessionId?: string | null): RunContextUsageSummary | null {
-    const direct = storageAdapter.readSessionUsage(key);
-    if (direct) return direct;
-    if (!fallbackSessionId || fallbackSessionId === key || isSubagentSessionId(fallbackSessionId)) return null;
-    const viaSession = storageAdapter.readSessionUsage(fallbackSessionId);
-    return viaSession?.runId === key ? viaSession : null;
-  }
-
-  private resolveSessionTurnControls(
-    key: string,
-    summary: RunLlmExecutionSummary,
-  ): ConversationTurnControls | null {
-    if (key.startsWith('sess_')) return storageAdapter.readSession(key)?.turnControls ?? null;
+  private resolveSessionTurnControls(summary: RunLlmExecutionSummary): ConversationTurnControls | null {
     return summary.sessionId ? storageAdapter.readSession(summary.sessionId)?.turnControls ?? null : null;
   }
 
-  private persistRunUsage(key: string, sessionId: string | null | undefined): void {
-    if (!sessionId || isSubagentSessionId(sessionId)) return;
-    const usage = this.getRunContextUsage(key);
+  private contextUsageForKey(key: string): RunContextUsageSummary | null {
+    const summary = this.runSummaries.get(key);
+    return summary ? this.toContextUsageSummary(key, summary) : null;
+  }
+
+  private persistRunUsage(key: string, sessionId: string): void {
+    const usage = this.contextUsageForKey(key);
     if (usage) storageAdapter.writeSessionUsage(sessionId, usage);
   }
 
-  private broadcastRunUsage(runId: string): void {
-    const usage = this.getRunContextUsage(runId);
-    if (usage) workflowProjectionPublisher.publishRunUsage(usage);
+  private broadcastRunUsage(key: string): void {
+    const summary = this.runSummaries.get(key);
+    if (!summary?.sessionId) return;
+
+    const session = storageAdapter.readSession(summary.sessionId);
+    const usage = this.contextUsageForKey(key);
+    if (!session || !usage) return;
+
+    workflowProjectionPublisher.publishRunUsage({
+      projectId: session.projectId,
+      sessionId: session.sessionId,
+    }, usage);
   }
 }
 

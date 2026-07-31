@@ -37,8 +37,11 @@ export class WorkflowProjectionPublisher {
     this.publish('workflow:runStatusChanged', payload);
   }
 
-  publishRunUsage(usage: RunContextUsageSummary): void {
-    this.publish('workflow:runUsageChanged', usage);
+  publishRunUsage(scope: SessionScope, usage: RunContextUsageSummary): void {
+    this.publish('workflow:runUsageChanged', {
+      ...scope,
+      payload: usage,
+    });
   }
 
   publishTraceProjectionChanged(scope: SessionScope, presentation: AgentRunPresentation): void {

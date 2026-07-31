@@ -146,13 +146,16 @@ requireCssContract(
     && contextBreakdownPopover.includes("t('contextBreakdown.lastActual')")
     && contextBreakdownPopover.includes('prepared.compactionApplied')
     && contextBreakdownPopover.includes("phase === 'actual' || phase === 'idle'")
-    && contextBreakdownPopover.includes("data-testid=\"context-breakdown-preparing\"")
+    && contextBreakdownPopover.includes('data-testid="context-breakdown-preparing"')
+    && contextBreakdownPopover.includes('prepared={showPrepared ? prepared : null}')
     && !contextBreakdownPopover.includes('showWindowPercent')
     && !contextBreakdownPopover.includes('context-breakdown-meter-eyebrow')
+    && !contextBreakdownPopover.includes('context-breakdown-runtime')
+    && contextRunMeterBand.includes('const metricUsage = isCurrent ? null : usage;')
+    && contextRunMeterBand.includes("data-phase={isCurrent ? 'current' : 'actual'}")
     && (contextRunMeterBand.match(/data-testid="context-breakdown-run-meter"/g) || []).length === 1,
-  'Context popover must keep one phase authority: Preparing without Last actual hero/meter, Current request without a stacked historical meter, and a single Tokens/Cache/Reasoning strip under Actual/Last actual (no repeated phase eyebrow).',
-);
-requireCssContract(
+  'Context popover must keep one phase authority: Preparing has no usage meter; Current renders its fixed prepared Tokens/Cache/Reasoning strip without historical provider telemetry; Actual/Last actual use one real-usage strip and internal runtime diagnostics stay absent.',
+);requireCssContract(
   interactionPerformanceProbe.includes("get(PERFORMANCE_QUERY_KEY) !== '1') return")
     && interactionPerformanceProbe.includes("PerformanceObserver.supportedEntryTypes.includes('event')")
     && interactionPerformanceProbe.includes('durationThreshold: EVENT_TIMING_THRESHOLD_MS')

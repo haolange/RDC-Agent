@@ -13,7 +13,9 @@ export const createEventSubscriptionApi = (): EventSubscriptionApi => ({
   onRunStatusChanged: (callback): (() => void) =>
     registerTrackedListener('workflow:runStatusChanged', (data) => (callback as (value: unknown) => void)(data)),
   onRunUsageChanged: (callback): (() => void) =>
-    registerTrackedListener('workflow:runUsageChanged', (summary) => callback(summary as RunContextUsageSummary)),
+    registerTrackedListener('workflow:runUsageChanged', (summary) =>
+      callback(summary as SessionScopedPayload<RunContextUsageSummary>),
+    ),
   onTraceProjectionChanged: (callback): (() => void) =>
     registerTrackedListener('trace:projectionChanged', (payload) =>
       callback(payload as TraceProjectionChangedPayload),

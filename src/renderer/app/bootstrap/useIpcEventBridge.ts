@@ -27,6 +27,7 @@ import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { resetWorkbenchStores } from '../../stores/storesReset';
+import { acceptsContextUsage } from '../../stores/contextUsageProjectionModel';
 import { createConversationEventBatcher } from './conversationEventBatcher';
 import { isActiveSessionEvent, isActiveSessionScope } from './sessionEventGate';
 
@@ -74,15 +75,19 @@ export function useIpcEventBridge(options: {
 
     const projection = () => useSessionProjectionStore.getState();
 
-    const unsubscribeRunUsageChanged = electronAPI.events.onRunUsageChanged((summary) => {
-      const { currentRun } = useSessionStore.getState();
-      const isCurrentRun = currentRun?.runId === summary.runId;
-      // Ask 模式：summary.runId 承载 sessionId，与 debug run 并列判断（run 结束后仍需更新）。
+    const unsubscribeRunUsageChanged = electronAPI.events.onRunUsageChanged((event) => {
       const currentSession = useProjectStore.getState().currentSession;
-      const isCurrentSession = currentSession?.sessionId === summary.runId;
-      if (isCurrentRun || isCurrentSession) {
-        useSessionStore.getState().setCurrentRunUsage(summary);
+      if (!currentSession || currentSession.sessionId !== event.sessionId) {
+        projection().projectRunUsage(event.sessionId, event.payload, null);
+        return;
       }
+
+      const session = useSessionStore.getState();
+      const activeRunId = session.currentRun?.runId ?? null;
+      if (!acceptsContextUsage(session, event.payload, activeRunId)) return;
+
+      projection().projectRunUsage(event.sessionId, event.payload, activeRunId);
+      session.setCurrentRunUsage(event.payload);
     });
 
     const unsubscribeTraceProjectionChanged = electronAPI.events.onTraceProjectionChanged((payload) => {
@@ -112,15 +117,20 @@ export function useIpcEventBridge(options: {
     const conversationEventBatcher = createConversationEventBatcher({
       applyMessage: (event) => {
         const sessionId = resolveMessageSessionId(event.message) ?? event.sessionId;
+        const terminal = event.type === 'message_completed' || event.type === 'message_errored';
         if (!isActiveSessionEvent(sessionId)) {
           if (sessionId) {
             projection().projectConversationMessage(sessionId, event.message);
+            if (terminal) {
+              projection().projectConversationTerminal(sessionId, event.turnId, event.type === 'message_completed');
+            }
           }
           return;
         }
         const conversation = useConversationStore.getState();
         conversation.upsertConversationMessage(event.message);
-        if (event.type === 'message_completed' || event.type === 'message_errored') {
+        if (terminal) {
+          projection().projectConversationTerminal(sessionId, event.turnId, event.type === 'message_completed');
           useSessionStore.getState().markConversationTurnTerminal(
             event.turnId,
             event.type === 'message_completed',
@@ -133,6 +143,9 @@ export function useIpcEventBridge(options: {
       if (!isActiveSessionEvent(event.sessionId)) {
         if (event.type === 'message_patched' || event.type === 'message_completed' || event.type === 'message_errored') {
           projection().projectConversationMessage(event.sessionId, event.message);
+          if (event.type === 'message_completed' || event.type === 'message_errored') {
+            projection().projectConversationTerminal(event.sessionId, event.turnId, event.type === 'message_completed');
+          }
         }
         return;
       }
@@ -343,9 +356,6 @@ export function useIpcEventBridge(options: {
           stopReason: payload.stopReason || current.stopReason,
           stoppedAt: ['cancelled', 'interrupted'].includes(payload.status) ? Date.now() : current.stoppedAt,
         });
-        if (!['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(payload.status)) {
-          session.markRunUsageStale();
-        }
       }
     });
 
