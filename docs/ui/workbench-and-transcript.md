@@ -45,6 +45,8 @@ Effort：能力驱动 reasoning rail + `Max mode` + `Fast mode`。关档文案�
 
 Context 环：面只显示 `%` / `—` / `…`；相位文案在 title/aria 与 breakdown。相位权威：Preparing / Current request ~ / Actual|Last actual。Actual 三栏 Tokens | Cache | Reasoning；缺遥测显示 `—`，禁止假 0。
 
+`Current request` 固定渲染 `Tokens | Cache | Reasoning` 三栏：Tokens 的 Input 与 Total 都是 `~preparedInputTokens`，Output、Cache 和 Reasoning 都是 `—`；不得混入上一轮的 Actual / Last actual 数值。第一个同一 turn 的真实 provider usage 到达后原位切换为 Actual。终止后保留 Last actual，关闭再打开 session 仍可见；只有应用重启或从 `usage.json` 回读时标记 stale，新 session 从未拿到快照才显示「暂无用量」。产品弹窗不展示 continuation、derived context 或 prompt-cache policy 等内部诊断。
+
 Send 不因打字/改模型触发 Context preview IPC。在途 turn 冻结创建时 `RequestPlan`。
 
 Stop：Preparing 一次干净撤销（prompt 回填、无 stopped↔streaming 闪烁）；Turn 已开始后单调落停（按钮与 Work Process 不回跳运行态）。Edit and resend 提交后立即离开编辑态并 optimistic 切入新分支 draft，再进入工作过程。

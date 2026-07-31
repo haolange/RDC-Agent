@@ -1,6 +1,7 @@
 import { useCaptureStore } from './captureStore';
 import { useConversationStore } from './conversationStore';
 import { useWorkflowStore } from './workflowStore';
+import { useSessionStore } from './sessionStore';
 import type { SessionProjection } from './sessionProjectionModel';
 
 export function hydrateSessionProjection(projection: SessionProjection): boolean {
@@ -21,5 +22,6 @@ export function hydrateSessionProjection(projection: SessionProjection): boolean
   capture.setContextSnapshot(projection.contextSnapshot);
   capture.setOpenedCapture(projection.openedCapture);
   capture.setCaptures(projection.contextSnapshot?.captureDescriptors ?? []);
+  useSessionStore.getState().hydrateContextUsage(projection.contextUsage);
   return true;
 }

@@ -1,9 +1,5 @@
 import { create } from 'zustand';
-import type {
-  RuntimeLogEntry,
-  RuntimeLogNamespace,
-  RuntimeLogSeverity,
-} from '@shared/types/runtimeLog';
+import type { RuntimeLogEntry, RuntimeLogNamespace, RuntimeLogSeverity } from '@shared/types/runtimeLog';
 
 export type TerminalScopeFilter = 'current-session' | 'current-run' | 'app' | 'all-sessions';
 export type RuntimeNamespaceFilter = RuntimeLogNamespace | 'all';

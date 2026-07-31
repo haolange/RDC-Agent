@@ -244,6 +244,7 @@ ConversationSendResult
 ConversationStreamEvent
 ConversationSwitchBranchRequest
 ConversationSwitchBranchResult
+ConversationTaskStatus
 ConversationThinkingStatus
 ConversationToolApproval
 ConversationToolApprovalStatus
@@ -687,10 +688,13 @@ RIGHT_PANEL_COLLAPSED_WIDTH
 RIGHT_PANEL_DEFAULT_WIDTH
 RIGHT_PANEL_MAX_WIDTH
 RIGHT_PANEL_MIN_WIDTH
+RIGHT_RAIL_DRAWER_BREAKPOINT
 RightPanelViewModel
 ROOT_BRANCH_ID
 RunApi
 RunCapsule
+RunContextUsageReadResult
+RunContextUsageRequest
 RunContextUsageSummary
 RunRecord
 RunRecoveryState
@@ -854,6 +858,7 @@ VERIFIER_AGENTS
 VisibleReasoningMode
 VisibleReasoningPacket
 WindowControlsApi
+WindowLayoutPreference
 WORKBENCH_CHAT_RAIL_MAX_WIDTH
 WorkflowApi
 WorkflowPhase

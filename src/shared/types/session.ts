@@ -234,6 +234,16 @@ export interface RunContextUsageSummary {
   cumulativeCost?: number;
 }
 
+export interface RunContextUsageRequest {
+  sessionId: string;
+  runId?: string;
+}
+
+export interface RunContextUsageReadResult {
+  usage: RunContextUsageSummary | null;
+  stale: boolean;
+}
+
 export interface PreparedTurnContextSummary {
   requestId: string;
   turnId: string;

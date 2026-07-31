@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { ConversationMessage } from '@shared/types/conversation';
+import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 import { useConversationStore } from './conversationStore';
 import { useWorkflowStore } from './workflowStore';
 import { useCaptureStore } from './captureStore';
 import { useSessionProjectionStore } from './sessionProjectionStore';
+import { useSessionStore } from './sessionStore';
 
 const message = (overrides: Partial<ConversationMessage> = {}): ConversationMessage => ({
   id: 'msg-1',
@@ -18,12 +20,57 @@ const message = (overrides: Partial<ConversationMessage> = {}): ConversationMess
   ...overrides,
 });
 
+const preparedUsageContext = (turnId: string): PreparedTurnContextSummary => ({
+  requestId: `request-${turnId}`,
+  turnId,
+  route: {
+    providerId: 'provider-a',
+    adapterId: 'openai-responses',
+    selectedModelId: 'model-a',
+    effectiveModelId: 'model-a',
+    protocol: 'OpenAIResponses',
+    catalogRevision: 'catalog-1',
+    routeRevision: 'route-1',
+    bindingIds: [],
+  },
+  wirePatch: { headers: {}, body: {} },
+  controls: { reasoningLevel: 'high', maxContextMode: false, fastModel: false },
+  contextMode: 'normal',
+  preparedInputTokens: 20,
+  uncompactedInputTokens: 20,
+  promptBudgetTokens: 100,
+  contextWindowTokens: 100,
+  usagePercent: 20,
+  breakdown: [],
+  compactionApplied: false,
+  filteredArtifactCount: 0,
+  preparedAt: 10,
+  continuation: { executionFingerprint: 'test', strategy: 'semantic-replay', replayedArtifactCount: 0, droppedArtifactCount: 0, decisionCounts: [] },
+  derivedContext: { status: 'none', compactedTurnCount: 0 },
+  cache: { enabled: false, mode: 'none', keyCarrier: 'none', breakpointCarrier: 'none', ttl: 'none', breakpoint: 'none', stableTokenEstimate: 0, stableSegmentCount: 0, providerReported: false, reason: 'test' },
+});
+
+const usageSnapshot = (runId: string): RunContextUsageSummary => ({
+  runId,
+  providerId: 'provider-a',
+  modelId: 'model-a',
+  inputTokens: 20,
+  outputTokens: 2,
+  totalTokens: 22,
+  contextWindowTokens: 100,
+  usagePercent: 22,
+  occupiedTokens: 20,
+  breakdown: [],
+  snapshotAt: 20,
+});
 describe('sessionProjectionStore', () => {
   beforeEach(() => {
     useConversationStore.getState().reset();
     useWorkflowStore.getState().reset();
     useCaptureStore.getState().reset();
     useSessionProjectionStore.getState().reset();
+    useSessionStore.getState().clearUsageSnapshot();
+    useSessionStore.getState().setCurrentRun(null);
   });
 
   it('caches background conversation patches and hydrates on activate', () => {
@@ -77,5 +124,32 @@ describe('sessionProjectionStore', () => {
     useSessionProjectionStore.getState().projectConversationMessage('session-a', message());
     useSessionProjectionStore.getState().evictSession('session-a');
     expect(useSessionProjectionStore.getState().activateSession('session-a')).toBe(false);
+  });
+  it('keeps terminal background usage for its owner session and drops another turn', () => {
+    const session = useSessionStore.getState();
+    session.setPreparedTurnContext(preparedUsageContext('turn-a'));
+    session.setConversationPreparationPhase('current');
+    useSessionProjectionStore.getState().captureActiveSession('session-a');
+    session.clearUsageSnapshot();
+
+    const projection = useSessionProjectionStore.getState();
+    projection.projectConversationTerminal('session-a', 'turn-a', true);
+    projection.projectRunUsage('session-a', usageSnapshot('turn-a'), null);
+
+    expect(projection.activateSession('session-a')).toBe(true);
+    expect(useSessionStore.getState()).toMatchObject({
+      conversationPreparationPhase: 'idle',
+      preparedTurnContext: null,
+      lastKnownUsage: expect.objectContaining({ runId: 'turn-a' }),
+    });
+
+    const active = useSessionStore.getState();
+    active.clearUsageSnapshot();
+    active.setPreparedTurnContext(preparedUsageContext('turn-b'));
+    active.setConversationPreparationPhase('current');
+    projection.captureActiveSession('session-b');
+    projection.projectRunUsage('session-b', usageSnapshot('turn-a'), null);
+
+    expect(useSessionProjectionStore.getState().bySessionId['session-b']?.contextUsage.lastKnownUsage).toBeNull();
   });
 });

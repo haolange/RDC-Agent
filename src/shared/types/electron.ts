@@ -51,6 +51,8 @@ import type {
   OpenedCaptureState,
   ProjectInputRecord,
   ProjectRecord,
+  RunContextUsageReadResult,
+  RunContextUsageRequest,
   RunContextUsageSummary,
   RunSummary,
   SessionAttachmentRecord,
@@ -188,9 +190,7 @@ export interface ElectronAPI {
      * 读取上下文用量快照。key 优先级：runId > sessionId > handler 内部 currentRunId。
      * sessionId 用于 Ask 模式（无 debug run，用量以 sessionId 为 store key）。
      */
-    getRunUsage: (runId?: string, sessionId?: string) => Promise<{
-      usage: RunContextUsageSummary | null;
-    }>;
+    getRunUsage: (request: RunContextUsageRequest) => Promise<RunContextUsageReadResult>;
     listRuns: () => Promise<{ runs: RunSummary[] }>;
     listActiveRuns: () => Promise<{ runs: Array<{ runId: string; sessionId: string; projectId: string; startedAt: number; stage?: string }> }>;
   };
@@ -441,7 +441,9 @@ export interface ElectronAPI {
     onWorkflowStateChanged: (callback: (state: WorkflowState) => void) => () => void;
     onWorkflowStageChanged: (callback: (data: { stage: WorkflowStage; blockers: unknown[] }) => void) => () => void;
     onRunStatusChanged: (callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; lastStage?: string; stopReason?: string }) => void) => () => void;
-    onRunUsageChanged: (callback: (summary: RunContextUsageSummary) => void) => () => void;
+    onRunUsageChanged: (
+      callback: (summary: SessionScopedPayload<RunContextUsageSummary>) => void
+    ) => () => void;
     onTraceProjectionChanged: (callback: (payload: TraceProjectionChangedPayload) => void) => () => void;
     onEffectiveCatalogChanged: (callback: (snapshot: EffectiveCatalogSnapshot) => void) => () => void;
     onAgentMessage: (callback: (msg: unknown) => void) => () => void;

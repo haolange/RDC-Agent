@@ -701,6 +701,7 @@ html[data-resolved-theme='light'] .app-main {
 }
 
 .context-breakdown {
+  container-type: inline-size;
   position: absolute;
   left: 0;
   right: 0;
@@ -1016,6 +1017,37 @@ html[data-resolved-theme='light'] .app-main {
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
 }
+@container (max-width: 42rem) {
+  .context-breakdown-hero-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .context-breakdown-hero-tokens {
+    white-space: normal;
+  }
+
+  .context-breakdown-run-columns {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0;
+  }
+
+  .context-breakdown-run-col {
+    padding: var(--space-3) 0 0;
+  }
+
+  .context-breakdown-run-col + .context-breakdown-run-col {
+    margin-top: var(--space-3);
+    padding-inline-start: 0;
+    border-inline-start: 0;
+    border-top: 1px solid var(--token-border-subtle);
+  }
+
+  .context-breakdown-meter-stats {
+    flex-wrap: wrap;
+  }
+}
 
 /* Details disclosure toggle */
 .context-breakdown-details-toggle {
@@ -1090,58 +1122,6 @@ html[data-resolved-theme='light'] .app-main {
   flex-direction: column;
   flex: 0 0 auto;
   overflow: visible;
-}
-
-.context-breakdown-runtime {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin: 0 var(--space-5) var(--space-4);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--token-border-subtle);
-}
-
-.context-breakdown-runtime-row {
-  display: grid;
-  grid-template-columns: minmax(7rem, 0.34fr) minmax(0, 1fr);
-  align-items: baseline;
-  gap: var(--space-3);
-}
-
-.context-breakdown-runtime-label {
-  color: var(--token-text-placeholder);
-  font-size: var(--text-xs);
-  font-weight: var(--font-medium);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.context-breakdown-runtime-value {
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  color: var(--token-text-body);
-  font-size: var(--text-sm);
-}
-
-.context-breakdown-runtime-value.is-wrapping {
-  flex-wrap: wrap;
-}
-
-.context-breakdown-runtime-value.status-stale {
-  color: var(--token-status-warning);
-}
-
-.context-breakdown-runtime-value code {
-  max-width: 100%;
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-sm);
-  background: var(--token-bg-muted);
-  color: var(--token-text-heading);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  overflow-wrap: anywhere;
 }
 
 .context-breakdown-legend {

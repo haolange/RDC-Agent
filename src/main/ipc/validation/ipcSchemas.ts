@@ -112,6 +112,8 @@ export const WorkflowStopArgsSchema = z.tuple([
 ]);
 
 export const WorkflowGetRunUsageArgsSchema = z.tuple([
-  ipcId(128, 'runId').optional(),
-  ipcId(128, 'sessionId').optional(),
+  z.object({
+    sessionId: ipcId(128, 'sessionId'),
+    runId: ipcId(128, 'runId').optional(),
+  }).strict(),
 ]);

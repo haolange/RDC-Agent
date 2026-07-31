@@ -44,7 +44,6 @@ context-breakdown
 context-breakdown-cost
 context-breakdown-preparing
 context-breakdown-run-meter
-context-breakdown-runtime
 conversation-thread
 empty-workbench-prompt
 empty-workbench-tool-${toolMode}
@@ -71,10 +70,11 @@ message-bubble-user
 message-variant-navigator
 mode-menu-item-${agent.id}
 open-settings-entry
-right-rail-${id}
 project-capture-import-panel
+right-rail-${id}
 right-rail-drawer
 right-rail-opened-capture
+right-rail-replay-device
 right-rail-scroll
 runtime-log-entry-${entry.id}
 runtime-terminal

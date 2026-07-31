@@ -94,7 +94,6 @@ const App: React.FC = () => {
     setRuntimeTestMode,
     setWindowMaximized,
     resolvedTheme,
-    hasActiveDebugRun,
   });
 
   useIpcEventBridge({

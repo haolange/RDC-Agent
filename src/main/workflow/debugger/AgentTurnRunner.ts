@@ -43,6 +43,7 @@ import { compileEffectivePolicy } from '../../agent-runtime/permissions/PolicyCo
 import { agentUserInputRequestService } from '../../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
 import type {
+  AssistantMessage,
   AgentEvent as CoreAgentEvent,
   Message,
   StreamOptions,
@@ -76,6 +77,10 @@ import type {
   ResolvedRuntimeTools,
   ToolExecutorRuntimeContext,
 } from './orchestratorTypes';
+
+export function hasActualProviderUsage(message: AssistantMessage): boolean {
+  return message.stopReason !== 'error';
+}
 
 export interface AgentTurnRunnerDeps {
   slots: AgentSlotRegistry;
@@ -247,7 +252,7 @@ export class AgentTurnRunner {
         return snapshot.id;
       },
       onResponse: (requestId, message) => {
-        if (!requestId) return;
+        if (!requestId || !hasActualProviderUsage(message)) return;
         recordEffectivePlanSuccess(providerId, modelId, settingsService.getAll(), streamOptions.requestPlan);
         requestSnapshotStore.complete(requestId, sessionId ?? undefined, turnSignature || undefined, {
           inputTokens: message.usage.inputTokens,
@@ -560,7 +565,7 @@ export class AgentTurnRunner {
           .filter((block) => block.type === 'text')
           .map((block) => (block as { text: string }).text)
           .join('');
-        if (event.message.usage) {
+        if (event.message.usage && hasActualProviderUsage(event.message)) {
           // 按当前实际注入的工具定义计量（含本 turn 内新激活的 deferred 工具）；
           // deferred 段仅计未激活 schema 估算，且仅在 >0 时加入。
           const injectedDefs = slot.agent.state.tools ?? [];
@@ -627,6 +632,7 @@ export class AgentTurnRunner {
 
           debuggerLlmService.recordAgentTurnUsage({
             runId: input.runId,
+            turnId: turnHandle.turnId,
             sessionId: input.sessionId,
             providerId: input.providerId,
             modelId: input.modelId,
