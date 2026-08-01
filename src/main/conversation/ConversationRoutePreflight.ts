@@ -26,6 +26,7 @@ import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/Route
 import { settingsService } from '../settings/SettingsService';
 import { resolveEffectiveModelSelection } from '../settings/EffectiveModelResolver';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { AgentLoopTerminationError } from '../agent-runtime/agent/LoopProgressGuard';
 
 export interface ConversationBranchTurnContext {
   branchId: string;
@@ -374,8 +375,27 @@ export function recordLlmDiagnostic(
   });
 }
 
-export function createRequestFailedDiagnostic(route: AgentRoutePreflightOk, error: unknown): ConversationMessageDiagnostic {
+export function createTurnFailedDiagnostic(
+  route: Pick<AgentRoutePreflightOk, 'agentId' | 'providerId' | 'modelId'>,
+  error: unknown,
+): ConversationMessageDiagnostic {
   const label = getAgentLabel(route.agentId);
+  if (error instanceof AgentLoopTerminationError) {
+    const isNoProgress = error.code === 'AGENT_NO_PROGRESS';
+    return createConversationDiagnostic({
+      agentId: route.agentId,
+      code: isNoProgress
+        ? 'CONVERSATION_AGENT_LOOP_STALLED'
+        : 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED',
+      severity: 'error',
+      userMessage: isNoProgress
+        ? `${label} 连续三轮执行了相同的工具、参数并得到相同结果。本次 Agent Loop 已停止，以免继续无效消耗。请调整任务或改用具备所需工具的 Agent 后重试。`
+        : `${label} 在 ${error.maxTurns ?? error.turn} 轮上限内仍需要继续调用工具。本次 Agent Loop 已停止；请缩小任务范围或调整 Agent 的轮次策略后重试。`,
+      providerId: route.providerId,
+      modelId: route.modelId,
+      technicalMessage: redactTechnicalMessage(error),
+    });
+  }
   return createConversationDiagnostic({
     agentId: route.agentId,
     code: 'CONVERSATION_LLM_REQUEST_FAILED',

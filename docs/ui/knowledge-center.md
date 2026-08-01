@@ -16,7 +16,7 @@
 | 入口 | `src/renderer/app/WorkbenchShell.tsx`（`sidebar-knowledge-center-trigger`） |
 | 模态 | `src/renderer/features/knowledge/KnowledgeCenterModal/` |
 | 主进程 | `src/main/runtime/KnowledgeBrowseService.ts`、`src/main/ipc/knowledgeHandlers.ts` |
-| Preload | `src/preload/api/knowledge.ts` |
+| Renderer API | `src/shared/renderer-api/core.ts`（Desktop / Browser 共用） |
 | 类型 | `src/shared/types/knowledge.ts` |
 
 权威产品边界见根目录 `DESIGN.md`「Memory and Knowledge」。

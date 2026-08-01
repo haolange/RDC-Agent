@@ -225,6 +225,22 @@ describe('ConversationService work trace tool approvals', () => {
     expect(completed.blocks[0].completedAt).toBeUndefined();
   });
 
+  it('marks an unexecuted tool call as skipped when a run otherwise completes', () => {
+    const trace = upsertRuntimeToolCall(undefined, {
+      id: 'tool-pending',
+      toolName: 'task_list',
+      status: 'pending',
+      startedAt: 100,
+    });
+
+    const completed = finalizeTrace(trace, 'complete', 'Reply completed');
+
+    expect(completed.blocks[0].toolCalls[0]).toMatchObject({
+      status: 'skipped',
+      resultPreview: 'Run completed before this tool call executed.',
+    });
+  });
+
   it('does not regress a completed tool call when approval resolution arrives late', () => {
     let trace = upsertRuntimeToolCall(undefined, {
       id: 'tool-web-search',

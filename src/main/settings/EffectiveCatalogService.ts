@@ -199,11 +199,20 @@ export class EffectiveCatalogService {
         ],
       };
     });
+    // A catalog revision freezes executable/selectable model semantics. Evidence
+    // timestamps are audit metadata and are renewed by an otherwise identical
+    // discovery refresh; including them makes every SWR refresh invalidate an
+    // in-flight renderer preflight even when no effective model fact changed.
+    const revisionModels = models.map(({
+      provenance: _provenance,
+      catalogRevision: _catalogRevision,
+      ...model
+    }) => model);
     const catalogRevision = revisionFor({
       providerId: request.providerId,
       accountId: request.accountId,
       protocol: request.protocol ?? null,
-      models,
+      models: revisionModels,
     });
     const revisionedModels = models.map((model) => ({ ...model, catalogRevision }));
     const snapshot: EffectiveCatalogSnapshot = {

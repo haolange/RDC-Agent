@@ -1,11 +1,12 @@
 /**
- * Security contract suite — Bridge auth, secret isolation, MCP trust.
+ * Security contract suite - Bridge auth, secret isolation, MCP trust.
  * Phase 7 matrix entry; deeper cases live beside bridgeSecurity / McpTrustService.
  */
 import { describe, expect, it, vi } from 'vitest';
+import { RENDERER_INVOKE_CHANNELS } from '@shared/renderer-api';
 import {
   createBridgeBearerToken,
-  isBridgeChannelDenied,
+  isBridgeChannelAllowed,
   isOriginAllowed,
   tokensMatch,
 } from '../../browserAppBridge/bridgeSecurity';
@@ -16,18 +17,7 @@ import {
 import type { AgentRuntimeMcpDescriptor } from '@shared/types/agentRuntime';
 
 vi.mock('../../ipc/invokeRegistry', () => ({
-  hasRegisteredIpcChannel: (channel: string) => [
-    'settings:get',
-    'settings:hasProviderSecret',
-    'settings:getProviderSecret',
-    'terminal:write',
-    'memory:list',
-    'mcp:getStatusSummary',
-    'command:execute',
-    'conversation:answerToolApproval',
-    'rdx-runtime:trustMcp',
-    'conversation:getHistory',
-  ].includes(channel),
+  hasRegisteredIpcChannel: () => true,
 }));
 
 describe('securityContract: browser bridge', () => {
@@ -38,21 +28,10 @@ describe('securityContract: browser bridge', () => {
     expect(tokensMatch(token, token)).toBe(true);
   });
 
-  it('denies secret/terminal/mcp/trust channels on bridge', async () => {
-    const { isBridgeChannelAllowed } = await import('../../browserAppBridge/bridgeSecurity');
-    for (const channel of [
-      'settings:getProviderSecret',
-      'terminal:write',
-      'memory:list',
-      'mcp:getStatusSummary',
-      'command:execute',
-      'conversation:answerToolApproval',
-      'rdx-runtime:trustMcp',
-    ]) {
-      expect(isBridgeChannelDenied(channel)).toBe(true);
-      expect(isBridgeChannelAllowed(channel)).toBe(false);
+  it('exposes the full registered product API through the browser transport', () => {
+    for (const channel of RENDERER_INVOKE_CHANNELS) {
+      expect(isBridgeChannelAllowed(channel), channel).toBe(true);
     }
-    expect(isBridgeChannelAllowed('settings:get')).toBe(true);
   });
 
   it('rejects non-allowlisted origins', () => {
@@ -61,12 +40,10 @@ describe('securityContract: browser bridge', () => {
     expect(isOriginAllowed('http://127.0.0.1:7788', allowed)).toBe(true);
   });
 
-  it('allows hasProviderSecret but permanently denies getProviderSecret', async () => {
-    const { isBridgeChannelAllowed } = await import('../../browserAppBridge/bridgeSecurity');
-    expect(isBridgeChannelDenied('settings:getProviderSecret')).toBe(true);
+  it('allows secret status but rejects nonexistent raw-secret and unknown channels', () => {
     expect(isBridgeChannelAllowed('settings:getProviderSecret')).toBe(false);
-    expect(isBridgeChannelDenied('settings:hasProviderSecret')).toBe(false);
     expect(isBridgeChannelAllowed('settings:hasProviderSecret')).toBe(true);
+    expect(isBridgeChannelAllowed('future:dangerous')).toBe(false);
   });
 
   it('issues unique bearer tokens per call', () => {

@@ -132,8 +132,11 @@ describe('formatToolSearchResult', () => {
   });
 
   it('returns no-match message when empty', () => {
-    expect(formatToolSearchResult({ total: 0, offset: 0, limit: 20, matches: [] }))
-      .toBe('No matching tools found.');
+    const page = searchTools([], { query: 'task_create' });
+    const text = formatToolSearchResult(page);
+    expect(text).toContain('NO_MATCH_IN_EFFECTIVE_TOOL_SET');
+    expect(text).toContain('This result is authoritative.');
+    expect(text).toContain(page.scopeFingerprint);
   });
 });
 
@@ -148,5 +151,16 @@ describe('createToolSearchTool', () => {
     expect(text).toContain('Found 1 tools (showing 1-1 of 1):');
     expect(text).toContain('name: alpha');
     expect(result.isError).toBe(false);
+  });
+
+  it('returns structured authoritative no-match details for the effective tool set', async () => {
+    const tool = createToolSearchTool(() => [fakeTool({ name: 'task_list' })]);
+    const result = await tool.execute('call-2', { query: 'task_create' });
+    expect(result.details).toMatchObject({
+      code: 'NO_MATCH_IN_EFFECTIVE_TOOL_SET',
+      authoritative: true,
+      total: 0,
+    });
+    expect((result.details as { scopeFingerprint: string }).scopeFingerprint).toMatch(/^[a-f0-9]{24}$/u);
   });
 });

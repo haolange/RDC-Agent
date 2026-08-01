@@ -29,13 +29,12 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 ## Browser Bridge（QA-only / debug-only）
 
 - **定位**：Debug / QA 验收辅助面；**不进 release 包默认运行路径**。仅 `pnpm run start:agent-browser`（或 launcher `--mode browser|browser-dev`）在 `RDC_AGENT_BROWSER_QA=1` 时启动；桌面 `desktop` / 发布 exe **不得**默认打开 Bridge。
-- 同 renderer、异传输：桌面 `preload → IPC` 与 Browser QA `BrowserAppBridge → /invoke` 共用 handler registry；不是第二套 UI。
+- 同产品 API、异传输：桌面 `preload → IPC` 与 Browser QA `BrowserAppBridge → HTTP/SSE` 共用 `src/shared/renderer-api` 的唯一 `ElectronAPI` 工厂、channel manifest 与 main handler registry；不是第二套 UI 或第二套能力面。
 - **权威入口**：`http://127.0.0.1:<port>/qa`（`Set-Cookie: rdcBridgeToken` → 302 干净 `/app`）。启动日志主打 `/qa`；长 query `/app?rdcBridgeToken=…` 仅为 fallback。
 - **鉴权三元组**（`resolveProvidedBridgeToken`）：Bearer **或** query `rdcBridgeToken|token` **或** cookie `rdcBridgeToken`。禁止恢复「只认 `token`、打印 `rdcBridgeToken`」双轨。截断/无凭证 → **401 JSON**（`Content-Type: application/json`），勿当「已打开 Workbench」。
-- 精确 Origin allowlist；channel allowlist fail-closed；未注册 / 未 allow / 命中 deny → 403。
-- **永久 deny**（桌面专用）：`terminal:*`、`memory:*`、`approval:*`、`hook:*`、`mcp:*`、`settings:set`、`settings:getProviderSecret`、`command:execute`、RDX hook/MCP trust、`conversation:answerToolApproval` 等（见 `bridgeSecurity.ts`）。
-- **QA 工作台主路径 allow**：`app` / `project` / `session` / `conversation`（send/rewrite/cancel/history…）/ `workflow` / `trace` / `settings` 读与 Agents 写（`saveAgentDefinition` 等）/ `agent` / `capture` 等；完整矩阵见 [`docs/architecture/browser-qa-surface.md`](../architecture/browser-qa-surface.md)。
-- Headless userData 默认 `qa-<runId>`；`instance.lock`；冲突实例 fail-closed。
+- 精确 Origin allowlist；仅 canonical renderer channel 且存在已注册 handler 时可调用。未知 channel、内部 channel、未注册 handler 与不存在的明文 `settings:getProviderSecret` → 403。
+- **完整产品面 parity**：Settings、Models Override、Terminal、Memory、Command、Tool Approval、MCP 状态、Hook/MCP trust/revoke/test 等 preload 已公开能力在 Browser 中走同一 main-owned Zod、PermissionPolicy、单次 approval token、MCP trust 与 `safeStorage` 边界；Browser 不保留拒绝桩或专用禁用 UI。完整矩阵见 [`docs/architecture/browser-qa-surface.md`](../architecture/browser-qa-surface.md)。
+- Browser / Browser-dev 默认解析与 Desktop 相同的 canonical userData。自动化 smoke 必须显式传入 disposable `RDC_AGENT_USER_DATA`；`instance.lock` 冲突 fail-closed，禁止静默切换到空配置。
 - Smoke：`pnpm run smoke:agent-browser`（假定 bridge 已起或脚本拉起；**不**并入默认 release pack）。
 - 实现：`src/main/browserAppBridge/bridgeSecurity.ts`、`BrowserAppBridgeServer.ts`；测试：`bridgeSecurity.test.ts`、`BrowserAppBridgeServer.contract.test.ts`。
 
@@ -57,7 +56,7 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 
 - Project MCP 与 user 同 ID 时，不可覆盖 user 的 `command` / `args` / `url` / `env`。
 - 可执行指纹变化 → `needsRetrust`；连接前 `assertConnectAllowed`。
-- Settings 提供显式 trust 面板；`rdx-runtime:trustMcp` 不在 Bridge allowlist。
+- Settings 提供显式 trust 面板；Browser 与 Desktop 均通过相同 `rdx-runtime:trustMcp` handler 和主进程 trust 校验。
 - MCP 连接池按 project 分组（`projectRoot + descriptorHash`）；仅 eviction 失配连接。
 
 ## Shell 与 Bash 分析
@@ -73,6 +72,7 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 ## 相关测试入口
 
 - `src/main/browserAppBridge/bridgeSecurity.test.ts`
+- `src/shared/renderer-api/createRendererApi.test.ts`
 - `src/main/settings/SecretStorageService.test.ts`
 - `src/main/settings/AgentRuntimeConfigService.test.ts`（MCP trust）
 - `src/main/ipc/validation/IpcPayloadGuard.test.ts`

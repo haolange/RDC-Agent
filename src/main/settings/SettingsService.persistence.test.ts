@@ -305,7 +305,7 @@ describe('SettingsService provider persistence', () => {
       .toMatchObject({ refreshToken: 'refresh-new' });
   });
 
-  it('keeps maintained Volc Coding Plan rows when candidate validation returns a subset', async () => {
+  it('keeps maintained Volc Coding Plan rows and their explicit catalog denials when candidate validation returns a subset', async () => {
     const { SettingsService } = await import('./SettingsService');
     const { getProviderModelSummaries } = await import('../provider-catalog/ProviderCatalogRegistry');
     const service = new SettingsService();
@@ -323,7 +323,10 @@ describe('SettingsService provider persistence', () => {
     expect(models.map((model) => model.id))
       .toEqual(getProviderModelSummaries('volcengine-coding-plan').map((model) => model.id));
     expect(models.find((model) => model.id === 'doubao-seed-2.0-code')?.availability).toBe('available');
-    expect(models.find((model) => model.id === 'glm-4.7')?.availability).toBe('available');
+    expect(models.find((model) => model.id === 'glm-4.7')).toMatchObject({
+      availability: 'unavailable',
+      availabilityReason: expect.stringContaining('does not support the Coding Plan feature'),
+    });
     expect(models.find((model) => model.id === 'kimi-k2.7-code')).toMatchObject({
       availability: 'unavailable',
       availabilityReason: expect.stringContaining('user-observed'),

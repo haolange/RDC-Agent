@@ -133,6 +133,7 @@ export class ToolExecutorFactory {
     }
     const permissionSettings = plan?.permissionSettings;
     const compiledPolicy = plan?.policy;
+    const planActivatedDeferredTools = new Set(plan?.activatedDeferredTools ?? []);
     return {
       execute: async (toolCall: ToolCall, signal?: AbortSignal, onUpdate?: (partialResult: unknown) => void) => {
         const normalizedName = normalizeToolName(toolCall.name);
@@ -159,7 +160,9 @@ export class ToolExecutorFactory {
         if (isDeferredToolName(normalizedName)) {
           const activation = this.deps.getActiveTurn(runtimeContext?.sessionId)?.deferredActivation ?? null;
           const slot = activation ? this.deps.slots.getSlot(activation.slotKey) : undefined;
-          if (!slot?.activatedDeferredTools.has(normalizedName)) {
+          const activatedByFrozenPlan = planActivatedDeferredTools.has(normalizedName);
+          const activatedDuringTurn = slot?.activatedDeferredTools.has(normalizedName) === true;
+          if (!activatedByFrozenPlan && !activatedDuringTurn) {
             return {
               role: 'toolResult',
               toolCallId: toolCall.id,

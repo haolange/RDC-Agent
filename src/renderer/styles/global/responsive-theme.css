@@ -23,6 +23,7 @@
 
 @media (max-width: 720px) {
   .app-body {
+    min-width: 0;
     grid-template-columns:
       3.5rem
       0
@@ -164,6 +165,40 @@
     padding-inline: 12px;
   }
 
+}
+
+@media (max-width: 480px) {
+  .composer-footer-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .composer-toolbar-group-left,
+  .composer-toolbar-group-right {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .composer-toolbar-group-left {
+    justify-content: stretch;
+  }
+
+  .composer-toolbar-group-right {
+    justify-content: flex-end;
+  }
+
+  .composer-agent-menu,
+  .composer-permission-menu {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .composer-agent-pill,
+  .composer-permission-pill {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 /* Professional workstation polish */

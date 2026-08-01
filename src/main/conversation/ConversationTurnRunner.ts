@@ -23,6 +23,7 @@ import { canonicalizeSessionContextTurnEntry } from './SessionContextJournal';
 import type { Message as AgentRuntimeMessage } from '../agent-runtime/core/types';
 import { ConversationStreamPatchScheduler, type ConversationStreamPatchCommitOptions } from './ConversationStreamPatchScheduler';
 import { finalizeTrace, upsertWorkBlock } from './ConversationWorkTrace';
+import { attachToolExecutionEvidence } from './ConversationToolEvidence';
 import type { ConversationLoopContinuationState } from '@shared/conversation/loopOutputPhase';
 import { beginAssistantContentLoopIfPending } from './ConversationLoopRuntimeState';
 import { EMPTY_CANONICAL_ASSISTANT_OUTPUT, requireCanonicalFinalAnswer } from './CanonicalAssistantOutput';
@@ -35,7 +36,7 @@ import type {
   ResolvedConversationContext,
 } from './ConversationRoutePreflight';
 import {
-  createRequestFailedDiagnostic,
+  createTurnFailedDiagnostic,
   getAgentLabel,
   isActiveRun,
   recordLlmDiagnostic,
@@ -451,7 +452,7 @@ export async function completeProfileTurn(
 
       requireCanonicalFinalAnswer(canonicalOutput);
     } catch (error) {
-      llmDiagnostic = createRequestFailedDiagnostic(routePreflight, error);
+      llmDiagnostic = createTurnFailedDiagnostic(routePreflight, error);
       errorViewModel = {
         code: llmDiagnostic.code,
         message: llmDiagnostic.userMessage,
@@ -483,28 +484,38 @@ export async function completeProfileTurn(
   if (abortController.signal.aborted || runWasCancelled) return;
 
   const outputSummary = llmDiagnostic
-    ? llmDiagnostic.code === 'CONVERSATION_LLM_REQUEST_FAILED'
-      ? 'Model request failed; diagnostic recorded.'
-      : 'Model route unavailable; configuration diagnostic returned.'
+    ? llmDiagnostic.code === 'CONVERSATION_LLM_ROUTE_MISSING'
+      ? 'Model route unavailable; configuration diagnostic returned.'
+      : llmDiagnostic.code === 'CONVERSATION_AGENT_LOOP_STALLED'
+        ? 'Agent loop stopped after three identical tool rounds.'
+        : llmDiagnostic.code === 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED'
+          ? 'Agent loop stopped at the configured turn limit.'
+          : 'Model request failed; diagnostic recorded.'
     : 'Final answer generated.';
+
+  const traceWithOutput = upsertWorkBlock(assistantMessage.workTrace, 'assistant-output', {
+    kind: 'output',
+    status: finalStatus === 'error' ? 'error' : 'complete',
+    summary: outputSummary,
+    completedAt: nowMs(),
+  });
+  const traceWithEvidence = attachToolExecutionEvidence(traceWithOutput);
+  const terminalSummary = (traceWithEvidence.toolEvidence?.total ?? 0) > 0
+    ? undefined
+    : llmDiagnostic
+      ? finalStatus === 'error'
+        ? '回复失败'
+        : '等待模型配置'
+      : '回复已完成';
 
   commitTerminalAssistantMessage(finalStatus === 'error' ? 'message_errored' : 'message_completed', {
     status: finalStatus,
     content: assistantContent,
     diagnostic: llmDiagnostic,
     ...withWorkTrace(finalizeTrace(
-      upsertWorkBlock(assistantMessage.workTrace, 'assistant-output', {
-        kind: 'output',
-        status: finalStatus === 'error' ? 'error' : 'complete',
-        summary: outputSummary,
-        completedAt: nowMs(),
-      }),
+      traceWithEvidence,
       traceStatus,
-      llmDiagnostic
-        ? finalStatus === 'error'
-          ? '回复失败'
-          : '等待模型配置'
-        : '回复已完成',
+      terminalSummary,
     )),
   });
   // handoff 消费：agent_handoff 工具成功时设置 pendingHandoff，

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { buildEffectiveCatalogRequest } from './EffectiveModelResolver';
+import { mergeEffectiveCatalog } from './effectiveCatalogMerge';
 import {
   createProviderEntryFromCatalog,
   getLoadedProviderSurface,
@@ -33,6 +34,7 @@ describe('data-only provider discovery fixtures', () => {
     await Promise.all([
       ...cases.map(([providerId]) => loadProviderSurface(providerId)),
       loadProviderSurface('iflow'),
+      loadProviderSurface('deepseek'),
     ]);
   });
 
@@ -86,6 +88,50 @@ describe('data-only provider discovery fixtures', () => {
     expect(contributions.find((model) => model.modelId === 'claude-opus-4-8')?.route?.protocol).toBe('AnthropicMessages');
     expect(contributions.find((model) => model.modelId === 'qwen3.6-plus')?.route?.protocol).toBe('AnthropicMessages');
     expect(contributions.find((model) => model.modelId === 'minimax-m3')?.route?.protocol).toBe('OpenAICompatibleChatCompletions');
+  });
+
+  it('treats a protocol-less candidate list as availability evidence without replacing model-owned routes', () => {
+    const provider = createProviderEntryFromCatalog('deepseek');
+    const request = buildEffectiveCatalogRequest({
+      ...provider,
+      protocol: 'OpenAIResponses',
+      baseUrl: 'https://api.deepseek.com',
+    });
+    const surface = getLoadedProviderSurface('deepseek');
+    const discovery = surface?.discovery.strategy;
+    if (!surface || discovery?.kind !== 'json-catalog') throw new Error('Missing DeepSeek discovery');
+    const parsed = parseDeclarativeCatalog(discovery, {
+      data: [
+        { id: 'deepseek-v4-flash' },
+        { id: 'deepseek-v4-pro' },
+      ],
+    });
+    const contributions = toDeclarativeCatalogContributions(parsed, {
+      protocol: 'OpenAIResponses',
+      baseUrl: 'https://api.deepseek.com',
+    });
+
+    expect(contributions.every((model) => model.route === undefined)).toBe(true);
+    const staleFallbackContributions = contributions.map((model) => ({
+      ...model,
+      route: {
+        protocol: 'OpenAIResponses' as const,
+        baseUrl: 'https://api.deepseek.com',
+        source: 'catalog' as const,
+      },
+    }));
+    const models = mergeEffectiveCatalog({
+      ...request,
+      discovery: {
+        source: 'discovery',
+        observedAt: '2026-08-01T00:00:00.000Z',
+        models: staleFallbackContributions,
+      },
+    });
+    expect(models.find((model) => model.modelId === 'deepseek-v4-flash')?.route.protocol)
+      .toBe('OpenAIResponses');
+    expect(models.find((model) => model.modelId === 'deepseek-v4-pro')?.route.protocol)
+      .toBe('OpenAICompatibleChatCompletions');
   });
 
   it('projects documented context and capability metadata without static inference', () => {

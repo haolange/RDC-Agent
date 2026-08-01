@@ -12,6 +12,8 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 
 唯一运行时路径是 agent loop：解析 profile / model route / policy / tools → 调用 LLM → 执行已批准工具 → 回灌结果 → 产出 final answer。Renderer 不得伪造推理阶段；隐藏 CoT 永不作为 UI 内容展示或持久化。
 
+Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完成。`LoopProgressGuard` 对工具名、规范化参数、结果语义与 runtime revision 生成稳定指纹；连续第二轮无进展只注入一次不落盘纠偏指令，第三轮仍相同以 `AGENT_NO_PROGRESS` 终止。仍需 continuation 却达到 `maxTurns` 时以 `AGENT_MAX_TURNS_EXCEEDED` 终止。两者分别投影 `CONVERSATION_AGENT_LOOP_STALLED` / `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`，不得归类成 Provider 请求失败。
+
 ## Architecture Principles
 
 1. **单一真相**：Session / Conversation / branch / journal 是会话历史权威；Agent slot 是执行配置与缓存，不是私有历史。
@@ -19,6 +21,7 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 3. **主进程权威**：权限、secret、MCP trust、Shell、RDX CLI、IPC 校验均在 `src/main`；preload / renderer / Browser Bridge 只暴露受控面。
 4. **Scope 固定**：用户资源 `~/.rdx`，项目资源 `<project-root>/.rdx`；无配置 workspace root、无旧目录 fallback、无静默迁移。
 5. **Provider 事实分层**：Manifest 是**基线真值**（baseline truth），Discovery 是**候选验证**（candidate validation），用户覆盖（`models.json`）是**显式覆盖，自带 provenance**（explicit override with provenance），三者合并为 EffectiveCatalog。模型/协议/控件基线事实只在 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth、discovery 与 user-override。用户覆盖禁止触及 route.protocol、authSchemaId、adapterId、compatibilityGroup、carrier 等安全/延续性字段。
+   `catalogRevision` 只冻结 Effective Catalog 的可执行/可选择语义；刷新仅更新 provenance 时间戳时 revision 必须稳定，route、control、availability、quota 等有效语义变化时才更新。
 6. **可取消与可回收**：Turn 经 `TurnCoordinator`；子进程经 `ProcessSupervisor`；应用退出经 `ShutdownCoordinator`；abort 必须 join，迟到 event 按 generation 丢弃。Conversation Stop 相位语义：`preparing` 干净撤销（不留 journal/lease/optimistic 残渣）；`committing`/`running` 单调落停（禁止 UI 回跳 `streaming` / 发送前态）。Renderer 对 monotonic-stopped turn/request 丢弃迟到 `draft|streaming` patch，与 main generation 守卫对齐。流式 `conversation:event` 在 renderer 按帧合并；trace 投影流式期节流。
 7. **失败有分类**：安全类 fail-closed；完整性 degrade-safe；可用性 recoverable。分类权威见 `docs/contracts/failure-model.md`。
 8. **无 legacy 双轨**：新结构替代旧结构时直接收敛；默认不保留兼容 shim。
@@ -34,7 +37,10 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 | Fail-closed 三分类与标注点 | [`docs/contracts/failure-model.md`](docs/contracts/failure-model.md) |
 | Orchestrator façade 行数 / 职责外提 | 本文件 Invariant + `pnpm run check:orchestrator-facade` |
 | Profiles / Skills / Hooks / Memory / RDX 产品规格 | [`docs/product/`](docs/product/) |
-| Workbench / Work Process / Appearance / Design System | [`docs/ui/`](docs/ui/) |
+| Workbench / Transcript / Composer | [`docs/ui/workbench-and-transcript.md`](docs/ui/workbench-and-transcript.md) |
+| Design System（Token / 按钮 / 颜色 / 组件） | [`docs/ui/design-system.md`](docs/ui/design-system.md) |
+| Work Process UI 验收 checklist | [`docs/ui/work-process-checklist.md`](docs/ui/work-process-checklist.md) |
+| Appearance UI 验收 checklist | [`docs/ui/appearance-checklist.md`](docs/ui/appearance-checklist.md) |
 | 模块地图与数据流 | [`docs/architecture/`](docs/architecture/) |
 | 工作流与 Debugger 主链 | [`docs/workflows/`](docs/workflows/) |
 | Agent 修改纪律与验证命令 | [`AGENTS.md`](AGENTS.md) |
@@ -46,10 +52,12 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 - **资源优先级**：`builtin < user < project`；整资源替换；policy 只收紧（deny 并集、审批强度只升、数值上限只降）。
 - **Skill 工具面**：`allowedTools = ∩(skill_i) ∩ runtimeAllowlist`（空声明不收窄）；skill 只能收窄、永不扩展 profile 工具集；元工具豁免见 runtime 契约。
 - **Deferred tools**：未激活 deferred → `TOOL_NOT_ACTIVATED`；仅 `tool_search`（及契约允许的激活路径）可激活。
+- **Tasks 能力真值**：Prompt 只描述 route 最终实际注入的工具。Ask 仅可读 `task_list` / `task_get`；Plan/Edit 仅在其冻结工具集确实包含 mutation 工具时才宣称可写。text-only route 不得列出、模仿或反复搜索 Tasks 工具。
+- **Tool search 无匹配**：返回 `NO_MATCH_IN_EFFECTIVE_TOOL_SET`、`authoritative: true` 与有效工具集 fingerprint；fingerprint 未变化时禁止重复同一搜索。
 - **Capability unknown**：`toolCalling.state === unknown` → text-only；仅 `supported` 才 `native-structured`。
 - **输出通道**：`ProviderOutputRef` 一经声明永久归属 `thinking` | `text` | `tool_call` 之一；普通 assistant text 永不合成 thinking；仅 `final_answer` 写正文。
 - **Secret**：`safeStorage` 不可用则 fail-closed；secret 不得进入 renderer / IPC 明文 / Trace / RequestPlan。
-- **Browser Bridge（debug-only）**：仅 `RDC_AGENT_BROWSER_QA=1`（launcher `browser`/`browser-dev`）；权威入口 `/qa`（cookie → `/app`）；鉴权 Bearer | query `rdcBridgeToken|token` | cookie；与桌面 preload 共享 handler registry，allowlist 更窄；**不进 release 默认路径**。权限矩阵见 [`docs/contracts/permissions.md`](docs/contracts/permissions.md) 与 [`docs/architecture/browser-qa-surface.md`](docs/architecture/browser-qa-surface.md)。
+- **Browser Bridge（debug-only）**：仅 `RDC_AGENT_BROWSER_QA=1`（launcher `browser`/`browser-dev`）；权威入口 `/qa`（cookie → `/app`）；鉴权 Bearer | query `rdcBridgeToken|token` | cookie；Browser 与 Desktop 共用 `src/shared/renderer-api` 的唯一 `ElectronAPI` 工厂与 channel manifest，产品能力、状态、审批及持久化语义一致，仅 transport / 原生窗口容器不同；未知 channel、内部 channel、未注册 handler 与不存在的明文 secret 读取仍 fail-closed；**不进 release 默认路径**。权限矩阵见 [`docs/contracts/permissions.md`](docs/contracts/permissions.md) 与 [`docs/architecture/browser-qa-surface.md`](docs/architecture/browser-qa-surface.md)。
 - **MCP project**：同 ID 不可覆盖 user 的 command/args/url/env；变更需 `needsRetrust` + 显式 trust。
 - **RDX**：无内置 CLI 副本；Open `.rdc` 等垂直入口只走 Settings 配置的 shell action。
 - **Capture 所有权**：`ownerSessionId` 不匹配则 fail-closed；不得跨 session 继承已打开 capture。
@@ -78,7 +86,9 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 ### UI
 
 - [`docs/ui/workbench-and-transcript.md`](docs/ui/workbench-and-transcript.md) — Workbench 轨、Work Process、Composer、Markdown
-- [`docs/ui/design-system.md`](docs/ui/design-system.md) — Token、Appearance 双体系
+- [`docs/ui/design-system.md`](docs/ui/design-system.md) — Token、按钮、颜色、组件规则、Appearance 双体系
+- [`docs/ui/work-process-checklist.md`](docs/ui/work-process-checklist.md) — Work Process UI 验收清单
+- [`docs/ui/appearance-checklist.md`](docs/ui/appearance-checklist.md) — Appearance / Provider/Composer 控件 / Effort 滑杆验收清单
 - [`docs/ui/knowledge-center.md`](docs/ui/knowledge-center.md)
 
 ### Architecture / Workflows
@@ -95,8 +105,8 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 
 UI/工作流用 `pnpm run start:agent-browser` 真实会话验收（先停旧进程、删光 QA project 全部 session、再新建隔离 session）。完整清单见 `AGENTS.md`。
 
-Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThemes` 为 RDC 默认（清理历史污染）。桌面窗口几何写入 `layout.window`（宽高/坐标/最大化），主进程在 resize/move/close 时持久化并在启动恢复；左右栏与 terminal 高度仍经 renderer `settings:set` 持久化。Browser QA 永久 deny `settings:set`，故浏览器会话不记忆侧栏宽度属预期。
+Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThemes` 为 RDC 默认（清理历史污染）。桌面窗口几何写入 `layout.window`（宽高/坐标/最大化），主进程在 resize/move/close 时持久化并在启动恢复；左右栏与 terminal 高度仍经 renderer `settings:set` 持久化。Browser 与 Desktop 读取同一 canonical userData 并走同一 Settings 持久化路径；自动化必须显式传入 disposable `RDC_AGENT_USER_DATA`，共享状态由 `instance.lock` 阻止并发占用。
 
 ## Right Rail Authority
 
-Right Rail has two target-specific surfaces. Selecting a Project renders only the project-scoped `Import .rdc` input surface and its imported capture list; it never reads session runtime state. Selecting a Session renders the fixed `Progress / Outputs / Context / Capture` inspector. The main-owned `RightRailProjectionService` still assembles `RightPanelViewModel` for an explicit `{ projectId, sessionId }`; renderer consumes that projection and does not rebuild session business state. Context is limited to task resources. Capture is always visible in a session: it is either an honest `.rdc` empty state or the owner-session selection/open/preview surface. Runtime identifiers remain owner-scoped agent data. Outputs expose only user-facing output-file categories: an agent must explicitly publish a finished project file through `output_register`, which copies it into the owning run before projection; inputs and plans are rejected. Empty areas track docked rail inline-size during resize but stay compact in block size; they use a quiet self-contained surface with the original wireframe illustrations, and populated areas become one continuous inspector with hairline dividers, not a stack of cards. The dock remains available through compact desktop widths and becomes the shared overlay drawer only at or below `RIGHT_RAIL_DRAWER_BREAKPOINT` (920px), or when geometry cannot preserve the minimum work surface. Static enforcement: `pnpm run check:right-rail`.
+Right Rail has two target-specific surfaces. Selecting a Project renders only the project-scoped `Import .rdc` input surface and its imported capture list; it never reads session runtime state. Selecting a Session renders the fixed `Progress / Outputs / Context / Capture` inspector. The main-owned `RightRailProjectionService` still assembles `RightPanelViewModel` for an explicit `{ projectId, sessionId }`; renderer consumes that projection and does not rebuild session business state. Context is limited to task resources. Capture is always visible in a session: it is either an honest `.rdc` empty state or the owner-session selection/open/preview surface. Runtime identifiers remain owner-scoped agent data. Outputs expose only user-facing output-file categories: an agent must explicitly publish a finished project file through `output_register`, which copies it into the owning run before projection; inputs and plans are rejected. Progress, Outputs, Context, and Capture always remain four separate, non-collapsible rounded cards with the same background, border, title treatment, padding, and spacing whether empty or populated. Empty content uses the quiet original wireframe illustration; populated content grows only its own card and uses internal hairlines between sibling rows. The dock remains available through compact desktop widths and becomes the shared overlay drawer only at or below `RIGHT_RAIL_DRAWER_BREAKPOINT` (920px), or when geometry cannot preserve the minimum work surface. Static enforcement: `pnpm run check:right-rail`.

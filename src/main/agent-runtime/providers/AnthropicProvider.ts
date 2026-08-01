@@ -73,6 +73,7 @@ interface AnthropicMessageDelta extends AnthropicEventBase {
     output_tokens?: number;
     cache_read_input_tokens?: number;
     cache_creation_input_tokens?: number;
+    speed?: 'standard' | 'fast';
   };
 }
 
@@ -85,6 +86,7 @@ interface AnthropicMessageStart extends AnthropicEventBase {
       output_tokens?: number;
       cache_read_input_tokens?: number;
       cache_creation_input_tokens?: number;
+      speed?: 'standard' | 'fast';
     };
   };
 }
@@ -197,6 +199,7 @@ export class AnthropicProvider implements ProviderStrategy {
       let outputTokens = 0;
       let cacheReadTokens: number | undefined;
       let cacheWriteTokens: number | undefined;
+      let speed: 'standard' | 'fast' | undefined;
       let sawOutput = false;
 
       for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
@@ -220,6 +223,9 @@ export class AnthropicProvider implements ProviderStrategy {
             if (typeof evt.message.usage?.cache_creation_input_tokens === 'number') {
               cacheWriteTokens = evt.message.usage.cache_creation_input_tokens;
             }
+            if (evt.message.usage?.speed === 'standard' || evt.message.usage?.speed === 'fast') {
+              speed = evt.message.usage.speed;
+            }
             builder.setUsage(finalizeProviderUsage({
               // Anthropic 的 input_tokens 不含 prompt cache 命中/写入部分；
               // agent-runtime Usage.inputTokens 归一为完整 prompt 占用（与 OpenAI prompt_tokens 口径一致）。
@@ -227,6 +233,7 @@ export class AnthropicProvider implements ProviderStrategy {
               outputTokens,
               ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
               ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
+              ...(speed !== undefined ? { speed } : {}),
             }));
             break;
           }
@@ -336,12 +343,16 @@ export class AnthropicProvider implements ProviderStrategy {
             if (typeof evt.usage?.cache_creation_input_tokens === 'number') {
               cacheWriteTokens = evt.usage.cache_creation_input_tokens;
             }
+            if (evt.usage?.speed === 'standard' || evt.usage?.speed === 'fast') {
+              speed = evt.usage.speed;
+            }
             if (evt.usage) {
               builder.setUsage(finalizeProviderUsage({
                 inputTokens: inputTokens + (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0),
                 outputTokens,
                 ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
                 ...(cacheWriteTokens !== undefined ? { cacheWriteTokens } : {}),
+                ...(speed !== undefined ? { speed } : {}),
               }));
             }
             break;
@@ -415,9 +426,13 @@ export function buildAnthropicMessagesUrl(
   surface: 'anthropic' | 'vertex' = 'anthropic',
 ): string {
   const trimmed = baseUrl.replace(/\/+$/u, '');
-  return surface === 'vertex'
-    ? `${trimmed}/models/${encodeURIComponent(modelId)}:streamRawPredict`
-    : trimmed.endsWith('/messages') ? trimmed : `${trimmed}/messages`;
+  if (surface === 'vertex') {
+    return `${trimmed}/models/${encodeURIComponent(modelId)}:streamRawPredict`;
+  }
+  if (trimmed.endsWith('/messages')) return trimmed;
+  return /\/v\d+(?:\/|$)/u.test(new URL(trimmed).pathname)
+    ? `${trimmed}/messages`
+    : `${trimmed}/v1/messages`;
 }
 
 function resolveAnthropicThinkingKind(reasoningVisibility?: ReasoningVisibility): ThinkingArtifactKind {

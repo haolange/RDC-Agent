@@ -7,6 +7,7 @@ const LABEL_TO_KEY: Record<string, TranslationKey> = {
   '等待中': 'chat.workProcessStatusPending',
   '进行中': 'chat.workProcessStatusRunning',
   '失败': 'chat.workProcessStatusError',
+  '已跳过': 'chat.workProcessStatusSkipped',
   '正在思考': 'chat.workProcessThinkingStreaming',
   '已思考': 'chat.workProcessThinkingComplete',
   '收束摘要': 'chat.workProcessThinkingClosing',

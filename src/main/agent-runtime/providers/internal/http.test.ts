@@ -1,11 +1,24 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   composeAbortSignals,
+  ensureOk,
   parseSSE,
   ProviderTimeoutError,
 } from './http';
 
 describe('provider http stream helpers', () => {
+  it('summarizes an HTML gateway error without leaking markup into product diagnostics', async () => {
+    const response = new Response('<!DOCTYPE html><html><head><title>opencode.ai | 502: Bad gateway</title></head><body>proxy</body></html>', {
+      status: 502,
+      headers: { 'Content-Type': 'text/html' },
+    });
+
+    await expect(ensureOk(response, 'openai-compatible')).rejects.toMatchObject({
+      message: '[openai-compatible] HTTP 502: opencode.ai | 502: Bad gateway',
+      status: 502,
+    });
+  });
+
   it('classifies first-byte timeout before any stream chunk arrives', async () => {
     vi.useFakeTimers();
     const response = new Response(new ReadableStream<Uint8Array>());

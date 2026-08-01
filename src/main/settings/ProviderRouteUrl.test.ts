@@ -9,10 +9,21 @@ function materializeContractBaseUrl(template: string): string {
 }
 
 describe('provider route URL contracts', () => {
-  it('keeps every non-empty Anthropic-compatible base on an explicit versioned API path', () => {
+  it('builds every Anthropic-compatible base into one versioned messages operation', () => {
     const invalid = listProviderSummaries().flatMap((surface) => surface.routes
-      .filter((route) => route.protocol === 'AnthropicMessages' && route.baseUrl && !/\/v1(?:\/|$)/u.test(route.baseUrl))
-      .map((route) => `${surface.id}: ${route.baseUrl}`));
+      .filter((route) => route.protocol === 'AnthropicMessages' && route.baseUrl)
+      .flatMap((route) => {
+        const target = buildProviderOperationTarget({
+          adapterId: route.adapterId,
+          protocol: route.protocol,
+          baseUrl: materializeContractBaseUrl(route.baseUrl),
+          modelId: surface.models[0]?.modelId ?? 'catalog-contract-model',
+          connectionValues: { AICORE_DEPLOYMENT_ID: 'catalog-contract-deployment' },
+        });
+        return /\/v\d+(?:\/[^/?#]+)*\/messages(?:\?|$)/u.test(new URL(target.url).pathname)
+          ? []
+          : [`${surface.id}: ${target.url}`];
+      }));
     expect(invalid).toEqual([]);
   });
 

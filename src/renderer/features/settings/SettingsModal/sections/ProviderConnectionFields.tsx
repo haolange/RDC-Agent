@@ -7,10 +7,6 @@ import {
 } from '../providerConnectionState';
 import type { ProviderConnectionDraft } from '../types';
 import { STORED_SECRET_MASK } from '../utils';
-import {
-  BrowserQaDesktopOnlyNotice,
-  isBrowserQaDesktopOnlySurface,
-} from '../../../../platform/BrowserQaDesktopOnlyNotice';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -42,10 +38,8 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
 }) => {
   const schema = connectionProvider.connectionSchema;
   const primarySecret = resolvePrimarySecretField(schema);
-  const desktopOnlySecrets = isBrowserQaDesktopOnlySurface();
 
   const updateField = (field: LlmProviderConnectionField, value: string) => {
-    if (desktopOnlySecrets && field.kind === 'secret') return;
     const connectionValues = { ...connectionDraft.connectionValues, [field.id]: value };
     const usingStoredConnectionSecrets = {
       ...connectionDraft.usingStoredConnectionSecrets,
@@ -145,14 +139,10 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
 
   return (
     <div className="settings-provider-connection-fields" data-testid="settings-provider-connection-fields">
-      {desktopOnlySecrets ? (
-        <BrowserQaDesktopOnlyNotice kind="secret" testId="browser-qa-secret-desktop-only" />
-      ) : null}
       {schema.fields.map((field) => {
         const usingStoredSecret = field.kind === 'secret'
           && connectionDraft.usingStoredConnectionSecrets[field.id] === true;
         const visible = connectionDraft.visibleConnectionSecrets[field.id] === true;
-        const secretLocked = desktopOnlySecrets && field.kind === 'secret';
         return (
           <label className="settings-field" key={field.id}>
             <span className="settings-field-label settings-connection-field-label">
@@ -167,9 +157,7 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
                   type={visible && !usingStoredSecret ? 'text' : 'password'}
                   value={usingStoredSecret ? STORED_SECRET_MASK : connectionDraft.connectionValues[field.id] ?? ''}
                   placeholder={field.placeholder ?? ''}
-                  disabled={secretLocked}
                   onFocus={() => {
-                    if (secretLocked) return;
                     if (usingStoredSecret) replaceStoredSecret(field);
                   }}
                   onChange={(event) => updateField(field, event.target.value)}
@@ -179,7 +167,6 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
                   className="settings-secret-toggle"
                   data-testid={`settings-provider-connect-field-toggle-${field.id}`}
                   onClick={() => {
-                    if (secretLocked) return;
                     if (usingStoredSecret) {
                       replaceStoredSecret(field);
                       return;
@@ -194,7 +181,7 @@ export const ProviderConnectionFields: React.FC<ProviderConnectionFieldsProps> =
                   aria-label={usingStoredSecret
                     ? t('settings.replaceSecret')
                     : visible ? t('settings.hideSecret') : t('settings.showSecret')}
-                  disabled={secretLocked || (!usingStoredSecret && !connectionDraft.connectionValues[field.id])}
+                  disabled={!usingStoredSecret && !connectionDraft.connectionValues[field.id]}
                 >
                   {usingStoredSecret
                     ? t('settings.replaceSecret')

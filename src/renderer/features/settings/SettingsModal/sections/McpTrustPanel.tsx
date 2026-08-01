@@ -1,10 +1,6 @@
 import React, { useState } from 'react';
 import type { RdxRuntimeOverview } from '@shared/types/rdxRuntime';
 import { useI18n } from '../../../../i18n';
-import {
-  BrowserQaDesktopOnlyNotice,
-  isBrowserQaDesktopOnlySurface,
-} from '../../../../platform/BrowserQaDesktopOnlyNotice';
 
 export const McpTrustPanel: React.FC<{
   overview: RdxRuntimeOverview | null;
@@ -13,7 +9,6 @@ export const McpTrustPanel: React.FC<{
   const { t } = useI18n();
   const [busyId, setBusyId] = useState('');
   const [message, setMessage] = useState('');
-  const desktopOnly = isBrowserQaDesktopOnlySurface();
   const projectServers = overview?.mcpServers.filter((server) => (
     server.scope === 'project' || server.executableOverrideRejected || server.needsRetrust
   )) ?? [];
@@ -23,7 +18,7 @@ export const McpTrustPanel: React.FC<{
   }
 
   const run = async (descriptorId: string, action: 'trust' | 'revoke') => {
-    if (!overview.projectRoot || desktopOnly) return;
+    if (!overview.projectRoot) return;
     setBusyId(descriptorId);
     setMessage('');
     try {
@@ -40,7 +35,6 @@ export const McpTrustPanel: React.FC<{
   return (
     <div className="settings-runtime-list" data-testid="settings-mcp-trust-panel">
       <h3 className="settings-mcp-status-title">{t('settings.mcpTrustTitle')}</h3>
-      <BrowserQaDesktopOnlyNotice kind="mcpTrust" testId="browser-qa-mcp-trust-desktop-only" />
       <p>{t('settings.mcpTrustHint')}</p>
       {projectServers.map((server) => (
         <article className="settings-runtime-card" key={server.id}>
@@ -65,7 +59,7 @@ export const McpTrustPanel: React.FC<{
                 <button
                   type="button"
                   className="button button-secondary"
-                  disabled={desktopOnly || busyId === server.id}
+                  disabled={busyId === server.id}
                   onClick={() => void run(server.id, 'revoke')}
                 >
                   {t('settings.mcpRevoke')}
@@ -75,7 +69,7 @@ export const McpTrustPanel: React.FC<{
                 <button
                   type="button"
                   className="button button-primary"
-                  disabled={desktopOnly || busyId === server.id}
+                  disabled={busyId === server.id}
                   onClick={() => void run(server.id, 'trust')}
                 >
                   {t('settings.mcpTrust')}

@@ -2,11 +2,12 @@ import type {
   ConversationLoopOutputPhase,
   ConversationLoopStopReason,
   ConversationDiagnosticSeverity,
+  ConversationToolExecutionEvidence,
   ConversationWorkBlock,
 } from '@shared/types/conversation';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 
-export type WorkProcessRowStatus = 'pending' | 'running' | 'complete' | 'error';
+export type WorkProcessRowStatus = 'pending' | 'running' | 'complete' | 'error' | 'skipped';
 
 /** Per-builtin Work Process header glyph. Each catalog tool maps to a unique key. */
 export type WorkProcessIconKey =
@@ -230,6 +231,7 @@ export interface WorkProcessPresentation {
   stepCount: number;
   toolCount: number;
   summary: string;
+  toolEvidence?: ConversationToolExecutionEvidence;
   duration: string;
   actionCount: number;
   defaultExpanded: boolean;

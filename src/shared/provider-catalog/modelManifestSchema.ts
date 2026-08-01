@@ -69,6 +69,7 @@ export const ReasoningWireProfileSchema = z.discriminatedUnion('kind', [
     kind: z.literal('openai-responses'),
     on: NamedReasoningLevelSchema,
     levels: z.partialRecord(NamedReasoningLevelSchema, OpenAiEffortSchema),
+    offMode: z.literal('reasoning-none').optional(),
   }).strict(),
   z.object({
     kind: z.literal('openai-compatible'),
@@ -431,6 +432,7 @@ export const ModelLiveProjectionSchema = z.object({
 
 export const ModelModeActionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('request-patch'), patch: JsonObjectSchema }).strict(),
+  z.object({ kind: z.literal('request-headers'), headers: z.record(z.string(), z.string()) }).strict(),
   z.object({
     kind: z.literal('model-switch'),
     targetModelId: z.string().min(1),

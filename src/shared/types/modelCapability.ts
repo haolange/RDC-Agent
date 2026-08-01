@@ -27,6 +27,7 @@ export type ReasoningWireProfile =
       kind: 'openai-responses';
       on: NamedReasoningLevel;
       levels: Partial<Record<NamedReasoningLevel, OpenAiWireEffort>>;
+      offMode?: 'reasoning-none';
     }
   | {
       kind: 'openai-compatible';

@@ -223,9 +223,17 @@ async function main() {
   assert(renderDocToolchain.includes('openCapture'), 'RDX shell actions should include the open capture action.');
 
   const composer = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/debugger/composer/Composer.tsx'), 'utf8');
-  assert(composer.includes('userInvocableAgents.map'), 'Composer should list user-invocable Agent manifests.');
+  const composerAgentMenu = fs.readFileSync(
+    path.join(repoRoot, 'src/renderer/features/debugger/composer/ComposerAgentMenu.tsx'),
+    'utf8',
+  );
+  assert(
+    composer.includes('userInvocableAgents={userInvocableAgents}')
+      && composerAgentMenu.includes('userInvocableAgents.map'),
+    'Composer should list user-invocable Agent manifests through the canonical Agent menu.',
+  );
   assert(!composer.includes('AGENT_MODES.map'), 'Composer should not hardcode mode entries as Agent choices.');
-  assert(composer.includes('composer-agent-menu-item-tooltip'), 'Composer should keep Agent descriptions in hover tooltip UI.');
+  assert(composerAgentMenu.includes('composer-agent-menu-item-tooltip'), 'Composer should keep Agent descriptions in hover tooltip UI.');
   const capabilityHook = fs.readFileSync(
     path.join(repoRoot, 'src/renderer/features/debugger/composer/useEffectiveModelCapability.ts'),
     'utf8',
@@ -276,19 +284,34 @@ async function main() {
   assert(agentManifestServiceSource.includes('routeAgentIds.add(definition.id)'), 'Agent manifest routes should add custom profile ids.');
 
   const settingsServiceSource = fs.readFileSync(path.join(repoRoot, 'src/main/settings/SettingsService.ts'), 'utf8');
-  assert(!settingsServiceSource.includes('KNOWN_AGENT_IDS'), 'Settings route normalization should not use a built-in Agent allowlist.');
-  assert(settingsServiceSource.includes('isSafeAgentProfileId(route.agentId)'), 'Settings route normalization should validate safe custom profile ids.');
-  assert(settingsServiceSource.includes('routeMap.set(route.agentId, route)'), 'Settings route normalization should preserve custom route ids.');
+  const settingsProviderSanitizeSource = fs.readFileSync(
+    path.join(repoRoot, 'src/main/settings/settingsProviderSanitize.ts'),
+    'utf8',
+  );
+  const settingsServiceHelpersSource = fs.readFileSync(
+    path.join(repoRoot, 'src/main/settings/settingsServiceHelpers.ts'),
+    'utf8',
+  );
+  assert(!settingsProviderSanitizeSource.includes('KNOWN_AGENT_IDS'), 'Settings route normalization should not use a built-in Agent allowlist.');
+  assert(settingsProviderSanitizeSource.includes('isSafeAgentProfileId(route.agentId)'), 'Settings route normalization should validate safe custom profile ids.');
+  assert(settingsProviderSanitizeSource.includes('routeMap.set(route.agentId, route)'), 'Settings route normalization should preserve custom route ids.');
   assert(!settingsServiceSource.includes('agentRoutes?: LlmAgentRoute[];'), 'Persisted settings must not mirror Agent routes.');
-  assert(settingsServiceSource.includes('routesFromDefinitions(createEmptyAgentRoutes(), baseAgentSettings.definitions)'), 'Runtime Agent routes must derive from .agent.md definitions.');
+  assert(settingsServiceHelpersSource.includes('routesFromDefinitions(createEmptyAgentRoutes(), baseAgentSettings.definitions)'), 'Runtime Agent routes must derive from .agent.md definitions.');
 
-  const conversationServiceSource = fs.readFileSync(path.join(repoRoot, 'src/main/conversation/ConversationService.ts'), 'utf8');
-  assert(conversationServiceSource.includes('resolveEnabledAgentDefinition'), 'Conversation routing should resolve enabled manifest definitions.');
-  assert(!conversationServiceSource.includes('KNOWN_CONVERSATION_AGENTS'), 'Conversation routing should not be limited to built-in Agent roles.');
+  const conversationRoutePreflightSource = fs.readFileSync(
+    path.join(repoRoot, 'src/main/conversation/ConversationRoutePreflight.ts'),
+    'utf8',
+  );
+  assert(conversationRoutePreflightSource.includes('resolveEnabledAgentDefinition'), 'Conversation routing should resolve enabled manifest definitions.');
+  assert(!conversationRoutePreflightSource.includes('KNOWN_CONVERSATION_AGENTS'), 'Conversation routing should not be limited to built-in Agent roles.');
 
   const orchestratorSource = fs.readFileSync(path.join(repoRoot, 'src/main/workflow/debugger/AgentOrchestrator.ts'), 'utf8');
   assert(orchestratorSource.includes('getOrCreateAgentConfig'), 'Agent orchestrator should lazily initialize custom Agent config.');
-  assert(orchestratorSource.includes("isTopLevelAgentId(agentId) ? agentId : 'edit'"), 'Custom Agent fallback config should use a generic profile default.');
+  const agentSlotRegistrySource = fs.readFileSync(
+    path.join(repoRoot, 'src/main/workflow/debugger/AgentSlotRegistry.ts'),
+    'utf8',
+  );
+  assert(agentSlotRegistrySource.includes("isTopLevelAgentId(agentId) ? agentId : 'edit'"), 'Custom Agent fallback config should use a generic profile default.');
 
   const runtimePolicySource = fs.readFileSync(path.join(repoRoot, 'src/main/workflow/debugger/DebuggerRuntimePolicy.ts'), 'utf8');
   assert(runtimePolicySource.includes('manifest.tools.flatMap'), 'Runtime tool policy should derive manifest tool allowlists directly.');

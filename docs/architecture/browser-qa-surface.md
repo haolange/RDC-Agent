@@ -1,38 +1,45 @@
-# Browser QA Surface（debug-only）
+# Browser App Surface（debug-only）
 
-Browser QA 与桌面 Electron **共用同一套 renderer**；差异仅在传输与 channel 面：
+Browser 与桌面 Electron 共用同一套 renderer、`ElectronAPI` 产品接口、main runtime、状态目录与权限语义。允许差异仅限 transport 和 Electron 原生窗口容器：
 
-| 路径 | 传输 | 鉴权 |
+| 路径 | Transport | 鉴权 |
 | --- | --- | --- |
-| Desktop | `preload` → `ipcMain` | 进程内信任边界 |
-| Browser QA | `BrowserAppBridge` → `POST /invoke` | Bearer / query `rdcBridgeToken\|token` / cookie `rdcBridgeToken` |
+| Desktop | `preload` → `ipcRenderer` → `ipcMain` | 进程内信任边界 |
+| Browser | `BrowserAppBridge` → localhost HTTP/SSE → IPC handler registry | Bearer / query `rdcBridgeToken\|token` / cookie `rdcBridgeToken` |
 
-权威短入口：`GET /qa` → Set-Cookie → 302 `/app`。仅 `RDC_AGENT_BROWSER_QA=1` 启动；**不进 release 默认路径**。
+权威短入口：`GET /qa` → Set-Cookie → 302 `/app`。仅 `RDC_AGENT_BROWSER_QA=1` 启动；不进 release 默认路径。
 
-实现权威：`src/main/browserAppBridge/bridgeSecurity.ts`（allow/deny 正则）、`BrowserAppBridge.ts`（renderer 镜像 + deny stub）。
+## 单轨接口
 
-## 工作台主路径（应对齐）
+- `src/shared/renderer-api/` 是唯一 `ElectronAPI` 工厂与 channel manifest；Desktop 和 Browser 各自只实现 transport。
+- manifest 中的全部 invoke channel 必须存在 main handler；启动时 `assertRendererIpcParity` fail-closed 校验。
+- Browser bridge 仅接受 canonical manifest 中且已注册的 channel。未知、内部、未注册 channel 与不存在的明文 `settings:getProviderSecret` 返回 403。
+- Secret 只可提交给主进程；renderer 只读取 `{ hasSecret, maskedPreview? }`，不得获得明文。
 
-| 能力 | Desktop | Bridge |
+## 产品能力矩阵
+
+| 能力 | Desktop | Browser |
 | --- | --- | --- |
-| Workbench / Project / Session | ✅ | ✅ `project:*` `session:*` |
-| Conversation Send / Stop / Rewrite / History | ✅ | ✅ 显式 allow 的 `conversation:*` |
-| Work Process / Trace / Workflow | ✅ | ✅ `trace:*` `workflow:*` `run:*` |
-| Settings 读 / Providers catalog / Effective model | ✅ | ✅ `settings:get*` 只读族 |
-| Agents 编辑（`.agent.md` save） | ✅ | ✅ `settings:saveAgentDefinition` 等 |
-| Capture / Context / Device / Knowledge | ✅ | ✅ 对应前缀 allow |
-| Appearance / General `settings:set` | ✅ | ❌ 永久 deny（UI 显式桌面专用） |
-| Provider secret 读写 | ✅ | ❌ `settings:getProviderSecret` deny；UI 禁用 |
-| MCP trust / revoke | ✅ | ❌ `rdx-runtime:trustMcp` 等；UI 禁用 |
-| Tool approval / Memory / Hook trust / command execute | ✅ | ❌ 永久 deny |
-| PTY `terminal:*` | ✅ | ❌ deny（Agent Activity 抽屉走 `runtimeLog:*`，仍可用） |
+| Workbench / Project / Session / Run | ✅ | ✅ |
+| Conversation / Stop / Rewrite / Tool Approval | ✅ | ✅ |
+| Work Process / Trace / Workflow / Context Usage | ✅ | ✅ |
+| Settings / Language / Appearance / Models Override | ✅ | ✅ |
+| Provider connect / secret status / secret submission | ✅ | ✅ |
+| Agents / Skills / MCP / Hooks / Policy | ✅ | ✅ |
+| Capture / Context / Device / Knowledge | ✅ | ✅ |
+| Terminal / Runtime Log / Command Execute | ✅ | ✅ |
+| Memory approval / write / delete | ✅ | ✅ |
+| Hook/MCP trust / revoke / test | ✅ | ✅ |
+| Electron 原生窗口 chrome | ✅ | 浏览器标签页容器 |
 
-## Deny 面 UX
+上述 Browser 能力仍受 main-owned Zod、PermissionPolicy、approval token、MCP trust、`safeStorage`、session ownership 与 shell policy 约束；parity 不等于绕过权限。
 
-Browser 模式下上述桌面专用入口必须 **禁用或隐藏并说明**，禁止仅靠 `Promise.reject` 看起来像故障。文案键：`browserQa.desktopOnly*`（`i18n.ts`）。
+## 状态与实例
+
+Browser / Browser-dev 默认使用与 Desktop 相同的 canonical Electron userData，不创建 `qa-*` fallback，也不复制或迁移数据。两种载体不得同时占用该目录；`instance.lock` 冲突应明确失败。自动化 smoke 必须显式设置临时 `RDC_AGENT_USER_DATA`，结束后清理。
 
 ## 验证
 
-- 契约：`bridgeSecurity.test.ts`、`BrowserAppBridgeServer.contract.test.ts`
+- 契约：`createRendererApi.test.ts`、`bridgeSecurity.test.ts`、`BrowserAppBridgeServer.contract.test.ts`
 - Smoke：`pnpm run smoke:agent-browser`
-- 人工：`start:agent-browser` → 打开 `/qa` → 隔离 project 主路径 + deny 抽检
+- 人工：`start:agent-browser` → 打开 `/qa` → 验证真实本机 Settings/Project/Session/usage、语言持久化及 parity 能力；再以显式临时 userData 验证有副作用的权限流程

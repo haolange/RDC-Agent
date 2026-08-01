@@ -6,6 +6,7 @@ import type {
 import type { LlmProviderModel } from '@shared/types/settings';
 import type { CatalogModelContribution } from './effectiveCatalogTypes';
 import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
+import { parseOpenAiReasoningControl } from './LiveProviderCatalogParsers';
 
 export interface CopilotModelCapabilityMetadata {
   limits: {
@@ -46,6 +47,12 @@ function entitlement(value: unknown): EntitlementState {
     if (tier[key] === false) return 'denied';
   }
   return 'unknown';
+}
+
+function explicitCapability(value: unknown): { state: 'supported' | 'unsupported' } | undefined {
+  if (value === true) return { state: 'supported' };
+  if (value === false) return { state: 'unsupported' };
+  return undefined;
 }
 
 function copilotRouteOptions(endpoints: readonly string[], apiBaseUrl: string): ModelRouteOption[] {
@@ -121,6 +128,50 @@ export function parseCopilotBillingTiers(billing: unknown): ContextTier[] {
   return tiers;
 }
 
+/** Project only account-advertised context controls; model names never imply a tier. */
+export function parseCopilotBillingContribution(
+  modelId: string,
+  billing: unknown,
+): CatalogModelContribution | undefined {
+  const contextTiers = parseCopilotBillingTiers(billing);
+  if (contextTiers.length === 0) return undefined;
+  const longContext = contextTiers.find((tier) => tier.id === 'long_context');
+  const fixedMillionContext = !longContext && contextTiers.some((tier) => (
+    (tier.maxPromptTokens ?? 0) >= 1_000_000 || (tier.maxTotalTokens ?? 0) >= 1_000_000
+  ));
+  return {
+    modelId,
+    contextTiers,
+    controls: {
+      context1m: longContext
+        ? {
+            state: 'selectable',
+            defaultValue: false,
+            entitlement: longContext.entitlement,
+            tierId: longContext.id,
+            label: 'Max mode',
+          }
+        : fixedMillionContext
+          ? {
+              state: 'fixed',
+              fixedValue: true,
+              entitlement: contextTiers[0].entitlement,
+              tierId: contextTiers[0].id,
+              label: 'Max mode',
+            }
+          : { state: 'unsupported', fixedValue: false },
+    },
+    ...(longContext ? {
+      executionBindings: [{
+        id: 'context:copilot-long-context',
+        when: { context1m: true },
+        actions: [{ kind: 'client-tier', tierId: longContext.id }],
+        entitlement: longContext.entitlement,
+      }],
+    } : {}),
+  };
+}
+
 export function parseCopilotModelCatalog(
   payload: unknown,
   apiBaseUrl = 'https://api.githubcopilot.com',
@@ -140,7 +191,7 @@ export function parseCopilotModelCatalog(
     const supportedEndpoints = Array.isArray(entry.supported_endpoints)
       ? entry.supported_endpoints.filter((value): value is string => typeof value === 'string')
       : [];
-    const supportsChatEndpoint = supportedEndpoints.length === 0 || supportedEndpoints.some((endpoint) => (
+    const supportsChatEndpoint = supportedEndpoints.some((endpoint) => (
       endpoint.includes('/chat/completions') || endpoint.includes('/responses') || endpoint.includes('/v1/messages')
     ));
     if (
@@ -154,6 +205,19 @@ export function parseCopilotModelCatalog(
     seen.add(id);
     const label = typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim() : id;
     const routeOptions = copilotRouteOptions(supportedEndpoints, apiBaseUrl);
+    const preferredProtocol = routeOptions[0]?.route.protocol;
+    const reasoning = Array.isArray(entry.supported_reasoning_efforts)
+      && (preferredProtocol === 'OpenAIResponses' || preferredProtocol === 'OpenAICompatibleChatCompletions')
+      ? parseOpenAiReasoningControl(
+          entry.supported_reasoning_efforts,
+          entry.default_reasoning_effort,
+          preferredProtocol === 'OpenAIResponses' ? 'openai-responses' : 'openai-compatible',
+        )
+      : undefined;
+    const supports = record(capabilities.supports);
+    const toolCalling = explicitCapability(supports.tool_calls);
+    const visionInput = explicitCapability(supports.vision);
+    const structuredOutput = explicitCapability(supports.structured_outputs);
     const deniedByAccountPolicy = copilotPolicyDenied(entry);
     const unavailableReason = deniedByAccountPolicy
       ? 'This model is disabled by the current Copilot account, plan, client, or organization policy.'
@@ -181,7 +245,11 @@ export function parseCopilotModelCatalog(
       availability: deniedByAccountPolicy ? 'unavailable' : 'available',
       ...(unavailableReason ? { unavailableReason } : {}),
       ...(routeOptions.length > 0 ? { routeOptions } : {}),
-      ...(routeOptions.length === 1 ? { preferredRouteOptionId: routeOptions[0].id } : {}),
+      ...(routeOptions.length > 0 ? { preferredRouteOptionId: routeOptions[0].id } : {}),
+      ...(reasoning ? { controls: { reasoning } } : {}),
+      ...(toolCalling ? { toolCalling } : {}),
+      ...(visionInput ? { visionInput } : {}),
+      ...(structuredOutput ? { structuredOutput } : {}),
     });
     const metadata: CopilotModelCapabilityMetadata = {
       limits: {

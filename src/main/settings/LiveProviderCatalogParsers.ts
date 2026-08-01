@@ -195,7 +195,12 @@ export function parseOpenAiReasoningControl(
     levels,
     defaultSelection,
     wireProfile: protocol === 'openai-responses'
-      ? { kind: 'openai-responses', on: onSelection, levels: wireLevels }
+      ? {
+          kind: 'openai-responses',
+          on: onSelection,
+          levels: wireLevels,
+          ...(supportsOff ? { offMode: 'reasoning-none' as const } : {}),
+        }
       : {
           kind: 'openai-compatible',
           on: onSelection,

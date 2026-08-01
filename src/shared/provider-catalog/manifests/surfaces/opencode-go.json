@@ -33,6 +33,15 @@
       "refreshedAt": "2026-07-25T00:00:00+08:00",
       "surface": "opencode-go",
       "accountScope": "credential-scoped"
+    },
+    {
+      "id": "runtime-observation:opencode-go-hy3-preview:2026-08-01",
+      "sourceKind": "runtime-observation",
+      "sourceRevision": "capability-probe:model-not-supported",
+      "observedAt": "2026-08-01",
+      "refreshedAt": "2026-08-01",
+      "surface": "opencode-go",
+      "accountScope": "credential-scoped"
     }
   ],
   "defaultFactSourceId": "rdc-agent:opencode-go:0",
@@ -1551,7 +1560,8 @@
       "modelId": "hy3-preview",
       "label": "HY3 Preview",
       "aliases": [],
-      "availability": "unknown",
+      "availability": "unavailable",
+      "unavailableReason": "The OpenCode Go inference endpoint rejected this discovered id as model_not_supported.",
       "contextTiers": [
         {
           "id": "default",
@@ -1602,7 +1612,7 @@
           }
         }
       },
-      "factSourceId": "rdc-agent:opencode-go:0",
+      "factSourceId": "runtime-observation:opencode-go-hy3-preview:2026-08-01",
       "liveProjection": {
         "context": {
           "observedTierId": "default",

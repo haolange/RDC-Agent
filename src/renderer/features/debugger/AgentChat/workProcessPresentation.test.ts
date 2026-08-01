@@ -638,6 +638,34 @@ describe('buildWorkProcessPresentation', () => {
     expect(visibleSteps.map((row) => row.type)).toEqual(Array(7).fill('tool'));
   });
 
+  it('projects structured tool evidence and keeps skipped calls visibly distinct', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'complete',
+      toolEvidence: { total: 3, succeeded: 1, failed: 1, skipped: 1 },
+      updatedAt: now + 20,
+      blocks: [{
+        id: 'runtime-loop-evidence',
+        kind: 'llm_turn',
+        title: 'LLM turn',
+        status: 'complete',
+        result: { status: 'complete', outputPhase: 'commentary', toolCallIds: ['ok', 'failed', 'skipped'] },
+        toolCalls: [
+          { id: 'ok', toolName: 'read_file', status: 'complete', startedAt: now, completedAt: now + 1 },
+          { id: 'failed', toolName: 'bash', status: 'error', error: 'exit 1', startedAt: now + 2, completedAt: now + 3 },
+          { id: 'skipped', toolName: 'web_search', status: 'skipped', startedAt: now + 4, completedAt: now + 5 },
+        ],
+        startedAt: now,
+        completedAt: now + 5,
+      }],
+    });
+
+    expect(presentation.toolEvidence).toEqual({ total: 3, succeeded: 1, failed: 1, skipped: 1 });
+    expect(flattenWorkRows(presentation.rows)).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'tool', id: 'failed', status: 'error' }),
+      expect.objectContaining({ type: 'tool', id: 'skipped', status: 'skipped', verb: '已跳过' }),
+    ]));
+  });
+
   it('preserves info, warning, and error diagnostic severity in Work Process rows', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'error',

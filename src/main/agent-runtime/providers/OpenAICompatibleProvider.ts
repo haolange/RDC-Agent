@@ -76,6 +76,16 @@ interface OpenAIStreamChunk {
   };
 }
 
+function hasSemanticChoice(choice: OpenAIStreamChoice): boolean {
+  const delta = choice.delta;
+  return Boolean(
+    (typeof delta?.content === 'string' && delta.content.length > 0)
+    || (typeof delta?.reasoning === 'string' && delta.reasoning.length > 0)
+    || (typeof delta?.reasoning_content === 'string' && delta.reasoning_content.length > 0)
+    || (Array.isArray(delta?.tool_calls) && delta.tool_calls.length > 0),
+  );
+}
+
 export interface OpenAICompatibleProviderOptions {
   /** 默认 baseUrl，可被 `StreamOptions.baseUrl` 覆盖。 */
   baseUrl?: string;
@@ -215,13 +225,24 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
           }));
         }
 
-        const choice = chunk.choices?.[0];
-        if (!choice) continue;
+        const choices = chunk.choices ?? [];
         if (finishReason !== null) {
+          if (choices.some(hasSemanticChoice)) {
+            throw new ProviderStreamProtocolError(
+              'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
+              textRef,
+              'Provider emitted another semantic Chat Completions choice after finish_reason.',
+            );
+          }
+          continue;
+        }
+        const choice = choices.find((candidate) => (candidate.index ?? 0) === 0) ?? choices[0];
+        if (!choice) continue;
+        if (choices.some((candidate) => candidate !== choice && hasSemanticChoice(candidate))) {
           throw new ProviderStreamProtocolError(
-            'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
+            'PROVIDER_STREAM_CHANNEL_COLLISION',
             textRef,
-            'Provider emitted another Chat Completions choice after finish_reason.',
+            'Provider emitted multiple semantic Chat Completions choices for a single-choice request.',
           );
         }
 

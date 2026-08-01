@@ -620,6 +620,17 @@ export interface LlmModelCapabilityProbeResult {
   status: 'verified' | 'inconclusive' | 'denied' | 'failed';
   requestSent: boolean;
   detail?: string;
+  evidence?: {
+    protocol: LlmProviderProtocol;
+    effectiveModelId: string;
+    observedAt: string;
+    usage: {
+      inputTokens: number;
+      outputTokens: number;
+      totalTokens: number;
+      speed?: 'standard' | 'fast';
+    };
+  };
 }
 
 export type LlmProviderAccountLoginMode = 'browser' | 'device';

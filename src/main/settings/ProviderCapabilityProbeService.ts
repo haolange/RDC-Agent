@@ -29,6 +29,7 @@ import {
   releaseProviderRuntimeCredentials,
 } from './ProviderRuntimeCredentialLease';
 const OBSERVED_ENTITLEMENT_TTL_MS = 24 * 60 * 60 * 1000;
+const PROBE_QUOTA_RETRY_MS = 60 * 1000;
 
 export type CapabilityProbeFailureKind =
   | 'entitlement-denied'
@@ -40,11 +41,19 @@ export type CapabilityProbeFailureKind =
 export function classifyCapabilityProbeFailure(
   status: number,
   manifestDeclaresEntitlementDenial = false,
+  detail = '',
 ): CapabilityProbeFailureKind {
   if (manifestDeclaresEntitlementDenial) return 'entitlement-denied';
   if (status === 401) return 'authentication-failed';
   if (status === 404) return 'route-unavailable';
   if (status === 429) return 'quota-exhausted';
+  const normalizedDetail = detail.toLowerCase();
+  if (status === 402 && (
+    normalizedDetail.includes('quota_exceeded')
+    || normalizedDetail.includes('quota exceeded')
+    || normalizedDetail.includes('usage limit')
+    || normalizedDetail.includes('out of budget')
+  )) return 'quota-exhausted';
   return 'unknown';
 }
 
@@ -207,12 +216,15 @@ const productionDependencies: ProviderCapabilityProbeDependencies = {
   },
   recordFailure: (request, target, plan, status, detail) => {
     const manifestMatchesDenial = manifestDeclaresEntitlementDenial(request, plan, status, detail);
-    const failureKind = classifyCapabilityProbeFailure(status, manifestMatchesDenial);
+    const failureKind = classifyCapabilityProbeFailure(status, manifestMatchesDenial, detail);
     if (failureKind === 'quota-exhausted') {
       effectiveCatalogService.recordTransientQuota(
         identity(target, plan),
         target.model.modelId,
-        { note: `Capability probe received HTTP ${status}` },
+        {
+          exhaustedUntil: new Date(Date.now() + PROBE_QUOTA_RETRY_MS).toISOString(),
+          note: `Capability probe received HTTP ${status}; retry deferred 60s`,
+        },
       );
       return false;
     }
@@ -242,6 +254,24 @@ function statusFromError(error: unknown): number | undefined {
 function errorDetail(error: unknown): string {
   const value = error instanceof Error ? error.message : String(error);
   return value.slice(0, 400);
+}
+
+function probeEvidence(
+  target: ResolvedProbeTarget,
+  plan: RequestPlan,
+  message: AssistantMessage,
+): NonNullable<LlmModelCapabilityProbeResult['evidence']> {
+  return {
+    protocol: plan.route.protocol,
+    effectiveModelId: plan.effectiveModelId || target.model.modelId,
+    observedAt: new Date().toISOString(),
+    usage: {
+      inputTokens: message.usage.inputTokens,
+      outputTokens: message.usage.outputTokens,
+      totalTokens: message.usage.totalTokens,
+      ...(message.usage.speed ? { speed: message.usage.speed } : {}),
+    },
+  };
 }
 
 export class ProviderCapabilityProbeService {
@@ -304,9 +334,19 @@ export class ProviderCapabilityProbeService {
     }
 
     try {
-      await this.dependencies.execute({ request, ...target, plan: planning.plan, credentialHandle });
+      const message = await this.dependencies.execute({ request, ...target, plan: planning.plan, credentialHandle });
+      const evidence = probeEvidence(target, planning.plan, message);
+      if (request.mode === 'fast' && message.usage.speed !== 'fast') {
+        return {
+          success: false,
+          status: 'inconclusive',
+          requestSent: true,
+          detail: 'Provider did not confirm usage.speed=fast for this request.',
+          evidence,
+        };
+      }
       this.dependencies.recordSuccess(request, target, planning.plan);
-      return { success: true, status: 'verified', requestSent: true };
+      return { success: true, status: 'verified', requestSent: true, evidence };
     } catch (error) {
       const status = statusFromError(error);
       const detail = errorDetail(error);

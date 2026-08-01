@@ -39,12 +39,16 @@ export function buildOpenAiResponsesReasoning(
     return {};
   }
 
+  const profile = reasoning.control.wireProfile;
   const wireLevel = resolveWireLevel(reasoning);
   if (!wireLevel) {
+    if (profile.offMode === 'reasoning-none') {
+      return { reasoning: { effort: 'none' } };
+    }
     return {};
   }
 
-  const effort = reasoning.control.wireProfile.levels[wireLevel];
+  const effort = profile.levels[wireLevel];
   if (!effort) {
     return {};
   }

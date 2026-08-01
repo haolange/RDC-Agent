@@ -18,7 +18,7 @@
 - `rdx-runtime.md`：Scope、资源覆盖、Instructions、Skills、Hooks、Memory（产品规格见 product/scoped-runtime-resources）。
 - `agentic-trace-protocol.md`：Trace、Progress 与 right-panel projection。
 - `provider-architecture.md`：Catalog / EffectiveModel / RequestPlan / credential lease。
-- `browser-qa-surface.md`：Browser QA（debug-only）与桌面 channel 矩阵、deny 面 UX。
+- `browser-qa-surface.md`：Browser（debug-only）与 Desktop 的单轨 API、transport、安全及状态 parity。
 - `spec-driven-development.md`：跨层规范与执行约束。
 
 ## 对照资料

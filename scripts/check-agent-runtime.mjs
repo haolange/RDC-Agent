@@ -110,12 +110,12 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(kimiCapability.toolCallingMode === 'native-structured', 'kimi-coding-plan must resolve to native structured tool calling.');
   assert(kimiCapability.supportsToolResults === true, 'native structured routes must support tool results.');
 
-  const grok = configuredProvider('grok-account', ['grok-code-fast-1']);
-  const grokCapability = resolveAgentRouteCapability(grok, 'grok-code-fast-1', effectiveModel(grok, 'grok-code-fast-1', {
+  const grok = configuredProvider('grok-account', ['grok-4.5']);
+  const grokCapability = resolveAgentRouteCapability(grok, 'grok-4.5', effectiveModel(grok, 'grok-4.5', {
     toolCalling: { state: 'unknown' },
   }));
-  assert(grokCapability.toolCallingMode === 'native-structured', 'grok-account must resolve to native structured tool calling.');
-  assert(grokCapability.supportsToolResults === true, 'grok-account native structured routes must support tool results.');
+  assert(grokCapability.toolCallingMode === 'text-only', 'grok-account must fail closed while structured tool calling remains unverified.');
+  assert(grokCapability.supportsToolResults === false, 'Unverified grok-account routes must not receive synthetic tool-result support.');
 
   const openRouter = configuredProvider('openrouter', ['anthropic/claude-haiku-latest']);
   const openRouterCapability = resolveAgentRouteCapability(openRouter, 'anthropic/claude-haiku-latest', effectiveModel(openRouter, 'anthropic/claude-haiku-latest', {

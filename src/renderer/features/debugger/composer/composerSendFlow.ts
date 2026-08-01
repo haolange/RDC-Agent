@@ -88,6 +88,11 @@ export async function sendComposerConversationTurn(options: {
   const sentSkillIds = [...pendingSkillIds];
   const requestId = createConversationRequestId();
   const owningSessionId = currentSession?.sessionId ?? null;
+  let turnOwnership = {
+    sessionId: owningSessionId ?? 'no-session',
+    requestId,
+    agentId: selectedAgentId,
+  };
   const optimistic = buildOptimisticConversationTurn({
     requestId,
     trimmed: sentPrompt,
@@ -107,9 +112,8 @@ export async function sendComposerConversationTurn(options: {
   };
 
   useComposerSessionContextStore.getState().beginTurn({
-    sessionId: owningSessionId ?? 'no-session',
+    ...turnOwnership,
     projectId: currentProject?.projectId ?? null,
-    requestId,
     optimisticTurnId: optimistic.assistantDraftMessage.turnId,
     realTurnId: null,
   });
@@ -142,7 +146,7 @@ export async function sendComposerConversationTurn(options: {
       return false;
     }
     // Stop already performed a clean preparing revoke; stay idempotent.
-    useComposerSessionContextStore.getState().clearActiveTurn();
+    useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
     useSessionStore.getState().setPreparedTurnContext(null);
     useSessionStore.getState().setConversationPreparationPhase('idle');
     return true;
@@ -195,14 +199,14 @@ export async function sendComposerConversationTurn(options: {
       if (result.error.code === 'REQUEST_CANCELLED') {
         rollbackOptimistic();
         restoreComposerDraft();
-        useComposerSessionContextStore.getState().clearActiveTurn();
+        useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
         useSessionStore.getState().setPreparedTurnContext(null);
         useSessionStore.getState().setConversationPreparationPhase('idle');
         return;
       }
       rollbackOptimistic();
       restoreComposerDraft();
-      useComposerSessionContextStore.getState().clearActiveTurn();
+      useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
       useSessionStore.getState().setPreparedTurnContext(null);
       useSessionStore.getState().setConversationPreparationPhase('idle');
       showNotice(result.error.message || failedSummary);
@@ -213,7 +217,16 @@ export async function sendComposerConversationTurn(options: {
     rollbackOptimistic();
 
     const turn = result.turn;
-    useComposerSessionContextStore.getState().setRealTurnId(turn.userMessage.turnId);
+    const committedSessionId = turn.session?.sessionId
+      ?? turn.userMessage.sessionId
+      ?? turn.assistantDraftMessage.sessionId
+      ?? turnOwnership.sessionId;
+    useComposerSessionContextStore.getState().setRealTurnId(
+      turnOwnership,
+      turn.userMessage.turnId,
+      committedSessionId,
+    );
+    turnOwnership = { ...turnOwnership, sessionId: committedSessionId };
     useSessionStore.getState().setPreparedTurnContext(result.preparedContext);
     useSessionStore.getState().setConversationPreparationPhase('current');
 
@@ -240,13 +253,14 @@ export async function sendComposerConversationTurn(options: {
       setTracePresentation,
       setBranchState,
     });
+    useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
   } catch (error) {
     if (finishRevokedOrCancelled()) {
       return;
     }
     rollbackOptimistic();
     restoreComposerDraft();
-    useComposerSessionContextStore.getState().clearActiveTurn();
+    useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
     useSessionStore.getState().setPreparedTurnContext(null);
     useSessionStore.getState().setConversationPreparationPhase('idle');
     if (isRequestCancelledError(error)) {

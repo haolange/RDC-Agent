@@ -195,7 +195,7 @@ describe('provider prompt cache wire', () => {
       capturedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
       return new Response([
         'event: message_start',
-        'data: {"type":"message_start","message":{"id":"msg-1","usage":{"input_tokens":20,"output_tokens":0,"cache_read_input_tokens":10,"cache_creation_input_tokens":5}}}',
+        'data: {"type":"message_start","message":{"id":"msg-1","usage":{"input_tokens":20,"output_tokens":0,"cache_read_input_tokens":10,"cache_creation_input_tokens":5,"speed":"fast"}}}',
         '',
         'event: content_block_start',
         'data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}',
@@ -207,7 +207,7 @@ describe('provider prompt cache wire', () => {
         'data: {"type":"content_block_stop","index":0}',
         '',
         'event: message_delta',
-        'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2,"cache_read_input_tokens":10,"cache_creation_input_tokens":5}}',
+        'data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2,"cache_read_input_tokens":10,"cache_creation_input_tokens":5,"speed":"fast"}}',
         '',
         'event: message_stop',
         'data: {"type":"message_stop"}',
@@ -239,6 +239,7 @@ describe('provider prompt cache wire', () => {
       cacheWriteTokens: 5,
       cacheHitTokens: 10,
       cacheMissTokens: 25,
+      speed: 'fast',
     });
   });
 

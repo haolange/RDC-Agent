@@ -940,7 +940,7 @@ html[data-resolved-theme='light'] .debugger-page {
   height: var(--space-6);
   transform: translateY(-50%);
   border-radius: var(--radius-full);
-  border: 1px solid color-mix(in srgb, var(--token-border-focus) 52%, var(--token-border-muted));
+  border: 1px solid color-mix(in srgb, var(--composer-mode-accent) 52%, var(--token-border-muted));
   background: var(--composer-effort-track-fill);
   overflow: hidden;
   /* Ordinary drag must stay snappy — no fill damping here. */
@@ -1140,7 +1140,7 @@ html[data-resolved-theme='light'] .debugger-page {
 }
 
 .composer-effort-slider-thumb:focus-visible {
-  outline: 2px solid var(--token-border-focus);
+  outline: 2px solid var(--composer-mode-accent);
   outline-offset: 3px;
 }
 

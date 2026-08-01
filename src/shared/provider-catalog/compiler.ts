@@ -368,6 +368,8 @@ function validateModel(
     for (const action of binding.actions) {
       if (action.kind === 'request-patch') {
         validatePublicPatch(action.patch, `${surface.id}/${model.modelId}.executionBindings.${binding.id}.patch`, errors);
+      } else if (action.kind === 'request-headers') {
+        validatePublicPatch(action.headers, `${surface.id}/${model.modelId}.executionBindings.${binding.id}.headers`, errors);
       }
     }
   }
@@ -506,6 +508,8 @@ function validateSurface(
         }
         if (action.kind === 'request-patch') {
           validatePublicPatch(action.patch, `${surface.id}.discoveredModelProjection.${binding.id}.patch`, errors);
+        } else if (action.kind === 'request-headers') {
+          validatePublicPatch(action.headers, `${surface.id}.discoveredModelProjection.${binding.id}.headers`, errors);
         }
       }
     }

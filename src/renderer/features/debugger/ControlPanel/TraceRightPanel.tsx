@@ -20,8 +20,8 @@ const focusWorkProcessTask = (taskId: string): void => {
   window.setTimeout(() => target.classList.remove('is-trace-flash', 'is-trace-flash-static'), reduced ? 800 : 1600);
 };
 
-const RailSection: React.FC<{ id: 'progress' | 'outputs' | 'context' | 'capture'; title: string; empty?: boolean; children: React.ReactNode }> = ({ id, title, empty = false, children }) => (
-  <section className={`right-rail-section${empty ? ' is-empty' : ''}`} data-testid={`right-rail-${id}`}>
+const RailSection: React.FC<{ id: 'progress' | 'outputs' | 'context' | 'capture'; title: string; children: React.ReactNode }> = ({ id, title, children }) => (
+  <section className="right-rail-section" data-testid={`right-rail-${id}`}>
     <h2 className="right-rail-section-heading">{title}</h2>
     <div className="right-rail-section-content">{children}</div>
   </section>
@@ -54,10 +54,10 @@ export const TraceRightPanel: React.FC = () => {
 
   return (
     <aside className="right-rail" aria-label="Session inspector">
-      <RailSection id="progress" title="Progress" empty={tasks.length === 0}>{tasks.length ? <ProgressList tasks={tasks} /> : <EmptyState kind="progress" copy="Steps will show as the task unfolds." />}</RailSection>
-      <RailSection id="outputs" title="Outputs" empty={!hasOutputs}>{hasOutputs ? <TraceArtifactList current={outputs.current} previous={outputs.previous} /> : <EmptyState kind="outputs" copy="Outputs created during this task appear here." />}</RailSection>
-      <RailSection id="context" title="Context" empty={!hasTaskContext}>{hasTaskContext && taskContext ? <RightRailContext task={taskContext} /> : <EmptyState kind="context" copy="Tools and referenced files used in this task appear here." />}</RailSection>
-      <RailSection id="capture" title="Capture" empty={!hasCapture}>{hasCapture && taskContext && captureContext ? <CapturePanel task={taskContext} capture={captureContext} /> : <EmptyState kind="capture" copy="Import a .rdc file to this project to open and preview it here." />}</RailSection>
+      <RailSection id="progress" title="Progress">{tasks.length ? <ProgressList tasks={tasks} /> : <EmptyState kind="progress" copy="Steps will show as the task unfolds." />}</RailSection>
+      <RailSection id="outputs" title="Outputs">{hasOutputs ? <TraceArtifactList current={outputs.current} previous={outputs.previous} /> : <EmptyState kind="outputs" copy="Outputs created during this task appear here." />}</RailSection>
+      <RailSection id="context" title="Context">{hasTaskContext && taskContext ? <RightRailContext task={taskContext} /> : <EmptyState kind="context" copy="Tools and referenced files used in this task appear here." />}</RailSection>
+      <RailSection id="capture" title="Capture">{hasCapture && taskContext && captureContext ? <CapturePanel task={taskContext} capture={captureContext} /> : <EmptyState kind="capture" copy="Import a .rdc file to this project to open and preview it here." />}</RailSection>
     </aside>
   );
 };

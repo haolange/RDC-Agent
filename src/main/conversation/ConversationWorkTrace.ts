@@ -126,6 +126,7 @@ function cloneTrace(trace: ConversationWorkTrace | null | undefined): Conversati
   return trace
     ? {
         ...trace,
+        toolEvidence: trace.toolEvidence ? { ...trace.toolEvidence } : undefined,
         blocks: trace.blocks.map(cloneWorkBlock),
       }
     : {
@@ -202,11 +203,17 @@ export function finalizeTrace(
           }
           return cloned;
         }
+        const terminalToolStatus: ConversationToolCall['status'] = status === 'complete'
+          ? 'skipped'
+          : 'error';
         return {
           ...cloned,
-          status: terminalBlockStatus,
+          status: terminalToolStatus,
           completedAt: toolCall.completedAt ?? terminalAt,
-          error: terminalBlockStatus === 'error'
+          resultPreview: terminalToolStatus === 'skipped'
+            ? (toolCall.resultPreview ?? 'Run completed before this tool call executed.')
+            : toolCall.resultPreview,
+          error: terminalToolStatus === 'error'
             ? (toolCall.error ?? 'Run ended before this tool call completed.')
             : toolCall.error,
           approval: cancelPendingApproval,
@@ -291,7 +298,9 @@ export function upsertRuntimeToolCall(
     });
   }
   syncLoopResultToolIds(block);
-  if (block.toolCalls.length > 0 && block.toolCalls.every((toolCall) => toolCall.status === 'complete' || toolCall.status === 'error')) {
+  if (block.toolCalls.length > 0 && block.toolCalls.every((toolCall) => (
+    toolCall.status === 'complete' || toolCall.status === 'error' || toolCall.status === 'skipped'
+  ))) {
     block.status = block.toolCalls.some((toolCall) => toolCall.status === 'error') ? 'error' : 'complete';
     block.completedAt = nowMs();
     if (block.kind === 'llm_turn') {

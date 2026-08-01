@@ -14,6 +14,8 @@ import {
 
 type PreparationPhase = 'idle' | 'preparing' | 'current' | 'actual';
 
+const METER_UNAVAILABLE = '—';
+
 const ContextBarSegment: React.FC<{
   id: ContextUsageBreakdownId;
   widthPercent: number;
@@ -50,28 +52,28 @@ export const ContextBreakdownPopover: React.FC<{
     (state) => state.setContextBreakdownExpanded,
   );
   const showPrepared = phase === 'current' && prepared !== null;
-  const showActualAsPrimary = (phase === 'actual' || phase === 'idle') && usage !== null;
+  // A new request must not erase the last truthful snapshot before its own
+  // prepared projection arrives. Preparing therefore keeps the same visual
+  // structure and falls back to the previous actual usage when available.
+  const showUsage = !showPrepared && usage !== null;
   const windowTokens = showPrepared
     ? prepared.promptBudgetTokens
-    : showActualAsPrimary
-      ? usage.contextWindowTokens ?? selectedContextWindowTokens ?? 0
-      : selectedContextWindowTokens ?? 0;
+    : usage?.contextWindowTokens ?? selectedContextWindowTokens;
   const occupiedTokens = showPrepared
     ? prepared.preparedInputTokens
-    : showActualAsPrimary
-      ? usage.occupiedTokens
-      : 0;
+    : usage?.occupiedTokens;
   const displayUsagePercent = showPrepared
     ? prepared.usagePercent
-    : showActualAsPrimary
-      ? usage.usagePercent
-      : 0;
+    : usage?.usagePercent;
   const breakdown = showPrepared
     ? prepared.breakdown
-    : showActualAsPrimary
-      ? usage.breakdown ?? []
-      : [];
-  const denom = windowTokens > 0 ? windowTokens : occupiedTokens;
+    : usage?.breakdown ?? [];
+  const hasAuthoritativeBreakdown = showPrepared || Boolean(usage && usage.breakdown !== null);
+  const denom = typeof windowTokens === 'number' && windowTokens > 0
+    ? windowTokens
+    : typeof occupiedTokens === 'number'
+      ? occupiedTokens
+      : 0;
   const pct = (tokens: number): number => (denom > 0 ? (tokens / denom) * 100 : 0);
   const orderedEntries = CONTEXT_BREAKDOWN_ORDER.map((id) => (
     breakdown.find((entry) => entry.id === id) ?? { id, tokens: 0 }
@@ -81,6 +83,16 @@ export const ContextBreakdownPopover: React.FC<{
       && entry.id !== 'free'
       && entry.id !== 'mcp_tools_deferred'
       && entry.id !== 'builtin_tools_deferred',
+  );
+  const summaryCaption = showPrepared
+    ? t('contextBreakdown.currentRequest')
+    : showUsage
+      ? phase === 'actual'
+        ? t('contextBreakdown.actual')
+        : t('contextBreakdown.lastActual')
+      : t('contextBreakdown.noUsageYet');
+  const formatKnownTokens = (value: number | null | undefined): string => (
+    typeof value === 'number' ? formatTokenCount(value) : METER_UNAVAILABLE
   );
 
   React.useEffect(() => {
@@ -120,72 +132,34 @@ export const ContextBreakdownPopover: React.FC<{
           </button>
         </div>
 
-        {phase === 'preparing' ? (
-          <div className="context-breakdown-preparing" data-testid="context-breakdown-preparing">
-            <div className="context-breakdown-status is-pending" role="status">
-              {t('contextBreakdown.preparing')}
-            </div>
-            {selectedContextWindowTokens ? (
-              <span className="context-breakdown-run-stat">
-                {t('contextBreakdown.selectedWindow')} {formatTokenCount(selectedContextWindowTokens)}
+        <div className="context-breakdown-hero">
+          <div className="context-breakdown-hero-row">
+            <div className="context-breakdown-hero-usage">
+              <span className="context-breakdown-pct-large">
+                {typeof displayUsagePercent === 'number' ? `${displayUsagePercent}%` : METER_UNAVAILABLE}
               </span>
-            ) : null}
-          </div>
-        ) : !showPrepared && !showActualAsPrimary ? (
-          <div className="context-breakdown-empty-state">
-            <p className="context-breakdown-empty">{t('contextBreakdown.noUsageYet')}</p>
-            {selectedContextWindowTokens ? (
-              <span className="context-breakdown-run-stat">
-                {t('contextBreakdown.selectedWindow')} {formatTokenCount(selectedContextWindowTokens)}
-              </span>
-            ) : null}
-          </div>
-        ) : (
-          <div className="context-breakdown-hero">
-            <div className="context-breakdown-hero-row">
-              <div className="context-breakdown-hero-usage">
-                <span className="context-breakdown-pct-large">{displayUsagePercent}%</span>
-                <span className="context-breakdown-summary-caption">
-                  {showPrepared
-                    ? t('contextBreakdown.currentRequest')
-                    : phase === 'actual'
-                      ? t('contextBreakdown.actual')
-                      : t('contextBreakdown.lastActual')}
-                </span>
-              </div>
-              <span className="context-breakdown-hero-tokens">
-                {showPrepared ? '~' : ''}{formatTokenCount(occupiedTokens)} / {formatTokenCount(windowTokens)}{' '}
-                {t('contextBreakdown.tokensLabel')}
-              </span>
+              <span className="context-breakdown-summary-caption">{summaryCaption}</span>
             </div>
-            <div className="context-breakdown-bar" aria-hidden="true">
-              {barEntries.map((entry) => (
-                <ContextBarSegment
-                  key={entry.id}
-                  id={entry.id}
-                  widthPercent={pct(entry.tokens)}
-                  title={`${t(SEGMENT_LABEL_KEYS[entry.id])} · ${formatTokenCount(entry.tokens)}`}
-                />
-              ))}
-            </div>
-            {showPrepared ? (
-              <div className="context-breakdown-projection-meta">
-                <span>{t('contextBreakdown.completeWindow')} {formatTokenCount(prepared.contextWindowTokens)}</span>
-                <span>{prepared.contextMode === 'one-million' ? t('contextBreakdown.oneMillionMode') : t('contextBreakdown.normalMode')}</span>
-                {prepared.compactionApplied ? <span className="is-warning">{t('contextBreakdown.compactionApplied')}</span> : null}
-                {prepared.filteredArtifactCount > 0 ? (
-                  <span>{t('contextBreakdown.filteredArtifacts', { count: prepared.filteredArtifactCount })}</span>
-                ) : null}
-              </div>
-            ) : null}
+            <span className="context-breakdown-hero-tokens">
+              {showPrepared ? '~' : ''}{formatKnownTokens(occupiedTokens)} / {formatKnownTokens(windowTokens)}{' '}
+              {t('contextBreakdown.tokensLabel')}
+            </span>
           </div>
-        )}
+          <div className="context-breakdown-bar" aria-hidden="true">
+            {barEntries.map((entry) => (
+              <ContextBarSegment
+                key={entry.id}
+                id={entry.id}
+                widthPercent={pct(entry.tokens)}
+                title={`${t(SEGMENT_LABEL_KEYS[entry.id])} · ${formatTokenCount(entry.tokens)}`}
+              />
+            ))}
+          </div>
+        </div>
 
-        {showPrepared || showActualAsPrimary ? (
-          <ContextRunMeterBand usage={usage} prepared={showPrepared ? prepared : null} />
-        ) : null}
+        <ContextRunMeterBand usage={showUsage ? usage : null} prepared={showPrepared ? prepared : null} />
 
-        {showActualAsPrimary && usage && (usage.cost || typeof usage.cumulativeCost === 'number') ? (
+        {showUsage && usage && (usage.cost || typeof usage.cumulativeCost === 'number') ? (
           <div className="context-breakdown-run-meter" data-testid="context-breakdown-cost">
             <h3 className="context-breakdown-run-col-title">{t('contextBreakdown.costColumn')}</h3>
             <div className="context-breakdown-meter-stats">
@@ -209,27 +183,25 @@ export const ContextBreakdownPopover: React.FC<{
           </div>
         ) : null}
 
-        {breakdown.length > 0 ? (
-          <button
-            type="button"
-            className={`context-breakdown-details-toggle${detailsExpanded ? ' is-expanded' : ''}`}
-            aria-expanded={detailsExpanded}
-            aria-controls="context-breakdown-details"
-            aria-label={detailsExpanded ? t('contextBreakdown.detailsCollapseAria') : t('contextBreakdown.detailsExpandAria')}
-            onClick={() => { void setContextBreakdownExpanded(!detailsExpanded); }}
-          >
-            <span className={`context-breakdown-details-chevron${detailsExpanded ? ' is-expanded' : ''}`} aria-hidden="true">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 6l6 6-6 6" />
-              </svg>
-            </span>
-            <span className="context-breakdown-details-label">{t('contextBreakdown.detailsLabel')}</span>
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className={`context-breakdown-details-toggle${detailsExpanded ? ' is-expanded' : ''}`}
+          aria-expanded={detailsExpanded}
+          aria-controls="context-breakdown-details"
+          aria-label={detailsExpanded ? t('contextBreakdown.detailsCollapseAria') : t('contextBreakdown.detailsExpandAria')}
+          onClick={() => { void setContextBreakdownExpanded(!detailsExpanded); }}
+        >
+          <span className={`context-breakdown-details-chevron${detailsExpanded ? ' is-expanded' : ''}`} aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </span>
+          <span className="context-breakdown-details-label">{t('contextBreakdown.detailsLabel')}</span>
+        </button>
 
-        {breakdown.length > 0 && detailsExpanded ? (
+        {detailsExpanded ? (
           <div id="context-breakdown-details" className="context-breakdown-details">
-            <ContextBreakdownLegend entries={orderedEntries} />
+            <ContextBreakdownLegend entries={breakdown} unavailable={!hasAuthoritativeBreakdown} />
           </div>
         ) : null}
 

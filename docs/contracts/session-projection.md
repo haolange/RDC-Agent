@@ -37,14 +37,15 @@ interface ActiveTurnContext {
   sessionId: string;
   projectId: string | null;
   requestId: string;
+  agentId: AgentId;
   optimisticTurnId: string | null;
   realTurnId: string | null;
 }
 ```
 
-- Session 切换时清空 context 与 `isPromptSending`。
+- Session 切换时清空 context 与 `isPromptSending`；Agent 运行态只读取当前 context 的 `agentId`，禁止扫描历史 draft/streaming 消息推断。
 - Stop 只读当前 session 的 context；禁止依赖跨 session 的 stale `activeRequestIdRef`。
-- Monotonic stop 以 **`requestId` 为主**、`turnId` 为辅：optimistic → real turnId 替换后，已停止的 request 仍拒绝迟到 `draft`/`streaming` patch。
+- Send、Rewrite、Stop 与运行中菜单状态都按 `sessionId + requestId + agentId` 投影。Monotonic stop 以 **`requestId` 为主**、`turnId` 为辅：optimistic → real turnId 替换后，已停止的 request 仍拒绝迟到 `draft`/`streaming` patch。
 
 ## Session 切换 Hygiene
 

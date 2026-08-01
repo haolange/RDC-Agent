@@ -95,6 +95,10 @@ const interactionPerformanceProbe = fs.readFileSync(
   path.join(repoRoot, 'src/renderer/platform/performance/InteractionPerformanceProbe.ts'),
   'utf8',
 );
+const composerAgentMenu = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/features/debugger/composer/ComposerAgentMenu.tsx'),
+  'utf8',
+);
 
 const requireCssContract = (condition, message) => {
   if (condition) return;
@@ -144,18 +148,24 @@ requireCssContract(
 requireCssContract(
   contextBreakdownPopover.includes("t('contextBreakdown.currentRequest')")
     && contextBreakdownPopover.includes("t('contextBreakdown.lastActual')")
-    && contextBreakdownPopover.includes('prepared.compactionApplied')
-    && contextBreakdownPopover.includes("phase === 'actual' || phase === 'idle'")
-    && contextBreakdownPopover.includes('data-testid="context-breakdown-preparing"')
+    && contextBreakdownPopover.includes("t('contextBreakdown.noUsageYet')")
+    && contextBreakdownPopover.includes('const showUsage = !showPrepared && usage !== null;')
+    && contextBreakdownPopover.includes('className="context-breakdown-hero"')
+    && contextBreakdownPopover.includes('className="context-breakdown-bar"')
     && contextBreakdownPopover.includes('prepared={showPrepared ? prepared : null}')
+    && contextBreakdownPopover.includes('usage={showUsage ? usage : null}')
+    && contextBreakdownPopover.includes('unavailable={!hasAuthoritativeBreakdown}')
+    && !contextBreakdownPopover.includes('context-breakdown-preparing')
+    && !contextBreakdownPopover.includes('context-breakdown-empty-state')
     && !contextBreakdownPopover.includes('showWindowPercent')
     && !contextBreakdownPopover.includes('context-breakdown-meter-eyebrow')
     && !contextBreakdownPopover.includes('context-breakdown-runtime')
     && contextRunMeterBand.includes('const metricUsage = isCurrent ? null : usage;')
-    && contextRunMeterBand.includes("data-phase={isCurrent ? 'current' : 'actual'}")
+    && contextRunMeterBand.includes("data-phase={isCurrent ? 'current' : usage ? 'actual' : 'unavailable'}")
     && (contextRunMeterBand.match(/data-testid="context-breakdown-run-meter"/g) || []).length === 1,
-  'Context popover must keep one phase authority: Preparing has no usage meter; Current renders its fixed prepared Tokens/Cache/Reasoning strip without historical provider telemetry; Actual/Last actual use one real-usage strip and internal runtime diagnostics stay absent.',
-);requireCssContract(
+  'Context popover must keep one visual structure: Current renders the prepared Tokens/Cache/Reasoning strip; Preparing retains the last truthful usage when available; no telemetry remains explicit as unavailable; internal runtime diagnostics stay absent.',
+);
+requireCssContract(
   interactionPerformanceProbe.includes("get(PERFORMANCE_QUERY_KEY) !== '1') return")
     && interactionPerformanceProbe.includes("PerformanceObserver.supportedEntryTypes.includes('event')")
     && interactionPerformanceProbe.includes('durationThreshold: EVENT_TIMING_THRESHOLD_MS')
@@ -164,6 +174,23 @@ requireCssContract(
     && !interactionPerformanceProbe.includes('window.setTimeout')
     && interactionPerformanceProbe.includes('data-rdc-qa-performance'),
   'Composer performance QA must remain query-gated and expose native Event Timing click-to-next-paint plus long-task metrics without timer/RAF proxies.',
+);
+
+requireCssContract(
+  composerAgentMenu.includes("isSelected ? ' is-selected' : ''")
+    && composerAgentMenu.includes("isRunning ? ' is-running' : ''")
+    && composerAgentMenu.includes('role="menuitemradio"')
+    && composerAgentMenu.includes('aria-checked={isSelected}')
+    && composerAgentMenu.includes("t('chat.workProcessStatusRunning')")
+    && composerAgentMenu.includes('composer-agent-menu-item-running-state')
+    && composerAgentMenu.includes('composer-agent-menu-item-running-dot')
+    && composerAgentMenu.includes('composer-agent-menu-item-check')
+    && appShellCss.includes('.composer-agent-menu-item.is-selected')
+    && cssBlock(appShellCss, '.composer-agent-menu-item-running-dot').includes('width: var(--space-2);')
+    && cssBlock(appShellCss, '.composer-agent-menu-item-running-dot').includes('height: var(--space-2);')
+    && appShellCss.includes('@media (prefers-reduced-motion: reduce)')
+    && appShellCss.includes('.composer-agent-menu-item-running-dot {\n    animation: none;'),
+  'Agent menu must keep selected and session-scoped running states separate, accessible, compact, localized, and reduced-motion safe.',
 );
 
 console.log(

@@ -9,7 +9,7 @@ The agent runtime owns agent turns, tool mediation policy, deterministic events,
 - Provider adapters format model requests and stream model responses. They do not decide product mode, workflow stage, approval state, tool policy, or final run status.
 - Agent route capability gates tool registration before each turn. Only `native-structured` routes receive tool schemas and enter the tool execution loop.
 - Prompt composition lives in `src/main/agent-runtime/prompt`. Conversation code collects context, but does not hand-code provider/tool prompt fragments.
-- Ask mode is read-only. It may use `read_file`, `glob`, `grep`, `task_list`, `tool_search`, `web_fetch`, and `web_search`, but it must not request shell, write, edit, remove, task mutation (`task_create` / `task_update` / `task_stop`), or RenderDoc mutation.
+- Ask mode is read-only. It may use `read_file`, `glob`, `grep`, `task_list`, `task_get`, `tool_search`, `web_fetch`, and `web_search`, but it must not request shell, write, edit, remove, task mutation (`task_create` / `task_update` / `task_stop`), or RenderDoc mutation. Plan/Edit only receive writable Tasks language when their frozen route-effective tools actually contain those mutation tools.
 - Debugger, Analyzer, and Optimizer execution may use shell access through their runtime profiles. RDX-specific app entries are mediated by Settings shell actions and `ShellInvocationService`.
 - No RDC-specific bridge, MCP server, or skill registry is injected as a hidden default tool path.
 - Assistant text is never parsed as an executable tool call. Textual tool-call shaped output produces a diagnostic event only.
@@ -28,7 +28,15 @@ General agent tools are mediated by `AgentPermissionPolicy` before execution. Th
 
 ## Deferred Tool Loading（core/extended 分层）
 
-`native-structured` 路由按 tier 注入工具 schema：`BUILTIN_AGENT_TOOL_TIERS` 中的 core builtin 每请求常驻注入且顺序稳定（保 prompt cache 前缀）；extended builtin 与 `mcp__*` 工具默认 deferred——保留在执行器 `toolMap` 中可执行，但不进入 provider tools 列表，发现入口为 `tool_search`（只搜索 allowlist + runtime policy 过滤后的工具集）与 `mcp` catalog 工具。激活途径有二：`tool_search` 结果命中 deferred 工具（结果文本已含完整 schema），或模型直接调用未注入的 deferred 工具（fail-open 执行并顺带激活）。激活集按 `session::agent` + 全量工具签名保存在 orchestrator（`partitionDeferredTools`，`src/main/workflow/debugger/deferredTools.ts`），激活后经 `Agent.setTools` 原地更新共享 tools 引用，激活 schema 按激活顺序追加在 core 前缀之后，同 turn 内下一次 LLM 调用即携带；全量工具集合变化时激活集重置。`RequestEnvelopeSnapshot.tools` 始终反映实际发送集；context breakdown 以 `mcp_tools_deferred` / `builtin_tools_deferred` 报告未激活估算量。契约由 `pnpm run check:tool-system` 静态校验。
+`native-structured` 路由按 tier 注入工具 schema：`BUILTIN_AGENT_TOOL_TIERS` 中的 core builtin 每请求常驻注入且顺序稳定（保 prompt cache 前缀）；extended builtin 与 `mcp__*` 工具默认 deferred——保留在执行器 `toolMap` 中可执行，但不进入 provider tools 列表，发现入口为 `tool_search`（只搜索 allowlist + runtime policy 过滤后的工具集）与 `mcp` catalog 工具。只有 `tool_search` 命中可激活 deferred 工具；直接调用未激活 deferred 工具 fail-closed 返回 `TOOL_NOT_ACTIVATED`。Tasks 是显式例外：在 Agent 角色过滤完成后，冻结计划预激活其已获准的 Tasks 工具，Ask 仅可读，Plan/Edit 可按各自 policy 获得 mutation。激活集按 `session::agent` + 全量工具签名保存在 orchestrator（`partitionDeferredTools`，`src/main/workflow/debugger/deferredTools.ts`），激活后经 `Agent.setTools` 原地更新共享 tools 引用，激活 schema 按激活顺序追加在 core 前缀之后，同 turn 内下一次 LLM 调用即携带；全量工具集合变化时激活集重置。`RequestEnvelopeSnapshot.tools` 始终反映实际发送集；context breakdown 以 `mcp_tools_deferred` / `builtin_tools_deferred` 报告未激活估算量。契约由 `pnpm run check:tool-system` 静态校验。
+
+`tool_search` 对最终 effective tool set 做权威搜索。空结果返回结构化 `NO_MATCH_IN_EFFECTIVE_TOOL_SET`、`authoritative: true` 和 tool-set fingerprint；同一 fingerprint 下重复相同搜索不能得到新工具。text-only route 在 `PromptPlanBuilder` 中得到空工具集，Prompt 明确禁止把 tool-call-shaped 文本当作调用，也禁止反复搜索本轮不存在的工具。
+
+## Loop Progress 与终止
+
+`LoopProgressGuard` 在每次工具结果回灌后构建稳定指纹：有序工具名、规范化参数、成功/失败、语义结果和 `LoopRuntimeState.revision`；call id、时间戳与耗时不参与。第二个连续相同指纹只为下一次 LLM 请求追加一次易失 `<runtime_no_progress>` 指令，第三次仍相同抛出 `AGENT_NO_PROGRESS`。任一参数、结果或 revision 变化都复位计数。
+
+Agent 达到 `maxTurns` 时，只有已经获得 canonical final 才能正常完成；若 Provider 仍要求 continuation，则抛出 `AGENT_MAX_TURNS_EXCEEDED`。Conversation 分别映射为 `CONVERSATION_AGENT_LOOP_STALLED` 与 `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`，和 `CONVERSATION_LLM_REQUEST_FAILED` 互斥。Work Process 的完成摘要由真实 tool result 统计成功、失败、跳过，模型自述不能覆盖 runtime 证据。
 
 ## Provider Event Normalization
 
@@ -39,6 +47,7 @@ Provider-private protocols are normalized before reaching Conversation or Work P
 - Gemini and Ollama map native function/tool call responses into the same event contract.
 - GitLab Duo and SAP AI Core use the shared AI SDK streaming bridge only after a dedicated adapter has resolved their native authentication and route. The bridge verifies the frozen `RequestPlan.effectiveModelId`, forwards its closed wire patch, and normalizes text, reasoning, tool calls, usage, abort, and terminal state without re-reading Settings.
 - Tool execution emits `tool.started` and `tool.completed` from the runtime, not from frontend inference.
+- Work Process result summaries are reduced from those runtime completions; a recoverable tool failure remains visible and cannot be rewritten into an all-success product status by assistant prose.
 - Route capability diagnostics use structured `code + severity + message + surface`: unverified native tools are runtime-log-only `info`, explicit unsupported is a Work Process `warning`, and unavailable/disabled routes are Work Process `error`. Textual tool calls and empty no-tool responses remain diagnostics, never executable tool evidence.
 
 Work Process renders these normalized events only. It must not infer reasoning, tools, or results from the assistant body.

@@ -988,6 +988,8 @@ assert(!i18nSource.includes('workProcessInternalReasoning'), 'i18n must not keep
 assert(!cssSource.includes('.work-process-reasoning-indicator'), 'CSS must not keep CoT placeholder styles');
 assert(presentationSource.includes('getToolFamily'), 'tool projection should map tools onto unified card families');
 assert(presentationSource.includes('actionCount'), 'presentation should expose actionCount for top-level transcript meta');
+assert(!componentSource.includes('chat.workProcessToolEvidence'), 'Work Process must not render a redundant succeeded/failed/skipped aggregate');
+assert(!i18nSource.includes('chat.workProcessToolEvidence'), 'redundant Work Process tool aggregate copy must be removed');
 assert(presentationSource.includes("normalized.startsWith('mcp__')"), 'dynamic MCP wildcard should have a semantic display path');
 assert(presentationSource.includes("label: status === 'streaming' || isActiveBlock"), 'thinking labels should branch on active vs settled state');
 assert(presentationSource.includes('resolveSettledThinkingLabel'), 'settled thinking should resolve Thought-for labels centrally');

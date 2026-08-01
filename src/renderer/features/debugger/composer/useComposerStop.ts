@@ -1,5 +1,4 @@
 import { useCallback, type Dispatch, type SetStateAction } from 'react';
-import type { ConversationMessage } from '@shared/types/conversation';
 import type { RunSummary, SessionRecord } from '@shared/types/session';
 import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
 import { useSessionStore } from '../../../stores/sessionStore';
@@ -8,15 +7,18 @@ import type { useI18n } from '../../../i18n';
 import { removeOptimisticConversationMessages } from './composerSendHelpers';
 import {
   restoreLastSentIfCurrentSession,
+  type ActiveTurnOwnership,
   useComposerSessionContextStore,
 } from './composerSessionContext';
 import { stopWorkTrace } from './stopWorkTrace';
+import {
+  ACTIVE_ASSISTANT_STATUSES,
+  selectActiveAssistantForTurn,
+} from './composerStopSelection';
 
 export { stopWorkTrace };
 
 type Translate = ReturnType<typeof useI18n>['t'];
-
-const ACTIVE_ASSISTANT_STATUSES = new Set<ConversationMessage['status']>(['draft', 'streaming']);
 
 export function useComposerStop(options: {
   showNotice: (message: string) => void;
@@ -45,21 +47,23 @@ export function useComposerStop(options: {
     try {
       useComposerSessionContextStore.getState().setIsPromptSending(false);
       const activeTurn = useComposerSessionContextStore.getState().activeTurn;
-      const requestId = (
+      const turnOwnership: ActiveTurnOwnership | null = (
         activeTurn
-        && activeTurn.sessionId === currentSession?.sessionId
-          ? activeTurn.requestId
+        && activeTurn.sessionId === (currentSession?.sessionId ?? 'no-session')
+          ? {
+            sessionId: activeTurn.sessionId,
+            requestId: activeTurn.requestId,
+            agentId: activeTurn.agentId,
+          }
           : null
       );
+      const requestId = turnOwnership?.requestId ?? null;
       const conversation = useConversationStore.getState();
-      const activeAssistant = conversation.conversationMessages
-        .slice()
-        .reverse()
-        .find((message) => (
-          message.role === 'assistant'
-          && ACTIVE_ASSISTANT_STATUSES.has(message.status)
-          && (!currentSession?.sessionId || message.sessionId === currentSession.sessionId)
-        ));
+      const activeAssistant = selectActiveAssistantForTurn(
+        conversation.conversationMessages,
+        currentSession?.sessionId,
+        activeTurn,
+      );
 
       // Optimistic stop for both preparing (optimistic-turn-*) and committed streaming turns.
       if (activeAssistant) {
@@ -123,7 +127,9 @@ export function useComposerStop(options: {
         }
         useSessionStore.getState().setPreparedTurnContext(null);
         useSessionStore.getState().setConversationPreparationPhase('idle');
-        useComposerSessionContextStore.getState().clearActiveTurn();
+        if (turnOwnership) {
+          useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
+        }
         if (workflowStopPromise) {
           void workflowStopPromise.catch(() => undefined);
         }
@@ -132,14 +138,11 @@ export function useComposerStop(options: {
       }
 
       const latestConversation = useConversationStore.getState();
-      const latestActiveAssistant = latestConversation.conversationMessages
-        .slice()
-        .reverse()
-        .find((message) => (
-          message.role === 'assistant'
-          && ACTIVE_ASSISTANT_STATUSES.has(message.status)
-          && (!currentSession?.sessionId || message.sessionId === currentSession.sessionId)
-        ))
+      const latestActiveAssistant = selectActiveAssistantForTurn(
+        latestConversation.conversationMessages,
+        currentSession?.sessionId,
+        activeTurn,
+      )
         ?? (activeAssistant && ACTIVE_ASSISTANT_STATUSES.has(activeAssistant.status) ? activeAssistant : null);
 
       const stopRequestId = requestId
@@ -158,7 +161,9 @@ export function useComposerStop(options: {
       }
 
       if (cancelResult.success) {
-        useComposerSessionContextStore.getState().clearActiveTurn();
+        if (turnOwnership) {
+          useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
+        }
       }
 
       // Do not block notice on workflow stop latency.

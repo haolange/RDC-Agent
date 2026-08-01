@@ -93,6 +93,28 @@ assert(
 );
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const effortPopupSource = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/features/debugger/composer/EffortControlPopup.tsx'),
+  'utf8',
+);
+const effortMaxFieldSource = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/features/debugger/composer/EffortMaxField.tsx'),
+  'utf8',
+);
+assert(
+  !effortPopupSource.includes("'--composer-effort-stops-opacity'"),
+  'Effort popup must not compete with the Max animation for stop opacity ownership',
+);
+assert(
+  effortMaxFieldSource.includes(
+    "assignDynStyle(host, { '--composer-effort-stops-opacity': stopsOpacity.toFixed(3) })",
+  ),
+  'Max animation must own stop opacity frame delivery',
+);
+assert(
+  effortMaxFieldSource.includes('clearDynStyle(host)'),
+  'Max animation must release imperative stop opacity on cleanup',
+);
 assert(!fs.existsSync(path.join(repoRoot, 'src/renderer/styles/themes/oklch-themes.css')), 'legacy oklch-themes.css must be removed');
 assert(!fs.existsSync(path.join(repoRoot, 'src/renderer/styles/tokens/index.css')), 'legacy styles/tokens dual track must be removed');
 

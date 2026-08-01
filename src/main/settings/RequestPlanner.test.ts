@@ -102,6 +102,31 @@ describe('planModelRequest', () => {
     });
   });
 
+  it('keeps conditional provider headers out of the request body', () => {
+    const base = model({
+      controls: {
+        ...model().controls,
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
+      },
+      executionBindings: [{
+        id: 'fast:anthropic-speed',
+        when: { fast: true },
+        actions: [
+          { kind: 'request-patch', patch: { speed: 'fast' } },
+          { kind: 'request-headers', headers: { 'anthropic-beta': 'fast-mode-2026-02-01' } },
+        ],
+        entitlement: 'granted',
+      }],
+    });
+
+    const result = planModelRequest({ model: base, catalogModels: [base], controls: { fastModel: true } });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.headers).toEqual({ 'anthropic-beta': 'fast-mode-2026-02-01' });
+    expect(result.plan.bodyPatch).toEqual({ speed: 'fast' });
+    expect(result.plan.bodyPatch).not.toHaveProperty('headers');
+  });
+
   it('applies an unconditional route parameter policy without inventing a UI control', () => {
     const base = model({
       executionBindings: [{

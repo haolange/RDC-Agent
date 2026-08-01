@@ -50,7 +50,10 @@ const preparedUsageContext = (turnId: string): PreparedTurnContextSummary => ({
   cache: { enabled: false, mode: 'none', keyCarrier: 'none', breakpointCarrier: 'none', ttl: 'none', breakpoint: 'none', stableTokenEstimate: 0, stableSegmentCount: 0, providerReported: false, reason: 'test' },
 });
 
-const usageSnapshot = (runId: string): RunContextUsageSummary => ({
+const usageSnapshot = (
+  runId: string,
+  overrides: Partial<RunContextUsageSummary> = {},
+): RunContextUsageSummary => ({
   runId,
   providerId: 'provider-a',
   modelId: 'model-a',
@@ -62,6 +65,7 @@ const usageSnapshot = (runId: string): RunContextUsageSummary => ({
   occupiedTokens: 20,
   breakdown: [],
   snapshotAt: 20,
+  ...overrides,
 });
 describe('sessionProjectionStore', () => {
   beforeEach(() => {
@@ -125,7 +129,7 @@ describe('sessionProjectionStore', () => {
     useSessionProjectionStore.getState().evictSession('session-a');
     expect(useSessionProjectionStore.getState().activateSession('session-a')).toBe(false);
   });
-  it('keeps terminal background usage for its owner session and drops another turn', () => {
+  it('accepts the prepared turn usage when its durable run id differs from the conversation turn id', () => {
     const session = useSessionStore.getState();
     session.setPreparedTurnContext(preparedUsageContext('turn-a'));
     session.setConversationPreparationPhase('current');
@@ -134,21 +138,24 @@ describe('sessionProjectionStore', () => {
 
     const projection = useSessionProjectionStore.getState();
     projection.projectConversationTerminal('session-a', 'turn-a', true);
-    projection.projectRunUsage('session-a', usageSnapshot('turn-a'), null);
+    projection.projectRunUsage('session-a', usageSnapshot('run-a'), null);
 
     expect(projection.activateSession('session-a')).toBe(true);
     expect(useSessionStore.getState()).toMatchObject({
       conversationPreparationPhase: 'idle',
       preparedTurnContext: null,
-      lastKnownUsage: expect.objectContaining({ runId: 'turn-a' }),
+      lastKnownUsage: expect.objectContaining({ runId: 'run-a' }),
     });
+  });
 
+  it('drops a stale background usage snapshot from before the prepared turn', () => {
+    const projection = useSessionProjectionStore.getState();
     const active = useSessionStore.getState();
     active.clearUsageSnapshot();
     active.setPreparedTurnContext(preparedUsageContext('turn-b'));
     active.setConversationPreparationPhase('current');
     projection.captureActiveSession('session-b');
-    projection.projectRunUsage('session-b', usageSnapshot('turn-a'), null);
+    projection.projectRunUsage('session-b', usageSnapshot('run-a', { snapshotAt: 5 }), null);
 
     expect(useSessionProjectionStore.getState().bySessionId['session-b']?.contextUsage.lastKnownUsage).toBeNull();
   });

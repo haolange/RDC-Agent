@@ -54,10 +54,11 @@
 | `TurnCoordinator` / `TurnHandle` | `src/main/workflow/debugger/` | 每 session 活跃 turn；generation 丢弃迟到 event |
 | `ShutdownCoordinator` | `src/main/lifecycle/` | before-quit 限时 shutdownAll |
 | `EffectiveRuntimePlan` | `src/main/agent-runtime/` | `schemaVersion: 2`；`prepareTurn` 完整冻结；Prompt 与 Executor 共用 |
+| `LoopProgressGuard` / `AgentLoopTerminationError` | `src/main/agent-runtime/agent/` | 第二轮相同工具结果注入不落盘纠偏；第三轮 `AGENT_NO_PROGRESS`；仍需 continuation 的 max-turn 抛 `AGENT_MAX_TURNS_EXCEEDED`，不得静默完成或误报 Provider failure |
 | `AgentOrchestrator` | `src/main/workflow/debugger/AgentOrchestrator.ts` | façade 少于 800 行；职责外提；`pnpm run check:orchestrator-facade` |
 | `RdxRuntimeContextRegistry` | `src/main/sessions/` | **仅** per-session lease；禁止 `legacyGlobalMirror` / `getRdxRuntimeContext` |
-| Session Projection | `src/renderer/stores/sessionProjectionStore.ts` + `sessionEventGate` | 仅投影 `currentSession`；IPC 事件须 gate；后台 cache；Composer restore / Stop monotonic 绑 session+`requestId`；`pnpm run check:session-projection` |
-| `bridgeSecurity` | `src/main/browserAppBridge/` | **仅** `RDC_AGENT_BROWSER_QA=1`；bearer + Origin + allowlist；敏感 channel 永久 deny |
+| Session Projection | `src/renderer/stores/sessionProjectionStore.ts` + `sessionEventGate` | 仅投影 `currentSession`；IPC 事件须 gate；后台 cache；Composer restore / Stop / Agent 运行态绑 `sessionId + requestId + agentId`；`pnpm run check:session-projection` |
+| `bridgeSecurity` | `src/main/browserAppBridge/` | **仅** `RDC_AGENT_BROWSER_QA=1`；bearer + Origin + canonical renderer channel + 已注册 handler；未知/内部/明文 secret channel fail-closed |
 | `McpTrustService` | `src/main/settings/` | project 不可覆盖 user executable；needsRetrust |
 | IPC Zod | `src/main/ipc/validation/` | **全量** handler `parseIpcArgs`；approvalToken 单次消费 |
 | `BashAstAnalyzer` | `src/main/agent-runtime/permissions/` | 风险分类器**不是**安全边界；PermissionPolicy 才是 |
@@ -79,51 +80,23 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 
 ## 设计系统约束（agent 写 CSS 必读）
 
-**权威文件**：`DESIGN.md` Authority Map + `docs/ui/design-system.md` 与 Appearance 双体系章节。本节是快速执行摘要。
+**权威文件**：[`docs/ui/design-system.md`](docs/ui/design-system.md)（Token / 按钮 / 颜色 / 组件规则 / 视觉参考）。本节仅保留高层原则。
 
-### Token 使用规则
-
-- **必须**引用语义 token（`--token-*`），禁止在组件 CSS 中直接用 primitive token（`--color-bg-3`、`rgb(var(--color-accent-500))` 等）。
-- `--token-*` 完整定义在 `src/renderer/styles/design-system.css` 的 "Semantic Token Layer" 部分。
-- 边框 token 已内含 alpha，使用方式为 `rgb(var(--color-border-subtle))`，**禁止**追加额外 alpha：`rgb(var(--color-border-subtle) / 0.65)` 是无效 CSS。
-- 字号必须用 `var(--text-*)` 变量，**禁止** px 字面值。
-- 间距必须用 `var(--space-*)` 变量，**禁止**奇数像素值（3px、7px、9px）。
-
-### 按钮规则
-
-- 全局唯一按钮系统：`.button`（基类） + `.button-primary / button-secondary / button-ghost / button-danger`，定义在 `panels-composer.css`。
-- React 层用 `<Button variant="primary|secondary|ghost|danger" size="sm|md|lg">`（`src/renderer/ui/Button.tsx`）。
-- **禁止**新增第三套按钮类名，禁止在 feature CSS 中重复定义按钮样式。
-
-### 颜色使用规则
-
-- 强调色（`--color-accent-*`）只用于：焦点环、激活状态、主要 CTA（非 Composer）。不得用于正文、装饰或多处背景。全局 accent 来自 Appearance chrome 编译，不接管 Composer。
-- 状态色（success / warning / error / info）只用于语义状态，不得挪作装饰。
-- **双体系**：全局 chrome（`chromeThemes.light|dark` → `ThemeChromeCompiler`）驱动 shell/Settings/transcript；Composer 第二套由当前 agent 的 `.agent.md` `accent` 派生 `--composer-mode-accent` 与 `--composer-effort-*`（边框流光、边缘泛光、mode pill、send、Effort/Max 滑条、Max 字色、Max mode / Fast 开关开态、`2x`/`Fast` pill）。禁止这些 compose 控件再读 `--token-border-focus` 或裸 `--token-effort-*` 作为唯一色源。Light/Dark 只调制 compose 派生色的亮度，不替换色相来源。`--token-effort-*` 仅为 compose 变量缺省回退，禁止挪作其它装饰或背景。
-- Agent accent 必须可配置（`.agent.md` + Settings → Agents GUI）；`AGENT_SEED_ACCENTS` 仅用于 builtin seed 初值，不是运行时权威。
-- `--token-context-*` 色阶专用于 Context breakdown 弹窗的分段条与图例色点，不得挪作其它装饰或背景。
-- 不得引入非 design-system.css / ThemeChromeCompiler 定义的新颜色；需要新颜色时先在 `--token-*` 或 chrome 编译层添加并说明用途。
-
-### 新增组件规则
-
-每个新组件必须：
-1. 覆盖所有交互状态：rest / hover / active / focus / disabled（按需加 loading / error）。
-2. 通过 CSS 变量控制 variant，不得在选择器里硬编码颜色。
-3. 不使用内联 `style={{}}`，动态值（宽度百分比、JS 计算值）例外。
-4. 文件行数不超过 300 行（组件）/ 200 行（hook / service）。
-
-### 视觉参考
-
-`designs/rdc-agent-design-system/Design System Preview.html`——在浏览器打开，可交互查看所有 token、组件规范和完整 dark/light 两套主题展示。写新组件前应先参考对应 section。
+- **必须**引用语义 token（`--token-*`），禁止直接用 primitive token；字号用 `var(--text-*)`，间距用 `var(--space-*)`。
+- 全局唯一按钮系统：`.button` + variant 修饰类；React 层用 `<Button>`。
+- 颜色双体系：全局 chrome vs Composer agent accent；详见 [`docs/ui/design-system.md`](docs/ui/design-system.md) 与 [`docs/ui/appearance-checklist.md`](docs/ui/appearance-checklist.md)。
+- 新组件必须覆盖所有交互状态、通过 CSS 变量控制 variant、不使用内联 style、文件行数 ≤300/200。
+- 视觉参考：`designs/rdc-agent-design-system/Design System Preview.html`。
 
 ## 浏览器真实会话边界
 
 - agent 日常 UI/功能验证默认使用 headless Browser QA：`pnpm run start:agent-browser`（`RDC_AGENT_HEADLESS=1` + `RDC_AGENT_BROWSER_QA=1`），再用主进程日志输出的 **`http://127.0.0.1:<port>/qa`** 打开同一套 renderer（`/qa` Set-Cookie 后进干净 `/app`）。**优先 `/qa`**；勿把截断的长 `?rdcBridgeToken=` URL 当验过了——白屏若是 Pretty-print JSON，即为 **401 Unauthorized**。
 - 浏览器真实会话通过 localhost bridge 连接真实 `main process`、workspace、settings、LLM runtime、事件流和已配置的 RDX CLI invoker；不得新增渲染层本地样本或演示场景作为验收入口。
-- Bridge 为 **debug-only** 安全边界（`bridgeSecurity`）：非 `RDC_AGENT_BROWSER_QA=1` 不得启动；**不进 release 默认路径**；敏感 channel 永久 deny；与桌面 preload 共享 handler registry，但 allowlist 更窄。矩阵见 `docs/architecture/browser-qa-surface.md`。
-- Electron 窗口仍通过 `preload -> IPC` 进入主进程；浏览器真实会话通过 `localhost bridge -> IPC handler registry` 进入主进程。两条路径必须共享同一套 main/runtime 能力（QA 工作台主路径对齐，非全 IPC 镜像）。
+- Bridge 为 **debug-only** 安全边界（`bridgeSecurity`）：非 `RDC_AGENT_BROWSER_QA=1` 不得启动，且**不进 release 默认路径**。Browser 与 Desktop 必须共用 `src/shared/renderer-api` 的唯一 `ElectronAPI` 工厂、channel manifest 与 main handler registry；所有 preload 公开产品能力均保持 parity，未知/内部/未注册 channel 及不存在的明文 secret 读取 fail-closed。矩阵见 `docs/architecture/browser-qa-surface.md`。
+- Electron 窗口通过 `preload -> IPC transport` 进入主进程；浏览器真实会话通过 `localhost HTTP/SSE transport -> IPC handler registry` 进入主进程。除 transport 与原生窗口容器外，两条路径的 API、状态、持久化与审批语义必须一致，禁止恢复手写 Browser API、拒绝桩或第二套 channel 规则。
 - 涉及 UI/UX、布局、消息流、状态展示、样式、面板可达性的改动，优先用浏览器真实会话和内置浏览器点击/截图验证。
-- 产品级浏览器评审必须至少覆盖：Workbench 初始状态、Project/Session 入口、`.rdc` 导入或打开状态、Settings > Providers、Settings > Agents、桌面与窄屏视口、水平溢出检查、长路径/中文文件名显示、按钮 disabled/active 状态和前后端数据一致性；deny 面（secret / MCP trust / `settings:set` / approval 等）须显式不可用，禁止静默像「坏了」。
+- 产品级浏览器评审必须至少覆盖：Workbench 初始状态、Project/Session 入口、`.rdc` 导入或打开状态、Settings > Providers、Settings > Agents、语言/Appearance 持久化、Terminal、Memory approval、Tool Approval、Command、MCP/Hook trust/revoke、桌面与窄屏视口、水平溢出检查、长路径/中文文件名显示、按钮 disabled/active 状态和前后端数据一致性；未知/内部/明文 secret channel 的 fail-closed 面须单独抽检。
+- 约 390px 窄屏验收必须确认 `.app-body` 不保留桌面最小宽度、Composer 控件无重叠且全部可达、Agent 菜单不越界、selected/running 语义分离、Arrow/Home/End/Escape 与焦点返回正确，并在 reduced-motion 下确认运行状态点不播放动画。
 - Composer 性能回归：先经 `/qa` 进入后在同源加 `?qaPerformance=1`（或带有效鉴权打开 `/app?qaPerformance=1`），读取 `data-rdc-qa-performance`；以原生 Event Timing 的 click-to-next-paint p95 和 Long Task 为准；16 ms 以下未上报 entry 按阈值保守计入，不支持 Event Timing 时 fail-closed。不得用 Browser 工具调用往返时间或后台节流的 RAF cadence 替代 renderer 指标；默认 `/app` 不得安装该探针的 listener 或 observer。
 - 本地契约烟测：`pnpm run smoke:agent-browser`（失败 exit≠0；不并入默认 pack）。
 - 涉及 `src/main`、`src/preload`、窗口、IPC 注册、workspace 权限、RDX CLI invoker 或 `RenderDoc` 本地链路时，补真实启动检查或内置浏览器真实会话；禁止把 Playwright/Electron E2E 作为门禁。
@@ -160,9 +133,9 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 ## Right Rail single-track gate
 
 - The right rail is driven only by the main-owned `RightRailProjectionService` and its `RightPanelViewModel`. Renderer code must not rebuild Progress, Outputs, Context resources, or Capture state from action events, global capture state, working-directory scans, or tool catalogs. internal runtime identifiers are reserved for owner-scoped agent consumption, and raw diagnostic detail must not become sidebar inventory.
-- The selected Project rail is only the project-scoped `Import .rdc` surface and imported-input list; it must not read session runtime state. The selected Session rail is always `Progress / Outputs / Context / Capture`; Context contains task-used attachments, references, tools, and capabilities only, while Capture is always visible with an honest empty state when no input exists. Capture owns scoped `.rdc` selection, Replay Device, open, preview, refresh, copy, clear, and compact diagnostics. Do not restore Classic fallback, ArtifactTree, Working Directory, standalone Memory, per-tool `rd.*` inventory, CLI catalog summary, tool count, duplicate Skills catalog, or `session:outputs:list`.
+- The selected Project rail is only the project-scoped `Import .rdc` surface and imported-input list; it must not read session runtime state. The selected Session rail is always four separate, non-collapsible rounded `Progress / Outputs / Context / Capture` cards whose shell never changes between empty and populated content. Context contains task-used attachments, references, tools, and capabilities only, while Capture is always visible with an honest empty state when no input exists. Capture owns scoped `.rdc` selection, Replay Device, open, preview, refresh, copy, clear, and compact diagnostics. Do not restore Classic fallback, ArtifactTree, Working Directory, standalone Memory, per-tool `rd.*` inventory, CLI catalog summary, tool count, duplicate Skills catalog, or `session:outputs:list`.
 - Outputs only show explicit user output files. `output_register` is the canonical agent action: it may copy only a completed file inside the active project into the owning run, and it must reject inputs and escaping paths. Do not pin `plan.md`; do not expose `artifact_store`, `run_report`, or `action_output` source names in UI contracts.
-- Run `pnpm run check:right-rail` for UI/IPC changes. Browser QA must use the latest `start:agent-browser` `/qa` surface, delete QA project sessions first, create isolated sessions, and cover empty state, real Tasks, Outputs, project import, RDX owner/diagnostic behavior, cross project/session gates, narrow drawer, Escape/focus return, and Settings/bridge deny surfaces.
+- Run `pnpm run check:right-rail` for UI/IPC changes. Browser QA must use the latest `start:agent-browser` `/qa` surface, delete QA project sessions first, create isolated sessions, and cover empty state, real Tasks, Outputs, project import, RDX owner/diagnostic behavior, cross project/session gates, narrow drawer, Escape/focus return, Settings parity, and unknown-channel bridge denial.
 
 ## 修改时的检查项
 
@@ -175,32 +148,39 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 
 ## 验证建议
 
-- 开始实现前先写明本次验证方式；实现后按该方式验证并报告结果。无法运行的验证，必须说明原因和剩余风险。
-- `pnpm run test:coverage` 门禁覆盖 node unit surface（`vitest.config.ts` exclude 后的 main/shared；lines/functions ≥75、branches ≥63）；集成面走 `check:contracts` + 浏览器真实会话；renderer 走 browser QA 与 `check:*`。
-- 代码改动后执行 `pnpm run typecheck` 与 `pnpm run lint`（`no-unused-vars` / `exhaustive-deps` 为 error）。
-- 依赖、入口、构建、发布配置或仓库目录治理改动后执行 `pnpm run check:repository-hygiene`。
-- renderer 结构或 UI 锚点改动后执行 `pnpm run check:architecture`（含 Orchestrator façade &lt;800 与 `src/main` 单文件 ≤900）、`pnpm run check:fidelity`、`pnpm run check:shared-exports`。
-- Orchestrator / debugger 编排拆分后执行 `pnpm run check:orchestrator-facade`（`AgentOrchestrator.ts` 少于 800 行；禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext`）。
-- Session 切换、IPC 投影、Composer draft 恢复、Stop/Rewrite 或多 session 并行 UI 改动后执行 `pnpm run check:session-projection`；Browser QA 须覆盖：新建/切换 session 无 composer 串台、后台 turn 不污染 active transcript/trace、Rewrite+立即 Stop 单调落停、Preparing Stop 干净撤销本 session 草稿；每次先删尽 QA project sessions 再新建隔离 session。
-- CI（`.github/workflows/ci.yml`）必须跑 hygiene / typecheck / lint / test / test:coverage / 全套关键 `check:*` / `check:contracts` / build；宣称完成不得只靠 commit message。
-- 覆盖率阈值改动或相关门禁回归执行 `pnpm run test:coverage`。
-- Work Process 投影、工具行文案/图标或 transcript UI 改动后执行 `pnpm run check:work-process`、`pnpm run check:work-process-tool-coverage`。
-- Work Process UI 验收必须覆盖：运行中顶层「工作中 / Working」与 Active Signal 文本能量扫光、完成后「工作过程 / Work process」+ meta、loop thinking 运行态默认展开（summary/raw/unknown 与 final-answer/收束 thinking 同一生命周期）与 Active Signal「正在思考 / Thinking」、完成后默认折叠「已思考 · {duration} / Thought for」+ 前置 quiet icon、用户对手动开合 sticky 覆盖自动策略、commentary 散文（markdown，不进 thinking 槽）、统一单披露 tool 卡片（header icon+动词 + **结果优先** 族 body：有结果时显示计数/路径样本等，运行中才回退 pattern/path/`$ cmd`；展开为族内容层 + 样式化 Raw 面板；默认不展开 Raw；无 verb/target 双轨 toggle、无 `toolGroup` 双层壳）或 ≥8 聚合摘要行、同 loop 连续 tool 外距 `--space-2`、thinking/commentary → 首个 tool 与相邻 loop section 顶距均为 `--space-3`（只比 tool 宽一档；与是否有 commentary 无关）、file/search/shell/git/web/generic 族模板一致、每个 builtin tool 唯一 header glyph（`mcp__*`→`plug`）、安静 loop 级轨道点、`web_search` 为 favicon+域名 source pills（title 仅 tooltip）、`web_fetch` 为 Fetched page/已抓取 + 异形 page chip（非 pill 条；favicon 仅经 main `web:resolveFavicon`→data URL，失败用字母 monogram 禁止全落 globe）、无 Reply 边界行（收束 thinking 归入普通折叠）、opaque/hidden 永不渲染 CoT 占位句（仅保留真实 tools/commentary/可见 thinking；answer-only 静默）、`error_recovery_*` 自动恢复遥测不进 Work Process 叙事（仅 Agent Activity / runtime log；禁止蓝字「错误恢复成功…」旁白）、Request Inspector 不出现在消息流也不在右侧默认会话/Trace 面板、真实事件驱动的逐条出现与短 CSS 入场（禁止假 stagger）、**assistant full-bleed**（最终答案与 Work Process 含 tool 卡片横跨外轨全宽并与 composer 对齐；page-shell / Local utilities / composer / transcript 共用 `--workbench-outer-rail-width`，禁止再用更窄的 content-rail 把 compose 挤歪；仅用户 prompt 使用 raised bubble、fit-content、右对齐；loop nest 用 `--space-3`；用户 bubble / Work Process / final answer 共用 `.conversation-thread` 的 `padding-inline: --space-3` 离开左右轨/滚动条缝（同一内容列，禁止 WP 独享 gutter））、**MessageMarkdown**（commentary 与最终答案：GFM、代码块 language+复制、KaTeX、Mermaid fail-closed；thinking/CoT 保持纯文本）、**Appearance**：Settings → Appearance 为权威入口；`composerMarkdown` / `usePointerCursors` 默认关；Effort 色跟 agent `accent`；`pnpm run check:appearance`。
-- Appearance / chrome / compose accent 改动后执行 `pnpm run check:appearance`。Appearance UI 验收必须覆盖：System/Light/Dark 迷你窗口磁贴、双栏视觉预览（非 JSON/代码块）、Light/Dark 编辑卡跟随 App chrome、圆角色板+hex、可读预设下拉（统一 pill Aa+名称触发体、菜单右缘贴合并向左延伸、caret 衔接 tip、毛玻璃菜单、每项 Aa+勾选、足够宽度）、Import/Copy `rdx-theme-v1:`、Preferences；全局预览跟 chrome、Composer/Effort 仍跟 agent accent；Context Usage 弹层底色跟 chrome 编译的 `--color-surface-overlay` / `--token-bg-overlay`（分段色点仍用全局 `--token-context-*`）；不得残留验收脏色（如纯 `#ff0000`）或伪 `ThemePreview: ThemeConfig` 文案。
-- provider thinking 投递或 reasoning artifact 投影改动后执行 `pnpm run check:reasoning-delivery`。
-- Provider/model/Composer control 改动的真实验收必须覆盖：`reasoning unknown` / `none` 均呈现灰掉的 `Disabled` / `禁用`（不发明档位、不出现 Provider 管理文案）、可调关档文案同为 `Disabled` / `禁用`、canonical wire `xhigh` 统一显示 `Extra` 且产品最高档为 `Max`、上下文开关只叫 `Max mode / Max 模式`（reasoning 的 `Max` 不变）、固定 Max mode 开启且不可关闭、快速 A→B→C 只保留最新 revision、在途 turn 保持创建时冻结的 `RequestPlan`、切换和输入不触发 Context preview IPC、发送后计量相位依次为 `Preparing` / `Current request ~` / provider `Actual`（圆环环面只显示 `%` / `—` / `…`，阶段文案仅在 title/aria 与 Context breakdown 弹层；弹层保持相位单一权威：Preparing 不展示上一轮 Last actual hero/meter，Current request 不叠历史 Last actual 三栏带，Actual/idle Last actual 才有一条 Tokens | Cache | Reasoning flat strip 且不重复 uppercase phase eyebrow）、Actual / Last actual 为同行固定三栏 Tokens | Cache | Reasoning（Cache：省 tokens、最近一轮%、累计%、命中/未命中；缺遥测显示 `—`，禁止假 0 / 假 0%）、缩窗只在发送 preflight 内派生压缩视图而不提前改写历史。
-- Composer Effort 滑杆拖拽验收必须覆盖：白方块全程落在 track 内（inset 几何，无端点 transform 突变）、弹层拖拽无横向滚动条与布局跳动、松手仍 snap 到最近档位并短动画回位。
-- scoped resource、project instruction、prompt snapshot、skill、hook 或 memory policy 改动后，必须执行相应专项 contract check；缺少时应在同一改动中补齐。
-- 安全 / 并发 / 取消 / 存储故障 / provider wire 契约改动后执行：`vitest run src/main/testing/contracts`（及被触及的既有单测，如 `bridgeSecurity`、`jsonl`、`TurnCoordinator`、`ProcessSupervisor`、`DebuggerRuntimePolicy`）。
-- 入口、构建或窗口逻辑改动后，再补 `pnpm run build` 或等价打包检查。
-- 发布配置改动后执行 `pnpm run pack`，并确认 unpacked 产物不包含开发期包管理器、lockfile、launcher 和缓存状态。
-- 浏览器真实会话使用 `pnpm run start:agent-browser`（或 `scripts/run-rdc-launcher.* --mode browser`），然后用 Codex 内置浏览器打开主进程输出的 **`/qa`**（勿截断 token URL）。Work Process / tool 卡片 UI 验收前必须先停旧进程再重启以加载最新前后端，并删除该 QA project 下全部 session 后新建隔离 session，避免跨 session/project 串台与脏数据。涉及 Send/Stop/Edit-and-resend 或流式卡顿时额外验收：Preparing Stop 干净撤销、Running Stop 单调落停、Rewrite 提交即时切分支、流式期间窗口拖拽/滚动无明显整应用卡顿。
-- 人类开发入口使用 `pnpm run start:human:dev`，源码构建入口使用 `pnpm run start:human`；平台包装器只转发到共享 launcher，依赖与 build 由指纹条件式准备，发布模式直接双击 exe / app 包。
-- Provider 体系契约验证使用 `pnpm run check:provider-system`。
-- Provider Catalog strict manifest 与编译语义验证使用 `pnpm run check:provider-catalog`。Catalog schema、manifest 字段、identity 覆盖或 route/binding 改动后必须执行。
-- HAL adapter 的 reasoning level 映射必须经 `ProviderReasoningMapper` 统一处理：manifest `reasoningEfforts` → wire effort 参数；新增 adapter 时确认 reasoning 投递路径经 `check:reasoning-delivery` 验证。
-- Builtin 工具目录、manifest token 展开与 `REJECTED_TOOL_TOKENS` 契约验证使用 `pnpm run check:tool-system`。
-- Settings Agents 路由契约验证使用 `pnpm run check:settings-agents`。
-- 产品级本地验收通过真实浏览器会话完成，并指向真实 project 和 `.rdc`；RDX/RenderDoc 失败必须 fail-closed 并显示诊断。
-- 涉及工作台交互、页面结构、样式引用或共享契约的改动后，至少补一次关键 E2E smoke 或等价人工回归，确认主界面、关键面板和主要交互未退化。
-- 仅文档改动时，检查术语、路径和描述是否与当前仓库结构一致。
+标签说明：
+- **[AUTO]** — 可通过 `pnpm run ...` 或 `vitest` 在本地 / CI 自动执行，CI 已覆盖或应覆盖。
+- **[MANUAL]** — 需人工判断、审查或确认，无对应自动化门禁。
+- **[BROWSER-QA]** — 需通过 `pnpm run start:agent-browser` 浏览器真实会话验收，涉及视觉 / 交互 / 端到端行为。
+- 一条规则可同时携带多个标签（如 `[AUTO] [BROWSER-QA]` 表示既有自动化检查又需浏览器视觉验收）。
+
+---
+
+- **[MANUAL]** 开始实现前先写明本次验证方式；实现后按该方式验证并报告结果。无法运行的验证，必须说明原因和剩余风险。
+- **[AUTO]** `pnpm run test:coverage` 门禁覆盖 node unit surface（`vitest.config.ts` exclude 后的 main/shared；lines/functions ≥75、branches ≥63）；集成面走 `check:contracts` + 浏览器真实会话；renderer 走 browser QA 与 `check:*`。
+- **[AUTO]** 代码改动后执行 `pnpm run typecheck` 与 `pnpm run lint`（`no-unused-vars` / `exhaustive-deps` 为 error）。
+- **[AUTO]** 依赖、入口、构建、发布配置或仓库目录治理改动后执行 `pnpm run check:repository-hygiene`。
+- **[AUTO]** renderer 结构或 UI 锚点改动后执行 `pnpm run check:architecture`（含 Orchestrator façade &lt;800 与 `src/main` 单文件 ≤900）、`pnpm run check:fidelity`、`pnpm run check:shared-exports`。
+- **[AUTO]** Orchestrator / debugger 编排拆分后执行 `pnpm run check:orchestrator-facade`（`AgentOrchestrator.ts` 少于 800 行；禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext`）。
+- **[AUTO] [BROWSER-QA]** Session 切换、IPC 投影、Composer draft 恢复、Stop/Rewrite 或多 session 并行 UI 改动后执行 `pnpm run check:session-projection`；Browser QA 须覆盖：新建/切换 session 无 composer 串台、后台 turn 不污染 active transcript/trace、Rewrite+立即 Stop 单调落停、Preparing Stop 干净撤销本 session 草稿；每次先删尽 QA project sessions 再新建隔离 session。
+- **[MANUAL]** CI（`.github/workflows/ci.yml`）必须跑 hygiene / typecheck / lint / test / test:coverage / 全套关键 `check:*` / `check:contracts` / build；宣称完成不得只靠 commit message。
+- **[AUTO]** 覆盖率阈值改动或相关门禁回归执行 `pnpm run test:coverage`。
+- **[AUTO]** Work Process 投影、工具行文案/图标或 transcript UI 改动后执行 `pnpm run check:work-process`、`pnpm run check:work-process-tool-coverage`。完整验收 checklist 见 [`docs/ui/work-process-checklist.md`](docs/ui/work-process-checklist.md)。
+- **[BROWSER-QA]** Appearance / chrome / compose accent 改动后执行 `pnpm run check:appearance`。完整验收 checklist（含 Provider/Composer 控件、Effort 滑杆）见 [`docs/ui/appearance-checklist.md`](docs/ui/appearance-checklist.md)。
+- **[AUTO]** provider thinking 投递或 reasoning artifact 投影改动后执行 `pnpm run check:reasoning-delivery`。
+- **[AUTO]** scoped resource、project instruction、prompt snapshot、skill、hook 或 memory policy 改动后，必须执行相应专项 contract check；缺少时应在同一改动中补齐。
+- **[AUTO]** 安全 / 并发 / 取消 / 存储故障 / provider wire 契约改动后执行：`vitest run src/main/testing/contracts`（及被触及的既有单测，如 `bridgeSecurity`、`jsonl`、`TurnCoordinator`、`ProcessSupervisor`、`DebuggerRuntimePolicy`）。
+- **[AUTO]** 入口、构建或窗口逻辑改动后，再补 `pnpm run build` 或等价打包检查。
+- **[MANUAL]** 发布配置改动后执行 `pnpm run pack`，并确认 unpacked 产物不包含开发期包管理器、lockfile、launcher 和缓存状态。
+- **[BROWSER-QA]** 浏览器真实会话使用 `pnpm run start:agent-browser`（或 `scripts/run-rdc-launcher.* --mode browser`），然后用 Codex 内置浏览器打开主进程输出的 **`/qa`**（勿截断 token URL）。Work Process / tool 卡片 UI 验收前必须先停旧进程再重启以加载最新前后端，并删除该 QA project 下全部 session 后新建隔离 session，避免跨 session/project 串台与脏数据。涉及 Send/Stop/Edit-and-resend 或流式卡顿时额外验收：Preparing Stop 干净撤销、Running Stop 单调落停、Rewrite 提交即时切分支、流式期间窗口拖拽/滚动无明显整应用卡顿。
+- **[MANUAL]** 人类开发入口使用 `pnpm run start:human:dev`，源码构建入口使用 `pnpm run start:human`；平台包装器只转发到共享 launcher，依赖与 build 由指纹条件式准备，发布模式直接双击 exe / app 包。
+- **[AUTO]** Provider 体系契约验证使用 `pnpm run check:provider-system`。
+- **[AUTO]** Provider Catalog strict manifest 与编译语义验证使用 `pnpm run check:provider-catalog`。Catalog schema、manifest 字段、identity 覆盖或 route/binding 改动后必须执行。
+- **[AUTO] [BROWSER-QA]** Agent Loop / Tasks 改动必须覆盖相同指纹第二轮纠偏、第三轮终止、revision/result/args 变化复位、max-turn typed error、Ask Tasks 只读、Plan/Edit Tasks 可写、text-only route 不宣称工具、`tool_search` authoritative no-match；Browser 真实会话至少命中一次三轮无进展终止并确认没有 `CONVERSATION_LLM_REQUEST_FAILED`。
+- **[BROWSER-QA]** Provider/model/control 改动先 fresh discovery，再对最终 selectable 集合逐模型发最小真实请求；按 `provider + protocol + adapter + reasoning mapping + context activation + fast binding + continuation` 去重深测。账户 denial 保持不可选，429 与明确 quota 的 402 记录短期 expiry，5xx 保持可恢复且不得伪装成功。容量来源必须区分 source-backed 与真实 activation，禁止伪称百万 token 满窗压测。
+- **[AUTO]** HAL adapter 的 reasoning level 映射必须经 `ProviderReasoningMapper` 统一处理：manifest `reasoningEfforts` → wire effort 参数；新增 adapter 时确认 reasoning 投递路径经 `check:reasoning-delivery` 验证。
+- **[AUTO]** Builtin 工具目录、manifest token 展开与 `REJECTED_TOOL_TOKENS` 契约验证使用 `pnpm run check:tool-system`。
+- **[AUTO]** Settings Agents 路由契约验证使用 `pnpm run check:settings-agents`。
+- **[BROWSER-QA]** 产品级本地验收通过真实浏览器会话完成，并指向真实 project 和 `.rdc`；RDX/RenderDoc 失败必须 fail-closed 并显示诊断。
+- **[BROWSER-QA]** 涉及工作台交互、页面结构、样式引用或共享契约的改动后，至少补一次关键 E2E smoke 或等价人工回归，确认主界面、关键面板和主要交互未退化。
+- **[MANUAL]** 仅文档改动时，检查术语、路径和描述是否与当前仓库结构一致。

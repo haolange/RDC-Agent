@@ -36,7 +36,7 @@ export type ConversationWorkBlockKind =
   | 'output'
   | 'command';
 
-export type ConversationToolCallStatus = 'pending' | 'running' | 'complete' | 'error';
+export type ConversationToolCallStatus = 'pending' | 'running' | 'complete' | 'error' | 'skipped';
 
 export type ConversationThinkingStatus = 'streaming' | 'complete';
 
@@ -57,7 +57,9 @@ export type ConversationReasoningState = 'raw' | 'summary' | 'unknown' | 'opaque
 export type ConversationMessageDiagnosticCode =
   | 'CONVERSATION_LLM_ROUTE_MISSING'
   | 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
-  | 'CONVERSATION_LLM_REQUEST_FAILED';
+  | 'CONVERSATION_LLM_REQUEST_FAILED'
+  | 'CONVERSATION_AGENT_LOOP_STALLED'
+  | 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED';
 
 export interface ConversationMessageDiagnostic {
   code: ConversationMessageDiagnosticCode;
@@ -136,8 +138,16 @@ export interface ConversationWorkBlock {
 export interface ConversationWorkTrace {
   status: 'idle' | 'running' | 'complete' | 'error' | 'stopped';
   summary?: string;
+  toolEvidence?: ConversationToolExecutionEvidence;
   blocks: ConversationWorkBlock[];
   updatedAt: number;
+}
+
+export interface ConversationToolExecutionEvidence {
+  total: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
 }
 
 export interface ConversationMessage {

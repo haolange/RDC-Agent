@@ -14,6 +14,10 @@
 
 `ConversationWorkTrace` 是可见进度契约。块类型包括：`llm_turn`、`reasoning`、`approval`、`user_input`、`compaction`、`subagent`、`handoff`、`diagnostic`、`output`。历史不匹配 canonical schema 的 `workTrace` 在存储读边界丢弃（`workTrace: null`），无 legacy 归一化。
 
+每个工具回灌轮次必须经过 `LoopProgressGuard`。指纹包含有序工具名、规范化参数、成功/失败、语义结果与 runtime revision，忽略 call id、时间戳和耗时。连续第二次相同只向下一次请求注入不落盘的 `<runtime_no_progress>`；第三次仍相同抛出 `AgentLoopTerminationError('AGENT_NO_PROGRESS')`。参数、结果或 runtime revision 改变立即复位。达到 `maxTurns` 时若 Provider 仍要求 continuation，抛出 `AgentLoopTerminationError('AGENT_MAX_TURNS_EXCEEDED')`，禁止静默完成或伪造缺失 final answer。
+
+Work Process 的工具摘要只由 runtime tool result 计算 `succeeded / failed / skipped`，不得采信模型自述。可恢复的中途失败仍保留可见证据，产品不能显示“全部成功”的合成结论。
+
 ## 关键编排模块（Phase 1–4）
 
 | 模块 | 职责 |
@@ -26,6 +30,7 @@
 | `AgentSlotRegistry` / `McpConnectionCoordinator` / `DeferredToolActivationTracker` / `HandoffMailbox` | 自 Orchestrator 拆出的协作单元 |
 | `RdxRuntimeContextRegistry` | 仅 per-session RDX context lease；无 global mirror |
 | `LoopRuntimeState` | Agent 工具面 COW；每轮读 `runtime.current` |
+| `LoopProgressGuard` | 检测相同工具轮次无进展；第二轮纠偏、第三轮 typed termination；runtime revision 变化即复位 |
 
 Conversation 单一真相：turn 开始 `rehydrate(fromDisk)`；结束 flush 并清空 slot messages；分支切换 / rewrite 显式 `syncSessionSlots`。
 
@@ -100,11 +105,15 @@ interface AssistantMessageDiagnostic {
 
 `isRetryableAssistantError(message)` 遍历 `diagnostics` 并对每个 `error` 调用 `classifyProviderError`，任一 retryable 则整条消息可重试。诊断信息不进入 IPC / renderer / Trace，仅供主进程重试决策与脱敏日志使用。
 
+Agent loop 终止与 Provider 失败互斥：`AGENT_NO_PROGRESS` → `CONVERSATION_AGENT_LOOP_STALLED`；`AGENT_MAX_TURNS_EXCEEDED` → `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`。只有真实网络、鉴权、配额或 wire 故障才产生 `CONVERSATION_LLM_REQUEST_FAILED`。
+
 ## Tools 与 Permission（执行侧）
 
 Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（36 ids）。Manifest token 经 `CANONICAL_TOOL_TOKEN_EXPANSIONS` 展开；`REJECTED_TOOL_TOKENS` 拒绝无静默 fallback。
 
-`native-structured` 路由：core schema 常驻；extended / `mcp__*` deferred，经 `tool_search` 等契约路径激活。未激活调用 → `TOOL_NOT_ACTIVATED`。
+`native-structured` 路由：core schema 常驻；extended / `mcp__*` deferred，经 `tool_search` 等契约路径激活。未激活调用 → `TOOL_NOT_ACTIVATED`。Tasks 工具按 Agent 角色过滤后预激活：Ask 仅 `task_list` / `task_get`，Plan/Edit 等具备 mutation 权限的 profile 才可获得 `task_create` / `task_update` / `task_stop`。
+
+Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only route 的有效工具集为空，不得列出或模仿工具调用。`tool_search` 无结果时返回 `NO_MATCH_IN_EFFECTIVE_TOOL_SET`、`authoritative: true` 与工具集 fingerprint；fingerprint 未变化时重复同一搜索属于无进展。
 
 执行前：`toolValidator.validate`；失败 → `TOOL_SCHEMA_VIOLATION`。`CompiledPolicy.deniedTools` 进入 Permission + Executor。非法 policy → fail-closed。
 

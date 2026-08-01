@@ -3,6 +3,7 @@ import type { EffectiveModel, RequestPlan, RequestPlanningResult } from '@shared
 import { providerAdapterIdForProtocol } from '@shared/provider-catalog/implementationRegistry';
 import { createTestRequestPlan } from '../testing/createTestRequestPlan';
 import type { LlmModelCapabilityProbeRequest, LlmProviderEntry } from '@shared/types/settings';
+import type { AssistantMessage } from '../agent-runtime/core/types';
 import {
   buildProbeFailurePatch,
   buildProbeSuccessPatch,
@@ -99,7 +100,15 @@ function plan(
 
 function dependencies(effectiveModel: EffectiveModel) {
   const resolved = target(effectiveModel);
-  const execute = vi.fn(async () => ({} as never));
+  const execute = vi.fn(async (): Promise<AssistantMessage> => ({
+    role: 'assistant',
+    content: [{ type: 'text', text: 'ok' }],
+    model: effectiveModel.modelId,
+    provider: effectiveModel.providerId,
+    usage: { inputTokens: 3, outputTokens: 1, totalTokens: 4 },
+    stopReason: 'stop',
+    timestamp: 1,
+  }));
   const freezeCredentials = vi.fn(async () => 'credential-probe');
   const releaseCredentials = vi.fn();
   const recordSuccess = vi.fn();
@@ -122,12 +131,62 @@ describe('ProviderCapabilityProbeService', () => {
     const service = new ProviderCapabilityProbeService(fixture.value);
     const request = { providerId: 'provider-a', modelId: 'model-a', mode: 'default' } as const;
 
-    await expect(service.test(request)).resolves.toEqual({
-      success: true, status: 'verified', requestSent: true,
+    await expect(service.test(request)).resolves.toMatchObject({
+      success: true,
+      status: 'verified',
+      requestSent: true,
+      evidence: {
+        protocol: 'OpenAIResponses',
+        effectiveModelId: 'model-a',
+        usage: { inputTokens: 3, outputTokens: 1, totalTokens: 4 },
+      },
     });
     expect(fixture.execute).toHaveBeenCalledOnce();
     expect(fixture.execute).toHaveBeenCalledWith(expect.objectContaining({ credentialHandle: 'credential-probe' }));
     expect(fixture.releaseCredentials).toHaveBeenCalledWith('credential-probe');
+    expect(fixture.recordSuccess).toHaveBeenCalledOnce();
+  });
+
+  it('does not grant Fast until the provider confirms usage.speed=fast', async () => {
+    const effectiveModel = model({
+      controls: {
+        ...model().controls,
+        fast: { state: 'selectable', defaultValue: false, entitlement: 'unknown' },
+      },
+      executionBindings: [{
+        id: 'fast:priority',
+        when: { fast: true },
+        actions: [{ kind: 'request-patch', patch: { speed: 'fast' } }],
+        entitlement: 'unknown',
+      }],
+    });
+    const fixture = dependencies(effectiveModel);
+    const service = new ProviderCapabilityProbeService(fixture.value);
+    const request = { providerId: 'provider-a', modelId: 'model-a', mode: 'fast' } as const;
+
+    await expect(service.test(request)).resolves.toMatchObject({
+      success: false,
+      status: 'inconclusive',
+      requestSent: true,
+      detail: expect.stringContaining('usage.speed=fast'),
+      evidence: { usage: { totalTokens: 4 } },
+    });
+    expect(fixture.recordSuccess).not.toHaveBeenCalled();
+
+    fixture.execute.mockResolvedValueOnce({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'fast' }],
+      model: 'model-a',
+      provider: 'provider-a',
+      usage: { inputTokens: 3, outputTokens: 1, totalTokens: 4, speed: 'fast' },
+      stopReason: 'stop',
+      timestamp: 2,
+    });
+    await expect(service.test(request)).resolves.toMatchObject({
+      success: true,
+      status: 'verified',
+      evidence: { usage: { speed: 'fast' } },
+    });
     expect(fixture.recordSuccess).toHaveBeenCalledOnce();
   });
   it('reports credential freeze failure before any provider request is sent', async () => {
@@ -242,6 +301,11 @@ describe('ProviderCapabilityProbeService', () => {
   it('accepts a manifest-matched HTTP 401 as entitlement denial without changing generic 401 classification', () => {
     expect(classifyCapabilityProbeFailure(401)).toBe('authentication-failed');
     expect(classifyCapabilityProbeFailure(401, true)).toBe('entitlement-denied');
+  });
+
+  it('classifies only an explicit HTTP 402 quota response as transient quota exhaustion', () => {
+    expect(classifyCapabilityProbeFailure(402, false, 'quota_exceeded')).toBe('quota-exhausted');
+    expect(classifyCapabilityProbeFailure(402, false, 'payment required')).toBe('unknown');
   });
 
   it('never turns HTTP 401 authentication failure into entitlement evidence', () => {

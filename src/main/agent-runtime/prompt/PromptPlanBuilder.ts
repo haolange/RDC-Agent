@@ -145,13 +145,17 @@ export class PromptPlanBuilder {
       push({ id: 'skills:catalog', kind: 'skill-catalog', scope: 'runtime', sourcePath: 'runtime://skills/catalog', sourceHash: hashScopedResource(catalogLines), content: catalogLines.join('\n') });
     }
 
+    const effectiveTools = input.routeCapability.toolCallingMode === 'native-structured'
+      ? input.tools
+      : [];
+    const effectiveToolContent = buildEffectiveToolContent(input.profile.id, effectiveTools);
     push({
       id: 'runtime:tools',
       kind: 'tool-capability',
       scope: 'runtime',
       sourcePath: 'runtime://tools/effective',
-      sourceHash: hashScopedResource(input.tools),
-      content: input.tools.length ? ['# Effective Tools', ...input.tools.map((tool) => `- ${tool}`)].join('\n') : '# Effective Tools\nNo runtime tools are available for this turn.',
+      sourceHash: hashScopedResource(effectiveTools),
+      content: effectiveToolContent,
     });
 
     const permission = input.permissionSettings;
@@ -217,3 +221,47 @@ export class PromptPlanBuilder {
 }
 
 export const promptPlanBuilder = new PromptPlanBuilder();
+
+function buildEffectiveToolContent(agentId: string, tools: readonly string[]): string {
+  const lines = tools.length
+    ? ['# Effective Tools', ...tools.map((tool) => `- ${tool}`)]
+    : [
+        '# Effective Tools',
+        'No runtime tools are available for this turn.',
+        'Do not imitate tool calls in text. If the user asks for an unavailable tool, state the capability mismatch once; do not search for or retry that tool unless the effective tool set changes.',
+      ];
+  const toolSet = new Set(tools);
+  const readableTasks = toolSet.has('task_list') || toolSet.has('task_get');
+  const mutableTasks = toolSet.has('task_create')
+    || toolSet.has('task_update')
+    || toolSet.has('task_stop');
+
+  if (mutableTasks) {
+    lines.push(
+      '',
+      '## Tasks capability',
+      'Tasks are writable in this turn. Create, update, inspect, list, or stop Tasks only through the effective task tools shown above.',
+    );
+  } else if (readableTasks) {
+    lines.push(
+      '',
+      '## Tasks capability',
+      'Tasks are read-only in this turn. You may inspect Tasks with task_list/task_get, but you cannot create, update, or stop them.',
+      agentId === 'ask'
+        ? 'Ask is intentionally read-only. Use Plan or Edit for work that must create or change Tasks.'
+        : 'Use a Plan or Edit turn whose effective tools include task mutations when Tasks must change.',
+    );
+  } else {
+    lines.push('', '## Tasks capability', 'No Tasks tools are available in this turn.');
+  }
+
+  if (toolSet.has('tool_search')) {
+    lines.push(
+      '',
+      '## Tool discovery authority',
+      'tool_search searches only this effective tool set; it cannot reveal or activate tools denied by the Agent profile, policy, or runtime.',
+      'An authoritative no-match must not be repeated until the effective tool set fingerprint changes.',
+    );
+  }
+  return lines.join('\n');
+}

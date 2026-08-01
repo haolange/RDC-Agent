@@ -76,6 +76,12 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
     () => projectProviderModels(provider.catalogOwnership, models, snapshot),
     [models, provider.catalogOwnership, snapshot],
   );
+  const availableModelCount = useMemo(
+    () => resolvedModels.filter(({ model, effectiveModel }) => (
+      effectiveModel?.availability ?? model.availability
+    ) !== 'unavailable').length,
+    [resolvedModels],
+  );
   useEffect(() => onModelCountChange(resolvedModels.length), [onModelCountChange, resolvedModels.length]);
   const allUnavailable = resolvedModels.length > 0 && resolvedModels.every(({ model, effectiveModel }) => (
     effectiveModel?.availability ?? model.availability
@@ -89,7 +95,10 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
           ? t('settings.providers.capability.appManagedModels')
           : t('settings.providers.capability.userManagedModels')}</span>
         <span className="settings-help-text">
-          {t('settings.providerModelCount', { count: resolvedModels.length })}
+          {t('settings.providerManagedModelCount', {
+            available: availableModelCount,
+            total: resolvedModels.length,
+          })}
         </span>
       </div>
       {provider.catalogOwnership !== 'user-managed' ? (

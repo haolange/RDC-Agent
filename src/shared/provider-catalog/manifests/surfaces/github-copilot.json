@@ -37,6 +37,24 @@
       "plan": "Copilot Pro+"
     },
     {
+      "id": "provider-docs:github-copilot:2026-07-24",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "github-copilot-claude-opus-5-rollout@2026-07-24",
+      "observedAt": "2026-07-24",
+      "refreshedAt": "2026-08-01",
+      "surface": "github-copilot",
+      "accountScope": "account-entitled"
+    },
+    {
+      "id": "runtime-observation:github-copilot-gemini-3.5:2026-08-01",
+      "sourceKind": "runtime-observation",
+      "sourceRevision": "capability-probe:reasoning-none-rejected",
+      "observedAt": "2026-08-01",
+      "refreshedAt": "2026-08-01",
+      "surface": "github-copilot",
+      "accountScope": "observed-account"
+    },
+    {
       "id": "models.dev:github-copilot:1",
       "sourceKind": "models.dev",
       "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
@@ -411,6 +429,68 @@
         }
       },
       "factSourceId": "user-observation:github-copilot:2026-07-14"
+    },
+    {
+      "modelId": "claude-opus-5",
+      "label": "Claude Opus 5",
+      "aliases": [],
+      "availability": "unknown",
+      "unavailableReason": "Available only when the current GitHub Copilot account catalog returns this exact model id and an agent endpoint.",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "1M window",
+          "maxPromptTokens": 1000000,
+          "maxOutputTokens": 128000,
+          "maxTotalTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "unknown"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false,
+          "reason": "GitHub Copilot Fast is not inferred from Anthropic direct API capabilities."
+        },
+        "context1m": {
+          "state": "unknown",
+          "defaultValue": false,
+          "reason": "The current account catalog must provide the effective context entitlement."
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultSelection": "off",
+          "defaultState": "unknown",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "provider-docs:github-copilot:2026-07-24"
     },
     {
       "modelId": "claude-sonnet-5",
@@ -1156,7 +1236,7 @@
         },
         "reasoning": {
           "kind": "levels",
-          "supportsOff": true,
+          "supportsOff": false,
           "levels": [
             "low",
             "medium",
@@ -1170,12 +1250,11 @@
               "low": "low",
               "medium": "medium",
               "high": "high"
-            },
-            "offMode": "reasoning-none"
+            }
           }
         }
       },
-      "factSourceId": "user-observation:github-copilot:2026-07-14"
+      "factSourceId": "runtime-observation:github-copilot-gemini-3.5:2026-08-01"
     },
     {
       "modelId": "kimi-k2.7-code",
@@ -2122,6 +2201,7 @@
     "claude-opus-4.6",
     "claude-opus-4.8",
     "claude-opus-4.8-fast",
+    "claude-opus-5",
     "claude-sonnet-5",
     "claude-fable-5",
     "gpt-5.4-mini",

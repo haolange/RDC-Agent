@@ -51,10 +51,8 @@ export const EffortControlPopup: React.FC<{
   tooltipLeftPercent: number;
   tooltipLabel: string;
   trackWidthPx: number;
-  oneMillionContextVisible: boolean;
   oneMillionContextAvailable: boolean;
   oneMillionContextStatusLabel?: string;
-  fastModelVisible: boolean;
   fastModelAvailable: boolean;
   fastModelStatusLabel?: string;
   oneMillionContextMode: boolean;
@@ -90,10 +88,8 @@ export const EffortControlPopup: React.FC<{
   tooltipLeftPercent,
   tooltipLabel,
   trackWidthPx,
-  oneMillionContextVisible,
   oneMillionContextAvailable,
   oneMillionContextStatusLabel,
-  fastModelVisible,
   fastModelAvailable,
   fastModelStatusLabel,
   oneMillionContextMode,
@@ -110,9 +106,6 @@ export const EffortControlPopup: React.FC<{
 }) => {
   const popupDynStyle = useDynStyle({
     '--composer-effort-popup-shift-x': `${popupShiftPx}px`,
-  });
-  const trackDynStyle = useDynStyle({
-    '--composer-effort-stops-opacity': String(maxTimeline.fromStopsOpacity),
   });
   const thumbDynStyle = useDynStyle({ left: `${thumbPercent}%` });
   const tooltipDynStyle = useDynStyle({ left: `${tooltipLeftPercent}%` });
@@ -152,7 +145,6 @@ export const EffortControlPopup: React.FC<{
           data-max-emitter-ratio={thumbRatio.toFixed(3)}
           data-max-field-energy={maxTimeline.fromEnergy.toFixed(3)}
           data-max-clip-ratio={thumbRatio.toFixed(3)}
-          {...trackDynStyle}
           onPointerDown={onTrackPointerDown}
           onPointerMove={onTrackPointerMove}
           onPointerUp={onTrackPointerUp}
@@ -219,29 +211,23 @@ export const EffortControlPopup: React.FC<{
       </div>
     ) : null}
 
-    {oneMillionContextVisible || fastModelVisible ? (
-      <div className="composer-effort-popup-divider" aria-hidden="true" />
-    ) : null}
+    <div className="composer-effort-popup-divider" aria-hidden="true" />
 
-    {oneMillionContextVisible ? (
-      <EffortOneMillionContextSwitchRow
-        label={t('composer.effort.oneMillionContext')}
-        statusLabel={oneMillionContextStatusLabel}
-        available={oneMillionContextAvailable}
-        active={oneMillionContextMode}
-        onToggle={onToggleOneMillionContext}
-      />
-    ) : null}
+    <EffortOneMillionContextSwitchRow
+      label={t('composer.effort.oneMillionContext')}
+      statusLabel={oneMillionContextStatusLabel}
+      available={oneMillionContextAvailable}
+      active={oneMillionContextMode}
+      onToggle={onToggleOneMillionContext}
+    />
 
-    {fastModelVisible ? (
-      <EffortFastModeSwitchRow
-        label={t('composer.effort.fastModel')}
-        statusLabel={fastModelStatusLabel}
-        available={fastModelAvailable}
-        active={fastModel}
-        onToggle={onToggleFastModel}
-      />
-    ) : null}
+    <EffortFastModeSwitchRow
+      label={t('composer.effort.fastModel')}
+      statusLabel={fastModelStatusLabel}
+      available={fastModelAvailable}
+      active={fastModel}
+      onToggle={onToggleFastModel}
+    />
   </div>
   );
 };
