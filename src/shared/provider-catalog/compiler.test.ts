@@ -149,12 +149,12 @@ describe('Provider Catalog compiler', () => {
     expect(() => compileProviderCatalog(foreignWire)).toThrow(/first-party direct.*protocol owner/u);
   });
 
-  it('keeps Kimi stable aliases and account-scoped K3 behind authoritative discovery', () => {
+  it('keeps all four official Kimi model ids behind credential-scoped discovery', () => {
     const catalog = compileProviderCatalog(input());
     const surface = catalog.surfaces.get('kimi-coding-plan')?.surface;
     expect(catalog.index.surfaces.find((entry) => entry.id === 'kimi-coding-plan')).toMatchObject({
       discoveryAuthority: 'authoritative-list',
-      modelCount: 2,
+      modelCount: 3,
     });
     expect(surface?.discovery).toMatchObject({
       authority: 'authoritative-list',
@@ -163,7 +163,7 @@ describe('Provider Catalog compiler', () => {
     expect(surface?.models.map((model) => model.modelId)).toEqual([
       'kimi-for-coding',
       'k3',
-      'k3[1m]',
+      'k3-256k',
       'kimi-for-coding-highspeed',
     ]);
     expect(surface?.models.filter((model) => model.selection.pickerVisibility === 'primary')
@@ -193,14 +193,32 @@ describe('Provider Catalog compiler', () => {
       controls: {
         fast: { state: 'unsupported' },
         context1m: { state: 'selectable' },
-        reasoning: { kind: 'unknown', supportsOff: false },
+        reasoning: {
+          kind: 'levels', supportsOff: false, levels: ['low', 'high', 'max'], defaultSelection: 'high',
+        },
       },
+      executionBindings: [{
+        id: 'context:max', when: { context1m: true },
+        actions: [{ kind: 'client-tier', tierId: 'max' }],
+      }],
       liveProjection: {
         entitlementDenialMatchers: [{ mode: 'one-million-context', statuses: [403] }],
       },
     });
-    expect(surface?.models.find((model) => model.modelId === 'kimi-for-coding-highspeed')?.selection)
-      .toEqual({ pickerVisibility: 'internal', relatedPrimaryModelIds: ['kimi-for-coding'] });
+    expect(surface?.models.find((model) => model.modelId === 'k3-256k')).toMatchObject({
+      controls: {
+        fast: { state: 'unsupported', fixedValue: false },
+        context1m: { state: 'unsupported', fixedValue: false },
+        reasoning: {
+          kind: 'levels', supportsOff: false, levels: ['low', 'high', 'max'], defaultSelection: 'high',
+        },
+      },
+      visionInput: { state: 'supported' },
+    });
+    expect(surface?.models.find((model) => model.modelId === 'kimi-for-coding-highspeed')).toMatchObject({
+      selection: { pickerVisibility: 'internal', relatedPrimaryModelIds: ['kimi-for-coding'] },
+      controls: { fast: { state: 'unsupported', fixedValue: false } },
+    });
     expect(surface?.models.some((model) => model.modelId === 'kimi-k2.7-code')).toBe(false);
   });
   it('keeps direct and subscription K3 identities isolated by Provider surface', () => {
@@ -234,6 +252,10 @@ describe('Provider Catalog compiler', () => {
       'grok-4.5',
     ]));
     expect(openCodeGo?.models.length).toBeGreaterThanOrEqual(20);
+    expect(openCodeGo?.models.find((model) => model.modelId === 'hy3-preview')).toMatchObject({
+      availability: 'unavailable',
+      unavailableReason: expect.stringContaining('model_not_supported'),
+    });
     expect(openCodeGo?.models.find((model) => model.modelId === 'kimi-k3')).toMatchObject({
       presencePolicy: 'account-entitled',
       availability: 'unknown',
@@ -348,12 +370,40 @@ describe('Provider Catalog compiler', () => {
       ['gpt-5.4', 256_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
       ['gpt-5.3-codex-spark', 256_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
     ]);
+    const chatGptAccount = catalog.surfaces.get('chatgpt-account')?.surface;
+    for (const model of chatGptAccount?.models ?? []) {
+      expect(
+        model.executionBindings?.find((binding) => binding.id === 'route:chatgpt-codex-parameter-policy'),
+        `chatgpt-account/${model.modelId} Codex request policy`,
+      ).toMatchObject({
+        when: {},
+        actions: [{
+          kind: 'request-patch',
+          patch: { temperature: null, top_p: null, max_output_tokens: null },
+        }],
+      });
+      const fastBinding = model.executionBindings?.find((binding) => binding.when.fast === true);
+      if (fastBinding) {
+        expect(fastBinding, `chatgpt-account/${model.modelId} Fast request policy`).toMatchObject({
+          actions: [{
+            kind: 'request-patch',
+            patch: {
+              temperature: null,
+              top_p: null,
+              max_output_tokens: null,
+              service_tier: 'priority',
+            },
+          }],
+        });
+      }
+    }
 
     verify('github-copilot', [
       ['claude-sonnet-4.6', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'max'], 'medium'],
       ['claude-opus-4.6', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'max'], 'medium'],
       ['claude-opus-4.8', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['claude-opus-4.8-fast', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
+      ['claude-opus-5', 1_000_000, 'unknown', 'unsupported', 'unknown', false, [], 'off'],
       ['claude-sonnet-5', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['claude-fable-5', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.4-mini', 128_000, 'unsupported', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh'], 'medium'],
@@ -363,7 +413,7 @@ describe('Provider Catalog compiler', () => {
       ['gpt-5.6-sol', 256_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-terra', 256_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gemini-3.1-pro-preview', 200_000, 'selectable', 'unsupported', 'levels', false, ['low', 'medium', 'high'], 'medium'],
-      ['gemini-3.5-flash', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['low', 'medium', 'high'], 'medium'],
+      ['gemini-3.5-flash', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high'], 'medium'],
       ['kimi-k2.7-code', 256_000, 'unsupported', 'unsupported', 'unknown', false, [], 'on'],
     ]);
     const copilot = catalog.surfaces.get('github-copilot')?.surface;
@@ -390,6 +440,10 @@ describe('Provider Catalog compiler', () => {
       ['grok-build-0.1', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on'],
     ]);
     const grokSurface = catalog.surfaces.get('grok-account')?.surface;
+    expect(grokSurface?.models.find((model) => model.modelId === 'grok-4.20-0309-reasoning')?.controls.reasoning)
+      .toMatchObject({ kind: 'always-on', wireProfile: { kind: 'none' } });
+    expect(grokSurface?.models.find((model) => model.modelId === 'grok-build-0.1')?.controls.reasoning)
+      .toMatchObject({ kind: 'always-on', wireProfile: { kind: 'none' } });
     expect(grokSurface?.routes).toEqual(expect.arrayContaining([
       expect.objectContaining({
         baseUrl: 'https://cli-chat-proxy.grok.com/v1',
@@ -398,18 +452,18 @@ describe('Provider Catalog compiler', () => {
     ]));
 
     verify('deepseek', [
-      ['deepseek-v4-pro', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
-      ['deepseek-v4-flash', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
+      ['deepseek-v4-flash', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['low', 'high', 'max'], 'high'],
+      ['deepseek-v4-pro', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
     ]);
     const deepseek = catalog.surfaces.get('deepseek')?.surface;
     expect(deepseek?.discovery).toMatchObject({ authority: 'candidate-validation', strategy: { kind: 'json-catalog' } });
-    expect(deepseek?.models.map((model) => model.modelId)).toEqual(['deepseek-v4-pro', 'deepseek-v4-flash']);
+    expect(deepseek?.models.map((model) => model.modelId)).toEqual(['deepseek-v4-flash', 'deepseek-v4-pro']);
     expect(deepseek?.models.every((model) => model.aliases.length === 0)).toBe(true);
 
     verify('kimi-coding-plan', [
       ['kimi-for-coding', 256_000, 'unsupported', 'selectable', 'always-on', false, [], 'on'],
-      ['k3', 256_000, 'selectable', 'unsupported', 'unknown', false, [], 'on'],
-      ['k3[1m]', 1_000_000, 'fixed', 'unsupported', 'unknown', false, [], 'on', 'internal'],
+      ['k3', 256_000, 'selectable', 'unsupported', 'levels', false, ['low', 'high', 'max'], 'high'],
+      ['k3-256k', 256_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'high', 'max'], 'high'],
       ['kimi-for-coding-highspeed', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on', 'internal'],
     ]);
 
@@ -434,6 +488,12 @@ describe('Provider Catalog compiler', () => {
       ['cline-pass/qwen3.7-plus', 128_000, 'unsupported', 'unsupported', 'unknown', false, [], 'on'],
     ]);
     const volcengine = catalog.surfaces.get('volcengine-coding-plan')?.surface;
+    for (const modelId of ['doubao-seed-code', 'minimax-m2.5', 'kimi-k2.5', 'glm-5.1', 'glm-4.7']) {
+      expect(volcengine?.models.find((model) => model.modelId === modelId), modelId).toMatchObject({
+        availability: 'unavailable',
+        unavailableReason: expect.stringContaining('does not support the Coding Plan feature'),
+      });
+    }
     expect(volcengine?.models.find((model) => model.modelId === 'kimi-k2.7-code')).toMatchObject({
       availability: 'unavailable',
       unavailableReason: expect.stringContaining('user-observed'),
@@ -445,6 +505,43 @@ describe('Provider Catalog compiler', () => {
       availability: 'unavailable',
       selection: { pickerVisibility: 'internal' },
     });
+  });
+
+  it('compiles Opus 5 direct Fast and DeepSeek V4 protocol-specific controls without aliases', () => {
+    const catalog = compileProviderCatalog(input());
+    const opus5 = catalog.surfaces.get('anthropic')?.surface.models
+      .find((model) => model.modelId === 'claude-opus-5');
+    expect(opus5).toMatchObject({
+      contextTiers: [expect.objectContaining({ maxPromptTokens: 1_000_000, maxOutputTokens: 128_000 })],
+      cost: { input: 5, output: 25 },
+      controls: {
+        fast: { state: 'selectable', entitlement: 'unknown' },
+        reasoning: {
+          supportsOff: true,
+          levels: ['low', 'medium', 'high', 'xhigh', 'max'],
+          defaultSelection: 'high',
+        },
+      },
+      executionBindings: [expect.objectContaining({
+        actions: [
+          { kind: 'request-patch', patch: { speed: 'fast' } },
+          { kind: 'request-headers', headers: { 'anthropic-beta': 'fast-mode-2026-02-01' } },
+        ],
+      })],
+    });
+
+    const deepseek = catalog.surfaces.get('deepseek')?.surface;
+    const flash = deepseek?.models.find((model) => model.modelId === 'deepseek-v4-flash');
+    const pro = deepseek?.models.find((model) => model.modelId === 'deepseek-v4-pro');
+    expect(flash?.route.protocol).toBe('OpenAIResponses');
+    expect(flash?.routeOptions?.map((option) => option.route.protocol)).toEqual([
+      'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'AnthropicMessages',
+    ]);
+    expect(pro?.routeOptions?.map((option) => option.route.protocol)).toEqual([
+      'OpenAICompatibleChatCompletions', 'AnthropicMessages',
+    ]);
+    expect(pro?.routeOptions?.map((option) => option.route.protocol)).not.toContain('OpenAIResponses');
+    expect(deepseek?.models.every((model) => model.aliases.length === 0)).toBe(true);
   });
 
   it('requires explicit typed connection schemas instead of a runtime API-key fallback', () => {

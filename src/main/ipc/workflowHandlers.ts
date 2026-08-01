@@ -1,9 +1,8 @@
 import { ipcMain } from 'electron';
 import { traceProjectionRefreshService } from '../agent-trace/TraceProjectionRefreshService';
-import type { RunSummary } from '@shared/types/session';
+import type { RunContextUsageReadResult, RunSummary } from '@shared/types/session';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { rdxSessionService } from '../sessions';
-import { debuggerLlmService } from '../settings/DebuggerLlmService';
 import { runExecutionService } from '../workflow/debugger/RunExecutionService';
 import { debuggerRuntime } from '../workflow/debugger/DebuggerRuntime';
 import type { WorkbenchIpcContext } from './workbenchContext';
@@ -14,6 +13,7 @@ import {
   WorkflowResumeArgsSchema,
   WorkflowStopArgsSchema,
 } from './validation/ipcSchemas';
+import { readRunContextUsage } from './runContextUsageBoundary';
 
 export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
   const { state } = context;
@@ -81,19 +81,13 @@ export function registerWorkflowHandlers(context: WorkbenchIpcContext): void {
     }
   });
 
-  ipcMain.handle('workflow:getRunUsage', async (_event, ...rawArgs: unknown[]) => {
+  ipcMain.handle('workflow:getRunUsage', async (_event, ...rawArgs: unknown[]): Promise<RunContextUsageReadResult> => {
     const [request] = parseIpcArgs(WorkflowGetRunUsageArgsSchema, rawArgs, {
       label: 'workflow:getRunUsage',
       maxBytes: 4 * 1024,
       padTo: 1,
     });
-    if (!storageAdapter.readSession(request.sessionId)) {
-      return { usage: null, stale: false };
-    }
-
-    return {
-      usage: debuggerLlmService.getSessionContextUsage(request),
-    };
+    return readRunContextUsage(request);
   });
 
   ipcMain.handle('workflow:listRuns', async (_event, ...rawArgs: unknown[]) => {

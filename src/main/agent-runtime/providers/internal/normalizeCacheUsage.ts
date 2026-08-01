@@ -57,6 +57,7 @@ export interface ProviderUsageDraft {
   inputTokens: number;
   outputTokens: number;
   totalTokens?: number;
+  speed?: 'standard' | 'fast';
   cacheReadTokens?: number;
   cacheWriteTokens?: number;
   cacheWriteLongTokens?: number;
@@ -94,6 +95,7 @@ export function finalizeProviderUsage(draft: ProviderUsageDraft): import('../../
     ...(rest.cacheWriteTokens !== undefined ? { cacheWriteTokens: rest.cacheWriteTokens } : {}),
     ...(rest.cacheWriteLongTokens !== undefined ? { cacheWriteLongTokens: rest.cacheWriteLongTokens } : {}),
     ...(rest.reasoningTokens !== undefined ? { reasoningTokens: rest.reasoningTokens } : {}),
+    ...(rest.speed !== undefined ? { speed: rest.speed } : {}),
     ...(rest.cost !== undefined ? { cost: rest.cost } : {}),
     ...normalized,
   };

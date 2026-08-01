@@ -186,7 +186,15 @@ export function toDeclarativeCatalogContributions(
     label: model.label,
     aliases: model.aliases,
     availability: 'available',
-    route: discoveredModelRoute(model, fallbackRoute),
+    // A list endpoint that does not report a protocol is availability evidence,
+    // not route evidence. Applying the provider fallback here would overwrite a
+    // model-owned route (for example DeepSeek V4 Pro's Chat Completions route)
+    // merely because the provider default is Responses. User-managed models are
+    // created with the request fallback before this patch is merged, so omitting
+    // an unobserved route remains executable without inventing live facts.
+    ...(model.route || model.protocol
+      ? { route: discoveredModelRoute(model, fallbackRoute) }
+      : {}),
     ...(model.contextWindow !== undefined
       ? {
           contextTiers: [{

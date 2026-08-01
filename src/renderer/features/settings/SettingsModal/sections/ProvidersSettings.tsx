@@ -215,7 +215,7 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
         <details className="settings-provider-upcoming" data-testid="settings-provider-upcoming">
           <summary className="settings-provider-upcoming-summary">
             <span>{t('settings.providers.upcoming')}</span>
-            <span>{t('settings.providerModelCount', { count: upcomingProviders.length })}</span>
+            <span>{t('settings.providerCount', { count: upcomingProviders.length })}</span>
           </summary>
           <div className="settings-provider-upcoming-body">
             <div className="settings-section-subtitle">{t('settings.providers.upcomingHint')}</div>

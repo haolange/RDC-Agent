@@ -1,6 +1,7 @@
 /**
  * ToolSearch — 运行时工具发现 AgentTool。
  */
+import { createHash } from 'node:crypto';
 import type { AgentTool, AgentToolResult } from '../agent/AgentTool';
 
 export type ToolSearchToolInfo = Pick<AgentTool, 'name' | 'description' | 'parameters' | 'spec'>;
@@ -22,6 +23,9 @@ export interface ToolSearchMatch {
 }
 
 export interface ToolSearchPage {
+  code: 'MATCHES_IN_EFFECTIVE_TOOL_SET' | 'NO_MATCH_IN_EFFECTIVE_TOOL_SET';
+  authoritative: true;
+  scopeFingerprint: string;
   total: number;
   offset: number;
   limit: number;
@@ -91,12 +95,25 @@ export function searchTools(tools: ToolSearchToolInfo[], params: ToolSearchParam
     parameters: tool.parameters ?? { type: 'object', properties: {} },
   }));
 
-  return { total, offset, limit, matches: page };
+  return {
+    code: total === 0 ? 'NO_MATCH_IN_EFFECTIVE_TOOL_SET' : 'MATCHES_IN_EFFECTIVE_TOOL_SET',
+    authoritative: true,
+    scopeFingerprint: createToolSetFingerprint(tools),
+    total,
+    offset,
+    limit,
+    matches: page,
+  };
 }
 
 export function formatToolSearchResult(page: ToolSearchPage): string {
   if (page.total === 0) {
-    return 'No matching tools found.';
+    return [
+      'No matching tools exist in the effective tool set for this turn.',
+      `Code: ${page.code}`,
+      `Effective tool set fingerprint: ${page.scopeFingerprint}`,
+      'This result is authoritative. Do not repeat the same search unless the effective tool set fingerprint changes.',
+    ].join('\n');
   }
 
   const start = page.matches.length === 0 ? 0 : page.offset + 1;
@@ -117,6 +134,29 @@ export function formatToolSearchResult(page: ToolSearchPage): string {
   });
 
   return `Found ${page.total} tools (showing ${rangeLabel}):\n${blocks.join('\n')}`;
+}
+
+export function createToolSetFingerprint(tools: readonly ToolSearchToolInfo[]): string {
+  const canonicalTools = tools
+    .map((tool) => ({
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters ?? { type: 'object', properties: {} },
+      spec: tool.spec ?? null,
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+  return createHash('sha256').update(stableSerialize(canonicalTools)).digest('hex').slice(0, 24);
+}
+
+function stableSerialize(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(',')}]`;
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, child]) => `${JSON.stringify(key)}:${stableSerialize(child)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
 }
 
 export function createToolSearchTool(getAllTools: () => ToolSearchToolInfo[]): AgentTool {

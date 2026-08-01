@@ -24,7 +24,7 @@ import type {
   LlmProviderProtocol,
 } from '@shared/types/settings';
 import { planModelRequest } from './RequestPlanner';
-import { parseCopilotBillingTiers } from './CopilotBilling';
+import { parseCopilotBillingContribution } from './CopilotBilling';
 import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 import { settingsService } from './SettingsService';
 import { projectModelProtocolOverlays, resolveModelRoutePrecedence } from './ProviderRouteProjection';
@@ -57,7 +57,7 @@ function executionBindingMatchesPlan(binding: ExecutionBindingDefinition, plan: 
 function routeFor(
   provider: LlmProviderEntry,
   modelRoute?: ModelRoute,
-  selectedProtocol = modelRoute?.source === 'model' ? modelRoute.protocol : provider.protocol,
+  selectedProtocol = modelRoute?.protocol ?? provider.protocol,
 ): ModelRoute {
   const surface = getLoadedProviderSurface(provider.id);
   const targetProtocol = selectedProtocol;
@@ -123,10 +123,15 @@ export function buildCatalogModelContribution(
         ...fields
       }) => fields)(definition)
     : null;
+  const selectedCatalogProtocol = catalogDefinition?.routeOptions?.some((option) => (
+    option.route.protocol === provider.protocol
+  ))
+    ? provider.protocol
+    : catalogDefinition?.route?.protocol ?? provider.protocol;
   const base: CatalogModelContribution = catalogDefinition
     ? {
         ...catalogDefinition,
-        route: routeFor(provider, catalogDefinition.route),
+        route: routeFor(provider, catalogDefinition.route, selectedCatalogProtocol),
         routeOptions: catalogDefinition.routeOptions?.map((option) => ({
           ...option,
           route: routeFor(provider, option.route, option.route.protocol),
@@ -184,10 +189,8 @@ function copilotEntitlementContribution(provider: LlmProviderEntry): CatalogLaye
   try {
     const raw = settingsService.getProviderOAuthSecret(provider.id);
     const bundle = JSON.parse(raw) as { copilotModelBilling?: Record<string, unknown> };
-    const models = Object.entries(bundle.copilotModelBilling ?? {}).flatMap(([modelId, billing]) => {
-      const contextTiers = parseCopilotBillingTiers(billing);
-      return contextTiers.length > 0 ? [{ modelId, contextTiers }] : [];
-    });
+    const models = Object.entries(bundle.copilotModelBilling ?? {})
+      .flatMap(([modelId, billing]) => parseCopilotBillingContribution(modelId, billing) ?? []);
     if (models.length === 0) return undefined;
     return {
       source: 'entitlement',

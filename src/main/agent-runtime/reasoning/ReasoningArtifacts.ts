@@ -43,7 +43,11 @@ export function withThinkingText(thinking: ThinkingContent, text: string): Think
 
 export function appendThinkingText(thinking: ThinkingContent, delta: string): ThinkingContent {
   if (!delta) return thinking;
-  return withThinkingText(thinking, (thinking.text ?? '') + delta);
+  const text = (thinking.text ?? '') + delta;
+  return {
+    ...thinking,
+    ...(text ? { text } : { text: undefined }),
+  };
 }
 
 export function mergeThinkingContent(

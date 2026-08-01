@@ -25,9 +25,9 @@
     {
       "id": "rdc-agent:volcengine-coding-plan:0",
       "sourceKind": "rdc-agent",
-      "sourceRevision": "RDC-Agent-Provider-Model-Catalog.md@2026-07-14",
-      "observedAt": "2026-07-14",
-      "refreshedAt": "2026-07-15T13:04:00+08:00",
+      "sourceRevision": "capability-probe-matrix@2026-08-01",
+      "observedAt": "2026-08-01",
+      "refreshedAt": "2026-08-01",
       "surface": "volcengine-coding-plan",
       "accountScope": "observed-account",
       "surfaceBuild": "RDC-Agent 1.0.0",
@@ -371,7 +371,8 @@
       "aliases": [
         "doubao-seed-code-preview"
       ],
-      "availability": "available",
+      "availability": "unavailable",
+      "unavailableReason": "The Volcengine execution endpoint reports that this model does not support the Coding Plan feature.",
       "contextTiers": [
         {
           "id": "default",
@@ -537,7 +538,8 @@
       "aliases": [
         "MiniMax-M2.5"
       ],
-      "availability": "available",
+      "availability": "unavailable",
+      "unavailableReason": "The Volcengine execution endpoint reports that this model does not support the Coding Plan feature.",
       "contextTiers": [
         {
           "id": "default",
@@ -886,7 +888,8 @@
       "modelId": "kimi-k2.5",
       "label": "kimi-k2.5",
       "aliases": [],
-      "availability": "available",
+      "availability": "unavailable",
+      "unavailableReason": "The Volcengine execution endpoint reports that this model does not support the Coding Plan feature.",
       "contextTiers": [
         {
           "id": "default",
@@ -1062,7 +1065,8 @@
       "modelId": "glm-5.1",
       "label": "glm-5.1",
       "aliases": [],
-      "availability": "available",
+      "availability": "unavailable",
+      "unavailableReason": "The Volcengine execution endpoint reports that this model does not support the Coding Plan feature.",
       "contextTiers": [
         {
           "id": "default",
@@ -1143,7 +1147,8 @@
       "modelId": "glm-4.7",
       "label": "glm-4.7",
       "aliases": [],
-      "availability": "available",
+      "availability": "unavailable",
+      "unavailableReason": "The Volcengine execution endpoint reports that this model does not support the Coding Plan feature.",
       "contextTiers": [
         {
           "id": "default",

@@ -5,9 +5,12 @@ export interface ActiveTurnContext {
   sessionId: string;
   projectId: string | null;
   requestId: string;
+  agentId: string;
   optimisticTurnId: string | null;
   realTurnId: string | null;
 }
+
+export type ActiveTurnOwnership = Pick<ActiveTurnContext, 'sessionId' | 'requestId' | 'agentId'>;
 
 export interface LastSentPrompt {
   sessionId: string;
@@ -23,9 +26,12 @@ interface ComposerSessionContextState {
   isPromptSending: boolean;
 
   beginTurn: (context: ActiveTurnContext) => void;
-  setRealTurnId: (turnId: string) => void;
-  clearActiveTurn: () => void;
-  clearActiveTurnIfSession: (sessionId: string | null | undefined) => void;
+  setRealTurnId: (
+    ownership: ActiveTurnOwnership,
+    turnId: string,
+    committedSessionId?: string | null,
+  ) => void;
+  clearActiveTurnIfOwned: (ownership: ActiveTurnOwnership) => void;
   setLastSent: (lastSent: LastSentPrompt | null) => void;
   setIsPromptSending: (sending: boolean) => void;
   /** Session switch hygiene: drop in-flight send context for any session. */
@@ -38,15 +44,20 @@ export const useComposerSessionContextStore = create<ComposerSessionContextState
   isPromptSending: false,
 
   beginTurn: (context) => set({ activeTurn: context }),
-  setRealTurnId: (turnId) => {
+  setRealTurnId: (ownership, turnId, committedSessionId) => {
     const current = get().activeTurn;
-    if (!current) return;
-    set({ activeTurn: { ...current, realTurnId: turnId } });
+    if (!current || !ownsActiveTurn(current, ownership)) return;
+    set({
+      activeTurn: {
+        ...current,
+        sessionId: committedSessionId ?? current.sessionId,
+        realTurnId: turnId,
+      },
+    });
   },
-  clearActiveTurn: () => set({ activeTurn: null }),
-  clearActiveTurnIfSession: (sessionId) => {
+  clearActiveTurnIfOwned: (ownership) => {
     const current = get().activeTurn;
-    if (current && sessionId && current.sessionId === sessionId) {
+    if (current && ownsActiveTurn(current, ownership)) {
       set({ activeTurn: null });
     }
   },
@@ -58,6 +69,15 @@ export const useComposerSessionContextStore = create<ComposerSessionContextState
     // Keep lastSent for its owning session; restore path validates sessionId.
   }),
 }));
+
+export function ownsActiveTurn(
+  activeTurn: ActiveTurnContext,
+  ownership: ActiveTurnOwnership,
+): boolean {
+  return activeTurn.sessionId === ownership.sessionId
+    && activeTurn.requestId === ownership.requestId
+    && activeTurn.agentId === ownership.agentId;
+}
 
 /** Restore draft only when lastSent owns the current session. */
 export function restoreLastSentIfCurrentSession(

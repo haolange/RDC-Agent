@@ -37,6 +37,27 @@ describe('buildOpenAiResponsesReasoning', () => {
       control: reasoningControl,
     }).reasoning).toMatchObject({ effort: 'max' });
   });
+
+  it('uses the documented DeepSeek Responses none wire when Off is selected', () => {
+    const control = {
+      kind: 'levels',
+      supportsOff: true,
+      levels: ['low', 'high', 'xhigh', 'max'],
+      defaultSelection: 'high',
+      wireProfile: {
+        kind: 'openai-responses',
+        on: 'high',
+        levels: { low: 'low', high: 'high', xhigh: 'high', max: 'max' },
+        offMode: 'reasoning-none',
+      },
+    } satisfies ReasoningControl;
+
+    expect(buildOpenAiResponsesReasoning({ selection: 'off', control })).toEqual({
+      reasoning: { effort: 'none' },
+    });
+    expect(buildOpenAiResponsesReasoning({ selection: 'xhigh', control }).reasoning)
+      .toEqual({ effort: 'high' });
+  });
 });
 
 describe('applyAnthropicReasoning', () => {

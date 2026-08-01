@@ -8,7 +8,7 @@ import {
   isDeferredToolName,
   isMcpPrefixedToolName,
   partitionDeferredTools,
-  preactivateTaskLifecycleTools,
+  preactivateTaskTools,
 } from './deferredTools';
 
 describe('isMcpPrefixedToolName', () => {
@@ -40,20 +40,32 @@ describe('isDeferredToolName', () => {
   });
 });
 
-describe('preactivateTaskLifecycleTools', () => {
-  it('activates creation and update only when the complete task capability is available', () => {
+describe('preactivateTaskTools', () => {
+  it('activates the complete granted task surface in canonical order', () => {
     const activated = new Set<string>(['mcp__fs__read']);
-    preactivateTaskLifecycleTools([
+    preactivateTaskTools([
       { name: 'task_create' },
       { name: 'task_update' },
+      { name: 'task_get' },
       { name: 'output_register' },
       { name: 'task_list' },
+      { name: 'task_stop' },
     ], activated);
-    expect([...activated]).toEqual(['mcp__fs__read', 'task_create', 'task_update', 'output_register']);
+    expect([...activated]).toEqual([
+      'mcp__fs__read',
+      'task_create',
+      'task_update',
+      'task_get',
+      'task_list',
+      'task_stop',
+      'output_register',
+    ]);
+  });
 
-    const incomplete = new Set<string>();
-    preactivateTaskLifecycleTools([{ name: 'task_create' }], incomplete);
-    expect(incomplete).toEqual(new Set());
+  it('activates only the read-only task tools granted to Ask', () => {
+    const readOnly = new Set<string>();
+    preactivateTaskTools([{ name: 'task_list' }, { name: 'task_get' }], readOnly);
+    expect([...readOnly]).toEqual(['task_get', 'task_list']);
   });
 });
 describe('partitionDeferredTools', () => {

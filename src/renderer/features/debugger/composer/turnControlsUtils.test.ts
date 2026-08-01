@@ -4,8 +4,6 @@ import {
   buildInitialTurnControls,
   hasSelectableFastMode,
   hasSelectableOneMillionContext,
-  hasStructuralFastMode,
-  hasStructuralOneMillionContext,
   isFastModeDenied,
   isFastModeUnverified,
   isOneMillionContextDenied,
@@ -173,10 +171,8 @@ describe('turnControlsUtils', () => {
         context1m: { state: 'selectable' as const, defaultValue: false, entitlement: 'denied' as const, tierId: 'max' },
       },
     };
-    expect(hasStructuralFastMode(deniedFast)).toBe(true);
     expect(hasSelectableFastMode(deniedFast)).toBe(false);
     expect(isFastModeDenied(deniedFast)).toBe(true);
-    expect(hasStructuralOneMillionContext(deniedFast)).toBe(true);
     expect(isOneMillionContextDenied(deniedFast)).toBe(true);
 
     const unverifiedFast = {
@@ -186,7 +182,6 @@ describe('turnControlsUtils', () => {
         fast: { state: 'selectable' as const, defaultValue: false, entitlement: 'unknown' as const },
       },
     };
-    expect(hasStructuralFastMode(unverifiedFast)).toBe(true);
     expect(hasSelectableFastMode(unverifiedFast)).toBe(false);
     expect(isFastModeUnverified(unverifiedFast)).toBe(true);
 
@@ -198,7 +193,7 @@ describe('turnControlsUtils', () => {
         context1m: { state: 'unsupported' as const, fixedValue: false },
       },
     };
-    expect(hasStructuralFastMode(unsupported)).toBe(false);
-    expect(hasStructuralOneMillionContext(unsupported)).toBe(false);
+    expect(hasSelectableFastMode(unsupported)).toBe(false);
+    expect(hasSelectableOneMillionContext(unsupported)).toBe(false);
   });
 });

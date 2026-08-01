@@ -423,9 +423,7 @@
     {
       "modelId": "deepseek-v4-pro",
       "label": "deepseek-v4-pro",
-      "aliases": [
-        "deepseek-reasoner"
-      ],
+      "aliases": [],
       "availability": "available",
       "contextTiers": [
         {

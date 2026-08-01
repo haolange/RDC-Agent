@@ -73,4 +73,15 @@ describe('provider request URL contracts', () => {
       'claude-sonnet-4-6',
     )).toBe('https://api-gateway.merge.dev/v1/anthropic/messages');
   });
+
+  it('adds the protocol version for an official unversioned Anthropic-compatible base', () => {
+    expect(buildAnthropicMessagesUrl(
+      'https://api.kimi.com/coding/',
+      'k3',
+    )).toBe('https://api.kimi.com/coding/v1/messages');
+    expect(buildAnthropicMessagesUrl(
+      'https://api.deepseek.com/anthropic',
+      'deepseek-v4-pro',
+    )).toBe('https://api.deepseek.com/anthropic/v1/messages');
+  });
 });

@@ -1006,6 +1006,15 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   background: transparent;
 }
 
+.work-process-step-rail.status-skipped .work-process-rail-marker {
+  border-color: color-mix(in srgb, var(--token-text-caption) 55%, transparent);
+  background: color-mix(in srgb, var(--token-text-caption) 16%, transparent);
+}
+
+.work-process-tool-card.status-skipped .work-process-tool-card-verb {
+  color: var(--token-text-muted);
+}
+
 @keyframes work-process-rail-pulse {
   0% { transform: scale(0.8); opacity: 0.7; }
   100% { transform: scale(1.6); opacity: 0; }
@@ -2116,30 +2125,6 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   .work-process-tool-card-meta {
     gap: var(--space-1) var(--space-2);
   }
-}
-
-/* === Agent Status Indicator === */
-.composer-agent-status-dot {
-  display: inline-block;
-  width: var(--space-6);
-  height: var(--space-6);
-  border-radius: 50%;
-  margin-left: var(--space-4);
-  flex-shrink: 0;
-}
-
-.composer-agent-status-dot.is-active {
-  background: var(--token-status-success);
-  animation: pulse-status 1.4s ease-in-out infinite;
-}
-
-.composer-agent-status-dot.is-error {
-  background: var(--token-status-error);
-}
-
-@keyframes pulse-status {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.5; transform: scale(0.8); }
 }
 
 /* Message chrome refinement */

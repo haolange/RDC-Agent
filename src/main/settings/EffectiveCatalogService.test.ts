@@ -63,6 +63,38 @@ describe('EffectiveCatalogService', () => {
     vi.restoreAllMocks();
   });
 
+  it('marks a discovery-only model without a positive executable context budget unavailable', async () => {
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
+    const [model] = mergeEffectiveCatalog(request({
+      catalog: {
+        source: 'catalog',
+        observedAt: '2026-01-01T00:00:00.000Z',
+        models: [],
+      },
+      discovery: {
+        source: 'discovery',
+        observedAt: '2026-01-02T00:00:00.000Z',
+        models: [{
+          modelId: 'discovery-without-limits',
+          label: 'Discovery without limits',
+          availability: 'available',
+          routeOptions: [{
+            id: 'chat',
+            route,
+            availability: 'available',
+          }],
+        }],
+      },
+    }));
+
+    expect(model).toMatchObject({
+      modelId: 'discovery-without-limits',
+      availability: 'unavailable',
+      defaultBudgetTokens: 0,
+      unavailableReason: expect.stringContaining('positive executable context budget'),
+    });
+  });
+
   it('merges every layer by field and records winning field evidence', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const [model] = mergeEffectiveCatalog(request({
@@ -444,6 +476,7 @@ describe('EffectiveCatalogService', () => {
           modelId: 'claude-opus-4-8',
           label: 'Seed Opus',
           availability: 'available',
+          defaultBudgetTokens: 200_000,
           controls: { fast: { state: 'unsupported', fixedValue: false } },
         }],
       },
@@ -601,6 +634,31 @@ describe('EffectiveCatalogService', () => {
     expect(service.getSnapshot(request()).models[0].label).toBe('Cold discovery');
     await vi.waitFor(() => expect(service.getSnapshot(request()).models[0].label).toBe('SWR discovery'));
     expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the catalog revision stable when refresh only renews evidence timestamps', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    let nowMs = Date.parse('2026-01-01T00:00:00.000Z');
+    const service = new EffectiveCatalogService({ statePath, now: () => new Date(nowMs) });
+
+    await service.refreshDiscovery(request(), async () => ({
+      models: [{ modelId: 'model-a', label: 'Stable discovery' }],
+    }));
+    const first = service.getSnapshot(request());
+
+    nowMs += 60_000;
+    await service.refreshDiscovery(request(), async () => ({
+      models: [{ modelId: 'model-a', label: 'Stable discovery' }],
+    }));
+    const timestampOnlyRefresh = service.getSnapshot(request());
+
+    expect(timestampOnlyRefresh.models[0].provenance).not.toEqual(first.models[0].provenance);
+    expect(timestampOnlyRefresh.catalogRevision).toBe(first.catalogRevision);
+
+    await service.refreshDiscovery(request(), async () => ({
+      models: [{ modelId: 'model-a', label: 'Changed discovery' }],
+    }));
+    expect(service.getSnapshot(request()).catalogRevision).not.toBe(first.catalogRevision);
   });
 
   it('retains last-known-good after refresh failure and isolates account caches', async () => {

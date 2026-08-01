@@ -101,12 +101,13 @@ Discovery authority 为 `authoritative-list`、`candidate-validation`、`additiv
 - `discovered`：完整 authoritative list 的缺席可以判定不可用；
 - `account-entitled`：由账号完整列表决定访问权。
 
-Catalog ownership 只用于审计，不能决定 discovery 缺席语义。Kimi Coding Plan 使用稳定产品身份：`kimi-for-coding` 是基础 primary，精确 `k3` 仅在当前 credential-scoped authoritative catalog 返回时成为第二个 primary，`kimi-for-coding-highspeed` 始终是不可选择的 internal Fast target，`k3[1m]` 是 manifest-maintained 的 internal Context Max target。三个 live identity 均按 `account-entitled` 处理，缺席会 tombstone；internal target 永远不进入 selector 或持久化配置，已引用 primary route 保持 fail-closed。后台 K2.x/K3 版本名只可进入 provenance/脱敏诊断，禁止生成 selector、alias、持久化 route 或跨 surface 映射。
+Catalog ownership 只用于审计，不能决定 discovery 缺席语义。Kimi Coding Plan 只使用官方四个精确 model id：`k3`、`k3-256k`、`kimi-for-coding`、`kimi-for-coding-highspeed`。前三者是 primary；HighSpeed 是 `kimi-for-coding` 的 internal Fast target。`k3` 的 1M 是同一 model id 的 client-side context tier，禁止恢复虚构的 `k3[1m]` target。四个 live identity 均按 `account-entitled` 处理，缺席会 tombstone；internal target 不进入 selector 或持久化配置，已引用 primary route 保持 fail-closed。Anthropic-compatible base URL 固定为 `/coding`，OpenAI-compatible base URL 固定为 `/coding/v1`。后台版本名只可进入 provenance/脱敏诊断，禁止生成 selector、alias、持久化 route 或跨 surface 映射。
 Credential-scoped live discovery follows one path: `parser -> LiveModelObservation -> manifest.liveProjection -> CatalogModelContribution -> Effective Catalog`. Parsers report only explicit upstream identity, availability, context, protocol, reasoning metadata, and capability evidence. Product labels, selection, routes, tiers, controls, bindings, and Fast targets remain compiled-manifest facts. `liveProjection` declares allowed fields and authority; it is never exposed through IPC or Settings persistence.
 Missing protocol, context, or reasoning efforts remain manifest-owned or unknown; projection never guesses OpenAI-compatible, 256K, or High. `observedTierId` scopes a live capacity to one manifest tier, and `entitlementAuthority` independently selects manifest, catalog-observation, or execution-evidence authority. A default-tier 256K observation cannot erase a separate 1M tier; target presence cannot grant a Fast or Max binding.
 
 Discovery、overlay、entitlement、observed evidence 和 user preference 按字段合并。冲突记录 provenance，不静默覆盖。Unknown model fallback 不创造窗口、Fast、Max mode 或 reasoning 事实。Max mode 的目标 tier 在每次 live overlay 合并后都必须保持完整窗口至少一百万 tokens；否则只阻断 Max mode，默认模型继续可用。 Account discovery 只有在当前认证表面同时证明 endpoint 与协议可执行时才可贡献 route；Super Grok 的 direct xAI `/models` 仅提供 availability/context 事实，执行 route 继续由 `cli-chat-proxy.grok.com` OAuth manifest/Builder catalog 掌管。该 proxy 所需的非秘密客户端协议版本同样属于 route manifest；不得依赖运行机器恰好安装 Grok CLI，也不得在 adapter 中按 hostname 猜测或伪造。
-Structural capability, account entitlement, expiring execution evidence, and transient quota are independent dimensions. Unknown or denied entitlement disables normal execution without hiding the explicit Retry surface. Observed evidence replaces the same provider/account/protocol/model/binding scope, and capability-probe denials expire or are cleared by catalog refresh and explicit Retry. HTTP 401/403 is not itself subscription evidence: only a strict manifest matcher scoped to the model, mode, and optional protocol may classify a rejection as entitlement denial.
+`catalogRevision` 是 preflight 与冻结 `RequestPlan` 共用的语义 revision：它包含 effective model 的 route、control、availability、selection、quota 等行为事实，但排除 provenance 时间戳与快照生成时间。SWR discovery 只续期相同 evidence 时 revision 必须不变；有效模型事实变化时才使旧 preflight fail-closed。
+Structural capability, account entitlement, expiring execution evidence, and transient quota are independent dimensions. Unknown or denied entitlement disables normal execution without hiding the explicit Retry surface. Observed evidence replaces the same provider/account/protocol/model/binding scope, and capability-probe denials expire or are cleared by catalog refresh and explicit Retry. HTTP 401/403 is not itself subscription evidence: only a strict manifest matcher scoped to the model, mode, and optional protocol may classify a rejection as entitlement denial. HTTP 429 is transient quota; HTTP 402 is transient quota only when the response explicitly identifies `quota_exceeded` / quota exhaustion, otherwise it remains unknown. Capability probes attach a bounded retry expiry and never downgrade structural capability.
 
 
 ## 凭据与请求事务
@@ -132,10 +133,11 @@ Preflight 失败或取消不得留下 Session、Turn、branch、attachment、jou
 ## 重点事实契约
 
 - ChatGPT OAuth：GPT-5.4/5.5/5.6 的 Fast 按该 surface 精确 binding；GPT-5.4 mini 与 Spark 均无 Fast。5.6 支持 Low/Medium/High/Extra/Max。
-- Copilot：结构能力由 manifest/user-observed fact 保留，账号 `/models` policy 与 entitlement 只收窄访问。Gemini 3.1 Pro 默认 200K 并可选 Max mode；Gemini 3.5 Flash 只有固定 1M Max mode，不存在 200K 普通模式。标记原生 1M 的 Claude 显示固定 Max mode；Opus Fast 仅使用精确 internal binding。
-- Kimi Coding Plan：稳定基础入口为 `kimi-for-coding`；账户目录精确返回 `k3` 时才增加 `Kimi K3`，highspeed 仅作为内部 Fast target。禁止显示或接纳 `Kimi K2.7 Code` / `kimi-k2.7-code`。K3 reasoning、Context Max mode 与 Fast 分别服从该 surface 的 live contract，不从名称或其他 Moonshot surface 推断。
+- Anthropic Direct：`claude-opus-5` 为 1M input / 128K output、$5/$25、Low/Medium/High/Extra/Max（默认 High）并显式支持 Off。Fast 是 `speed=fast` + beta header 的 request binding；只有真实 usage 返回 `speed=fast` 才授予 entitlement。
+- Copilot：结构能力由 manifest/user-observed fact 保留，账号 `/models` 的 `supported_reasoning_efforts`、`capabilities.supports`、默认/long-context billing tier、endpoint 与 policy 是当前账户的覆盖真值。支持扩展上下文的模型必须呈现“默认窗口 + 可选 1M”，禁止再把 Claude/GPT 扩展窗口写成固定 1M。`claude-opus-5` 只有在当前账户 discovery 精确返回 model id 和 agent endpoint 时可选，不继承 Direct API Fast。
+- Kimi Coding Plan：账户目录只接纳 `k3`、`k3-256k`、`kimi-for-coding`、`kimi-for-coding-highspeed`。K3 两个精确 ID 均为 Low/High/Max（默认 High）；关闭 Thinking 会路由到 K2.6，因此 K3 UI 不暴露 Off。`k3` 的 1M entitlement、HighSpeed Fast 与各模型多模态能力分别服从该 surface 的 live contract，不从名称或其他 Moonshot surface 推断。
 - GLM-5.2：固定 1M、High/Max、默认 High、无 Off/Fast；不同协议使用不同 wire profile。
-- DeepSeek Pro/Flash：固定 1M、Off/High/Max、默认 High。
+- DeepSeek Direct：Pro/Flash 固定 1M、默认 High。Flash UI 为 Off/Low/High/Max；Pro UI 为 Off/High/Max。兼容输入 mapping 分别为 Flash `low/high/xhigh/max → low/high/high/max`、Pro `low/high/xhigh/max → high/high/max/max`，不能把被折叠的兼容输入再渲染成额外档位。Flash 默认 `OpenAIResponses`，也支持 Chat Completions / Anthropic；Pro 只支持后两者且保持 Preview。Thinking 开启时 inert sampling 参数必须从 wire 删除；旧 `deepseek-chat` / `deepseek-reasoner` alias 已删除。
 - Grok 4.20 non-reasoning、reasoning、multi-agent 是三个独立模型；multi-agent 推理控件 fail-closed（UI=`Disabled`），不提供 reasoning toggle。Grok 4.3 是固定 1M 的 Max mode，Grok 4.5 Super Grok OAuth 不继承 direct xAI API 的 Priority Fast，Grok Build 0.1 为 256K。
 - canonical wire 保留 `xhigh`，产品统一显示 `Extra`；不存在 Ultra 档位。
 
@@ -144,6 +146,8 @@ Preflight 失败或取消不得留下 Session、Turn、branch、attachment、jou
 Manifest 只能引用注册过的 `adapterId`、`authSchemaId`、`discoveryPolicyId` 和 `wireProfileId`。现有协议、认证机制、标准 discovery mapping、endpoint、route、model facts、controls、bindings 与 provenance 只改 JSON。
 
 只有新 wire protocol、请求签名、OAuth/device/refresh、非标准动态目录或外部进程集成才新增 TS 行为。GitLab Duo 与 SAP AI Core 使用专用 adapter；标准 OpenAI-compatible surface 复用统一 adapter，但不能把原生/混合 surface 强压成兼容协议。
+
+`OpenAIResponsesProvider` 必须处理 `response.reasoning_text.delta/done`、raw reasoning item、function-call continuation、terminal usage/error。DeepSeek 工具 loop 回放 Provider 要求的 raw reasoning/function-call item，且不使用 `previous_response_id`；Chat/Anthropic route 则按各自 continuation contract 回放 `reasoning_content`。
 
 最终操作 URL 按 operation builder 构建并逐 route 测试，禁止重复追加 `/chat/completions`、`/responses` 或 Anthropic `/v1`。所有 stable surface 必须具有 adapter、auth schema、endpoint、Connection Test 与 operation URL；无凭据显示 `Unconfigured`，不得显示假 `Available`。
 

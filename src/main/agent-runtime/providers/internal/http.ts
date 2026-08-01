@@ -207,7 +207,13 @@ export async function ensureOk(response: Response, providerApi: string): Promise
   } catch {
     bodyText = undefined;
   }
-  const snippet = bodyText ? bodyText.slice(0, 500) : response.statusText || 'request failed';
+  const looksLikeHtml = Boolean(bodyText && /(?:<!doctype\s+html|<html\b)/i.test(bodyText));
+  const htmlTitle = looksLikeHtml ? bodyText?.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] : undefined;
+  const snippet = looksLikeHtml
+    ? (htmlTitle?.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      || response.statusText
+      || 'HTML error response')
+    : bodyText ? bodyText.slice(0, 500) : response.statusText || 'request failed';
   throw new ProviderHttpError(providerApi, response.status, snippet, bodyText);
 }
 

@@ -27,9 +27,9 @@
     {
       "id": "rdc-agent:kimi-coding-plan:0",
       "sourceKind": "rdc-agent",
-      "sourceRevision": "kimi-code-catalog-v2-always-on",
-      "observedAt": "2026-07-23",
-      "refreshedAt": "2026-07-23T00:00:00+08:00",
+      "sourceRevision": "kimi-code-models@2026-08-02",
+      "observedAt": "2026-08-02",
+      "refreshedAt": "2026-08-02T00:00:00+08:00",
       "surface": "kimi-coding-plan",
       "accountScope": "credential-scoped",
       "plan": "Kimi Coding Plan"
@@ -61,7 +61,7 @@
       "id": "AnthropicMessages",
       "protocol": "AnthropicMessages",
       "adapterId": "anthropic-messages",
-      "baseUrl": "https://api.kimi.com/coding/v1",
+      "baseUrl": "https://api.kimi.com/coding",
       "default": true,
       "protocolOwner": "anthropic",
       "contractOverrides": {
@@ -143,19 +143,18 @@
         "state": "unknown"
       },
       "visionInput": {
-        "state": "unknown"
+        "state": "supported"
       },
       "structuredOutput": {
         "state": "unknown"
       },
-      "fixedTemperature": 1,
       "selection": {
         "pickerVisibility": "primary"
       },
       "presencePolicy": "account-entitled",
       "route": {
         "protocol": "AnthropicMessages",
-        "baseUrl": "https://api.kimi.com/coding/v1",
+        "baseUrl": "https://api.kimi.com/coding",
         "source": "catalog"
       },
       "routeOptions": [
@@ -163,7 +162,7 @@
           "id": "AnthropicMessages",
           "route": {
             "protocol": "AnthropicMessages",
-            "baseUrl": "https://api.kimi.com/coding/v1",
+            "baseUrl": "https://api.kimi.com/coding",
             "source": "catalog"
           },
           "availability": "available",
@@ -303,7 +302,7 @@
         "state": "unknown"
       },
       "visionInput": {
-        "state": "unknown"
+        "state": "supported"
       },
       "structuredOutput": {
         "state": "unknown"
@@ -314,7 +313,7 @@
       "presencePolicy": "account-entitled",
       "route": {
         "protocol": "AnthropicMessages",
-        "baseUrl": "https://api.kimi.com/coding/v1",
+        "baseUrl": "https://api.kimi.com/coding",
         "source": "catalog"
       },
       "routeOptions": [
@@ -322,7 +321,7 @@
           "id": "AnthropicMessages",
           "route": {
             "protocol": "AnthropicMessages",
-            "baseUrl": "https://api.kimi.com/coding/v1",
+            "baseUrl": "https://api.kimi.com/coding",
             "source": "catalog"
           },
           "availability": "available",
@@ -354,13 +353,24 @@
           "label": "Max mode"
         },
         "reasoning": {
-          "kind": "unknown",
+          "kind": "levels",
           "supportsOff": false,
-          "levels": [],
-          "defaultState": "provider-managed",
-          "defaultSelection": "on",
+          "levels": [
+            "low",
+            "high",
+            "max"
+          ],
+          "defaultState": "known",
+          "defaultSelection": "high",
           "wireProfile": {
-            "kind": "none"
+            "kind": "anthropic",
+            "on": "high",
+            "levels": {
+              "low": "low",
+              "high": "high",
+              "max": "max"
+            },
+            "onMode": "enabled"
           }
         }
       },
@@ -372,8 +382,8 @@
           },
           "actions": [
             {
-              "kind": "model-switch",
-              "targetModelId": "k3[1m]"
+              "kind": "client-tier",
+              "tierId": "max"
             }
           ],
           "entitlement": "unknown"
@@ -399,7 +409,7 @@
           "wireProfiles": {
             "AnthropicMessages": {
               "kind": "anthropic",
-              "on": "max",
+              "on": "high",
               "levels": {
                 "low": "low",
                 "medium": "medium",
@@ -411,7 +421,7 @@
             },
             "OpenAICompatibleChatCompletions": {
               "kind": "openai-compatible",
-              "on": "max",
+              "on": "high",
               "levels": {
                 "minimal": "minimal",
                 "low": "low",
@@ -432,41 +442,38 @@
       }
     },
     {
-      "modelId": "k3[1m]",
-      "label": "Kimi K3 Max target",
+      "modelId": "k3-256k",
+      "label": "Kimi K3 256K",
       "aliases": [],
-      "availability": "available",
+      "availability": "unknown",
       "contextTiers": [
         {
           "id": "default",
-          "label": "Max mode",
-          "maxPromptTokens": 1000000,
+          "label": "256K window",
+          "maxPromptTokens": 256000,
           "activation": {
             "kind": "implicit"
           },
           "entitlement": "unknown"
         }
       ],
-      "defaultBudgetTokens": 1000000,
+      "defaultBudgetTokens": 256000,
       "toolCalling": {
         "state": "unknown"
       },
       "visionInput": {
-        "state": "unknown"
+        "state": "supported"
       },
       "structuredOutput": {
         "state": "unknown"
       },
       "selection": {
-        "pickerVisibility": "internal",
-        "relatedPrimaryModelIds": [
-          "k3"
-        ]
+        "pickerVisibility": "primary"
       },
-      "presencePolicy": "maintained",
+      "presencePolicy": "account-entitled",
       "route": {
         "protocol": "AnthropicMessages",
-        "baseUrl": "https://api.kimi.com/coding/v1",
+        "baseUrl": "https://api.kimi.com/coding",
         "source": "catalog"
       },
       "routeOptions": [
@@ -474,7 +481,7 @@
           "id": "AnthropicMessages",
           "route": {
             "protocol": "AnthropicMessages",
-            "baseUrl": "https://api.kimi.com/coding/v1",
+            "baseUrl": "https://api.kimi.com/coding",
             "source": "catalog"
           },
           "availability": "available",
@@ -499,24 +506,68 @@
           "fixedValue": false
         },
         "context1m": {
-          "state": "fixed",
-          "fixedValue": true,
-          "entitlement": "unknown",
-          "tierId": "default",
-          "label": "Max mode"
+          "state": "unsupported",
+          "fixedValue": false
         },
         "reasoning": {
-          "kind": "unknown",
+          "kind": "levels",
           "supportsOff": false,
-          "levels": [],
-          "defaultState": "provider-managed",
-          "defaultSelection": "on",
+          "levels": [
+            "low",
+            "high",
+            "max"
+          ],
+          "defaultState": "known",
+          "defaultSelection": "high",
           "wireProfile": {
-            "kind": "none"
+            "kind": "anthropic",
+            "on": "high",
+            "levels": {
+              "low": "low",
+              "high": "high",
+              "max": "max"
+            },
+            "onMode": "enabled"
           }
         }
       },
-      "factSourceId": "rdc-agent:kimi-coding-plan:0"
+      "factSourceId": "rdc-agent:kimi-coding-plan:0",
+      "liveProjection": {
+        "context": {
+          "observedTierId": "default",
+          "entitlementAuthority": "catalog-observation"
+        },
+        "reasoning": {
+          "offPolicy": "forbidden",
+          "wireProfiles": {
+            "AnthropicMessages": {
+              "kind": "anthropic",
+              "on": "high",
+              "levels": {
+                "low": "low",
+                "high": "high",
+                "max": "max"
+              },
+              "onMode": "enabled"
+            },
+            "OpenAICompatibleChatCompletions": {
+              "kind": "openai-compatible",
+              "on": "high",
+              "levels": {
+                "low": "low",
+                "high": "high",
+                "max": "max"
+              },
+              "onMode": "thinking-enabled"
+            }
+          }
+        },
+        "capabilities": [
+          "toolCalling",
+          "visionInput",
+          "structuredOutput"
+        ]
+      }
     },
     {
       "modelId": "kimi-for-coding-highspeed",
@@ -539,12 +590,11 @@
         "state": "unknown"
       },
       "visionInput": {
-        "state": "unknown"
+        "state": "supported"
       },
       "structuredOutput": {
         "state": "unknown"
       },
-      "fixedTemperature": 1,
       "selection": {
         "pickerVisibility": "internal",
         "relatedPrimaryModelIds": [
@@ -554,7 +604,7 @@
       "presencePolicy": "account-entitled",
       "route": {
         "protocol": "AnthropicMessages",
-        "baseUrl": "https://api.kimi.com/coding/v1",
+        "baseUrl": "https://api.kimi.com/coding",
         "source": "catalog"
       },
       "routeOptions": [
@@ -562,7 +612,7 @@
           "id": "AnthropicMessages",
           "route": {
             "protocol": "AnthropicMessages",
-            "baseUrl": "https://api.kimi.com/coding/v1",
+            "baseUrl": "https://api.kimi.com/coding",
             "source": "catalog"
           },
           "availability": "available",
@@ -616,26 +666,11 @@
             "AnthropicMessages": {
               "kind": "anthropic",
               "on": "max",
-              "levels": {
-                "low": "low",
-                "medium": "medium",
-                "high": "high",
-                "xhigh": "xhigh",
-                "max": "max"
-              },
               "onMode": "enabled"
             },
             "OpenAICompatibleChatCompletions": {
               "kind": "openai-compatible",
               "on": "max",
-              "levels": {
-                "minimal": "minimal",
-                "low": "low",
-                "medium": "medium",
-                "high": "high",
-                "xhigh": "xhigh",
-                "max": "max"
-              },
               "onMode": "thinking-enabled"
             }
           }
@@ -649,6 +684,66 @@
     }
   ],
   "protocolOverrides": [
+    {
+      "modelId": "k3",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "high",
+              "max"
+            ],
+            "defaultState": "known",
+            "defaultSelection": "high",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "high",
+              "levels": {
+                "low": "low",
+                "high": "high",
+                "max": "max"
+              },
+              "onMode": "thinking-enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:kimi-coding-plan:0"
+    },
+    {
+      "modelId": "k3-256k",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": false,
+            "levels": [
+              "low",
+              "high",
+              "max"
+            ],
+            "defaultState": "known",
+            "defaultSelection": "high",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "high",
+              "levels": {
+                "low": "low",
+                "high": "high",
+                "max": "max"
+              },
+              "onMode": "thinking-enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:kimi-coding-plan:0"
+    },
     {
       "modelId": "kimi-for-coding",
       "protocol": "OpenAICompatibleChatCompletions",

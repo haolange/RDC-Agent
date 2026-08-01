@@ -144,7 +144,7 @@ const reasoningContentPlan = createPlan({
   providerId: 'deepseek',
   adapterId: 'openai-compatible',
   protocol: 'OpenAICompatibleChatCompletions',
-  modelId: 'deepseek-reasoner',
+  modelId: 'deepseek-v4-pro',
   carrier: 'reasoning-content',
   continuation: 'same-provider-model',
   artifactPolicy: 'preserve-reasoning-content',

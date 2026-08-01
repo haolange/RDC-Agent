@@ -51,30 +51,32 @@ export function useUserMessageRewrite(message: ConversationMessage) {
     const previousMessages = useConversationStore.getState().allConversationMessages;
     const previousBranchState = useConversationStore.getState().branchState;
     const requestId = createConversationRequestId();
+    const rewriteAgentId = pairedAssistant?.agentId ?? message.agentId ?? message.modeContext ?? 'ask';
+    const turnOwnership = {
+      sessionId: message.sessionId ?? 'no-session',
+      requestId,
+      agentId: rewriteAgentId,
+    };
     const optimistic = buildOptimisticRewriteSnapshot({
       requestId,
       sourceMessage: message,
       nextContent,
       allMessages: previousMessages,
       branchState: previousBranchState,
-      agentId: pairedAssistant?.agentId ?? null,
+      agentId: rewriteAgentId,
     });
 
     setConversationSnapshot(optimistic.messages, optimistic.branchState);
     useSessionStore.getState().setConversationPreparationPhase('preparing');
     useComposerSessionContextStore.getState().beginTurn({
-      sessionId: message.sessionId ?? 'no-session',
+      ...turnOwnership,
       projectId: message.projectId ?? currentProject?.projectId ?? null,
-      requestId,
       optimisticTurnId: optimistic.optimisticTurnId,
       realTurnId: null,
     });
 
     try {
-      const routeAgentId = pairedAssistant?.agentId ?? null;
-      const agentCommit = routeAgentId
-        ? await useAppSettingsStore.getState().flushAgentDefinitionSaves(routeAgentId)
-        : null;
+      const agentCommit = await useAppSettingsStore.getState().flushAgentDefinitionSaves(rewriteAgentId);
       const result = await electronAPI.conversation.rewriteFromMessage({
         requestId,
         messageId: message.id,
@@ -83,7 +85,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         currentRunId: message.runId ?? null,
         replayDeviceId: null,
         mode: message.modeContext ?? 'ask',
-        agentId: pairedAssistant?.agentId ?? null,
+        agentId: rewriteAgentId,
         message: nextContent,
         attachments: message.attachments?.map((attachment) => ({
           sourcePath: attachment.filePath,
@@ -92,15 +94,15 @@ export function useUserMessageRewrite(message: ConversationMessage) {
           size: attachment.size,
         })) ?? [],
         turnControls: { ...useTurnControlsStore.getState().turnControls },
-        configurationCommit: routeAgentId ? {
-          agentId: routeAgentId,
+        configurationCommit: {
+          agentId: rewriteAgentId,
           agentCommitHash: agentCommit?.commitHash,
           providerId: agentCommit?.route?.providerId,
-        } : undefined,
+        },
       });
 
       if (useConversationStore.getState().consumeRevokedRequest(requestId)) {
-        useComposerSessionContextStore.getState().clearActiveTurn();
+        useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
         useSessionStore.getState().setPreparedTurnContext(null);
         useSessionStore.getState().setConversationPreparationPhase('idle');
         return;
@@ -115,7 +117,11 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         optimisticIds,
       ));
 
-      useComposerSessionContextStore.getState().setRealTurnId(result.userMessage.turnId);
+      useComposerSessionContextStore.getState().setRealTurnId(
+        turnOwnership,
+        result.userMessage.turnId,
+        result.session?.sessionId ?? result.userMessage.sessionId ?? result.assistantDraftMessage.sessionId,
+      );
 
       await applyConversationTurnResult({
         electronAPI,
@@ -133,7 +139,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
       });
 
       if (useConversationStore.getState().monotonicStoppedRequestIds.includes(requestId)) {
-        useComposerSessionContextStore.getState().clearActiveTurn();
+        useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
         useSessionStore.getState().setConversationPreparationPhase('idle');
         return;
       }
@@ -157,7 +163,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
       });
     } catch (error) {
       setConversationSnapshot(previousMessages, previousBranchState);
-      useComposerSessionContextStore.getState().clearActiveTurn();
+      useComposerSessionContextStore.getState().clearActiveTurnIfOwned(turnOwnership);
       useSessionStore.getState().setPreparedTurnContext(null);
       useSessionStore.getState().setConversationPreparationPhase('idle');
       throw error;

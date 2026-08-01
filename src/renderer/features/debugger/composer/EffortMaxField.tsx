@@ -1,5 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { assignDynStyle } from '../../../lib/useDynStyle';
+import { assignDynStyle, clearDynStyle } from '../../../lib/useDynStyle';
 import {
   clampMaxProgress,
   maxFieldNoise,
@@ -146,7 +146,7 @@ export const EffortMaxField: React.FC<{
   thumbRef.current = thumbRatio;
   completeRef.current = onTimelineComplete;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!fieldActive) return undefined;
     const canvas = canvasRef.current;
     const layer = layerRef.current;
@@ -203,7 +203,7 @@ export const EffortMaxField: React.FC<{
     return () => {
       resizeObserver.disconnect();
       themeObserver.disconnect();
-      assignDynStyle(host, { '--composer-effort-stops-opacity': '1' });
+      clearDynStyle(host);
       paintRef.current = () => null;
     };
   }, [fieldActive]);

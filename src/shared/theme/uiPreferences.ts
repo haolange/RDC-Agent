@@ -24,7 +24,7 @@ export function createDefaultUiPreferences(): UiPreferences {
     fontScale: 'medium',
     composerMarkdown: false,
     usePointerCursors: false,
-    contextBreakdownExpanded: false,
+    contextBreakdownExpanded: true,
     reduceMotion: 'system',
     chromeThemes: createDefaultChromeThemes(),
   };

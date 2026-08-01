@@ -30,6 +30,76 @@ describe('PromptPlanBuilder', () => {
     expect(plan.segments.some((segment) => segment.kind === 'skill-catalog')).toBe(false);
     expect(plan.systemPrompt).not.toContain('# Available Skills');
     expect(plan.systemPrompt).toContain('Do not invent progress from stages or UI state.');
+    expect(plan.systemPrompt).toContain('No Tasks tools are available in this turn.');
+  });
+
+  it('describes Ask Tasks as read-only and tool_search no-match as authoritative', async () => {
+    const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
+    const profile = {
+      id: 'ask', fileName: 'ask.agent.md', filePath: 'C:/User/.rdx/agents/ask.agent.md', name: 'Ask', description: 'Read-only answers', argumentHint: '', target: 'rdc-agent', models: [], icon: 'message-orbit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['task_list', 'task_get', 'tool_search'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Answer from current evidence.', builtin: false, enabled: true,
+    } satisfies AgentManifestDefinition;
+    const plan = new PromptPlanBuilder().build({
+      profile,
+      scopedInstructions: { sources: [], totalBytes: 0, diagnostics: [] },
+      preloadedSkills: [],
+      skillCatalog: [],
+      tools: ['task_list', 'task_get', 'tool_search'],
+      workDir: 'D:/Project',
+      routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
+      permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
+      currentDate: '2026-08-01',
+      timeZone: 'Asia/Shanghai',
+    });
+    expect(plan.systemPrompt).toContain('Tasks are read-only in this turn.');
+    expect(plan.systemPrompt).toContain('Use Plan or Edit');
+    expect(plan.systemPrompt).toContain('cannot reveal or activate tools denied');
+    expect(plan.systemPrompt).toContain('must not be repeated');
+  });
+
+  it('describes Plan/Edit task mutation capability only when mutation tools are effective', async () => {
+    const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
+    const profile = {
+      id: 'edit', fileName: 'edit.agent.md', filePath: 'C:/User/.rdx/agents/edit.agent.md', name: 'Edit', description: 'Edit files', argumentHint: '', target: 'rdc-agent', models: [], icon: 'pencil-edit', accent: '#38c6f4', disableModelInvocation: false, userInvocable: true, tools: ['task_create', 'task_update', 'task_stop'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Execute.', builtin: false, enabled: true,
+    } satisfies AgentManifestDefinition;
+    const plan = new PromptPlanBuilder().build({
+      profile,
+      scopedInstructions: { sources: [], totalBytes: 0, diagnostics: [] },
+      preloadedSkills: [],
+      skillCatalog: [],
+      tools: ['task_create', 'task_update', 'task_stop'],
+      workDir: 'D:/Project',
+      routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
+      permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
+      currentDate: '2026-08-01',
+      timeZone: 'Asia/Shanghai',
+    });
+    expect(plan.systemPrompt).toContain('Tasks are writable in this turn.');
+    expect(plan.systemPrompt).not.toContain('Tasks are read-only in this turn.');
+  });
+
+  it('projects no effective Tasks tools when the selected route cannot execute structured tools', async () => {
+    const { PromptPlanBuilder } = await import('./PromptPlanBuilder');
+    const profile = {
+      id: 'plan', fileName: 'plan.agent.md', filePath: 'C:/User/.rdx/agents/plan.agent.md', name: 'Plan', description: 'Plan work', argumentHint: '', target: 'rdc-agent', models: [], icon: 'route-plan', accent: '#8d8bff', disableModelInvocation: false, userInvocable: true, tools: ['task_create', 'task_update', 'task_list'], skills: [], mcpServers: [], agents: [], handoffs: [], metadata: {}, instructions: 'Plan from evidence.', builtin: false, enabled: true,
+    } satisfies AgentManifestDefinition;
+    const plan = new PromptPlanBuilder().build({
+      profile,
+      scopedInstructions: { sources: [], totalBytes: 0, diagnostics: [] },
+      preloadedSkills: [],
+      skillCatalog: [],
+      tools: ['task_create', 'task_update', 'task_list', 'tool_search'],
+      workDir: 'D:/Project',
+      routeCapability: { providerId: 'cline-pass', modelId: 'glm-5.2', toolCallingMode: 'text-only', reasoningVisibility: 'none', reasoningDelivery: 'none', reasoningContract: { semantic: 'none', source: 'none', displayLabel: 'None', carrier: 'none', artifactFormat: 'none', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'none' }, supportsStreaming: true, supportsToolResults: false, toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'prompt-fallback' },
+      permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
+      currentDate: '2026-08-01',
+      timeZone: 'Asia/Shanghai',
+    });
+
+    expect(plan.systemPrompt).toContain('No runtime tools are available for this turn.');
+    expect(plan.systemPrompt).toContain('No Tasks tools are available in this turn.');
+    expect(plan.systemPrompt).toContain('Do not imitate tool calls in text.');
+    expect(plan.systemPrompt).not.toContain('- task_create');
+    expect(plan.systemPrompt).not.toContain('Tasks are writable in this turn.');
   });
 
   it('includes the skill catalog for large and small windows when non-empty', async () => {
@@ -54,4 +124,3 @@ describe('PromptPlanBuilder', () => {
     expect(buildWith(32_000).systemPrompt).toContain('# Available Skills');
   });
 });
-

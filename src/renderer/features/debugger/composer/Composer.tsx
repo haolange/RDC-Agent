@@ -6,7 +6,6 @@ import { deriveComposeAccentVars } from '@shared/theme/composeAccent';
 import { useI18n } from '../../../i18n';
 import { useDynStyle } from '../../../lib/useDynStyle';
 import { useLayoutStore } from '../../../stores/layoutStore';
-import { useConversationStore } from '../../../stores/conversationStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import type { ComposerController } from './useComposer';
@@ -21,6 +20,7 @@ import { ComposerMarkdownModeTabs } from './ComposerMarkdownModeTabs';
 import { ComposerAgentMenu } from './ComposerAgentMenu';
 import { ComposerAttachmentChips } from './ComposerAttachmentChips';
 import { buildComposerSessionScopeKey } from './composerSessionScope';
+import { useComposerSessionContextStore } from './composerSessionContext';
 
 export interface ComposerProps {
   composer: ComposerController;
@@ -41,15 +41,14 @@ export const Composer: React.FC<ComposerProps> = ({
   const appearanceTheme = useAppSettingsStore((state) => state.settings.appearance.theme);
   const systemTheme = useAppSettingsStore((state) => state.systemTheme);
   const resolvedTheme: ResolvedTheme = appearanceTheme === 'system' ? systemTheme : appearanceTheme;
-  const activeAgentId = useConversationStore((state) => {
-    const activeMsg = state.conversationMessages.find(
-      (m) => m.role === 'assistant' && (m.status === 'streaming' || m.status === 'draft'),
-    );
-    return activeMsg?.agentId ?? null;
-  });
-  const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
   const currentProject = useProjectStore((state) => state.currentProject);
   const currentSession = useProjectStore((state) => state.currentSession);
+  const activeAgentId = useComposerSessionContextStore((state) => (
+    state.activeTurn?.sessionId === (currentSession?.sessionId ?? 'no-session')
+      ? state.activeTurn.agentId
+      : null
+  ));
+  const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
   const composerScopeKey = useMemo(
     () => buildComposerSessionScopeKey(currentProject?.projectId, currentSession?.sessionId),
     [currentProject?.projectId, currentSession?.sessionId],

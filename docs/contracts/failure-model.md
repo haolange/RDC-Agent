@@ -26,7 +26,7 @@
 
 | 点 | 分类 | 说明 |
 | --- | --- | --- |
-| Browser Bridge 未 QA / 无 bearer / Origin / deny channel | Security | QA-only；fail-closed allowlist |
+| Browser Bridge 未 QA / 无 bearer / Origin / 未知或未注册 channel | Security | debug-only；canonical renderer manifest + handler registry fail-closed |
 | `safeStorage` 不可用 / secret IPC 明文 | Security | 禁止明文存储与跨层暴露 |
 | Project MCP 覆盖 user executable / 未 trust | Security | `needsRetrust` + `assertConnectAllowed` |
 | IPC Zod 非法 payload / approvalToken 重放 | Security | **全量** handler `parseIpcArgs`；单次消费 token |
@@ -42,6 +42,8 @@
 | Skill `allowedTools` 收窄 | Security（授权面） | `∩ skill ∩ runtime` |
 | Capability `unknown` → text-only | Security（能力面） | 禁止猜测 native tools |
 | Provider channel collision / 无 final_answer | Integrity | 终止 step + 诊断 |
+| Agent 连续三轮相同工具结果 | Integrity | `AGENT_NO_PROGRESS` → `CONVERSATION_AGENT_LOOP_STALLED`；不得误报 Provider failure |
+| Agent 达到 maxTurns 仍要求 continuation | Integrity | `AGENT_MAX_TURNS_EXCEEDED` → `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`；不得静默完成 |
 | JSONL 坏行 diagnostics | Integrity | 不静默当成功；调用方 assert |
 | 非法历史 `workTrace` → null | Integrity | 读边界丢弃 |
 | Context 无法装入 → `CONTEXT_CANNOT_FIT` | Integrity | hard degrade 后仍失败则报错 |
@@ -50,7 +52,7 @@
 | 用户 Stop / abortAndJoin | Availability | join producers；丢弃迟到 event |
 | ProcessSupervisor timeout/abort | Availability | 杀进程树；registry 清空 |
 | ShutdownCoordinator 限时 shutdown | Availability | 尽量排空后退出 |
-| Provider 网络/配额类错误 | Availability | 按 ErrorRecovery 契约；不发明 entitlement |
+| Provider 网络/配额类错误 | Availability | 按 ErrorRecovery 契约；不发明 entitlement；429 与明确 `quota_exceeded` 的 402 只记录短期 quota |
 | Headless instance.lock 冲突 | Security + Availability | 冲突 fail-closed 避免串 userData |
 
 ## 过度 fail-closed 的纠正原则

@@ -126,6 +126,8 @@ export interface Usage {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
+  /** Provider-confirmed service speed for this request. */
+  speed?: 'standard' | 'fast';
   /** Provider 上报的 cache read tokens；未提供时缺省。 */
   cacheReadTokens?: number;
   /** Provider 上报的 cache write / creation tokens；未提供时缺省。 */

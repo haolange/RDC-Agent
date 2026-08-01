@@ -167,6 +167,7 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
   }
 
   const bodyPatch: JsonObject = {};
+  const bindingHeaders: Record<string, string> = {};
   let suppressReasoningWire = false;
 
   const switchModel = (
@@ -264,6 +265,11 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
         if (conflict) {
           return planningError('PLAN_CONFLICT', `Execution binding conflicts at ${conflict}`, controls);
         }
+      } else if (action.kind === 'request-headers') {
+        const conflict = mergeHeaders(bindingHeaders, action.headers);
+        if (conflict) {
+          return planningError('PLAN_CONFLICT', `Execution binding conflicts at header ${conflict}`, controls);
+        }
       } else if (action.kind === 'model-switch') {
         if (effectiveModelId !== model.modelId && effectiveModelId !== action.targetModelId) {
           return planningError('PLAN_CONFLICT', 'Execution binding selects conflicting target models', controls);
@@ -288,6 +294,10 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
   }
 
   const headers = { ...(route.headers ?? {}) };
+  const bindingHeaderConflict = mergeHeaders(headers, bindingHeaders);
+  if (bindingHeaderConflict) {
+    return planningError('PLAN_CONFLICT', `Execution binding conflicts at header ${bindingHeaderConflict}`, controls);
+  }
   if (oneMillionMode && tierChoices.oneMillionUnverified) {
     warnings.push('Max mode entitlement is unverified');
   } else if (activeTier.entitlement === 'unknown') {

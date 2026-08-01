@@ -14,10 +14,6 @@ import {
   ChromeThemeCard,
   ThemeModeTile,
 } from './AppearanceChromeParts';
-import {
-  BrowserQaDesktopOnlyNotice,
-  isBrowserQaDesktopOnlySurface,
-} from '../../../../platform/BrowserQaDesktopOnlyNotice';
 import './AppearanceSettings.css';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -45,15 +41,9 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
 }) => {
   const light = settings.appearance.chromeThemes.light;
   const dark = settings.appearance.chromeThemes.dark;
-  const desktopOnly = isBrowserQaDesktopOnlySurface();
-  const guard = <T,>(action: () => T): void => {
-    if (desktopOnly) return;
-    void action();
-  };
 
   return (
     <section className="settings-page settings-page-appearance" data-testid="settings-appearance-page">
-      <BrowserQaDesktopOnlyNotice kind="settingsWrite" testId="browser-qa-appearance-desktop-only" />
       <div className="appearance-mode-grid" role="group" aria-label={t('userMenu.theme')}>
         {(['system', 'light', 'dark'] as AppTheme[]).map((mode) => (
           <ThemeModeTile
@@ -61,7 +51,7 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
             mode={mode}
             active={settings.appearance.theme === mode}
             label={t(`theme.${mode}`)}
-            onSelect={() => guard(() => onThemeChange(mode))}
+            onSelect={() => void onThemeChange(mode)}
           />
         ))}
       </div>
@@ -75,13 +65,13 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
         variant="light"
         chrome={light}
         t={t}
-        onChange={(chrome) => guard(() => onChromeThemeChange('light', chrome))}
+        onChange={(chrome) => void onChromeThemeChange('light', chrome)}
       />
       <ChromeThemeCard
         variant="dark"
         chrome={dark}
         t={t}
-        onChange={(chrome) => guard(() => onChromeThemeChange('dark', chrome))}
+        onChange={(chrome) => void onChromeThemeChange('dark', chrome)}
       />
 
       <div className="settings-section appearance-preferences">
@@ -96,9 +86,8 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
             </div>
             <Switch
               checked={settings.appearance.usePointerCursors}
-              onCheckedChange={(enabled) => guard(() => onUsePointerCursorsChange(enabled))}
+              onCheckedChange={(enabled) => void onUsePointerCursorsChange(enabled)}
               aria-label={t('settings.usePointerCursors')}
-              disabled={desktopOnly}
             />
           </div>
 
@@ -114,8 +103,7 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                   type="button"
                   className={`user-menu-pill ${settings.appearance.reduceMotion === value ? 'active' : ''}`}
                   data-testid={`appearance-reduce-motion-${value}`}
-                  disabled={desktopOnly}
-                  onClick={() => guard(() => onReduceMotionChange(value))}
+                  onClick={() => void onReduceMotionChange(value)}
                 >
                   {t(`settings.appearanceReduceMotion.${value}`)}
                 </button>
@@ -133,8 +121,7 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
                   key={fontScale}
                   type="button"
                   className={`user-menu-pill ${settings.appearance.fontScale === fontScale ? 'active' : ''}`}
-                  disabled={desktopOnly}
-                  onClick={() => guard(() => onFontScaleChange(fontScale))}
+                  onClick={() => void onFontScaleChange(fontScale)}
                 >
                   {t(`font.${fontScale}`)}
                 </button>
@@ -149,9 +136,8 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
             </div>
             <Switch
               checked={settings.appearance.composerMarkdown}
-              onCheckedChange={(enabled) => guard(() => onComposerMarkdownChange(enabled))}
+              onCheckedChange={(enabled) => void onComposerMarkdownChange(enabled)}
               aria-label={t('settings.composerMarkdown')}
-              disabled={desktopOnly}
             />
           </div>
         </div>

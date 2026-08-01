@@ -260,6 +260,7 @@ export class AssistantStreamBuilder {
       cacheHitTokens: partial.cacheHitTokens ?? this.usage.cacheHitTokens,
       cacheMissTokens: partial.cacheMissTokens ?? this.usage.cacheMissTokens,
       reasoningTokens: partial.reasoningTokens ?? this.usage.reasoningTokens,
+      speed: partial.speed ?? this.usage.speed,
     };
   }
 

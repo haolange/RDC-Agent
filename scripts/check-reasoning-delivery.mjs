@@ -180,7 +180,7 @@ assert(!/event\.type === 'tool\.started'[\s\S]{0,240}beginAssistantContentLoop\(
 assert(!conversationServiceSource.includes('currentLoopText.trim() || rawResponse || visibleResponse'), 'Conversation terminal content must not fall back to loop text.');
 assert(!conversationServiceSource.includes('rawResponse ||'), 'Conversation terminal content must not restore raw provider text fallback.');
 assert(traceCanonicalSource.includes("block.result?.outputPhase === 'final_answer'"), 'Trace reload must read only explicit final_answer blocks.');
-assert(openaiCompatibleSource.includes('Provider emitted another Chat Completions choice after finish_reason.'), 'Chat Completions must reject semantic choices after finish_reason.');
+assert(openaiCompatibleSource.includes('Provider emitted another semantic Chat Completions choice after finish_reason.'), 'Chat Completions must reject semantic choices after finish_reason.');
 assert(openaiResponsesSource.includes('providerTerminalSeen'), 'Responses must reject events after its terminal event.');
 
 const unknownProvider = configuredProvider('custom-endpoint', 'OpenAICompatibleChatCompletions');

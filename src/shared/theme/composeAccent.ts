@@ -42,11 +42,15 @@ export function deriveComposeAccentVars(
   const hsl = rgbToHsl(base);
   const isLight = resolvedTheme === 'light';
 
-  // Ordinary tiers (exclude Max): low = lighter/softer, high = deeper/stronger.
+  // Ordinary tiers (exclude Max) stay centred on the agent's own accent.
+  // Fixed dark-theme luminance previously pushed light violet agents into
+  // saturated indigo, so the control no longer looked related to its agent.
   const fill = (level: number) => {
-    const l = isLight
-      ? 86 - level * 8
-      : 72 - level * 7;
+    const lightnessOffsets = isLight
+      ? [2, -4, -10, -16, -22]
+      : [8, 4, 0, -4, -8];
+    const bounds = isLight ? { min: 38, max: 78 } : { min: 52, max: 84 };
+    const l = Math.min(bounds.max, Math.max(bounds.min, hsl.l + (lightnessOffsets[level - 1] ?? 0)));
     const s = Math.min(100, hsl.s * (0.85 + level * 0.04));
     return `hsl(${Math.round(hsl.h)} ${Math.round(s)}% ${Math.round(l)}%)`;
   };

@@ -119,7 +119,7 @@ Manifest-facing tool names are canonical tokens (see `CANONICAL_TOOL_TOKEN_EXPAN
 
 Removed tokens `todo` and `search_codebase` are rejected (`REJECTED_TOOL_TOKENS`); use `task` and `glob`/`grep` instead.
 
-`ask` is read-only by default (`read` / `search` / `web` / `askUser` / `task` / `tool_search`; policy keeps Ask on `task_list` rather than task mutation). `plan` uses research, questions, handoffs, memory or plan artifacts rather than direct implementation. `edit`、`debugger`、`analyzer`、`optimizer` are executable profiles and may use configured tools such as `bash`、`write`、`edit` and `rdxContext` when policy allows.
+`ask` is read-only by default (`read` / `search` / `web` / `askUser` / `tool_search` plus `task_list` / `task_get`; policy removes `task_create` / `task_update` / `task_stop`). `plan` and `edit` may mutate Tasks only when those tools survive profile, policy and route filtering in the frozen effective tool set. A text-only route receives no tool schemas and its Prompt must not imitate or repeatedly search for unavailable Tasks tools. `plan` uses research, questions, handoffs, memory or plan artifacts rather than direct implementation. `edit`、`debugger`、`analyzer`、`optimizer` are executable profiles and may use configured tools such as `bash`、`write`、`edit` and `rdxContext` when policy allows.
 
 ## Plan 输出
 

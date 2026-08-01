@@ -46,6 +46,7 @@ function deriveStatus(rows: ToolRow[]): WorkProcessRowStatus {
   if (rows.some((row) => row.status === 'error')) return 'error';
   if (rows.some((row) => row.status === 'running')) return 'running';
   if (rows.some((row) => row.status === 'pending')) return 'pending';
+  if (rows.some((row) => row.status === 'skipped')) return 'skipped';
   return 'complete';
 }
 

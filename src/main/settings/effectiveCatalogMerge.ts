@@ -8,6 +8,7 @@ import type {
 } from '@shared/types/providerCapability';
 import type { LlmProviderCatalogOwnership } from '@shared/types/settings';
 import type { ReasoningControl } from '@shared/types/modelCapability';
+import { contextTierPromptCap } from '@shared/utils/contextTiers';
 import { isAdmittedDiscoveredModel, normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 import { resolveExecutionBinding, resolveModelControls } from '@shared/utils/modelControls';
 import type {
@@ -387,6 +388,19 @@ function applyLayer(
     const ordinaryPatch: Record<string, unknown> = rekeyFromDiscovery
       ? { ...ordinaryFields, ...availabilityPatch }
       : { ...ordinaryFields, ...availabilityPatch, ...(aliases !== undefined ? { aliases } : {}) };
+    // Historical declarative discovery projected the provider fallback as a
+    // catalog-sourced route even when the list payload carried no protocol.
+    // Such a row is availability evidence only and must not replace an already
+    // admitted model's manifest-owned route. Explicit live routes use
+    // `source: model` and continue to merge normally.
+    if (
+      layer.source === 'discovery'
+      && matched
+      && isObject(ordinaryPatch.route)
+      && ordinaryPatch.route.source === 'catalog'
+    ) {
+      delete ordinaryPatch.route;
+    }
     // Live rows without a measured window must not clobber compiled/manifest budgets (Agents picker
     // requires defaultBudgetTokens > 0; OpenCode Go /models returns ids only).
     if (
@@ -503,6 +517,11 @@ export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): Effecti
       : undefined;
     const preferredRouteOptionId = preferredRouteOption ? model.preferredRouteOptionId : undefined;
     const projectedRoute = preferredRouteOption?.route ?? model.route;
+    const defaultTier = model.contextTiers.find((tier) => tier.id === 'default' && tier.entitlement !== 'denied')
+      ?? model.contextTiers.find((tier) => tier.entitlement !== 'denied');
+    const derivedDefaultBudgetTokens = model.defaultBudgetTokens > 0
+      ? model.defaultBudgetTokens
+      : defaultTier ? contextTierPromptCap(defaultTier) ?? 0 : 0;
     const projected = {
       ...model,
       aliases: [...model.aliases],
@@ -512,6 +531,7 @@ export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): Effecti
       routeRevision: preferredRouteOption?.routeRevision
         ?? routeRevision(model.route),
       routeOptions,
+      defaultBudgetTokens: derivedDefaultBudgetTokens,
       ...(preferredRouteOptionId
         ? { preferredRouteOptionId }
         : { preferredRouteOptionId: undefined }),
@@ -526,6 +546,21 @@ export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): Effecti
         source: 'catalog',
         observedAt: new Date().toISOString(),
         detail: `Cleared unavailable preferred route ${model.preferredRouteOptionId}`,
+      });
+    }
+    if (projected.availability === 'available' && projected.defaultBudgetTokens <= 0) {
+      projected.availability = 'unavailable';
+      projected.unavailableReason = 'Provider discovery did not supply a positive executable context budget.';
+      projected.provenance.push({
+        field: 'availability',
+        source: 'catalog',
+        observedAt: new Date().toISOString(),
+        detail: 'Executable context budget fail-closed gate',
+      }, {
+        field: 'unavailableReason',
+        source: 'catalog',
+        observedAt: new Date().toISOString(),
+        detail: 'Executable context budget fail-closed gate',
       });
     }
     if (request.providerAvailability?.state === 'unavailable') {
@@ -559,4 +594,3 @@ export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): Effecti
     };
   });
 }
-

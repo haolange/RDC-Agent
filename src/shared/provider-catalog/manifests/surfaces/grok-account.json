@@ -31,6 +31,15 @@
       "accountScope": "observed-account",
       "surfaceBuild": "control panel build unrecorded",
       "plan": "Super Grok"
+    },
+    {
+      "id": "runtime-observation:grok-account-fixed-reasoning:2026-08-01",
+      "sourceKind": "runtime-observation",
+      "sourceRevision": "capability-probe:reasoning-effort-rejected",
+      "observedAt": "2026-08-01",
+      "refreshedAt": "2026-08-01",
+      "surface": "grok-account",
+      "accountScope": "observed-account"
     }
   ],
   "defaultFactSourceId": "user-observation:grok-account:2026-07-14",
@@ -217,15 +226,11 @@
           "defaultSelection": "on",
           "lockedSelection": "on",
           "wireProfile": {
-            "kind": "openai-responses",
-            "on": "high",
-            "levels": {
-              "high": "high"
-            }
+            "kind": "none"
           }
         }
       },
-      "factSourceId": "user-observation:grok-account:2026-07-14"
+      "factSourceId": "runtime-observation:grok-account-fixed-reasoning:2026-08-01"
     },
     {
       "modelId": "grok-4.20-multi-agent-0309",
@@ -510,15 +515,11 @@
           "defaultSelection": "on",
           "lockedSelection": "on",
           "wireProfile": {
-            "kind": "openai-responses",
-            "on": "high",
-            "levels": {
-              "high": "high"
-            }
+            "kind": "none"
           }
         }
       },
-      "factSourceId": "user-observation:grok-account:2026-07-14"
+      "factSourceId": "runtime-observation:grok-account-fixed-reasoning:2026-08-01"
     },
     {
       "modelId": "grok-composer-2.5-fast",

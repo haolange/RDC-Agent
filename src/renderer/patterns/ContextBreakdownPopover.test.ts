@@ -18,7 +18,7 @@ vi.mock('../stores/appSettingsStore', () => ({
     settings: { appearance: { contextBreakdownExpanded: boolean } };
     setContextBreakdownExpanded: (value: boolean) => void;
   }) => unknown) => selector({
-    settings: { appearance: { contextBreakdownExpanded: false } },
+    settings: { appearance: { contextBreakdownExpanded: true } },
     setContextBreakdownExpanded: () => undefined,
   }),
 }));
@@ -94,7 +94,7 @@ describe('ContextBreakdownPopover phase authority', () => {
     vi.clearAllMocks();
   });
 
-  it('Preparing shows only preparing status and never a Last actual meter', () => {
+  it('Preparing keeps the last actual structure instead of replacing it with a status card', () => {
     const html = renderToStaticMarkup(
       React.createElement(ContextBreakdownPopover, {
         prepared: null,
@@ -105,11 +105,58 @@ describe('ContextBreakdownPopover phase authority', () => {
         onClose: () => undefined,
       }),
     );
-    expect(html).toContain('context-breakdown-preparing');
-    expect(html).toContain('contextBreakdown.preparing');
-    expect(html).not.toContain('context-breakdown-run-meter');
-    expect(html).not.toContain('context-breakdown-hero');
-    expect(html).not.toContain('contextBreakdown.lastActual');
+    expect(html).toContain('context-breakdown-hero');
+    expect(html).toContain('context-breakdown-run-meter');
+    expect(html).toContain('data-phase="actual"');
+    expect(html).toContain('contextBreakdown.lastActual');
+    expect(html).not.toContain('context-breakdown-preparing');
+    expect(html).not.toContain('contextBreakdown.preparing');
+    expect(html).toContain('context-breakdown-details');
+  });
+
+  it('uses the same meter and details structure when telemetry has not arrived', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ContextBreakdownPopover, {
+        prepared: null,
+        phase: 'preparing',
+        usage: null,
+        selectedContextWindowTokens: 200_000,
+        stale: false,
+        onClose: () => undefined,
+      }),
+    );
+    expect(html).toContain('context-breakdown-hero');
+    expect(html).toContain('context-breakdown-run-meter');
+    expect(html).toContain('data-phase="unavailable"');
+    expect(html).toContain('contextBreakdown.noUsageYet');
+    expect(html).toContain('context-breakdown-details');
+    expect(html).toContain('>—</span>');
+    expect(html).not.toContain('context-breakdown-empty-state');
+    expect(html).not.toContain('context-breakdown-preparing');
+  });
+
+  it('keeps authoritative zero values distinct from unavailable telemetry', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ContextBreakdownPopover, {
+        prepared: null,
+        phase: 'idle',
+        usage: {
+          ...usage,
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+          occupiedTokens: 0,
+          usagePercent: 0,
+          breakdown: [],
+        },
+        selectedContextWindowTokens: 200_000,
+        stale: false,
+        onClose: () => undefined,
+      }),
+    );
+    expect(html).toContain('>0%</span>');
+    expect(html).toContain('>0contextBreakdown.countSuffix.system_tools</span>');
+    expect(html).not.toContain('data-phase="unavailable"');
   });
 
   it('Current request shows prepared hero without stacking historical Last actual meter', () => {

@@ -121,6 +121,24 @@ describe('Bedrock body-aware request authorization', () => {
     }).result()).rejects.toMatchObject({ code: 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL' });
   });
 
+  it('accepts a non-semantic usage trailer after Chat Completions finish_reason', async () => {
+    vi.stubGlobal('fetch', async () => new Response([
+      'data: {"choices":[{"index":0,"delta":{"content":"ok"},"finish_reason":"stop"}]}',
+      'data: {"choices":[{"index":0,"delta":{},"finish_reason":null}],"usage":{"prompt_tokens":2,"completion_tokens":1,"total_tokens":3}}',
+      'data: [DONE]',
+      '',
+    ].join('\n\n'), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+    const baseUrl = 'https://bedrock-mantle.us-east-1.api.aws/v1';
+    const provider = new OpenAICompatibleProvider({ baseUrl, authorization: 'none', requestAuthorizer: async (input) => input.headers });
+
+    await expect(provider.stream(model, context, {
+      requestPlan: plan('OpenAICompatibleChatCompletions', baseUrl),
+    }).result()).resolves.toMatchObject({
+      content: expect.arrayContaining([expect.objectContaining({ type: 'text', text: 'ok' })]),
+      usage: { inputTokens: 2, outputTokens: 1, totalTokens: 3 },
+    });
+  });
+
   it('fails closed when Responses emits an event after response.completed', async () => {
     vi.stubGlobal('fetch', async () => new Response([
       'data: {"type":"response.output_text.delta","delta":"ok"}',

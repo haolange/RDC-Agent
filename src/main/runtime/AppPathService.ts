@@ -2,6 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { app } from 'electron';
+import { resolveCanonicalUserDataPath } from './userDataPath';
 
 export interface UserRdxPaths {
   userRdxRoot: string;
@@ -65,7 +66,7 @@ export class AppPathService {
     const appDataRoot = app?.getPath?.('appData') || (process.platform === 'win32'
       ? path.join(os.homedir(), 'AppData', 'Roaming')
       : path.join(os.homedir(), '.config'));
-    return normalizePath(process.env.RDC_AGENT_USER_DATA?.trim() || path.join(appDataRoot, 'RDC-Agent'));
+    return resolveCanonicalUserDataPath(process.env.RDC_AGENT_USER_DATA, appDataRoot);
   }
 
   getUserRdxRoot(): string {

@@ -1,12 +1,16 @@
 import fs from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
-import { parseCopilotBillingTiers, parseCopilotModelCatalog } from './CopilotBilling';
+import {
+  parseCopilotBillingContribution,
+  parseCopilotBillingTiers,
+  parseCopilotModelCatalog,
+} from './CopilotBilling';
 
 const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'copilot-models.json'), 'utf8')) as unknown;
 
 describe('Copilot account catalog parser', () => {
-  it('projects account visibility, routes, and billing without inventing structural controls', () => {
+  it('projects only account-advertised visibility, routes, controls, and capabilities', () => {
     const catalog = parseCopilotModelCatalog(fixture);
     expect(catalog.models.map((model) => model.id)).toEqual([
       'gpt-5.5',
@@ -33,11 +37,18 @@ describe('Copilot account catalog parser', () => {
           route: expect.objectContaining({ baseUrl: 'https://api.githubcopilot.com' }),
         }),
       ],
+      controls: {
+        reasoning: {
+          kind: 'levels', supportsOff: true,
+          levels: ['low', 'medium', 'high', 'xhigh'], defaultSelection: 'high',
+        },
+      },
+      toolCalling: { state: 'supported' },
+      visionInput: { state: 'supported' },
+      structuredOutput: { state: 'supported' },
     });
-    expect(gpt).not.toHaveProperty('controls');
     expect(gpt).not.toHaveProperty('executionBindings');
     expect(gpt).not.toHaveProperty('contextTiers');
-    expect(gpt).not.toHaveProperty('reasoning');
 
     const fastTarget = catalog.contributions.find((model) => model.modelId === 'claude-opus-4.8-fast');
     expect(fastTarget).toMatchObject({ availability: 'available' });
@@ -54,6 +65,20 @@ describe('Copilot account catalog parser', () => {
     expect(parseCopilotBillingTiers(catalog.billingByModel['gpt-5-mini'])).toEqual([
       { id: 'default', label: 'Default', maxPromptTokens: 272_000, maxOutputTokens: 64_000, maxTotalTokens: 336_000, activation: { kind: 'implicit' }, entitlement: 'unknown' },
     ]);
+    expect(parseCopilotBillingContribution('gpt-5.5', catalog.billingByModel['gpt-5.5']))
+      .toMatchObject({
+        controls: {
+          context1m: { state: 'selectable', tierId: 'long_context', entitlement: 'unknown' },
+        },
+        executionBindings: [{
+          id: 'context:copilot-long-context',
+          when: { context1m: true },
+          actions: [{ kind: 'client-tier', tierId: 'long_context' }],
+          entitlement: 'unknown',
+        }],
+      });
+    expect(parseCopilotBillingContribution('gpt-5-mini', catalog.billingByModel['gpt-5-mini']))
+      .toMatchObject({ controls: { context1m: { state: 'unsupported', fixedValue: false } } });
   });
 
   it('parses a Gemini 3.5 billing threshold without declaring structural controls', () => {
@@ -130,6 +155,35 @@ describe('Copilot account catalog parser', () => {
         modelId: 'responses-only-model',
         preferredRouteOptionId: 'OpenAIResponses',
         routeOptions: [expect.objectContaining({ id: 'OpenAIResponses' })],
+      }),
+    ]);
+  });
+
+  it('admits Opus 5 only from an exact account row with an advertised agent endpoint', () => {
+    const catalog = parseCopilotModelCatalog({
+      data: [
+        {
+          id: 'claude-opus-5',
+          name: 'Claude Opus 5',
+          model_picker_enabled: true,
+          supported_endpoints: ['/v1/messages'],
+          capabilities: { type: 'chat' },
+        },
+        {
+          id: 'claude-opus-5-without-route',
+          name: 'Claude Opus 5 without route',
+          model_picker_enabled: true,
+          capabilities: { type: 'chat' },
+        },
+      ],
+    });
+
+    expect(catalog.models.map((model) => model.id)).toEqual(['claude-opus-5']);
+    expect(catalog.contributions).toEqual([
+      expect.objectContaining({
+        modelId: 'claude-opus-5',
+        preferredRouteOptionId: 'AnthropicMessages',
+        routeOptions: [expect.objectContaining({ id: 'AnthropicMessages' })],
       }),
     ]);
   });

@@ -53,6 +53,7 @@ const ROW_STATUS_LABEL: Record<WorkProcessRowStatus, string> = {
   running: '进行中',
   complete: '',
   error: '失败',
+  skipped: '已跳过',
 };
 
 const TARGET_KEYS = [
@@ -300,6 +301,7 @@ export const buildWorkProcessPresentation = (
     toolCount,
     actionCount: toolCount,
     summary,
+    toolEvidence: trace.toolEvidence ? { ...trace.toolEvidence } : undefined,
     duration: formatTraceDuration(blocks),
     defaultExpanded: trace.status !== 'idle' || rows.length > 0 || Boolean(summary),
     important,
@@ -322,9 +324,9 @@ const countSteps = (rows: WorkProcessRow[]): number => rows.reduce((total, row) 
 }, 0);
 
 const rowsHaveAttention = (rows: WorkProcessRow[]): boolean => rows.some((row) => {
-  if (row.type === 'section') return row.status === 'running' || row.status === 'error' || rowsHaveAttention(row.steps);
-  if (row.type === 'toolAggregate') return row.status === 'error' || row.status === 'running';
-  return row.status === 'error' || row.status === 'running';
+  if (row.type === 'section') return row.status === 'running' || row.status === 'error' || row.status === 'skipped' || rowsHaveAttention(row.steps);
+  if (row.type === 'toolAggregate') return row.status === 'error' || row.status === 'running' || row.status === 'skipped';
+  return row.status === 'error' || row.status === 'running' || row.status === 'skipped';
 });
 
 const formatTraceDuration = (blocks: ConversationWorkBlock[]): string => {
@@ -570,6 +572,7 @@ const getToolVerb = (
   if (approval?.status === 'pending') return '等待审批';
   if (status === 'pending') return display.pendingVerb ?? '等待执行';
   if (status === 'running') return display.runningVerb;
+  if (status === 'skipped') return '已跳过';
   if (status !== 'error') return display.completeVerb;
   return isToolApprovalRejected(approval) || /approval required|no changes were made/i.test(resultPreview ?? '') ? '已阻断' : '执行失败';
 };

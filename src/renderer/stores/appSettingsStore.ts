@@ -22,7 +22,6 @@ import {
 import type { AgentPermissionMode, AppSettings } from '@shared/types/settings';
 import type { AppSettingsState } from './appSettingsStoreState';
 import { createAppSettingsAppearanceActions } from './appSettingsAppearanceActions';
-import { isBrowserAppBridge } from '../platform/browserAppBridge/BrowserAppBridge';
 
 export { nextAgentDefinitionClientRevision } from './agentDefinitionSettings';
 
@@ -48,11 +47,6 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   hydrate: (settings, systemTheme) => set({ settings, systemTheme, hydrated: true, agentRouteSyncById: {} }),
   setSystemTheme: (systemTheme) => set({ systemTheme }),
   patchSettings: async (patch) => {
-    if (isBrowserAppBridge()) {
-      throw new Error(
-        'BROWSER_QA_DESKTOP_ONLY: settings:set is unavailable in Browser QA. Use the desktop Electron app.',
-      );
-    }
     const nextSettings = await window.electronAPI.settings.set(patch);
     set({ settings: nextSettings, hydrated: true });
     return nextSettings;

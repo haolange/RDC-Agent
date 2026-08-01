@@ -261,6 +261,52 @@ describe('ToolExecutorFactory', () => {
     expect(JSON.stringify(result)).toMatch(/TOOL_NOT_ACTIVATED/);
   });
 
+  it('executes a task tool preactivated by the frozen runtime plan', async () => {
+    const execute = vi.fn(async () => ({
+      content: [{ type: 'text' as const, text: 'created' }],
+      details: { taskId: 'task-1' },
+    }));
+    const toolMap = new Map([['task_create', {
+      name: 'task_create',
+      description: 'create task',
+      parameters: { type: 'object', properties: {} },
+      execute,
+    }]]);
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+      getActiveTurn: () => null,
+      resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
+      isAllowedForRuntime: () => true,
+      matchesToolAllowlist: () => true,
+    });
+    const executor = factory.createToolExecutor('plan', ['task_create'], undefined, 'session-1', {
+      effectivePlan: {
+        toolAllowlist: ['task_create'],
+        activatedDeferredTools: ['task_create'],
+        skillIntersection: null,
+        permissionSettings: {
+          mode: 'default',
+          readableRoots: [],
+          writableRoots: [],
+          allowedCommandPrefixes: [],
+          deniedCommandPrefixes: [],
+        },
+        policy: { deniedTools: [], limits: { maxTurns: 5 } },
+        projectId: null,
+        projectRootPath: null,
+      } as never,
+    });
+    const result = await executor.execute({
+      type: 'toolCall',
+      id: 'tc-task-create',
+      name: 'task_create',
+      arguments: {},
+    });
+    expect(execute).toHaveBeenCalledOnce();
+    expect(result.isError).not.toBe(true);
+  });
+
   it('createToolExecutor runs allowed tool from map', async () => {
     const execute = vi.fn(async () => ({
       content: [{ type: 'text' as const, text: 'ok' }],

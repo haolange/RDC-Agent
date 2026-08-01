@@ -42,7 +42,6 @@ composer-usage-indicator
 composer-user-input-panel
 context-breakdown
 context-breakdown-cost
-context-breakdown-preparing
 context-breakdown-run-meter
 conversation-thread
 empty-workbench-prompt
@@ -73,7 +72,6 @@ open-settings-entry
 project-capture-import-panel
 right-rail-${id}
 right-rail-drawer
-right-rail-opened-capture
 right-rail-replay-device
 right-rail-scroll
 runtime-log-entry-${entry.id}

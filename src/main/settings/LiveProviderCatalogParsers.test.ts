@@ -52,12 +52,17 @@ describe('live Provider Catalog parsers', () => {
         supports_reasoning: true, supports_thinking_type: 'only', protocol: 'openai',
         think_efforts: { valid_efforts: ['low', 'high', 'max'], default_effort: 'max' },
       },
+      {
+        id: 'k3-256k', context_length: 256_000, supports_reasoning: true,
+        think_efforts: { valid_efforts: ['low', 'high', 'max'], default_effort: 'high' },
+      },
       { id: 'kimi-for-coding-highspeed', context_length: 256_000, supports_reasoning: true },
       { id: 'kimi-k2.7-code', display_name: 'must-not-enter' },
     ] });
 
     expect(parsed.models.map((model) => [model.id, model.label])).toEqual([
       ['k3', 'Kimi K3'],
+      ['k3-256k', 'Kimi K3 256K'],
       ['kimi-for-coding', 'Kimi for Coding'],
       ['kimi-for-coding-highspeed', 'Kimi for Coding HighSpeed'],
     ]);
@@ -71,7 +76,7 @@ describe('live Provider Catalog parsers', () => {
       },
       executionBindings: [{
         id: 'context:max',
-        actions: [{ kind: 'model-switch', targetModelId: 'k3[1m]' }],
+        actions: [{ kind: 'client-tier', tierId: 'max' }],
       }],
     });
     expect(parsed.contributions.find((model) => model.modelId === 'kimi-for-coding')).toMatchObject({
@@ -83,10 +88,10 @@ describe('live Provider Catalog parsers', () => {
       ]),
     });
     expect(parsed.contributions.find((model) => model.modelId === 'kimi-for-coding-highspeed'))
-      .toMatchObject({ selection: { pickerVisibility: 'internal' } });
+      .toMatchObject({ selection: { pickerVisibility: 'internal' }, controls: { fast: { state: 'unsupported' } } });
   });
 
-  it('projects Kimi K3 single-effort and unknown metadata without inventing Off or Fast', () => {
+  it('narrows Kimi K3 live effort metadata without erasing the official baseline', () => {
     const maxOnly = parseKimiCodeCatalog({ models: [{
       id: 'k3', context_length: 256_000, supports_reasoning: true,
       think_efforts: { valid_efforts: ['max'], default_effort: 'max' },
@@ -102,7 +107,8 @@ describe('live Provider Catalog parsers', () => {
     const unknown = parseKimiCodeCatalog({ data: [{ id: 'k3', context_length: 256_000 }] })
       .contributions[0];
     expect(unknown?.controls?.reasoning).toMatchObject({
-      kind: 'unknown', supportsOff: false, defaultState: 'provider-managed',
+      kind: 'levels', supportsOff: false, levels: ['low', 'high', 'max'],
+      defaultState: 'known', defaultSelection: 'high',
     });
     expect(() => parseKimiCodeCatalog({ unexpected: [] })).toThrow(/missing a data or models array/u);
   });

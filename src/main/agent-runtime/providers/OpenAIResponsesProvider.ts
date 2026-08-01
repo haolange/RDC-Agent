@@ -146,7 +146,9 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
       const toolArgBuffers = new Map<number, string>();
       let currentReasoningArtifact: ProviderContinuationArtifact | undefined;
       const summarySource = reasoningProjectionSource(options.requestPlan, 'summary');
+      const rawSource = reasoningProjectionSource(options.requestPlan, 'raw');
       const opaqueSource = reasoningProjectionSource(options.requestPlan, 'opaque');
+      const deepSeekResponses = isDeepSeekResponsesPlan(options.requestPlan);
       const textRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:text', contentIndex: TEXT_INDEX });
       const reasoningRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:reasoning', contentIndex: REASONING_INDEX });
       const toolRefs = new Map<number, ReturnType<typeof createProviderOutputRef>>();
@@ -154,6 +156,8 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
       let textStarted = false;
       let thinkingStarted = false;
       let thinkingClosed = false;
+      let thinkingMode: 'summary' | 'raw' | 'opaque' | null = null;
+      let rawReasoningText = '';
       const toolRefFor = (slot: number, itemId?: string) => {
         const existing = toolRefs.get(slot);
         if (existing) return existing;
@@ -208,6 +212,7 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
                   continuation: currentReasoningArtifact,
                 });
                 thinkingStarted = true;
+                thinkingMode = 'summary';
               }
               builder.appendThinking(reasoningRef, delta, {
                 kind: 'summary',
@@ -225,6 +230,7 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
                 continuation: currentReasoningArtifact,
               });
               thinkingStarted = true;
+              thinkingMode = 'summary';
             }
             builder.endThinking(reasoningRef, {
               kind: 'summary',
@@ -234,27 +240,72 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
             });
             thinkingClosed = true;
             break;
+          case 'response.reasoning_text.delta': {
+            const delta = readString(event.delta) || readString(event.text);
+            if (delta) {
+              sawOutput = true;
+              rawReasoningText += delta;
+              if (!thinkingStarted) {
+                builder.startThinking(reasoningRef, {
+                  kind: 'raw', source: rawSource, visibility: 'raw-collapsed',
+                  continuation: currentReasoningArtifact,
+                });
+                thinkingStarted = true;
+                thinkingMode = 'raw';
+              }
+              builder.appendThinking(reasoningRef, delta, {
+                kind: 'raw', source: rawSource, visibility: 'raw-collapsed',
+                continuation: currentReasoningArtifact,
+              });
+            }
+            break;
+          }
+          case 'response.reasoning_text.done': {
+            const fullText = readString(event.text) || readString(event.reasoning_text);
+            if (fullText && !rawReasoningText) {
+              sawOutput = true;
+              rawReasoningText = fullText;
+              if (!thinkingStarted) {
+                builder.startThinking(reasoningRef, {
+                  kind: 'raw', source: rawSource, visibility: 'raw-collapsed',
+                  continuation: currentReasoningArtifact,
+                });
+                thinkingStarted = true;
+                thinkingMode = 'raw';
+              }
+              builder.appendThinking(reasoningRef, fullText, {
+                kind: 'raw', source: rawSource, visibility: 'raw-collapsed',
+                continuation: currentReasoningArtifact,
+              });
+            }
+            break;
+          }
           case 'response.output_item.added': {
             const outputIndex = readNumber(event.output_index) ?? 0;
             const item = readRecord(event.item);
             const reasoningArtifact = createResponsesReasoningArtifact(options.requestPlan, item);
             if (reasoningArtifact) {
               currentReasoningArtifact = reasoningArtifact;
-              sawOutput = true;
-              if (!thinkingStarted) {
-                builder.startThinking(reasoningRef, {
-                  kind: 'opaque',
-                  source: opaqueSource,
-                  visibility: 'hidden',
-                  continuation: currentReasoningArtifact,
-                });
-                thinkingStarted = true;
-              } else if (!thinkingClosed) builder.updateThinking(reasoningRef, {
-                kind: 'opaque',
-                source: opaqueSource,
-                visibility: 'hidden',
-                continuation: currentReasoningArtifact,
-              });
+              if (!deepSeekResponses) {
+                sawOutput = true;
+                if (!thinkingStarted) {
+                  builder.startThinking(reasoningRef, {
+                    kind: 'opaque',
+                    source: opaqueSource,
+                    visibility: 'hidden',
+                    continuation: currentReasoningArtifact,
+                  });
+                  thinkingStarted = true;
+                  thinkingMode = 'opaque';
+                } else if (!thinkingClosed) {
+                  builder.updateThinking(reasoningRef, {
+                    kind: thinkingMode ?? 'opaque',
+                    source: thinkingMode === 'summary' ? summarySource : opaqueSource,
+                    visibility: thinkingMode === 'summary' ? 'summary' : 'hidden',
+                    continuation: currentReasoningArtifact,
+                  });
+                }
+              }
             } else if (readString(item?.type) === 'function_call') {
               const slot = TOOL_INDEX_BASE + outputIndex;
               const itemId = readString(item?.id);
@@ -295,21 +346,49 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
             const reasoningArtifact = createResponsesReasoningArtifact(options.requestPlan, item);
             if (reasoningArtifact) {
               currentReasoningArtifact = reasoningArtifact;
-              sawOutput = true;
-              if (!thinkingStarted) {
-                builder.startThinking(reasoningRef, {
+              if (deepSeekResponses) {
+                const itemReasoningText = readDeepSeekReasoningText(item);
+                if (itemReasoningText && !rawReasoningText) {
+                  sawOutput = true;
+                  rawReasoningText = itemReasoningText;
+                  if (!thinkingStarted) {
+                    builder.startThinking(reasoningRef, {
+                      kind: 'raw', source: rawSource, visibility: 'raw-collapsed',
+                      continuation: currentReasoningArtifact,
+                    });
+                    thinkingStarted = true;
+                    thinkingMode = 'raw';
+                  }
+                  builder.appendThinking(reasoningRef, itemReasoningText, {
+                    kind: 'raw', source: rawSource, visibility: 'raw-collapsed',
+                    continuation: currentReasoningArtifact,
+                  });
+                }
+                if (thinkingStarted && !thinkingClosed && thinkingMode === 'raw') {
+                  builder.endThinking(reasoningRef, {
+                    kind: 'raw', source: rawSource, visibility: 'raw-collapsed',
+                    continuation: currentReasoningArtifact,
+                  });
+                  thinkingClosed = true;
+                }
+              } else {
+                sawOutput = true;
+                if (!thinkingStarted) {
+                  builder.startThinking(reasoningRef, {
+                    kind: 'opaque',
+                    source: opaqueSource,
+                    visibility: 'hidden',
+                    continuation: currentReasoningArtifact,
+                  });
+                  thinkingStarted = true;
+                  thinkingMode = 'opaque';
+                } else if (!thinkingClosed) builder.updateThinking(reasoningRef, {
                   kind: 'opaque',
                   source: opaqueSource,
                   visibility: 'hidden',
                   continuation: currentReasoningArtifact,
                 });
-                thinkingStarted = true;
-              } else if (!thinkingClosed) builder.updateThinking(reasoningRef, {
-                kind: 'opaque',
-                source: opaqueSource,
-                visibility: 'hidden',
-                continuation: currentReasoningArtifact,
-              });
+              }
             } else if (readString(item?.type) === 'function_call') {
               const slot = TOOL_INDEX_BASE + outputIndex;
               const itemId = readString(item?.id);
@@ -341,12 +420,18 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
               const completedArtifact = findResponsesReasoningArtifact(options.requestPlan, completed.output);
               if (completedArtifact) {
                 currentReasoningArtifact = completedArtifact;
-                if (thinkingStarted && !thinkingClosed) builder.updateThinking(reasoningRef, {
-                  kind: 'summary',
-                  source: summarySource,
-                  visibility: 'summary',
-                  continuation: currentReasoningArtifact,
-                });
+                if (thinkingStarted && !thinkingClosed) {
+                  const kind = thinkingMode ?? (deepSeekResponses ? 'raw' : 'opaque');
+                  const source = kind === 'raw' ? rawSource : kind === 'summary' ? summarySource : opaqueSource;
+                  const visibility = kind === 'raw' ? 'raw-collapsed' : kind === 'summary' ? 'summary' : 'hidden';
+                  builder.endThinking(reasoningRef, {
+                    kind,
+                    source,
+                    visibility,
+                    continuation: currentReasoningArtifact,
+                  });
+                  thinkingClosed = true;
+                }
               }
               finishReason = completed.status === 'incomplete' ? 'length' : sawToolCall ? 'toolUse' : 'stop';
             }
@@ -356,16 +441,30 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
             providerTerminalSeen = true;
             break;
           }
-          case 'response.incomplete':
+          case 'response.incomplete': {
+            const incomplete = readRecord(event.response) as ResponsesCompletedPayload | null;
+            if (incomplete) {
+              applyCompletedUsage(builder, incomplete);
+              const incompleteArtifact = findResponsesReasoningArtifact(options.requestPlan, incomplete.output);
+              if (incompleteArtifact) currentReasoningArtifact = incompleteArtifact;
+            }
+            if (thinkingStarted && !thinkingClosed) {
+              const kind = thinkingMode ?? (deepSeekResponses ? 'raw' : 'opaque');
+              const source = kind === 'raw' ? rawSource : kind === 'summary' ? summarySource : opaqueSource;
+              const visibility = kind === 'raw' ? 'raw-collapsed' : kind === 'summary' ? 'summary' : 'hidden';
+              builder.endThinking(reasoningRef, { kind, source, visibility, continuation: currentReasoningArtifact });
+              thinkingClosed = true;
+            }
             finishReason = 'length';
             if (!sawOutput) {
               throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
             }
             providerTerminalSeen = true;
             break;
+          }
           case 'response.failed': {
             const failed = readRecord(event.response);
-            const error = readRecord(failed?.error);
+            const error = readRecord(failed?.error) ?? readRecord(event.error);
             throw new ProviderHttpError(
               PROVIDER_API,
               502,
@@ -381,6 +480,12 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
 
       if (!sawOutput) {
         throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+      }
+      if (thinkingStarted && !thinkingClosed) {
+        const kind = thinkingMode ?? (deepSeekResponses ? 'raw' : 'opaque');
+        const source = kind === 'raw' ? rawSource : kind === 'summary' ? summarySource : opaqueSource;
+        const visibility = kind === 'raw' ? 'raw-collapsed' : kind === 'summary' ? 'summary' : 'hidden';
+        builder.endThinking(reasoningRef, { kind, source, visibility, continuation: currentReasoningArtifact });
       }
       builder.done(finishReason);
     } catch (err) {
@@ -413,12 +518,13 @@ export function buildOpenAIResponsesUrl(baseUrl: string): string {
 }
 
 function buildRequestBody(model: Model, context: Context, options: StreamOptions): Record<string, unknown> {
-  const providerState = findLatestProviderState(context, options.requestPlan);
+  const deepSeekResponses = isDeepSeekResponsesPlan(options.requestPlan);
+  const providerState = deepSeekResponses ? undefined : findLatestProviderState(context, options.requestPlan);
   const inputContext = providerState
     ? { ...context, messages: context.messages.slice(providerState.assistantMessageIndex + 1) }
     : context;
   const prompt = partitionSystemPrompt(context);
-  const explicitBreakpoint = options.promptCache?.enabled === true
+  const explicitBreakpoint = !deepSeekResponses && options.promptCache?.enabled === true
     && options.promptCache.breakpointCarrier === 'openai-prompt-cache'
     && (
       options.promptCache.breakpoint === 'explicit'
@@ -445,10 +551,12 @@ function buildRequestBody(model: Model, context: Context, options: StreamOptions
     model: model.id,
     input,
     stream: true,
-    store: options.requestPlan.statePlan.store,
-    parallel_tool_calls: true,
+    ...(!deepSeekResponses ? {
+      store: options.requestPlan.statePlan.store,
+      parallel_tool_calls: true,
+    } : {}),
   };
-  if (options.promptCache?.enabled
+  if (!deepSeekResponses && options.promptCache?.enabled
     && options.promptCache.keyCarrier === 'prompt-cache-key'
     && options.promptCache.requestKey) {
     body.prompt_cache_key = options.promptCache.requestKey;
@@ -469,7 +577,7 @@ function buildRequestBody(model: Model, context: Context, options: StreamOptions
   if (reasoningPayload.reasoning) {
     body.reasoning = reasoningPayload.reasoning;
   }
-  if (reasoningPayload.include?.includes(RESPONSES_REASONING_INCLUDE)) {
+  if (!deepSeekResponses && reasoningPayload.include?.includes(RESPONSES_REASONING_INCLUDE)) {
     body.include = [RESPONSES_REASONING_INCLUDE];
   }
   const maxTokens = options.maxTokens ?? model.maxTokens;
@@ -623,6 +731,21 @@ function findResponsesReasoningArtifact(
   return undefined;
 }
 
+function isDeepSeekResponsesPlan(requestPlan: RequestPlan): boolean {
+  return requestPlan.executionIdentity.protocolDialect === 'DeepSeekResponses';
+}
+
+function readDeepSeekReasoningText(item: Record<string, unknown> | null | undefined): string {
+  if (!item) return '';
+  if (typeof item.content === 'string') return item.content;
+  if (!Array.isArray(item.content)) return '';
+  return item.content.flatMap((part): string[] => {
+    const value = readRecord(part);
+    const text = readString(value?.text) || readString(value?.content);
+    return text ? [text] : [];
+  }).join('');
+}
+
 function resolveToolSlot(event: Record<string, unknown>, toolSlotsByItemId: Map<string, number>): number | null {
   const itemId = readString(event.item_id);
   if (itemId && toolSlotsByItemId.has(itemId)) {
@@ -657,4 +780,10 @@ function readNumber(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-export const __testing = { buildRequestBody, isReasoningEnabled, toResponsesInput };
+export const __testing = {
+  buildRequestBody,
+  isDeepSeekResponsesPlan,
+  isReasoningEnabled,
+  readDeepSeekReasoningText,
+  toResponsesInput,
+};

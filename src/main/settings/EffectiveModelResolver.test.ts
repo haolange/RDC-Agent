@@ -65,7 +65,10 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
         context1m: { state: 'unsupported', fixedValue: false },
         reasoning: { levels: ['low', 'medium', 'high', 'xhigh'], defaultSelection: 'medium' },
       },
-      executionBindings: [{ id: 'fast:activation' }],
+      executionBindings: [
+        { id: 'route:chatgpt-codex-parameter-policy' },
+        { id: 'fast:activation' },
+      ],
     });
   });
 
@@ -119,7 +122,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     });
   });
 
-  it('preserves a live Kimi K3 Max tier only when discovery supplies its executable binding', () => {
+  it('preserves Kimi K3 Max as a client-side budget tier without inventing a model id', () => {
     const kimi = provider('kimi-coding-plan', 'OpenAICompatibleChatCompletions');
     const parsed = parseKimiCodeCatalog({ data: [{
       id: 'k3', context_length: 256_000, supports_reasoning: true,
@@ -140,12 +143,12 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       controls: { context1m: { state: 'selectable', tierId: 'max' } },
       executionBindings: [{
         id: 'context:max',
-        actions: [{ kind: 'model-switch', targetModelId: 'k3[1m]' }],
+        actions: [{ kind: 'client-tier', tierId: 'max' }],
       }],
       resolvedControls: { context1m: { state: 'blocked', disabled: true, entitlement: 'unknown' } },
     });
   });
-  it('keeps normal K3 Max planning blocked while an explicit probe may verify the internal target', async () => {
+  it('keeps normal K3 Max planning blocked while an explicit probe may verify the same model tier', async () => {
     const kimi = provider('kimi-coding-plan', 'OpenAICompatibleChatCompletions');
     const settings = { llm: { providers: [kimi], agentRoutes: [] } } as unknown as AppSettings;
     const parsed = parseKimiCodeCatalog({ data: [{
@@ -171,7 +174,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       ok: true,
       plan: {
         selectedModelId: 'k3',
-        effectiveModelId: 'k3[1m]',
+        effectiveModelId: 'k3',
         activeTierId: 'max',
         contextMode: 'one-million',
         appliedBindingIds: ['context:max'],
@@ -198,6 +201,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     expect(discovery).toEqual([
       expect.objectContaining({ modelId: 'kimi-for-coding', availability: 'available' }),
       expect.objectContaining({ modelId: 'k3', availability: 'unavailable' }),
+      expect.objectContaining({ modelId: 'k3-256k', availability: 'unavailable' }),
       expect.objectContaining({ modelId: 'kimi-for-coding-highspeed', availability: 'unavailable' }),
     ]);
     const request = buildEffectiveCatalogRequest(kimi);

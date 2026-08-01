@@ -1,85 +1,25 @@
 import { randomBytes, timingSafeEqual } from 'crypto';
+import { isRendererInvokeChannel } from '@shared/renderer-api';
 import { hasRegisteredIpcChannel } from '../ipc/invokeRegistry';
 
 /**
- * Phase 0 stop-ship: browser bridge is not a generic IPC proxy.
- * Channels must be registered AND match the explicit allowlist, and must not
- * match the hard deny list (sensitive capabilities stay desktop-only).
- *
- * Non-blocking assumption vs plan wording "仅只读诊断": AGENTS.md requires the
- * browser QA surface to exercise the real workbench. We keep a curated QA
- * allowlist (not full ipcMain) while permanently denying terminal/secret/
- * memory/approval/hook/mcp/settings mutation/trust channels.
+ * Browser QA is not a generic ipcMain proxy. It exposes exactly the product
+ * API available through the desktop preload, while main-process validation,
+ * permissions, trust, and secret isolation remain authoritative.
  */
-const BRIDGE_DENIED_CHANNEL_PATTERNS: RegExp[] = [
-  /^terminal:/,
-  /^memory:/,
-  /^approval:/,
-  /^hook:/,
-  /^mcp:/,
-  /^settings:set$/,
-  /^settings:getProviderSecret$/,
-  /^command:execute$/,
-  /^rdx-runtime:trustHook$/,
-  /^rdx-runtime:revokeHook$/,
-  /^rdx-runtime:testHook$/,
-  /^rdx-runtime:trustMcp$/,
-  /^rdx-runtime:revokeMcp$/,
-  /^conversation:answerToolApproval$/,
-];
-
-/** Explicit browser-QA allow prefixes. Unknown prefixes fail closed. */
-const BRIDGE_ALLOWED_CHANNEL_PATTERNS: RegExp[] = [
-  /^app:/,
-  /^web:resolveFavicon$/,
-  /^conversation:(sendMessage|rewriteFromMessage|cancelActiveTurn|answerUserInput|getHistory|switchBranch|clearHistory|undoLastTurn|compactHistory)$/,
-  /^dialog:/,
-  /^workflow:/,
-  /^agent:/,
-  /^knowledge:/,
-  /^rdx-runtime:(overview|validate|upsert|import|delete|reveal|listSnapshots|getSnapshot)$/,
-  /^command:list$/,
-  /^tool:/,
-  /^evidence:/,
-  /^llm:/,
-  /^settings:(get|getProviderCatalog|getEffectiveModel|getEffectiveCatalog|hasProviderSecret|importAgentManifest|saveAgentDefinition|getAgentDefinitionCommit|saveProviderDefinition|getProviderDefinitionCommit)$/,
-  /^project:/,
-  /^device:/,
-  /^session:/,
-  /^run:/,
-  /^runtimeLog:/,
-  /^capture:/,
-  /^context:/,
-  /^trace:/,
-  /^window:/,
-];
+export function isBridgeChannelAllowed(channel: string): boolean {
+  return isRendererInvokeChannel(channel) && hasRegisteredIpcChannel(channel);
+}
 
 export function createBridgeBearerToken(): string {
   return randomBytes(32).toString('hex');
-}
-
-export function isBridgeChannelDenied(channel: string): boolean {
-  return BRIDGE_DENIED_CHANNEL_PATTERNS.some((pattern) => pattern.test(channel));
-}
-
-export function isBridgeChannelAllowlisted(channel: string): boolean {
-  return BRIDGE_ALLOWED_CHANNEL_PATTERNS.some((pattern) => pattern.test(channel));
-}
-
-/** Allow only registered, allowlisted, non-denied channels. */
-export function isBridgeChannelAllowed(channel: string): boolean {
-  return hasRegisteredIpcChannel(channel)
-    && isBridgeChannelAllowlisted(channel)
-    && !isBridgeChannelDenied(channel);
 }
 
 export function extractBearerToken(authorizationHeader: string | undefined, queryToken: string | null): string | null {
   const header = authorizationHeader?.trim();
   if (header) {
     const match = /^Bearer\s+(.+)$/i.exec(header);
-    if (match?.[1]) {
-      return match[1].trim();
-    }
+    if (match?.[1]) return match[1].trim();
   }
   const fromQuery = queryToken?.trim();
   return fromQuery || null;
@@ -90,11 +30,7 @@ export function resolveBridgeQueryToken(url: URL): string | null {
   return url.searchParams.get('rdcBridgeToken') ?? url.searchParams.get('token');
 }
 
-/**
- * Document / invoke auth resolution order for Browser QA:
- * Bearer → query `rdcBridgeToken|token` → cookie `rdcBridgeToken`.
- * Never accept only bare `token` while printing `rdcBridgeToken` (Phase 0 regression).
- */
+/** Resolve Browser QA auth in order: Bearer, query token, then auth cookie. */
 export function resolveProvidedBridgeToken(input: {
   authorizationHeader?: string;
   url: URL;
@@ -106,18 +42,9 @@ export function resolveProvidedBridgeToken(input: {
   ) ?? resolveBridgeCookieToken(input.cookieHeader);
 }
 
-/** Stable lists for docs / matrix tests (patterns are source of truth above). */
-export function listBridgeDeniedChannelPatterns(): readonly string[] {
-  return BRIDGE_DENIED_CHANNEL_PATTERNS.map((pattern) => pattern.source);
-}
-
-export function listBridgeAllowedChannelPatterns(): readonly string[] {
-  return BRIDGE_ALLOWED_CHANNEL_PATTERNS.map((pattern) => pattern.source);
-}
-
 const BRIDGE_COOKIE_NAME = 'rdcBridgeToken';
 
-/** Cookie used by short `/qa` entry so Glass/Simple Browser need not keep a long query string. */
+/** Cookie used by short `/qa` entry so the address bar does not retain the bearer token. */
 export function resolveBridgeCookieToken(cookieHeader: string | undefined): string | null {
   if (!cookieHeader) return null;
   for (const part of cookieHeader.split(';')) {
@@ -142,14 +69,10 @@ export function buildBridgeAuthCookie(token: string): string {
 export { BRIDGE_COOKIE_NAME };
 
 export function tokensMatch(expected: string, provided: string | null): boolean {
-  if (!provided) {
-    return false;
-  }
+  if (!provided) return false;
   const expectedBuffer = Buffer.from(expected);
   const providedBuffer = Buffer.from(provided);
-  if (expectedBuffer.length !== providedBuffer.length) {
-    return false;
-  }
+  if (expectedBuffer.length !== providedBuffer.length) return false;
   return timingSafeEqual(expectedBuffer, providedBuffer);
 }
 

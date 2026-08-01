@@ -24,6 +24,14 @@ describe('composeAccent', () => {
     expect(light['--composer-effort-thumb']).toMatch(/^hsl\(/);
   });
 
+  it('keeps dark effort tiers visually anchored to a light violet agent accent', () => {
+    const analyzer = deriveComposeAccentVars('#8d8bff', 'dark');
+    expect(analyzer['--composer-mode-accent']).toBe('#8d8bff');
+    expect(analyzer['--composer-effort-fill-3']).toBe('hsl(241 97% 77%)');
+    expect(analyzer['--composer-effort-fill-4']).toBe('hsl(241 100% 73%)');
+    expect(analyzer['--composer-effort-fill-5']).toBe('hsl(241 100% 69%)');
+  });
+
   it('modulateAccentForTheme preserves hue while clamping luminance', () => {
     const light = modulateAccentForTheme('#33d1ff', 'light');
     const dark = modulateAccentForTheme('#33d1ff', 'dark');

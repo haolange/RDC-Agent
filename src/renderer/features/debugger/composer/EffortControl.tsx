@@ -24,8 +24,6 @@ import { EffortControlPopup } from './EffortControlPopup';
 import {
   hasSelectableFastMode,
   hasSelectableOneMillionContext,
-  hasStructuralFastMode,
-  hasStructuralOneMillionContext,
   isFastModeUnverified,
   isOneMillionContextUnverified,
   oneMillionContextTokens,
@@ -130,10 +128,8 @@ export const EffortControl: React.FC<{
     reasoningLockedDisabled ? 'composer.effort.levelOff' : EFFORT_LABEL_KEYS[displayLevel],
   );
   const oneMillionTokens = oneMillionContextTokens(capability);
-  const oneMillionVisible = hasStructuralOneMillionContext(capability);
   const oneMillionAvailable = hasSelectableOneMillionContext(capability);
   const oneMillionUnverified = isOneMillionContextUnverified(capability);
-  const fastVisible = hasStructuralFastMode(capability);
   const fastAvailable = hasSelectableFastMode(capability);
   const fastUnverified = isFastModeUnverified(capability);
   const statusPresentation = capabilityStatusPresentation(capabilityState);
@@ -272,10 +268,8 @@ export const EffortControl: React.FC<{
           tooltipLeftPercent={tooltipLeftPercent}
           tooltipLabel={tooltipLabel}
           trackWidthPx={trackWidthPx}
-          oneMillionContextVisible={oneMillionVisible}
           oneMillionContextAvailable={capabilityReady && oneMillionAvailable}
           oneMillionContextStatusLabel={oneMillionContextStatusLabel}
-          fastModelVisible={fastVisible}
           fastModelAvailable={capabilityReady && fastAvailable}
           fastModelStatusLabel={fastModelStatusLabel}
           oneMillionContextMode={turnControls.maxContextMode}

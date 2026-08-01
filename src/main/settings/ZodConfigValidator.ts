@@ -35,7 +35,7 @@ const UiPreferencesSchema = z.object({
   fontScale: z.enum(['small', 'medium', 'large']).optional().default('medium'),
   composerMarkdown: z.boolean().optional().default(false),
   usePointerCursors: z.boolean().optional().default(false),
-  contextBreakdownExpanded: z.boolean().optional().default(false),
+  contextBreakdownExpanded: z.boolean().optional().default(true),
   reduceMotion: z.enum(['system', 'on', 'off']).optional().default('system'),
   chromeThemes: z.object({
     light: ThemeChromeSchema,

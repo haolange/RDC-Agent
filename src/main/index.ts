@@ -5,7 +5,6 @@
 import { app, BrowserWindow, dialog, Menu, session, shell } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
-import { randomBytes } from 'crypto';
 import { fileURLToPath } from 'url';
 
 import { registerIPCHandlers, setMainWindow, initializeIpcState, stopAllActiveRuns } from './ipc/handlers';
@@ -32,6 +31,8 @@ import {
   bindWindowLayoutPersistence,
   resolveWindowCreationOptions,
 } from './window/windowLayoutPersistence';
+import { resolveCanonicalUserDataPath } from './runtime/userDataPath';
+import { acquireUserDataInstanceLock } from './runtime/userDataInstanceLock';
 
 // Re-export for callers that historically imported from main entry.
 export { rdxSessionService } from './sessions';
@@ -164,93 +165,34 @@ function installRendererSecurityPolicy(): void {
   });
 }
 
-function resolveUserDataPath(): string {
-  const configured = process.env.RDC_AGENT_USER_DATA?.trim();
-  if (configured) {
-    return path.resolve(configured);
-  }
-  if (isHeadlessMode) {
-    const runId = process.env.RDC_AGENT_QA_RUN_ID?.trim() || randomBytes(8).toString('hex');
-    const qaRoot = path.join(app.getPath('appData'), 'rdc-agent', `qa-${runId}`);
-    process.env.RDC_AGENT_USER_DATA = qaRoot;
-    process.env.RDC_AGENT_QA_RUN_ID = runId;
-    return qaRoot;
-  }
-  return path.join(app.getPath('appData'), 'rdc-agent');
-}
-
-const userDataPath = resolveUserDataPath();
+const userDataPath = resolveCanonicalUserDataPath(
+  process.env.RDC_AGENT_USER_DATA,
+  app.getPath('appData'),
+);
+process.env.RDC_AGENT_USER_DATA = userDataPath;
 fs.mkdirSync(userDataPath, { recursive: true });
 app.commandLine.appendSwitch('user-data-dir', userDataPath);
 app.setPath('userData', userDataPath);
 
-function acquireUserDataInstanceLock(targetUserDataPath: string): void {
-  const mode = isHeadlessMode ? 'browser-qa' : 'desktop';
-  const lockPath = path.join(targetUserDataPath, 'instance.lock');
-  const startTs = new Date().toISOString();
-  const payload = `${JSON.stringify({
-    pid: process.pid,
-    mode,
-    startTs,
-    headless: isHeadlessMode,
-  })}\n`;
-
-  const isProcessAlive = (pid: number): boolean => {
-    if (!Number.isInteger(pid) || pid <= 0) return false;
-    try {
-      process.kill(pid, 0);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  // Desktop still uses Electron's single-instance lock for UX; instance.lock
-  // additionally fail-closes shared userData between desktop and browser QA.
-  if (fs.existsSync(lockPath)) {
-    try {
-      const existing = JSON.parse(fs.readFileSync(lockPath, 'utf8')) as { pid?: number; mode?: string };
-      if (typeof existing.pid === 'number' && existing.pid !== process.pid && isProcessAlive(existing.pid)) {
-        console.error(
-          `[RDC-Agent] userData is already in use by pid ${existing.pid}`
-          + `${existing.mode ? ` (${existing.mode})` : ''}: ${targetUserDataPath}`,
-        );
-        app.exit(1);
-        return;
-      }
-    } catch {
-      // Stale or corrupt lock; replace below.
-    }
-  }
-
-  try {
-    fs.writeFileSync(lockPath, payload, { encoding: 'utf8', flag: 'w' });
-  } catch (error) {
-    console.error('[RDC-Agent] Failed to acquire userData instance.lock:', error);
-    app.exit(1);
-  }
-
-  const release = (): void => {
-    try {
-      if (fs.existsSync(lockPath)) {
-        const existing = JSON.parse(fs.readFileSync(lockPath, 'utf8')) as { pid?: number };
-        if (existing.pid === process.pid) {
-          fs.rmSync(lockPath, { force: true });
-        }
-      }
-    } catch {
-      // Best-effort unlock on shutdown.
-    }
-  };
-  process.once('exit', release);
+const userDataLock = acquireUserDataInstanceLock(userDataPath, {
+  pid: process.pid,
+  mode: isHeadlessMode ? 'browser' : 'desktop',
+  startTs: new Date().toISOString(),
+});
+if (!userDataLock.acquired) {
+  const owner = userDataLock.owner;
+  console.error(
+    `[RDC-Agent] userData is already in use${owner ? ` by pid ${owner.pid} (${owner.mode})` : ''}`
+    + `: ${userDataPath}`,
+  );
+  app.exit(1);
+} else {
+  process.once('exit', userDataLock.release);
 }
 
-acquireUserDataInstanceLock(userDataPath);
-
-// Browser QA is a second, headless surface over the real runtime. It must not
-// own the desktop lock, otherwise a later human launcher is redirected to an
-// instance that can never show a window. The bridge port remains the headless
-// singleton boundary; visible desktop instances keep Electron's canonical lock.
+// Both carriers own the canonical userData lock above. The headless Browser
+// skips Electron's window-oriented single-instance redirect; instance.lock is
+// the cross-carrier boundary, while visible desktop instances keep both locks.
 const hasSingleInstanceLock = isSettingsRebuildOnly
   || isHeadlessMode
   || app.requestSingleInstanceLock();

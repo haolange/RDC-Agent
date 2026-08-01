@@ -45,7 +45,7 @@ export const ContextRunMeterBand: React.FC<{
       className="context-breakdown-run-meter"
       data-testid="context-breakdown-run-meter"
       data-columns="3"
-      data-phase={isCurrent ? 'current' : 'actual'}
+      data-phase={isCurrent ? 'current' : usage ? 'actual' : 'unavailable'}
     >
       <div className="context-breakdown-run-columns">
         <section className="context-breakdown-run-col" data-col="tokens" aria-label={t('contextBreakdown.tokensColumn')}>

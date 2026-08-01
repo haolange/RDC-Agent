@@ -13,6 +13,8 @@
 
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -107,13 +109,13 @@ async function assertQaSurface(baseUrl) {
   return true;
 }
 
-async function waitForBridgeFromChild() {
+async function waitForBridgeFromChild(userDataPath) {
   const child = spawn(
     process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
     ['run', 'start:agent-browser'],
     {
       cwd: repoRoot,
-      env: { ...process.env },
+      env: { ...process.env, RDC_AGENT_USER_DATA: userDataPath },
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: process.platform === 'win32',
     },
@@ -153,16 +155,74 @@ async function waitForBridgeFromChild() {
   return { child, baseUrl };
 }
 
+async function stopChildTree(child) {
+  if (!child || child.exitCode != null || !child.pid) return;
+  if (process.platform === 'win32') {
+    await new Promise((resolve) => {
+      const killer = spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], {
+        stdio: 'ignore',
+      });
+      killer.once('error', () => resolve());
+      killer.once('exit', () => resolve());
+    });
+    return;
+  }
+  child.kill('SIGTERM');
+  await new Promise((resolve) => {
+    const timeout = setTimeout(resolve, 5_000);
+    child.once('exit', () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+  });
+  if (child.exitCode == null) child.kill('SIGKILL');
+}
+
+async function removeSmokeUserData(smokeUserData) {
+  const resolvedTempRoot = path.resolve(tmpdir());
+  const resolvedSmokeRoot = path.resolve(smokeUserData);
+  const safePrefix = `${resolvedTempRoot}${path.sep}rdc-agent-browser-smoke-`;
+  if (!resolvedSmokeRoot.startsWith(safePrefix)) {
+    fail(`Refusing to clean unexpected smoke userData path: ${resolvedSmokeRoot}`);
+    return;
+  }
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      rmSync(resolvedSmokeRoot, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (attempt === 19) {
+        fail(`Could not clean smoke userData ${resolvedSmokeRoot}: ${error instanceof Error ? error.message : String(error)}`);
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+}
+
 async function main() {
   let child = null;
+  let smokeUserData = null;
   let baseUrl = DEFAULT_BASE.replace(/\/$/, '');
 
   try {
     if (START) {
-      const started = await waitForBridgeFromChild();
+      smokeUserData = mkdtempSync(path.join(tmpdir(), 'rdc-agent-browser-smoke-'));
+      const started = await waitForBridgeFromChild(smokeUserData);
       child = started.child;
       if (!started.baseUrl) return;
       baseUrl = started.baseUrl;
+      const lockPath = path.join(smokeUserData, 'instance.lock');
+      if (!existsSync(lockPath)) {
+        fail(`Explicit smoke userData was not activated: ${lockPath}`);
+        return;
+      }
+      const lockOwner = JSON.parse(readFileSync(lockPath, 'utf8'));
+      if (lockOwner?.mode !== 'browser') {
+        fail(`Explicit smoke userData lock has unexpected owner mode: ${String(lockOwner?.mode)}`);
+        return;
+      }
+      ok('Explicit disposable RDC_AGENT_USER_DATA → active browser instance.lock');
     } else {
       try {
         const probe = await fetch(`${baseUrl}/qa`, { redirect: 'manual' });
@@ -181,8 +241,9 @@ async function main() {
       ok(`PASS (${baseUrl})`);
     }
   } finally {
-    if (child && child.exitCode == null) {
-      child.kill();
+    await stopChildTree(child);
+    if (smokeUserData) {
+      await removeSmokeUserData(smokeUserData);
     }
   }
 }

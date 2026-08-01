@@ -80,12 +80,13 @@ for (const required of ['EmptyState', 'Steps will show as the task unfolds.', 'O
 for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail', 'harnessTasks', 'RequestInspector', 'No tasks', 'aria-expanded', 'useState']) {
   forbidText(tracePanel, forbidden, `TraceRightPanel must not retain ${forbidden}`);
 }
+forbidText(tracePanel, 'is-empty', 'TraceRightPanel sections must keep one card shell regardless of content');
 
 const projectCaptureImport = read('src/renderer/features/debugger/ControlPanel/ProjectCaptureImportPanel.tsx');
-for (const required of ['project.inputs.import', 'project.inputs.refresh', 'Import .rdc', 'Imported .rdc files appear here.']) {
+for (const required of ['project.inputs.import', 'project.inputs.refresh', 'Import .rdc', 'Imported .rdc files appear here.', 'right-rail-section project-capture-import-section', 'project-capture-input-list']) {
   requireText(projectCaptureImport, required, `ProjectCaptureImportPanel must retain ${required}`);
 }
-for (const forbidden of ['useCaptureStore', 'openedCapture', 'TraceRightPanel']) {
+for (const forbidden of ['useCaptureStore', 'openedCapture', 'TraceRightPanel', 'project-capture-inputs-section', '<h3>Captures</h3>', 'input.filePath}</small>']) {
   forbidText(projectCaptureImport, forbidden, `ProjectCaptureImportPanel must not retain ${forbidden}`);
 }
 
@@ -106,15 +107,16 @@ for (const forbidden of ['context?: ContextPanelViewModel', 'Rdx', 'Capture', 'P
 }
 
 const capturePanel = read('src/renderer/features/debugger/ControlPanel/CapturePanel.tsx');
-for (const required of ['RdxContextPanelViewModel', "'Open'", "'Preview'", "'Refresh'", "'Copy'", "'Clear'", 'capture.openProjectInput', 'context.openHumanPreview', 'capture.clearOpenedState']) {
+for (const required of ['RdxContextPanelViewModel', "'Open'", "'Preview'", "'Refresh'", "'Copy'", "'Clear'", 'capture.openProjectInput', 'context.openHumanPreview', 'capture.clearOpenedState', 'right-rail-capture-open-row', 'right-rail-capture-open-button']) {
   requireText(capturePanel, required, `CapturePanel must retain ${required}`);
 }
+forbidText(capturePanel, 'right-rail-capture-summary', 'CapturePanel must not duplicate the selected capture above its picker');
 
 const rightRailCss = read('src/renderer/features/debugger/ControlPanel/RightRail.css');
-for (const required of ['.right-rail-empty-state', '.right-rail-empty-visual', 'grid-template-rows:', 'flex: 0 0 auto', 'font-size: var(--text-md)', 'font-size: var(--text-xl)', '.right-rail-capture-panel', '.project-capture-import-section', '.output-visual', '.context-visual', '.capture-visual']) {
+for (const required of ['.right-rail-empty-state', '.right-rail-empty-visual', 'grid-template-rows:', 'flex: 0 0 auto', 'font-size: var(--text-md)', 'font-size: var(--text-xl)', '.right-rail-capture-panel', '.right-rail-capture-open-row', '.project-capture-import-section', '.project-capture-input-list', '.output-visual', '.context-visual', '.capture-visual']) {
   requireText(rightRailCss, required, `RightRail.css must retain ${required}`);
 }
-for (const forbidden of ['.control-panel', '.cp-section', '.capture-library', '.panel-action-btn', 'trace-plan-preview', 'is-plan', '.right-rail-details', '.right-rail-context-area-heading', '.right-rail-rdx-context']) {
+for (const forbidden of ['.control-panel', '.cp-section', '.capture-library', '.panel-action-btn', 'trace-plan-preview', 'is-plan', '.right-rail-details', '.right-rail-context-area-heading', '.right-rail-rdx-context', '.right-rail-section:not(.is-empty)', '.right-rail-section.is-empty', '.right-rail-capture-summary']) {
   forbidText(rightRailCss, forbidden, `RightRail.css must not retain ${forbidden}`);
 }
 
@@ -161,7 +163,7 @@ const controlPanel = read('src/renderer/features/debugger/ControlPanel/index.tsx
 for (const required of ['rightRailTarget', 'ProjectCaptureImportPanel', "rightRailTarget !== 'session'"]) {
   requireText(controlPanel, required, `ControlPanel must retain ${required}`);
 }
-const channels = read('src/main/ipc/channels.ts');
+const channels = read('src/shared/renderer-api/channels.ts');
 for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail', 'CaptureLibrary']) {
   forbidText(controlPanel, forbidden, `ControlPanel must not retain ${forbidden}`);
 }

@@ -28,6 +28,49 @@
 - 生产 CSP：`style-src 'self'`（无 `unsafe-inline`）+ `style-src-attr 'none'`。Appearance chrome（`applyChromeTheme`）与组件动态样式必须走 constructable stylesheet（`adoptedStyleSheets` / `useDynStyle` / `assignDynStyle`），禁止 `<style>.textContent` 或 `element.style` 注入。
 - Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThemes` 为 RDC 默认（清理历史污染）。
 
+## Token 使用规则
+
+- **必须**引用语义 token（`--token-*`），禁止在组件 CSS 中直接用 primitive token（`--color-bg-3`、`rgb(var(--color-accent-500))` 等）。
+- `--token-*` 完整定义在 `src/renderer/styles/design-system.css` 的 "Semantic Token Layer" 部分。
+- 边框 token 已内含 alpha，使用方式为 `rgb(var(--color-border-subtle))`，**禁止**追加额外 alpha：`rgb(var(--color-border-subtle) / 0.65)` 是无效 CSS。
+- 字号必须用 `var(--text-*)` 变量，**禁止** px 字面值。
+- 间距必须用 `var(--space-*)` 变量，**禁止**奇数像素值（3px、7px、9px）。
+
+## 按钮规则
+
+- 全局唯一按钮系统：`.button`（基类） + `.button-primary / button-secondary / button-ghost / button-danger`，定义在 `panels-composer.css`。
+- React 层用 `<Button variant="primary|secondary|ghost|danger" size="sm|md|lg">`（`src/renderer/ui/Button.tsx`）。
+- **禁止**新增第三套按钮类名，禁止在 feature CSS 中重复定义按钮样式。
+
+## 颜色使用规则
+
+- 强调色（`--color-accent-*`）只用于：焦点环、激活状态、主要 CTA（非 Composer）。不得用于正文、装饰或多处背景。全局 accent 来自 Appearance chrome 编译，不接管 Composer。
+- 状态色（success / warning / error / info）只用于语义状态，不得挪作装饰。
+- **双体系**：全局 chrome（`chromeThemes.light|dark` → `ThemeChromeCompiler`）驱动 shell/Settings/transcript；Composer 第二套由当前 agent 的 `.agent.md` `accent` 派生 `--composer-mode-accent` 与 `--composer-effort-*`（边框流光、边缘泛光、mode pill、send、Effort/Max 滑条、Max 字色、Max mode / Fast 开关开态、`2x`/`Fast` pill）。禁止这些 compose 控件再读 `--token-border-focus` 或裸 `--token-effort-*` 作为唯一色源。Light/Dark 只调制 compose 派生色的亮度，不替换色相来源。`--token-effort-*` 仅为 compose 变量缺省回退，禁止挪作其它装饰或背景。
+- Effort 弹层的 Max mode / Fast mode 是稳定能力槽位，不随模型消失：unsupported 显示灰色关闭，fixed 显示灰色开启，selectable 才允许切换。
+- Agent accent 必须可配置（`.agent.md` + Settings → Agents GUI）；`AGENT_SEED_ACCENTS` 仅用于 builtin seed 初值，不是运行时权威。
+- `--token-context-*` 色阶专用于 Context breakdown 弹窗的分段条与图例色点，不得挪作其它装饰或背景。
+- 不得引入非 design-system.css / ThemeChromeCompiler 定义的新颜色；需要新颜色时先在 `--token-*` 或 chrome 编译层添加并说明用途。
+
+## 新增组件规则
+
+每个新组件必须：
+1. 覆盖所有交互状态：rest / hover / active / focus / disabled（按需加 loading / error）。
+2. 通过 CSS 变量控制 variant，不得在选择器里硬编码颜色。
+3. 不使用内联 `style={{}}`，动态值（宽度百分比、JS 计算值）例外。
+4. 文件行数不超过 300 行（组件）/ 200 行（hook / service）。
+
+## 窄屏 Workbench
+
+- `<=720px` 时桌面工作区最小宽度必须解除，主区与 Composer 以真实 viewport 收缩，不得用 `overflow: hidden` 掩盖被裁掉的桌面宽度。
+- `<=480px` 时 Composer Footer 使用两层、每层不换行的工具栏：Attach / Agent / Permission 在第一层，Effort / Usage / Send 在第二层；所有控件必须可点击，不得互相覆盖。
+- Agent 菜单在窄屏锚定到 Composer 上方并完整位于 viewport 内；running 与 selected 分列，约 8px 状态点使用 semantic status token，`prefers-reduced-motion: reduce` 时停止动画。
+- Browser 验收至少覆盖约 390px viewport、水平溢出、菜单 selected/running、键盘导航、Escape 焦点返回及 reduced-motion。
+
+## 视觉参考
+
+`designs/rdc-agent-design-system/Design System Preview.html`——在浏览器打开，可交互查看所有 token、组件规范和完整 dark/light 两套主题展示。写新组件前应先参考对应 section。
+
 ## 验证
 
 ```bash
@@ -35,4 +78,4 @@ pnpm run check:appearance
 pnpm run typecheck
 ```
 
-浏览器真实会话覆盖 Settings → Appearance、agent accent、Light/Dark、Compose Effort 染色边界（见 `AGENTS.md`）。验收前须重启最新 `start:agent-browser`，并删除该 QA project 下全部 session 后新建隔离 session。
+浏览器真实会话覆盖 Settings → Appearance、agent accent、Light/Dark、Compose Effort 染色边界（见 [`appearance-checklist.md`](appearance-checklist.md)）。验收前须重启最新 `start:agent-browser`，并删除该 QA project 下全部 session 后新建隔离 session。

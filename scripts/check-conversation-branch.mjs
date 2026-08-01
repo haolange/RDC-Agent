@@ -231,41 +231,59 @@ const conversationService = fs.readFileSync(
   path.join(process.cwd(), 'src/main/conversation/ConversationService.ts'),
   'utf8',
 ).replace(/\r\n/g, '\n');
+const conversationTurnRunner = fs.readFileSync(
+  path.join(process.cwd(), 'src/main/conversation/ConversationTurnRunner.ts'),
+  'utf8',
+).replace(/\r\n/g, '\n');
+const conversationTurnTerminal = fs.readFileSync(
+  path.join(process.cwd(), 'src/main/conversation/ConversationTurnTerminal.ts'),
+  'utf8',
+).replace(/\r\n/g, '\n');
 assert(
-  conversationService.includes('storageAdapter.commitConversationTerminal')
-    && conversationService.includes('visibleTurnIds')
-    && conversationService.includes('await Promise.allSettled')
-    && conversationService.includes('Failed to persist conversation snapshot')
-    && conversationService.includes('settleStopped()'),
-  'rewriteFromMessage must await stopped turns, materialize journal context, settle stop, and classify persistence failures',
+  conversationTurnRunner.includes('storageAdapter.commitConversationTerminal')
+    && conversationTurnRunner.includes('visibleTurnIds')
+    && conversationTurnTerminal.includes('Failed to persist conversation snapshot')
+    && conversationTurnRunner.includes('settleStopped();'),
+  'terminal runner must commit journal context, settle stopped turns, and classify persistence failures through the terminal helper',
 );
-const stopImplementation = conversationService.match(/stop:\s*\(\)\s*=>\s*\{([\s\S]*?)\n\s*\},\n\s*\}\);/)?.[1] ?? '';
-const awaitStoppedIndex = conversationService.indexOf('await Promise.allSettled(turnsToStop.map((turn) => turn.stopped))');
-const terminalCleanupIndex = conversationService.lastIndexOf('this.clearActiveTurn(assistantMessage.turnId, abortController);');
-const stoppedSettledIndex = conversationService.indexOf('settleStopped();', terminalCleanupIndex);
+const stopImplementation = conversationTurnRunner.match(/stop:\s*\(\)\s*=>\s*\{([\s\S]*?)\n\s*\},\n\s*\}\);/)?.[1] ?? '';
+const rewriteJoinIndex = conversationService.indexOf('await Promise.all([');
+const awaitStoppedIndex = conversationService.indexOf('Promise.allSettled(turnsToStop.map((turn) => turn.stopped))');
+const historyRehydrateIndex = conversationService.indexOf(
+  'const history = storageAdapter.readConversationHistory(sessionId);',
+  awaitStoppedIndex,
+);
+const terminalCleanupIndex = conversationTurnRunner.lastIndexOf('host.clearActiveTurn(assistantMessage.turnId, abortController);');
+const stoppedSettledIndex = conversationTurnRunner.indexOf('settleStopped();', terminalCleanupIndex);
 assert(
-  awaitStoppedIndex >= 0
-    && conversationService.indexOf('const history = storageAdapter.readConversationHistory(sessionId);', awaitStoppedIndex) > awaitStoppedIndex
+  rewriteJoinIndex >= 0
+    && awaitStoppedIndex > rewriteJoinIndex
+    && historyRehydrateIndex > awaitStoppedIndex
     && terminalCleanupIndex >= 0
     && stoppedSettledIndex > terminalCleanupIndex
     && !stopImplementation.includes('settleStopped()')
     && !stopImplementation.includes('clearActiveTurn('),
-  'stopped must resolve only after completeProfileTurn cleanup, and rewrite must re-read history after awaiting it',
+  'rewrite must re-read history after stopped turns settle, and the terminal runner must settle only after cleanup',
 );
 assert(
-  conversationService.includes('turnHadAskPause')
-    && conversationService.includes('resolveStreamingOutputPhase')
-    && conversationService.includes('syncVisibleResponseForStreaming'),
-  'assistant loops must stamp streaming outputPhase and gate bubble writes after ask pauses',
+  conversationTurnRunner.includes('turnHadAskPause')
+    && conversationTurnRunner.includes('resolveStreamingOutputPhase')
+    && conversationTurnRunner.includes('syncVisibleResponseForStreaming'),
+  'terminal runner must stamp streaming outputPhase and gate bubble writes after ask pauses',
 );
 const conversationStore = fs.readFileSync(
   path.join(process.cwd(), 'src/renderer/stores/conversationStore.ts'),
   'utf8',
 );
+const conversationStoreModel = fs.readFileSync(
+  path.join(process.cwd(), 'src/renderer/stores/conversationStoreModel.ts'),
+  'utf8',
+);
 assert(
   conversationStore.includes('allConversationMessages')
-    && conversationStore.includes('resolveVisibleConversationMessages'),
-  'renderer conversationStore must project visible messages from branchState',
+    && conversationStore.includes('projectVisibleMessages')
+    && conversationStoreModel.includes('resolveVisibleConversationMessages'),
+  'renderer conversationStore must project visible messages from branchState through its canonical model',
 );
 
 console.log('[conversation-branch] OK');

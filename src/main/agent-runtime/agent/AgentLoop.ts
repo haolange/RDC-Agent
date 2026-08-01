@@ -30,6 +30,11 @@ import type {
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import { ErrorRecovery, type RecoveryAction } from './ErrorRecovery';
 import type { CompressResult } from './ContextManager';
+import {
+  AgentLoopTerminationError,
+  LoopProgressGuard,
+  RUNTIME_NO_PROGRESS_INSTRUCTION,
+} from './LoopProgressGuard';
 
 export type TransformContextResult = AgentMessage[] | CompressResult;
 
@@ -195,6 +200,8 @@ async function runAgentLoop(
 ): Promise<void> {
   const newMessages: Message[] = [];
   const maxTurns = config.maxTurns ?? 100;
+  const progressGuard = new LoopProgressGuard();
+  let runtimeNoProgressInstruction: string | undefined;
 
   // 桥接外部 abort 信号到 stream
   const onExternalAbort = (): void => {
@@ -264,7 +271,11 @@ async function runAgentLoop(
       // 4. turn 计数 + max_turns 终止
       state = { ...state, turn: state.turn + 1 };
       if (state.turn > maxTurns) {
-        break;
+        throw new AgentLoopTerminationError(
+          'AGENT_MAX_TURNS_EXCEEDED',
+          `Agent still required tool-loop continuation after ${maxTurns} turns.`,
+          { turn: state.turn - 1, maxTurns },
+        );
       }
       stream.push({ type: 'turn_start', turn: state.turn });
 
@@ -272,11 +283,14 @@ async function runAgentLoop(
       injectScheduled();
 
       // 6. 调用 LLM 生成助手消息（带错误恢复，内部是独立 transition 子状态机）
+      const ephemeralInstruction = runtimeNoProgressInstruction;
+      runtimeNoProgressInstruction = undefined;
       const { message: assistantMessage } = await streamAssistantResponseWithRecovery(
         context,
         config,
         providerStrategy,
         stream,
+        ephemeralInstruction,
       );
       newMessages.push(assistantMessage);
 
@@ -303,6 +317,22 @@ async function runAgentLoop(
         message: assistantMessage,
         toolResults: toolResults.results,
       });
+
+      const progress = progressGuard.observe(
+        assistantMessage,
+        toolResults.results,
+        context.runtime?.current.revision ?? 0,
+      );
+      if (progress.action === 'terminate') {
+        throw new AgentLoopTerminationError(
+          'AGENT_NO_PROGRESS',
+          `Agent repeated the same tool round ${progress.consecutiveMatches} consecutive times without runtime progress.`,
+          { turn: state.turn },
+        );
+      }
+      if (progress.action === 'inject-guidance') {
+        runtimeNoProgressInstruction = RUNTIME_NO_PROGRESS_INSTRUCTION;
+      }
 
       // 9. next_turn 站点：正常工具循环继续
       state = { pending: [], turn: state.turn, transition: 'next_turn' };
@@ -382,6 +412,7 @@ async function streamAssistantResponseWithRecovery(
   config: AgentLoopConfig,
   provider: ProviderStrategy,
   stream: EventStream<AgentEvent, Message[]>,
+  ephemeralInstruction?: string,
 ): Promise<{ message: AssistantMessage }> {
   const recovery = config.errorRecovery;
   const CIRCUIT_BREAKER_LIMIT = 3;
@@ -409,6 +440,7 @@ async function streamAssistantResponseWithRecovery(
         config,
         provider,
         stream,
+        ephemeralInstruction,
       );
       // 成功时重置断路器
       consecutiveCompactionFailures = 0;
@@ -525,11 +557,22 @@ async function streamAssistantResponse(
   config: AgentLoopConfig,
   provider: ProviderStrategy,
   stream: EventStream<AgentEvent, Message[]>,
+  ephemeralInstruction?: string,
 ): Promise<AssistantMessage> {
   // 1. 可选的上下文变换（压缩 / 剪裁）
   let messages: AgentMessage[] = context.messages;
   if (config.transformContext) {
     messages = await applyTransformContext(context.messages, config, stream);
+  }
+  if (ephemeralInstruction) {
+    messages = [
+      ...messages,
+      {
+        role: 'user',
+        content: [{ type: 'text', text: ephemeralInstruction }],
+        timestamp: Date.now(),
+      },
+    ];
   }
 
   // 2. 转换为 LLM Message[]

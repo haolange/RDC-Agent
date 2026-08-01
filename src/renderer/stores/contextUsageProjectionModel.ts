@@ -57,7 +57,7 @@ export function acceptsContextUsage(
   activeRunId: string | null,
 ): boolean {
   if (activeRunId) return usage.runId === activeRunId;
-  if (state.preparedTurnContext) return usage.runId === state.preparedTurnContext.turnId;
+  if (state.preparedTurnContext) return usageMatchesPreparedContext(state.preparedTurnContext, usage);
   if (state.conversationTerminalTurnId) return usage.runId === state.conversationTerminalTurnId;
   if (
     state.currentRunUsage?.runId === usage.runId

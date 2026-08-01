@@ -1,4 +1,5 @@
 import { BrowserWindow, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { RENDERER_INVOKE_CHANNELS } from '@shared/renderer-api';
 
 type InvokeHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown | Promise<unknown>;
 
@@ -39,4 +40,11 @@ export async function invokeRegisteredIpcChannel(channel: string, args: unknown[
 
 export function hasRegisteredIpcChannel(channel: string): boolean {
   return invokeHandlers.has(channel);
+}
+
+export function assertRendererIpcParity(): void {
+  const missingChannels = RENDERER_INVOKE_CHANNELS.filter((channel) => !invokeHandlers.has(channel));
+  if (missingChannels.length > 0) {
+    throw new Error(`Renderer IPC parity violation; missing handlers: ${missingChannels.join(', ')}`);
+  }
 }

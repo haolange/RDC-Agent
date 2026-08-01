@@ -9,3 +9,4 @@ export * from './AgentHooks';
 export * from './MCPManager';
 export * from './ContextManager';
 export * from './ErrorRecovery';
+export * from './LoopProgressGuard';

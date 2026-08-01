@@ -150,6 +150,21 @@
       },
       "executionBindings": [
         {
+          "id": "route:chatgpt-codex-parameter-policy",
+          "when": {},
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null
+              }
+            }
+          ],
+          "entitlement": "granted"
+        },
+        {
           "id": "fast:activation",
           "when": {
             "fast": true
@@ -158,6 +173,9 @@
             {
               "kind": "request-patch",
               "patch": {
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null,
                 "service_tier": "priority"
               }
             }
@@ -240,6 +258,21 @@
       },
       "executionBindings": [
         {
+          "id": "route:chatgpt-codex-parameter-policy",
+          "when": {},
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null
+              }
+            }
+          ],
+          "entitlement": "granted"
+        },
+        {
           "id": "fast:activation",
           "when": {
             "fast": true
@@ -248,6 +281,9 @@
             {
               "kind": "request-patch",
               "patch": {
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null,
                 "service_tier": "priority"
               }
             }
@@ -330,6 +366,21 @@
       },
       "executionBindings": [
         {
+          "id": "route:chatgpt-codex-parameter-policy",
+          "when": {},
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null
+              }
+            }
+          ],
+          "entitlement": "granted"
+        },
+        {
           "id": "fast:activation",
           "when": {
             "fast": true
@@ -338,6 +389,9 @@
             {
               "kind": "request-patch",
               "patch": {
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null,
                 "service_tier": "priority"
               }
             }
@@ -419,6 +473,21 @@
       },
       "executionBindings": [
         {
+          "id": "route:chatgpt-codex-parameter-policy",
+          "when": {},
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null
+              }
+            }
+          ],
+          "entitlement": "granted"
+        },
+        {
           "id": "fast:activation",
           "when": {
             "fast": true
@@ -427,6 +496,9 @@
             {
               "kind": "request-patch",
               "patch": {
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null,
                 "service_tier": "priority"
               }
             }
@@ -519,6 +591,21 @@
       },
       "executionBindings": [
         {
+          "id": "route:chatgpt-codex-parameter-policy",
+          "when": {},
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null
+              }
+            }
+          ],
+          "entitlement": "granted"
+        },
+        {
           "id": "fast:activation",
           "when": {
             "fast": true
@@ -527,6 +614,9 @@
             {
               "kind": "request-patch",
               "patch": {
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null,
                 "service_tier": "priority"
               }
             }
@@ -692,6 +782,23 @@
           }
         }
       },
+      "executionBindings": [
+        {
+          "id": "route:chatgpt-codex-parameter-policy",
+          "when": {},
+          "actions": [
+            {
+              "kind": "request-patch",
+              "patch": {
+                "temperature": null,
+                "top_p": null,
+                "max_output_tokens": null
+              }
+            }
+          ],
+          "entitlement": "granted"
+        }
+      ],
       "factSourceId": "rdc-agent:chatgpt-account:0"
     }
   ],

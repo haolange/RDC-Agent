@@ -2029,7 +2029,7 @@ src/main/agent-runtime/tools/
 src/shared/types/knowledge.ts
 src/renderer/features/knowledge/
 src/main/ipc/knowledgeHandlers.ts
-src/preload/api/knowledge.ts
+src/shared/renderer-api/core.ts
 
 resources/agent-runtime/skills/
   knowledge-scout/

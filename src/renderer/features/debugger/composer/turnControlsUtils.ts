@@ -25,12 +25,6 @@ export function sanitizeTurnControls(
   return resolveModelControls(capability, controls).controls;
 }
 
-export function hasStructuralOneMillionContext(capability: EffectiveModel | null): boolean {
-  if (!capability) return false;
-  const state = capability.controls.context1m.state;
-  return state === 'selectable' || state === 'fixed';
-}
-
 export function hasSelectableOneMillionContext(capability: EffectiveModel | null): boolean {
   if (!capability) return false;
   const resolved = resolveModelControls(capability).resolved.context1m;
@@ -55,12 +49,6 @@ export function isOneMillionContextDenied(capability: EffectiveModel | null): bo
   if (!capability) return false;
   const control = capability.controls.context1m;
   return control.state === 'selectable' && control.entitlement === 'denied';
-}
-
-export function hasStructuralFastMode(capability: EffectiveModel | null): boolean {
-  if (!capability) return false;
-  const state = capability.controls.fast.state;
-  return state === 'selectable' || state === 'fixed';
 }
 
 export function hasSelectableFastMode(capability: EffectiveModel | null): boolean {
