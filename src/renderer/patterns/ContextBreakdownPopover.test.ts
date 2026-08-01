@@ -197,6 +197,10 @@ describe('ContextBreakdownPopover phase authority', () => {
     expect(html).toContain('contextBreakdown.tokensColumn');
     expect(html).toContain('contextBreakdown.cacheColumn');
     expect(html).toContain('contextBreakdown.reasoningLabel');
+    expect(html).toContain('data-columns="3"');
+    expect(html).toContain('data-col="tokens"');
+    expect(html).toContain('data-col="cache"');
+    expect(html).toContain('data-col="reasoning"');
     expect(html).not.toContain('context-breakdown-runtime');
     expect(html).not.toContain('semantic-replay');
     expect(html).not.toContain('stableTokenEstimate');

@@ -176,8 +176,9 @@ export const EffortControl: React.FC<{
     capabilityStateLabel ?? '',
     reasoningLockedDisabled ? '1' : '0',
     hasAdjustableReasoning ? '1' : '0',
+    displayLevelsKey,
   ].join('|');
-  const { popupShift, trackWidthPx } = useEffortPopupLayout({
+  const { popupShift, trackWidthPx, positionTransitionsReady } = useEffortPopupLayout({
     open,
     menuRef,
     popupRef,
@@ -268,6 +269,7 @@ export const EffortControl: React.FC<{
           tooltipLeftPercent={tooltipLeftPercent}
           tooltipLabel={tooltipLabel}
           trackWidthPx={trackWidthPx}
+          positionTransitionsReady={positionTransitionsReady}
           oneMillionContextAvailable={capabilityReady && oneMillionAvailable}
           oneMillionContextStatusLabel={oneMillionContextStatusLabel}
           fastModelAvailable={capabilityReady && fastAvailable}

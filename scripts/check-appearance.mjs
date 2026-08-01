@@ -97,8 +97,20 @@ const effortPopupSource = fs.readFileSync(
   path.join(repoRoot, 'src/renderer/features/debugger/composer/EffortControlPopup.tsx'),
   'utf8',
 );
+const effortControlSource = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/features/debugger/composer/EffortControl.tsx'),
+  'utf8',
+);
 const effortMaxFieldSource = fs.readFileSync(
   path.join(repoRoot, 'src/renderer/features/debugger/composer/EffortMaxField.tsx'),
+  'utf8',
+);
+const effortLayoutSource = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/features/debugger/composer/useEffortPopupLayout.ts'),
+  'utf8',
+);
+const debuggerCssSource = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/pages/Debugger/Debugger.css'),
   'utf8',
 );
 assert(
@@ -114,6 +126,21 @@ assert(
 assert(
   effortMaxFieldSource.includes('clearDynStyle(host)'),
   'Max animation must release imperative stop opacity on cleanup',
+);
+const trackObserveKeySource = effortControlSource.match(/const trackObserveKey = \[([\s\S]*?)\]\.join/)?.[1] ?? '';
+assert(
+  effortLayoutSource.includes('positionTransitionsReady')
+    && effortLayoutSource.includes('requestAnimationFrame(() =>')
+    && effortLayoutSource.includes('cancelSettleFrame')
+    && effortPopupSource.includes('positionTransitionsReady')
+    && effortPopupSource.includes('is-layout-stabilizing')
+    && debuggerCssSource.includes('--composer-effort-position-duration: 0ms;')
+    && debuggerCssSource.includes('left var(--composer-effort-position-duration')
+    && debuggerCssSource.includes('transform var(--composer-effort-position-duration')
+    && debuggerCssSource.includes('background var(--transition-fast)')
+    && debuggerCssSource.includes('opacity var(--transition-fast)')
+    && trackObserveKeySource.includes('displayLevelsKey'),
+  'Effort layout measurement must settle before enabling position transitions while preserving color/opacity and Max lifecycle animations',
 );
 assert(!fs.existsSync(path.join(repoRoot, 'src/renderer/styles/themes/oklch-themes.css')), 'legacy oklch-themes.css must be removed');
 assert(!fs.existsSync(path.join(repoRoot, 'src/renderer/styles/tokens/index.css')), 'legacy styles/tokens dual track must be removed');

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 
 export function useEffortPopupLayout(options: {
   open: boolean;
@@ -9,11 +9,21 @@ export function useEffortPopupLayout(options: {
 }): {
   popupShift: number;
   trackWidthPx: number;
+  positionTransitionsReady: boolean;
 } {
   const { open, menuRef, popupRef, trackRef, trackObserveKey } = options;
   const [popupShift, setPopupShift] = useState(0);
   const [trackWidthPx, setTrackWidthPx] = useState(0);
+  const [positionTransitionsReady, setPositionTransitionsReady] = useState(false);
   const popupShiftRef = useRef(0);
+  const trackWidthRef = useRef(0);
+  const settleFrameRef = useRef<number | null>(null);
+
+  const cancelSettleFrame = useCallback(() => {
+    if (settleFrameRef.current === null || typeof cancelAnimationFrame !== 'function') return;
+    cancelAnimationFrame(settleFrameRef.current);
+    settleFrameRef.current = null;
+  }, []);
 
   useLayoutEffect(() => {
     if (!open) return undefined;
@@ -43,19 +53,56 @@ export function useEffortPopupLayout(options: {
   }, [menuRef, open, popupRef]);
 
   useLayoutEffect(() => {
-    if (!open) return undefined;
+    cancelSettleFrame();
+    if (!open) {
+      setPositionTransitionsReady(false);
+      return undefined;
+    }
+
+    setPositionTransitionsReady(false);
+
+    const schedulePositionTransitions = () => {
+      cancelSettleFrame();
+      if (typeof requestAnimationFrame !== 'function') {
+        setPositionTransitionsReady(true);
+        return;
+      }
+      settleFrameRef.current = requestAnimationFrame(() => {
+        settleFrameRef.current = requestAnimationFrame(() => {
+          settleFrameRef.current = null;
+          setPositionTransitionsReady(true);
+        });
+      });
+    };
+
     const track = trackRef.current;
     if (!track) return undefined;
+    let hasValidTrackWidth = false;
     const syncTrackWidth = () => {
       const width = track.getBoundingClientRect().width;
-      if (width <= 0) return;
-      setTrackWidthPx((prev) => (Math.abs(prev - width) < 0.5 ? prev : width));
+      if (width <= 0) {
+        hasValidTrackWidth = false;
+        cancelSettleFrame();
+        setPositionTransitionsReady(false);
+        return;
+      }
+      hasValidTrackWidth = true;
+      const changed = Math.abs(trackWidthRef.current - width) >= 0.5;
+      if (!changed) return;
+      trackWidthRef.current = width;
+      setTrackWidthPx(width);
+      setPositionTransitionsReady(false);
+      schedulePositionTransitions();
     };
     syncTrackWidth();
+    if (hasValidTrackWidth) schedulePositionTransitions();
     const observer = new ResizeObserver(syncTrackWidth);
     observer.observe(track);
-    return () => observer.disconnect();
-  }, [open, trackObserveKey, trackRef]);
+    return () => {
+      observer.disconnect();
+      cancelSettleFrame();
+    };
+  }, [cancelSettleFrame, open, trackObserveKey, trackRef]);
 
-  return { popupShift, trackWidthPx };
+  return { popupShift, trackWidthPx, positionTransitionsReady };
 }

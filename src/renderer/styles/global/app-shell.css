@@ -903,11 +903,12 @@ html[data-resolved-theme='light'] .app-main {
 
 .context-breakdown-run-columns {
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.7fr) minmax(0, 0.7fr);
+  grid-template-columns: max-content max-content max-content;
   column-gap: 0;
   row-gap: var(--space-3);
   min-width: 0;
   align-items: start;
+  justify-content: start;
 }
 
 .context-breakdown-run-col {
@@ -985,23 +986,22 @@ html[data-resolved-theme='light'] .app-main {
   .context-breakdown-hero-tokens {
     white-space: normal;
   }
+}
 
+@container (max-width: 33rem) {
   .context-breakdown-run-columns {
     grid-template-columns: minmax(0, 1fr);
     row-gap: 0;
   }
-
   .context-breakdown-run-col {
     padding: var(--space-3) 0 0;
   }
-
   .context-breakdown-run-col + .context-breakdown-run-col {
     margin-top: var(--space-3);
     padding-inline-start: 0;
     border-inline-start: 0;
     border-top: 1px solid var(--token-border-subtle);
   }
-
   .context-breakdown-meter-stats {
     flex-wrap: wrap;
   }

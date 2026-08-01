@@ -51,6 +51,7 @@ export const EffortControlPopup: React.FC<{
   tooltipLeftPercent: number;
   tooltipLabel: string;
   trackWidthPx: number;
+  positionTransitionsReady: boolean;
   oneMillionContextAvailable: boolean;
   oneMillionContextStatusLabel?: string;
   fastModelAvailable: boolean;
@@ -88,6 +89,7 @@ export const EffortControlPopup: React.FC<{
   tooltipLeftPercent,
   tooltipLabel,
   trackWidthPx,
+  positionTransitionsReady,
   oneMillionContextAvailable,
   oneMillionContextStatusLabel,
   fastModelAvailable,
@@ -136,7 +138,7 @@ export const EffortControlPopup: React.FC<{
       <div className={`composer-effort-slider-section ${hasAdjustableReasoning ? '' : 'is-disabled'}`}>
         <div
           ref={trackRef}
-          className={`composer-effort-slider is-level-${displayLevel}${hasAdjustableReasoning ? '' : ' is-disabled'}${isDragging ? ' is-dragging' : ''}${showMaxTrack ? ' is-max-visual' : ''}${exitingMaxPhase !== 'off' ? ` is-exiting-max is-exiting-max-${exitingMaxPhase}` : ''} is-max-phase-${maxTimeline.phase}`}
+          className={`composer-effort-slider is-level-${displayLevel}${hasAdjustableReasoning ? '' : ' is-disabled'}${isDragging ? ' is-dragging' : ''}${showMaxTrack ? ' is-max-visual' : ''}${exitingMaxPhase !== 'off' ? ` is-exiting-max is-exiting-max-${exitingMaxPhase}` : ''}${positionTransitionsReady ? '' : ' is-layout-stabilizing'} is-max-phase-${maxTimeline.phase}`}
           data-testid="composer-effort-slider"
           data-exiting-max={exitingMaxPhase}
           data-max-phase={maxTimeline.phase}

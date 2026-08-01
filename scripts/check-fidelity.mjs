@@ -193,6 +193,25 @@ requireCssContract(
   'Agent menu must keep selected and session-scoped running states separate, accessible, compact, localized, and reduced-motion safe.',
 );
 
+const contextMetricResponsiveStart = appShellCss.indexOf('@container (max-width: 33rem)');
+const contextMetricResponsiveEnd = appShellCss.indexOf('/* Details disclosure toggle */', contextMetricResponsiveStart);
+const contextMetricResponsiveCss = contextMetricResponsiveStart >= 0 && contextMetricResponsiveEnd > contextMetricResponsiveStart
+  ? appShellCss.slice(contextMetricResponsiveStart, contextMetricResponsiveEnd)
+  : '';
+const heroOnlyResponsiveStart = appShellCss.indexOf('@container (max-width: 42rem)');
+const heroOnlyResponsiveCss = heroOnlyResponsiveStart >= 0 && contextMetricResponsiveStart > heroOnlyResponsiveStart
+  ? appShellCss.slice(heroOnlyResponsiveStart, contextMetricResponsiveStart)
+  : '';
+requireCssContract(
+  cssBlock(appShellCss, '.context-breakdown-run-columns').includes('grid-template-columns: max-content max-content max-content;')
+    && cssBlock(appShellCss, '.context-breakdown-run-columns').includes('justify-content: start;')
+    && contextMetricResponsiveCss.includes('grid-template-columns: minmax(0, 1fr);')
+    && contextMetricResponsiveCss.includes('flex-wrap: wrap;')
+    && !heroOnlyResponsiveCss.includes('grid-template-columns: minmax(0, 1fr);')
+    && !heroOnlyResponsiveCss.includes('flex-wrap: wrap;'),
+  'Context Usage metrics must remain content-sized in one row above 33rem; only the narrow metric query may stack them.',
+);
+
 console.log(
   `[fidelity] OK (baseline: ${baselineClasses.size} classes, ${baselineTestIds.size} testids; `
   + `added: +${addedClasses} classes, +${addedTestIds} testids allowed)`,
