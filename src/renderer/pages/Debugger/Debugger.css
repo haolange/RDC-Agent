@@ -1025,6 +1025,10 @@ html[data-resolved-theme='light'] .debugger-page {
   transition: none;
 }
 
+.composer-effort-slider.is-layout-stabilizing {
+  --composer-effort-position-duration: 0ms;
+}
+
 .composer-effort-slider-stop {
   position: absolute;
   top: 0;
@@ -1038,8 +1042,8 @@ html[data-resolved-theme='light'] .debugger-page {
   transform: translate(-50%, -50%);
   pointer-events: none;
   transition:
-    left var(--transition-fast),
-    transform var(--transition-fast),
+    left var(--composer-effort-position-duration, var(--transition-fast)),
+    transform var(--composer-effort-position-duration, var(--transition-fast)),
     background var(--transition-fast),
     border-color var(--transition-fast);
 }
@@ -1094,8 +1098,8 @@ html[data-resolved-theme='light'] .debugger-page {
     0 0 0 1px color-mix(in srgb, var(--token-text-inverse) 24%, transparent);
   transform: translate(-50%, -50%);
   transition:
-    left var(--transition-base),
-    transform var(--transition-base),
+    left var(--composer-effort-position-duration, var(--transition-base)),
+    transform var(--composer-effort-position-duration, var(--transition-base)),
     background var(--transition-fast),
     border-color var(--transition-fast),
     opacity var(--transition-fast);
@@ -1110,15 +1114,15 @@ html[data-resolved-theme='light'] .debugger-page {
   );
   background: var(--composer-effort-max-thumb, var(--token-effort-max-thumb));
   transition:
-    left var(--transition-base),
-    transform var(--transition-base),
+    left var(--composer-effort-position-duration, var(--transition-base)),
+    transform var(--composer-effort-position-duration, var(--transition-base)),
     opacity var(--transition-fast);
 }
 
 .composer-effort-slider.is-exiting-max-settle:not(.is-dragging):not(.is-max-visual) .composer-effort-slider-thumb {
   transition:
-    left var(--transition-base),
-    transform var(--transition-base),
+    left var(--composer-effort-position-duration, var(--transition-base)),
+    transform var(--composer-effort-position-duration, var(--transition-base)),
     background 384ms cubic-bezier(0.4, 0, 0.2, 1),
     border-color 384ms cubic-bezier(0.4, 0, 0.2, 1),
     opacity var(--transition-fast);
