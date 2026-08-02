@@ -16,6 +16,7 @@ export { appPathService } from '../../runtime/AppPathService';
 export { storageAdapter } from '../../sessions/StorageAdapter';
 export { executionProfileService } from '../../settings/ExecutionProfileService';
 export { settingsService } from '../../settings/SettingsService';
+export { agentManifestService } from '../../settings/AgentManifestService';
 export { providerRuntimeCredentialService } from '../../settings/ProviderRuntimeCredentialService';
 export { freezeProviderRuntimeCredentials } from '../../settings/ProviderRuntimeCredentialLease';
 export {
@@ -30,12 +31,12 @@ export {
 } from './TurnCoordinator';
 export { AgentSlotRegistry } from './AgentSlotRegistry';
 export { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
-export { HandoffMailbox } from './HandoffMailbox';
 export { McpConnectionCoordinator } from './McpConnectionCoordinator';
 export { workflowProjectionPublisher } from './WorkflowProjectionPublisher';
 export {
   isToolAllowedForAgent,
   resolveAgentToolAllowlist,
+  resolveAgentToolAllowlistFromDefinition,
 } from './DebuggerRuntimePolicy';
 export { PromptPlanForTurn } from './PromptPlanForTurn';
 export { RuntimeToolAssembly } from './RuntimeToolAssembly';

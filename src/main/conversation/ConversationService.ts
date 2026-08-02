@@ -18,6 +18,9 @@
  * to ensure terminal content comes from canonical final state.
  */
 import { createHash } from 'crypto';
+import { createReadStream, statSync } from 'fs';
+import { MAX_ATTACHMENT_BYTES_PER_FILE } from './ConversationAttachmentMaterializer';
+import * as path from 'path';
 import type {
   ConversationAttachmentInput,
   ConversationAnswerToolApprovalRequest,
@@ -76,6 +79,31 @@ import {
 } from './ConversationTurnTerminal';
 
 
+function hashAttachmentContent(sourcePath: string): Promise<string> {
+  return new Promise((resolve) => {
+    const absolutePath = path.resolve(sourcePath);
+    try {
+      const stats = statSync(absolutePath);
+      if (!stats.isFile()) {
+        resolve('not-file:' + absolutePath);
+        return;
+      }
+      if (stats.size > MAX_ATTACHMENT_BYTES_PER_FILE) {
+        resolve('oversized:' + stats.size);
+        return;
+      }
+    } catch {
+      resolve('missing:' + sourcePath);
+      return;
+    }
+    const hash = createHash('sha256');
+    const stream = createReadStream(absolutePath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('error', () => resolve('missing:' + sourcePath));
+    stream.on('end', () => resolve(hash.digest('hex')));
+  });
+}
+
 interface ConversationContextInput extends ConversationSendRequest {
   fallbackProjectId?: string | null;
   fallbackSessionId?: string | null;
@@ -106,7 +134,7 @@ export class ConversationService {
   /**
    * 待处理的 handoff（sessionId → {toProfile, prompt}）。
    *
-   * agent_handoff 工具成功后由 AgentOrchestrator.consumePendingHandoff 消费并存入此 map，
+   * agent_handoff terminal result ? ConversationTurnRunner ?????? map?
    * 下次该 session 消息时优先用 toProfile 并把 prompt 前置到用户消息。
    * 内存维护（不持久化），session 重启后丢失（handoff 是即时意图）。
    */
@@ -297,19 +325,19 @@ export class ConversationService {
     };
   }
 
-  private computeRequestFingerprint(
+  private async computeRequestFingerprint(
     input: ConversationContextInput | ConversationRewriteContextInput,
-  ): string {
-    const attachmentHashes = (input.attachments ?? [])
-      .map((attachment) => createHash('sha256')
+  ): Promise<string> {
+    const attachmentHashes = (await Promise.all((input.attachments ?? []).map(async (attachment) => (
+      createHash('sha256')
         .update(canonicalJson({
-          sourcePath: attachment.sourcePath,
           fileName: attachment.fileName,
           mimeType: attachment.mimeType ?? null,
-          size: attachment.size ?? null,
+          declaredSize: attachment.size ?? null,
+          contentHash: await hashAttachmentContent(attachment.sourcePath),
         }))
-        .digest('hex'))
-      .sort();
+        .digest('hex')
+    )))).sort();
     const branchAnchor = 'messageId' in input && typeof input.messageId === 'string'
       ? input.messageId
       : null;
@@ -339,6 +367,7 @@ export class ConversationService {
   private async findPersistedTurn(
     input: ConversationContextInput | ConversationRewriteContextInput,
     requestId: string,
+    requestFingerprint: string,
   ): Promise<ConversationTurnResult | null> {
     const explicitSessionId = input.sessionId ?? input.fallbackSessionId ?? null;
     const explicitProjectId = input.projectId ?? input.fallbackProjectId ?? null;
@@ -356,6 +385,9 @@ export class ConversationService {
       if (!userMessage || !assistantDraftMessage || !preparedContext) continue;
       if (userMessage.content !== input.message.trim()) {
         throw new Error('REQUEST_ID_CONFLICT: requestId already belongs to a different user message.');
+      }
+      if (userMessage.requestFingerprint !== requestFingerprint) {
+        throw new Error('REQUEST_ID_CONFLICT: persisted request fingerprint is missing or differs from this request.');
       }
       const requestedCatalogRevision = input.configurationCommit?.providerCatalogRevision;
       if (
@@ -398,7 +430,7 @@ export class ConversationService {
 
   private async runIdempotentTurn(
     input: ConversationContextInput | ConversationRewriteContextInput,
-    operation: (requestId: string, controller: AbortController) => Promise<ConversationTurnResult>,
+    operation: (requestId: string, controller: AbortController, requestFingerprint: string) => Promise<ConversationTurnResult>,
   ): Promise<ConversationTurnResult> {
     if (!this.acceptingTurns) {
       throw new Error('SHUTTING_DOWN: conversation service is no longer accepting turns.');
@@ -406,11 +438,11 @@ export class ConversationService {
     const requestId = input.requestId?.trim();
     if (!requestId) throw new Error('PREFLIGHT_FAILED: requestId is required.');
     const { scopeKey, idempotencyKey } = this.resolveIdempotencyScope(input);
-    const fingerprint = this.computeRequestFingerprint(input);
+    const fingerprint = await this.computeRequestFingerprint(input);
     this.assertFingerprintMatch(idempotencyKey, fingerprint);
     const existing = this.sendRequests.get(idempotencyKey);
     if (existing) return existing;
-    const persisted = await this.findPersistedTurn(input, requestId);
+    const persisted = await this.findPersistedTurn(input, requestId, fingerprint);
     if (persisted) {
       this.sendRequestFingerprints.set(idempotencyKey, fingerprint);
       return persisted;
@@ -430,7 +462,7 @@ export class ConversationService {
       cancelAfterCommit: false,
       credentialLeaseTransferred: false,
     });
-    const pending = operation(requestId, controller)
+    const pending = operation(requestId, controller, fingerprint)
       .finally(() => {
         const requestState = this.preparingRequests.get(idempotencyKey);
         if (requestState?.credentialHandle && !requestState.credentialLeaseTransferred) {
@@ -451,7 +483,7 @@ export class ConversationService {
 
   async sendMessage(input: ConversationContextInput): Promise<ConversationTurnResult> {
     const trimmed = input.message.trim();
-    return this.runIdempotentTurn(input, async (requestId, controller) => {
+    return this.runIdempotentTurn(input, async (requestId, controller, requestFingerprint) => {
         const context = await this.resolveContext(input);
         if (context.session && Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === context.session?.sessionId)) {
           throw new Error('CONVERSATION_BUSY: this conversation already has a running turn.');
@@ -468,20 +500,23 @@ export class ConversationService {
           requestId,
           controller,
           input.configurationCommit,
+          requestFingerprint,
         );
     });
   }
 
   async rewriteFromMessage(input: ConversationRewriteContextInput): Promise<ConversationTurnResult> {
-    return this.runIdempotentTurn(input, (requestId, controller) => this.rewriteFromMessageCore(
+    return this.runIdempotentTurn(input, (requestId, controller, requestFingerprint) => this.rewriteFromMessageCore(
       { ...input, requestId },
       controller,
+      requestFingerprint,
     ));
   }
 
   private async rewriteFromMessageCore(
     input: ConversationRewriteContextInput,
     preparationController: AbortController,
+    requestFingerprint?: string,
   ): Promise<ConversationTurnResult> {
     const trimmed = input.message.trim();
     const context = await this.resolveContext(input);
@@ -499,6 +534,7 @@ export class ConversationService {
         input.requestId,
         preparationController,
         input.configurationCommit,
+        requestFingerprint,
       );
     }
 
@@ -596,6 +632,7 @@ export class ConversationService {
       input.requestId,
       preparationController,
       input.configurationCommit,
+      requestFingerprint,
     );
   }
 
@@ -737,6 +774,7 @@ export class ConversationService {
     requestId: string = generateEventId('request'),
     preparationController: AbortController = new AbortController(),
     configurationCommit?: ConversationSendRequest['configurationCommit'],
+    requestFingerprint?: string,
   ): Promise<ConversationTurnResult> {
     return runStartProfileTurn(
       this.createTurnStarterHost(),
@@ -752,6 +790,7 @@ export class ConversationService {
       requestId,
       preparationController,
       configurationCommit,
+      requestFingerprint,
     );
   }
 

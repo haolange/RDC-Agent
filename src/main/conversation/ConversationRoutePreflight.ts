@@ -8,7 +8,7 @@ import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import type { AgentRole } from '@shared/types/agent';
 import { isTopLevelAgentId } from '@shared/types/agent';
 import type { AgentRouteCapability, AgentEvent } from '@shared/types/agentRuntime';
-import type { PromptPlan } from '@shared/types/rdxRuntime';
+import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdxRuntime';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type {
   AppMode,
@@ -24,6 +24,7 @@ import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { normalizeToolName } from '../workflow/debugger/DebuggerRuntimePolicy';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
 import { settingsService } from '../settings/SettingsService';
+import { agentManifestService } from '../settings/AgentManifestService';
 import { resolveEffectiveModelSelection } from '../settings/EffectiveModelResolver';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { AgentLoopTerminationError } from '../agent-runtime/agent/LoopProgressGuard';
@@ -98,6 +99,10 @@ export interface ResolvedConversationContext {
 
 export interface PreparedConversationPrompt {
   projectRootPath: string | null;
+  /** Exact User/Project-resolved profile frozen for this turn. */
+  effectiveProfile: EffectiveAgentProfile;
+  /** Enabled profile ids from the same resolution snapshot, used by handoff validation. */
+  effectiveProfileIds: string[];
   allowedToolNames: string[];
   promptPlan: PromptPlan;
   visibleTurnIds: string[];
@@ -163,6 +168,7 @@ export function createConversationMessage(
   content: string,
   options: {
     requestId?: string;
+    requestFingerprint?: string;
     turnId: string;
     sessionId?: string | null;
     projectId?: string | null;
@@ -183,6 +189,7 @@ export function createConversationMessage(
   return {
     id: generateEventId(role === 'user' ? 'msgu' : role === 'assistant' ? 'msga' : 'msgs'),
     requestId: options.requestId,
+    requestFingerprint: options.requestFingerprint,
     turnId: options.turnId,
     sessionId: options.sessionId ?? null,
     projectId: options.projectId ?? null,
@@ -204,8 +211,17 @@ export function createConversationMessage(
   };
 }
 
-export function resolveEnabledAgentDefinition(agentId: string) {
-  return settingsService.getAll().agents.definitions.find((entry) => entry.id === agentId && entry.enabled) ?? null;
+export function resolveEnabledAgentDefinition(agentId: string, projectRootPath?: string | null) {
+  const settings = settingsService.getAll();
+  if (!settings.paths) return null;
+  const providers = settings.llm?.providers ?? [];
+  const agentRoutes = settings.llm?.agentRoutes ?? [];
+  return agentManifestService.getEffectiveProfiles(
+    settings.paths,
+    providers,
+    agentRoutes,
+    projectRootPath ?? undefined,
+  ).find((entry) => entry.id === agentId && entry.enabled) ?? null;
 }
 
 export function getAgentLabel(agentId: AgentRole): string {

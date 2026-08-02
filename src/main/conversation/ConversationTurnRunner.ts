@@ -40,7 +40,6 @@ import {
   getAgentLabel,
   isActiveRun,
   recordLlmDiagnostic,
-  resolveEnabledAgentDefinition,
 } from './ConversationRoutePreflight';
 
 export interface CompleteProfileTurnInput {
@@ -112,6 +111,7 @@ export async function completeProfileTurn(
     executionIdentity: ExecutionIdentity;
     status: 'complete' | 'stopped' | 'error';
   } | null } = { value: null };
+  let terminalHandoff: import('../workflow/debugger/TurnCoordinator').PendingHandoff | null = null;
 
   const applyAssistantMessagePatch = (
     type: ConversationStreamEvent['type'],
@@ -437,6 +437,7 @@ export async function completeProfileTurn(
               executionIdentity: result.executionIdentity,
               status: result.status,
             };
+            terminalHandoff = result.pendingHandoff ?? null;
           },
           onEvent: createAgentEventHandler({
             host, sessionId, input, agentLabel, turnStreamState,
@@ -518,35 +519,41 @@ export async function completeProfileTurn(
       terminalSummary,
     )),
   });
-  // handoff 消费：agent_handoff 工具成功时设置 pendingHandoff，
-  // turn 完成后 consume → emit handoff.requested 事件 + 存入 pendingHandoffs map，
-  // 下次该 session 消息自动用新 profile 并前置 handoff prompt。
-  if (finalStatus !== 'error' && input.context.session) {
-    const handoff = agentOrchestrator.consumePendingHandoff();
-    if (handoff && handoff.toProfile && resolveEnabledAgentDefinition(handoff.toProfile)) {
-      host.setPendingHandoff(input.context.session.sessionId, {
-        toProfile: handoff.toProfile,
-        prompt: handoff.prompt,
-      });
-      host.emitConversationEvent({
-        type: 'agent_event',
+  const handoff = terminalHandoff as import('../workflow/debugger/TurnCoordinator').PendingHandoff | null;
+  const frozenPlan = input.preparedTurn.runtime.effectivePlan;
+  const handoffTargetAllowed = (target: string): boolean => frozenPlan.enabledProfileIds.includes(target)
+    && (frozenPlan.profileHandoffs.length === 0 || frozenPlan.profileHandoffs.some((declared) => declared.agent === target));
+  if (
+    finalStatus !== 'error'
+    && input.context.session
+    && handoff
+    && handoff.turnId === assistantMessage.turnId
+    && handoff.sessionId === input.context.session.sessionId
+    && handoff.toProfile
+    && handoffTargetAllowed(handoff.toProfile)
+  ) {
+    host.setPendingHandoff(input.context.session.sessionId, {
+      toProfile: handoff.toProfile,
+      prompt: handoff.prompt,
+    });
+    host.emitConversationEvent({
+      type: 'agent_event',
+      sessionId: input.context.session.sessionId,
+      turnId: assistantMessage.turnId,
+      event: {
+        id: generateEventId('agent-event'),
+        type: 'handoff.requested',
+        timestamp: nowMs(),
         sessionId: input.context.session.sessionId,
-        turnId: assistantMessage.turnId,
-        event: {
-          id: generateEventId('agent-event'),
-          type: 'handoff.requested',
-          timestamp: nowMs(),
-          sessionId: input.context.session.sessionId,
-          agentId: handoff.fromAgentId,
-          payload: {
-            fromAgentId: handoff.fromAgentId,
-            toProfile: handoff.toProfile,
-            prompt: handoff.prompt,
-            label: handoff.label,
-          },
+        agentId: handoff.fromAgentId,
+        payload: {
+          fromAgentId: handoff.fromAgentId,
+          toProfile: handoff.toProfile,
+          prompt: handoff.prompt,
+          label: handoff.label,
         },
-      });
-    }
+      },
+    });
   }
 
   } finally {
@@ -662,6 +669,7 @@ export async function completeProfileTurn(
         console.error(`[ConversationService] Failed to finalize run ${ownedRun.runId}:`, error);
       }
     }
+    await input.preparedTurn.runtime.mcpLease?.release();
     agentOrchestrator.releaseProviderRuntimeCredentials(input.preparedTurn.runtime.credentialHandle);
     settleStopped();
   }

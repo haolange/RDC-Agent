@@ -73,11 +73,15 @@ export async function startProfileTurn(
   requestId: string = generateEventId('request'),
   preparationController: AbortController = new AbortController(),
   configurationCommit?: ConversationSendRequest['configurationCommit'],
+  requestFingerprint?: string,
 ): Promise<ConversationTurnResult> {
+  const pendingProjectRootPath = context.projectId
+    ? storageAdapter.getProjectById(context.projectId)?.rootPath ?? null
+    : null;
   const pendingHandoff = context.session
     ? host.getPendingHandoff(context.session.sessionId)
     : undefined;
-  const handoffProfile = pendingHandoff && resolveEnabledAgentDefinition(pendingHandoff.toProfile)
+  const handoffProfile = pendingHandoff && resolveEnabledAgentDefinition(pendingHandoff.toProfile, pendingProjectRootPath)
     ? pendingHandoff.toProfile
     : null;
   const effectiveMessage = pendingHandoff
@@ -222,8 +226,11 @@ export async function startProfileTurn(
     requestPlan: planning.plan,
     turnControls: planning.controls,
     promptPlan: preparedPrompt.promptPlan,
+    effectiveProfile: preparedPrompt.effectiveProfile,
+    effectiveProfileIds: preparedPrompt.effectiveProfileIds,
     toolAllowlist: preparedPrompt.allowedToolNames,
     projectRootPath: preparedPrompt.projectRootPath,
+    projectId: context.projectId,
     sessionId: context.session?.sessionId ?? null,
     visibleTurnIds: preparedPrompt.visibleTurnIds,
     activeBranchId: preparedBranchId,
@@ -278,6 +285,7 @@ export async function startProfileTurn(
       ?? ROOT_BRANCH_ID;
     userMessage = createConversationMessage('user', rawMessage, {
       requestId,
+      requestFingerprint,
       turnId,
       sessionId: sessionIdForBranch,
       projectId: context.projectId,
@@ -359,6 +367,7 @@ export async function startProfileTurn(
     } catch (rollbackError) {
       console.error(`[ConversationService] Failed to roll back turn ${turnId}:`, rollbackError);
     }
+    await preparedTurn.runtime.mcpLease?.release({ discardIfIdle: true });
     throw new Error(`TURN_COMMIT_FAILED: ${redactTechnicalMessage(error)}`);
   }
   if (pendingHandoff && context.session) {
@@ -404,6 +413,9 @@ export async function startProfileTurn(
   // projection and blank the right-rail sections until the full projection arrives.
   host.publishConversationTrace(traceSessionId, [userMessage, assistantDraftMessage], workingSession?.sessionId ?? null);
 
+  if (cancelAfterCommit) {
+    await preparedTurn.runtime.mcpLease?.release({ discardIfIdle: true });
+  }
   if (!cancelAfterCommit) {
     const runningRequestState = host.getPreparingRequestByRequestId(requestId);
     if (runningRequestState) runningRequestState.credentialLeaseTransferred = true;

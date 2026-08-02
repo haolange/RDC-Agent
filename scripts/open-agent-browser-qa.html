@@ -1,15 +1,9 @@
-﻿<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="utf-8" />
-  <title>Open RDC-Agent Browser QA</title>
-  <meta http-equiv="refresh" content="0;url=http://127.0.0.1:5127/qa" />
-</head>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>RDC-Agent Browser QA</title></head>
 <body>
-  <p>正在打开 Workbench…</p>
-  <p><a href="http://127.0.0.1:5127/qa">若未自动跳转，点这里</a></p>
-  <script>
-    location.replace('http://127.0.0.1:5127/qa');
-  </script>
+<h1>RDC-Agent Browser QA</h1>
+<p>Start the latest browser service with <code>pnpm run start:agent-browser</code>.</p>
+<p>Copy the complete one-time <code>http://127.0.0.1:&lt;port&gt;/qa?qaBootstrap=...</code> URL from its log and open it in the in-app Browser. The bootstrap is single-use; a bare <code>/qa</code> URL intentionally returns 401.</p>
 </body>
 </html>

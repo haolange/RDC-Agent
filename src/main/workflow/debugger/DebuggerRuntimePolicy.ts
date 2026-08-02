@@ -156,6 +156,17 @@ function expandToken(toolName: string): string[] {
   return [normalizeToolName(toolName)];
 }
 
+export function resolveAgentToolAllowlistFromDefinition(
+  agentId: AgentRole,
+  definitionTools: readonly string[],
+): string[] {
+  const profileTools = definitionTools.flatMap(expandToken);
+  const filtered = agentId === 'ask'
+    ? profileTools.filter((toolName) => !isDeniedAskTool(toolName, normalizeToolName(toolName)))
+    : profileTools;
+  return Array.from(new Set(filtered));
+}
+
 export function resolveAgentToolAllowlist(agentId: AgentRole, stage?: WorkflowStage): string[] {
   const settings = settingsService.getAll();
   const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, stage || 'investigate', agentId);

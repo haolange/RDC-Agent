@@ -50,6 +50,7 @@ export class AgentSlotRegistry {
   private readonly agentStates = new Map<AgentRole, AgentState>();
   private readonly agentConfigs = new Map<AgentRole, AgentConfig>();
   private readonly agentSlots = new Map<string, AgentSlot>();
+  private readonly quarantinedSlots = new Map<string, Promise<void>>();
 
   initializeDefaults(): void {
     for (const role of AGENT_ROLES) {
@@ -141,6 +142,22 @@ export class AgentSlotRegistry {
     return this.agentSlots.get(slotKey);
   }
 
+  isQuarantined(slotKey: string): boolean {
+    return this.quarantinedSlots.has(slotKey);
+  }
+
+  /** Keep an orphaned slot key reserved until its provider/tool loop settles. */
+  quarantineSlot(slotKey: string, completion: Promise<unknown>): void {
+    if (this.quarantinedSlots.has(slotKey)) return;
+    const tracked = Promise.resolve(completion).then(() => undefined, () => undefined);
+    this.quarantinedSlots.set(slotKey, tracked);
+    void tracked.then(() => {
+      if (this.quarantinedSlots.get(slotKey) === tracked) {
+        this.quarantinedSlots.delete(slotKey);
+      }
+    });
+  }
+
   setSlot(slotKey: string, slot: AgentSlot): void {
     this.agentSlots.set(slotKey, slot);
   }
@@ -176,6 +193,9 @@ export class AgentSlotRegistry {
             slot.agent.abort();
           } catch {
             // ignore
+          }
+          if (slot.agent.activeLoopPromise) {
+            this.quarantineSlot(key, slot.agent.activeLoopPromise);
           }
           slot.agent.clearMessages();
         }

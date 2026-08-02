@@ -40,8 +40,8 @@ async function fetchRaw(url, init = {}) {
   return { response, contentType, text };
 }
 
-async function assertQaSurface(baseUrl) {
-  const qa = await fetchRaw(`${baseUrl}/qa`);
+async function assertQaSurface(baseUrl, qaUrl) {
+  const qa = await fetchRaw(qaUrl);
   if (qa.response.status !== 302) {
     fail(`GET /qa expected 302, got ${qa.response.status}`);
     return null;
@@ -121,13 +121,13 @@ async function waitForBridgeFromChild(userDataPath) {
     },
   );
 
-  let baseUrl = null;
+  let qaUrl = null;
   const deadline = Date.now() + TIMEOUT_MS;
 
   const onLine = (line) => {
-    const match = /Browser app session:\s*(https?:\/\/127\.0\.0\.1:\d+)\/qa/i.exec(line);
+    const match = /Browser app session:\s*(https?:\/\/127\.0\.0\.1:\d+\/qa(?:\?qaBootstrap=[^\s]+)?)/i.exec(line);
     if (match) {
-      baseUrl = match[1];
+      qaUrl = match[1];
     }
   };
 
@@ -139,20 +139,20 @@ async function waitForBridgeFromChild(userDataPath) {
     });
   }
 
-  while (!baseUrl && Date.now() < deadline) {
+  while (!qaUrl && Date.now() < deadline) {
     if (child.exitCode != null) {
       fail(`start:agent-browser exited early with code ${child.exitCode}`);
-      return { child, baseUrl: null };
+      return { child, qaUrl: null };
     }
     await new Promise((r) => setTimeout(r, 250));
   }
 
-  if (!baseUrl) {
+  if (!qaUrl) {
     child.kill();
-    fail(`Timed out waiting for BrowserAppBridge /qa log (${TIMEOUT_MS}ms)`);
-    return { child, baseUrl: null };
+    fail(`Timed out waiting for BrowserAppBridge bootstrap /qa log (${TIMEOUT_MS}ms)`);
+    return { child, qaUrl: null };
   }
-  return { child, baseUrl };
+  return { child, qaUrl };
 }
 
 async function stopChildTree(child) {
@@ -204,14 +204,16 @@ async function main() {
   let child = null;
   let smokeUserData = null;
   let baseUrl = DEFAULT_BASE.replace(/\/$/, '');
+  let qaUrl = process.env.RDC_AGENT_SMOKE_QA_URL?.trim() || `${baseUrl}/qa`;
 
   try {
     if (START) {
       smokeUserData = mkdtempSync(path.join(tmpdir(), 'rdc-agent-browser-smoke-'));
       const started = await waitForBridgeFromChild(smokeUserData);
       child = started.child;
-      if (!started.baseUrl) return;
-      baseUrl = started.baseUrl;
+      if (!started.qaUrl) return;
+      qaUrl = started.qaUrl;
+      baseUrl = new URL(qaUrl).origin;
       const lockPath = path.join(smokeUserData, 'instance.lock');
       if (!existsSync(lockPath)) {
         fail(`Explicit smoke userData was not activated: ${lockPath}`);
@@ -225,9 +227,9 @@ async function main() {
       ok('Explicit disposable RDC_AGENT_USER_DATA → active browser instance.lock');
     } else {
       try {
-        const probe = await fetch(`${baseUrl}/qa`, { redirect: 'manual' });
+        const probe = await fetch(qaUrl, { redirect: 'manual' });
         if (probe.status !== 302 && probe.status !== 401 && probe.status !== 200) {
-          fail(`Bridge not reachable at ${baseUrl} (status ${probe.status}). Start with pnpm run start:agent-browser, or set RDC_AGENT_SMOKE_START=1.`);
+          fail(`Bridge not reachable at ${qaUrl} (status ${probe.status}). Start with pnpm run start:agent-browser and use its bootstrap URL, or set RDC_AGENT_SMOKE_START=1.`);
           return;
         }
       } catch (error) {
@@ -236,7 +238,7 @@ async function main() {
       }
     }
 
-    const passed = await assertQaSurface(baseUrl);
+    const passed = await assertQaSurface(baseUrl, qaUrl);
     if (passed) {
       ok(`PASS (${baseUrl})`);
     }

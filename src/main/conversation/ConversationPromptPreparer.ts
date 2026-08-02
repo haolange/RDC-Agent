@@ -6,14 +6,13 @@ import { agentRuntimeConfigService } from '../settings/AgentRuntimeConfigService
 import { scopedInstructionResolver } from '../runtime/ScopedInstructionResolver';
 import { appPathService } from '../runtime/AppPathService';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import { normalizeToolName, resolveAgentToolAllowlist } from '../workflow/debugger/DebuggerRuntimePolicy';
+import { normalizeToolName, resolveAgentToolAllowlistFromDefinition } from '../workflow/debugger/DebuggerRuntimePolicy';
 import { repairConversationBranchState, resolveVisibleConversationMessages } from './ConversationBranchResolver';
 import type {
   AgentRoutePreflightOk,
   PreparedConversationPrompt,
   ResolvedConversationContext,
 } from './ConversationRoutePreflight';
-import { resolveEnabledAgentDefinition } from './ConversationRoutePreflight';
 
 export interface PrepareConversationPromptInput {
   context: ResolvedConversationContext;
@@ -32,18 +31,18 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     ? storageAdapter.getProjectById(input.context.projectId)?.rootPath ?? null
     : null;
   const runtimeSettings = settingsService.getAll();
-  const definition = agentManifestService.getEffectiveProfiles(
+  const effectiveProfiles = agentManifestService.getEffectiveProfiles(
     runtimeSettings.paths,
     runtimeSettings.llm.providers,
     runtimeSettings.llm.agentRoutes,
     projectRootPath ?? undefined,
-  ).find((profile) => profile.id === input.agentId && profile.enabled)
-    ?? resolveEnabledAgentDefinition(input.agentId);
+  );
+  const definition = effectiveProfiles.find((profile) => profile.id === input.agentId && profile.enabled) ?? null;
   if (!definition) {
     throw new Error(`AGENT_PROFILE_UNAVAILABLE: ${input.agentId}`);
   }
 
-  const allowedToolNames = resolveAgentToolAllowlist(input.agentId, 'investigate')
+  const allowedToolNames = resolveAgentToolAllowlistFromDefinition(input.agentId, definition.tools)
     .map((toolName) => normalizeToolName(toolName));
   const activePaths = [
     projectRootPath,
@@ -99,5 +98,15 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     ));
   }
 
-  return { projectRootPath, allowedToolNames, promptPlan, visibleTurnIds };
+  return {
+    projectRootPath,
+    effectiveProfile: definition,
+    effectiveProfileIds: (() => {
+      const ids = effectiveProfiles.filter((profile) => profile.enabled).map((profile) => profile.id);
+      return ids.length > 0 ? ids : [definition.id];
+    })(),
+    allowedToolNames,
+    promptPlan,
+    visibleTurnIds,
+  };
 }

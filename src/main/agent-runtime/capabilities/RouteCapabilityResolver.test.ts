@@ -179,6 +179,15 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
     });
   });
 
+  it.each(['AzureOpenAIResponses', 'MistralConversations', 'BedrockConverseStream'] as const)('enables native tools for the dedicated %s adapter contract', (protocol) => {
+    const capability = resolveAgentRouteCapability(provider, 'model-a', model({
+      route: { protocol, baseUrl: 'https://example.test', source: 'catalog', contracts: testContracts(protocol) },
+      toolCalling: { state: 'supported' },
+    }));
+    expect(capability.toolCallingMode).toBe('native-structured');
+    expect(capability.supportsToolResults).toBe(true);
+  });
+
   it('fails closed for an unavailable EffectiveModel', () => {
     const capability = resolveAgentRouteCapability(provider, 'model-a', model({
       availability: 'unavailable',

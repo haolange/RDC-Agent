@@ -3,7 +3,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 export type MemoryType = 'user' | 'feedback' | 'project' | 'reference';
-export interface MemoryRecord { id: string; name: string; description: string; type: MemoryType; content: string; tags?: string[]; createdAt: number; updatedAt: number; }
+export interface MemoryRecord { id: string; name: string; displayName: string; normalizedName: string; description: string; type: MemoryType; content: string; tags?: string[]; createdAt: number; updatedAt: number; }
 export interface WriteMemoryInput { name: string; description: string; type: MemoryType; content: string; tags?: string[]; }
 
 const hashSlug = (value: string): string => createHash('sha256').update(value).digest('hex');
@@ -51,14 +51,26 @@ const parseFrontmatter = (source: string): { meta: Record<string, unknown>; body
   }
   return { meta, body: match[2].trim() };
 };
-const serialize = (record: MemoryRecord): string => ['---', `id: ${JSON.stringify(record.id)}`, `name: ${JSON.stringify(record.name)}`, `description: ${JSON.stringify(record.description)}`, `type: ${JSON.stringify(record.type)}`, `tags: ${JSON.stringify(record.tags ?? [])}`, `createdAt: ${record.createdAt}`, `updatedAt: ${record.updatedAt}`, '---', '', record.content.trim(), ''].join('\n');
+const serialize = (record: MemoryRecord): string => ['---', `id: ${JSON.stringify(record.id)}`, `name: ${JSON.stringify(record.name)}`, `displayName: ${JSON.stringify(record.displayName)}`, `normalizedName: ${JSON.stringify(record.normalizedName)}`, `description: ${JSON.stringify(record.description)}`, `type: ${JSON.stringify(record.type)}`, `tags: ${JSON.stringify(record.tags ?? [])}`, `createdAt: ${record.createdAt}`, `updatedAt: ${record.updatedAt}`, '---', '', record.content.trim(), ''].join('\n');
 
 /** Explicit file-backed memory store. It never builds or injects a global index. */
 export class MemoryStore {
+  private writeQueue: Promise<void> = Promise.resolve();
+
   constructor(private readonly memoryDir: string) {}
   getMemoryDir(): string { return this.memoryDir; }
 
+  private enqueueWrite<T>(operation: () => Promise<T>): Promise<T> {
+    const next = this.writeQueue.then(operation, operation);
+    this.writeQueue = next.then(() => undefined, () => undefined);
+    return next;
+  }
+
   async writeMemory(input: WriteMemoryInput): Promise<MemoryRecord> {
+    return this.enqueueWrite(() => this.writeMemoryUnsafe(input));
+  }
+
+  private async writeMemoryUnsafe(input: WriteMemoryInput): Promise<MemoryRecord> {
     const sourceName = input.name.trim();
     if (!sourceName) throw new Error('Memory name is required.');
     if (!input.description.trim() || !input.content.trim()) {
@@ -66,22 +78,39 @@ export class MemoryStore {
     }
     await fs.mkdir(this.memoryDir, { recursive: true });
     const baseSlug = slugify(sourceName);
-    const existing = await this.getMemory(baseSlug);
-    const name = existing
-      ? baseSlug
+    const normalizedSourceName = sourceName.normalize('NFKC').trim().toLowerCase();
+    let existingOwner: MemoryRecord | null = null;
+    try {
+      const entries = await fs.readdir(this.memoryDir);
+      for (const entry of entries) {
+        if (!entry.endsWith('.md')) continue;
+        const candidate = await this.readMemoryFile(entry.slice(0, -3));
+        if (candidate && (candidate.displayName === sourceName || candidate.normalizedName === normalizedSourceName)) {
+          existingOwner = candidate;
+          break;
+        }
+      }
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+    const sameOwner = Boolean(existingOwner);
+    const name = sameOwner
+      ? existingOwner!.name
       : await resolveSlugCollision(baseSlug, sourceName, async (slug) => {
           try {
-            await fs.access(path.join(this.memoryDir, `${slug}.md`));
+            await fs.access(path.join(this.memoryDir, slug + ".md"));
             return true;
           } catch {
             return false;
           }
         });
-    const prior = name === baseSlug ? existing : await this.getMemory(name);
+    const prior = existingOwner;
     const now = Date.now();
     const record: MemoryRecord = {
       id: prior?.id ?? `mem_${now}_${randomBytes(4).toString('hex')}`,
       name,
+      displayName: sourceName,
+      normalizedName: sourceName.normalize('NFKC').trim().toLowerCase(),
       description: input.description.trim(),
       type: input.type,
       content: input.content.trim(),
@@ -89,24 +118,90 @@ export class MemoryStore {
       createdAt: prior?.createdAt ?? now,
       updatedAt: now,
     };
-    await fs.writeFile(path.join(this.memoryDir, `${name}.md`), serialize(record), 'utf8');
+    const target = path.join(this.memoryDir, `${name}.md`);
+    const temporary = `${target}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
+    try {
+      await fs.writeFile(temporary, serialize(record), { encoding: 'utf8', mode: 0o600 });
+      try {
+        await fs.rename(temporary, target);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== 'EEXIST' && code !== 'EPERM') throw error;
+        await fs.rm(target, { force: true });
+        await fs.rename(temporary, target);
+      }
+    } finally {
+      await fs.rm(temporary, { force: true }).catch(() => undefined);
+    }
     return record;
   }
 
   async deleteMemory(name: string): Promise<boolean> {
-    const slug = slugify(name);
-    try { await fs.unlink(path.join(this.memoryDir, `${slug}.md`)); return true; }
+    const record = await this.getMemory(name);
+    if (!record) return false;
+    try { await fs.unlink(path.join(this.memoryDir, `${record.name}.md`)); return true; }
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; }
   }
 
-  async getMemory(name: string): Promise<MemoryRecord | null> {
-    const slug = slugify(name);
+  private async readMemoryFile(slug: string): Promise<MemoryRecord | null> {
     try {
-      const { meta, body } = parseFrontmatter(await fs.readFile(path.join(this.memoryDir, `${slug}.md`), 'utf8'));
+      const { meta, body } = parseFrontmatter(await fs.readFile(path.join(this.memoryDir, slug + '.md'), 'utf8'));
       const candidateType = String(meta.type ?? 'reference');
-      const type: MemoryType = ['user', 'feedback', 'project', 'reference'].includes(candidateType) ? candidateType as MemoryType : 'reference';
-      return { id: String(meta.id ?? slug), name: String(meta.name ?? slug), description: String(meta.description ?? ''), type, content: body, tags: Array.isArray(meta.tags) ? meta.tags.map(String) : undefined, createdAt: Number(meta.createdAt ?? 0), updatedAt: Number(meta.updatedAt ?? 0) };
-    } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null; throw error; }
+      const type: MemoryType = ['user', 'feedback', 'project', 'reference'].includes(candidateType)
+        ? candidateType as MemoryType
+        : 'reference';
+      const storedName = String(meta.name ?? slug);
+      const displayName = String(meta.displayName ?? storedName);
+      return {
+        id: String(meta.id ?? slug),
+        name: storedName,
+        displayName,
+        normalizedName: String(meta.normalizedName ?? displayName.normalize('NFKC').trim().toLowerCase()),
+        description: String(meta.description ?? ''),
+        type,
+        content: body,
+        tags: Array.isArray(meta.tags) ? meta.tags.map(String) : undefined,
+        createdAt: Number(meta.createdAt ?? 0),
+        updatedAt: Number(meta.updatedAt ?? 0),
+      };
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    }
+  }
+
+  async getMemory(name: string): Promise<MemoryRecord | null> {
+    const requested = name.trim();
+    const normalized = requested.normalize('NFKC').toLowerCase();
+    const slug = slugify(requested);
+    const direct = await this.readMemoryFile(slug);
+    const findCollisionOwner = async (): Promise<MemoryRecord | null> => {
+      let entries: string[];
+      try {
+        entries = await fs.readdir(this.memoryDir);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+        throw error;
+      }
+      for (const entry of entries) {
+        if (!entry.endsWith('.md')) continue;
+        const candidate = await this.readMemoryFile(entry.slice(0, -3));
+        if (candidate && (
+          candidate.displayName === requested
+          || candidate.normalizedName === normalized
+        )) {
+          return candidate;
+        }
+      }
+      return null;
+    };
+    if (!direct) return findCollisionOwner();
+    if (direct.displayName === requested || direct.normalizedName === normalized || direct.name === requested) {
+      return direct;
+    }
+    // A normalized slug may be owned by another display name (for example
+    // "A B" versus "A-B"). Resolve the requested owner without overwriting.
+    return (await findCollisionOwner()) ?? (direct.name === requested ? direct : null);
   }
 
   async listMemories(): Promise<MemoryRecord[]> {
@@ -119,6 +214,6 @@ export class MemoryStore {
 
   async searchMemories(query: string, limit = 20): Promise<MemoryRecord[]> {
     const needle = query.trim().toLocaleLowerCase();
-    return (await this.listMemories()).filter((record) => !needle || [record.name, record.description, record.content, ...(record.tags ?? [])].some((value) => value.toLocaleLowerCase().includes(needle))).slice(0, Math.max(1, Math.min(limit, 100)));
+    return (await this.listMemories()).filter((record) => !needle || [record.name, record.displayName, record.normalizedName, record.description, record.content, ...(record.tags ?? [])].some((value) => value.toLocaleLowerCase().includes(needle))).slice(0, Math.max(1, Math.min(limit, 100)));
   }
 }

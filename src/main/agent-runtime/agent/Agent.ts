@@ -124,6 +124,7 @@ export class Agent {
   private _isStreaming = false;
   private _subscribers: AgentEventSubscriber[] = [];
   private _currentStream: EventStream<AgentEvent, Message[]> | null = null;
+  private _activeLoopPromise: Promise<Message[]> | null = null;
   private readonly _provider: ProviderStrategy;
   private readonly _toolExecutor?: ToolExecutor;
   private readonly _options: AgentOptions;
@@ -221,10 +222,32 @@ export class Agent {
     const userMessage = normalizeUserMessage(input);
     const pending: UserMessage[] = [userMessage];
 
-    return this.runLoop(pending);
+    const loopPromise = this.runLoop(pending);
+    this._activeLoopPromise = loopPromise;
+    try {
+      return await loopPromise;
+    } finally {
+      if (this._activeLoopPromise === loopPromise) {
+        this._activeLoopPromise = null;
+      }
+    }
   }
 
   /** 中止当前流；非 streaming 状态时是 no-op。 */
+  /** Wait for the complete provider/tool loop after requesting cancellation. */
+  async abortAndJoin(): Promise<void> {
+    this.abort();
+    const loopPromise = this._activeLoopPromise;
+    if (loopPromise) {
+      await loopPromise.catch(() => undefined);
+    }
+  }
+
+  /** The current loop promise, when a provider/tool producer is still active. */
+  get activeLoopPromise(): Promise<Message[]> | null {
+    return this._activeLoopPromise;
+  }
+
   abort(): void {
     if (this._currentStream && !this._currentStream.isDone) {
       this._currentStream.abort();

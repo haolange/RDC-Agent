@@ -20,7 +20,8 @@ export type ProcessExitReason =
   | 'timeout'
   | 'abort'
   | 'spawn_failed'
-  | 'supervisor_kill';
+  | 'supervisor_kill'
+  | 'unconfirmed_orphan';
 
 export type ProcessOwner =
   | 'mcp'
@@ -58,6 +59,8 @@ export interface SupervisedProcess {
   readonly exit: Promise<ProcessExitInfo>;
   abort(reason?: ProcessExitReason): void;
   join(timeoutMs?: number): Promise<ProcessExitInfo>;
+  /** True when the last bounded join could not observe child.close yet. */
+  readonly orphaned: boolean;
 }
 
 export interface ProcessExitInfo {
@@ -109,6 +112,7 @@ interface RegistryEntry {
   abortHandler: (() => void) | null;
   abortSignal: AbortSignal | null;
   startedAt: number;
+  unconfirmed: boolean;
 }
 
 function terminateTree(pid: number | undefined, signal: NodeJS.Signals = 'SIGTERM'): void {
@@ -192,6 +196,7 @@ export class ProcessSupervisor {
         startedAt,
         stdout,
         stderr,
+        orphaned: false,
         exit: Promise.resolve({
           reason: 'spawn_failed' as const,
           code: null,
@@ -227,11 +232,13 @@ export class ProcessSupervisor {
       abortHandler: null,
       abortSignal: opts.abortSignal ?? null,
       startedAt,
+      unconfirmed: false,
     };
 
     const settle = (info: ProcessExitInfo): void => {
       if (entry.exitInfo) return;
       entry.exitInfo = info;
+      entry.unconfirmed = false;
       if (entry.killTimer) {
         clearTimeout(entry.killTimer);
         entry.killTimer = null;
@@ -249,17 +256,19 @@ export class ProcessSupervisor {
 
     const abort = (reason: ProcessExitReason = 'abort'): void => {
       if (entry.exitInfo) return;
-      entry.forcedReason = reason;
+      entry.forcedReason ??= reason;
       terminateTree(child.pid, 'SIGTERM');
       try {
         if (!child.killed) child.kill();
       } catch {
         // Parent already exited; the tree-kill path above remains authoritative.
       }
-      entry.killTimer = setTimeout(() => {
-        terminateTree(child.pid, 'SIGKILL');
-      }, DEFAULT_GRACE_MS);
-      entry.killTimer.unref?.();
+      if (!entry.killTimer) {
+        entry.killTimer = setTimeout(() => {
+          terminateTree(child.pid, 'SIGKILL');
+        }, DEFAULT_GRACE_MS);
+        entry.killTimer.unref?.();
+      }
     };
 
     const supervised: SupervisedProcess = {
@@ -274,27 +283,49 @@ export class ProcessSupervisor {
       stderr,
       exit: exitPromise,
       abort,
+      get orphaned() {
+        return entry.unconfirmed;
+      },
       join: async (timeoutMs?: number) => {
         if (entry.exitInfo) return entry.exitInfo;
         if (timeoutMs == null || timeoutMs <= 0) return exitPromise;
-        return Promise.race([
-          exitPromise,
-          new Promise<ProcessExitInfo>((resolve) => {
-            const timer = setTimeout(() => {
-              if (!entry.exitInfo && !entry.forcedReason) abort('timeout');
-              const reason = entry.forcedReason ?? 'timeout';
-              const info: ProcessExitInfo = {
-                reason,
-                code: null,
-                signal: null,
-                durationMs: Date.now() - startedAt,
-              };
-              settle(info);
-              resolve(info);
-            }, timeoutMs);
-            timer.unref?.();
-          }),
-        ]);
+        let deadlineTimer: ReturnType<typeof setTimeout> | null = null;
+        const deadline = new Promise<ProcessExitInfo>((resolve) => {
+          deadlineTimer = setTimeout(async () => {
+            if (entry.exitInfo) {
+              resolve(entry.exitInfo);
+              return;
+            }
+            abort('timeout');
+            let observationTimer: ReturnType<typeof setTimeout> | null = null;
+            const killObservation = await Promise.race<ProcessExitInfo | null>([
+              exitPromise,
+              new Promise<ProcessExitInfo | null>((orphanResolve) => {
+                observationTimer = setTimeout(() => {
+                  entry.unconfirmed = true;
+                  orphanResolve(null);
+                }, DEFAULT_GRACE_MS + 1_000);
+                observationTimer.unref?.();
+              }),
+            ]);
+            if (observationTimer) clearTimeout(observationTimer);
+            if (killObservation) {
+              resolve(killObservation);
+              return;
+            }
+            resolve({
+              reason: 'unconfirmed_orphan',
+              code: null,
+              signal: null,
+              error: new Error(`Process ${id} did not report close after forced termination.`),
+              durationMs: Date.now() - startedAt,
+            });
+          }, timeoutMs);
+          deadlineTimer.unref?.();
+        });
+        const observed = await Promise.race([exitPromise, deadline]);
+        if (deadlineTimer) clearTimeout(deadlineTimer);
+        return observed;
       },
     };
     entry.supervised = supervised;
@@ -365,8 +396,8 @@ export class ProcessSupervisor {
         timer.unref?.();
       }),
     ]);
-    // Bounded shutdown must leave an empty registry even if a platform kill races.
-    this.registry.clear();
+    // Keep unconfirmed processes in the registry until child.close is observed.
+    // This makes shutdown diagnostics truthful and prevents reuse of orphaned resources.
   }
 
   /** Soft reset after joinAll so tests / restarts can spawn again. */

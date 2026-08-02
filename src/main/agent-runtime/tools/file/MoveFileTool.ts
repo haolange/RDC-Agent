@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { AgentTool } from '../../agent/AgentTool';
-import { assertFileSizeCap, isPathExisting, safeResolvePath } from '../primitives/_shared';
+import { assertFileSizeCap, isPathExisting, requireMutationWorkspaceRoot, safeResolvePath } from '../primitives/_shared';
 import { COPY_MOVE_MAX_BYTES } from '../primitives/toolLimits';
 
 interface MoveFileParams {
@@ -33,8 +33,9 @@ export const moveFileTool: AgentTool<MoveFileParams, MoveFileDetails> = {
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');
-    const src = safeResolvePath(params.source, undefined, context);
-    const dest = safeResolvePath(params.destination, undefined, context);
+    const workspaceRoot = requireMutationWorkspaceRoot(context);
+    const src = safeResolvePath(params.source, workspaceRoot, context);
+    const dest = safeResolvePath(params.destination, workspaceRoot, context);
     assertFileSizeCap(src, COPY_MOVE_MAX_BYTES, 'Source file');
     const destDir = path.dirname(dest);
     await fs.mkdir(destDir, { recursive: true });

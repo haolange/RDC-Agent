@@ -5,7 +5,21 @@ import type { LlmProviderEntry, LlmProviderId, LlmProviderProtocol } from '@shar
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import { createFailClosedProviderContracts, createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
 
-const NATIVE_TOOL_PROTOCOLS = new Set<LlmProviderProtocol>(['AnthropicMessages', 'OpenAIResponses', 'OpenAICompatibleChatCompletions', 'OpenRouterChatCompletions', 'GoogleInteractions', 'GoogleGemini', 'GitLabDuo', 'SapAiCoreOrchestration', 'SapAiCoreFoundationModels', 'OllamaOpenAICompatibleChatCompletions']);
+const NATIVE_TOOL_PROTOCOLS = new Set<LlmProviderProtocol>([
+  'AnthropicMessages',
+  'OpenAIResponses',
+  'OpenAICompatibleChatCompletions',
+  'OpenRouterChatCompletions',
+  'GoogleInteractions',
+  'GoogleGemini',
+  'GitLabDuo',
+  'SapAiCoreOrchestration',
+  'SapAiCoreFoundationModels',
+  'OllamaOpenAICompatibleChatCompletions',
+  'AzureOpenAIResponses',
+  'MistralConversations',
+  'BedrockConverseStream',
+]);
 
 export interface RouteCapabilityDiagnostic {
   code:

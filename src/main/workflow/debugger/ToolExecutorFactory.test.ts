@@ -307,6 +307,40 @@ describe('ToolExecutorFactory', () => {
     expect(result.isError).not.toBe(true);
   });
 
+  it('enforces the frozen maxToolCalls and wall-clock policy budget before execution', async () => {
+    const execute = vi.fn(async () => ({ content: [{ type: 'text' as const, text: 'ok' }] }));
+    const toolMap = new Map([['read_file', {
+      name: 'read_file', description: 'read', parameters: { type: 'object', properties: {} }, execute,
+    }]]);
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+      getActiveTurn: () => null,
+      resolveRuntimeTools: () => ({ toolMap, definitions: [], deferredDefinitions: [] }),
+      isAllowedForRuntime: () => true,
+      matchesToolAllowlist: () => true,
+    });
+    const budget = { toolCalls: 0, subagents: 0, childDepth: 0, wallStartedAt: Date.now(), maxToolCalls: 1, maxSubagents: 3, maxChildDepth: 3, maxWallTimeMs: 60_000 };
+    const executor = factory.createToolExecutor('ask', ['read_file'], undefined, null, {
+      effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
+      policyBudget: budget,
+    });
+    const first = await executor.execute({ type: 'toolCall', id: 'first', name: 'read_file', arguments: {} });
+    const second = await executor.execute({ type: 'toolCall', id: 'second', name: 'read_file', arguments: {} });
+    expect(first.isError).not.toBe(true);
+    expect(second).toMatchObject({ isError: true, details: { code: 'POLICY_LIMIT_EXCEEDED', limit: 'maxToolCalls' } });
+    expect(execute).toHaveBeenCalledOnce();
+
+    const expired = { ...budget, toolCalls: 0, wallStartedAt: Date.now() - 100, maxWallTimeMs: 1 };
+    const expiredExecutor = factory.createToolExecutor('ask', ['read_file'], undefined, null, {
+      effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
+      policyBudget: expired,
+    });
+    await expect(expiredExecutor.execute({ type: 'toolCall', id: 'expired', name: 'read_file', arguments: {} })).resolves.toMatchObject({
+      isError: true, details: { code: 'POLICY_LIMIT_EXCEEDED', limit: 'maxWallTimeMs' },
+    });
+  });
+
   it('createToolExecutor runs allowed tool from map', async () => {
     const execute = vi.fn(async () => ({
       content: [{ type: 'text' as const, text: 'ok' }],

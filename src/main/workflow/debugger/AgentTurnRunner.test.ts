@@ -27,7 +27,6 @@ import type { AssistantMessage, ToolResultMessage } from '../../agent-runtime/co
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
-import type { HandoffMailbox } from './HandoffMailbox';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 
 function createRunner(): AgentTurnRunner {
@@ -35,7 +34,6 @@ function createRunner(): AgentTurnRunner {
     slots: {} as AgentSlotRegistry,
     mcp: {} as McpConnectionCoordinator,
     deferredActivation: {} as DeferredToolActivationTracker,
-    handoffMailbox: {} as HandoffMailbox,
     tokenizerService: new TokenizerService(),
     sessionTurnKey: (sessionId) => sessionId ?? 'default',
     resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }),
@@ -75,13 +73,13 @@ describe('AgentTurnRunner', () => {
 
   it('resolveMaxTurns prefers finite policy capped by profile', () => {
     const runner = createRunner();
-    expect(runner.resolveMaxTurns('ask', 100)).toBe(12);
-    expect(runner.resolveMaxTurns('ask', 5)).toBe(5);
+    expect(runner.resolveMaxTurns('ask', 100, 12)).toBe(12);
+    expect(runner.resolveMaxTurns('ask', 5, 12)).toBe(5);
   });
 
   it('resolveMaxTurns uses profile max when policy omitted', () => {
     const runner = createRunner();
-    expect(runner.resolveMaxTurns('ask')).toBe(12);
+    expect(runner.resolveMaxTurns('ask', undefined, 12)).toBe(12);
   });
 
   it('resolveMaxTurns uses role defaults for execution agents', () => {

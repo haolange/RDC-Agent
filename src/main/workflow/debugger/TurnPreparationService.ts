@@ -9,7 +9,7 @@ import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import { CONTEXT_COMPACTION_RATIO } from '@shared/types/modelCapability';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { ContextUsageBreakdownEntry, PreparedTurnContextSummary } from '@shared/types/session';
-import type { PromptPlan } from '@shared/types/rdxRuntime';
+import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdxRuntime';
 import { charsToTokens } from '@shared/utils/tokens';
 import { nowMs } from '@shared/utils/id';
 import { turnPreparationWorkerPool } from '../../workers/TurnPreparationWorkerPool';
@@ -45,12 +45,10 @@ import {
 } from './orchestratorTypes';
 
 function aggregateMcpDescriptorHash(
-  agentId: AgentRole,
+  profile: EffectiveAgentProfile,
   projectRootPath: string | null,
 ): string | null {
-  const settings = settingsService.getAll();
-  const manifest = settings.agents.definitions.find((entry) => entry.id === agentId && entry.enabled);
-  const enabledIds = new Set(manifest?.mcpServers ?? []);
+  const enabledIds = new Set(profile.mcpServers);
   if (enabledIds.size === 0) return null;
   const hashes = agentRuntimeConfigService.listMcpServers(projectRootPath ?? undefined)
     .filter((server) => enabledIds.has(server.id) || enabledIds.has(server.name))
@@ -85,6 +83,8 @@ export interface TurnPreparationServiceDeps {
     sessionId?: string | null,
     turnHandle?: TurnHandle | null,
     projectId?: string | null,
+    projectRootPath?: string | null,
+    mcpPoolKey?: string | null,
   ) => ResolvedRuntimeTools;
   createToolSignature: (tools: ToolDefinition[]) => string;
 }
@@ -106,8 +106,11 @@ export class TurnPreparationService {
     requestPlan: RequestPlan;
     turnControls: ConversationTurnControls;
     promptPlan: PromptPlan;
+    effectiveProfile: EffectiveAgentProfile;
+    effectiveProfileIds: string[];
     toolAllowlist: string[];
     projectRootPath: string | null;
+    projectId: string | null;
     sessionId: string | null;
     visibleTurnIds: string[];
     activeBranchId?: string | null;
@@ -139,13 +142,28 @@ export class TurnPreparationService {
           compactedTurnCount: 0,
         };
     throwIfCancelled();
-    const mcpConnectionErrors = await this.deps.mcp.ensureConnections(input.agentId, input.projectRootPath);
-    throwIfCancelled();
+    // Compile the immutable policy before acquiring any external MCP lease.
+    // Invalid policy must not spawn processes or establish network connections.
+    const turnSettings = settingsService.getAll();
+    const compiledPolicy = compileEffectivePolicy(input.projectRootPath);
+    const acquiredMcp = await this.deps.mcp.acquireConnections(
+      input.agentId,
+      input.projectRootPath,
+      input.effectiveProfile.mcpServers,
+    );
+    const mcpConnectionErrors = acquiredMcp.errors;
+    const mcpLease = acquiredMcp.lease;
+    try {
+      throwIfCancelled();
     const runtimeTools = this.deps.resolveRuntimeTools(
       input.agentId,
       input.toolAllowlist,
       'investigate',
       input.sessionId,
+      undefined,
+      input.projectId,
+      input.projectRootPath,
+      mcpLease?.poolKey ?? null,
     );
     const slotKey = agentSlotKey(input.sessionId, input.agentId);
     const toolSignature = this.deps.createToolSignature(runtimeTools.definitions);
@@ -255,10 +273,8 @@ export class TurnPreparationService {
     }
     const initialMessages = compactedMessages.slice(0, -1);
     // prepareTurn 唯一一次解析 settings → 写入 effectivePlan；runAgentTurn/Executor 不得再读。
-    const turnSettings = settingsService.getAll();
-    const profile = turnSettings.agents.definitions
-      .find((definition) => definition.id === input.agentId && definition.enabled);
-    const profileSkills = profile?.skills ?? [];
+    const profile = input.effectiveProfile;
+    const profileSkills = profile.skills;
     const skillIntersection = resolveSkillIntersection(
       profileSkills,
       input.toolAllowlist,
@@ -267,18 +283,20 @@ export class TurnPreparationService {
     const effectivePlan = buildEffectiveRuntimePlan({
       agentId: input.agentId,
       projectRootPath: input.projectRootPath,
-      projectId: null,
-      profile: profile ?? null,
+      projectId: input.projectId,
+      profile,
+      profileProvenance: profile.provenance,
+      enabledProfileIds: input.effectiveProfileIds,
       toolAllowlist: input.toolAllowlist,
       permissionSettings: turnSettings.agentRuntime.permissions,
       routeCapability: input.routeCapability,
       requestPlan: input.requestPlan,
       promptPlan: input.promptPlan,
-      policy: compileEffectivePolicy(input.projectRootPath),
+      policy: compiledPolicy,
       skillIntersection,
       visibleToolNames: activeToolDefinitions.map((definition) => definition.name),
       activatedDeferredTools,
-      mcpDescriptorHash: aggregateMcpDescriptorHash(input.agentId, input.projectRootPath),
+      mcpDescriptorHash: aggregateMcpDescriptorHash(profile, input.projectRootPath),
     });
     const summary: PreparedTurnContextSummary = {
       requestId: input.requestId,
@@ -354,10 +372,15 @@ export class TurnPreparationService {
         activeToolDefinitions,
         routeCapability: input.routeCapability,
         mcpConnectionErrors,
+        mcpLease,
         credentialHandle: input.credentialHandle,
         promptCache,
         effectivePlan,
       },
     };
+    } catch (error) {
+      await mcpLease?.release({ discardIfIdle: true });
+      throw error;
+    }
   }
 }

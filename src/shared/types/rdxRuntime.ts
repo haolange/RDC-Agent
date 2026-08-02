@@ -277,5 +277,6 @@ export interface CompiledPolicy {
   maxToolCalls: number;
   maxSubagents: number;
   maxChildDepth: number;
+  maxWallTimeMs: number;
   sourceFingerprint: string;
 }

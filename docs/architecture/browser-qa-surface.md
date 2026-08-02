@@ -7,7 +7,7 @@ Browser 与桌面 Electron 共用同一套 renderer、`ElectronAPI` 产品接口
 | Desktop | `preload` → `ipcRenderer` → `ipcMain` | 进程内信任边界 |
 | Browser | `BrowserAppBridge` → localhost HTTP/SSE → IPC handler registry | Bearer / query `rdcBridgeToken\|token` / cookie `rdcBridgeToken` |
 
-权威短入口：`GET /qa` → Set-Cookie → 302 `/app`。仅 `RDC_AGENT_BROWSER_QA=1` 启动；不进 release 默认路径。
+Authoritative entry: the launcher logs one-time `GET /qa?qaBootstrap=...`; consume it once to mint the bridge cookie, then redirect to clean `/app`. Only `RDC_AGENT_BROWSER_QA=1` starts this surface; missing, repeated, or invalid bootstrap returns 401. JSON bodies are capped at 1 MiB.
 
 ## 单轨接口
 
@@ -42,4 +42,4 @@ Browser / Browser-dev 默认使用与 Desktop 相同的 canonical Electron userD
 
 - 契约：`createRendererApi.test.ts`、`bridgeSecurity.test.ts`、`BrowserAppBridgeServer.contract.test.ts`
 - Smoke：`pnpm run smoke:agent-browser`
-- 人工：`start:agent-browser` → 打开 `/qa` → 验证真实本机 Settings/Project/Session/usage、语言持久化及 parity 能力；再以显式临时 userData 验证有副作用的权限流程
+- Manual: run start:agent-browser, copy the complete one-time /qa?qaBootstrap=... URL from the latest log, and verify real local Settings/Project/Session/usage, language persistence, and parity. Use explicit temporary userData for side-effecting permission flows.

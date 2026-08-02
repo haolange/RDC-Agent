@@ -50,7 +50,7 @@
 | 配置文件单文件 invalid + diagnostics | Integrity | 逐文件隔离，不拖垮列表 |
 | Provider stream buffer 超限 | Integrity | 8MiB fail-closed 截断会话步 |
 | 用户 Stop / abortAndJoin | Availability | join producers；丢弃迟到 event |
-| ProcessSupervisor timeout/abort | Availability | 杀进程树；registry 清空 |
+| ProcessSupervisor timeout/abort | Availability | terminate process tree; settle only after observed close/error; retain `unconfirmed_orphan` in registry for diagnostics |
 | ShutdownCoordinator 限时 shutdown | Availability | 尽量排空后退出 |
 | Provider 网络/配额类错误 | Availability | 按 ErrorRecovery 契约；不发明 entitlement；429 与明确 `quota_exceeded` 的 402 只记录短期 quota |
 | Headless instance.lock 冲突 | Security + Availability | 冲突 fail-closed 避免串 userData |

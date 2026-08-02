@@ -11,9 +11,11 @@ import type {
 import type { EffectiveModel, ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
 import type { PreparedTurnContextSummary } from '@shared/types/session';
 import type { WorkflowStage } from '@shared/types/workflow';
-import type { PromptPlan } from '@shared/types/rdxRuntime';
+import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdxRuntime';
 import type { CompiledPromptCache } from '@shared/types/semanticContext';
 import type { EffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
+import type { PendingHandoff, PolicyBudgetState, SubagentBudgetState } from './TurnCoordinator';
+import type { McpConnectionLease } from './McpConnectionCoordinator';
 import type { AgentEventBridgeContext } from '../../agent-runtime/AgentEventBridge';
 import type {
   Message,
@@ -40,6 +42,8 @@ export interface AgentTurnOptions {
   requestPlan?: RequestPlan;
   userContent?: UserMessage['content'];
   preloadSkillIds?: string[];
+  policyBudget?: PolicyBudgetState;
+  subagentBudget?: SubagentBudgetState;
 }
 
 export interface AgentProfileTurnOptions extends AgentTurnOptions {
@@ -57,8 +61,15 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
   /** 当前激活项目 id。 */
   projectId?: string | null;
   promptPlan?: PromptPlan;
+  /** Exact profile snapshot used to build this child turn. */
+  effectiveProfile?: EffectiveAgentProfile | null;
+  /** Enabled profile ids from the same resolution snapshot. */
+  effectiveProfileIds?: string[];
   visibleTurnIds?: string[];
   activeBranchId?: string;
+  /** Shared parent-child policy lineage; child turns must not reset counters. */
+  policyBudget?: PolicyBudgetState;
+  subagentBudget?: SubagentBudgetState;
   preparedTurn?: PreparedAgentTurnContext;
   onTerminalContext?: (result: {
     messages: Message[];
@@ -66,6 +77,7 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
     status: 'complete' | 'stopped' | 'error';
     selectedTurnCount: number;
     filteredArtifactCount: number;
+    pendingHandoff?: PendingHandoff;
   }) => void;
 }
 
@@ -79,6 +91,7 @@ export interface PreparedAgentRuntime {
   activeToolDefinitions: ToolDefinition[];
   routeCapability: AgentRouteCapability;
   mcpConnectionErrors: string[];
+  mcpLease: McpConnectionLease | null;
   credentialHandle: string;
   promptCache: CompiledPromptCache;
   effectivePlan: EffectiveRuntimePlan;
@@ -111,10 +124,13 @@ export interface ToolExecutorRuntimeContext {
   onEvent?: (event: SharedAgentEvent) => void;
   /** 当前激活项目根目录，用于把工具执行 base 对齐到 project root 而非 process.cwd()。 */
   projectRootPath?: string | null;
+  /** Exact MCP pool leased by this turn; never resolve tools from a mutable active-project pointer. */
+  mcpPoolKey?: string | null;
   /** 当前激活项目 id（审计/事件关联）。 */
   projectId?: string | null;
   /** Turn 冻结的 EffectiveRuntimePlan；Prompt/Executor 共用 planId/fingerprint。 */
   effectivePlan?: EffectiveRuntimePlan;
+  policyBudget?: PolicyBudgetState;
 }
 
 export function countContinuationDecisions(

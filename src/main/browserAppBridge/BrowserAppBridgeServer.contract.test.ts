@@ -22,9 +22,16 @@ const EXPECTED = 'a'.repeat(64);
 
 function createMinimalQaServer(): Promise<{ server: Server; baseUrl: string }> {
   return new Promise((resolveListen, reject) => {
+    let bootstrapToken: string | null = 'qa-bootstrap';
     const server = createServer((request: IncomingMessage, response: ServerResponse) => {
       const url = new URL(request.url ?? '/', 'http://127.0.0.1');
       if (url.pathname === '/qa' && (request.method === 'GET' || request.method === 'HEAD')) {
+        if (!bootstrapToken || url.searchParams.get('qaBootstrap') !== bootstrapToken) {
+          response.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+          response.end(JSON.stringify({ success: false, error: 'QA bootstrap required' }));
+          return;
+        }
+        bootstrapToken = null;
         response.writeHead(302, {
           Location: '/app',
           'Set-Cookie': buildBridgeAuthCookie(EXPECTED),
@@ -72,7 +79,7 @@ describe('BrowserAppBridge /qa auth contract', () => {
     const started = await createMinimalQaServer();
     server = started.server;
 
-    const qaResponse = await fetch(`${started.baseUrl}/qa`, { redirect: 'manual' });
+    const qaResponse = await fetch(`${started.baseUrl}/qa?qaBootstrap=qa-bootstrap`, { redirect: 'manual' });
     expect(qaResponse.status).toBe(302);
     expect(qaResponse.headers.get('location')).toBe('/app');
     const setCookie = qaResponse.headers.get('set-cookie') ?? '';
@@ -87,6 +94,9 @@ describe('BrowserAppBridge /qa auth contract', () => {
     const body = await appResponse.text();
     expect(body).toContain('Workbench');
     expect(body.trimStart().startsWith('{')).toBe(false);
+
+    const replay = await fetch(`${started.baseUrl}/qa?qaBootstrap=qa-bootstrap`, { redirect: 'manual' });
+    expect(replay.status).toBe(401);
   });
 
   it('GET /app without cookie or token returns 401 JSON', async () => {

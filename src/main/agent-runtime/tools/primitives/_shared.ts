@@ -9,6 +9,7 @@
  */
 
 import * as fs from 'fs';
+import * as fsp from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
 import type { ToolExecutionContext } from '../../agent/AgentTool';
@@ -18,6 +19,17 @@ import { BINARY_SAMPLE_BYTES, TEXT_FILE_MAX_BYTES } from './toolLimits';
  * 获取 workspace 根目录（绝对路径）。
  * 优先使用执行上下文中的 project root，使工具相对当前激活项目解析路径。
  */
+/**
+ * Mutation tools require an explicitly owned project root. The application
+ * process cwd is never an implicit write target.
+ */
+export function requireMutationWorkspaceRoot(context?: ToolExecutionContext): string {
+  if (!context?.projectRootPath) {
+    throw new Error('MUTATION_REQUIRES_PROJECT: select a trusted project before using a mutation tool.');
+  }
+  return path.resolve(context.projectRootPath);
+}
+
 export function getWorkspaceRoot(context?: ToolExecutionContext): string {
   if (context?.projectRootPath) {
     return path.resolve(context.projectRootPath);
@@ -59,6 +71,33 @@ function assertInsideAllowedRoots(
   throw new Error(`路径 "${input}" 超出 workspace (${workspaceRoot})`);
 }
 
+function assertNoSymlinkPath(target: string): void {
+  let current = path.resolve(target);
+  while (fs.existsSync(current)) {
+    const stat = fs.lstatSync(current);
+    if (stat.isSymbolicLink()) {
+      throw new Error(`SYMLINK_PATH_REJECTED: refusing to follow symlink/reparse path ${current}.`);
+    }
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+}
+
+/** Write through a descriptor that refuses symlink replacement on platforms that support O_NOFOLLOW. */
+export async function writeTextFileNoFollow(absolutePath: string, content: string): Promise<void> {
+  assertNoSymlinkPath(absolutePath);
+  const noFollow = (fs.constants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0;
+  const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | noFollow;
+  const handle = await fsp.open(absolutePath, flags, 0o600);
+  try {
+    await handle.writeFile(content, 'utf8');
+  } finally {
+    await handle.close();
+  }
+  assertNoSymlinkPath(absolutePath);
+}
+
 function realpathExistingAncestor(target: string): string {
   let current = path.resolve(target);
   const missing: string[] = [];
@@ -90,6 +129,7 @@ export function safeResolvePath(input: string, root?: string, context?: ToolExec
     : path.resolve(workspaceRoot, expandedInput);
 
   assertInsideAllowedRoots(lexical, workspaceRoot, input, context);
+  assertNoSymlinkPath(lexical);
 
   const resolved = realpathExistingAncestor(lexical);
   assertInsideAllowedRoots(resolved, workspaceRoot, input, context);

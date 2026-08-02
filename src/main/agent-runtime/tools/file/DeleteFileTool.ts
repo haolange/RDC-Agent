@@ -2,7 +2,7 @@ import * as fs from 'fs/promises';
 import type { AgentTool } from '../../agent/AgentTool';
 import {
   assertNotSensitiveDeletePath,
-  getWorkspaceRoot,
+  requireMutationWorkspaceRoot,
   safeResolvePath,
 } from '../primitives/_shared';
 
@@ -31,7 +31,7 @@ export const deleteFileTool: AgentTool<DeleteFileParams, DeleteFileDetails> = {
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');
-    const workspaceRoot = getWorkspaceRoot(context);
+    const workspaceRoot = requireMutationWorkspaceRoot(context);
     const absolute = safeResolvePath(params.path, workspaceRoot, context);
     assertNotSensitiveDeletePath(absolute, workspaceRoot);
     let existed = false;

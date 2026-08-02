@@ -24,6 +24,10 @@ const NATIVE_IMAGE_MIME_TYPES = new Set([
 
 const MAX_IMAGE_PIXELS = 40_000_000;
 const MAX_IMAGE_EDGE = 16_384;
+const MAX_ATTACHMENT_COUNT = 32;
+export const MAX_ATTACHMENT_BYTES_PER_FILE = 64 * 1024 * 1024;
+export const MAX_ATTACHMENT_TOTAL_BYTES = 256 * 1024 * 1024;
+const MAX_DECODED_IMAGE_BYTES = 128 * 1024 * 1024;
 
 function inferAttachmentMimeType(filePath: string, declaredMimeType?: string | null): string {
   const declared = declaredMimeType?.trim().toLowerCase();
@@ -187,35 +191,34 @@ export async function assertSafeImageAttachment(
 export async function resolvePendingAttachmentDescriptors(
   attachments: ConversationAttachmentInput[],
 ): Promise<AgentInputAttachment[]> {
-  return Promise.all(attachments.map(async (attachment) => {
+  if (attachments.length > MAX_ATTACHMENT_COUNT) {
+    throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: at most ${MAX_ATTACHMENT_COUNT} attachments are allowed.`);
+  }
+  const resolved: AgentInputAttachment[] = [];
+  let totalBytes = 0;
+  for (const attachment of attachments) {
     const filePath = path.resolve(attachment.sourcePath);
     const stats = await fs.promises.stat(filePath).catch(() => null);
     if (!stats?.isFile()) {
       throw new Error(`ATTACHMENT_NOT_FOUND: ${attachment.fileName || path.basename(filePath)}`);
     }
+    if (stats.size > MAX_ATTACHMENT_BYTES_PER_FILE) {
+      throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: ${attachment.fileName || path.basename(filePath)} exceeds ${MAX_ATTACHMENT_BYTES_PER_FILE} bytes.`);
+    }
+    totalBytes += stats.size;
+    if (totalBytes > MAX_ATTACHMENT_TOTAL_BYTES) {
+      throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: total attachment bytes exceed ${MAX_ATTACHMENT_TOTAL_BYTES}.`);
+    }
+    const fileName = attachment.fileName || path.basename(filePath);
     const mimeType = inferAttachmentMimeType(filePath, attachment.mimeType);
     if (mimeType.startsWith('image/')) {
-      const checked = await assertSafeImageAttachment(
-        filePath,
-        mimeType,
-        attachment.fileName || path.basename(filePath),
-      );
-      return {
-        kind: 'image' as const,
-        fileName: attachment.fileName || path.basename(filePath),
-        filePath,
-        mimeType: checked.mimeType,
-        size: checked.size,
-      };
+      const checked = await assertSafeImageAttachment(filePath, mimeType, fileName);
+      resolved.push({ kind: 'image', fileName, filePath, mimeType: checked.mimeType, size: checked.size });
+    } else {
+      resolved.push({ kind: 'file', fileName, filePath, mimeType, size: stats.size });
     }
-    return {
-      kind: 'file' as const,
-      fileName: attachment.fileName || path.basename(filePath),
-      filePath,
-      mimeType,
-      size: stats.size,
-    };
-  }));
+  }
+  return resolved;
 }
 
 export async function materializeAgentUserInput(
@@ -226,6 +229,21 @@ export async function materializeAgentUserInput(
 ): Promise<MaterializedAgentUserInput> {
   if (attachments.length === 0) {
     return { content: message, imageTokenAdjustment: 0 };
+  }
+  if (attachments.length > MAX_ATTACHMENT_COUNT) {
+    throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: at most ${MAX_ATTACHMENT_COUNT} attachments are allowed.`);
+  }
+  let totalBytes = 0;
+  for (const attachment of attachments) {
+    const stats = await fs.promises.stat(attachment.filePath).catch(() => null);
+    const actualSize = stats?.isFile() ? stats.size : attachment.size;
+    if (!Number.isFinite(actualSize) || actualSize < 0 || actualSize > MAX_ATTACHMENT_BYTES_PER_FILE) {
+      throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: ${attachment.fileName} exceeds the per-file byte limit.`);
+    }
+    totalBytes += actualSize;
+    if (totalBytes > MAX_ATTACHMENT_TOTAL_BYTES) {
+      throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: total attachment bytes exceed ${MAX_ATTACHMENT_TOTAL_BYTES}.`);
+    }
   }
 
   const imageAttachments = attachments.filter((attachment) => attachment.kind === 'image');
@@ -254,12 +272,20 @@ export async function materializeAgentUserInput(
     text: `${message}\n\nAttachments available in this request:\n${attachmentSummary}`,
   }];
   let imageTokenAdjustment = 0;
+  const imageData = new Map<string, string>();
+  if (includeImageData) {
+    for (const attachment of imageAttachments) {
+      const bytes = await fs.promises.readFile(attachment.filePath);
+      if (bytes.byteLength > MAX_DECODED_IMAGE_BYTES) {
+        throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: decoded image ${attachment.fileName} exceeds ${MAX_DECODED_IMAGE_BYTES} bytes.`);
+      }
+      imageData.set(attachment.filePath, bytes.toString('base64'));
+    }
+  }
   for (const attachment of imageAttachments) {
     content.push({
       type: 'image',
-      data: includeImageData
-        ? (await fs.promises.readFile(attachment.filePath)).toString('base64')
-        : '',
+      data: includeImageData ? (imageData.get(attachment.filePath) ?? '') : '',
       mimeType: attachment.mimeType,
     });
     imageTokenAdjustment += Math.max(256, Math.ceil(attachment.size / 1024)) - 256;

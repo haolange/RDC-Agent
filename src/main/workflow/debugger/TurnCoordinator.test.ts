@@ -76,6 +76,24 @@ describe('TurnCoordinator', () => {
     expect(handle.reason).toBe('user_stop');
   });
 
+  it('marks an unjoined producer orphaned without dropping its ownership', async () => {
+    const handle = await coordinator.beginTurn({ sessionKey: 'orphan', turnId: 't' });
+    let resolveJoin!: () => void;
+    const joinPromise = new Promise<void>((resolve) => { resolveJoin = resolve; });
+    handle.registerProducer({
+      id: 'slow',
+      abort: () => undefined,
+      join: () => joinPromise,
+    });
+
+    await handle.abortAndJoin({ reason: 'user_stop', graceMs: 5, forceAfterMs: 5 });
+    expect(handle.isOrphaned).toBe(true);
+    expect(handle.isLive(handle.generation)).toBe(false);
+
+    resolveJoin();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
   it('replacing session turn aborts previous', async () => {
     const first = await coordinator.beginTurn({ sessionKey: 's', turnId: 't1' });
     const second = await coordinator.beginTurn({ sessionKey: 's', turnId: 't2' });

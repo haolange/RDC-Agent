@@ -76,7 +76,7 @@ export default defineConfig({
         'src/main/workflow/debugger/AgentTurnRunner.ts',
         'src/main/workflow/debugger/TaskBoard.ts',
         'src/main/workflow/debugger/WorkflowStateStore.ts',
-        'src/main/workflow/debugger/HandoffMailbox.ts',
+
         'src/main/workflow/debugger/TurnPreparationService.ts',
         'src/main/workflow/debugger/RuntimeToolAssembly.ts',
         // Provider adapters + stream glue: golden fixtures/contracts cover wire; adapters need live/SSE harness.

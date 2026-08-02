@@ -27,12 +27,10 @@ import {
 } from './DebuggerRuntimePolicy';
 import type { TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
-import type { HandoffMailbox } from './HandoffMailbox';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
 
 export interface RuntimeToolAssemblyDeps {
   mcp: McpConnectionCoordinator;
-  handoffMailbox: HandoffMailbox;
   getActiveTurn: (sessionId?: string | null) => TurnHandle | null;
   getMemoryStore: (scope: 'user' | 'project', projectRootPath?: string | null) => MemoryStore;
   createSubagentTools: (parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null) => AgentTool[];
@@ -209,7 +207,6 @@ export class RuntimeToolAssembly {
     { fromAgentId: AgentRole; toAgentId: string; label: string; prompt: string; valid: boolean }
   > {
     const getActiveTurn = this.deps.getActiveTurn;
-    const handoffMailbox = this.deps.handoffMailbox;
     const capturedTurn = turnHandle ?? getActiveTurn(sessionId);
     return {
       name: 'agent_handoff',
@@ -227,11 +224,18 @@ export class RuntimeToolAssembly {
       permissionHint: 'readonly',
       async execute(_toolCallId, args) {
         const toProfile = typeof args.agent === 'string' ? args.agent.trim() : '';
+        const turn = capturedTurn ?? getActiveTurn(sessionId);
         const resolved = handoffController.resolve(
           agentId,
           toProfile,
           typeof args.prompt === 'string' ? args.prompt : undefined,
           typeof args.label === 'string' ? args.label : undefined,
+          turn?.runtimePlan
+            ? {
+                sourceHandoffs: turn.runtimePlan.profileHandoffs,
+                enabledProfileIds: turn.runtimePlan.enabledProfileIds,
+              }
+            : undefined,
         );
         if (!resolved.valid || !resolved.request) {
           return {
@@ -244,8 +248,8 @@ export class RuntimeToolAssembly {
           };
         }
         const { toProfile: target, label, prompt } = resolved.request;
-        const turn = capturedTurn ?? getActiveTurn(sessionId);
         const handoff = {
+          turnId: turn?.turnId ?? '',
           fromAgentId: agentId,
           toProfile: target as AgentRole,
           prompt,
@@ -256,7 +260,6 @@ export class RuntimeToolAssembly {
           turn.pendingHandoff = handoff;
         }
         // 记录待处理 handoff，供 ConversationService turn 结束后 consume 实现 profile 切换。
-        handoffMailbox.deposit(handoff);
         return {
           content: [{
             type: 'text',
@@ -330,7 +333,7 @@ export class RuntimeToolAssembly {
       permissionHint: 'readonly',
       async execute(_id, args, _signal, _update, context) {
         const records = await resolveStore(args.scope, context?.projectRootPath).searchMemories(args.query ?? '', args.limit ?? 20);
-        return { content: [{ type: 'text', text: records.length ? records.map((record) => `- ${record.name}: ${record.description}`).join('\n') : 'No matching memories were found.' }], details: { sessionId: sessionId ?? null, scope: args.scope, count: records.length } };
+        return { content: [{ type: 'text', text: records.length ? records.map((record) => `- ${record.displayName}: ${record.description}`).join('\n') : 'No matching memories were found.' }], details: { sessionId: sessionId ?? null, scope: args.scope, count: records.length } };
       },
     };
   }
@@ -351,7 +354,7 @@ export class RuntimeToolAssembly {
       permissionHint: 'readonly',
       async execute(_id, args, _signal, _update, context) {
         const record = await resolveStore(args.scope, context?.projectRootPath).getMemory(args.name);
-        return { content: [{ type: 'text', text: record ? `# ${record.name}\n\n${record.description}\n\n${record.content}` : `No memory named "${args.name}" was found.` }], details: { sessionId: sessionId ?? null, scope: args.scope, count: record ? 1 : 0 } };
+        return { content: [{ type: 'text', text: record ? `# ${record.displayName}\n\n${record.description}\n\n${record.content}` : `No memory named "${args.name}" was found.` }], details: { sessionId: sessionId ?? null, scope: args.scope, count: record ? 1 : 0 } };
       },
     };
   }
@@ -393,8 +396,8 @@ export class RuntimeToolAssembly {
           tags: Array.isArray(args.tags) ? args.tags : undefined,
         });
         return {
-          content: [{ type: 'text', text: `Memory saved: ${record.name} (${record.type})` }],
-          details: { scope: args.scope, name: record.name, created: true },
+          content: [{ type: 'text', text: `Memory saved: ${record.displayName} (${record.type})` }],
+          details: { scope: args.scope, name: record.displayName, storageKey: record.name, created: true },
         };
       },
     };
@@ -582,6 +585,8 @@ export class RuntimeToolAssembly {
     sessionId?: string | null,
     turnHandle?: TurnHandle | null,
     projectId?: string | null,
+    projectRootPath?: string | null,
+    mcpPoolKey?: string | null,
   ): ResolvedRuntimeTools {
     const availableTools = new Map<string, AgentTool>();
     for (const tool of getPrimitiveTools()) {
@@ -595,7 +600,10 @@ export class RuntimeToolAssembly {
     for (const tool of this.createWorkbenchTools(agentId, sessionId, turnHandle)) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
-    for (const tool of this.deps.mcp.getAgentTools()) {
+    for (const tool of this.deps.mcp.getAgentTools(
+      projectRootPath ?? turnHandle?.eventSink?.projectRootPath ?? null,
+      mcpPoolKey ?? null,
+    )) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
     // tool_search 只能发现 allowlist + runtime policy 过滤后的工具集，

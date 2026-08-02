@@ -91,8 +91,7 @@ export class BackgroundTaskRunner {
         shell: true,
         env: process.env,
         windowsHide: true,
-        isolateProcessGroup: false,
-        abortSignal: signal,
+          abortSignal: signal,
         ringBufferBytes: MAX_OUTPUT_CHARS * 2,
       });
     } catch (err) {
