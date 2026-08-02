@@ -9,7 +9,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { AgentTool } from '../../agent/AgentTool';
-import { isPathExisting, safeResolvePath } from './_shared';
+import { isPathExisting, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from './_shared';
 import { WRITE_FILE_MAX_CONTENT_BYTES } from './toolLimits';
 
 interface WriteFileParams {
@@ -59,7 +59,8 @@ export const writeFileTool: AgentTool<WriteFileParams, WriteFileDetails> = {
       );
     }
 
-    const absolute = safeResolvePath(params.path, undefined, context);
+    const workspaceRoot = requireMutationWorkspaceRoot(context);
+    const absolute = safeResolvePath(params.path, workspaceRoot, context);
     const dir = path.dirname(absolute);
 
     if (isPathExisting(absolute)) {
@@ -74,7 +75,7 @@ export const writeFileTool: AgentTool<WriteFileParams, WriteFileDetails> = {
     if (signal?.aborted) {
       throw new Error('Aborted');
     }
-    await fs.writeFile(absolute, content, 'utf8');
+    await writeTextFileNoFollow(absolute, content);
 
     const created = !existed;
     const overwritten = existed;

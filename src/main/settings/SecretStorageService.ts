@@ -47,7 +47,7 @@ function applySecretFileMode(filePath: string): void {
   } catch {
     // Windows may ignore POSIX mode bits; ACL hardening is best-effort below.
   }
-  if (process.platform === 'win32') {
+  if (process.platform === 'win32' && process.env.VITEST !== 'true' && process.env.NODE_ENV !== 'test') {
     try {
       // Restrict the secret file to the current user where icacls is available.
       spawnSync('icacls', [filePath, '/inheritance:r', '/grant:r', `${process.env.USERNAME}:F`], {
@@ -118,8 +118,14 @@ export class SecretStorageService {
       } finally {
         fs.closeSync(fd);
       }
-      applySecretFileMode(temporaryPath);
-      fs.renameSync(temporaryPath, filePath);
+      try {
+        fs.renameSync(temporaryPath, filePath);
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== 'EEXIST' && code !== 'EPERM') throw error;
+        fs.rmSync(filePath, { force: true, maxRetries: 5, retryDelay: 100 });
+        fs.renameSync(temporaryPath, filePath);
+      }
       applySecretFileMode(filePath);
       try {
         fsyncPath(directory);
@@ -127,7 +133,13 @@ export class SecretStorageService {
         // Directory fsync is best-effort on some platforms.
       }
     } finally {
-      if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+      try {
+        fs.rmSync(temporaryPath, { force: true, maxRetries: 5, retryDelay: 100 });
+      } catch (error) {
+        // Cleanup is best-effort: the durable rename already succeeded, and Windows
+        // may retain a transient ACL handle for the temporary path.
+        void error;
+      }
     }
   }
 
@@ -178,7 +190,7 @@ export class SecretStorageService {
     }
 
     if (entry.encoding !== 'safeStorage') {
-      console.warn('[SecretStorageService] Refusing legacy non-safeStorage secret encoding for:', secretRef);
+      console.warn('[SecretStorageService] Refusing unsupported non-safeStorage secret encoding for:', secretRef);
       return '';
     }
 

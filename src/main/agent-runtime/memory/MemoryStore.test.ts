@@ -42,6 +42,32 @@ describe('MemoryStore explicit scoped storage', () => {
     expect(await store.getMemory(emoji.name)).toMatchObject({ content: 'party' });
   });
 
+  it('keeps colliding display names in separate owned records', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-memory-collision-'));
+    roots.push(root);
+    const store = new MemoryStore(root);
+    const first = await store.writeMemory({ name: 'A B', description: 'first', type: 'user', content: 'one' });
+    const second = await store.writeMemory({ name: 'A-B', description: 'second', type: 'user', content: 'two' });
+    expect(second.name).not.toBe(first.name);
+    expect(second.displayName).toBe('A-B');
+    expect(await store.getMemory('A B')).toMatchObject({ displayName: 'A B', content: 'one' });
+    expect(await store.getMemory('A-B')).toMatchObject({ displayName: 'A-B', content: 'two' });
+    expect(await store.getMemory(first.name)).toMatchObject({ displayName: 'A B', content: 'one' });
+    expect(await store.getMemory(second.name)).toMatchObject({ displayName: 'A-B', content: 'two' });
+  });
+
+  it('serializes colliding writes and preserves both owners', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-memory-race-'));
+    roots.push(root);
+    const store = new MemoryStore(root);
+    const [first, second] = await Promise.all([
+      store.writeMemory({ name: 'Race Name', description: 'first', type: 'user', content: 'one' }),
+      store.writeMemory({ name: 'Race-Name', description: 'second', type: 'user', content: 'two' }),
+    ]);
+    expect(first.name).not.toBe(second.name);
+    expect((await store.listMemories()).map((record) => record.displayName).sort()).toEqual(['Race Name', 'Race-Name']);
+  });
+
   it('keeps user and project stores physically isolated', async () => {
     const userRoot = await mkdtemp(path.join(os.tmpdir(), 'rdx-user-memory-'));
     const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'rdx-project-memory-'));

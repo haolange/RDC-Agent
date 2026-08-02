@@ -10,7 +10,7 @@
  *  - 状态广播仍走 `WorkflowProjectionPublisher`，事件名不变。
  *
  * Phase 4：状态登记委托 AgentSlotRegistry / McpConnectionCoordinator /
- * DeferredToolActivationTracker / HandoffMailbox；TurnEventSink 由 TurnCoordinator 持有。
+ * DeferredToolActivationTracker?TurnEventSink ? TurnCoordinator ???
  *
  * Provider path: LLM streaming is delegated to AgentTurnRunner which uses
  * `configuredRuntimeProvider` (the HAL adapter registry entry point).
@@ -52,7 +52,6 @@ import {
   executionProfileService,
   freezeProviderRuntimeCredentials,
   generateEventId,
-  HandoffMailbox,
   isToolAllowedForAgent,
   isTopLevelAgentId,
   McpConnectionCoordinator,
@@ -63,10 +62,12 @@ import {
   PromptPlanForTurn,
   providerRuntimeCredentialService,
   resolveAgentToolAllowlist,
+  resolveAgentToolAllowlistFromDefinition,
   resolveEffectiveModel,
   RuntimeToolAssembly,
   runtimeLogService,
   appPathService,
+  agentManifestService,
   sessionContextJournal,
   settingsService,
   storageAdapter,
@@ -90,7 +91,6 @@ export class AgentOrchestrator {
   private readonly slots = new AgentSlotRegistry();
   private readonly mcp = new McpConnectionCoordinator();
   private readonly deferredActivation = new DeferredToolActivationTracker();
-  private readonly handoffMailbox = new HandoffMailbox();
   private readonly tokenizerService = new TokenizerService();
   private readonly promptPlan = new PromptPlanForTurn();
   private readonly tools: RuntimeToolAssembly;
@@ -112,7 +112,6 @@ export class AgentOrchestrator {
 
     this.tools = new RuntimeToolAssembly({
       mcp: this.mcp,
-      handoffMailbox: this.handoffMailbox,
       getActiveTurn,
       getMemoryStore: (scope, projectRootPath) => this.getMemoryStore(scope, projectRootPath),
       createSubagentTools: (parentAgentId, sessionId, turnHandle) =>
@@ -141,7 +140,6 @@ export class AgentOrchestrator {
       slots: this.slots,
       mcp: this.mcp,
       deferredActivation: this.deferredActivation,
-      handoffMailbox: this.handoffMailbox,
       tokenizerService: this.tokenizerService,
       sessionTurnKey: (sessionId) => this.sessionTurnKey(sessionId),
       resolveRuntimeTools: (...args) => this.tools.resolveRuntimeTools(...args),
@@ -209,10 +207,14 @@ export class AgentOrchestrator {
     try {
       const stub = createTestModeStub(agentId, content, this.getAgentDisplayName(agentId));
       let runtimeProfile = this.resolveRuntimeProfile(agentId, context?.stageId);
+      let effectiveSnapshot = this.resolveEffectiveAgentProfileSnapshot(agentId, context?.projectRootPath);
+      let effectiveProfile = effectiveSnapshot.profile;
       if (!stub) {
         const credentialProviderId = runtimeProfile.providerId;
         ownedCredentialHandle = await this.refreshProviderRuntimeCredentials(credentialProviderId);
         runtimeProfile = this.resolveRuntimeProfile(agentId, context?.stageId);
+        effectiveSnapshot = this.resolveEffectiveAgentProfileSnapshot(agentId, context?.projectRootPath);
+        effectiveProfile = effectiveSnapshot.profile;
         if (runtimeProfile.providerId !== credentialProviderId) {
           providerRuntimeCredentialService.release(ownedCredentialHandle);
           ownedCredentialHandle = await this.refreshProviderRuntimeCredentials(runtimeProfile.providerId);
@@ -220,7 +222,7 @@ export class AgentOrchestrator {
       }
       const config: AgentConfig = {
         ...fallbackConfig,
-        systemPrompt: runtimeProfile.systemPrompt,
+        systemPrompt: effectiveProfile?.instructions || runtimeProfile.systemPrompt,
         modelProvider: runtimeProfile.providerId,
         modelName: runtimeProfile.modelId,
         temperature: runtimeProfile.temperature ?? fallbackConfig.temperature,
@@ -251,7 +253,9 @@ export class AgentOrchestrator {
       const contextTokenLimit = Math.floor(
         planning.plan.contextBudgetTokens * CONTEXT_COMPACTION_RATIO,
       );
-      const toolAllowlist = resolveAgentToolAllowlist(agentId, context?.stageId);
+      const toolAllowlist = effectiveProfile
+        ? resolveAgentToolAllowlistFromDefinition(agentId, effectiveProfile.tools)
+        : resolveAgentToolAllowlist(agentId, context?.stageId);
       // Debug 路径与 Composer/Ask 对齐：经 PromptPlanBuilder 拆分 system/memory_files/skills。
       const promptPlan = this.promptPlan.buildPromptPlanForAgentTurn({
         agentId,
@@ -264,6 +268,7 @@ export class AgentOrchestrator {
         systemPrompt: config.systemPrompt,
         messageText: content,
         preloadSkillIds: options?.preloadSkillIds,
+        effectiveProfile,
       });
       if (!stub && !promptPlan) {
         throw new Error(`PROMPT_PLAN_UNAVAILABLE: ${agentId}`);
@@ -296,6 +301,8 @@ export class AgentOrchestrator {
           projectId: context?.projectId ?? null,
           promptPlan: promptPlan!,
           effectiveModel: capability,
+          effectiveProfile,
+          effectiveProfileIds: effectiveSnapshot.enabledProfileIds,
           credentialHandle: ownedCredentialHandle,
           contextWindow: activeContextWindow,
           contextTokenLimit,
@@ -358,11 +365,25 @@ export class AgentOrchestrator {
         routeMap = new Map(settings.llm.agentRoutes.map((entry) => [entry.agentId, entry]));
         route = routeMap.get(routeAgentId);
       }
+      const effectiveProfiles = options?.effectiveProfile
+        ? [options.effectiveProfile]
+        : agentManifestService.getEffectiveProfiles(
+            settings.paths,
+            settings.llm.providers,
+            settings.llm.agentRoutes,
+            options?.projectRootPath ?? undefined,
+          );
+      const effectiveProfile = options?.effectiveProfile
+        ?? effectiveProfiles.find((definition) => definition.id === agentId && definition.enabled)
+        ?? null;
+      const effectiveProfileIds = options?.effectiveProfileIds?.length
+        ? options.effectiveProfileIds
+        : effectiveProfiles.filter((definition) => definition.enabled).map((definition) => definition.id);
       const config: AgentConfig = {
         ...fallbackConfig,
         modelProvider: frozenRequestPlan?.providerId ?? route?.providerId ?? fallbackConfig.modelProvider,
         modelName: frozenRequestPlan?.effectiveModelId ?? route?.modelId ?? fallbackConfig.modelName,
-        systemPrompt: options?.systemPrompt || fallbackConfig.systemPrompt,
+        systemPrompt: options?.systemPrompt || effectiveProfile?.instructions || fallbackConfig.systemPrompt,
         temperature: options?.temperature ?? fallbackConfig.temperature,
         maxTokens: options?.maxTokens ?? fallbackConfig.maxTokens,
       };
@@ -374,7 +395,9 @@ export class AgentOrchestrator {
       }
 
       const toolAllowlist = preparedTurn?.toolAllowlist
-        ?? resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== 'report' ? options.stage : undefined);
+        ?? (effectiveProfile
+          ? resolveAgentToolAllowlistFromDefinition(agentId, effectiveProfile.tools)
+          : resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== 'report' ? options.stage : undefined));
       const routeProviderId = config.modelProvider;
       const routeModelId = config.modelName;
       const sessionControls = options?.sessionId ? storageAdapter.readSession(options.sessionId)?.turnControls : undefined;
@@ -423,6 +446,7 @@ export class AgentOrchestrator {
         systemPrompt: config.systemPrompt,
         messageText: typeof content === 'string' ? content : '',
         preloadSkillIds: options?.preloadSkillIds,
+        effectiveProfile,
       });
       if (!promptPlan) throw new Error(`PROMPT_PLAN_UNAVAILABLE: ${agentId}`);
 
@@ -480,6 +504,8 @@ export class AgentOrchestrator {
         projectId: options?.projectId ?? null,
         promptPlan,
         effectiveModel: capability,
+        effectiveProfile,
+        effectiveProfileIds,
         credentialHandle: ownedCredentialHandle,
         contextWindow: activeContextWindow,
         contextTokenLimit,
@@ -496,12 +522,13 @@ export class AgentOrchestrator {
         },
         preparedRuntime: preparedTurn?.runtime,
         terminalContext: options?.onTerminalContext
-          ? (messages, status) => options.onTerminalContext?.({
+          ? (messages, status, pendingHandoff) => options.onTerminalContext?.({
               messages,
               executionIdentity: planning.plan.executionIdentity,
               status,
               selectedTurnCount: materialized.selectedTurnCount,
               filteredArtifactCount: materialized.filteredArtifactCount,
+              pendingHandoff,
             })
           : undefined,
       });
@@ -580,7 +607,7 @@ export class AgentOrchestrator {
       const record = await this.getMemoryStore('user').getMemory(name);
       if (!record) return null;
       return {
-        name: record.name,
+        name: record.displayName,
         description: record.description,
         type: record.type,
         content: record.content,
@@ -596,7 +623,7 @@ export class AgentOrchestrator {
   async writeMemoryForUi(request: { name: string; description: string; type: 'user' | 'feedback' | 'project' | 'reference'; content: string; tags?: string[] }): Promise<{ success: boolean; name: string; error?: string }> {
     try {
       const record = await this.getMemoryStore('user').writeMemory(request);
-      return { success: true, name: record.name };
+      return { success: true, name: record.displayName };
     } catch (error) {
       return { success: false, name: request.name, error: error instanceof Error ? error.message : String(error) };
     }
@@ -611,16 +638,6 @@ export class AgentOrchestrator {
     }
   }
 
-  consumePendingHandoff(): {
-    fromAgentId: AgentRole;
-    toProfile: AgentRole;
-    prompt: string;
-    label: string;
-    sessionId?: string | null;
-  } | null {
-    return this.handoffMailbox.consume();
-  }
-
 
   getMcpServerStatusSummary(projectRootPath?: string | null, query?: string): MCPServerStatusSummary[] {
     return this.mcp.getMcpServerStatusSummary(projectRootPath, query);
@@ -628,6 +645,20 @@ export class AgentOrchestrator {
 
   async disconnectAllMcpServers(): Promise<void> {
     await this.mcp.disconnectAll();
+  }
+
+  private resolveEffectiveAgentProfileSnapshot(agentId: AgentRole, projectRootPath?: string | null) {
+    const settings = settingsService.getAll();
+    const profiles = agentManifestService.getEffectiveProfiles(
+      settings.paths,
+      settings.llm.providers,
+      settings.llm.agentRoutes,
+      projectRootPath ?? undefined,
+    );
+    return {
+      profile: profiles.find((definition) => definition.id === agentId && definition.enabled) ?? null,
+      enabledProfileIds: profiles.filter((definition) => definition.enabled).map((definition) => definition.id),
+    };
   }
 
   private resolveRuntimeProfile(agentId: AgentRole, stage?: WorkflowStage) {

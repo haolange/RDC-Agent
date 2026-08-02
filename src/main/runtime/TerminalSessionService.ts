@@ -77,7 +77,6 @@ export class TerminalSessionService {
       cwd,
       stdio: 'pipe',
       windowsHide: true,
-      isolateProcessGroup: false,
       env: {
         ...process.env,
         TERM: 'xterm-256color',

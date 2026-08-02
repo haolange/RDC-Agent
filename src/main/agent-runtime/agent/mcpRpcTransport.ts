@@ -12,6 +12,46 @@ interface JsonRpcResponse {
 
 export const MAX_MCP_BUFFER_BYTES = 1 * 1024 * 1024;
 
+function serializeJsonRpcPayload(payload: Record<string, unknown>, suffix = ''): string {
+  const body = JSON.stringify(payload) + suffix;
+  if (Buffer.byteLength(body, 'utf8') > MAX_MCP_BUFFER_BYTES) {
+    throw new Error(`MCP request exceeded ${MAX_MCP_BUFFER_BYTES} bytes`);
+  }
+  return body;
+}
+export async function readBoundedResponseBody(response: Response, maxBytes: number): Promise<string> {
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) throw new Error('MCP HTTP response exceeded ' + maxBytes + ' bytes');
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return new TextDecoder().decode(bytes);
+}
+
+function createTimedAbortController(parent: AbortSignal, timeoutMs: number): { controller: AbortController; clear: () => void } {
+  const controller = new AbortController();
+  const forward = () => controller.abort(parent.reason);
+  if (parent.aborted) controller.abort(parent.reason);
+  else parent.addEventListener('abort', forward, { once: true });
+  const timer = setTimeout(() => controller.abort(new Error('MCP request timed out')), timeoutMs);
+  timer.unref?.();
+  return { controller, clear: () => { clearTimeout(timer); parent.removeEventListener('abort', forward); } };
+}
+
+
 const JsonRpcResponseSchema = z.object({
   jsonrpc: z.literal('2.0'),
   id: z.union([z.number(), z.string()]).optional(),
@@ -99,8 +139,7 @@ export class StdioRpcClient {
       return Promise.reject(new Error('MCP connection is closed'));
     }
     const id = this.nextId++;
-    const payload =
-      JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n';
+    const payload = serializeJsonRpcPayload({ jsonrpc: '2.0', id, method, params }, '\n');
 
     return new Promise<unknown>((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -133,7 +172,7 @@ export class StdioRpcClient {
 
   notify(method: string, params: unknown): void {
     if (this.closed) return;
-    const payload = JSON.stringify({ jsonrpc: '2.0', method, params }) + '\n';
+    const payload = serializeJsonRpcPayload({ jsonrpc: '2.0', method, params }, '\n');
     try {
       this.proc.stdin?.write(payload);
     } catch {
@@ -157,18 +196,21 @@ export class SseRpcClient {
 
   constructor(private readonly baseUrl: string) {}
 
-  async connect(_timeoutMs: number): Promise<void> {
-    const response = await fetch(this.baseUrl, {
-      method: 'GET',
-      headers: { Accept: 'text/event-stream' },
-      signal: this.abortController.signal,
-    });
-
-    if (!response.ok || !response.body) {
-      throw new Error(`SSE connect failed: ${response.status} ${response.statusText}`);
+  async connect(timeoutMs: number): Promise<void> {
+    const timed = createTimedAbortController(this.abortController.signal, timeoutMs);
+    try {
+      const response = await fetch(this.baseUrl, {
+        method: 'GET',
+        headers: { Accept: 'text/event-stream' },
+        signal: timed.controller.signal,
+      });
+      if (!response.ok || !response.body) {
+        throw new Error(`SSE connect failed: ${response.status} ${response.statusText}`);
+      }
+      void this.readSseStream(response.body);
+    } finally {
+      timed.clear();
     }
-
-    void this.readSseStream(response.body);
   }
 
   private async readSseStream(body: ReadableStream<Uint8Array>): Promise<void> {
@@ -254,21 +296,19 @@ export class SseRpcClient {
       return Promise.reject(new Error('SSE connection is closed'));
     }
     const id = this.nextId++;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-
+    const timed = createTimedAbortController(this.abortController.signal, timeoutMs);
     try {
       const res = await fetch(this.baseUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
-        signal: controller.signal,
+        body: serializeJsonRpcPayload({ jsonrpc: '2.0', id, method, params }),
+        signal: timed.controller.signal,
       });
       if (!res.ok) {
         throw new Error(`SSE POST ${res.status} ${res.statusText}`);
       }
-      const rawBody = await res.json();
-      const body = parseJsonRpcResponse(JSON.stringify(rawBody));
+      const rawBody = await readBoundedResponseBody(res, MAX_MCP_BUFFER_BYTES);
+      const body = parseJsonRpcResponse(rawBody);
       if (!body) {
         throw new Error('MCP HTTP returned invalid JSON-RPC');
       }
@@ -279,19 +319,21 @@ export class SseRpcClient {
       }
       return body.result;
     } finally {
-      clearTimeout(timer);
+      timed.clear();
     }
   }
 
   notify(method: string, params: unknown): void {
     if (this.closed) return;
-    fetch(this.baseUrl, {
+    const timed = createTimedAbortController(this.abortController.signal, 5_000);
+    void fetch(this.baseUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', method, params }),
-    }).catch(() => {
-      /* ignore */
-    });
+      body: serializeJsonRpcPayload({ jsonrpc: '2.0', method, params }),
+      signal: timed.controller.signal,
+    }).then((response) => response.body ? readBoundedResponseBody(response, MAX_MCP_BUFFER_BYTES) : '')
+      .catch(() => undefined)
+      .finally(timed.clear);
   }
 
   close(): void {

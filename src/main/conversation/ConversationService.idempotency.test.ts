@@ -80,8 +80,7 @@ describe('ConversationService idempotency scoping', () => {
     first.catch(() => undefined);
 
     // Allow microtasks from the async runIdempotentTurn prologue to settle.
-    await Promise.resolve();
-    await Promise.resolve();
+    await new Promise<void>((resolve) => setImmediate(resolve));
 
     expect([...service.sendRequests.keys()]).toEqual(['session:session-a:shared-request']);
 
@@ -97,8 +96,7 @@ describe('ConversationService idempotency scoping', () => {
       async () => ({ requestId: 'shared-request', session: { sessionId: 'session-b' } }),
     );
     second.catch(() => undefined);
-    await Promise.resolve();
-    await Promise.resolve();
+    await new Promise<void>((resolve) => setImmediate(resolve));
 
     expect(service.sendRequests.has('session:session-a:shared-request')).toBe(true);
     expect(service.sendRequests.has('session:session-b:shared-request')).toBe(true);
@@ -135,8 +133,7 @@ describe('ConversationService idempotency scoping', () => {
       },
     );
     first.catch(() => undefined);
-    await Promise.resolve();
-    await Promise.resolve();
+    await new Promise<void>((resolve) => setImmediate(resolve));
     expect([...service.sendRequestFingerprints.keys()]).toEqual(['session:session-a:req-1']);
 
     await expect(service.runIdempotentTurn(

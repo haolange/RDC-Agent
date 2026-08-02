@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { BrowserWindow, dialog, ipcMain } from 'electron';
 import type { MemoryWriteRequest } from '@shared/types/electron';
 import { MemoryStore } from '../agent-runtime/memory';
 import { appPathService } from '../runtime/AppPathService';
@@ -21,6 +21,23 @@ const storeFor = (scope: 'user' | 'project', projectRoot?: string): MemoryStore 
   return new MemoryStore(appPathService.getUserRdxPaths().memoryPath);
 };
 
+async function confirmMemoryMutation(action: 'memory.write' | 'memory.delete', scope: 'user' | 'project', name?: string): Promise<boolean> {
+  if (process.env.RDC_AGENT_TEST_MODE === '1') return true;
+  const owner = BrowserWindow.getFocusedWindow() ?? undefined;
+  if (!owner) return false;
+  const result = await dialog.showMessageBox(owner, {
+    type: 'warning',
+    buttons: ['Allow once', 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    title: 'Confirm memory change',
+    message: action === 'memory.write' ? 'Save this memory entry?' : 'Delete this memory entry?',
+    detail: `${scope}${name ? ` ? ${name}` : ''}. The action is authorized by the native main-process dialog.`,
+    noLink: true,
+  });
+  return result.response === 0;
+}
+
 function validationFailure(error: unknown): { success: false; name?: string; error: string } {
   const message = error instanceof Error ? error.message : String(error);
   return { success: false, error: message };
@@ -33,6 +50,8 @@ export function registerMemoryHandlers(_context: WorkbenchIpcContext): void {
         label: 'memory:issueApprovalToken',
         maxBytes: 8 * 1024,
       });
+      const confirmed = await confirmMemoryMutation(request.action, request.scope, request.name);
+      if (!confirmed) return { error: 'Memory mutation was not confirmed by the main-process dialog.' };
       const token = ipcApprovalTokenService.issue(request);
       return { token };
     } catch (error) {
@@ -90,7 +109,7 @@ export function registerMemoryHandlers(_context: WorkbenchIpcContext): void {
         content: request.content,
         tags: request.tags,
       });
-      return { success: true, name: memory.name };
+      return { success: true, name: memory.displayName };
     } catch (error) {
       if (error instanceof IpcValidationError) return validationFailure(error);
       return {

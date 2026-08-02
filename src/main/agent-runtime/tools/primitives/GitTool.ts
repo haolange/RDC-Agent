@@ -2,7 +2,7 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import type { AgentTool, AgentToolResult } from '../../agent/AgentTool';
-import { getWorkspaceRoot, isWithinRoot, truncateOutput } from './_shared';
+import { getWorkspaceRoot, isWithinRoot, requireMutationWorkspaceRoot, truncateOutput } from './_shared';
 import { GIT_MAX_OUTPUT_BYTES, GIT_TIMEOUT_MS } from './toolLimits';
 
 const execFileAsync = promisify(execFile);
@@ -195,7 +195,7 @@ export const gitAddTool: AgentTool<GitPathParams, GitDetails> = {
   permissionHint: 'mutation',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
-    const root = getWorkspaceRoot(context);
+    const root = requireMutationWorkspaceRoot(context);
     return executeGit(['add', '--', validateGitPath(params.path)], root, signal);
   },
 };
@@ -215,7 +215,7 @@ export const gitUnstageTool: AgentTool<GitPathParams, GitDetails> = {
   permissionHint: 'mutation',
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
-    const root = getWorkspaceRoot(context);
+    const root = requireMutationWorkspaceRoot(context);
     return executeGit(['restore', '--staged', '--', validateGitPath(params.path)], root, signal);
   },
 };
@@ -239,7 +239,7 @@ export const gitCommitTool: AgentTool<GitCommitParams, GitDetails> = {
     if (!message) {
       throw new Error('Commit message is required.');
     }
-    const root = getWorkspaceRoot(context);
+    const root = requireMutationWorkspaceRoot(context);
     return executeGit(['commit', '-m', message], root, signal);
   },
 };

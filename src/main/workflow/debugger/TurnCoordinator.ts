@@ -11,6 +11,8 @@
 import type { AgentEvent as SharedAgentEvent } from '@shared/types/agentRuntime';
 import type { AgentRole } from '@shared/types/agent';
 import type { ToolDefinition } from '../../agent-runtime/core/types';
+import type { CompiledPolicy } from '@shared/types/rdxRuntime';
+import type { EffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
 
 export type AbortReason =
   | 'user_stop'
@@ -36,11 +38,41 @@ export interface TurnDeferredActivation {
 }
 
 export interface PendingHandoff {
+  turnId: string;
   fromAgentId: AgentRole;
   toProfile: AgentRole;
   prompt: string;
   label: string;
   sessionId?: string | null;
+}
+
+export interface PolicyBudgetState {
+  toolCalls: number;
+  subagents: number;
+  childDepth: number;
+  wallStartedAt: number;
+  maxToolCalls: number;
+  maxSubagents: number;
+  maxChildDepth: number;
+  maxWallTimeMs: number;
+}
+
+export function createPolicyBudgetState(
+  policy?: Pick<CompiledPolicy, 'maxToolCalls' | 'maxSubagents' | 'maxChildDepth' | 'maxWallTimeMs'>,
+  childDepth = 0,
+  shared?: PolicyBudgetState,
+): PolicyBudgetState {
+  if (shared) return shared;
+  return {
+    toolCalls: 0,
+    subagents: 0,
+    childDepth,
+    wallStartedAt: Date.now(),
+    maxToolCalls: policy?.maxToolCalls ?? Number.MAX_SAFE_INTEGER,
+    maxSubagents: policy?.maxSubagents ?? Number.MAX_SAFE_INTEGER,
+    maxChildDepth: policy?.maxChildDepth ?? Number.MAX_SAFE_INTEGER,
+    maxWallTimeMs: policy?.maxWallTimeMs ?? Number.MAX_SAFE_INTEGER,
+  };
 }
 
 export interface SubagentBudget {
@@ -121,6 +153,9 @@ export class TurnHandle {
   readonly startedAt: number;
   readonly abortController: AbortController;
   readonly subagentBudget: SubagentBudgetState;
+  readonly policyBudget: PolicyBudgetState;
+  /** Frozen runtime authority installed before any tool can execute. */
+  runtimePlan: EffectiveRuntimePlan | null = null;
 
   eventSink: TurnEventSink | null = null;
   deferredActivation: TurnDeferredActivation | null = null;
@@ -132,6 +167,8 @@ export class TurnHandle {
   private abortReason: AbortReason | null = null;
   private joinPromise: Promise<void> | null = null;
   private closed = false;
+  private orphaned = false;
+  private wallTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(input: {
     sessionKey: string;
@@ -140,6 +177,7 @@ export class TurnHandle {
     generation: number;
     parentSignal?: AbortSignal | null;
     subagentBudget?: SubagentBudgetState;
+    policyBudget?: PolicyBudgetState;
   }) {
     this.sessionKey = input.sessionKey;
     this.turnId = input.turnId;
@@ -148,6 +186,13 @@ export class TurnHandle {
     this.startedAt = Date.now();
     this.abortController = new AbortController();
     this.subagentBudget = input.subagentBudget ?? createSubagentBudgetState();
+    this.policyBudget = input.policyBudget ?? createPolicyBudgetState();
+    if (this.policyBudget.maxWallTimeMs > 0 && this.policyBudget.maxWallTimeMs < 2_147_000_000) {
+      this.wallTimer = setTimeout(() => {
+        void this.abortAndJoin({ reason: 'timeout' });
+      }, this.policyBudget.maxWallTimeMs);
+      this.wallTimer.unref?.();
+    }
 
     if (input.parentSignal) {
       if (input.parentSignal.aborted) {
@@ -176,6 +221,11 @@ export class TurnHandle {
 
   get reason(): AbortReason | null {
     return this.abortReason;
+  }
+
+  /** True when a bounded abort could not confirm all producers stopped. */
+  get isOrphaned(): boolean {
+    return this.orphaned;
   }
 
   /** True when this handle is still the active generation for late-write guards. */
@@ -228,15 +278,51 @@ export class TurnHandle {
 
     this.joinPromise = (async () => {
       const joins = Array.from(this.producers.values()).map((p) => p.join());
-      await Promise.race([
-        Promise.allSettled(joins),
-        new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, Math.max(graceMs, forceAfterMs));
-          timer.unref?.();
-        }),
-      ]);
-      this.closed = true;
-      this.producers.clear();
+      const allJoined = Promise.allSettled(joins);
+      const waitFor = async (durationMs: number): Promise<boolean> => {
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const result = await Promise.race([
+          allJoined.then(() => true),
+          new Promise<boolean>((resolve) => {
+            timer = setTimeout(() => resolve(false), Math.max(0, durationMs));
+            timer.unref?.();
+          }),
+        ]);
+        if (timer) clearTimeout(timer);
+        return result;
+      };
+      if (await waitFor(graceMs)) {
+        this.closed = true;
+        this.producers.clear();
+        if (this.wallTimer) { clearTimeout(this.wallTimer); this.wallTimer = null; }
+        return;
+      }
+
+      // Escalate once the graceful window is exhausted. Producers remain
+      // registered until their own join promises settle.
+      for (const producer of this.producers.values()) {
+        try {
+          producer.abort(reason);
+        } catch {
+          // ignore individual producer abort failures
+        }
+      }
+      if (await waitFor(forceAfterMs)) {
+        this.closed = true;
+        this.producers.clear();
+        if (this.wallTimer) { clearTimeout(this.wallTimer); this.wallTimer = null; }
+        return;
+      }
+
+      // Do not announce a clean close or discard producers until their promises settle.
+      this.orphaned = true;
+      void allJoined.then(() => {
+        if (!this.closed) {
+          this.closed = true;
+          this.producers.clear();
+          if (this.wallTimer) { clearTimeout(this.wallTimer); this.wallTimer = null; }
+        }
+      });
     })();
 
     return this.joinPromise;
@@ -244,6 +330,7 @@ export class TurnHandle {
 
   close(): void {
     this.closed = true;
+    if (this.wallTimer) { clearTimeout(this.wallTimer); this.wallTimer = null; }
     this.eventSink = null;
     this.deferredActivation = null;
   }
@@ -265,6 +352,7 @@ export class TurnCoordinator {
     parentSignal?: AbortSignal | null;
     eventSink?: TurnEventSink | null;
     subagentBudget?: SubagentBudgetState;
+    policyBudget?: PolicyBudgetState;
   }): Promise<TurnHandle> {
     const previous = this.activeBySession.get(input.sessionKey);
     if (previous) {
@@ -278,6 +366,7 @@ export class TurnCoordinator {
       generation: this.generationSeq,
       parentSignal: input.parentSignal,
       subagentBudget: input.subagentBudget,
+      policyBudget: input.policyBudget,
     });
     if (input.eventSink) {
       handle.eventSink = input.eventSink;

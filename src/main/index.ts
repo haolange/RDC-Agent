@@ -211,7 +211,6 @@ if (isTestMode || isHeadlessMode) {
 // Main window reference.
 let mainWindow: BrowserWindow | null = null;
 let headlessKeepAliveTimer: NodeJS.Timeout | null = null;
-let headlessKeepAliveWindow: BrowserWindow | null = null;
 const allowedNavigationOrigins = new Set<string>();
 
 app.on('second-instance', () => {
@@ -570,27 +569,12 @@ app.whenReady().then(async () => {
       raw: { bridgeUrl, userDataPath },
     });
     if (isHeadlessMode) {
-      headlessKeepAliveWindow = new BrowserWindow({
-        width: 1,
-        height: 1,
-        show: false,
-        skipTaskbar: true,
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true,
-          sandbox: true,
-        },
-      });
-      headlessKeepAliveWindow.loadURL('about:blank').catch(() => {
-        // The window only anchors the Electron lifecycle; a blank-load failure is non-fatal.
-      });
-      headlessKeepAliveWindow.on('closed', () => {
-        headlessKeepAliveWindow = null;
-      });
+      // Headless QA has no renderer window. The bridge plus this timer keep
+      // Electron alive without creating a GPU-backed hidden BrowserWindow.
       headlessKeepAliveTimer = setInterval(() => {
-        // Keep Electron's main process alive when the browser session has no BrowserWindow.
+        // Keep Electron's main process alive while Browser QA is connected.
       }, 60_000);
-      console.log(`[BrowserAppBridge] Headless mode enabled. Open the printed /app URL with token.`);
+      console.log(`[BrowserAppBridge] Headless mode enabled without a renderer window.`);
     }
   } else if (isHeadlessMode) {
     console.error('[RDC-Agent] Headless mode requires the browser app bridge.');
@@ -622,10 +606,6 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', (event) => {
-  if (isHeadlessMode) {
-    event.preventDefault();
-    return;
-  }
   if (shutdownStarted || shutdownCoordinator.isShuttingDown()) {
     event.preventDefault();
     return;
@@ -633,10 +613,6 @@ app.on('before-quit', (event) => {
   shutdownStarted = true;
   event.preventDefault();
 
-  if (headlessKeepAliveWindow && !headlessKeepAliveWindow.isDestroyed()) {
-    headlessKeepAliveWindow.destroy();
-    headlessKeepAliveWindow = null;
-  }
   if (headlessKeepAliveTimer) {
     clearInterval(headlessKeepAliveTimer);
     headlessKeepAliveTimer = null;
@@ -648,6 +624,13 @@ app.on('before-quit', (event) => {
     app.exit(0);
   });
 });
+
+// External QA/CLI launchers use process signals; route them through the same shutdown state machine.
+const requestProcessShutdown = () => {
+  if (!shutdownStarted) app.quit();
+};
+process.once('SIGINT', requestProcessShutdown);
+process.once('SIGTERM', requestProcessShutdown);
 
 // Block navigation to unknown origins.
 app.on('web-contents-created', (_event, contents) => {

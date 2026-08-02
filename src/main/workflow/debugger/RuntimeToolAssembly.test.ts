@@ -19,7 +19,6 @@ vi.mock('../../sessions/RdxRuntimeContextRegistry', () => ({
 import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
 import { RuntimeToolAssembly } from './RuntimeToolAssembly';
 import { TurnHandle } from './TurnCoordinator';
-import type { HandoffMailbox } from './HandoffMailbox';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 
 function createAssembly(): RuntimeToolAssembly {
@@ -28,9 +27,6 @@ function createAssembly(): RuntimeToolAssembly {
       getConnectedTools: () => [],
       getAgentTools: () => [],
     } as unknown as McpConnectionCoordinator,
-    handoffMailbox: {
-      deposit: vi.fn(),
-    } as unknown as HandoffMailbox,
     getActiveTurn: () => null,
     getMemoryStore: () => ({}) as never,
     createSubagentTools: () => [],

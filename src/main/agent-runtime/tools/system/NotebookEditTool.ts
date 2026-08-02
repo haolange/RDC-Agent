@@ -1,7 +1,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { AgentTool } from '../../agent/AgentTool';
-import { assertFileSizeCap, assertTextReadable, safeResolvePath } from '../primitives/_shared';
+import { assertFileSizeCap, assertTextReadable, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from '../primitives/_shared';
 import { NOTEBOOK_MAX_BYTES } from '../primitives/toolLimits';
 
 interface NotebookEditParams {
@@ -35,7 +35,8 @@ export const notebookEditTool: AgentTool<NotebookEditParams, NotebookEditDetails
 
   async execute(_toolCallId, params, signal, _onUpdate, context) {
     if (signal?.aborted) throw new Error('Aborted');
-    const absolute = safeResolvePath(params.notebook_path, undefined, context);
+    const workspaceRoot = requireMutationWorkspaceRoot(context);
+    const absolute = safeResolvePath(params.notebook_path, workspaceRoot, context);
     if (path.extname(absolute).toLowerCase() !== '.ipynb') {
       throw new Error(`notebook_edit requires a .ipynb file: ${absolute}`);
     }
@@ -57,7 +58,7 @@ export const notebookEditTool: AgentTool<NotebookEditParams, NotebookEditDetails
     cell.source = Array.isArray(cell.source)
       ? params.new_source.split(/(?<=\n)/)
       : params.new_source;
-    await fs.writeFile(absolute, JSON.stringify(notebook, null, 2), 'utf8');
+    await writeTextFileNoFollow(absolute, JSON.stringify(notebook, null, 2));
     return {
       content: [{ type: 'text', text: `Edited cell ${idx} in ${absolute}` }],
       details: {

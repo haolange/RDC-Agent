@@ -15,7 +15,7 @@
  */
 
 import type { AgentHandoffDefinition } from '@shared/types/agentManifest';
-import { settingsService } from '../../settings/SettingsService';
+import type { FrozenHandoffDefinition } from '../EffectiveRuntimePlan';
 
 export interface HandoffRequest {
   /** 源 profile。 */
@@ -26,6 +26,11 @@ export interface HandoffRequest {
   prompt: string;
   /** handoff 标签。 */
   label: string;
+}
+
+export interface FrozenHandoffContext {
+  sourceHandoffs: readonly FrozenHandoffDefinition[];
+  enabledProfileIds: readonly string[];
 }
 
 export interface HandoffResolveResult {
@@ -51,6 +56,7 @@ export class HandoffController {
     toProfile: string,
     promptOverride?: string,
     labelOverride?: string,
+    frozen?: FrozenHandoffContext,
   ): HandoffResolveResult {
     const target = toProfile.trim();
     if (!target) {
@@ -58,26 +64,24 @@ export class HandoffController {
     }
 
     // 校验目标 profile 存在且启用
-    const definitions = settingsService.getAll().agents.definitions;
-    const targetDef = definitions.find((d) => d.id === target && d.enabled);
-    if (!targetDef) {
-      return { valid: false, reason: `Target profile "${target}" is not enabled or does not exist.` };
+    // Handoff authorization is turn-scoped. Re-reading mutable settings here
+    // would let a later settings change diverge from the prompt/executor plan.
+    if (!frozen) {
+      return { valid: false, reason: 'Handoff requires a frozen turn runtime plan.' };
+    }
+    const targetEnabled = frozen.enabledProfileIds.includes(target);
+    if (!targetEnabled) {
+      return { valid: false, reason: 'Target profile "' + target + '" is not enabled or does not exist.' };
+    }
+    const sourceHandoffs = frozen.sourceHandoffs;
+    if (sourceHandoffs.length > 0 && !sourceHandoffs.some((handoff) => handoff.agent === target)) {
+      return {
+        valid: false,
+        reason: `Profile "${fromAgentId}" does not declare a handoff to "${target}".`,
+      };
     }
 
-    // 校验目标在源 profile 声明的 handoffs 列表内（若源 profile 有声明 handoffs）
-    const sourceDef = definitions.find((d) => d.id === fromAgentId && d.enabled);
-    if (sourceDef && sourceDef.handoffs.length > 0) {
-      const allowed = sourceDef.handoffs.some((h) => h.agent === target);
-      if (!allowed) {
-        return {
-          valid: false,
-          reason: `Profile "${fromAgentId}" does not declare a handoff to "${target}".`,
-        };
-      }
-    }
-
-    // 缺省 prompt/label 从源 profile 声明的 handoffs 定义取
-    const declared: AgentHandoffDefinition | undefined = sourceDef?.handoffs.find((h) => h.agent === target);
+    const declared: AgentHandoffDefinition | FrozenHandoffDefinition | undefined = sourceHandoffs.find((handoff) => handoff.agent === target);
     const prompt = (promptOverride?.trim() || declared?.prompt || `Continue from ${fromAgentId} as ${target}.`).trim();
     const label = (labelOverride?.trim() || declared?.label || `Hand off to ${target}`).trim();
 

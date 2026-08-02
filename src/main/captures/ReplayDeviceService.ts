@@ -790,7 +790,6 @@ export class ReplayDeviceService {
     const supervised = processSupervisor.spawn('replay', adbPath, args, {
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
-      isolateProcessGroup: false,
     });
     const info = await supervised.exit;
     const stdout = supervised.stdout.toString();

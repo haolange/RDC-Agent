@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { EffectiveModel } from '@shared/types/providerCapability';
+import type { EffectiveAgentProfile } from '@shared/types/rdxRuntime';
 import { createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 
@@ -116,6 +117,14 @@ const baseInput = {
   },
   toolAllowlist: [],
   projectRootPath: null,
+  projectId: null,
+  effectiveProfile: {
+    id: 'ask',
+    skills: [],
+    mcpServers: [],
+    provenance: { scope: 'builtin', sourcePath: 'test', sourceHash: 'test' },
+  } as unknown as EffectiveAgentProfile,
+  effectiveProfileIds: ['ask'],
   sessionId: null,
   visibleTurnIds: [],
   activeBranchId: 'root',

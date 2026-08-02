@@ -32,6 +32,7 @@ import {
 import {
   MAX_MCP_BUFFER_BYTES,
   parseJsonRpcResponse,
+  readBoundedResponseBody,
   SseRpcClient,
   StdioRpcClient,
 } from './mcpRpcTransport';
@@ -264,7 +265,7 @@ export class MCPManager {
           stdio: ['pipe', 'pipe', 'pipe'],
           env: buildSparseMcpEnv(config.env),
           // MCP JSON-RPC 依赖 stdin/stdout；不使用 detached pgid。
-          isolateProcessGroup: false,
+          isolateProcessGroup: true,
         },
       );
       const proc = supervised.child;
@@ -708,8 +709,8 @@ export class MCPManager {
       if (!res.ok) {
         throw new Error(`MCP HTTP ${res.status} ${res.statusText}`);
       }
-      const rawBody = await res.json();
-      const body = parseJsonRpcResponse(JSON.stringify(rawBody));
+      const rawBody = await readBoundedResponseBody(res, MAX_MCP_BUFFER_BYTES);
+      const body = parseJsonRpcResponse(rawBody);
       if (!body) {
         throw new Error('MCP HTTP returned invalid JSON-RPC');
       }
@@ -747,54 +748,35 @@ export class MCPManager {
       if (!res.ok) {
         throw new Error(`MCP streamable-http ${res.status} ${res.statusText}`);
       }
-      // 读取流式 NDJSON 响应
-      if (res.body) {
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = '';
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          if (Buffer.byteLength(buffer, 'utf8') > MAX_MCP_BUFFER_BYTES) {
-            throw new Error(`MCP streamable-http buffer exceeded ${MAX_MCP_BUFFER_BYTES} bytes`);
-          }
-          const lines = buffer.split('\n');
-          buffer = lines.pop() ?? '';
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed) continue;
-            const msg = parseJsonRpcResponse(trimmed);
-            if (!msg) continue;
-            if (msg.error) {
-              throw new Error(`MCP error ${msg.error.code}: ${msg.error.message}`);
-            }
-            if (typeof msg.id === 'number' || typeof msg.id === 'string') {
-              return msg.result;
-            }
-          }
+
+      // Read the response exactly once. The bounded reader accounts for the
+      // cumulative stream size, so a sequence of small NDJSON frames cannot
+      // bypass the response cap.
+      const rawBody = await readBoundedResponseBody(res, MAX_MCP_BUFFER_BYTES);
+      const lines = rawBody.split(/\r?\n/);
+      let sawJsonRpcMessage = false;
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        const msg = parseJsonRpcResponse(trimmed);
+        if (!msg) {
+          throw new Error('MCP streamable-http returned invalid JSON-RPC');
         }
-        // 处理最后剩余的
-        if (buffer.trim()) {
-          const msg = parseJsonRpcResponse(buffer.trim());
-          if (!msg) {
-            throw new Error('MCP streamable-http returned invalid JSON-RPC');
-          }
-          return msg.result;
+        if (msg.error) {
+          throw new Error(`MCP error ${msg.error.code}: ${msg.error.message}`);
+        }
+        if (typeof msg.id === 'number' || typeof msg.id === 'string') {
+          sawJsonRpcMessage = true;
+          if (msg.id === id) return msg.result;
         }
       }
-      // fallback: 非流式 JSON 响应
-      const rawBody = await res.json();
-      const body = parseJsonRpcResponse(JSON.stringify(rawBody));
-      if (!body) {
-        throw new Error('MCP streamable-http returned invalid JSON-RPC');
+      if (!sawJsonRpcMessage) {
+        throw new Error('MCP streamable-http returned no JSON-RPC response');
       }
-      if (body.error) {
-        throw new Error(`MCP error ${body.error.code}: ${body.error.message}`);
-      }
-      return body.result;
+      throw new Error('MCP streamable-http response id mismatch');
     } finally {
       clearTimeout(timer);
     }
   }
+
 }

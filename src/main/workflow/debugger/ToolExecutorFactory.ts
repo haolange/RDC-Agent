@@ -20,7 +20,6 @@ import { ToolValidationError, toolValidator } from '../../agent-runtime/core/Too
 import { hookEngine } from '../../hooks/HookEngine';
 import { appPathService } from '../../runtime/AppPathService';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
-import { settingsService } from '../../settings/SettingsService';
 import {
   extractDeferredToolNamesFromToolSearchDetails,
   isDeferredToolName,
@@ -45,6 +44,8 @@ export interface ToolExecutorFactoryDeps {
     sessionId?: string | null,
     turnHandle?: TurnHandle | null,
     projectId?: string | null,
+    projectRootPath?: string | null,
+    mcpPoolKey?: string | null,
   ) => ResolvedRuntimeTools;
   isAllowedForRuntime: (
     agentId: AgentRole,
@@ -98,6 +99,8 @@ export class ToolExecutorFactory {
       sessionId,
       this.deps.getActiveTurn(sessionId),
       runtimeContext?.projectId ?? plan?.projectId,
+      runtimeContext?.projectRootPath ?? plan?.projectRootPath,
+      runtimeContext?.mcpPoolKey ?? null,
     ).toolMap;
     // Skill allowed-tools 收窄集（DESIGN Skills 条款：只收窄、不扩展）。
     // 多 skill：allowedTools = ∩(skill_i) ∩ runtimeAllowlist（空声明不参与）。
@@ -117,20 +120,6 @@ export class ToolExecutorFactory {
       );
     };
     // 无 plan 时才从 settings 解析 preloaded skills；有 plan 则用冻结的 skillIntersection。
-    if (!plan) {
-      const profileSkillIds = settingsService.getAll().agents.definitions
-        .find((definition) => definition.id === agentId && definition.enabled)?.skills
-        ?? [];
-      for (const skillId of profileSkillIds) {
-        const preloaded = agentRuntimeConfigService.loadSkill(
-          skillId,
-          runtimeContext?.projectRootPath ?? undefined,
-        );
-        if (preloaded?.allowedTools?.length) {
-          applySkillNarrowing(preloaded.allowedTools);
-        }
-      }
-    }
     const permissionSettings = plan?.permissionSettings;
     const compiledPolicy = plan?.policy;
     const planActivatedDeferredTools = new Set(plan?.activatedDeferredTools ?? []);
@@ -176,6 +165,16 @@ export class ToolExecutorFactory {
         const tool = tools.get(normalizedName);
         if (!tool) {
           return this.createPolicyDeniedToolResult(toolCall, agentId);
+        }
+        const policyBudget = runtimeContext?.policyBudget;
+        if (policyBudget) {
+          if (Date.now() - policyBudget.wallStartedAt >= policyBudget.maxWallTimeMs) {
+            return this.createPolicyLimitToolResult(toolCall, agentId, 'maxWallTimeMs');
+          }
+          if (policyBudget.toolCalls >= policyBudget.maxToolCalls) {
+            return this.createPolicyLimitToolResult(toolCall, agentId, 'maxToolCalls');
+          }
+          policyBudget.toolCalls += 1;
         }
         let validatedArgs: Record<string, unknown>;
         try {
@@ -392,6 +391,18 @@ export class ToolExecutorFactory {
         timestamp: Date.now(),
       };
     }
+  }
+
+  createPolicyLimitToolResult(toolCall: ToolCall, agentId: AgentRole, limit: string): ToolResultMessage {
+    return {
+      role: 'toolResult',
+      toolCallId: toolCall.id,
+      toolName: toolCall.name,
+      content: [{ type: 'text', text: `POLICY_LIMIT_EXCEEDED: ${limit} for ${agentId}; tool execution was not started.` }],
+      isError: true,
+      details: { code: 'POLICY_LIMIT_EXCEEDED', limit },
+      timestamp: Date.now(),
+    };
   }
 
   createPolicyDeniedToolResult(toolCall: ToolCall, agentId: AgentRole, reason?: string): ToolResultMessage {

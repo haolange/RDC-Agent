@@ -3,6 +3,7 @@
  */
 
 import type { AgentId, AgentRole } from '@shared/types/agent';
+import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import { isTopLevelAgentId } from '@shared/types/agent';
 import {
   AGENT_DESCRIPTIONS,
@@ -43,6 +44,8 @@ export class PromptPlanForTurn {
     systemPrompt?: string;
     messageText?: string;
     preloadSkillIds?: string[];
+    /** Exact effective profile snapshot resolved by the caller. */
+    effectiveProfile?: AgentManifestDefinition | null;
     /**
      * Same-turn frozen plan. When present, permission / profileSkills / toolAllowlist
      * come from the plan — never re-read settings for those execution semantics.
@@ -54,15 +57,15 @@ export class PromptPlanForTurn {
   }): PromptPlan | null {
     const plan = input.effectivePlan;
     const runtimeSettings = settingsService.getAll();
-    const definition = agentManifestService.getEffectiveProfiles(
-      runtimeSettings.paths,
-      runtimeSettings.llm.providers,
-      runtimeSettings.llm.agentRoutes,
-      (plan?.projectRootPath ?? input.projectRootPath) ?? undefined,
-    ).find((profile) => profile.id === input.agentId && profile.enabled)
-      ?? runtimeSettings.agents.definitions.find((entry) => entry.id === input.agentId && entry.enabled)
+    const definition = input.effectiveProfile
+      ?? agentManifestService.getEffectiveProfiles(
+        runtimeSettings.paths,
+        runtimeSettings.llm.providers,
+        runtimeSettings.llm.agentRoutes,
+        (plan?.projectRootPath ?? input.projectRootPath) ?? undefined,
+      ).find((profile) => profile.id === input.agentId && profile.enabled)
       ?? null;
-    if (!definition) {
+    if (!definition || !definition.enabled) {
       return null;
     }
     const profileSkills = plan ? [...plan.profileSkills] : definition.skills;

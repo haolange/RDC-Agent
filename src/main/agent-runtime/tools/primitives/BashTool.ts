@@ -9,7 +9,7 @@
  */
 
 import type { AgentTool } from '../../agent/AgentTool';
-import { getWorkspaceRoot, truncateOutput } from './_shared';
+import { requireMutationWorkspaceRoot, truncateOutput } from './_shared';
 import {
   BASH_DEFAULT_TIMEOUT_MS,
   BASH_MAX_OUTPUT_BYTES,
@@ -25,6 +25,7 @@ interface BashParams {
 
 interface BashDetails {
   command: string;
+  reason: string;
   exitCode: number | null;
   signal: NodeJS.Signals | null;
   durationMs: number;
@@ -70,7 +71,7 @@ export const bashTool: AgentTool<BashParams, BashDetails> = {
         Math.floor(Number.isFinite(params.timeout) ? Number(params.timeout) : BASH_DEFAULT_TIMEOUT_MS),
       ),
     );
-    const cwd = getWorkspaceRoot(context);
+    const cwd = requireMutationWorkspaceRoot(context);
     const startedAt = Date.now();
 
     if (params.run_in_background === true) {
@@ -135,8 +136,10 @@ export const bashTool: AgentTool<BashParams, BashDetails> = {
         content: [
           { type: 'text', text: truncateOutput(text, BASH_MAX_OUTPUT_BYTES) },
         ],
+        isError: true,
         details: {
           command,
+          reason: 'spawn_failed',
           exitCode: null,
           signal: null,
           durationMs: Date.now() - startedAt,
@@ -154,12 +157,15 @@ export const bashTool: AgentTool<BashParams, BashDetails> = {
       combined += `\n[aborted]`;
     }
     const truncated = Buffer.byteLength(combined, 'utf8') > BASH_MAX_OUTPUT_BYTES || outputCapped;
+    const failed = info.reason !== 'exit' || info.code !== 0;
     return {
       content: [
         { type: 'text', text: truncateOutput(combined, BASH_MAX_OUTPUT_BYTES) },
       ],
+      isError: failed,
       details: {
         command,
+        reason: info.reason,
         exitCode: info.code,
         signal: info.signal,
         durationMs: Date.now() - startedAt,

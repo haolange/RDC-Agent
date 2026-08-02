@@ -10,12 +10,18 @@ vi.mock('electron', () => ({
 vi.mock('../../settings/SettingsService', () => ({
   settingsService: {
     getAll: () => ({
-      agents: {
-        definitions: [
-          { id: 'ask', enabled: true, instructions: 'Ask profile instructions' },
-        ],
-      },
+      agents: { definitions: [] },
+      paths: { userRdxRoot: 'C:/tmp/rdc-agent-test', projectRdxRoot: 'C:/tmp/rdc-agent-test/projects' },
+      llm: { providers: [], agentRoutes: [] },
     }),
+  },
+}));
+
+vi.mock('../../settings/AgentManifestService', () => ({
+  agentManifestService: {
+    getEffectiveProfiles: () => [
+      { id: 'ask', enabled: true, instructions: 'Ask profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [] },
+    ],
   },
 }));
 

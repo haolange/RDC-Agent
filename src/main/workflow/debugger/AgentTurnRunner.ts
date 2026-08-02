@@ -6,7 +6,7 @@ import type { AgentRole } from '@shared/types/agent';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { AppMode, ContextUsageBreakdownEntry } from '@shared/types/session';
 import type { WorkflowStage } from '@shared/types/workflow';
-import type { PromptPlan } from '@shared/types/rdxRuntime';
+import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdxRuntime';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import { CONTEXT_COMPACTION_RATIO } from '@shared/types/modelCapability';
 import { generateEventId, nowMs } from '@shared/utils/id';
@@ -58,15 +58,16 @@ import {
 } from '../../settings/EffectiveModelResolver';
 import { debuggerLlmService } from '../../settings/DebuggerLlmService';
 import { settingsService } from '../../settings/SettingsService';
+import { agentManifestService } from '../../settings/AgentManifestService';
 import {
   turnCoordinator,
   createSubagentBudgetState,
+  createPolicyBudgetState,
   DEFAULT_SUBAGENT_BUDGET,
 } from './TurnCoordinator';
 import { agentSlotKey, type AgentSlot, type AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
-import type { HandoffMailbox } from './HandoffMailbox';
-import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
+import type { McpConnectionCoordinator, McpConnectionLease } from './McpConnectionCoordinator';
 import {
   isMcpPrefixedToolName,
   partitionDeferredTools,
@@ -86,7 +87,6 @@ export interface AgentTurnRunnerDeps {
   slots: AgentSlotRegistry;
   mcp: McpConnectionCoordinator;
   deferredActivation: DeferredToolActivationTracker;
-  handoffMailbox: HandoffMailbox;
   tokenizerService: TokenizerService;
   sessionTurnKey: (sessionId?: string | null) => string;
   resolveRuntimeTools: (
@@ -96,6 +96,8 @@ export interface AgentTurnRunnerDeps {
     sessionId?: string | null,
     turnHandle?: import('./TurnCoordinator').TurnHandle | null,
     projectId?: string | null,
+    projectRootPath?: string | null,
+    mcpPoolKey?: string | null,
   ) => ResolvedRuntimeTools;
   createToolSignature: (tools: ToolDefinition[]) => string;
   createToolExecutor: (
@@ -110,24 +112,15 @@ export interface AgentTurnRunnerDeps {
 export class AgentTurnRunner {
   constructor(private readonly deps: AgentTurnRunnerDeps) {}
 
-  resolveMaxTurns(agentId: AgentRole, policyMaxTurns?: number): number {
+  resolveMaxTurns(agentId: AgentRole, policyMaxTurns?: number, profileMaxTurns?: number | null): number {
+    const defaultMax = agentId === 'edit' || agentId === 'debugger' || agentId === 'optimizer' ? 50 : 25;
+    const profileMax = typeof profileMaxTurns === 'number' && profileMaxTurns > 0
+      ? profileMaxTurns
+      : defaultMax;
     if (typeof policyMaxTurns === 'number' && Number.isFinite(policyMaxTurns) && policyMaxTurns > 0) {
-      const manifest = settingsService.getAll().agents.definitions
-        .find((definition) => definition.id === agentId && definition.enabled);
-      const profileMax = manifest?.maxTurns && manifest.maxTurns > 0
-        ? manifest.maxTurns
-        : (agentId === 'edit' || agentId === 'debugger' || agentId === 'optimizer' ? 50 : 25);
       return Math.min(policyMaxTurns, profileMax);
     }
-    const manifest = settingsService.getAll().agents.definitions
-      .find((definition) => definition.id === agentId && definition.enabled);
-    if (manifest?.maxTurns && manifest.maxTurns > 0) {
-      return manifest.maxTurns;
-    }
-    if (agentId === 'edit' || agentId === 'debugger' || agentId === 'optimizer') {
-      return 50;
-    }
-    return 25;
+    return profileMax;
   }
 
   getOrCreateAgentSlot(
@@ -149,11 +142,15 @@ export class AgentTurnRunner {
     signatureTools?: ToolDefinition[],
     routeCapabilityOverride?: AgentRouteCapability,
     policyMaxTurns?: number,
+    profileMaxTurns?: number | null,
   ): AgentSlot {
     if (!promptPlan) {
       throw new Error('PromptPlan is required before creating an agent runtime slot.');
     }
     const slotKey = agentSlotKey(sessionId, agentId);
+    if (this.deps.slots.isQuarantined(slotKey)) {
+      throw new Error(`AGENT_SLOT_QUARANTINED: ${slotKey} is still owned by an orphaned turn.`);
+    }
     const toolSignature = this.deps.createToolSignature(signatureTools ?? tools);
     const activeContextWindow = contextWindow ?? streamOptions.requestPlan.contextWindowTokens;
     const requestCompactionThreshold = contextTokenLimit
@@ -164,6 +161,9 @@ export class AgentTurnRunner {
       throw new Error('PROMPT_OVERHEAD_EXCEEDS_BUDGET: system prompt and tool schemas leave no conversation budget.');
     }
     const existing = this.deps.slots.getSlot(slotKey);
+    if (existing?.agent.isStreaming) {
+      throw new Error(`AGENT_SLOT_BUSY: ${slotKey} has not completed its previous provider loop.`);
+    }
     if (
       existing
       && existing.providerId === providerId
@@ -214,7 +214,7 @@ export class AgentTurnRunner {
       provider: configuredRuntimeProvider,
       toolExecutor,
       streamOptions,
-      maxTurns: this.resolveMaxTurns(agentId, policyMaxTurns),
+      maxTurns: this.resolveMaxTurns(agentId, policyMaxTurns, profileMaxTurns),
       // transformContext：长对话接近窗口上限时自动压缩历史。
       transformContext: (messages) => contextManager.compress(messages),
       // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
@@ -312,13 +312,15 @@ export class AgentTurnRunner {
     /** Ask 路径由 ConversationService 传入的 prompt 分段字符数，用于细化 breakdown。 */
     promptPlan: PromptPlan;
     effectiveModel?: EffectiveModel;
+    effectiveProfile?: EffectiveAgentProfile | null;
+    effectiveProfileIds?: readonly string[];
     credentialHandle?: string;
     contextWindow?: number;
     contextTokenLimit?: number;
     initialMessages?: Message[];
     contextDiagnostic?: Record<string, unknown>;
     preparedRuntime?: PreparedAgentRuntime;
-    terminalContext?: (messages: Message[], status: 'complete' | 'stopped' | 'error') => void;
+    terminalContext?: (messages: Message[], status: 'complete' | 'stopped' | 'error', pendingHandoff?: import('./TurnCoordinator').PendingHandoff) => void;
   }): Promise<string> {
     if (!input.providerId || !input.modelId) {
       throw new Error('No provider/model route is configured for this agent.');
@@ -328,22 +330,58 @@ export class AgentTurnRunner {
     if (!requestPlan) {
       throw new Error('RequestPlan is required for every provider request.');
     }
+    const turnPolicy = input.preparedRuntime?.effectivePlan.policy ?? compileEffectivePolicy(input.projectRootPath);
     const runtimeSettings = input.effectiveModel ? null : settingsService.getAll();
     const routeProvider = runtimeSettings?.llm.providers.find((entry) => entry.id === input.providerId);
+    const fallbackEffectiveProfiles = runtimeSettings
+      ? agentManifestService.getEffectiveProfiles(
+          runtimeSettings.paths,
+          runtimeSettings.llm.providers,
+          runtimeSettings.llm.agentRoutes,
+          input.projectRootPath ?? undefined,
+        )
+      : [];
+    const fallbackProfile = input.effectiveProfile
+      ?? fallbackEffectiveProfiles.find((definition) => definition.id === input.agentId && definition.enabled);
     const effectiveModel = input.effectiveModel
       ?? (runtimeSettings ? resolveEffectiveModel(input.providerId, input.modelId, runtimeSettings) : null);
     const routeCapability = input.preparedRuntime?.routeCapability
       ?? resolveAgentRouteCapability(routeProvider, input.modelId, effectiveModel, requestPlan);
-    const mcpConnectionErrors = input.preparedRuntime?.mcpConnectionErrors
-      ?? await this.deps.mcp.ensureConnections(input.agentId, input.projectRootPath);
+    let mcpLease: McpConnectionLease | null = input.preparedRuntime?.mcpLease ?? null;
+    let mcpConnectionErrors = input.preparedRuntime?.mcpConnectionErrors ?? [];
+    if (!input.preparedRuntime) {
+      const acquiredMcp = await this.deps.mcp.acquireConnections(
+        input.agentId,
+        input.projectRootPath,
+        fallbackProfile?.mcpServers,
+      );
+      mcpConnectionErrors = acquiredMcp.errors;
+      mcpLease = acquiredMcp.lease;
+    }
     const sessionKey = this.deps.sessionTurnKey(input.sessionId);
-    const turnHandle = await turnCoordinator.beginTurn({
+    let turnHandle;
+    try {
+      turnHandle = await turnCoordinator.beginTurn({
       sessionKey,
       turnId: input.turnId ?? generateEventId('turn'),
       runId: input.runId,
       parentSignal: input.options?.signal,
-      subagentBudget: createSubagentBudgetState(DEFAULT_SUBAGENT_BUDGET),
-    });
+      subagentBudget: input.options?.subagentBudget ?? createSubagentBudgetState({
+        ...DEFAULT_SUBAGENT_BUDGET,
+        maxDepth: turnPolicy.maxChildDepth ?? DEFAULT_SUBAGENT_BUDGET.maxDepth,
+        maxChildren: turnPolicy.maxSubagents ?? DEFAULT_SUBAGENT_BUDGET.maxChildren,
+        maxAggregateToolCalls: turnPolicy.maxToolCalls ?? DEFAULT_SUBAGENT_BUDGET.maxAggregateToolCalls,
+      }),
+      policyBudget: createPolicyBudgetState(
+        turnPolicy,
+        input.options?.subagentBudget?.depth ?? 0,
+        input.options?.policyBudget,
+      ),
+      });
+    } catch (error) {
+      await mcpLease?.release({ discardIfIdle: true });
+      throw error;
+    }
     const turnGeneration = turnHandle.generation;
     turnHandle.eventSink = {
       onEvent: (event) => {
@@ -363,6 +401,8 @@ export class AgentTurnRunner {
       input.sessionId,
       turnHandle,
       input.projectId,
+      input.projectRootPath,
+      mcpLease?.poolKey ?? null,
     );
     // Preparation freezes the schemas sent to the provider before a staged
     // conversation session has a durable run. Rebuild tool instances here so
@@ -399,30 +439,35 @@ export class AgentTurnRunner {
       allDefinitions: runtimeTools.definitions,
     };
     turnHandle.agentSlotKey = slotKey;
-    // Prefer turn-frozen plan from prepareTurnContext. Fallback builds once when absent
-    // (e.g. subagent / legacy path); never re-read settings for execution when plan exists.
+    // Prefer the turn-frozen plan. When preparation is not used (for example
+    // an isolated child turn), build once from the exact profile snapshot supplied
+    // by the caller; never re-resolve profile semantics inside execution.
     const preparedPlan = input.preparedRuntime?.effectivePlan;
     const effectivePlan = preparedPlan ?? (() => {
       const fallbackSettings = settingsService.getAll();
-      const profile = fallbackSettings.agents.definitions
-        .find((definition) => definition.id === input.agentId && definition.enabled);
+      const effectiveProfiles = fallbackEffectiveProfiles;
+      const profile = fallbackProfile;
       return buildEffectiveRuntimePlan({
         agentId: input.agentId,
         projectRootPath: input.projectRootPath ?? null,
         projectId: input.projectId ?? null,
         profile: profile ?? null,
+        enabledProfileIds: input.effectiveProfileIds?.length
+          ? [...input.effectiveProfileIds]
+          : (() => { const ids = effectiveProfiles.filter((definition) => definition.enabled).map((definition) => definition.id); return ids.length > 0 ? ids : [input.agentId]; })(),
         toolAllowlist: input.toolAllowlist,
         permissionSettings: fallbackSettings.agentRuntime.permissions,
         routeCapability,
         requestPlan,
         promptPlan: input.promptPlan,
-        policy: compileEffectivePolicy(input.projectRootPath),
+        policy: turnPolicy,
         visibleToolNames: activeToolDefinitions.map((definition) => definition.name),
         activatedDeferredTools,
         skillIntersection: null,
         mcpDescriptorHash: null,
       });
     })();
+    turnHandle.runtimePlan = effectivePlan;
     // native-structured：执行器用 plan 冻结 allowlist；其它路由与注入列表一致。
     const executorAllowlist = routeCapability.toolCallingMode === 'native-structured'
       ? [...effectivePlan.toolAllowlist]
@@ -435,7 +480,9 @@ export class AgentTurnRunner {
       onEvent: input.options?.onEvent,
       projectRootPath: effectivePlan.projectRootPath ?? input.projectRootPath ?? null,
       projectId: effectivePlan.projectId ?? input.projectId ?? null,
+      mcpPoolKey: mcpLease?.poolKey ?? null,
       effectivePlan,
+      policyBudget: turnHandle.policyBudget,
     });
     const promptCache = input.preparedRuntime?.promptCache ?? promptCacheCompiler.compile({
       promptPlan: input.promptPlan,
@@ -509,6 +556,7 @@ export class AgentTurnRunner {
       effectivePlan.policy.maxTurns === Number.MAX_SAFE_INTEGER
         ? undefined
         : effectivePlan.policy.maxTurns,
+      effectivePlan.profileMaxTurns,
     );
 
     const userMessage: UserMessage = {
@@ -691,7 +739,7 @@ export class AgentTurnRunner {
         }
       },
       join: async () => {
-        // Agent.prompt settles when abort completes; no extra wait here.
+        await slot.agent.abortAndJoin();
       },
     });
     let abortListener: (() => void) | null = null;
@@ -719,6 +767,9 @@ export class AgentTurnRunner {
       terminalStatus = input.options?.signal?.aborted || turnHandle.isAborted ? 'stopped' : 'error';
       throw error;
     } finally {
+      if (turnHandle.isAborted) {
+        await slot.agent.abortAndJoin();
+      }
       unsubscribe();
       unregisterAgentProducer();
       if (abortListener && input.options?.signal) {
@@ -726,13 +777,19 @@ export class AgentTurnRunner {
       }
       agentUserInputRequestService.cancelTurn(input.turnId);
       agentToolApprovalRequestService.cancelTurn(input.turnId);
-      if (turnHandle.pendingHandoff) {
-        this.deps.handoffMailbox.deposit(turnHandle.pendingHandoff);
-      }
       // Terminal context first (ConversationService persists to conversation.jsonl),
       // then flush in-memory slot messages — disk is the single source of truth.
-      input.terminalContext?.(slot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus);
+      input.terminalContext?.(slot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus, turnHandle.pendingHandoff ?? undefined);
       this.deps.slots.flush(slot);
+      if (turnHandle.isAborted) {
+        await turnHandle.abortAndJoin({ reason: turnHandle.reason ?? 'user_stop' });
+      }
+      if (turnHandle.isOrphaned) {
+        // Reserve the key until the orphaned provider/tool loop actually settles.
+        this.deps.slots.quarantineSlot(slotKey, slot.agent.activeLoopPromise ?? Promise.resolve());
+        this.deps.slots.deleteSlot(slotKey);
+      }
+      await mcpLease?.release({ discardIfIdle: turnHandle.isOrphaned });
       turnCoordinator.endTurn(turnHandle);
     }
   }

@@ -30,6 +30,7 @@
     "deleteAppDataOnUninstall": false
   },
   "mac": {
+    "hardenedRuntime": true,
     "target": [
       {
         "target": "dmg",

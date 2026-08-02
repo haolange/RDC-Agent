@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   assertTextReadable,
   safeResolvePath,
+  requireMutationWorkspaceRoot,
   sliceUtf8Bytes,
   truncateOutput,
   abortPromise,
@@ -67,6 +68,18 @@ describe('assertTextReadable', () => {
   });
 });
 
+describe('mutation workspace ownership', () => {
+  it('rejects implicit process cwd writes when no project is selected', () => {
+    expect(() => requireMutationWorkspaceRoot(undefined)).toThrow(/MUTATION_REQUIRES_PROJECT/);
+    expect(() => requireMutationWorkspaceRoot({
+      workspaceRoot: process.cwd(),
+      projectRootPath: null,
+      projectId: null,
+      sessionId: null,
+    })).toThrow(/MUTATION_REQUIRES_PROJECT/);
+  });
+});
+
 describe('safeResolvePath', () => {
   it('rejects symlink escape outside workspace', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-symlink-ws-'));
@@ -81,7 +94,7 @@ describe('safeResolvePath', () => {
       // Windows may require elevation for symlinks; skip in that environment.
       return;
     }
-    expect(() => safeResolvePath('escape', root)).toThrow(/超出 workspace/);
+    expect(() => safeResolvePath('escape', root)).toThrow(/workspace|SYMLINK_PATH_REJECTED/);
   });
 
   it('allows ordinary workspace files', async () => {

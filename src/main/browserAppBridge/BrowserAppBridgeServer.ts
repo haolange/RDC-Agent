@@ -2,7 +2,7 @@ import { createReadStream, existsSync, readFileSync, statSync } from 'fs';
 import { createHash } from 'crypto';
 import { createServer, request as httpRequest, type IncomingMessage, type Server, type ServerResponse } from 'http';
 import { request as httpsRequest } from 'https';
-import { extname, join, normalize, resolve } from 'path';
+import { extname, isAbsolute, join, normalize, relative, resolve } from 'path';
 import { URL } from 'url';
 import { invokeRegisteredIpcChannel } from '../ipc/invokeRegistry';
 import { rendererEventHub } from './rendererEventHub';
@@ -58,8 +58,11 @@ interface BrowserHealthMetadata {
 let server: Server | null = null;
 let bridgeUrl: string | null = null;
 let bridgeToken: string | null = null;
+let qaBootstrapToken: string | null = null;
 let allowedOrigins = new Set<string>();
 let healthMetadata: BrowserHealthMetadata | null = null;
+
+const MAX_JSON_BODY_BYTES = 1 * 1024 * 1024;
 
 const contentTypes: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
@@ -184,8 +187,15 @@ async function checkDevRenderer(url: string): Promise<{ ok: boolean; url: string
 
 async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
+  let total = 0;
   for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += buffer.byteLength;
+    if (total > MAX_JSON_BODY_BYTES) {
+      request.destroy();
+      throw new Error('PAYLOAD_TOO_LARGE: bridge JSON body exceeds 1 MiB.');
+    }
+    chunks.push(buffer);
   }
   const text = Buffer.concat(chunks).toString('utf-8').trim();
   return text ? JSON.parse(text) : {};
@@ -214,7 +224,10 @@ function serveStatic(response: ServerResponse, rendererRoot: string, requestPath
   const requestedPath = normalize(join(rendererRoot, relativePath || 'index.html'));
   const root = resolve(rendererRoot);
   const fallbackIndex = join(root, 'index.html');
-  const filePath = requestedPath.startsWith(root) && existsSync(requestedPath) && statSync(requestedPath).isFile()
+  const relativePathFromRoot = relative(root, requestedPath);
+  const contained = relativePathFromRoot === ''
+    || (!relativePathFromRoot.startsWith('..') && !isAbsolute(relativePathFromRoot));
+  const filePath = contained && existsSync(requestedPath) && statSync(requestedPath).isFile()
     ? requestedPath
     : fallbackIndex;
 
@@ -269,12 +282,16 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
   const bridgeOrigin = bridgeUrl ?? 'http://127.0.0.1';
   const url = new URL(request.url, bridgeOrigin);
 
-  // Short QA entry: no token in the address bar (Glass truncates long query → JSON white screen).
+  // Short QA entry: a one-time out-of-band bootstrap is required before the
+  // bearer cookie is minted. A local process can no longer mint a QA session
+  // by blindly requesting /qa.
   if (url.pathname === '/qa' && (request.method === 'GET' || request.method === 'HEAD')) {
-    if (!bridgeToken) {
-      sendJson(response, 503, { success: false, error: 'Bridge token unavailable' }, requestOrigin);
+    const suppliedBootstrap = url.searchParams.get('qaBootstrap');
+    if (!bridgeToken || !qaBootstrapToken || !tokensMatch(qaBootstrapToken, suppliedBootstrap)) {
+      sendJson(response, 401, { success: false, error: 'QA bootstrap required' }, requestOrigin);
       return;
     }
+    qaBootstrapToken = null;
     redirectWithBridgeCookie(response, `${bridgeOrigin}/app`, bridgeToken);
     return;
   }
@@ -335,9 +352,10 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
         sendJson(response, 200, { success: true, result }, requestOrigin);
       })
       .catch((error) => {
-        sendJson(response, 500, {
+        const message = error instanceof Error ? error.message : String(error);
+        sendJson(response, message.startsWith('PAYLOAD_TOO_LARGE') ? 413 : 500, {
           success: false,
-          error: error instanceof Error ? error.message : String(error),
+          error: message,
         }, requestOrigin);
       });
     return;
@@ -399,6 +417,7 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
   const preferredPort = options.preferredPort ?? Number(process.env.RDC_AGENT_BROWSER_BRIDGE_PORT || 5127);
   healthMetadata = resolveHealthMetadata(options);
   bridgeToken = process.env.RDC_AGENT_BROWSER_BRIDGE_TOKEN?.trim() || createBridgeBearerToken();
+  qaBootstrapToken = process.env.RDC_AGENT_BROWSER_QA_BOOTSTRAP?.trim() || createBridgeBearerToken();
   process.env.RDC_AGENT_BROWSER_BRIDGE_TOKEN = bridgeToken;
 
   server = createServer((request, response) => {
@@ -444,7 +463,11 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
     __RDC_AGENT_BROWSER_BRIDGE_TOKEN__?: string;
   }).__RDC_AGENT_BROWSER_BRIDGE_TOKEN__ = bridgeToken;
 
-  const qaUrl = `${bridgeUrl}/qa`;
+  const bootstrap = qaBootstrapToken;
+  if (!bootstrap) {
+    throw new Error('QA bootstrap token was not initialized');
+  }
+  const qaUrl = `${bridgeUrl}/qa?qaBootstrap=${encodeURIComponent(bootstrap)}`;
   const appUrl = `${bridgeUrl}/app?rdcBridgeToken=${encodeURIComponent(bridgeToken)}`;
   console.log(`[BrowserAppBridge] Browser app session: ${qaUrl}`);
   console.log(`[BrowserAppBridge] Direct /app URL (fallback): ${appUrl}`);
@@ -456,6 +479,7 @@ export async function stopBrowserAppBridge(): Promise<void> {
   server = null;
   bridgeUrl = null;
   bridgeToken = null;
+  qaBootstrapToken = null;
   allowedOrigins = new Set();
   healthMetadata = null;
   delete (globalThis as typeof globalThis & { __RDC_AGENT_BROWSER_BRIDGE_URL__?: string }).__RDC_AGENT_BROWSER_BRIDGE_URL__;

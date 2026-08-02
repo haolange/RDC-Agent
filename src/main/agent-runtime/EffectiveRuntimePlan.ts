@@ -1,11 +1,20 @@
 import { createHash, randomBytes } from 'crypto';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { PromptPlan, CompiledPolicy } from '@shared/types/rdxRuntime';
+import type { PromptPlan, CompiledPolicy, ResourceProvenance } from '@shared/types/rdxRuntime';
 import type { AgentPermissionSettings } from '@shared/types/settings';
 import type { RequestPlan } from '@shared/types/providerCapability';
 import type { ToolDefinition } from './core/types';
 import { compileEffectivePolicy, emptyCompiledPolicy } from './permissions/PolicyCompiler';
+
+export interface FrozenHandoffDefinition {
+  agent: string;
+  label: string;
+  prompt: string;
+  send?: boolean;
+  showContinueOn?: boolean;
+  model?: string;
+}
 
 export const EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION = 2 as const;
 
@@ -15,8 +24,15 @@ export interface EffectiveRuntimePlan {
   fingerprint: string;
   projectRootPath: string | null;
   projectId: string | null;
+  /** Provenance of the exact profile resolved before preparation. */
+  profileProvenance: ResourceProvenance | null;
   agentId: string;
   profileSkills: readonly string[];
+  profileMaxTurns: number | null;
+  /** Exact handoff declarations from the resolved profile. */
+  profileHandoffs: readonly FrozenHandoffDefinition[];
+  /** Enabled profile ids from the same resolution snapshot. */
+  enabledProfileIds: readonly string[];
   toolAllowlist: readonly string[];
   /**
    * Frozen `∩(skill_i.allowedTools) ∩ toolAllowlist` at prepareTurn.
@@ -44,7 +60,9 @@ export interface BuildEffectiveRuntimePlanInput {
   agentId: string;
   projectRootPath: string | null;
   projectId?: string | null;
-  profile?: Pick<AgentManifestDefinition, 'skills'> | null;
+  profileProvenance?: ResourceProvenance | null;
+  profile?: Pick<AgentManifestDefinition, 'skills' | 'maxTurns'> & { handoffs?: AgentManifestDefinition['handoffs'] } | null;
+  enabledProfileIds?: readonly string[];
   toolAllowlist: readonly string[];
   permissionSettings: AgentPermissionSettings;
   routeCapability: AgentRouteCapability;
@@ -71,6 +89,7 @@ export function policyFingerprintOf(policy: CompiledPolicy): string {
     policy.maxToolCalls,
     policy.maxSubagents,
     policy.maxChildDepth,
+    policy.maxWallTimeMs,
     policy.sourceFingerprint,
   ]);
 }
@@ -110,6 +129,18 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     deniedCommandPrefixes: [...input.permissionSettings.deniedCommandPrefixes],
   };
   const profileSkills = freezeStringList(input.profile?.skills ?? []);
+  const profileMaxTurns = typeof input.profile?.maxTurns === 'number' && input.profile.maxTurns > 0
+    ? input.profile.maxTurns
+    : null;
+  const profileHandoffs = Object.freeze((input.profile?.handoffs ?? []).map((handoff) => Object.freeze({
+    agent: handoff.agent,
+    label: handoff.label,
+    prompt: handoff.prompt,
+    ...(handoff.send !== undefined ? { send: handoff.send } : {}),
+    ...(handoff.showContinueOn !== undefined ? { showContinueOn: handoff.showContinueOn } : {}),
+    ...(handoff.model !== undefined ? { model: handoff.model } : {}),
+  })));
+  const enabledProfileIds = freezeStringList(input.enabledProfileIds);
   const toolAllowlist = freezeStringList(input.toolAllowlist);
   const skillIntersection = input.skillIntersection === undefined || input.skillIntersection === null
     ? null
@@ -125,7 +156,11 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     input.agentId,
     input.projectRootPath,
     input.projectId ?? null,
+    input.profileProvenance ?? null,
     profileSkills,
+    profileMaxTurns,
+    profileHandoffs,
+    enabledProfileIds,
     toolAllowlist,
     skillIntersection,
     visibleToolNames,
@@ -143,8 +178,12 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     fingerprint,
     projectRootPath: input.projectRootPath,
     projectId: input.projectId ?? null,
+    profileProvenance: input.profileProvenance ?? null,
     agentId: input.agentId,
     profileSkills,
+    profileMaxTurns,
+    profileHandoffs,
+    enabledProfileIds,
     toolAllowlist,
     skillIntersection,
     visibleToolNames,

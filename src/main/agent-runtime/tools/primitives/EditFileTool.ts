@@ -8,7 +8,7 @@
 
 import * as fs from 'fs/promises';
 import type { AgentTool } from '../../agent/AgentTool';
-import { assertTextReadable, safeResolvePath } from './_shared';
+import { assertTextReadable, requireMutationWorkspaceRoot, safeResolvePath, writeTextFileNoFollow } from './_shared';
 import { TEXT_FILE_MAX_BYTES } from './toolLimits';
 
 interface EditFileParams {
@@ -64,7 +64,8 @@ export const editFileTool: AgentTool<EditFileParams, EditFileDetails> = {
       throw new Error('old_text 与 new_text 相同，无需编辑');
     }
 
-    const absolute = safeResolvePath(params.path, undefined, context);
+    const workspaceRoot = requireMutationWorkspaceRoot(context);
+    const absolute = safeResolvePath(params.path, workspaceRoot, context);
     assertTextReadable(absolute, { maxBytes: TEXT_FILE_MAX_BYTES });
 
     const original = await fs.readFile(absolute, 'utf8');
@@ -89,7 +90,7 @@ export const editFileTool: AgentTool<EditFileParams, EditFileDetails> = {
       params.new_text +
       original.slice(firstIdx + params.old_text.length);
 
-    await fs.writeFile(absolute, updated, 'utf8');
+    await writeTextFileNoFollow(absolute, updated);
 
     const oldBytes = Buffer.byteLength(params.old_text, 'utf8');
     const newBytes = Buffer.byteLength(params.new_text, 'utf8');

@@ -50,7 +50,7 @@
 
 | 模块 | 路径（示意） | 边界 |
 | --- | --- | --- |
-| `ProcessSupervisor` | `src/main/runtime/` | 子进程 spawn/joinAll；abort 后 registry 为空 |
+| `ProcessSupervisor` | `src/main/runtime/` | 子进程 spawn/joinAll；仅在观察到 close/error 后移除 registry；超时未确认保留 `unconfirmed_orphan` |
 | `TurnCoordinator` / `TurnHandle` | `src/main/workflow/debugger/` | 每 session 活跃 turn；generation 丢弃迟到 event |
 | `ShutdownCoordinator` | `src/main/lifecycle/` | before-quit 限时 shutdownAll |
 | `EffectiveRuntimePlan` | `src/main/agent-runtime/` | `schemaVersion: 2`；`prepareTurn` 完整冻结；Prompt 与 Executor 共用 |
@@ -90,7 +90,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 
 ## 浏览器真实会话边界
 
-- agent 日常 UI/功能验证默认使用 headless Browser QA：`pnpm run start:agent-browser`（`RDC_AGENT_HEADLESS=1` + `RDC_AGENT_BROWSER_QA=1`），再用主进程日志输出的 **`http://127.0.0.1:<port>/qa`** 打开同一套 renderer（`/qa` Set-Cookie 后进干净 `/app`）。**优先 `/qa`**；勿把截断的长 `?rdcBridgeToken=` URL 当验过了——白屏若是 Pretty-print JSON，即为 **401 Unauthorized**。
+- agent 日常 UI/功能验证默认使用 headless Browser QA：`pnpm run start:agent-browser`（`RDC_AGENT_HEADLESS=1` + `RDC_AGENT_BROWSER_QA=1`），再用主进程日志输出的 **one-time `http://127.0.0.1:<port>/qa?qaBootstrap=...`** 打开同一套 renderer（`/qa` Set-Cookie 后进干净 `/app`）。**优先 `/qa`**；勿把截断的长 `?rdcBridgeToken=` URL 当验过了——白屏若是 Pretty-print JSON，即为 **401 Unauthorized**。
 - 浏览器真实会话通过 localhost bridge 连接真实 `main process`、workspace、settings、LLM runtime、事件流和已配置的 RDX CLI invoker；不得新增渲染层本地样本或演示场景作为验收入口。
 - Bridge 为 **debug-only** 安全边界（`bridgeSecurity`）：非 `RDC_AGENT_BROWSER_QA=1` 不得启动，且**不进 release 默认路径**。Browser 与 Desktop 必须共用 `src/shared/renderer-api` 的唯一 `ElectronAPI` 工厂、channel manifest 与 main handler registry；所有 preload 公开产品能力均保持 parity，未知/内部/未注册 channel 及不存在的明文 secret 读取 fail-closed。矩阵见 `docs/architecture/browser-qa-surface.md`。
 - Electron 窗口通过 `preload -> IPC transport` 进入主进程；浏览器真实会话通过 `localhost HTTP/SSE transport -> IPC handler registry` 进入主进程。除 transport 与原生窗口容器外，两条路径的 API、状态、持久化与审批语义必须一致，禁止恢复手写 Browser API、拒绝桩或第二套 channel 规则。
@@ -135,7 +135,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - The right rail is driven only by the main-owned `RightRailProjectionService` and its `RightPanelViewModel`. Renderer code must not rebuild Progress, Outputs, Context resources, or Capture state from action events, global capture state, working-directory scans, or tool catalogs. internal runtime identifiers are reserved for owner-scoped agent consumption, and raw diagnostic detail must not become sidebar inventory.
 - The selected Project rail is only the project-scoped `Import .rdc` surface and imported-input list; it must not read session runtime state. The selected Session rail is always four separate, non-collapsible rounded `Progress / Outputs / Context / Capture` cards whose shell never changes between empty and populated content. Context contains only concrete task-used attachments, files, directories, Skill sources, invoked MCP tools, and web references proven by frozen Prompt segments or successful tool results; generic tool categories and configured-but-unused entries are forbidden. Renderer must not parse args/result previews or rebuild these resources. Capture is always visible with an honest empty state when no input exists. Capture owns scoped `.rdc` selection, Replay Device, open, preview, refresh, copy, clear, and compact diagnostics. Do not restore Classic fallback, ArtifactTree, Working Directory, standalone Memory, per-tool `rd.*` inventory, CLI catalog summary, tool count, duplicate Skills catalog, or `session:outputs:list`.
 - Outputs only show explicit user output files. `output_register` is the canonical agent action: it may copy only a completed file inside the active project into the owning run, and it must reject inputs and escaping paths. Do not pin `plan.md`; do not expose `artifact_store`, `run_report`, or `action_output` source names in UI contracts.
-- Run `pnpm run check:right-rail` for UI/IPC changes. Browser QA must use the latest `start:agent-browser` `/qa` surface, delete QA project sessions first, create isolated sessions, and cover empty state, real Tasks, Outputs, project import, RDX owner/diagnostic behavior, cross project/session gates, narrow drawer, Escape/focus return, Settings parity, and unknown-channel bridge denial.
+- Run `pnpm run check:right-rail` for UI/IPC changes. Browser QA must use the latest `start:agent-browser` bootstrap `/qa` surface, delete QA project sessions first, create isolated sessions, and cover empty state, real Tasks, Outputs, project import, RDX owner/diagnostic behavior, cross project/session gates, narrow drawer, Escape/focus return, Settings parity, and unknown-channel bridge denial.
 
 ## 修改时的检查项
 
@@ -172,7 +172,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - **[AUTO]** 安全 / 并发 / 取消 / 存储故障 / provider wire 契约改动后执行：`vitest run src/main/testing/contracts`（及被触及的既有单测，如 `bridgeSecurity`、`jsonl`、`TurnCoordinator`、`ProcessSupervisor`、`DebuggerRuntimePolicy`）。
 - **[AUTO]** 入口、构建或窗口逻辑改动后，再补 `pnpm run build` 或等价打包检查。
 - **[MANUAL]** 发布配置改动后执行 `pnpm run pack`，并确认 unpacked 产物不包含开发期包管理器、lockfile、launcher 和缓存状态。
-- **[BROWSER-QA]** 浏览器真实会话使用 `pnpm run start:agent-browser`（或 `scripts/run-rdc-launcher.* --mode browser`），然后用 Codex 内置浏览器打开主进程输出的 **`/qa`**（勿截断 token URL）。Work Process / tool 卡片 UI 验收前必须先停旧进程再重启以加载最新前后端，并删除该 QA project 下全部 session 后新建隔离 session，避免跨 session/project 串台与脏数据。涉及 Send/Stop/Edit-and-resend 或流式卡顿时额外验收：Preparing Stop 干净撤销、Running Stop 单调落停、Rewrite 提交即时切分支、流式期间窗口拖拽/滚动无明显整应用卡顿。
+- **[BROWSER-QA]** 浏览器真实会话使用 `pnpm run start:agent-browser`（或 `scripts/run-rdc-launcher.* --mode browser`），然后用 Codex 内置浏览器打开主进程输出的 **complete bootstrap `/qa?qaBootstrap=...`**（勿截断 token URL）。Work Process / tool 卡片 UI 验收前必须先停旧进程再重启以加载最新前后端，并删除该 QA project 下全部 session 后新建隔离 session，避免跨 session/project 串台与脏数据。涉及 Send/Stop/Edit-and-resend 或流式卡顿时额外验收：Preparing Stop 干净撤销、Running Stop 单调落停、Rewrite 提交即时切分支、流式期间窗口拖拽/滚动无明显整应用卡顿。
 - **[MANUAL]** 人类开发入口使用 `pnpm run start:human:dev`，源码构建入口使用 `pnpm run start:human`；平台包装器只转发到共享 launcher，依赖与 build 由指纹条件式准备，发布模式直接双击 exe / app 包。
 - **[AUTO]** Provider 体系契约验证使用 `pnpm run check:provider-system`。
 - **[AUTO]** Provider Catalog strict manifest 与编译语义验证使用 `pnpm run check:provider-catalog`。Catalog schema、manifest 字段、identity 覆盖或 route/binding 改动后必须执行。

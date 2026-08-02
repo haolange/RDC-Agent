@@ -160,7 +160,6 @@ export class HookEngine {
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
-      isolateProcessGroup: false,
       timeoutMs: definition.timeoutMs,
       ringBufferBytes: MAX_OUTPUT_BYTES,
     });

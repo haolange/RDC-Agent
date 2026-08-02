@@ -171,6 +171,8 @@ export interface ConversationMessage {
   id: string;
   /** Stable idempotency key for the user request that created this message. */
   requestId?: string;
+  /** Canonical request fingerprint persisted for restart-safe idempotency. */
+  requestFingerprint?: string;
   turnId: string;
   sessionId: string | null;
   projectId: string | null;

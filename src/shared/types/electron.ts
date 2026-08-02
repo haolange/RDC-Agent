@@ -75,7 +75,9 @@ import type { KnowledgeCardDetail, KnowledgeCardSummary, KnowledgeSpace } from '
 /** Memory 面板列表项摘要（对应 MemoryRecord 的精简视图）。 */
 export interface MemorySummary {
   scope: 'user' | 'project';
+  /** Canonical storage key; use displayName for user-facing text. */
   name: string;
+  displayName: string;
   description: string;
   type: 'user' | 'feedback' | 'project' | 'reference';
   updatedAt: number;

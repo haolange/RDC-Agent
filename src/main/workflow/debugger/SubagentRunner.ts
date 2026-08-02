@@ -11,6 +11,7 @@ import type {
 import { generateEventId, nowMs } from '@shared/utils/id';
 import type { AgentTool } from '../../agent-runtime/agent/AgentTool';
 import { settingsService } from '../../settings/SettingsService';
+import { agentManifestService } from '../../settings/AgentManifestService';
 import {
   assertSubagentBudgetAllowsChild,
   createSubagentBudgetState,
@@ -44,8 +45,38 @@ export class SubagentRunner {
     parentTurn?: TurnHandle | null;
     signal?: AbortSignal | null;
   }): Promise<{ text: string; status: SubagentResultStatus; subagentId: string }> {
+    // Resolve and authorize the exact project profile before mutating parent budgets or emitting a child event.
+    const childSettings = settingsService.getAll();
+    const effectiveProfiles = childSettings.paths
+      ? agentManifestService.getEffectiveProfiles(
+          childSettings.paths,
+          childSettings.llm?.providers ?? [],
+          childSettings.llm?.agentRoutes ?? [],
+          input.projectRootPath ?? undefined,
+        )
+      : [];
+    const definition = effectiveProfiles.find((entry) => entry.id === input.targetProfile && entry.enabled);
+    if (!definition) {
+      throw new Error('AGENT_PROFILE_UNAVAILABLE: ' + input.targetProfile);
+    }
+    const effectiveProfileIds = effectiveProfiles.filter((entry) => entry.enabled).map((entry) => entry.id);
+    const systemPrompt = definition.instructions?.trim() || this.deps.systemPromptForAgent(input.targetProfile);
+
     const parentBudget = input.parentTurn?.subagentBudget ?? createSubagentBudgetState();
     assertSubagentBudgetAllowsChild(parentBudget);
+    const policyBudget = input.parentTurn?.policyBudget;
+    if (policyBudget) {
+      if (Date.now() - policyBudget.wallStartedAt >= policyBudget.maxWallTimeMs) {
+        throw new Error(`POLICY_LIMIT_EXCEEDED: maxWallTimeMs ${policyBudget.maxWallTimeMs}.`);
+      }
+      if (input.parentTurn && input.parentTurn.subagentBudget.depth >= policyBudget.maxChildDepth) {
+        throw new Error(`POLICY_LIMIT_EXCEEDED: maxChildDepth ${policyBudget.maxChildDepth}.`);
+      }
+      if (policyBudget.subagents >= policyBudget.maxSubagents) {
+        throw new Error(`POLICY_LIMIT_EXCEEDED: maxSubagents ${policyBudget.maxSubagents}.`);
+      }
+      policyBudget.subagents += 1;
+    }
     parentBudget.childrenSpawned += 1;
 
     const subagentId = generateEventId('subagent');
@@ -84,14 +115,15 @@ export class SubagentRunner {
     });
 
     // 组装子 agent system prompt（目标 profile instructions）
-    const definition = settingsService.getAll().agents.definitions
-      .find((d) => d.id === input.targetProfile && d.enabled);
-    const systemPrompt = definition?.instructions?.trim()
-      || this.deps.systemPromptForAgent(input.targetProfile);
-
     let resultText = '';
     let resultStatus: SubagentResultStatus = 'complete';
-    const childBudget = createSubagentBudgetState(parentBudget.budget, parentBudget.depth + 1);
+    let childPromise: Promise<string> | null = null;
+    const childBudget = createSubagentBudgetState({
+      ...parentBudget.budget,
+      maxDepth: policyBudget?.maxChildDepth ?? parentBudget.budget.maxDepth,
+      maxChildren: policyBudget?.maxSubagents ?? parentBudget.budget.maxChildren,
+      maxAggregateToolCalls: policyBudget?.maxToolCalls ?? parentBudget.budget.maxAggregateToolCalls,
+    }, parentBudget.depth + 1);
     childBudget.aggregateToolCalls = parentBudget.aggregateToolCalls;
     childBudget.wallStartedAt = parentBudget.wallStartedAt;
 
@@ -99,7 +131,7 @@ export class SubagentRunner {
       id: subagentId,
       abort: () => onParentAbort(),
       join: async () => {
-        // Child turn join is awaited via sendProfileMessage completion below.
+        if (childPromise) await childPromise.catch(() => undefined);
       },
     });
 
@@ -107,7 +139,7 @@ export class SubagentRunner {
       if (childAbort.signal.aborted) {
         throw new DOMException('Aborted', 'AbortError');
       }
-      resultText = await this.deps.sendProfileMessage(
+      childPromise = this.deps.sendProfileMessage(
         input.targetProfile,
         input.task,
         {
@@ -116,7 +148,11 @@ export class SubagentRunner {
           projectRootPath: input.projectRootPath,
           projectId: input.projectId,
           systemPrompt,
+          effectiveProfile: definition ?? null,
+          effectiveProfileIds,
           signal: childAbort.signal,
+          policyBudget,
+          subagentBudget: childBudget,
           onEvent: (event: SharedAgentEvent) => {
             if (input.parentTurn && !input.parentTurn.isLive(input.parentTurn.generation)) {
               return;
@@ -204,6 +240,7 @@ export class SubagentRunner {
           },
         },
       );
+      resultText = await childPromise;
       if (childAbort.signal.aborted) {
         resultStatus = 'cancelled';
       }
@@ -280,7 +317,13 @@ export class SubagentRunner {
         });
         return {
           content: [{ type: 'text', text: result.text || '(sub-agent returned empty output)' }],
-          details: { subagentId: result.subagentId, profile: targetProfile, status: result.status },
+          isError: result.status !== 'complete',
+          details: {
+            subagentId: result.subagentId,
+            profile: targetProfile,
+            status: result.status,
+            errorCode: result.status === 'cancelled' ? 'SUBAGENT_CANCELLED' : result.status === 'failed' ? 'SUBAGENT_FAILED' : undefined,
+          },
         };
       },
     };

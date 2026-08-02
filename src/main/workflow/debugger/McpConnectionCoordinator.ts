@@ -13,32 +13,59 @@ import { MCPManager, type MCPServerConfig } from '../../agent-runtime/agent/MCPM
 import type { AgentTool } from '../../agent-runtime/agent/AgentTool';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import { mcpTrustService } from '../../settings/McpTrustService';
-import { settingsService } from '../../settings/SettingsService';
+
+interface ProjectMcpPool {
+  key: string;
+  projectRootPath: string | null;
+  descriptorHash: string;
+  manager: MCPManager;
+  connecting: Map<string, Promise<void>>;
+  failedMcpServers: Map<string, string>;
+  lastUsedAt: number;
+  activeTurnRefs: number;
+  closing: boolean;
+  superseded: boolean;
+}
+
+export interface McpConnectionLease {
+  readonly poolKey: string;
+  readonly projectRootPath: string | null;
+  readonly descriptorHash: string;
+  release(options?: { discardIfIdle?: boolean }): Promise<void>;
+}
+
+export interface AcquiredMcpConnections {
+  errors: string[];
+  lease: McpConnectionLease | null;
+}
 
 export class McpConnectionCoordinator {
-  private readonly mcpManager = new MCPManager();
-  private readonly connectedMcpServerIds = new Set<string>();
-  private readonly failedMcpServers = new Map<string, string>();
-  private readonly mcpConnectionMeta = new Map<string, { projectRoot: string | null; descriptorHash: string }>();
+  private readonly pools = new Map<string, ProjectMcpPool>();
+  private readonly activePoolByProject = new Map<string, string>();
 
-  getAgentTools(): AgentTool[] {
-    return this.mcpManager.getAgentTools();
+  getAgentTools(projectRootPath?: string | null, poolKey?: string | null): AgentTool[] {
+    const pool = poolKey
+      ? this.pools.get(poolKey)
+      : this.resolveActivePool(projectRootPath);
+    if (!pool || pool.closing) return [];
+    if (poolKey && projectRootPath && pool.projectRootPath && this.projectKey(pool.projectRootPath) !== this.projectKey(projectRootPath)) {
+      return [];
+    }
+    return pool.manager.getAgentTools();
   }
 
-  getRuntimeStatusSummary(): MCPServerStatusSummary[] {
-    return this.mcpManager.getServerStatusSummary();
+  getRuntimeStatusSummary(projectRootPath?: string | null): MCPServerStatusSummary[] {
+    return this.resolveActivePool(projectRootPath)?.manager.getServerStatusSummary() ?? [];
   }
 
-  /**
-   * Settings / IPC 与 mcp 目录工具共用：合并已配置 MCP 与运行时连接状态。
-   */
+  /** Settings / IPC status is scoped to the requested project and never merges pools. */
   getMcpServerStatusSummary(projectRootPath?: string | null, query?: string): MCPServerStatusSummary[] {
     const normalizedQuery = query?.trim().toLowerCase() ?? '';
     const configured = agentRuntimeConfigService.listMcpServers(projectRootPath ?? undefined)
       .filter((server) => !normalizedQuery
-        || `${server.id} ${server.name} ${server.description}`.toLowerCase().includes(normalizedQuery));
+        || (server.id + ' ' + server.name + ' ' + server.description).toLowerCase().includes(normalizedQuery));
     const runtimeById = new Map(
-      this.getRuntimeStatusSummary().map((entry) => [entry.id, entry]),
+      this.getRuntimeStatusSummary(projectRootPath).map((entry) => [entry.id, entry]),
     );
     return configured.map((server) => {
       const runtime = runtimeById.get(server.id) ?? runtimeById.get(server.name);
@@ -49,68 +76,164 @@ export class McpConnectionCoordinator {
         toolCount: runtime?.toolCount ?? 0,
         tools: runtime?.tools ?? [],
       };
-      if (runtime?.lastError) {
-        summary.lastError = runtime.lastError;
-      }
+      if (runtime?.lastError) summary.lastError = runtime.lastError;
       return summary;
     });
   }
 
   async disconnectAll(): Promise<void> {
-    await this.mcpManager.disconnectAll();
-    this.connectedMcpServerIds.clear();
-    this.failedMcpServers.clear();
-    this.mcpConnectionMeta.clear();
+    const pools = Array.from(this.pools.values());
+    for (const pool of pools) pool.closing = true;
+    await Promise.all(pools.map(async (pool) => {
+      await Promise.allSettled(pool.connecting.values());
+      await pool.manager.disconnectAll();
+    }));
+    this.pools.clear();
+    this.activePoolByProject.clear();
   }
 
-  async ensureConnections(agentId: AgentRole, projectRootPath?: string | null): Promise<string[]> {
-    const errors: string[] = [];
-    const nextProjectRoot = projectRootPath ? path.resolve(projectRootPath) : null;
-    const descriptors = this.getEnabledMcpDescriptors(agentId, projectRootPath);
-    const desiredById = new Map(
-      descriptors.map((descriptor) => [descriptor.id, descriptor] as const),
-    );
-
-    for (const serverId of Array.from(this.connectedMcpServerIds)) {
-      const meta = this.mcpConnectionMeta.get(serverId);
-      const desired = desiredById.get(serverId);
-      const desiredHash = desired ? this.hashMcpDescriptor(desired) : null;
-      const stillValid = Boolean(
-        desired
-        && meta
-        && meta.projectRoot === nextProjectRoot
-        && meta.descriptorHash === desiredHash,
-      );
-      if (stillValid) continue;
-      await this.mcpManager.disconnect(serverId);
-      this.connectedMcpServerIds.delete(serverId);
-      this.mcpConnectionMeta.delete(serverId);
-      this.failedMcpServers.delete(serverId);
+  async acquireConnections(
+    agentId: AgentRole,
+    projectRootPath?: string | null,
+    enabledMcpIds?: readonly string[],
+  ): Promise<AcquiredMcpConnections> {
+    const descriptors = this.getEnabledMcpDescriptors(agentId, projectRootPath, enabledMcpIds);
+    if (descriptors.length === 0) {
+      if (projectRootPath) this.activePoolByProject.delete(this.projectKey(projectRootPath));
+      return { errors: [], lease: null };
     }
-
-    for (const descriptor of descriptors) {
-      if (this.connectedMcpServerIds.has(descriptor.id)) {
-        continue;
+    const root = projectRootPath ? path.resolve(projectRootPath) : null;
+    const descriptorHash = this.descriptorSetHash(descriptors);
+    const poolKey = this.poolKey(root, descriptorHash);
+    let pool = this.pools.get(poolKey);
+    if (!pool) {
+      pool = {
+        key: poolKey,
+        projectRootPath: root,
+        descriptorHash,
+        manager: new MCPManager(),
+        connecting: new Map(),
+        failedMcpServers: new Map(),
+        lastUsedAt: Date.now(),
+        activeTurnRefs: 0,
+        closing: false,
+        superseded: false,
+      };
+      this.pools.set(poolKey, pool);
+    }
+    if (pool.closing) {
+      throw new Error(`MCP pool ${poolKey} is closing; retry the turn preparation.`);
+    }
+    pool.activeTurnRefs += 1;
+    pool.lastUsedAt = Date.now();
+    if (root) {
+      const rootKey = this.projectKey(root);
+      this.activePoolByProject.set(rootKey, poolKey);
+      for (const candidate of this.pools.values()) {
+        if (candidate.key !== poolKey && candidate.projectRootPath && this.projectKey(candidate.projectRootPath) === rootKey) {
+          candidate.superseded = true;
+        }
       }
-      if (this.failedMcpServers.has(descriptor.id)) {
-        errors.push(`${descriptor.id}: ${this.failedMcpServers.get(descriptor.id)}`);
+    }
+    const errors: string[] = [];
+    for (const descriptor of descriptors) {
+      if (pool.manager.listServers().includes(descriptor.id)) continue;
+      const previousError = pool.failedMcpServers.get(descriptor.id);
+      if (previousError) {
+        errors.push(descriptor.id + ': ' + previousError);
         continue;
       }
       try {
-        mcpTrustService.assertConnectAllowed(descriptor, projectRootPath);
-        await this.mcpManager.connect(this.toMcpServerConfig(descriptor));
-        this.connectedMcpServerIds.add(descriptor.id);
-        this.mcpConnectionMeta.set(descriptor.id, {
-          projectRoot: nextProjectRoot,
-          descriptorHash: this.hashMcpDescriptor(descriptor),
-        });
+        await this.ensurePoolServerConnected(pool, descriptor, projectRootPath);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        this.failedMcpServers.set(descriptor.id, message);
-        errors.push(`${descriptor.id}: ${message}`);
+        pool.failedMcpServers.set(descriptor.id, message);
+        errors.push(descriptor.id + ': ' + message);
       }
     }
-    return errors;
+    let released = false;
+    const lease: McpConnectionLease = {
+      poolKey,
+      projectRootPath: root,
+      descriptorHash,
+      release: async (options = {}) => {
+        if (released) return;
+        released = true;
+        await this.releasePool(poolKey, options.discardIfIdle === true);
+      },
+    };
+    return { errors, lease };
+  }
+
+  private async releasePool(poolKey: string, discardIfIdle: boolean): Promise<void> {
+    const pool = this.pools.get(poolKey);
+    if (!pool) return;
+    pool.activeTurnRefs = Math.max(0, pool.activeTurnRefs - 1);
+    pool.lastUsedAt = Date.now();
+    if (pool.activeTurnRefs > 0) return;
+    if (!discardIfIdle && !pool.superseded) return;
+    const projectKey = pool.projectRootPath ? this.projectKey(pool.projectRootPath) : null;
+    if (projectKey && this.activePoolByProject.get(projectKey) === poolKey) {
+      this.activePoolByProject.delete(projectKey);
+    }
+    await this.evictPool(pool);
+  }
+
+  private async ensurePoolServerConnected(
+    pool: ProjectMcpPool,
+    descriptor: AgentRuntimeMcpDescriptor,
+    projectRootPath?: string | null,
+  ): Promise<void> {
+    if (pool.manager.listServers().includes(descriptor.id)) return;
+    if (pool.closing) throw new Error('MCP pool ' + pool.key + ' is closing.');
+    const existing = pool.connecting.get(descriptor.id);
+    if (existing) return existing;
+    const pending = (async () => {
+      mcpTrustService.assertConnectAllowed(descriptor, projectRootPath);
+      await pool.manager.connect(this.toMcpServerConfig(descriptor));
+    })();
+    pool.connecting.set(descriptor.id, pending);
+    try {
+      await pending;
+    } finally {
+      if (pool.connecting.get(descriptor.id) === pending) pool.connecting.delete(descriptor.id);
+    }
+  }
+  private async evictPool(pool: ProjectMcpPool): Promise<void> {
+    if (pool.closing || pool.activeTurnRefs > 0) return;
+    pool.closing = true;
+    try {
+      await Promise.allSettled(pool.connecting.values());
+      await pool.manager.disconnectAll();
+    } finally {
+      if (this.pools.get(pool.key) === pool) this.pools.delete(pool.key);
+      const projectKey = pool.projectRootPath ? this.projectKey(pool.projectRootPath) : null;
+      if (projectKey && this.activePoolByProject.get(projectKey) === pool.key) {
+        this.activePoolByProject.delete(projectKey);
+      }
+    }
+  }
+
+  private resolveActivePool(projectRootPath?: string | null): ProjectMcpPool | undefined {
+    const key = projectRootPath ? this.activePoolByProject.get(this.projectKey(projectRootPath)) : undefined;
+    if (key) return this.pools.get(key);
+    if (!projectRootPath && this.pools.size === 1) return this.pools.values().next().value;
+    return undefined;
+  }
+
+  private projectKey(projectRootPath: string): string {
+    return path.resolve(projectRootPath).toLowerCase();
+  }
+
+  private poolKey(projectRootPath: string | null, descriptorHash: string): string {
+    return (projectRootPath ? this.projectKey(projectRootPath) : '<user>') + ':' + descriptorHash;
+  }
+
+  private descriptorSetHash(descriptors: readonly AgentRuntimeMcpDescriptor[]): string {
+    return createHash('sha256')
+      .update(JSON.stringify(descriptors.map((descriptor) => this.hashMcpDescriptor(descriptor)).sort()))
+      .digest('hex')
+      .slice(0, 24);
   }
 
   private hashMcpDescriptor(descriptor: AgentRuntimeMcpDescriptor): string {
@@ -127,13 +250,16 @@ export class McpConnectionCoordinator {
       .slice(0, 16);
   }
 
-  private getEnabledMcpDescriptors(agentId: AgentRole, projectRootPath?: string | null): AgentRuntimeMcpDescriptor[] {
-    const settings = settingsService.getAll();
-    const manifest = settings.agents.definitions.find((entry) => entry.id === agentId && entry.enabled);
-    const enabledIds = new Set(manifest?.mcpServers ?? []);
-    if (enabledIds.size === 0) {
-      return [];
-    }
+  private getEnabledMcpDescriptors(
+    _agentId: AgentRole,
+    projectRootPath?: string | null,
+    enabledMcpIds?: readonly string[],
+  ): AgentRuntimeMcpDescriptor[] {
+    // The caller must provide the frozen effective profile surface. An
+    // omitted list means that this turn has no enabled MCP servers; falling
+    // back to user settings would reintroduce prompt/runtime split-brain.
+    const ids = enabledMcpIds ?? [];
+    const enabledIds = new Set(ids);
     return agentRuntimeConfigService.listMcpServers(projectRootPath ?? undefined)
       .filter((server) => enabledIds.has(server.id) || enabledIds.has(server.name));
   }

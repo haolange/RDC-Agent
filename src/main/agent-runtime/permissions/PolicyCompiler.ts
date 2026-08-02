@@ -18,7 +18,10 @@ const DEFAULT_LIMITS = {
   maxToolCalls: Number.MAX_SAFE_INTEGER,
   maxSubagents: Number.MAX_SAFE_INTEGER,
   maxChildDepth: Number.MAX_SAFE_INTEGER,
+  maxWallTimeMs: Number.MAX_SAFE_INTEGER,
 } as const;
+
+const KNOWN_LIMIT_KEYS = new Set(['maxTurns', 'maxToolCalls', 'maxSubagents', 'maxChildDepth', 'maxWallTimeMs']);
 
 const EMPTY_POLICY: RestrictivePolicy = {
   deniedTools: [],
@@ -79,6 +82,9 @@ function sanitizeRestrictivePolicy(raw: unknown, sourcePath: string): Restrictiv
       throw new Error(`POLICY_INVALID: ${sourcePath} limits must be an object.`);
     }
     for (const [key, value] of Object.entries(input.limits as Record<string, unknown>)) {
+      if (!KNOWN_LIMIT_KEYS.has(key)) {
+        throw new Error(`POLICY_INVALID: unknown limit "${key}".`);
+      }
       limits[key] = assertFiniteNonNegative(key, value);
     }
   }
@@ -120,6 +126,9 @@ function loadPolicyDirectory(dir: string): RestrictivePolicy[] {
         `POLICY_INVALID: failed to parse ${sourcePath}: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
+    if (raw && typeof raw === 'object' && !Array.isArray(raw) && (raw as Record<string, unknown>).enabled === false) {
+      continue;
+    }
     policies.push(sanitizeRestrictivePolicy(raw, sourcePath));
   }
   return policies;
@@ -146,6 +155,7 @@ function compileRestrictivePolicy(policy: RestrictivePolicy, sourceFingerprint: 
     maxToolCalls: typeof limits.maxToolCalls === 'number' ? limits.maxToolCalls : DEFAULT_LIMITS.maxToolCalls,
     maxSubagents: typeof limits.maxSubagents === 'number' ? limits.maxSubagents : DEFAULT_LIMITS.maxSubagents,
     maxChildDepth: typeof limits.maxChildDepth === 'number' ? limits.maxChildDepth : DEFAULT_LIMITS.maxChildDepth,
+    maxWallTimeMs: typeof limits.maxWallTimeMs === 'number' ? limits.maxWallTimeMs : DEFAULT_LIMITS.maxWallTimeMs,
     sourceFingerprint,
   };
 }
