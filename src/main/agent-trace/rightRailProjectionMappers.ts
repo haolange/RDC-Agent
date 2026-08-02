@@ -1,4 +1,4 @@
-﻿import type { ActionEvent } from '@shared/types/evidence';
+import path from 'path';
 import type { AppMode, ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type {
   ArtifactsPanelViewModel,
@@ -98,46 +98,41 @@ export function mapRightRailArtifacts(input: {
 }
 
 const running = new Set<RunSummary['status']>(['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping']);
-const toolName = (event: ActionEvent): string | null => {
-  const value = event.payload.toolName ?? event.payload.tool_name;
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
+const dedupeTaskResources = (resources: TaskContextResource[]): TaskContextResource[] => {
+  const seen = new Set<string>();
+  return resources.filter((resource) => {
+    const identity = resource.path
+      ? 'path:' + path.normalize(resource.path).replaceAll('\\', '/').toLocaleLowerCase()
+      : resource.id;
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
 };
 
 export function buildTaskContext(input: {
   session: SessionRecord;
   project: ProjectRecord | null;
   runs: RunSummary[];
-  events: ActionEvent[];
   attachments: SessionArtifactSource[];
-  usedToolNames: string[];
+  resources: TaskContextResource[];
   mode: AppMode;
-  settings: { agentRuntime: { permissions: { mode: string } }; agents: { definitions: Array<{ id: string; enabled: boolean; skills?: string[]; mcpServers?: string[] }> } };
+  permissionMode: string;
 }): ContextPanelViewModel['task'] {
   const latest = input.runs.slice().sort((left, right) => (right.startedAt ?? 0) - (left.startedAt ?? 0))[0];
   const mode = latest?.mode ?? input.mode;
   const profile = agentProfileRegistry.getForMode(mode);
-  const definition = input.settings.agents.definitions.find((entry) => entry.id === mode && entry.enabled);
   const resources: TaskContextResource[] = input.attachments.filter((item) => item.kind === 'attachment').map((item) => ({
     id: `attachment:${item.id}`, kind: 'attachment', label: item.title, summary: item.filePath, path: item.filePath, state: 'active',
   }));
-  for (const skill of definition?.skills ?? []) resources.push({ id: `skill:${skill}`, kind: 'skill', label: skill, state: 'preloaded' });
-  for (const mcp of definition?.mcpServers ?? []) resources.push({ id: `mcp:${mcp}`, kind: 'mcp', label: mcp, state: 'preloaded' });
-  const usedTools = [
-    ...input.events.map(toolName).filter((value): value is string => Boolean(value)),
-    ...input.usedToolNames,
-  ];
-  for (const name of Array.from(new Set(usedTools)).slice(-8)) {
-    resources.push({ id: `tool:${name}`, kind: 'tool', label: name, state: 'used' });
-  }
-  for (const reference of Array.from(new Set(input.events.flatMap((event) => event.refs))).slice(-6)) {
-    resources.push({ id: `reference:${reference}`, kind: 'reference', label: reference, state: 'used' });
-  }
+  resources.push(...input.resources);
+  const distinctResources = dedupeTaskResources(resources);
   return {
     projectId: input.session.projectId, projectName: input.project?.name ?? input.session.projectId,
     sessionId: input.session.sessionId, sessionTitle: input.session.title, workingDirectory: input.session.sessionPath,
     configurationPhase: latest && running.has(latest.status) ? 'current_turn' : 'next_turn',
-    agentProfile: profile.displayName, permission: input.settings.agentRuntime.permissions.mode,
-    resources,
+    agentProfile: profile.displayName, permission: input.permissionMode,
+    resources: distinctResources,
   };
 }
 

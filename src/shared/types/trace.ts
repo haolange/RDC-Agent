@@ -1,4 +1,4 @@
-﻿export type PlanStatus =
+export type PlanStatus =
   | 'draft'
   | 'awaiting_approval'
   | 'accepted'
@@ -145,9 +145,11 @@ export interface ArtifactsPanelViewModel {
 export type TaskContextResourceKind =
   | 'attachment'
   | 'reference'
+  | 'file'
+  | 'directory'
   | 'skill'
   | 'mcp'
-  | 'tool';
+  | 'web';
 
 export interface TaskContextResource {
   id: string;
@@ -156,6 +158,7 @@ export interface TaskContextResource {
   summary?: string;
   state?: 'active' | 'preloaded' | 'used' | 'available';
   path?: string;
+  url?: string;
 }
 
 export interface TaskContextPanelViewModel {

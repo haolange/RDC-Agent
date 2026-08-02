@@ -204,8 +204,11 @@ const heroOnlyResponsiveCss = heroOnlyResponsiveStart >= 0 && contextMetricRespo
   : '';
 requireCssContract(
   cssBlock(appShellCss, '.context-breakdown-run-columns').includes('grid-template-columns: max-content max-content max-content;')
+    && cssBlock(appShellCss, '.context-breakdown-run-columns').includes('column-gap: clamp(0px, calc((100% - 32rem) / 2), var(--space-6));')
     && cssBlock(appShellCss, '.context-breakdown-run-columns').includes('justify-content: start;')
     && contextMetricResponsiveCss.includes('grid-template-columns: minmax(0, 1fr);')
+    && cssBlock(appShellCss, '.context-breakdown-run-col + .context-breakdown-run-col').includes('padding-inline-end: var(--space-4);')
+    && cssBlock(appShellCss, ".context-breakdown-run-col[data-col='reasoning']").includes('padding-inline-end: 0;')
     && contextMetricResponsiveCss.includes('flex-wrap: wrap;')
     && !heroOnlyResponsiveCss.includes('grid-template-columns: minmax(0, 1fr);')
     && !heroOnlyResponsiveCss.includes('flex-wrap: wrap;'),

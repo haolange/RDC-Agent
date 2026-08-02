@@ -904,7 +904,7 @@ html[data-resolved-theme='light'] .app-main {
 .context-breakdown-run-columns {
   display: grid;
   grid-template-columns: max-content max-content max-content;
-  column-gap: 0;
+  column-gap: clamp(0px, calc((100% - 32rem) / 2), var(--space-6));
   row-gap: var(--space-3);
   min-width: 0;
   align-items: start;
@@ -923,6 +923,10 @@ html[data-resolved-theme='light'] .app-main {
 .context-breakdown-run-col + .context-breakdown-run-col {
   border-inline-start: 1px solid var(--token-border-subtle);
   padding-inline-start: var(--space-4);
+  padding-inline-end: var(--space-4);
+}
+
+.context-breakdown-run-col[data-col='reasoning'] {
   padding-inline-end: 0;
 }
 

@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { ContextSnapshot, OpenedCaptureState, RunSummary } from '@shared/types/session';
 import type { TraceArtifactRecord } from '@shared/types/trace';
 import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
@@ -80,13 +80,21 @@ describe('right rail projection mappers', () => {
     expect(result.runtime).toMatchObject({ contextId: 'context-a', replaySessionId: 'rdx-session-a', runtimeOwner: 'rdc-agent', ownerLeaseId: 'lease-a', remoteId: 'remote-a', remoteStatus: 'connected' });
   });
 
-  it('keeps main-owned used tools visible when the action chain has not persisted yet', () => {
+  it('projects concrete resources and deduplicates attachments by canonical path', () => {
+    const attachment = { ...source('input', 'attachment'), title: 'DESIGN.md', filePath: 'D:/project/DESIGN.md' };
     const result = buildTaskContext({
       session: { sessionId: 'session-a', projectId: 'project-a', title: 'Session', sessionPath: 'D:/session' } as never,
-      project: { projectId: 'project-a', name: 'Project' } as never, runs: [], events: [], attachments: [], mode: 'debugger',
-      usedToolNames: ['rdx_context', 'glob'],
-      settings: { agentRuntime: { permissions: { mode: 'default' } }, agents: { definitions: [] } },
+      project: { projectId: 'project-a', name: 'Project' } as never,
+      runs: [],
+      attachments: [attachment],
+      resources: [
+        { id: 'file:duplicate', kind: 'file', label: 'DESIGN.md', path: 'D:/project/DESIGN.md', state: 'used' },
+        { id: 'mcp:renderdoc:inspect', kind: 'mcp', label: 'inspect', summary: 'renderdoc', state: 'used' },
+      ],
+      mode: 'debugger',
+      permissionMode: 'default',
     });
-    expect(result.resources.map((resource) => resource.label)).toEqual(['rdx_context', 'glob']);
+    expect(result.resources.map((resource) => resource.label)).toEqual(['DESIGN.md', 'inspect']);
+    expect(result.resources.every((resource) => resource.kind !== ('tool' as never))).toBe(true);
   });
 });
