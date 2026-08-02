@@ -28,6 +28,7 @@ const lineCount = (relativePath) => read(relativePath).split(/\r?\n/).length;
 const requiredFiles = [
   'src/main/agent-trace/RightRailProjectionService.ts',
   'src/main/agent-trace/rightRailProjectionMappers.ts',
+  'src/main/agent-trace/rightRailTaskContextResources.ts',
   'src/main/reports/OutputRegistrationTool.ts',
   'src/main/sessions/SessionArtifactSource.ts',
   'src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx',
@@ -106,6 +107,9 @@ for (const forbidden of ['context?: ContextPanelViewModel', 'Rdx', 'Capture', 'P
   forbidText(context, forbidden, `RightRailContext must not retain ${forbidden}`);
 }
 
+for (const forbidden of ['TOOL_LABELS', 'Runtime lookup', 'displayLabel']) {
+  forbidText(context, forbidden, 'RightRailContext must not project generic tool category ' + forbidden);
+}
 const capturePanel = read('src/renderer/features/debugger/ControlPanel/CapturePanel.tsx');
 for (const required of ['RdxContextPanelViewModel', "'Open'", "'Preview'", "'Refresh'", "'Copy'", "'Clear'", 'capture.openProjectInput', 'context.openHumanPreview', 'capture.clearOpenedState', 'right-rail-capture-open-row', 'right-rail-capture-open-button']) {
   requireText(capturePanel, required, `CapturePanel must retain ${required}`);
@@ -138,11 +142,21 @@ for (const forbidden of ['groups:', 'session:outputs:list', 'previewMarkdown', '
   forbidText(traceTypes, forbidden, `trace contract must not retain ${forbidden}`);
 }
 
+const taskContextResources = read('src/main/agent-trace/rightRailTaskContextResources.ts');
+for (const required of ['promptSegments', 'resourceRefs', "tool.status === 'complete'", "segment.kind === 'preloaded-skill'", "segment.kind === 'scoped-instruction'"]) {
+  requireText(taskContextResources, required, 'task Context resources must retain ' + required);
+}
+for (const forbidden of ['argsPreview', 'resultPreview', 'configuredTools', 'settings.agents.definitions', 'collectSessionUsedToolNames']) {
+  forbidText(taskContextResources, forbidden, 'task Context resources must not infer from ' + forbidden);
+}
 const projection = read('src/main/agent-trace/rightRailProjectionMappers.ts');
 for (const forbidden of ['ToolRuntimeSummary', 'cliSummary', 'toolCount', 'session_plan', 'run_report', 'action_output', 'previewMarkdown']) {
   forbidText(projection, forbidden, `right rail projection must not retain ${forbidden}`);
 }
 
+for (const forbidden of ['usedToolNames', "kind: 'tool'", 'settings.agents.definitions']) {
+  forbidText(projection, forbidden, 'right rail projection must not retain generic resource path ' + forbidden);
+}
 const artifactSource = read('src/main/sessions/SessionArtifactSource.ts');
 for (const required of ['export type SessionArtifactSourceKind = \'attachment\' | \'output\'', 'categorizeOutput', 'artifactStore.list']) {
   requireText(artifactSource, required, `SessionArtifactSource must retain ${required}`);

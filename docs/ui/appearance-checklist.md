@@ -39,7 +39,7 @@
 - 发送后计量相位依次为 `Preparing` / `Current request ~` / provider `Actual`。
   - 圆环环面只显示 `%` / `—` / `…`，阶段文案仅在 title/aria 与 Context breakdown 弹层。
   - 弹层始终使用同一 hero、分段条、Tokens | Cache | Reasoning 和 Details 结构：Preparing 尚无新快照时保留最近真实计量，Current request 显示 prepared 预估，完全无遥测显示 `—`，不制造假 0 或切换到独立空态。
-- Actual / Last actual 在弹层宽度大于 `33rem` 时保持内容宽度驱动的同行三栏 Tokens | Cache | Reasoning（Cache：省 tokens、最近一轮%、累计%、命中/未命中；缺遥测显示 `—`，禁止假 0 / 假 0%）；只有真实窄屏才纵向堆叠，禁止用比例列制造组间大空白。
+- Actual / Last actual 在弹层宽度大于 `33rem` 时保持内容宽度驱动的同行三栏 Tokens | Cache | Reasoning（Cache：省 tokens、最近一轮%、累计%、命中/未命中；缺遥测显示 `—`，禁止假 0 / 假 0%）；分隔线两侧保留稳定内间距，最长的 Cache 值不得贴住下一组；只有真实窄屏才纵向堆叠，禁止用比例列制造组间大空白。
 - 缩窗只在发送 preflight 内派生压缩视图而不提前改写历史。
 
 ## Composer Effort 滑杆

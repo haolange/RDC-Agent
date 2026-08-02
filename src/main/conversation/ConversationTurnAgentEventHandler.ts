@@ -11,7 +11,9 @@ import type {
 } from '@shared/types/conversation';
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
 import { nowMs } from '@shared/utils/id';
+import type { ToolCallResult } from '@shared/types/tool';
 import { buildToolResultPreview } from '@shared/utils/toolResultPreview';
+import { extractConversationToolResourceRefs } from './ConversationToolResourceRefs';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { shouldProjectDiagnosticToWorkProcess } from './workProcessDiagnosticPolicy';
@@ -491,7 +493,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               });
             }
             if (event.type === 'tool.completed') {
-              const result = event.payload.result as { ok?: boolean; error?: { message?: string } } | undefined;
+              const result = event.payload.result as ToolCallResult | undefined;
               const isAskUserTool = normalizeToolName(String(event.payload.toolName)) === 'ask_user';
               const isHandoffTool = normalizeToolName(String(event.payload.toolName)) === 'agent_handoff';
               if (isAskUserTool && result?.ok) {
@@ -508,6 +510,8 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                 error: result?.ok ? undefined : result?.error?.message,
                 completedAt: nowMs(),
               };
+              const resourceRefs = extractConversationToolResourceRefs(String(event.payload.toolName), result);
+              if (resourceRefs.length > 0) toolCallPatch.resourceRefs = resourceRefs;
               if (!(isAskUserTool && result?.ok)) {
                 toolCallPatch.resultPreview = buildToolResultPreview(event.payload.result ?? {});
               }

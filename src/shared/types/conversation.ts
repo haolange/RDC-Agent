@@ -38,6 +38,21 @@ export type ConversationWorkBlockKind =
 
 export type ConversationToolCallStatus = 'pending' | 'running' | 'complete' | 'error' | 'skipped';
 
+export type ConversationToolResourceKind = 'file' | 'directory' | 'skill' | 'mcp' | 'web';
+
+/**
+ * Sanitized resource evidence emitted by a successful tool call.
+ * Arbitrary tool arguments and result payloads must never be copied here.
+ */
+export interface ConversationToolResourceRef {
+  id: string;
+  kind: ConversationToolResourceKind;
+  label: string;
+  summary?: string;
+  path?: string;
+  url?: string;
+}
+
 export type ConversationThinkingStatus = 'streaming' | 'complete';
 
 export type ConversationLoopResultStatus = 'streaming' | 'complete';
@@ -82,6 +97,8 @@ export interface ConversationToolCall {
   userInputQuestions?: ConversationAskUserQuestion[];
   argsPreview?: string;
   resultPreview?: string;
+  /** Canonical, non-sensitive resources proven by this tool result. */
+  resourceRefs?: ConversationToolResourceRef[];
   error?: string;
   approval?: ConversationToolApproval;
   startedAt: number;

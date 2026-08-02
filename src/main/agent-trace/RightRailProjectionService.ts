@@ -1,4 +1,4 @@
-﻿import type { ActionEvent } from '@shared/types/evidence';
+import type { ActionEvent } from '@shared/types/evidence';
 import type { RunSummary } from '@shared/types/session';
 import type { AppMode } from '@shared/types/session';
 import type { RightPanelViewModel } from '@shared/types/trace';
@@ -7,7 +7,8 @@ import { rdxSessionService } from '../sessions';
 import { listSessionArtifactSources } from '../sessions/SessionArtifactSource';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { settingsService } from '../settings/SettingsService';
-import { collectSessionUsedToolNames } from './rightRailTaskContextResources';
+import { requestSnapshotStore } from '../agent-runtime/prompt';
+import { collectSessionTaskContextResources } from './rightRailTaskContextResources';
 import {
   buildRdxContext,
   buildTaskContext,
@@ -41,10 +42,11 @@ export class RightRailProjectionService {
     const session = storageAdapter.readSession(input.sessionId);
     if (!session) return emptyRightPanel(input.sessionId);
 
-    const [sources, taskRecords, conversations] = await Promise.all([
+    const [sources, taskRecords, conversations, requestSnapshots] = await Promise.all([
       listSessionArtifactSources(input.sessionId),
       createSessionTaskStore(input.sessionId).listTasks().catch(() => []),
       Promise.resolve(storageAdapter.readConversationHistory(input.sessionId)),
+      Promise.resolve().then(() => requestSnapshotStore.list(input.sessionId)).catch(() => []),
     ]);
     const project = storageAdapter.getProjectById(session.projectId);
     const openedCapture = rdxSessionService.snapshotOpenedCaptureForSession({
@@ -59,10 +61,16 @@ export class RightRailProjectionService {
     const artifacts = mapRightRailArtifacts({
       sessionId: input.sessionId, branchId: input.branchId, sources, runs: input.runs,
     });
+    const settings = settingsService.getAll();
+    const taskResources = collectSessionTaskContextResources({
+      messages: conversations,
+      promptSegments: requestSnapshots.flatMap((snapshot) => snapshot.promptPlan.segments),
+      projectRoot: project?.rootPath,
+    });
     const task = buildTaskContext({
-      session, project, runs: input.runs, events: input.events, mode: input.mode,
-      attachments: sources, settings: settingsService.getAll(),
-      usedToolNames: collectSessionUsedToolNames(conversations),
+      session, project, runs: input.runs, mode: input.mode,
+      attachments: sources, resources: taskResources,
+      permissionMode: settings.agentRuntime.permissions.mode,
     });
     const rdx = buildRdxContext({
       openedCapture,

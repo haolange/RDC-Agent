@@ -80,6 +80,7 @@ function cloneToolCall(toolCall: ConversationToolCall): ConversationToolCall {
       ...question,
       options: question.options.map((option) => ({ ...option })),
     })),
+    resourceRefs: toolCall.resourceRefs?.map((resource) => ({ ...resource })),
     approval: toolCall.approval ? { ...toolCall.approval } : undefined,
   };
 }
@@ -277,6 +278,9 @@ export function upsertRuntimeToolCall(
             options: question.options.map((option) => ({ ...option })),
           }))
         : existingToolCall.userInputQuestions,
+      resourceRefs: patch.resourceRefs
+        ? patch.resourceRefs.map((resource) => ({ ...resource }))
+        : existingToolCall.resourceRefs?.map((resource) => ({ ...resource })),
       approval: nextApproval,
     };
   } else {
@@ -291,6 +295,7 @@ export function upsertRuntimeToolCall(
       })),
       argsPreview: patch.argsPreview,
       resultPreview: patch.resultPreview,
+      resourceRefs: patch.resourceRefs?.map((resource) => ({ ...resource })),
       error: patch.error,
       approval: patch.approval ? { ...patch.approval } : undefined,
       startedAt: patch.startedAt ?? nowMs(),
