@@ -68,6 +68,23 @@ describe('MemoryStore explicit scoped storage', () => {
     expect((await store.listMemories()).map((record) => record.displayName).sort()).toEqual(['Race Name', 'Race-Name']);
   });
 
+  it('serializes writes from separate store instances targeting the same real directory', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-memory-instance-race-'));
+    roots.push(root);
+    const firstStore = new MemoryStore(root);
+    const secondStore = new MemoryStore(path.join(root, '.'));
+    const [first, second] = await Promise.all([
+      firstStore.writeMemory({ name: 'Instance Race', description: 'first', type: 'user', content: 'one' }),
+      secondStore.writeMemory({ name: 'Instance-Race', description: 'second', type: 'user', content: 'two' }),
+    ]);
+
+    expect(first.name).not.toBe(second.name);
+    expect((await firstStore.listMemories()).map((record) => record.displayName).sort()).toEqual([
+      'Instance Race',
+      'Instance-Race',
+    ]);
+  });
+
   it('keeps user and project stores physically isolated', async () => {
     const userRoot = await mkdtemp(path.join(os.tmpdir(), 'rdx-user-memory-'));
     const projectRoot = await mkdtemp(path.join(os.tmpdir(), 'rdx-project-memory-'));

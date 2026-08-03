@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AssistantMessage, ToolResultMessage } from '../core/types';
+import type { AssistantMessage, ToolDefinition, ToolResultMessage } from '../core/types';
 import {
   createToolRoundFingerprint,
   LoopProgressGuard,
@@ -79,5 +79,30 @@ describe('LoopProgressGuard', () => {
       2,
     );
     expect(second).toBe(first);
+  });
+
+  it('exempts only rounds whose calls are all known and explicitly pollable, then resets matching state', () => {
+    const guard = new LoopProgressGuard();
+    const pollableDefinition: ToolDefinition = {
+      name: 'task_list',
+      description: 'List tasks',
+      parameters: { type: 'object' },
+      pollable: true,
+    };
+
+    expect(guard.observe(toolRound(), [result()], 4, [pollableDefinition])).toMatchObject({
+      action: 'continue',
+      consecutiveMatches: 0,
+    });
+    expect(guard.observe(toolRound(), [result()], 4, [pollableDefinition])).toMatchObject({
+      action: 'continue',
+      consecutiveMatches: 0,
+    });
+
+    // A missing definition is not treated as pollable and starts a normal guard round.
+    expect(guard.observe(toolRound(), [result()], 4)).toMatchObject({
+      action: 'continue',
+      consecutiveMatches: 1,
+    });
   });
 });

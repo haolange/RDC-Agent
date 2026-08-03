@@ -3,7 +3,9 @@
  */
 
 import { app, BrowserWindow, dialog, Menu, session, shell } from 'electron';
+import { randomBytes } from 'crypto';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -165,10 +167,32 @@ function installRendererSecurityPolicy(): void {
   });
 }
 
-const userDataPath = resolveCanonicalUserDataPath(
-  process.env.RDC_AGENT_USER_DATA,
-  app.getPath('appData'),
-);
+const qaUserDataRoot = path.resolve(os.tmpdir(), 'rdc-agent');
+const qaDisposableUserDataPattern = /^qa-[0-9]+-[0-9a-f]{16}$/;
+
+function createDisposableBrowserQaUserData(): string {
+  fs.mkdirSync(qaUserDataRoot, { recursive: true });
+  return path.join(qaUserDataRoot, `qa-${Date.now()}-${randomBytes(8).toString('hex')}`);
+}
+
+function isValidatedDisposableBrowserQaUserData(targetPath: string): boolean {
+  const resolved = path.resolve(targetPath);
+  const relativePath = path.relative(qaUserDataRoot, resolved);
+  return relativePath !== ''
+    && !relativePath.startsWith('..')
+    && !path.isAbsolute(relativePath)
+    && qaDisposableUserDataPattern.test(path.basename(resolved));
+}
+
+const explicitUserDataPath = process.env.RDC_AGENT_USER_DATA?.trim();
+const useDisposableBrowserQaUserData = process.env.RDC_AGENT_BROWSER_QA === '1'
+  && !explicitUserDataPath
+  && process.env.RDC_AGENT_USE_CANONICAL_USERDATA !== '1';
+const userDataPath = useDisposableBrowserQaUserData
+  ? createDisposableBrowserQaUserData()
+  : resolveCanonicalUserDataPath(explicitUserDataPath, app.getPath('appData'));
+const cleanupDisposableBrowserQaUserData = useDisposableBrowserQaUserData
+  && isValidatedDisposableBrowserQaUserData(userDataPath);
 process.env.RDC_AGENT_USER_DATA = userDataPath;
 fs.mkdirSync(userDataPath, { recursive: true });
 app.commandLine.appendSwitch('user-data-dir', userDataPath);
@@ -188,6 +212,16 @@ if (!userDataLock.acquired) {
   app.exit(1);
 } else {
   process.once('exit', userDataLock.release);
+  if (cleanupDisposableBrowserQaUserData) {
+    app.once('will-quit', () => {
+      if (!isValidatedDisposableBrowserQaUserData(userDataPath)) return;
+      try {
+        fs.rmSync(userDataPath, { recursive: true, force: true });
+      } catch (error) {
+        console.warn(`[RDC-Agent] Failed to clean disposable Browser QA userData: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    });
+  }
 }
 
 // Both carriers own the canonical userData lock above. The headless Browser

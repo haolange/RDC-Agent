@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { AssistantMessage, ToolCall, ToolResultMessage } from '../core/types';
+import type { AssistantMessage, ToolCall, ToolDefinition, ToolResultMessage } from '../core/types';
 
 export type AgentLoopTerminationCode =
   | 'AGENT_NO_PROGRESS'
@@ -51,12 +51,25 @@ export class LoopProgressGuard {
     assistantMessage: AssistantMessage,
     toolResults: readonly ToolResultMessage[],
     runtimeRevision: number,
+    toolDefinitions: readonly ToolDefinition[] = [],
   ): LoopProgressObservation {
     const fingerprint = createToolRoundFingerprint(
       assistantMessage,
       toolResults,
       runtimeRevision,
     );
+    const toolCalls = assistantMessage.content.filter(
+      (block): block is ToolCall => block.type === 'toolCall',
+    );
+    const definitions = new Map(toolDefinitions.map((definition) => [definition.name, definition]));
+    const allPollable = toolCalls.length > 0 && toolCalls.every((toolCall) => (
+      definitions.get(toolCall.name)?.pollable === true
+    ));
+    if (allPollable) {
+      this.previousFingerprint = null;
+      this.consecutiveMatches = 0;
+      return { fingerprint, consecutiveMatches: 0, action: 'continue' };
+    }
     if (fingerprint === this.previousFingerprint) {
       this.consecutiveMatches += 1;
     } else {

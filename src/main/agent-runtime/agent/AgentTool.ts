@@ -47,6 +47,7 @@ export interface AgentTool<
   readonly label?: string;
   readonly description: string;
   readonly parameters: JsonSchema;
+  readonly pollable?: boolean;
   readonly permissionHint?: AgentToolPermissionHint;
   readonly spec?: AgentToolSpec;
 
@@ -59,10 +60,11 @@ export interface AgentTool<
   ): Promise<AgentToolResult<TDetails>>;
 }
 
-export function toolToDefinition(tool: Pick<AgentTool, 'name' | 'description' | 'parameters'>): ToolDefinition {
+export function toolToDefinition(tool: Pick<AgentTool, 'name' | 'description' | 'parameters' | 'pollable'>): ToolDefinition {
   return {
     name: tool.name,
     description: tool.description,
     parameters: tool.parameters,
+    ...(tool.pollable ? { pollable: true } : {}),
   };
 }

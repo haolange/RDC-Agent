@@ -11,6 +11,7 @@ interface JsonRpcResponse {
 }
 
 export const MAX_MCP_BUFFER_BYTES = 1 * 1024 * 1024;
+export const MAX_SSE_EVENT_BYTES = MAX_MCP_BUFFER_BYTES;
 
 function serializeJsonRpcPayload(payload: Record<string, unknown>, suffix = ''): string {
   const body = JSON.stringify(payload) + suffix;
@@ -49,6 +50,22 @@ function createTimedAbortController(parent: AbortSignal, timeoutMs: number): { c
   const timer = setTimeout(() => controller.abort(new Error('MCP request timed out')), timeoutMs);
   timer.unref?.();
   return { controller, clear: () => { clearTimeout(timer); parent.removeEventListener('abort', forward); } };
+}
+
+function createHeaderTimeoutController(parent: AbortSignal, timeoutMs: number): { controller: AbortController; clear: () => void } {
+  const controller = new AbortController();
+  const forward = () => controller.abort(parent.reason);
+  if (parent.aborted) controller.abort(parent.reason);
+  else parent.addEventListener('abort', forward, { once: true });
+  const timer = setTimeout(() => controller.abort(new Error('MCP SSE connection timed out')), timeoutMs);
+  timer.unref?.();
+  return {
+    controller,
+    clear: () => {
+      clearTimeout(timer);
+      parent.removeEventListener('abort', forward);
+    },
+  };
 }
 
 
@@ -192,12 +209,13 @@ export class SseRpcClient {
     { resolve: (v: unknown) => void; reject: (e: Error) => void }
   >();
   private closed = false;
-  private abortController = new AbortController();
+  private readonly abortController = new AbortController();
+  private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
 
   constructor(private readonly baseUrl: string) {}
 
   async connect(timeoutMs: number): Promise<void> {
-    const timed = createTimedAbortController(this.abortController.signal, timeoutMs);
+    const timed = createHeaderTimeoutController(this.abortController.signal, timeoutMs);
     try {
       const response = await fetch(this.baseUrl, {
         method: 'GET',
@@ -215,36 +233,52 @@ export class SseRpcClient {
 
   private async readSseStream(body: ReadableStream<Uint8Array>): Promise<void> {
     const reader = body.getReader();
+    this.reader = reader;
     const decoder = new TextDecoder();
     let buffer = '';
     let currentEvent = '';
+    const flushEvent = (): void => {
+      if (!currentEvent) return;
+      this.processEvent(currentEvent);
+      currentEvent = '';
+    };
+    const processLine = (rawLine: string): void => {
+      const line = rawLine.endsWith('\r') ? rawLine.slice(0, -1) : rawLine;
+      if (line === '') {
+        flushEvent();
+        return;
+      }
+      if (!line.startsWith('data: ')) return;
+      const nextEvent = currentEvent + line.slice(6);
+      if (Buffer.byteLength(nextEvent, 'utf8') > MAX_SSE_EVENT_BYTES) {
+        throw new Error(`MCP SSE event exceeded ${MAX_SSE_EVENT_BYTES} bytes`);
+      }
+      currentEvent = nextEvent;
+    };
 
     try {
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        if (Buffer.byteLength(buffer, 'utf8') > MAX_MCP_BUFFER_BYTES) {
-          throw new Error(`MCP SSE buffer exceeded ${MAX_MCP_BUFFER_BYTES} bytes`);
+        if (Buffer.byteLength(buffer, 'utf8') > MAX_SSE_EVENT_BYTES) {
+          throw new Error(`MCP SSE line exceeded ${MAX_SSE_EVENT_BYTES} bytes`);
         }
 
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-
-        for (const rawLine of lines) {
-          const line = rawLine.trimEnd();
-          if (line === '') {
-            if (currentEvent) {
-              this.processEvent(currentEvent);
-              currentEvent = '';
-            }
-            continue;
-          }
-          if (line.startsWith('data: ')) {
-            currentEvent += line.slice(6);
-          }
+        let newlineIndex = buffer.indexOf('\n');
+        while (newlineIndex >= 0) {
+          processLine(buffer.slice(0, newlineIndex));
+          buffer = buffer.slice(newlineIndex + 1);
+          newlineIndex = buffer.indexOf('\n');
         }
       }
+      buffer += decoder.decode();
+      if (Buffer.byteLength(buffer, 'utf8') > MAX_SSE_EVENT_BYTES) {
+        throw new Error(`MCP SSE line exceeded ${MAX_SSE_EVENT_BYTES} bytes`);
+      }
+      if (buffer) processLine(buffer);
+      flushEvent();
+      if (!this.closed) this.onClose(new Error('MCP SSE connection closed'));
     } catch (err) {
       if (!this.closed) {
         this.onClose(
@@ -253,10 +287,7 @@ export class SseRpcClient {
       }
     } finally {
       try { reader.releaseLock(); } catch { /* ignore */ }
-    }
-
-    if (currentEvent) {
-      this.processEvent(currentEvent);
+      if (this.reader === reader) this.reader = null;
     }
   }
 
@@ -281,6 +312,7 @@ export class SseRpcClient {
   private onClose(err: Error): void {
     if (this.closed) return;
     this.closed = true;
+    void this.reader?.cancel().catch(() => undefined);
     for (const entry of this.pending.values()) {
       entry.reject(err);
     }
