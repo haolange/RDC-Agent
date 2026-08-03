@@ -35,8 +35,8 @@ function normalizeToolName(name: string): string {
 }
 
 function assertFiniteNonNegative(key: string, value: unknown): number {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-    throw new Error(`POLICY_INVALID: limit "${key}" must be a non-negative finite number.`);
+  if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
+    throw new Error(`POLICY_INVALID: limit "${key}" must be a non-negative integer.`);
   }
   return value;
 }

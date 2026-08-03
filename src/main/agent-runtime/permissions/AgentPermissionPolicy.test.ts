@@ -271,6 +271,19 @@ describe('AgentPermissionPolicyService hard deny and path extract', () => {
     expect(decision.action).toBe('deny');
     expect(decision.reason).toMatch(/deniedTools/i);
   });
+
+  it('enforces compiled approval floors even in full-access mode', () => {
+    const compiledPolicy = compilePolicyFromRestrictive({
+      approvalFloorByTool: { read_file: 'user' },
+    });
+    const decision = service.evaluate({
+      tool: readFileTool,
+      toolCall: makeReadFileToolCall(path.join(workspaceRoot, 'src', 'main.ts')),
+      projectRootPath: workspaceRoot,
+      compiledPolicy,
+    });
+    expect(decision.action).toBe('ask_user');
+  });
 });
 
 describe('AgentPermissionPolicyService shell risk classifier', () => {

@@ -57,12 +57,23 @@ export interface PolicyBudgetState {
   maxWallTimeMs: number;
 }
 
+export function assertPolicyWallTimeAllowed(maxWallTimeMs: number): void {
+  if (maxWallTimeMs === 0) {
+    throw new Error('POLICY_MAX_WALL_TIME_ZERO: maxWallTimeMs must be greater than zero for an executable turn.');
+  }
+}
+
 export function createPolicyBudgetState(
   policy?: Pick<CompiledPolicy, 'maxToolCalls' | 'maxSubagents' | 'maxChildDepth' | 'maxWallTimeMs'>,
   childDepth = 0,
   shared?: PolicyBudgetState,
 ): PolicyBudgetState {
-  if (shared) return shared;
+  if (shared) {
+    assertPolicyWallTimeAllowed(shared.maxWallTimeMs);
+    return shared;
+  }
+  const maxWallTimeMs = policy?.maxWallTimeMs ?? Number.MAX_SAFE_INTEGER;
+  assertPolicyWallTimeAllowed(maxWallTimeMs);
   return {
     toolCalls: 0,
     subagents: 0,
@@ -71,7 +82,7 @@ export function createPolicyBudgetState(
     maxToolCalls: policy?.maxToolCalls ?? Number.MAX_SAFE_INTEGER,
     maxSubagents: policy?.maxSubagents ?? Number.MAX_SAFE_INTEGER,
     maxChildDepth: policy?.maxChildDepth ?? Number.MAX_SAFE_INTEGER,
-    maxWallTimeMs: policy?.maxWallTimeMs ?? Number.MAX_SAFE_INTEGER,
+    maxWallTimeMs,
   };
 }
 
@@ -187,6 +198,7 @@ export class TurnHandle {
     this.abortController = new AbortController();
     this.subagentBudget = input.subagentBudget ?? createSubagentBudgetState();
     this.policyBudget = input.policyBudget ?? createPolicyBudgetState();
+    assertPolicyWallTimeAllowed(this.policyBudget.maxWallTimeMs);
     if (this.policyBudget.maxWallTimeMs > 0 && this.policyBudget.maxWallTimeMs < 2_147_000_000) {
       this.wallTimer = setTimeout(() => {
         void this.abortAndJoin({ reason: 'timeout' });

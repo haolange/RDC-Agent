@@ -5,6 +5,8 @@ import {
   createSubagentBudgetState,
   assertSubagentBudgetAllowsChild,
   DEFAULT_SUBAGENT_BUDGET,
+  createPolicyBudgetState,
+  assertPolicyWallTimeAllowed,
 } from './TurnCoordinator';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 
@@ -129,5 +131,30 @@ describe('SubagentBudget', () => {
       subagentBudget: createSubagentBudgetState(DEFAULT_SUBAGENT_BUDGET, 1),
     });
     expect(parent.subagentBudget.depth).toBe(1);
+  });
+
+  it('rejects a zero policy wall time before creating a timer', () => {
+    expect(() => createPolicyBudgetState({
+      maxToolCalls: 1,
+      maxSubagents: 1,
+      maxChildDepth: 1,
+      maxWallTimeMs: 0,
+    })).toThrow(/POLICY_MAX_WALL_TIME_ZERO/);
+    expect(() => assertPolicyWallTimeAllowed(0)).toThrow(/POLICY_MAX_WALL_TIME_ZERO/);
+    expect(() => new TurnHandle({
+      sessionKey: 's',
+      turnId: 't',
+      generation: 1,
+      policyBudget: {
+        toolCalls: 0,
+        subagents: 0,
+        childDepth: 0,
+        wallStartedAt: Date.now(),
+        maxToolCalls: 1,
+        maxSubagents: 1,
+        maxChildDepth: 1,
+        maxWallTimeMs: 0,
+      },
+    })).toThrow(/POLICY_MAX_WALL_TIME_ZERO/);
   });
 });

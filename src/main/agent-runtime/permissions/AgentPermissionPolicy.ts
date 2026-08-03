@@ -270,10 +270,10 @@ export class AgentPermissionPolicyService {
         toolName,
         input.tool.permissionHint,
       );
-      if (floor === 'user' && mode !== 'full-access') {
+      if (floor === 'user') {
         return request(mode, `Compiled policy requires approval for tool "${input.toolCall.name}".`, 'high');
       }
-      if (floor === 'auto_review' && mode !== 'full-access') {
+      if (floor === 'auto_review') {
         return { action: 'auto_review', reason: `Compiled policy requires auto-review for tool "${input.toolCall.name}".`, risk: 'medium', temporaryPathRoots: [] };
       }
     }
