@@ -31,11 +31,12 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 
 - **定位**：Debug / QA 验收辅助面；**不进 release 包默认运行路径**。仅 `pnpm run start:agent-browser`（或 launcher `--mode browser|browser-dev`）在 `RDC_AGENT_BROWSER_QA=1` 时启动；桌面 `desktop` / 发布 exe **不得**默认打开 Bridge。
 - 同产品 API、异传输：桌面 `preload → IPC` 与 Browser QA `BrowserAppBridge → HTTP/SSE` 共用 `src/shared/renderer-api` 的唯一 `ElectronAPI` 工厂、channel manifest 与 main handler registry；不是第二套 UI 或第二套能力面。
-- Authoritative entry: use the complete http://127.0.0.1:<port>/qa?qaBootstrap=... URL printed by the launcher. It mints a one-time rdcBridgeToken cookie and redirects to clean /app; /app?rdcBridgeToken=... is an explicit development fallback only.
-- **鉴权三元组**（`resolveProvidedBridgeToken`）：Bearer **或** query `rdcBridgeToken|token` **或** cookie `rdcBridgeToken`。禁止恢复「只认 `token`、打印 `rdcBridgeToken`」双轨。截断/无凭证 → **401 JSON**（`Content-Type: application/json`），勿当「已打开 Workbench」。
+- Authoritative entry: use the complete http://127.0.0.1:<port>/qa?qaBootstrap=... URL printed by the launcher. It consumes a one-time bootstrap, mints an HttpOnly `rdcBridgeToken` cookie (`SameSite=Strict`, and `Secure` for HTTPS), and redirects to clean `/app`. Dev Renderer uses a one-time challenge handshake; bridge auth is never placed in a URL query.
+- **鉴权**（`resolveProvidedBridgeToken`）：programmatic clients may use an explicit Bearer header; browser navigation and EventSource use the HttpOnly `rdcBridgeToken` cookie. Query `rdcBridgeToken|token` is never accepted. 截断/无凭证 → **401 JSON**（`Content-Type: application/json`），勿当「已打开 Workbench」。
+- Browser QA high-risk channels (`terminal:*`, `command:execute`, `settings:set`, `rdx-runtime:trustMcp`, `rdx-runtime:revokeMcp`) require the independent `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` opt-in and remain fail-closed without it. Headless Memory mutation auto-confirmation has the same gate; desktop keeps the native confirmation dialog.
 - 精确 Origin allowlist；仅 canonical renderer channel 且存在已注册 handler 时可调用。未知 channel、内部 channel、未注册 handler 与不存在的明文 `settings:getProviderSecret` → 403。
 - **完整产品面 parity**：Settings、Models Override、Terminal、Memory、Command、Tool Approval、MCP 状态、Hook/MCP trust/revoke/test 等 preload 已公开能力在 Browser 中走同一 main-owned Zod、PermissionPolicy、单次 approval token、MCP trust 与 `safeStorage` 边界；Browser 不保留拒绝桩或专用禁用 UI。完整矩阵见 [`docs/architecture/browser-qa-surface.md`](../architecture/browser-qa-surface.md)。
-- Browser / Browser-dev 默认解析与 Desktop 相同的 canonical userData。自动化 smoke 必须显式传入 disposable `RDC_AGENT_USER_DATA`；`instance.lock` 冲突 fail-closed，禁止静默切换到空配置。
+- Browser QA / Browser-dev 默认使用经过路径校验的 disposable `os.tmpdir()/rdc-agent/qa-*` userData，并在退出时清理；显式 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 才使用 canonical userData。`instance.lock` 冲突 fail-closed，禁止静默切换到空配置。
 - Smoke：`pnpm run smoke:agent-browser`（假定 bridge 已起或脚本拉起；**不**并入默认 release pack）。
 - 实现：`src/main/browserAppBridge/bridgeSecurity.ts`、`BrowserAppBridgeServer.ts`；测试：`bridgeSecurity.test.ts`、`BrowserAppBridgeServer.contract.test.ts`。
 
@@ -68,7 +69,7 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 
 ## Policy 编译
 
-`.policy.yml` 损坏或非法 → `POLICY_INVALID` fail-closed。Project policy 只能收紧，不能放宽。
+`.policy.yml` 损坏或非法 → `POLICY_INVALID` fail-closed。Project policy 只能收紧，不能放宽。Policy 优先级为 `built-in hard deny > user/project policy floor > Full access > tool metadata`；数值预算必须是非负整数，`0` 明确表示禁止任何对应执行（例如 `maxTurns: 0`、`maxWallTimeMs: 0` 返回 typed error），且该 floor 即使在 Full access 下仍生效。
 - Runtime budget limits are frozen in the turn plan and enforced by one shared budget: `maxTurns`、`maxToolCalls`、`maxSubagents`、`maxChildDepth`、`maxWallTimeMs`；disabled policy files are filtered before merge.
 
 ## 相关测试入口
