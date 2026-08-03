@@ -9,7 +9,6 @@ import { rendererEventHub } from './rendererEventHub';
 import {
   buildBridgeAuthCookie,
   createBridgeBearerToken,
-  resolveBridgeQueryToken,
   resolveProvidedBridgeToken,
   isBridgeChannelAllowed,
   isOriginAllowed,
@@ -59,7 +58,9 @@ let server: Server | null = null;
 let bridgeUrl: string | null = null;
 let bridgeToken: string | null = null;
 let qaBootstrapToken: string | null = null;
+let devRendererChallenge: string | null = null;
 let allowedOrigins = new Set<string>();
+let trustedDevRendererOrigins = new Set<string>();
 let healthMetadata: BrowserHealthMetadata | null = null;
 
 const MAX_JSON_BODY_BYTES = 1 * 1024 * 1024;
@@ -108,6 +109,7 @@ function setCors(response: ServerResponse, requestOrigin: string | undefined): v
   if (requestOrigin && allowedOrigins.has(requestOrigin)) {
     response.setHeader('Access-Control-Allow-Origin', requestOrigin);
     response.setHeader('Vary', 'Origin');
+    response.setHeader('Access-Control-Allow-Credentials', 'true');
   }
   response.setHeader('Access-Control-Allow-Headers', 'content-type, authorization');
   response.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -124,16 +126,14 @@ function sendJson(
   response.end(JSON.stringify(payload));
 }
 
-function requireBridgeAuth(request: IncomingMessage, url: URL): boolean {
+function requireBridgeAuth(request: IncomingMessage): boolean {
   if (!bridgeToken) {
     return false;
   }
-  // Document navigations have no Authorization header. Accept:
-  // 1) Bearer, 2) query rdcBridgeToken|token, 3) cookie from short /qa entry.
-  // Glass/Simple Browser often truncates long query tokens → 401 JSON "Pretty-print" white screen.
+  // Document navigations have no Authorization header, so /qa supplies an
+  // HttpOnly cookie. Programmatic clients may still use an explicit Bearer.
   const provided = resolveProvidedBridgeToken({
     authorizationHeader: request.headers.authorization,
-    url,
     cookieHeader: request.headers.cookie,
   });
   return tokensMatch(bridgeToken, provided);
@@ -143,10 +143,11 @@ function redirectWithBridgeCookie(
   response: ServerResponse,
   location: string,
   token: string,
+  bridgeOrigin: string,
 ): void {
   response.writeHead(302, {
     Location: location,
-    'Set-Cookie': buildBridgeAuthCookie(token),
+    'Set-Cookie': buildBridgeAuthCookie(token, { secure: bridgeOrigin.startsWith('https:') }),
     'Cache-Control': 'no-store',
   });
   response.end();
@@ -205,11 +206,13 @@ function redirectToDevRenderer(
   response: ServerResponse,
   rendererUrl: string,
   bridgeOrigin: string,
-  token: string,
+  challenge?: string,
 ): void {
   const target = new URL(rendererUrl);
   target.searchParams.set('rdcBridgeOrigin', bridgeOrigin);
-  target.searchParams.set('rdcBridgeToken', token);
+  target.searchParams.delete('rdcBridgeToken');
+  if (challenge) target.searchParams.set('rdcBridgeChallenge', challenge);
+  else target.searchParams.delete('rdcBridgeChallenge');
   response.writeHead(302, {
     Location: target.toString(),
     'Cache-Control': 'no-store',
@@ -267,8 +270,26 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
     return;
   }
 
+  const bridgeOrigin = bridgeUrl ?? 'http://127.0.0.1';
+  const url = new URL(request.url, bridgeOrigin);
+
   if (requestOrigin && !isOriginAllowed(requestOrigin, allowedOrigins)) {
     sendJson(response, 403, { success: false, error: 'Origin not allowed' }, undefined);
+    return;
+  }
+
+  const devRendererOrigin = options.devRendererUrl
+    ? new URL(options.devRendererUrl).origin
+    : null;
+  const isDevHandshake = url.pathname === '/dev-renderer/handshake' && request.method === 'POST';
+  if (
+    requestOrigin
+    && requestOrigin !== bridgeOrigin
+    && !trustedDevRendererOrigins.has(requestOrigin)
+    && !isDevHandshake
+    && request.method !== 'OPTIONS'
+  ) {
+    sendJson(response, 403, { success: false, error: 'Dev renderer handshake required' }, requestOrigin);
     return;
   }
 
@@ -278,9 +299,6 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
     response.end();
     return;
   }
-
-  const bridgeOrigin = bridgeUrl ?? 'http://127.0.0.1';
-  const url = new URL(request.url, bridgeOrigin);
 
   // Short QA entry: a one-time out-of-band bootstrap is required before the
   // bearer cookie is minted. A local process can no longer mint a QA session
@@ -292,7 +310,26 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
       return;
     }
     qaBootstrapToken = null;
-    redirectWithBridgeCookie(response, `${bridgeOrigin}/app`, bridgeToken);
+    redirectWithBridgeCookie(response, `${bridgeOrigin}/app`, bridgeToken, bridgeOrigin);
+    return;
+  }
+
+  if (isDevHandshake) {
+    if (!devRendererOrigin || requestOrigin !== devRendererOrigin || !devRendererChallenge) {
+      sendJson(response, 401, { success: false, error: 'Dev renderer handshake is unavailable' }, requestOrigin);
+      return;
+    }
+    const body = await readJsonBody(request) as { challenge?: unknown };
+    if (typeof body.challenge !== 'string' || !tokensMatch(devRendererChallenge, body.challenge)) {
+      sendJson(response, 401, { success: false, error: 'Invalid dev renderer handshake challenge' }, requestOrigin);
+      return;
+    }
+    devRendererChallenge = null;
+    trustedDevRendererOrigins.add(devRendererOrigin);
+    if (bridgeToken) {
+      response.setHeader('Set-Cookie', buildBridgeAuthCookie(bridgeToken, { secure: bridgeOrigin.startsWith('https:') }));
+    }
+    sendJson(response, 200, { success: true }, requestOrigin);
     return;
   }
 
@@ -300,15 +337,9 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
   // /app without auth previously redirected with the token in Location (leak).
   const isPublicAsset = !options.devRendererUrl
     && (url.pathname.startsWith('/assets/') || url.pathname === '/favicon.ico');
-  if (!isPublicAsset && !requireBridgeAuth(request, url)) {
+  if (!isPublicAsset && !requireBridgeAuth(request)) {
     sendJson(response, 401, { success: false, error: 'Unauthorized' }, requestOrigin);
     return;
-  }
-
-  // Persist query token into a cookie so a later clean /app navigation still authenticates.
-  const queryToken = resolveBridgeQueryToken(url);
-  if (queryToken && bridgeToken && tokensMatch(bridgeToken, queryToken)) {
-    response.setHeader('Set-Cookie', buildBridgeAuthCookie(bridgeToken));
   }
 
   if (url.pathname === '/api/settings/providers/catalog' && request.method === 'GET') {
@@ -377,11 +408,11 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
         }, requestOrigin);
         return;
       }
-      if (!bridgeToken) {
-        sendJson(response, 503, { success: false, error: 'Bridge token unavailable' }, requestOrigin);
-        return;
+      const origin = new URL(options.devRendererUrl).origin;
+      if (origin !== bridgeOrigin && !trustedDevRendererOrigins.has(origin) && !devRendererChallenge) {
+        devRendererChallenge = createBridgeBearerToken();
       }
-      redirectToDevRenderer(response, options.devRendererUrl, bridgeOrigin, bridgeToken);
+      redirectToDevRenderer(response, options.devRendererUrl, bridgeOrigin, devRendererChallenge ?? undefined);
       return;
     }
     serveStatic(response, options.rendererRoot, url.pathname);
@@ -401,10 +432,6 @@ export function shouldStartBrowserAppBridge(): boolean {
   return process.env.RDC_AGENT_BROWSER_QA === '1';
 }
 
-export function getBrowserAppBridgeToken(): string | null {
-  return bridgeToken;
-}
-
 export async function startBrowserAppBridge(options: BridgeOptions): Promise<string> {
   if (server && bridgeUrl) {
     return bridgeUrl;
@@ -416,9 +443,8 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
 
   const preferredPort = options.preferredPort ?? Number(process.env.RDC_AGENT_BROWSER_BRIDGE_PORT || 5127);
   healthMetadata = resolveHealthMetadata(options);
-  bridgeToken = process.env.RDC_AGENT_BROWSER_BRIDGE_TOKEN?.trim() || createBridgeBearerToken();
+  bridgeToken = createBridgeBearerToken();
   qaBootstrapToken = process.env.RDC_AGENT_BROWSER_QA_BOOTSTRAP?.trim() || createBridgeBearerToken();
-  process.env.RDC_AGENT_BROWSER_BRIDGE_TOKEN = bridgeToken;
 
   server = createServer((request, response) => {
     void handleRequest(options, request, response).catch((error) => {
@@ -455,22 +481,18 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
   const port = typeof address === 'object' && address ? address.port : preferredPort;
   bridgeUrl = `http://127.0.0.1:${port}`;
   allowedOrigins = resolveBridgeAllowedOrigins(bridgeUrl, options.devRendererUrl);
+  trustedDevRendererOrigins = new Set([bridgeUrl]);
+  devRendererChallenge = options.devRendererUrl ? createBridgeBearerToken() : null;
   (globalThis as typeof globalThis & {
     __RDC_AGENT_BROWSER_BRIDGE_URL__?: string;
-    __RDC_AGENT_BROWSER_BRIDGE_TOKEN__?: string;
   }).__RDC_AGENT_BROWSER_BRIDGE_URL__ = bridgeUrl;
-  (globalThis as typeof globalThis & {
-    __RDC_AGENT_BROWSER_BRIDGE_TOKEN__?: string;
-  }).__RDC_AGENT_BROWSER_BRIDGE_TOKEN__ = bridgeToken;
 
   const bootstrap = qaBootstrapToken;
   if (!bootstrap) {
     throw new Error('QA bootstrap token was not initialized');
   }
   const qaUrl = `${bridgeUrl}/qa?qaBootstrap=${encodeURIComponent(bootstrap)}`;
-  const appUrl = `${bridgeUrl}/app?rdcBridgeToken=${encodeURIComponent(bridgeToken)}`;
   console.log(`[BrowserAppBridge] Browser app session: ${qaUrl}`);
-  console.log(`[BrowserAppBridge] Direct /app URL (fallback): ${appUrl}`);
   return bridgeUrl;
 }
 
@@ -480,10 +502,11 @@ export async function stopBrowserAppBridge(): Promise<void> {
   bridgeUrl = null;
   bridgeToken = null;
   qaBootstrapToken = null;
+  devRendererChallenge = null;
   allowedOrigins = new Set();
+  trustedDevRendererOrigins = new Set();
   healthMetadata = null;
   delete (globalThis as typeof globalThis & { __RDC_AGENT_BROWSER_BRIDGE_URL__?: string }).__RDC_AGENT_BROWSER_BRIDGE_URL__;
-  delete (globalThis as typeof globalThis & { __RDC_AGENT_BROWSER_BRIDGE_TOKEN__?: string }).__RDC_AGENT_BROWSER_BRIDGE_TOKEN__;
   if (!activeServer) {
     return;
   }

@@ -117,8 +117,11 @@ export class AgentTurnRunner {
     const profileMax = typeof profileMaxTurns === 'number' && profileMaxTurns > 0
       ? profileMaxTurns
       : defaultMax;
-    if (typeof policyMaxTurns === 'number' && Number.isFinite(policyMaxTurns) && policyMaxTurns > 0) {
-      return Math.min(policyMaxTurns, profileMax);
+    if (typeof policyMaxTurns === 'number' && Number.isFinite(policyMaxTurns)) {
+      if (policyMaxTurns === 0) {
+        throw new Error('POLICY_MAX_TURNS_ZERO: maxTurns must be greater than zero for an executable turn.');
+      }
+      if (policyMaxTurns > 0) return Math.min(policyMaxTurns, profileMax);
     }
     return profileMax;
   }
@@ -349,15 +352,6 @@ export class AgentTurnRunner {
       ?? resolveAgentRouteCapability(routeProvider, input.modelId, effectiveModel, requestPlan);
     let mcpLease: McpConnectionLease | null = input.preparedRuntime?.mcpLease ?? null;
     let mcpConnectionErrors = input.preparedRuntime?.mcpConnectionErrors ?? [];
-    if (!input.preparedRuntime) {
-      const acquiredMcp = await this.deps.mcp.acquireConnections(
-        input.agentId,
-        input.projectRootPath,
-        fallbackProfile?.mcpServers,
-      );
-      mcpConnectionErrors = acquiredMcp.errors;
-      mcpLease = acquiredMcp.lease;
-    }
     const sessionKey = this.deps.sessionTurnKey(input.sessionId);
     let turnHandle;
     try {
@@ -382,6 +376,24 @@ export class AgentTurnRunner {
       await mcpLease?.release({ discardIfIdle: true });
       throw error;
     }
+    let slotKey = agentSlotKey(input.sessionId, input.agentId);
+    let slot: AgentSlot | null = null;
+    let unsubscribe: (() => void) | null = null;
+    let unregisterAgentProducer: (() => void) | null = null;
+    let abortListener: (() => void) | null = null;
+    let turnEnded = false;
+    let setupCleanupComplete = false;
+    try {
+    if (!input.preparedRuntime) {
+      const acquiredMcp = await this.deps.mcp.acquireConnections(
+        input.agentId,
+        input.projectRootPath,
+        fallbackProfile?.mcpServers,
+        input.projectId,
+      );
+      mcpConnectionErrors = acquiredMcp.errors;
+      mcpLease = acquiredMcp.lease;
+    }
     const turnGeneration = turnHandle.generation;
     turnHandle.eventSink = {
       onEvent: (event) => {
@@ -394,9 +406,12 @@ export class AgentTurnRunner {
       agentId: input.agentId,
     };
 
+    const frozenToolAllowlist = input.preparedRuntime?.effectivePlan
+      ? [...input.preparedRuntime.effectivePlan.toolAllowlist]
+      : [...input.toolAllowlist];
     const liveRuntimeTools = this.deps.resolveRuntimeTools(
       input.agentId,
-      input.toolAllowlist,
+      frozenToolAllowlist,
       input.stage,
       input.sessionId,
       turnHandle,
@@ -411,7 +426,7 @@ export class AgentTurnRunner {
     const runtimeTools = input.preparedRuntime
       ? { definitions: input.preparedRuntime.runtimeTools.definitions, toolMap: liveRuntimeTools.toolMap }
       : liveRuntimeTools;
-    const slotKey = agentSlotKey(input.sessionId, input.agentId);
+    slotKey = agentSlotKey(input.sessionId, input.agentId);
     const allToolSignature = this.deps.createToolSignature(runtimeTools.definitions);
     const activatedDeferredTools = this.deps.deferredActivation.resolveActivatedSet(slotKey, allToolSignature);
     const injectedToolDefinitions = input.preparedRuntime?.activeToolDefinitions
@@ -455,7 +470,7 @@ export class AgentTurnRunner {
         enabledProfileIds: input.effectiveProfileIds?.length
           ? [...input.effectiveProfileIds]
           : (() => { const ids = effectiveProfiles.filter((definition) => definition.enabled).map((definition) => definition.id); return ids.length > 0 ? ids : [input.agentId]; })(),
-        toolAllowlist: input.toolAllowlist,
+        toolAllowlist: frozenToolAllowlist,
         permissionSettings: fallbackSettings.agentRuntime.permissions,
         routeCapability,
         requestPlan,
@@ -536,7 +551,7 @@ export class AgentTurnRunner {
         }));
       }
     }
-    const slot = this.getOrCreateAgentSlot(
+    slot = this.getOrCreateAgentSlot(
       input.agentId,
       input.providerId,
       input.modelId,
@@ -558,6 +573,10 @@ export class AgentTurnRunner {
         : effectivePlan.policy.maxTurns,
       effectivePlan.profileMaxTurns,
     );
+    if (!slot) {
+      throw new Error('Agent slot setup did not produce a slot.');
+    }
+    const activeSlot = slot;
 
     const userMessage: UserMessage = {
       role: 'user',
@@ -568,7 +587,7 @@ export class AgentTurnRunner {
     let responseText = '';
     let sawStructuredToolCall = false;
     const structuredToolCallingEvidenceGate = { recorded: false };
-    const unsubscribe = slot.agent.subscribe((event: CoreAgentEvent) => {
+    unsubscribe = activeSlot.agent.subscribe((event: CoreAgentEvent) => {
       if (event.type === 'message_update') {
         const ev = event.assistantMessageEvent;
         if (ev.type === 'text_delta' && typeof ev.delta === 'string') {
@@ -616,10 +635,10 @@ export class AgentTurnRunner {
         if (event.message.usage && hasActualProviderUsage(event.message)) {
           // 按当前实际注入的工具定义计量（含本 turn 内新激活的 deferred 工具）；
           // deferred 段仅计未激活 schema 估算，且仅在 >0 时加入。
-          const injectedDefs = slot.agent.state.tools ?? [];
+          const injectedDefs = activeSlot.agent.state.tools ?? [];
           const { deferredMcp: deferredMcpDefs, deferredBuiltin: deferredBuiltinDefs } = partitionDeferredTools(
             runtimeTools.definitions,
-            slot.activatedDeferredTools,
+            activeSlot.activatedDeferredTools,
           );
           const isMcpDef = (d: ToolDefinition) => isMcpPrefixedToolName(d.name);
           const isSubagentDef = (d: ToolDefinition) => d.name === 'subagent';
@@ -635,8 +654,8 @@ export class AgentTurnRunner {
           const skillsChars   = pm?.skills ?? 0;
 
           // 压缩统计：在 message_end 时对当前 agent 的消息历史分类。
-          const compressionStats = slot.contextManager.classifyMessages(
-            slot.agent.messages as import('../../agent-runtime/core/types').AgentMessage[],
+          const compressionStats = activeSlot.contextManager.classifyMessages(
+            activeSlot.agent.messages as import('../../agent-runtime/core/types').AgentMessage[],
           );
 
           const precomputedBreakdown: ContextUsageBreakdownEntry[] = [
@@ -729,25 +748,21 @@ export class AgentTurnRunner {
     });
 
     // abort 信号桥接到 Agent.abort()；同时注册为 turn producer。
-    const unregisterAgentProducer = turnHandle.registerProducer({
+    unregisterAgentProducer = turnHandle.registerProducer({
       id: `agent:${slotKey}`,
       abort: () => {
         try {
-          slot.agent.abort();
+            activeSlot.agent.abort();
         } catch {
           // ignore
         }
       },
       join: async () => {
-        await slot.agent.abortAndJoin();
+        await activeSlot.agent.abortAndJoin();
       },
     });
-    let abortListener: (() => void) | null = null;
     if (input.options?.signal) {
       if (input.options.signal.aborted) {
-        unsubscribe();
-        unregisterAgentProducer();
-        turnCoordinator.endTurn(turnHandle);
         throw new DOMException('Aborted', 'AbortError');
       }
       abortListener = () => {
@@ -756,22 +771,22 @@ export class AgentTurnRunner {
       input.options.signal.addEventListener('abort', abortListener, { once: true });
     }
 
-    const initialMessageCount = slot.agent.messages.length;
+    const initialMessageCount = activeSlot.agent.messages.length;
     let terminalStatus: 'complete' | 'stopped' | 'error' = 'complete';
     try {
       // Agent.prompt 内部跑完整循环；返回值是新增的全部消息，
       // 我们只在订阅里收集助手文本，最后返回 `responseText`。
-      await slot.agent.prompt(userMessage);
+      await activeSlot.agent.prompt(userMessage);
       return responseText;
     } catch (error) {
       terminalStatus = input.options?.signal?.aborted || turnHandle.isAborted ? 'stopped' : 'error';
       throw error;
     } finally {
       if (turnHandle.isAborted) {
-        await slot.agent.abortAndJoin();
+        await activeSlot.agent.abortAndJoin();
       }
-      unsubscribe();
-      unregisterAgentProducer();
+      unsubscribe?.();
+      unregisterAgentProducer?.();
       if (abortListener && input.options?.signal) {
         input.options.signal.removeEventListener('abort', abortListener);
       }
@@ -779,18 +794,54 @@ export class AgentTurnRunner {
       agentToolApprovalRequestService.cancelTurn(input.turnId);
       // Terminal context first (ConversationService persists to conversation.jsonl),
       // then flush in-memory slot messages — disk is the single source of truth.
-      input.terminalContext?.(slot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus, turnHandle.pendingHandoff ?? undefined);
-      this.deps.slots.flush(slot);
+      input.terminalContext?.(activeSlot.agent.messages.slice(initialMessageCount) as Message[], terminalStatus, turnHandle.pendingHandoff ?? undefined);
+      this.deps.slots.flush(activeSlot);
       if (turnHandle.isAborted) {
         await turnHandle.abortAndJoin({ reason: turnHandle.reason ?? 'user_stop' });
       }
       if (turnHandle.isOrphaned) {
         // Reserve the key until the orphaned provider/tool loop actually settles.
-        this.deps.slots.quarantineSlot(slotKey, slot.agent.activeLoopPromise ?? Promise.resolve());
+        this.deps.slots.quarantineSlot(slotKey, activeSlot.agent.activeLoopPromise ?? Promise.resolve());
         this.deps.slots.deleteSlot(slotKey);
       }
       await mcpLease?.release({ discardIfIdle: turnHandle.isOrphaned });
       turnCoordinator.endTurn(turnHandle);
+      turnEnded = true;
+      setupCleanupComplete = true;
+    }
+    } catch (error) {
+      if (!setupCleanupComplete) {
+        if (abortListener && input.options?.signal) {
+          input.options.signal.removeEventListener('abort', abortListener);
+        }
+        unsubscribe?.();
+        unregisterAgentProducer?.();
+        if (slot?.agent.isStreaming || slot?.agent.activeLoopPromise) {
+          try {
+            await slot.agent.abortAndJoin();
+          } catch {
+            // Preserve the setup failure; the turn join below owns orphan detection.
+          }
+        }
+        await turnHandle.abortAndJoin({ reason: turnHandle.reason ?? 'unknown' });
+        if (slot) {
+          // Setup can create a reusable slot before a later subscription or
+          // executor step fails. Keep the slot only when it is not orphaned,
+          // but never leave setup messages in the execution cache.
+          this.deps.slots.flush(slot);
+        }
+        if (turnHandle.isOrphaned && slot) {
+          this.deps.slots.quarantineSlot(slotKey, slot.agent.activeLoopPromise ?? Promise.resolve());
+          this.deps.slots.deleteSlot(slotKey);
+        }
+        await mcpLease?.release({ discardIfIdle: turnHandle.isOrphaned });
+        if (!turnEnded) {
+          turnCoordinator.endTurn(turnHandle);
+          turnEnded = true;
+        }
+        setupCleanupComplete = true;
+      }
+      throw error;
     }
   }
 }

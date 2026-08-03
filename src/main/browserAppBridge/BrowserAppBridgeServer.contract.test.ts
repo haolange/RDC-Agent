@@ -43,7 +43,6 @@ function createMinimalQaServer(): Promise<{ server: Server; baseUrl: string }> {
       if (url.pathname === '/app') {
         const provided = resolveProvidedBridgeToken({
           authorizationHeader: request.headers.authorization,
-          url,
           cookieHeader: request.headers.cookie,
         });
         if (!tokensMatch(EXPECTED, provided)) {
@@ -111,13 +110,11 @@ describe('BrowserAppBridge /qa auth contract', () => {
     expect(payload.error).toBe('Unauthorized');
   });
 
-  it('truncated / mismatched token returns 401 JSON (not HTML workbench)', async () => {
+  it('URL token is not accepted and returns 401 JSON (not HTML workbench)', async () => {
     const started = await createMinimalQaServer();
     server = started.server;
 
-    const response = await fetch(
-      `${started.baseUrl}/app?rdcBridgeToken=${EXPECTED.slice(0, 16)}`,
-    );
+    const response = await fetch(`${started.baseUrl}/app?rdcBridgeToken=${EXPECTED}`);
     expect(response.status).toBe(401);
     expect(response.headers.get('content-type')).toMatch(/application\/json/);
     const text = await response.text();

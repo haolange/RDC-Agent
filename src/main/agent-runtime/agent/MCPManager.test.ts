@@ -54,11 +54,11 @@ describe('MCPManager', () => {
     });
 
     it('disconnect 不存在的服务器不应报错', async () => {
-      await expect(manager.disconnect('nonexistent')).resolves.toBeUndefined();
+      await expect(manager.disconnect('nonexistent')).resolves.toBe('disconnected');
     });
 
     it('disconnectAll 应正常完成', async () => {
-      await expect(manager.disconnectAll()).resolves.toBeUndefined();
+      await expect(manager.disconnectAll()).resolves.toEqual([]);
     });
   });
 

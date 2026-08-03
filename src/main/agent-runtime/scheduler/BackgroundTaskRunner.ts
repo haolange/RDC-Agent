@@ -114,7 +114,7 @@ export class BackgroundTaskRunner {
     supervised.child.stdout?.on('data', appendOutput);
     supervised.child.stderr?.on('data', appendOutput);
 
-    void supervised.exit.then((info) => {
+    void supervised.join(120_000).then((info) => {
       const current = this.tasks.get(id);
       if (current && !current.output) {
         current.output = supervised.stdout.toString() || supervised.stderr.toString();
@@ -126,6 +126,11 @@ export class BackgroundTaskRunner {
         if (current) {
           current.output += `\n[spawn error] ${info.error?.message ?? 'spawn failed'}`;
         }
+        this.markFinished(id, 'failed', undefined);
+        return;
+      }
+      if (info.reason === 'unconfirmed_orphan') {
+        if (current) current.output += '\n[orphan] process termination was not confirmed.';
         this.markFinished(id, 'failed', undefined);
         return;
       }

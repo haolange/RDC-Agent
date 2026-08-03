@@ -13,7 +13,7 @@ describe('BrowserAppBridge scoped capture contract', () => {
       json: async () => ({ success: true, result: null }),
     });
     const browserWindow: { location: { href: string; origin: string }; sessionStorage: { getItem: (key: string) => string | null; setItem: (key: string, value: string) => void }; electronAPI?: ElectronAPI } = {
-      location: { href: 'http://127.0.0.1:4312/app?rdcBridgeToken=qa-token', origin: 'http://127.0.0.1:4312' },
+      location: { href: 'http://127.0.0.1:4312/app', origin: 'http://127.0.0.1:4312' },
       sessionStorage: { getItem: (key: string) => stored.get(key) ?? null, setItem: (key: string, value: string) => stored.set(key, value) },
       electronAPI: undefined,
     };
@@ -27,7 +27,7 @@ describe('BrowserAppBridge scoped capture contract', () => {
 
     expect(fetchMock).toHaveBeenCalledWith('http://127.0.0.1:4312/invoke', expect.objectContaining({
       method: 'POST',
-      headers: expect.objectContaining({ Authorization: 'Bearer qa-token' }),
+      credentials: 'include',
       body: JSON.stringify({ channel: 'capture:getOpenedState', args: [{ projectId: 'project-a', sessionId: 'session-a' }] }),
     }));
   });

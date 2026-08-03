@@ -29,8 +29,15 @@ describe('securityContract: browser bridge', () => {
   });
 
   it('exposes the full registered product API through the browser transport', () => {
-    for (const channel of RENDERER_INVOKE_CHANNELS) {
-      expect(isBridgeChannelAllowed(channel), channel).toBe(true);
+    const previousFullAccess = process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS;
+    process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS = '1';
+    try {
+      for (const channel of RENDERER_INVOKE_CHANNELS) {
+        expect(isBridgeChannelAllowed(channel), channel).toBe(true);
+      }
+    } finally {
+      if (previousFullAccess === undefined) delete process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS;
+      else process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS = previousFullAccess;
     }
   });
 

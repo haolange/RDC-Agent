@@ -1,11 +1,31 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import path from 'path';
-import { McpConnectionCoordinator } from './McpConnectionCoordinator';
+import { canonicalMcpProjectRoot, McpConnectionCoordinator } from './McpConnectionCoordinator';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 
 describe('McpConnectionCoordinator project ownership', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('normalizes project roots only on Windows and includes project identity in pool keys', async () => {
+    const resolved = path.resolve('Case-Sensitive-Project');
+    expect(canonicalMcpProjectRoot(resolved, 'linux')).toBe(resolved);
+    expect(canonicalMcpProjectRoot(resolved, 'darwin')).toBe(resolved);
+    expect(canonicalMcpProjectRoot(resolved, 'win32')).toBe(resolved.toLowerCase());
+
+    const descriptor = {
+      id: 'identity-server', name: 'Identity', description: '', transport: 'stdio' as const, scope: 'user' as const,
+      sourcePath: 'identity', sourceHash: 'identity', enabledByDefault: true,
+    };
+    vi.spyOn(agentRuntimeConfigService, 'listMcpServers').mockReturnValue([descriptor]);
+    const coordinator = new McpConnectionCoordinator();
+    const first = await coordinator.acquireConnections('ask', resolved, [descriptor.id], 'project-a');
+    const second = await coordinator.acquireConnections('ask', resolved, [descriptor.id], 'project-b');
+    expect(first.lease?.poolKey).not.toBe(second.lease?.poolKey);
+    await first.lease?.release({ discardIfIdle: true });
+    await second.lease?.release({ discardIfIdle: true });
+    await coordinator.disconnectAll();
   });
 
   it('evicts a project pool only after every turn lease is released', async () => {

@@ -25,15 +25,23 @@ import { AgentTurnRunner, hasActualProviderUsage } from './AgentTurnRunner';
 import { TokenizerService } from '../../agent-runtime/core/TokenizerService';
 import type { AssistantMessage, ToolResultMessage } from '../../agent-runtime/core/types';
 import type { RequestPlan } from '@shared/types/providerCapability';
+import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
-import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
+import type { McpConnectionCoordinator, McpConnectionLease } from './McpConnectionCoordinator';
+import type { PreparedAgentRuntime } from './orchestratorTypes';
+import type { EffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
+import type { AgentRouteCapability } from '@shared/types/agentRuntime';
+import type { PromptPlan } from '@shared/types/rdxRuntime';
+import { turnCoordinator } from './TurnCoordinator';
 
 function createRunner(): AgentTurnRunner {
   return new AgentTurnRunner({
     slots: {} as AgentSlotRegistry,
     mcp: {} as McpConnectionCoordinator,
-    deferredActivation: {} as DeferredToolActivationTracker,
+    deferredActivation: {
+      resolveActivatedSet: () => new Set<string>(),
+    } as unknown as DeferredToolActivationTracker,
     tokenizerService: new TokenizerService(),
     sessionTurnKey: (sessionId) => sessionId ?? 'default',
     resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }),
@@ -82,6 +90,11 @@ describe('AgentTurnRunner', () => {
     expect(runner.resolveMaxTurns('ask', undefined, 12)).toBe(12);
   });
 
+  it('rejects a zero policy maxTurns as a typed policy error', () => {
+    const runner = createRunner();
+    expect(() => runner.resolveMaxTurns('ask', 0, 12)).toThrow(/POLICY_MAX_TURNS_ZERO/);
+  });
+
   it('resolveMaxTurns uses role defaults for execution agents', () => {
     const runner = createRunner();
     expect(runner.resolveMaxTurns('debugger')).toBe(50);
@@ -110,5 +123,79 @@ describe('AgentTurnRunner', () => {
       800,
       undefined,
     )).toThrow(/PromptPlan is required/);
+  });
+
+  it('cleans the turn and prepared MCP lease when slot setup throws', async () => {
+    const release = vi.fn(async () => undefined);
+    const runner = createRunner();
+    vi.spyOn(runner, 'getOrCreateAgentSlot').mockImplementation(() => {
+      throw new Error('slot setup failed');
+    });
+    const requestPlan = createTestRequestPlan({
+      providerId: 'test',
+      adapterId: 'openai-compatible',
+      catalogRevision: 'test',
+      routeRevision: 'test',
+      selectedModelId: 'model',
+      effectiveModelId: 'model',
+      appliedBindingIds: [],
+      route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://example.test', source: 'catalog' },
+      headers: {},
+      bodyPatch: {},
+      contextBudgetTokens: 1000,
+      contextMode: 'normal',
+      contextWindowTokens: 2000,
+      activeTierId: 'normal',
+      fastMode: false,
+      reasoningWire: {
+        selection: 'off',
+        control: {
+          kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' },
+        },
+      },
+    });
+    const lease = {
+      poolKey: 'pool',
+      projectRootPath: null,
+      projectId: 'project',
+      descriptorHash: 'descriptor',
+      release,
+    } as McpConnectionLease;
+    const policy = {
+      maxTurns: 5,
+      maxToolCalls: 5,
+      maxSubagents: 2,
+      maxChildDepth: 2,
+      maxWallTimeMs: 10_000,
+    } as EffectiveRuntimePlan['policy'];
+    const preparedRuntime = {
+      runtimeTools: { definitions: [], toolMap: new Map() },
+      activeToolDefinitions: [],
+      routeCapability: { toolCallingMode: 'disabled' } as AgentRouteCapability,
+      mcpConnectionErrors: [],
+      mcpLease: lease,
+      credentialHandle: 'credential',
+      promptCache: {},
+      effectivePlan: { policy, toolAllowlist: [], routeCapability: { toolCallingMode: 'disabled' } } as unknown as EffectiveRuntimePlan,
+    } as unknown as PreparedAgentRuntime;
+
+    await expect(runner.runAgentTurn({
+      agentId: 'ask',
+      content: 'setup',
+      systemPrompt: 'system',
+      providerId: 'test',
+      modelId: 'model',
+      mode: 'ask',
+      toolAllowlist: [],
+      sessionId: 'setup-session',
+      turnId: 'setup-turn',
+      promptPlan: {} as PromptPlan,
+      effectiveModel: {} as never,
+      preparedRuntime,
+      options: { requestPlan },
+    })).rejects.toThrow('slot setup failed');
+
+    expect(release).toHaveBeenCalledWith({ discardIfIdle: false });
+    expect(turnCoordinator.getActive('setup-session')).toBeNull();
   });
 });

@@ -8,7 +8,6 @@ import {
   isOriginAllowed,
   resolveBridgeAllowedOrigins,
   resolveBridgeCookieToken,
-  resolveBridgeQueryToken,
   resolveProvidedBridgeToken,
   tokensMatch,
 } from './bridgeSecurity';
@@ -25,6 +24,7 @@ describe('browserAppBridge security', () => {
   beforeEach(() => {
     hasRegisteredIpcChannelMock.mockReset();
     hasRegisteredIpcChannelMock.mockReturnValue(true);
+    delete process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS;
   });
 
   it('creates a 256-bit bearer token', () => {
@@ -36,48 +36,58 @@ describe('browserAppBridge security', () => {
     const token = createBridgeBearerToken();
     expect(tokensMatch(token, null)).toBe(false);
     expect(tokensMatch(token, 'deadbeef')).toBe(false);
-    expect(tokensMatch(token, extractBearerToken(`Bearer ${token}`, null))).toBe(true);
-    expect(tokensMatch(token, extractBearerToken(undefined, token))).toBe(true);
+    expect(tokensMatch(token, extractBearerToken(`Bearer ${token}`))).toBe(true);
+    expect(tokensMatch(token, extractBearerToken(undefined))).toBe(false);
   });
 
-  it('resolves printed /app rdcBridgeToken query before bare token', () => {
-    const printed = new URL('http://127.0.0.1:5127/app?rdcBridgeToken=abc123');
-    expect(resolveBridgeQueryToken(printed)).toBe('abc123');
-    const probe = new URL('http://127.0.0.1:5127/health?token=probe-token');
-    expect(resolveBridgeQueryToken(probe)).toBe('probe-token');
-    const both = new URL('http://127.0.0.1:5127/app?rdcBridgeToken=primary&token=secondary');
-    expect(resolveBridgeQueryToken(both)).toBe('primary');
+  it('does not accept bridge tokens from URL query parameters', () => {
+    expect(resolveProvidedBridgeToken({
+      cookieHeader: 'rdcBridgeToken=from-cookie',
+    })).toBe('from-cookie');
+    expect(resolveProvidedBridgeToken({
+      cookieHeader: undefined,
+    })).toBeNull();
   });
 
-  it('reads bridge auth cookie set by /qa entry', () => {
+  it('reads an HttpOnly strict bridge auth cookie set by /qa entry', () => {
     expect(resolveBridgeCookieToken('rdcBridgeToken=abc%2F123; other=1')).toBe('abc/123');
     expect(resolveBridgeCookieToken('other=1')).toBeNull();
     expect(buildBridgeAuthCookie('secret')).toContain('rdcBridgeToken=secret');
+    expect(buildBridgeAuthCookie('secret')).toContain('HttpOnly');
+    expect(buildBridgeAuthCookie('secret')).toContain('SameSite=Strict');
+    expect(buildBridgeAuthCookie('secret', { secure: true })).toContain('Secure');
   });
 
-  it('resolves auth triad Bearer -> query -> cookie', () => {
-    const url = new URL('http://127.0.0.1:5127/app');
+  it('resolves auth from Bearer before cookie', () => {
     expect(resolveProvidedBridgeToken({
       authorizationHeader: 'Bearer from-header',
-      url,
       cookieHeader: 'rdcBridgeToken=from-cookie',
     })).toBe('from-header');
-
-    const withQuery = new URL('http://127.0.0.1:5127/app?rdcBridgeToken=from-query');
     expect(resolveProvidedBridgeToken({
-      url: withQuery,
-      cookieHeader: 'rdcBridgeToken=from-cookie',
-    })).toBe('from-query');
-
-    expect(resolveProvidedBridgeToken({
-      url,
       cookieHeader: 'rdcBridgeToken=from-cookie',
     })).toBe('from-cookie');
-    expect(resolveProvidedBridgeToken({ url })).toBeNull();
+    expect(resolveProvidedBridgeToken({})).toBeNull();
   });
 
-  it('allows every registered renderer API channel through the browser transport', () => {
-    for (const channel of RENDERER_INVOKE_CHANNELS) {
+  it('keeps ordinary registered renderer channels available to the browser transport', () => {
+    const ordinaryChannels = RENDERER_INVOKE_CHANNELS.filter((channel) => !(
+      channel === 'command:execute'
+      || channel === 'settings:set'
+      || channel === 'rdx-runtime:trustMcp'
+      || channel === 'rdx-runtime:revokeMcp'
+      || channel.startsWith('terminal:')
+    ));
+    for (const channel of ordinaryChannels) {
+      expect(isBridgeChannelAllowed(channel), channel).toBe(true);
+    }
+  });
+
+  it('requires full-access opt-in for high-risk browser channels', () => {
+    for (const channel of ['command:execute', 'settings:set', 'rdx-runtime:trustMcp', 'rdx-runtime:revokeMcp', 'terminal:write']) {
+      expect(isBridgeChannelAllowed(channel), channel).toBe(false);
+    }
+    process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS = '1';
+    for (const channel of ['command:execute', 'settings:set', 'rdx-runtime:trustMcp', 'rdx-runtime:revokeMcp', 'terminal:write']) {
       expect(isBridgeChannelAllowed(channel), channel).toBe(true);
     }
   });
@@ -91,10 +101,11 @@ describe('browserAppBridge security', () => {
     expect(isBridgeChannelAllowed('settings:get')).toBe(false);
   });
 
-  it('uses an exact Origin allowlist without private-network wildcard CORS', () => {
-    const allowed = resolveBridgeAllowedOrigins('http://127.0.0.1:5127', 'http://127.0.0.1:5173/');
+  it('uses an exact Origin allowlist without a fixed Vite port or private-network wildcard CORS', () => {
+    const allowed = resolveBridgeAllowedOrigins('http://127.0.0.1:5127', 'http://127.0.0.1:54431/');
     expect(allowed.has('http://127.0.0.1:5127')).toBe(true);
-    expect(allowed.has('http://127.0.0.1:5173')).toBe(true);
+    expect(allowed.has('http://127.0.0.1:54431')).toBe(true);
+    expect(allowed.has('http://127.0.0.1:5173')).toBe(false);
     expect(isOriginAllowed('https://evil.example', allowed)).toBe(false);
     expect(isOriginAllowed(undefined, allowed)).toBe(true);
   });

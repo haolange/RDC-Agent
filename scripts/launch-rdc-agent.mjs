@@ -460,21 +460,24 @@ function waitForExit(child) {
   });
 }
 
-function isPortOpen(port) {
-  return new Promise((resolve) => {
-    const socket = net.createConnection({ host: '127.0.0.1', port });
-    socket.once('connect', () => { socket.destroy(); resolve(true); });
-    socket.once('error', () => resolve(false));
-    socket.setTimeout(500, () => { socket.destroy(); resolve(false); });
+function findFreePort() {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const address = probe.address();
+      const port = typeof address === 'object' && address ? address.port : 0;
+      probe.close((error) => error ? reject(error) : resolve(port));
+    });
   });
 }
 
-async function waitForRenderer(child, timeoutMs = 15_000) {
+async function waitForRenderer(child, rendererUrl, timeoutMs = 15_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error('Renderer dev server exited before becoming reachable.');
     const ready = await new Promise((resolve) => {
-      const request = http.get('http://127.0.0.1:5173/', (response) => {
+      const request = http.get(`${rendererUrl}/`, (response) => {
         response.resume();
         resolve((response.statusCode ?? 500) < 500);
       });
@@ -484,7 +487,7 @@ async function waitForRenderer(child, timeoutMs = 15_000) {
     if (ready) return;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  throw new Error('Renderer dev server did not become reachable at http://127.0.0.1:5173/.');
+  throw new Error(`Renderer dev server did not become reachable at ${rendererUrl}/.`);
 }
 
 async function terminate(child) {
@@ -521,18 +524,19 @@ async function main() {
   }
 
   if (effectiveMode === 'browser-dev') {
-    if (await isPortOpen(5173)) fail('Port 5173 is already in use; browser-dev requires that exact renderer port.');
-    console.log('[RDC-Agent] Starting renderer dev server at http://127.0.0.1:5173/...');
+    const rendererPort = await findFreePort();
+    const rendererUrl = `http://127.0.0.1:${rendererPort}`;
+    console.log(`[RDC-Agent] Starting renderer dev server at ${rendererUrl}/...`);
     const renderer = runChild(process.execPath, [
       path.join(nodeModulesPath, 'vite', 'bin', 'vite.js'),
-      '--config', 'vite.renderer.config.ts', '--host', '127.0.0.1', '--port', '5173', '--strictPort',
+      '--config', 'vite.renderer.config.ts', '--host', '127.0.0.1', '--port', String(rendererPort), '--strictPort',
     ], env);
     const cleanup = () => { void terminate(renderer); };
     process.once('SIGINT', cleanup);
     process.once('SIGTERM', cleanup);
     try {
-      await waitForRenderer(renderer);
-      const browserEnv = { ...env, ELECTRON_RENDERER_URL: 'http://127.0.0.1:5173' };
+      await waitForRenderer(renderer, rendererUrl);
+      const browserEnv = { ...env, ELECTRON_RENDERER_URL: rendererUrl };
       console.log('[RDC-Agent] Starting headless main process for browser verification...');
       const electron = runChild(dependencyState.electronExecutable, [mainEntry], browserEnv);
       process.exitCode = await waitForExit(electron);
