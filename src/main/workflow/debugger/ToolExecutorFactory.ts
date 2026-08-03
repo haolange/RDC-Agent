@@ -51,6 +51,7 @@ export interface ToolExecutorFactoryDeps {
     agentId: AgentRole,
     toolName: string,
     stage?: WorkflowStage | 'report',
+    frozenToolAllowlist?: readonly string[],
   ) => boolean;
   matchesToolAllowlist: (toolName: string, toolAllowlist: string[]) => boolean;
 }
@@ -126,7 +127,7 @@ export class ToolExecutorFactory {
     return {
       execute: async (toolCall: ToolCall, signal?: AbortSignal, onUpdate?: (partialResult: unknown) => void) => {
         const normalizedName = normalizeToolName(toolCall.name);
-        if (!this.deps.isAllowedForRuntime(agentId, toolCall.name, stage) || !tools.has(normalizedName)) {
+        if (!this.deps.isAllowedForRuntime(agentId, toolCall.name, stage, effectiveToolAllowlist) || !tools.has(normalizedName)) {
           return this.createPolicyDeniedToolResult(toolCall, agentId);
         }
         if (

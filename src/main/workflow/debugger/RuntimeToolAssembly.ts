@@ -22,7 +22,7 @@ import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTo
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import {
   expandCanonicalToolToken,
-  isToolAllowedForAgent,
+  isToolAllowedByFrozenAllowlist,
   normalizeToolName,
 } from './DebuggerRuntimePolicy';
 import type { TurnHandle } from './TurnCoordinator';
@@ -65,9 +65,10 @@ export class RuntimeToolAssembly {
     agentId: AgentRole,
     toolName: string,
     stage?: WorkflowStage | 'report',
+    frozenToolAllowlist?: readonly string[],
   ): boolean {
-    const workflowStage = stage === 'report' ? undefined : stage;
-    return isToolAllowedForAgent(toolName, agentId, workflowStage);
+    void stage;
+    return isToolAllowedByFrozenAllowlist(toolName, agentId, frozenToolAllowlist ?? []);
   }
 
   createTaskRuntimeTools(sessionId?: string | null, turnHandle?: TurnHandle | null): AgentTool[] {
@@ -109,6 +110,7 @@ export class RuntimeToolAssembly {
       name: 'rdx_context',
       label: 'RDX Context',
       description: 'Read the current stable RDX runtime context captured by configured shell actions.',
+      pollable: true,
       parameters: {
         type: 'object',
         properties: {},
@@ -526,6 +528,7 @@ export class RuntimeToolAssembly {
       name: 'mcp',
       label: 'List MCP Services',
       description: 'List MCP services configured for the current workspace, including connection status and tools.',
+      pollable: true,
       parameters: {
         type: 'object',
         properties: {
@@ -611,7 +614,7 @@ export class RuntimeToolAssembly {
     const toolSearchTool = createToolSearchTool(() =>
       Array.from(availableTools.values()).filter((tool) =>
         this.matchesToolAllowlist(tool.name, toolAllowlist)
-        && this.isAllowedForRuntime(agentId, tool.name, stage),
+        && this.isAllowedForRuntime(agentId, tool.name, stage, toolAllowlist),
       ),
     );
     availableTools.set(normalizeToolName(toolSearchTool.name), toolSearchTool);
@@ -620,7 +623,7 @@ export class RuntimeToolAssembly {
     const toolMap = new Map<string, AgentTool>();
     for (const tool of availableTools.values()) {
       if (!this.matchesToolAllowlist(tool.name, toolAllowlist)) continue;
-      if (!this.isAllowedForRuntime(agentId, tool.name, stage)) continue;
+      if (!this.isAllowedForRuntime(agentId, tool.name, stage, toolAllowlist)) continue;
       const normalized = normalizeToolName(tool.name);
       if (!toolMap.has(normalized)) {
         toolMap.set(normalized, tool);

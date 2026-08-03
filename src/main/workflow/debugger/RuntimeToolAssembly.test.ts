@@ -52,11 +52,20 @@ describe('RuntimeToolAssembly', () => {
     expect(assembly.matchesToolAllowlist('write_file', ['read_file'])).toBe(false);
   });
 
+  it('uses the turn-frozen allowlist for runtime checks and tool assembly', () => {
+    const assembly = createAssembly();
+    const frozen = ['read_file'];
+    expect(assembly.isAllowedForRuntime('ask', 'read_file', 'investigate', frozen)).toBe(true);
+    expect(assembly.isAllowedForRuntime('ask', 'write_file', 'investigate', frozen)).toBe(false);
+    frozen[0] = 'write_file';
+    expect(assembly.isAllowedForRuntime('ask', 'read_file', 'investigate', ['read_file'])).toBe(true);
+  });
+
   it('isAllowedForRuntime maps report stage to undefined workflow stage', () => {
     const assembly = createAssembly();
     // ask profile allows readonly tools in policy tables
-    expect(typeof assembly.isAllowedForRuntime('ask', 'read_file', 'report')).toBe('boolean');
-    expect(typeof assembly.isAllowedForRuntime('ask', 'read_file', 'investigate')).toBe('boolean');
+    expect(assembly.isAllowedForRuntime('ask', 'read_file', 'report', ['read_file'])).toBe(true);
+    expect(assembly.isAllowedForRuntime('ask', 'read_file', 'investigate', [])).toBe(false);
   });
 
   it('createAskUserTool rejects empty questions', async () => {

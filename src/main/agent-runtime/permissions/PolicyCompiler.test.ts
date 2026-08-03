@@ -58,6 +58,9 @@ describe('PolicyCompiler', () => {
       limits: { maxTurns: -1 },
     })).toThrow(/POLICY_INVALID/);
     expect(() => compilePolicyFromRestrictive({
+      limits: { maxTurns: 1.5 },
+    })).toThrow(/non-negative integer/);
+    expect(() => compilePolicyFromRestrictive({
       limits: { maxOutputBytes: 10 },
     })).toThrow(/unknown limit/);
   });

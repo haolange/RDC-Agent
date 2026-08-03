@@ -187,7 +187,7 @@ export function resolveAgentToolAllowlist(agentId: AgentRole, stage?: WorkflowSt
   return Array.from(new Set(profileTools));
 }
 
-export function isToolAllowedForAgent(toolName: string, agentId: AgentRole, stage?: WorkflowStage): boolean {
+export function isBuiltinToolAllowedForAgent(toolName: string, agentId: AgentRole): boolean {
   const normalizedToolName = normalizeToolName(toolName);
   if (SHADER_EDIT_TOOLS.includes(normalizedToolName)) {
     return false;
@@ -196,21 +196,22 @@ export function isToolAllowedForAgent(toolName: string, agentId: AgentRole, stag
     return false;
   }
 
-  const allowlist = resolveAgentToolAllowlist(agentId, stage);
-  for (const pattern of allowlist) {
-    const normalizedPattern = normalizeToolName(pattern);
-    if (normalizedPattern === '*' || normalizedPattern === normalizedToolName) {
-      return true;
-    }
-    if (normalizedPattern.endsWith('.*') && normalizedToolName.startsWith(normalizedPattern.slice(0, -1))) {
-      return true;
-    }
-    if (normalizedPattern.endsWith('*') && normalizedToolName.startsWith(normalizedPattern.slice(0, -1))) {
-      return true;
-    }
-  }
+  return true;
+}
 
-  return false;
+export function isToolAllowedByFrozenAllowlist(
+  toolName: string,
+  agentId: AgentRole,
+  toolAllowlist: readonly string[],
+): boolean {
+  if (!isBuiltinToolAllowedForAgent(toolName, agentId)) return false;
+  const normalizedToolName = normalizeToolName(toolName);
+  const expandedAllowlist = toolAllowlist.flatMap(expandToken);
+  return matchesAllowlistPattern(normalizedToolName, expandedAllowlist);
+}
+
+export function isToolAllowedForAgent(toolName: string, agentId: AgentRole, stage?: WorkflowStage): boolean {
+  return isToolAllowedByFrozenAllowlist(toolName, agentId, resolveAgentToolAllowlist(agentId, stage));
 }
 
 export function normalizeToolName(toolName: string): string {
