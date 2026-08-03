@@ -5,7 +5,7 @@ Browser 与桌面 Electron 共用同一套 renderer、`ElectronAPI` 产品接口
 | 路径 | Transport | 鉴权 |
 | --- | --- | --- |
 | Desktop | `preload` → `ipcRenderer` → `ipcMain` | 进程内信任边界 |
-| Browser | `BrowserAppBridge` → localhost HTTP/SSE → IPC handler registry | Bearer / query `rdcBridgeToken\|token` / cookie `rdcBridgeToken` |
+| Browser | `BrowserAppBridge` → localhost HTTP/SSE → IPC handler registry | One-time `/qa` bootstrap or dev-renderer challenge → HttpOnly `rdcBridgeToken` cookie; explicit Bearer for programmatic clients |
 
 Authoritative entry: the launcher logs one-time `GET /qa?qaBootstrap=...`; consume it once to mint the bridge cookie, then redirect to clean `/app`. Only `RDC_AGENT_BROWSER_QA=1` starts this surface; missing, repeated, or invalid bootstrap returns 401. JSON bodies are capped at 1 MiB.
 
@@ -32,14 +32,14 @@ Authoritative entry: the launcher logs one-time `GET /qa?qaBootstrap=...`; consu
 | Hook/MCP trust / revoke / test | ✅ | ✅ |
 | Electron 原生窗口 chrome | ✅ | 浏览器标签页容器 |
 
-上述 Browser 能力仍受 main-owned Zod、PermissionPolicy、approval token、MCP trust、`safeStorage`、session ownership 与 shell policy 约束；parity 不等于绕过权限。
+上述 Browser 能力仍受 main-owned Zod、PermissionPolicy、approval token、MCP trust、`safeStorage`、session ownership 与 shell policy 约束；parity 不等于绕过权限。`terminal:*`、`command:execute`、`settings:set`、`rdx-runtime:trustMcp`、`rdx-runtime:revokeMcp` 仅在 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时开放，否则 fail-closed。
 
 ## 状态与实例
 
-Browser / Browser-dev 默认使用与 Desktop 相同的 canonical Electron userData，不创建 `qa-*` fallback，也不复制或迁移数据。两种载体不得同时占用该目录；`instance.lock` 冲突应明确失败。自动化 smoke 必须显式设置临时 `RDC_AGENT_USER_DATA`，结束后清理。
+Browser QA / Browser-dev 在未显式指定 `RDC_AGENT_USER_DATA` 且未设置 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 时默认使用经过校验的临时 `os.tmpdir()/rdc-agent/qa-*` userData，并在 `will-quit` 清理；显式路径或 canonical 开关才会共享真实数据。两种载体不得同时占用同一目录；`instance.lock` 冲突应明确失败。涉及真实本机数据的验收必须显式指定 userData。
 
 ## 验证
 
 - 契约：`createRendererApi.test.ts`、`bridgeSecurity.test.ts`、`BrowserAppBridgeServer.contract.test.ts`
 - Smoke：`pnpm run smoke:agent-browser`
-- Manual: run start:agent-browser, copy the complete one-time /qa?qaBootstrap=... URL from the latest log, and verify real local Settings/Project/Session/usage, language persistence, and parity. Use explicit temporary userData for side-effecting permission flows.
+- Manual: run start:agent-browser, copy the complete one-time `/qa?qaBootstrap=...` URL from the latest log, and verify real Settings/Project/Session/usage, language persistence, and parity. Check high-risk channels both without and with `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`; use explicit canonical userData only for an authorized real-data flow.

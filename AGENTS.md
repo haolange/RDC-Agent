@@ -90,7 +90,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 
 ## 浏览器真实会话边界
 
-- agent 日常 UI/功能验证默认使用 headless Browser QA：`pnpm run start:agent-browser`（`RDC_AGENT_HEADLESS=1` + `RDC_AGENT_BROWSER_QA=1`），再用主进程日志输出的 **one-time `http://127.0.0.1:<port>/qa?qaBootstrap=...`** 打开同一套 renderer（`/qa` Set-Cookie 后进干净 `/app`）。**优先 `/qa`**；勿把截断的长 `?rdcBridgeToken=` URL 当验过了——白屏若是 Pretty-print JSON，即为 **401 Unauthorized**。
+- agent 日常 UI/功能验证默认使用 headless Browser QA：`pnpm run start:agent-browser`（`RDC_AGENT_HEADLESS=1` + `RDC_AGENT_BROWSER_QA=1`），每次默认使用经过校验的 disposable `os.tmpdir()/rdc-agent/qa-*` userData；只有显式 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 才进入真实共享数据。再用主进程日志输出的 **one-time `http://127.0.0.1:<port>/qa?qaBootstrap=...`** 打开同一套 renderer（`/qa` Set-Cookie 后进干净 `/app`）。**优先 `/qa`**；桥接鉴权不接受任何 URL token，Dev Renderer 需一次性 challenge handshake；`terminal:*`、`command:execute`、`settings:set`、MCP trust/revoke 在无 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时必须 fail-closed。
 - 浏览器真实会话通过 localhost bridge 连接真实 `main process`、workspace、settings、LLM runtime、事件流和已配置的 RDX CLI invoker；不得新增渲染层本地样本或演示场景作为验收入口。
 - Bridge 为 **debug-only** 安全边界（`bridgeSecurity`）：非 `RDC_AGENT_BROWSER_QA=1` 不得启动，且**不进 release 默认路径**。Browser 与 Desktop 必须共用 `src/shared/renderer-api` 的唯一 `ElectronAPI` 工厂、channel manifest 与 main handler registry；所有 preload 公开产品能力均保持 parity，未知/内部/未注册 channel 及不存在的明文 secret 读取 fail-closed。矩阵见 `docs/architecture/browser-qa-surface.md`。
 - Electron 窗口通过 `preload -> IPC transport` 进入主进程；浏览器真实会话通过 `localhost HTTP/SSE transport -> IPC handler registry` 进入主进程。除 transport 与原生窗口容器外，两条路径的 API、状态、持久化与审批语义必须一致，禁止恢复手写 Browser API、拒绝桩或第二套 channel 规则。
