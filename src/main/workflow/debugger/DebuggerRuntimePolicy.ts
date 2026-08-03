@@ -211,6 +211,7 @@ export function isToolAllowedByFrozenAllowlist(
 }
 
 export function isToolAllowedForAgent(toolName: string, agentId: AgentRole, stage?: WorkflowStage): boolean {
+  if (!isBuiltinToolAllowedForAgent(toolName, agentId)) return false;
   return isToolAllowedByFrozenAllowlist(toolName, agentId, resolveAgentToolAllowlist(agentId, stage));
 }
 
