@@ -8,6 +8,32 @@ export interface WriteMemoryInput { name: string; description: string; type: Mem
 
 const hashSlug = (value: string): string => createHash('sha256').update(value).digest('hex');
 
+const directoryWriteQueues = new Map<string, Promise<void>>();
+
+async function withDirectoryMutex<T>(
+  memoryDir: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  // Resolve the lock key after creating the directory so two MemoryStore
+  // instances (including symlinked aliases) share one physical mutex.
+  await fs.mkdir(memoryDir, { recursive: true });
+  const realMemoryDir = await fs.realpath(memoryDir);
+  const previous = directoryWriteQueues.get(realMemoryDir) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => { release = resolve; });
+  const tail = previous.then(() => current);
+  directoryWriteQueues.set(realMemoryDir, tail);
+  await previous;
+  try {
+    return await operation();
+  } finally {
+    release();
+    if (directoryWriteQueues.get(realMemoryDir) === tail) {
+      directoryWriteQueues.delete(realMemoryDir);
+    }
+  }
+}
+
 /**
  * Unicode-aware slugify: keep letters/numbers across scripts (\p{L}\p{N}),
  * collapse separators, and fall back to a short hash when the result is empty.
@@ -55,19 +81,11 @@ const serialize = (record: MemoryRecord): string => ['---', `id: ${JSON.stringif
 
 /** Explicit file-backed memory store. It never builds or injects a global index. */
 export class MemoryStore {
-  private writeQueue: Promise<void> = Promise.resolve();
-
   constructor(private readonly memoryDir: string) {}
   getMemoryDir(): string { return this.memoryDir; }
 
-  private enqueueWrite<T>(operation: () => Promise<T>): Promise<T> {
-    const next = this.writeQueue.then(operation, operation);
-    this.writeQueue = next.then(() => undefined, () => undefined);
-    return next;
-  }
-
   async writeMemory(input: WriteMemoryInput): Promise<MemoryRecord> {
-    return this.enqueueWrite(() => this.writeMemoryUnsafe(input));
+    return withDirectoryMutex(this.memoryDir, () => this.writeMemoryUnsafe(input));
   }
 
   private async writeMemoryUnsafe(input: WriteMemoryInput): Promise<MemoryRecord> {
@@ -137,10 +155,12 @@ export class MemoryStore {
   }
 
   async deleteMemory(name: string): Promise<boolean> {
-    const record = await this.getMemory(name);
-    if (!record) return false;
-    try { await fs.unlink(path.join(this.memoryDir, `${record.name}.md`)); return true; }
-    catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; }
+    return withDirectoryMutex(this.memoryDir, async () => {
+      const record = await this.getMemory(name);
+      if (!record) return false;
+      try { await fs.unlink(path.join(this.memoryDir, `${record.name}.md`)); return true; }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; }
+    });
   }
 
   private async readMemoryFile(slug: string): Promise<MemoryRecord | null> {

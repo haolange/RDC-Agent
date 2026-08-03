@@ -322,6 +322,7 @@ async function runAgentLoop(
         assistantMessage,
         toolResults.results,
         context.runtime?.current.revision ?? 0,
+        context.runtime?.current.activeTools ?? context.tools ?? [],
       );
       if (progress.action === 'terminate') {
         throw new AgentLoopTerminationError(

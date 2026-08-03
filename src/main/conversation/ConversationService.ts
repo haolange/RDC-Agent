@@ -18,9 +18,6 @@
  * to ensure terminal content comes from canonical final state.
  */
 import { createHash } from 'crypto';
-import { createReadStream, statSync } from 'fs';
-import { MAX_ATTACHMENT_BYTES_PER_FILE } from './ConversationAttachmentMaterializer';
-import * as path from 'path';
 import type {
   ConversationAttachmentInput,
   ConversationAnswerToolApprovalRequest,
@@ -67,6 +64,7 @@ import type {
 } from './ConversationRoutePreflight';
 import { canonicalJson } from './ConversationRoutePreflight';
 import { prepareConversationPrompt as buildConversationPrompt, type PrepareConversationPromptInput } from './ConversationPromptPreparer';
+import { hashAttachmentContents } from './ConversationAttachmentHashing';
 import { startProfileTurn as runStartProfileTurn } from './ConversationTurnStarter';
 import { completeProfileTurn as runCompleteProfileTurn, type CompleteProfileTurnInput } from './ConversationTurnRunner';
 import {
@@ -78,31 +76,6 @@ import {
   ephemeralTraceSessionId,
 } from './ConversationTurnTerminal';
 
-
-function hashAttachmentContent(sourcePath: string): Promise<string> {
-  return new Promise((resolve) => {
-    const absolutePath = path.resolve(sourcePath);
-    try {
-      const stats = statSync(absolutePath);
-      if (!stats.isFile()) {
-        resolve('not-file:' + absolutePath);
-        return;
-      }
-      if (stats.size > MAX_ATTACHMENT_BYTES_PER_FILE) {
-        resolve('oversized:' + stats.size);
-        return;
-      }
-    } catch {
-      resolve('missing:' + sourcePath);
-      return;
-    }
-    const hash = createHash('sha256');
-    const stream = createReadStream(absolutePath);
-    stream.on('data', (chunk) => hash.update(chunk));
-    stream.on('error', () => resolve('missing:' + sourcePath));
-    stream.on('end', () => resolve(hash.digest('hex')));
-  });
-}
 
 interface ConversationContextInput extends ConversationSendRequest {
   fallbackProjectId?: string | null;
@@ -328,16 +301,17 @@ export class ConversationService {
   private async computeRequestFingerprint(
     input: ConversationContextInput | ConversationRewriteContextInput,
   ): Promise<string> {
-    const attachmentHashes = (await Promise.all((input.attachments ?? []).map(async (attachment) => (
+    const contentHashes = await hashAttachmentContents(input.attachments ?? []);
+    const attachmentHashes = input.attachments?.map((attachment, index) => (
       createHash('sha256')
         .update(canonicalJson({
           fileName: attachment.fileName,
           mimeType: attachment.mimeType ?? null,
           declaredSize: attachment.size ?? null,
-          contentHash: await hashAttachmentContent(attachment.sourcePath),
+          contentHash: contentHashes[index],
         }))
         .digest('hex')
-    )))).sort();
+    ) ?? []).sort();
     const branchAnchor = 'messageId' in input && typeof input.messageId === 'string'
       ? input.messageId
       : null;

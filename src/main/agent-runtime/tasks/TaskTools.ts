@@ -236,6 +236,7 @@ export function createTaskGetTool(
     name: 'task_get',
     label: 'Get Task',
     description: 'Get full details of a specific task',
+    pollable: true,
     parameters: {
       type: 'object',
       properties: {
@@ -273,6 +274,7 @@ export function createTaskListTool(
     name: 'task_list',
     label: 'List Tasks',
     description: 'List all tasks with their current status',
+    pollable: true,
     parameters: {
       type: 'object',
       properties: {},

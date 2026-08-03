@@ -184,6 +184,8 @@ export interface ToolDefinition {
   description: string;
   /** 入参 JSON Schema。 */
   parameters: JsonSchema;
+  /** Whether repeating the same call is a valid wait-for-state-change poll. */
+  pollable?: boolean;
 }
 
 /**
