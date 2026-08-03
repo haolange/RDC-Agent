@@ -8,38 +8,46 @@ import { hasRegisteredIpcChannel } from '../ipc/invokeRegistry';
  * permissions, trust, and secret isolation remain authoritative.
  */
 export function isBridgeChannelAllowed(channel: string): boolean {
-  return isRendererInvokeChannel(channel) && hasRegisteredIpcChannel(channel);
+  if (!isRendererInvokeChannel(channel) || !hasRegisteredIpcChannel(channel)) {
+    return false;
+  }
+  if (isBridgeHighRiskChannel(channel) && process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS !== '1') {
+    return false;
+  }
+  return true;
+}
+
+/** Browser QA requires an explicit second opt-in for high-impact mutations. */
+export const BRIDGE_HIGH_RISK_CHANNELS = new Set<string>([
+  'command:execute',
+  'settings:set',
+  'rdx-runtime:trustMcp',
+  'rdx-runtime:revokeMcp',
+]);
+
+export function isBridgeHighRiskChannel(channel: string): boolean {
+  return BRIDGE_HIGH_RISK_CHANNELS.has(channel) || channel.startsWith('terminal:');
 }
 
 export function createBridgeBearerToken(): string {
   return randomBytes(32).toString('hex');
 }
 
-export function extractBearerToken(authorizationHeader: string | undefined, queryToken: string | null): string | null {
+export function extractBearerToken(authorizationHeader: string | undefined): string | null {
   const header = authorizationHeader?.trim();
   if (header) {
     const match = /^Bearer\s+(.+)$/i.exec(header);
     if (match?.[1]) return match[1].trim();
   }
-  const fromQuery = queryToken?.trim();
-  return fromQuery || null;
+  return null;
 }
 
-/** Prefer the printed /app query name; keep bare `token` for invoke/health probes. */
-export function resolveBridgeQueryToken(url: URL): string | null {
-  return url.searchParams.get('rdcBridgeToken') ?? url.searchParams.get('token');
-}
-
-/** Resolve Browser QA auth in order: Bearer, query token, then auth cookie. */
+/** Resolve Browser QA auth from an explicit Bearer header or HttpOnly auth cookie. */
 export function resolveProvidedBridgeToken(input: {
   authorizationHeader?: string;
-  url: URL;
   cookieHeader?: string;
 }): string | null {
-  return extractBearerToken(
-    input.authorizationHeader,
-    resolveBridgeQueryToken(input.url),
-  ) ?? resolveBridgeCookieToken(input.cookieHeader);
+  return extractBearerToken(input.authorizationHeader) ?? resolveBridgeCookieToken(input.cookieHeader);
 }
 
 const BRIDGE_COOKIE_NAME = 'rdcBridgeToken';
@@ -61,9 +69,9 @@ export function resolveBridgeCookieToken(cookieHeader: string | undefined): stri
   return null;
 }
 
-export function buildBridgeAuthCookie(token: string): string {
-  // QA-only localhost bridge: readable by renderer so /invoke can send Bearer.
-  return `${BRIDGE_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; SameSite=Lax`;
+export function buildBridgeAuthCookie(token: string, options: { secure?: boolean } = {}): string {
+  const secure = options.secure ? '; Secure' : '';
+  return `${BRIDGE_COOKIE_NAME}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Strict${secure}`;
 }
 
 export { BRIDGE_COOKIE_NAME };
@@ -85,8 +93,6 @@ export function resolveBridgeAllowedOrigins(bridgeOrigin: string, devRendererUrl
       // Ignore invalid renderer URLs.
     }
   }
-  // Vite browser-dev default; keep exact-origin only (no wildcard).
-  allowed.add('http://127.0.0.1:5173');
   return allowed;
 }
 

@@ -169,9 +169,19 @@ export class HookEngine {
     } catch {
       // ignore broken stdin
     }
-    const info = await supervised.exit;
+    const info = await supervised.join(definition.timeoutMs ?? 120_000);
     const stdout = supervised.stdout.toString().slice(0, MAX_OUTPUT_BYTES);
     const stderr = supervised.stderr.toString().slice(0, MAX_OUTPUT_BYTES);
+    if (info.reason === 'unconfirmed_orphan') {
+      return {
+        hookId: definition.id,
+        allowed: false,
+        status: 'failed',
+        stdout,
+        stderr,
+        reason: 'Hook process termination was not confirmed; execution was denied.',
+      };
+    }
     if (info.reason === 'timeout') {
       return {
         hookId: definition.id,

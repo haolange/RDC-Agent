@@ -13,10 +13,12 @@ import { MCPManager, type MCPServerConfig } from '../../agent-runtime/agent/MCPM
 import type { AgentTool } from '../../agent-runtime/agent/AgentTool';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import { mcpTrustService } from '../../settings/McpTrustService';
+import { runtimeLogService } from '../../runtime/RuntimeLogService';
 
 interface ProjectMcpPool {
   key: string;
   projectRootPath: string | null;
+  projectId: string | null;
   descriptorHash: string;
   manager: MCPManager;
   connecting: Map<string, Promise<void>>;
@@ -30,6 +32,7 @@ interface ProjectMcpPool {
 export interface McpConnectionLease {
   readonly poolKey: string;
   readonly projectRootPath: string | null;
+  readonly projectId: string | null;
   readonly descriptorHash: string;
   release(options?: { discardIfIdle?: boolean }): Promise<void>;
 }
@@ -37,6 +40,11 @@ export interface McpConnectionLease {
 export interface AcquiredMcpConnections {
   errors: string[];
   lease: McpConnectionLease | null;
+}
+
+export function canonicalMcpProjectRoot(projectRootPath: string, platform = process.platform): string {
+  const resolved = path.resolve(projectRootPath);
+  return platform === 'win32' ? resolved.toLowerCase() : resolved;
 }
 
 export class McpConnectionCoordinator {
@@ -84,32 +92,61 @@ export class McpConnectionCoordinator {
   async disconnectAll(): Promise<void> {
     const pools = Array.from(this.pools.values());
     for (const pool of pools) pool.closing = true;
-    await Promise.all(pools.map(async (pool) => {
+    const statuses = await Promise.all(pools.map(async (pool) => {
       await Promise.allSettled(pool.connecting.values());
-      await pool.manager.disconnectAll();
+      return pool.manager.disconnectAll();
     }));
+    this.reportOrphanedDisconnects(statuses.flat(), 'MCP shutdown left an orphaned process');
     this.pools.clear();
     this.activePoolByProject.clear();
+  }
+
+  private reportOrphanedDisconnects(statuses: readonly string[], title: string): void {
+    const orphanCount = statuses.filter((status) => status === 'orphaned').length;
+    if (orphanCount === 0) return;
+    runtimeLogService.log({
+      scope: 'app',
+      namespace: 'agent',
+      severity: 'error',
+      title,
+      summary: `${orphanCount} MCP process(es) did not confirm close within the bounded join window.`,
+      raw: { orphanCount },
+    });
   }
 
   async acquireConnections(
     agentId: AgentRole,
     projectRootPath?: string | null,
     enabledMcpIds?: readonly string[],
+    projectId?: string | null,
   ): Promise<AcquiredMcpConnections> {
     const descriptors = this.getEnabledMcpDescriptors(agentId, projectRootPath, enabledMcpIds);
     if (descriptors.length === 0) {
-      if (projectRootPath) this.activePoolByProject.delete(this.projectKey(projectRootPath));
+      const pools = projectRootPath
+        ? (() => {
+            const rootKey = this.projectKey(projectRootPath);
+            const activeKey = this.activePoolByProject.get(rootKey);
+            this.activePoolByProject.delete(rootKey);
+            const activePool = activeKey ? this.pools.get(activeKey) : undefined;
+            return activePool ? [activePool] : [];
+          })()
+        : Array.from(this.pools.values()).filter((pool) => pool.projectRootPath === null);
+      for (const pool of pools) {
+        if (pool.activeTurnRefs === 0) await this.evictPool(pool);
+        else pool.superseded = true;
+      }
       return { errors: [], lease: null };
     }
     const root = projectRootPath ? path.resolve(projectRootPath) : null;
     const descriptorHash = this.descriptorSetHash(descriptors);
-    const poolKey = this.poolKey(root, descriptorHash);
+    const normalizedProjectId = projectId?.trim() || null;
+    const poolKey = this.poolKey(root, normalizedProjectId, descriptorHash);
     let pool = this.pools.get(poolKey);
     if (!pool) {
       pool = {
         key: poolKey,
         projectRootPath: root,
+        projectId: normalizedProjectId,
         descriptorHash,
         manager: new MCPManager(),
         connecting: new Map(),
@@ -155,6 +192,7 @@ export class McpConnectionCoordinator {
     const lease: McpConnectionLease = {
       poolKey,
       projectRootPath: root,
+      projectId: normalizedProjectId,
       descriptorHash,
       release: async (options = {}) => {
         if (released) return;
@@ -204,7 +242,8 @@ export class McpConnectionCoordinator {
     pool.closing = true;
     try {
       await Promise.allSettled(pool.connecting.values());
-      await pool.manager.disconnectAll();
+      const statuses = await pool.manager.disconnectAll();
+      this.reportOrphanedDisconnects(statuses, 'MCP pool eviction left an orphaned process');
     } finally {
       if (this.pools.get(pool.key) === pool) this.pools.delete(pool.key);
       const projectKey = pool.projectRootPath ? this.projectKey(pool.projectRootPath) : null;
@@ -222,11 +261,13 @@ export class McpConnectionCoordinator {
   }
 
   private projectKey(projectRootPath: string): string {
-    return path.resolve(projectRootPath).toLowerCase();
+    return canonicalMcpProjectRoot(projectRootPath);
   }
 
-  private poolKey(projectRootPath: string | null, descriptorHash: string): string {
-    return (projectRootPath ? this.projectKey(projectRootPath) : '<user>') + ':' + descriptorHash;
+  private poolKey(projectRootPath: string | null, projectId: string | null, descriptorHash: string): string {
+    const rootKey = projectRootPath ? this.projectKey(projectRootPath) : '<user>';
+    const projectKey = projectId ? encodeURIComponent(projectId) : '<no-project>';
+    return `${rootKey}:${projectKey}:${descriptorHash}`;
   }
 
   private descriptorSetHash(descriptors: readonly AgentRuntimeMcpDescriptor[]): string {

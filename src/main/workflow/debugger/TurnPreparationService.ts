@@ -150,6 +150,7 @@ export class TurnPreparationService {
       input.agentId,
       input.projectRootPath,
       input.effectiveProfile.mcpServers,
+      input.projectId,
     );
     const mcpConnectionErrors = acquiredMcp.errors;
     const mcpLease = acquiredMcp.lease;

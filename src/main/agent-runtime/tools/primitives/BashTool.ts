@@ -125,9 +125,26 @@ export const bashTool: AgentTool<BashParams, BashDetails> = {
       emitUpdate();
     });
 
-    const info = await supervised.exit;
+    const info = await supervised.join(timeoutMs);
     stdout = supervised.stdout.toString() || stdout;
     stderr = supervised.stderr.toString() || stderr;
+
+    if (info.reason === 'unconfirmed_orphan') {
+      const text = combineOutput(stdout, stderr) + '\n[orphan] process termination was not confirmed.';
+      return {
+        content: [{ type: 'text', text: truncateOutput(text, BASH_MAX_OUTPUT_BYTES) }],
+        isError: true,
+        details: {
+          command,
+          reason: 'unconfirmed_orphan',
+          exitCode: null,
+          signal: null,
+          durationMs: Date.now() - startedAt,
+          truncated: Buffer.byteLength(text, 'utf8') > BASH_MAX_OUTPUT_BYTES,
+          cwd,
+        },
+      };
+    }
 
     if (info.reason === 'spawn_failed') {
       const text = combineOutput(stdout, stderr) + `\n[spawn error] ${info.error?.message ?? 'spawn failed'}`;

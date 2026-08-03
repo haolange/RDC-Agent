@@ -59,7 +59,7 @@ export class ShellInvocationService {
     this.activeProcesses.set(procId, { supervised, runId: request.runId });
 
     try {
-      const info = await supervised.exit;
+      const info = await supervised.join(request.timeoutMs ?? 120_000);
       const stdout = supervised.stdout.toString();
       const stderr = supervised.stderr.toString();
 
@@ -76,6 +76,14 @@ export class ShellInvocationService {
           exitCode: 124,
           stdout,
           stderr: stderr || `Process timeout after ${request.timeoutMs}ms`,
+          duration_ms: nowMs() - startTime,
+        };
+      }
+      if (info.reason === 'unconfirmed_orphan') {
+        return {
+          exitCode: 1,
+          stdout,
+          stderr: stderr || 'Process termination was not confirmed; the process is quarantined as an orphan.',
           duration_ms: nowMs() - startTime,
         };
       }

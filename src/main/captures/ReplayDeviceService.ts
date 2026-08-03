@@ -791,9 +791,12 @@ export class ReplayDeviceService {
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    const info = await supervised.exit;
+    const info = await supervised.join(120_000);
     const stdout = supervised.stdout.toString();
     const stderr = supervised.stderr.toString();
+    if (info.reason === 'unconfirmed_orphan') {
+      throw new Error('Replay device command became an unconfirmed orphan.');
+    }
     if (info.reason === 'spawn_failed') {
       throw info.error ?? new Error(stderr.trim() || 'adb spawn failed');
     }

@@ -2,7 +2,7 @@
  * Agent LoopRuntimeState COW / revision semantics (Phase 4.2).
  */
 import { describe, expect, it } from 'vitest';
-import type { Model, ToolDefinition } from '../core/types';
+import type { Message, Model, ToolDefinition } from '../core/types';
 import { Agent } from './Agent';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 
@@ -115,5 +115,29 @@ describe('Agent LoopRuntimeState', () => {
     expect(agent.runtimeState.revision).toBe(2);
     expect([...agent.runtimeState.activatedDeferredTools]).toEqual(['mcp__x__y']);
     expect(agent.runtimeState.activeTools.map((t) => t.name)).toEqual(['core', 'mcp__x__y']);
+  });
+
+  it('abortAndJoin waits for the complete active loop promise', async () => {
+    const agent = new Agent({
+      initialState: { model, tools: [], messages: [] },
+      provider: unusedProvider,
+      streamOptions,
+    });
+    let release!: (messages: Message[]) => void;
+    const activeLoopPromise = new Promise<Message[]>((resolve) => {
+      release = resolve;
+    });
+    (agent as unknown as { _activeLoopPromise: Promise<Message[]> })._activeLoopPromise = activeLoopPromise;
+
+    let joined = false;
+    const joinPromise = agent.abortAndJoin().then(() => {
+      joined = true;
+    });
+    await Promise.resolve();
+    expect(joined).toBe(false);
+
+    release([]);
+    await joinPromise;
+    expect(joined).toBe(true);
   });
 });

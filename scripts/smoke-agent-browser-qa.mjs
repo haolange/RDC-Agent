@@ -74,17 +74,9 @@ async function assertQaSurface(baseUrl, qaUrl) {
   }
   ok('GET /app without auth → 401 JSON');
 
-  const tokenMatch = /rdcBridgeToken=([^;]+)/.exec(cookie);
-  const token = tokenMatch ? decodeURIComponent(tokenMatch[1]) : '';
-  if (!token) {
-    fail('Could not parse bridge token from Set-Cookie');
-    return null;
-  }
-
   const invoke = await fetchRaw(`${baseUrl}/invoke`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       Cookie: cookie,
     },

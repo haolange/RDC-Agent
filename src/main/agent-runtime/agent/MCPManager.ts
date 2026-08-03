@@ -95,6 +95,8 @@ export interface MCPServerConfig {
   timeoutMs?: number;
 }
 
+export type McpDisconnectStatus = 'disconnected' | 'orphaned';
+
 /** MCP 发现的工具描述。 */
 export interface MCPDiscoveredTool {
   serverName: string;
@@ -270,7 +272,7 @@ export class MCPManager {
       );
       const proc = supervised.child;
       if (!proc || !supervised.pid) {
-        const exit = await supervised.exit;
+        const exit = await supervised.join(5_000);
         throw exit.error ?? new Error(`MCP stdio server "${config.name}" failed to spawn`);
       }
       proc.stderr?.setEncoding('utf8');
@@ -314,6 +316,10 @@ export class MCPManager {
       } catch (err) {
         rpc.close();
         supervised.abort('supervisor_kill');
+        const exit = await supervised.join(5_000);
+        if (exit.reason === 'unconfirmed_orphan') {
+          throw new Error(`MCP stdio server "${config.name}" became an unconfirmed orphan while connecting.`);
+        }
         throw err;
       }
 
@@ -437,7 +443,7 @@ export class MCPManager {
   }
 
   /** 断开 MCP 服务器。 */
-  async disconnect(serverName: string): Promise<void> {
+  async disconnect(serverName: string): Promise<McpDisconnectStatus> {
     const conn = this.connections.get(serverName);
     if (!conn) {
       if (this.serverStatuses.has(serverName)) {
@@ -447,7 +453,7 @@ export class MCPManager {
           'disconnected',
         );
       }
-      return;
+      return 'disconnected';
     }
     this.connections.delete(serverName);
     for (const t of conn.tools) {
@@ -459,8 +465,11 @@ export class MCPManager {
     if (conn.rpcSse) {
       conn.rpcSse.close();
     }
+    let status: McpDisconnectStatus = 'disconnected';
     if (conn.supervised) {
       conn.supervised.abort('supervisor_kill');
+      const exit = await conn.supervised.join(5_000);
+      if (exit.reason === 'unconfirmed_orphan') status = 'orphaned';
     } else if (conn.process) {
       try {
         conn.process.kill();
@@ -469,12 +478,13 @@ export class MCPManager {
       }
     }
     this.recordServerStatus(serverName, conn.config.name, 'disconnected');
+    return status;
   }
 
   /** 断开所有服务器。 */
-  async disconnectAll(): Promise<void> {
+  async disconnectAll(): Promise<McpDisconnectStatus[]> {
     const names = Array.from(this.connections.keys());
-    await Promise.all(names.map((n) => this.disconnect(n)));
+    return Promise.all(names.map((n) => this.disconnect(n)));
   }
 
   /** 列出已连接的服务器。 */
