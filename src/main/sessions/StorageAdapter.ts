@@ -227,14 +227,6 @@ export class StorageAdapter implements StorageHost {
     return this.sessions.updateRun(caseId, runId, data);
   }
 
-  async writeArtifact(caseId: string, runId: string, artifactName: string, data: unknown): Promise<string> {
-    return this.sessions.writeArtifact(caseId, runId, artifactName, data);
-  }
-
-  async readArtifact(caseId: string, runId: string, artifactName: string): Promise<Record<string, unknown> | null> {
-    return this.sessions.readArtifact(caseId, runId, artifactName);
-  }
-
   getActionChainPath(sessionId: string): string {
     return this.sessions.getActionChainPath(sessionId);
   }

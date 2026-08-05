@@ -36,6 +36,16 @@ import type {
 import type { StagedConversationSessionCommit } from './storageCommitTypes';
 
 
+const SAFE_RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
+function isSafeRunId(runId: string): boolean {
+  if (!runId || typeof runId !== 'string') return false;
+  if (runId === '.' || runId === '..') return false;
+  if (runId.includes('/') || runId.includes('\\') || runId.includes('\0')) return false;
+  if (path.isAbsolute(runId)) return false;
+  return SAFE_RUN_ID_RE.test(runId);
+}
+
 export class SessionRecordStore {
   constructor(private readonly host: import('./storageHost').StorageHost) {}
 
@@ -280,7 +290,16 @@ export class SessionRecordStore {
     if (!location) {
       throw new Error(`Session not found for run lookup: ${caseId}`);
     }
-    return path.join(location.sessionPath, 'runs', runId);
+    if (!isSafeRunId(runId)) {
+      throw new Error(`Invalid runId: ${runId}`);
+    }
+    const runsRoot = path.resolve(location.sessionPath, 'runs');
+    const runPath = path.resolve(runsRoot, runId);
+    const relative = path.relative(runsRoot, runPath);
+    if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) {
+      throw new Error(`runId escaped runs directory: ${runId}`);
+    }
+    return runPath;
   }
 
   async createCase(input: {
@@ -478,17 +497,6 @@ export class SessionRecordStore {
       lastRunId: runId,
     });
     this.syncSessionEvidence(caseId, existing.projectId);
-  }
-
-  async writeArtifact(caseId: string, runId: string, artifactName: string, data: unknown): Promise<string> {
-    const artifactPath = path.join(this.getRunPath(caseId, runId), 'artifacts', artifactName);
-    writeYaml(artifactPath, data);
-    return artifactPath;
-  }
-
-  async readArtifact(caseId: string, runId: string, artifactName: string): Promise<Record<string, unknown> | null> {
-    const artifactPath = path.join(this.getRunPath(caseId, runId), 'artifacts', artifactName);
-    return readYaml<Record<string, unknown>>(artifactPath);
   }
 
   getActionChainPath(sessionId: string): string {

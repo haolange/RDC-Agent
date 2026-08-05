@@ -30,7 +30,6 @@ export default defineConfig({
         'src/main/ipc/sessionOutputs.ts',
         'src/main/browserAppBridge/BrowserAppBridgeServer.ts',
         'src/main/browserAppBridge/rendererEventHub.ts',
-        'src/main/updater/**',
         'src/main/telemetry/**',
         'src/main/workers/turnPreparationWorker.ts',
         'src/main/workers/TurnPreparationWorkerPool.ts',

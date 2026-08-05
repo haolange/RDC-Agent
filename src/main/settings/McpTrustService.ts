@@ -84,6 +84,9 @@ export class McpTrustService {
   }
 
   assertConnectAllowed(descriptor: AgentRuntimeMcpDescriptor, projectRoot?: string | null): void {
+    if (descriptor.blockedReason && descriptor.blockedReason.startsWith('MCP_TRANSPORT_UNSUPPORTED:')) {
+      throw new Error(descriptor.blockedReason);
+    }
     // executableOverrideRejected means the project command was discarded and the
     // retained user executable may still connect.
     if (descriptor.scope !== 'project') {
