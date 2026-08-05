@@ -80,7 +80,7 @@ export class StorageAdapter implements StorageHost {
     return this.projects.listProjects();
   }
 
-  createProject(rootPath: string): ProjectRecord {
+  async createProject(rootPath: string): Promise<ProjectRecord> {
     return this.projects.createProject(rootPath);
   }
 
@@ -100,15 +100,15 @@ export class StorageAdapter implements StorageHost {
     return this.projects.getProjectById(projectId);
   }
 
-  listProjectInputs(projectId: string): ProjectInputRecord[] {
+  async listProjectInputs(projectId: string): Promise<ProjectInputRecord[]> {
     return this.projects.listProjectInputs(projectId);
   }
 
-  refreshProjectInputs(projectId: string): ProjectInputRecord[] {
+  async refreshProjectInputs(projectId: string): Promise<ProjectInputRecord[]> {
     return this.projects.refreshProjectInputs(projectId);
   }
 
-  importProjectInputs(projectId: string, filePaths: string[]): ProjectInputRecord[] {
+  async importProjectInputs(projectId: string, filePaths: string[]): Promise<ProjectInputRecord[]> {
     return this.projects.importProjectInputs(projectId, filePaths);
   }
 

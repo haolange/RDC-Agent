@@ -24,8 +24,7 @@ export class RunScopedStore {
 
   writeJson(sessionId: string, runId: string, relativePath: string, data: unknown): string {
     const filePath = this.resolveRunPath(sessionId, runId, relativePath);
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    storageAdapter.io.writeJsonAtomic(filePath, data);
     return filePath;
   }
 

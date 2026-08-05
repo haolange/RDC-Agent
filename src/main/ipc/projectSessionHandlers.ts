@@ -67,7 +67,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         label: 'project:add',
         maxBytes: 8 * 1024,
       });
-      const project = storageAdapter.createProject(rootPath);
+      const project = await storageAdapter.createProject(rootPath);
       await context.selectCurrentProject(project.projectId);
       return { success: true, project };
     } catch (err) {
@@ -132,7 +132,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       label: 'project:inputs:list',
       maxBytes: 4 * 1024,
     });
-    return { inputs: storageAdapter.listProjectInputs(projectId) };
+    return { inputs: await storageAdapter.listProjectInputs(projectId) };
   });
 
   ipcMain.handle('project:inputs:refresh', async (_event, ...rawArgs: unknown[]) => {
@@ -140,7 +140,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       label: 'project:inputs:refresh',
       maxBytes: 4 * 1024,
     });
-    const inputs = storageAdapter.refreshProjectInputs(projectId);
+    const inputs = await storageAdapter.refreshProjectInputs(projectId);
     context.broadcastToRenderer('project:inputsChanged', { projectId, inputs });
     return { inputs };
   });
@@ -156,10 +156,10 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
     });
 
     if (result.canceled || result.filePaths.length === 0) {
-      return { success: true, inputs: storageAdapter.listProjectInputs(projectId) };
+      return { success: true, inputs: await storageAdapter.listProjectInputs(projectId) };
     }
 
-    const inputs = storageAdapter.importProjectInputs(projectId, result.filePaths);
+    const inputs = await storageAdapter.importProjectInputs(projectId, result.filePaths);
     context.broadcastToRenderer('project:inputsChanged', { projectId, inputs });
     return { success: true, inputs };
   });
@@ -170,7 +170,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         label: 'project:inputs:importPaths',
         maxBytes: 64 * 1024,
       });
-      const inputs = storageAdapter.importProjectInputs(projectId, filePaths);
+      const inputs = await storageAdapter.importProjectInputs(projectId, filePaths);
       context.broadcastToRenderer('project:inputsChanged', { projectId, inputs });
       return { success: true, inputs };
     } catch (error) {

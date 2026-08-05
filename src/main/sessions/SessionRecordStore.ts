@@ -138,7 +138,7 @@ export class SessionRecordStore {
     this.host.io.ensureDir(path.join(sessionPath, 'attachments'));
     this.host.io.ensureDir(path.join(sessionPath, 'timeline'));
     this.host.io.ensureDir(path.join(sessionPath, 'runs'));
-    this.host.io.writeJson(path.join(sessionPath, 'session.json'), session);
+    this.host.io.writeJsonAtomic(path.join(sessionPath, 'session.json'), session);
     if (!fs.existsSync(path.join(sessionPath, 'action_chain.jsonl'))) {
       fs.writeFileSync(path.join(sessionPath, 'action_chain.jsonl'), '', 'utf-8');
     }
@@ -146,7 +146,7 @@ export class SessionRecordStore {
       fs.writeFileSync(path.join(sessionPath, 'conversation.jsonl'), '', 'utf-8');
     }
     if (!fs.existsSync(path.join(sessionPath, 'attachments.json'))) {
-      this.host.io.writeJson(path.join(sessionPath, 'attachments.json'), [] satisfies SessionAttachmentRecord[]);
+      this.host.io.writeJsonAtomic(path.join(sessionPath, 'attachments.json'), [] satisfies SessionAttachmentRecord[]);
     }
     this.syncSessionEvidence(session.sessionId, session.projectId);
 
@@ -251,7 +251,7 @@ export class SessionRecordStore {
       updatedAt: nowMs(),
     };
 
-    this.host.io.writeJson(path.join(location.sessionPath, 'session.json'), nextSession);
+    this.host.io.writeJsonAtomic(path.join(location.sessionPath, 'session.json'), nextSession);
     this.host.projects.touchProject(existing.projectId, nextSession.sessionId, nextSession.updatedAt);
     return nextSession;
   }
@@ -474,9 +474,31 @@ export class SessionRecordStore {
       return;
     }
 
+    const allowedTopLevel = new Set([
+      'status',
+      'stopReason',
+      'runtime',
+      'endedAt',
+      'updatedAt',
+      'finishedAt',
+      'stoppedAt',
+      'lastStage',
+      'goal',
+      'captures',
+      'reportPaths',
+      'backend',
+      'mode',
+      'turnId',
+    ]);
+    const sanitizedPatch: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (!allowedTopLevel.has(key)) continue;
+      sanitizedPatch[key] = value;
+    }
+
     const merged = this.host.io.deepMerge(
       existing as unknown as Record<string, unknown>,
-      data,
+      sanitizedPatch,
     ) as unknown as PersistedRunRecord;
     const workflowStage = merged.runtime?.workflow_stage || existing.runtime.workflow_stage;
     merged.runtime = {
@@ -697,7 +719,7 @@ export class SessionRecordStore {
   writeRunFiles(run: PersistedRunRecord): void {
     const runPath = this.getRunPath(run.sessionId, run.runId);
     this.host.io.ensureDir(runPath);
-    this.host.io.writeJson(path.join(runPath, 'run.json'), run);
+    this.host.io.writeJsonAtomic(path.join(runPath, 'run.json'), run);
     writeYaml(path.join(runPath, 'run.yaml'), {
       run_id: run.runId,
       turn_id: run.turnId,
@@ -866,7 +888,7 @@ export class SessionRecordStore {
           ...session,
           title: nextTitle,
         };
-        this.host.io.writeJson(path.join(sessionPath, 'session.json'), rewrittenSession);
+        this.host.io.writeJsonAtomic(path.join(sessionPath, 'session.json'), rewrittenSession);
         rewrittenBySessionId.set(session.sessionId, rewrittenSession);
         didRewrite = true;
         continue;

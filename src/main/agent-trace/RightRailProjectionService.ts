@@ -72,10 +72,11 @@ export class RightRailProjectionService {
       attachments: sources, resources: taskResources,
       permissionMode: settings.agentRuntime.permissions.mode,
     });
+    const projectInputs = await storageAdapter.listProjectInputs(session.projectId);
     const rdx = buildRdxContext({
       openedCapture,
       contextSnapshot,
-      availableCaptures: storageAdapter.listProjectInputs(session.projectId).map((capture) => ({
+      availableCaptures: projectInputs.map((capture) => ({
         inputId: capture.inputId, fileName: capture.fileName, filePath: capture.filePath, sizeBytes: capture.size,
       })),
     });

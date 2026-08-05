@@ -91,7 +91,7 @@ describe('StorageAdapter.removeSession side-channel cleanup', () => {
     const { appPathService } = await import('../runtime/AppPathService');
     const paths = appPathService.getAppStatePaths();
 
-    const project = storageAdapter.createProject(path.join(tempRoot, 'project-root'));
+    const project = await storageAdapter.createProject(path.join(tempRoot, 'project-root'));
     const session = storageAdapter.createSession(project.projectId, 'Cleanup Session');
     const run = await storageAdapter.createRun({
       caseId: session.sessionId,
@@ -127,7 +127,7 @@ describe('StorageAdapter.removeSession side-channel cleanup', () => {
     const { storageAdapter } = await import('./StorageAdapter');
     const projectRoot = path.join(tempRoot, 'staged-project-root');
     fs.mkdirSync(projectRoot, { recursive: true });
-    const project = storageAdapter.createProject(projectRoot);
+    const project = await storageAdapter.createProject(projectRoot);
     const sourcePath = path.join(tempRoot, 'staged-attachment.txt');
     fs.writeFileSync(sourcePath, 'attachment', 'utf8');
     const staged = storageAdapter.beginStagedConversationSession(
@@ -212,7 +212,7 @@ describe('StorageAdapter.removeSession side-channel cleanup', () => {
     const { storageAdapter } = await import('./StorageAdapter');
     const projectRoot = path.join(tempRoot, 'recover-project-root');
     fs.mkdirSync(projectRoot, { recursive: true });
-    const project = storageAdapter.createProject(projectRoot);
+    const project = await storageAdapter.createProject(projectRoot);
     const session = storageAdapter.createSession(project.projectId, 'Recover turn');
     const sourcePath = path.join(tempRoot, 'recover-attachment.txt');
     fs.writeFileSync(sourcePath, 'pending', 'utf8');
@@ -292,7 +292,7 @@ describe('StorageAdapter terminal transaction', () => {
     const { storageAdapter } = await import('./StorageAdapter');
     const projectRoot = path.join(tempRoot, 'terminal-commit-project');
     fs.mkdirSync(projectRoot, { recursive: true });
-    const project = storageAdapter.createProject(projectRoot);
+    const project = await storageAdapter.createProject(projectRoot);
     const session = storageAdapter.createSession(project.projectId, 'Terminal commit');
     const user: ConversationMessage = {
       id: 'user-terminal',
@@ -352,7 +352,7 @@ describe('StorageAdapter terminal transaction', () => {
     const { storageAdapter } = await import('./StorageAdapter');
     const projectRoot = path.join(tempRoot, `terminal-recovery-${phase}`);
     fs.mkdirSync(projectRoot, { recursive: true });
-    const project = storageAdapter.createProject(projectRoot);
+    const project = await storageAdapter.createProject(projectRoot);
     const session = storageAdapter.createSession(project.projectId, `Terminal recovery ${phase}`);
     const beforeHistory: ConversationMessage[] = [{
       id: 'assistant-terminal',

@@ -99,7 +99,7 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
       if (!session || session.projectId !== request.projectId) {
         return { success: false, error: 'Session does not belong to the requested project.' };
       }
-      const input = storageAdapter.listProjectInputs(request.projectId)
+      const input = (await storageAdapter.listProjectInputs(request.projectId))
         .find((entry) => entry.inputId === request!.inputId && entry.filePath === request!.filePath);
       if (!input) return { success: false, error: `Project input not found: ${request.inputId}` };
 

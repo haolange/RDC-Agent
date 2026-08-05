@@ -36,11 +36,12 @@ export class ProjectWorkspaceStore {
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
-  createProject(rootPath: string): ProjectRecord {
-    const normalizedRootPath = path.resolve(rootPath);
-    if (!fs.existsSync(normalizedRootPath) || !fs.statSync(normalizedRootPath).isDirectory()) {
-      throw new Error(`Project root is not a directory: ${normalizedRootPath}`);
+  async createProject(rootPath: string): Promise<ProjectRecord> {
+    const resolvedRootPath = path.resolve(rootPath);
+    if (!fs.existsSync(resolvedRootPath) || !fs.statSync(resolvedRootPath).isDirectory()) {
+      throw new Error(`Project root is not a directory: ${resolvedRootPath}`);
     }
+    const normalizedRootPath = fs.realpathSync.native(resolvedRootPath);
 
     const registry = this.readRegistry();
     const existing = registry.projects.find((project) => project.rootPath === normalizedRootPath);
@@ -52,7 +53,7 @@ export class ProjectWorkspaceStore {
     const projectName = path.basename(normalizedRootPath) || normalizedRootPath;
     const slug = this.createUniqueProjectSlug(projectName, registry.projects);
     const { resourcePath, knowledgePath, inputsPath } = this.ensureProjectResourceLayout(normalizedRootPath);
-    const inputs = this.collectProjectInputs(inputsPath);
+    const inputs = await this.collectProjectInputs(inputsPath);
 
     const timestamp = nowMs();
     const project: ProjectRecord = {
@@ -120,18 +121,18 @@ export class ProjectWorkspaceStore {
     return this.readRegistry().projects.find((project) => project.projectId === projectId) || null;
   }
 
-  listProjectInputs(projectId: string): ProjectInputRecord[] {
+  async listProjectInputs(projectId: string): Promise<ProjectInputRecord[]> {
     const project = this.getProjectById(projectId);
     if (!project) return [];
     return this.refreshProjectInputs(projectId);
   }
 
-  refreshProjectInputs(projectId: string): ProjectInputRecord[] {
+  async refreshProjectInputs(projectId: string): Promise<ProjectInputRecord[]> {
     const project = this.getProjectById(projectId);
     if (!project) return [];
 
     const normalizedProject = this.normalizeProjectRecord(project);
-    const inputs = this.collectProjectInputs(normalizedProject.inputsPath);
+    const inputs = await this.collectProjectInputs(normalizedProject.inputsPath);
     const nextProject: ProjectRecord = {
       ...normalizedProject,
       inputs,
@@ -141,7 +142,7 @@ export class ProjectWorkspaceStore {
     return nextProject.inputs;
   }
 
-  importProjectInputs(projectId: string, filePaths: string[]): ProjectInputRecord[] {
+  async importProjectInputs(projectId: string, filePaths: string[]): Promise<ProjectInputRecord[]> {
     const project = this.getProjectById(projectId);
     if (!project) {
       throw new Error(`Project not found: ${projectId}`);
@@ -214,7 +215,7 @@ export class ProjectWorkspaceStore {
       return;
     }
 
-    this.host.io.writeJson(this.host.registryPath, {
+    this.host.io.writeJsonAtomic(this.host.registryPath, {
       schemaVersion: '1',
       projects: [],
     } satisfies ProjectRegistry);
@@ -225,16 +226,26 @@ export class ProjectWorkspaceStore {
       return;
     }
 
-    this.host.io.writeJson(this.host.selectionPath, {
+    this.host.io.writeJsonAtomic(this.host.selectionPath, {
       projectId: null,
       sessionId: null,
     } satisfies SelectionState);
   }
 
   readRegistry(): ProjectRegistry {
-    const registry = this.host.io.readJson<ProjectRegistry>(this.host.registryPath) || {
-      schemaVersion: '1',
-      projects: [],
+    const loaded = this.host.io.readJson<ProjectRegistry>(this.host.registryPath);
+    if (!loaded) {
+      const empty: ProjectRegistry = {
+        schemaVersion: '1',
+        projects: [],
+      };
+      this.writeRegistry(empty);
+      return empty;
+    }
+
+    const registry: ProjectRegistry = {
+      schemaVersion: loaded.schemaVersion === '1' ? '1' : '1',
+      projects: Array.isArray(loaded.projects) ? loaded.projects : [],
     };
     const normalizedProjects = registry.projects.map((project) => this.normalizeProjectRecord(project));
     const changed = JSON.stringify(normalizedProjects) !== JSON.stringify(registry.projects);
@@ -250,24 +261,33 @@ export class ProjectWorkspaceStore {
   }
 
   writeRegistry(registry: ProjectRegistry): void {
-    this.host.io.writeJson(this.host.registryPath, registry);
+    this.host.io.writeJsonAtomic(this.host.registryPath, registry);
   }
 
   readSelection(): SelectionState {
-    return this.host.io.readJson<SelectionState>(this.host.selectionPath) || {
-      projectId: null,
-      sessionId: null,
+    const loaded = this.host.io.readJson<SelectionState>(this.host.selectionPath);
+    if (!loaded) {
+      const empty: SelectionState = {
+        projectId: null,
+        sessionId: null,
+      };
+      this.writeSelection(empty);
+      return empty;
+    }
+    return {
+      projectId: typeof loaded.projectId === 'string' || loaded.projectId === null ? loaded.projectId : null,
+      sessionId: typeof loaded.sessionId === 'string' || loaded.sessionId === null ? loaded.sessionId : null,
     };
   }
 
   writeSelection(selection: SelectionState): void {
-    this.host.io.writeJson(this.host.selectionPath, selection);
+    this.host.io.writeJsonAtomic(this.host.selectionPath, selection);
   }
 
   writeProjectMetadata(project: ProjectRecord): void {
     const normalizedProject = this.normalizeProjectRecord(project);
     this.host.io.ensureDir(this.getProjectDataPath(normalizedProject));
-    this.host.io.writeJson(path.join(this.getProjectDataPath(normalizedProject), 'project.json'), normalizedProject);
+    this.host.io.writeJsonAtomic(path.join(this.getProjectDataPath(normalizedProject), 'project.json'), normalizedProject);
     const projectPaths = appPathService.initializeProjectRdx(normalizedProject.rootPath);
     writeYaml(projectPaths.projectMetadataPath, {
       schema_version: '1',
@@ -361,38 +381,63 @@ export class ProjectWorkspaceStore {
   }
 
   normalizeProjectRecord(project: ProjectRecord): ProjectRecord {
-    const rootPath = path.resolve(project.rootPath);
+    const resolvedRoot = path.resolve(project.rootPath);
+    let rootPath = resolvedRoot;
+    try {
+      if (fs.existsSync(resolvedRoot)) {
+        rootPath = fs.realpathSync.native(resolvedRoot);
+      }
+    } catch {
+      rootPath = resolvedRoot;
+    }
     const { resourcePath, knowledgePath, inputsPath } = this.ensureProjectResourceLayout(rootPath);
-    const inputs = this.collectProjectInputs(inputsPath);
     return {
       ...project,
       rootPath,
       resourcePath,
       knowledgePath,
       inputsPath,
-      inputs,
+      inputs: Array.isArray(project.inputs) ? project.inputs : [],
       inputsUpdatedAt: project.inputsUpdatedAt || nowMs(),
     };
   }
 
-  private collectProjectInputs(inputsPath: string): ProjectInputRecord[] {
+  private static readonly PROJECT_INPUTS_MAX_DEPTH = 8;
+  private static readonly PROJECT_INPUTS_MAX_ENTRIES = 2000;
+  private static readonly PROJECT_INPUTS_YIELD_EVERY = 64;
+
+  private async collectProjectInputs(inputsPath: string): Promise<ProjectInputRecord[]> {
     if (!fs.existsSync(inputsPath)) {
       return [];
     }
 
     const records: ProjectInputRecord[] = [];
-    const walk = (dirPath: string) => {
-      for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+    let visited = 0;
+
+    const walk = async (dirPath: string, depth: number): Promise<void> => {
+      if (depth > ProjectWorkspaceStore.PROJECT_INPUTS_MAX_DEPTH) {
+        throw new Error(`PROJECT_INPUTS_BUDGET_EXCEEDED: maxDepth ${ProjectWorkspaceStore.PROJECT_INPUTS_MAX_DEPTH} exceeded under ${inputsPath}`);
+      }
+      const entries = await fs.promises.readdir(dirPath, { withFileTypes: true });
+      for (const entry of entries) {
+        visited += 1;
+        if (visited > ProjectWorkspaceStore.PROJECT_INPUTS_MAX_ENTRIES) {
+          throw new Error(`PROJECT_INPUTS_BUDGET_EXCEEDED: maxEntries ${ProjectWorkspaceStore.PROJECT_INPUTS_MAX_ENTRIES} exceeded under ${inputsPath}`);
+        }
+        if (visited % ProjectWorkspaceStore.PROJECT_INPUTS_YIELD_EVERY === 0) {
+          await new Promise<void>((resolve) => setImmediate(resolve));
+        }
+
         const fullPath = path.join(dirPath, entry.name);
         if (entry.isDirectory()) {
-          walk(fullPath);
+          await walk(fullPath, depth + 1);
           continue;
         }
         if (path.extname(entry.name).toLowerCase() !== '.rdc') {
           continue;
         }
 
-        const stats = fs.statSync(fullPath);
+        const stats = await fs.promises.stat(fullPath);
         records.push({
           inputId: this.createProjectInputId(inputsPath, fullPath),
           fileName: path.basename(fullPath),
@@ -405,7 +450,7 @@ export class ProjectWorkspaceStore {
       }
     };
 
-    walk(inputsPath);
+    await walk(inputsPath, 0);
     return records.sort((a, b) => a.fileName.localeCompare(b.fileName));
   }
 
