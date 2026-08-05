@@ -96,8 +96,17 @@ export interface MCPServerConfig {
 
 export type McpDisconnectStatus = 'disconnected' | 'orphaned';
 
+export interface McpDisconnectDetail {
+  serverName: string;
+  status: McpDisconnectStatus;
+  /** Present when status is orphaned and a supervised handle was retained. */
+  supervised?: SupervisedProcess;
+}
+
 /** MCP 发现的工具描述。 */
 export interface MCPDiscoveredTool {
+  /** Exact original server config.name / descriptor id. */
+  serverId: string;
   serverName: string;
   originalName: string;
   /** 带前缀的名称：mcp__{server}__{tool}。 */
@@ -148,25 +157,51 @@ class MCPAgentTool implements AgentTool {
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
-/** 把任意名称规范化为可作为 LLM 工具名的形式：仅保留 a-zA-Z0-9_-。 */
-function sanitizeName(name: string): string {
-  return name.replace(/[^a-zA-Z0-9_-]/g, '_');
+/** Encode an identity segment for tool names: reversible base64url of utf8. */
+export function encodeMcpNameSegment(value: string): string {
+  return encodeNameSegment(value);
 }
 
-/** 构造前缀工具名：mcp__{server}__{tool}。 */
-function buildPrefixedName(serverName: string, toolName: string): string {
-  return `mcp__${sanitizeName(serverName)}__${sanitizeName(toolName)}`;
+function encodeNameSegment(value: string): string {
+  return Buffer.from(value, 'utf8')
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function decodeNameSegment(encoded: string): string | null {
+  try {
+    const padded = encoded.replace(/-/g, '+').replace(/_/g, '/');
+    const padLen = (4 - (padded.length % 4)) % 4;
+    const base64 = padded + '='.repeat(padLen);
+    const decoded = Buffer.from(base64, 'base64').toString('utf8');
+    // Reject ambiguous legacy/sanitized segments that are not valid encodings.
+    if (encodeNameSegment(decoded) !== encoded) return null;
+    return decoded;
+  } catch {
+    return null;
+  }
+}
+
+/** Build reversible prefixed tool name: mcp__{encode(serverId)}__{encode(toolName)}. */
+export function buildMcpPrefixedName(serverId: string, toolName: string): string {
+  return buildPrefixedName(serverId, toolName);
+}
+
+function buildPrefixedName(serverId: string, toolName: string): string {
+  return `mcp__${encodeNameSegment(serverId)}__${encodeNameSegment(toolName)}`;
 }
 
 /**
- * MCP 管理器。
+ * MCP manager.
  *
- * 同一个实例可以并发管理多个 server；所有发现的工具按 prefixedName 注册到全局表。
+ * One instance can manage multiple servers; discovered tools are registered by prefixedName.
  */
 export class MCPManager {
   private connections = new Map<string, MCPConnection>();
   private discoveredTools = new Map<string, MCPDiscoveredTool>();
-  /** 连接生命周期状态（含失败/断开），供目录工具与仪表盘复用。 */
+  /** Connection lifecycle status (including failed/disconnected). */
   private serverStatuses = new Map<string, {
     name: string;
     connectionStatus: MCPConnectionStatus;
@@ -398,7 +433,7 @@ export class MCPManager {
   }
 
   /** 断开 MCP 服务器。 */
-  async disconnect(serverName: string): Promise<McpDisconnectStatus> {
+  async disconnect(serverName: string): Promise<McpDisconnectDetail> {
     const conn = this.connections.get(serverName);
     if (!conn) {
       if (this.serverStatuses.has(serverName)) {
@@ -408,7 +443,7 @@ export class MCPManager {
           'disconnected',
         );
       }
-      return 'disconnected';
+      return { serverName, status: 'disconnected' };
     }
     this.connections.delete(serverName);
     for (const t of conn.tools) {
@@ -418,10 +453,15 @@ export class MCPManager {
       conn.rpc.close();
     }
     let status: McpDisconnectStatus = 'disconnected';
+    let supervised: SupervisedProcess | undefined;
     if (conn.supervised) {
       conn.supervised.abort('supervisor_kill');
       const exit = await conn.supervised.join(5_000);
-      if (exit.reason === 'unconfirmed_orphan') status = 'orphaned';
+      if (exit.reason === 'unconfirmed_orphan') {
+        status = 'orphaned';
+        // Retain handle so callers can observe eventual exit and lift quarantine.
+        supervised = conn.supervised;
+      }
     } else if (conn.process) {
       try {
         conn.process.kill();
@@ -430,11 +470,13 @@ export class MCPManager {
       }
     }
     this.recordServerStatus(serverName, conn.config.name, 'disconnected');
-    return status;
+    return supervised
+      ? { serverName, status, supervised }
+      : { serverName, status };
   }
 
   /** 断开所有服务器。 */
-  async disconnectAll(): Promise<McpDisconnectStatus[]> {
+  async disconnectAll(): Promise<McpDisconnectDetail[]> {
     const names = Array.from(this.connections.keys());
     return Promise.all(names.map((n) => this.disconnect(n)));
   }
@@ -470,41 +512,46 @@ export class MCPManager {
     prefixedName: string,
     args: Record<string, unknown>,
   ): Promise<AgentToolResult> {
-    const parsed = this.parsePrefixedName(prefixedName);
-    if (!parsed) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Invalid MCP tool name: ${prefixedName}`,
-          },
-        ],
-        isError: true,
-      };
-    }
-    const conn = this.findConnectionByServer(parsed.serverName);
-    if (!conn) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `MCP server "${parsed.serverName}" not connected`,
-          },
-        ],
-        isError: true,
-      };
-    }
-    const tool = conn.tools.find((t) => t.prefixedName === prefixedName);
-    if (!tool) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `MCP tool "${prefixedName}" not found on server "${parsed.serverName}"`,
-          },
-        ],
-        isError: true,
-      };
+    const mapped = this.discoveredTools.get(prefixedName);
+    let tool = mapped;
+    let conn = mapped ? this.connections.get(mapped.serverId) : undefined;
+    if (!tool || !conn) {
+      const parsed = this.parsePrefixedName(prefixedName);
+      if (!parsed) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Invalid MCP tool name: ${prefixedName}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      conn = this.findConnectionByServer(parsed.serverId);
+      if (!conn) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `MCP server "${parsed.serverId}" not connected`,
+            },
+          ],
+          isError: true,
+        };
+      }
+      tool = conn.tools.find((t) => t.prefixedName === prefixedName);
+      if (!tool) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `MCP tool "${prefixedName}" not found on server "${parsed.serverId}"`,
+            },
+          ],
+          isError: true,
+        };
+      }
     }
 
     const timeoutMs = conn.config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -545,18 +592,32 @@ export class MCPManager {
     return toolName.startsWith('mcp__');
   }
 
-  /** 从前缀名称解析服务器和工具名。 */
+  /** 从前缀名称解析服务器和工具名（优先可逆 decode）。 */
   parsePrefixedName(
     prefixedName: string,
-  ): { serverName: string; toolName: string } | null {
+  ): { serverId: string; serverName: string; toolName: string } | null {
     if (!prefixedName.startsWith('mcp__')) return null;
     const rest = prefixedName.slice('mcp__'.length);
     const sepIdx = rest.indexOf('__');
     if (sepIdx <= 0 || sepIdx === rest.length - 2) return null;
-    const serverName = rest.slice(0, sepIdx);
-    const toolName = rest.slice(sepIdx + 2);
-    if (!serverName || !toolName) return null;
-    return { serverName, toolName };
+    const serverPart = rest.slice(0, sepIdx);
+    const toolPart = rest.slice(sepIdx + 2);
+    if (!serverPart || !toolPart) return null;
+    const decodedServer = decodeNameSegment(serverPart);
+    const decodedTool = decodeNameSegment(toolPart);
+    if (decodedServer !== null && decodedTool !== null) {
+      return {
+        serverId: decodedServer,
+        serverName: decodedServer,
+        toolName: decodedTool,
+      };
+    }
+    // Legacy sanitized form fallback for in-flight names only.
+    return {
+      serverId: serverPart,
+      serverName: serverPart,
+      toolName: toolPart,
+    };
   }
 
   // -------------------------------------------------------------------
@@ -564,7 +625,7 @@ export class MCPManager {
   // -------------------------------------------------------------------
 
   private toDiscoveredTool(
-    serverName: string,
+    serverId: string,
     raw: Record<string, unknown>,
   ): MCPDiscoveredTool {
     const originalName =
@@ -577,9 +638,10 @@ export class MCPManager {
         : ({ type: 'object', properties: {} } as JsonSchema);
 
     return {
-      serverName,
+      serverId,
+      serverName: serverId,
       originalName,
-      prefixedName: buildPrefixedName(serverName, originalName),
+      prefixedName: buildPrefixedName(serverId, originalName),
       description,
       inputSchema,
     };
@@ -587,16 +649,26 @@ export class MCPManager {
 
   private registerTools(tools: MCPDiscoveredTool[]): void {
     for (const t of tools) {
+      const existing = this.discoveredTools.get(t.prefixedName);
+      if (
+        existing
+        && (existing.serverId !== t.serverId || existing.originalName !== t.originalName)
+      ) {
+        throw new Error(
+          `MCP_TOOL_NAME_COLLISION: prefixed name "${t.prefixedName}" already registered for `
+          + `${existing.serverId}/${existing.originalName}; refusing ${t.serverId}/${t.originalName}`,
+        );
+      }
       this.discoveredTools.set(t.prefixedName, t);
     }
   }
 
-  /** 从 sanitized server name 反查连接。 */
-  private findConnectionByServer(
-    sanitizedServerName: string,
-  ): MCPConnection | undefined {
+  /** Match connection by exact original server config.name (descriptor id). */
+  private findConnectionByServer(serverId: string): MCPConnection | undefined {
+    const direct = this.connections.get(serverId);
+    if (direct) return direct;
     for (const conn of this.connections.values()) {
-      if (sanitizeName(conn.config.name) === sanitizedServerName) {
+      if (conn.config.name === serverId) {
         return conn;
       }
     }
