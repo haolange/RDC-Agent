@@ -16,7 +16,7 @@ import {
   projectOverridesUserExecutable,
 } from './McpTrustService';
 
-const MCP_TRANSPORTS = new Set<MCPTransport>(['stdio', 'sse', 'streamable-http']);
+const MCP_TRANSPORTS = new Set<MCPTransport>(['stdio', 'streamable-http']);
 
 const toRuntimeId = (value: string, fallback = 'custom'): string =>
   value.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || fallback;
@@ -133,8 +133,20 @@ export class AgentRuntimeConfigService {
       if (!fs.existsSync(root)) return;
       fs.readdirSync(root).filter((entry) => entry.endsWith('.mcp.json')).forEach((entry) => {
         const sourcePath = path.join(root, entry);
-        const value = readJsonFile<AgentRuntimeMcpDescriptor>(sourcePath);
-        if (!value?.id || !MCP_TRANSPORTS.has(value.transport)) return;
+        const value = readJsonFile<AgentRuntimeMcpDescriptor & { transport?: string }>(sourcePath);
+        if (!value?.id) return;
+        if (!MCP_TRANSPORTS.has(value.transport as MCPTransport)) {
+          const transportLabel = typeof value.transport === 'string' ? value.transport : String(value.transport);
+          target.set(value.id, {
+            ...value,
+            transport: value.transport as MCPTransport,
+            scope,
+            sourcePath,
+            enabledByDefault: false,
+            blockedReason: 'MCP_TRANSPORT_UNSUPPORTED: ' + transportLabel,
+          });
+          return;
+        }
         target.set(value.id, {
           ...value,
           scope,

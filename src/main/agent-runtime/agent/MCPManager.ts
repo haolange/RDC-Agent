@@ -33,7 +33,6 @@ import {
   MAX_MCP_BUFFER_BYTES,
   parseJsonRpcResponse,
   readBoundedResponseBody,
-  SseRpcClient,
   StdioRpcClient,
 } from './mcpRpcTransport';
 
@@ -83,13 +82,13 @@ export interface MCPServerConfig {
   /** 服务器名称标识。 */
   name: string;
   /** 连接类型。 */
-  type: 'stdio' | 'http' | 'sse' | 'streamable-http';
+  type: 'stdio' | 'http' | 'streamable-http';
   /** stdio: 命令。 */
   command?: string;
   /** stdio: 命令参数。 */
   args?: string[];
   env?: Record<string, string>;
-  /** http/sse/streamable-http: 端点 URL。 */
+  /** http/streamable-http: 端点 URL。 */
   url?: string;
   /** 调用超时（毫秒），默认 30s。 */
   timeoutMs?: number;
@@ -117,8 +116,6 @@ interface MCPConnection {
   supervised?: SupervisedProcess;
   /** stdio 模式下的 RPC 客户端。 */
   rpc?: StdioRpcClient;
-  /** sse 模式下的 RPC 客户端。 */
-  rpcSse?: SseRpcClient;
 }
 
 // =====================================================================
@@ -362,48 +359,6 @@ export class MCPManager {
       return conn.tools.map((t) => t.prefixedName);
     }
 
-    if (config.type === 'sse') {
-      if (!config.url) {
-        throw new Error(`MCP sse server "${config.name}" missing url`);
-      }
-      const sseRpc = new SseRpcClient(config.url);
-      const conn: MCPConnection = { config, tools: [], rpcSse: sseRpc };
-
-      try {
-        await sseRpc.connect(timeoutMs);
-        // SSE 模式：initialization 也通过 POST 发送
-        await sseRpc.request(
-          'initialize',
-          {
-            protocolVersion: '2024-11-05',
-            capabilities: {},
-            clientInfo: { name: 'rdc-agent', version: '0.1.0' },
-          },
-          timeoutMs,
-        );
-        sseRpc.notify('notifications/initialized', {});
-
-        const listResult = (await sseRpc.request(
-          'tools/list',
-          {},
-          timeoutMs,
-        )) as { tools?: Array<Record<string, unknown>> } | undefined;
-        const rawTools = Array.isArray(listResult?.tools)
-          ? listResult!.tools!
-          : [];
-        conn.tools = rawTools.map((t) =>
-          this.toDiscoveredTool(config.name, t),
-        );
-      } catch (err) {
-        sseRpc.close();
-        throw err;
-      }
-
-      this.connections.set(config.name, conn);
-      this.registerTools(conn.tools);
-      return conn.tools.map((t) => t.prefixedName);
-    }
-
     if (config.type === 'streamable-http') {
       if (!config.url) {
         throw new Error(`MCP streamable-http server "${config.name}" missing url`);
@@ -439,7 +394,7 @@ export class MCPManager {
       return conn.tools.map((t) => t.prefixedName);
     }
 
-    throw new Error(`Unsupported MCP transport type: ${String(config.type)}`);
+    throw new Error(`MCP_TRANSPORT_UNSUPPORTED: ${String(config.type)}`);
   }
 
   /** 断开 MCP 服务器。 */
@@ -461,9 +416,6 @@ export class MCPManager {
     }
     if (conn.rpc) {
       conn.rpc.close();
-    }
-    if (conn.rpcSse) {
-      conn.rpcSse.close();
     }
     let status: McpDisconnectStatus = 'disconnected';
     if (conn.supervised) {
@@ -563,15 +515,6 @@ export class MCPManager {
           throw new Error('stdio rpc client not initialized');
         }
         result = await conn.rpc.request(
-          'tools/call',
-          { name: tool.originalName, arguments: args },
-          timeoutMs,
-        );
-      } else if (conn.config.type === 'sse') {
-        if (!conn.rpcSse) {
-          throw new Error('sse rpc client not initialized');
-        }
-        result = await conn.rpcSse.request(
           'tools/call',
           { name: tool.originalName, arguments: args },
           timeoutMs,

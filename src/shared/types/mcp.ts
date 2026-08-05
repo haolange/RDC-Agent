@@ -3,7 +3,7 @@
  */
 
 /** MCP 传输类型 */
-export type MCPTransport = 'stdio' | 'sse' | 'streamable-http';
+export type MCPTransport = 'stdio' | 'streamable-http';
 
 /**
  * MCP 连接状态。
@@ -24,7 +24,7 @@ export interface MCPServerConfig {
   /** stdio 模式的命令 */
   command?: string;
   args?: string[];
-  /** SSE/HTTP 模式的 URL */
+  /** HTTP 模式的 URL */
   url?: string;
   /** 环境变量 */
   env?: Record<string, string>;
