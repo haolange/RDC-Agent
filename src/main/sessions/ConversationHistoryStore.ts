@@ -697,6 +697,36 @@ export class ConversationHistoryStore {
     return planned;
   }
 
+  /**
+   * Copy attachment sources into a turn staging directory and return staged absolute paths
+   * in the same order as the input. Used for fingerprint hashing before commit may re-copy.
+   */
+  stageAttachmentInputs(sourcePaths: string[], stagingDir: string): string[] {
+    this.host.io.ensureDir(stagingDir);
+    const stagedPaths: string[] = [];
+    for (let index = 0; index < sourcePaths.length; index += 1) {
+      const sourcePath = path.resolve(sourcePaths[index]!);
+      if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
+        throw new Error(`Attachment is not a readable file: ${sourcePath}`);
+      }
+      const extension = path.extname(sourcePath);
+      const baseName = path.basename(sourcePath, extension) || `attachment-${index}`;
+      let fileName = `${String(index).padStart(3, '0')}-${baseName}${extension}`;
+      let targetPath = path.join(stagingDir, fileName);
+      let counter = 2;
+      while (fs.existsSync(targetPath)) {
+        fileName = `${String(index).padStart(3, '0')}-${baseName}-${counter}${extension}`;
+        targetPath = path.join(stagingDir, fileName);
+        counter += 1;
+      }
+      const temporaryPath = `${targetPath}.${process.pid}.${generateShortId()}.tmp`;
+      fs.copyFileSync(sourcePath, temporaryPath);
+      fs.renameSync(temporaryPath, targetPath);
+      stagedPaths.push(targetPath);
+    }
+    return stagedPaths;
+  }
+
   private resolveImportedFilePath(dirPath: string, fileName: string): string {
     const extension = path.extname(fileName);
     const baseName = path.basename(fileName, extension);

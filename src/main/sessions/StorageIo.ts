@@ -6,6 +6,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { generateShortId } from '@shared/utils/id';
 
+const DEEP_MERGE_FORBIDDEN_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
 export class StorageIo {
   ensureDir(dirPath: string): void {
     if (!fs.existsSync(dirPath)) {
@@ -14,20 +16,63 @@ export class StorageIo {
   }
 
   readJson<T>(filePath: string): T | null {
+    let raw: string;
     try {
       if (!fs.existsSync(filePath)) {
         return null;
       }
-      return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as T;
+      raw = fs.readFileSync(filePath, 'utf-8');
     } catch (error) {
-      console.error(`Failed to read JSON file: ${filePath}`, error);
-      return null;
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') {
+        return null;
+      }
+      throw new Error(
+        `STORAGE_CORRUPT: failed to read JSON file: ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    try {
+      return JSON.parse(raw) as T;
+    } catch (parseError) {
+      const bakPath = `${filePath}.bak`;
+      try {
+        if (fs.existsSync(bakPath)) {
+          const bakRaw = fs.readFileSync(bakPath, 'utf-8');
+          const restored = JSON.parse(bakRaw) as T;
+          try {
+            this.writeUtf8Atomic(filePath, bakRaw);
+          } catch {
+            // Return restored payload even if primary rewrite fails.
+          }
+          return restored;
+        }
+      } catch {
+        // Bak missing or also corrupt — fall through to quarantine.
+      }
+
+      this.quarantineCorruptFile(filePath);
+      throw new Error(
+        `STORAGE_CORRUPT: failed to parse JSON file: ${filePath}: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+      );
     }
   }
 
-  writeJson(filePath: string, data: unknown): void {
-    this.ensureDir(path.dirname(filePath));
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+  private quarantineCorruptFile(filePath: string): void {
+    if (!fs.existsSync(filePath)) {
+      return;
+    }
+    const corruptPath = `${filePath}.corrupt.${Date.now()}`;
+    try {
+      fs.renameSync(filePath, corruptPath);
+    } catch {
+      try {
+        fs.copyFileSync(filePath, corruptPath);
+        fs.rmSync(filePath, { force: true });
+      } catch {
+        // Best-effort quarantine only.
+      }
+    }
   }
 
   writeUtf8Atomic(filePath: string, content: string): void {
@@ -37,8 +82,46 @@ export class StorageIo {
     try {
       fs.renameSync(temporaryPath, filePath);
     } catch (error) {
-      if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
-      throw error;
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'EEXIST' && code !== 'EPERM') {
+        if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+        throw error;
+      }
+
+      // Windows-safe bak-swap: no rm-then-rename data-loss window.
+      const bakTmpPath = `${filePath}.bak.tmp.${process.pid}.${generateShortId()}`;
+      try {
+        fs.renameSync(filePath, bakTmpPath);
+      } catch (bakError) {
+        if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+        throw bakError;
+      }
+
+      try {
+        fs.renameSync(temporaryPath, filePath);
+      } catch (finalError) {
+        try {
+          fs.renameSync(bakTmpPath, filePath);
+        } catch {
+          // Leave bakTmp in place for manual recovery.
+        }
+        if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+        throw finalError;
+      }
+
+      const durableBakPath = `${filePath}.bak`;
+      try {
+        if (fs.existsSync(durableBakPath)) {
+          fs.rmSync(durableBakPath, { force: true });
+        }
+        fs.renameSync(bakTmpPath, durableBakPath);
+      } catch {
+        try {
+          fs.rmSync(bakTmpPath, { force: true });
+        } catch {
+          // Best-effort bak cleanup.
+        }
+      }
     }
   }
 
@@ -57,6 +140,10 @@ export class StorageIo {
     const output: Record<string, unknown> = { ...base };
 
     for (const [key, value] of Object.entries(patch)) {
+      if (DEEP_MERGE_FORBIDDEN_KEYS.has(key)) {
+        continue;
+      }
+
       if (Array.isArray(value)) {
         output[key] = value;
         continue;

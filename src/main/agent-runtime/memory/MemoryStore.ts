@@ -10,6 +10,10 @@ const hashSlug = (value: string): string => createHash('sha256').update(value).d
 
 const directoryWriteQueues = new Map<string, Promise<void>>();
 
+const LIST_MAX_FILES = 500;
+const LIST_MAX_FILE_BYTES = 512 * 1024;
+const LIST_CONCURRENCY = 8;
+
 async function withDirectoryMutex<T>(
   memoryDir: string,
   operation: () => Promise<T>,
@@ -79,10 +83,60 @@ const parseFrontmatter = (source: string): { meta: Record<string, unknown>; body
 };
 const serialize = (record: MemoryRecord): string => ['---', `id: ${JSON.stringify(record.id)}`, `name: ${JSON.stringify(record.name)}`, `displayName: ${JSON.stringify(record.displayName)}`, `normalizedName: ${JSON.stringify(record.normalizedName)}`, `description: ${JSON.stringify(record.description)}`, `type: ${JSON.stringify(record.type)}`, `tags: ${JSON.stringify(record.tags ?? [])}`, `createdAt: ${record.createdAt}`, `updatedAt: ${record.updatedAt}`, '---', '', record.content.trim(), ''].join('\n');
 
+function assertMemoryPathContained(memoryDir: string, targetPath: string): void {
+  const root = path.resolve(memoryDir);
+  const resolved = path.resolve(targetPath);
+  const relative = path.relative(root, resolved);
+  if (relative === '' || relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`MEMORY_PATH_ESCAPE: path escaped memory directory: ${targetPath}`);
+  }
+}
+
+async function replaceFileAtomic(target: string, temporary: string): Promise<void> {
+  try {
+    await fs.rename(temporary, target);
+    return;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== 'EEXIST' && code !== 'EPERM') throw error;
+  }
+
+  const bakPath = `${target}.bak.${process.pid}.${randomBytes(4).toString('hex')}`;
+  try {
+    await fs.rename(target, bakPath);
+  } catch (bakError) {
+    await fs.rm(temporary, { force: true }).catch(() => undefined);
+    throw bakError;
+  }
+
+  try {
+    await fs.rename(temporary, target);
+  } catch (finalError) {
+    try {
+      await fs.rename(bakPath, target);
+    } catch {
+      // Leave bak for recovery if restore fails.
+    }
+    await fs.rm(temporary, { force: true }).catch(() => undefined);
+    throw finalError;
+  }
+
+  await fs.rm(bakPath, { force: true }).catch(() => undefined);
+}
+
 /** Explicit file-backed memory store. It never builds or injects a global index. */
 export class MemoryStore {
   constructor(private readonly memoryDir: string) {}
   getMemoryDir(): string { return this.memoryDir; }
+
+  private resolveMemoryFilePath(slug: string): string {
+    if (!slug || slug.includes('/') || slug.includes('\\') || slug.includes('\0') || slug === '.' || slug === '..') {
+      throw new Error(`MEMORY_INVALID_SLUG: ${slug}`);
+    }
+    const target = path.join(this.memoryDir, `${slug}.md`);
+    assertMemoryPathContained(this.memoryDir, target);
+    return target;
+  }
 
   async writeMemory(input: WriteMemoryInput): Promise<MemoryRecord> {
     return withDirectoryMutex(this.memoryDir, () => this.writeMemoryUnsafe(input));
@@ -116,7 +170,7 @@ export class MemoryStore {
       ? existingOwner!.name
       : await resolveSlugCollision(baseSlug, sourceName, async (slug) => {
           try {
-            await fs.access(path.join(this.memoryDir, slug + ".md"));
+            await fs.access(this.resolveMemoryFilePath(slug));
             return true;
           } catch {
             return false;
@@ -136,18 +190,11 @@ export class MemoryStore {
       createdAt: prior?.createdAt ?? now,
       updatedAt: now,
     };
-    const target = path.join(this.memoryDir, `${name}.md`);
+    const target = this.resolveMemoryFilePath(name);
     const temporary = `${target}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
     try {
       await fs.writeFile(temporary, serialize(record), { encoding: 'utf8', mode: 0o600 });
-      try {
-        await fs.rename(temporary, target);
-      } catch (error) {
-        const code = (error as NodeJS.ErrnoException).code;
-        if (code !== 'EEXIST' && code !== 'EPERM') throw error;
-        await fs.rm(target, { force: true });
-        await fs.rename(temporary, target);
-      }
+      await replaceFileAtomic(target, temporary);
     } finally {
       await fs.rm(temporary, { force: true }).catch(() => undefined);
     }
@@ -158,23 +205,35 @@ export class MemoryStore {
     return withDirectoryMutex(this.memoryDir, async () => {
       const record = await this.getMemory(name);
       if (!record) return false;
-      try { await fs.unlink(path.join(this.memoryDir, `${record.name}.md`)); return true; }
-      catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; }
+      try {
+        await fs.unlink(this.resolveMemoryFilePath(record.name));
+        return true;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false;
+        throw error;
+      }
     });
   }
 
   private async readMemoryFile(slug: string): Promise<MemoryRecord | null> {
     try {
-      const { meta, body } = parseFrontmatter(await fs.readFile(path.join(this.memoryDir, slug + '.md'), 'utf8'));
+      const filePath = this.resolveMemoryFilePath(slug);
+      const stats = await fs.stat(filePath);
+      if (!stats.isFile()) return null;
+      if (stats.size > LIST_MAX_FILE_BYTES) {
+        console.warn(`[MemoryStore] skipping oversized memory file: ${filePath} (${stats.size} bytes)`);
+        return null;
+      }
+      const { meta, body } = parseFrontmatter(await fs.readFile(filePath, 'utf8'));
       const candidateType = String(meta.type ?? 'reference');
       const type: MemoryType = ['user', 'feedback', 'project', 'reference'].includes(candidateType)
         ? candidateType as MemoryType
         : 'reference';
-      const storedName = String(meta.name ?? slug);
-      const displayName = String(meta.displayName ?? storedName);
+      // Disk filename slug is the sole path authority; frontmatter name is display-only when it differs.
+      const displayName = String(meta.displayName ?? meta.name ?? slug);
       return {
         id: String(meta.id ?? slug),
-        name: storedName,
+        name: slug,
         displayName,
         normalizedName: String(meta.normalizedName ?? displayName.normalize('NFKC').trim().toLowerCase()),
         description: String(meta.description ?? ''),
@@ -186,6 +245,10 @@ export class MemoryStore {
       };
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      if (error instanceof Error && error.message.startsWith('MEMORY_')) {
+        console.warn(`[MemoryStore] ${error.message}`);
+        return null;
+      }
       throw error;
     }
   }
@@ -228,8 +291,26 @@ export class MemoryStore {
     let entries: string[];
     try { entries = await fs.readdir(this.memoryDir); }
     catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []; throw error; }
-    const records = await Promise.all(entries.filter((entry) => entry.endsWith('.md')).map((entry) => this.getMemory(entry.slice(0, -3))));
-    return records.filter((record): record is MemoryRecord => Boolean(record)).sort((left, right) => right.updatedAt - left.updatedAt || left.name.localeCompare(right.name));
+
+    const mdEntries = entries.filter((entry) => entry.endsWith('.md')).slice(0, LIST_MAX_FILES);
+    if (entries.filter((entry) => entry.endsWith('.md')).length > LIST_MAX_FILES) {
+      console.warn(`[MemoryStore] listMemories truncated to ${LIST_MAX_FILES} files under ${this.memoryDir}`);
+    }
+
+    const records: MemoryRecord[] = [];
+    let nextIndex = 0;
+    const worker = async (): Promise<void> => {
+      while (nextIndex < mdEntries.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        const entry = mdEntries[index]!;
+        const record = await this.readMemoryFile(entry.slice(0, -3));
+        if (record) records.push(record);
+      }
+    };
+    const workerCount = Math.min(LIST_CONCURRENCY, mdEntries.length);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    return records.sort((left, right) => right.updatedAt - left.updatedAt || left.name.localeCompare(right.name));
   }
 
   async searchMemories(query: string, limit = 20): Promise<MemoryRecord[]> {

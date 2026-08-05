@@ -11,6 +11,7 @@ import {
   readJsonl,
   writeJsonl,
 } from '@shared/utils/jsonl';
+import { StorageIo } from '../../sessions/StorageIo';
 
 describe('storageFaultContract: corrupted JSONL', () => {
   let root = '';
@@ -57,5 +58,42 @@ describe('storageFaultContract: corrupted JSONL', () => {
     expect(result.records.map((r) => r.id)).toEqual(['ok']);
     expect(result.diagnostics).toHaveLength(1);
     expect(result.diagnostics[0]?.line).toBe(2);
+  });
+});
+
+describe('storageFaultContract: StorageIo corrupt JSON', () => {
+  let root = '';
+  const io = new StorageIo();
+
+  afterEach(() => {
+    if (root && fs.existsSync(root)) {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('throws STORAGE_CORRUPT and quarantines unrecoverable JSON (failure-class: integrity)', () => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-storage-corrupt-'));
+    const filePath = path.join(root, 'session.json');
+    fs.writeFileSync(filePath, 'not-json', 'utf8');
+    expect(() => io.readJson(filePath)).toThrow(/STORAGE_CORRUPT/);
+    expect(fs.existsSync(filePath)).toBe(false);
+    expect(fs.readdirSync(root).some((name) => name.includes('.corrupt.'))).toBe(true);
+  });
+
+  it('deepMerge rejects prototype pollution keys', () => {
+    const merged = io.deepMerge(
+      { a: 1 } as Record<string, unknown>,
+      JSON.parse('{"__proto__":{"polluted":true},"a":2}') as Record<string, unknown>,
+    );
+    expect(merged).toEqual({ a: 2 });
+    expect(({} as { polluted?: boolean }).polluted).toBeUndefined();
+  });
+
+  it('atomic write survives and leaves no tmp residue', () => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-storage-atomic-'));
+    const filePath = path.join(root, 'run.json');
+    io.writeJsonAtomic(filePath, { status: 'running' });
+    expect(io.readJson(filePath)).toEqual({ status: 'running' });
+    expect(fs.readdirSync(root).filter((name) => name.endsWith('.tmp'))).toEqual([]);
   });
 });

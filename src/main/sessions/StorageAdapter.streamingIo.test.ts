@@ -100,7 +100,7 @@ describe('StorageAdapter conversation streaming I/O', () => {
   it('writes deltas for streaming updates and compacts without full-snapshot amplification', async () => {
     const { storageAdapter } = await import('./StorageAdapter');
     await storageAdapter.initializeWorkspace();
-    const project = storageAdapter.createProject(path.join(tempRoot, 'project-root'));
+    const project = await storageAdapter.createProject(path.join(tempRoot, 'project-root'));
     const session = storageAdapter.createSession(project.projectId, 'stream-io');
 
     const base = makeMessage({

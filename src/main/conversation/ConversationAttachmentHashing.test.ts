@@ -81,4 +81,28 @@ describe('conversation attachment hashing', () => {
     await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
     expect(stream.destroyed).toBe(true);
   });
+
+  it('preserves attachment order in returned content hashes', async () => {
+    vi.mocked(createReadStream).mockImplementation((filePath) => {
+      const label = String(filePath);
+      let started = false;
+      return new Readable({
+        read() {
+          if (started) return;
+          started = true;
+          const payload = label.includes('2.txt') ? 'second' : label.includes('1.txt') ? 'first' : 'zeroth';
+          this.push(Buffer.from(payload));
+          this.push(null);
+        },
+      }) as unknown as ReturnType<typeof createReadStream>;
+    });
+
+    const hashes = await hashAttachmentContents([attachment(0), attachment(1), attachment(2)]);
+    expect(hashes).toHaveLength(3);
+    expect(new Set(hashes).size).toBe(3);
+    // Re-hash reverse order should reverse results, proving order preservation rather than sort-by-hash.
+    const reversed = await hashAttachmentContents([attachment(2), attachment(1), attachment(0)]);
+    expect(reversed).toEqual([hashes[2], hashes[1], hashes[0]]);
+  });
+
 });

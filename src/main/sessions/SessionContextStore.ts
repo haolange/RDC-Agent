@@ -31,7 +31,7 @@ export class SessionContextStore {
     if (!usagePath) {
       throw new Error(`Session not found for usage snapshot: ${sessionId}`);
     }
-    this.host.io.writeJson(usagePath, usage);
+    this.host.io.writeJsonAtomic(usagePath, usage);
   }
 
   writeSessionContextJournal(sessionId: string, entries: SessionContextTurnEntry[]): void {

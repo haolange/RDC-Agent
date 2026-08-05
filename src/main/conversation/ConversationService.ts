@@ -18,6 +18,9 @@
  * to ensure terminal content comes from canonical final state.
  */
 import { createHash } from 'crypto';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import type {
   ConversationAttachmentInput,
   ConversationAnswerToolApprovalRequest,
@@ -300,9 +303,13 @@ export class ConversationService {
 
   private async computeRequestFingerprint(
     input: ConversationContextInput | ConversationRewriteContextInput,
+    signal?: AbortSignal,
+    stagedAttachments?: ConversationAttachmentInput[],
   ): Promise<string> {
-    const contentHashes = await hashAttachmentContents(input.attachments ?? []);
-    const attachmentHashes = input.attachments?.map((attachment, index) => (
+    const attachments = stagedAttachments ?? input.attachments ?? [];
+    const contentHashes = await hashAttachmentContents(attachments, signal);
+    // Preserve attachment order — image order is semantic for multimodal prompts.
+    const attachmentHashes = attachments.map((attachment, index) => (
       createHash('sha256')
         .update(canonicalJson({
           fileName: attachment.fileName,
@@ -311,7 +318,7 @@ export class ConversationService {
           contentHash: contentHashes[index],
         }))
         .digest('hex')
-    ) ?? []).sort();
+    ));
     const branchAnchor = 'messageId' in input && typeof input.messageId === 'string'
       ? input.messageId
       : null;
@@ -329,6 +336,25 @@ export class ConversationService {
         configurationCommit: input.configurationCommit ?? null,
       }))
       .digest('hex');
+  }
+
+  private stageAttachmentsForFingerprint(
+    attachments: readonly ConversationAttachmentInput[],
+    requestId: string,
+  ): { stagingDir: string; stagedAttachments: ConversationAttachmentInput[] } {
+    const stagingDir = fs.mkdtempSync(path.join(os.tmpdir(), `rdc-agent-att-fp-${requestId.slice(0, 24)}-`));
+    try {
+      const sourcePaths = attachments.map((attachment) => attachment.sourcePath);
+      const stagedPaths = storageAdapter.history.stageAttachmentInputs(sourcePaths, stagingDir);
+      const stagedAttachments = attachments.map((attachment, index) => ({
+        ...attachment,
+        sourcePath: stagedPaths[index]!,
+      }));
+      return { stagingDir, stagedAttachments };
+    } catch (error) {
+      fs.rmSync(stagingDir, { recursive: true, force: true });
+      throw error;
+    }
   }
 
   private assertFingerprintMatch(idempotencyKey: string, fingerprint: string): void {
@@ -412,21 +438,53 @@ export class ConversationService {
     const requestId = input.requestId?.trim();
     if (!requestId) throw new Error('PREFLIGHT_FAILED: requestId is required.');
     const { scopeKey, idempotencyKey } = this.resolveIdempotencyScope(input);
-    const fingerprint = await this.computeRequestFingerprint(input);
-    this.assertFingerprintMatch(idempotencyKey, fingerprint);
-    const existing = this.sendRequests.get(idempotencyKey);
-    if (existing) return existing;
-    const persisted = await this.findPersistedTurn(input, requestId, fingerprint);
-    if (persisted) {
-      this.sendRequestFingerprints.set(idempotencyKey, fingerprint);
-      return persisted;
+
+    // Controller first so Stop during fingerprint hashing can abort streams.
+    const controller = new AbortController();
+    let stagingDir: string | null = null;
+    let fingerprint: string;
+    try {
+      const attachments = input.attachments ?? [];
+      // Light validation before heavy hash work.
+      for (const attachment of attachments) {
+        if (!attachment.sourcePath || typeof attachment.sourcePath !== 'string') {
+          throw new Error('PREFLIGHT_FAILED: attachment sourcePath is required.');
+        }
+      }
+      let stagedAttachments = attachments;
+      if (attachments.length > 0) {
+        const staged = this.stageAttachmentsForFingerprint(attachments, requestId);
+        stagingDir = staged.stagingDir;
+        stagedAttachments = staged.stagedAttachments;
+      }
+      fingerprint = await this.computeRequestFingerprint(input, controller.signal, stagedAttachments);
+    } catch (error) {
+      if (stagingDir) fs.rmSync(stagingDir, { recursive: true, force: true });
+      throw error;
     }
 
-    const scopeOwner = this.activeSendScopes.get(scopeKey);
-    if (scopeOwner && scopeOwner !== requestId) {
-      throw new Error('CONVERSATION_BUSY: another request is preparing for this conversation.');
+    try {
+      this.assertFingerprintMatch(idempotencyKey, fingerprint);
+      const existing = this.sendRequests.get(idempotencyKey);
+      if (existing) {
+        if (stagingDir) fs.rmSync(stagingDir, { recursive: true, force: true });
+        return existing;
+      }
+      const persisted = await this.findPersistedTurn(input, requestId, fingerprint);
+      if (persisted) {
+        if (stagingDir) fs.rmSync(stagingDir, { recursive: true, force: true });
+        this.sendRequestFingerprints.set(idempotencyKey, fingerprint);
+        return persisted;
+      }
+
+      const scopeOwner = this.activeSendScopes.get(scopeKey);
+      if (scopeOwner && scopeOwner !== requestId) {
+        throw new Error('CONVERSATION_BUSY: another request is preparing for this conversation.');
+      }
+    } catch (error) {
+      if (stagingDir) fs.rmSync(stagingDir, { recursive: true, force: true });
+      throw error;
     }
-    const controller = new AbortController();
     this.activeSendScopes.set(scopeKey, requestId);
     this.preparingRequests.set(idempotencyKey, {
       requestId,
@@ -436,8 +494,10 @@ export class ConversationService {
       cancelAfterCommit: false,
       credentialLeaseTransferred: false,
     });
+    // Note: commit still re-copies from original source paths; staged bytes are fingerprint-only in this batch.
     const pending = operation(requestId, controller, fingerprint)
       .finally(() => {
+        if (stagingDir) fs.rmSync(stagingDir, { recursive: true, force: true });
         const requestState = this.preparingRequests.get(idempotencyKey);
         if (requestState?.credentialHandle && !requestState.credentialLeaseTransferred) {
           agentOrchestrator.releaseProviderRuntimeCredentials(requestState.credentialHandle);
@@ -669,7 +729,7 @@ export class ConversationService {
       ? storageAdapter.listRuns(resolvedSessionId).find((entry) => entry.runId === (input.currentRunId ?? input.fallbackRunId))
         ?? storageAdapter.getLatestRun(resolvedSessionId)
       : null;
-    const projectInputs = projectId ? storageAdapter.listProjectInputs(projectId) : [];
+    const projectInputs = projectId ? await storageAdapter.listProjectInputs(projectId) : [];
     const openedCapture = projectId && resolvedSessionId
       ? rdxSessionService.snapshotOpenedCaptureForSession({ projectId, sessionId: resolvedSessionId })
       : null;
