@@ -146,8 +146,12 @@ class MCPAgentTool implements AgentTool {
     this.parameters = tool.inputSchema;
   }
 
-  async execute(_toolCallId: string, args: Record<string, unknown>): Promise<AgentToolResult> {
-    return this.manager.executeTool(this.name, args);
+  async execute(
+    _toolCallId: string,
+    args: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<AgentToolResult> {
+    return this.manager.executeTool(this.name, args, signal);
   }
 }
 
@@ -156,6 +160,40 @@ class MCPAgentTool implements AgentTool {
 // =====================================================================
 
 const DEFAULT_TIMEOUT_MS = 30_000;
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException('The operation was aborted', 'AbortError');
+  }
+}
+
+function linkAbortSignals(
+  primary: AbortSignal,
+  external?: AbortSignal,
+): { signal: AbortSignal; cleanup: () => void } {
+  if (!external) {
+    return { signal: primary, cleanup: () => {} };
+  }
+  if (primary.aborted || external.aborted) {
+    const controller = new AbortController();
+    controller.abort();
+    return { signal: controller.signal, cleanup: () => {} };
+  }
+  if (typeof AbortSignal.any === 'function') {
+    return { signal: AbortSignal.any([primary, external]), cleanup: () => {} };
+  }
+  const controller = new AbortController();
+  const onAbort = () => controller.abort();
+  primary.addEventListener('abort', onAbort, { once: true });
+  external.addEventListener('abort', onAbort, { once: true });
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      primary.removeEventListener('abort', onAbort);
+      external.removeEventListener('abort', onAbort);
+    },
+  };
+}
 
 /** Encode an identity segment for tool names: reversible base64url of utf8. */
 export function encodeMcpNameSegment(value: string): string {
@@ -266,13 +304,14 @@ export class MCPManager {
   }
 
   /** 连接到 MCP 服务器，返回该服务器发现的 prefixedName 列表。 */
-  async connect(config: MCPServerConfig): Promise<string[]> {
+  async connect(config: MCPServerConfig, signal?: AbortSignal): Promise<string[]> {
+    throwIfAborted(signal);
     if (this.connections.has(config.name)) {
       throw new Error(`MCP server "${config.name}" already connected`);
     }
     this.recordServerStatus(config.name, config.name, 'connecting');
     try {
-      const toolNames = await this.connectInternal(config);
+      const toolNames = await this.connectInternal(config, signal);
       this.recordServerStatus(config.name, config.name, 'connected');
       return toolNames;
     } catch (err) {
@@ -282,7 +321,8 @@ export class MCPManager {
     }
   }
 
-  private async connectInternal(config: MCPServerConfig): Promise<string[]> {
+  private async connectInternal(config: MCPServerConfig, signal?: AbortSignal): Promise<string[]> {
+    throwIfAborted(signal);
     const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
     if (config.type === 'stdio') {
@@ -323,6 +363,7 @@ export class MCPManager {
       };
 
       try {
+        throwIfAborted(signal);
         await rpc.request(
           'initialize',
           {
@@ -331,13 +372,16 @@ export class MCPManager {
             clientInfo: { name: 'rdc-agent', version: '0.1.0' },
           },
           timeoutMs,
+          signal,
         );
         rpc.notify('notifications/initialized', {});
 
+        throwIfAborted(signal);
         const listResult = (await rpc.request(
           'tools/list',
           {},
           timeoutMs,
+          signal,
         )) as { tools?: Array<Record<string, unknown>> } | undefined;
         const rawTools = Array.isArray(listResult?.tools)
           ? listResult!.tools!
@@ -365,6 +409,7 @@ export class MCPManager {
         throw new Error(`MCP http server "${config.name}" missing url`);
       }
       const conn: MCPConnection = { config, tools: [] };
+      throwIfAborted(signal);
       await this.httpRpc(
         config.url,
         'initialize',
@@ -374,13 +419,16 @@ export class MCPManager {
           clientInfo: { name: 'rdc-agent', version: '0.1.0' },
         },
         timeoutMs,
+        signal,
       );
 
+      throwIfAborted(signal);
       const listResult = (await this.httpRpc(
         config.url,
         'tools/list',
         {},
         timeoutMs,
+        signal,
       )) as { tools?: Array<Record<string, unknown>> } | undefined;
       const rawTools = Array.isArray(listResult?.tools)
         ? listResult!.tools!
@@ -400,6 +448,7 @@ export class MCPManager {
       }
       // streamable-http: 使用 POST + streaming response (NDJSON)
       const conn: MCPConnection = { config, tools: [] };
+      throwIfAborted(signal);
       await this.streamableHttpRpc(
         config.url,
         'initialize',
@@ -409,13 +458,16 @@ export class MCPManager {
           clientInfo: { name: 'rdc-agent', version: '0.1.0' },
         },
         timeoutMs,
+        signal,
       );
 
+      throwIfAborted(signal);
       const listResult = (await this.streamableHttpRpc(
         config.url,
         'tools/list',
         {},
         timeoutMs,
+        signal,
       )) as { tools?: Array<Record<string, unknown>> } | undefined;
       const rawTools = Array.isArray(listResult?.tools)
         ? listResult!.tools!
@@ -511,7 +563,15 @@ export class MCPManager {
   async executeTool(
     prefixedName: string,
     args: Record<string, unknown>,
+    signal?: AbortSignal,
   ): Promise<AgentToolResult> {
+    if (signal?.aborted) {
+      return {
+        content: [{ type: 'text', text: 'MCP execute aborted' }],
+        isError: true,
+      };
+    }
+
     const mapped = this.discoveredTools.get(prefixedName);
     let tool = mapped;
     let conn = mapped ? this.connections.get(mapped.serverId) : undefined;
@@ -565,17 +625,29 @@ export class MCPManager {
           'tools/call',
           { name: tool.originalName, arguments: args },
           timeoutMs,
+          signal,
         );
       } else {
         if (!conn.config.url) {
           throw new Error('server url missing');
         }
-        result = await this.httpRpc(
-          conn.config.url,
-          'tools/call',
-          { name: tool.originalName, arguments: args },
-          timeoutMs,
-        );
+        if (conn.config.type === 'streamable-http') {
+          result = await this.streamableHttpRpc(
+            conn.config.url,
+            'tools/call',
+            { name: tool.originalName, arguments: args },
+            timeoutMs,
+            signal,
+          );
+        } else {
+          result = await this.httpRpc(
+            conn.config.url,
+            'tools/call',
+            { name: tool.originalName, arguments: args },
+            timeoutMs,
+            signal,
+          );
+        }
       }
       return this.normalizeToolResult(result);
     } catch (err) {
@@ -720,16 +792,18 @@ export class MCPManager {
     method: string,
     params: unknown,
     timeoutMs: number,
+    externalSignal?: AbortSignal,
   ): Promise<unknown> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timeoutController = new AbortController();
+    const timer = setTimeout(() => timeoutController.abort(), timeoutMs);
+    const { signal, cleanup } = linkAbortSignals(timeoutController.signal, externalSignal);
     try {
       const id = Date.now() + Math.floor(Math.random() * 1000);
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
-        signal: controller.signal,
+        signal,
       });
       if (!res.ok) {
         throw new Error(`MCP HTTP ${res.status} ${res.statusText}`);
@@ -747,6 +821,7 @@ export class MCPManager {
       return body.result;
     } finally {
       clearTimeout(timer);
+      cleanup();
     }
   }
 
@@ -756,9 +831,11 @@ export class MCPManager {
     method: string,
     params: unknown,
     timeoutMs: number,
+    externalSignal?: AbortSignal,
   ): Promise<unknown> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timeoutController = new AbortController();
+    const timer = setTimeout(() => timeoutController.abort(), timeoutMs);
+    const { signal, cleanup } = linkAbortSignals(timeoutController.signal, externalSignal);
     try {
       const id = Date.now() + Math.floor(Math.random() * 1000);
       const res = await fetch(url, {
@@ -768,7 +845,7 @@ export class MCPManager {
           Accept: 'application/x-ndjson',
         },
         body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
-        signal: controller.signal,
+        signal,
       });
       if (!res.ok) {
         throw new Error(`MCP streamable-http ${res.status} ${res.statusText}`);
@@ -801,6 +878,7 @@ export class MCPManager {
       throw new Error('MCP streamable-http response id mismatch');
     } finally {
       clearTimeout(timer);
+      cleanup();
     }
   }
 

@@ -338,5 +338,12 @@ describe('ContextManager', () => {
       ];
       await expect(cm.compress(msgs)).rejects.toThrow(/CONTEXT_CANNOT_FIT/);
     });
+
+    it('throws AbortError when signal is already aborted', async () => {
+      const cm = createContextManager();
+      const controller = new AbortController();
+      controller.abort();
+      await expect(cm.compress([user('hello')], controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    });
   });
 });

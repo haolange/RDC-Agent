@@ -118,11 +118,51 @@ describe('AgentTurnRunner', () => {
       [],
       undefined,
       '',
-      null,
+      'test-scope',
       1000,
       800,
       undefined,
     )).toThrow(/PromptPlan is required/);
+  });
+
+  it('rejects runAgentTurn without preparedRuntime', async () => {
+    const runner = createRunner();
+    const requestPlan = createTestRequestPlan({
+      providerId: 'test',
+      adapterId: 'openai-compatible',
+      catalogRevision: 'test',
+      routeRevision: 'test',
+      selectedModelId: 'model',
+      effectiveModelId: 'model',
+      appliedBindingIds: [],
+      route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://example.test', source: 'catalog' },
+      headers: {},
+      bodyPatch: {},
+      contextBudgetTokens: 1000,
+      contextMode: 'normal',
+      contextWindowTokens: 2000,
+      activeTierId: 'normal',
+      fastMode: false,
+      reasoningWire: {
+        selection: 'off',
+        control: {
+          kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' },
+        },
+      },
+    });
+    await expect(runner.runAgentTurn({
+      agentId: 'ask',
+      content: 'x',
+      systemPrompt: 'system',
+      providerId: 'test',
+      modelId: 'model',
+      mode: 'ask',
+      toolAllowlist: [],
+      sessionId: 's',
+      turnId: 't',
+      promptPlan: {} as PromptPlan,
+      options: { requestPlan },
+    })).rejects.toThrow(/TURN_NOT_PREPARED/);
   });
 
   it('cleans the turn and prepared MCP lease when slot setup throws', async () => {

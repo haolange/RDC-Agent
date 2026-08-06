@@ -96,6 +96,52 @@ describe('TurnCoordinator', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 
+  it('joins late-registered producers during abort', async () => {
+    const handle = await coordinator.beginTurn({ sessionKey: 'late', turnId: 't' });
+    let lateJoined = false;
+    handle.registerProducer({
+      id: 'early',
+      abort: () => {
+        handle.registerProducer({
+          id: 'late',
+          abort: () => undefined,
+          join: async () => {
+            await new Promise((r) => setTimeout(r, 20));
+            lateJoined = true;
+          },
+        });
+      },
+      join: async () => {
+        await new Promise((r) => setTimeout(r, 10));
+      },
+    });
+    await handle.abortAndJoin({ reason: 'user_stop', graceMs: 500, forceAfterMs: 1_000 });
+    expect(lateJoined).toBe(true);
+    expect(handle.isOrphaned).toBe(false);
+  });
+
+  it('blocks beginTurn while an orphaned turn is unsettled', async () => {
+    const first = await coordinator.beginTurn({ sessionKey: 'block-orphan', turnId: 't1' });
+    let resolveJoin!: () => void;
+    const joinPromise = new Promise<void>((resolve) => { resolveJoin = resolve; });
+    first.registerProducer({
+      id: 'slow',
+      abort: () => undefined,
+      join: () => joinPromise,
+    });
+    await first.abortAndJoin({ reason: 'user_stop', graceMs: 5, forceAfterMs: 5 });
+    expect(first.isOrphaned).toBe(true);
+    coordinator.endTurn(first);
+    await expect(coordinator.beginTurn({ sessionKey: 'block-orphan', turnId: 't2' }))
+      .rejects.toThrow(/TURN_ORPHANED/);
+    resolveJoin();
+    await first.whenSettled();
+    await new Promise((r) => setTimeout(r, 10));
+    const second = await coordinator.beginTurn({ sessionKey: 'block-orphan', turnId: 't2' });
+    expect(second.turnId).toBe('t2');
+    await second.abortAndJoin({ reason: 'user_stop' });
+  });
+
   it('replacing session turn aborts previous', async () => {
     const first = await coordinator.beginTurn({ sessionKey: 's', turnId: 't1' });
     const second = await coordinator.beginTurn({ sessionKey: 's', turnId: 't2' });

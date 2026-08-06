@@ -19,6 +19,7 @@ import {
   type TurnHandle,
 } from './TurnCoordinator';
 import type { AgentProfileTurnOptions } from './orchestratorTypes';
+import { createEphemeralScopeId } from './executionScope';
 
 export interface SubagentRunnerDeps {
   sendProfileMessage: (
@@ -83,7 +84,7 @@ export class SubagentRunner {
     // 子 agent 用独立 sessionId 段隔离 context/messages（不污染父线程持久化）。
     const subagentSessionId = input.parentSessionId
       ? `${input.parentSessionId}::subagent::${subagentId}`
-      : null;
+      : createEphemeralScopeId();
 
     const childAbort = new AbortController();
     const parentSignal = input.signal ?? input.parentTurn?.signal ?? null;
@@ -118,6 +119,7 @@ export class SubagentRunner {
     let resultText = '';
     let resultStatus: SubagentResultStatus = 'complete';
     let childPromise: Promise<string> | null = null;
+    const seenToolCallIds = new Set<string>();
     const childBudget = createSubagentBudgetState({
       ...parentBudget.budget,
       maxDepth: policyBudget?.maxChildDepth ?? parentBudget.budget.maxDepth,
@@ -143,7 +145,7 @@ export class SubagentRunner {
         input.targetProfile,
         input.task,
         {
-          sessionId: subagentSessionId ?? undefined,
+          sessionId: subagentSessionId,
           stage: 'investigate',
           projectRootPath: input.projectRootPath,
           projectId: input.projectId,
@@ -158,8 +160,14 @@ export class SubagentRunner {
               return;
             }
             if (event.type === 'tool.started' || event.type === 'tool.completed' || event.type === 'tool.denied') {
-              parentBudget.aggregateToolCalls += 1;
-              childBudget.aggregateToolCalls = parentBudget.aggregateToolCalls;
+              const toolPayload = event.payload as { toolCallId?: string };
+              const toolCallId = typeof toolPayload.toolCallId === 'string' ? toolPayload.toolCallId.trim() : '';
+              // Count once per unique toolCallId; skip events without a stable id.
+              if (toolCallId && !seenToolCallIds.has(toolCallId)) {
+                seenToolCallIds.add(toolCallId);
+                parentBudget.aggregateToolCalls += 1;
+                childBudget.aggregateToolCalls = parentBudget.aggregateToolCalls;
+              }
             }
             const basePayload = {
               subagentId,

@@ -35,6 +35,7 @@ describe('IPC schema coverage', () => {
     expect(parseIpcArgs(AgentSendMessageArgsSchema, ['ask', 'hello'])).toEqual(['ask', 'hello']);
     expect(() => parseIpcArgs(AgentSendMessageArgsSchema, ['', 'hello'])).toThrow();
     expect(parseIpcArgs(AgentGetStateArgsSchema, ['ask'])).toEqual(['ask']);
+    expect(parseIpcArgs(AgentGetStateArgsSchema, ['ask', 'session-1'])).toEqual(['ask', 'session-1']);
     expect(parseIpcArgs(AgentConfigureArgsSchema, ['ask', { temperature: 0.2 }])).toEqual([
       'ask',
       { temperature: 0.2 },

@@ -57,11 +57,12 @@ export function registerAgentHandlers(context: WorkbenchIpcContext): void {
   });
 
   ipcMain.handle('agent:getState', async (_event, ...rawArgs: unknown[]) => {
-    const [agentId] = parseIpcArgs(AgentGetStateArgsSchema, rawArgs, {
+    const [agentId, sessionId] = parseIpcArgs(AgentGetStateArgsSchema, rawArgs, {
       label: 'agent:getState',
       maxBytes: 4 * 1024,
     });
-    return agentOrchestrator.getAgentState(agentId as any);
+    if (!sessionId) return null;
+    return agentOrchestrator.getAgentState(sessionId, agentId as any);
   });
 
   ipcMain.handle('agent:getAllStates', async (_event, ...rawArgs: unknown[]) => {

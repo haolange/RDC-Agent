@@ -93,3 +93,38 @@ describe('concurrencyContract: temporary path roots', () => {
     })).toThrow(/超出 workspace/);
   });
 });
+
+
+describe('concurrencyContract: orphan ownership', () => {
+  it('fail-closed beginTurn while previous orphan is unsettled', async () => {
+    const coordinator = new TurnCoordinator();
+    const first = await coordinator.beginTurn({
+      sessionKey: 'orphan-session',
+      turnId: 't-orphan',
+      eventSink: { sessionId: 'orphan-session' },
+    });
+    let resolveJoin!: () => void;
+    const joinPromise = new Promise<void>((resolve) => { resolveJoin = resolve; });
+    first.registerProducer({
+      id: 'hang',
+      abort: () => undefined,
+      join: () => joinPromise,
+    });
+    await first.abortAndJoin({ reason: 'user_stop', graceMs: 5, forceAfterMs: 5 });
+    expect(first.isOrphaned).toBe(true);
+    coordinator.endTurn(first);
+    await expect(coordinator.beginTurn({
+      sessionKey: 'orphan-session',
+      turnId: 't-next',
+    })).rejects.toThrow(/TURN_ORPHANED/);
+    resolveJoin();
+    await first.whenSettled();
+    await new Promise((r) => setTimeout(r, 10));
+    const next = await coordinator.beginTurn({
+      sessionKey: 'orphan-session',
+      turnId: 't-next',
+    });
+    expect(next.turnId).toBe('t-next');
+    await next.abortAndJoin({ reason: 'user_stop' });
+  });
+});

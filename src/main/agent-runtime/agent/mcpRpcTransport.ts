@@ -123,9 +123,13 @@ export class StdioRpcClient {
     method: string,
     params: unknown,
     timeoutMs: number,
+    signal?: AbortSignal,
   ): Promise<unknown> {
     if (this.closed) {
       return Promise.reject(new Error('MCP connection is closed'));
+    }
+    if (signal?.aborted) {
+      return Promise.reject(new DOMException('The operation was aborted', 'AbortError'));
     }
     const id = this.nextId++;
     const payload = serializeJsonRpcPayload({ jsonrpc: '2.0', id, method, params }, '\n');
@@ -138,13 +142,32 @@ export class StdioRpcClient {
         }
       }, timeoutMs);
 
+      const cleanupAbort = () => {
+        if (signal) {
+          signal.removeEventListener('abort', onAbort);
+        }
+      };
+      const onAbort = () => {
+        if (this.pending.has(id)) {
+          this.pending.delete(id);
+          clearTimeout(timer);
+          cleanupAbort();
+          reject(new DOMException('The operation was aborted', 'AbortError'));
+        }
+      };
+      if (signal) {
+        signal.addEventListener('abort', onAbort, { once: true });
+      }
+
       this.pending.set(id, {
         resolve: (v) => {
           clearTimeout(timer);
+          cleanupAbort();
           resolve(v);
         },
         reject: (e) => {
           clearTimeout(timer);
+          cleanupAbort();
           reject(e);
         },
       });

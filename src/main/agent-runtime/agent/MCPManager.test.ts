@@ -103,5 +103,13 @@ describe('MCPManager', () => {
       const result = await manager.executeTool('mcp__unknown__tool', {});
       expect(result.isError).toBe(true);
     });
+
+    it('aborted signal 应立即返回 isError', async () => {
+      const controller = new AbortController();
+      controller.abort();
+      const result = await manager.executeTool('mcp__unknown__tool', {}, controller.signal);
+      expect(result.isError).toBe(true);
+      expect(result.content[0]).toMatchObject({ type: 'text', text: 'MCP execute aborted' });
+    });
   });
 });

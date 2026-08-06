@@ -38,6 +38,12 @@ import {
 
 export type TransformContextResult = AgentMessage[] | CompressResult;
 
+/** Handle returned by agentLoop: stream for consumers + producerCompletion for join. */
+export interface AgentLoopHandle {
+  stream: EventStream<AgentEvent, Message[]>;
+  producerCompletion: Promise<void>;
+}
+
 // =====================================================================
 // 配置 / 上下文 / 执行器接口
 // =====================================================================
@@ -146,8 +152,12 @@ export function agentLoop(
   config: AgentLoopConfig,
   providerStrategy: ProviderStrategy,
   toolExecutor?: ToolExecutor,
-): EventStream<AgentEvent, Message[]> {
+): AgentLoopHandle {
   const stream = new EventStream<AgentEvent, Message[]>();
+  let settleProducer!: () => void;
+  const producerCompletion = new Promise<void>((resolve) => {
+    settleProducer = resolve;
+  });
   void runAgentLoop(
     [...pendingMessages],
     context,
@@ -155,8 +165,10 @@ export function agentLoop(
     providerStrategy,
     toolExecutor,
     stream,
-  );
-  return stream;
+  ).finally(() => {
+    settleProducer();
+  });
+  return { stream, producerCompletion };
 }
 
 /**
@@ -169,7 +181,7 @@ export function agentLoopContinue(
   config: AgentLoopConfig,
   providerStrategy: ProviderStrategy,
   toolExecutor?: ToolExecutor,
-): EventStream<AgentEvent, Message[]> {
+): AgentLoopHandle {
   return agentLoop([], context, config, providerStrategy, toolExecutor);
 }
 
@@ -494,7 +506,7 @@ async function streamAssistantResponseWithRecovery(
         case 'retry': {
           beginRecovery(action);
           recovery.noteRetryAttempt();
-          await sleep(action.delayMs);
+          await sleep(action.delayMs, stream.signal);
           continue;
         }
         case 'escalate_tokens': {
@@ -539,9 +551,32 @@ async function streamAssistantResponseWithRecovery(
   }
 }
 
-/** 简单的异步延时。 */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function createAbortError(): Error {
+  const err = new Error('Aborted');
+  err.name = 'AbortError';
+  return err;
+}
+
+/** Abort-aware async delay used by recovery retry. */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    return Promise.reject(createAbortError());
+  }
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+    const onAbort = (): void => {
+      cleanup();
+      reject(createAbortError());
+    };
+    const cleanup = (): void => {
+      clearTimeout(t);
+      signal?.removeEventListener('abort', onAbort);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 /**

@@ -8,6 +8,7 @@ export const AgentSendMessageArgsSchema = z.tuple([
 
 export const AgentGetStateArgsSchema = z.tuple([
   ipcNonEmptyString(200, 'agentId'),
+  ipcNonEmptyString(200, 'sessionId').optional(),
 ]);
 
 export const AgentConfigureArgsSchema = z.tuple([

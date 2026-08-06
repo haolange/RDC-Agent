@@ -33,6 +33,7 @@ import {
   agentLoop,
   type AgentContext,
   type AgentLoopConfig,
+  type AgentLoopHandle,
   type LoopRuntimeState,
   type ToolExecutor,
   type TransformContextResult,
@@ -125,6 +126,7 @@ export class Agent {
   private _subscribers: AgentEventSubscriber[] = [];
   private _currentStream: EventStream<AgentEvent, Message[]> | null = null;
   private _activeLoopPromise: Promise<Message[]> | null = null;
+  private _activeProducerCompletion: Promise<void> | null = null;
   private readonly _provider: ProviderStrategy;
   private readonly _toolExecutor?: ToolExecutor;
   private readonly _options: AgentOptions;
@@ -238,9 +240,11 @@ export class Agent {
   async abortAndJoin(): Promise<void> {
     this.abort();
     const loopPromise = this._activeLoopPromise;
-    if (loopPromise) {
-      await loopPromise.catch(() => undefined);
-    }
+    const producerCompletion = this._activeProducerCompletion;
+    await Promise.allSettled([
+      loopPromise ?? Promise.resolve(),
+      producerCompletion ?? Promise.resolve(),
+    ]);
   }
 
   /** The current loop promise, when a provider/tool producer is still active. */
@@ -330,7 +334,7 @@ export class Agent {
     };
 
     const config = this.createLoopConfig();
-    const stream = agentLoop(
+    const { stream, producerCompletion }: AgentLoopHandle = agentLoop(
       pending,
       context,
       config,
@@ -338,6 +342,7 @@ export class Agent {
       this._toolExecutor,
     );
     this._currentStream = stream;
+    this._activeProducerCompletion = producerCompletion;
 
     try {
       // 多播事件（单一消费者读取，转发给所有订阅者）
@@ -347,6 +352,10 @@ export class Agent {
       const result = await stream.result();
       return result;
     } finally {
+      await producerCompletion.catch(() => undefined);
+      if (this._activeProducerCompletion === producerCompletion) {
+        this._activeProducerCompletion = null;
+      }
       this._isStreaming = false;
       this._currentStream = null;
     }

@@ -240,6 +240,45 @@ export class TurnHandle {
     return this.orphaned;
   }
 
+  /** True when the handle has finished joining (or never needed join). */
+  get isSettled(): boolean {
+    return this.closed && this.producers.size === 0;
+  }
+
+  /** Resolves when orphaned/aborted producers have fully settled. */
+  whenSettled(): Promise<void> {
+    if (this.isSettled) return Promise.resolve();
+    if (this.joinPromise) {
+      return this.joinPromise.then(() => {
+        // Orphan path may leave joinPromise resolved while background settle continues.
+        if (this.isSettled) return;
+        return this.waitUntilProducersEmpty();
+      });
+    }
+    return this.waitUntilProducersEmpty();
+  }
+
+  private async waitUntilProducersEmpty(): Promise<void> {
+    while (!this.isSettled) {
+      const entries = Array.from(this.producers.entries());
+      if (entries.length === 0) {
+        this.closed = true;
+        return;
+      }
+      await Promise.allSettled(
+        entries.map(([, producer]) =>
+          producer.join().then(() => undefined, () => undefined),
+        ),
+      );
+      // Joins may settle without unregister callbacks; drop settled entries so
+      // Orphaned → Settled remains reachable after endTurn() close().
+      for (const [id] of entries) {
+        this.producers.delete(id);
+      }
+      this.closed = true;
+    }
+  }
+
   /** True when this handle is still the active generation for late-write guards. */
   isLive(expectedGeneration: number): boolean {
     return !this.closed && this.generation === expectedGeneration && !this.aborted;
@@ -258,7 +297,25 @@ export class TurnHandle {
   }
 
   registerProducer(producer: TurnProducer): () => void {
+    // Closed handles (including orphaned handles closed by endTurn) reject
+    // further registration so settle cannot be blocked by late producers.
+    if (this.closed) {
+      try {
+        producer.abort(this.abortReason ?? 'unknown');
+      } catch {
+        // ignore
+      }
+      void producer.join().catch(() => undefined);
+      return () => undefined;
+    }
     this.producers.set(producer.id, producer);
+    if (this.aborted || this.orphaned) {
+      try {
+        producer.abort(this.abortReason ?? 'unknown');
+      } catch {
+        // ignore
+      }
+    }
     return () => {
       this.producers.delete(producer.id);
     };
@@ -289,12 +346,53 @@ export class TurnHandle {
     const forceAfterMs = options.forceAfterMs ?? 5_000;
 
     this.joinPromise = (async () => {
-      const joins = Array.from(this.producers.values()).map((p) => p.join());
-      const allJoined = Promise.allSettled(joins);
+      const trackedJoins = new Map<string, Promise<void>>();
+
+      const trackAndAbortCurrent = (): void => {
+        for (const [id, producer] of this.producers.entries()) {
+          if (trackedJoins.has(id)) continue;
+          try {
+            producer.abort(reason);
+          } catch {
+            // ignore
+          }
+          trackedJoins.set(
+            id,
+            producer.join().then(
+              () => undefined,
+              () => undefined,
+            ),
+          );
+        }
+      };
+
+      /** Wait until every known producer join settles and no late producers remain untracked. */
+      const joinUntilStable = async (): Promise<void> => {
+        for (;;) {
+          trackAndAbortCurrent();
+          const pending = Array.from(trackedJoins.values());
+          if (pending.length === 0) {
+            return;
+          }
+          await Promise.allSettled(pending);
+          let hasUntracked = false;
+          for (const id of this.producers.keys()) {
+            if (!trackedJoins.has(id)) {
+              hasUntracked = true;
+              break;
+            }
+          }
+          if (!hasUntracked) {
+            return;
+          }
+        }
+      };
+
       const waitFor = async (durationMs: number): Promise<boolean> => {
         let timer: ReturnType<typeof setTimeout> | null = null;
+        const settled = joinUntilStable().then(() => true);
         const result = await Promise.race([
-          allJoined.then(() => true),
+          settled,
           new Promise<boolean>((resolve) => {
             timer = setTimeout(() => resolve(false), Math.max(0, durationMs));
             timer.unref?.();
@@ -303,6 +401,7 @@ export class TurnHandle {
         if (timer) clearTimeout(timer);
         return result;
       };
+
       if (await waitFor(graceMs)) {
         this.closed = true;
         this.producers.clear();
@@ -310,15 +409,8 @@ export class TurnHandle {
         return;
       }
 
-      // Escalate once the graceful window is exhausted. Producers remain
-      // registered until their own join promises settle.
-      for (const producer of this.producers.values()) {
-        try {
-          producer.abort(reason);
-        } catch {
-          // ignore individual producer abort failures
-        }
-      }
+      // Escalate once the graceful window is exhausted.
+      trackAndAbortCurrent();
       if (await waitFor(forceAfterMs)) {
         this.closed = true;
         this.producers.clear();
@@ -326,14 +418,14 @@ export class TurnHandle {
         return;
       }
 
-      // Do not announce a clean close or discard producers until their promises settle.
+      // Do not announce a clean close until producers settle.
+      // Always clear producers when the background join finishes — endTurn may
+      // have already set closed=true while retaining the orphan for Settled.
       this.orphaned = true;
-      void allJoined.then(() => {
-        if (!this.closed) {
-          this.closed = true;
-          this.producers.clear();
-          if (this.wallTimer) { clearTimeout(this.wallTimer); this.wallTimer = null; }
-        }
+      void joinUntilStable().then(() => {
+        this.closed = true;
+        this.producers.clear();
+        if (this.wallTimer) { clearTimeout(this.wallTimer); this.wallTimer = null; }
       });
     })();
 
@@ -350,10 +442,16 @@ export class TurnHandle {
 
 export class TurnCoordinator {
   private readonly activeBySession = new Map<string, TurnHandle>();
+  /** Orphaned handles retained until producers fully settle. */
+  private readonly orphanedBySession = new Map<string, TurnHandle>();
   private generationSeq = 0;
 
   getActive(sessionKey: string): TurnHandle | null {
     return this.activeBySession.get(sessionKey) ?? null;
+  }
+
+  getOrphaned(sessionKey: string): TurnHandle | null {
+    return this.orphanedBySession.get(sessionKey) ?? null;
   }
 
   /** Begin a turn for a session; aborts any previous active turn for that session. */
@@ -366,9 +464,28 @@ export class TurnCoordinator {
     subagentBudget?: SubagentBudgetState;
     policyBudget?: PolicyBudgetState;
   }): Promise<TurnHandle> {
+    const orphaned = this.orphanedBySession.get(input.sessionKey);
+    if (orphaned && !orphaned.isSettled) {
+      throw new Error(
+        `TURN_ORPHANED: session ${input.sessionKey} still has an orphaned turn (${orphaned.turnId}) awaiting producer settlement.`,
+      );
+    }
+    if (orphaned && orphaned.isSettled) {
+      this.orphanedBySession.delete(input.sessionKey);
+    }
+
     const previous = this.activeBySession.get(input.sessionKey);
     if (previous) {
       await previous.abortAndJoin({ reason: 'edit_resend', graceMs: 500, forceAfterMs: 2_000 });
+      if (previous.isOrphaned && !previous.isSettled) {
+        this.retainOrphan(previous);
+        throw new Error(
+          `TURN_ORPHANED: session ${input.sessionKey} previous turn (${previous.turnId}) is orphaned and not settled.`,
+        );
+      }
+      if (this.activeBySession.get(input.sessionKey) === previous) {
+        this.activeBySession.delete(input.sessionKey);
+      }
     }
     this.generationSeq += 1;
     const handle = new TurnHandle({
@@ -387,8 +504,23 @@ export class TurnCoordinator {
     return handle;
   }
 
+  private retainOrphan(handle: TurnHandle): void {
+    this.orphanedBySession.set(handle.sessionKey, handle);
+    this.activeBySession.delete(handle.sessionKey);
+    void handle.whenSettled().then(() => {
+      if (this.orphanedBySession.get(handle.sessionKey) === handle) {
+        this.orphanedBySession.delete(handle.sessionKey);
+      }
+    });
+  }
+
   /** End turn if it is still the active generation. */
   endTurn(handle: TurnHandle): void {
+    if (handle.isOrphaned && !handle.isSettled) {
+      this.retainOrphan(handle);
+      handle.close();
+      return;
+    }
     const current = this.activeBySession.get(handle.sessionKey);
     if (current === handle) {
       this.activeBySession.delete(handle.sessionKey);
@@ -400,14 +532,24 @@ export class TurnCoordinator {
     const handle = this.activeBySession.get(sessionKey);
     if (!handle) return;
     await handle.abortAndJoin({ reason });
+    if (handle.isOrphaned && !handle.isSettled) {
+      this.retainOrphan(handle);
+      return;
+    }
     this.activeBySession.delete(sessionKey);
   }
 
   async abortAll(reason: AbortReason = 'app_shutdown'): Promise<void> {
     const handles = Array.from(this.activeBySession.values());
     this.activeBySession.clear();
-    await Promise.allSettled(handles.map((h) => h.abortAndJoin({ reason })));
+    await Promise.allSettled(handles.map(async (h) => {
+      await h.abortAndJoin({ reason });
+      if (h.isOrphaned && !h.isSettled) {
+        this.retainOrphan(h);
+      }
+    }));
   }
 }
 
 export const turnCoordinator = new TurnCoordinator();
+

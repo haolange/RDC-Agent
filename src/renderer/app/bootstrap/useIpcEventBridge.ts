@@ -246,13 +246,19 @@ export function useIpcEventBridge(options: {
     const isAgentStatePayload = (value: unknown): value is AgentState => {
       if (!value || typeof value !== 'object') return false;
       const obj = value as Record<string, unknown>;
-      return typeof obj.agentId === 'string' && typeof obj.status === 'string';
+      return typeof obj.agentId === 'string'
+        && typeof obj.status === 'string'
+        && typeof obj.sessionId === 'string'
+        && obj.sessionId.trim().length > 0;
     };
 
     const unsubscribeAgentStatusChanged = electronAPI.events.onAgentStatusChanged((rawState) => {
       if (isAgentStatePayload(rawState)) {
-        const sessionId = (rawState as AgentState & { sessionId?: string }).sessionId;
-        if (sessionId !== undefined && !isActiveSessionEvent(sessionId)) {
+        const sessionId = rawState.sessionId;
+        if (typeof sessionId !== 'string' || !sessionId.trim()) {
+          return;
+        }
+        if (!isActiveSessionEvent(sessionId)) {
           return;
         }
         useAgentStore.getState().updateAgentState(rawState);
