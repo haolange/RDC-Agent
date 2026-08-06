@@ -284,6 +284,38 @@ describe('AgentPermissionPolicyService hard deny and path extract', () => {
     });
     expect(decision.action).toBe('ask_user');
   });
+
+  it('raises allow baseline to auto_review via floor without short-circuiting baseline', () => {
+    const compiledPolicy = compilePolicyFromRestrictive({
+      approvalFloorByTool: { read_file: 'auto_review' },
+    });
+    const decision = service.evaluate({
+      tool: readFileTool,
+      toolCall: makeReadFileToolCall(path.join(workspaceRoot, 'src', 'main.ts')),
+      projectRootPath: workspaceRoot,
+      compiledPolicy,
+    });
+    expect(decision.action).toBe('auto_review');
+  });
+
+  it('does not weaken deny when floor is lower', () => {
+    const compiledPolicy = compilePolicyFromRestrictive({
+      deniedTools: ['bash'],
+      approvalFloorByTool: { bash: 'auto_review' },
+    });
+    const decision = service.evaluate({
+      tool: bashTool,
+      toolCall: {
+        type: 'toolCall',
+        id: 'tc-bash',
+        name: 'bash',
+        arguments: { command: 'echo hi' },
+      },
+      projectRootPath: workspaceRoot,
+      compiledPolicy,
+    });
+    expect(decision.action).toBe('deny');
+  });
 });
 
 describe('AgentPermissionPolicyService shell risk classifier', () => {

@@ -4,6 +4,7 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 import { RENDERER_INVOKE_CHANNELS } from '@shared/renderer-api';
+import { resolveBridgeChannelCapability } from '@shared/renderer-api/channelCapabilities';
 import {
   createBridgeBearerToken,
   isBridgeChannelAllowed,
@@ -28,12 +29,17 @@ describe('securityContract: browser bridge', () => {
     expect(tokensMatch(token, token)).toBe(true);
   });
 
-  it('exposes the full registered product API through the browser transport', () => {
+  it('exposes read/mutation/high-impact channels with FULL_ACCESS, never desktop-only', () => {
     const previousFullAccess = process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS;
     process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS = '1';
     try {
       for (const channel of RENDERER_INVOKE_CHANNELS) {
-        expect(isBridgeChannelAllowed(channel), channel).toBe(true);
+        const capability = resolveBridgeChannelCapability(channel);
+        if (capability === 'desktop-only') {
+          expect(isBridgeChannelAllowed(channel), channel).toBe(false);
+        } else {
+          expect(isBridgeChannelAllowed(channel), channel).toBe(true);
+        }
       }
     } finally {
       if (previousFullAccess === undefined) delete process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS;

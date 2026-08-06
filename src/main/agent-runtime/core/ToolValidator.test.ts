@@ -81,4 +81,40 @@ describe('ToolValidator', () => {
       { path: '/tmp/a', command: 'ls', url: 'https://example.test' },
     )).toEqual({ path: '/tmp/a', command: 'ls', url: 'https://example.test' });
   });
+
+  it('rejects undeclared fields by default', () => {
+    expect(() => validator.validate(
+      def({
+        type: 'object',
+        properties: { name: { type: 'string' } },
+      }),
+      { name: 'ok', extra: true },
+    )).toThrow(/未声明字段/);
+  });
+
+  it('rejects unsupported schema keywords at compile time', () => {
+    expect(() => validator.validate(
+      def({
+        type: 'object',
+        properties: {
+          mode: { oneOf: [{ type: 'string' }, { type: 'number' }] } as never,
+        },
+      }),
+      { mode: 'a' },
+    )).toThrow(/不支持的 schema 关键字/);
+  });
+
+  it('enforces const and numeric minimum/maximum', () => {
+    const tool = def({
+      type: 'object',
+      properties: {
+        kind: { const: 'fixed' },
+        n: { type: 'number', minimum: 1, maximum: 3 },
+      },
+    });
+    expect(validator.validate(tool, { kind: 'fixed', n: 2 })).toEqual({ kind: 'fixed', n: 2 });
+    expect(() => validator.validate(tool, { kind: 'other', n: 2 })).toThrow(/const/);
+    expect(() => validator.validate(tool, { kind: 'fixed', n: 0 })).toThrow(/不得小于/);
+    expect(() => validator.validate(tool, { kind: 'fixed', n: 4 })).toThrow(/不得大于/);
+  });
 });

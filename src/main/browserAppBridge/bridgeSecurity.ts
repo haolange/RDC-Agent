@@ -1,32 +1,35 @@
 import { randomBytes, timingSafeEqual } from 'crypto';
 import { isRendererInvokeChannel } from '@shared/renderer-api';
+import { resolveBridgeChannelCapability } from '@shared/renderer-api/channelCapabilities';
 import { hasRegisteredIpcChannel } from '../ipc/invokeRegistry';
 
 /**
  * Browser QA is not a generic ipcMain proxy. It exposes exactly the product
  * API available through the desktop preload, while main-process validation,
  * permissions, trust, and secret isolation remain authoritative.
+ *
+ * Capability matrix (with channels.ts):
+ * - read | mutation: default allow
+ * - high-impact: requires RDC_AGENT_BROWSER_QA_FULL_ACCESS=1
+ * - desktop-only: always denied
  */
 export function isBridgeChannelAllowed(channel: string): boolean {
   if (!isRendererInvokeChannel(channel) || !hasRegisteredIpcChannel(channel)) {
     return false;
   }
-  if (isBridgeHighRiskChannel(channel) && process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS !== '1') {
+  const capability = resolveBridgeChannelCapability(channel);
+  if (capability === 'desktop-only') {
+    return false;
+  }
+  if (capability === 'high-impact' && process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS !== '1') {
     return false;
   }
   return true;
 }
 
-/** Browser QA requires an explicit second opt-in for high-impact mutations. */
-export const BRIDGE_HIGH_RISK_CHANNELS = new Set<string>([
-  'command:execute',
-  'settings:set',
-  'rdx-runtime:trustMcp',
-  'rdx-runtime:revokeMcp',
-]);
-
+/** @deprecated Prefer resolveBridgeChannelCapability — retained for tests that assert the high-impact set. */
 export function isBridgeHighRiskChannel(channel: string): boolean {
-  return BRIDGE_HIGH_RISK_CHANNELS.has(channel) || channel.startsWith('terminal:');
+  return resolveBridgeChannelCapability(channel) === 'high-impact';
 }
 
 export function createBridgeBearerToken(): string {
@@ -84,21 +87,27 @@ export function tokensMatch(expected: string, provided: string | null): boolean 
   return timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
-export function resolveBridgeAllowedOrigins(bridgeOrigin: string, devRendererUrl: string | null): Set<string> {
-  const allowed = new Set<string>([bridgeOrigin]);
-  if (devRendererUrl) {
-    try {
-      allowed.add(new URL(devRendererUrl).origin);
-    } catch {
-      // Ignore invalid renderer URLs.
-    }
-  }
-  return allowed;
+export function resolveBridgeAllowedOrigins(bridgeOrigin: string, _devRendererUrl: string | null = null): Set<string> {
+  // Cookie sessions are same-origin to the bridge. Dev renderer must handshake
+  // and use Bearer; it is no longer an Origin allowlist peer for cookie auth.
+  return new Set<string>([bridgeOrigin]);
 }
 
-export function isOriginAllowed(originHeader: string | undefined, allowedOrigins: Set<string>): boolean {
+/**
+ * Origin gate for bridge requests.
+ * - Bearer auth: Origin may be omitted (non-browser / automation clients).
+ * - Cookie auth: Origin must be present and exactly equal to bridgeOrigin.
+ */
+export function isOriginAllowed(
+  originHeader: string | undefined,
+  allowedOrigins: Set<string>,
+  options: { authViaCookie?: boolean; bridgeOrigin?: string } = {},
+): boolean {
+  if (options.authViaCookie) {
+    if (!originHeader || !options.bridgeOrigin) return false;
+    return originHeader === options.bridgeOrigin && allowedOrigins.has(originHeader);
+  }
   if (!originHeader) {
-    // Same-origin navigations and non-browser clients may omit Origin.
     return true;
   }
   return allowedOrigins.has(originHeader);

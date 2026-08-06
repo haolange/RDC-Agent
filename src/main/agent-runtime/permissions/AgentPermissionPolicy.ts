@@ -216,6 +216,46 @@ function denied(reason: string, risk: AgentPermissionDecision['risk'] = 'high'):
   return { action: 'deny', reason, risk, temporaryPathRoots: [] };
 }
 
+/** Decision strength lattice: allow < auto_review < ask_user < deny. */
+const DECISION_STRENGTH: Record<AgentPermissionDecisionAction, number> = {
+  allow: 0,
+  auto_review: 1,
+  ask_user: 2,
+  deny: 3,
+};
+
+function floorAction(
+  floor: 'none' | 'auto_review' | 'user',
+  mode: AgentPermissionMode,
+  toolName: string,
+): AgentPermissionDecision | null {
+  if (floor === 'none') return null;
+  if (floor === 'auto_review') {
+    return {
+      action: 'auto_review',
+      reason: `Compiled policy requires auto-review for tool "${toolName}".`,
+      risk: 'medium',
+      temporaryPathRoots: [],
+    };
+  }
+  return request(mode, `Compiled policy requires approval for tool "${toolName}".`, 'high');
+}
+
+function maxDecision(
+  baseline: AgentPermissionDecision,
+  floor: AgentPermissionDecision | null,
+): AgentPermissionDecision {
+  if (!floor) return baseline;
+  return DECISION_STRENGTH[floor.action] > DECISION_STRENGTH[baseline.action]
+    ? {
+        ...floor,
+        temporaryPathRoots: floor.temporaryPathRoots.length > 0
+          ? floor.temporaryPathRoots
+          : baseline.temporaryPathRoots,
+      }
+    : baseline;
+}
+
 function request(
   mode: AgentPermissionMode,
   reason: string,
@@ -232,6 +272,7 @@ export class AgentPermissionPolicyService {
   /**
    * Classify tool-call risk and return an allow / ask / review / deny decision.
    * Risk classifier only — callers must not treat this as a sandbox.
+   * Final action = max(baseline, policy approval floor) on allow<auto_review<ask_user<deny.
    */
   evaluate(input: AgentPermissionDecisionInput): AgentPermissionDecision {
     const settings = input.permissionSettings
@@ -264,20 +305,23 @@ export class AgentPermissionPolicyService {
       }
     }
 
-    if (input.compiledPolicy) {
-      const floor = resolvePolicyApprovalFloor(
-        input.compiledPolicy,
-        toolName,
-        input.tool.permissionHint,
-      );
-      if (floor === 'user') {
-        return request(mode, `Compiled policy requires approval for tool "${input.toolCall.name}".`, 'high');
-      }
-      if (floor === 'auto_review') {
-        return { action: 'auto_review', reason: `Compiled policy requires auto-review for tool "${input.toolCall.name}".`, risk: 'medium', temporaryPathRoots: [] };
-      }
-    }
+    const baseline = this.evaluateBaseline(input, permissions, mode, toolName, workspaceRoot);
+    if (!input.compiledPolicy) return baseline;
+    const floor = resolvePolicyApprovalFloor(
+      input.compiledPolicy,
+      toolName,
+      input.tool.permissionHint,
+    );
+    return maxDecision(baseline, floorAction(floor, mode, input.toolCall.name));
+  }
 
+  private evaluateBaseline(
+    input: AgentPermissionDecisionInput,
+    permissions: AgentPermissionSettings,
+    mode: AgentPermissionMode,
+    toolName: string,
+    workspaceRoot: string,
+  ): AgentPermissionDecision {
     if (mode === 'full-access') {
       return { action: 'allow', risk: 'low', temporaryPathRoots: ['*'] };
     }
