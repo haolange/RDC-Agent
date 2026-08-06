@@ -7,5 +7,11 @@ export {
   isRendererInvokeChannel,
 } from './channels';
 export type { RendererEventChannel, RendererInvokeChannel } from './channels';
+export {
+  assertChannelCapabilityCoverage,
+  listUnclassifiedInvokeChannels,
+  resolveBridgeChannelCapability,
+} from './channelCapabilities';
+export type { BridgeChannelCapability } from './channelCapabilities';
 export { createRendererApi } from './createRendererApi';
 export type { RendererApiTransport, RendererEventCallback } from './transport';

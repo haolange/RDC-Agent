@@ -9,10 +9,11 @@ import { rendererEventHub } from './rendererEventHub';
 import {
   buildBridgeAuthCookie,
   createBridgeBearerToken,
-  resolveProvidedBridgeToken,
+  extractBearerToken,
   isBridgeChannelAllowed,
   isOriginAllowed,
   resolveBridgeAllowedOrigins,
+  resolveBridgeCookieToken,
   tokensMatch,
 } from './bridgeSecurity';
 import { EFFECTIVE_CATALOG_SCHEMA_VERSION } from '../settings/effectiveCatalogTypes';
@@ -126,17 +127,33 @@ function sendJson(
   response.end(JSON.stringify(payload));
 }
 
-function requireBridgeAuth(request: IncomingMessage): boolean {
+function requireBridgeAuth(
+  request: IncomingMessage,
+  bridgeOrigin: string,
+  options: { requireCookieOrigin?: boolean } = {},
+): {
+  ok: boolean;
+  authViaCookie: boolean;
+} {
   if (!bridgeToken) {
-    return false;
+    return { ok: false, authViaCookie: false };
   }
-  // Document navigations have no Authorization header, so /qa supplies an
-  // HttpOnly cookie. Programmatic clients may still use an explicit Bearer.
-  const provided = resolveProvidedBridgeToken({
-    authorizationHeader: request.headers.authorization,
-    cookieHeader: request.headers.cookie,
-  });
-  return tokensMatch(bridgeToken, provided);
+  const bearer = extractBearerToken(request.headers.authorization);
+  if (bearer && tokensMatch(bridgeToken, bearer)) {
+    return { ok: true, authViaCookie: false };
+  }
+  const cookieToken = resolveBridgeCookieToken(request.headers.cookie);
+  if (cookieToken && tokensMatch(bridgeToken, cookieToken)) {
+    if (options.requireCookieOrigin) {
+      const origin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined;
+      // Cookie-authenticated API calls require an exact bridge Origin.
+      if (!isOriginAllowed(origin, allowedOrigins, { authViaCookie: true, bridgeOrigin })) {
+        return { ok: false, authViaCookie: true };
+      }
+    }
+    return { ok: true, authViaCookie: true };
+  }
+  return { ok: false, authViaCookie: false };
 }
 
 function redirectWithBridgeCookie(
@@ -337,7 +354,10 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
   // /app without auth previously redirected with the token in Location (leak).
   const isPublicAsset = !options.devRendererUrl
     && (url.pathname.startsWith('/assets/') || url.pathname === '/favicon.ico');
-  if (!isPublicAsset && !requireBridgeAuth(request)) {
+  if (!isPublicAsset && !requireBridgeAuth(request, bridgeOrigin, {
+    // Document navigations omit Origin; cookie Origin is enforced on API surfaces.
+    requireCookieOrigin: url.pathname === '/invoke' || url.pathname.startsWith('/api/'),
+  }).ok) {
     sendJson(response, 401, { success: false, error: 'Unauthorized' }, requestOrigin);
     return;
   }

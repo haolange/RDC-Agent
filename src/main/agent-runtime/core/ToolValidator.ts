@@ -16,6 +16,35 @@ export class ToolValidationError extends Error {
   }
 }
 
+/** Keywords outside the supported subset — fail-closed at schema compile time. */
+const UNSUPPORTED_SCHEMA_KEYS = new Set([
+  'oneOf',
+  'anyOf',
+  'allOf',
+  'not',
+  '$ref',
+  '$defs',
+  'definitions',
+  'if',
+  'then',
+  'else',
+  'dependentSchemas',
+  'dependentRequired',
+  'patternProperties',
+  'propertyNames',
+  'unevaluatedProperties',
+  'unevaluatedItems',
+  'prefixItems',
+  'contains',
+  'minContains',
+  'maxContains',
+]);
+
+const MAX_SCHEMA_DEPTH = 12;
+const MAX_SCHEMA_NODES = 256;
+const MAX_OBJECT_KEYS = 64;
+const MAX_ARRAY_ITEMS_HARD = 256;
+
 /** 安全敏感字段：禁止 number/boolean → string 等模糊 coercion。 */
 const SAFE_PARAM_KEY = /^(?:path|.*_?path|cwd|command|url|uri|source|destination|notebook_path|file|filename|dir|directory)$/i;
 
@@ -35,14 +64,62 @@ function schemaString(schema: JsonSchema, key: string): string | undefined {
   return typeof raw === 'string' ? raw : undefined;
 }
 
+function assertSupportedSchema(
+  schema: JsonSchema,
+  path: string,
+  toolName: string,
+  depth = 0,
+  counters = { nodes: 0 },
+): void {
+  counters.nodes += 1;
+  if (depth > MAX_SCHEMA_DEPTH) {
+    throw new ToolValidationError(
+      `schema 递归深度超过上限 ${MAX_SCHEMA_DEPTH}`,
+      path,
+      toolName,
+    );
+  }
+  if (counters.nodes > MAX_SCHEMA_NODES) {
+    throw new ToolValidationError(
+      `schema 节点数超过上限 ${MAX_SCHEMA_NODES}`,
+      path,
+      toolName,
+    );
+  }
+  for (const key of Object.keys(schema)) {
+    if (UNSUPPORTED_SCHEMA_KEYS.has(key)) {
+      throw new ToolValidationError(
+        `不支持的 schema 关键字 "${key}"（严格子集 fail-closed）`,
+        path,
+        toolName,
+      );
+    }
+  }
+  if (schema.additionalProperties !== undefined && schema.additionalProperties !== false) {
+    throw new ToolValidationError(
+      'additionalProperties 仅允许省略或 false（默认拒绝未声明字段）',
+      path,
+      toolName,
+    );
+  }
+  if (schema.properties) {
+    for (const [key, child] of Object.entries(schema.properties)) {
+      assertSupportedSchema(child, `${path}.properties.${key}`, toolName, depth + 1, counters);
+    }
+  }
+  if (schema.items && typeof schema.items === 'object' && !Array.isArray(schema.items)) {
+    assertSupportedSchema(schema.items as JsonSchema, `${path}.items`, toolName, depth + 1, counters);
+  }
+}
+
 /**
  * 工具调用参数 JSON Schema 验证器。
  *
  * 设计原则：
  * - 不引入第三方依赖（如 AJV），实现轻量自包含。
- * - 支持基础类型、required、enum、items、min/maxItems、min/maxLength、pattern。
- * - 非安全字段允许温和强转；path/command/URL 等安全参数 fail-closed 要求精确类型。
- * - 验证失败时抛出 `ToolValidationError`，附带字段路径和工具名。
+ * - Strict subset: type/required/properties/items/enum/const/min-max/pattern; undeclared fields rejected by default.
+ * - Compile-time reject unsupported keywords (oneOf/anyOf/allOf/$ref).
+ * - Non-safe fields may coerce mildly; path/command/URL stay fail-closed exact types.
  */
 export class ToolValidator {
   /**
@@ -56,8 +133,9 @@ export class ToolValidator {
     args: Record<string, unknown>,
   ): Record<string, unknown> {
     const schema = toolDef.parameters;
+    assertSupportedSchema(schema, 'parameters', toolDef.name);
     const value = args ?? {};
-    const validated = this.validateValue(value, schema, 'args', toolDef.name, false);
+    const validated = this.validateValue(value, schema, 'args', toolDef.name, false, 0);
     if (validated === null || typeof validated !== 'object' || Array.isArray(validated)) {
       throw new ToolValidationError('参数必须是对象', 'args', toolDef.name);
     }
@@ -82,20 +160,35 @@ export class ToolValidator {
     return this.validate(def, toolCall.arguments ?? {});
   }
 
-  // -------------------------------------------------------------------
-  // 内部实现
-  // -------------------------------------------------------------------
-
   private validateValue(
     value: unknown,
     schema: JsonSchema,
     path: string,
     toolName: string,
     safeParam: boolean,
+    depth: number,
   ): unknown {
-    // 缺省值：若 value 为 undefined 且 schema 提供 default，则使用 default。
+    if (depth > MAX_SCHEMA_DEPTH) {
+      throw new ToolValidationError(
+        `值递归深度超过上限 ${MAX_SCHEMA_DEPTH}`,
+        path,
+        toolName,
+      );
+    }
+
     if (value === undefined && schema.default !== undefined) {
       value = schema.default;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(schema, 'const')) {
+      if (!Object.is(value, schema.const) && JSON.stringify(value) !== JSON.stringify(schema.const)) {
+        throw new ToolValidationError(
+          `值必须等于 const ${JSON.stringify(schema.const)}（实际: ${JSON.stringify(value)}）`,
+          path,
+          toolName,
+        );
+      }
+      return value;
     }
 
     const expectedType = schema.type;
@@ -109,16 +202,22 @@ export class ToolValidator {
       case 'boolean':
         return this.validateBoolean(value, path, toolName, safeParam);
       case 'array':
-        return this.validateArray(value, schema, path, toolName, safeParam);
+        return this.validateArray(value, schema, path, toolName, safeParam, depth);
       case 'object':
-        return this.validateObject(value, schema, path, toolName);
+        return this.validateObject(value, schema, path, toolName, depth);
       case 'null':
         if (value !== null) {
           throw new ToolValidationError(`期望 null，实际为 ${typeof value}`, path, toolName);
         }
         return null;
       default:
-        // 未指定 type 或非标准 type：放行原值。
+        if (schema.enum && Array.isArray(schema.enum) && !schema.enum.includes(value as never)) {
+          throw new ToolValidationError(
+            `值必须是以下枚举之一: ${schema.enum.join(', ')}`,
+            path,
+            toolName,
+          );
+        }
         return value;
     }
   }
@@ -228,8 +327,25 @@ export class ToolValidator {
         toolName,
       );
     }
+
+    const minimum = schemaNumber(schema, 'minimum');
+    if (minimum !== undefined && coerced < minimum) {
+      throw new ToolValidationError(
+        `数值不得小于 ${minimum}（实际: ${coerced}）`,
+        path,
+        toolName,
+      );
+    }
+    const maximum = schemaNumber(schema, 'maximum');
+    if (maximum !== undefined && coerced > maximum) {
+      throw new ToolValidationError(
+        `数值不得大于 ${maximum}（实际: ${coerced}）`,
+        path,
+        toolName,
+      );
+    }
+
     if (schema.enum && Array.isArray(schema.enum) && !schema.enum.includes(String(coerced))) {
-      // enum 在 schema 中以 string 数组形式描述时退化为字符串比较。
       const numericEnum = schema.enum.map((e) => Number(e));
       if (!numericEnum.includes(coerced)) {
         throw new ToolValidationError(
@@ -273,10 +389,18 @@ export class ToolValidator {
     path: string,
     toolName: string,
     safeParam: boolean,
+    depth: number,
   ): unknown[] {
     if (!Array.isArray(value)) {
       throw new ToolValidationError(
         `期望 array，实际为 ${describeType(value)}`,
+        path,
+        toolName,
+      );
+    }
+    if (value.length > MAX_ARRAY_ITEMS_HARD) {
+      throw new ToolValidationError(
+        `数组元素数超过硬上限 ${MAX_ARRAY_ITEMS_HARD}`,
         path,
         toolName,
       );
@@ -307,6 +431,7 @@ export class ToolValidator {
         `${path}[${idx}]`,
         toolName,
         safeParam,
+        depth + 1,
       ),
     );
   }
@@ -316,6 +441,7 @@ export class ToolValidator {
     schema: JsonSchema,
     path: string,
     toolName: string,
+    depth: number,
   ): Record<string, unknown> {
     if (value === null || typeof value !== 'object' || Array.isArray(value)) {
       throw new ToolValidationError(
@@ -325,13 +451,19 @@ export class ToolValidator {
       );
     }
     const input = value as Record<string, unknown>;
+    const keys = Object.keys(input);
+    if (keys.length > MAX_OBJECT_KEYS) {
+      throw new ToolValidationError(
+        `对象字段数超过上限 ${MAX_OBJECT_KEYS}`,
+        path,
+        toolName,
+      );
+    }
     const output: Record<string, unknown> = {};
 
-    // required 字段检查
     if (schema.required && Array.isArray(schema.required)) {
       for (const key of schema.required) {
         if (!(key in input) || input[key] === undefined || input[key] === null) {
-          // 允许 default 兜底
           const propSchema = schema.properties?.[key];
           if (!propSchema || propSchema.default === undefined) {
             throw new ToolValidationError(
@@ -360,14 +492,18 @@ export class ToolValidator {
           childPath,
           toolName,
           isSafeParamKey(key),
+          depth + 1,
         );
       }
     }
 
-    // 透传未在 properties 中声明的字段（保持工具入参的扩展能力）。
-    for (const [key, raw] of Object.entries(input)) {
-      if (!(key in output) && !(schema.properties && key in schema.properties)) {
-        output[key] = raw;
+    for (const key of keys) {
+      if (!(schema.properties && key in schema.properties)) {
+        throw new ToolValidationError(
+          `未声明字段 "${key}" 被拒绝（默认 additionalProperties=false）`,
+          `${path}.${key}`,
+          toolName,
+        );
       }
     }
 

@@ -9,6 +9,7 @@ import {
   sliceUtf8Bytes,
   truncateOutput,
   abortPromise,
+  writeTextFileNoFollow,
 } from './_shared';
 
 const roots: string[] = [];
@@ -132,5 +133,18 @@ describe('safeResolvePath', () => {
       sessionId: null,
       temporaryAllowedPathRoots: [],
     })).toThrow(/超出 workspace/);
+  });
+});
+
+describe('writeTextFileNoFollow', () => {
+  it('writes via sibling temp then atomic rename', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-write-atomic-'));
+    roots.push(root);
+    const target = path.join(root, 'note.txt');
+    await writeTextFileNoFollow(target, 'hello-atomic');
+    const { readFile } = await import('node:fs/promises');
+    expect(await readFile(target, 'utf8')).toBe('hello-atomic');
+    await writeTextFileNoFollow(target, 'replaced');
+    expect(await readFile(target, 'utf8')).toBe('replaced');
   });
 });

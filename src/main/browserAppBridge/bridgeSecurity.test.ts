@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RENDERER_INVOKE_CHANNELS } from '@shared/renderer-api';
+import { resolveBridgeChannelCapability } from '@shared/renderer-api/channelCapabilities';
 import {
   buildBridgeAuthCookie,
   createBridgeBearerToken,
@@ -70,26 +71,28 @@ describe('browserAppBridge security', () => {
   });
 
   it('keeps ordinary registered renderer channels available to the browser transport', () => {
-    const ordinaryChannels = RENDERER_INVOKE_CHANNELS.filter((channel) => !(
-      channel === 'command:execute'
-      || channel === 'settings:set'
-      || channel === 'rdx-runtime:trustMcp'
-      || channel === 'rdx-runtime:revokeMcp'
-      || channel.startsWith('terminal:')
-    ));
+    const ordinaryChannels = RENDERER_INVOKE_CHANNELS.filter((channel) => {
+      const capability = resolveBridgeChannelCapability(channel);
+      return capability === 'read' || capability === 'mutation';
+    });
     for (const channel of ordinaryChannels) {
       expect(isBridgeChannelAllowed(channel), channel).toBe(true);
     }
   });
 
   it('requires full-access opt-in for high-risk browser channels', () => {
-    for (const channel of ['command:execute', 'settings:set', 'rdx-runtime:trustMcp', 'rdx-runtime:revokeMcp', 'terminal:write']) {
+    for (const channel of ['command:execute', 'settings:set', 'rdx-runtime:trustMcp', 'rdx-runtime:revokeMcp', 'terminal:write', 'memory:issueApprovalToken']) {
       expect(isBridgeChannelAllowed(channel), channel).toBe(false);
     }
     process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS = '1';
-    for (const channel of ['command:execute', 'settings:set', 'rdx-runtime:trustMcp', 'rdx-runtime:revokeMcp', 'terminal:write']) {
+    for (const channel of ['command:execute', 'settings:set', 'rdx-runtime:trustMcp', 'rdx-runtime:revokeMcp', 'terminal:write', 'memory:issueApprovalToken']) {
       expect(isBridgeChannelAllowed(channel), channel).toBe(true);
     }
+    // desktop-only stays denied even with FULL_ACCESS
+    expect(isBridgeChannelAllowed('window:close')).toBe(false);
+    expect(isBridgeChannelAllowed('web:resolveFavicon')).toBe(false);
+    expect(isBridgeChannelAllowed('dialog:selectDirectory')).toBe(true);
+    expect(isBridgeChannelAllowed('app:copyText')).toBe(true);
   });
 
   it('fails closed for unknown, internal, raw-secret, and unregistered channels', () => {
@@ -101,12 +104,19 @@ describe('browserAppBridge security', () => {
     expect(isBridgeChannelAllowed('settings:get')).toBe(false);
   });
 
-  it('uses an exact Origin allowlist without a fixed Vite port or private-network wildcard CORS', () => {
+  it('uses an exact bridge-only Origin allowlist (dev renderer is not a cookie peer)', () => {
     const allowed = resolveBridgeAllowedOrigins('http://127.0.0.1:5127', 'http://127.0.0.1:54431/');
     expect(allowed.has('http://127.0.0.1:5127')).toBe(true);
-    expect(allowed.has('http://127.0.0.1:54431')).toBe(true);
-    expect(allowed.has('http://127.0.0.1:5173')).toBe(false);
+    expect(allowed.has('http://127.0.0.1:54431')).toBe(false);
     expect(isOriginAllowed('https://evil.example', allowed)).toBe(false);
     expect(isOriginAllowed(undefined, allowed)).toBe(true);
+    expect(isOriginAllowed(undefined, allowed, {
+      authViaCookie: true,
+      bridgeOrigin: 'http://127.0.0.1:5127',
+    })).toBe(false);
+    expect(isOriginAllowed('http://127.0.0.1:5127', allowed, {
+      authViaCookie: true,
+      bridgeOrigin: 'http://127.0.0.1:5127',
+    })).toBe(true);
   });
 });

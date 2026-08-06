@@ -84,18 +84,72 @@ function assertNoSymlinkPath(target: string): void {
   }
 }
 
-/** Write through a descriptor that refuses symlink replacement on platforms that support O_NOFOLLOW. */
+/** Write via sibling temp + fsync + atomic rename; refuse symlink/reparse paths. */
 export async function writeTextFileNoFollow(absolutePath: string, content: string): Promise<void> {
-  assertNoSymlinkPath(absolutePath);
+  const target = path.resolve(absolutePath);
+  const parentDir = path.dirname(target);
+  if (!fs.existsSync(parentDir)) {
+    throw new Error(`WRITE_PARENT_MISSING: parent directory does not exist: ${parentDir}`);
+  }
+  assertNoSymlinkPath(parentDir);
+  if (fs.existsSync(target)) {
+    assertNoSymlinkPath(target);
+  }
+
+  const realParent = fs.realpathSync.native
+    ? fs.realpathSync.native(parentDir)
+    : fs.realpathSync(parentDir);
+  const finalTarget = path.join(realParent, path.basename(target));
+  if (!isWithinRoot(finalTarget, realParent)) {
+    throw new Error(`WRITE_PARENT_ESCAPE: resolved write target escaped parent ${realParent}`);
+  }
+
+  const tmpName = `.${path.basename(finalTarget)}.${process.pid}.${Date.now().toString(36)}.tmp`;
+  const temporaryPath = path.join(realParent, tmpName);
+  assertNoSymlinkPath(temporaryPath);
+
   const noFollow = (fs.constants as { O_NOFOLLOW?: number }).O_NOFOLLOW ?? 0;
-  const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | noFollow;
-  const handle = await fsp.open(absolutePath, flags, 0o600);
+  const flags = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | noFollow;
+  const handle = await fsp.open(temporaryPath, flags, 0o600);
   try {
     await handle.writeFile(content, 'utf8');
+    await handle.sync();
   } finally {
     await handle.close();
   }
-  assertNoSymlinkPath(absolutePath);
+
+  try {
+    await fsp.rename(temporaryPath, finalTarget);
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code !== 'EEXIST' && code !== 'EPERM') {
+      await fsp.rm(temporaryPath, { force: true }).catch(() => undefined);
+      throw error;
+    }
+
+    // Windows-safe bak-swap: no rm-then-rename data-loss window.
+    const bakTmpPath = `${finalTarget}.bak.tmp.${process.pid}.${Date.now().toString(36)}`;
+    try {
+      await fsp.rename(finalTarget, bakTmpPath);
+    } catch (bakError) {
+      await fsp.rm(temporaryPath, { force: true }).catch(() => undefined);
+      throw bakError;
+    }
+    try {
+      await fsp.rename(temporaryPath, finalTarget);
+    } catch (finalError) {
+      try {
+        await fsp.rename(bakTmpPath, finalTarget);
+      } catch {
+        // Leave bakTmp for recovery.
+      }
+      await fsp.rm(temporaryPath, { force: true }).catch(() => undefined);
+      throw finalError;
+    }
+    await fsp.rm(bakTmpPath, { force: true }).catch(() => undefined);
+  }
+
+  assertNoSymlinkPath(finalTarget);
 }
 
 function realpathExistingAncestor(target: string): string {

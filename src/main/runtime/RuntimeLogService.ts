@@ -7,6 +7,7 @@ import type {
 } from '@shared/types/runtimeLog';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { rendererEventHub } from '../browserAppBridge/rendererEventHub';
+import { redactCredentialLikeText, redactSecretsDeep } from './secretRedaction';
 
 const APP_LOG_LIMIT = 1000;
 const SESSION_LOG_LIMIT = 500;
@@ -40,10 +41,19 @@ function clampEntryFields(input: RuntimeLogInput): Pick<
   RuntimeLogEntry,
   'title' | 'summary' | 'detail' | 'raw'
 > {
-  let title = truncateUtf8(input.title, 4 * 1024);
-  let summary = truncateUtf8(input.summary, 8 * 1024);
-  let detail = input.detail !== undefined ? truncateUtf8(input.detail, 16 * 1024) : undefined;
-  let raw: unknown = input.raw ?? null;
+  const redactedTitle = redactCredentialLikeText(input.title);
+  const redactedSummary = redactCredentialLikeText(input.summary);
+  const redactedDetail = input.detail !== undefined
+    ? redactCredentialLikeText(input.detail)
+    : undefined;
+  const redactedRaw = input.raw === undefined || input.raw === null
+    ? input.raw ?? null
+    : redactSecretsDeep(input.raw, 'raw').value;
+
+  let title = truncateUtf8(redactedTitle, 4 * 1024);
+  let summary = truncateUtf8(redactedSummary, 8 * 1024);
+  let detail = redactedDetail !== undefined ? truncateUtf8(redactedDetail, 16 * 1024) : undefined;
+  let raw: unknown = redactedRaw ?? null;
   let rawJson = '';
   try {
     rawJson = raw === null || raw === undefined ? '' : JSON.stringify(raw);

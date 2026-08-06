@@ -460,16 +460,32 @@ function waitForExit(child) {
   });
 }
 
-function findFreePort() {
-  return new Promise((resolve, reject) => {
-    const probe = net.createServer();
-    probe.once('error', reject);
-    probe.listen(0, '127.0.0.1', () => {
-      const address = probe.address();
-      const port = typeof address === 'object' && address ? address.port : 0;
-      probe.close((error) => error ? reject(error) : resolve(port));
+async function startRendererDevServer(env) {
+  // Prefer OS-assigned port via Vite (no pre-probe race). Parse the bound URL from stdout.
+  const renderer = runChild(process.execPath, [
+    path.join(nodeModulesPath, 'vite', 'bin', 'vite.js'),
+    '--config', 'vite.renderer.config.ts', '--host', '127.0.0.1', '--port', '0',
+  ], env);
+  const rendererUrl = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Timed out waiting for Vite to report its port.')), 20_000);
+    const onData = (chunk) => {
+      const text = String(chunk);
+      const match = text.match(/https?:\/\/(?:127\.0\.0\.1|localhost):\d+/i);
+      if (match) {
+        clearTimeout(timer);
+        renderer.stdout?.off('data', onData);
+        renderer.stderr?.off('data', onData);
+        resolve(match[0].replace(/\/$/, ''));
+      }
+    };
+    renderer.stdout?.on('data', onData);
+    renderer.stderr?.on('data', onData);
+    renderer.once('exit', (code) => {
+      clearTimeout(timer);
+      reject(new Error(`Renderer dev server exited before reporting a port (code=${code}).`));
     });
   });
+  return { renderer, rendererUrl };
 }
 
 async function waitForRenderer(child, rendererUrl, timeoutMs = 15_000) {
@@ -524,13 +540,9 @@ async function main() {
   }
 
   if (effectiveMode === 'browser-dev') {
-    const rendererPort = await findFreePort();
-    const rendererUrl = `http://127.0.0.1:${rendererPort}`;
-    console.log(`[RDC-Agent] Starting renderer dev server at ${rendererUrl}/...`);
-    const renderer = runChild(process.execPath, [
-      path.join(nodeModulesPath, 'vite', 'bin', 'vite.js'),
-      '--config', 'vite.renderer.config.ts', '--host', '127.0.0.1', '--port', String(rendererPort), '--strictPort',
-    ], env);
+    console.log('[RDC-Agent] Starting renderer dev server (OS-assigned port)...');
+    const { renderer, rendererUrl } = await startRendererDevServer(env);
+    console.log(`[RDC-Agent] Renderer ready at ${rendererUrl}/`);
     const cleanup = () => { void terminate(renderer); };
     process.once('SIGINT', cleanup);
     process.once('SIGTERM', cleanup);
