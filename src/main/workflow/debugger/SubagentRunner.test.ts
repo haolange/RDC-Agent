@@ -129,6 +129,90 @@ describe('SubagentRunner', () => {
     expect(result.text).toBe('boom');
   });
 
+  it('counts unique toolCallId once across started/completed/denied', async () => {
+    const parentBudget = createSubagentBudgetState();
+    const runner = new SubagentRunner({
+      sendProfileMessage: async (_agentId, _content, options) => {
+        options?.onEvent?.({
+          id: 'e1', type: 'tool.started', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
+          payload: { toolCallId: 'same', toolName: 'grep', args: {} },
+        });
+        options?.onEvent?.({
+          id: 'e2', type: 'tool.completed', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
+          payload: { toolCallId: 'same', toolName: 'grep', result: { ok: true, duration_ms: 1 } },
+        });
+        options?.onEvent?.({
+          id: 'e3', type: 'tool.denied', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
+          payload: { toolCallId: 'same', toolName: 'grep', reason: 'no' },
+        });
+        options?.onEvent?.({
+          id: 'e4', type: 'tool.started', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
+          payload: { toolCallId: 'other', toolName: 'read', args: {} },
+        });
+        return 'ok';
+      },
+      systemPromptForAgent: () => 'fallback',
+      getActiveTurn: () => null,
+    });
+    const parentTurn = {
+      subagentBudget: parentBudget,
+      signal: undefined,
+      generation: 1,
+      isLive: () => true,
+      registerProducer: () => () => undefined,
+      eventSink: { sessionId: 'parent', onEvent: () => undefined },
+    } as unknown as TurnHandle;
+    await runner.runSubagent({
+      parentAgentId: 'debugger',
+      parentToolCallId: 'parent-tool',
+      targetProfile: 'ask',
+      task: 'inspect',
+      parentSessionId: 'parent',
+      parentTurn,
+    });
+    expect(parentBudget.aggregateToolCalls).toBe(2);
+  });
+
+  it('does not inflate aggregateToolCalls for events without toolCallId', async () => {
+    const parentBudget = createSubagentBudgetState();
+    const runner = new SubagentRunner({
+      sendProfileMessage: async (_agentId, _content, options) => {
+        options?.onEvent?.({
+          id: 'e1', type: 'tool.started', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
+          payload: { toolCallId: '', toolName: 'grep', args: {} },
+        });
+        options?.onEvent?.({
+          id: 'e2', type: 'tool.completed', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
+          payload: { toolCallId: '   ', toolName: 'grep', result: { ok: true, duration_ms: 1 } },
+        });
+        options?.onEvent?.({
+          id: 'e3', type: 'tool.denied', timestamp: Date.now(), sessionId: 's', agentId: 'ask',
+          payload: { toolCallId: '', toolName: 'grep', reason: 'no' },
+        });
+        return 'ok';
+      },
+      systemPromptForAgent: () => 'fallback',
+      getActiveTurn: () => null,
+    });
+    const parentTurn = {
+      subagentBudget: parentBudget,
+      signal: undefined,
+      generation: 1,
+      isLive: () => true,
+      registerProducer: () => () => undefined,
+      eventSink: { sessionId: 'parent', onEvent: () => undefined },
+    } as unknown as TurnHandle;
+    await runner.runSubagent({
+      parentAgentId: 'debugger',
+      parentToolCallId: 'parent-tool',
+      targetProfile: 'ask',
+      task: 'inspect',
+      parentSessionId: 'parent',
+      parentTurn,
+    });
+    expect(parentBudget.aggregateToolCalls).toBe(0);
+  });
+
   it('createSubagentTools executes delegated run', async () => {
     const runner = new SubagentRunner({
       sendProfileMessage: async () => 'child done',

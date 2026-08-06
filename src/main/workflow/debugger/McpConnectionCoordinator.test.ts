@@ -285,4 +285,34 @@ describe('McpConnectionCoordinator orphan quarantine', () => {
 
     await coordinator2.disconnectAll();
   });
+
+  it('does not record AbortError into MCP failure cache', async () => {
+    const root = path.resolve('abort-cache-project');
+    const d = { ...descriptor('abort-server'), command: 'node' };
+    vi.spyOn(agentRuntimeConfigService, 'listMcpServers').mockReturnValue([d]);
+
+    const { MCPManager } = await import('../../agent-runtime/agent/MCPManager');
+    vi.spyOn(MCPManager.prototype, 'connect').mockImplementation(async (_config, signal) => {
+      await new Promise<never>((_resolve, reject) => {
+        const onAbort = () => reject(new DOMException('The operation was aborted', 'AbortError'));
+        if (signal?.aborted) onAbort();
+        else signal?.addEventListener('abort', onAbort, { once: true });
+      });
+      return [];
+    });
+
+    const coordinator2 = new McpConnectionCoordinator();
+    const controller = new AbortController();
+    const pending = coordinator2.acquireConnections('ask', root, [d.id], 'abort-p', controller.signal);
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+
+    const internals = coordinator2 as unknown as {
+      pools: Map<string, { failedMcpServers: Map<string, unknown> }>;
+    };
+    const pool = Array.from(internals.pools.values())[0];
+    expect(pool?.failedMcpServers.size ?? 0).toBe(0);
+
+    await coordinator2.disconnectAll();
+  });
 });

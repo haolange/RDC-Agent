@@ -140,4 +140,28 @@ describe('Agent LoopRuntimeState', () => {
     await joinPromise;
     expect(joined).toBe(true);
   });
+
+  it('abortAndJoin waits for producerCompletion even if loop promise settles first', async () => {
+    const agent = new Agent({
+      initialState: { model, tools: [], messages: [] },
+      provider: unusedProvider,
+      streamOptions,
+    });
+    let releaseProducer!: () => void;
+    const producerCompletion = new Promise<void>((resolve) => {
+      releaseProducer = resolve;
+    });
+    (agent as unknown as { _activeLoopPromise: Promise<Message[]> })._activeLoopPromise = Promise.resolve([]);
+    (agent as unknown as { _activeProducerCompletion: Promise<void> })._activeProducerCompletion = producerCompletion;
+
+    let joined = false;
+    const joinPromise = agent.abortAndJoin().then(() => {
+      joined = true;
+    });
+    await Promise.resolve();
+    expect(joined).toBe(false);
+    releaseProducer();
+    await joinPromise;
+    expect(joined).toBe(true);
+  });
 });

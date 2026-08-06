@@ -11,6 +11,7 @@ export interface TurnPreparationComputationInput {
   modelId: string;
   messageBudget: number;
   imageTokenAdjustment: number;
+  signal?: AbortSignal;
 }
 
 export interface TurnPreparationComputationResult {
@@ -38,7 +39,7 @@ export async function computeTurnPreparation(
   });
   const beforeConversationTokens = contextManager.estimateTokens(input.messages)
     + input.imageTokenAdjustment;
-  const compacted = await contextManager.compress(input.messages);
+  const compacted = await contextManager.compress(input.messages, input.signal);
   const compactedMessages = contextManager.convertToLlm(compacted.messages);
   const afterConversationTokens = contextManager.estimateTokens(compacted.messages)
     + input.imageTokenAdjustment;

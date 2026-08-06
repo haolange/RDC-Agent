@@ -149,7 +149,7 @@ describe('AgentLoop progress termination', () => {
       },
     };
     const context = createContext();
-    const stream = agentLoop([], context, {
+    const { stream } = agentLoop([], context, {
       model: TEST_MODEL,
       convertToLlm: (messages) => messages as Message[],
       maxTurns: 10,
@@ -177,7 +177,7 @@ describe('AgentLoop progress termination', () => {
         return providerStream(toolUseMessage(calls));
       },
     };
-    const stream = agentLoop([], createContext(), {
+    const { stream } = agentLoop([], createContext(), {
       model: TEST_MODEL,
       convertToLlm: (messages) => messages as Message[],
       maxTurns: 1,

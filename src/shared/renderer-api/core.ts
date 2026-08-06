@@ -85,7 +85,7 @@ export function createWorkflowApi(transport: RendererApiTransport): WorkflowApi 
 export function createAgentApi(transport: RendererApiTransport): AgentApi {
   return {
     sendMessage: (agentId, content) => transport.invoke(INVOKE.agent.sendMessage, agentId, content),
-    getState: (agentId) => transport.invoke(INVOKE.agent.getState, agentId),
+    getState: (agentId, sessionId) => transport.invoke(INVOKE.agent.getState, agentId, sessionId),
     getAllStates: () => transport.invoke(INVOKE.agent.getAllStates),
     configure: (agentId, config) => transport.invoke(INVOKE.agent.configure, agentId, config),
   };

@@ -106,7 +106,12 @@ export class ContextManager {
    */
   async compress(
     messages: AgentMessage[],
+    signal?: AbortSignal,
   ): Promise<CompressResult> {
+    if (signal?.aborted) {
+      throw new DOMException('The operation was aborted', 'AbortError');
+    }
+
     const tokenLimit = this.config.contextTokenLimit;
     const beforeCount = messages.length;
     const beforeTokens = this.estimateTokens(messages);
@@ -139,6 +144,9 @@ export class ContextManager {
     }
 
     if (this.estimateTokens(result) > tokenLimit) {
+      if (signal?.aborted) {
+        throw new DOMException('The operation was aborted', 'AbortError');
+      }
       const beforeFull = result;
       const compacted = await this.fullCompact(result);
       result = compacted.messages;

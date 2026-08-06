@@ -36,10 +36,6 @@ import {
   translateCoreToSharedAgentEvent,
   type AgentEventBridgeContext,
 } from '../../agent-runtime/AgentEventBridge';
-import {
-  buildEffectiveRuntimePlan,
-} from '../../agent-runtime/EffectiveRuntimePlan';
-import { compileEffectivePolicy } from '../../agent-runtime/permissions/PolicyCompiler';
 import { agentUserInputRequestService } from '../../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
 import type {
@@ -58,7 +54,6 @@ import {
 } from '../../settings/EffectiveModelResolver';
 import { debuggerLlmService } from '../../settings/DebuggerLlmService';
 import { settingsService } from '../../settings/SettingsService';
-import { agentManifestService } from '../../settings/AgentManifestService';
 import {
   turnCoordinator,
   createSubagentBudgetState,
@@ -135,7 +130,7 @@ export class AgentTurnRunner {
     tools: ToolDefinition[] = [],
     toolExecutor = this.deps.createToolExecutor(agentId, [], undefined),
     turnSignature = '',
-    sessionId?: string | null,
+    sessionId: string = '',
     contextWindow?: number,
     contextTokenLimit?: number,
     promptPlan?: PromptPlan,
@@ -149,6 +144,9 @@ export class AgentTurnRunner {
   ): AgentSlot {
     if (!promptPlan) {
       throw new Error('PromptPlan is required before creating an agent runtime slot.');
+    }
+    if (!sessionId) {
+      throw new Error('EXECUTION_SCOPE_REQUIRED: agent slot requires a session or ephemeral scope id.');
     }
     const slotKey = agentSlotKey(sessionId, agentId);
     if (this.deps.slots.isQuarantined(slotKey)) {
@@ -219,7 +217,7 @@ export class AgentTurnRunner {
       streamOptions,
       maxTurns: this.resolveMaxTurns(agentId, policyMaxTurns, profileMaxTurns),
       // transformContext：长对话接近窗口上限时自动压缩历史。
-      transformContext: (messages) => contextManager.compress(messages),
+      transformContext: (messages, signal) => contextManager.compress(messages, signal),
       // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
       errorRecovery,
       onRequest: ({ model, context: requestContext, streamOptions: requestOptions }) => {
@@ -333,25 +331,15 @@ export class AgentTurnRunner {
     if (!requestPlan) {
       throw new Error('RequestPlan is required for every provider request.');
     }
-    const turnPolicy = input.preparedRuntime?.effectivePlan.policy ?? compileEffectivePolicy(input.projectRootPath);
-    const runtimeSettings = input.effectiveModel ? null : settingsService.getAll();
-    const routeProvider = runtimeSettings?.llm.providers.find((entry) => entry.id === input.providerId);
-    const fallbackEffectiveProfiles = runtimeSettings
-      ? agentManifestService.getEffectiveProfiles(
-          runtimeSettings.paths,
-          runtimeSettings.llm.providers,
-          runtimeSettings.llm.agentRoutes,
-          input.projectRootPath ?? undefined,
-        )
-      : [];
-    const fallbackProfile = input.effectiveProfile
-      ?? fallbackEffectiveProfiles.find((definition) => definition.id === input.agentId && definition.enabled);
-    const effectiveModel = input.effectiveModel
-      ?? (runtimeSettings ? resolveEffectiveModel(input.providerId, input.modelId, runtimeSettings) : null);
-    const routeCapability = input.preparedRuntime?.routeCapability
-      ?? resolveAgentRouteCapability(routeProvider, input.modelId, effectiveModel, requestPlan);
-    let mcpLease: McpConnectionLease | null = input.preparedRuntime?.mcpLease ?? null;
-    let mcpConnectionErrors = input.preparedRuntime?.mcpConnectionErrors ?? [];
+    if (!input.preparedRuntime) {
+      throw new Error('TURN_NOT_PREPARED: preparedRuntime is required; call prepareTurnContext/prepareProfileTurn before runAgentTurn.');
+    }
+    const preparedRuntime = input.preparedRuntime;
+    const turnPolicy = preparedRuntime.effectivePlan.policy;
+    const effectiveModel = input.effectiveModel ?? null;
+    const routeCapability = preparedRuntime.routeCapability;
+    let mcpLease: McpConnectionLease | null = preparedRuntime.mcpLease ?? null;
+    let mcpConnectionErrors = preparedRuntime.mcpConnectionErrors ?? [];
     const sessionKey = this.deps.sessionTurnKey(input.sessionId);
     let turnHandle;
     try {
@@ -376,6 +364,9 @@ export class AgentTurnRunner {
       await mcpLease?.release({ discardIfIdle: true });
       throw error;
     }
+    if (!input.sessionId) {
+      throw new Error('EXECUTION_SCOPE_REQUIRED: runAgentTurn requires a session or ephemeral scope id.');
+    }
     let slotKey = agentSlotKey(input.sessionId, input.agentId);
     let slot: AgentSlot | null = null;
     let unsubscribe: (() => void) | null = null;
@@ -384,16 +375,6 @@ export class AgentTurnRunner {
     let turnEnded = false;
     let setupCleanupComplete = false;
     try {
-    if (!input.preparedRuntime) {
-      const acquiredMcp = await this.deps.mcp.acquireConnections(
-        input.agentId,
-        input.projectRootPath,
-        fallbackProfile?.mcpServers,
-        input.projectId,
-      );
-      mcpConnectionErrors = acquiredMcp.errors;
-      mcpLease = acquiredMcp.lease;
-    }
     const turnGeneration = turnHandle.generation;
     turnHandle.eventSink = {
       onEvent: (event) => {
@@ -406,9 +387,7 @@ export class AgentTurnRunner {
       agentId: input.agentId,
     };
 
-    const frozenToolAllowlist = input.preparedRuntime?.effectivePlan
-      ? [...input.preparedRuntime.effectivePlan.toolAllowlist]
-      : [...input.toolAllowlist];
+    const frozenToolAllowlist = [...preparedRuntime.effectivePlan.toolAllowlist];
     const liveRuntimeTools = this.deps.resolveRuntimeTools(
       input.agentId,
       frozenToolAllowlist,
@@ -423,14 +402,17 @@ export class AgentTurnRunner {
     // conversation session has a durable run. Rebuild tool instances here so
     // their closures receive the committed session/run ownership, while keeping
     // the prepared definition set immutable for the request.
-    const runtimeTools = input.preparedRuntime
-      ? { definitions: input.preparedRuntime.runtimeTools.definitions, toolMap: liveRuntimeTools.toolMap }
-      : liveRuntimeTools;
+    const runtimeTools = {
+      definitions: preparedRuntime.runtimeTools.definitions,
+      toolMap: liveRuntimeTools.toolMap,
+    };
+    if (!input.sessionId) {
+      throw new Error('EXECUTION_SCOPE_REQUIRED: runAgentTurn requires a session or ephemeral scope id.');
+    }
     slotKey = agentSlotKey(input.sessionId, input.agentId);
     const allToolSignature = this.deps.createToolSignature(runtimeTools.definitions);
-    const activatedDeferredTools = this.deps.deferredActivation.resolveActivatedSet(slotKey, allToolSignature);
-    const injectedToolDefinitions = input.preparedRuntime?.activeToolDefinitions
-      ?? partitionDeferredTools(runtimeTools.definitions, activatedDeferredTools).injected;
+    void this.deps.deferredActivation.resolveActivatedSet(slotKey, allToolSignature);
+    const injectedToolDefinitions = preparedRuntime.activeToolDefinitions;
     // native-structured：core 常驻注入，mcp__* 与 extended builtin 默认 deferred；
     // 其它路由不注入工具 schema。
     const activeToolDefinitions = routeCapability.toolCallingMode === 'native-structured'
@@ -454,34 +436,7 @@ export class AgentTurnRunner {
       allDefinitions: runtimeTools.definitions,
     };
     turnHandle.agentSlotKey = slotKey;
-    // Prefer the turn-frozen plan. When preparation is not used (for example
-    // an isolated child turn), build once from the exact profile snapshot supplied
-    // by the caller; never re-resolve profile semantics inside execution.
-    const preparedPlan = input.preparedRuntime?.effectivePlan;
-    const effectivePlan = preparedPlan ?? (() => {
-      const fallbackSettings = settingsService.getAll();
-      const effectiveProfiles = fallbackEffectiveProfiles;
-      const profile = fallbackProfile;
-      return buildEffectiveRuntimePlan({
-        agentId: input.agentId,
-        projectRootPath: input.projectRootPath ?? null,
-        projectId: input.projectId ?? null,
-        profile: profile ?? null,
-        enabledProfileIds: input.effectiveProfileIds?.length
-          ? [...input.effectiveProfileIds]
-          : (() => { const ids = effectiveProfiles.filter((definition) => definition.enabled).map((definition) => definition.id); return ids.length > 0 ? ids : [input.agentId]; })(),
-        toolAllowlist: frozenToolAllowlist,
-        permissionSettings: fallbackSettings.agentRuntime.permissions,
-        routeCapability,
-        requestPlan,
-        promptPlan: input.promptPlan,
-        policy: turnPolicy,
-        visibleToolNames: activeToolDefinitions.map((definition) => definition.name),
-        activatedDeferredTools,
-        skillIntersection: null,
-        mcpDescriptorHash: null,
-      });
-    })();
+    const effectivePlan = preparedRuntime.effectivePlan;
     turnHandle.runtimePlan = effectivePlan;
     // native-structured：执行器用 plan 冻结 allowlist；其它路由与注入列表一致。
     const executorAllowlist = routeCapability.toolCallingMode === 'native-structured'
@@ -499,11 +454,7 @@ export class AgentTurnRunner {
       effectivePlan,
       policyBudget: turnHandle.policyBudget,
     });
-    const promptCache = input.preparedRuntime?.promptCache ?? promptCacheCompiler.compile({
-      promptPlan: input.promptPlan,
-      requestPlan,
-      tools: activeToolDefinitions,
-    });
+    const promptCache = preparedRuntime.promptCache;
     const streamOptions: StreamOptions = {
       maxTokens: input.maxTokens,
       temperature: requestPlan.temperature,
@@ -512,7 +463,7 @@ export class AgentTurnRunner {
       signal: input.options?.signal,
       requestPlan,
       promptCache,
-      credentialHandle: input.preparedRuntime?.credentialHandle ?? input.credentialHandle,
+      credentialHandle: preparedRuntime.credentialHandle ?? input.credentialHandle,
     };
     const routeDiagnostic = describeRouteCapabilityDiagnostic(routeCapability, runtimeTools.definitions.length);
     if (mcpConnectionErrors.length > 0) {

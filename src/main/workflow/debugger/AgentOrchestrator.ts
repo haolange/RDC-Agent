@@ -45,7 +45,6 @@ import {
   AgentSlotRegistry,
   AgentTurnRunner,
   CONTEXT_COMPACTION_RATIO,
-  countContinuationDecisions,
   createProfileTestResponse,
   createTestModeStub,
   DeferredToolActivationTracker,
@@ -56,7 +55,6 @@ import {
   isTopLevelAgentId,
   McpConnectionCoordinator,
   MemoryStore,
-  nowIso,
   nowMs,
   planEffectiveModelRequest,
   PromptPlanForTurn,
@@ -68,7 +66,6 @@ import {
   runtimeLogService,
   appPathService,
   agentManifestService,
-  sessionContextJournal,
   settingsService,
   storageAdapter,
   streamTestModeStub,
@@ -77,6 +74,10 @@ import {
   ToolExecutorFactory,
   turnCoordinator,
   TurnPreparationService,
+  ProfileTurnPreparation,
+  OrchestratorMemoryUi,
+  resolveExecutionScopeId,
+  createEphemeralScopeId,
   workflowProjectionPublisher,
   type AbortReason,
   type AgentProfileTurnOptions,
@@ -96,11 +97,14 @@ export class AgentOrchestrator {
   private readonly tools: RuntimeToolAssembly;
   private readonly toolExecutors: ToolExecutorFactory;
   private readonly turnPrep: TurnPreparationService;
+  private readonly profilePrep: ProfileTurnPreparation;
   private readonly turnRunner: AgentTurnRunner;
   private readonly subagents: SubagentRunner;
+  private readonly memoryUi: OrchestratorMemoryUi;
 
   constructor() {
     this.slots.initializeDefaults();
+    this.memoryUi = new OrchestratorMemoryUi(() => this.getMemoryStore('user'));
     const getActiveTurn = (sessionId?: string | null) =>
       turnCoordinator.getActive(this.sessionTurnKey(sessionId));
 
@@ -135,6 +139,7 @@ export class AgentOrchestrator {
       resolveRuntimeTools: (...args) => this.tools.resolveRuntimeTools(...args),
       createToolSignature: (...args) => this.tools.createToolSignature(...args),
     });
+    this.profilePrep = new ProfileTurnPreparation(this.turnPrep);
 
     this.turnRunner = new AgentTurnRunner({
       slots: this.slots,
@@ -148,8 +153,8 @@ export class AgentOrchestrator {
     });
   }
 
-  getAgentState(agentId: AgentRole): AgentState | null {
-    return this.slots.getAgentState(agentId);
+  getAgentState(sessionOrScopeId: string, agentId: AgentRole): AgentState | null {
+    return this.slots.getAgentState(sessionOrScopeId, agentId);
   }
 
   getAllAgentStates(): AgentState[] {
@@ -185,12 +190,8 @@ export class AgentOrchestrator {
     return this.slots.getOrCreateAgentConfig(agentId);
   }
 
-  private ensureAgentState(agentId: AgentRole): AgentState {
-    return this.slots.ensureAgentState(agentId);
-  }
-
-  private sessionTurnKey(sessionId?: string | null): string {
-    return sessionId?.trim() || '__anon__';
+  private sessionTurnKey(sessionId?: string | null, ephemeralScopeId?: string | null): string {
+    return resolveExecutionScopeId(sessionId, ephemeralScopeId);
   }
 
   async sendMessage(
@@ -199,10 +200,12 @@ export class AgentOrchestrator {
     context?: AgentTurnContext,
     options?: AgentTurnOptions,
   ): Promise<string> {
+    const executionScopeId = resolveExecutionScopeId(context?.sessionId, createEphemeralScopeId());
     const fallbackConfig = this.getOrCreateAgentConfig(agentId);
     let ownedCredentialHandle: string | undefined;
+    let preparedLeaseRelease: (() => Promise<void>) | undefined;
 
-    this.updateAgentStatus(agentId, 'thinking');
+    this.updateAgentStatus(executionScopeId, agentId, 'thinking');
 
     try {
       const stub = createTestModeStub(agentId, content, this.getAgentDisplayName(agentId));
@@ -231,8 +234,24 @@ export class AgentOrchestrator {
 
       await this.recordMessage(agentId, 'user', content, context);
 
+      if (stub) {
+        const responseText = await streamTestModeStub(stub, options);
+        const finalContent = await this.finalizeRecordedAssistantMessage(
+          agentId,
+          responseText,
+          responseText,
+          context,
+        );
+        this.updateAgentStatus(executionScopeId, agentId, 'complete');
+        return finalContent;
+      }
+
+      if (!effectiveProfile) {
+        throw new Error(`AGENT_PROFILE_UNAVAILABLE: ${agentId}`);
+      }
       const settings = settingsService.getAll();
       const sessionRecord = context?.sessionId ? storageAdapter.readSession(context.sessionId) : null;
+      const toolAllowlist = resolveAgentToolAllowlistFromDefinition(agentId, effectiveProfile.tools);
       const planning = planEffectiveModelRequest({
         providerId: config.modelProvider,
         modelId: config.modelName,
@@ -253,10 +272,6 @@ export class AgentOrchestrator {
       const contextTokenLimit = Math.floor(
         planning.plan.contextBudgetTokens * CONTEXT_COMPACTION_RATIO,
       );
-      const toolAllowlist = effectiveProfile
-        ? resolveAgentToolAllowlistFromDefinition(agentId, effectiveProfile.tools)
-        : resolveAgentToolAllowlist(agentId, context?.stageId);
-      // Debug 路径与 Composer/Ask 对齐：经 PromptPlanBuilder 拆分 system/memory_files/skills。
       const promptPlan = this.promptPlan.buildPromptPlanForAgentTurn({
         agentId,
         projectRootPath: context?.projectRootPath ?? null,
@@ -270,43 +285,67 @@ export class AgentOrchestrator {
         preloadSkillIds: options?.preloadSkillIds,
         effectiveProfile,
       });
-      if (!stub && !promptPlan) {
+      if (!promptPlan) {
         throw new Error(`PROMPT_PLAN_UNAVAILABLE: ${agentId}`);
       }
-      const systemPrompt = promptPlan?.systemPrompt
-        ?? this.promptPlan.systemPromptForAgent(agentId, config.systemPrompt);
-      const responseText = stub
-        ? await streamTestModeStub(stub, options)
-        : await this.turnRunner.runAgentTurn({
-          agentId,
-          content,
-          systemPrompt,
-          providerId: config.modelProvider,
-          modelId: config.modelName,
-          maxTokens: config.maxTokens,
-          temperature: planning.plan.temperature,
-          mode: this.modeForAgent(agentId),
-          stage: context?.stageId,
-          runId: context?.runId,
-          sessionId: context?.sessionId ?? null,
-          turnId: context?.turnId,
-          toolAllowlist,
-          options: {
-            ...options,
-            reasoning: planning.plan.reasoningWire,
-            turnControls: planning.controls,
-            requestPlan: planning.plan,
-          },
-          projectRootPath: context?.projectRootPath ?? null,
-          projectId: context?.projectId ?? null,
-          promptPlan: promptPlan!,
-          effectiveModel: capability,
-          effectiveProfile,
-          effectiveProfileIds: effectiveSnapshot.enabledProfileIds,
-          credentialHandle: ownedCredentialHandle,
-          contextWindow: activeContextWindow,
-          contextTokenLimit,
-        });
+      const preparedBundle = await this.profilePrep.prepare({
+        agentId,
+        content,
+        systemPrompt: promptPlan.systemPrompt,
+        providerId: config.modelProvider,
+        modelId: config.modelName,
+        toolAllowlist,
+        promptPlan,
+        effectiveProfile,
+        effectiveProfileIds: effectiveSnapshot.enabledProfileIds,
+        projectRootPath: context?.projectRootPath ?? null,
+        projectId: context?.projectId ?? null,
+        sessionId: context?.sessionId ?? null,
+        turnId: context?.turnId,
+        credentialHandle: ownedCredentialHandle!,
+        requestPlan: planning.plan,
+        turnControls: planning.controls,
+        temperature: config.temperature,
+        signal: options?.signal,
+        isolateContext: !context?.sessionId,
+      });
+      preparedLeaseRelease = async () => {
+        await preparedBundle.prepared.runtime.mcpLease?.release({ discardIfIdle: true });
+      };
+      const responseText = await this.turnRunner.runAgentTurn({
+        agentId,
+        content,
+        systemPrompt: promptPlan.systemPrompt,
+        providerId: config.modelProvider,
+        modelId: config.modelName,
+        maxTokens: config.maxTokens,
+        temperature: planning.plan.temperature,
+        mode: this.modeForAgent(agentId),
+        stage: context?.stageId,
+        runId: context?.runId,
+        sessionId: executionScopeId,
+        turnId: context?.turnId ?? preparedBundle.prepared.summary.turnId,
+        toolAllowlist: preparedBundle.prepared.toolAllowlist,
+        options: {
+          ...options,
+          reasoning: planning.plan.reasoningWire,
+          turnControls: planning.controls,
+          requestPlan: planning.plan,
+        },
+        projectRootPath: context?.projectRootPath ?? null,
+        projectId: context?.projectId ?? null,
+        promptPlan,
+        effectiveModel: preparedBundle.effectiveModel,
+        effectiveProfile,
+        effectiveProfileIds: effectiveSnapshot.enabledProfileIds,
+        credentialHandle: ownedCredentialHandle,
+        contextWindow: activeContextWindow,
+        contextTokenLimit,
+        initialMessages: preparedBundle.prepared.initialMessages,
+        contextDiagnostic: preparedBundle.prepared.contextDiagnostic,
+        preparedRuntime: preparedBundle.prepared.runtime,
+      });
+      preparedLeaseRelease = undefined;
 
       const finalContent = await this.finalizeRecordedAssistantMessage(
         agentId,
@@ -315,12 +354,15 @@ export class AgentOrchestrator {
         context,
       );
 
-      this.updateAgentStatus(agentId, 'complete');
+      this.updateAgentStatus(executionScopeId, agentId, 'complete');
       return finalContent;
     } catch (error) {
-      this.updateAgentStatus(agentId, 'error');
+      this.updateAgentStatus(executionScopeId, agentId, 'error');
       throw error;
     } finally {
+      if (preparedLeaseRelease) {
+        await preparedLeaseRelease().catch(() => undefined);
+      }
       providerRuntimeCredentialService.release(ownedCredentialHandle);
     }
   }
@@ -346,19 +388,24 @@ export class AgentOrchestrator {
     content: string,
     options?: AgentProfileTurnOptions,
   ): Promise<string> {
+    const executionScopeId = resolveExecutionScopeId(options?.sessionId, createEphemeralScopeId());
     const fallbackConfig = this.getOrCreateAgentConfig(agentId);
     let ownedCredentialHandle: string | undefined;
+    let preparedLeaseRelease: (() => Promise<void>) | undefined;
+    let ownsPreparedRuntime = false;
 
-    this.updateAgentStatus(agentId, 'thinking');
+    this.updateAgentStatus(executionScopeId, agentId, 'thinking');
 
     try {
-      const preparedTurn = options?.preparedTurn;
+      let preparedTurn = options?.preparedTurn;
       let settings = settingsService.getAll();
       let routeMap = new Map(settings.llm.agentRoutes.map((route) => [route.agentId, route]));
       const routeAgentId = options?.routeAgentId ?? agentId;
       let route = routeMap.get(routeAgentId);
       const frozenRequestPlan = options?.requestPlan;
-      const credentialProviderId = frozenRequestPlan?.providerId ?? route?.providerId;
+      const credentialProviderId = frozenRequestPlan?.providerId
+        ?? preparedTurn?.summary.route.providerId
+        ?? route?.providerId;
       if (credentialProviderId && !preparedTurn && process.env.RDC_AGENT_TEST_MODE !== '1') {
         ownedCredentialHandle = await this.refreshProviderRuntimeCredentials(credentialProviderId);
         settings = settingsService.getAll();
@@ -390,29 +437,33 @@ export class AgentOrchestrator {
 
       if (process.env.RDC_AGENT_TEST_MODE === '1') {
         const finalStub = await createProfileTestResponse(agentId, content, options);
-        this.updateAgentStatus(agentId, 'complete');
+        this.updateAgentStatus(executionScopeId, agentId, 'complete');
         return finalStub;
       }
 
+      if (!effectiveProfile) {
+        throw new Error(`AGENT_PROFILE_UNAVAILABLE: ${agentId}`);
+      }
+
       const toolAllowlist = preparedTurn?.toolAllowlist
-        ?? (effectiveProfile
-          ? resolveAgentToolAllowlistFromDefinition(agentId, effectiveProfile.tools)
-          : resolveAgentToolAllowlist(agentId, options?.stage && options.stage !== 'report' ? options.stage : undefined));
+        ?? resolveAgentToolAllowlistFromDefinition(agentId, effectiveProfile.tools);
       const routeProviderId = config.modelProvider;
       const routeModelId = config.modelName;
-      const sessionControls = options?.sessionId ? storageAdapter.readSession(options.sessionId)?.turnControls : undefined;
+      const sessionControls = options?.sessionId
+        ? storageAdapter.readSession(options.sessionId)?.turnControls
+        : undefined;
       const planning = frozenRequestPlan
         ? {
             ok: true as const,
             plan: frozenRequestPlan,
             controls: options?.turnControls ?? {
               reasoningLevel: frozenRequestPlan.reasoningWire.selection === 'unknown'
-                ? 'off'
+                ? 'off' as const
                 : frozenRequestPlan.reasoningWire.selection,
               maxContextMode: frozenRequestPlan.contextMode === 'one-million',
               fastModel: frozenRequestPlan.fastMode,
             },
-            warnings: [],
+            warnings: [] as string[],
           }
         : planEffectiveModelRequest({
             providerId: routeProviderId,
@@ -450,35 +501,42 @@ export class AgentOrchestrator {
       });
       if (!promptPlan) throw new Error(`PROMPT_PLAN_UNAVAILABLE: ${agentId}`);
 
-      const journalSessionId = options?.sessionId && !options.sessionId.includes('::subagent::')
-        ? options.sessionId
-        : null;
-      const materialized = preparedTurn
-        ? {
-            messages: preparedTurn.initialMessages,
-            selectedTurnCount: preparedTurn.contextDiagnostic.selectedTurnCount,
-            filteredArtifactCount: preparedTurn.contextDiagnostic.filteredArtifactCount,
-            replayedArtifactCount: preparedTurn.contextDiagnostic.replayedArtifactCount,
-            artifactDecisions: [],
-            derivedContextStatus: preparedTurn.contextDiagnostic.derivedContextStatus,
-            compactedTurnCount: preparedTurn.contextDiagnostic.compactedTurnCount,
-          }
-        : journalSessionId
-          ? sessionContextJournal.materialize(
-              journalSessionId,
-              options?.visibleTurnIds ?? [],
-              planning.plan,
-              options?.activeBranchId ?? undefined,
-            )
-          : {
-              messages: [],
-              selectedTurnCount: 0,
-              replayedArtifactCount: 0,
-              filteredArtifactCount: 0,
-              artifactDecisions: [],
-              derivedContextStatus: 'none' as const,
-              compactedTurnCount: 0,
-            };
+      const isSubagentSession = Boolean(options?.sessionId?.includes('::subagent::'));
+      if (!preparedTurn) {
+        const preparedBundle = await this.profilePrep.prepare({
+          agentId,
+          content,
+          systemPrompt: promptPlan.systemPrompt,
+          providerId: routeProviderId,
+          modelId: routeModelId,
+          toolAllowlist,
+          promptPlan,
+          effectiveProfile,
+          effectiveProfileIds: [...effectiveProfileIds],
+          projectRootPath: options?.projectRootPath ?? null,
+          projectId: options?.projectId ?? null,
+          sessionId: isSubagentSession ? null : (options?.sessionId ?? null),
+          turnId: options?.turnId,
+          credentialHandle: (() => {
+            if (!ownedCredentialHandle) {
+              throw new Error('CREDENTIAL_HANDLE_REQUIRED: profile turn preparation requires a credential lease.');
+            }
+            return ownedCredentialHandle;
+          })(),
+          requestPlan: planning.plan,
+          turnControls: planning.controls,
+          temperature: config.temperature,
+          visibleTurnIds: options?.visibleTurnIds,
+          activeBranchId: options?.activeBranchId,
+          signal: options?.signal,
+          isolateContext: isSubagentSession || !options?.sessionId,
+        });
+        preparedTurn = preparedBundle.prepared;
+        ownsPreparedRuntime = true;
+        preparedLeaseRelease = async () => {
+          await preparedTurn?.runtime.mcpLease?.release({ discardIfIdle: true });
+        };
+      }
 
       const responseText = await this.turnRunner.runAgentTurn({
         agentId,
@@ -491,9 +549,9 @@ export class AgentOrchestrator {
         mode: this.modeForAgent(agentId),
         stage: options?.stage ?? 'investigate',
         runId: options?.runId,
-        sessionId: options?.sessionId ?? null,
-        turnId: options?.turnId,
-        toolAllowlist,
+        sessionId: executionScopeId,
+        turnId: options?.turnId ?? preparedTurn.summary.turnId,
+        toolAllowlist: preparedTurn.toolAllowlist,
         options: {
           ...options,
           reasoning: planning.plan.reasoningWire,
@@ -503,35 +561,29 @@ export class AgentOrchestrator {
         projectRootPath: options?.projectRootPath ?? null,
         projectId: options?.projectId ?? null,
         promptPlan,
-        effectiveModel: capability,
+        effectiveModel: preparedTurn.effectiveModel,
         effectiveProfile,
         effectiveProfileIds,
-        credentialHandle: ownedCredentialHandle,
+        credentialHandle: ownedCredentialHandle ?? preparedTurn.runtime.credentialHandle,
         contextWindow: activeContextWindow,
         contextTokenLimit,
-        initialMessages: materialized.messages,
-        contextDiagnostic: preparedTurn?.contextDiagnostic ?? {
-          selectedTurnCount: materialized.selectedTurnCount,
-          activeBranchId: options?.activeBranchId ?? null,
-          filteredArtifactCount: materialized.filteredArtifactCount,
-          replayedArtifactCount: materialized.replayedArtifactCount,
-          continuationDecisionCounts: countContinuationDecisions(materialized.artifactDecisions),
-          derivedContextStatus: materialized.derivedContextStatus,
-          compactedTurnCount: materialized.compactedTurnCount,
-          compactionState: 'derived-view-only',
-        },
-        preparedRuntime: preparedTurn?.runtime,
+        initialMessages: preparedTurn.initialMessages,
+        contextDiagnostic: preparedTurn.contextDiagnostic,
+        preparedRuntime: preparedTurn.runtime,
         terminalContext: options?.onTerminalContext
           ? (messages, status, pendingHandoff) => options.onTerminalContext?.({
               messages,
               executionIdentity: planning.plan.executionIdentity,
               status,
-              selectedTurnCount: materialized.selectedTurnCount,
-              filteredArtifactCount: materialized.filteredArtifactCount,
+              selectedTurnCount: preparedTurn!.contextDiagnostic.selectedTurnCount,
+              filteredArtifactCount: preparedTurn!.contextDiagnostic.filteredArtifactCount,
               pendingHandoff,
             })
           : undefined,
       });
+      if (ownsPreparedRuntime) {
+        preparedLeaseRelease = undefined;
+      }
 
       runtimeLogService.log({
         scope: options?.sessionId ? 'session' : 'app',
@@ -547,12 +599,15 @@ export class AgentOrchestrator {
         },
       });
 
-      this.updateAgentStatus(agentId, 'complete');
+      this.updateAgentStatus(executionScopeId, agentId, 'complete');
       return responseText;
     } catch (error) {
-      this.updateAgentStatus(agentId, 'error');
+      this.updateAgentStatus(executionScopeId, agentId, 'error');
       throw error;
     } finally {
+      if (preparedLeaseRelease) {
+        await preparedLeaseRelease().catch(() => undefined);
+      }
       providerRuntimeCredentialService.release(ownedCredentialHandle);
     }
   }
@@ -569,7 +624,9 @@ export class AgentOrchestrator {
     sessionId: string | null | undefined,
     options?: { graceMs?: number; forceAfterMs?: number; reason?: AbortReason },
   ): Promise<void> {
-    const key = this.sessionTurnKey(sessionId);
+    const key = sessionId?.trim();
+    if (!key) return;
+    // use resolved key without generating a new ephemeral scope
     const handle = turnCoordinator.getActive(key);
     if (!handle) {
       await turnCoordinator.abortSession(key, options?.reason ?? 'user_stop');
@@ -592,50 +649,21 @@ export class AgentOrchestrator {
   }
 
   async listMemoriesForUi(): Promise<Array<{ name: string; description: string; type: string; updatedAt: number }>> {
-    try {
-      const all = await this.getMemoryStore('user').listMemories();
-      return all.map((m) => ({ name: m.name, description: m.description, type: m.type, updatedAt: m.updatedAt }));
-    } catch {
-      return [];
-    }
+    return this.memoryUi.listMemories();
   }
 
   async getMemoryForUi(name: string): Promise<{
     name: string; description: string; type: string; content: string; tags?: string[]; createdAt: number; updatedAt: number;
   } | null> {
-    try {
-      const record = await this.getMemoryStore('user').getMemory(name);
-      if (!record) return null;
-      return {
-        name: record.displayName,
-        description: record.description,
-        type: record.type,
-        content: record.content,
-        tags: record.tags,
-        createdAt: record.createdAt,
-        updatedAt: record.updatedAt,
-      };
-    } catch {
-      return null;
-    }
+    return this.memoryUi.getMemory(name);
   }
 
   async writeMemoryForUi(request: { name: string; description: string; type: 'user' | 'feedback' | 'project' | 'reference'; content: string; tags?: string[] }): Promise<{ success: boolean; name: string; error?: string }> {
-    try {
-      const record = await this.getMemoryStore('user').writeMemory(request);
-      return { success: true, name: record.displayName };
-    } catch (error) {
-      return { success: false, name: request.name, error: error instanceof Error ? error.message : String(error) };
-    }
+    return this.memoryUi.writeMemory(request);
   }
 
   async deleteMemoryForUi(name: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      const deleted = await this.getMemoryStore('user').deleteMemory(name);
-      return { success: deleted };
-    } catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) };
-    }
+    return this.memoryUi.deleteMemory(name);
   }
 
 
@@ -689,24 +717,22 @@ export class AgentOrchestrator {
     return finalContent;
   }
 
-  private updateAgentStatus(agentId: AgentRole, status: AgentState['status']): void {
-    const state = this.ensureAgentState(agentId);
-    if (state) {
-      state.status = status;
-      state.lastActivity = nowIso();
-      runtimeLogService.log({
-        scope: 'app',
-        namespace: 'agent',
-        severity: status === 'error' ? 'error' : status === 'complete' ? 'success' : 'info',
-        title: this.getAgentDisplayName(agentId),
-        summary: `Status changed to ${status}.`,
-        raw: {
-          agentId,
-          status,
-        },
-      });
-      this.notifyAgentStateChanged(state);
-    }
+  private updateAgentStatus(sessionOrScopeId: string, agentId: AgentRole, status: AgentState['status']): void {
+    const state = this.slots.updateAgentStatus(sessionOrScopeId, agentId, status);
+    runtimeLogService.log({
+      scope: 'app',
+      namespace: 'agent',
+      severity: status === 'error' ? 'error' : status === 'complete' ? 'success' : 'info',
+      title: this.getAgentDisplayName(agentId),
+      summary: `Status changed to ${status}.`,
+      sessionId: sessionOrScopeId,
+      raw: {
+        agentId,
+        sessionId: sessionOrScopeId,
+        status,
+      },
+    });
+    this.notifyAgentStateChanged(state);
   }
 
   private async recordMessage(

@@ -26,6 +26,7 @@ import { nowIso } from '@shared/utils/id';
 import type { Agent } from '../../agent-runtime/agent/Agent';
 import type { ContextManager } from '../../agent-runtime/agent/ContextManager';
 import type { AgentMessage } from '../../agent-runtime/core/types';
+import { requireExecutionScopeId } from './executionScope';
 
 /** 单个 AgentRole 在内部维护的运行态。 */
 export interface AgentSlot {
@@ -42,45 +43,51 @@ export interface AgentSlot {
   activatedDeferredTools: Set<string>;
 }
 
-export function agentSlotKey(sessionId: string | null | undefined, agentId: AgentRole): string {
-  return sessionId ? `${sessionId}::${agentId}` : `__no_session__::${agentId}`;
+export function agentSlotKey(sessionOrScopeId: string, agentId: AgentRole): string {
+  const scope = requireExecutionScopeId(sessionOrScopeId);
+  return `${scope}::${agentId}`;
+}
+
+export function agentStateKey(sessionOrScopeId: string, agentId: AgentRole): string {
+  return agentSlotKey(sessionOrScopeId, agentId);
 }
 
 export class AgentSlotRegistry {
-  private readonly agentStates = new Map<AgentRole, AgentState>();
+  private readonly agentStates = new Map<string, AgentState>();
   private readonly agentConfigs = new Map<AgentRole, AgentConfig>();
   private readonly agentSlots = new Map<string, AgentSlot>();
   private readonly quarantinedSlots = new Map<string, Promise<void>>();
 
   initializeDefaults(): void {
     for (const role of AGENT_ROLES) {
-      this.ensureAgentState(role);
       this.agentConfigs.set(role, this.createDefaultAgentConfig(role));
     }
   }
 
-  ensureAgentState(agentId: AgentRole): AgentState {
-    const existing = this.agentStates.get(agentId);
+  ensureAgentState(sessionOrScopeId: string, agentId: AgentRole): AgentState {
+    const key = agentStateKey(sessionOrScopeId, agentId);
+    const existing = this.agentStates.get(key);
     if (existing) return existing;
     const state: AgentState = {
       agentId,
+      sessionId: requireExecutionScopeId(sessionOrScopeId),
       status: 'idle',
       lastActivity: nowIso(),
     };
-    this.agentStates.set(agentId, state);
+    this.agentStates.set(key, state);
     return state;
   }
 
-  getAgentState(agentId: AgentRole): AgentState | null {
-    return this.agentStates.get(agentId) ?? null;
+  getAgentState(sessionOrScopeId: string, agentId: AgentRole): AgentState | null {
+    return this.agentStates.get(agentStateKey(sessionOrScopeId, agentId)) ?? null;
   }
 
   getAllAgentStates(): AgentState[] {
     return Array.from(this.agentStates.values());
   }
 
-  updateAgentStatus(agentId: AgentRole, status: AgentState['status']): AgentState {
-    const state = this.ensureAgentState(agentId);
+  updateAgentStatus(sessionOrScopeId: string, agentId: AgentRole, status: AgentState['status']): AgentState {
+    const state = this.ensureAgentState(sessionOrScopeId, agentId);
     state.status = status;
     state.lastActivity = nowIso();
     if (status === 'error') {
@@ -107,7 +114,6 @@ export class AgentSlotRegistry {
   }
 
   getOrCreateAgentConfig(agentId: AgentRole): AgentConfig {
-    this.ensureAgentState(agentId);
     const existing = this.agentConfigs.get(agentId);
     if (existing) return existing;
     const config = this.createDefaultAgentConfig(agentId);
@@ -186,7 +192,7 @@ export class AgentSlotRegistry {
   syncSession(sessionId: string): void {
     const prefix = `${sessionId}::`;
     for (const key of Array.from(this.agentSlots.keys())) {
-      if (key.startsWith(prefix) || (!sessionId && key.startsWith('__no_session__::'))) {
+      if (key.startsWith(prefix)) {
         const slot = this.agentSlots.get(key);
         if (slot) {
           try {

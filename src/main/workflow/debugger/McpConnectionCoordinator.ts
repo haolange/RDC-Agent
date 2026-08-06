@@ -212,7 +212,11 @@ export class McpConnectionCoordinator {
     projectRootPath?: string | null,
     enabledMcpIds?: readonly string[],
     projectId?: string | null,
+    signal?: AbortSignal,
   ): Promise<AcquiredMcpConnections> {
+    if (signal?.aborted) {
+      throw new DOMException('The operation was aborted', 'AbortError');
+    }
     const descriptors = this.getEnabledMcpDescriptors(agentId, projectRootPath, enabledMcpIds);
     const normalizedProjectId = projectId?.trim() || null;
     const root = projectRootPath ? this.resolveRootPath(projectRootPath) : null;
@@ -287,6 +291,9 @@ export class McpConnectionCoordinator {
     const errors: string[] = [];
     const now = Date.now();
     for (const descriptor of descriptors) {
+      if (signal?.aborted) {
+        throw new DOMException('The operation was aborted', 'AbortError');
+      }
       if (pool.manager.listServers().includes(descriptor.id)) continue;
       const previous = pool.failedMcpServers.get(descriptor.id);
       if (previous) {
@@ -307,9 +314,17 @@ export class McpConnectionCoordinator {
         }
       }
       try {
-        await this.ensurePoolServerConnected(pool, descriptor, projectRootPath);
+        await this.ensurePoolServerConnected(pool, descriptor, projectRootPath, signal);
         pool.failedMcpServers.delete(descriptor.id);
       } catch (error) {
+        // Cancellation must not poison the failure/backoff cache.
+        if (
+          signal?.aborted
+          || (error instanceof Error && error.name === 'AbortError')
+          || (typeof DOMException !== 'undefined' && error instanceof DOMException && error.name === 'AbortError')
+        ) {
+          throw error instanceof Error ? error : new DOMException('The operation was aborted', 'AbortError');
+        }
         const record = this.recordFailure(pool, descriptor.id, error);
         errors.push(descriptor.id + ': ' + record.lastError);
       }
@@ -365,14 +380,34 @@ export class McpConnectionCoordinator {
     pool: ProjectMcpPool,
     descriptor: AgentRuntimeMcpDescriptor,
     projectRootPath?: string | null,
+    signal?: AbortSignal,
   ): Promise<void> {
+    if (signal?.aborted) {
+      throw new DOMException('The operation was aborted', 'AbortError');
+    }
     if (pool.manager.listServers().includes(descriptor.id)) return;
     if (pool.closing || pool.quarantined) throw new Error('MCP pool ' + pool.key + ' is closing.');
     const existing = pool.connecting.get(descriptor.id);
-    if (existing) return existing;
+    if (existing) {
+      // An in-flight connect without our signal still observes abort via race.
+      if (!signal) return existing;
+      await Promise.race([
+        existing,
+        new Promise<never>((_, reject) => {
+          const onAbort = () => reject(new DOMException('The operation was aborted', 'AbortError'));
+          if (signal.aborted) {
+            onAbort();
+            return;
+          }
+          signal.addEventListener('abort', onAbort, { once: true });
+          void existing.finally(() => signal.removeEventListener('abort', onAbort));
+        }),
+      ]);
+      return;
+    }
     const pending = (async () => {
       mcpTrustService.assertConnectAllowed(descriptor, projectRootPath);
-      await pool.manager.connect(this.toMcpServerConfig(descriptor));
+      await pool.manager.connect(this.toMcpServerConfig(descriptor), signal);
     })();
     pool.connecting.set(descriptor.id, pending);
     try {

@@ -88,3 +88,34 @@ describe('cancellationContract: late events', () => {
     expect(received).toEqual(['early']);
   });
 });
+
+
+describe('cancellationContract: dynamic producer join', () => {
+  it('abortAndJoin waits for late-registered producer', async () => {
+    const coordinator = new TurnCoordinator();
+    const handle = await coordinator.beginTurn({
+      sessionKey: 'late-prod',
+      turnId: 't',
+      eventSink: { sessionId: 'late-prod' },
+    });
+    let lateJoined = false;
+    handle.registerProducer({
+      id: 'seed',
+      abort: () => {
+        handle.registerProducer({
+          id: 'late',
+          abort: () => undefined,
+          join: async () => {
+            await new Promise((r) => setTimeout(r, 30));
+            lateJoined = true;
+          },
+        });
+      },
+      join: async () => {
+        await new Promise((r) => setTimeout(r, 5));
+      },
+    });
+    await handle.abortAndJoin({ reason: 'user_stop', graceMs: 500, forceAfterMs: 1_000 });
+    expect(lateJoined).toBe(true);
+  });
+});

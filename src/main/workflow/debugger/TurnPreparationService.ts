@@ -25,6 +25,7 @@ import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigServ
 import { mcpDescriptorHash } from '../../settings/McpTrustService';
 import { settingsService } from '../../settings/SettingsService';
 import { agentSlotKey } from './AgentSlotRegistry';
+import { resolveExecutionScopeId } from './executionScope';
 import {
   combineActiveSkillAllowlists,
 } from './DebuggerRuntimePolicy';
@@ -151,6 +152,7 @@ export class TurnPreparationService {
       input.projectRootPath,
       input.effectiveProfile.mcpServers,
       input.projectId,
+      input.signal,
     );
     const mcpConnectionErrors = acquiredMcp.errors;
     const mcpLease = acquiredMcp.lease;
@@ -166,7 +168,7 @@ export class TurnPreparationService {
       input.projectRootPath,
       mcpLease?.poolKey ?? null,
     );
-    const slotKey = agentSlotKey(input.sessionId, input.agentId);
+    const slotKey = agentSlotKey(resolveExecutionScopeId(input.sessionId), input.agentId);
     const toolSignature = this.deps.createToolSignature(runtimeTools.definitions);
     const activatedDeferredTools = this.deps.deferredActivation.resolveActivatedSet(slotKey, toolSignature);
     preactivateTaskTools(runtimeTools.definitions, activatedDeferredTools);

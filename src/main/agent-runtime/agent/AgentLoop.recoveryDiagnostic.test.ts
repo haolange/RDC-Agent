@@ -113,7 +113,7 @@ describe('AgentLoop recovery diagnostics', () => {
     };
     const recovery = new ErrorRecovery({ primaryModel: TEST_MODEL, maxRetries: 3 });
 
-    const stream = agentLoop([], context, {
+    const { stream } = agentLoop([], context, {
       model: TEST_MODEL,
       convertToLlm: (messages) => messages as Message[],
       errorRecovery: recovery,
@@ -156,7 +156,7 @@ describe('AgentLoop recovery diagnostics', () => {
       }],
     };
 
-    const stream = agentLoop([], context, {
+    const { stream } = agentLoop([], context, {
       model: TEST_MODEL,
       convertToLlm: (messages) => messages as Message[],
       errorRecovery: new ErrorRecovery({ primaryModel: TEST_MODEL }),
@@ -169,5 +169,45 @@ describe('AgentLoop recovery diagnostics', () => {
     }
 
     expect(events.some((event) => event.type === 'diagnostic')).toBe(false);
+  });
+
+  it('aborts recovery sleep when stream is aborted', async () => {
+    let attempts = 0;
+    const provider: ProviderStrategy = {
+      api: 'openai-completions',
+      stream: () => {
+        attempts += 1;
+        const stream = new EventStream<AssistantMessageEvent, AssistantMessage>();
+        void Promise.resolve().then(() => {
+          stream.error(new Error('429 rate limit exceeded'));
+        });
+        return stream;
+      },
+    };
+    const context: AgentContext = {
+      messages: [{
+        role: 'user',
+        content: [{ type: 'text', text: 'hello' }],
+        timestamp: Date.now(),
+      }],
+    };
+    const recovery = new ErrorRecovery({ primaryModel: TEST_MODEL, maxRetries: 5 });
+    const { stream, producerCompletion } = agentLoop([], context, {
+      model: TEST_MODEL,
+      convertToLlm: (messages) => messages as Message[],
+      errorRecovery: recovery,
+      maxTurns: 1,
+      streamOptions: { maxTokens: 256, requestPlan: TEST_REQUEST_PLAN } satisfies StreamOptions,
+    }, provider);
+
+    // Abort during the long retry backoff.
+    setTimeout(() => stream.abort(), 5);
+    await expect((async () => {
+      for await (const _event of stream) {
+        // drain
+      }
+    })()).rejects.toMatchObject({ name: 'AbortError' });
+    await producerCompletion;
+    expect(attempts).toBeGreaterThanOrEqual(1);
   });
 });

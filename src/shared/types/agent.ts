@@ -27,6 +27,8 @@ export type WriteScope =
 
 export interface AgentState {
   agentId: AgentRole;
+  /** Session or ephemeral execution scope that owns this status projection. */
+  sessionId: string;
   status: AgentStatus;
   token?: SpecialistToken;
   brief?: string;

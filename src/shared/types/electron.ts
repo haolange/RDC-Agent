@@ -202,7 +202,7 @@ export interface ElectronAPI {
       response?: string;
       error?: string;
     }>;
-    getState: (agentId: AgentRole) => Promise<AgentState>;
+    getState: (agentId: AgentRole, sessionId?: string) => Promise<AgentState | null>;
     getAllStates: () => Promise<AgentState[]>;
     configure: (agentId: AgentRole, config: Partial<AgentConfig>) => Promise<{
       success: boolean;
