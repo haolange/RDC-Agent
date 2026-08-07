@@ -30,6 +30,7 @@ jobs:
       - run: pnpm run lint
       - run: pnpm test
       - run: pnpm run test:coverage
+      - run: pnpm run check:coverage-ratchet
       - run: pnpm run check:architecture
       - run: pnpm run check:fidelity
       - run: pnpm run check:shared-exports
@@ -104,3 +105,59 @@ jobs:
           esac
       - name: Build unpacked release
         run: pnpm run pack
+      - name: Release config + SBOM/checksum helpers
+        if: runner.os == 'Linux'
+        run: |
+          pnpm run check:release-config
+          pnpm run release:sbom
+          pnpm run release:checksums
+
+  browser-smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        full_access: ['0', '1']
+    env:
+      RDC_AGENT_SMOKE_START: '1'
+      RDC_AGENT_BROWSER_QA_FULL_ACCESS: ${{ matrix.full_access }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Browser QA smoke
+        run: xvfb-run -a pnpm run smoke:agent-browser
+
+  desktop-smoke:
+    runs-on: ubuntu-latest
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - run: pnpm run build
+      - run: pnpm run pack
+      - name: Desktop unpacked health smoke
+        run: xvfb-run -a pnpm run smoke:desktop
+      - name: Release config after pack
+        run: |
+          pnpm run check:release-config
+          pnpm run release:sbom
+          pnpm run release:checksums

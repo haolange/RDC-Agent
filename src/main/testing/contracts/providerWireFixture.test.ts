@@ -22,8 +22,16 @@ import {
   createProviderOutputRef,
   ProviderStreamProtocolError,
 } from '../../agent-runtime/providers/internal/AssistantStreamBuilder';
-import { parseJsonLines, parseSSE } from '../../agent-runtime/providers/internal/http';
+import {
+  parseJsonLines,
+  parseSSE,
+  ProviderStreamBufferError,
+} from '../../agent-runtime/providers/internal/http';
 import { requestPlanHeaders } from '../../agent-runtime/providers/requestPlanWire';
+import {
+  applyOpenAiCompatibleReasoning,
+  buildOpenAiResponsesReasoning,
+} from '../../agent-runtime/providers/reasoningWire';
 import { __testing as openAICompatibleTesting } from '../../agent-runtime/providers/OpenAICompatibleProvider';
 import { __testing as openAIResponsesTesting } from '../../agent-runtime/providers/OpenAIResponsesProvider';
 import { __testing as anthropicTesting } from '../../agent-runtime/providers/AnthropicProvider';
@@ -437,5 +445,177 @@ describe('providerWireFixture fail-closed stream invariants', () => {
     expect(() => builder.appendText(ref, 'early')).toThrowError(expect.objectContaining({
       code: 'PROVIDER_STREAM_DELTA_BEFORE_START',
     }) as ProviderStreamProtocolError);
+  });
+
+  it('aborts mid-stream and discards late EventStream output', async () => {
+    const raw = new EventStream<string, string>();
+    raw.push('early');
+    raw.abort();
+    raw.push('late-after-abort');
+    expect(raw.signal.aborted).toBe(true);
+    const seen: string[] = [];
+    await expect(async () => {
+      for await (const event of raw) {
+        seen.push(event);
+      }
+    }).rejects.toMatchObject({ name: 'AbortError' });
+    expect(seen).toEqual(['early']);
+
+    const builder = makeBuilder();
+    const textRef = createProviderOutputRef({
+      protocol: 'fixture',
+      providerBlockKey: 'text:abort',
+      sourceIndex: 0,
+      contentIndex: 0,
+    });
+    builder.startText(textRef);
+    builder.appendText(textRef, 'partial');
+    const abortErr = new Error('fixture abort');
+    abortErr.name = 'AbortError';
+    builder.fail(abortErr, 'aborted');
+    expect(() => builder.appendText(textRef, 'late')).toThrowError(expect.objectContaining({
+      code: 'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
+    }) as ProviderStreamProtocolError);
+  });
+
+  it('fail-closes oversized / truncated SSE buffers', async () => {
+    const oversized = `data: ${'{"x":"'.padEnd(64, 'a')}\n`;
+    const response = new Response(oversized, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+    await expect(async () => {
+      for await (const _ of parseSSE(response, undefined, {
+        providerApi: 'openai-compatible',
+        maxBufferBytes: 16,
+      })) {
+        // consume
+      }
+    }).rejects.toBeInstanceOf(ProviderStreamBufferError);
+
+    const truncated = readFileSync(
+      path.join(FIXTURE_ROOT, 'openai-compatible', 'stream-truncated.sse'),
+      'utf8',
+    );
+    const truncatedResponse = new Response(truncated, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+    const payloads: string[] = [];
+    for await (const data of parseSSE(truncatedResponse, undefined, {
+      providerApi: 'openai-compatible',
+    })) {
+      payloads.push(data);
+    }
+    // Consumers must fail-closed: only well-formed JSON objects are accepted.
+    const parsed = parseJsonObjects(payloads);
+    expect(parsed.length).toBeGreaterThan(0);
+    expect(JSON.stringify(parsed)).toMatch(/"content":"ok"/);
+    expect(JSON.stringify(parsed)).not.toMatch(/incomplete/);
+
+    const builder = makeBuilder();
+    const badRef = createProviderOutputRef({
+      protocol: 'fixture',
+      providerBlockKey: 'tool:malformed',
+      sourceIndex: 3,
+      contentIndex: 3,
+    });
+    expect(() => builder.appendToolCallArgs(badRef, '{"path":')).toThrowError(
+      expect.objectContaining({ code: 'PROVIDER_STREAM_DELTA_BEFORE_START' }) as ProviderStreamProtocolError,
+    );
+  });
+
+  it('maps reasoning wire when selection is present', () => {
+    const openAiResponses = buildOpenAiResponsesReasoning({
+      selection: 'high',
+      control: {
+        kind: 'levels',
+        supportsOff: true,
+        levels: ['low', 'medium', 'high'],
+        defaultSelection: 'medium',
+        wireProfile: {
+          kind: 'openai-responses',
+          on: 'medium',
+          levels: { low: 'low', medium: 'medium', high: 'high' },
+        },
+      },
+    });
+    expect(openAiResponses.reasoning).toMatchObject({ effort: 'high' });
+
+    const body: Record<string, unknown> = { model: 'fixture-chat', stream: true };
+    applyOpenAiCompatibleReasoning(body, {
+      selection: 'medium',
+      control: {
+        kind: 'levels',
+        supportsOff: true,
+        levels: ['low', 'medium', 'high'],
+        defaultSelection: 'medium',
+        wireProfile: {
+          kind: 'openai-compatible',
+          on: 'medium',
+          levels: { low: 'low', medium: 'medium', high: 'high' },
+        },
+      },
+    });
+    expect(body.reasoning_effort).toBe('medium');
+
+    const reasoningFixture = readFileSync(
+      path.join(FIXTURE_ROOT, 'openai-compatible', 'stream-reasoning.sse'),
+      'utf8',
+    );
+    expect(reasoningFixture).toMatch(/reasoning_content/);
+    expect(reasoningFixture).not.toMatch(/sk-fixture|Bearer |api[_-]?key/i);
+  });
+
+  it('accepts parallel tool_call refs in one turn', async () => {
+    const stream = new EventStream<AssistantMessageEvent, AssistantMessage>(
+      (event) => event.type === 'done',
+      (event) => (event as Extract<AssistantMessageEvent, { type: 'done' }>).message,
+    );
+    const builder = new AssistantStreamBuilder(stream, 'model', 'provider');
+    builder.start();
+    const toolA = createProviderOutputRef({
+      protocol: 'fixture',
+      providerBlockKey: 'tool:a',
+      sourceIndex: 0,
+      itemId: 'call_a',
+      contentIndex: 0,
+    });
+    const toolB = createProviderOutputRef({
+      protocol: 'fixture',
+      providerBlockKey: 'tool:b',
+      sourceIndex: 1,
+      itemId: 'call_b',
+      contentIndex: 1,
+    });
+    builder.startToolCall(toolA, 'call_a', 'read_file');
+    builder.startToolCall(toolB, 'call_b', 'read_file');
+    builder.appendToolCallArgs(toolA, '{"path":"a.md"}');
+    builder.appendToolCallArgs(toolB, '{"path":"b.md"}');
+    builder.endToolCall(toolA);
+    builder.endToolCall(toolB);
+    builder.done('toolUse');
+
+    const message = await stream.result();
+    const toolCalls = message.content.filter((block) => block.type === 'toolCall');
+    expect(toolCalls).toHaveLength(2);
+    expect(toolCalls.map((block) => (block.type === 'toolCall' ? block.id : ''))).toEqual([
+      'call_a',
+      'call_b',
+    ]);
+  });
+
+  it('keeps RequestPlan wire headers free of fixture secrets across adapters', () => {
+    const secretPattern = /sk-fixture|fixture-api-key|fixture-goog-key|session=fixture/i;
+    for (const spec of ADAPTER_FIXTURES) {
+      const plan = buildPlan(spec);
+      const safeHeaders = requestPlanHeaders(plan);
+      expect(JSON.stringify(safeHeaders)).not.toMatch(secretPattern);
+      expect(Object.keys(safeHeaders)).not.toEqual(
+        expect.arrayContaining(['authorization', 'x-api-key', 'x-goog-api-key', 'cookie']),
+      );
+      const streamRaw = readFileSync(path.join(fixtureDir(spec), spec.streamFile), 'utf8');
+      expect(streamRaw).not.toMatch(secretPattern);
+    }
   });
 });
