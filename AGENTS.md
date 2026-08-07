@@ -67,7 +67,7 @@
 
 失败语义三分类见 `docs/contracts/failure-model.md`（Security fail-closed / Integrity degrade-safe / Availability recoverable）。多 skill 工具面：`allowedTools = ∩(skill_i) ∩ runtimeAllowlist`。
 
-Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`（security / concurrency / cancellation / storageFault / providerWireFixture）。覆盖率阈值门禁：`pnpm run test:coverage`。Orchestrator 行数契约：`pnpm run check:orchestrator-facade`（`check:architecture` 依赖链已接入）。
+Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`（security / concurrency / cancellation / storageFault / providerWireFixture / faultInjection）。覆盖率：`pnpm run test:coverage` + `pnpm run check:coverage-ratchet`。Orchestrator 行数契约：`pnpm run check:orchestrator-facade`（`check:architecture` 依赖链已接入）。
 
 ## UI / UX 约束
 
@@ -157,7 +157,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 ---
 
 - **[MANUAL]** 开始实现前先写明本次验证方式；实现后按该方式验证并报告结果。无法运行的验证，必须说明原因和剩余风险。
-- **[AUTO]** `pnpm run test:coverage` 门禁覆盖 node unit surface（`vitest.config.ts` exclude 后的 main/shared；lines/functions ≥75、branches ≥63）；集成面走 `check:contracts` + 浏览器真实会话；renderer 走 browser QA 与 `check:*`。
+- **[AUTO]** `pnpm run test:coverage` 覆盖 node unit surface（`vitest.config.ts` 仅排除 Electron/OS 强绑定 glue；核心 runtime 计入覆盖率）；初始阈值 floor 见 `vitest.config.ts` thresholds，实测只升不降门禁见 `scripts/fidelity/coverage-ratchet.json` + `pnpm run check:coverage-ratchet`（当前基线约 lines 65 / functions 68 / branches 53）。集成面走 `check:contracts` + 浏览器真实会话；renderer 走 browser QA 与 `check:*`。
 - **[AUTO]** 代码改动后执行 `pnpm run typecheck` 与 `pnpm run lint`（`no-unused-vars` / `exhaustive-deps` 为 error）。
 - **[AUTO]** 依赖、入口、构建、发布配置或仓库目录治理改动后执行 `pnpm run check:repository-hygiene`。
 - **[AUTO]** renderer 结构或 UI 锚点改动后执行 `pnpm run check:architecture`（含 Orchestrator façade &lt;800 与 `src/main` 单文件 ≤900）、`pnpm run check:fidelity`、`pnpm run check:shared-exports`。

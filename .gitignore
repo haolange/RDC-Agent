@@ -3,6 +3,8 @@ node_modules/
 out/
 dist/
 release/
+!scripts/release/
+!scripts/release/**
 .eslintcache
 .vite/
 .electron-vite/

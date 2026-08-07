@@ -12,6 +12,7 @@
     "resources/agent-runtime/**/*",
     "resources/knowledge/**/*"
   ],
+  "forceCodeSigning": false,
   "win": {
     "executableName": "RdcAgent",
     "target": [
@@ -21,7 +22,8 @@
       }
     ],
     "icon": "resources/icons/icon.ico",
-    "artifactName": "${productName}-${version}-${arch}-setup.${ext}"
+    "artifactName": "${productName}-${version}-${arch}-setup.${ext}",
+    "signAndEditExecutable": true
   },
   "nsis": {
     "oneClick": false,
@@ -31,6 +33,8 @@
   },
   "mac": {
     "hardenedRuntime": true,
+    "gatekeeperAssess": false,
+    "notarize": false,
     "target": [
       {
         "target": "dmg",
