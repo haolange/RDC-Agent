@@ -5,9 +5,9 @@ Browser 与桌面 Electron 共用同一套 renderer、`ElectronAPI` 产品接口
 | 路径 | Transport | 鉴权 |
 | --- | --- | --- |
 | Desktop | `preload` → `ipcRenderer` → `ipcMain` | 进程内信任边界 |
-| Browser | `BrowserAppBridge` → localhost HTTP/SSE → IPC handler registry | One-time `/qa` bootstrap or dev-renderer challenge → HttpOnly `rdcBridgeToken` cookie; explicit Bearer for programmatic clients |
+| Browser | `BrowserAppBridge` → localhost HTTP/SSE → IPC handler registry | One-time `/qa` bootstrap → HttpOnly `rdcBridgeToken` cookie（同源 `/app`）；explicit Bearer for programmatic clients |
 
-Authoritative entry: the launcher logs one-time `GET /qa?qaBootstrap=...`; consume it once to mint the bridge cookie, then redirect to clean `/app`. Only `RDC_AGENT_BROWSER_QA=1` starts this surface; missing, repeated, or invalid bootstrap returns 401. JSON bodies are capped at 1 MiB.
+Authoritative entry: the launcher logs one-time `GET /qa?qaBootstrap=...`; consume it once to mint the bridge cookie, then redirect to clean `/app` **on the same bridge origin**. In `browser-dev`, Vite is reverse-proxied through the bridge（含 HMR WebSocket）；浏览器不得直接打开 Vite 端口，也不再经跨端口 challenge / `rdcBridgeOrigin` query。Only `RDC_AGENT_BROWSER_QA=1` starts this surface; missing, repeated, or invalid bootstrap returns 401. JSON bodies are capped at 1 MiB.
 
 ## 单轨接口
 

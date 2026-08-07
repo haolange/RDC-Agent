@@ -88,8 +88,8 @@ export function tokensMatch(expected: string, provided: string | null): boolean 
 }
 
 export function resolveBridgeAllowedOrigins(bridgeOrigin: string, _devRendererUrl: string | null = null): Set<string> {
-  // Cookie sessions are same-origin to the bridge. Dev renderer must handshake
-  // and use Bearer; it is no longer an Origin allowlist peer for cookie auth.
+  // Cookie sessions and the renderer are same-origin to the bridge.
+  // Vite is reverse-proxied and never appears as a peer Origin.
   return new Set<string>([bridgeOrigin]);
 }
 

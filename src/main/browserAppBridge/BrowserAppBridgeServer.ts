@@ -16,6 +16,11 @@ import {
   resolveBridgeCookieToken,
   tokensMatch,
 } from './bridgeSecurity';
+import {
+  attachDevRendererWebSocketProxy,
+  proxyHttpToDevRenderer,
+  shouldProxyToDevRenderer,
+} from './devRendererProxy';
 import { EFFECTIVE_CATALOG_SCHEMA_VERSION } from '../settings/effectiveCatalogTypes';
 import {
   MODELS_DEV_IDENTITY_COUNT,
@@ -59,9 +64,8 @@ let server: Server | null = null;
 let bridgeUrl: string | null = null;
 let bridgeToken: string | null = null;
 let qaBootstrapToken: string | null = null;
-let devRendererChallenge: string | null = null;
+let activeDevRendererUrl: string | null = null;
 let allowedOrigins = new Set<string>();
-let trustedDevRendererOrigins = new Set<string>();
 let healthMetadata: BrowserHealthMetadata | null = null;
 
 const MAX_JSON_BODY_BYTES = 1 * 1024 * 1024;
@@ -146,7 +150,6 @@ function requireBridgeAuth(
   if (cookieToken && tokensMatch(bridgeToken, cookieToken)) {
     if (options.requireCookieOrigin) {
       const origin = typeof request.headers.origin === 'string' ? request.headers.origin : undefined;
-      // Cookie-authenticated API calls require an exact bridge Origin.
       if (!isOriginAllowed(origin, allowedOrigins, { authViaCookie: true, bridgeOrigin })) {
         return { ok: false, authViaCookie: true };
       }
@@ -219,24 +222,6 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
   return text ? JSON.parse(text) : {};
 }
 
-function redirectToDevRenderer(
-  response: ServerResponse,
-  rendererUrl: string,
-  bridgeOrigin: string,
-  challenge?: string,
-): void {
-  const target = new URL(rendererUrl);
-  target.searchParams.set('rdcBridgeOrigin', bridgeOrigin);
-  target.searchParams.delete('rdcBridgeToken');
-  if (challenge) target.searchParams.set('rdcBridgeChallenge', challenge);
-  else target.searchParams.delete('rdcBridgeChallenge');
-  response.writeHead(302, {
-    Location: target.toString(),
-    'Cache-Control': 'no-store',
-  });
-  response.end();
-}
-
 function serveStatic(response: ServerResponse, rendererRoot: string, requestPath: string): void {
   const relativePath = requestPath === '/app' || requestPath === '/app/'
     ? 'index.html'
@@ -260,7 +245,6 @@ function serveStatic(response: ServerResponse, rendererRoot: string, requestPath
     'Cache-Control': 'no-store',
     'Content-Type': contentTypes[extname(filePath)] ?? 'application/octet-stream',
   };
-  // Defense-in-depth for browser/headless /app: match Electron production CSP.
   if (extname(filePath) === '.html') {
     headers['Content-Security-Policy'] = [
       "default-src 'self'",
@@ -295,18 +279,13 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
     return;
   }
 
-  const devRendererOrigin = options.devRendererUrl
-    ? new URL(options.devRendererUrl).origin
-    : null;
-  const isDevHandshake = url.pathname === '/dev-renderer/handshake' && request.method === 'POST';
+  // Same-origin only: reject foreign Origins (no cross-port Vite peer).
   if (
     requestOrigin
     && requestOrigin !== bridgeOrigin
-    && !trustedDevRendererOrigins.has(requestOrigin)
-    && !isDevHandshake
     && request.method !== 'OPTIONS'
   ) {
-    sendJson(response, 403, { success: false, error: 'Dev renderer handshake required' }, requestOrigin);
+    sendJson(response, 403, { success: false, error: 'Origin not allowed' }, requestOrigin);
     return;
   }
 
@@ -317,9 +296,6 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
     return;
   }
 
-  // Short QA entry: a one-time out-of-band bootstrap is required before the
-  // bearer cookie is minted. A local process can no longer mint a QA session
-  // by blindly requesting /qa.
   if (url.pathname === '/qa' && (request.method === 'GET' || request.method === 'HEAD')) {
     const suppliedBootstrap = url.searchParams.get('qaBootstrap');
     if (!bridgeToken || !qaBootstrapToken || !tokensMatch(qaBootstrapToken, suppliedBootstrap)) {
@@ -331,31 +307,9 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
     return;
   }
 
-  if (isDevHandshake) {
-    if (!devRendererOrigin || requestOrigin !== devRendererOrigin || !devRendererChallenge) {
-      sendJson(response, 401, { success: false, error: 'Dev renderer handshake is unavailable' }, requestOrigin);
-      return;
-    }
-    const body = await readJsonBody(request) as { challenge?: unknown };
-    if (typeof body.challenge !== 'string' || !tokensMatch(devRendererChallenge, body.challenge)) {
-      sendJson(response, 401, { success: false, error: 'Invalid dev renderer handshake challenge' }, requestOrigin);
-      return;
-    }
-    devRendererChallenge = null;
-    trustedDevRendererOrigins.add(devRendererOrigin);
-    if (bridgeToken) {
-      response.setHeader('Set-Cookie', buildBridgeAuthCookie(bridgeToken, { secure: bridgeOrigin.startsWith('https:') }));
-    }
-    sendJson(response, 200, { success: true }, requestOrigin);
-    return;
-  }
-
-  // Every non-preflight bridge surface requires the per-run bearer token.
-  // /app without auth previously redirected with the token in Location (leak).
   const isPublicAsset = !options.devRendererUrl
     && (url.pathname.startsWith('/assets/') || url.pathname === '/favicon.ico');
   if (!isPublicAsset && !requireBridgeAuth(request, bridgeOrigin, {
-    // Document navigations omit Origin; cookie Origin is enforced on API surfaces.
     requireCookieOrigin: url.pathname === '/invoke' || url.pathname.startsWith('/api/'),
   }).ok) {
     sendJson(response, 401, { success: false, error: 'Unauthorized' }, requestOrigin);
@@ -377,6 +331,7 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
       productName: 'RDC-Agent',
       mode: 'browser-app-session',
       bridgeUrl,
+      sameOriginDevProxy: Boolean(options.devRendererUrl),
       renderer,
       ...healthMetadata,
     }, requestOrigin);
@@ -417,29 +372,31 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
     return;
   }
 
-  if (url.pathname === '/app' || url.pathname.startsWith('/app/')) {
-    if (options.devRendererUrl) {
-      const renderer = await checkDevRenderer(options.devRendererUrl);
-      if (!renderer.ok) {
-        sendJson(response, 503, {
-          success: false,
-          error: 'Dev renderer is not reachable',
-          renderer,
-        }, requestOrigin);
-        return;
-      }
-      const origin = new URL(options.devRendererUrl).origin;
-      if (origin !== bridgeOrigin && !trustedDevRendererOrigins.has(origin) && !devRendererChallenge) {
-        devRendererChallenge = createBridgeBearerToken();
-      }
-      redirectToDevRenderer(response, options.devRendererUrl, bridgeOrigin, devRendererChallenge ?? undefined);
+  if (shouldProxyToDevRenderer(url.pathname, options.devRendererUrl)) {
+    const renderer = await checkDevRenderer(options.devRendererUrl!);
+    if (!renderer.ok) {
+      sendJson(response, 503, {
+        success: false,
+        error: 'Dev renderer is not reachable',
+        renderer,
+      }, requestOrigin);
       return;
     }
+    proxyHttpToDevRenderer(request, response, {
+      bridgeOrigin,
+      devRendererUrl: options.devRendererUrl!,
+      pathname: url.pathname,
+      search: url.search,
+    });
+    return;
+  }
+
+  if (url.pathname === '/app' || url.pathname.startsWith('/app/')) {
     serveStatic(response, options.rendererRoot, url.pathname);
     return;
   }
 
-  if (!options.devRendererUrl && (url.pathname.startsWith('/assets/') || url.pathname === '/favicon.ico')) {
+  if (url.pathname.startsWith('/assets/') || url.pathname === '/favicon.ico') {
     serveStatic(response, options.rendererRoot, url.pathname);
     return;
   }
@@ -448,7 +405,6 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
 }
 
 export function shouldStartBrowserAppBridge(): boolean {
-  // Desktop must never start the bridge. Browser QA is an explicit opt-in.
   return process.env.RDC_AGENT_BROWSER_QA === '1';
 }
 
@@ -465,6 +421,7 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
   healthMetadata = resolveHealthMetadata(options);
   bridgeToken = createBridgeBearerToken();
   qaBootstrapToken = process.env.RDC_AGENT_BROWSER_QA_BOOTSTRAP?.trim() || createBridgeBearerToken();
+  activeDevRendererUrl = options.devRendererUrl;
 
   server = createServer((request, response) => {
     void handleRequest(options, request, response).catch((error) => {
@@ -475,6 +432,7 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
       }, requestOrigin);
     });
   });
+  attachDevRendererWebSocketProxy(server, () => activeDevRendererUrl);
 
   await new Promise<void>((resolveListen, rejectListen) => {
     const activeServer = server;
@@ -501,8 +459,6 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
   const port = typeof address === 'object' && address ? address.port : preferredPort;
   bridgeUrl = `http://127.0.0.1:${port}`;
   allowedOrigins = resolveBridgeAllowedOrigins(bridgeUrl, options.devRendererUrl);
-  trustedDevRendererOrigins = new Set([bridgeUrl]);
-  devRendererChallenge = options.devRendererUrl ? createBridgeBearerToken() : null;
   (globalThis as typeof globalThis & {
     __RDC_AGENT_BROWSER_BRIDGE_URL__?: string;
   }).__RDC_AGENT_BROWSER_BRIDGE_URL__ = bridgeUrl;
@@ -513,6 +469,9 @@ export async function startBrowserAppBridge(options: BridgeOptions): Promise<str
   }
   const qaUrl = `${bridgeUrl}/qa?qaBootstrap=${encodeURIComponent(bootstrap)}`;
   console.log(`[BrowserAppBridge] Browser app session: ${qaUrl}`);
+  if (options.devRendererUrl) {
+    console.log(`[BrowserAppBridge] Same-origin dev proxy → ${options.devRendererUrl}`);
+  }
   return bridgeUrl;
 }
 
@@ -522,9 +481,8 @@ export async function stopBrowserAppBridge(): Promise<void> {
   bridgeUrl = null;
   bridgeToken = null;
   qaBootstrapToken = null;
-  devRendererChallenge = null;
+  activeDevRendererUrl = null;
   allowedOrigins = new Set();
-  trustedDevRendererOrigins = new Set();
   healthMetadata = null;
   delete (globalThis as typeof globalThis & { __RDC_AGENT_BROWSER_BRIDGE_URL__?: string }).__RDC_AGENT_BROWSER_BRIDGE_URL__;
   if (!activeServer) {
