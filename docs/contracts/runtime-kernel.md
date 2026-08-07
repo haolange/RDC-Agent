@@ -23,11 +23,11 @@ Work Process 的工具摘要只由 runtime tool result 计算 `succeeded / faile
 | 模块 | 职责 |
 | --- | --- |
 | `EffectiveRuntimePlan` | `schemaVersion: 2`；one exact User/Project profile snapshot (provenance, skills, handoffs, enabled ids), tools/skill intersection, deferred/MCP lease, permission/policy/route/request+prompt fingerprints；Prompt and Executor share it |
-| `AgentOrchestrator` | façade（少于 800 行）；turn 准备 / tool 装配 / executor / runner 职责外提；门禁 `check:orchestrator-facade` |
-| `TurnCoordinator` / `TurnHandle` | 每 session 活跃 turn；eventSink、deferred、producers、generation |
+| `AgentOrchestrator` | façade（少于 800 行）；`ProfileTurnPreparation` 为 sendMessage/sendProfileMessage/subagent 唯一 prepare 入口；无 `preparedRuntime` → `TURN_NOT_PREPARED` |
+| `TurnCoordinator` / `TurnHandle` | Session ownership Active→Aborting→Orphaned→Settled；Orphaned 时 `beginTurn` → `TURN_ORPHANED`；`abortAndJoin` 等 stream + producerCompletion；late producer join |
 | `ProcessSupervisor` | spawn/joinAll；POSIX pgid；Windows `taskkill /T`；close-observed registry；timeout yields `unconfirmed_orphan` |
 | `ShutdownCoordinator` | `running → … → exited`；before-quit 限时 `shutdownAll` |
-| `AgentSlotRegistry` / `McpConnectionCoordinator` / `DeferredToolActivationTracker` / `TurnHandle.pendingHandoff` | Per-session/per-project ownership units; orphaned slots stay quarantined until their provider/tool promise settles; no global mailbox or cross-scope handoff state |
+| `AgentSlotRegistry` / `McpConnectionCoordinator` / `DeferredToolActivationTracker` / `TurnHandle.pendingHandoff` | Per-session/per-project ownership；AgentState 键 `scope::agentId`；MCP pool `realpath+projectId+descriptorHash`；orphan pool quarantine；transport 仅 stdio/streamable-http（sse fail-closed） |
 | `RdxRuntimeContextRegistry` | 仅 per-session RDX context lease；无 global mirror |
 | `LoopRuntimeState` | Agent 工具面 COW；每轮读 `runtime.current` |
 | `LoopProgressGuard` | 检测相同工具轮次无进展；第二轮纠偏、第三轮 typed termination；runtime revision 变化即复位 |

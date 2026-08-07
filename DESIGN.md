@@ -22,7 +22,7 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 4. **Scope 固定**：用户资源 `~/.rdx`，项目资源 `<project-root>/.rdx`；无配置 workspace root、无旧目录 fallback、无静默迁移。
 5. **Provider 事实分层**：Manifest 是**基线真值**（baseline truth），Discovery 是**候选验证**（candidate validation），用户覆盖（`models.json`）是**显式覆盖，自带 provenance**（explicit override with provenance），三者合并为 EffectiveCatalog。模型/协议/控件基线事实只在 `src/shared/provider-catalog/manifests` 的严格 JSON；TS 只实现 Schema、compiler、Registry、Resolver、Planner、adapter、auth、discovery 与 user-override。用户覆盖禁止触及 route.protocol、authSchemaId、adapterId、compatibilityGroup、carrier 等安全/延续性字段。
    `catalogRevision` 只冻结 Effective Catalog 的可执行/可选择语义；刷新仅更新 provenance 时间戳时 revision 必须稳定，route、control、availability、quota 等有效语义变化时才更新。
-6. **可取消与可回收**：Turn 经 `TurnCoordinator`；子进程经 `ProcessSupervisor`；应用退出经 `ShutdownCoordinator`；abort 必须 join，迟到 event 按 generation 丢弃。Conversation Stop 相位语义：`preparing` 干净撤销（不留 journal/lease/optimistic 残渣）；`committing`/`running` 单调落停（禁止 UI 回跳 `streaming` / 发送前态）。Renderer 对 monotonic-stopped turn/request 丢弃迟到 `draft|streaming` patch，与 main generation 守卫对齐。流式 `conversation:event` 在 renderer 按帧合并；trace 投影流式期节流。 ProcessSupervisor 超时未观察到 close 时标记 unconfirmed_orphan 并保留 registry，禁止伪造已退出。
+6. **可取消与可回收**：Turn 经 `TurnCoordinator`（Session ownership：Active → Aborting → Orphaned → Settled；Orphaned 时 `beginTurn` fail-closed `TURN_ORPHANED`；`abortAndJoin` 等 stream terminal **与** producerCompletion）。子进程经 `ProcessSupervisor`；应用退出经 `ShutdownCoordinator`；迟到 event 按 generation 丢弃。无 durable session 的 turn/slot 使用 ephemeral scope id（禁止 `__anon__` / `__no_session__`）。Conversation Stop 相位语义：`preparing` 干净撤销；`committing`/`running` 单调落停。Renderer 对 monotonic-stopped turn/request 丢弃迟到 `draft|streaming` patch。ProcessSupervisor 超时未观察到 close 时标记 `unconfirmed_orphan` 并保留 registry，禁止伪造已退出。
 7. **失败有分类**：安全类 fail-closed；完整性 degrade-safe；可用性 recoverable。分类权威见 `docs/contracts/failure-model.md`。
 8. **无 legacy 双轨**：新结构替代旧结构时直接收敛；默认不保留兼容 shim。
 
@@ -61,7 +61,12 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 - **MCP project**：同 ID 不可覆盖 user 的 command/args/url/env；变更需 `needsRetrust` + 显式 trust；运行时连接按 `projectRoot + descriptorHash` 建立独立 ref-counted pool，handoff 只属于当前 Turn terminal result。
 - **RDX**：无内置 CLI 副本；Open `.rdc` 等垂直入口只走 Settings 配置的 shell action。
 - **Capture 所有权**：`ownerSessionId` 不匹配则 fail-closed；不得跨 session 继承已打开 capture。
-- **Orchestrator façade**：`AgentOrchestrator.ts` 保持 façade（**少于 800 行**）；turn 准备、tool 装配、executor、turn/subagent runner、prompt-plan 等职责外提到协作单元；门禁 `pnpm run check:orchestrator-facade`（亦挂在 `check:architecture`）。
+- **唯一 Turn Preparation**：`sendMessage` / `sendProfileMessage` / Subagent 经 `ProfileTurnPreparation`（或 conversation `prepareTurn`）冻结 `preparedRuntime`；`AgentTurnRunner` 无 preparedRuntime 抛 `TURN_NOT_PREPARED`，禁止 fallback plan。
+- **AgentState 复合键**：`sessionId|ephemeralScope` + `agentId`；renderer `agentStore` 与 IPC bridge 无 sessionId 的事件丢弃。
+- **存储 fail-closed**：`StorageIo.readJson` 区分 ENOENT(null) 与损坏（quarantine + throw）；写入走 atomic rename；`deepMerge` 拒绝 `__proto__`/`constructor`。
+- **MCP transport**：仅 `stdio` / `streamable-http`；`sse` 配置 fail-closed（`MCP_TRANSPORT_UNSUPPORTED`）。Pool identity：`realpath + projectId + descriptorHash`；失败缓存指数退避；orphan pool quarantine。
+- **ToolValidator**：严格 JSON Schema 子集；默认拒绝未声明字段；不支持关键字编译期 fail-closed。
+- **Orchestrator façade**：`AgentOrchestrator.ts` 保持 façade（**少于 800 行**）；turn 准备、tool 装配、executor、turn/subagent runner、prompt-plan、memory UI 等职责外提到协作单元；门禁 `pnpm run check:orchestrator-facade`（亦挂在 `check:architecture`）。
 - **CSP**：生产 `script-src` 无 `unsafe-inline`；`style-src 'self'`（无 `unsafe-inline`）；`style-src-attr 'none'`；动态样式经 constructable stylesheet（`useDynStyle` / `assignDynStyle` / Appearance `applyChromeTheme`），禁止依赖 inline style attributes 或 `<style>` textContent 注入。Appearance chrome 权威见 [`docs/ui/design-system.md`](docs/ui/design-system.md)；`chromeThemes` 由 Settings `schemaVersion` **6** 起在升级时硬重置为 RDC 默认（不可逆，清历史污染）。
 - **IPC Zod**：全部 IPC handler 经 `parseIpcArgs`；非法 payload fail-closed；`approvalToken` 单次消费。
 - **RDX context lease**：仅 per-session lease（`setRdxRuntimeContextForSession` / `getRdxContextLease` / `assertRdxContextLeaseOwnership`）；**禁止** RDX global mirror、`legacyGlobalMirror`、`getRdxRuntimeContext` 全局 API。
@@ -101,7 +106,7 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 
 **宣称完成必须以门禁与浏览器证据为准**，不得仅靠 commit message。
 
-本地 / CI（`.github/workflows/ci.yml` `build` job）必跑：`check:repository-hygiene` → `typecheck` → `lint` → `test` → `test:coverage`（unit surface：lines/functions ≥75、branches ≥63；集成面走 contracts + browser QA）→ `check:architecture`（含 Orchestrator &lt;800 与 main 单文件 ≤900）→ `check:fidelity` / `check:shared-exports` / `check:work-process*` / `check:conversation-branch` / `check:reasoning-delivery` / `check:agent-runtime` / `check:tool-system` / `check:appearance` / `check:settings-agents` / `check:provider-system` / `check:provider-catalog` / `check:scoped-resources` / `check:project-instructions` / `check:prompt-plan-snapshot` / `check:skills` / `check:hooks` / `check:memory-policy` / `check:contracts` → `build`。三 OS `pack` 仍为必绿并行 job。
+本地 / CI（`.github/workflows/ci.yml`）必跑：`check:repository-hygiene` → `typecheck` → `lint` → `test` → `test:coverage` → `check:coverage-ratchet`（只升不降；基线 `scripts/fidelity/coverage-ratchet.json`）→ `check:architecture`（含 Orchestrator &lt;800 与 main 单文件 ≤900）→ 全套关键 `check:*`（含 `check:browser-capability` / `check:release-config`）→ `check:contracts` → `build`。并行：`browser-smoke`（xvfb + smoke:agent-browser 双 FULL_ACCESS 矩阵）、`desktop-smoke`、三 OS `launcher-fresh-checkout`/`pack`（Linux 上 SBOM/checksum）。
 
 UI/工作流用 `pnpm run start:agent-browser` 真实会话验收（先停旧进程、删光 QA project 全部 session、再新建隔离 session）。完整清单见 `AGENTS.md`。
 
