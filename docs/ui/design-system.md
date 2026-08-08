@@ -60,6 +60,16 @@
 3. 不使用内联 `style={{}}`，动态值（宽度百分比、JS 计算值）例外。
 4. 文件行数不超过 300 行（组件）/ 200 行（hook / service）。
 
+## 空态插画（Right Rail Empty Visuals）
+
+Session 右侧栏四张卡（Progress / Outputs / Context / Capture）的空态使用统一的**等距 3D 磨砂玻璃插画**语言，实现在 `src/renderer/features/debugger/ControlPanel/RightRailEmptyVisuals.tsx`，样式在 `RightRail.css`：
+
+- 构图：等距投影几何体（顶面高亮、左右侧面半透明渐变互透）+ 底部 `feGaussianBlur` 弥散地面投影 + 顶部边缘 1px 白色高光；无动画，天然兼容 `prefers-reduced-motion`。
+- 色彩：插画是图形资产而非 UI 语义色载体。渐变 stop 只允许引用既有 primitive 色谱（`--color-primary-*` / `--color-accent-*` / `--color-success` / `--color-warning` / `--color-purple` / `--color-pink` 及其 `color-mix` 淡化），通过 `.rr-eg-{tone}-hi/lo` 类经 CSS 注入 `stop-color` / `stop-opacity`（presentation attribute，CSP 合规），随 chrome light/dark 与预设自动适配；**禁止**在 SVG 属性或 CSS 中写死 hex 色值。白色高光与黑/墨阴影是玻璃技法固有中性色，透明度由 `.right-rail-empty-visual` 上的 `--rr-eg-*-op` 变量按主题分支调制。
+- 上述状态色/彩虹 primitive 在插画内的装饰性使用是本小节的显式例外，不违反「状态色只用于语义状态」；例外范围仅限 `.right-rail-empty-visual` 内部，不得扩散到其它组件。
+- 语义：Progress=上升台阶（蓝→青→绿→琥珀，最高块带进行中光点）；Outputs=虚线收集框+悬浮玻璃文件；Context=异色玻璃节点发光连线网；Capture=玻璃 capture 卡+播放徽标+REC 点。文案保持一句 honest copy，图形不承载文字。
+- gradient/filter 的 `id` 必须带场景前缀（`rr-eg-<scene>-*`），保证四卡同屏唯一；不引入 svgr/图片资产双轨。
+
 ## 窄屏 Workbench
 
 - `<=720px` 时桌面工作区最小宽度必须解除，主区与 Composer 以真实 viewport 收缩，不得用 `overflow: hidden` 掩盖被裁掉的桌面宽度。
