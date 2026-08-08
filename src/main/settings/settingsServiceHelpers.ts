@@ -105,6 +105,20 @@ export function readJsonFile<T>(filePath: string): T | null {
   }
 }
 
+/** Async counterpart of `readJsonFile` for event-loop-friendly reads. */
+export async function readJsonFileAsync<T>(filePath: string): Promise<T | null> {
+  try {
+    const raw = await fs.promises.readFile(filePath, 'utf8');
+    return JSON.parse(raw) as T;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException | undefined)?.code;
+    if (code !== 'ENOENT') {
+      console.warn('[SettingsService] Failed to read JSON:', filePath, error);
+    }
+    return null;
+  }
+}
+
 export function createDefaultRuntimeSettings(): AppSettings {
   const resourceCatalog = executionProfileService.normalizeResourceCatalog({
     availableSkills: [],

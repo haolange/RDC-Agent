@@ -105,11 +105,9 @@ export function useWorkbenchLayout() {
     observer.observe(node);
     syncAppBodyWidth();
     window.addEventListener('resize', syncAppBodyWidth);
-    const intervalId = window.setInterval(syncAppBodyWidth, 160);
     return () => {
       observer.disconnect();
       window.removeEventListener('resize', syncAppBodyWidth);
-      window.clearInterval(intervalId);
     };
   }, []);
 

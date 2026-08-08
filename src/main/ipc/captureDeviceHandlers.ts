@@ -214,4 +214,19 @@ export function registerCaptureDeviceHandlers(context: WorkbenchIpcContext): voi
     const [deviceId] = parseIpcArgs(DeviceActivateArgsSchema, rawArgs, { label: 'device:activate', maxBytes: 4 * 1024 });
     return replayDeviceService.activateDevice(deviceId);
   });
+
+  ipcMain.handle('device:watch:start', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'device:watch:start', maxBytes: 1024 });
+    replayDeviceService.startWatch();
+  });
+
+  ipcMain.handle('device:watch:renew', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'device:watch:renew', maxBytes: 1024 });
+    replayDeviceService.renewWatch();
+  });
+
+  ipcMain.handle('device:watch:stop', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, { label: 'device:watch:stop', maxBytes: 1024 });
+    replayDeviceService.stopWatch();
+  });
 }

@@ -62,6 +62,8 @@ const sanitizePathSegment = (value: string): string => value.replace(/[^a-zA-Z0-
 const normalizePath = (targetPath: string): string => path.resolve(targetPath);
 
 export class AppPathService {
+  private runtimeInitMemo: { key: string; paths: RuntimePaths } | null = null;
+
   private getUserDataRoot(): string {
     const appDataRoot = app?.getPath?.('appData') || (process.platform === 'win32'
       ? path.join(os.homedir(), 'AppData', 'Roaming')
@@ -130,6 +132,10 @@ export class AppPathService {
 
   initializeRuntime(): RuntimePaths {
     const paths = this.getRuntimePaths();
+    const memoKey = `${paths.userRdxRoot}\u0000${paths.appStateRoot}`;
+    if (this.runtimeInitMemo?.key === memoKey) {
+      return this.runtimeInitMemo.paths;
+    }
     const directories = [
       paths.userRdxRoot,
       paths.agentsPath,
@@ -151,6 +157,7 @@ export class AppPathService {
       paths.profileStatePath,
     ];
     directories.forEach((directory) => fs.mkdirSync(directory, { recursive: true }));
+    this.runtimeInitMemo = { key: memoKey, paths };
     return paths;
   }
 

@@ -338,6 +338,9 @@ export interface ElectronAPI {
     list: () => Promise<ReplayDeviceEntry[]>;
     refresh: () => Promise<ReplayDeviceEntry[]>;
     activate: (deviceId: string) => Promise<ReplayDeviceEntry>;
+    watchStart: () => Promise<void>;
+    watchRenew: () => Promise<void>;
+    watchStop: () => Promise<void>;
   };
 
   session: {

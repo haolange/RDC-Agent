@@ -93,7 +93,7 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
   variant = 'sidebar',
   collapsed = false,
 }) => {
-  const { devices, selectedDevice, setSelectedDevice, refreshDevices, activateDevice } = useDeviceStore();
+  const { devices, selectedDevice, setSelectedDevice, startDeviceWatch, stopDeviceWatch, activateDevice } = useDeviceStore();
   const [isOpen, setIsOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -132,11 +132,20 @@ export const DeviceSelector: React.FC<DeviceSelectorProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (isOpen) {
+      void startDeviceWatch();
+      return () => {
+        void stopDeviceWatch();
+      };
+    }
+
+    void stopDeviceWatch();
+    return undefined;
+  }, [isOpen, startDeviceWatch, stopDeviceWatch]);
+
   const handleToggleOpen = () => {
     setIsOpen((open) => !open);
-    if (!isOpen) {
-      void refreshDevices();
-    }
   };
 
   const handleSelect = async (device: ReplayDeviceEntry) => {
