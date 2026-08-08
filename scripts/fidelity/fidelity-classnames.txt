@@ -68,7 +68,6 @@ artifact-viewer-header
 artifact-viewer-title
 artifact-viewer-title-icon
 breadcrumb-item
-buddy-pet
 button
 button-danger
 button-ghost

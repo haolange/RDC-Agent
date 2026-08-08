@@ -10,8 +10,13 @@ interface DeviceState {
   applyStatusPayload: (payload: ReplayDeviceStatusChangedPayload) => void;
   loadDevices: () => Promise<void>;
   refreshDevices: () => Promise<void>;
+  startDeviceWatch: () => Promise<void>;
+  stopDeviceWatch: () => Promise<void>;
   activateDevice: (deviceId: string) => Promise<ReplayDeviceEntry | null>;
 }
+
+const DEVICE_WATCH_RENEW_MS = 5000;
+let deviceWatchRenewTimer: ReturnType<typeof setInterval> | null = null;
 
 const LOCAL_DEVICE: ReplayDeviceEntry = {
   id: 'local',
@@ -69,6 +74,35 @@ export const useDeviceStore = create<DeviceState>((set, get) => ({
       set((state) => normalizeDevices(devices ?? state.devices, state.selectedDevice));
     } catch {
       set((state) => normalizeDevices(state.devices, state.selectedDevice));
+    }
+  },
+
+  startDeviceWatch: async () => {
+    try {
+      await window.electronAPI.device.watchStart();
+    } catch {
+      return;
+    }
+
+    if (deviceWatchRenewTimer) {
+      clearInterval(deviceWatchRenewTimer);
+    }
+
+    deviceWatchRenewTimer = setInterval(() => {
+      void window.electronAPI.device.watchRenew().catch(() => undefined);
+    }, DEVICE_WATCH_RENEW_MS);
+  },
+
+  stopDeviceWatch: async () => {
+    if (deviceWatchRenewTimer) {
+      clearInterval(deviceWatchRenewTimer);
+      deviceWatchRenewTimer = null;
+    }
+
+    try {
+      await window.electronAPI.device.watchStop();
+    } catch {
+      // ignore stop failures during teardown
     }
   },
 

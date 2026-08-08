@@ -159,9 +159,22 @@ export function useAppBootstrap(options: {
     const electronAPI = window.electronAPI;
     if (!electronAPI?.events?.onEffectiveCatalogChanged) return undefined;
     // Agents modelOptions are projected only on settings:get; keep them fresh after discovery.
-    return electronAPI.events.onEffectiveCatalogChanged(() => {
-      void useAppSettingsStore.getState().reloadSettings().catch(() => undefined);
+    let debounceTimer: number | undefined;
+    const unsubscribe = electronAPI.events.onEffectiveCatalogChanged(() => {
+      if (debounceTimer !== undefined) {
+        window.clearTimeout(debounceTimer);
+      }
+      debounceTimer = window.setTimeout(() => {
+        debounceTimer = undefined;
+        void useAppSettingsStore.getState().reloadSettings().catch(() => undefined);
+      }, 250);
     });
+    return () => {
+      if (debounceTimer !== undefined) {
+        window.clearTimeout(debounceTimer);
+      }
+      unsubscribe?.();
+    };
   }, []);
 
   useProjectInputsBootstrap(runtimeTestMode);

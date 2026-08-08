@@ -926,4 +926,64 @@ describe('EffectiveCatalogService', () => {
       ),
     ).toBe(false);
   });
+
+  it('backs off automatic refresh after failure and clears backoff on success', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    let nowMs = Date.parse('2026-01-01T00:00:00.000Z');
+    const service = new EffectiveCatalogService({ statePath, now: () => new Date(nowMs), discoveryTtlMs: 1000 });
+    const failingLoader = vi.fn(async () => { throw new Error('offline'); });
+    service.setDiscoveryLoaderResolver(() => failingLoader);
+
+    await service.refreshDiscovery(request(), failingLoader);
+    expect(failingLoader).toHaveBeenCalledTimes(1);
+
+    nowMs += 2000;
+    service.getSnapshot(request());
+    expect(failingLoader).toHaveBeenCalledTimes(1);
+
+    nowMs += 30_000;
+    service.getSnapshot(request());
+    await vi.waitFor(() => expect(failingLoader).toHaveBeenCalledTimes(2));
+
+    const successLoader = vi.fn(async () => ({ models: [{ modelId: 'model-a', label: 'Recovered' }] }));
+    await service.refreshDiscovery(request(), successLoader);
+    expect(successLoader).toHaveBeenCalledTimes(1);
+
+    nowMs += 2000;
+    failingLoader.mockClear();
+    service.setDiscoveryLoaderResolver(() => failingLoader);
+    service.getSnapshot(request());
+    await vi.waitFor(() => expect(failingLoader).toHaveBeenCalledTimes(1));
+  });
+
+  it('explicit refreshDiscovery bypasses failure backoff', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    let nowMs = Date.parse('2026-01-01T00:00:00.000Z');
+    const service = new EffectiveCatalogService({ statePath, now: () => new Date(nowMs), discoveryTtlMs: 1000 });
+    const failingLoader = vi.fn(async () => { throw new Error('offline'); });
+
+    await service.refreshDiscovery(request(), failingLoader);
+    expect(failingLoader).toHaveBeenCalledTimes(1);
+
+    nowMs += 1000;
+    await service.refreshDiscovery(request(), failingLoader);
+    expect(failingLoader).toHaveBeenCalledTimes(2);
+  });
+
+  it('deduplicates emit when snapshot fingerprint is unchanged', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-01-01T00:00:00.000Z') });
+    const listener = vi.fn();
+    service.subscribe(listener);
+    const loader = vi.fn(async () => ({ models: [{ modelId: 'model-a', label: 'Stable' }] }));
+
+    await service.refreshDiscovery(request(), loader);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    await service.refreshDiscovery(request(), loader);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    await service.refreshDiscovery(request(), async () => ({ models: [{ modelId: 'model-a', label: 'Changed' }] }));
+    expect(listener).toHaveBeenCalledTimes(2);
+  });
 });

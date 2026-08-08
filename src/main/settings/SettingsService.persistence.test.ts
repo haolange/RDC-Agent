@@ -587,6 +587,75 @@ describe('SettingsService provider persistence', () => {
     saveSpy.mockRestore();
   });
 
+  it('persistWindowLayout patches only layout.window without touching llm providers', async () => {
+    const { settingsPath } = await createVerifiedPersistedSettings();
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    service.initialize();
+
+    const before = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+      llm: { providers: unknown[] };
+      layout?: { window?: unknown };
+    };
+    const providersBefore = JSON.stringify(before.llm.providers);
+
+    service.persistWindowLayout({
+      width: 1440,
+      height: 900,
+      x: 120,
+      y: 80,
+      isMaximized: false,
+    });
+
+    const after = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+      llm: { providers: unknown[] };
+      layout: { window: { width: number; height: number; x: number; y: number; isMaximized: boolean } };
+    };
+
+    expect(JSON.stringify(after.llm.providers)).toBe(providersBefore);
+    expect(after.layout.window).toEqual({
+      width: 1440,
+      height: 900,
+      x: 120,
+      y: 80,
+      isMaximized: false,
+    });
+  });
+
+  it('persistWindowLayoutAsync patches only layout.window without touching llm providers', async () => {
+    const { settingsPath } = await createVerifiedPersistedSettings();
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    service.initialize();
+
+    const before = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+      llm: { providers: unknown[] };
+    };
+    const providersBefore = JSON.stringify(before.llm.providers);
+
+    await service.persistWindowLayoutAsync({
+      width: 1600,
+      height: 1000,
+      x: 10,
+      y: 20,
+      isMaximized: true,
+    });
+
+    const after = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+      llm: { providers: unknown[] };
+      layout: { window: { width: number; height: number; x: number; y: number; isMaximized: boolean } };
+    };
+
+    expect(JSON.stringify(after.llm.providers)).toBe(providersBefore);
+    expect(after.layout.window).toEqual({
+      width: 1600,
+      height: 1000,
+      x: 10,
+      y: 20,
+      isMaximized: true,
+    });
+  });
+
   it('schema 6 upgrade irreversibly resets chromeThemes to RDC defaults', async () => {
     const { createDefaultChromeThemes } = await import('../../shared/theme/presets');
     const workspaceRoot = path.join(userDataRoot, '.rdx');

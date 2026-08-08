@@ -22,6 +22,7 @@ import type {
   ProviderDefinitionCommitSnapshot,
   ProviderDefinitionSaveRequest,
   ProviderDefinitionSaveResult,
+  WindowLayoutPreference,
 } from '@shared/types/settings';
 import type {
   AgentDefinitionCommitSnapshot,
@@ -72,9 +73,11 @@ import {
   deleteSecretsAfterCommit,
   normalizePersistedSettings,
   readJsonFile,
+  readJsonFileAsync,
   rebuildPersistedSettings,
   toRuntimeSettings,
   writeSettings,
+  writeSettingsAsync,
 } from './settingsServiceHelpers';
 
 export { SETTINGS_SCHEMA_VERSION } from './settingsDefaults';
@@ -188,6 +191,47 @@ export class SettingsService {
       getProviderAccountSecretRef(providerId, provider?.authAccountIds?.account, 'oauth'),
       workspaceRoot,
     );
+  }
+
+  /**
+   * Narrow sync write for window close — patches layout.window only.
+   * Skips provider normalization and secret hydration.
+   */
+  persistWindowLayout(window: WindowLayoutPreference): void {
+    this.ensureInitialized();
+    const paths = appPathService.getRuntimePaths();
+    const current = readJsonFile<PersistedSettingsPayload>(paths.settingsPath);
+    writeSettings(this.assembleWindowLayoutPayload(window, current));
+  }
+
+  /**
+   * Narrow async write for move/resize debounce — patches layout.window only.
+   * Skips provider normalization and secret hydration.
+   */
+  async persistWindowLayoutAsync(window: WindowLayoutPreference): Promise<void> {
+    this.ensureInitialized();
+    const paths = appPathService.getRuntimePaths();
+    const current = await readJsonFileAsync<PersistedSettingsPayload>(paths.settingsPath);
+    await writeSettingsAsync(this.assembleWindowLayoutPayload(window, current));
+  }
+
+  private assembleWindowLayoutPayload(
+    window: WindowLayoutPreference,
+    current: PersistedSettingsPayload | null,
+  ): PersistedSettingsPayload {
+    const base = current ?? createDefaultPersistedSettings();
+    const currentLayout = base.layout ?? {};
+    return {
+      ...base,
+      schemaVersion: base.schemaVersion ?? SETTINGS_SCHEMA_VERSION,
+      layout: {
+        ...currentLayout,
+        leftSidebar: currentLayout.leftSidebar ?? DEFAULT_LAYOUT.leftSidebar,
+        rightPanel: currentLayout.rightPanel ?? DEFAULT_LAYOUT.rightPanel,
+        terminal: currentLayout.terminal ?? DEFAULT_LAYOUT.terminal,
+        window: sanitizeWindow(window, currentLayout.window ?? DEFAULT_LAYOUT.window),
+      },
+    };
   }
 
   setAll(patch: AppSettingsPatch, runtimePaths?: Partial<AppRuntimePaths>): AppSettings {

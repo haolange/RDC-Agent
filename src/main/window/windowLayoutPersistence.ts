@@ -74,26 +74,27 @@ export function resolveWindowCreationOptions(
   };
 }
 
+/** Sync persist for close path — must finish before quit. */
 export function persistWindowLayout(win: BrowserWindow | null): void {
   if (!win || win.isDestroyed()) return;
   try {
-    settingsService.setAll({
-      layout: {
-        window: captureWindowLayout(win),
-      },
-    });
+    settingsService.persistWindowLayout(captureWindowLayout(win));
   } catch (error) {
     console.error('[WindowLayout] Failed to persist window bounds:', error);
   }
 }
 
+/** Debounced async persist for move/resize — narrow window write only. */
 export function schedulePersistWindowLayout(win: BrowserWindow | null): void {
   if (saveTimer) {
     clearTimeout(saveTimer);
   }
   saveTimer = setTimeout(() => {
     saveTimer = null;
-    persistWindowLayout(win);
+    if (!win || win.isDestroyed()) return;
+    void settingsService.persistWindowLayoutAsync(captureWindowLayout(win)).catch((error) => {
+      console.error('[WindowLayout] Failed to persist window bounds:', error);
+    });
   }, SAVE_DEBOUNCE_MS);
 }
 

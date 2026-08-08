@@ -73,6 +73,14 @@ function evidenceKey(providerId: string, accountId: string): string {
   return `${providerId}\u0000${accountId}`;
 }
 
+interface RefreshBackoffState {
+  failCount: number;
+  lastFailedAtMs: number;
+}
+
+const REFRESH_BACKOFF_BASE_MS = 30_000;
+const REFRESH_BACKOFF_MAX_MS = 10 * 60_000;
+
 export class EffectiveCatalogService {
   private readonly statePath: string;
   private readonly now: () => Date;
@@ -81,6 +89,8 @@ export class EffectiveCatalogService {
   private readonly refreshes = new Map<string, Promise<EffectiveCatalogSnapshot>>();
   private readonly listeners = new Set<EffectiveCatalogListener>();
   private readonly lastErrors = new Map<string, string>();
+  private readonly refreshBackoff = new Map<string, RefreshBackoffState>();
+  private readonly lastEmitFingerprints = new Map<string, string>();
   private readonly transientQuota = new Map<string, TransientQuotaEntry>();
   private readonly latestRequests = new Map<string, EffectiveCatalogRequest>();
   private discoveryLoaderResolver?: DiscoveryLoaderResolver;
@@ -121,7 +131,7 @@ export class EffectiveCatalogService {
       if (key === exactKey || (!exactKey && key.startsWith(prefix))) {
         delete this.state.discoveries[key];
         delete this.state.entitlements[key];
-        this.lastErrors.delete(key);
+        this.clearKeyRefreshState(key);
       }
     }
     const observedKey = evidenceKey(input.providerId, input.accountId);
@@ -132,7 +142,7 @@ export class EffectiveCatalogService {
       ));
       if (this.state.observed[observedKey].length === 0) delete this.state.observed[observedKey];
     }
-    if (exactKey) this.lastErrors.delete(exactKey);
+    if (exactKey) this.clearKeyRefreshState(exactKey);
     this.persistState();
     this.emitLatestSnapshots(input);
   }
@@ -142,7 +152,11 @@ export class EffectiveCatalogService {
     this.latestRequests.set(key, cloneJson(request));
     const snapshot = this.createSnapshot(request);
     const activeLoader = loader ?? this.discoveryLoaderResolver?.(request);
-    if ((!this.resolveDiscovery(request) || snapshot.stale) && activeLoader) {
+    if (
+      (!this.resolveDiscovery(request) || snapshot.stale)
+      && activeLoader
+      && !this.isInBackoffWindow(key)
+    ) {
       void this.refreshDiscovery(request, activeLoader);
     }
     return snapshot;
@@ -267,9 +281,11 @@ export class EffectiveCatalogService {
           delete this.state.entitlements[key];
         }
         this.lastErrors.delete(key);
+        this.refreshBackoff.delete(key);
         this.persistState();
       } catch (error) {
         this.lastErrors.set(key, error instanceof Error ? error.message : String(error));
+        this.recordRefreshFailure(key);
       } finally {
         this.refreshes.delete(key);
       }
@@ -346,7 +362,22 @@ export class EffectiveCatalogService {
     }
   }
 
+  private snapshotFingerprint(snapshot: EffectiveCatalogSnapshot): string {
+    return [
+      snapshot.catalogRevision,
+      snapshot.stale,
+      snapshot.refreshing,
+      snapshot.lastRefreshError ?? '',
+    ].join('\u0000');
+  }
+
   private emit(snapshot: EffectiveCatalogSnapshot): void {
+    const key = cacheKey(snapshot.providerId, snapshot.accountId, snapshot.protocol);
+    const fingerprint = this.snapshotFingerprint(snapshot);
+    if (this.lastEmitFingerprints.get(key) === fingerprint) {
+      return;
+    }
+    this.lastEmitFingerprints.set(key, fingerprint);
     for (const listener of this.listeners) {
       try {
         listener(snapshot);
@@ -354,6 +385,39 @@ export class EffectiveCatalogService {
         // A renderer subscription must not break catalog persistence or other listeners.
       }
     }
+  }
+
+  private getBackoffWindowMs(failCount: number): number {
+    if (failCount <= 0) {
+      return 0;
+    }
+    return Math.min(
+      REFRESH_BACKOFF_BASE_MS * 2 ** (failCount - 1),
+      REFRESH_BACKOFF_MAX_MS,
+    );
+  }
+
+  private isInBackoffWindow(key: string): boolean {
+    const backoff = this.refreshBackoff.get(key);
+    if (!backoff || backoff.failCount <= 0) {
+      return false;
+    }
+    const windowMs = this.getBackoffWindowMs(backoff.failCount);
+    return this.now().getTime() - backoff.lastFailedAtMs < windowMs;
+  }
+
+  private recordRefreshFailure(key: string): void {
+    const existing = this.refreshBackoff.get(key);
+    this.refreshBackoff.set(key, {
+      failCount: (existing?.failCount ?? 0) + 1,
+      lastFailedAtMs: this.now().getTime(),
+    });
+  }
+
+  private clearKeyRefreshState(key: string): void {
+    this.lastErrors.delete(key);
+    this.refreshBackoff.delete(key);
+    this.lastEmitFingerprints.delete(key);
   }
 
   private readState(): PersistedCatalogState {

@@ -14,11 +14,9 @@ export const useNarrowViewport = (maxWidth: number): boolean => {
     sync();
     media.addEventListener('change', sync);
     window.addEventListener('resize', sync);
-    const intervalId = window.setInterval(sync, 160);
     return () => {
       media.removeEventListener('change', sync);
       window.removeEventListener('resize', sync);
-      window.clearInterval(intervalId);
     };
   }, [maxWidth]);
 

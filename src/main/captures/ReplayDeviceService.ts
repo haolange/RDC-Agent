@@ -12,10 +12,22 @@ import type {
   ReplayDeviceStatusChangedPayload,
   ReplayDeviceTransport,
 } from '@shared/types/device';
+import { AdbExecutableCache } from './adbExecutable';
+import {
+  queryAdbDevicesLines,
+  queryAdbDevicesLinesWithServerBootstrap,
+  type AdbStartServerState,
+} from './adbServerClient';
+import {
+  devicesSemanticallyEqual,
+  nextPollIntervalMs,
+  POLL_BASE_MS,
+} from './replayDeviceDiff';
 
-const POLL_INTERVAL_MS = 5000;
 const ACTIVATE_TIMEOUT_MS = 90000;
 const PREPARED_REMOTE_TTL_MS = 10 * 60 * 1000;
+export const WATCH_POLL_MS = 2500;
+export const WATCH_LEASE_TTL_MS = 10_000;
 
 const LOCAL_DEVICE: ReplayDeviceEntry = {
   id: 'local',
@@ -50,63 +62,6 @@ export interface PreparedRemoteSurface {
 
 function sanitizeDeviceId(value: string): string {
   return value.replace(/[^a-zA-Z0-9_-]/g, '-');
-}
-
-function adbUnavailableMessage(): string {
-  return 'adb executable not found. Configure RDX_ANDROID_ADB_PATH or install Android platform-tools.';
-}
-
-function candidateAdbPaths(): string[] {
-  const candidates: string[] = [];
-  const push = (value?: string) => {
-    const trimmed = value?.trim();
-    if (trimmed) {
-      candidates.push(trimmed);
-    }
-  };
-
-  push(process.env.RDX_ANDROID_ADB_PATH);
-  push(process.env.ADB);
-
-  for (const envName of ['ANDROID_SDK_ROOT', 'ANDROID_HOME']) {
-    const root = process.env[envName]?.trim();
-    if (!root) {
-      continue;
-    }
-    push(path.join(root, 'platform-tools', 'adb.exe'));
-    push(path.join(root, 'platform-tools', 'adb'));
-  }
-
-  const localAppData = process.env.LOCALAPPDATA?.trim();
-  if (localAppData) {
-    push(path.join(localAppData, 'Android', 'Sdk', 'platform-tools', 'adb.exe'));
-  }
-
-  return candidates;
-}
-
-function resolveAdbExecutable(): string {
-  for (const candidate of candidateAdbPaths()) {
-    if (fs.existsSync(candidate)) {
-      return path.resolve(candidate);
-    }
-  }
-
-  for (const entry of (process.env.PATH ?? '').split(path.delimiter)) {
-    const trimmed = entry.trim();
-    if (!trimmed) {
-      continue;
-    }
-
-    for (const adbName of ['adb.exe', 'adb']) {
-      const candidate = path.join(trimmed, adbName);
-      if (fs.existsSync(candidate)) {
-        return path.resolve(candidate);
-      }
-    }
-  }
-
-  throw new Error(adbUnavailableMessage());
 }
 
 function normalizeString(value: unknown): string | undefined {
@@ -382,13 +337,20 @@ function parseRemoteBootstrap(data: Record<string, unknown>): AndroidBootstrapMe
 
 export class ReplayDeviceService {
   private devices = new Map<string, ReplayDeviceEntry>([[LOCAL_DEVICE.id, LOCAL_DEVICE]]);
-  private pollTimer: NodeJS.Timeout | null = null;
+  private watchPollTimer: NodeJS.Timeout | null = null;
+  private watchLeaseTimer: NodeJS.Timeout | null = null;
+  private watchActive = false;
+  private watchLeaseDeadline = 0;
+  private pollIntervalMs = POLL_BASE_MS;
   private mainWindow: BrowserWindow | null = null;
   private initialized = false;
   private refreshPromise: Promise<ReplayDeviceEntry[]> | null = null;
   private activationPromises = new Map<string, Promise<ReplayDeviceEntry>>();
   private preparedRemotes = new Map<string, PreparedRemoteSurface>();
   private resumeCache: DeviceResumeCacheRecord | null = null;
+  private readonly adbExecutable = new AdbExecutableCache();
+  /** Lifecycle flag: auto `adb start-server` at most once until manual refresh resets it. */
+  private readonly adbStartServerState: AdbStartServerState = { startServerAttempted: false };
 
   setMainWindow(window: BrowserWindow): void {
     this.mainWindow = window;
@@ -401,19 +363,52 @@ export class ReplayDeviceService {
 
     this.initialized = true;
     await this.loadResumeCache();
-    await this.refreshDevices();
-    this.pollTimer = setInterval(() => {
-      void this.refreshDevices().catch((error) => {
-        console.warn('[ReplayDeviceService] Poll refresh failed:', error);
+  }
+
+  startWatch(): void {
+    if (this.watchActive) {
+      this.renewWatch();
+      return;
+    }
+
+    this.watchActive = true;
+    this.renewWatch();
+    void this.runRefresh()
+      .catch((error) => {
+        console.warn('[ReplayDeviceService] Watch refresh failed:', error);
+      })
+      .finally(() => {
+        if (this.watchActive) {
+          this.scheduleWatchPoll();
+        }
       });
-    }, POLL_INTERVAL_MS);
+  }
+
+  renewWatch(): void {
+    if (!this.watchActive) {
+      return;
+    }
+
+    this.watchLeaseDeadline = Date.now() + WATCH_LEASE_TTL_MS;
+    this.scheduleWatchLeaseExpiry();
+  }
+
+  stopWatch(): void {
+    this.watchActive = false;
+    this.watchLeaseDeadline = 0;
+    if (this.watchPollTimer) {
+      clearTimeout(this.watchPollTimer);
+      this.watchPollTimer = null;
+    }
+    if (this.watchLeaseTimer) {
+      clearTimeout(this.watchLeaseTimer);
+      this.watchLeaseTimer = null;
+    }
   }
 
   dispose(): void {
-    if (this.pollTimer) {
-      clearInterval(this.pollTimer);
-      this.pollTimer = null;
-    }
+    this.initialized = false;
+    this.stopWatch();
   }
 
   listDevices(): ReplayDeviceEntry[] {
@@ -424,7 +419,63 @@ export class ReplayDeviceService {
     return this.devices.get(deviceId) ?? null;
   }
 
+  /** Manual refresh (IPC device:refresh): run immediately and reset backoff to BASE. */
   async refreshDevices(): Promise<ReplayDeviceEntry[]> {
+    this.pollIntervalMs = POLL_BASE_MS;
+    // Allow one more start-server attempt after a user-initiated refresh.
+    this.adbStartServerState.startServerAttempted = false;
+    try {
+      return await this.runRefresh();
+    } finally {
+      if (this.watchActive) {
+        this.scheduleWatchPoll();
+      }
+    }
+  }
+
+  private scheduleWatchPoll(): void {
+    if (!this.watchActive) {
+      return;
+    }
+
+    if (this.watchPollTimer) {
+      clearTimeout(this.watchPollTimer);
+    }
+
+    const delayMs = Math.max(this.pollIntervalMs, WATCH_POLL_MS);
+    this.watchPollTimer = setTimeout(() => {
+      this.watchPollTimer = null;
+      if (!this.watchActive) {
+        return;
+      }
+
+      void this.runRefresh()
+        .catch((error) => {
+          console.warn('[ReplayDeviceService] Watch poll refresh failed:', error);
+        })
+        .finally(() => {
+          if (this.watchActive) {
+            this.scheduleWatchPoll();
+          }
+        });
+    }, delayMs);
+  }
+
+  private scheduleWatchLeaseExpiry(): void {
+    if (this.watchLeaseTimer) {
+      clearTimeout(this.watchLeaseTimer);
+    }
+
+    const remainingMs = Math.max(0, this.watchLeaseDeadline - Date.now());
+    this.watchLeaseTimer = setTimeout(() => {
+      this.watchLeaseTimer = null;
+      if (this.watchActive && Date.now() >= this.watchLeaseDeadline) {
+        this.stopWatch();
+      }
+    }, remainingMs);
+  }
+
+  private async runRefresh(): Promise<ReplayDeviceEntry[]> {
     if (this.refreshPromise) {
       return this.refreshPromise;
     }
@@ -576,9 +627,32 @@ export class ReplayDeviceService {
   }
 
   private async performRefresh(): Promise<ReplayDeviceEntry[]> {
-    const detectedDevices = await this.detectAdbDevices();
-    const now = Date.now();
-    const nextDevices = new Map<string, ReplayDeviceEntry>([[LOCAL_DEVICE.id, { ...LOCAL_DEVICE, lastSeen: now }]]);
+    let adbAvailable = true;
+    let detectedDevices: ReplayDeviceEntry[] = [];
+
+    try {
+      detectedDevices = await this.detectAdbDevices();
+    } catch (error) {
+      adbAvailable = false;
+      const message = error instanceof Error ? error.message : String(error);
+      this.preparedRemotes.clear();
+      detectedDevices = this.getSortedDevices()
+        .filter((device) => device.id !== 'local')
+        .map((device) => ({
+          ...device,
+          status: 'offline' as const,
+          detailText: message,
+          lastError: message,
+        }));
+    }
+
+    this.pollIntervalMs = nextPollIntervalMs(this.pollIntervalMs, adbAvailable);
+
+    const previousLocal = this.devices.get(LOCAL_DEVICE.id) ?? LOCAL_DEVICE;
+    const nextDevices = new Map<string, ReplayDeviceEntry>([[
+      LOCAL_DEVICE.id,
+      { ...LOCAL_DEVICE, lastSeen: previousLocal.lastSeen },
+    ]]);
     const detectedIds = new Set<string>(['local']);
 
     for (const detected of detectedDevices) {
@@ -597,7 +671,7 @@ export class ReplayDeviceService {
           activationErrorCode: previous.activationErrorCode,
           activationErrorMessage: previous.activationErrorMessage,
           activationUpdatedAt: previous.activationUpdatedAt,
-          lastSeen: decoratedDevice.lastSeen ?? previous.lastSeen,
+          lastSeen: previous.lastSeen ?? decoratedDevice.lastSeen,
         });
       } else if (
         previous
@@ -616,8 +690,11 @@ export class ReplayDeviceService {
           activationErrorCode: previous.activationErrorCode,
           activationErrorMessage: previous.activationErrorMessage,
           activationUpdatedAt: previous.activationUpdatedAt,
-          lastSeen: decoratedDevice.lastSeen ?? previous.lastSeen,
+          lastSeen: previous.lastSeen ?? decoratedDevice.lastSeen,
         });
+      } else if (previous && devicesSemanticallyEqual([previous], [{ ...decoratedDevice, lastSeen: previous.lastSeen }])) {
+        // Preserve previous lastSeen when identity is unchanged.
+        nextDevices.set(decoratedDevice.id, { ...decoratedDevice, lastSeen: previous.lastSeen });
       } else {
         nextDevices.set(decoratedDevice.id, decoratedDevice);
       }
@@ -642,30 +719,14 @@ export class ReplayDeviceService {
   }
 
   private async detectAdbDevices(): Promise<ReplayDeviceEntry[]> {
-    try {
-      const lines = await this.runAdbCommand(['devices', '-l']);
-      return lines
-        .map((line) => parseAdbDeviceLine(line))
-        .filter((device): device is ReplayDeviceEntry => device !== null);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const offlineDevices = this.getSortedDevices()
-        .filter((device) => device.id !== 'local')
-        .map((device) => ({
-          ...device,
-          status: 'offline' as const,
-          detailText: message,
-          lastError: message,
-        }));
-
-      this.preparedRemotes.clear();
-
-      const fallbackDevices = new Map<string, ReplayDeviceEntry>([[LOCAL_DEVICE.id, LOCAL_DEVICE]]);
-      for (const device of offlineDevices) {
-        fallbackDevices.set(device.id, device);
-      }
-      return this.replaceDevices(fallbackDevices);
-    }
+    const lines = await queryAdbDevicesLinesWithServerBootstrap({
+      queryLines: () => queryAdbDevicesLines(),
+      startServer: () => this.runAdbCommand(['start-server']),
+      state: this.adbStartServerState,
+    });
+    return lines
+      .map((line) => parseAdbDeviceLine(line))
+      .filter((device): device is ReplayDeviceEntry => device !== null);
   }
 
   private async performActivation(deviceId: string): Promise<ReplayDeviceEntry> {
@@ -786,7 +847,14 @@ export class ReplayDeviceService {
   }
 
   private async runAdbCommand(args: string[]): Promise<string[]> {
-    const adbPath = resolveAdbExecutable();
+    let adbPath: string;
+    try {
+      adbPath = await this.adbExecutable.resolveAdbExecutableAsync();
+    } catch (error) {
+      this.adbExecutable.invalidate();
+      throw error;
+    }
+
     const supervised = processSupervisor.spawn('replay', adbPath, args, {
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -798,6 +866,7 @@ export class ReplayDeviceService {
       throw new Error('Replay device command became an unconfirmed orphan.');
     }
     if (info.reason === 'spawn_failed') {
+      this.adbExecutable.invalidate();
       throw info.error ?? new Error(stderr.trim() || 'adb spawn failed');
     }
     if (info.code !== 0) {
@@ -847,15 +916,23 @@ export class ReplayDeviceService {
     const previous = this.getSortedDevices();
     this.devices = nextDevices;
     const devices = this.getSortedDevices();
-    const changedDevice = devices.find((device, index) => JSON.stringify(device) !== JSON.stringify(previous[index]));
-    const hasLengthChange = previous.length !== devices.length;
 
-    if (changedDevice || hasLengthChange) {
-      this.broadcast({
-        device: changedDevice ?? devices[0] ?? LOCAL_DEVICE,
-        devices,
-      });
+    if (devicesSemanticallyEqual(previous, devices)) {
+      return devices;
     }
+
+    const changedDevice = devices.find((device, index) => {
+      const prior = previous[index];
+      if (!prior) {
+        return true;
+      }
+      return !devicesSemanticallyEqual([prior], [device]);
+    });
+
+    this.broadcast({
+      device: changedDevice ?? devices[0] ?? LOCAL_DEVICE,
+      devices,
+    });
 
     return devices;
   }
