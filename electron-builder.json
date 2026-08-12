@@ -13,6 +13,7 @@
     "resources/knowledge/**/*"
   ],
   "forceCodeSigning": false,
+  "electronDist": "node_modules/electron/dist",
   "win": {
     "executableName": "RdcAgent",
     "target": [

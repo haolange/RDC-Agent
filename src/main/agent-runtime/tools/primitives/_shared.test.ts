@@ -10,6 +10,7 @@ import {
   truncateOutput,
   abortPromise,
   writeTextFileNoFollow,
+  withTemporaryPathAccess,
 } from './_shared';
 
 const roots: string[] = [];
@@ -133,6 +134,22 @@ describe('safeResolvePath', () => {
       sessionId: null,
       temporaryAllowedPathRoots: [],
     })).toThrow(/超出 workspace/);
+  });
+
+  it('withTemporaryPathAccess treats missing roots as empty and scopes only the callback', async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-ws-'));
+    roots.push(workspace);
+    const context = {
+      workspaceRoot: workspace,
+      projectRootPath: workspace,
+      projectId: null,
+      sessionId: null,
+    };
+    const seen: Array<readonly string[] | undefined> = [];
+    await withTemporaryPathAccess(context, undefined, async (scoped) => {
+      seen.push(scoped?.temporaryAllowedPathRoots);
+    });
+    expect(seen[0]).toEqual([]);
   });
 });
 

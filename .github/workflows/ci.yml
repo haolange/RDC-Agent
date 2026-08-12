@@ -110,11 +110,13 @@ jobs:
       - name: Build unpacked Windows release
         if: runner.os == 'Windows'
         run: pnpm run pack
-      - name: Release config + SBOM/checksum helpers
+      - name: Release config + SBOM
         run: |
           pnpm run check:release-config
           pnpm run release:sbom
-          pnpm run release:checksums
+      - name: Release checksums
+        if: runner.os == 'Windows'
+        run: pnpm run release:checksums
 
   browser-smoke:
     runs-on: windows-latest
