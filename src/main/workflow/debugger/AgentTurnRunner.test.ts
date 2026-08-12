@@ -238,4 +238,75 @@ describe('AgentTurnRunner', () => {
     expect(release).toHaveBeenCalledWith({ discardIfIdle: false });
     expect(turnCoordinator.getActive('setup-session')).toBeNull();
   });
+
+  it('rejects missing execution scope before beginTurn so no TurnHandle leaks', async () => {
+    const release = vi.fn(async () => undefined);
+    const runner = createRunner();
+    const requestPlan = createTestRequestPlan({
+      providerId: 'test',
+      adapterId: 'openai-compatible',
+      catalogRevision: 'test',
+      routeRevision: 'test',
+      selectedModelId: 'model',
+      effectiveModelId: 'model',
+      appliedBindingIds: [],
+      route: { protocol: 'OpenAICompatibleChatCompletions', baseUrl: 'https://example.test', source: 'catalog' },
+      headers: {},
+      bodyPatch: {},
+      contextBudgetTokens: 1000,
+      contextMode: 'normal',
+      contextWindowTokens: 2000,
+      activeTierId: 'normal',
+      fastMode: false,
+      reasoningWire: {
+        selection: 'off',
+        control: {
+          kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' },
+        },
+      },
+    });
+    const lease = {
+      poolKey: 'pool',
+      projectRootPath: null,
+      projectId: 'project',
+      descriptorHash: 'descriptor',
+      release,
+    } as McpConnectionLease;
+    const policy = {
+      maxTurns: 5,
+      maxToolCalls: 5,
+      maxSubagents: 2,
+      maxChildDepth: 2,
+      maxWallTimeMs: 10_000,
+    } as EffectiveRuntimePlan['policy'];
+    const preparedRuntime = {
+      runtimeTools: { definitions: [], toolMap: new Map() },
+      activeToolDefinitions: [],
+      routeCapability: { toolCallingMode: 'disabled' } as AgentRouteCapability,
+      mcpConnectionErrors: [],
+      mcpLease: lease,
+      credentialHandle: 'credential',
+      promptCache: {},
+      effectivePlan: { policy, toolAllowlist: [], routeCapability: { toolCallingMode: 'disabled' } } as unknown as EffectiveRuntimePlan,
+    } as unknown as PreparedAgentRuntime;
+
+    await expect(runner.runAgentTurn({
+      agentId: 'ask',
+      content: 'no-scope',
+      systemPrompt: 'system',
+      providerId: 'test',
+      modelId: 'model',
+      mode: 'ask',
+      toolAllowlist: [],
+      sessionId: null,
+      turnId: 'no-scope-turn',
+      promptPlan: {} as PromptPlan,
+      effectiveModel: {} as never,
+      preparedRuntime,
+      options: { requestPlan },
+    })).rejects.toThrow(/EXECUTION_SCOPE_REQUIRED/);
+
+    expect(turnCoordinator.getActive('default')).toBeNull();
+    expect(release).not.toHaveBeenCalled();
+  });
 });

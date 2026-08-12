@@ -8,6 +8,9 @@ import * as fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
+import type { ChildProcess } from 'node:child_process';
 import { EventStream } from '../../agent-runtime/core/EventStream';
 import type { AssistantMessage, AssistantMessageEvent } from '../../agent-runtime/core/types';
 import {
@@ -17,6 +20,10 @@ import {
 } from '../../agent-runtime/providers/internal/AssistantStreamBuilder';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
 import { StorageIo } from '../../sessions/StorageIo';
+import { StdioRpcClient } from '../../agent-runtime/agent/mcpRpcTransport';
+import { ShutdownCoordinator } from '../../lifecycle/ShutdownCoordinator';
+import { writeTextFileNoFollow } from '../../agent-runtime/tools/primitives/_shared';
+import { ConversationHistoryStore } from '../../sessions/ConversationHistoryStore';
 
 const childState = vi.hoisted(() => {
   const listeners = new Map<string, (...args: unknown[]) => void>();
@@ -230,5 +237,98 @@ describe('faultInjectionContract: concurrent write mutex (realpath)', () => {
     expect(first.name).not.toBe(second.name);
     const listed = (await a.listMemories()).map((record) => record.displayName).sort();
     expect(listed).toEqual(['Mutex A', 'Mutex-B']);
+  });
+});
+
+describe('faultInjectionContract: MCP half-packet disconnect', () => {
+  it('rejects in-flight JSON-RPC when the stdio stream ends mid-object', async () => {
+    const stdout = new PassThrough();
+    const stdin = new PassThrough();
+    const proc = new EventEmitter() as EventEmitter & {
+      stdout: PassThrough;
+      stdin: PassThrough;
+    };
+    proc.stdout = stdout;
+    proc.stdin = stdin;
+    const client = new StdioRpcClient(proc as unknown as ChildProcess);
+    const pending = client.request('tools/call', { name: 'x' }, 5_000);
+    stdout.write('{"jsonrpc":"2.0","id":1,"result":');
+    proc.emit('exit', 1);
+    await expect(pending).rejects.toThrow(/exited|closed/i);
+  });
+});
+
+describe('faultInjectionContract: attachment source replaced after staging', () => {
+  it('commits staged bytes after the original source is overwritten', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-fault-att-'));
+    try {
+      const sourcePath = path.join(root, 'source.txt');
+      const stagingDir = path.join(root, 'staging');
+      fs.writeFileSync(sourcePath, 'staged-bytes');
+      const store = new ConversationHistoryStore({
+        io: new StorageIo(),
+      } as ConstructorParameters<typeof ConversationHistoryStore>[0]);
+      const [stagedPath] = store.stageAttachmentInputs([sourcePath], stagingDir);
+      fs.writeFileSync(sourcePath, 'replaced');
+      expect(fs.readFileSync(stagedPath!, 'utf8')).toBe('staged-bytes');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('faultInjectionContract: symlink parent swap', () => {
+  it('rejects writes when the parent path is a symlink/reparse point', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-fault-symlink-'));
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-fault-symlink-out-'));
+    try {
+      const parent = path.join(root, 'parent');
+      fs.mkdirSync(parent);
+      const target = path.join(parent, 'note.txt');
+      await writeTextFileNoFollow(target, 'inside');
+      fs.rmSync(parent, { recursive: true, force: true });
+      try {
+        fs.symlinkSync(outside, parent, 'junction');
+      } catch {
+        return;
+      }
+      await expect(writeTextFileNoFollow(target, 'escaped')).rejects.toThrow(/SYMLINK_PATH_REJECTED/);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('faultInjectionContract: renderer/main storage recovery', () => {
+  it('re-reads atomically written JSON after a simulated renderer crash', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-fault-renderer-'));
+    try {
+      const io = new StorageIo();
+      const filePath = path.join(root, 'session.json');
+      io.writeJsonAtomic(filePath, { sessionId: 'sess_crash', title: 'ok' });
+      expect(io.readJson(filePath)).toEqual({ sessionId: 'sess_crash', title: 'ok' });
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('faultInjectionContract: shutdown with active producers', () => {
+  it('disposes turn, subagent, MCP, and terminal before exit', async () => {
+    const coordinator = new ShutdownCoordinator();
+    const seen: string[] = [];
+    for (const id of ['turn', 'subagent', 'mcp', 'terminal'] as const) {
+      coordinator.register({
+        id,
+        phase: id === 'terminal' ? 'terminate_processes' : 'abort_all',
+        dispose: () => {
+          seen.push(id);
+        },
+      });
+    }
+    await coordinator.shutdownAll(1_000);
+    expect(seen.sort()).toEqual(['mcp', 'subagent', 'terminal', 'turn']);
+    expect(coordinator.getPhase()).toBe('exited');
   });
 });

@@ -1,6 +1,7 @@
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 import { useSessionProjectionStore } from '../../../stores/sessionProjectionStore';
+import { useAgentStore } from '../../../stores/agentStore';
 import { applySessionSwitchHygiene } from '../../../app/bootstrap/sessionSwitchHygiene';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { RightRailTarget } from './types';
@@ -208,6 +209,7 @@ export async function handleSessionRemoveOp(
     }
 
     useSessionProjectionStore.getState().evictSession(session.sessionId);
+    useAgentStore.getState().clearScope(session.sessionId);
 
     const nextSessions = await ctx.loadProjectSessionList(session.projectId);
     if (!ctx.isLatestSelectionRequest(requestId)) {

@@ -151,4 +151,46 @@ describe('ConversationService idempotency scoping', () => {
     release();
     await first;
   });
+
+  it('registers preparingRequests before fingerprint hashing so Stop can abort', async () => {
+    const service = conversationService as unknown as IdempotentService & {
+      computeRequestFingerprint: (
+        input: Record<string, unknown>,
+        signal?: AbortSignal,
+      ) => Promise<string>;
+    };
+
+    service.computeRequestFingerprint = async (_input, signal) => {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => resolve(), 10_000);
+        signal?.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(new Error('TURN_CANCELLED: preparation aborted.'));
+        });
+      });
+      return 'fp';
+    };
+
+    const pending = service.runIdempotentTurn(
+      {
+        requestId: 'req-stop-hash',
+        sessionId: 'session-stop',
+        projectId: 'project-stop',
+        mode: 'debugger',
+        message: 'hash-me',
+        turnControls: { reasoningLevel: 'off', maxContextMode: false, fastModel: false },
+      },
+      async () => ({ requestId: 'req-stop-hash' }),
+    );
+    pending.catch(() => undefined);
+
+    await vi.waitFor(() => {
+      expect(service.preparingRequests.size).toBeGreaterThan(0);
+    });
+
+    const cancelled = await conversationService.cancelActiveTurn({ requestId: 'req-stop-hash' });
+    expect(cancelled.success).toBe(true);
+    await expect(pending).rejects.toThrow(/TURN_CANCELLED|aborted/);
+    expect(service.preparingRequests.size).toBe(0);
+  });
 });

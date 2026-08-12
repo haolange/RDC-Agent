@@ -27,3 +27,9 @@ export function requireExecutionScopeId(scopeId: string | null | undefined): str
   }
   return value;
 }
+
+/** Execution metadata that must not outlive the turn that created it. */
+export function isTransientExecutionScope(scopeId: string): boolean {
+  const value = scopeId.trim();
+  return value.startsWith('ephemeral:') || value.includes('::subagent::');
+}

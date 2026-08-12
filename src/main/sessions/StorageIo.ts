@@ -4,7 +4,13 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import type { ZodType } from 'zod';
 import { generateShortId } from '@shared/utils/id';
+import {
+  parseStoredDocument,
+  StorageSchemaError,
+  type StorageMigration,
+} from './storageSchema';
 
 const DEEP_MERGE_FORBIDDEN_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
@@ -15,7 +21,7 @@ export class StorageIo {
     }
   }
 
-  readJson<T>(filePath: string): T | null {
+  readJson<T>(filePath: string, validator?: ZodType<T> | readonly StorageMigration<T>[]): T | null {
     let raw: string;
     try {
       if (!fs.existsSync(filePath)) {
@@ -33,13 +39,16 @@ export class StorageIo {
     }
 
     try {
-      return JSON.parse(raw) as T;
+      return this.parseJsonPayload<T>(raw, filePath, validator);
     } catch (parseError) {
+      if (parseError instanceof StorageSchemaError && parseError.message.includes('STORAGE_SCHEMA_UNSUPPORTED')) {
+        throw parseError;
+      }
       const bakPath = `${filePath}.bak`;
       try {
         if (fs.existsSync(bakPath)) {
           const bakRaw = fs.readFileSync(bakPath, 'utf-8');
-          const restored = JSON.parse(bakRaw) as T;
+          const restored = this.parseJsonPayload<T>(bakRaw, bakPath, validator);
           try {
             this.writeUtf8Atomic(filePath, bakRaw);
           } catch {
@@ -56,6 +65,27 @@ export class StorageIo {
         `STORAGE_CORRUPT: failed to parse JSON file: ${filePath}: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
       );
     }
+  }
+
+  private parseJsonPayload<T>(
+    raw: string,
+    filePath: string,
+    validator?: ZodType<T> | readonly StorageMigration<T>[],
+  ): T {
+    const parsed: unknown = JSON.parse(raw);
+    if (!validator) {
+      return parsed as T;
+    }
+    if (!('safeParse' in validator)) {
+      return parseStoredDocument(parsed, validator, filePath);
+    }
+    const result = validator.safeParse(parsed);
+    if (!result.success) {
+      throw new StorageSchemaError(
+        `STORAGE_SCHEMA: ${filePath} failed runtime validation: ${result.error.issues.map((issue: { message: string }) => issue.message).join('; ')}`,
+      );
+    }
+    return result.data;
   }
 
   private quarantineCorruptFile(filePath: string): void {

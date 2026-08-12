@@ -18,16 +18,32 @@ interface AgentStoreState {
   updateAgentState: (state: AgentState) => void;
   /** 获取指定 scope + Agent 的状态。 */
   getAgentState: (sessionId: string, agentId: string) => AgentState | undefined;
+  /** 清空指定 scope 下的执行态。 */
+  clearScope: (sessionId: string) => void;
   /** 清空所有状态。 */
   reset: () => void;
 }
 
 export const useAgentStore = create<AgentStoreState>((set, get) => ({
   agents: {},
-  updateAgentState: (state) =>
+  updateAgentState: (state) => {
+    if (state.sessionId.startsWith('ephemeral:') || state.sessionId.includes('::subagent::')) {
+      return;
+    }
     set((s) => ({
       agents: { ...s.agents, [agentStateKey(state)]: state },
-    })),
+    }));
+  },
   getAgentState: (sessionId, agentId) => get().agents[`${sessionId}::${agentId}`],
+  clearScope: (sessionId) => {
+    const prefix = `${sessionId}::`;
+    set((s) => {
+      const next = { ...s.agents };
+      for (const key of Object.keys(next)) {
+        if (key.startsWith(prefix)) delete next[key];
+      }
+      return { agents: next };
+    });
+  },
   reset: () => set({ agents: {} }),
 }));

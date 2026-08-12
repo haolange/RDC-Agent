@@ -13,7 +13,8 @@ Authoritative entry: the launcher logs one-time `GET /qa?qaBootstrap=...`; consu
 
 - `src/shared/renderer-api/` 是唯一 `ElectronAPI` 工厂与 channel manifest；Desktop 和 Browser 各自只实现 transport。
 - manifest 中的全部 invoke channel 必须存在 main handler；启动时 `assertRendererIpcParity` fail-closed 校验。
-- Browser bridge 仅接受 canonical manifest 中且已注册的 channel。未知、内部、未注册 channel 与不存在的明文 `settings:getProviderSecret` 返回 403。
+- Browser bridge 仅接受 canonical manifest 中且已登记 capability 并已注册的 channel。未知、内部、未注册 channel 与不存在的明文 `settings:getProviderSecret` 返回 403。capability 映射是闭合 Record，禁止默认 `mutation` fallback。
+- Cookie 认证的 `/invoke`、`/events`、`/api/*` 必须带精确 Origin。`browser-dev` 同源反代 Vite 时不得把 cookie / authorization / `x-rdc-*` 转给上游。
 - Secret 只可提交给主进程；renderer 只读取 `{ hasSecret, maskedPreview? }`，不得获得明文。
 
 ## 产品能力矩阵

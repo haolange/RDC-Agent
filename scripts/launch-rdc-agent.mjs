@@ -449,8 +449,8 @@ function modeEnvironment(mode, rebuildSettingsOnly) {
   return env;
 }
 
-function runChild(command, args, env) {
-  return spawn(command, args, { cwd: repoRoot, env, stdio: 'inherit' });
+function runChild(command, args, env, stdio = 'inherit') {
+  return spawn(command, args, { cwd: repoRoot, env, stdio });
 }
 
 function waitForExit(child) {
@@ -462,25 +462,28 @@ function waitForExit(child) {
 
 async function startRendererDevServer(env) {
   // Prefer OS-assigned port via Vite (no pre-probe race). Parse the bound URL from stdout.
+  // Pipe stdout/stderr so we can read the URL while still echoing to the terminal.
   const renderer = runChild(process.execPath, [
     path.join(nodeModulesPath, 'vite', 'bin', 'vite.js'),
     '--config', 'vite.renderer.config.ts', '--host', '127.0.0.1', '--port', '0',
-  ], env);
+  ], env, ['inherit', 'pipe', 'pipe']);
   const rendererUrl = await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error('Timed out waiting for Vite to report its port.')), 20_000);
-    const onData = (chunk) => {
-      const text = String(chunk);
-      const match = text.match(/https?:\/\/(?:127\.0\.0\.1|localhost):\d+/i);
+    let resolved = false;
+    const onData = (sink, chunk) => {
+      sink.write(chunk);
+      if (resolved) return;
+      const match = String(chunk).match(/https?:\/\/(?:127\.0\.0\.1|localhost):\d+/i);
       if (match) {
+        resolved = true;
         clearTimeout(timer);
-        renderer.stdout?.off('data', onData);
-        renderer.stderr?.off('data', onData);
         resolve(match[0].replace(/\/$/, ''));
       }
     };
-    renderer.stdout?.on('data', onData);
-    renderer.stderr?.on('data', onData);
+    renderer.stdout?.on('data', (chunk) => onData(process.stdout, chunk));
+    renderer.stderr?.on('data', (chunk) => onData(process.stderr, chunk));
     renderer.once('exit', (code) => {
+      if (resolved) return;
       clearTimeout(timer);
       reject(new Error(`Renderer dev server exited before reporting a port (code=${code}).`));
     });

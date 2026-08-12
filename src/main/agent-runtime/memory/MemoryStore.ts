@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { withMemoryDirectoryLock } from './memoryDirectoryLock';
 
 export type MemoryType = 'user' | 'feedback' | 'project' | 'reference';
 export interface MemoryRecord { id: string; name: string; displayName: string; normalizedName: string; description: string; type: MemoryType; content: string; tags?: string[]; createdAt: number; updatedAt: number; }
@@ -29,7 +30,7 @@ async function withDirectoryMutex<T>(
   directoryWriteQueues.set(realMemoryDir, tail);
   await previous;
   try {
-    return await operation();
+    return await withMemoryDirectoryLock(realMemoryDir, operation);
   } finally {
     release();
     if (directoryWriteQueues.get(realMemoryDir) === tail) {

@@ -6,6 +6,7 @@ import type {
   SessionRecord,
 } from '@shared/types/session';
 import { runExecutionService } from '../workflow/debugger/RunExecutionService';
+import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
 import type { WorkbenchIpcContext } from './workbenchContext';
@@ -261,6 +262,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       }
 
       storageAdapter.removeSession(id);
+      agentOrchestrator.syncSessionSlots(id);
       const remainingSessions = storageAdapter.listSessions(session.projectId);
       const nextSession = remainingSessions[0] || null;
       let nextRun: RunSummary | null = null;

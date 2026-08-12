@@ -59,7 +59,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -103,17 +103,17 @@ jobs:
             "$HOME/.cache/rdc-agent/pnpm-store"/*) ;;
             *) echo "Unexpected pnpm store: $(pnpm store path)" >&2; exit 1 ;;
           esac
-      - name: Build unpacked release
+      - name: Build unpacked Windows release
+        if: runner.os == 'Windows'
         run: pnpm run pack
       - name: Release config + SBOM/checksum helpers
-        if: runner.os == 'Linux'
         run: |
           pnpm run check:release-config
           pnpm run release:sbom
           pnpm run release:checksums
 
   browser-smoke:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
@@ -131,13 +131,11 @@ jobs:
           node-version: '22.13.0'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Install xvfb
-        run: sudo apt-get update && sudo apt-get install -y xvfb
       - name: Browser QA smoke
-        run: xvfb-run -a pnpm run smoke:agent-browser
+        run: pnpm run smoke:agent-browser
 
   desktop-smoke:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     steps:
@@ -150,12 +148,10 @@ jobs:
           node-version: '22.13.0'
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Install xvfb
-        run: sudo apt-get update && sudo apt-get install -y xvfb
       - run: pnpm run build
       - run: pnpm run pack
       - name: Desktop unpacked health smoke
-        run: xvfb-run -a pnpm run smoke:desktop
+        run: pnpm run smoke:desktop
       - name: Release config after pack
         run: |
           pnpm run check:release-config

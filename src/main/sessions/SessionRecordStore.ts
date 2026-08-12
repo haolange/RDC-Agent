@@ -34,6 +34,9 @@ import type {
   SessionEvidenceRecord,
 } from './storageTypes';
 import type { StagedConversationSessionCommit } from './storageCommitTypes';
+import { SessionRecordSchema } from './storageSchema';
+import { reconcileProjectSessionTitles } from './sessionRecordReconcile';
+import { readPersistedRun as loadPersistedRun, toRunSummary, writeRunFiles as persistRunFiles } from './sessionRunPersistence';
 
 
 const SAFE_RUN_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -111,7 +114,9 @@ export class SessionRecordStore {
   listSessions(projectId: string): SessionRecord[] {
     const project = this.host.projects.getProjectById(projectId);
     if (!project) return [];
-    return this.reconcileProjectSessionTitles(project)
+    return reconcileProjectSessionTitles(this.host, project, (session, sessionPath) => (
+      this.normalizeSessionRecord(session, sessionPath)
+    ))
       .sort((a, b) => b.updatedAt - a.updatedAt);
   }
 
@@ -231,7 +236,9 @@ export class SessionRecordStore {
   readSession(sessionId: string): SessionRecord | null {
     const location = this.findSessionLocation(sessionId);
     if (!location) return null;
-    const sessions = this.reconcileProjectSessionTitles(location.project);
+    const sessions = reconcileProjectSessionTitles(this.host, location.project, (session, sessionPath) => (
+      this.normalizeSessionRecord(session, sessionPath)
+    ));
     return sessions.find((session) => session.sessionId === sessionId) ?? null;
   }
 
@@ -239,7 +246,7 @@ export class SessionRecordStore {
     const location = this.findSessionLocation(sessionId);
     if (!location) return null;
 
-    const existing = this.host.io.readJson<SessionRecord>(path.join(location.sessionPath, 'session.json'));
+    const existing = this.host.io.readJson(path.join(location.sessionPath, 'session.json'), SessionRecordSchema);
     if (!existing) return null;
 
     const nextSession: SessionRecord = {
@@ -270,7 +277,7 @@ export class SessionRecordStore {
       .map((entry) => this.readPersistedRun(sessionId, entry.name))
       .filter((run): run is PersistedRunRecord => run !== null)
       .sort((a, b) => b.startedAt - a.startedAt)
-      .map((run) => this.toRunSummary(run));
+      .map((run) => toRunSummary(run));
   }
 
   getLatestRun(sessionId: string): RunSummary | null {
@@ -425,7 +432,7 @@ export class SessionRecordStore {
       },
     };
 
-    this.writeRunFiles(persistedRun);
+    persistRunFiles(this.host, runPath, persistedRun);
     writeYaml(path.join(runPath, 'capture_refs.yaml'), {
       captures: captures.map((capture, index) => ({
         capture_id: capture.id || `cap-${index}`,
@@ -514,7 +521,7 @@ export class SessionRecordStore {
       merged.finishedAt = merged.finishedAt || merged.updatedAt;
     }
 
-    this.writeRunFiles(merged);
+    persistRunFiles(this.host, this.getRunPath(merged.sessionId, merged.runId), merged);
     this.updateSession(caseId, {
       lastRunId: runId,
     });
@@ -645,7 +652,7 @@ export class SessionRecordStore {
       run.finishedAt = run.finishedAt || run.updatedAt;
     }
 
-    this.writeRunFiles(run);
+    persistRunFiles(this.host, this.getRunPath(run.sessionId, run.runId), run);
 
     if (blockers.length > 0) {
       const boardPath = path.join(this.getRunPath(caseId, runId), 'notes', 'hypothesis_board.yaml');
@@ -717,26 +724,7 @@ export class SessionRecordStore {
   }
 
   writeRunFiles(run: PersistedRunRecord): void {
-    const runPath = this.getRunPath(run.sessionId, run.runId);
-    this.host.io.ensureDir(runPath);
-    this.host.io.writeJsonAtomic(path.join(runPath, 'run.json'), run);
-    writeYaml(path.join(runPath, 'run.yaml'), {
-      run_id: run.runId,
-      turn_id: run.turnId,
-      session_id: run.sessionId,
-      case_id: run.caseId,
-      project_id: run.projectId,
-      created_at: new Date(run.createdAt).toISOString(),
-      updated_at: new Date(run.updatedAt).toISOString(),
-      mode: run.mode,
-      goal: run.goal,
-      status: run.status,
-      last_stage: run.lastStage,
-      coordination_mode: 'staged_handoff',
-      orchestration_mode: 'multi_agent',
-      runtime: run.runtime,
-      captures: run.captures,
-    });
+    persistRunFiles(this.host, this.getRunPath(run.sessionId, run.runId), run);
   }
 
   findSessionLocation(sessionId: string): { project: ProjectRecord; sessionPath: string } | null {
@@ -758,65 +746,7 @@ export class SessionRecordStore {
   }
 
   readPersistedRun(sessionId: string, runId: string): PersistedRunRecord | null {
-    const runJsonPath = path.join(this.getRunPath(sessionId, runId), 'run.json');
-    const runJson = this.host.io.readJson<PersistedRunRecord>(runJsonPath);
-    if (runJson) {
-      runJson.lastStage = normalizeWorkflowStage(runJson.lastStage);
-      runJson.runtime.workflow_stage = normalizeWorkflowStage(runJson.runtime.workflow_stage);
-      return runJson;
-    }
-
-    const runYaml = readYaml<Record<string, unknown>>(path.join(this.getRunPath(sessionId, runId), 'run.yaml'));
-    if (!runYaml) {
-      return null;
-    }
-
-    return {
-      runId,
-      turnId: typeof runYaml.turn_id === 'string' ? runYaml.turn_id : undefined,
-      projectId: String(runYaml.project_id || ''),
-      sessionId,
-      caseId: String(runYaml.case_id || sessionId),
-      mode: (runYaml.mode as ExecutableAppMode) || 'debugger',
-      goal: String(runYaml.goal || ''),
-      captures: (runYaml.captures as CaptureDescriptor[]) || [],
-      startedAt: Date.parse(String(runYaml.created_at || nowIso())),
-      finishedAt: runYaml.finished_at ? Date.parse(String(runYaml.finished_at)) : undefined,
-      status: (runYaml.status as PersistedRunRecord['status']) || 'running',
-      lastStage: normalizeWorkflowStage(String(runYaml.last_stage || 'preflight')),
-      backend: ((runYaml.runtime as Record<string, unknown>)?.backend as 'local' | 'remote') || 'local',
-      createdAt: Date.parse(String(runYaml.created_at || nowIso())),
-      updatedAt: Date.parse(String(runYaml.updated_at || runYaml.created_at || nowIso())),
-      runtime: {
-        backend: ((runYaml.runtime as Record<string, unknown>)?.backend as 'local' | 'remote') || 'local',
-        entry_mode: (((runYaml.runtime as Record<string, unknown>)?.entry_mode as 'cli' | 'mcp') || 'cli'),
-        context_id: ((runYaml.runtime as Record<string, unknown>)?.context_id as string | null) || null,
-        runtime_owner: ((runYaml.runtime as Record<string, unknown>)?.runtime_owner as string | null) || null,
-        session_id: String((runYaml.runtime as Record<string, unknown>)?.session_id || sessionId),
-        workflow_stage: normalizeWorkflowStage((runYaml.runtime as Record<string, unknown>)?.workflow_stage as string | undefined),
-      },
-    };
-  }
-
-  private toRunSummary(run: PersistedRunRecord): RunSummary {
-    return {
-      runId: run.runId,
-      turnId: run.turnId,
-      projectId: run.projectId,
-      sessionId: run.sessionId,
-      caseId: run.caseId,
-      mode: run.mode,
-      goal: run.goal,
-      captures: run.captures,
-      startedAt: run.startedAt,
-      finishedAt: run.finishedAt,
-      stoppedAt: run.stoppedAt,
-      status: run.status,
-      stopReason: run.stopReason,
-      lastStage: run.lastStage,
-      backend: run.backend,
-      reportPaths: run.reportPaths,
-    };
+    return loadPersistedRun(this.host, this.getRunPath(sessionId, runId), sessionId, runId);
   }
 
   private normalizeSessionTitle(projectId: string, title?: string): string {
@@ -846,77 +776,4 @@ export class SessionRecordStore {
     return Math.max(...usedIndexes) + 1;
   }
 
-  private reconcileProjectSessionTitles(project: ProjectRecord): SessionRecord[] {
-    const storedSessions = this.readProjectSessions(project);
-    const normalizedSessions = storedSessions.map(({ session, sessionPath }) => (
-      this.normalizeSessionRecord(session, sessionPath)
-    ));
-    const autoGeneratedTitlePattern = /^new session (\d+)$/i;
-    const timestampTitlePattern = /^Session \d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;
-    const autoSessions = normalizedSessions
-      .filter((session) => (
-        autoGeneratedTitlePattern.test(session.title.trim()) || timestampTitlePattern.test(session.title.trim())
-      ))
-      .sort((a, b) => {
-        if (a.createdAt !== b.createdAt) {
-          return a.createdAt - b.createdAt;
-        }
-        return a.sessionId.localeCompare(b.sessionId);
-      });
-
-    if (autoSessions.length === 0) {
-      return normalizedSessions;
-    }
-
-    const nextTitlesBySessionId = new Map<string, string>();
-    autoSessions.forEach((session, index) => {
-      nextTitlesBySessionId.set(session.sessionId, `new session ${index}`);
-    });
-
-    let didRewrite = false;
-    const rewrittenBySessionId = new Map<string, SessionRecord>();
-
-    for (const { sessionPath } of storedSessions) {
-      const session = normalizedSessions.find((entry) => entry.sessionPath === sessionPath);
-      if (!session) {
-        continue;
-      }
-
-      const nextTitle = nextTitlesBySessionId.get(session.sessionId);
-      if (nextTitle && session.title !== nextTitle) {
-        const rewrittenSession: SessionRecord = {
-          ...session,
-          title: nextTitle,
-        };
-        this.host.io.writeJsonAtomic(path.join(sessionPath, 'session.json'), rewrittenSession);
-        rewrittenBySessionId.set(session.sessionId, rewrittenSession);
-        didRewrite = true;
-        continue;
-      }
-
-      rewrittenBySessionId.set(session.sessionId, session);
-    }
-
-    if (!didRewrite) {
-      return normalizedSessions;
-    }
-
-    return normalizedSessions.map((session) => rewrittenBySessionId.get(session.sessionId) ?? session);
-  }
-
-  private readProjectSessions(project: ProjectRecord): Array<{ session: SessionRecord; sessionPath: string }> {
-    const sessionsRoot = this.host.projects.ensureProjectSessionsRoot(project);
-    if (!fs.existsSync(sessionsRoot)) {
-      return [];
-    }
-
-    return fs.readdirSync(sessionsRoot, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .map((entry) => {
-        const sessionPath = path.join(sessionsRoot, entry.name);
-        const session = this.host.io.readJson<SessionRecord>(path.join(sessionPath, 'session.json'));
-        return session ? { session, sessionPath } : null;
-      })
-      .filter((entry): entry is { session: SessionRecord; sessionPath: string } => entry !== null);
-  }
 }

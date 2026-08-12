@@ -1,0 +1,7 @@
+data: {"id":"chatcmpl_reasoning","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","reasoning_content":"plan next step"}}]}
+
+data: {"id":"chatcmpl_reasoning","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"Hello"}}]}
+
+data: {"id":"chatcmpl_reasoning","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]

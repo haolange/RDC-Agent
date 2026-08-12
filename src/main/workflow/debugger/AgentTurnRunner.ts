@@ -334,6 +334,9 @@ export class AgentTurnRunner {
     if (!input.preparedRuntime) {
       throw new Error('TURN_NOT_PREPARED: preparedRuntime is required; call prepareTurnContext/prepareProfileTurn before runAgentTurn.');
     }
+    if (!input.sessionId) {
+      throw new Error('EXECUTION_SCOPE_REQUIRED: runAgentTurn requires a session or ephemeral scope id.');
+    }
     const preparedRuntime = input.preparedRuntime;
     const turnPolicy = preparedRuntime.effectivePlan.policy;
     const effectiveModel = input.effectiveModel ?? null;
@@ -364,10 +367,7 @@ export class AgentTurnRunner {
       await mcpLease?.release({ discardIfIdle: true });
       throw error;
     }
-    if (!input.sessionId) {
-      throw new Error('EXECUTION_SCOPE_REQUIRED: runAgentTurn requires a session or ephemeral scope id.');
-    }
-    let slotKey = agentSlotKey(input.sessionId, input.agentId);
+    const slotKey = agentSlotKey(input.sessionId, input.agentId);
     let slot: AgentSlot | null = null;
     let unsubscribe: (() => void) | null = null;
     let unregisterAgentProducer: (() => void) | null = null;
@@ -406,10 +406,6 @@ export class AgentTurnRunner {
       definitions: preparedRuntime.runtimeTools.definitions,
       toolMap: liveRuntimeTools.toolMap,
     };
-    if (!input.sessionId) {
-      throw new Error('EXECUTION_SCOPE_REQUIRED: runAgentTurn requires a session or ephemeral scope id.');
-    }
-    slotKey = agentSlotKey(input.sessionId, input.agentId);
     const allToolSignature = this.deps.createToolSignature(runtimeTools.definitions);
     void this.deps.deferredActivation.resolveActivatedSet(slotKey, allToolSignature);
     const injectedToolDefinitions = preparedRuntime.activeToolDefinitions;

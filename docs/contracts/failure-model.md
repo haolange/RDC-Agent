@@ -45,6 +45,9 @@
 | Agent 连续三轮相同工具结果 | Integrity | `AGENT_NO_PROGRESS` → `CONVERSATION_AGENT_LOOP_STALLED`；不得误报 Provider failure |
 | Agent 达到 maxTurns 仍要求 continuation | Integrity | `AGENT_MAX_TURNS_EXCEEDED` → `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`；不得静默完成 |
 | JSONL 坏行 diagnostics | Integrity | 不静默当成功；调用方 assert |
+| Storage schema 损坏 | Integrity | quarantine + `STORAGE_CORRUPT` |
+| Storage 未知更高 schemaVersion | Integrity | `STORAGE_SCHEMA_UNSUPPORTED`，不 quarantine |
+| Memory 跨进程锁超时 | Availability | `.memory.lock` pid+stale recovery；超时 `MEMORY_LOCK_TIMEOUT` |
 | 非法历史 `workTrace` → null | Integrity | 读边界丢弃 |
 | Context 无法装入 → `CONTEXT_CANNOT_FIT` | Integrity | hard degrade 后仍失败则报错 |
 | 配置文件单文件 invalid + diagnostics | Integrity | 逐文件隔离，不拖垮列表 |

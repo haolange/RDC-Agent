@@ -69,6 +69,7 @@ import {
 import { SettingsAgentOps } from './SettingsAgentOps';
 import { SettingsProviderOps } from './SettingsProviderOps';
 import {
+  assertPersistedSettingsSchemaVersion,
   createDefaultRuntimeSettings,
   deleteSecretsAfterCommit,
   normalizePersistedSettings,
@@ -96,6 +97,7 @@ export class SettingsService {
     executionProfileService.ensureScaffold();
 
     const rawPersisted = readJsonFile<PersistedSettingsPayload>(runtimePaths.settingsPath);
+    assertPersistedSettingsSchemaVersion(rawPersisted, runtimePaths.settingsPath);
     const rebuildResult = rebuildPersistedSettings(rawPersisted, runtimePaths.userRdxRoot);
     this.persistHardRebuild(runtimePaths, rawPersisted, rebuildResult);
 
@@ -123,6 +125,7 @@ export class SettingsService {
     const paths = appPathService.getRuntimePaths();
     const persisted = readJsonFile<PersistedSettingsPayload>(paths.settingsPath)
       ?? createDefaultPersistedSettings();
+    assertPersistedSettingsSchemaVersion(persisted, paths.settingsPath);
     return toRuntimeSettings(persisted, runtimePaths);
   }
 

@@ -6,6 +6,8 @@
 
 RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDoc `.rdc`。它应能作为日常 agent 工作台完成阅读、规划、编辑、搜索、工具调用、handoff、memory 与 subagent 编排，同时保留 capture 打开、replay 上下文、RDX actions、诊断与 RenderDoc 调查等垂直能力。
 
+**发布面是 Windows-only。** `electron-builder.json` 只保留 `win`；mac/linux 安装包与公证不在产品范围内。POSIX launcher wrapper（`.sh`）仅供 Ubuntu CI 的 node 面准备，不是发布目标。Windows release 通道（`RDC_AGENT_RELEASE_CHANNEL=release` 或 git tag）必须提供 `WIN_CSC_LINK` / `WIN_CSC_KEY_PASSWORD`（或 `CSC_*` 别名）；本地 `pnpm run pack` 保持不签名。SBOM 由完整 `pnpm-lock.yaml` 传递依赖图生成 CycloneDX，并记录 git SHA 与 lockfile digest。
+
 **不做** image/video 生成 runtime、media provider 目录面或 `MediaRuntimeService` 类骨架；discovery 对非 agent modality（含 image/video output）保持 fail-closed 剔除。用户附件 vision-input（读图）仍属 agent chat 能力，与生成 media 无关。
 
 产品不是固定模式向导。Ask、Plan、Edit、Debugger、Analyzer、Optimizer 是 agent profiles（指令、工具、审批策略、handoff、可见性不同）。仅 `user-invocable` 的 profile 出现在 composer orchestrator 菜单。Plan 不是硬编码 `AppMode`，而是可研究、提问、写 plan artifact、调用允许的 subagent 并 handoff 实现的 `.agent.md` profile。
@@ -49,7 +51,7 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 
 ## 核心 Invariant
 
-- **资源优先级**：`builtin < user < project`；整资源替换；policy 只收紧（deny 并集、审批强度只升、数值上限只降）。执行时 `built-in hard deny > user/project policy floor > Full access > tool metadata`；预算值必须是非负整数，`0` 表示禁止对应执行并 fail-closed，即使 Full access 也不能绕过 policy floor。
+- **资源优先级**：`builtin < user < project`；整资源替换；policy 只收紧（deny 并集、审批强度只升、数值上限只降）。执行时 `built-in hard deny > user/project policy floor > Full access > tool metadata`；预算值必须是非负整数，`0` 表示禁止对应执行并 fail-closed，即使 Full access 也不能绕过 policy floor。Decision lattice 为 `allow < auto_review < ask_user < deny`；`approvalFloorByTool: user` 无条件 `ask_user`，不得被 Permission Mode（含 Auto-review）降级。
 - **Skill 工具面**：`allowedTools = ∩(skill_i) ∩ runtimeAllowlist`（空声明不收窄）；skill 只能收窄、永不扩展 profile 工具集；元工具豁免见 runtime 契约。
 - **Deferred tools**：未激活 deferred → `TOOL_NOT_ACTIVATED`；仅 `tool_search`（及契约允许的激活路径）可激活。
 - **Tasks 能力真值**：Prompt 只描述 route 最终实际注入的工具。Ask 仅可读 `task_list` / `task_get`；Plan/Edit 仅在其冻结工具集确实包含 mutation 工具时才宣称可写。text-only route 不得列出、模仿或反复搜索 Tasks 工具。
@@ -57,15 +59,15 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 - **Capability unknown**：`toolCalling.state === unknown` → text-only；仅 `supported` 才 `native-structured`。
 - **输出通道**：`ProviderOutputRef` 一经声明永久归属 `thinking` | `text` | `tool_call` 之一；普通 assistant text 永不合成 thinking；仅 `final_answer` 写正文。
 - **Secret**：`safeStorage` 不可用则 fail-closed；secret 不得进入 renderer / IPC 明文 / Trace / RequestPlan。
-- **Browser Bridge (debug-only)**: only `RDC_AGENT_BROWSER_QA=1` (launcher browser/browser-dev) starts it. The authoritative entry is the one-time `/qa?qaBootstrap=...` URL printed by the launcher; successful bootstrap mints an HttpOnly `SameSite=Strict` cookie (with `Secure` for HTTPS) and redirects to clean `/app` on the **same bridge origin**. In `browser-dev`, Vite is reverse-proxied through the bridge (including HMR WebSocket); the browser never opens the Vite port and never carries bridge auth or a challenge in a URL query. Programmatic clients may use an explicit Bearer header. Channel capability matrix: `read`/`mutation` default-allow; `high-impact` additionally requires `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`; `desktop-only` is always denied. Browser and Desktop share the single `src/shared/renderer-api` ElectronAPI factory and channel manifest; unknown, internal, unregistered, and plaintext-secret channels fail closed. This surface is never part of the release default path. See docs/contracts/permissions.md and docs/architecture/browser-qa-surface.md.
+- **Browser Bridge (debug-only)**: only `RDC_AGENT_BROWSER_QA=1` (launcher browser/browser-dev) starts it. The authoritative entry is the one-time `/qa?qaBootstrap=...` URL printed by the launcher; successful bootstrap mints an HttpOnly `SameSite=Strict` cookie (with `Secure` for HTTPS) and redirects to clean `/app` on the **same bridge origin**. In `browser-dev`, Vite is reverse-proxied through the bridge (including HMR WebSocket); the browser never opens the Vite port and never carries bridge auth or a challenge in a URL query. Cookie-authenticated `/invoke`, `/events`, and `/api/*` require `Origin` equal to the bridge origin. Dev proxy strips `cookie` / `authorization` / `proxy-authorization` / `x-rdc-*` before forwarding to Vite. Programmatic clients may use an explicit Bearer header. Channel capability is a closed `Record<RendererInvokeChannel, BridgeChannelCapability>` in `src/shared/renderer-api/channelCapabilities.ts`; TypeScript forces every new channel to be classified; unknown channels fail closed. `high-impact` additionally requires `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1`; `desktop-only` is always denied. Browser and Desktop share the single `src/shared/renderer-api` ElectronAPI factory and channel manifest. This surface is never part of the release default path. See docs/contracts/permissions.md and docs/architecture/browser-qa-surface.md.
 - **MCP project**：同 ID 不可覆盖 user 的 command/args/url/env；变更需 `needsRetrust` + 显式 trust；运行时连接按 `projectRoot + descriptorHash` 建立独立 ref-counted pool，handoff 只属于当前 Turn terminal result。
 - **RDX**：无内置 CLI 副本；Open `.rdc` 等垂直入口只走 Settings 配置的 shell action。
 - **Capture 所有权**：`ownerSessionId` 不匹配则 fail-closed；不得跨 session 继承已打开 capture。
 - **唯一 Turn Preparation**：`sendMessage` / `sendProfileMessage` / Subagent 经 `ProfileTurnPreparation`（或 conversation `prepareTurn`）冻结 `preparedRuntime`；`AgentTurnRunner` 无 preparedRuntime 抛 `TURN_NOT_PREPARED`，禁止 fallback plan。
 - **AgentState 复合键**：`sessionId|ephemeralScope` + `agentId`；renderer `agentStore` 与 IPC bridge 无 sessionId 的事件丢弃。
-- **存储 fail-closed**：`StorageIo.readJson` 区分 ENOENT(null) 与损坏（quarantine + throw）；写入走 atomic rename；`deepMerge` 拒绝 `__proto__`/`constructor`。
+- **存储 fail-closed**：`StorageIo.readJson` 区分 ENOENT(null)、损坏（quarantine + `STORAGE_CORRUPT`）与未知更高 `schemaVersion`（`STORAGE_SCHEMA_UNSUPPORTED`，不 quarantine）。JSON store 经 zod runtime 校验；带版本的文档走 `schemaVersion → migration registry → 升级`。Settings 的 `rebuildPersistedSettings` 是该框架下的 settings 迁移实现，未知更高版本同样 fail-closed。写入走 atomic rename；`deepMerge` 拒绝 `__proto__`/`constructor`。
 - **MCP transport**：仅 `stdio` / `streamable-http`；`sse` 配置 fail-closed（`MCP_TRANSPORT_UNSUPPORTED`）。Pool identity：`realpath + projectId + descriptorHash`；失败缓存指数退避；orphan pool quarantine。
-- **ToolValidator**：严格 JSON Schema 子集；默认拒绝未声明字段；不支持关键字编译期 fail-closed。
+- **ToolValidator**：严格 JSON Schema 子集；只接受 `SUPPORTED_SCHEMA_KEYS` 白名单；未声明字段与未实现关键字编译期 `UNSUPPORTED_TOOL_SCHEMA` fail-closed。
 - **Orchestrator façade**：`AgentOrchestrator.ts` 保持 façade（**少于 800 行**）；turn 准备、tool 装配、executor、turn/subagent runner、prompt-plan、memory UI 等职责外提到协作单元；门禁 `pnpm run check:orchestrator-facade`（亦挂在 `check:architecture`）。
 - **CSP**：生产 `script-src` 无 `unsafe-inline`；`style-src 'self'`（无 `unsafe-inline`）；`style-src-attr 'none'`；动态样式经 constructable stylesheet（`useDynStyle` / `assignDynStyle` / Appearance `applyChromeTheme`），禁止依赖 inline style attributes 或 `<style>` textContent 注入。Appearance chrome 权威见 [`docs/ui/design-system.md`](docs/ui/design-system.md)；`chromeThemes` 由 Settings `schemaVersion` **6** 起在升级时硬重置为 RDC 默认（不可逆，清历史污染）。
 - **IPC Zod**：全部 IPC handler 经 `parseIpcArgs`；非法 payload fail-closed；`approvalToken` 单次消费。

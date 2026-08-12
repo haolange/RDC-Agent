@@ -25,6 +25,34 @@ const HOP_BY_HOP = new Set([
   'content-length',
 ]);
 
+const STRIP_FROM_UPSTREAM = new Set([
+  'cookie',
+  'authorization',
+  'proxy-authorization',
+]);
+
+function shouldStripUpstreamHeader(name: string): boolean {
+  const key = name.toLowerCase();
+  return HOP_BY_HOP.has(key)
+    || STRIP_FROM_UPSTREAM.has(key)
+    || key.startsWith('x-rdc-');
+}
+
+/** Copy request headers to Vite without leaking bridge auth. */
+export function copyDevRendererUpstreamHeaders(
+  source: IncomingMessage,
+  targetHost: string,
+): Record<string, string | string[] | undefined> {
+  const headers: Record<string, string | string[] | undefined> = { ...source.headers };
+  for (const key of Object.keys(headers)) {
+    if (shouldStripUpstreamHeader(key)) {
+      delete headers[key];
+    }
+  }
+  headers.host = targetHost;
+  return headers;
+}
+
 /** Map bridge request path onto the Vite server path space. */
 export function mapDevRendererProxyPath(pathname: string, search = ''): string {
   if (pathname === '/app' || pathname === '/app/') {
@@ -53,13 +81,7 @@ export function shouldProxyToDevRenderer(
 }
 
 function copyRequestHeaders(source: IncomingMessage, targetHost: string): Record<string, string | string[] | undefined> {
-  const headers: Record<string, string | string[] | undefined> = { ...source.headers, host: targetHost };
-  for (const key of Object.keys(headers)) {
-    if (HOP_BY_HOP.has(key.toLowerCase())) {
-      delete headers[key];
-    }
-  }
-  return headers;
+  return copyDevRendererUpstreamHeaders(source, targetHost);
 }
 
 export function proxyHttpToDevRenderer(

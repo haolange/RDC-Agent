@@ -1,0 +1,14 @@
+event: contentBlockDelta
+data: {"contentBlockDelta":{"contentBlockIndex":0,"delta":{"text":"Hello world"}}}
+
+event: contentBlockStart
+data: {"contentBlockStart":{"start":{"toolUse":{"toolUseId":"tool_fixture_1","name":"read_file"}},"contentBlockIndex":1}}
+
+event: contentBlockDelta
+data: {"contentBlockDelta":{"contentBlockIndex":1,"delta":{"toolUse":{"input":"{\"path\":\"README.md\"}"}}}}
+
+event: metadata
+data: {"metadata":{"usage":{"inputTokens":12,"outputTokens":8,"totalTokens":20}}}
+
+event: messageStop
+data: {"messageStop":{"stopReason":"tool_use"}}

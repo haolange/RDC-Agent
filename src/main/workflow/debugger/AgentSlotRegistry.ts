@@ -86,6 +86,22 @@ export class AgentSlotRegistry {
     return Array.from(this.agentStates.values());
   }
 
+  /**
+   * Drop execution-only AgentState for a session or ephemeral/subagent scope.
+   * Durable history lives in Trace/Storage, not this registry.
+   */
+  purgeAgentStatesForScope(sessionOrScopeId: string): number {
+    const prefix = `${requireExecutionScopeId(sessionOrScopeId)}::`;
+    let removed = 0;
+    for (const key of Array.from(this.agentStates.keys())) {
+      if (key.startsWith(prefix)) {
+        this.agentStates.delete(key);
+        removed += 1;
+      }
+    }
+    return removed;
+  }
+
   updateAgentStatus(sessionOrScopeId: string, agentId: AgentRole, status: AgentState['status']): AgentState {
     const state = this.ensureAgentState(sessionOrScopeId, agentId);
     state.status = status;
@@ -188,9 +204,9 @@ export class AgentSlotRegistry {
     slot.agent.clearMessages();
   }
 
-  /** 分支切换 / 重写后显式同步：丢弃该 session 下全部 slot 执行缓存。 */
+  /** 分支切换 / 重写 / session 删除：丢弃该 scope 下 slot 执行缓存与 AgentState。 */
   syncSession(sessionId: string): void {
-    const prefix = `${sessionId}::`;
+    const prefix = `${requireExecutionScopeId(sessionId)}::`;
     for (const key of Array.from(this.agentSlots.keys())) {
       if (key.startsWith(prefix)) {
         const slot = this.agentSlots.get(key);
@@ -208,6 +224,7 @@ export class AgentSlotRegistry {
         this.agentSlots.delete(key);
       }
     }
+    this.purgeAgentStatesForScope(sessionId);
   }
 
   private getAgentCategory(role: AgentRole): AgentCategory {

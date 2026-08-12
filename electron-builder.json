@@ -30,28 +30,5 @@
     "perMachine": false,
     "allowToChangeInstallationDirectory": true,
     "deleteAppDataOnUninstall": false
-  },
-  "mac": {
-    "hardenedRuntime": true,
-    "gatekeeperAssess": false,
-    "notarize": false,
-    "target": [
-      {
-        "target": "dmg",
-        "arch": ["x64", "arm64"]
-      }
-    ],
-    "icon": "resources/icons/icon.icns",
-    "artifactName": "${productName}-${version}-${arch}.${ext}"
-  },
-  "linux": {
-    "target": [
-      {
-        "target": "AppImage",
-        "arch": ["x64"]
-      }
-    ],
-    "icon": "resources/icons/icon.png",
-    "artifactName": "${productName}-${version}-${arch}.${ext}"
   }
 }
