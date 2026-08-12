@@ -370,7 +370,7 @@ export function isPathExisting(absolutePath: string): boolean {
  */
 export async function withTemporaryPathAccess<T>(
   context: ToolExecutionContext | undefined,
-  allowedRoots: string[],
+  allowedRoots: readonly string[] | undefined,
   callback: (scopedContext: ToolExecutionContext | undefined) => Promise<T>,
 ): Promise<T> {
   if (!context) {
@@ -380,7 +380,7 @@ export async function withTemporaryPathAccess<T>(
     ...context,
     temporaryAllowedPathRoots: [
       ...(context.temporaryAllowedPathRoots ?? []),
-      ...allowedRoots,
+      ...(allowedRoots ?? []),
     ],
   };
   return callback(scopedContext);
