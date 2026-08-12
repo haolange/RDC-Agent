@@ -157,8 +157,9 @@ jobs:
         with:
           node-version: '22.13.0'
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
+      - name: Prepare through Windows wrapper
+        shell: cmd
+        run: scripts\start-rdc-agent.cmd --prepare-only
       - run: pnpm run pack
       - name: Desktop unpacked health smoke
         run: pnpm run smoke:desktop
