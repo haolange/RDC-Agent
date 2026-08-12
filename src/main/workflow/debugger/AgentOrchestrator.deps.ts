@@ -43,7 +43,7 @@ export { RuntimeToolAssembly } from './RuntimeToolAssembly';
 export { ToolExecutorFactory } from './ToolExecutorFactory';
 export { TurnPreparationService } from './TurnPreparationService';
 export { ProfileTurnPreparation } from './ProfileTurnPreparation';
-export { resolveExecutionScopeId, createEphemeralScopeId } from './executionScope';
+export { resolveExecutionScopeId, createEphemeralScopeId, isTransientExecutionScope } from './executionScope';
 export { OrchestratorMemoryUi } from './OrchestratorMemoryUi';
 export { AgentTurnRunner } from './AgentTurnRunner';
 export { SubagentRunner } from './SubagentRunner';

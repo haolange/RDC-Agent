@@ -22,6 +22,7 @@ import { appPathService } from '../runtime/AppPathService';
 import { agentManifestService } from './AgentManifestService';
 import { executionProfileService } from './ExecutionProfileService';
 import { secretStorageService } from './SecretStorageService';
+import { StorageSchemaError } from '../sessions/storageSchema';
 import {
   DEFAULT_APPEARANCE,
   DEFAULT_AGENT_RUNTIME,
@@ -102,6 +103,22 @@ export function readJsonFile<T>(filePath: string): T | null {
   } catch (error) {
     console.warn('[SettingsService] Failed to read JSON:', filePath, error);
     return null;
+  }
+}
+
+export function assertPersistedSettingsSchemaVersion(raw: unknown, filePath: string): void {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return;
+  }
+  const version = (raw as { schemaVersion?: unknown }).schemaVersion;
+  if (version == null) {
+    return;
+  }
+  const numeric = typeof version === 'number' ? version : Number(version);
+  if (Number.isFinite(numeric) && numeric > SETTINGS_SCHEMA_VERSION) {
+    throw new StorageSchemaError(
+      `STORAGE_SCHEMA_UNSUPPORTED: ${filePath} has schemaVersion ${version}; supported up to ${SETTINGS_SCHEMA_VERSION}`,
+    );
   }
 }
 

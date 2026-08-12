@@ -53,6 +53,8 @@
 | `ProcessSupervisor` | `src/main/runtime/` | 子进程 spawn/joinAll；仅在观察到 close/error 后移除 registry；超时未确认保留 `unconfirmed_orphan` |
 | `TurnCoordinator` / `TurnHandle` | `src/main/workflow/debugger/` | 每 session 活跃 turn；generation 丢弃迟到 event |
 | `ShutdownCoordinator` | `src/main/lifecycle/` | before-quit 限时 shutdownAll |
+| `MemoryStore` | `src/main/agent-runtime/memory/` | 进程内 realpath 队列 + `.memory.lock`（pid + stale recovery）跨进程互斥 |
+| `StorageIo` / `storageSchema` | `src/main/sessions/` | zod runtime 校验 + `schemaVersion` migration registry；未知更高版本 `STORAGE_SCHEMA_UNSUPPORTED` |
 | `EffectiveRuntimePlan` | `src/main/agent-runtime/` | `schemaVersion: 2`；`prepareTurn` 完整冻结；Prompt 与 Executor 共用 |
 | `LoopProgressGuard` / `AgentLoopTerminationError` | `src/main/agent-runtime/agent/` | 第二轮相同工具结果注入不落盘纠偏；第三轮 `AGENT_NO_PROGRESS`；仍需 continuation 的 max-turn 抛 `AGENT_MAX_TURNS_EXCEEDED`，不得静默完成或误报 Provider failure |
 | `AgentOrchestrator` | `src/main/workflow/debugger/AgentOrchestrator.ts` | façade 少于 800 行；职责外提；`pnpm run check:orchestrator-facade` |

@@ -11,6 +11,7 @@ import {
   resolveBridgeCookieToken,
   resolveProvidedBridgeToken,
   tokensMatch,
+  cookieOriginRequiredForPath,
 } from './bridgeSecurity';
 
 const { hasRegisteredIpcChannelMock } = vi.hoisted(() => ({
@@ -118,5 +119,13 @@ describe('browserAppBridge security', () => {
       authViaCookie: true,
       bridgeOrigin: 'http://127.0.0.1:5127',
     })).toBe(true);
+  });
+
+  it('requires cookie Origin for /invoke, /events, and /api/*', () => {
+    expect(cookieOriginRequiredForPath('/invoke')).toBe(true);
+    expect(cookieOriginRequiredForPath('/events')).toBe(true);
+    expect(cookieOriginRequiredForPath('/api/settings/providers/catalog')).toBe(true);
+    expect(cookieOriginRequiredForPath('/health')).toBe(false);
+    expect(cookieOriginRequiredForPath('/app')).toBe(false);
   });
 });

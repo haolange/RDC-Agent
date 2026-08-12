@@ -5,12 +5,12 @@
  * Asserts electron-builder.json has appId/files/platforms, no always-on secrets,
  * and that SBOM/checksum script paths exist.
  *
- * Signing / notarize (env-gated, never commit secrets):
- *   Windows: CSC_LINK, CSC_KEY_PASSWORD (or WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD)
- *   macOS signing: CSC_LINK, CSC_KEY_PASSWORD
- *   macOS notarize: APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
- *     (or APPLE_API_KEY / APPLE_API_KEY_ID / APPLE_API_ISSUER)
- *   CI packs with CSC_IDENTITY_AUTO_DISCOVERY=false unless a release job sets the above.
+ * Signing (env-gated, never commit secrets):
+ *   Windows release channel: WIN_CSC_LINK + WIN_CSC_KEY_PASSWORD
+ *     (CSC_LINK / CSC_KEY_PASSWORD also accepted).
+ *   Local `pnpm run pack` stays unsigned.
+ *   Required when RDC_AGENT_RELEASE_CHANNEL=release or GITHUB_REF is a tag.
+ * Product is Windows-only; mac/linux electron-builder targets are forbidden.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
@@ -46,10 +46,13 @@ if (!Array.isArray(builder.files) || builder.files.length === 0) {
   fail('electron-builder.json files must include out/**/*.');
 }
 
-for (const platform of ['win', 'mac', 'linux']) {
+for (const platform of ['win']) {
   if (!builder[platform] || typeof builder[platform] !== 'object') {
     fail(`electron-builder.json must declare platform config: ${platform}`);
   }
+}
+if (builder.mac || builder.linux) {
+  fail('electron-builder.json must not declare mac/linux targets; product is Windows-only.');
 }
 
 const secretPatterns = [
@@ -80,13 +83,22 @@ for (const forbiddenKey of [
 }
 
 if (builder.mac?.notarize === true) {
-  // Allowed only as an env-gated release toggle; credentials must come from APPLE_* env.
-  console.log('[release-config] mac.notarize=true relies on APPLE_* env at release time.');
-} else if (builder.mac && builder.mac.notarize !== false && builder.mac.notarize != null) {
-  const teamId = builder.mac.notarize?.teamId;
-  if (typeof teamId === 'string' && teamId.length > 0 && !teamId.includes('${env.')) {
-    fail('mac.notarize.teamId must be env-gated (${env.APPLE_TEAM_ID}) or omitted.');
+  fail('mac.notarize is forbidden; product is Windows-only.');
+}
+
+const requireWinSign = process.env.RDC_AGENT_RELEASE_CHANNEL === 'release'
+  || Boolean(process.env.GITHUB_REF && process.env.GITHUB_REF.startsWith('refs/tags/'));
+if (requireWinSign) {
+  const link = process.env.WIN_CSC_LINK || process.env.CSC_LINK;
+  const password = process.env.WIN_CSC_KEY_PASSWORD || process.env.CSC_KEY_PASSWORD;
+  if (!link) {
+    fail('Release channel requires WIN_CSC_LINK (or CSC_LINK).');
   }
+  if (!password) {
+    fail('Release channel requires WIN_CSC_KEY_PASSWORD (or CSC_KEY_PASSWORD).');
+  }
+} else {
+  console.log('[release-config] local/CI pack may stay unsigned (RDC_AGENT_RELEASE_CHANNEL is not release).');
 }
 
 const requiredScripts = [

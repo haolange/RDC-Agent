@@ -116,7 +116,7 @@ async function main() {
   }
   ok(`Starting ${executable} for ${HOLD_MS}ms`);
 
-  const child = spawn(executable, ['--no-sandbox'], {
+  const child = spawn(executable, [], {
     cwd: unpacked,
     env: {
       ...process.env,

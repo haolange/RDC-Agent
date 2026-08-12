@@ -1,6 +1,6 @@
 import { randomBytes, timingSafeEqual } from 'crypto';
 import { isRendererInvokeChannel } from '@shared/renderer-api';
-import { resolveBridgeChannelCapability } from '@shared/renderer-api/channelCapabilities';
+import { resolveBridgeChannelCapability, hasBridgeChannelCapability } from '@shared/renderer-api/channelCapabilities';
 import { hasRegisteredIpcChannel } from '../ipc/invokeRegistry';
 
 /**
@@ -17,6 +17,9 @@ export function isBridgeChannelAllowed(channel: string): boolean {
   if (!isRendererInvokeChannel(channel) || !hasRegisteredIpcChannel(channel)) {
     return false;
   }
+  if (!hasBridgeChannelCapability(channel)) {
+    return false;
+  }
   const capability = resolveBridgeChannelCapability(channel);
   if (capability === 'desktop-only') {
     return false;
@@ -25,11 +28,6 @@ export function isBridgeChannelAllowed(channel: string): boolean {
     return false;
   }
   return true;
-}
-
-/** @deprecated Prefer resolveBridgeChannelCapability — retained for tests that assert the high-impact set. */
-export function isBridgeHighRiskChannel(channel: string): boolean {
-  return resolveBridgeChannelCapability(channel) === 'high-impact';
 }
 
 export function createBridgeBearerToken(): string {
@@ -111,4 +109,11 @@ export function isOriginAllowed(
     return true;
   }
   return allowedOrigins.has(originHeader);
+}
+
+/** Cookie-authenticated product surfaces that must be same-origin to the bridge. */
+export function cookieOriginRequiredForPath(pathname: string): boolean {
+  return pathname === '/invoke'
+    || pathname === '/events'
+    || pathname.startsWith('/api/');
 }

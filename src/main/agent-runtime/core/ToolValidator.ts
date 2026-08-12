@@ -16,28 +16,25 @@ export class ToolValidationError extends Error {
   }
 }
 
-/** Keywords outside the supported subset — fail-closed at schema compile time. */
-const UNSUPPORTED_SCHEMA_KEYS = new Set([
-  'oneOf',
-  'anyOf',
-  'allOf',
-  'not',
-  '$ref',
-  '$defs',
-  'definitions',
-  'if',
-  'then',
-  'else',
-  'dependentSchemas',
-  'dependentRequired',
-  'patternProperties',
-  'propertyNames',
-  'unevaluatedProperties',
-  'unevaluatedItems',
-  'prefixItems',
-  'contains',
-  'minContains',
-  'maxContains',
+/** Closed supported JSON Schema subset — unknown keywords fail-closed. */
+const SUPPORTED_SCHEMA_KEYS = new Set([
+  'type',
+  'enum',
+  'const',
+  'default',
+  'required',
+  'properties',
+  'items',
+  'minimum',
+  'maximum',
+  'minLength',
+  'maxLength',
+  'pattern',
+  'minItems',
+  'maxItems',
+  'additionalProperties',
+  'description',
+  'title',
 ]);
 
 const MAX_SCHEMA_DEPTH = 12;
@@ -87,7 +84,7 @@ function assertSupportedSchema(
     );
   }
   for (const key of Object.keys(schema)) {
-    if (UNSUPPORTED_SCHEMA_KEYS.has(key)) {
+    if (!SUPPORTED_SCHEMA_KEYS.has(key)) {
       throw new ToolValidationError(
         `不支持的 schema 关键字 "${key}"（严格子集 fail-closed）`,
         path,
@@ -118,7 +115,7 @@ function assertSupportedSchema(
  * 设计原则：
  * - 不引入第三方依赖（如 AJV），实现轻量自包含。
  * - Strict subset: type/required/properties/items/enum/const/min-max/pattern; undeclared fields rejected by default.
- * - Compile-time reject unsupported keywords (oneOf/anyOf/allOf/$ref).
+ * - Compile-time reject any keyword outside SUPPORTED_SCHEMA_KEYS.
  * - Non-safe fields may coerce mildly; path/command/URL stay fail-closed exact types.
  */
 export class ToolValidator {

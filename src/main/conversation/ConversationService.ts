@@ -430,7 +430,12 @@ export class ConversationService {
 
   private async runIdempotentTurn(
     input: ConversationContextInput | ConversationRewriteContextInput,
-    operation: (requestId: string, controller: AbortController, requestFingerprint: string) => Promise<ConversationTurnResult>,
+    operation: (
+      requestId: string,
+      controller: AbortController,
+      requestFingerprint: string,
+      attachments: ConversationAttachmentInput[],
+    ) => Promise<ConversationTurnResult>,
   ): Promise<ConversationTurnResult> {
     if (!this.acceptingTurns) {
       throw new Error('SHUTTING_DOWN: conversation service is no longer accepting turns.');
@@ -439,13 +444,44 @@ export class ConversationService {
     if (!requestId) throw new Error('PREFLIGHT_FAILED: requestId is required.');
     const { scopeKey, idempotencyKey } = this.resolveIdempotencyScope(input);
 
-    // Controller first so Stop during fingerprint hashing can abort streams.
     const controller = new AbortController();
     let stagingDir: string | null = null;
-    let fingerprint: string;
+    let fingerprint: string | null = null;
+    const existingPreparation = this.preparingRequests.get(idempotencyKey);
+    const ownsPreparation = !existingPreparation;
+    if (ownsPreparation) {
+      const scopeOwner = this.activeSendScopes.get(scopeKey);
+      if (scopeOwner && scopeOwner !== requestId) {
+        throw new Error('CONVERSATION_BUSY: another request is preparing for this conversation.');
+      }
+      this.activeSendScopes.set(scopeKey, requestId);
+      this.preparingRequests.set(idempotencyKey, {
+        requestId,
+        controller,
+        phase: 'preparing',
+        scopeKey,
+        cancelAfterCommit: false,
+        credentialLeaseTransferred: false,
+      });
+    }
+    const activeController = existingPreparation?.controller ?? controller;
+
+    const releasePreparation = (releaseRegistry = ownsPreparation): void => {
+      if (stagingDir) {
+        fs.rmSync(stagingDir, { recursive: true, force: true });
+        stagingDir = null;
+      }
+      if (!releaseRegistry) return;
+      const requestState = this.preparingRequests.get(idempotencyKey);
+      if (requestState?.credentialHandle && !requestState.credentialLeaseTransferred) {
+        agentOrchestrator.releaseProviderRuntimeCredentials(requestState.credentialHandle);
+      }
+      this.preparingRequests.delete(idempotencyKey);
+      if (this.activeSendScopes.get(scopeKey) === requestId) this.activeSendScopes.delete(scopeKey);
+    };
+
     try {
       const attachments = input.attachments ?? [];
-      // Light validation before heavy hash work.
       for (const attachment of attachments) {
         if (!attachment.sourcePath || typeof attachment.sourcePath !== 'string') {
           throw new Error('PREFLIGHT_FAILED: attachment sourcePath is required.');
@@ -457,67 +493,44 @@ export class ConversationService {
         stagingDir = staged.stagingDir;
         stagedAttachments = staged.stagedAttachments;
       }
-      fingerprint = await this.computeRequestFingerprint(input, controller.signal, stagedAttachments);
-    } catch (error) {
-      if (stagingDir) fs.rmSync(stagingDir, { recursive: true, force: true });
-      throw error;
-    }
-
-    try {
+      if (activeController.signal.aborted) {
+        throw new Error('TURN_CANCELLED: preparation aborted.');
+      }
+      fingerprint = await this.computeRequestFingerprint(input, activeController.signal, stagedAttachments);
       this.assertFingerprintMatch(idempotencyKey, fingerprint);
       const existing = this.sendRequests.get(idempotencyKey);
       if (existing) {
-        if (stagingDir) fs.rmSync(stagingDir, { recursive: true, force: true });
+        releasePreparation();
         return existing;
       }
       const persisted = await this.findPersistedTurn(input, requestId, fingerprint);
       if (persisted) {
-        if (stagingDir) fs.rmSync(stagingDir, { recursive: true, force: true });
         this.sendRequestFingerprints.set(idempotencyKey, fingerprint);
+        releasePreparation();
         return persisted;
       }
 
-      const scopeOwner = this.activeSendScopes.get(scopeKey);
-      if (scopeOwner && scopeOwner !== requestId) {
-        throw new Error('CONVERSATION_BUSY: another request is preparing for this conversation.');
-      }
+      const pending = operation(requestId, activeController, fingerprint, stagedAttachments)
+        .finally(() => {
+          releasePreparation();
+        });
+      this.rememberSendRequest(idempotencyKey, fingerprint, pending);
+      void pending.catch(() => {
+        if (this.sendRequests.get(idempotencyKey) === pending) {
+          this.sendRequests.delete(idempotencyKey);
+          this.sendRequestFingerprints.delete(idempotencyKey);
+        }
+      });
+      return pending;
     } catch (error) {
-      if (stagingDir) fs.rmSync(stagingDir, { recursive: true, force: true });
+      releasePreparation();
       throw error;
     }
-    this.activeSendScopes.set(scopeKey, requestId);
-    this.preparingRequests.set(idempotencyKey, {
-      requestId,
-      controller,
-      phase: 'preparing',
-      scopeKey,
-      cancelAfterCommit: false,
-      credentialLeaseTransferred: false,
-    });
-    // Note: commit still re-copies from original source paths; staged bytes are fingerprint-only in this batch.
-    const pending = operation(requestId, controller, fingerprint)
-      .finally(() => {
-        if (stagingDir) fs.rmSync(stagingDir, { recursive: true, force: true });
-        const requestState = this.preparingRequests.get(idempotencyKey);
-        if (requestState?.credentialHandle && !requestState.credentialLeaseTransferred) {
-          agentOrchestrator.releaseProviderRuntimeCredentials(requestState.credentialHandle);
-        }
-        this.preparingRequests.delete(idempotencyKey);
-        if (this.activeSendScopes.get(scopeKey) === requestId) this.activeSendScopes.delete(scopeKey);
-      });
-    this.rememberSendRequest(idempotencyKey, fingerprint, pending);
-    void pending.catch(() => {
-      if (this.sendRequests.get(idempotencyKey) === pending) {
-        this.sendRequests.delete(idempotencyKey);
-        this.sendRequestFingerprints.delete(idempotencyKey);
-      }
-    });
-    return pending;
   }
 
   async sendMessage(input: ConversationContextInput): Promise<ConversationTurnResult> {
     const trimmed = input.message.trim();
-    return this.runIdempotentTurn(input, async (requestId, controller, requestFingerprint) => {
+    return this.runIdempotentTurn(input, async (requestId, controller, requestFingerprint, attachments) => {
         const context = await this.resolveContext(input);
         if (context.session && Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === context.session?.sessionId)) {
           throw new Error('CONVERSATION_BUSY: this conversation already has a running turn.');
@@ -527,7 +540,7 @@ export class ConversationService {
           input.mode,
           input.agentId ?? null,
           trimmed,
-          input.attachments ?? [],
+          attachments,
           input.preloadSkillIds ?? [],
           undefined,
           input.turnControls,
@@ -540,8 +553,8 @@ export class ConversationService {
   }
 
   async rewriteFromMessage(input: ConversationRewriteContextInput): Promise<ConversationTurnResult> {
-    return this.runIdempotentTurn(input, (requestId, controller, requestFingerprint) => this.rewriteFromMessageCore(
-      { ...input, requestId },
+    return this.runIdempotentTurn(input, (requestId, controller, requestFingerprint, attachments) => this.rewriteFromMessageCore(
+      { ...input, requestId, attachments },
       controller,
       requestFingerprint,
     ));

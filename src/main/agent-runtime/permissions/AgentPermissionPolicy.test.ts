@@ -315,6 +315,60 @@ describe('AgentPermissionPolicyService hard deny and path extract', () => {
       compiledPolicy,
     });
     expect(decision.action).toBe('deny');
+    expect(decision.reason).toMatch(/deniedTools|denied/i);
+  });
+});
+
+describe('AgentPermissionPolicyService floor × mode lattice', () => {
+  const service = new AgentPermissionPolicyService();
+  const writeFileTool: AgentTool = {
+    name: 'write_file',
+    description: 'write file',
+    parameters: { type: 'object', properties: {} },
+    permissionHint: 'mutation',
+    execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+  };
+
+  function evaluate(mode: AgentPermissionMode, floor: 'none' | 'auto_review' | 'user') {
+    mockSettings.agentRuntime.permissions.mode = mode;
+    mockSettings.agentRuntime.permissions.readableRoots = [];
+    mockSettings.agentRuntime.permissions.writableRoots = [];
+    mockSettings.agentRuntime.permissions.allowedCommandPrefixes = [];
+    mockSettings.agentRuntime.permissions.deniedCommandPrefixes = [];
+    const compiledPolicy = floor === 'none'
+      ? compilePolicyFromRestrictive({})
+      : compilePolicyFromRestrictive({ approvalFloorByTool: { write_file: floor } });
+    return service.evaluate({
+      tool: writeFileTool,
+      toolCall: {
+        type: 'toolCall',
+        id: 'tc-write',
+        name: 'write_file',
+        arguments: { path: path.join(workspaceRoot, 'out.txt') },
+      },
+      projectRootPath: workspaceRoot,
+      compiledPolicy,
+    });
+  }
+
+  const modes: AgentPermissionMode[] = ['default', 'auto-review', 'full-access', 'custom'];
+
+  it.each(modes)('floor=user stays ask_user in %s mode', (mode) => {
+    expect(evaluate(mode, 'user').action).toBe('ask_user');
+  });
+
+  it.each(modes)('floor=auto_review never drops below auto_review in %s mode', (mode) => {
+    const action = evaluate(mode, 'auto_review').action;
+    expect(['auto_review', 'ask_user', 'deny']).toContain(action);
+    expect(action).not.toBe('allow');
+  });
+
+  it('does not let auto-review mode weaken a user floor below ask_user', () => {
+    expect(evaluate('auto-review', 'user').action).toBe('ask_user');
+  });
+
+  it('keeps full-access allow when floor is none', () => {
+    expect(evaluate('full-access', 'none').action).toBe('allow');
   });
 });
 

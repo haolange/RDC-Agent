@@ -5,6 +5,7 @@ import { writeYaml } from '@shared/utils/yaml';
 import type { ProjectInputRecord, ProjectRecord } from '@shared/types/session';
 import { appPathService } from '../runtime/AppPathService';
 import type { ProjectRegistry, SelectionState } from './storageTypes';
+import { PROJECT_REGISTRY_MIGRATIONS, SelectionStateSchema } from './storageSchema';
 
 
 export class ProjectWorkspaceStore {
@@ -233,7 +234,7 @@ export class ProjectWorkspaceStore {
   }
 
   readRegistry(): ProjectRegistry {
-    const loaded = this.host.io.readJson<ProjectRegistry>(this.host.registryPath);
+    const loaded = this.host.io.readJson(this.host.registryPath, PROJECT_REGISTRY_MIGRATIONS);
     if (!loaded) {
       const empty: ProjectRegistry = {
         schemaVersion: '1',
@@ -244,8 +245,8 @@ export class ProjectWorkspaceStore {
     }
 
     const registry: ProjectRegistry = {
-      schemaVersion: loaded.schemaVersion === '1' ? '1' : '1',
-      projects: Array.isArray(loaded.projects) ? loaded.projects : [],
+      schemaVersion: loaded.schemaVersion,
+      projects: loaded.projects,
     };
     const normalizedProjects = registry.projects.map((project) => this.normalizeProjectRecord(project));
     const changed = JSON.stringify(normalizedProjects) !== JSON.stringify(registry.projects);
@@ -265,7 +266,7 @@ export class ProjectWorkspaceStore {
   }
 
   readSelection(): SelectionState {
-    const loaded = this.host.io.readJson<SelectionState>(this.host.selectionPath);
+    const loaded = this.host.io.readJson(this.host.selectionPath, SelectionStateSchema);
     if (!loaded) {
       const empty: SelectionState = {
         projectId: null,

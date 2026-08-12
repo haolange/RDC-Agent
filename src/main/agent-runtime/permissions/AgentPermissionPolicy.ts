@@ -226,7 +226,6 @@ const DECISION_STRENGTH: Record<AgentPermissionDecisionAction, number> = {
 
 function floorAction(
   floor: 'none' | 'auto_review' | 'user',
-  mode: AgentPermissionMode,
   toolName: string,
 ): AgentPermissionDecision | null {
   if (floor === 'none') return null;
@@ -238,7 +237,12 @@ function floorAction(
       temporaryPathRoots: [],
     };
   }
-  return request(mode, `Compiled policy requires approval for tool "${toolName}".`, 'high');
+  return {
+    action: 'ask_user',
+    reason: `Compiled policy requires approval for tool "${toolName}".`,
+    risk: 'high',
+    temporaryPathRoots: [],
+  };
 }
 
 function maxDecision(
@@ -312,7 +316,7 @@ export class AgentPermissionPolicyService {
       toolName,
       input.tool.permissionHint,
     );
-    return maxDecision(baseline, floorAction(floor, mode, input.toolCall.name));
+    return maxDecision(baseline, floorAction(floor, input.toolCall.name));
   }
 
   private evaluateBaseline(

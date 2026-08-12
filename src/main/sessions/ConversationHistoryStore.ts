@@ -15,6 +15,12 @@ import {
   type ConversationTurnCommitJournal,
   type ExistingConversationTurnCommit,
 } from './storageCommitTypes';
+import {
+  CONVERSATION_TERMINAL_COMMIT_MIGRATIONS,
+  CONVERSATION_TURN_COMMIT_MIGRATIONS,
+  SessionAttachmentManifestSchema,
+  SessionRecordSchema,
+} from './storageSchema';
 
 export type {
   ExistingConversationTurnCommit,
@@ -79,7 +85,7 @@ export class ConversationHistoryStore {
     branchState: ConversationBranchState | null,
   ): void {
     const journalPath = this.getConversationTurnCommitJournalPath(commit.session.sessionPath);
-    const journal = this.host.io.readJson<ConversationTurnCommitJournal>(journalPath);
+    const journal = this.host.io.readJson(journalPath, CONVERSATION_TURN_COMMIT_MIGRATIONS);
     if (!journal || journal.requestId !== commit.requestId || journal.turnId !== commit.turnId) {
       throw new Error('Conversation turn commit journal is missing or belongs to another turn.');
     }
@@ -557,7 +563,7 @@ export class ConversationHistoryStore {
           fs.rmSync(entryPath, { recursive: true, force: true });
           continue;
         }
-        const session = this.host.io.readJson<SessionRecord>(path.join(entryPath, 'session.json'));
+        const session = this.host.io.readJson(path.join(entryPath, 'session.json'), SessionRecordSchema);
         if (session) {
           this.recoverSessionTurnCommit(session.sessionId);
           this.recoverSessionTerminalCommit(session.sessionId);
@@ -570,9 +576,9 @@ export class ConversationHistoryStore {
     const location = this.host.sessions.findSessionLocation(sessionId);
     if (!location) return;
     const journalPath = this.getConversationTurnCommitJournalPath(location.sessionPath);
-    const journal = this.host.io.readJson<ConversationTurnCommitJournal>(journalPath);
+    const journal = this.host.io.readJson(journalPath, CONVERSATION_TURN_COMMIT_MIGRATIONS);
     if (!journal) return;
-    const session = this.host.io.readJson<SessionRecord>(path.join(location.sessionPath, 'session.json'));
+    const session = this.host.io.readJson(path.join(location.sessionPath, 'session.json'), SessionRecordSchema);
     if (!session) return;
     const shouldRollForward = !forceRollback
       && (journal.phase === 'committing' || journal.phase === 'committed')
@@ -585,9 +591,9 @@ export class ConversationHistoryStore {
     const location = this.host.sessions.findSessionLocation(sessionId);
     if (!location) return;
     const journalPath = this.getConversationTerminalCommitJournalPath(location.sessionPath);
-    const journal = this.host.io.readJson<ConversationTerminalCommitJournal>(journalPath);
+    const journal = this.host.io.readJson(journalPath, CONVERSATION_TERMINAL_COMMIT_MIGRATIONS);
     if (!journal) return;
-    const session = this.host.io.readJson<SessionRecord>(path.join(location.sessionPath, 'session.json'));
+    const session = this.host.io.readJson(path.join(location.sessionPath, 'session.json'), SessionRecordSchema);
     if (!session) return;
     const shouldRollForward = journal.phase === 'committing' || journal.phase === 'committed';
     this.applyConversationTerminalJournal(session, journal, shouldRollForward);
@@ -639,7 +645,7 @@ export class ConversationHistoryStore {
   }
 
   readSessionAttachments(sessionId: string): SessionAttachmentRecord[] {
-    return this.host.io.readJson<SessionAttachmentRecord[]>(this.host.sessions.getSessionAttachmentsManifestPath(sessionId)) ?? [];
+    return this.host.io.readJson(this.host.sessions.getSessionAttachmentsManifestPath(sessionId), SessionAttachmentManifestSchema) ?? [];
   }
 
   writeSessionAttachments(sessionId: string, attachments: SessionAttachmentRecord[]): void {
@@ -699,7 +705,7 @@ export class ConversationHistoryStore {
 
   /**
    * Copy attachment sources into a turn staging directory and return staged absolute paths
-   * in the same order as the input. Used for fingerprint hashing before commit may re-copy.
+   * in the same order as the input. Commit/materialize must use these staged bytes, not the original sources.
    */
   stageAttachmentInputs(sourcePaths: string[], stagingDir: string): string[] {
     this.host.io.ensureDir(stagingDir);

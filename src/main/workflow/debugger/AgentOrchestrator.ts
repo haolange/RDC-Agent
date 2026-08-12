@@ -2,31 +2,9 @@
  * AgentOrchestrator — façade over turn preparation, tool assembly, executor,
  * turn runner, subagent runner, and prompt-plan helpers.
  *
- * 公共契约（不变）：
- *  - `sendMessage(agentId, content, runContext?, options?) → Promise<string>`
- *  - `sendProfileMessage(agentId, content, options?) -> Promise<string>`
- *  - `getAgentState`, `getAllAgentStates`, `configureAgent`, `applyLlmConfig`
- *  - `prepareTurnContext`（委托 TurnPreparationService）
- *  - 状态广播仍走 `WorkflowProjectionPublisher`，事件名不变。
- *
- * Phase 4：状态登记委托 AgentSlotRegistry / McpConnectionCoordinator /
- * DeferredToolActivationTracker?TurnEventSink ? TurnCoordinator ???
- *
- * Provider path: LLM streaming is delegated to AgentTurnRunner which uses
- * `configuredRuntimeProvider` (the HAL adapter registry entry point).
- *
- * Tool gating: AgentTurnRunner calls `resolveAgentRouteCapability` to determine
- * `activeToolDefinitions` based on route capability. `describeRouteCapabilityDiagnostic`
- * emits diagnostics for text-only or disabled routes. `recordObservedToolCallingSupport`
- * persists structured tool evidence. Diagnostics include `textual_tool_call_not_executed`
- * and `empty_response_without_tool_call` normalization.
- *
- * Permission: Tools are mediated via `agentPermissionPolicyService.evaluate` and
- * `agentToolApprovalRequestService.request` / `agentToolApprovalRequestService.autoReview`.
- * External path access uses `withTemporaryPathAccess` scoped to tool execution.
- *
- * PromptPlan is required before creating an agent runtime slot.
- * RequestEnvelope snapshots are created via `requestEnvelopeBuilder.build`.
+ * Public contract: `sendMessage` / `sendProfileMessage` / `getAgentState` /
+ * `configureAgent` / `prepareTurnContext`. LLM streaming and tool gating stay
+ * in AgentTurnRunner; permissions stay in AgentPermissionPolicy.
  */
 
 import type {
@@ -78,6 +56,7 @@ import {
   OrchestratorMemoryUi,
   resolveExecutionScopeId,
   createEphemeralScopeId,
+  isTransientExecutionScope,
   workflowProjectionPublisher,
   type AbortReason,
   type AgentProfileTurnOptions,
@@ -184,6 +163,11 @@ export class AgentOrchestrator {
   syncSessionSlots(sessionId: string): void {
     this.slots.syncSession(sessionId);
     this.deferredActivation.clearSession(sessionId);
+  }
+
+  private releaseTransientAgentState(scopeId: string): void {
+    if (!isTransientExecutionScope(scopeId)) return;
+    this.slots.purgeAgentStatesForScope(scopeId);
   }
 
   private getOrCreateAgentConfig(agentId: AgentRole): AgentConfig {
@@ -360,6 +344,7 @@ export class AgentOrchestrator {
       this.updateAgentStatus(executionScopeId, agentId, 'error');
       throw error;
     } finally {
+      this.releaseTransientAgentState(executionScopeId);
       if (preparedLeaseRelease) {
         await preparedLeaseRelease().catch(() => undefined);
       }
@@ -605,6 +590,7 @@ export class AgentOrchestrator {
       this.updateAgentStatus(executionScopeId, agentId, 'error');
       throw error;
     } finally {
+      this.releaseTransientAgentState(executionScopeId);
       if (preparedLeaseRelease) {
         await preparedLeaseRelease().catch(() => undefined);
       }

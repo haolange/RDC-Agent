@@ -37,6 +37,9 @@ import { __testing as openAIResponsesTesting } from '../../agent-runtime/provide
 import { __testing as anthropicTesting } from '../../agent-runtime/providers/AnthropicProvider';
 import { __testing as geminiTesting } from '../../agent-runtime/providers/GeminiProvider';
 import { __testing as ollamaTesting } from '../../agent-runtime/providers/OllamaProvider';
+import { __testing as azureTesting } from '../../agent-runtime/providers/AzureOpenAIResponsesProvider';
+import { __testing as mistralTesting } from '../../agent-runtime/providers/MistralProvider';
+import { __testing as bedrockTesting } from '../../agent-runtime/providers/BedrockConverseProvider';
 import { buildGoogleInteractionsRequest } from '../../agent-runtime/providers/GoogleInteractionsWire';
 
 const FIXTURE_ROOT = path.join(__dirname, '../../agent-runtime/providers/__fixtures__');
@@ -114,6 +117,33 @@ const ADAPTER_FIXTURES: readonly AdapterFixtureSpec[] = [
     transport: 'jsonl',
     providerId: 'ollama',
     modelId: 'fixture-model',
+  },
+  {
+    dir: 'azure-openai-responses',
+    adapterId: 'azure-openai-responses',
+    protocol: 'AzureOpenAIResponses',
+    streamFile: 'stream.sse',
+    transport: 'sse',
+    providerId: 'azure-cognitive-services',
+    modelId: 'fixture-azure',
+  },
+  {
+    dir: 'mistral-conversations',
+    adapterId: 'mistral-conversations',
+    protocol: 'MistralConversations',
+    streamFile: 'stream.sse',
+    transport: 'sse',
+    providerId: 'mistral',
+    modelId: 'mistral-fixture',
+  },
+  {
+    dir: 'bedrock-converse-stream',
+    adapterId: 'bedrock-converse-stream',
+    protocol: 'BedrockConverseStream',
+    streamFile: 'stream.sse',
+    transport: 'sse',
+    providerId: 'amazon-bedrock',
+    modelId: 'fixture-bedrock',
   },
 ];
 
@@ -295,6 +325,32 @@ function assertTextAndToolCall(spec: AdapterFixtureSpec, events: Record<string, 
       expect(events.some((event) => event.done === true)).toBe(true);
       break;
     }
+    case 'mistral-conversations': {
+      const hasText = events.some((event) => {
+        const choice = (event.choices as Array<Record<string, unknown>> | undefined)?.[0];
+        const delta = choice?.delta as Record<string, unknown> | undefined;
+        return typeof delta?.content === 'string' && delta.content.length > 0;
+      });
+      const hasTool = events.some((event) => {
+        const choice = (event.choices as Array<Record<string, unknown>> | undefined)?.[0];
+        const delta = choice?.delta as Record<string, unknown> | undefined;
+        return Array.isArray(delta?.tool_calls) && delta.tool_calls.length > 0;
+      });
+      expect(hasText).toBe(true);
+      expect(hasTool).toBe(true);
+      break;
+    }
+    case 'azure-openai-responses': {
+      const types = events.map((event) => event.type);
+      expect(types).toContain('response.output_text.delta');
+      expect(types).toContain('response.function_call_arguments.delta');
+      break;
+    }
+    case 'bedrock-converse-stream': {
+      expect(events.some((event) => event.contentBlockDelta)).toBe(true);
+      expect(JSON.stringify(events)).toMatch(/read_file/);
+      break;
+    }
     default:
       throw new Error(`Unhandled fixture dir: ${spec.dir}`);
   }
@@ -347,6 +403,25 @@ function assertWireBody(spec: AdapterFixtureSpec, plan: RequestPlan): void {
     case 'ollama': {
       const messages = ollamaTesting.toOllamaMessages(FIXTURE_CONTEXT);
       expect(messages[0]).toMatchObject({ role: 'system', content: 'Stay precise.' });
+      expect(messages.some((message) => message.role === 'user')).toBe(true);
+      break;
+    }
+    case 'mistral-conversations': {
+      const messages = mistralTesting.toMistralMessages(FIXTURE_CONTEXT, plan);
+      expect(messages.some((message) => message.role === 'system' || message.role === 'user')).toBe(true);
+      expect(mistralTesting.buildMistralChatCompletionsUrl(plan.route.baseUrl ?? '')).toMatch(/\/chat\/completions$/);
+      break;
+    }
+    case 'azure-openai-responses': {
+      const body = azureTesting.buildRequestBody(model, FIXTURE_CONTEXT, { requestPlan: plan });
+      expect(body).toMatchObject({
+        model: model.id,
+        stream: true,
+      });
+      break;
+    }
+    case 'bedrock-converse-stream': {
+      const messages = bedrockTesting.toBedrockMessages(FIXTURE_CONTEXT);
       expect(messages.some((message) => message.role === 'user')).toBe(true);
       break;
     }

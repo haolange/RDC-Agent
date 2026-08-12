@@ -15,6 +15,7 @@ import {
   resolveBridgeAllowedOrigins,
   resolveBridgeCookieToken,
   tokensMatch,
+  cookieOriginRequiredForPath,
 } from './bridgeSecurity';
 import {
   attachDevRendererWebSocketProxy,
@@ -310,7 +311,7 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
   const isPublicAsset = !options.devRendererUrl
     && (url.pathname.startsWith('/assets/') || url.pathname === '/favicon.ico');
   if (!isPublicAsset && !requireBridgeAuth(request, bridgeOrigin, {
-    requireCookieOrigin: url.pathname === '/invoke' || url.pathname.startsWith('/api/'),
+    requireCookieOrigin: cookieOriginRequiredForPath(url.pathname),
   }).ok) {
     sendJson(response, 401, { success: false, error: 'Unauthorized' }, requestOrigin);
     return;

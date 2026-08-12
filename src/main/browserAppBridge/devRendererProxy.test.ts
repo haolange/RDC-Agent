@@ -6,6 +6,7 @@ import {
   mapDevRendererProxyPath,
   proxyHttpToDevRenderer,
   shouldProxyToDevRenderer,
+  copyDevRendererUpstreamHeaders,
 } from './devRendererProxy';
 
 describe('devRendererProxy path mapping', () => {
@@ -27,6 +28,30 @@ describe('devRendererProxy path mapping', () => {
     expect(shouldProxyToDevRenderer('/app', 'http://127.0.0.1:5173')).toBe(true);
     expect(shouldProxyToDevRenderer('/invoke', 'http://127.0.0.1:5173')).toBe(false);
     expect(shouldProxyToDevRenderer('/app', null)).toBe(false);
+  });
+});
+
+describe('devRendererProxy upstream header stripping', () => {
+  it('strips cookie, authorization, and x-rdc-* before forwarding to Vite', () => {
+    const headers = copyDevRendererUpstreamHeaders(
+      {
+        headers: {
+          host: '127.0.0.1:5127',
+          cookie: 'rdcBridgeToken=SECRET',
+          authorization: 'Bearer SECRET',
+          'proxy-authorization': 'Basic SECRET',
+          'x-rdc-debug': 'nope',
+          accept: 'text/html',
+        },
+      } as unknown as IncomingMessage,
+      '127.0.0.1:5173',
+    );
+    expect(headers.host).toBe('127.0.0.1:5173');
+    expect(headers.cookie).toBeUndefined();
+    expect(headers.authorization).toBeUndefined();
+    expect(headers['proxy-authorization']).toBeUndefined();
+    expect(headers['x-rdc-debug']).toBeUndefined();
+    expect(headers.accept).toBe('text/html');
   });
 });
 

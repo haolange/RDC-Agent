@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ToolValidationError, ToolValidator } from './ToolValidator';
 import type { ToolDefinition } from './types';
+import { toolToDefinition } from '../agent/AgentTool';
+import { getPrimitiveTools, createToolSearchTool } from '../tools';
 
 const validator = new ToolValidator();
 
@@ -104,6 +106,30 @@ describe('ToolValidator', () => {
     )).toThrow(/不支持的 schema 关键字/);
   });
 
+  it('rejects keywords outside the closed supported subset', () => {
+    const unsupported = [
+      'exclusiveMinimum',
+      'exclusiveMaximum',
+      'multipleOf',
+      'minProperties',
+      'maxProperties',
+      'uniqueItems',
+      'format',
+      '$id',
+    ];
+    for (const key of unsupported) {
+      expect(() => validator.validate(
+        def({
+          type: 'object',
+          properties: {
+            n: { type: 'number', [key]: 1 } as never,
+          },
+        }),
+        { n: 1 },
+      ), key).toThrow(/不支持的 schema 关键字/);
+    }
+  });
+
   it('enforces const and numeric minimum/maximum', () => {
     const tool = def({
       type: 'object',
@@ -116,5 +142,20 @@ describe('ToolValidator', () => {
     expect(() => validator.validate(tool, { kind: 'other', n: 2 })).toThrow(/const/);
     expect(() => validator.validate(tool, { kind: 'fixed', n: 0 })).toThrow(/不得小于/);
     expect(() => validator.validate(tool, { kind: 'fixed', n: 4 })).toThrow(/不得大于/);
+  });
+
+  it('compiles every builtin primitive and tool_search schema', () => {
+    const tools = [
+      ...getPrimitiveTools(),
+      createToolSearchTool(() => []),
+    ];
+    for (const tool of tools) {
+      try {
+        validator.validate(toolToDefinition(tool), {});
+      } catch (error) {
+        expect(error, tool.name).toBeInstanceOf(ToolValidationError);
+        expect((error as Error).message, tool.name).not.toMatch(/不支持的 schema 关键字/);
+      }
+    }
   });
 });

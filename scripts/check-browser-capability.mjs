@@ -14,8 +14,13 @@ function main() {
   const {
     resolveBridgeChannelCapability,
     assertChannelCapabilityCoverage,
+    listUnclassifiedInvokeChannels,
   } = require('../src/shared/renderer-api/channelCapabilities.ts');
 
+  const missing = listUnclassifiedInvokeChannels();
+  if (missing.length > 0) {
+    fail(`Unclassified invoke channels: ${missing.join(', ')}`);
+  }
   assertChannelCapabilityCoverage();
 
   const counts = { read: 0, mutation: 0, 'high-impact': 0, 'desktop-only': 0 };
