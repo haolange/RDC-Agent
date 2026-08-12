@@ -10,7 +10,7 @@ import type { AgentToolResult, ToolExecutionContext } from '../../agent-runtime/
 import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
 import type { ToolExecutor } from '../../agent-runtime/agent/AgentLoop';
 import type { ToolCall, ToolResultMessage } from '../../agent-runtime/core/types';
-import { getWorkspaceRoot } from '../../agent-runtime/tools/primitives/_shared';
+import { getWorkspaceRoot, withTemporaryPathAccess } from '../../agent-runtime/tools/primitives/_shared';
 import { buildDiagnosticAgentEvent } from '../../agent-runtime/AgentEventBridge';
 import { agentUserInputRequestService } from '../../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentPermissionPolicyService } from '../../agent-runtime/permissions/AgentPermissionPolicy';
@@ -262,14 +262,17 @@ export class ToolExecutorFactory {
             projectRootPath,
             projectId: runtimeContext?.projectId ?? plan?.projectId ?? null,
             sessionId: runtimeContext?.sessionId ?? null,
-            temporaryAllowedPathRoots: permissionDecision.temporaryPathRoots,
           };
-          const result = await tool.execute(
-            toolCall.id,
-            validatedArgs,
-            signal,
-            onUpdate,
+          const result = await withTemporaryPathAccess(
             toolContext,
+            permissionDecision.temporaryPathRoots,
+            (scopedContext) => tool.execute(
+              toolCall.id,
+              validatedArgs,
+              signal,
+              onUpdate,
+              scopedContext,
+            ),
           );
           await this.triggerRuntimeHooks('tool.after-call', agentId, runtimeContext, {
             toolName: toolCall.name,

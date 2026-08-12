@@ -166,7 +166,12 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(!agentManifestService.includes('provider.models.some'), 'AgentManifestService must not validate routes against the static settings model list.');
   assert(agentManifestService.includes('EffectiveCatalog is the only'), 'AgentManifestService must preserve explicit routes for EffectiveCatalog validation.');
 
-  const orchestrator = read('src/main/workflow/debugger/AgentOrchestrator.ts');
+  const orchestrator = [
+    'src/main/workflow/debugger/AgentOrchestrator.ts',
+    'src/main/workflow/debugger/AgentTurnRunner.ts',
+    'src/main/workflow/debugger/ToolExecutorFactory.ts',
+    'src/main/workflow/debugger/TurnPreparationService.ts',
+  ].map(read).join('\n');
   assert(orchestrator.includes('configuredRuntimeProvider'), 'AgentOrchestrator must use the configured runtime provider path.');
   assert(!orchestrator.includes('llmAdapterProvider'), 'AgentOrchestrator must not use the settings LLMAdapterProvider.');
   assert(orchestrator.includes('resolveAgentRouteCapability'), 'AgentOrchestrator must gate tools by route capability.');
