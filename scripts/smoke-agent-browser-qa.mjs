@@ -74,11 +74,48 @@ async function assertQaSurface(baseUrl, qaUrl) {
   }
   ok('GET /app without auth → 401 JSON');
 
+  const origin = new URL(baseUrl).origin;
+  const invokeNoOrigin = await fetchRaw(`${baseUrl}/invoke`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Cookie: cookie,
+    },
+    body: JSON.stringify({ channel: 'app:getMeta', args: [] }),
+  });
+  if (invokeNoOrigin.response.status !== 401) {
+    fail(`POST /invoke without Origin expected 401, got ${invokeNoOrigin.response.status}: ${invokeNoOrigin.text.slice(0, 200)}`);
+    return null;
+  }
+  ok('POST /invoke cookie without Origin → 401');
+
+  const eventsNoOrigin = await fetchRaw(`${baseUrl}/events`, {
+    headers: { Cookie: cookie },
+  });
+  if (eventsNoOrigin.response.status !== 401) {
+    fail(`GET /events without Origin expected 401, got ${eventsNoOrigin.response.status}: ${eventsNoOrigin.text.slice(0, 200)}`);
+    return null;
+  }
+  ok('GET /events cookie without Origin → 401');
+
+  const eventsEvilOrigin = await fetchRaw(`${baseUrl}/events`, {
+    headers: {
+      Cookie: cookie,
+      Origin: 'http://evil.example',
+    },
+  });
+  if (eventsEvilOrigin.response.status !== 401 && eventsEvilOrigin.response.status !== 403) {
+    fail(`GET /events foreign Origin expected 401/403, got ${eventsEvilOrigin.response.status}: ${eventsEvilOrigin.text.slice(0, 200)}`);
+    return null;
+  }
+  ok('GET /events cookie + foreign Origin → denied');
+
   const invoke = await fetchRaw(`${baseUrl}/invoke`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Cookie: cookie,
+      Origin: origin,
     },
     body: JSON.stringify({ channel: 'app:getMeta', args: [] }),
   });
