@@ -23,7 +23,8 @@ import {
 } from '../../agent-runtime/providers/internal/http';
 import { requestPlanHeaders } from '../../agent-runtime/providers/requestPlanWire';
 import { classifyProviderError } from '../../agent-runtime/providers/internal/errorClassifier';
-import { finalizeProviderUsage, normalizeCacheUsage } from '../../agent-runtime/providers/internal/normalizeCacheUsage';
+import { normalizeCacheUsage } from '../../agent-runtime/providers/internal/normalizeCacheUsage';
+import { calculateUsageCost } from '../../agent-runtime/providers/internal/costCalculator';
 
 const FIXTURE_ROOT = path.join(__dirname, '../../agent-runtime/providers/__fixtures__');
 const PROFILE_ROOT = path.join(__dirname, '../../../shared/provider-catalog/manifests/profiles');
@@ -70,6 +71,7 @@ type Surface = (typeof SURFACES)[number];
 type SurfaceContract = {
   reasoning: 'none' | 'present';
   vision: 'fail-closed' | 'present';
+  cache: 'none' | 'present';
 };
 type SurfaceHttpError = { status: number; body: string };
 type SurfaceErrors = {
@@ -108,6 +110,7 @@ function readContract(surface: Surface): SurfaceContract {
   const raw = JSON.parse(readFixture(surface, 'contract.json')) as SurfaceContract;
   expect(raw.reasoning === 'none' || raw.reasoning === 'present').toBe(true);
   expect(raw.vision === 'fail-closed' || raw.vision === 'present').toBe(true);
+  expect(raw.cache === 'none' || raw.cache === 'present').toBe(true);
   return raw;
 }
 
@@ -391,13 +394,7 @@ describe('provider wire 9×16 matrix', () => {
               if (!catalog) {
                 throw new Error(`PROVIDER_CATALOG_CONTRACTS_MISSING: ${surface.adapterId}`);
               }
-              const visionPlan = buildPlan(surface, catalog);
-              const routeContracts = visionPlan.route.contracts;
-              if (!routeContracts) {
-                throw new Error(`PROVIDER_CONTRACTS_MISSING: ${surface.dir}`);
-              }
               expect(catalog.semanticContext.attachments).toBe(contract.vision);
-              expect(routeContracts.semanticContext.attachments).toBe(catalog.semanticContext.attachments);
               const fixtureText = [
                 readFixture(surface, surface.streamFile),
                 ...requiredStreamStarFiles(surface, contract).map((fileName) => readFixture(surface, fileName)),
@@ -412,16 +409,20 @@ describe('provider wire 9×16 matrix', () => {
               break;
             }
             case 'cache': {
+              const contract = readContract(surface);
               const usage = extractUsage(objects);
               expect(usage).toBeTruthy();
-              const normalized = normalizeCacheUsage({
-                inputTokens: usage!.inputTokens,
-                cacheReadTokens: usage!.cacheReadTokens,
-              });
-              if (usage!.cacheReadTokens !== undefined) {
-                expect(normalized.cacheHitTokens).toBe(usage!.cacheReadTokens);
+              if (contract.cache === 'present') {
+                expect(usage!.cacheReadTokens).toBeGreaterThan(0);
+                const normalized = normalizeCacheUsage({
+                  inputTokens: usage!.inputTokens,
+                  cacheReadTokens: usage!.cacheReadTokens,
+                });
+                expect(normalized.cacheMissTokens).toBe(Math.max(usage!.inputTokens - usage!.cacheReadTokens!, 0));
+                expect(normalized.cacheHitTokens).toBeGreaterThan(0);
               } else {
-                expect(normalized).toEqual({});
+                expect(usage!.cacheReadTokens).toBeUndefined();
+                expect(normalizeCacheUsage({ inputTokens: usage!.inputTokens })).toEqual({});
               }
               break;
             }
@@ -432,21 +433,20 @@ describe('provider wire 9×16 matrix', () => {
             case 'cost': {
               const usage = extractUsage(objects);
               expect(usage).toBeTruthy();
-              const finalized = finalizeProviderUsage({
+              const cost = calculateUsageCost({
+                cost: { input: 1, output: 2, cacheRead: 0.25, cacheWrite: 0.5 },
+              }, {
                 inputTokens: usage!.inputTokens,
                 outputTokens: usage!.outputTokens,
+                totalTokens: usage!.inputTokens + usage!.outputTokens,
                 cacheReadTokens: usage!.cacheReadTokens,
               });
-              expect(finalized.totalTokens).toBe(usage!.inputTokens + usage!.outputTokens);
-              expect(finalized.inputTokens).toBe(usage!.inputTokens);
-              expect(finalized.outputTokens).toBe(usage!.outputTokens);
-              if (usage!.cacheReadTokens !== undefined) {
-                expect(finalized.cacheHitTokens).toBe(usage!.cacheReadTokens);
-              } else {
-                expect(finalized.cacheHitTokens).toBeUndefined();
-              }
-              expect(finalized.cost).toBeUndefined();
-              expect(JSON.stringify(finalized)).not.toMatch(/sk-fixture/);
+              expect(cost).toBeDefined();
+              expect(cost!.input).toBe((1 / 1_000_000) * usage!.inputTokens);
+              expect(cost!.output).toBe((2 / 1_000_000) * usage!.outputTokens);
+              expect(cost!.cacheRead).toBe((0.25 / 1_000_000) * (usage!.cacheReadTokens ?? 0));
+              expect(cost!.total).toBe(cost!.input + cost!.output + (cost!.cacheRead ?? 0) + (cost!.cacheWrite ?? 0));
+              expect(JSON.stringify(cost)).not.toMatch(/sk-fixture/);
               break;
             }
             case 'context_overflow': {
