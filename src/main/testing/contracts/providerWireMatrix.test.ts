@@ -1,8 +1,8 @@
 /**
  * Provider wire matrix: 9 adapter surfaces × 16 contract dimensions.
- * Golden streams live under src/main/agent-runtime/providers/__fixtures__/.
+ * Each surface directory is self-contained. Missing fixtures fail the test.
  */
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
 import type { LlmProviderProtocol } from '@shared/types/settings';
@@ -23,7 +23,6 @@ import {
 import { requestPlanHeaders } from '../../agent-runtime/providers/requestPlanWire';
 import { classifyProviderError } from '../../agent-runtime/providers/internal/errorClassifier';
 import { finalizeProviderUsage, normalizeCacheUsage } from '../../agent-runtime/providers/internal/normalizeCacheUsage';
-import { applyOpenAiCompatibleReasoning } from '../../agent-runtime/providers/reasoningWire';
 
 const FIXTURE_ROOT = path.join(__dirname, '../../agent-runtime/providers/__fixtures__');
 
@@ -64,26 +63,75 @@ const DIMENSIONS = [
   'secret_non_leak',
 ] as const;
 
-async function loadPayloads(surface: (typeof SURFACES)[number]): Promise<string[]> {
-  const raw = readFileSync(path.join(FIXTURE_ROOT, surface.dir, surface.streamFile), 'utf8');
+type Surface = (typeof SURFACES)[number];
+type SurfaceContract = {
+  reasoning: 'none' | 'present';
+};
+
+function extFor(surface: Surface): 'sse' | 'jsonl' {
+  return surface.transport === 'jsonl' ? 'jsonl' : 'sse';
+}
+
+function requiredStreamStarFiles(surface: Surface): string[] {
+  const ext = extFor(surface);
+  return [
+    `stream-truncated.${ext}`,
+    `stream-malformed.${ext}`,
+    `stream-continuation.${ext}`,
+    `stream-reasoning.${ext}`,
+  ];
+}
+
+function readFixture(surface: Surface, fileName: string): string {
+  const filePath = path.join(FIXTURE_ROOT, surface.dir, fileName);
+  if (!existsSync(filePath)) {
+    throw new Error(`PROVIDER_FIXTURE_MISSING: ${path.join(surface.dir, fileName)}`);
+  }
+  return readFileSync(filePath, 'utf8');
+}
+
+function readContract(surface: Surface): SurfaceContract {
+  const raw = JSON.parse(readFixture(surface, 'contract.json')) as SurfaceContract;
+  expect(raw.reasoning === 'none' || raw.reasoning === 'present').toBe(true);
+  return raw;
+}
+
+async function parseTransport(surface: Surface, raw: string, providerApi: string): Promise<string[]> {
   const response = new Response(raw, {
     status: 200,
     headers: { 'Content-Type': surface.transport === 'sse' ? 'text/event-stream' : 'application/x-ndjson' },
   });
   const payloads: string[] = [];
   if (surface.transport === 'sse') {
-    for await (const data of parseSSE(response, undefined, { providerApi: surface.dir })) {
+    for await (const data of parseSSE(response, undefined, { providerApi })) {
       payloads.push(data);
     }
   } else {
-    for await (const line of parseJsonLines(response, undefined, { providerApi: surface.dir })) {
+    for await (const line of parseJsonLines(response, undefined, { providerApi })) {
       payloads.push(line);
     }
   }
   return payloads;
 }
 
-function buildPlan(surface: (typeof SURFACES)[number]) {
+function parsedObjects(payloads: string[]): unknown[] {
+  const objects: unknown[] = [];
+  for (const payload of payloads) {
+    try {
+      objects.push(JSON.parse(payload));
+    } catch {
+      // Incomplete or malformed frames must not become objects.
+    }
+  }
+  return objects;
+}
+
+function looksLikeThinking(value: unknown): boolean {
+  const blob = JSON.stringify(value);
+  return /reasoning_content|"thinking"|thinking_delta|"thought"|reasoningContent|response\.reasoning/i.test(blob);
+}
+
+function buildPlan(surface: Surface) {
   return createTestRequestPlan({
     providerId: surface.dir,
     adapterId: surface.adapterId,
@@ -117,17 +165,50 @@ function buildPlan(surface: (typeof SURFACES)[number]) {
   });
 }
 
+function collectStreamStarFiles(dir: string, acc: string[] = []): string[] {
+  for (const entry of readdirSync(dir)) {
+    const full = path.join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      collectStreamStarFiles(full, acc);
+      continue;
+    }
+    if (entry.startsWith('stream-')) {
+      acc.push(full);
+    }
+  }
+  return acc;
+}
+
 describe('provider wire 9×16 matrix', () => {
-  it('covers every required surface and dimension', () => {
+  it('covers every required surface, dimension, and per-directory fixture', () => {
     expect(SURFACES).toHaveLength(9);
     expect(DIMENSIONS).toHaveLength(16);
+    const requiredAbs = new Set<string>();
+    for (const surface of SURFACES) {
+      expect(existsSync(path.join(FIXTURE_ROOT, surface.dir, surface.streamFile))).toBe(true);
+      expect(existsSync(path.join(FIXTURE_ROOT, surface.dir, 'contract.json'))).toBe(true);
+      readFixture(surface, 'contract.json');
+      for (const fileName of requiredStreamStarFiles(surface)) {
+        const abs = path.join(FIXTURE_ROOT, surface.dir, fileName);
+        expect(existsSync(abs), abs).toBe(true);
+        readFileSync(abs, 'utf8');
+        requiredAbs.add(path.normalize(abs));
+      }
+    }
+    const present = collectStreamStarFiles(FIXTURE_ROOT).map((file) => path.normalize(file));
+    const unreferenced = present.filter((file) => !requiredAbs.has(file));
+    expect(unreferenced).toEqual([]);
   });
 
   for (const surface of SURFACES) {
     describe(surface.dir, () => {
       for (const dimension of DIMENSIONS) {
         it(dimension, async () => {
-          const payloads = await loadPayloads(surface);
+          const payloads = await parseTransport(
+            surface,
+            readFixture(surface, surface.streamFile),
+            surface.adapterId,
+          );
           const blob = payloads.join('\n');
           const plan = buildPlan(surface);
 
@@ -141,37 +222,39 @@ describe('provider wire 9×16 matrix', () => {
             case 'tool_call':
               expect(blob).toMatch(/read_file|toolUse|function_call|tool_calls|tool_use/);
               break;
-            case 'tool_result_continuation':
-              expect(plan.route.protocol).toBe(surface.protocol);
-              expect(Array.isArray(plan.appliedBindingIds)).toBe(true);
-              break;
-            case 'reasoning': {
-              const body: Record<string, unknown> = { model: 'fixture', stream: true };
-              applyOpenAiCompatibleReasoning(body, {
-                selection: 'medium',
-                control: {
-                  kind: 'levels',
-                  supportsOff: true,
-                  levels: ['low', 'medium', 'high'],
-                  defaultSelection: 'medium',
-                  wireProfile: {
-                    kind: 'openai-compatible',
-                    on: 'medium',
-                    levels: { low: 'low', medium: 'medium', high: 'high' },
-                  },
-                },
-              });
-              expect(body.reasoning_effort === 'medium' || surface.dir.includes('gemini') || surface.dir.includes('bedrock')).toBe(true);
+            case 'tool_result_continuation': {
+              const continuationRaw = readFixture(surface, `stream-continuation.${extFor(surface)}`);
+              const continuation = await parseTransport(surface, continuationRaw, surface.adapterId);
+              expect(continuation.join('\n')).toMatch(/continued after tool/i);
+              expect(continuation.join('\n')).toMatch(/tool_result|toolResult|function\.output|tool_use|toolUse|function_call|functionCall|tool_calls/i);
               break;
             }
-            case 'vision':
-              expect(plan.route.contracts?.semanticContext.attachments ?? 'fail-closed').toBeDefined();
+            case 'reasoning': {
+              const contract = readContract(surface);
+              const reasoningRaw = readFixture(surface, `stream-reasoning.${extFor(surface)}`);
+              const reasoningPayloads = await parseTransport(surface, reasoningRaw, surface.adapterId);
+              const objects = parsedObjects(reasoningPayloads);
+              if (contract.reasoning === 'none') {
+                expect(contract.reasoning).toBe('none');
+                expect(objects.some(looksLikeThinking)).toBe(false);
+              } else {
+                expect(objects.some(looksLikeThinking)).toBe(true);
+              }
               break;
+            }
+            case 'vision': {
+              const attachments = plan.route.contracts?.semanticContext.attachments;
+              expect(attachments).toBeDefined();
+              expect(attachments).toBe('fail-closed');
+              break;
+            }
             case 'cache':
               expect(normalizeCacheUsage({
                 inputTokens: 100,
                 cacheReadTokens: 40,
-              })).toMatchObject({ cacheHitTokens: 40 });
+                providerApi: surface.adapterId,
+              } as { inputTokens: number; cacheReadTokens: number })).toMatchObject({ cacheHitTokens: 40 });
+              expect(surface.adapterId).toBe(plan.adapterId);
               break;
             case 'usage':
               expect(blob).toMatch(/usage|token|eval_count|promptToken|inputTokens|output_tokens|total_tokens/i);
@@ -181,24 +264,38 @@ describe('provider wire 9×16 matrix', () => {
                 inputTokens: 10,
                 outputTokens: 4,
                 cost: { input: 0.01, output: 0.02, total: 0.03 },
-              });
+                providerApi: surface.adapterId,
+              } as { inputTokens: number; outputTokens: number; cost: { input: number; output: number; total: number } });
               expect(usage.cost?.total).toBe(0.03);
               expect(JSON.stringify(usage)).not.toMatch(/sk-fixture/);
+              expect(surface.adapterId).toBe(plan.adapterId);
               break;
             }
-            case 'context_overflow':
-              expect(classifyProviderError(new Error('context length exceeded'), 400).code).toBe('context_overflow');
+            case 'context_overflow': {
+              const classified = classifyProviderError(
+                new Error(`${surface.adapterId}: context length exceeded`),
+                400,
+              );
+              expect(classified.code).toBe('context_overflow');
+              expect(classified.message).toContain(surface.adapterId);
               break;
-            case 'http_429':
-              await expect(ensureOk(new Response('rate limited', { status: 429 }), surface.dir))
+            }
+            case 'http_429': {
+              await expect(ensureOk(new Response('rate limited', { status: 429 }), surface.adapterId))
                 .rejects.toBeInstanceOf(ProviderHttpError);
-              expect(classifyProviderError(new Error('rate limit'), 429).code).toBe('rate_limit');
+              const classified = classifyProviderError(new Error(`${surface.adapterId} rate limit`), 429);
+              expect(classified.code).toBe('rate_limit');
+              expect(classified.message).toContain(surface.adapterId);
               break;
-            case 'http_5xx':
-              await expect(ensureOk(new Response('unavailable', { status: 503 }), surface.dir))
-                .rejects.toMatchObject({ status: 503 });
-              expect(classifyProviderError(new Error('server error'), 503).retryable).toBe(true);
+            }
+            case 'http_5xx': {
+              await expect(ensureOk(new Response('unavailable', { status: 503 }), surface.adapterId))
+                .rejects.toMatchObject({ status: 503, providerApi: surface.adapterId });
+              const classified = classifyProviderError(new Error(`${surface.adapterId} server error`), 503);
+              expect(classified.retryable).toBe(true);
+              expect(classified.message).toContain(surface.adapterId);
               break;
+            }
             case 'abort': {
               const stream = new EventStream<string, string>();
               stream.push('early');
@@ -215,63 +312,65 @@ describe('provider wire 9×16 matrix', () => {
                   (event) => (event as Extract<AssistantMessageEvent, { type: 'done' }>).message,
                 ),
                 'model',
-                surface.dir,
+                surface.adapterId,
               );
               builder.start();
               const ref = createProviderOutputRef({
-                protocol: surface.dir,
+                protocol: surface.adapterId,
                 providerBlockKey: 'text:0',
                 sourceIndex: 0,
                 contentIndex: 0,
               });
               builder.startText(ref);
-              const abortErr = new Error('abort');
+              const abortErr = new Error(`${surface.adapterId} abort`);
               abortErr.name = 'AbortError';
               builder.fail(abortErr, 'aborted');
               expect(() => builder.appendText(ref, 'late')).toThrow();
               break;
             }
             case 'malformed_stream': {
-              const malformed = new Response('data: {not-json\n\ndata: {"ok":true}\n\n', {
-                status: 200,
-                headers: { 'Content-Type': 'text/event-stream' },
-              });
-              const parsed: string[] = [];
-              for await (const data of parseSSE(malformed, undefined, { providerApi: surface.dir })) {
-                parsed.push(data);
-              }
-              expect(parsed.some((entry) => entry.includes('"ok":true'))).toBe(true);
+              const malformedRaw = readFixture(surface, `stream-malformed.${extFor(surface)}`);
+              const parsed = await parseTransport(surface, malformedRaw, surface.adapterId);
+              const objects = parsedObjects(parsed);
+              expect(parsed.some((entry) => entry.includes('{not-json') || entry.includes('not-json'))).toBe(true);
+              expect(objects.some((entry) => {
+                try {
+                  JSON.parse(JSON.stringify(entry));
+                  return typeof entry === 'object' && entry !== null && JSON.stringify(entry).includes('{not-json');
+                } catch {
+                  return false;
+                }
+              })).toBe(false);
+              expect(JSON.stringify(objects)).toMatch(/ok|world|Hello/i);
               break;
             }
             case 'truncated_stream': {
-              const truncated = readFileSync(
-                path.join(FIXTURE_ROOT, 'openai-compatible', 'stream-truncated.sse'),
-                'utf8',
-              );
-              const response = new Response(truncated, {
-                status: 200,
-                headers: { 'Content-Type': 'text/event-stream' },
-              });
-              const parsed: string[] = [];
-              for await (const data of parseSSE(response, undefined, { providerApi: surface.dir })) {
-                parsed.push(data);
-              }
-              const objects: unknown[] = [];
-              for (const payload of parsed) {
-                try {
-                  objects.push(JSON.parse(payload));
-                } catch {
-                  // Truncated JSON is discarded; only well-formed objects remain.
-                }
-              }
-              expect(JSON.stringify(objects)).toMatch(/ok/);
+              const truncatedRaw = readFixture(surface, `stream-truncated.${extFor(surface)}`);
+              const parsed = await parseTransport(surface, truncatedRaw, surface.adapterId);
+              const objects = parsedObjects(parsed);
+              expect(JSON.stringify(objects)).toMatch(/ok/i);
               expect(JSON.stringify(objects)).not.toMatch(/incomplete/);
+              const truncatedFrames = parsed.filter((entry) => {
+                try {
+                  JSON.parse(entry);
+                  return false;
+                } catch {
+                  return true;
+                }
+              });
+              expect(truncatedFrames.length).toBeGreaterThan(0);
               break;
             }
             case 'secret_non_leak': {
               const headers = requestPlanHeaders(plan);
               expect(headers.authorization).toBeUndefined();
               expect(JSON.stringify(headers)).not.toMatch(/sk-fixture|fixture-api-key/);
+              const fixtureText = [
+                readFixture(surface, surface.streamFile),
+                ...requiredStreamStarFiles(surface).map((fileName) => readFixture(surface, fileName)),
+                readFixture(surface, 'contract.json'),
+              ].join('\n');
+              expect(fixtureText).not.toMatch(/sk-fixture/);
               expect(blob).not.toMatch(/sk-fixture-must-not-appear/);
               break;
             }

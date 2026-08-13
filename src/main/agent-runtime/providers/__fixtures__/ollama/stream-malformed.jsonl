@@ -1,0 +1,3 @@
+{"message":{"content":"ok"},"done":false}
+{not-json
+{"message":{"content":"world"},"done":true}

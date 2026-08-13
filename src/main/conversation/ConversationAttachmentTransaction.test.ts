@@ -1,39 +1,133 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
-import { ConversationHistoryStore } from '../sessions/ConversationHistoryStore';
-import { StorageIo } from '../sessions/StorageIo';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+import { hashAttachmentContents } from './ConversationAttachmentHashing';
+
+const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-att-tx-'));
+
+vi.mock('../runtime/AppPathService', () => {
+  const appStateRoot = path.join(tempRoot, 'state');
+  const paths = {
+    appStateRoot,
+    projectsPath: path.join(appStateRoot, 'projects'),
+    sessionsPath: path.join(appStateRoot, 'sessions'),
+    tasksPath: path.join(appStateRoot, 'tasks'),
+    tracesPath: path.join(appStateRoot, 'traces'),
+    llmCallsPath: path.join(appStateRoot, 'llm-calls'),
+    secretsPath: path.join(tempRoot, 'secrets'),
+    logsPath: path.join(tempRoot, 'logs'),
+    logPath: path.join(tempRoot, 'logs', 'app.log'),
+    capturePreviewsPath: path.join(tempRoot, 'capture-previews'),
+    profileStatePath: path.join(appStateRoot, 'profile'),
+    knowledgePath: path.join(appStateRoot, 'knowledge'),
+  };
+  for (const dir of Object.values(paths)) {
+    if (typeof dir === 'string' && !dir.endsWith('.log')) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  }
+  return {
+    appPathService: {
+      getAppStatePaths: () => paths,
+      getUserDataRoot: () => tempRoot,
+      getRuntimePaths: () => ({ userDataRoot: tempRoot, ...paths }),
+      getProjectRdxPaths: (projectRoot: string) => ({
+        projectRoot,
+        projectRdxRoot: path.join(projectRoot, '.rdx'),
+        projectMetadataPath: path.join(projectRoot, '.rdx', 'project.yaml'),
+        gitignorePath: path.join(projectRoot, '.rdx', '.gitignore'),
+        agentsPath: path.join(projectRoot, '.rdx', 'agents'),
+        skillsPath: path.join(projectRoot, '.rdx', 'skills'),
+        mcpPath: path.join(projectRoot, '.rdx', 'mcp'),
+        hooksPath: path.join(projectRoot, '.rdx', 'hooks'),
+        policiesPath: path.join(projectRoot, '.rdx', 'policies'),
+        knowledgePath: path.join(projectRoot, '.rdx', 'knowledge'),
+        memoryPath: path.join(projectRoot, '.rdx', 'memory'),
+        inputsPath: path.join(projectRoot, '.rdx', 'inputs'),
+        artifactsPath: path.join(projectRoot, '.rdx', 'artifacts'),
+      }),
+      initializeProjectRdx: (projectRoot: string) => {
+        const projectPaths = {
+          projectRoot,
+          projectRdxRoot: path.join(projectRoot, '.rdx'),
+          projectMetadataPath: path.join(projectRoot, '.rdx', 'project.yaml'),
+          gitignorePath: path.join(projectRoot, '.rdx', '.gitignore'),
+          agentsPath: path.join(projectRoot, '.rdx', 'agents'),
+          skillsPath: path.join(projectRoot, '.rdx', 'skills'),
+          mcpPath: path.join(projectRoot, '.rdx', 'mcp'),
+          hooksPath: path.join(projectRoot, '.rdx', 'hooks'),
+          policiesPath: path.join(projectRoot, '.rdx', 'policies'),
+          knowledgePath: path.join(projectRoot, '.rdx', 'knowledge'),
+          memoryPath: path.join(projectRoot, '.rdx', 'memory'),
+          inputsPath: path.join(projectRoot, '.rdx', 'inputs'),
+          artifactsPath: path.join(projectRoot, '.rdx', 'artifacts'),
+        };
+        for (const dir of [
+          projectPaths.projectRdxRoot,
+          projectPaths.agentsPath,
+          projectPaths.skillsPath,
+          projectPaths.mcpPath,
+          projectPaths.hooksPath,
+          projectPaths.policiesPath,
+          projectPaths.knowledgePath,
+          projectPaths.memoryPath,
+          projectPaths.inputsPath,
+          projectPaths.artifactsPath,
+        ]) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        return projectPaths;
+      },
+    },
+  };
+});
 
 describe('attachment staging bytes are the commit source', () => {
-  const dirs: string[] = [];
-
-  afterEach(() => {
-    for (const dir of dirs) {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-    dirs.length = 0;
+  afterAll(() => {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
   });
 
-  it('keeps staged bytes after the original source is replaced', () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-att-tx-'));
-    dirs.push(root);
-    const sourcePath = path.join(root, 'source.txt');
-    const stagingDir = path.join(root, 'staging');
-    const commitDir = path.join(root, 'commit');
-    fs.writeFileSync(sourcePath, 'fingerprint-bytes');
-    fs.mkdirSync(commitDir);
+  it('hashes staged bytes then commits them after the original source is replaced', async () => {
+    const { storageAdapter } = await import('../sessions/StorageAdapter');
+    await storageAdapter.initializeWorkspace();
+    const projectRoot = path.join(tempRoot, 'project-root');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const project = await storageAdapter.createProject(projectRoot);
+    const session = storageAdapter.createSession(project.projectId, 'Attachment commit');
 
-    const store = new ConversationHistoryStore({
-      io: new StorageIo(),
-    } as ConstructorParameters<typeof ConversationHistoryStore>[0]);
-    const [stagedPath] = store.stageAttachmentInputs([sourcePath], stagingDir);
+    const sourcePath = path.join(tempRoot, 'source.txt');
+    fs.writeFileSync(sourcePath, 'fingerprint-bytes');
+    const stagingDir = path.join(tempRoot, 'staging');
+    const [stagedPath] = storageAdapter.history.stageAttachmentInputs([sourcePath], stagingDir);
     expect(stagedPath).toBeTruthy();
+
+    const hashes = await hashAttachmentContents([{
+      sourcePath: stagedPath!,
+      fileName: 'source.txt',
+      mimeType: 'text/plain',
+    }]);
+    expect(hashes[0]).toMatch(/^[a-f0-9]{64}$/);
+
     fs.writeFileSync(sourcePath, 'replaced-after-hash');
 
-    const committedPath = path.join(commitDir, 'committed.txt');
-    fs.copyFileSync(stagedPath!, committedPath);
-    expect(fs.readFileSync(committedPath, 'utf8')).toBe('fingerprint-bytes');
+    const commit = storageAdapter.beginExistingConversationTurnCommit(
+      session.sessionId,
+      [stagedPath!],
+      'req-att-tx',
+      'turn-att-tx',
+    );
+    const committedPath = commit.attachments[0]?.filePath;
+    expect(committedPath).toBeTruthy();
+    expect(fs.readFileSync(committedPath!, 'utf8')).toBe('fingerprint-bytes');
     expect(fs.readFileSync(sourcePath, 'utf8')).toBe('replaced-after-hash');
+    expect(fs.readFileSync(stagedPath!, 'utf8')).toBe('fingerprint-bytes');
+
+    const replayHashes = await hashAttachmentContents([{
+      sourcePath: committedPath!,
+      fileName: 'source.txt',
+      mimeType: 'text/plain',
+    }]);
+    expect(replayHashes[0]).toBe(hashes[0]);
   });
 });

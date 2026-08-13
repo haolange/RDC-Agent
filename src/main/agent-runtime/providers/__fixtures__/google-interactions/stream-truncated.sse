@@ -1,0 +1,4 @@
+data: {"event_type":"step.delta","delta":{"type":"text","text":"ok"}}
+
+data: {"event_type":"step.delta","delta":{"type":"text","text":"incomplete"
+

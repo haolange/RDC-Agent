@@ -6,6 +6,7 @@ import type { ProjectInputRecord, ProjectRecord } from '@shared/types/session';
 import { appPathService } from '../runtime/AppPathService';
 import type { ProjectRegistry, SelectionState } from './storageTypes';
 import { PROJECT_REGISTRY_MIGRATIONS, SelectionStateSchema } from './storageSchema';
+import { withDirectoryFileLockSync } from './directoryFileLock';
 
 
 export class ProjectWorkspaceStore {
@@ -216,10 +217,10 @@ export class ProjectWorkspaceStore {
       return;
     }
 
-    this.host.io.writeJsonAtomic(this.host.registryPath, {
+    this.writeRegistry({
       schemaVersion: '1',
       projects: [],
-    } satisfies ProjectRegistry);
+    });
   }
 
   private ensureSelection(): void {
@@ -262,7 +263,12 @@ export class ProjectWorkspaceStore {
   }
 
   writeRegistry(registry: ProjectRegistry): void {
-    this.host.io.writeJsonAtomic(this.host.registryPath, registry);
+    withDirectoryFileLockSync(path.dirname(this.host.registryPath), {
+      lockFileName: '.registry.lock',
+      timeoutCode: 'PROJECT_REGISTRY_LOCK_TIMEOUT',
+    }, () => {
+      this.host.io.writeJsonAtomic(this.host.registryPath, registry);
+    });
   }
 
   readSelection(): SelectionState {

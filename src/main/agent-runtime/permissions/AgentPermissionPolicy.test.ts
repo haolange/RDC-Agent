@@ -352,24 +352,34 @@ describe('AgentPermissionPolicyService floor × mode lattice', () => {
   }
 
   const modes: AgentPermissionMode[] = ['default', 'auto-review', 'full-access', 'custom'];
+  const floors = ['none', 'auto_review', 'user'] as const;
+  const expectedAction: Record<(typeof floors)[number], Record<AgentPermissionMode, 'allow' | 'auto_review' | 'ask_user'>> = {
+    user: {
+      default: 'ask_user',
+      'auto-review': 'ask_user',
+      'full-access': 'ask_user',
+      custom: 'ask_user',
+    },
+    auto_review: {
+      default: 'ask_user',
+      'auto-review': 'auto_review',
+      'full-access': 'auto_review',
+      custom: 'ask_user',
+    },
+    none: {
+      default: 'ask_user',
+      'auto-review': 'auto_review',
+      'full-access': 'allow',
+      custom: 'ask_user',
+    },
+  };
 
-  it.each(modes)('floor=user stays ask_user in %s mode', (mode) => {
-    expect(evaluate(mode, 'user').action).toBe('ask_user');
-  });
-
-  it.each(modes)('floor=auto_review never drops below auto_review in %s mode', (mode) => {
-    const action = evaluate(mode, 'auto_review').action;
-    expect(['auto_review', 'ask_user', 'deny']).toContain(action);
-    expect(action).not.toBe('allow');
-  });
-
-  it('does not let auto-review mode weaken a user floor below ask_user', () => {
-    expect(evaluate('auto-review', 'user').action).toBe('ask_user');
-  });
-
-  it('keeps full-access allow when floor is none', () => {
-    expect(evaluate('full-access', 'none').action).toBe('allow');
-  });
+  it.each(floors.flatMap((floor) => modes.map((mode) => [floor, mode, expectedAction[floor][mode]] as const)))(
+    'write_file in workspace: floor=%s mode=%s => %s',
+    (floor, mode, action) => {
+      expect(evaluate(mode, floor).action).toBe(action);
+    },
+  );
 });
 
 describe('AgentPermissionPolicyService shell risk classifier', () => {

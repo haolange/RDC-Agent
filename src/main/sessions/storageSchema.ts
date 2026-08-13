@@ -29,6 +29,24 @@ function readSchemaVersion(raw: unknown): string | null {
   return null;
 }
 
+export const CURRENT_STORE_SCHEMA_VERSION = '1';
+
+export function assertNoUnsupportedSchemaVersion(
+  raw: unknown,
+  currentVersion: string,
+  filePath: string,
+): void {
+  const version = readSchemaVersion(raw);
+  if (version === null) return;
+  const numeric = Number(version);
+  const currentNumeric = Number(currentVersion);
+  if (Number.isFinite(numeric) && Number.isFinite(currentNumeric) && numeric > currentNumeric) {
+    throw new StorageSchemaError(
+      `STORAGE_SCHEMA_UNSUPPORTED: ${filePath} has schemaVersion ${version}; supported up to ${currentVersion}`,
+    );
+  }
+}
+
 export function parseStoredDocument<T>(
   raw: unknown,
   migrations: readonly StorageMigration<T>[],
@@ -136,6 +154,9 @@ export const SessionEvidenceV1Schema = z.object({
   updated_at: z.string(),
   event_counts: z.record(z.string(), z.number()),
   active_blockers: z.array(z.unknown()),
+  verification_summary: z.array(z.string()).optional(),
+  reasoning_summaries: z.array(z.unknown()).optional(),
+  report_paths: z.unknown().nullable().optional(),
 }).passthrough();
 
 export const SESSION_EVIDENCE_MIGRATIONS: StorageMigration<z.infer<typeof SessionEvidenceV1Schema>>[] = [

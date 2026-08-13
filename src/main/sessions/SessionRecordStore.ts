@@ -34,7 +34,7 @@ import type {
   SessionEvidenceRecord,
 } from './storageTypes';
 import type { StagedConversationSessionCommit } from './storageCommitTypes';
-import { SessionRecordSchema } from './storageSchema';
+import { SessionRecordSchema, SESSION_EVIDENCE_MIGRATIONS } from './storageSchema';
 import { reconcileProjectSessionTitles } from './sessionRecordReconcile';
 import { readPersistedRun as loadPersistedRun, toRunSummary, writeRunFiles as persistRunFiles } from './sessionRunPersistence';
 
@@ -575,7 +575,11 @@ export class SessionRecordStore {
   }
 
   readSessionEvidence(sessionId: string): SessionEvidenceRecord | null {
-    return readYaml<SessionEvidenceRecord>(this.getSessionEvidencePath(sessionId));
+    const parsed = this.host.io.readYaml(
+      this.getSessionEvidencePath(sessionId),
+      SESSION_EVIDENCE_MIGRATIONS,
+    );
+    return parsed as SessionEvidenceRecord | null;
   }
 
   async appendActionEvent(sessionId: string, event: ActionEvent): Promise<void> {

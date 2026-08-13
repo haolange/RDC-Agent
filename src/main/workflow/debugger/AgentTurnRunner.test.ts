@@ -22,6 +22,7 @@ vi.mock('../../settings/SettingsService', () => ({
 }));
 
 import { AgentTurnRunner, hasActualProviderUsage } from './AgentTurnRunner';
+import { resolveExecutionScopeId } from './executionScope';
 import { TokenizerService } from '../../agent-runtime/core/TokenizerService';
 import type { AssistantMessage, ToolResultMessage } from '../../agent-runtime/core/types';
 import type { RequestPlan } from '@shared/types/providerCapability';
@@ -43,7 +44,7 @@ function createRunner(): AgentTurnRunner {
       resolveActivatedSet: () => new Set<string>(),
     } as unknown as DeferredToolActivationTracker,
     tokenizerService: new TokenizerService(),
-    sessionTurnKey: (sessionId) => sessionId ?? 'default',
+    sessionTurnKey: (sessionId) => resolveExecutionScopeId(sessionId),
     resolveRuntimeTools: () => ({ toolMap: new Map(), definitions: [], deferredDefinitions: [] }),
     createToolSignature: () => '',
     createToolExecutor: () => ({
@@ -239,9 +240,12 @@ describe('AgentTurnRunner', () => {
     expect(turnCoordinator.getActive('setup-session')).toBeNull();
   });
 
-  it('rejects missing execution scope before beginTurn so no TurnHandle leaks', async () => {
+  it.each([null, '', '   ', '\t'] as const)(
+    'rejects empty execution scope %j before beginTurn and releases MCP lease',
+    async (sessionId) => {
     const release = vi.fn(async () => undefined);
     const runner = createRunner();
+    const beginSpy = vi.spyOn(turnCoordinator, 'beginTurn');
     const requestPlan = createTestRequestPlan({
       providerId: 'test',
       adapterId: 'openai-compatible',
@@ -298,7 +302,7 @@ describe('AgentTurnRunner', () => {
       modelId: 'model',
       mode: 'ask',
       toolAllowlist: [],
-      sessionId: null,
+      sessionId,
       turnId: 'no-scope-turn',
       promptPlan: {} as PromptPlan,
       effectiveModel: {} as never,
@@ -306,7 +310,8 @@ describe('AgentTurnRunner', () => {
       options: { requestPlan },
     })).rejects.toThrow(/EXECUTION_SCOPE_REQUIRED/);
 
-    expect(turnCoordinator.getActive('default')).toBeNull();
-    expect(release).not.toHaveBeenCalled();
+    expect(beginSpy).not.toHaveBeenCalled();
+    expect(release).toHaveBeenCalledWith({ discardIfIdle: true });
+    beginSpy.mockRestore();
   });
 });

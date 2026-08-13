@@ -1,0 +1,4 @@
+data: {"candidates":[{"content":{"parts":[{"functionCall":{"name":"read_file"}}]}}]}
+
+data: {"candidates":[{"content":{"parts":[{"text":"continued after tool"}]}}]}
+

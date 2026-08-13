@@ -1,0 +1,6 @@
+data: {"type":"response.reasoning.delta","delta":"plan next step"}
+
+data: {"type":"response.output_text.delta","delta":"Hello"}
+
+data: [DONE]
+

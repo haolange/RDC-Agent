@@ -1,0 +1,2 @@
+{"message":{"tool_calls":[{"function":{"name":"read_file"}}]},"done":false}
+{"message":{"content":"continued after tool"},"done":true}

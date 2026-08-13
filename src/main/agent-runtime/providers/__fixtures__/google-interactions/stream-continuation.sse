@@ -1,0 +1,4 @@
+data: {"event_type":"step.start","step":{"type":"function_call","name":"read_file"}}
+
+data: {"event_type":"step.delta","delta":{"type":"text","text":"continued after tool"}}
+
