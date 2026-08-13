@@ -71,7 +71,10 @@ export class ConversationHistoryStore {
         fs.copyFileSync(sourcePath, temporaryPath);
         fs.renameSync(temporaryPath, targetPath);
       }
-      this.host.io.writeJsonAtomic(this.host.sessions.getSessionAttachmentsManifestPath(sessionId), afterAttachments);
+      this.host.io.writeJsonAtomic(
+        this.host.sessions.getSessionAttachmentsManifestPath(sessionId),
+        toSessionAttachmentManifest(afterAttachments),
+      );
       return { session, requestId, turnId, attachments, beforeHistory, beforeBranch };
     } catch (error) {
       this.host.turnCommitSessionIds.delete(sessionId);
