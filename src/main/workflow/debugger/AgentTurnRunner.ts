@@ -61,6 +61,7 @@ import {
   DEFAULT_SUBAGENT_BUDGET,
 } from './TurnCoordinator';
 import { agentSlotKey, type AgentSlot, type AgentSlotRegistry } from './AgentSlotRegistry';
+import { requireExecutionScopeId } from './executionScope';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import type { McpConnectionCoordinator, McpConnectionLease } from './McpConnectionCoordinator';
 import {
@@ -145,10 +146,8 @@ export class AgentTurnRunner {
     if (!promptPlan) {
       throw new Error('PromptPlan is required before creating an agent runtime slot.');
     }
-    if (!sessionId) {
-      throw new Error('EXECUTION_SCOPE_REQUIRED: agent slot requires a session or ephemeral scope id.');
-    }
-    const slotKey = agentSlotKey(sessionId, agentId);
+    const executionScopeId = requireExecutionScopeId(sessionId);
+    const slotKey = agentSlotKey(executionScopeId, agentId);
     if (this.deps.slots.isQuarantined(slotKey)) {
       throw new Error(`AGENT_SLOT_QUARANTINED: ${slotKey} is still owned by an orphaned turn.`);
     }
@@ -221,10 +220,10 @@ export class AgentTurnRunner {
       // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
       errorRecovery,
       onRequest: ({ model, context: requestContext, streamOptions: requestOptions }) => {
-        const callIndex = requestSnapshotStore.nextCallIndex(sessionId ?? undefined, turnSignature || undefined);
+        const callIndex = requestSnapshotStore.nextCallIndex(executionScopeId, turnSignature || undefined);
         const snapshot = requestEnvelopeBuilder.build({
           promptPlan,
-          sessionId: sessionId ?? undefined,
+          sessionId: executionScopeId,
           turnId: turnSignature || undefined,
           callIndex,
           route: {
@@ -255,7 +254,7 @@ export class AgentTurnRunner {
       onResponse: (requestId, message) => {
         if (!requestId || !hasActualProviderUsage(message)) return;
         recordEffectivePlanSuccess(providerId, modelId, settingsService.getAll(), streamOptions.requestPlan);
-        requestSnapshotStore.complete(requestId, sessionId ?? undefined, turnSignature || undefined, {
+        requestSnapshotStore.complete(requestId, executionScopeId, turnSignature || undefined, {
           inputTokens: message.usage.inputTokens,
           outputTokens: message.usage.outputTokens,
           ...(typeof message.usage.cacheReadTokens === 'number'
@@ -334,16 +333,20 @@ export class AgentTurnRunner {
     if (!input.preparedRuntime) {
       throw new Error('TURN_NOT_PREPARED: preparedRuntime is required; call prepareTurnContext/prepareProfileTurn before runAgentTurn.');
     }
-    if (!input.sessionId) {
-      throw new Error('EXECUTION_SCOPE_REQUIRED: runAgentTurn requires a session or ephemeral scope id.');
-    }
     const preparedRuntime = input.preparedRuntime;
     const turnPolicy = preparedRuntime.effectivePlan.policy;
     const effectiveModel = input.effectiveModel ?? null;
     const routeCapability = preparedRuntime.routeCapability;
     let mcpLease: McpConnectionLease | null = preparedRuntime.mcpLease ?? null;
     let mcpConnectionErrors = preparedRuntime.mcpConnectionErrors ?? [];
-    const sessionKey = this.deps.sessionTurnKey(input.sessionId);
+    let executionScopeId: string;
+    try {
+      executionScopeId = requireExecutionScopeId(input.sessionId);
+    } catch (error) {
+      await mcpLease?.release({ discardIfIdle: true });
+      throw error;
+    }
+    const sessionKey = this.deps.sessionTurnKey(executionScopeId);
     let turnHandle;
     try {
       turnHandle = await turnCoordinator.beginTurn({
@@ -367,7 +370,7 @@ export class AgentTurnRunner {
       await mcpLease?.release({ discardIfIdle: true });
       throw error;
     }
-    const slotKey = agentSlotKey(input.sessionId, input.agentId);
+    let slotKey = '';
     let slot: AgentSlot | null = null;
     let unsubscribe: (() => void) | null = null;
     let unregisterAgentProducer: (() => void) | null = null;
@@ -375,13 +378,14 @@ export class AgentTurnRunner {
     let turnEnded = false;
     let setupCleanupComplete = false;
     try {
+    slotKey = agentSlotKey(executionScopeId, input.agentId);
     const turnGeneration = turnHandle.generation;
     turnHandle.eventSink = {
       onEvent: (event) => {
         if (!turnHandle.isLive(turnGeneration)) return;
         input.options?.onEvent?.(event);
       },
-      sessionId: input.sessionId ?? null,
+      sessionId: executionScopeId,
       projectRootPath: input.projectRootPath ?? null,
       projectId: input.projectId ?? null,
       agentId: input.agentId,
@@ -392,7 +396,7 @@ export class AgentTurnRunner {
       input.agentId,
       frozenToolAllowlist,
       input.stage,
-      input.sessionId,
+      executionScopeId,
       turnHandle,
       input.projectId,
       input.projectRootPath,
@@ -419,7 +423,7 @@ export class AgentTurnRunner {
       agentId: input.agentId,
       runId: input.runId,
       turnId: input.turnId,
-      sessionId: input.sessionId ?? null,
+      sessionId: executionScopeId,
       stage: input.stage,
       mode: input.mode,
       providerId: input.providerId,
@@ -438,8 +442,8 @@ export class AgentTurnRunner {
     const executorAllowlist = routeCapability.toolCallingMode === 'native-structured'
       ? [...effectivePlan.toolAllowlist]
       : activeToolAllowlist;
-    const toolExecutor = this.deps.createToolExecutor(input.agentId, executorAllowlist, input.stage, input.sessionId, {
-      sessionId: input.sessionId ?? null,
+    const toolExecutor = this.deps.createToolExecutor(input.agentId, executorAllowlist, input.stage, executionScopeId, {
+      sessionId: executionScopeId,
       runId: input.runId,
       turnId: input.turnId,
       eventContext: sharedEventContext,
@@ -473,12 +477,12 @@ export class AgentTurnRunner {
     if (routeDiagnostic) {
       if (routeDiagnostic.surface === 'runtime-log') {
         runtimeLogService.log({
-          scope: input.sessionId ? 'session' : 'app',
+          scope: 'session',
           namespace: 'agent',
           severity: routeDiagnostic.severity,
           title: 'Model route capability',
           summary: routeDiagnostic.message,
-          sessionId: input.sessionId,
+          sessionId: executionScopeId,
           projectId: input.projectId,
           runId: input.runId,
           raw: {
@@ -507,7 +511,7 @@ export class AgentTurnRunner {
       activeToolDefinitions,
       toolExecutor,
       input.turnId ?? '',
-      input.sessionId,
+      executionScopeId,
       input.contextWindow,
       input.contextTokenLimit,
       input.promptPlan,
@@ -556,12 +560,12 @@ export class AgentTurnRunner {
               );
             } catch (error) {
               runtimeLogService.log({
-                scope: input.sessionId ? 'session' : 'app',
+                scope: 'session',
                 namespace: 'agent',
                 severity: 'warning',
                 title: 'Tool capability evidence was not persisted',
                 summary: error instanceof Error ? error.message : String(error),
-                sessionId: input.sessionId,
+                sessionId: executionScopeId,
                 projectId: input.projectId,
                 runId: input.runId,
                 raw: {
@@ -647,7 +651,7 @@ export class AgentTurnRunner {
           debuggerLlmService.recordAgentTurnUsage({
             runId: input.runId,
             turnId: turnHandle.turnId,
-            sessionId: input.sessionId,
+            sessionId: executionScopeId,
             providerId: input.providerId,
             modelId: input.modelId,
             inputTokens: event.message.usage.inputTokens,
@@ -777,7 +781,7 @@ export class AgentTurnRunner {
           // but never leave setup messages in the execution cache.
           this.deps.slots.flush(slot);
         }
-        if (turnHandle.isOrphaned && slot) {
+        if (turnHandle.isOrphaned && slot && slotKey) {
           this.deps.slots.quarantineSlot(slotKey, slot.agent.activeLoopPromise ?? Promise.resolve());
           this.deps.slots.deleteSlot(slotKey);
         }

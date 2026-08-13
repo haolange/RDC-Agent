@@ -1,0 +1,4 @@
+data: {"contentBlockStart":{"start":{"toolUse":{"name":"read_file"}}}}
+
+data: {"contentBlockDelta":{"delta":{"text":"continued after tool"}}}
+

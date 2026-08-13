@@ -23,6 +23,7 @@ import { StorageIo } from '../../sessions/StorageIo';
 import { StdioRpcClient } from '../../agent-runtime/agent/mcpRpcTransport';
 import { ShutdownCoordinator } from '../../lifecycle/ShutdownCoordinator';
 import { writeTextFileNoFollow } from '../../agent-runtime/tools/primitives/_shared';
+import { hashAttachmentContents } from '../../conversation/ConversationAttachmentHashing';
 import { ConversationHistoryStore } from '../../sessions/ConversationHistoryStore';
 
 const childState = vi.hoisted(() => {
@@ -259,7 +260,7 @@ describe('faultInjectionContract: MCP half-packet disconnect', () => {
 });
 
 describe('faultInjectionContract: attachment source replaced after staging', () => {
-  it('commits staged bytes after the original source is overwritten', () => {
+  it('hashes staged bytes so a later source rewrite cannot change the fingerprint', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-fault-att-'));
     try {
       const sourcePath = path.join(root, 'source.txt');
@@ -269,8 +270,19 @@ describe('faultInjectionContract: attachment source replaced after staging', () 
         io: new StorageIo(),
       } as ConstructorParameters<typeof ConversationHistoryStore>[0]);
       const [stagedPath] = store.stageAttachmentInputs([sourcePath], stagingDir);
+      const [stagedHash] = await hashAttachmentContents([{
+        sourcePath: stagedPath!,
+        fileName: 'source.txt',
+        mimeType: 'text/plain',
+      }]);
       fs.writeFileSync(sourcePath, 'replaced');
+      const [sourceHash] = await hashAttachmentContents([{
+        sourcePath,
+        fileName: 'source.txt',
+        mimeType: 'text/plain',
+      }]);
       expect(fs.readFileSync(stagedPath!, 'utf8')).toBe('staged-bytes');
+      expect(stagedHash).not.toBe(sourceHash);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -278,7 +290,20 @@ describe('faultInjectionContract: attachment source replaced after staging', () 
 });
 
 describe('faultInjectionContract: symlink parent swap', () => {
-  it('rejects writes when the parent path is a symlink/reparse point', async () => {
+  const probeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-symlink-probe-'));
+  let symlinkAvailable = false;
+  let skipReason = '';
+  try {
+    fs.symlinkSync(probeRoot, path.join(probeRoot, 'link'), 'junction');
+    symlinkAvailable = true;
+  } catch (error) {
+    skipReason = error instanceof Error ? error.message : String(error);
+    console.warn(`SYMLINK_TEST_SKIPPED: ${skipReason}`);
+  } finally {
+    fs.rmSync(probeRoot, { recursive: true, force: true });
+  }
+
+  it.skipIf(!symlinkAvailable)('rejects writes when the parent path is a symlink/reparse point', async () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-fault-symlink-'));
     const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-fault-symlink-out-'));
     try {
@@ -287,11 +312,7 @@ describe('faultInjectionContract: symlink parent swap', () => {
       const target = path.join(parent, 'note.txt');
       await writeTextFileNoFollow(target, 'inside');
       fs.rmSync(parent, { recursive: true, force: true });
-      try {
-        fs.symlinkSync(outside, parent, 'junction');
-      } catch {
-        return;
-      }
+      fs.symlinkSync(outside, parent, 'junction');
       await expect(writeTextFileNoFollow(target, 'escaped')).rejects.toThrow(/SYMLINK_PATH_REJECTED/);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
@@ -315,20 +336,57 @@ describe('faultInjectionContract: renderer/main storage recovery', () => {
 });
 
 describe('faultInjectionContract: shutdown with active producers', () => {
-  it('disposes turn, subagent, MCP, and terminal before exit', async () => {
+  it('aborts real turns and invokes MCP/terminal dispose façades in index.ts phase order', async () => {
+    const { TurnCoordinator } = await import('../../workflow/debugger/TurnCoordinator');
+    const { McpConnectionCoordinator } = await import('../../workflow/debugger/McpConnectionCoordinator');
     const coordinator = new ShutdownCoordinator();
+    const turns = new TurnCoordinator();
+    const mcp = new McpConnectionCoordinator();
+    const disconnectAll = vi.spyOn(mcp, 'disconnectAll');
+    const terminalTabs = new Map<string, { tabId: string }>([['term_fake', { tabId: 'term_fake' }]]);
+    const terminal = {
+      disposeAll() {
+        terminalTabs.clear();
+      },
+    };
+    const handle = await turns.beginTurn({
+      sessionKey: 'shutdown-session',
+      turnId: 'shutdown-turn',
+    });
+    expect(turns.getActive('shutdown-session')?.turnId).toBe(handle.turnId);
+
     const seen: string[] = [];
-    for (const id of ['turn', 'subagent', 'mcp', 'terminal'] as const) {
-      coordinator.register({
-        id,
-        phase: id === 'terminal' ? 'terminate_processes' : 'abort_all',
-        dispose: () => {
-          seen.push(id);
-        },
-      });
-    }
+    coordinator.register({
+      id: 'conversation.abort-all',
+      phase: 'abort_all',
+      dispose: async () => {
+        seen.push('abort_all');
+        await turns.abortAll('app_shutdown');
+      },
+    });
+    coordinator.register({
+      id: 'mcp.disconnect-all',
+      phase: 'terminate_processes',
+      dispose: async () => {
+        seen.push('terminate_processes:mcp');
+        await mcp.disconnectAll();
+      },
+    });
+    coordinator.register({
+      id: 'terminal.dispose-all',
+      phase: 'terminate_processes',
+      dispose: () => {
+        seen.push('terminate_processes:terminal');
+        terminal.disposeAll();
+      },
+    });
+
     await coordinator.shutdownAll(1_000);
-    expect(seen.sort()).toEqual(['mcp', 'subagent', 'terminal', 'turn']);
+    expect(turns.getActive('shutdown-session')).toBeNull();
+    expect(disconnectAll).toHaveBeenCalledTimes(1);
+    expect(terminalTabs.size).toBe(0);
+    expect(seen[0]).toBe('abort_all');
+    expect(seen.slice(1).sort()).toEqual(['terminate_processes:mcp', 'terminate_processes:terminal']);
     expect(coordinator.getPhase()).toBe('exited');
   });
 });

@@ -1,0 +1,6 @@
+data: {"id":"chatcmpl_cont","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"read_file","arguments":"{}"}}]}}]}
+
+data: {"id":"chatcmpl_cont","choices":[{"index":0,"delta":{"content":"continued after tool"},"finish_reason":"stop"}]}
+
+data: [DONE]
+

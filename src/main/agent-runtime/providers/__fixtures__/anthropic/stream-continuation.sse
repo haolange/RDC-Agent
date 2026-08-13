@@ -1,0 +1,4 @@
+data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_1","name":"read_file","input":{}}}
+
+data: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"continued after tool"}}
+

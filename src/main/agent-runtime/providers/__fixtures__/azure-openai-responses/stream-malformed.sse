@@ -1,0 +1,8 @@
+data: {"type":"response.output_text.delta","delta":"ok"}
+
+data: {not-json
+
+data: {"type":"response.output_text.delta","delta":"world"}
+
+data: [DONE]
+

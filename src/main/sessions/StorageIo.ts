@@ -7,10 +7,13 @@ import * as path from 'path';
 import type { ZodType } from 'zod';
 import { generateShortId } from '@shared/utils/id';
 import {
+  assertNoUnsupportedSchemaVersion,
+  CURRENT_STORE_SCHEMA_VERSION,
   parseStoredDocument,
   StorageSchemaError,
   type StorageMigration,
 } from './storageSchema';
+import { parse as parseYamlDocument } from 'yaml';
 
 const DEEP_MERGE_FORBIDDEN_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
 
@@ -79,6 +82,67 @@ export class StorageIo {
     if (!('safeParse' in validator)) {
       return parseStoredDocument(parsed, validator, filePath);
     }
+    assertNoUnsupportedSchemaVersion(parsed, CURRENT_STORE_SCHEMA_VERSION, filePath);
+    const result = validator.safeParse(parsed);
+    if (!result.success) {
+      throw new StorageSchemaError(
+        `STORAGE_SCHEMA: ${filePath} failed runtime validation: ${result.error.issues.map((issue: { message: string }) => issue.message).join('; ')}`,
+      );
+    }
+    return result.data;
+  }
+
+  readYaml<T>(filePath: string, validator?: ZodType<T> | readonly StorageMigration<T>[]): T | null {
+    let raw: string;
+    try {
+      if (!fs.existsSync(filePath)) {
+        return null;
+      }
+      raw = fs.readFileSync(filePath, 'utf-8');
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') {
+        return null;
+      }
+      throw new Error(
+        `STORAGE_CORRUPT: failed to read YAML file: ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    try {
+      return this.parseYamlPayload<T>(raw, filePath, validator);
+    } catch (parseError) {
+      if (parseError instanceof StorageSchemaError && parseError.message.includes('STORAGE_SCHEMA_UNSUPPORTED')) {
+        throw parseError;
+      }
+      this.quarantineCorruptFile(filePath);
+      throw new Error(
+        `STORAGE_CORRUPT: failed to parse YAML file: ${filePath}: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+      );
+    }
+  }
+
+  quarantineCorrupt(filePath: string): void {
+    this.quarantineCorruptFile(filePath);
+  }
+
+  private parseYamlPayload<T>(
+    raw: string,
+    filePath: string,
+    validator?: ZodType<T> | readonly StorageMigration<T>[],
+  ): T {
+    const parsed: unknown = parseYamlDocument(raw);
+    if (parsed == null) {
+      throw new StorageSchemaError(`STORAGE_SCHEMA: ${filePath} is empty or not a YAML document`);
+    }
+    if (!validator) {
+      assertNoUnsupportedSchemaVersion(parsed, CURRENT_STORE_SCHEMA_VERSION, filePath);
+      return parsed as T;
+    }
+    if (!('safeParse' in validator)) {
+      return parseStoredDocument(parsed, validator, filePath);
+    }
+    assertNoUnsupportedSchemaVersion(parsed, CURRENT_STORE_SCHEMA_VERSION, filePath);
     const result = validator.safeParse(parsed);
     if (!result.success) {
       throw new StorageSchemaError(

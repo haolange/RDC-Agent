@@ -1,0 +1,6 @@
+data: {"event_type":"step.delta","delta":{"type":"text","text":"ok"}}
+
+data: {not-json
+
+data: {"event_type":"step.delta","delta":{"type":"text","text":"world"}}
+

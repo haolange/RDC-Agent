@@ -1,0 +1,6 @@
+data: {"type":"response.function_call_arguments.done","item":{"type":"function_call","name":"read_file"}}
+
+data: {"type":"response.output_text.delta","delta":"continued after tool"}
+
+data: [DONE]
+

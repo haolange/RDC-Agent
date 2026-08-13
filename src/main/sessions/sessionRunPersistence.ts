@@ -1,10 +1,14 @@
 import * as path from 'path';
-import { readYaml, writeYaml } from '@shared/utils/yaml';
+import { writeYaml } from '@shared/utils/yaml';
 import { nowIso } from '@shared/utils/id';
 import { normalizeWorkflowStage } from '@shared/constants/stages';
 import type { CaptureDescriptor, ExecutableAppMode, RunSummary } from '@shared/types/session';
 import type { PersistedRunRecord } from './storageTypes';
-import { PersistedRunRecordSchema } from './storageSchema';
+import {
+  assertNoUnsupportedSchemaVersion,
+  CURRENT_STORE_SCHEMA_VERSION,
+  PersistedRunRecordSchema,
+} from './storageSchema';
 import type { StorageHost } from './storageHost';
 
 export function toRunSummary(run: PersistedRunRecord): RunSummary {
@@ -32,6 +36,7 @@ export function writeRunFiles(host: StorageHost, runPath: string, run: Persisted
   host.io.ensureDir(runPath);
   host.io.writeJsonAtomic(path.join(runPath, 'run.json'), run);
   writeYaml(path.join(runPath, 'run.yaml'), {
+    schema_version: CURRENT_STORE_SCHEMA_VERSION,
     run_id: run.runId,
     turn_id: run.turnId,
     session_id: run.sessionId,
@@ -64,12 +69,14 @@ export function readPersistedRun(
     return runJson;
   }
 
-  const runYaml = readYaml<Record<string, unknown>>(path.join(runPath, 'run.yaml'));
+  const runYamlPath = path.join(runPath, 'run.yaml');
+  const runYaml = host.io.readYaml<Record<string, unknown>>(runYamlPath);
   if (!runYaml) {
     return null;
   }
+  assertNoUnsupportedSchemaVersion(runYaml, CURRENT_STORE_SCHEMA_VERSION, runYamlPath);
 
-  return {
+  const mapped: PersistedRunRecord = {
     runId,
     turnId: typeof runYaml.turn_id === 'string' ? runYaml.turn_id : undefined,
     projectId: String(runYaml.project_id || ''),
@@ -94,4 +101,14 @@ export function readPersistedRun(
       workflow_stage: normalizeWorkflowStage((runYaml.runtime as Record<string, unknown>)?.workflow_stage as string | undefined),
     },
   };
+  const parsed = PersistedRunRecordSchema.safeParse(mapped);
+  if (!parsed.success) {
+    host.io.quarantineCorrupt(runYamlPath);
+    throw new Error(
+      `STORAGE_CORRUPT: failed to parse YAML file: ${runYamlPath}: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`,
+    );
+  }
+  parsed.data.lastStage = normalizeWorkflowStage(parsed.data.lastStage);
+  parsed.data.runtime.workflow_stage = normalizeWorkflowStage(parsed.data.runtime.workflow_stage);
+  return parsed.data;
 }

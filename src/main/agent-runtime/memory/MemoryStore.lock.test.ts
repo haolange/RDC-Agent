@@ -19,6 +19,18 @@ describe('memoryDirectoryLock', () => {
     expect(acquired.lockPath).toBe(lockPath);
     await releaseMemoryDirectoryLock(lockPath);
   });
+
+  it('does not steal a live-pid lock even when the owner file is older than 30s', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-memory-live-'));
+    roots.push(root);
+    const first = await acquireMemoryDirectoryLock(root);
+    await writeFile(first.lockPath, JSON.stringify({
+      pid: process.pid,
+      createdAt: Date.now() - 120_000,
+    }), 'utf8');
+    await expect(acquireMemoryDirectoryLock(root, { maxAttempts: 3 })).rejects.toThrow(/MEMORY_LOCK_TIMEOUT/);
+    await releaseMemoryDirectoryLock(first.lockPath);
+  });
 });
 
 describe('MemoryStore cross-process lock', () => {

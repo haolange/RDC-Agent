@@ -697,4 +697,21 @@ describe('SettingsService provider persistence', () => {
     expect(persisted.appearance.chromeThemes.light.presetId).toBe('rdc');
     expect(persisted.appearance.chromeThemes.dark.accent).not.toBe('#ff0000');
   });
+
+  it('fail-closes unknown higher settings schemaVersion without rewriting the file', async () => {
+    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const settingsPath = path.join(workspaceRoot, 'config.json');
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    const future = {
+      schemaVersion: 99,
+      appearance: { theme: 'dark' },
+      llm: { providers: [] },
+    };
+    fs.writeFileSync(settingsPath, JSON.stringify(future, null, 2), 'utf8');
+
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    expect(() => service.initialize()).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
+    expect(JSON.parse(fs.readFileSync(settingsPath, 'utf8'))).toEqual(future);
+  });
 });
