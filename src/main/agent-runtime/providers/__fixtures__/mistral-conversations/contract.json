@@ -1,4 +1,5 @@
 {
   "reasoning": "present",
-  "vision": "fail-closed"
+  "vision": "fail-closed",
+  "cache": "present"
 }

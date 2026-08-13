@@ -44,67 +44,68 @@ export class ProjectWorkspaceStore {
       throw new Error(`Project root is not a directory: ${resolvedRootPath}`);
     }
     const normalizedRootPath = fs.realpathSync.native(resolvedRootPath);
-
-    const registry = this.readRegistry();
-    const existing = registry.projects.find((project) => project.rootPath === normalizedRootPath);
-    if (existing) {
-      this.setCurrentProjectId(existing.projectId);
-      return existing;
-    }
-
     const projectName = path.basename(normalizedRootPath) || normalizedRootPath;
-    const slug = this.createUniqueProjectSlug(projectName, registry.projects);
     const { resourcePath, knowledgePath, inputsPath } = this.ensureProjectResourceLayout(normalizedRootPath);
     const inputs = await this.collectProjectInputs(inputsPath);
-
     const timestamp = nowMs();
-    const project: ProjectRecord = {
-      projectId: `proj_${generateShortId()}`,
-      name: projectName,
-      rootPath: normalizedRootPath,
-      slug,
-      resourcePath,
-      knowledgePath,
-      inputsPath,
-      inputs,
-      inputsUpdatedAt: timestamp,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
-
-    registry.projects.push(project);
-    this.writeRegistry(registry);
-    this.host.io.ensureDir(this.getProjectDataPath(project));
-    this.host.io.ensureDir(this.getProjectSessionsRoot(project));
-    this.writeProjectMetadata(project);
-    this.setCurrentProjectId(project.projectId);
-
-    return project;
+    let result: ProjectRecord | undefined;
+    this.mutateRegistry((registry) => {
+      const existing = registry.projects.find((project) => project.rootPath === normalizedRootPath);
+      if (existing) {
+        result = existing;
+        return;
+      }
+      const project: ProjectRecord = {
+        projectId: `proj_${generateShortId()}`,
+        name: projectName,
+        rootPath: normalizedRootPath,
+        slug: this.createUniqueProjectSlug(projectName, registry.projects),
+        resourcePath,
+        knowledgePath,
+        inputsPath,
+        inputs,
+        inputsUpdatedAt: timestamp,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      };
+      registry.projects.push(project);
+      result = project;
+    });
+    if (!result) {
+      throw new Error(`Failed to create project: ${normalizedRootPath}`);
+    }
+    this.host.io.ensureDir(this.getProjectDataPath(result));
+    this.host.io.ensureDir(this.getProjectSessionsRoot(result));
+    this.writeProjectMetadata(result);
+    this.setCurrentProjectId(result.projectId);
+    return result;
   }
 
   renameProject(projectId: string, newName: string): ProjectRecord {
-    const registry = this.readRegistry();
-    const target = registry.projects.find((project) => project.projectId === projectId);
+    let target: ProjectRecord | undefined;
+    this.mutateRegistry((registry) => {
+      target = registry.projects.find((project) => project.projectId === projectId);
+      if (!target) {
+        throw new Error(`Project not found: ${projectId}`);
+      }
+      target.name = newName;
+      target.updatedAt = nowMs();
+    });
     if (!target) {
       throw new Error(`Project not found: ${projectId}`);
     }
-
-    target.name = newName;
-    target.updatedAt = nowMs();
-    
-    this.writeRegistry(registry);
     this.writeProjectMetadata(target);
-    
     return target;
   }
 
   removeProject(projectId: string): void {
-    const registry = this.readRegistry();
-    const target = registry.projects.find((project) => project.projectId === projectId);
+    let target: ProjectRecord | undefined;
+    this.mutateRegistry((registry) => {
+      target = registry.projects.find((project) => project.projectId === projectId);
+      if (!target) return;
+      registry.projects = registry.projects.filter((project) => project.projectId !== projectId);
+    });
     if (!target) return;
-
-    registry.projects = registry.projects.filter((project) => project.projectId !== projectId);
-    this.writeRegistry(registry);
 
     const projectPath = this.getProjectDataPath(target);
     if (fs.existsSync(projectPath)) {
@@ -235,39 +236,66 @@ export class ProjectWorkspaceStore {
   }
 
   readRegistry(): ProjectRegistry {
-    const loaded = this.host.io.readJson(this.host.registryPath, PROJECT_REGISTRY_MIGRATIONS);
-    if (!loaded) {
-      const empty: ProjectRegistry = {
-        schemaVersion: '1',
-        projects: [],
+    return this.withRegistryLock(() => {
+      const loaded = this.host.io.readJson(this.host.registryPath, PROJECT_REGISTRY_MIGRATIONS);
+      if (!loaded) {
+        const empty: ProjectRegistry = {
+          schemaVersion: '1',
+          projects: [],
+        };
+        this.persistRegistryUnlocked(empty);
+        return empty;
+      }
+
+      const registry: ProjectRegistry = {
+        schemaVersion: loaded.schemaVersion,
+        projects: loaded.projects,
       };
-      this.writeRegistry(empty);
-      return empty;
-    }
-
-    const registry: ProjectRegistry = {
-      schemaVersion: loaded.schemaVersion,
-      projects: loaded.projects,
-    };
-    const normalizedProjects = registry.projects.map((project) => this.normalizeProjectRecord(project));
-    const changed = JSON.stringify(normalizedProjects) !== JSON.stringify(registry.projects);
-
-    if (changed) {
+      const normalizedProjects = registry.projects.map((project) => this.normalizeProjectRecord(project));
+      const changed = JSON.stringify(normalizedProjects) !== JSON.stringify(registry.projects);
       registry.projects = normalizedProjects;
-      this.writeRegistry(registry);
-    } else {
-      registry.projects = normalizedProjects;
-    }
-
-    return registry;
+      if (changed) {
+        this.persistRegistryUnlocked(registry);
+      }
+      return registry;
+    });
   }
 
   writeRegistry(registry: ProjectRegistry): void {
-    withDirectoryFileLockSync(path.dirname(this.host.registryPath), {
+    this.withRegistryLock(() => this.persistRegistryUnlocked(registry));
+  }
+
+  private withRegistryLock<T>(operation: () => T): T {
+    return withDirectoryFileLockSync(path.dirname(this.host.registryPath), {
       lockFileName: '.registry.lock',
       timeoutCode: 'PROJECT_REGISTRY_LOCK_TIMEOUT',
-    }, () => {
-      this.host.io.writeJsonAtomic(this.host.registryPath, registry);
+    }, operation);
+  }
+
+  private loadRegistryUnlocked(): ProjectRegistry {
+    const loaded = this.host.io.readJson(this.host.registryPath, PROJECT_REGISTRY_MIGRATIONS);
+    if (!loaded) {
+      return {
+        schemaVersion: '1',
+        projects: [],
+      };
+    }
+    return {
+      schemaVersion: loaded.schemaVersion,
+      projects: loaded.projects.map((project) => this.normalizeProjectRecord(project)),
+    };
+  }
+
+  private persistRegistryUnlocked(registry: ProjectRegistry): void {
+    this.host.io.writeJsonAtomic(this.host.registryPath, registry);
+  }
+
+  private mutateRegistry(mutator: (registry: ProjectRegistry) => void): ProjectRegistry {
+    return this.withRegistryLock(() => {
+      const registry = this.loadRegistryUnlocked();
+      mutator(registry);
+      this.persistRegistryUnlocked(registry);
+      return registry;
     });
   }
 
@@ -303,23 +331,21 @@ export class ProjectWorkspaceStore {
   }
 
   touchProject(projectId: string, lastSessionId?: string | null, updatedAt: number = nowMs()): void {
-    const registry = this.readRegistry();
-    const nextProjects = registry.projects.map((project) => {
-      if (project.projectId !== projectId) return project;
-      const nextLastSessionId = lastSessionId === undefined
-        ? project.lastSessionId
-        : lastSessionId || undefined;
-      return {
-        ...project,
-        updatedAt,
-        lastSessionId: nextLastSessionId,
-      };
+    let project: ProjectRecord | undefined;
+    this.mutateRegistry((registry) => {
+      registry.projects = registry.projects.map((entry) => {
+        if (entry.projectId !== projectId) return entry;
+        const nextLastSessionId = lastSessionId === undefined
+          ? entry.lastSessionId
+          : lastSessionId || undefined;
+        return {
+          ...entry,
+          updatedAt,
+          lastSessionId: nextLastSessionId,
+        };
+      });
+      project = registry.projects.find((item) => item.projectId === projectId);
     });
-
-    registry.projects = nextProjects;
-    this.writeRegistry(registry);
-
-    const project = registry.projects.find((item) => item.projectId === projectId);
     if (project) {
       this.writeProjectMetadata(project);
     }
@@ -368,9 +394,11 @@ export class ProjectWorkspaceStore {
   }
 
   persistProject(project: ProjectRecord): void {
-    const registry = this.readRegistry();
-    registry.projects = registry.projects.map((entry) => entry.projectId === project.projectId ? project : entry);
-    this.writeRegistry(registry);
+    this.mutateRegistry((registry) => {
+      registry.projects = registry.projects.map((entry) => (
+        entry.projectId === project.projectId ? project : entry
+      ));
+    });
     this.writeProjectMetadata(project);
   }
 
