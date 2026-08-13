@@ -328,6 +328,7 @@ describe('provider wire 9×16 matrix', () => {
       expect(existsSync(path.join(FIXTURE_ROOT, surface.dir, surface.streamFile))).toBe(true);
       const contract = readContract(surface);
       readErrors(surface);
+      expect(catalogContractsFor(surface.adapterId), surface.adapterId).not.toBeNull();
       for (const fileName of requiredStreamStarFiles(surface, contract)) {
         const abs = path.join(FIXTURE_ROOT, surface.dir, fileName);
         expect(existsSync(abs), abs).toBe(true);
@@ -387,16 +388,16 @@ describe('provider wire 9×16 matrix', () => {
             case 'vision': {
               const contract = readContract(surface);
               const catalog = catalogContractsFor(surface.adapterId);
-              const routeContracts = plan.route.contracts;
+              if (!catalog) {
+                throw new Error(`PROVIDER_CATALOG_CONTRACTS_MISSING: ${surface.adapterId}`);
+              }
+              const visionPlan = buildPlan(surface, catalog);
+              const routeContracts = visionPlan.route.contracts;
               if (!routeContracts) {
                 throw new Error(`PROVIDER_CONTRACTS_MISSING: ${surface.dir}`);
               }
-              expect(routeContracts.semanticContext.attachments).toBe(contract.vision);
-              if (catalog) {
-                expect(catalog.semanticContext.attachments).toBe(contract.vision);
-              } else {
-                expect(contract.vision).toBe('fail-closed');
-              }
+              expect(catalog.semanticContext.attachments).toBe(contract.vision);
+              expect(routeContracts.semanticContext.attachments).toBe(catalog.semanticContext.attachments);
               const fixtureText = [
                 readFixture(surface, surface.streamFile),
                 ...requiredStreamStarFiles(surface, contract).map((fileName) => readFixture(surface, fileName)),
@@ -431,18 +432,20 @@ describe('provider wire 9×16 matrix', () => {
             case 'cost': {
               const usage = extractUsage(objects);
               expect(usage).toBeTruthy();
-              const cost = {
-                input: usage!.inputTokens * 0.001,
-                output: usage!.outputTokens * 0.002,
-                total: usage!.inputTokens * 0.001 + usage!.outputTokens * 0.002,
-              };
               const finalized = finalizeProviderUsage({
                 inputTokens: usage!.inputTokens,
                 outputTokens: usage!.outputTokens,
                 cacheReadTokens: usage!.cacheReadTokens,
-                cost,
               });
-              expect(finalized.cost?.total).toBe(cost.total);
+              expect(finalized.totalTokens).toBe(usage!.inputTokens + usage!.outputTokens);
+              expect(finalized.inputTokens).toBe(usage!.inputTokens);
+              expect(finalized.outputTokens).toBe(usage!.outputTokens);
+              if (usage!.cacheReadTokens !== undefined) {
+                expect(finalized.cacheHitTokens).toBe(usage!.cacheReadTokens);
+              } else {
+                expect(finalized.cacheHitTokens).toBeUndefined();
+              }
+              expect(finalized.cost).toBeUndefined();
               expect(JSON.stringify(finalized)).not.toMatch(/sk-fixture/);
               break;
             }

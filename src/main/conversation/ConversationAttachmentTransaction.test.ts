@@ -129,5 +129,12 @@ describe('attachment staging bytes are the commit source', () => {
       mimeType: 'text/plain',
     }]);
     expect(replayHashes[0]).toBe(hashes[0]);
+
+    const manifest = JSON.parse(
+      fs.readFileSync(path.join(session.sessionPath, 'attachments.json'), 'utf8'),
+    ) as { schemaVersion?: string; attachments?: unknown };
+    expect(manifest.schemaVersion).toBe('1');
+    expect(Array.isArray(manifest.attachments)).toBe(true);
+    expect(manifest.attachments).toHaveLength(1);
   });
 });
