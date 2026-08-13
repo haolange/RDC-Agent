@@ -1,0 +1,5 @@
+{
+  "context_overflow": { "status": 400, "body": "mistral-conversations fixture: maximum context length exceeded" },
+  "http_429": { "status": 429, "body": "mistral-conversations fixture: rate limit reached" },
+  "http_5xx": { "status": 503, "body": "mistral-conversations fixture: the server had an error" }
+}

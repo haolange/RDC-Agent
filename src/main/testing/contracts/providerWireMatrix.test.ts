@@ -7,6 +7,7 @@ import path from 'path';
 import { describe, expect, it } from 'vitest';
 import type { LlmProviderProtocol } from '@shared/types/settings';
 import type { ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';
+import type { ProviderContractBundle } from '@shared/provider-catalog/modelManifestSchema';
 import { createTestRequestPlan } from '../createTestRequestPlan';
 import { EventStream } from '../../agent-runtime/core/EventStream';
 import type { AssistantMessage, AssistantMessageEvent } from '../../agent-runtime/core/types';
@@ -25,6 +26,8 @@ import { classifyProviderError } from '../../agent-runtime/providers/internal/er
 import { finalizeProviderUsage, normalizeCacheUsage } from '../../agent-runtime/providers/internal/normalizeCacheUsage';
 
 const FIXTURE_ROOT = path.join(__dirname, '../../agent-runtime/providers/__fixtures__');
+const PROFILE_ROOT = path.join(__dirname, '../../../shared/provider-catalog/manifests/profiles');
+const IMAGE_PART_RE = /image_url|inlineData|inline_data|"type"\s*:\s*"image"|media_type/i;
 
 const SURFACES = [
   { dir: 'openai-compatible', adapterId: 'openai-compatible', protocol: 'OpenAICompatibleChatCompletions', streamFile: 'stream.sse', transport: 'sse' },
@@ -66,20 +69,31 @@ const DIMENSIONS = [
 type Surface = (typeof SURFACES)[number];
 type SurfaceContract = {
   reasoning: 'none' | 'present';
+  vision: 'fail-closed' | 'present';
+};
+type SurfaceHttpError = { status: number; body: string };
+type SurfaceErrors = {
+  context_overflow: SurfaceHttpError;
+  http_429: SurfaceHttpError;
+  http_5xx: SurfaceHttpError;
 };
 
 function extFor(surface: Surface): 'sse' | 'jsonl' {
   return surface.transport === 'jsonl' ? 'jsonl' : 'sse';
 }
 
-function requiredStreamStarFiles(surface: Surface): string[] {
+function requiredStreamStarFiles(surface: Surface, contract: SurfaceContract): string[] {
   const ext = extFor(surface);
-  return [
+  const files = [
     `stream-truncated.${ext}`,
     `stream-malformed.${ext}`,
     `stream-continuation.${ext}`,
     `stream-reasoning.${ext}`,
   ];
+  if (contract.vision === 'present') {
+    files.push(`stream-vision.${ext}`);
+  }
+  return files;
 }
 
 function readFixture(surface: Surface, fileName: string): string {
@@ -93,21 +107,53 @@ function readFixture(surface: Surface, fileName: string): string {
 function readContract(surface: Surface): SurfaceContract {
   const raw = JSON.parse(readFixture(surface, 'contract.json')) as SurfaceContract;
   expect(raw.reasoning === 'none' || raw.reasoning === 'present').toBe(true);
+  expect(raw.vision === 'fail-closed' || raw.vision === 'present').toBe(true);
   return raw;
 }
 
-async function parseTransport(surface: Surface, raw: string, providerApi: string): Promise<string[]> {
+function readErrors(surface: Surface): SurfaceErrors {
+  const raw = JSON.parse(readFixture(surface, 'errors.json')) as SurfaceErrors;
+  for (const key of ['context_overflow', 'http_429', 'http_5xx'] as const) {
+    expect(raw[key]?.status).toBeGreaterThan(0);
+    expect(raw[key]?.body).toContain(surface.dir);
+  }
+  return raw;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function catalogContractsFor(adapterId: string): ProviderContractBundle | null {
+  for (const file of readdirSync(PROFILE_ROOT)) {
+    if (!file.endsWith('.json')) continue;
+    const parsed = JSON.parse(readFileSync(path.join(PROFILE_ROOT, file), 'utf8')) as {
+      routeMechanics?: Array<{ adapter?: string; contracts?: ProviderContractBundle }>;
+    };
+    const match = parsed.routeMechanics?.find((entry) => entry.adapter === adapterId);
+    if (match?.contracts) return match.contracts;
+  }
+  return null;
+}
+
+async function parseTransport(
+  surface: Surface,
+  raw: string,
+  providerApi: string,
+  signal?: AbortSignal,
+): Promise<string[]> {
   const response = new Response(raw, {
     status: 200,
     headers: { 'Content-Type': surface.transport === 'sse' ? 'text/event-stream' : 'application/x-ndjson' },
   });
   const payloads: string[] = [];
   if (surface.transport === 'sse') {
-    for await (const data of parseSSE(response, undefined, { providerApi })) {
+    for await (const data of parseSSE(response, signal, { providerApi })) {
       payloads.push(data);
     }
   } else {
-    for await (const line of parseJsonLines(response, undefined, { providerApi })) {
+    for await (const line of parseJsonLines(response, signal, { providerApi })) {
       payloads.push(line);
     }
   }
@@ -126,12 +172,101 @@ function parsedObjects(payloads: string[]): unknown[] {
   return objects;
 }
 
+function looksLikeUsage(record: Record<string, unknown>): boolean {
+  return (
+    'prompt_tokens' in record
+    || 'input_tokens' in record
+    || 'promptTokenCount' in record
+    || 'total_input_tokens' in record
+    || 'inputTokens' in record
+    || 'prompt_eval_count' in record
+  );
+}
+
+function numberField(record: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+  }
+  return undefined;
+}
+
+function extractUsage(value: unknown): {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens?: number;
+} | null {
+  const record = asRecord(value);
+  if (!record) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = extractUsage(item);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  const usage = asRecord(record.usage) ?? asRecord(record.usageMetadata) ?? (looksLikeUsage(record) ? record : null);
+  if (usage) {
+    const details = asRecord(usage.prompt_tokens_details) ?? asRecord(usage.input_tokens_details);
+    const inputTokens = numberField(usage, [
+      'prompt_tokens',
+      'input_tokens',
+      'promptTokenCount',
+      'total_input_tokens',
+      'inputTokens',
+      'prompt_eval_count',
+    ]);
+    const outputTokens = numberField(usage, [
+      'completion_tokens',
+      'output_tokens',
+      'candidatesTokenCount',
+      'total_output_tokens',
+      'outputTokens',
+      'eval_count',
+    ]);
+    const cacheReadTokens = numberField(details ?? {}, ['cached_tokens'])
+      ?? numberField(usage, [
+        'cache_read_input_tokens',
+        'cachedContentTokenCount',
+        'total_cached_tokens',
+        'cacheReadInputTokens',
+        'prompt_cache_hit_tokens',
+      ]);
+    if (inputTokens !== undefined || outputTokens !== undefined || cacheReadTokens !== undefined) {
+      return {
+        inputTokens: inputTokens ?? 0,
+        outputTokens: outputTokens ?? 0,
+        ...(cacheReadTokens !== undefined ? { cacheReadTokens } : {}),
+      };
+    }
+  }
+
+  for (const nested of Object.values(record)) {
+    const found = extractUsage(nested);
+    if (found) return found;
+  }
+  return null;
+}
+
 function looksLikeThinking(value: unknown): boolean {
-  const blob = JSON.stringify(value);
+  const blob = typeof value === 'string' ? value : JSON.stringify(value);
   return /reasoning_content|"thinking"|thinking_delta|"thought"|reasoningContent|response\.reasoning/i.test(blob);
 }
 
-function buildPlan(surface: Surface) {
+function unparseableFrames(payloads: string[]): string[] {
+  return payloads.filter((entry) => {
+    try {
+      JSON.parse(entry);
+      return false;
+    } catch {
+      return true;
+    }
+  });
+}
+
+function buildPlan(surface: Surface, contracts?: ProviderContractBundle) {
   return createTestRequestPlan({
     providerId: surface.dir,
     adapterId: surface.adapterId,
@@ -140,7 +275,12 @@ function buildPlan(surface: Surface) {
     selectedModelId: 'fixture',
     effectiveModelId: 'fixture',
     appliedBindingIds: [],
-    route: { protocol: surface.protocol, baseUrl: 'https://example.test/v1', source: 'catalog' },
+    route: {
+      protocol: surface.protocol,
+      baseUrl: 'https://example.test/v1',
+      source: 'catalog',
+      ...(contracts ? { contracts } : {}),
+    },
     headers: {
       'x-rdc-activation': 'fixture',
       authorization: 'Bearer sk-fixture-must-not-appear',
@@ -186,9 +326,9 @@ describe('provider wire 9×16 matrix', () => {
     const requiredAbs = new Set<string>();
     for (const surface of SURFACES) {
       expect(existsSync(path.join(FIXTURE_ROOT, surface.dir, surface.streamFile))).toBe(true);
-      expect(existsSync(path.join(FIXTURE_ROOT, surface.dir, 'contract.json'))).toBe(true);
-      readFixture(surface, 'contract.json');
-      for (const fileName of requiredStreamStarFiles(surface)) {
+      const contract = readContract(surface);
+      readErrors(surface);
+      for (const fileName of requiredStreamStarFiles(surface, contract)) {
         const abs = path.join(FIXTURE_ROOT, surface.dir, fileName);
         expect(existsSync(abs), abs).toBe(true);
         readFileSync(abs, 'utf8');
@@ -210,7 +350,8 @@ describe('provider wire 9×16 matrix', () => {
             surface.adapterId,
           );
           const blob = payloads.join('\n');
-          const plan = buildPlan(surface);
+          const objects = parsedObjects(payloads);
+          const plan = buildPlan(surface, catalogContractsFor(surface.adapterId) ?? undefined);
 
           switch (dimension) {
             case 'plain':
@@ -233,70 +374,112 @@ describe('provider wire 9×16 matrix', () => {
               const contract = readContract(surface);
               const reasoningRaw = readFixture(surface, `stream-reasoning.${extFor(surface)}`);
               const reasoningPayloads = await parseTransport(surface, reasoningRaw, surface.adapterId);
-              const objects = parsedObjects(reasoningPayloads);
-              if (contract.reasoning === 'none') {
-                expect(contract.reasoning).toBe('none');
-                expect(objects.some(looksLikeThinking)).toBe(false);
+              const reasoningObjects = parsedObjects(reasoningPayloads);
+              if (contract.reasoning === 'present') {
+                expect(looksLikeThinking(reasoningRaw)).toBe(true);
+                expect(reasoningObjects.some(looksLikeThinking)).toBe(true);
               } else {
-                expect(objects.some(looksLikeThinking)).toBe(true);
+                expect(looksLikeThinking(reasoningRaw)).toBe(false);
+                expect(reasoningObjects.some(looksLikeThinking)).toBe(false);
               }
               break;
             }
             case 'vision': {
-              const attachments = plan.route.contracts?.semanticContext.attachments;
-              expect(attachments).toBeDefined();
-              expect(attachments).toBe('fail-closed');
+              const contract = readContract(surface);
+              const catalog = catalogContractsFor(surface.adapterId);
+              const routeContracts = plan.route.contracts;
+              if (!routeContracts) {
+                throw new Error(`PROVIDER_CONTRACTS_MISSING: ${surface.dir}`);
+              }
+              expect(routeContracts.semanticContext.attachments).toBe(contract.vision);
+              if (catalog) {
+                expect(catalog.semanticContext.attachments).toBe(contract.vision);
+              } else {
+                expect(contract.vision).toBe('fail-closed');
+              }
+              const fixtureText = [
+                readFixture(surface, surface.streamFile),
+                ...requiredStreamStarFiles(surface, contract).map((fileName) => readFixture(surface, fileName)),
+              ].join('\n');
+              if (contract.vision === 'present') {
+                const visionRaw = readFixture(surface, `stream-vision.${extFor(surface)}`);
+                expect(visionRaw).toMatch(IMAGE_PART_RE);
+              } else {
+                expect(fixtureText).not.toMatch(IMAGE_PART_RE);
+                expect(existsSync(path.join(FIXTURE_ROOT, surface.dir, `stream-vision.${extFor(surface)}`))).toBe(false);
+              }
               break;
             }
-            case 'cache':
-              expect(normalizeCacheUsage({
-                inputTokens: 100,
-                cacheReadTokens: 40,
-                providerApi: surface.adapterId,
-              } as { inputTokens: number; cacheReadTokens: number })).toMatchObject({ cacheHitTokens: 40 });
-              expect(surface.adapterId).toBe(plan.adapterId);
+            case 'cache': {
+              const usage = extractUsage(objects);
+              expect(usage).toBeTruthy();
+              const normalized = normalizeCacheUsage({
+                inputTokens: usage!.inputTokens,
+                cacheReadTokens: usage!.cacheReadTokens,
+              });
+              if (usage!.cacheReadTokens !== undefined) {
+                expect(normalized.cacheHitTokens).toBe(usage!.cacheReadTokens);
+              } else {
+                expect(normalized).toEqual({});
+              }
               break;
+            }
             case 'usage':
+              expect(extractUsage(objects)?.inputTokens).toBeGreaterThan(0);
               expect(blob).toMatch(/usage|token|eval_count|promptToken|inputTokens|output_tokens|total_tokens/i);
               break;
             case 'cost': {
-              const usage = finalizeProviderUsage({
-                inputTokens: 10,
-                outputTokens: 4,
-                cost: { input: 0.01, output: 0.02, total: 0.03 },
-                providerApi: surface.adapterId,
-              } as { inputTokens: number; outputTokens: number; cost: { input: number; output: number; total: number } });
-              expect(usage.cost?.total).toBe(0.03);
-              expect(JSON.stringify(usage)).not.toMatch(/sk-fixture/);
-              expect(surface.adapterId).toBe(plan.adapterId);
+              const usage = extractUsage(objects);
+              expect(usage).toBeTruthy();
+              const cost = {
+                input: usage!.inputTokens * 0.001,
+                output: usage!.outputTokens * 0.002,
+                total: usage!.inputTokens * 0.001 + usage!.outputTokens * 0.002,
+              };
+              const finalized = finalizeProviderUsage({
+                inputTokens: usage!.inputTokens,
+                outputTokens: usage!.outputTokens,
+                cacheReadTokens: usage!.cacheReadTokens,
+                cost,
+              });
+              expect(finalized.cost?.total).toBe(cost.total);
+              expect(JSON.stringify(finalized)).not.toMatch(/sk-fixture/);
               break;
             }
             case 'context_overflow': {
-              const classified = classifyProviderError(
-                new Error(`${surface.adapterId}: context length exceeded`),
-                400,
-              );
+              const spec = readErrors(surface).context_overflow;
+              const classified = classifyProviderError(new Error(spec.body), spec.status);
               expect(classified.code).toBe('context_overflow');
-              expect(classified.message).toContain(surface.adapterId);
+              expect(classified.message).toBe(spec.body);
               break;
             }
             case 'http_429': {
-              await expect(ensureOk(new Response('rate limited', { status: 429 }), surface.adapterId))
-                .rejects.toBeInstanceOf(ProviderHttpError);
-              const classified = classifyProviderError(new Error(`${surface.adapterId} rate limit`), 429);
+              const spec = readErrors(surface).http_429;
+              await expect(ensureOk(new Response(spec.body, { status: spec.status }), surface.adapterId))
+                .rejects.toMatchObject({ status: spec.status, providerApi: surface.adapterId } as Partial<ProviderHttpError>);
+              const classified = classifyProviderError(new Error(spec.body), spec.status);
               expect(classified.code).toBe('rate_limit');
-              expect(classified.message).toContain(surface.adapterId);
+              expect(classified.message).toBe(spec.body);
               break;
             }
             case 'http_5xx': {
-              await expect(ensureOk(new Response('unavailable', { status: 503 }), surface.adapterId))
-                .rejects.toMatchObject({ status: 503, providerApi: surface.adapterId });
-              const classified = classifyProviderError(new Error(`${surface.adapterId} server error`), 503);
+              const spec = readErrors(surface).http_5xx;
+              await expect(ensureOk(new Response(spec.body, { status: spec.status }), surface.adapterId))
+                .rejects.toMatchObject({ status: spec.status, providerApi: surface.adapterId });
+              const classified = classifyProviderError(new Error(spec.body), spec.status);
               expect(classified.retryable).toBe(true);
-              expect(classified.message).toContain(surface.adapterId);
+              expect(classified.message).toBe(spec.body);
               break;
             }
             case 'abort': {
+              const controller = new AbortController();
+              controller.abort();
+              await expect(parseTransport(
+                surface,
+                readFixture(surface, surface.streamFile),
+                surface.adapterId,
+                controller.signal,
+              )).rejects.toMatchObject({ name: 'AbortError' });
               const stream = new EventStream<string, string>();
               stream.push('early');
               stream.abort();
@@ -331,44 +514,31 @@ describe('provider wire 9×16 matrix', () => {
             case 'malformed_stream': {
               const malformedRaw = readFixture(surface, `stream-malformed.${extFor(surface)}`);
               const parsed = await parseTransport(surface, malformedRaw, surface.adapterId);
-              const objects = parsedObjects(parsed);
-              expect(parsed.some((entry) => entry.includes('{not-json') || entry.includes('not-json'))).toBe(true);
-              expect(objects.some((entry) => {
-                try {
-                  JSON.parse(JSON.stringify(entry));
-                  return typeof entry === 'object' && entry !== null && JSON.stringify(entry).includes('{not-json');
-                } catch {
-                  return false;
-                }
-              })).toBe(false);
-              expect(JSON.stringify(objects)).toMatch(/ok|world|Hello/i);
+              const malformedObjects = parsedObjects(parsed);
+              expect(unparseableFrames(parsed).length).toBeGreaterThan(0);
+              expect(JSON.stringify(malformedObjects)).not.toMatch(/not-json/);
+              expect(JSON.stringify(malformedObjects)).toMatch(/ok|world|Hello/i);
               break;
             }
             case 'truncated_stream': {
               const truncatedRaw = readFixture(surface, `stream-truncated.${extFor(surface)}`);
               const parsed = await parseTransport(surface, truncatedRaw, surface.adapterId);
-              const objects = parsedObjects(parsed);
-              expect(JSON.stringify(objects)).toMatch(/ok/i);
-              expect(JSON.stringify(objects)).not.toMatch(/incomplete/);
-              const truncatedFrames = parsed.filter((entry) => {
-                try {
-                  JSON.parse(entry);
-                  return false;
-                } catch {
-                  return true;
-                }
-              });
-              expect(truncatedFrames.length).toBeGreaterThan(0);
+              const truncatedObjects = parsedObjects(parsed);
+              expect(JSON.stringify(truncatedObjects)).toMatch(/ok/i);
+              expect(JSON.stringify(truncatedObjects)).not.toMatch(/incomplete/);
+              expect(unparseableFrames(parsed).length).toBeGreaterThan(0);
               break;
             }
             case 'secret_non_leak': {
               const headers = requestPlanHeaders(plan);
               expect(headers.authorization).toBeUndefined();
               expect(JSON.stringify(headers)).not.toMatch(/sk-fixture|fixture-api-key/);
+              const contract = readContract(surface);
               const fixtureText = [
                 readFixture(surface, surface.streamFile),
-                ...requiredStreamStarFiles(surface).map((fileName) => readFixture(surface, fileName)),
+                ...requiredStreamStarFiles(surface, contract).map((fileName) => readFixture(surface, fileName)),
                 readFixture(surface, 'contract.json'),
+                readFixture(surface, 'errors.json'),
               ].join('\n');
               expect(fixtureText).not.toMatch(/sk-fixture/);
               expect(blob).not.toMatch(/sk-fixture-must-not-appear/);

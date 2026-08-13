@@ -210,7 +210,32 @@ export const SessionAttachmentRecordSchema = z.object({
   createdAt: z.number(),
 }).passthrough();
 
-export const SessionAttachmentManifestSchema: ZodType<SessionAttachmentRecord[]> = z.array(SessionAttachmentRecordSchema) as ZodType<SessionAttachmentRecord[]>;
+const SessionAttachmentRecordsSchema = z.array(SessionAttachmentRecordSchema);
+
+export interface SessionAttachmentManifestDocument {
+  schemaVersion: string;
+  attachments: SessionAttachmentRecord[];
+}
+
+export function toSessionAttachmentManifest(
+  attachments: SessionAttachmentRecord[],
+): SessionAttachmentManifestDocument {
+  return { schemaVersion: CURRENT_STORE_SCHEMA_VERSION, attachments };
+}
+
+function unwrapAttachmentManifest(raw: unknown): unknown {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === 'object' && 'attachments' in raw) {
+    return (raw as { attachments: unknown }).attachments;
+  }
+  return raw;
+}
+
+/** Accepts current `{ schemaVersion, attachments }` and legacy bare arrays. */
+export const SessionAttachmentManifestSchema = z
+  .unknown()
+  .transform((raw) => unwrapAttachmentManifest(raw))
+  .pipe(SessionAttachmentRecordsSchema) as unknown as ZodType<SessionAttachmentRecord[]>;
 
 export const PersistedRunRecordSchema: ZodType<PersistedRunRecord> = z.object({
   runId: z.string().min(1),

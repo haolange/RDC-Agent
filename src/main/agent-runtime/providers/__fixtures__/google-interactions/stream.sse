@@ -20,7 +20,7 @@ event: step.stop
 data: {"event_type":"step.stop","index":1}
 
 event: interaction.requires_action
-data: {"event_type":"interaction.requires_action","interaction":{"id":"int_fixture","status":"requires_action","usage":{"total_input_tokens":11,"total_output_tokens":7,"total_tokens":18}}}
+data: {"event_type":"interaction.requires_action","interaction":{"id":"int_fixture","status":"requires_action","usage":{"total_input_tokens":11,"total_output_tokens":7,"total_tokens":18,"total_cached_tokens":5}}}
 
 event: done
 data: [DONE]

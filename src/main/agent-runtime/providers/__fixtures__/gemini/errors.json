@@ -1,0 +1,5 @@
+{
+  "context_overflow": { "status": 400, "body": "gemini fixture: input token count exceeds the maximum context length" },
+  "http_429": { "status": 429, "body": "gemini fixture: rate limit reached" },
+  "http_5xx": { "status": 503, "body": "gemini fixture: the server had an error" }
+}

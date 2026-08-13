@@ -1,3 +1,4 @@
 {
-  "reasoning": "present"
+  "reasoning": "present",
+  "vision": "fail-closed"
 }

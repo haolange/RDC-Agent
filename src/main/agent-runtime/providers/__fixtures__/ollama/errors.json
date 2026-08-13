@@ -1,0 +1,5 @@
+{
+  "context_overflow": { "status": 400, "body": "ollama fixture: the context length exceeded the model's limit" },
+  "http_429": { "status": 429, "body": "ollama fixture: rate limit reached" },
+  "http_5xx": { "status": 503, "body": "ollama fixture: the server had an error" }
+}

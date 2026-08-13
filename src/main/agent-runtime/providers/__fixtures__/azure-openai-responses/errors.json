@@ -1,0 +1,5 @@
+{
+  "context_overflow": { "status": 400, "body": "azure-openai-responses fixture: maximum context length exceeded" },
+  "http_429": { "status": 429, "body": "azure-openai-responses fixture: rate limit reached" },
+  "http_5xx": { "status": 503, "body": "azure-openai-responses fixture: the server had an error" }
+}

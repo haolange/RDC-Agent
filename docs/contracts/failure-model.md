@@ -49,6 +49,7 @@
 | Storage 未知更高 schemaVersion | Integrity | `STORAGE_SCHEMA_UNSUPPORTED`，不 quarantine |
 | Memory 跨进程锁超时 | Availability | `.memory.lock` / `.registry.lock` 活 pid 永不抢锁；死 pid 或损坏锁回收；超时 `MEMORY_LOCK_TIMEOUT` / `PROJECT_REGISTRY_LOCK_TIMEOUT` |
 | Session evidence YAML | Integrity | `SESSION_EVIDENCE_MIGRATIONS`；损坏 quarantine；未知更高 `schema_version` 不 quarantine |
+| Session attachments.json | Integrity | 现写 `{ schemaVersion, attachments }`；缺版本纯数组仍 Zod 校验；未知更高 `schemaVersion` 不 quarantine |
 | 非法历史 `workTrace` → null | Integrity | 读边界丢弃 |
 | Context 无法装入 → `CONTEXT_CANNOT_FIT` | Integrity | hard degrade 后仍失败则报错 |
 | 配置文件单文件 invalid + diagnostics | Integrity | 逐文件隔离，不拖垮列表 |

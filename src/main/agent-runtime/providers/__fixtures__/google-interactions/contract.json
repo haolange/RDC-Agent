@@ -1,3 +1,4 @@
 {
-  "reasoning": "none"
+  "reasoning": "none",
+  "vision": "fail-closed"
 }

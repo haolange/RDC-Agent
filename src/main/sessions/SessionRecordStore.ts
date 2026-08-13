@@ -25,7 +25,6 @@ import type {
   ExecutableAppMode,
   ProjectRecord,
   RunSummary,
-  SessionAttachmentRecord,
   SessionRecord,
 } from '@shared/types/session';
 import { appPathService } from '../runtime/AppPathService';
@@ -34,7 +33,7 @@ import type {
   SessionEvidenceRecord,
 } from './storageTypes';
 import type { StagedConversationSessionCommit } from './storageCommitTypes';
-import { SessionRecordSchema, SESSION_EVIDENCE_MIGRATIONS } from './storageSchema';
+import { SessionRecordSchema, SESSION_EVIDENCE_MIGRATIONS, toSessionAttachmentManifest } from './storageSchema';
 import { reconcileProjectSessionTitles } from './sessionRecordReconcile';
 import { readPersistedRun as loadPersistedRun, toRunSummary, writeRunFiles as persistRunFiles } from './sessionRunPersistence';
 
@@ -151,7 +150,7 @@ export class SessionRecordStore {
       fs.writeFileSync(path.join(sessionPath, 'conversation.jsonl'), '', 'utf-8');
     }
     if (!fs.existsSync(path.join(sessionPath, 'attachments.json'))) {
-      this.host.io.writeJsonAtomic(path.join(sessionPath, 'attachments.json'), [] satisfies SessionAttachmentRecord[]);
+      this.host.io.writeJsonAtomic(path.join(sessionPath, 'attachments.json'), toSessionAttachmentManifest([]));
     }
     this.syncSessionEvidence(session.sessionId, session.projectId);
 
@@ -216,7 +215,10 @@ export class SessionRecordStore {
     }
     this.host.io.writeJsonAtomic(path.join(commit.stagingPath, 'session.json'), commit.session);
     this.host.io.writeJsonlAtomic(path.join(commit.stagingPath, 'conversation.jsonl'), history);
-    this.host.io.writeJsonAtomic(path.join(commit.stagingPath, 'attachments.json'), commit.attachments);
+    this.host.io.writeJsonAtomic(
+      path.join(commit.stagingPath, 'attachments.json'),
+      toSessionAttachmentManifest(commit.attachments),
+    );
     this.host.io.writeUtf8Atomic(path.join(commit.stagingPath, 'action_chain.jsonl'), '');
     if (branchState) {
       this.host.io.writeJsonAtomic(path.join(commit.stagingPath, 'conversation-branches.json'), branchState);
