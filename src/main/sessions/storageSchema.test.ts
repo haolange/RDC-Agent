@@ -5,6 +5,7 @@ import {
   PROJECT_REGISTRY_MIGRATIONS,
   SessionRecordSchema,
   SessionAttachmentManifestSchema,
+  toSessionAttachmentManifest,
   PersistedRunRecordSchema,
   CONVERSATION_TURN_COMMIT_MIGRATIONS,
   CONVERSATION_TERMINAL_COMMIT_MIGRATIONS,
@@ -284,7 +285,7 @@ describe('storage schema store quartet', () => {
     {
       name: 'attachments',
       file: 'attachments.json',
-      legal: [legalAttachment],
+      legal: toSessionAttachmentManifest([legalAttachment]),
       corrupt: [{ attachmentId: 1 }],
       missingOrLegacy: [legalAttachment],
       higher: { schemaVersion: '99', attachments: [legalAttachment] },
@@ -378,7 +379,13 @@ describe('storage schema store quartet', () => {
         } else {
           io.writeJsonAtomic(filePath, store.legal);
         }
-        expect(store.read(filePath)).toBeTruthy();
+        const parsed = store.read(filePath);
+        expect(parsed).toBeTruthy();
+        if (store.name === 'attachments') {
+          expect(Array.isArray(parsed)).toBe(true);
+          expect((JSON.parse(fs.readFileSync(filePath, 'utf8')) as { schemaVersion?: string }).schemaVersion)
+            .toBe('1');
+        }
       });
 
       it('fail-closes a structurally damaged document', () => {

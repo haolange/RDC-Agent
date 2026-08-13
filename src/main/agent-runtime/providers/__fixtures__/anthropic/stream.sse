@@ -1,4 +1,4 @@
-data: {"type":"message_start","message":{"id":"msg_fixture","type":"message","role":"assistant","model":"claude-fixture","content":[],"usage":{"input_tokens":10,"output_tokens":1}}}
+data: {"type":"message_start","message":{"id":"msg_fixture","type":"message","role":"assistant","model":"claude-fixture","content":[],"usage":{"input_tokens":10,"output_tokens":1,"cache_read_input_tokens":4}}}
 
 data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
 

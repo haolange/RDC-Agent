@@ -20,6 +20,7 @@ import {
   CONVERSATION_TURN_COMMIT_MIGRATIONS,
   SessionAttachmentManifestSchema,
   SessionRecordSchema,
+  toSessionAttachmentManifest,
 } from './storageSchema';
 
 export type {
@@ -632,7 +633,10 @@ export class ConversationHistoryStore {
     const branchPath = path.join(session.sessionPath, 'conversation-branches.json');
     if (branch) this.host.io.writeJsonAtomic(branchPath, branch);
     else if (fs.existsSync(branchPath)) fs.rmSync(branchPath, { force: true });
-    this.host.io.writeJsonAtomic(path.join(session.sessionPath, 'attachments.json'), attachments);
+    this.host.io.writeJsonAtomic(
+      path.join(session.sessionPath, 'attachments.json'),
+      toSessionAttachmentManifest(attachments),
+    );
     if (!useAfter) {
       const attachmentsRoot = path.resolve(path.join(session.sessionPath, 'attachments'));
       for (const importedPath of journal.importedPaths) {
@@ -649,7 +653,10 @@ export class ConversationHistoryStore {
   }
 
   writeSessionAttachments(sessionId: string, attachments: SessionAttachmentRecord[]): void {
-    this.host.io.writeJsonAtomic(this.host.sessions.getSessionAttachmentsManifestPath(sessionId), attachments);
+    this.host.io.writeJsonAtomic(
+      this.host.sessions.getSessionAttachmentsManifestPath(sessionId),
+      toSessionAttachmentManifest(attachments),
+    );
   }
 
   planAttachmentsForTurn(

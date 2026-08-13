@@ -8,7 +8,7 @@ event: contentBlockDelta
 data: {"contentBlockDelta":{"contentBlockIndex":1,"delta":{"toolUse":{"input":"{\"path\":\"README.md\"}"}}}}
 
 event: metadata
-data: {"metadata":{"usage":{"inputTokens":12,"outputTokens":8,"totalTokens":20}}}
+data: {"metadata":{"usage":{"inputTokens":12,"outputTokens":8,"totalTokens":20,"cacheReadInputTokens":4}}}
 
 event: messageStop
 data: {"messageStop":{"stopReason":"tool_use"}}

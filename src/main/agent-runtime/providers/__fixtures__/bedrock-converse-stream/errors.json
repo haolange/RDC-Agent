@@ -1,0 +1,5 @@
+{
+  "context_overflow": { "status": 400, "body": "bedrock-converse-stream fixture: input is too long for the model's context length" },
+  "http_429": { "status": 429, "body": "bedrock-converse-stream fixture: rate limit reached" },
+  "http_5xx": { "status": 503, "body": "bedrock-converse-stream fixture: the server had an error" }
+}
