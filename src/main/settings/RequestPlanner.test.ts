@@ -74,6 +74,8 @@ describe('planModelRequest', () => {
     if (!result.ok) return;
     expect(result.plan.reasoningWire.selection).toBe('unknown');
     expect(result.plan.bodyPatch).not.toHaveProperty('reasoning_effort');
+    expect(result.plan.maxOutputTokens).toBe(16_000);
+    expect(result.plan.contextWindowTokens).toBe(256_000);
   });
 
   it('applies request-patch Fast from one execution binding', () => {
@@ -292,6 +294,9 @@ describe('planModelRequest', () => {
     expect(result.controls.maxContextMode).toBe(true);
     expect(result.plan).toMatchObject({ contextMode: 'one-million', activeTierId: 'fixed-1m' });
     expect(result.plan.contextWindowTokens).toBe(1_000_000);
+    expect(result.plan.maxOutputTokens).toBe(64_000);
+    expect(result.plan.contextBudgetTokens).toBe(1_000_000);
+    expect(result.plan.compactionThresholdTokens).toBe(800_000);
   });
 
   it('activates selectable Max mode through its tier body patch', () => {
@@ -317,6 +322,48 @@ describe('planModelRequest', () => {
     if (!result.ok) return;
     expect(result.plan.bodyPatch).toEqual({ context_mode: '1m' });
     expect(result.plan.contextMode).toBe('one-million');
+  });
+
+  it('uses the full 200k window as prompt budget when maxTotal equals the window', () => {
+    const haiku = model({
+      contextTiers: [{
+        id: 'default',
+        label: 'Default',
+        maxTotalTokens: 200_000,
+        maxOutputTokens: 64_000,
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
+      }],
+      defaultBudgetTokens: 200_000,
+    });
+    const result = planModelRequest({ model: haiku, catalogModels: [haiku] });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.contextBudgetTokens).toBe(200_000);
+    expect(result.plan.contextWindowTokens).toBe(200_000);
+    expect(result.plan.maxOutputTokens).toBe(64_000);
+    expect(result.plan.compactionThresholdTokens).toBe(160_000);
+  });
+
+  it('keeps an explicit prompt cap without subtracting max output', () => {
+    const split = model({
+      contextTiers: [{
+        id: 'default',
+        label: 'Default',
+        maxPromptTokens: 936_000,
+        maxOutputTokens: 64_000,
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
+      }],
+      defaultBudgetTokens: 1_000_000,
+    });
+    const result = planModelRequest({ model: split, catalogModels: [split] });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.contextBudgetTokens).toBe(936_000);
+    expect(result.plan.contextWindowTokens).toBe(1_000_000);
+    expect(result.plan.maxOutputTokens).toBe(64_000);
+    expect(result.plan.compactionThresholdTokens).toBe(748_800);
   });
 
   it('uses a model-switch reasoning Max binding and suppresses duplicate wire effort', () => {

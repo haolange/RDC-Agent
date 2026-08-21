@@ -14,8 +14,8 @@ type CompiledPlanFields =
   | 'streamingPlan'
   | 'contextTransitionPlan';
 
-export type TestRequestPlanInput = Omit<RequestPlan, CompiledPlanFields> &
-  Partial<Pick<RequestPlan, CompiledPlanFields>>;
+export type TestRequestPlanInput = Omit<RequestPlan, CompiledPlanFields | 'maxOutputTokens' | 'compactionThresholdTokens'> &
+  Partial<Pick<RequestPlan, CompiledPlanFields | 'maxOutputTokens' | 'compactionThresholdTokens'>>;
 
 export function createTestRequestPlan(input: TestRequestPlanInput): RequestPlan {
   const contracts = input.contracts
@@ -66,6 +66,9 @@ export function createTestRequestPlan(input: TestRequestPlanInput): RequestPlan 
   };
   return {
     ...input,
+    maxOutputTokens: input.maxOutputTokens ?? 0,
+    compactionThresholdTokens: input.compactionThresholdTokens
+      ?? Math.floor((input.contextBudgetTokens * 80) / 100),
     route: { ...input.route, contracts },
     contracts,
     executionIdentity: input.executionIdentity ?? {

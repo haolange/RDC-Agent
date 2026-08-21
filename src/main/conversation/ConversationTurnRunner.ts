@@ -423,7 +423,6 @@ export async function completeProfileTurn(
           projectId: input.context.projectId,
           systemPrompt: prepared.promptPlan.systemPrompt,
           promptPlan: prepared.promptPlan,
-          maxTokens: 1200,
           signal: abortController.signal,
           turnControls,
           requestPlan: planning.plan,

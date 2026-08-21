@@ -14,7 +14,8 @@ import { useComposerPendingSkills } from './useComposerPendingSkills';
 import { useComposerSend } from './useComposerSend';
 import { useScopedPromptDraft } from './useScopedPromptDraft';
 import { buildComposerPresentation } from './composerPresentation';
-import { useSelectedContextWindowTokens } from './useSelectedContextWindowTokens';
+import { projectContextUsagePreview } from './projectContextUsagePreview';
+import { useSelectedContextProfile } from './useSelectedContextProfile';
 import { useComposerDomEffects } from './useComposerDomEffects';
 
 export function useComposer(options: {
@@ -72,7 +73,12 @@ export function useComposer(options: {
     currentSession,
   });
   const selectedAgent = userInvocableAgents.find((agent) => agent.id === selectedAgentId) ?? userInvocableAgents[0];
-  const selectedContextWindowTokens = useSelectedContextWindowTokens();
+  const selectedContextProfile = useSelectedContextProfile();
+  const contextUsagePreview = projectContextUsagePreview(
+    lastKnownUsage,
+    selectedContextProfile,
+    conversationPreparationPhase,
+  );
   const agentAccent = resolveAgentDisplay(selectedAgent?.id ?? selectedAgentId, agentDefinitions).accent;
   const builtinMode = AGENT_MODES.find((mode) => mode.id === currentMode);
   const currentModeConfig: ModeConfig = builtinMode
@@ -154,11 +160,12 @@ export function useComposer(options: {
     selectedAgentId,
     userInvocableAgents,
     setSelectedAgentId,
-    lastKnownUsage,
+    lastKnownUsage: contextUsagePreview.usage,
+    usageEstimated: contextUsagePreview.estimated,
     usageStale,
     preparedTurnContext,
     conversationPreparationPhase,
-    selectedContextWindowTokens,
+    selectedContextProfile,
     hasActiveDebugRun,
     isComposerBusy: send.isComposerBusy,
     promptPlaceholder: presentation.promptPlaceholder,

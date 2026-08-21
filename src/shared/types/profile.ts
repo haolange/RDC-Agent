@@ -15,7 +15,6 @@ export interface AgentPromptProfile {
   modelProvider?: LlmProviderId;
   modelName?: string;
   temperature?: number;
-  maxTokens?: number;
   toolPolicy?: AgentToolPolicy;
 }
 
@@ -28,7 +27,6 @@ export interface AgentProfile {
   providerId?: LlmProviderId;
   modelId?: string;
   temperature?: number;
-  maxTokens?: number;
 }
 
 export interface EffectiveAgentRuntimeConfig {
@@ -37,7 +35,6 @@ export interface EffectiveAgentRuntimeConfig {
   providerId: LlmProviderId;
   modelId: string;
   temperature?: number;
-  maxTokens?: number;
   category?: string;
   writeScope?: WriteScope[];
   stage: WorkflowStage;

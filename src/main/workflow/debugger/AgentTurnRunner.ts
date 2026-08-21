@@ -8,9 +8,9 @@ import type { AppMode, ContextUsageBreakdownEntry } from '@shared/types/session'
 import type { WorkflowStage } from '@shared/types/workflow';
 import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdxRuntime';
 import type { EffectiveModel } from '@shared/types/providerCapability';
-import { CONTEXT_COMPACTION_RATIO } from '@shared/types/modelCapability';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { charsToTokens } from '@shared/utils/tokens';
+import { resolveTurnOutputTokens } from '@shared/utils/contextBudget';
 import { Agent } from '../../agent-runtime/agent/Agent';
 import { ContextManager } from '../../agent-runtime/agent/ContextManager';
 import { TokenizerService } from '../../agent-runtime/core/TokenizerService';
@@ -132,8 +132,8 @@ export class AgentTurnRunner {
     toolExecutor = this.deps.createToolExecutor(agentId, [], undefined),
     turnSignature = '',
     sessionId: string = '',
-    contextWindow?: number,
-    contextTokenLimit?: number,
+    contextWindow: number | undefined,
+    contextTokenLimit: number,
     promptPlan?: PromptPlan,
     initialMessages: Message[] = [],
     contextDiagnostic?: Record<string, unknown>,
@@ -153,8 +153,7 @@ export class AgentTurnRunner {
     }
     const toolSignature = this.deps.createToolSignature(signatureTools ?? tools);
     const activeContextWindow = contextWindow ?? streamOptions.requestPlan.contextWindowTokens;
-    const requestCompactionThreshold = contextTokenLimit
-      ?? Math.floor(activeContextWindow * CONTEXT_COMPACTION_RATIO);
+    const requestCompactionThreshold = contextTokenLimit;
     const fixedPromptTokens = promptPlan.totalTokenEstimate + charsToTokens(JSON.stringify(tools).length);
     const resolvedContextTokenLimit = requestCompactionThreshold - fixedPromptTokens;
     if (resolvedContextTokenLimit <= 0) {
@@ -183,7 +182,10 @@ export class AgentTurnRunner {
 
     // Every turn starts from the active branch materialized by the canonical
     // session journal. The in-memory slot is only an execution cache.
-    const agentModel = encodeAgentModel(providerId, modelId, { contextWindow: activeContextWindow });
+    const agentModel = encodeAgentModel(providerId, modelId, {
+      contextWindow: activeContextWindow,
+      maxOutputTokens: streamOptions.requestPlan.maxOutputTokens,
+    });
     const routeProvider = settingsService.getAll().llm.providers.find((provider) => provider.id === providerId);
     const reasoningContract = (routeCapabilityOverride ?? resolveAgentRouteCapability(
       routeProvider,
@@ -199,7 +201,7 @@ export class AgentTurnRunner {
       tokenizer: this.deps.tokenizerService,
     });
 
-    // ErrorRecovery：错误分类与恢复策略（retry/escalate_tokens/reactive_compact/continue/abort）。
+    // ErrorRecovery：错误分类与恢复策略（retry/reactive_compact/continue/abort）。
     // fallbackModel 暂省略（无 settings route fallback 配置时只做非 switch 恢复）。
     const errorRecovery = new ErrorRecovery({ primaryModel: agentModel });
 
@@ -219,6 +221,11 @@ export class AgentTurnRunner {
       transformContext: (messages, signal) => contextManager.compress(messages, signal),
       // errorRecovery：provider 错误后自动恢复（重试/提额/压缩/中止）。
       errorRecovery,
+      resolveMaxTokens: (messages) => resolveTurnOutputTokens({
+        contextWindowTokens: streamOptions.requestPlan.contextWindowTokens,
+        maxOutputTokens: streamOptions.requestPlan.maxOutputTokens,
+        promptTokens: this.deps.tokenizerService.countMessagesTokens(messages, modelId),
+      }),
       onRequest: ({ model, context: requestContext, streamOptions: requestOptions }) => {
         const callIndex = requestSnapshotStore.nextCallIndex(executionScopeId, turnSignature || undefined);
         const snapshot = requestEnvelopeBuilder.build({
@@ -298,7 +305,6 @@ export class AgentTurnRunner {
     systemPrompt: string;
     providerId: string;
     modelId: string;
-    maxTokens?: number;
     temperature?: number;
     mode: AppMode;
     stage?: WorkflowStage | 'report';
@@ -316,7 +322,7 @@ export class AgentTurnRunner {
     effectiveProfileIds?: readonly string[];
     credentialHandle?: string;
     contextWindow?: number;
-    contextTokenLimit?: number;
+    contextTokenLimit: number;
     initialMessages?: Message[];
     contextDiagnostic?: Record<string, unknown>;
     preparedRuntime?: PreparedAgentRuntime;
@@ -456,7 +462,6 @@ export class AgentTurnRunner {
     });
     const promptCache = preparedRuntime.promptCache;
     const streamOptions: StreamOptions = {
-      maxTokens: input.maxTokens,
       temperature: requestPlan.temperature,
       reasoning: requestPlan.reasoningWire,
       reasoningVisibility: requestPlan.reasoningWire.selection === 'off' ? 'none' : routeCapability.reasoningVisibility,

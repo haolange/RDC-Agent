@@ -6,11 +6,15 @@ import { createHash } from 'crypto';
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
-import { CONTEXT_COMPACTION_RATIO } from '@shared/types/modelCapability';
+import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { ContextUsageBreakdownEntry, PreparedTurnContextSummary } from '@shared/types/session';
 import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdxRuntime';
 import { charsToTokens } from '@shared/utils/tokens';
+import {
+  resolveCompactionThresholdTokens,
+  resolveEffectiveCompactionPercent,
+} from '@shared/utils/contextBudget';
 import { nowMs } from '@shared/utils/id';
 import { turnPreparationWorkerPool } from '../../workers/TurnPreparationWorkerPool';
 import { requestEnvelopeBuilder } from '../../agent-runtime/prompt';
@@ -147,6 +151,10 @@ export class TurnPreparationService {
     // Invalid policy must not spawn processes or establish network connections.
     const turnSettings = settingsService.getAll();
     const compiledPolicy = compileEffectivePolicy(input.projectRootPath);
+    const contextCompactionPercent = resolveEffectiveCompactionPercent(
+      turnSettings.agentRuntime.context.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
+      compiledPolicy.contextCompactionPercent,
+    );
     const acquiredMcp = await this.deps.mcp.acquireConnections(
       input.agentId,
       input.projectRootPath,
@@ -181,8 +189,9 @@ export class TurnPreparationService {
       : [];
     const toolTokens = charsToTokens(JSON.stringify(activeToolDefinitions).length);
     const fixedTokens = input.promptPlan.totalTokenEstimate + toolTokens;
-    const compactionThreshold = Math.floor(
-      input.requestPlan.contextBudgetTokens * CONTEXT_COMPACTION_RATIO,
+    const compactionThreshold = resolveCompactionThresholdTokens(
+      input.requestPlan.contextBudgetTokens,
+      contextCompactionPercent,
     );
     const messageBudget = compactionThreshold - fixedTokens - input.imageTokenAdjustment;
     if (messageBudget <= 0) {
@@ -214,7 +223,7 @@ export class TurnPreparationService {
       tools: activeToolDefinitions,
       ...(effectiveContextView ? { derivedContextView: effectiveContextView } : {}),
     });
-    if (preparedInputTokens > input.requestPlan.contextBudgetTokens) {
+    if (preparedInputTokens > compactionThreshold) {
       throw new Error(
         'CONTEXT_CANNOT_FIT: The request cannot fit after compaction. Remove attachments or select a larger context mode.',
       );
@@ -300,6 +309,8 @@ export class TurnPreparationService {
       visibleToolNames: activeToolDefinitions.map((definition) => definition.name),
       activatedDeferredTools,
       mcpDescriptorHash: aggregateMcpDescriptorHash(profile, input.projectRootPath),
+      compactionThresholdPercent: turnSettings.agentRuntime.context.compactionThresholdPercent
+        ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
     });
     const summary: PreparedTurnContextSummary = {
       requestId: input.requestId,
@@ -324,6 +335,8 @@ export class TurnPreparationService {
       uncompactedInputTokens,
       promptBudgetTokens: input.requestPlan.contextBudgetTokens,
       contextWindowTokens: input.requestPlan.contextWindowTokens,
+      maxOutputTokens: input.requestPlan.maxOutputTokens,
+      compactionThresholdTokens: compactionThreshold,
       usagePercent: Math.min(100, Math.round((preparedInputTokens / input.requestPlan.contextBudgetTokens) * 100)),
       breakdown,
       compactionApplied,

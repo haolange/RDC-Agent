@@ -221,6 +221,19 @@ export async function resolvePendingAttachmentDescriptors(
   return resolved;
 }
 
+export function imageTokenAdjustmentForContent(content: UserMessage['content']): number {
+  if (typeof content === 'string') return 0;
+  let extra = 0;
+  for (const block of content) {
+    if (block.type !== 'image') continue;
+    const data = typeof block.data === 'string' ? block.data : '';
+    if (!data) continue;
+    const byteLength = Math.max(0, Math.floor(data.length * 0.75));
+    extra += Math.max(256, Math.ceil(byteLength / 1024)) - 256;
+  }
+  return extra;
+}
+
 export async function materializeAgentUserInput(
   message: string,
   attachments: AgentInputAttachment[],

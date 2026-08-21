@@ -3,6 +3,8 @@ import type { ConversationMessage } from '@shared/types/conversation';
 import type { AgentMode } from '@shared/types/layout';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { AgentPermissionMode, AppTheme } from '@shared/types/settings';
+import { formatTokenCount } from '@shared/utils/tokens';
+import { translate } from '../../../i18n';
 import {
   nextAgentDefinitionClientRevision,
   useAppSettingsStore,
@@ -184,9 +186,15 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
       const result = await electronAPI.conversation.compactHistory(sessionId);
       if (result.success) {
         context.setConversationMessages(result.messages);
+        const language = useAppSettingsStore.getState().settings.appearance.language;
         context.showNotice(result.contextView
-          ? 'Context view created from ' + result.contextView.sourceTurnIds.length + ' earlier turns; transcript preserved.'
-          : 'The session is already within the manual compaction threshold.');
+          ? translate(language, 'composer.compact.created', {
+            count: result.contextView.sourceTurnIds.length,
+          })
+          : translate(language, 'composer.compact.withinThreshold', {
+            occupied: formatTokenCount(result.occupiedTokens ?? 0),
+            threshold: formatTokenCount(result.compactionThresholdTokens ?? 0),
+          }));
       } else {
         context.showNotice(result.error ?? 'Compaction failed.');
       }

@@ -13,6 +13,7 @@ import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjec
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { planEffectiveModelRequest } from './EffectiveModelResolver';
 import { settingsService } from './SettingsService';
+import { resolveCompactionPercentForSession } from './compactionPercent';
 
 export type LlmAuditStage = WorkflowStage | 'plan' | 'report';
 
@@ -66,7 +67,7 @@ const NON_OCCUPYING_BREAKDOWN_IDS = new Set<ContextUsageBreakdownId>([
 function buildScaledBreakdown(
   raw: ContextUsageBreakdownEntry[] | null,
   occupiedTokens: number,
-  contextWindowTokens: number | null,
+  promptBudgetTokens: number | null,
 ): ContextUsageBreakdownEntry[] | null {
   if (!raw || raw.length === 0) return null;
   const occupying = raw.filter((entry) => !NON_OCCUPYING_BREAKDOWN_IDS.has(entry.id));
@@ -83,8 +84,8 @@ function buildScaledBreakdown(
     tokens: Math.max(0, entry.tokens),
     ...(entry.count !== undefined ? { count: entry.count } : {}),
   })));
-  if (contextWindowTokens) {
-    scaled.push({ id: 'free', tokens: Math.max(0, contextWindowTokens - occupiedTokens) });
+  if (promptBudgetTokens) {
+    scaled.push({ id: 'free', tokens: Math.max(0, promptBudgetTokens - occupiedTokens) });
   }
   return scaled;
 }
@@ -248,13 +249,18 @@ export class DebuggerLlmService {
 
   private toContextUsageSummary(key: string, summary: RunLlmExecutionSummary): RunContextUsageSummary {
     const turnControls = this.resolveSessionTurnControls(summary);
+    const settings = settingsService.getAll();
     const planning = planEffectiveModelRequest({
       providerId: summary.providerId,
       modelId: summary.modelId,
-      settings: settingsService.getAll(),
+      settings,
       controls: turnControls ?? undefined,
+      compactionThresholdPercent: resolveCompactionPercentForSession(summary.sessionId),
     });
-    const contextWindowTokens = planning.ok ? planning.plan.contextBudgetTokens : 0;
+    const promptBudgetTokens = planning.ok ? planning.plan.contextBudgetTokens : 0;
+    const contextWindowTokens = planning.ok ? planning.plan.contextWindowTokens : null;
+    const maxOutputTokens = planning.ok ? planning.plan.maxOutputTokens : null;
+    const compactionThresholdTokens = planning.ok ? planning.plan.compactionThresholdTokens : null;
     const occupiedTokens = summary.lastOccupiedTokens ?? 0;
     const hasCacheStats = typeof summary.totalCacheHitTokens === 'number'
       || typeof summary.totalCacheMissTokens === 'number';
@@ -278,12 +284,15 @@ export class DebuggerLlmService {
       inputTokens: summary.totalInputTokens,
       outputTokens: summary.totalOutputTokens,
       totalTokens: summary.totalInputTokens + summary.totalOutputTokens,
+      promptBudgetTokens,
       contextWindowTokens,
-      usagePercent: contextWindowTokens > 0
-        ? Math.min(100, Math.max(0, Math.round((occupiedTokens / contextWindowTokens) * 100)))
+      maxOutputTokens,
+      compactionThresholdTokens,
+      usagePercent: promptBudgetTokens > 0
+        ? Math.min(100, Math.max(0, Math.round((occupiedTokens / promptBudgetTokens) * 100)))
         : 0,
       occupiedTokens,
-      breakdown: buildScaledBreakdown(summary.lastPromptBreakdown ?? null, occupiedTokens, contextWindowTokens || null),
+      breakdown: buildScaledBreakdown(summary.lastPromptBreakdown ?? null, occupiedTokens, promptBudgetTokens || null),
       snapshotAt: summary.lastSnapshotAt ?? null,
       ...(positiveTokenOrOmit(summary.totalCacheReadTokens) !== undefined
         ? { cacheReadTokens: positiveTokenOrOmit(summary.totalCacheReadTokens) }

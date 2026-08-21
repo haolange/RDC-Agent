@@ -19,9 +19,12 @@ import {
   rollbackProviderDefinitionSave,
   settleProviderDefinitionSave,
 } from './providerDefinitionSettings';
-import type { AgentPermissionMode, AppSettings } from '@shared/types/settings';
 import type { AppSettingsState } from './appSettingsStoreState';
 import { createAppSettingsAppearanceActions } from './appSettingsAppearanceActions';
+import {
+  withCompactionThresholdPercent,
+  withPermissionMode,
+} from './appSettingsRuntimePatch';
 
 export { nextAgentDefinitionClientRevision } from './agentDefinitionSettings';
 
@@ -30,14 +33,6 @@ const agentDefinitionMutations = new AgentDefinitionMutationCoordinator(
 );
 
 let permissionModeRevision = 0;
-
-function withPermissionMode(settings: AppSettings, mode: AgentPermissionMode): AppSettings {
-  const permissions = settings.agentRuntime?.permissions ?? DEFAULT_SETTINGS.agentRuntime.permissions;
-  return {
-    ...settings,
-    agentRuntime: { ...settings.agentRuntime, permissions: { ...permissions, mode } },
-  };
-}
 
 export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
   settings: DEFAULT_SETTINGS,
@@ -167,6 +162,21 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
       if (revision === permissionModeRevision) {
         set((state) => ({ settings: withPermissionMode(state.settings, previousMode) }));
       }
+      throw error;
+    }
+  },
+  setCompactionThresholdPercent: async (percent) => {
+    const previous = get().settings.agentRuntime?.context?.compactionThresholdPercent
+      ?? DEFAULT_SETTINGS.agentRuntime.context.compactionThresholdPercent;
+    if (previous === percent) return;
+    set((state) => ({ settings: withCompactionThresholdPercent(state.settings, percent), hydrated: true }));
+    try {
+      const nextSettings = await window.electronAPI.settings.set({
+        agentRuntime: { context: { compactionThresholdPercent: percent } },
+      });
+      set({ settings: nextSettings, hydrated: true });
+    } catch (error) {
+      set((state) => ({ settings: withCompactionThresholdPercent(state.settings, previous) }));
       throw error;
     }
   },

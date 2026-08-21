@@ -17,13 +17,20 @@ vi.mock('../sessions/StorageAdapter', () => ({
 vi.mock('./EffectiveModelResolver', () => ({
   planEffectiveModelRequest: vi.fn(() => ({
     ok: true,
-    plan: { contextBudgetTokens: 100_000 },
+    plan: {
+      contextBudgetTokens: 100_000,
+      contextWindowTokens: 128_000,
+      maxOutputTokens: 16_000,
+      compactionThresholdTokens: 80_000,
+    },
   })),
 }));
 
 vi.mock('./SettingsService', () => ({
   settingsService: {
-    getAll: vi.fn(() => ({})),
+    getAll: vi.fn(() => ({
+      agentRuntime: { context: { compactionThresholdPercent: 80 } },
+    })),
   },
 }));
 
@@ -172,7 +179,10 @@ describe('DebuggerLlmService cache aggregation', () => {
       inputTokens: 8,
       outputTokens: 2,
       totalTokens: 10,
-      contextWindowTokens: 100,
+      promptBudgetTokens: 100,
+      contextWindowTokens: 128,
+      maxOutputTokens: 28,
+      compactionThresholdTokens: 80,
       usagePercent: 8,
       occupiedTokens: 8,
       breakdown: null,
@@ -211,7 +221,10 @@ describe('DebuggerLlmService cache aggregation', () => {
       inputTokens: 0,
       outputTokens: 0,
       totalTokens: 0,
+      promptBudgetTokens: 256_000,
       contextWindowTokens: 256_000,
+      maxOutputTokens: 0,
+      compactionThresholdTokens: 204_800,
       usagePercent: 0,
       occupiedTokens: 0,
       breakdown: null,
@@ -221,6 +234,28 @@ describe('DebuggerLlmService cache aggregation', () => {
     expect(service.getSessionContextUsage({ sessionId: 'sess_zero_persisted' })).toEqual({
       usage: null,
       stale: false,
+    });
+  });
+
+  it('writes prompt budget, window, max output, and compaction threshold from the request plan', () => {
+    service.recordAgentTurnUsage({
+      runId: 'run_budget',
+      turnId: 'turn_budget',
+      sessionId: 'sess_budget',
+      providerId: 'deepseek',
+      modelId: 'deepseek-v4-flash',
+      inputTokens: 12,
+      outputTokens: 3,
+      precomputedBreakdown: [],
+    });
+
+    expect(service.getSessionContextUsage({ sessionId: 'sess_budget', runId: 'run_budget' }).usage).toMatchObject({
+      promptBudgetTokens: 100_000,
+      contextWindowTokens: 128_000,
+      maxOutputTokens: 16_000,
+      compactionThresholdTokens: 80_000,
+      occupiedTokens: 12,
+      usagePercent: 0,
     });
   });
 

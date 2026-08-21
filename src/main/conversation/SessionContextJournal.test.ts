@@ -512,4 +512,65 @@ describe('SessionContextJournal v2', () => {
     expect(result.messages.map((message) => message.role)).toEqual(['user', 'user']);
     expect(result.messages[0]).not.toHaveProperty('derivedContext');
   });
+
+  it('skips derived compaction while occupancy is within the compaction line', () => {
+    const journal = new SessionContextJournal();
+    const clear = vi.spyOn(storageAdapter, 'clearSessionDerivedContextView').mockImplementation(() => undefined);
+    const write = vi.spyOn(storageAdapter, 'writeSessionDerivedContextView').mockImplementation(() => undefined);
+    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([
+      entry({ turnId: 'turn-1' }),
+      entry({ turnId: 'turn-2' }),
+      entry({ turnId: 'turn-3' }),
+      entry({ turnId: 'turn-4' }),
+    ]);
+
+    expect(journal.createDerivedView(
+      'session-1',
+      ['turn-1', 'turn-2', 'turn-3', 'turn-4'],
+      'branch-root',
+      { occupiedTokens: 100_000, compactionThresholdTokens: 160_000 },
+    )).toBeNull();
+    expect(clear).toHaveBeenCalledWith('session-1');
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it('compacts older turns when occupancy exceeds the compaction line', () => {
+    const journal = new SessionContextJournal();
+    vi.spyOn(storageAdapter, 'clearSessionDerivedContextView').mockImplementation(() => undefined);
+    const write = vi.spyOn(storageAdapter, 'writeSessionDerivedContextView').mockImplementation(() => undefined);
+    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([
+      entry({
+        turnId: 'turn-1',
+        messages: [{ role: 'user', content: 'Oldest.', timestamp: 1 }],
+      }),
+      entry({
+        turnId: 'turn-2',
+        userMessageId: 'user-2',
+        assistantMessageId: 'assistant-2',
+        messages: [{ role: 'user', content: 'Older.', timestamp: 2 }],
+      }),
+      entry({
+        turnId: 'turn-3',
+        userMessageId: 'user-3',
+        assistantMessageId: 'assistant-3',
+        messages: [{ role: 'user', content: 'Recent.', timestamp: 3 }],
+      }),
+      entry({
+        turnId: 'turn-4',
+        userMessageId: 'user-4',
+        assistantMessageId: 'assistant-4',
+        messages: [{ role: 'user', content: 'Latest.', timestamp: 4 }],
+      }),
+    ]);
+
+    const view = journal.createDerivedView(
+      'session-1',
+      ['turn-1', 'turn-2', 'turn-3', 'turn-4'],
+      'branch-root',
+      { occupiedTokens: 180_000, compactionThresholdTokens: 160_000 },
+    );
+    expect(view?.sourceTurnIds).toEqual(['turn-1']);
+    expect(view?.retainedTurnIds).toEqual(['turn-2', 'turn-3', 'turn-4']);
+    expect(write).toHaveBeenCalled();
+  });
 });

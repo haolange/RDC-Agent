@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 import { ContextBreakdownPopover } from './ContextBreakdownPopover';
+import type { ContextUsageSelectedProfile } from './contextUsageDisplay';
 
 vi.mock('../i18n', () => ({
   useI18n: () => ({
@@ -28,7 +29,10 @@ const usage: RunContextUsageSummary = {
   providerId: 'provider',
   modelId: 'model',
   usagePercent: 12,
+  promptBudgetTokens: 200_000,
   contextWindowTokens: 200_000,
+  maxOutputTokens: 0,
+  compactionThresholdTokens: 160_000,
   inputTokens: 20_000,
   outputTokens: 1_000,
   totalTokens: 21_000,
@@ -62,6 +66,8 @@ const prepared: PreparedTurnContextSummary = {
   uncompactedInputTokens: 24_000,
   promptBudgetTokens: 200_000,
   contextWindowTokens: 200_000,
+  maxOutputTokens: 0,
+  compactionThresholdTokens: 160_000,
   usagePercent: 12,
   breakdown: [{ id: 'conversation', tokens: 2_400 }],
   compactionApplied: false,
@@ -89,6 +95,14 @@ const prepared: PreparedTurnContextSummary = {
   },
 };
 
+const profile = (overrides: Partial<ContextUsageSelectedProfile> = {}): ContextUsageSelectedProfile => ({
+  contextWindowTokens: 200_000,
+  contextBudgetTokens: 200_000,
+  maxOutputTokens: 0,
+  compactionThresholdTokens: 160_000,
+  ...overrides,
+});
+
 describe('ContextBreakdownPopover phase authority', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -100,7 +114,7 @@ describe('ContextBreakdownPopover phase authority', () => {
         prepared: null,
         phase: 'preparing',
         usage,
-        selectedContextWindowTokens: 200_000,
+        selectedProfile: profile(),
         stale: false,
         onClose: () => undefined,
       }),
@@ -120,7 +134,7 @@ describe('ContextBreakdownPopover phase authority', () => {
         prepared: null,
         phase: 'preparing',
         usage: null,
-        selectedContextWindowTokens: 200_000,
+        selectedProfile: profile(),
         stale: false,
         onClose: () => undefined,
       }),
@@ -149,7 +163,7 @@ describe('ContextBreakdownPopover phase authority', () => {
           usagePercent: 0,
           breakdown: [],
         },
-        selectedContextWindowTokens: 200_000,
+        selectedProfile: profile(),
         stale: false,
         onClose: () => undefined,
       }),
@@ -165,7 +179,7 @@ describe('ContextBreakdownPopover phase authority', () => {
         prepared,
         phase: 'current',
         usage,
-        selectedContextWindowTokens: 200_000,
+        selectedProfile: profile(),
         stale: false,
         onClose: () => undefined,
       }),
@@ -179,13 +193,13 @@ describe('ContextBreakdownPopover phase authority', () => {
     expect(html).not.toContain('contextBreakdown.lastActual');
   });
 
-  it('idle Last actual owns a single flat meter strip without phase eyebrow', () => {
+  it('idle Last actual owns three independent metric cards without phase eyebrow', () => {
     const html = renderToStaticMarkup(
       React.createElement(ContextBreakdownPopover, {
         prepared: null,
         phase: 'idle',
         usage,
-        selectedContextWindowTokens: 200_000,
+        selectedProfile: profile(),
         stale: false,
         onClose: () => undefined,
       }),
@@ -201,8 +215,135 @@ describe('ContextBreakdownPopover phase authority', () => {
     expect(html).toContain('data-col="tokens"');
     expect(html).toContain('data-col="cache"');
     expect(html).toContain('data-col="reasoning"');
+    expect(html).toContain('context-breakdown-run-col');
     expect(html).not.toContain('context-breakdown-runtime');
     expect(html).not.toContain('semantic-replay');
     expect(html).not.toContain('stableTokenEstimate');
+  });
+
+  it('shows projected occupancy against the selected model window', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ContextBreakdownPopover, {
+        prepared: null,
+        phase: 'idle',
+        usage: {
+          ...usage,
+          usagePercent: 12,
+          promptBudgetTokens: 1_000_000,
+          contextWindowTokens: 1_000_000,
+          maxOutputTokens: 0,
+          compactionThresholdTokens: 800_000,
+          occupiedTokens: 115_200,
+          breakdown: [
+            { id: 'conversation', tokens: 80_000 },
+            { id: 'free', tokens: 884_800 },
+          ],
+        },
+        selectedProfile: profile({
+          contextWindowTokens: 1_000_000,
+          contextBudgetTokens: 1_000_000,
+          compactionThresholdTokens: 800_000,
+        }),
+        stale: false,
+        estimated: true,
+        onClose: () => undefined,
+      }),
+    );
+    expect(html).toContain('contextBreakdown.projected');
+    expect(html).toContain('>~12%</span>');
+    expect(html).toContain('contextBreakdown.projectedNote');
+    expect(html).toContain('data-testid="context-breakdown-projected-note"');
+    expect(html).not.toContain('contextBreakdown.lastActual');
+    expect(html).not.toContain('contextBreakdown.staleNote');
+  });
+
+  it('keeps the projected popover during preparing instead of reverting to Last actual', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ContextBreakdownPopover, {
+        prepared: null,
+        phase: 'preparing',
+        usage: {
+          ...usage,
+          usagePercent: 12,
+          promptBudgetTokens: 1_000_000,
+          contextWindowTokens: 1_000_000,
+          maxOutputTokens: 0,
+          compactionThresholdTokens: 800_000,
+          occupiedTokens: 115_200,
+          breakdown: [
+            { id: 'conversation', tokens: 80_000 },
+            { id: 'free', tokens: 884_800 },
+          ],
+        },
+        selectedProfile: profile({
+          contextWindowTokens: 1_000_000,
+          contextBudgetTokens: 1_000_000,
+          compactionThresholdTokens: 800_000,
+        }),
+        stale: false,
+        estimated: true,
+        onClose: () => undefined,
+      }),
+    );
+    expect(html).toContain('contextBreakdown.projected');
+    expect(html).toContain('>~12%</span>');
+    expect(html).toContain('contextBreakdown.projectedNote');
+    expect(html).not.toContain('contextBreakdown.lastActual');
+  });
+
+  it('explains the compaction line and remaining generation budget', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ContextBreakdownPopover, {
+        prepared: null,
+        phase: 'idle',
+        usage: {
+          ...usage,
+          promptBudgetTokens: 1_000_000,
+          contextWindowTokens: 1_000_000,
+          maxOutputTokens: 384_000,
+          compactionThresholdTokens: 800_000,
+        },
+        selectedProfile: profile({
+          contextWindowTokens: 1_000_000,
+          contextBudgetTokens: 1_000_000,
+          maxOutputTokens: 384_000,
+          compactionThresholdTokens: 800_000,
+        }),
+        stale: false,
+        onClose: () => undefined,
+      }),
+    );
+    expect(html).toContain('data-testid="context-breakdown-window-note"');
+    expect(html).toContain('data-testid="context-breakdown-bar-threshold"');
+    expect(html).toContain('contextBreakdown.budgetNote.threshold:{&quot;threshold&quot;:&quot;800k&quot;}');
+    expect(html).toContain('contextBreakdown.budgetNote.generatable:{&quot;tokens&quot;:&quot;384k&quot;}');
+    expect(html).not.toContain('contextBreakdown.budgetNote.window');
+    expect(html).toContain('20k / 1M');
+  });
+
+  it('adds the full window only when it is larger than the prompt budget', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ContextBreakdownPopover, {
+        prepared: null,
+        phase: 'idle',
+        usage: {
+          ...usage,
+          promptBudgetTokens: 200_000,
+          contextWindowTokens: 264_000,
+          maxOutputTokens: 64_000,
+          compactionThresholdTokens: 160_000,
+        },
+        selectedProfile: profile({
+          contextWindowTokens: 264_000,
+          contextBudgetTokens: 200_000,
+          maxOutputTokens: 64_000,
+          compactionThresholdTokens: 160_000,
+        }),
+        stale: false,
+        onClose: () => undefined,
+      }),
+    );
+    expect(html).toContain('contextBreakdown.budgetNote.window:{&quot;window&quot;:&quot;264k&quot;}');
+    expect(html).toContain('20k / 200k');
   });
 });

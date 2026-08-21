@@ -4,6 +4,8 @@ import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { PromptPlan, CompiledPolicy, ResourceProvenance } from '@shared/types/rdxRuntime';
 import type { AgentPermissionSettings } from '@shared/types/settings';
 import type { RequestPlan } from '@shared/types/providerCapability';
+import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapability';
+import { resolveEffectiveCompactionPercent } from '@shared/utils/contextBudget';
 import type { ToolDefinition } from './core/types';
 import { compileEffectivePolicy, emptyCompiledPolicy } from './permissions/PolicyCompiler';
 
@@ -49,6 +51,8 @@ export interface EffectiveRuntimePlan {
   policy: CompiledPolicy;
   /** Stable hash of CompiledPolicy (independent of sourceFingerprint field naming). */
   policyFingerprint: string;
+  /** Frozen min(user compaction percent, policy). */
+  contextCompactionPercent: number;
   routeCapability: AgentRouteCapability;
   requestPlanFingerprint: string;
   promptPlanFingerprint: string;
@@ -78,6 +82,8 @@ export interface BuildEffectiveRuntimePlanInput {
   activatedDeferredTools?: ReadonlySet<string> | readonly string[];
   /** Aggregate MCP descriptor hash, or null when no MCP servers enabled. */
   mcpDescriptorHash?: string | null;
+  /** User-level compaction percent before policy min-merge. */
+  compactionThresholdPercent?: number;
 }
 
 export function policyFingerprintOf(policy: CompiledPolicy): string {
@@ -90,6 +96,7 @@ export function policyFingerprintOf(policy: CompiledPolicy): string {
     policy.maxSubagents,
     policy.maxChildDepth,
     policy.maxWallTimeMs,
+    policy.contextCompactionPercent,
     policy.sourceFingerprint,
   ]);
 }
@@ -151,6 +158,10 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
   const policyFingerprint = policyFingerprintOf(policy);
   const requestPlanFingerprint = input.requestPlan.executionIdentity.fingerprint;
   const promptPlanFingerprint = stableHash([input.promptPlan.systemPrompt]);
+  const contextCompactionPercent = resolveEffectiveCompactionPercent(
+    input.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
+    policy.contextCompactionPercent,
+  );
   const fingerprint = stableHash([
     EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION,
     input.agentId,
@@ -168,6 +179,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     mcpDescriptorHash,
     permissionSettings,
     policyFingerprint,
+    contextCompactionPercent,
     input.routeCapability.toolCallingMode,
     requestPlanFingerprint,
     promptPlanFingerprint,
@@ -192,6 +204,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     permissionSettings,
     policy,
     policyFingerprint,
+    contextCompactionPercent,
     routeCapability: input.routeCapability,
     requestPlanFingerprint,
     promptPlanFingerprint,

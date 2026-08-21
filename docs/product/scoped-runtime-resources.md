@@ -22,7 +22,7 @@
 
 应用拥有的 session / task / trace / UI / log / cache / secret 在 Electron OS data 下，不得写入 `~/.rdx` 或项目仓库。Project `.rdx/.gitignore` 排除 `inputs`、`artifacts`、`memory` 与 runtime state。
 
-优先级：`builtin < user < project`。整资源替换。Project disabled override 可故意遮蔽继承资源。Policy 只收紧。RDX CLI actions 与 secret 属本机边界，不能被 project 覆盖。
+优先级：`builtin < user < project`。整资源替换。Project disabled override 可故意遮蔽继承资源。Policy 只收紧。`.policy.yml` `limits.contextCompactionPercent` 默认 100（不设限）；用户级 Settings → Policy 顶部 Agent Runtime 压缩阈值为 50–90、步长 5，生效值为 `min(用户设置, policy)`。RDX CLI actions 与 secret 属本机边界，不能被 project 覆盖。
 
 Settings scoped 编辑器（Skills / MCP / Hooks / Policy）与 Agents 同级导航：User | Project 作用域行 + Import/New + 详情编辑器。禁止装饰性 “RDX Runtime” kicker；禁止 Settings Diagnostics 导航。
 

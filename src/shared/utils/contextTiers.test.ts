@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ContextTier, EffectiveModel } from '../types/providerCapability';
 import {
+  contextTierBudgetTokens,
   contextTierPromptCap,
   contextTierWindowTokens,
   resolveContextTierChoices,
@@ -43,10 +44,19 @@ describe('resolveContextTierChoices', () => {
     const copilot = tier('long', { maxPromptTokens: 922_000, maxOutputTokens: 128_000 }, 'granted');
     expect(contextTierPromptCap(copilot)).toBe(922_000);
     expect(contextTierWindowTokens(copilot)).toBe(1_050_000);
+    expect(contextTierBudgetTokens(copilot, 1_000_000)).toBe(922_000);
+    expect(contextTierBudgetTokens(copilot, 200_000)).toBe(200_000);
 
     const total = tier('total', { maxTotalTokens: 1_000_000, maxOutputTokens: 64_000 }, 'granted');
-    expect(contextTierPromptCap(total)).toBe(936_000);
+    expect(contextTierPromptCap(total)).toBe(1_000_000);
     expect(contextTierWindowTokens(total)).toBe(1_000_000);
+    expect(contextTierBudgetTokens(total, 1_000_000)).toBe(1_000_000);
+  });
+
+  it('uses the requested budget when a tier has no prompt cap', () => {
+    const uncapped = tier('open', {}, 'granted');
+    expect(contextTierPromptCap(uncapped)).toBeUndefined();
+    expect(contextTierBudgetTokens(uncapped, 256_000)).toBe(256_000);
   });
 
   it('resolves 1M only from the explicitly referenced tier', () => {

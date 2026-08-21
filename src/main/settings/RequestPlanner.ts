@@ -16,13 +16,19 @@ import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import {
   clampReasoningSelection,
   createReasoningControl,
+  DEFAULT_CONTEXT_COMPACTION_PERCENT,
 } from '@shared/types/modelCapability';
 import {
+  contextTierBudgetTokens,
   contextTierPromptCap,
   contextTierWindowTokens,
   ONE_MILLION_CONTEXT_TOKENS,
   resolveContextTierChoices,
 } from '@shared/utils/contextTiers';
+import {
+  resolveCompactionThresholdTokens,
+  sanitizeCompactionThresholdPercent,
+} from '@shared/utils/contextBudget';
 import { resolveModelControls } from '@shared/utils/modelControls';
 import { providerAdapterIdForProtocol } from '@shared/provider-catalog/implementationRegistry';
 
@@ -32,8 +38,9 @@ export interface RequestPlannerInput {
   /** Effective snapshot used to validate hidden internal model targets. */
   catalogModels?: readonly EffectiveModel[];
   controls?: Partial<ConversationTurnControls> & { reasoningLevel?: unknown };
-  clientBudgetTokens?: number;
   requestedTemperature?: number;
+  /** User/policy-merged compaction percent. Defaults to 80. */
+  compactionThresholdPercent?: number;
   /** Secret-free account/credential scope identifier; only its hash enters RequestPlan. */
   credentialScopeId?: string;
   /** Provider-managed state is opt-in. Local stateless is the product default. */
@@ -338,10 +345,17 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
 
   const requestedBudget = oneMillionMode
     ? ONE_MILLION_CONTEXT_TOKENS
-    : typeof input.clientBudgetTokens === 'number' && input.clientBudgetTokens > 0
-      ? input.clientBudgetTokens
-      : model.defaultBudgetTokens;
-  const contextBudgetTokens = tierCap ? Math.min(requestedBudget, tierCap) : requestedBudget;
+    : model.defaultBudgetTokens;
+  const contextBudgetTokens = contextTierBudgetTokens(activeTier, requestedBudget);
+  const maxOutputTokens = activeTier.maxOutputTokens ?? 0;
+  const compactionThresholdPercent = sanitizeCompactionThresholdPercent(
+    input.compactionThresholdPercent,
+    DEFAULT_CONTEXT_COMPACTION_PERCENT,
+  );
+  const compactionThresholdTokens = resolveCompactionThresholdTokens(
+    contextBudgetTokens,
+    compactionThresholdPercent,
+  );
   const reasoningSelection = model.controls.reasoning.kind === 'unknown'
     || (model.controls.reasoning.defaultState && model.controls.reasoning.defaultState !== 'known'
       && input.controls?.reasoningLevel === undefined)
@@ -488,6 +502,8 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
     contextBudgetTokens,
     contextMode,
     contextWindowTokens,
+    maxOutputTokens,
+    compactionThresholdTokens,
     activeTierId: activeTier.id,
     fastMode: evaluation.resolved.fast.value,
     reasoningWire: {

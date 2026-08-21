@@ -87,6 +87,8 @@ export interface AgentOptions {
   getApiKey?: (provider: string) => Promise<string | undefined>;
   /** Provider stream 调用选项。 */
   streamOptions: StreamOptions;
+  /** Per-call output cap; computed immediately before each provider request. */
+  resolveMaxTokens?: AgentLoopConfig['resolveMaxTokens'];
   /** 最大工具执行轮数（防御性上限）。 */
   maxTurns?: number;
   /** 错误恢复管理器（可选）。用于 LLM 错误的自动重试/模型切换/压缩。 */
@@ -379,6 +381,7 @@ export class Agent {
       convertToLlm: opts.convertToLlm ?? defaultConvertToLlm,
       transformContext: opts.transformContext,
       streamOptions: opts.streamOptions,
+      resolveMaxTokens: opts.resolveMaxTokens,
       getApiKey: opts.getApiKey,
       maxTurns: opts.maxTurns,
       signal: opts.streamOptions.signal,

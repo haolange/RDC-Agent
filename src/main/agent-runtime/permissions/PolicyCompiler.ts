@@ -19,9 +19,17 @@ const DEFAULT_LIMITS = {
   maxSubagents: Number.MAX_SAFE_INTEGER,
   maxChildDepth: Number.MAX_SAFE_INTEGER,
   maxWallTimeMs: Number.MAX_SAFE_INTEGER,
+  contextCompactionPercent: 100,
 } as const;
 
-const KNOWN_LIMIT_KEYS = new Set(['maxTurns', 'maxToolCalls', 'maxSubagents', 'maxChildDepth', 'maxWallTimeMs']);
+const KNOWN_LIMIT_KEYS = new Set([
+  'maxTurns',
+  'maxToolCalls',
+  'maxSubagents',
+  'maxChildDepth',
+  'maxWallTimeMs',
+  'contextCompactionPercent',
+]);
 
 const EMPTY_POLICY: RestrictivePolicy = {
   deniedTools: [],
@@ -156,6 +164,9 @@ function compileRestrictivePolicy(policy: RestrictivePolicy, sourceFingerprint: 
     maxSubagents: typeof limits.maxSubagents === 'number' ? limits.maxSubagents : DEFAULT_LIMITS.maxSubagents,
     maxChildDepth: typeof limits.maxChildDepth === 'number' ? limits.maxChildDepth : DEFAULT_LIMITS.maxChildDepth,
     maxWallTimeMs: typeof limits.maxWallTimeMs === 'number' ? limits.maxWallTimeMs : DEFAULT_LIMITS.maxWallTimeMs,
+    contextCompactionPercent: typeof limits.contextCompactionPercent === 'number'
+      ? limits.contextCompactionPercent
+      : DEFAULT_LIMITS.contextCompactionPercent,
     sourceFingerprint,
   };
 }

@@ -339,8 +339,13 @@ export interface AgentPermissionSettings {
   deniedCommandPrefixes: string[];
 }
 
+export interface AgentRuntimeContextSettings {
+  compactionThresholdPercent: number;
+}
+
 export interface AgentRuntimeSettings {
   permissions: AgentPermissionSettings;
+  context: AgentRuntimeContextSettings;
 }
 
 export interface AppRuntimePaths {
@@ -554,6 +559,7 @@ export type AppSettingsPatch = Partial<{
   }>;
   agentRuntime: Partial<{
     permissions: Partial<AgentPermissionSettings>;
+    context: Partial<AgentRuntimeContextSettings>;
   }>;
   llm: Partial<{
     providers: LlmProviderEntry[];

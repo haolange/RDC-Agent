@@ -1,6 +1,11 @@
 import path from 'path';
+import {
+  DEFAULT_CONTEXT_COMPACTION_PERCENT,
+} from '@shared/types/modelCapability';
+import { sanitizeCompactionThresholdPercent } from '@shared/utils/contextBudget';
 import type {
   AgentPermissionSettings,
+  AgentRuntimeContextSettings,
   AgentRuntimeSettings,
   LayoutPreferences,
   RdxActionId,
@@ -153,10 +158,24 @@ export function sanitizeAgentPermissionSettings(
   };
 }
 
+export function sanitizeAgentRuntimeContextSettings(
+  value: unknown,
+  fallback: AgentRuntimeContextSettings = DEFAULT_AGENT_RUNTIME.context,
+): AgentRuntimeContextSettings {
+  const candidate = value && typeof value === 'object' ? value as Partial<AgentRuntimeContextSettings> : {};
+  return {
+    compactionThresholdPercent: sanitizeCompactionThresholdPercent(
+      candidate.compactionThresholdPercent,
+      fallback.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
+    ),
+  };
+}
+
 export function sanitizeAgentRuntimeSettings(value: unknown): AgentRuntimeSettings {
   const candidate = value && typeof value === 'object' ? value as Partial<AgentRuntimeSettings> : {};
   return {
     permissions: sanitizeAgentPermissionSettings(candidate.permissions),
+    context: sanitizeAgentRuntimeContextSettings(candidate.context),
   };
 }
 

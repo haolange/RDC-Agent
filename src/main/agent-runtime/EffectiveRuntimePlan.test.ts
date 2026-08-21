@@ -228,4 +228,40 @@ describe('EffectiveRuntimePlan', () => {
       { name: 'b', description: '', parameters: { type: 'object', properties: {} } },
     ], openPlan)).toEqual(['a', 'b']);
   });
+
+  it('freezes min(user, policy) compaction percent into the fingerprint', () => {
+    const tightened = compilePolicyFromRestrictive({ limits: { contextCompactionPercent: 70 } });
+    const unlimited = compilePolicyFromRestrictive({ limits: {} });
+    const shared = {
+      agentId: 'ask',
+      projectRootPath: 'D:/Project',
+      projectId: 'proj-1',
+      profile: { skills: ['inspect'] },
+      toolAllowlist: ['read_file'],
+      permissionSettings: basePermission,
+      routeCapability,
+      requestPlan: { executionIdentity: { fingerprint: 'exec-fp' } },
+      promptPlan: { systemPrompt: 'system' },
+      skillIntersection: ['read_file'] as const,
+      visibleToolNames: ['read_file'] as const,
+      activatedDeferredTools: [] as string[],
+      mcpDescriptorHash: 'mcp-hash-1',
+    };
+
+    const plan = buildEffectiveRuntimePlan({
+      ...shared,
+      policy: tightened,
+      compactionThresholdPercent: 80,
+    });
+    const unlimitedPlan = buildEffectiveRuntimePlan({
+      ...shared,
+      policy: unlimited,
+      compactionThresholdPercent: 80,
+    });
+
+    expect(plan.contextCompactionPercent).toBe(70);
+    expect(unlimitedPlan.contextCompactionPercent).toBe(80);
+    expect(plan.fingerprint).not.toBe(unlimitedPlan.fingerprint);
+    expect(policyFingerprintOf(tightened)).not.toBe(policyFingerprintOf(unlimited));
+  });
 });

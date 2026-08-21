@@ -123,7 +123,6 @@ export class AgentSlotRegistry {
       modelProvider: defaultRouting.provider,
       modelName: defaultRouting.model,
       temperature: 0.7,
-      maxTokens: 4096,
       category: this.getAgentCategory(agentId),
       writeScope: this.getAgentWriteScopes(agentId),
     };

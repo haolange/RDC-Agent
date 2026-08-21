@@ -8,6 +8,7 @@ import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { EffectiveModel, RequestPlan } from '@shared/types/providerCapability';
 import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdxRuntime';
 import { generateEventId } from '@shared/utils/id';
+import { imageTokenAdjustmentForContent } from '../../conversation/ConversationAttachmentMaterializer';
 import {
   resolveAgentRouteCapability,
 } from '../../agent-runtime/capabilities/RouteCapabilityResolver';
@@ -101,7 +102,7 @@ export class ProfileTurnPreparation {
       turnId,
       agentId: input.agentId,
       content: input.content,
-      imageTokenAdjustment: 0,
+      imageTokenAdjustment: imageTokenAdjustmentForContent(input.content),
       providerId: input.providerId,
       selectedModelId: input.modelId,
       effectiveModel,

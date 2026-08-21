@@ -51,7 +51,6 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
   /** Durable run that owns user-visible outputs from this turn. */
   runId?: string;
   systemPrompt?: string;
-  maxTokens?: number;
   temperature?: number;
   turnId?: string;
   routeAgentId?: AgentRole;

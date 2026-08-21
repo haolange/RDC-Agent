@@ -308,8 +308,12 @@ export interface RequestPlan {
   /** Prompt/input budget after applying the selected context mode. */
   contextBudgetTokens: number;
   contextMode: 'normal' | 'one-million';
-  /** Complete provider context window, including the output reserve. */
+  /** Complete provider context window. */
   contextWindowTokens: number;
+  /** Model max output from the active context tier, or 0. */
+  maxOutputTokens: number;
+  /** Compaction trigger in tokens: prompt budget × effective compaction percent. */
+  compactionThresholdTokens: number;
   activeTierId: string;
   fastMode: boolean;
   reasoningWire: ResolvedReasoningSelection;

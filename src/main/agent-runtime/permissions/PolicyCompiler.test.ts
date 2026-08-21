@@ -27,6 +27,45 @@ describe('PolicyCompiler', () => {
     expect(compiled.maxSubagents).toBe(2);
     expect(compiled.maxChildDepth).toBe(3);
     expect(compiled.maxWallTimeMs).toBe(60000);
+    expect(compiled.contextCompactionPercent).toBe(100);
+  });
+
+  it('compiles contextCompactionPercent and lets project policy only tighten it', () => {
+    expect(compilePolicyFromRestrictive({
+      limits: { contextCompactionPercent: 70 },
+    }).contextCompactionPercent).toBe(70);
+
+    const previousHome = process.env.RDC_AGENT_HOME;
+    const userRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-policy-user-'));
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-policy-project-'));
+    try {
+      process.env.RDC_AGENT_HOME = userRoot;
+      fs.mkdirSync(path.join(userRoot, 'policies'), { recursive: true });
+      fs.writeFileSync(
+        path.join(userRoot, 'policies', 'user.policy.yml'),
+        'limits:\n  contextCompactionPercent: 80\n',
+        'utf8',
+      );
+      fs.mkdirSync(path.join(projectRoot, '.rdx', 'policies'), { recursive: true });
+      fs.writeFileSync(
+        path.join(projectRoot, '.rdx', 'policies', 'project.policy.yml'),
+        'limits:\n  contextCompactionPercent: 70\n',
+        'utf8',
+      );
+      expect(compileEffectivePolicy(projectRoot).contextCompactionPercent).toBe(70);
+
+      fs.writeFileSync(
+        path.join(projectRoot, '.rdx', 'policies', 'project.policy.yml'),
+        'limits:\n  contextCompactionPercent: 90\n',
+        'utf8',
+      );
+      expect(() => compileEffectivePolicy(projectRoot)).toThrow(/cannot raise contextCompactionPercent/);
+    } finally {
+      if (previousHome === undefined) delete process.env.RDC_AGENT_HOME;
+      else process.env.RDC_AGENT_HOME = previousHome;
+      fs.rmSync(userRoot, { recursive: true, force: true });
+      fs.rmSync(projectRoot, { recursive: true, force: true });
+    }
   });
 
 

@@ -650,6 +650,14 @@ html[data-resolved-theme='light'] .app-main {
   transition: stroke-dashoffset var(--transition-fast), stroke var(--transition-fast);
 }
 
+.composer-usage-ring-threshold {
+  fill: none;
+  stroke: var(--token-text-caption);
+  stroke-width: 3.5;
+  stroke-linecap: butt;
+  pointer-events: none;
+}
+
 .composer-usage-value {
   position: absolute;
   inset: 0;
@@ -691,6 +699,14 @@ html[data-resolved-theme='light'] .app-main {
 
 .composer-usage-indicator.is-stale .composer-usage-ring-progress {
   stroke: rgb(var(--color-text-muted));
+}
+
+.composer-usage-indicator.is-estimated .composer-usage-ring-progress {
+  stroke: color-mix(in srgb, var(--composer-mode-accent) 72%, var(--token-text-caption));
+}
+
+.composer-usage-indicator.is-estimated .composer-usage-value-number {
+  letter-spacing: -0.04em;
 }
 
 /* ── 上下文用量：锚定 composer 输入区上方（Cursor 式全宽弹层） ── */
@@ -818,8 +834,16 @@ html[data-resolved-theme='light'] .app-main {
   white-space: nowrap;
 }
 
+.context-breakdown-window-note {
+  margin: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+
 /* Stacked bar — thicker Cursor-style track */
 .context-breakdown-bar {
+  position: relative;
   display: flex;
   gap: 1px;
   width: 100%;
@@ -827,6 +851,18 @@ html[data-resolved-theme='light'] .app-main {
   border-radius: var(--radius-full);
   overflow: hidden;
   background: var(--token-context-free);
+}
+
+.context-breakdown-bar-threshold {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--context-threshold-left, 80%);
+  width: 2px;
+  margin-left: -1px;
+  background: var(--token-text-caption);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .context-breakdown-bar-segment {
@@ -890,25 +926,22 @@ html[data-resolved-theme='light'] .app-main {
   background: var(--token-context-free);
 }
 
-/* Actual / Last actual — flat metric band (no nested panels): group · label/value cells */
+/* Actual / Last actual — independent rounded metric cards */
 .context-breakdown-run-meter {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
   margin: 0 var(--space-5) var(--space-4);
-  padding: var(--space-3) 0 0;
-  border-top: 1px solid var(--token-border-subtle);
+  padding: 0;
   min-width: 0;
 }
 
 .context-breakdown-run-columns {
   display: grid;
-  grid-template-columns: max-content max-content max-content;
-  column-gap: clamp(0px, calc((100% - 32rem) / 2), var(--space-6));
-  row-gap: var(--space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
   min-width: 0;
-  align-items: start;
-  justify-content: start;
+  align-items: stretch;
 }
 
 .context-breakdown-run-col {
@@ -916,18 +949,10 @@ html[data-resolved-theme='light'] .app-main {
   flex-direction: column;
   gap: var(--space-2);
   min-width: 0;
-  padding: 0 var(--space-4) 0 0;
-  background: transparent;
-}
-
-.context-breakdown-run-col + .context-breakdown-run-col {
-  border-inline-start: 1px solid var(--token-border-subtle);
-  padding-inline-start: var(--space-4);
-  padding-inline-end: var(--space-4);
-}
-
-.context-breakdown-run-col[data-col='reasoning'] {
-  padding-inline-end: 0;
+  padding: var(--space-3);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: var(--token-bg-panel);
 }
 
 .context-breakdown-run-col-title {
@@ -941,10 +966,14 @@ html[data-resolved-theme='light'] .app-main {
 
 .context-breakdown-meter-stats {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--space-4);
   min-width: 0;
+}
+
+.context-breakdown-run-col[data-col='cache'] .context-breakdown-meter-stats {
+  flex-wrap: wrap;
 }
 
 .context-breakdown-meter-stat {
@@ -980,6 +1009,18 @@ html[data-resolved-theme='light'] .app-main {
   font-weight: var(--font-medium);
 }
 
+.context-breakdown-cost-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 var(--space-5) var(--space-4);
+  padding: var(--space-3);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: var(--token-bg-panel);
+  min-width: 0;
+}
+
 @container (max-width: 42rem) {
   .context-breakdown-hero-row {
     align-items: flex-start;
@@ -995,19 +1036,7 @@ html[data-resolved-theme='light'] .app-main {
 @container (max-width: 33rem) {
   .context-breakdown-run-columns {
     grid-template-columns: minmax(0, 1fr);
-    row-gap: 0;
-  }
-  .context-breakdown-run-col {
-    padding: var(--space-3) 0 0;
-  }
-  .context-breakdown-run-col + .context-breakdown-run-col {
-    margin-top: var(--space-3);
-    padding-inline-start: 0;
-    border-inline-start: 0;
-    border-top: 1px solid var(--token-border-subtle);
-  }
-  .context-breakdown-meter-stats {
-    flex-wrap: wrap;
+    gap: var(--space-3);
   }
 }
 

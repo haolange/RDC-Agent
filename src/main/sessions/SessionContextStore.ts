@@ -3,6 +3,7 @@ import * as path from 'path';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '@shared/utils/jsonl';
 import type { RunContextUsageSummary } from '@shared/types/session';
 import type { SessionContextTurnEntry } from '../conversation/SessionContextJournal';
+import { SESSION_USAGE_MIGRATIONS, toSessionUsageManifest } from './storageSchema';
 
 
 export class SessionContextStore {
@@ -20,7 +21,7 @@ export class SessionContextStore {
     }
     const usagePath = this.getSessionUsagePath(sessionId);
     if (!usagePath) return null;
-    return this.host.io.readJson<RunContextUsageSummary>(usagePath);
+    return this.host.io.readJson(usagePath, SESSION_USAGE_MIGRATIONS)?.usage ?? null;
   }
 
   writeSessionUsage(sessionId: string, usage: RunContextUsageSummary): void {
@@ -31,7 +32,7 @@ export class SessionContextStore {
     if (!usagePath) {
       throw new Error(`Session not found for usage snapshot: ${sessionId}`);
     }
-    this.host.io.writeJsonAtomic(usagePath, usage);
+    this.host.io.writeJsonAtomic(usagePath, toSessionUsageManifest(usage));
   }
 
   writeSessionContextJournal(sessionId: string, entries: SessionContextTurnEntry[]): void {

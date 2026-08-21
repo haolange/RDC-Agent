@@ -3445,22 +3445,26 @@
   gap: var(--space-4);
 }
 
-.settings-page-skills .settings-browser-block {
+.settings-page-skills .settings-browser-block,
+.settings-page-policy .settings-browser-block {
   margin-bottom: 0;
   padding: var(--space-5);
   border-radius: var(--radius-lg);
 }
 
-.settings-page-skills .settings-browser-section-head {
+.settings-page-skills .settings-browser-section-head,
+.settings-page-policy .settings-browser-section-head {
   min-height: var(--space-12);
   align-items: center;
 }
 
-.settings-page-skills .settings-browser-section-title {
+.settings-page-skills .settings-browser-section-title,
+.settings-page-policy .settings-browser-section-title {
   font-size: var(--text-xl);
 }
 
-.settings-page-skills .settings-help-text {
+.settings-page-skills .settings-help-text,
+.settings-page-policy .settings-help-text {
   margin-top: var(--space-1);
   color: var(--token-text-body);
   font-size: var(--text-sm);

@@ -86,7 +86,12 @@ export interface ResolvedReasoningSelection {
   control: ReasoningControl;
 }
 
-export const CONTEXT_COMPACTION_RATIO = 0.8;
+export const DEFAULT_CONTEXT_COMPACTION_PERCENT = 80;
+export const CONTEXT_COMPACTION_PERCENT_MIN = 50;
+export const CONTEXT_COMPACTION_PERCENT_MAX = 90;
+export const CONTEXT_COMPACTION_PERCENT_STEP = 5;
+/** Policy sentinel: do not constrain the user compaction percent. */
+export const POLICY_UNLIMITED_COMPACTION_PERCENT = 100;
 
 export function isNamedReasoningLevel(value: unknown): value is NamedReasoningLevel {
   return typeof value === 'string' && (NAMED_REASONING_LEVELS as readonly string[]).includes(value);

@@ -6,6 +6,8 @@ import {
   SessionRecordSchema,
   SessionAttachmentManifestSchema,
   toSessionAttachmentManifest,
+  SESSION_USAGE_MIGRATIONS,
+  toSessionUsageManifest,
   PersistedRunRecordSchema,
   CONVERSATION_TURN_COMMIT_MIGRATIONS,
   CONVERSATION_TERMINAL_COMMIT_MIGRATIONS,
@@ -72,6 +74,22 @@ describe('storageSchema parseStoredDocument', () => {
     )).toThrow(/STORAGE_SCHEMA/);
   });
 
+  it('treats unversioned documents as v0 when a v0 migration exists', () => {
+    expect(parseStoredDocument(
+      { name: 'legacy' },
+      migrations,
+      'doc.json',
+    )).toEqual({ schemaVersion: '1', name: 'legacy', extra: true });
+  });
+
+  it('fail-closes missing schemaVersion when no v0 migration exists', () => {
+    expect(() => parseStoredDocument(
+      { name: 'ok' },
+      [{ schemaVersion: '1', schema: current }],
+      'doc.json',
+    )).toThrow(/missing schemaVersion/);
+  });
+
   it('parses the project registry v1 contract', () => {
     const parsed = parseStoredDocument({
       schemaVersion: '1',
@@ -90,6 +108,81 @@ describe('storageSchema parseStoredDocument', () => {
       }],
     }, PROJECT_REGISTRY_MIGRATIONS, 'projects.json');
     expect(parsed.projects).toHaveLength(1);
+  });
+});
+
+describe('session usage schema v2', () => {
+  const legacyUsage = {
+    runId: 'run_legacy',
+    providerId: 'deepseek',
+    modelId: 'deepseek-v4-flash',
+    inputTokens: 12,
+    outputTokens: 3,
+    totalTokens: 15,
+    contextWindowTokens: 616_000,
+    usagePercent: 1,
+    occupiedTokens: 12,
+    breakdown: null,
+    snapshotAt: 1,
+  };
+
+  it('migrates a v0 bare usage object onto promptBudgetTokens then v2 output fields', () => {
+    const parsed = parseStoredDocument(legacyUsage, SESSION_USAGE_MIGRATIONS, 'usage.json');
+    expect(parsed).toEqual({
+      schemaVersion: '2',
+      usage: {
+        ...legacyUsage,
+        promptBudgetTokens: 616_000,
+        contextWindowTokens: null,
+        maxOutputTokens: null,
+        compactionThresholdTokens: null,
+      },
+    });
+  });
+
+  it('migrates a v1 document from outputReserveTokens to maxOutputTokens', () => {
+    const parsed = parseStoredDocument({
+      schemaVersion: '1',
+      usage: {
+        ...legacyUsage,
+        promptBudgetTokens: 616_000,
+        contextWindowTokens: 1_000_000,
+        outputReserveTokens: 384_000,
+      },
+    }, SESSION_USAGE_MIGRATIONS, 'usage.json');
+    expect(parsed).toEqual({
+      schemaVersion: '2',
+      usage: {
+        ...legacyUsage,
+        promptBudgetTokens: 616_000,
+        contextWindowTokens: 1_000_000,
+        maxOutputTokens: 384_000,
+        compactionThresholdTokens: null,
+      },
+    });
+  });
+
+  it('accepts a current { schemaVersion, usage } document', () => {
+    const usage = {
+      ...legacyUsage,
+      promptBudgetTokens: 616_000,
+      contextWindowTokens: 1_000_000,
+      maxOutputTokens: 384_000,
+      compactionThresholdTokens: 800_000,
+    };
+    expect(parseStoredDocument(
+      toSessionUsageManifest(usage),
+      SESSION_USAGE_MIGRATIONS,
+      'usage.json',
+    )).toEqual({ schemaVersion: '2', usage });
+  });
+
+  it('fail-closes an unknown higher usage schemaVersion', () => {
+    expect(() => parseStoredDocument(
+      { schemaVersion: '9', usage: legacyUsage },
+      SESSION_USAGE_MIGRATIONS,
+      'usage.json',
+    )).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
   });
 });
 
@@ -230,6 +323,23 @@ const legalEvidence = {
   report_paths: null,
 };
 
+const legalUsage = {
+  runId: 'run_1',
+  providerId: 'provider',
+  modelId: 'model',
+  inputTokens: 10,
+  outputTokens: 2,
+  totalTokens: 12,
+  promptBudgetTokens: 100,
+  contextWindowTokens: 128,
+  maxOutputTokens: 28,
+  compactionThresholdTokens: 80,
+  usagePercent: 10,
+  occupiedTokens: 10,
+  breakdown: null,
+  snapshotAt: 1,
+};
+
 const legalRegistry = {
   schemaVersion: '1',
   projects: [{
@@ -290,6 +400,27 @@ describe('storage schema store quartet', () => {
       missingOrLegacy: [legalAttachment],
       higher: { schemaVersion: '99', attachments: [legalAttachment] },
       read: (filePath: string) => io.readJson(filePath, SessionAttachmentManifestSchema),
+    },
+    {
+      name: 'session usage',
+      file: 'usage.json',
+      legal: toSessionUsageManifest(legalUsage),
+      corrupt: { schemaVersion: '1', usage: { runId: 1 } },
+      missingOrLegacy: {
+        runId: 'run_1',
+        providerId: 'provider',
+        modelId: 'model',
+        inputTokens: 10,
+        outputTokens: 2,
+        totalTokens: 12,
+        contextWindowTokens: 100,
+        usagePercent: 10,
+        occupiedTokens: 10,
+        breakdown: null,
+        snapshotAt: 1,
+      },
+      higher: { schemaVersion: '99', usage: legalUsage },
+      read: (filePath: string) => io.readJson(filePath, SESSION_USAGE_MIGRATIONS),
     },
     {
       name: 'turn-commit',
@@ -362,6 +493,7 @@ describe('storage schema store quartet', () => {
       'projects registry',
       'session record',
       'attachments',
+      'session usage',
       'turn-commit',
       'terminal-commit',
       'run',
@@ -385,6 +517,12 @@ describe('storage schema store quartet', () => {
           expect(Array.isArray(parsed)).toBe(true);
           expect((JSON.parse(fs.readFileSync(filePath, 'utf8')) as { schemaVersion?: string }).schemaVersion)
             .toBe('1');
+        }
+        if (store.name === 'session usage') {
+          expect((parsed as { schemaVersion?: string; usage?: { promptBudgetTokens?: number } }).schemaVersion)
+            .toBe('2');
+          expect((parsed as { usage?: { promptBudgetTokens?: number } }).usage?.promptBudgetTokens)
+            .toBe(100);
         }
       });
 

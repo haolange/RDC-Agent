@@ -8,6 +8,13 @@ import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { ContextBreakdownLegend } from './ContextBreakdownLegend';
 import { ContextRunMeterBand, MeterStat } from './ContextRunMeterBand';
 import {
+  resolveDisplayedCompactionThreshold,
+  resolveDisplayedContextWindow,
+  resolveDisplayedGeneratable,
+  resolveDisplayedPromptBudget,
+  type ContextUsageSelectedProfile,
+} from './contextUsageDisplay';
+import {
   CONTEXT_BREAKDOWN_ORDER,
   SEGMENT_LABEL_KEYS,
 } from './contextBreakdownMeta';
@@ -39,10 +46,11 @@ export const ContextBreakdownPopover: React.FC<{
   prepared: PreparedTurnContextSummary | null;
   phase: PreparationPhase;
   usage: RunContextUsageSummary | null;
-  selectedContextWindowTokens: number | null;
+  selectedProfile: ContextUsageSelectedProfile | null;
   stale: boolean;
+  estimated?: boolean;
   onClose: () => void;
-}> = ({ prepared, phase, usage, selectedContextWindowTokens, stale, onClose }) => {
+}> = ({ prepared, phase, usage, selectedProfile, stale, estimated = false, onClose }) => {
   const { t } = useI18n();
   const closeButtonRef = React.useRef<HTMLButtonElement>(null);
   const detailsExpanded = useAppSettingsStore(
@@ -56,9 +64,13 @@ export const ContextBreakdownPopover: React.FC<{
   // prepared projection arrives. Preparing therefore keeps the same visual
   // structure and falls back to the previous actual usage when available.
   const showUsage = !showPrepared && usage !== null;
-  const windowTokens = showPrepared
-    ? prepared.promptBudgetTokens
-    : usage?.contextWindowTokens ?? selectedContextWindowTokens;
+  const showEstimated = estimated && showUsage;
+  const windowTokens = resolveDisplayedPromptBudget(showPrepared, prepared, usage, selectedProfile);
+  const fullWindowTokens = resolveDisplayedContextWindow(showPrepared, prepared, usage, selectedProfile);
+  const compactionThresholdTokens = resolveDisplayedCompactionThreshold(
+    showPrepared, prepared, usage, selectedProfile,
+  );
+  const generatableTokens = resolveDisplayedGeneratable(showPrepared, prepared, usage, selectedProfile);
   const occupiedTokens = showPrepared
     ? prepared.preparedInputTokens
     : usage?.occupiedTokens;
@@ -86,11 +98,41 @@ export const ContextBreakdownPopover: React.FC<{
   );
   const summaryCaption = showPrepared
     ? t('contextBreakdown.currentRequest')
-    : showUsage
-      ? phase === 'actual'
-        ? t('contextBreakdown.actual')
-        : t('contextBreakdown.lastActual')
-      : t('contextBreakdown.noUsageYet');
+    : showEstimated
+      ? t('contextBreakdown.projected')
+      : showUsage
+        ? phase === 'actual'
+          ? t('contextBreakdown.actual')
+          : t('contextBreakdown.lastActual')
+        : t('contextBreakdown.noUsageYet');
+  const thresholdRatio = typeof compactionThresholdTokens === 'number'
+    && typeof windowTokens === 'number'
+    && windowTokens > 0
+    ? Math.max(0, Math.min(100, (compactionThresholdTokens / windowTokens) * 100))
+    : null;
+  const thresholdStyle = useDynStyle(
+    thresholdRatio == null ? {} : { '--context-threshold-left': `${thresholdRatio}%` },
+  );
+  const budgetNoteParts: string[] = [];
+  if (typeof compactionThresholdTokens === 'number') {
+    budgetNoteParts.push(t('contextBreakdown.budgetNote.threshold', {
+      threshold: formatTokenCount(compactionThresholdTokens),
+    }));
+  }
+  if (
+    typeof fullWindowTokens === 'number'
+    && typeof windowTokens === 'number'
+    && fullWindowTokens > windowTokens
+  ) {
+    budgetNoteParts.push(t('contextBreakdown.budgetNote.window', {
+      window: formatTokenCount(fullWindowTokens),
+    }));
+  }
+  if (typeof generatableTokens === 'number') {
+    budgetNoteParts.push(t('contextBreakdown.budgetNote.generatable', {
+      tokens: formatTokenCount(generatableTokens),
+    }));
+  }
   const formatKnownTokens = (value: number | null | undefined): string => (
     typeof value === 'number' ? formatTokenCount(value) : METER_UNAVAILABLE
   );
@@ -136,7 +178,9 @@ export const ContextBreakdownPopover: React.FC<{
           <div className="context-breakdown-hero-row">
             <div className="context-breakdown-hero-usage">
               <span className="context-breakdown-pct-large">
-                {typeof displayUsagePercent === 'number' ? `${displayUsagePercent}%` : METER_UNAVAILABLE}
+                {typeof displayUsagePercent === 'number'
+                  ? `${showEstimated ? '~' : ''}${displayUsagePercent}%`
+                  : METER_UNAVAILABLE}
               </span>
               <span className="context-breakdown-summary-caption">{summaryCaption}</span>
             </div>
@@ -145,6 +189,11 @@ export const ContextBreakdownPopover: React.FC<{
               {t('contextBreakdown.tokensLabel')}
             </span>
           </div>
+          {budgetNoteParts.length > 0 ? (
+            <p className="context-breakdown-window-note" data-testid="context-breakdown-window-note">
+              {budgetNoteParts.join(' · ')}
+            </p>
+          ) : null}
           <div className="context-breakdown-bar" aria-hidden="true">
             {barEntries.map((entry) => (
               <ContextBarSegment
@@ -154,13 +203,20 @@ export const ContextBreakdownPopover: React.FC<{
                 title={`${t(SEGMENT_LABEL_KEYS[entry.id])} · ${formatTokenCount(entry.tokens)}`}
               />
             ))}
+            {thresholdRatio != null ? (
+              <span
+                className="context-breakdown-bar-threshold"
+                data-testid="context-breakdown-bar-threshold"
+                {...thresholdStyle}
+              />
+            ) : null}
           </div>
         </div>
 
         <ContextRunMeterBand usage={showUsage ? usage : null} prepared={showPrepared ? prepared : null} />
 
         {showUsage && usage && (usage.cost || typeof usage.cumulativeCost === 'number') ? (
-          <div className="context-breakdown-run-meter" data-testid="context-breakdown-cost">
+          <div className="context-breakdown-cost-card" data-testid="context-breakdown-cost">
             <h3 className="context-breakdown-run-col-title">{t('contextBreakdown.costColumn')}</h3>
             <div className="context-breakdown-meter-stats">
               {usage.cost ? <MeterStat label={t('contextBreakdown.costThisTurn')} value={formatUsdCost(usage.cost.total)} /> : null}
@@ -205,7 +261,13 @@ export const ContextBreakdownPopover: React.FC<{
           </div>
         ) : null}
 
-        {stale ? <p className="context-breakdown-footer">{t('contextBreakdown.staleNote')}</p> : null}
+        {showEstimated ? (
+          <p className="context-breakdown-footer" data-testid="context-breakdown-projected-note">
+            {t('contextBreakdown.projectedNote')}
+          </p>
+        ) : stale ? (
+          <p className="context-breakdown-footer">{t('contextBreakdown.staleNote')}</p>
+        ) : null}
       </div>
     </>
   );
