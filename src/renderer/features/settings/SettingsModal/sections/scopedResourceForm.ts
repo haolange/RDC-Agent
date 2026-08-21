@@ -18,7 +18,7 @@ export const emptyForm = (kind: ScopedResourceKind, id: string): ResourceFormSta
   body: kind === 'skill'
     ? `---\nname: ${id}\ndescription: Reusable scoped instructions\nallowed-tools: []\n---\n\nDescribe the skill workflow here.`
     : kind === 'policy'
-      ? 'deniedTools: []\napproval: mutation\nlimits: {}'
+      ? 'deniedTools: []\napproval: mutation\nlimits:\n  contextCompactionPercent: 100'
       : '',
   name: id,
   transport: 'stdio',

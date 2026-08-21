@@ -13,7 +13,6 @@ export interface AgentConfig {
   modelProvider: LlmProviderId;
   modelName: string;
   temperature?: number;
-  maxTokens?: number;
   category: AgentCategory;
   writeScope: WriteScope[];
 }

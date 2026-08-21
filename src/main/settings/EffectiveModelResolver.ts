@@ -588,8 +588,8 @@ export function planEffectiveModelRequest(input: {
   modelId: string;
   settings: AppSettings;
   controls?: Partial<ConversationTurnControls> & { reasoningLevel?: unknown };
-  clientBudgetTokens?: number;
   requestedTemperature?: number;
+  compactionThresholdPercent?: number;
 }): RequestPlanningResult {
   const snapshot = resolveEffectiveCatalog(input.providerId, input.settings, input.modelId);
   const selection = snapshot
@@ -618,8 +618,8 @@ export function planEffectiveModelRequest(input: {
     model: selection.model,
     catalogModels: snapshot?.models,
     controls: input.controls,
-    clientBudgetTokens: input.clientBudgetTokens,
     requestedTemperature: input.requestedTemperature,
+    compactionThresholdPercent: input.compactionThresholdPercent,
     credentialScopeId: snapshot?.accountId,
   });
   if (!result.ok || !selection.remappedFrom) return result;

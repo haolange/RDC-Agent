@@ -45,4 +45,5 @@ export interface AppSettingsState {
   flushProviderSaves: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;
   removeProvider: (providerId: string) => Promise<void>;
   setAgentPermissionMode: (mode: AgentPermissionMode) => Promise<void>;
+  setCompactionThresholdPercent: (percent: number) => Promise<void>;
 }

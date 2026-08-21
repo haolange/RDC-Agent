@@ -81,7 +81,8 @@ export async function executeCapabilityProbe(input: CapabilityProbeExecution): P
 
   const stream = configuredRuntimeProvider.stream(
     encodeAgentModel(input.request.providerId, input.model.modelId, {
-      contextWindow: input.plan.contextBudgetTokens,
+      contextWindow: input.plan.contextWindowTokens,
+      maxOutputTokens: input.plan.maxOutputTokens || PROBE_MAX_OUTPUT_TOKENS,
     }),
     {
       systemPrompt: promptPlan.systemPrompt,

@@ -139,15 +139,25 @@ requireCssContract(
     && contextUsageIndicator.includes("t('contextBreakdown.preparing')")
     && contextUsageIndicator.includes("t('contextBreakdown.currentRequest')")
     && contextUsageIndicator.includes("t('contextBreakdown.lastActual')")
+    && contextUsageIndicator.includes("t('contextBreakdown.projected')")
+    && contextUsageIndicator.includes('is-estimated')
     && contextUsageIndicator.includes('composer-usage-value-number')
     && !contextUsageIndicator.includes('composer-usage-value-label')
     && !contextUsageIndicator.includes('preparingBadge')
     && !contextUsageIndicator.includes('NextRequestContextProjection'),
-  'Composer context ring must stay percent-first; Preparing / Current request / Last actual live in title and popover, never as in-ring badges or draft-time prediction.',
+  'Composer context ring must stay percent-first; Preparing / Current request / Last actual / Projected live in title and popover, never as in-ring badges or draft-time prediction.',
 );
 requireCssContract(
   contextBreakdownPopover.includes("t('contextBreakdown.currentRequest')")
     && contextBreakdownPopover.includes("t('contextBreakdown.lastActual')")
+    && contextBreakdownPopover.includes("t('contextBreakdown.projected')")
+    && contextBreakdownPopover.includes("t('contextBreakdown.projectedNote')")
+    && contextBreakdownPopover.includes("t('contextBreakdown.budgetNote.threshold'")
+    && contextBreakdownPopover.includes("t('contextBreakdown.budgetNote.window'")
+    && contextBreakdownPopover.includes("t('contextBreakdown.budgetNote.generatable'")
+    && contextBreakdownPopover.includes('context-breakdown-window-note')
+    && contextBreakdownPopover.includes('context-breakdown-bar-threshold')
+    && contextUsageIndicator.includes('composer-usage-ring-threshold')
     && contextBreakdownPopover.includes("t('contextBreakdown.noUsageYet')")
     && contextBreakdownPopover.includes('const showUsage = !showPrepared && usage !== null;')
     && contextBreakdownPopover.includes('className="context-breakdown-hero"')
@@ -203,16 +213,17 @@ const heroOnlyResponsiveCss = heroOnlyResponsiveStart >= 0 && contextMetricRespo
   ? appShellCss.slice(heroOnlyResponsiveStart, contextMetricResponsiveStart)
   : '';
 requireCssContract(
-  cssBlock(appShellCss, '.context-breakdown-run-columns').includes('grid-template-columns: max-content max-content max-content;')
-    && cssBlock(appShellCss, '.context-breakdown-run-columns').includes('column-gap: clamp(0px, calc((100% - 32rem) / 2), var(--space-6));')
-    && cssBlock(appShellCss, '.context-breakdown-run-columns').includes('justify-content: start;')
+  cssBlock(appShellCss, '.context-breakdown-run-columns').includes('grid-template-columns: repeat(3, minmax(0, 1fr));')
+    && cssBlock(appShellCss, '.context-breakdown-run-columns').includes('gap: var(--space-3);')
+    && cssBlock(appShellCss, '.context-breakdown-run-col').includes('border: 1px solid var(--token-border-card);')
+    && cssBlock(appShellCss, '.context-breakdown-run-col').includes('border-radius: var(--radius-lg);')
+    && cssBlock(appShellCss, '.context-breakdown-run-col').includes('background: var(--token-bg-panel);')
     && contextMetricResponsiveCss.includes('grid-template-columns: minmax(0, 1fr);')
-    && cssBlock(appShellCss, '.context-breakdown-run-col + .context-breakdown-run-col').includes('padding-inline-end: var(--space-4);')
-    && cssBlock(appShellCss, ".context-breakdown-run-col[data-col='reasoning']").includes('padding-inline-end: 0;')
-    && contextMetricResponsiveCss.includes('flex-wrap: wrap;')
+    && !appShellCss.includes('border-inline-start')
+    && !appShellCss.includes('column-gap: clamp(0px')
     && !heroOnlyResponsiveCss.includes('grid-template-columns: minmax(0, 1fr);')
     && !heroOnlyResponsiveCss.includes('flex-wrap: wrap;'),
-  'Context Usage metrics must remain content-sized in one row above 33rem; only the narrow metric query may stack them.',
+  'Context Usage metrics must be equal-width cards in one row above 33rem; only the narrow metric query may stack them.',
 );
 
 console.log(

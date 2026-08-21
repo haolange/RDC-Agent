@@ -278,5 +278,7 @@ export interface CompiledPolicy {
   maxSubagents: number;
   maxChildDepth: number;
   maxWallTimeMs: number;
+  /** 100 = unlimited (does not constrain the user compaction percent). */
+  contextCompactionPercent: number;
   sourceFingerprint: string;
 }

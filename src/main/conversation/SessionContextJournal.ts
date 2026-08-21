@@ -209,9 +209,11 @@ export class SessionContextJournal {
     sessionId: string,
     visibleTurnIds: string[],
     branchId: string,
+    occupancy: { occupiedTokens: number; compactionThresholdTokens: number },
     keepRecentTurns = 3,
   ): DerivedContextView | null {
-    if (visibleTurnIds.length <= keepRecentTurns) {
+    const withinCompactionLine = occupancy.occupiedTokens <= occupancy.compactionThresholdTokens;
+    if (withinCompactionLine || visibleTurnIds.length <= keepRecentTurns) {
       storageAdapter.clearSessionDerivedContextView(sessionId);
       return null;
     }

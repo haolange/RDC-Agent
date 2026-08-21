@@ -39,6 +39,7 @@ describe('ConversationService derived compaction', () => {
     vi.spyOn(storageAdapter, 'readConversationHistory').mockReturnValue(history);
     vi.spyOn(storageAdapter, 'readConversationBranchState')
       .mockReturnValue(createDefaultBranchState('session-1'));
+    vi.spyOn(storageAdapter, 'readSessionUsage').mockReturnValue(null);
     const writeHistory = vi.spyOn(storageAdapter, 'writeConversationHistory');
     vi.spyOn(sessionContextJournal, 'readEntries').mockReturnValue([
       { turnId: 'turn-1' } as SessionContextTurnEntry,
@@ -54,6 +55,7 @@ describe('ConversationService derived compaction', () => {
       'session-1',
       ['turn-1', 'turn-2'],
       'branch-root',
+      { occupiedTokens: 0, compactionThresholdTokens: 0 },
     );
     expect(writeHistory).not.toHaveBeenCalled();
   });

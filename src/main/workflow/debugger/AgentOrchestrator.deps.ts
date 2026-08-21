@@ -5,7 +5,6 @@
 
 export { isTopLevelAgentId } from '@shared/types/agent';
 export { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
-export { CONTEXT_COMPACTION_RATIO } from '@shared/types/modelCapability';
 export { generateEventId, nowIso, nowMs } from '@shared/utils/id';
 
 export { TokenizerService } from '../../agent-runtime/core/TokenizerService';
@@ -23,6 +22,7 @@ export {
   planEffectiveModelRequest,
   resolveEffectiveModel,
 } from '../../settings/EffectiveModelResolver';
+export { resolveCompactionPercentForSettings } from '../../settings/compactionPercent';
 
 export {
   turnCoordinator,

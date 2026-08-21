@@ -51,6 +51,8 @@ const preparedContext: ConversationTurnResult['preparedContext'] = {
   uncompactedInputTokens: 10,
   promptBudgetTokens: 100,
   contextWindowTokens: 128,
+  maxOutputTokens: 28,
+  compactionThresholdTokens: 80,
   usagePercent: 10,
   breakdown: [],
   compactionApplied: false,

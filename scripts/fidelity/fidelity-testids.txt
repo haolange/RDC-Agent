@@ -39,10 +39,14 @@ composer-permission-pill
 composer-skill-chip
 composer-tool-approval-panel
 composer-usage-indicator
+composer-usage-ring-threshold
 composer-user-input-panel
 context-breakdown
+context-breakdown-bar-threshold
 context-breakdown-cost
+context-breakdown-projected-note
 context-breakdown-run-meter
+context-breakdown-window-note
 conversation-thread
 empty-workbench-prompt
 empty-workbench-tool-${toolMode}
@@ -86,9 +90,11 @@ settings-add-provider
 settings-agent-look
 settings-agent-manifest-editor
 settings-agent-model-invalid
+settings-agent-runtime-block
 settings-agent-tool-diagnostics
 settings-appearance-page
 settings-center-panel
+settings-compaction-threshold
 settings-mcp-status-dashboard
 settings-mcp-status-refresh
 settings-mcp-status-row

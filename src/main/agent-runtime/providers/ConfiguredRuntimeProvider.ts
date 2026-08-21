@@ -45,7 +45,7 @@ interface EncodedAgentModel {
 export function encodeAgentModel(
   providerId: string,
   modelId: string,
-  options: { contextWindow: number },
+  options: { contextWindow: number; maxOutputTokens: number },
 ): Model {
   return {
     id: `${providerId}::${modelId}`,
@@ -53,7 +53,7 @@ export function encodeAgentModel(
     provider: providerId,
     api: CONFIGURED_PROVIDER_API,
     contextWindow: options.contextWindow,
-    maxTokens: 4096,
+    maxTokens: options.maxOutputTokens,
     reasoning: false,
     vision: false,
   };

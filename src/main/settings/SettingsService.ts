@@ -60,6 +60,7 @@ import {
 } from './settingsDefaults';
 import {
   sanitizeAgentPermissionSettings,
+  sanitizeAgentRuntimeContextSettings,
   sanitizeRdxActionsSettings,
   sanitizeRdxCliInvokerSettings,
   sanitizeSidebar,
@@ -349,6 +350,10 @@ export class SettingsService {
         permissions: sanitizeAgentPermissionSettings({
           ...(currentPersisted.agentRuntime?.permissions ?? createDefaultRuntimeSettings().agentRuntime.permissions),
           ...(patch.agentRuntime?.permissions ?? {}),
+        }),
+        context: sanitizeAgentRuntimeContextSettings({
+          ...(currentPersisted.agentRuntime?.context ?? createDefaultRuntimeSettings().agentRuntime.context),
+          ...(patch.agentRuntime?.context ?? {}),
         }),
       },
       llm: {

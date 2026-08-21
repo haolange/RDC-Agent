@@ -46,6 +46,7 @@ export interface PersistedSettingsPayload {
   };
   agentRuntime?: {
     permissions?: Partial<AgentPermissionSettings>;
+    context?: Partial<{ compactionThresholdPercent: number }>;
   };
 }
 
@@ -151,6 +152,9 @@ export const DEFAULT_AGENT_RUNTIME: AgentRuntimeSettings = {
     writableRoots: [],
     allowedCommandPrefixes: [],
     deniedCommandPrefixes: [],
+  },
+  context: {
+    compactionThresholdPercent: 80,
   },
 };
 

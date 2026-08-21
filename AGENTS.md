@@ -54,7 +54,8 @@
 | `TurnCoordinator` / `TurnHandle` | `src/main/workflow/debugger/` | 每 session 活跃 turn；generation 丢弃迟到 event |
 | `ShutdownCoordinator` | `src/main/lifecycle/` | before-quit 限时 shutdownAll |
 | `MemoryStore` | `src/main/agent-runtime/memory/` | 进程内 realpath 队列 + `.memory.lock`（`directoryFileLock`：活 pid 永不回收，死 pid / 损坏锁回收）跨进程互斥 |
-| `StorageIo` / `storageSchema` | `src/main/sessions/` | zod runtime 校验 + `schemaVersion` migration registry；未知更高版本 `STORAGE_SCHEMA_UNSUPPORTED`；`attachments.json` 现写 `{ schemaVersion, attachments }`，缺版本纯数组仍 Zod 校验 |
+| `StorageIo` / `storageSchema` | `src/main/sessions/` | zod runtime 校验 + `schemaVersion` migration registry；未知更高版本 `STORAGE_SCHEMA_UNSUPPORTED`；`attachments.json` 现写 `{ schemaVersion, attachments }`，缺版本纯数组仍 Zod 校验；`usage.json` 现写 `{ schemaVersion: '2', usage }`，v1 `outputReserveTokens` 经 `SESSION_USAGE_MIGRATIONS` 迁到 `maxOutputTokens` |
+| 上下文预算 / 压缩阈值 / 动态输出上限 | `src/shared/utils/contextBudget.ts` + `contextTiers.ts` | prompt 上限不扣输出；压缩百分比 `min(用户, policy)`；每次 LLM call 现算 `max_tokens`；门禁含 `check:fidelity` 与 Browser QA 环/刻度 |
 | `EffectiveRuntimePlan` | `src/main/agent-runtime/` | `schemaVersion: 2`；`prepareTurn` 完整冻结；Prompt 与 Executor 共用 |
 | `LoopProgressGuard` / `AgentLoopTerminationError` | `src/main/agent-runtime/agent/` | 第二轮相同工具结果注入不落盘纠偏；第三轮 `AGENT_NO_PROGRESS`；仍需 continuation 的 max-turn 抛 `AGENT_MAX_TURNS_EXCEEDED`，不得静默完成或误报 Provider failure |
 | `AgentOrchestrator` | `src/main/workflow/debugger/AgentOrchestrator.ts` | façade 少于 800 行；职责外提；`pnpm run check:orchestrator-facade` |
@@ -78,7 +79,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - 涉及页面结构、面板布局、状态展示、样式引用或视觉资源路径时，必须确认属于明确的产品变更；如果不是，应保持现有效果不变。
 - 修复结构问题时，不要顺手做与任务无关的视觉改版、布局重排或交互重定义。
 - 涉及 `src/renderer` 的改动，除检查类型和功能外，还要检查界面入口是否完整、关键面板是否可渲染、现有交互是否可达。
-- Settings 内 General / Appearance / Workspace / Models 与 Agents / Skills / Tools / Hooks / Policy 为同级导航；Appearance 承载 System/Light/Dark、Light/Dark 独立 chrome（预设、accent/surface/ink、contrast、字体、Import/Copy `rdx-theme-v1:`）、`fontScale`、`composerMarkdown`、`usePointerCursors`、`reduceMotion`；Language 留在 General。禁止恢复 translucent / semi-transparent sidebar。禁止恢复 `oklch-themes.css`、`styles/tokens/*` 双轨或解析 `codex-theme-v1:`。scoped 编辑条不展示装饰性 “RDX Runtime” kicker；User | Project 独占作用域行且横向 `1fr 1fr` 拉满均分。Skills/MCP/Hooks/Policy 内容区为 Import + New 列表与右侧详情编辑器；Agents 不在 scope 条上放 New（仅 Agents 工具栏 Import + New Agent）。禁止恢复 Settings「诊断信息 / Diagnostics」导航；禁止把 Request Inspector 挂到 Work Process 或右侧默认 Session/Trace 面板。Workspace「RDX Runtime 根目录」与 Control Panel「RDX 运行时上下文」职责不同，不得一并删除。
+- Settings 内 General / Appearance / Workspace / Models 与 Agents / Skills / Tools / Hooks / Policy 为同级导航；Appearance 承载 System/Light/Dark、Light/Dark 独立 chrome（预设、accent/surface/ink、contrast、字体、Import/Copy `rdx-theme-v1:`）、`fontScale`、`composerMarkdown`、`usePointerCursors`、`reduceMotion`；Language 留在 General。禁止恢复 translucent / semi-transparent sidebar。禁止恢复 `oklch-themes.css`、`styles/tokens/*` 双轨或解析 `codex-theme-v1:`。scoped 编辑条不展示装饰性 “RDX Runtime” kicker；User | Project 独占作用域行且横向 `1fr 1fr` 拉满均分。Skills/MCP/Hooks/Policy 内容区为 Import + New 列表与右侧详情编辑器；Policy 内容区顶部另有用户级 Agent Runtime 块（压缩阈值 50–90、步长 5），项目 policy `limits.contextCompactionPercent` 只能收紧。Agents 不在 scope 条上放 New（仅 Agents 工具栏 Import + New Agent）。禁止恢复 Settings「诊断信息 / Diagnostics」导航；禁止把 Request Inspector 挂到 Work Process 或右侧默认 Session/Trace 面板。Workspace「RDX Runtime 根目录」与 Control Panel「RDX 运行时上下文」职责不同，不得一并删除。
 
 ## 设计系统约束（agent 写 CSS 必读）
 

@@ -13,6 +13,7 @@ import { generateEventId, nowMs } from '@shared/utils/id';
 import { settingsService } from '../settings/SettingsService';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 import { planEffectiveModelRequest, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
+import { resolveCompactionPercentForSettings } from '../settings/compactionPercent';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
 import { storageAdapter } from '../sessions/StorageAdapter';
@@ -169,6 +170,7 @@ export async function startProfileTurn(
       ...(context.session?.turnControls ?? {}),
       ...(requestTurnControls ?? {}),
     },
+    compactionThresholdPercent: resolveCompactionPercentForSettings(settings, pendingProjectRootPath),
   });
   if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
   const plannedRouteCapability = resolveAgentRouteCapability(

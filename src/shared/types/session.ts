@@ -188,7 +188,14 @@ export interface RunContextUsageSummary {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
+  /** Occupancy denominator: executable prompt/input budget for the selected tier. */
+  promptBudgetTokens: number | null;
+  /** Complete provider context window. */
   contextWindowTokens: number | null;
+  /** Model max output from the active context tier; null when a legacy snapshot cannot recover it. */
+  maxOutputTokens: number | null;
+  /** Compaction trigger in tokens; null when a legacy snapshot cannot recover it. */
+  compactionThresholdTokens: number | null;
   usagePercent: number;
   /** 最近一次 LLM 请求的 prompt 占用量（=provider 上报的 inputTokens），用于窗口占用率。 */
   occupiedTokens: number;
@@ -267,6 +274,8 @@ export interface PreparedTurnContextSummary {
   uncompactedInputTokens: number;
   promptBudgetTokens: number;
   contextWindowTokens: number;
+  maxOutputTokens: number;
+  compactionThresholdTokens: number;
   usagePercent: number;
   breakdown: ContextUsageBreakdownEntry[];
   compactionApplied: boolean;

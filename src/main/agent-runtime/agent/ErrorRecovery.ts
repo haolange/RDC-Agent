@@ -17,8 +17,6 @@ import type { Model } from '../core/types';
 
 /** 恢复状态。 */
 export interface RecoveryState {
-  /** 是否已升级 max_tokens。 */
-  hasEscalated: boolean;
   /** 恢复重试次数。 */
   recoveryCount: number;
   /** 连续过载错误计数。 */
@@ -32,7 +30,6 @@ export interface RecoveryState {
 /** 恢复动作。 */
 export type RecoveryAction =
   | { type: 'retry'; delayMs: number }
-  | { type: 'escalate_tokens'; newMaxTokens: number }
   | { type: 'reactive_compact' }
   | { type: 'switch_model'; fallbackModel: Model }
   | { type: 'continue_prompt' }
@@ -55,8 +52,6 @@ export type ErrorCategory =
 
 const DEFAULT_MAX_RETRIES = 3;
 const DEFAULT_MAX_RECOVERY_RETRIES = 2;
-const DEFAULT_MAX_TOKENS = 4096;
-const DEFAULT_ESCALATED_MAX_TOKENS = 16384;
 const OVERLOAD_SWITCH_THRESHOLD = 3;
 const RETRY_BASE_MS = 1000;
 const RETRY_JITTER_MS = 500;
@@ -69,8 +64,6 @@ export class ErrorRecovery {
   private state: RecoveryState;
   private maxRetries: number;
   private maxRecoveryRetries: number;
-  private defaultMaxTokens: number;
-  private escalatedMaxTokens: number;
   private fallbackModel?: Model;
 
   constructor(options: {
@@ -78,19 +71,12 @@ export class ErrorRecovery {
     fallbackModel?: Model;
     maxRetries?: number;
     maxRecoveryRetries?: number;
-    defaultMaxTokens?: number;
-    escalatedMaxTokens?: number;
   }) {
     this.maxRetries = options.maxRetries ?? DEFAULT_MAX_RETRIES;
     this.maxRecoveryRetries =
       options.maxRecoveryRetries ?? DEFAULT_MAX_RECOVERY_RETRIES;
-    this.defaultMaxTokens =
-      options.defaultMaxTokens ?? DEFAULT_MAX_TOKENS;
-    this.escalatedMaxTokens =
-      options.escalatedMaxTokens ?? DEFAULT_ESCALATED_MAX_TOKENS;
     this.fallbackModel = options.fallbackModel;
     this.state = {
-      hasEscalated: false,
       recoveryCount: 0,
       consecutiveOverloads: 0,
       hasAttemptedReactiveCompact: false,
@@ -174,22 +160,9 @@ export class ErrorRecovery {
    * 优先级见类型声明处的列表（rate → overload → prompt → tokens → auth → network → server）。
    */
   decide(error: Error | null, stopReason?: string): RecoveryAction {
-    // 1. stop_reason === 'length' 优先按 max_tokens 处理
+    // 1. stop_reason === 'length' 优先按输出上限处理：先压缩，再续写。
     if (stopReason === 'length') {
-      if (!this.state.hasEscalated) {
-        return {
-          type: 'escalate_tokens',
-          newMaxTokens: this.escalatedMaxTokens,
-        };
-      }
-      if (this.state.recoveryCount < this.maxRecoveryRetries) {
-        return { type: 'continue_prompt' };
-      }
-      return {
-        type: 'abort',
-        reason:
-          'max_tokens reached and recovery limit exhausted; aborting',
-      };
+      return this.decideOutputLimit();
     }
 
     if (!error) {
@@ -247,19 +220,7 @@ export class ErrorRecovery {
       }
 
       case 'max_tokens': {
-        if (!this.state.hasEscalated) {
-          return {
-            type: 'escalate_tokens',
-            newMaxTokens: this.escalatedMaxTokens,
-          };
-        }
-        if (this.state.recoveryCount < this.maxRecoveryRetries) {
-          return { type: 'continue_prompt' };
-        }
-        return {
-          type: 'abort',
-          reason: 'max_tokens reached and recovery limit exhausted',
-        };
+        return this.decideOutputLimit();
       }
 
       case 'auth_error': {
@@ -301,7 +262,6 @@ export class ErrorRecovery {
   /** 重置状态（保留 currentModel）。 */
   reset(): void {
     this.state = {
-      hasEscalated: false,
       recoveryCount: 0,
       consecutiveOverloads: 0,
       hasAttemptedReactiveCompact: false,
@@ -312,12 +272,6 @@ export class ErrorRecovery {
   /** 获取当前模型。 */
   getCurrentModel(): Model {
     return this.state.currentModel;
-  }
-
-  /** 标记升级完成。 */
-  markEscalated(): void {
-    this.state.hasEscalated = true;
-    this.state.recoveryCount += 1;
   }
 
   /** 标记 reactive compact 已尝试。 */
@@ -331,14 +285,22 @@ export class ErrorRecovery {
     this.state.recoveryCount += 1;
   }
 
-  /** 配置中读取的默认 max_tokens（首次未升级时使用）。 */
-  getDefaultMaxTokens(): number {
-    return this.defaultMaxTokens;
-  }
-
   /** 暴露状态快照，便于上层观察 / 测试。 */
   getState(): Readonly<RecoveryState> {
     return { ...this.state };
+  }
+
+  private decideOutputLimit(): RecoveryAction {
+    if (!this.state.hasAttemptedReactiveCompact) {
+      return { type: 'reactive_compact' };
+    }
+    if (this.state.recoveryCount < this.maxRecoveryRetries) {
+      return { type: 'continue_prompt' };
+    }
+    return {
+      type: 'abort',
+      reason: 'max_tokens reached and recovery limit exhausted',
+    };
   }
 
   // -------------------------------------------------------------------

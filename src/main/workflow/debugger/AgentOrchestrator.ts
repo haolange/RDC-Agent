@@ -22,7 +22,6 @@ import {
   AGENT_DISPLAY_NAMES,
   AgentSlotRegistry,
   AgentTurnRunner,
-  CONTEXT_COMPACTION_RATIO,
   createProfileTestResponse,
   createTestModeStub,
   DeferredToolActivationTracker,
@@ -39,6 +38,7 @@ import {
   providerRuntimeCredentialService,
   resolveAgentToolAllowlist,
   resolveAgentToolAllowlistFromDefinition,
+  resolveCompactionPercentForSettings,
   resolveEffectiveModel,
   RuntimeToolAssembly,
   runtimeLogService,
@@ -213,7 +213,6 @@ export class AgentOrchestrator {
         modelProvider: runtimeProfile.providerId,
         modelName: runtimeProfile.modelId,
         temperature: runtimeProfile.temperature ?? fallbackConfig.temperature,
-        maxTokens: runtimeProfile.maxTokens ?? fallbackConfig.maxTokens,
       };
 
       await this.recordMessage(agentId, 'user', content, context);
@@ -248,14 +247,15 @@ export class AgentOrchestrator {
             : {}),
         },
         requestedTemperature: config.temperature,
+        compactionThresholdPercent: resolveCompactionPercentForSettings(
+          settings,
+          context?.projectRootPath ?? null,
+        ),
       });
       if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
       const capability = resolveEffectiveModel(config.modelProvider, config.modelName, settings);
       if (!capability) throw new Error(`MODEL_UNAVAILABLE: ${config.modelProvider}/${config.modelName}`);
       const activeContextWindow = planning.plan.contextWindowTokens;
-      const contextTokenLimit = Math.floor(
-        planning.plan.contextBudgetTokens * CONTEXT_COMPACTION_RATIO,
-      );
       const promptPlan = this.promptPlan.buildPromptPlanForAgentTurn({
         agentId,
         projectRootPath: context?.projectRootPath ?? null,
@@ -302,7 +302,6 @@ export class AgentOrchestrator {
         systemPrompt: promptPlan.systemPrompt,
         providerId: config.modelProvider,
         modelId: config.modelName,
-        maxTokens: config.maxTokens,
         temperature: planning.plan.temperature,
         mode: this.modeForAgent(agentId),
         stage: context?.stageId,
@@ -324,7 +323,7 @@ export class AgentOrchestrator {
         effectiveProfileIds: effectiveSnapshot.enabledProfileIds,
         credentialHandle: ownedCredentialHandle,
         contextWindow: activeContextWindow,
-        contextTokenLimit,
+        contextTokenLimit: preparedBundle.prepared.summary.compactionThresholdTokens,
         initialMessages: preparedBundle.prepared.initialMessages,
         contextDiagnostic: preparedBundle.prepared.contextDiagnostic,
         preparedRuntime: preparedBundle.prepared.runtime,
@@ -417,7 +416,6 @@ export class AgentOrchestrator {
         modelName: frozenRequestPlan?.effectiveModelId ?? route?.modelId ?? fallbackConfig.modelName,
         systemPrompt: options?.systemPrompt || effectiveProfile?.instructions || fallbackConfig.systemPrompt,
         temperature: options?.temperature ?? fallbackConfig.temperature,
-        maxTokens: options?.maxTokens ?? fallbackConfig.maxTokens,
       };
 
       if (process.env.RDC_AGENT_TEST_MODE === '1') {
@@ -462,15 +460,16 @@ export class AgentOrchestrator {
                 : {}),
             },
             requestedTemperature: config.temperature,
+            compactionThresholdPercent: resolveCompactionPercentForSettings(
+              settings,
+              options?.projectRootPath ?? null,
+            ),
           });
       if (!planning.ok) throw new Error(`${planning.code}: ${planning.message}`);
       const capability = preparedTurn?.effectiveModel
         ?? resolveEffectiveModel(routeProviderId, routeModelId, settings);
       if (!capability) throw new Error(`MODEL_UNAVAILABLE: ${routeProviderId}/${routeModelId}`);
       const activeContextWindow = planning.plan.contextWindowTokens;
-      const contextTokenLimit = Math.floor(
-        planning.plan.contextBudgetTokens * CONTEXT_COMPACTION_RATIO,
-      );
       const promptPlan = options?.promptPlan ?? this.promptPlan.buildPromptPlanForAgentTurn({
         agentId,
         projectRootPath: options?.projectRootPath ?? null,
@@ -529,7 +528,6 @@ export class AgentOrchestrator {
         systemPrompt: promptPlan.systemPrompt,
         providerId: routeProviderId,
         modelId: routeModelId,
-        maxTokens: config.maxTokens,
         temperature: planning.plan.temperature,
         mode: this.modeForAgent(agentId),
         stage: options?.stage ?? 'investigate',
@@ -551,7 +549,7 @@ export class AgentOrchestrator {
         effectiveProfileIds,
         credentialHandle: ownedCredentialHandle ?? preparedTurn.runtime.credentialHandle,
         contextWindow: activeContextWindow,
-        contextTokenLimit,
+        contextTokenLimit: preparedTurn.summary.compactionThresholdTokens,
         initialMessages: preparedTurn.initialMessages,
         contextDiagnostic: preparedTurn.contextDiagnostic,
         preparedRuntime: preparedTurn.runtime,

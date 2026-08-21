@@ -67,6 +67,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
       allowedCommandPrefixes: [],
       deniedCommandPrefixes: [],
     },
+    context: {
+      compactionThresholdPercent: 80,
+    },
   },
   llm: { providers: [], agentRoutes: createEmptyAgentRoutes() },
   agents: { directoryPath: '', definitions: [], modelOptions: [], globalInstructions: '' },

@@ -113,23 +113,19 @@ describe('ErrorRecovery', () => {
   });
 
   describe('decide', () => {
-    it('stop_reason === length 且未升级时应返回 escalate_tokens', () => {
+    it('stop_reason === length 且未压缩时应返回 reactive_compact', () => {
       const action = recovery.decide(null, 'length');
-      expect(action.type).toBe('escalate_tokens');
-      if (action.type === 'escalate_tokens') {
-        expect(action.newMaxTokens).toBe(16384);
-      }
+      expect(action.type).toBe('reactive_compact');
     });
 
-    it('stop_reason === length 且已升级时应返回 continue_prompt', () => {
-      recovery.markEscalated();
+    it('stop_reason === length 且已压缩时应返回 continue_prompt', () => {
+      recovery.markReactiveCompactAttempted();
       const action = recovery.decide(null, 'length');
       expect(action.type).toBe('continue_prompt');
     });
 
     it('stop_reason === length 且恢复次数耗尽应 abort', () => {
-      recovery.markEscalated();
-      recovery.noteRetryAttempt();
+      recovery.markReactiveCompactAttempted();
       recovery.noteRetryAttempt();
       const action = recovery.decide(null, 'length');
       expect(action.type).toBe('abort');
@@ -226,22 +222,16 @@ describe('ErrorRecovery', () => {
 
   describe('状态管理', () => {
     it('reset 应重置恢复状态但保留 currentModel', () => {
-      recovery.markEscalated();
       recovery.noteRetryAttempt();
       recovery.markReactiveCompactAttempted();
 
       recovery.reset();
 
       const state = recovery.getState();
-      expect(state.hasEscalated).toBe(false);
       expect(state.recoveryCount).toBe(0);
       expect(state.consecutiveOverloads).toBe(0);
       expect(state.hasAttemptedReactiveCompact).toBe(false);
       expect(state.currentModel.id).toBe('primary');
-    });
-
-    it('getDefaultMaxTokens 应返回默认值', () => {
-      expect(recovery.getDefaultMaxTokens()).toBe(4096);
     });
 
     it('getCurrentModel 应返回当前模型', () => {

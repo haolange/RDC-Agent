@@ -61,6 +61,11 @@ export interface AgentLoopConfig {
   ) => Promise<TransformContextResult>;
   /** LLM 调用选项（temperature/maxTokens 等）。 */
   streamOptions: StreamOptions;
+  /**
+   * Per-call output cap. Computed immediately before each provider request.
+   * `null` means the remaining window cannot admit output — fail closed.
+   */
+  resolveMaxTokens?: (messages: Message[]) => number | null;
   /** 获取动态 API Key（支持 OAuth token 刷新）。 */
   getApiKey?: (provider: string) => Promise<string | undefined>;
   /** 最大工具执行轮数（防止无限循环）。 */
@@ -379,8 +384,6 @@ function recoveryStartMessage(action: RecoveryAction, attempt: number): string {
   switch (action.type) {
     case 'retry':
       return `provider 错误，正在重试（第 ${attempt} 次）`;
-    case 'escalate_tokens':
-      return '上下文过长，已升级 token 上限';
     case 'reactive_compact':
       return '上下文过长，正在压缩历史消息';
     case 'switch_model':
@@ -458,21 +461,28 @@ async function streamAssistantResponseWithRecovery(
       // 成功时重置断路器
       consecutiveCompactionFailures = 0;
 
-      // stopReason === 'length'：输出被 max_tokens 截断，走恢复策略
-      // （escalate_tokens 提额 / continue_prompt 续写 / abort）。
+      // stopReason === 'length'：输出被截断，走恢复策略（reactive_compact / continue_prompt / abort）。
       if (recovery && assistantMessage.stopReason === 'length') {
         const lengthAction = recovery.decide(null, 'length');
         switch (lengthAction.type) {
-          case 'escalate_tokens': {
+          case 'reactive_compact': {
             beginRecovery(lengthAction);
-            recovery.markEscalated();
-            config.streamOptions.maxTokens = lengthAction.newMaxTokens;
+            consecutiveCompactionFailures++;
+            if (consecutiveCompactionFailures >= CIRCUIT_BREAKER_LIMIT) {
+              throw new Error(
+                `[Circuit breaker] ${CIRCUIT_BREAKER_LIMIT} consecutive compaction attempts failed; aborting`,
+              );
+            }
+            recovery.markReactiveCompactAttempted();
+            if (config.transformContext) {
+              const compacted = await applyTransformContext(context.messages, config, stream);
+              context.messages = compacted;
+            }
             continue;
           }
           case 'continue_prompt': {
             beginRecovery(lengthAction);
             recovery.noteRetryAttempt();
-            // 续写：注入一条 user nudge 让模型继续未完成的输出。
             context.messages.push({
               role: 'user',
               content: [{ type: 'text', text: 'Continue.' }],
@@ -484,7 +494,6 @@ async function streamAssistantResponseWithRecovery(
             throw new Error(`[Recovery abort] ${lengthAction.reason}`);
           }
           default: {
-            // retry/reactive_compact/switch_model 不适用于 length，直接返回。
             completePendingRecovery();
             return { message: assistantMessage };
           }
@@ -507,12 +516,6 @@ async function streamAssistantResponseWithRecovery(
           beginRecovery(action);
           recovery.noteRetryAttempt();
           await sleep(action.delayMs, stream.signal);
-          continue;
-        }
-        case 'escalate_tokens': {
-          beginRecovery(action);
-          recovery.markEscalated();
-          config.streamOptions.maxTokens = action.newMaxTokens;
           continue;
         }
         case 'reactive_compact': {
@@ -613,6 +616,16 @@ async function streamAssistantResponse(
 
   // 2. 转换为 LLM Message[]
   const llmMessages = config.convertToLlm(messages);
+  let resolvedMaxTokens = config.streamOptions.maxTokens;
+  if (config.resolveMaxTokens) {
+    const dynamicMaxTokens = config.resolveMaxTokens(llmMessages);
+    if (dynamicMaxTokens == null || dynamicMaxTokens <= 0) {
+      throw new Error(
+        'CONTEXT_CANNOT_FIT: remaining context window cannot admit any output tokens.',
+      );
+    }
+    resolvedMaxTokens = dynamicMaxTokens;
+  }
 
   // 3. 构建 LLM Context（tools 优先读 runtime.current，支持 deferred COW revision）
   const llmContext: Context = {
@@ -631,6 +644,7 @@ async function streamAssistantResponse(
   // 5. 合并 stream options，传入 abort 信号
   const streamOptions: StreamOptions = {
     ...config.streamOptions,
+    ...(typeof resolvedMaxTokens === 'number' ? { maxTokens: resolvedMaxTokens } : {}),
     apiKey,
     signal: stream.signal,
   };

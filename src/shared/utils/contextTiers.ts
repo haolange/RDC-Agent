@@ -12,20 +12,15 @@ export interface ContextTierChoices {
 
 export const ONE_MILLION_CONTEXT_TOKENS = 1_000_000;
 
+/** Prompt/input ceiling. Does not subtract the model's max output. */
 export function contextTierPromptCap(tier: ContextTier): number | undefined {
-  const explicitPromptCap = typeof tier.maxPromptTokens === 'number' && tier.maxPromptTokens > 0
-    ? tier.maxPromptTokens
-    : undefined;
-  if (typeof tier.maxTotalTokens === 'number' && tier.maxTotalTokens > 0) {
-    const outputReserve = typeof tier.maxOutputTokens === 'number' && tier.maxOutputTokens > 0
-      ? tier.maxOutputTokens
-      : 0;
-    const totalDerivedCap = Math.max(1, tier.maxTotalTokens - outputReserve);
-    return explicitPromptCap === undefined
-      ? totalDerivedCap
-      : Math.min(explicitPromptCap, totalDerivedCap);
+  if (typeof tier.maxPromptTokens === 'number' && tier.maxPromptTokens > 0) {
+    return tier.maxPromptTokens;
   }
-  return explicitPromptCap;
+  if (typeof tier.maxTotalTokens === 'number' && tier.maxTotalTokens > 0) {
+    return tier.maxTotalTokens;
+  }
+  return undefined;
 }
 
 /** Full context window, distinct from the prompt/input ceiling. */
@@ -40,6 +35,15 @@ export function contextTierWindowTokens(tier: ContextTier): number | undefined {
     ? tier.maxOutputTokens
     : 0;
   return tier.maxPromptTokens + outputReserve;
+}
+
+/**
+ * Prompt/input budget after applying the selected context mode.
+ * Matches RequestPlanner: `tierCap ? min(requestedBudget, tierCap) : requestedBudget`.
+ */
+export function contextTierBudgetTokens(tier: ContextTier, requestedBudget: number): number {
+  const tierCap = contextTierPromptCap(tier);
+  return tierCap ? Math.min(requestedBudget, tierCap) : requestedBudget;
 }
 
 export function isMaxContextTier(tier: ContextTier): boolean {

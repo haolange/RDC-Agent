@@ -1,5 +1,5 @@
 import { z, type ZodType } from 'zod';
-import type { SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
+import type { RunContextUsageSummary, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
 import type { PersistedRunRecord } from './storageTypes';
 import type {
   ConversationTerminalCommitJournal,
@@ -56,9 +56,13 @@ export function parseStoredDocument<T>(
     throw new StorageSchemaError(`STORAGE_SCHEMA: no migrations registered for ${filePath}`);
   }
   const current = migrations[migrations.length - 1]!;
-  const version = readSchemaVersion(raw);
+  let version = readSchemaVersion(raw);
   if (version === null) {
-    throw new StorageSchemaError(`STORAGE_SCHEMA: missing schemaVersion in ${filePath}`);
+    if (migrations.some((entry) => entry.schemaVersion === '0')) {
+      version = '0';
+    } else {
+      throw new StorageSchemaError(`STORAGE_SCHEMA: missing schemaVersion in ${filePath}`);
+    }
   }
 
   const known = migrations.find((entry) => entry.schemaVersion === version);
@@ -276,3 +280,141 @@ export const PersistedRunRecordSchema: ZodType<PersistedRunRecord> = z.object({
     workflow_stage: z.string(),
   }).passthrough(),
 }).passthrough() as ZodType<PersistedRunRecord>;
+
+const ContextUsageBreakdownEntrySchema = z.object({
+  id: z.string().min(1),
+  tokens: z.number(),
+  count: z.number().optional(),
+}).passthrough();
+
+const LlmUsageCostSchema = z.object({
+  input: z.number(),
+  output: z.number(),
+  cacheRead: z.number().optional(),
+  cacheWrite: z.number().optional(),
+  total: z.number(),
+}).passthrough();
+
+const UsageCoreFields = {
+  runId: z.string().min(1),
+  providerId: z.string().min(1),
+  modelId: z.string().min(1),
+  inputTokens: z.number(),
+  outputTokens: z.number(),
+  totalTokens: z.number(),
+  promptBudgetTokens: z.number().nullable(),
+  contextWindowTokens: z.number().nullable(),
+  usagePercent: z.number(),
+  occupiedTokens: z.number(),
+  breakdown: z.array(ContextUsageBreakdownEntrySchema).nullable(),
+  snapshotAt: z.number().nullable(),
+  cacheReadTokens: z.number().optional(),
+  cacheWriteTokens: z.number().optional(),
+  cacheHitTokens: z.number().optional(),
+  cacheMissTokens: z.number().optional(),
+  lastTurnCacheHitTokens: z.number().optional(),
+  lastTurnCacheMissTokens: z.number().optional(),
+  cacheSavedTokens: z.number().optional(),
+  lastTurnCacheHitRate: z.number().optional(),
+  cumulativeCacheHitRate: z.number().optional(),
+  reasoningTokens: z.number().optional(),
+  cost: LlmUsageCostSchema.optional(),
+  cumulativeCost: z.number().optional(),
+};
+
+export const RunContextUsageSummarySchema: ZodType<RunContextUsageSummary> = z.object({
+  ...UsageCoreFields,
+  maxOutputTokens: z.number().nullable(),
+  compactionThresholdTokens: z.number().nullable(),
+}).passthrough() as ZodType<RunContextUsageSummary>;
+
+export interface SessionUsageDocument {
+  schemaVersion: string;
+  usage: RunContextUsageSummary;
+}
+
+export const CURRENT_USAGE_SCHEMA_VERSION = '2';
+
+export const SessionUsageV1Schema = z.object({
+  schemaVersion: z.literal('1'),
+  usage: z.object({
+    ...UsageCoreFields,
+    outputReserveTokens: z.number().nullable(),
+  }).passthrough(),
+});
+
+export const SessionUsageV2Schema = z.object({
+  schemaVersion: z.literal('2'),
+  usage: RunContextUsageSummarySchema,
+});
+
+function migrateSessionUsageV0(raw: unknown): unknown {
+  const record = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? { ...(raw as Record<string, unknown>) }
+    : {};
+  const nested = record.usage;
+  const legacy = nested && typeof nested === 'object' && !Array.isArray(nested)
+    ? { ...(nested as Record<string, unknown>) }
+    : record;
+  delete legacy.schemaVersion;
+  delete legacy.usage;
+  const oldWindow = typeof legacy.contextWindowTokens === 'number' ? legacy.contextWindowTokens : null;
+  const promptBudgetTokens = typeof legacy.promptBudgetTokens === 'number'
+    ? legacy.promptBudgetTokens
+    : oldWindow;
+  return {
+    schemaVersion: '1',
+    usage: {
+      ...legacy,
+      promptBudgetTokens,
+      contextWindowTokens: null,
+      outputReserveTokens: null,
+    },
+  };
+}
+
+function migrateSessionUsageV1(raw: unknown): unknown {
+  const record = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? { ...(raw as Record<string, unknown>) }
+    : {};
+  const nested = record.usage && typeof record.usage === 'object' && !Array.isArray(record.usage)
+    ? { ...(record.usage as Record<string, unknown>) }
+    : {};
+  const maxOutputTokens = typeof nested.maxOutputTokens === 'number'
+    ? nested.maxOutputTokens
+    : typeof nested.outputReserveTokens === 'number'
+      ? nested.outputReserveTokens
+      : null;
+  delete nested.outputReserveTokens;
+  return {
+    schemaVersion: CURRENT_USAGE_SCHEMA_VERSION,
+    usage: {
+      ...nested,
+      maxOutputTokens,
+      compactionThresholdTokens: typeof nested.compactionThresholdTokens === 'number'
+        ? nested.compactionThresholdTokens
+        : null,
+    },
+  };
+}
+
+export function toSessionUsageManifest(usage: RunContextUsageSummary): SessionUsageDocument {
+  return { schemaVersion: CURRENT_USAGE_SCHEMA_VERSION, usage };
+}
+
+export const SESSION_USAGE_MIGRATIONS: StorageMigration<SessionUsageDocument>[] = [
+  {
+    schemaVersion: '0',
+    schema: z.object({}).passthrough() as unknown as ZodType<SessionUsageDocument>,
+    migrate: migrateSessionUsageV0,
+  },
+  {
+    schemaVersion: '1',
+    schema: SessionUsageV1Schema as unknown as ZodType<SessionUsageDocument>,
+    migrate: migrateSessionUsageV1,
+  },
+  {
+    schemaVersion: '2',
+    schema: SessionUsageV2Schema as ZodType<SessionUsageDocument>,
+  },
+];

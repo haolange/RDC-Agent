@@ -32,6 +32,12 @@ export {
 } from './agentModelRoute';
 export { charsToTokens } from './tokens';
 export {
+  resolveCompactionThresholdTokens,
+  resolveEffectiveCompactionPercent,
+  resolveTurnOutputTokens,
+  sanitizeCompactionThresholdPercent,
+} from './contextBudget';
+export {
   DEFAULT_ASK_USER_PROMPT,
   formatAskUserAnswersForToolResult,
   normalizeAskUserAnswers,

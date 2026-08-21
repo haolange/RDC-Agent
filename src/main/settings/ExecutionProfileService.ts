@@ -39,7 +39,6 @@ export class ExecutionProfileService {
       providerId: route?.providerId ?? '',
       modelId: route?.modelId ?? '',
       temperature: 0.3,
-      maxTokens: 4096,
       category: isTopLevelAgentId(agentId) ? AGENT_CATEGORIES[agentId] : 'general',
       writeScope: isTopLevelAgentId(agentId) ? AGENT_WRITE_SCOPES[agentId] : [],
       stage,

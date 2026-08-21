@@ -193,3 +193,69 @@ describe('AgentLoop progress termination', () => {
     expect(calls).toBe(1);
   });
 });
+
+describe('AgentLoop dynamic max tokens', () => {
+  function textMessage(): AssistantMessage {
+    return {
+      role: 'assistant',
+      content: [{ type: 'text', text: 'done' }],
+      model: TEST_MODEL.id,
+      provider: TEST_MODEL.provider,
+      usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+      stopReason: 'stop',
+      timestamp: Date.now(),
+    };
+  }
+
+  function textStream(message: AssistantMessage): EventStream<AssistantMessageEvent, AssistantMessage> {
+    const stream = new EventStream<AssistantMessageEvent, AssistantMessage>();
+    void Promise.resolve().then(() => {
+      stream.push({ type: 'start', partial: { ...message, content: [] } });
+      stream.push({ type: 'done', reason: 'stop', message });
+      stream.complete(message);
+    });
+    return stream;
+  }
+
+  it('applies resolveMaxTokens on each provider call', async () => {
+    const seen: Array<number | undefined> = [];
+    const provider: ProviderStrategy = {
+      api: TEST_MODEL.api,
+      stream: (_model, _context, options) => {
+        seen.push(options.maxTokens);
+        return textStream(textMessage());
+      },
+    };
+    const { stream } = agentLoop([], createContext(), {
+      model: TEST_MODEL,
+      convertToLlm: (messages) => messages as Message[],
+      maxTurns: 2,
+      streamOptions: { requestPlan: TEST_REQUEST_PLAN },
+      resolveMaxTokens: () => 12_345,
+    }, provider, toolExecutor);
+
+    await consume(stream);
+    expect(seen).toEqual([12_345]);
+  });
+
+  it('fails closed when resolveMaxTokens cannot admit any output', async () => {
+    let calls = 0;
+    const provider: ProviderStrategy = {
+      api: TEST_MODEL.api,
+      stream: () => {
+        calls += 1;
+        return textStream(textMessage());
+      },
+    };
+    const { stream } = agentLoop([], createContext(), {
+      model: TEST_MODEL,
+      convertToLlm: (messages) => messages as Message[],
+      maxTurns: 2,
+      streamOptions: { requestPlan: TEST_REQUEST_PLAN },
+      resolveMaxTokens: () => null,
+    }, provider, toolExecutor);
+
+    await expect(consume(stream)).rejects.toThrow(/CONTEXT_CANNOT_FIT/);
+    expect(calls).toBe(0);
+  });
+});

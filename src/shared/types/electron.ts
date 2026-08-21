@@ -168,6 +168,8 @@ export interface ElectronAPI {
       success: boolean;
       messages: ConversationMessage[];
       contextView?: import('./semanticContext').DerivedContextView | null;
+      occupiedTokens?: number;
+      compactionThresholdTokens?: number;
       error?: string;
     }>;
     onEvent: (callback: (event: ConversationStreamEvent) => void) => void;

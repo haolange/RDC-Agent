@@ -79,10 +79,11 @@ export const Composer: React.FC<ComposerProps> = ({
     userInvocableAgents,
     setSelectedAgentId,
     lastKnownUsage,
+    usageEstimated,
     usageStale,
     preparedTurnContext,
     conversationPreparationPhase,
-    selectedContextWindowTokens,
+    selectedContextProfile,
     isComposerBusy,
     promptPlaceholder,
     attachButtonLabel,
@@ -227,8 +228,9 @@ export const Composer: React.FC<ComposerProps> = ({
             usage={lastKnownUsage}
             prepared={preparedTurnContext}
             phase={conversationPreparationPhase}
-            selectedContextWindowTokens={selectedContextWindowTokens}
+            selectedProfile={selectedContextProfile}
             stale={usageStale}
+            estimated={usageEstimated}
           />
           <button
             type="button"
