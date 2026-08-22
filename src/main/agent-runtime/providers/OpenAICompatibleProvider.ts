@@ -25,7 +25,12 @@ import type {
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
-import { AssistantStreamBuilder, createProviderOutputRef, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
+import {
+  AlternatingTextThinkingChannels,
+  StreamChannelRefs,
+  closeSwitchedChannel,
+} from './internal/streamChannelRefs';
 import { composeAbortSignals, ensureOk, normalizeError, parseSSE, ProviderHttpError } from './internal/http';
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import { applyOpenAiCompatibleReasoning } from './reasoningWire';
@@ -180,15 +185,10 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
       await ensureOk(response, PROVIDER_API);
 
       let finishReason: string | null = null;
-      // contentIndex 由插槽决定：text 用 0；tool_calls 按 OpenAI 提供的 index + 1。
-      const TEXT_INDEX = 0;
-      const THINKING_INDEX = 1;
-      const TOOL_INDEX_BASE = 2;
-      const textRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:text', contentIndex: TEXT_INDEX });
-      const thinkingRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:thinking', contentIndex: THINKING_INDEX });
-      const toolRefs = new Map<number, ReturnType<typeof createProviderOutputRef>>();
-      let textStarted = false;
-      let thinkingStarted = false;
+      const channels = new StreamChannelRefs(PROVIDER_API);
+      const alternating = new AlternatingTextThinkingChannels(channels);
+      const terminalRef = channels.ref({ providerBlockKey: 'response:terminal' });
+      const toolRefs = new Map<number, ReturnType<StreamChannelRefs['ref']>>();
       let reasoningBuffer = '';
       const reasoningSource = reasoningProjectionSource(options.requestPlan, 'raw');
       let sawOutput = false;
@@ -230,7 +230,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
           if (choices.some(hasSemanticChoice)) {
             throw new ProviderStreamProtocolError(
               'PROVIDER_STREAM_EVENT_AFTER_TERMINAL',
-              textRef,
+              terminalRef,
               'Provider emitted another semantic Chat Completions choice after finish_reason.',
             );
           }
@@ -241,7 +241,7 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
         if (choices.some((candidate) => candidate !== choice && hasSemanticChoice(candidate))) {
           throw new ProviderStreamProtocolError(
             'PROVIDER_STREAM_CHANNEL_COLLISION',
-            textRef,
+            terminalRef,
             'Provider emitted multiple semantic Chat Completions choices for a single-choice request.',
           );
         }
@@ -256,16 +256,17 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
             type: 'reasoning_content',
             reasoningContent: reasoningBuffer,
           });
-          if (!thinkingStarted) {
-            builder.startThinking(thinkingRef, {
+          const switched = alternating.ensure('thinking');
+          closeSwitchedChannel(builder, switched.close);
+          if (switched.started) {
+            builder.startThinking(switched.ref, {
               kind: 'raw',
               source: reasoningSource,
               visibility: 'raw-collapsed',
               continuation,
             });
-            thinkingStarted = true;
           }
-          builder.appendThinking(thinkingRef, reasoningDelta, {
+          builder.appendThinking(switched.ref, reasoningDelta, {
             kind: 'raw',
             source: reasoningSource,
             visibility: 'raw-collapsed',
@@ -274,25 +275,21 @@ export class OpenAICompatibleProvider implements ProviderStrategy {
         }
         if (typeof delta.content === 'string' && delta.content.length > 0) {
           sawOutput = true;
-          if (!textStarted) {
-            builder.startText(textRef);
-            textStarted = true;
-          }
-          builder.appendText(textRef, delta.content);
+          const switched = alternating.ensure('text');
+          closeSwitchedChannel(builder, switched.close);
+          if (switched.started) builder.startText(switched.ref);
+          builder.appendText(switched.ref, delta.content);
         }
 
         if (Array.isArray(delta.tool_calls)) {
           for (const tc of delta.tool_calls) {
             const callIndex = typeof tc.index === 'number' ? tc.index : 0;
-            const slot = TOOL_INDEX_BASE + callIndex;
             sawOutput = true;
             let toolRef = toolRefs.get(callIndex);
             if (!toolRef) {
-              toolRef = createProviderOutputRef({
-                protocol: PROVIDER_API,
+              toolRef = channels.ref({
                 providerBlockKey: `virtual:tool:${callIndex}`,
                 sourceIndex: callIndex,
-                contentIndex: slot,
               });
               toolRefs.set(callIndex, toolRef);
               builder.startToolCall(toolRef, tc.id ?? '', tc.function?.name ?? '');

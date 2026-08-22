@@ -164,6 +164,7 @@ ChromeThemesConfig
 clampReasoningLevel
 clampReasoningSelection
 CLIResult
+CodeInterpreterSettings
 CodePreview
 CommandApi
 CommandContext
@@ -197,6 +198,7 @@ ContextSnapshot
 ContextTier
 contextTierBudgetTokens
 ContextTierChoices
+contextTierOutputTokens
 contextTierPromptCap
 ContextTierSchema
 contextTierWindowTokens
@@ -223,6 +225,8 @@ ConversationBranch
 ConversationBranchState
 ConversationCancelActiveTurnRequest
 ConversationCancelActiveTurnResult
+ConversationCompactionProvenance
+ConversationCompactionStats
 ConversationDiagnosticSeverity
 ConversationErrorViewModel
 ConversationExecutionTransition
@@ -251,6 +255,8 @@ ConversationSendResult
 ConversationStreamEvent
 ConversationSwitchBranchRequest
 ConversationSwitchBranchResult
+ConversationTaskSnapshot
+ConversationTaskSnapshotItem
 ConversationTaskStatus
 ConversationThinkingStatus
 ConversationToolApproval
@@ -258,6 +264,7 @@ ConversationToolApprovalStatus
 ConversationToolCall
 ConversationToolCallStatus
 ConversationToolExecutionEvidence
+ConversationToolImagePreviewRef
 ConversationToolResourceKind
 ConversationToolResourceRef
 ConversationTurnControls
@@ -386,7 +393,7 @@ getBlockersBySeverity
 getBuiltinToolTier
 getConcreteForkBranches
 getForkNavigator
-getOneMillionContextControl
+getMaxContextControl
 getPresetChrome
 getProviderAdapterImplementation
 getReasoningSelectionOrder
@@ -420,7 +427,7 @@ isAlphanumeric
 isEffectiveModelPickerSelectable
 isHexColor
 isLlmProviderProtocol
-isMaxContextTier
+isEligibleMaxContextTier
 isNamedReasoningLevel
 isReasoningSelection
 isRendererEventChannel
@@ -564,7 +571,6 @@ nowIso
 nowMs
 ObservationFact
 ObservationNode
-ONE_MILLION_CONTEXT_TOKENS
 OpenAiWireEffort
 OpenedCapturePreview
 OpenedCapturePreviewAttempt
@@ -732,6 +738,7 @@ resolveEffectiveCompactionPercent
 resolveExecutionBinding
 resolveModelControls
 resolveOnSelection
+resolvePlanningOutputTokens
 resolveTurnOutputTokens
 resolveVisibleConversationMessages
 ResourceProvenance

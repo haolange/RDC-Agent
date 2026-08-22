@@ -262,6 +262,7 @@ export class ToolExecutorFactory {
             projectRootPath,
             projectId: runtimeContext?.projectId ?? plan?.projectId ?? null,
             sessionId: runtimeContext?.sessionId ?? null,
+            visionInputMode: plan?.routeCapability?.visionInputMode ?? 'disabled',
           };
           const result = await withTemporaryPathAccess(
             toolContext,

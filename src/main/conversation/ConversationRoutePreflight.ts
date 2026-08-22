@@ -27,6 +27,10 @@ import { settingsService } from '../settings/SettingsService';
 import { agentManifestService } from '../settings/AgentManifestService';
 import { resolveEffectiveModelSelection } from '../settings/EffectiveModelResolver';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import {
+  AgentRecoveryAbortError,
+  isProviderStreamProtocolError,
+} from '../agent-runtime/agent/ErrorRecovery';
 import { AgentLoopTerminationError } from '../agent-runtime/agent/LoopProgressGuard';
 
 export interface ConversationBranchTurnContext {
@@ -413,6 +417,21 @@ export function createTurnFailedDiagnostic(
       userMessage: isNoProgress
         ? `${label} 连续三轮执行了相同的工具、参数并得到相同结果。本次 Agent Loop 已停止，以免继续无效消耗。请调整任务或改用具备所需工具的 Agent 后重试。`
         : `${label} 在 ${error.maxTurns ?? error.turn} 轮上限内仍需要继续调用工具。本次 Agent Loop 已停止；请缩小任务范围或调整 Agent 的轮次策略后重试。`,
+      providerId: route.providerId,
+      modelId: route.modelId,
+      technicalMessage: redactTechnicalMessage(error),
+    });
+  }
+  if (error instanceof AgentRecoveryAbortError || isProviderStreamProtocolError(error)) {
+    const streamCode = error instanceof AgentRecoveryAbortError
+      ? error.streamCode
+      : typeof error.code === 'string' ? error.code : undefined;
+    const streamLabel = streamCode ? `（${streamCode}）` : '';
+    return createConversationDiagnostic({
+      agentId: route.agentId,
+      code: 'CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION',
+      severity: 'error',
+      userMessage: `${label} 当前使用 ${route.providerId}/${route.modelId} 时，本地流式协议完整性校验失败${streamLabel}。这是客户端对流式输出分段的完整性故障，与账号、额度或网络无关。请将技术详情提供给开发者。`,
       providerId: route.providerId,
       modelId: route.modelId,
       technicalMessage: redactTechnicalMessage(error),

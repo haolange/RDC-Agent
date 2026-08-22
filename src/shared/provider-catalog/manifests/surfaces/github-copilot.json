@@ -147,7 +147,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "entitlement": "granted",
@@ -217,7 +217,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "entitlement": "granted",
@@ -288,7 +288,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "entitlement": "granted",
@@ -398,7 +398,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "entitlement": "granted",
@@ -474,7 +474,7 @@
           "fixedValue": false,
           "reason": "GitHub Copilot Fast is not inferred from Anthropic direct API capabilities."
         },
-        "context1m": {
+        "maxContext": {
           "state": "unknown",
           "defaultValue": false,
           "reason": "The current account catalog must provide the effective context entitlement."
@@ -532,7 +532,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "entitlement": "granted",
@@ -604,7 +604,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "entitlement": "granted",
@@ -676,7 +676,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },
@@ -754,7 +754,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "selectable",
           "defaultValue": false,
           "entitlement": "granted",
@@ -834,7 +834,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "selectable",
           "defaultValue": false,
           "entitlement": "granted",
@@ -914,7 +914,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "selectable",
           "defaultValue": false,
           "entitlement": "granted",
@@ -996,7 +996,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "selectable",
           "defaultValue": false,
           "entitlement": "granted",
@@ -1078,7 +1078,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "selectable",
           "defaultValue": false,
           "entitlement": "granted",
@@ -1160,7 +1160,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "selectable",
           "defaultValue": false,
           "entitlement": "granted",
@@ -1228,7 +1228,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "entitlement": "granted",
@@ -1296,7 +1296,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },

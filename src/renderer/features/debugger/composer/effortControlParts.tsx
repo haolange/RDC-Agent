@@ -35,7 +35,7 @@ export const EFFORT_LABEL_KEYS = {
   max: 'composer.effort.levelMax',
 } as const;
 
-export type EffortPillMode = 'one-million-context' | 'fast';
+export type EffortPillMode = 'max-context' | 'fast';
 
 export interface EffortPillModeBadge {
   mode: EffortPillMode;
@@ -60,19 +60,19 @@ export function resolveReasoningIconVariant(level: ReasoningSelection): Reasonin
 
 export function buildEffortPillPresentation(input: {
   reasoningLabel: string;
-  oneMillionContextMode: boolean;
-  oneMillionContextLabel: string;
-  oneMillionContextBadgeLabel: string;
+  maxContextMode: boolean;
+  maxContextLabel: string;
+  maxContextBadgeLabel: string;
   fastModel: boolean;
   fastModelLabel: string;
   fastModelBadgeLabel: string;
 }): EffortPillPresentation {
   const badges: EffortPillModeBadge[] = [];
-  if (input.oneMillionContextMode) {
+  if (input.maxContextMode) {
     badges.push({
-      mode: 'one-million-context',
-      label: input.oneMillionContextBadgeLabel,
-      title: input.oneMillionContextLabel,
+      mode: 'max-context',
+      label: input.maxContextBadgeLabel,
+      title: input.maxContextLabel,
     });
   }
   if (input.fastModel) {
@@ -119,11 +119,11 @@ function EffortModeSwitchRowBody(props: EffortModeSwitchRowProps) {
   );
 }
 
-export function EffortOneMillionContextSwitchRow(props: EffortModeSwitchRowProps) {
+export function EffortMaxContextSwitchRow(props: EffortModeSwitchRowProps) {
   return (
     <div
       className={`composer-effort-toggle-row ${props.available ? '' : 'is-disabled'}`}
-      data-testid="composer-effort-one-million-row"
+      data-testid="composer-effort-max-context-row"
     >
       <EffortModeSwitchRowBody {...props} />
     </div>

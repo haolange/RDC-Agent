@@ -34,6 +34,10 @@ describe('settingsSearchIndex', () => {
     expect(matchSettingsSearchEntries('language', titleOf).map((entry) => entry.id)).toContain('language');
     expect(matchSettingsSearchEntries('语言', titleOf).map((entry) => entry.id)).toContain('language');
     expect(matchSettingsSearchEntries('压缩', titleOf).map((entry) => entry.id)).toContain('compaction');
+    expect(matchSettingsSearchEntries('interpreter', titleOf).map((entry) => entry.id)).toContain('code-interpreter');
+    expect(matchSettingsSearchEntries('解释器', titleOf).map((entry) => entry.id)).toContain('code-interpreter');
+    expect(matchSettingsSearchEntries('环境变量', titleOf).map((entry) => entry.id)).toContain('code-interpreter');
+    expect(matchSettingsSearchEntries('env', titleOf).map((entry) => entry.id)).toContain('code-interpreter');
     expect(matchSettingsSearchEntries('agents', titleOf).map((entry) => entry.section)).toContain('agents');
   });
 });

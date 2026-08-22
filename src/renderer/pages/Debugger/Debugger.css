@@ -694,7 +694,7 @@ html[data-resolved-theme='light'] .debugger-page {
   white-space: nowrap;
 }
 
-.composer-effort-pill-mode[data-mode='one-million-context'],
+.composer-effort-pill-mode[data-mode='max-context'],
 .composer-effort-pill-mode[data-mode='fast'] {
   border-color: color-mix(in srgb, var(--composer-mode-accent) 64%, var(--token-border-muted));
   background: color-mix(in srgb, var(--composer-mode-accent) 22%, var(--token-bg-raised));

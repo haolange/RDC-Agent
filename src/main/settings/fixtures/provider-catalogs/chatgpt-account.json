@@ -6,8 +6,8 @@
       "visibility": "list",
       "supported_in_api": true,
       "input_modalities": ["text", "image"],
-      "context_window": 256000,
-      "max_context_window": 256000,
+      "context_window": 272000,
+      "max_context_window": 872000,
       "default_reasoning_level": "medium",
       "supported_reasoning_levels": [
         { "effort": "low" },
@@ -23,8 +23,8 @@
       "visibility": "list",
       "supported_in_api": true,
       "input_modalities": ["text", "image"],
-      "context_window": 256000,
-      "max_context_window": 256000,
+      "context_window": 272000,
+      "max_context_window": 872000,
       "default_reasoning_level": "medium",
       "supported_reasoning_levels": [
         { "effort": "low" },
@@ -40,8 +40,8 @@
       "visibility": "list",
       "supported_in_api": true,
       "input_modalities": ["text", "image"],
-      "context_window": 256000,
-      "max_context_window": 256000,
+      "context_window": 272000,
+      "max_context_window": 872000,
       "default_reasoning_level": "medium",
       "supported_reasoning_levels": [
         { "effort": "low" },
@@ -57,8 +57,8 @@
       "visibility": "list",
       "supported_in_api": true,
       "input_modalities": ["text", "image"],
-      "context_window": 256000,
-      "max_context_window": 256000,
+      "context_window": 272000,
+      "max_context_window": 272000,
       "default_reasoning_level": "medium",
       "supported_reasoning_levels": [
         { "effort": "low" },
@@ -73,8 +73,8 @@
       "visibility": "list",
       "supported_in_api": true,
       "input_modalities": ["text", "image"],
-      "context_window": 128000,
-      "max_context_window": 128000,
+      "context_window": 272000,
+      "max_context_window": 272000,
       "default_reasoning_level": "medium",
       "supported_reasoning_levels": [
         { "effort": "low" },
@@ -89,7 +89,7 @@
       "visibility": "list",
       "supported_in_api": true,
       "input_modalities": ["text", "image"],
-      "context_window": 256000,
+      "context_window": 272000,
       "max_context_window": 1000000,
       "default_reasoning_level": "medium",
       "supported_reasoning_levels": [

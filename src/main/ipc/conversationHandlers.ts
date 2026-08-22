@@ -20,11 +20,13 @@ import {
   ConversationClearHistoryArgsSchema,
   ConversationCompactHistoryArgsSchema,
   ConversationGetHistoryArgsSchema,
+  ConversationGetToolImagePreviewArgsSchema,
   ConversationRewriteFromMessageArgsSchema,
   ConversationSendMessageArgsSchema,
   ConversationSwitchBranchArgsSchema,
   ConversationUndoLastTurnArgsSchema,
 } from './validation/conversationSchemas';
+import { readToolImagePreviewDataUrl } from '../conversation/ToolImagePreviewStore';
 
 const PREFLIGHT_ERROR_CODES = new Set<ConversationPreflightErrorCode>([
   'REQUEST_CANCELLED',
@@ -223,5 +225,20 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
       maxBytes: 8 * 1024,
     }) as [ConversationAnswerToolApprovalRequest];
     return conversationService.answerToolApproval(request);
+  });
+
+  ipcMain.handle('conversation:getToolImagePreview', async (_event, ...rawArgs: unknown[]) => {
+    try {
+      const [request] = parseIpcArgs(ConversationGetToolImagePreviewArgsSchema, rawArgs, {
+        label: 'conversation:getToolImagePreview',
+        maxBytes: 4 * 1024,
+      }) as [{ sessionId: string; previewId: string }];
+      if (!state.currentSessionId || request.sessionId !== state.currentSessionId) {
+        return { dataUrl: null, error: 'IMAGE_PREVIEW_SESSION_DENIED' };
+      }
+      return { dataUrl: readToolImagePreviewDataUrl(request.sessionId, request.previewId) };
+    } catch (error) {
+      return { dataUrl: null, error: error instanceof Error ? error.message : String(error) };
+    }
   });
 }

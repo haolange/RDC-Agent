@@ -95,6 +95,13 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     target: 'tools',
   },
   {
+    id: 'code-interpreter',
+    section: 'tools',
+    titleKey: 'settings.codeInterpreterTitle',
+    keywords: ['interpreter', 'python', 'code', 'env', '解释器', '环境变量'],
+    target: 'tools',
+  },
+  {
     id: 'hooks',
     section: 'hooks',
     titleKey: 'settings.hooks',

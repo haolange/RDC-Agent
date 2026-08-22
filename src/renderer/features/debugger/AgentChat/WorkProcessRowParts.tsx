@@ -18,7 +18,9 @@ export const ToolRow: React.FC<{ row: ToolRowModel }> = ({ row }) => {
   const statusLabel = row.status === 'complete' ? '' : label(getRowStatusLabel(row.status));
   const hasDetail = row.previewLines.length > 0
     || Boolean(row.commandText)
-    || Boolean(row.pathChip && row.family === 'generic')
+    || Boolean(row.pathChip)
+    || Boolean(row.chips?.length)
+    || Boolean(row.imagePreviews?.length)
     || Boolean(row.sourcePills?.length && row.family === 'web');
   const hasRaw = row.argsLines.length > 0 || row.rawLines.length > 0;
   const canExpand = hasDetail || hasRaw;

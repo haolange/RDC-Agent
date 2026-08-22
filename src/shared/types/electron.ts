@@ -172,6 +172,10 @@ export interface ElectronAPI {
       compactionThresholdTokens?: number;
       error?: string;
     }>;
+    getToolImagePreview: (request: { sessionId: string; previewId: string }) => Promise<{
+      dataUrl: string | null;
+      error?: string;
+    }>;
     onEvent: (callback: (event: ConversationStreamEvent) => void) => void;
     offEvent: (callback: (event: ConversationStreamEvent) => void) => void;
   };

@@ -67,7 +67,7 @@ describe('AgentManifestService seed manifests', () => {
       defaultBudgetTokens: 200_000,
       controls: {
         fast: { state: 'unsupported' as const, fixedValue: false },
-        context1m: { state: 'unsupported' as const, fixedValue: false },
+        maxContext: { state: 'unsupported' as const, fixedValue: false },
         reasoning: { kind: 'unknown' as const, supportsOff: false, levels: [], defaultSelection: 'off' as const, wireProfile: { kind: 'none' as const } },
       },
       selection: { pickerVisibility: 'primary' as const },
@@ -126,7 +126,7 @@ describe('AgentManifestService seed manifests', () => {
         route: { protocol: 'OpenAICompatibleChatCompletions', source: 'catalog' }, presencePolicy: 'account-entitled',
         availability: 'available', contextTiers: [], defaultBudgetTokens: 0,
         controls: {
-          fast: { state: 'unsupported', fixedValue: false }, context1m: { state: 'unsupported', fixedValue: false },
+          fast: { state: 'unsupported', fixedValue: false }, maxContext: { state: 'unsupported', fixedValue: false },
           reasoning: { kind: 'unknown', supportsOff: false, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
         },
         selection: { pickerVisibility: 'primary' }, toolCalling: { state: 'unknown' }, visionInput: { state: 'unknown' },
@@ -185,7 +185,7 @@ describe('AgentManifestService seed manifests', () => {
         defaultBudgetTokens: 128_000,
         controls: {
           fast: { state: 'unsupported', fixedValue: false },
-          context1m: { state: 'unsupported', fixedValue: false },
+          maxContext: { state: 'unsupported', fixedValue: false },
           reasoning: { kind: 'unknown', supportsOff: false, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
         },
         selection: { pickerVisibility: 'internal', relatedPrimaryModelIds: ['kimi-for-coding'] },

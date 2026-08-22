@@ -1,15 +1,18 @@
 import React, { useState, type Dispatch, type SetStateAction } from 'react';
-import type { RdxActionSettingsMap, RdxCliInvokerSettings } from '@shared/types/settings';
+import type { CodeInterpreterSettings, RdxActionSettingsMap, RdxCliInvokerSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import { RdxCliInvokerSettingsFields } from './RdxCliInvokerSettingsFields';
+import { CodeInterpreterSettingsFields } from './CodeInterpreterSettingsFields';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
 interface ToolsSettingsProps {
   rdxCliDraft: RdxCliInvokerSettings;
   rdxActionsDraft: RdxActionSettingsMap;
+  codeInterpreterDraft: CodeInterpreterSettings;
   onRdxCliDraftChange: Dispatch<SetStateAction<RdxCliInvokerSettings>>;
   onRdxActionsDraftChange: Dispatch<SetStateAction<RdxActionSettingsMap>>;
+  onCodeInterpreterDraftChange: Dispatch<SetStateAction<CodeInterpreterSettings>>;
   onSaveToolsConfig: () => void | Promise<void>;
   t: Translate;
 }
@@ -17,8 +20,10 @@ interface ToolsSettingsProps {
 export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
   rdxCliDraft,
   rdxActionsDraft,
+  codeInterpreterDraft,
   onRdxCliDraftChange,
   onRdxActionsDraftChange,
+  onCodeInterpreterDraftChange,
   onSaveToolsConfig,
   t,
 }) => {
@@ -40,6 +45,11 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
           t={t}
         />
       </div>
+      <CodeInterpreterSettingsFields
+        draft={codeInterpreterDraft}
+        onChange={onCodeInterpreterDraftChange}
+        t={t}
+      />
       <div className="settings-actions settings-actions-split">
         <span className="settings-save-status">{status}</span>
         <button type="button" className="button button-primary" onClick={() => void save()}>{t('settings.saveTools')}</button>

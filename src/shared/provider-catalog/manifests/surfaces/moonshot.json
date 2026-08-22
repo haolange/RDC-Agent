@@ -194,7 +194,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "selectable",
           "defaultValue": false,
           "entitlement": "granted",
@@ -218,7 +218,7 @@
         {
           "id": "context:max",
           "when": {
-            "context1m": true
+            "maxContext": true
           },
           "actions": [
             {
@@ -296,7 +296,7 @@
           "defaultValue": false,
           "entitlement": "granted"
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },
@@ -396,7 +396,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },
@@ -478,7 +478,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },
@@ -560,7 +560,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },

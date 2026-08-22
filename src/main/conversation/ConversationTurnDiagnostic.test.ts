@@ -5,6 +5,7 @@ vi.mock('../settings/SettingsService', () => ({
     getAll: () => ({ agents: { definitions: [] } }),
   },
 }));
+import { AgentRecoveryAbortError } from '../agent-runtime/agent/ErrorRecovery';
 import { AgentLoopTerminationError } from '../agent-runtime/agent/LoopProgressGuard';
 import { createTurnFailedDiagnostic } from './ConversationRoutePreflight';
 
@@ -47,5 +48,30 @@ describe('conversation turn failure classification', () => {
     expect(diagnostic.code).toBe('CONVERSATION_LLM_REQUEST_FAILED');
     expect(diagnostic.userMessage).toContain('模型请求失败');
     expect(diagnostic.technicalMessage).toBe('429 quota exceeded');
+  });
+
+  it('classifies stream protocol violations independently from account failures', () => {
+    const diagnostic = createTurnFailedDiagnostic(
+      ROUTE,
+      new AgentRecoveryAbortError(
+        '[Recovery abort] PROVIDER_STREAM_BLOCK_CLOSED: Provider emitted delta after closing virtual:reasoning.',
+        'PROVIDER_STREAM_BLOCK_CLOSED',
+      ),
+    );
+    expect(diagnostic.code).toBe('CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION');
+    expect(diagnostic.userMessage).toContain('完整性');
+    expect(diagnostic.userMessage).toContain('PROVIDER_STREAM_BLOCK_CLOSED');
+    expect(diagnostic.userMessage).toContain('anthropic/claude-opus-5');
+    expect(diagnostic.userMessage).toContain('与账号、额度或网络无关');
+    expect(diagnostic.userMessage).not.toContain('请检查该账号');
+  });
+
+  it('classifies raw ProviderStreamProtocolError the same way', () => {
+    const error = new Error('Provider emitted delta after closing virtual:reasoning.');
+    error.name = 'ProviderStreamProtocolError';
+    (error as { code?: string }).code = 'PROVIDER_STREAM_BLOCK_CLOSED';
+    const diagnostic = createTurnFailedDiagnostic(ROUTE, error);
+    expect(diagnostic.code).toBe('CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION');
+    expect(diagnostic.userMessage).not.toContain('请检查该账号');
   });
 });

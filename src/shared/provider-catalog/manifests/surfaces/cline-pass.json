@@ -109,7 +109,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },
@@ -179,7 +179,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },
@@ -249,7 +249,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },
@@ -320,7 +320,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },
@@ -388,7 +388,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },
@@ -456,7 +456,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "entitlement": "unknown",
@@ -530,7 +530,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "entitlement": "unknown",
@@ -603,7 +603,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },
@@ -671,7 +671,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },
@@ -740,7 +740,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "entitlement": "unknown",
@@ -812,7 +812,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "entitlement": "unknown",
@@ -884,7 +884,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "entitlement": "unknown",
@@ -955,7 +955,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },

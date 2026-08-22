@@ -207,6 +207,14 @@ const FIXTURES = {
     argsPreview: JSON.stringify({ path: 'README.md' }),
     resultPreview: toolEnvelope('hello', { path: 'README.md' }),
   },
+  read_image: {
+    argsPreview: JSON.stringify({ path: 'captures/frame.png' }),
+    resultPreview: toolEnvelope('Viewed image frame.png', { path: 'captures/frame.png', mimeType: 'image/png', bytes: 1200 }),
+  },
+  code_interpreter: {
+    argsPreview: JSON.stringify({ code: 'print(1)' }),
+    resultPreview: toolEnvelope('1', { command: 'python', language: 'python', exitCode: 0 }),
+  },
 };
 
 const workbenchToolIds = AGENT_WORKBENCH_TOOL_CATALOG.map((tool) => tool.id);
@@ -274,7 +282,7 @@ for (const toolName of allTools) {
   assert(row.category.length > 0, `${toolName} should have a category`);
   assert(row.target.length > 0 || row.previewLines.length > 0, `${toolName} should expose target or preview`);
   assert(
-    ['file', 'search', 'shell', 'git', 'web', 'generic'].includes(row.family),
+    ['file', 'search', 'shell', 'git', 'web', 'memory', 'skill', 'mcp', 'runtime', 'interpreter', 'generic'].includes(row.family),
     `${toolName} should expose a unified card family, got "${row.family}"`,
   );
   assert(row.family === getToolFamily(toolName), `${toolName} family should match getToolFamily()`);
@@ -282,7 +290,7 @@ for (const toolName of allTools) {
   if (toolName.startsWith('mcp__')) {
     assert(row.target === 'filesystem/read_file', `dynamic MCP target should be server/tool, got "${row.target}"`);
     assert(row.groupKind === 'mcp', `dynamic MCP tool should be in mcp group, got "${row.groupKind}"`);
-    assert(row.family === 'generic', `dynamic MCP tools should use the generic card family`);
+    assert(row.family === 'mcp', `dynamic MCP tools should use the mcp card family`);
   }
 
   if (toolName === 'glob') {

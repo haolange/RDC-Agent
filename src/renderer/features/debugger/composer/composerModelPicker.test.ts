@@ -21,7 +21,7 @@ function model(partial: Record<string, unknown> & { modelId: string }): Effectiv
     defaultBudgetTokens: 8192,
     controls: {
       fast: { state: 'unsupported' },
-      context1m: { state: 'unsupported' },
+      maxContext: { state: 'unsupported' },
       reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
     },
     route: { protocol: 'openai-responses', source: 'catalog' },
@@ -45,16 +45,16 @@ describe('composerModelPicker', () => {
     }))).toBe(false);
   });
 
-  it('uses the largest published context window and reasoning kinds', () => {
+  it('uses the authoritative context range when a larger Max tier is reachable', () => {
     const entry = model({
       modelId: 'gpt',
       contextTiers: [
-        { id: 'base', label: 'base', maxPromptTokens: 128000, activation: { kind: 'implicit' }, entitlement: 'granted' },
+        { id: 'default', label: 'default', maxPromptTokens: 128000, activation: { kind: 'implicit' }, entitlement: 'granted' },
         { id: 'max', label: 'max', maxTotalTokens: 272000, activation: { kind: 'implicit' }, entitlement: 'granted' },
       ],
       controls: {
-        fast: { kind: 'none' },
-        context1m: { kind: 'none' },
+        fast: { state: 'unsupported', fixedValue: false },
+        maxContext: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'max' },
         reasoning: {
           kind: 'levels',
           supportsOff: true,
@@ -64,7 +64,10 @@ describe('composerModelPicker', () => {
         },
       },
     });
-    expect(resolvePickerContextWindow(entry)).toBe(272000);
+    expect(resolvePickerContextWindow(entry)).toEqual({
+      tokens: 272000,
+      label: '128k → 272k',
+    });
     expect(hasPickerReasoning(entry)).toBe(true);
   });
 

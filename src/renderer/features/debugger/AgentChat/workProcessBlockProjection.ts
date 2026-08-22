@@ -157,16 +157,43 @@ export function buildPresentationUnits(
     if (block.kind === 'compaction') {
       if (block.id !== latestCompactionId) continue;
       ctx.hasVisibleProcessEvidence = true;
+      const stats = block.compactionStats;
+      const detailLines: string[] = [];
+      if (stats?.messagesBefore != null && stats.messagesAfter != null) {
+        detailLines.push(`${stats.messagesBefore} → ${stats.messagesAfter} messages`);
+      }
+      if (stats?.tokensBefore != null && stats.tokensAfter != null) {
+        detailLines.push(`${stats.tokensBefore} → ${stats.tokensAfter} tokens`);
+      } else if (stats?.tokensBefore != null) {
+        detailLines.push(`${stats.tokensBefore} tokens`);
+      }
       units.push({
         kind: 'standalone',
         rows: [{
           type: 'summary',
           id: block.id,
           status: block.status,
-          // Token/message counts describe the runtime, not useful progress for the
-          // person reading the work trace. Raw compaction evidence remains in logs.
-          text: '上下文压缩',
-          detailLines: [],
+          text: stats?.provenance === 'manual' ? '手动压缩' : '自动压缩',
+          detailLines,
+          duration: formatDurationMs(block.startedAt, block.completedAt),
+          compactionProvenance: stats?.provenance,
+        }],
+        loopIds: [block.id],
+      });
+      continue;
+    }
+
+    if (block.kind === 'task_snapshot' && block.taskSnapshot) {
+      ctx.hasVisibleProcessEvidence = true;
+      units.push({
+        kind: 'standalone',
+        rows: [{
+          type: 'taskSnapshot',
+          id: block.id,
+          status: block.status,
+          completed: block.taskSnapshot.completed,
+          total: block.taskSnapshot.total,
+          items: block.taskSnapshot.items,
           duration: formatDurationMs(block.startedAt, block.completedAt),
         }],
         loopIds: [block.id],

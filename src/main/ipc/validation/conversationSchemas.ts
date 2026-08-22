@@ -70,6 +70,13 @@ export const ConversationClearHistoryArgsSchema = SessionIdArgsSchema;
 export const ConversationUndoLastTurnArgsSchema = SessionIdArgsSchema;
 export const ConversationCompactHistoryArgsSchema = SessionIdArgsSchema;
 
+export const ConversationGetToolImagePreviewArgsSchema = z.tuple([
+  z.object({
+    sessionId: ipcId(128, 'sessionId'),
+    previewId: ipcNonEmptyString(64, 'previewId'),
+  }).strict(),
+]);
+
 export const ConversationSwitchBranchArgsSchema = z.tuple([
   z.object({
     sessionId: ipcId(128, 'sessionId'),

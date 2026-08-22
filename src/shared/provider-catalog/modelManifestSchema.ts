@@ -401,7 +401,7 @@ export const BooleanControlDefinitionSchema = z.discriminatedUnion('state', [
 
 export const ModelControlsSchema = z.object({
   fast: BooleanControlDefinitionSchema,
-  context1m: BooleanControlDefinitionSchema,
+  maxContext: BooleanControlDefinitionSchema,
   reasoning: ReasoningControlSchema,
 }).strict();
 
@@ -417,7 +417,7 @@ const LiveReasoningProjectionSchema = z.object({
 }).strict();
 
 const EntitlementDenialMatcherSchema = z.object({
-  mode: z.enum(['fast', 'one-million-context']),
+  mode: z.enum(['fast', 'max-context']),
   statuses: z.array(z.number().int().min(400).max(599)).min(1),
   protocols: z.array(ProviderProtocolSchema).min(1).optional(),
   messageIncludes: z.string().min(1).optional(),
@@ -446,7 +446,7 @@ export const ModelModeActionSchema = z.discriminatedUnion('kind', [
 
 export const ExecutionBindingSelectorSchema = z.object({
   fast: z.boolean().optional(),
-  context1m: z.boolean().optional(),
+  maxContext: z.boolean().optional(),
   reasoning: z.array(ReasoningSelectionSchema).min(1).optional(),
 }).strict();
 
@@ -494,7 +494,7 @@ export const ModelManifestSchema = z.object({
 
 const ModelControlsPatchSchema = z.object({
   fast: BooleanControlDefinitionSchema.optional(),
-  context1m: BooleanControlDefinitionSchema.optional(),
+  maxContext: BooleanControlDefinitionSchema.optional(),
   reasoning: ReasoningControlSchema.optional(),
 }).strict();
 

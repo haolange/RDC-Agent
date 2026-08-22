@@ -26,7 +26,7 @@ const effectiveModel = (overrides: Partial<EffectiveModel> = {}): EffectiveModel
       wireProfile: { kind: 'none' },
     },
     fast: { state: 'unsupported', fixedValue: false },
-    context1m: { state: 'unsupported', fixedValue: false },
+    maxContext: { state: 'unsupported', fixedValue: false },
   },
   toolCalling: { state: 'supported' },
   visionInput: { state: 'unsupported' },

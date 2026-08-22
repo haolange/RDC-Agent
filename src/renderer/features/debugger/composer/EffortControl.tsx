@@ -24,10 +24,10 @@ import {
 import { EffortControlPopup } from './EffortControlPopup';
 import {
   hasSelectableFastMode,
-  hasSelectableOneMillionContext,
+  hasSelectableMaxContext,
   isFastModeUnverified,
-  isOneMillionContextUnverified,
-  oneMillionContextTokens,
+  isMaxContextUnverified,
+  maxContextTokens,
 } from './turnControlsUtils';
 import { useMaxVisualController } from './useMaxVisualController';
 import { createEffortSliderHandlers } from './effortSliderHandlers';
@@ -129,30 +129,30 @@ export const EffortControl: React.FC<{
   const tooltipLabel = t(
     reasoningLockedDisabled ? 'composer.effort.levelOff' : EFFORT_LABEL_KEYS[displayLevel],
   );
-  const oneMillionTokens = oneMillionContextTokens(capability);
-  const oneMillionAvailable = hasSelectableOneMillionContext(capability);
-  const oneMillionUnverified = isOneMillionContextUnverified(capability);
+  const maxContextTokenCount = maxContextTokens(capability);
+  const maxContextAvailable = hasSelectableMaxContext(capability);
+  const maxTierUnverified = isMaxContextUnverified(capability);
   const fastAvailable = hasSelectableFastMode(capability);
   const fastUnverified = isFastModeUnverified(capability);
   const statusPresentation = capabilityStatusPresentation(capabilityState);
   const capabilityStateLabel = statusPresentation.labelKey ? t(statusPresentation.labelKey) : undefined;
   const capabilityStateDetail = statusPresentation.detailKey ? t(statusPresentation.detailKey) : undefined;
-  const { oneMillionContextStatusLabel, fastModelStatusLabel } = buildEffortCapabilityStatusLabels({
+  const { maxContextStatusLabel, fastModelStatusLabel } = buildEffortCapabilityStatusLabels({
     capability,
     capabilityReady,
     capabilityStateLabel,
-    oneMillionUnverified,
+    maxTierUnverified,
     fastUnverified,
     t,
   });
-  const oneMillionContextBadgeLabel = oneMillionTokens
-    ? formatTokenCount(oneMillionTokens)
-    : t('composer.effort.oneMillionContextBadge');
+  const maxContextBadgeLabel = maxContextTokenCount
+    ? formatTokenCount(maxContextTokenCount)
+    : t('composer.effort.maxContextBadge');
   const pillPresentation = buildEffortPillPresentation({
     reasoningLabel: effortLabel,
-    oneMillionContextMode: turnControls.maxContextMode,
-    oneMillionContextLabel: t('composer.effort.oneMillionContext'),
-    oneMillionContextBadgeLabel,
+    maxContextMode: turnControls.maxContextMode,
+    maxContextLabel: t('composer.effort.maxContext'),
+    maxContextBadgeLabel,
     fastModel: turnControls.fastModel,
     fastModelLabel: t('composer.effort.fastModel'),
     fastModelBadgeLabel: t('composer.effort.fastMultiplier'),
@@ -264,11 +264,11 @@ export const EffortControl: React.FC<{
           tooltipLabel={tooltipLabel}
           trackWidthPx={trackWidthPx}
           positionTransitionsReady={positionTransitionsReady}
-          oneMillionContextAvailable={capabilityReady && oneMillionAvailable}
-          oneMillionContextStatusLabel={oneMillionContextStatusLabel}
+          maxContextAvailable={capabilityReady && maxContextAvailable}
+          maxContextStatusLabel={maxContextStatusLabel}
           fastModelAvailable={capabilityReady && fastAvailable}
           fastModelStatusLabel={fastModelStatusLabel}
-          oneMillionContextMode={turnControls.maxContextMode}
+          maxContextMode={turnControls.maxContextMode}
           fastModel={turnControls.fastModel}
           t={t}
           onTrackPointerDown={handleTrackPointerDown}
@@ -276,7 +276,7 @@ export const EffortControl: React.FC<{
           onTrackPointerUp={handleTrackPointerUp}
           onTrackClick={handleTrackClick}
           onThumbKeyDown={handleThumbKeyDown}
-          onToggleOneMillionContext={() => updateTurnControls({ maxContextMode: !turnControls.maxContextMode })}
+          onToggleMaxContext={() => updateTurnControls({ maxContextMode: !turnControls.maxContextMode })}
           onToggleFastModel={() => updateTurnControls({ fastModel: !turnControls.fastModel })}
         />
       ) : null}

@@ -37,10 +37,40 @@
       "sourceKind": "rdc-agent",
       "sourceRevision": "https://github.com/openai/codex/blob/main/codex-rs/models-manager/models.json",
       "observedAt": "2026-08-22",
-      "refreshedAt": "2026-08-22T03:40:00+08:00",
+      "refreshedAt": "2026-08-22T15:00:00+08:00",
       "surface": "chatgpt-account",
       "accountScope": "observed-account",
       "surfaceBuild": "Codex models.json max_context_window=872000 for gpt-5.6-sol/terra/luna"
+    },
+    {
+      "id": "rdc-agent:chatgpt-account:codex-39144",
+      "sourceKind": "upstream-implementation",
+      "sourceRevision": "https://github.com/openai/codex/issues/39144",
+      "observedAt": "2026-08-22",
+      "refreshedAt": "2026-08-22T15:00:00+08:00",
+      "surface": "chatgpt-account",
+      "accountScope": "per-account-rollout",
+      "surfaceBuild": "Same /models ETag: Sol briefly 272000, Terra/Luna 872000; later all three 872000"
+    },
+    {
+      "id": "rdc-agent:chatgpt-account:codex-38917",
+      "sourceKind": "upstream-implementation",
+      "sourceRevision": "https://github.com/openai/codex/issues/38917",
+      "observedAt": "2026-08-22",
+      "refreshedAt": "2026-08-22T15:00:00+08:00",
+      "surface": "chatgpt-account",
+      "accountScope": "server-enforced",
+      "surfaceBuild": "codex debug models --bundled: client config cannot raise max_context_window"
+    },
+    {
+      "id": "rdc-agent:chatgpt-account:catalog-v4-20260822",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "state/provider-catalog/catalog-v4.json",
+      "observedAt": "2026-08-22",
+      "refreshedAt": "2026-08-22T15:23:44+08:00",
+      "surface": "chatgpt-account",
+      "accountScope": "observed-account",
+      "surfaceBuild": "chatgpt-account /models: gpt-5.4 default=272000 max=1000000; gpt-5.5/gpt-5.4-mini default=272000; gpt-5.6 default=272000"
     }
   ],
   "defaultFactSourceId": "rdc-agent:chatgpt-account:0",
@@ -105,7 +135,7 @@
         {
           "id": "max",
           "label": "Max mode",
-          "maxPromptTokens": 1000000,
+          "maxPromptTokens": 872000,
           "activation": {
             "kind": "implicit"
           },
@@ -138,7 +168,7 @@
           "entitlement": "granted",
           "label": "Fast"
         },
-        "context1m": {
+        "maxContext": {
           "state": "selectable",
           "defaultValue": false,
           "tierId": "max",
@@ -228,7 +258,7 @@
         {
           "id": "max",
           "label": "Max mode",
-          "maxPromptTokens": 1000000,
+          "maxPromptTokens": 872000,
           "activation": {
             "kind": "implicit"
           },
@@ -261,7 +291,7 @@
           "entitlement": "granted",
           "label": "Fast"
         },
-        "context1m": {
+        "maxContext": {
           "state": "selectable",
           "defaultValue": false,
           "tierId": "max",
@@ -351,7 +381,7 @@
         {
           "id": "max",
           "label": "Max mode",
-          "maxPromptTokens": 1000000,
+          "maxPromptTokens": 872000,
           "activation": {
             "kind": "implicit"
           },
@@ -384,7 +414,7 @@
           "entitlement": "granted",
           "label": "Fast"
         },
-        "context1m": {
+        "maxContext": {
           "state": "selectable",
           "defaultValue": false,
           "tierId": "max",
@@ -465,14 +495,14 @@
         {
           "id": "default",
           "label": "Codex service limit",
-          "maxPromptTokens": 256000,
+          "maxPromptTokens": 272000,
           "activation": {
             "kind": "implicit"
           },
           "entitlement": "granted"
         }
       ],
-      "defaultBudgetTokens": 256000,
+      "defaultBudgetTokens": 272000,
       "toolCalling": {
         "state": "supported"
       },
@@ -498,7 +528,7 @@
           "entitlement": "granted",
           "label": "Fast"
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },
@@ -561,7 +591,10 @@
           "entitlement": "granted"
         }
       ],
-      "factSourceId": "rdc-agent:chatgpt-account:0"
+      "factSourceId": "rdc-agent:chatgpt-account:0",
+      "fieldFactSourceIds": {
+        "contextTiers": "rdc-agent:chatgpt-account:catalog-v4-20260822"
+      }
     },
     {
       "modelId": "gpt-5.4",
@@ -572,7 +605,7 @@
         {
           "id": "default",
           "label": "Codex service limit",
-          "maxPromptTokens": 256000,
+          "maxPromptTokens": 272000,
           "activation": {
             "kind": "implicit"
           },
@@ -588,7 +621,7 @@
           "entitlement": "unknown"
         }
       ],
-      "defaultBudgetTokens": 256000,
+      "defaultBudgetTokens": 272000,
       "toolCalling": {
         "state": "supported"
       },
@@ -614,7 +647,7 @@
           "entitlement": "granted",
           "label": "Fast"
         },
-        "context1m": {
+        "maxContext": {
           "state": "selectable",
           "defaultValue": false,
           "tierId": "max",
@@ -679,7 +712,10 @@
           "entitlement": "granted"
         }
       ],
-      "factSourceId": "rdc-agent:chatgpt-account:0"
+      "factSourceId": "rdc-agent:chatgpt-account:0",
+      "fieldFactSourceIds": {
+        "contextTiers": "rdc-agent:chatgpt-account:catalog-v4-20260822"
+      }
     },
     {
       "modelId": "gpt-5.4-mini",
@@ -690,14 +726,14 @@
         {
           "id": "default",
           "label": "Codex service limit",
-          "maxPromptTokens": 128000,
+          "maxPromptTokens": 272000,
           "activation": {
             "kind": "implicit"
           },
           "entitlement": "granted"
         }
       ],
-      "defaultBudgetTokens": 128000,
+      "defaultBudgetTokens": 272000,
       "toolCalling": {
         "state": "supported"
       },
@@ -721,7 +757,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },
@@ -766,7 +802,10 @@
           "entitlement": "granted"
         }
       ],
-      "factSourceId": "rdc-agent:chatgpt-account:0"
+      "factSourceId": "rdc-agent:chatgpt-account:0",
+      "fieldFactSourceIds": {
+        "contextTiers": "rdc-agent:chatgpt-account:catalog-v4-20260822"
+      }
     },
     {
       "modelId": "gpt-5.3-codex-spark",
@@ -809,7 +848,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },

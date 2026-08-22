@@ -195,6 +195,12 @@ const cleanupDisposableBrowserQaUserData = useDisposableBrowserQaUserData
   && isValidatedDisposableBrowserQaUserData(userDataPath);
 process.env.RDC_AGENT_USER_DATA = userDataPath;
 fs.mkdirSync(userDataPath, { recursive: true });
+if (useDisposableBrowserQaUserData) {
+  const isolatedHome = path.join(userDataPath, '.rdx');
+  fs.mkdirSync(isolatedHome, { recursive: true });
+  process.env.RDC_AGENT_HOME = isolatedHome;
+  console.log(`[RDC-Agent] Isolated Browser QA home: ${isolatedHome}`);
+}
 app.commandLine.appendSwitch('user-data-dir', userDataPath);
 app.setPath('userData', userDataPath);
 

@@ -112,7 +112,7 @@ export interface ResolvedBooleanControlCapability {
 
 export interface ResolvedModelControls {
   fast: ResolvedBooleanControlCapability;
-  context1m: ResolvedBooleanControlCapability;
+  maxContext: ResolvedBooleanControlCapability;
   reasoning: ReasoningControl;
   catalogRevision?: string;
   routeRevision?: string;
@@ -186,7 +186,7 @@ export interface EffectiveModel {
   cacheContract?: ProviderContractBundle['cache'];
   controls: {
     fast: BooleanControlDefinition;
-    context1m: BooleanControlDefinition;
+    maxContext: BooleanControlDefinition;
     reasoning: ReasoningControl;
   };
   executionBindings?: ExecutionBinding[];

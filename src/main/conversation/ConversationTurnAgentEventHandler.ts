@@ -6,6 +6,8 @@ import type {
   ConversationMessageDiagnostic,
   ConversationThinkingStatus,
   ConversationToolCall,
+  ConversationToolImagePreviewRef,
+  ConversationTaskSnapshotItem,
   ConversationWorkBlock,
   ConversationWorkTrace,
 } from '@shared/types/conversation';
@@ -137,17 +139,30 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               });
             }
             if (event.type === 'context.compacted') {
-              const payload = event.payload as { summary?: string };
+              const payload = event.payload as {
+                summary?: string;
+                messagesBefore?: number;
+                messagesAfter?: number;
+                tokensBefore?: number;
+                tokensAfter?: number;
+              };
               const summary = typeof payload.summary === 'string' ? payload.summary.trim() : '';
               if (summary && !seenCompactionSummaries.has(summary)) {
                 seenCompactionSummaries.add(summary);
                 commitAssistantMessage('message_patched', {
                   workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, `compaction-${event.id}`, {
                     kind: 'compaction',
-                    title: '上下文压缩',
+                    title: '自动压缩',
                     stage: 'context',
                     status: 'complete',
                     summary,
+                    compactionStats: {
+                      provenance: 'auto',
+                      messagesBefore: payload.messagesBefore,
+                      messagesAfter: payload.messagesAfter,
+                      tokensBefore: payload.tokensBefore,
+                      tokensAfter: payload.tokensAfter,
+                    },
                     completedAt: nowMs(),
                   }),
                 });
@@ -512,6 +527,8 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               };
               const resourceRefs = extractConversationToolResourceRefs(String(event.payload.toolName), result);
               if (resourceRefs.length > 0) toolCallPatch.resourceRefs = resourceRefs;
+              const imagePreviews = extractToolImagePreviews(result);
+              if (imagePreviews.length > 0) toolCallPatch.imagePreviews = imagePreviews;
               if (!(isAskUserTool && result?.ok)) {
                 toolCallPatch.resultPreview = buildToolResultPreview(event.payload.result ?? {});
               }
@@ -530,38 +547,23 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
                 title?: string;
                 status?: string;
                 statusReason?: string;
+                snapshot?: ConversationTaskSnapshotItem[];
               };
-              const taskId = typeof payload.taskId === 'string' && payload.taskId.trim()
-                ? payload.taskId.trim()
-                : 'runtime-tasks';
-              const title = typeof payload.title === 'string' && payload.title.trim()
-                ? payload.title.trim()
-                : taskId;
-              const taskStatus = payload.status === 'in_progress'
-                || payload.status === 'blocked'
-                || payload.status === 'completed'
-                || payload.status === 'cancelled'
-                ? payload.status
-                : 'pending';
-              const blockStatus: ConversationWorkBlock['status'] = taskStatus === 'in_progress'
-                ? 'running'
-                : taskStatus === 'pending'
-                  ? 'pending'
-                  : taskStatus === 'blocked' || taskStatus === 'cancelled'
-                    ? 'error'
-                    : 'complete';
+              const items = normalizeTaskSnapshotItems(payload);
+              const completed = items.filter((item) => item.status === 'completed').length;
+              const lastBlock = turnStreamState.assistantMessage.workTrace?.blocks.at(-1);
+              const snapshotId = lastBlock?.kind === 'task_snapshot'
+                ? lastBlock.id
+                : `task-snapshot-${event.id}`;
               commitAssistantMessage('message_patched', {
-                workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, taskId, {
-                  kind: 'command',
-                  title,
+                workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, snapshotId, {
+                  kind: 'task_snapshot',
+                  title: `${completed} of ${items.length} completed`,
                   stage: 'task',
-                  status: blockStatus,
-                  taskStatus,
-                  taskStatusReason: typeof payload.statusReason === 'string' && payload.statusReason.trim()
-                    ? payload.statusReason.trim()
-                    : undefined,
-                  summary: title,
-                  completedAt: taskStatus === 'completed' || taskStatus === 'cancelled' ? nowMs() : undefined,
+                  status: items.some((item) => item.status === 'in_progress') ? 'running' : 'complete',
+                  taskSnapshot: { completed, total: items.length, items },
+                  summary: `${completed} of ${items.length} completed`,
+                  completedAt: nowMs(),
                 }),
               });
             }
@@ -744,4 +746,55 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               turnStreamState.runWasCancelled = true;
             }
   };
+}
+
+function extractToolImagePreviews(result: ToolCallResult | undefined): ConversationToolImagePreviewRef[] {
+  const details = result?.data && typeof result.data === 'object' && !Array.isArray(result.data)
+    ? (result.data as { details?: unknown }).details
+    : undefined;
+  const raw = details && typeof details === 'object' && !Array.isArray(details)
+    ? (details as { imagePreviews?: unknown }).imagePreviews
+    : undefined;
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return [];
+    const record = entry as Record<string, unknown>;
+    if (typeof record.previewId !== 'string' || typeof record.fileName !== 'string' || typeof record.mimeType !== 'string') {
+      return [];
+    }
+    return [{
+      previewId: record.previewId,
+      fileName: record.fileName,
+      mimeType: record.mimeType,
+      width: typeof record.width === 'number' ? record.width : undefined,
+      height: typeof record.height === 'number' ? record.height : undefined,
+    }];
+  });
+}
+
+function normalizeTaskSnapshotItems(payload: {
+  taskId?: string;
+  title?: string;
+  status?: string;
+  statusReason?: string;
+  snapshot?: ConversationTaskSnapshotItem[];
+}): ConversationTaskSnapshotItem[] {
+  if (Array.isArray(payload.snapshot) && payload.snapshot.length > 0) {
+    return payload.snapshot.map((item) => ({
+      taskId: item.taskId,
+      title: item.title,
+      status: item.status,
+      statusReason: item.statusReason,
+    }));
+  }
+  const taskId = payload.taskId?.trim() || 'runtime-tasks';
+  return [{
+    taskId,
+    title: payload.title?.trim() || taskId,
+    status: payload.status === 'in_progress' || payload.status === 'blocked'
+      || payload.status === 'completed' || payload.status === 'cancelled'
+      ? payload.status
+      : 'pending',
+    statusReason: payload.statusReason,
+  }];
 }

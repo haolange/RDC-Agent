@@ -62,7 +62,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       presencePolicy: 'account-entitled',
       controls: {
         fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
-        context1m: { state: 'unsupported', fixedValue: false },
+        maxContext: { state: 'unsupported', fixedValue: false },
         reasoning: { levels: ['low', 'medium', 'high', 'xhigh'], defaultSelection: 'medium' },
       },
       executionBindings: [
@@ -82,7 +82,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       availability: 'unknown',
       controls: {
         fast: { state: 'selectable', defaultValue: false },
-        context1m: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'max' },
+        maxContext: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'max' },
         reasoning: {
           levels: ['low', 'medium', 'high', 'xhigh', 'max'],
           defaultSelection: 'medium',
@@ -140,15 +140,15 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
         { id: 'default', maxPromptTokens: 256_000 },
         { id: 'max', maxPromptTokens: 1_000_000 },
       ],
-      controls: { context1m: { state: 'selectable', tierId: 'max' } },
+      controls: { maxContext: { state: 'selectable', tierId: 'max' } },
       executionBindings: [{
         id: 'context:max',
         actions: [{ kind: 'client-tier', tierId: 'max' }],
       }],
-      resolvedControls: { context1m: { state: 'blocked', disabled: true, entitlement: 'unknown' } },
+      resolvedControls: { maxContext: { state: 'selectable', disabled: false, entitlement: 'unknown' } },
     });
   });
-  it('keeps normal K3 Max planning blocked while an explicit probe may verify the same model tier', async () => {
+  it('keeps normal K3 Max planning selectable while an explicit probe may verify the same model tier', async () => {
     const kimi = provider('kimi-coding-plan', 'OpenAICompatibleChatCompletions');
     const settings = { llm: { providers: [kimi], agentRoutes: [] } } as unknown as AppSettings;
     const parsed = parseKimiCodeCatalog({ data: [{
@@ -166,9 +166,17 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
     expect(planEffectiveModelRequest({
       providerId: 'kimi-coding-plan', modelId: 'k3', settings,
       controls: { maxContextMode: true },
-    })).toMatchObject({ ok: false, code: 'NO_USABLE_CONTEXT_TIER' });
+    })).toMatchObject({
+      ok: true,
+      plan: {
+        selectedModelId: 'k3',
+        effectiveModelId: 'k3',
+        activeTierId: 'max',
+        contextMode: 'one-million',
+      },
+    });
     expect(planEffectiveModelCapabilityProbe({
-      providerId: 'kimi-coding-plan', modelId: 'k3', mode: 'one-million-context', settings,
+      providerId: 'kimi-coding-plan', modelId: 'k3', mode: 'max-context', settings,
       controls: { maxContextMode: true },
     })).toMatchObject({
       ok: true,
@@ -338,7 +346,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       contextTiers: [{ id: 'default', entitlement: 'unknown' }],
       controls: {
         fast: { state: 'unknown', defaultValue: false },
-        context1m: { state: 'unknown', defaultValue: false },
+        maxContext: { state: 'unknown', defaultValue: false },
       },
     });
     expect(contribution.contextTiers?.[0]).not.toHaveProperty('maxPromptTokens');

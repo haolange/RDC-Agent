@@ -124,12 +124,12 @@ export function buildProbeSuccessPatch(
       )),
     };
   }
-  if (request.mode === 'one-million-context') {
+  if (request.mode === 'max-context') {
     return {
       modelId: target.model.modelId,
       ...(availability ? { availability } : {}),
-      controls: target.model.controls.context1m.state === 'selectable'
-        ? { context1m: { ...target.model.controls.context1m, entitlement: 'granted' } }
+      controls: target.model.controls.maxContext.state === 'selectable'
+        ? { maxContext: { ...target.model.controls.maxContext, entitlement: 'granted' } }
         : undefined,
       contextTiers: target.model.contextTiers.map((tier) => (
         tier.id === plan.activeTierId ? { ...tier, entitlement: 'granted' } : tier
@@ -152,11 +152,11 @@ export function buildProbeFailurePatch(
   manifestMatchesDenial = false,
 ): CatalogModelContribution | null {
   const kind = classifyCapabilityProbeFailure(status, manifestMatchesDenial);
-  if (request.mode === 'one-million-context' && kind === 'entitlement-denied') {
+  if (request.mode === 'max-context' && kind === 'entitlement-denied') {
     return {
       modelId: target.model.modelId,
-      controls: target.model.controls.context1m.state === 'selectable'
-        ? { context1m: { ...target.model.controls.context1m, entitlement: 'denied' } }
+      controls: target.model.controls.maxContext.state === 'selectable'
+        ? { maxContext: { ...target.model.controls.maxContext, entitlement: 'denied' } }
         : undefined,
       contextTiers: [{ id: plan.activeTierId, entitlement: 'denied' }],
       executionBindings: target.model.executionBindings?.map((binding) => (
@@ -283,22 +283,9 @@ export class ProviderCapabilityProbeService {
       return { success: false, status: 'failed', requestSent: false, detail: 'Model is not configured and available.' };
     }
     const choices = resolveContextTierChoices(target.model);
-    if (request.mode === 'one-million-context') {
-      if (!choices.oneMillionTier) {
+    if (request.mode === 'max-context') {
+      if (!choices.maxTier) {
         return { success: false, status: 'denied', requestSent: false, detail: 'No selectable Max mode.' };
-      }
-      const explicitBinding = target.model.executionBindings?.find((binding) => (
-        binding.when.context1m === true
-        && binding.actions.some((action) => action.kind === 'model-switch' || action.kind === 'request-patch')
-      ));
-      if (choices.oneMillionTier.entitlement === 'unknown'
-        && choices.oneMillionTier.activation.kind === 'implicit' && !explicitBinding) {
-        return {
-          success: false,
-          status: 'inconclusive',
-          requestSent: false,
-          detail: 'An implicit long-context tier requires a real request that crosses the default service threshold.',
-        };
       }
     }
     if (request.mode === 'fast' && target.model.controls.fast.state !== 'selectable') {
@@ -309,14 +296,14 @@ export class ProviderCapabilityProbeService {
       reasoningLevel: target.model.controls.reasoning.supportsOff
         ? 'off' as const
         : target.model.controls.reasoning.defaultSelection,
-      maxContextMode: request.mode === 'one-million-context',
+      maxContextMode: request.mode === 'max-context',
       fastModel: request.mode === 'fast',
     };
     const planning = this.dependencies.plan(request, controls);
     if (!planning.ok) {
       return { success: false, status: 'failed', requestSent: false, detail: planning.message };
     }
-    if ((request.mode === 'one-million-context' && !planning.controls.maxContextMode)
+    if ((request.mode === 'max-context' && !planning.controls.maxContextMode)
       || (request.mode === 'fast' && !planning.controls.fastModel)) {
       return { success: false, status: 'denied', requestSent: false, detail: 'The active model constraints rejected this mode.' };
     }

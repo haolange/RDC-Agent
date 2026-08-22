@@ -147,7 +147,7 @@ describe('PromptPlanForTurn', () => {
         defaultBudgetTokens: 1000,
         controls: {
           fast: { state: 'unsupported', fixedValue: false },
-          context1m: { state: 'unsupported', fixedValue: false },
+          maxContext: { state: 'unsupported', fixedValue: false },
           reasoning: {
             kind: 'none',
             supportsOff: true,
@@ -186,7 +186,7 @@ describe('PromptPlanForTurn', () => {
         defaultBudgetTokens: 1000,
         controls: {
           fast: { state: 'unsupported', fixedValue: false },
-          context1m: { state: 'unsupported', fixedValue: false },
+          maxContext: { state: 'unsupported', fixedValue: false },
           reasoning: {
             kind: 'none',
             supportsOff: true,
@@ -238,7 +238,7 @@ describe('PromptPlanForTurn', () => {
         defaultBudgetTokens: 1000,
         controls: {
           fast: { state: 'unsupported', fixedValue: false },
-          context1m: { state: 'unsupported', fixedValue: false },
+          maxContext: { state: 'unsupported', fixedValue: false },
           reasoning: {
             kind: 'none',
             supportsOff: true,

@@ -8,7 +8,7 @@ import type {
   ResolvedBooleanControlCapability,
   ResolvedModelControls,
 } from '../types/providerCapability';
-import { isMaxContextTier } from './contextTiers';
+import { contextTierWindowTokens, isEligibleMaxContextTier } from './contextTiers';
 
 export interface ModelControlEvaluation {
   controls: ConversationTurnControls;
@@ -37,7 +37,7 @@ function selectorMatches(
   controls: ConversationTurnControls,
 ): boolean {
   if (binding.when.fast !== undefined && binding.when.fast !== controls.fastModel) return false;
-  if (binding.when.context1m !== undefined && binding.when.context1m !== controls.maxContextMode) return false;
+  if (binding.when.maxContext !== undefined && binding.when.maxContext !== controls.maxContextMode) return false;
   if (binding.when.reasoning && !binding.when.reasoning.includes(controls.reasoningLevel)) return false;
   if (!binding.routeOptionIds?.length) return true;
   const selectedRouteOptionId = model.preferredRouteOptionId
@@ -51,7 +51,7 @@ function selectorMatches(
 
 function bindingSpecificity(binding: ExecutionBindingDefinition): number {
   return Number(binding.when.fast !== undefined)
-    + Number(binding.when.context1m !== undefined)
+    + Number(binding.when.maxContext !== undefined)
     + Number(Boolean(binding.when.reasoning));
 }
 
@@ -153,6 +153,22 @@ export function resolveExecutionBinding(
   return { state: 'available', effectiveModelId };
 }
 
+function applyBindingResolution(
+  control: ResolvedBooleanControlCapability,
+  resolution: ExecutionBindingResolution,
+  bindingId: string,
+): ResolvedBooleanControlCapability {
+  if (resolution.state === 'blocked') {
+    return { ...control, state: 'blocked', value: false, disabled: true, reason: resolution.reason };
+  }
+  return {
+    ...control,
+    bindingId,
+    effectiveModelId: resolution.effectiveModelId,
+    reason: resolution.state === 'unknown' ? resolution.reason : control.reason,
+  };
+}
+
 function resolvedDefinition(
   definition: ControlDefinition,
   value: boolean,
@@ -168,18 +184,26 @@ function resolvedDefinition(
         tierId: definition.tierId,
       };
     case 'selectable': {
-      const entitled = definition.entitlement === 'granted';
+      if (definition.entitlement === 'denied') {
+        return {
+          state: 'blocked',
+          value: false,
+          defaultValue: definition.defaultValue,
+          disabled: true,
+          entitlement: definition.entitlement,
+          reason: 'Control is not entitled for the active account.',
+          tierId: definition.tierId,
+        };
+      }
       return {
-        state: entitled ? 'selectable' : 'blocked',
-        value: entitled ? value : false,
+        state: 'selectable',
+        value,
         defaultValue: definition.defaultValue,
-        disabled: !entitled,
+        disabled: false,
         entitlement: definition.entitlement,
-        reason: entitled
-          ? undefined
-          : definition.entitlement === 'denied'
-            ? 'Control is not entitled for the active account.'
-            : 'Control entitlement is not yet verified.',
+        reason: definition.entitlement === 'unknown'
+          ? 'Control entitlement is not yet verified.'
+          : undefined,
         tierId: definition.tierId,
       };
     }
@@ -212,6 +236,11 @@ function resolvedDefinition(
   }
 }
 
+function resolveNormalTier(model: EffectiveModel) {
+  return model.contextTiers.find((tier) => tier.id === 'default' && tier.entitlement !== 'denied')
+    ?? model.contextTiers.find((tier) => tier.entitlement !== 'denied');
+}
+
 export function resolveModelControls(
   model: EffectiveModel,
   input: ModelControlInput = {},
@@ -223,10 +252,10 @@ export function resolveModelControls(
     reasoningLevel: clampReasoningSelection(input.reasoningLevel, model.controls.reasoning)
       ?? model.controls.reasoning.defaultSelection,
     fastModel: definitionValue(model.controls.fast, requestedFast),
-    maxContextMode: definitionValue(model.controls.context1m, requestedContext),
+    maxContextMode: definitionValue(model.controls.maxContext, requestedContext),
   };
   let fast = resolvedDefinition(model.controls.fast, controls.fastModel);
-  let context1m = resolvedDefinition(model.controls.context1m, controls.maxContextMode);
+  let maxContext = resolvedDefinition(model.controls.maxContext, controls.maxContextMode);
 
   const hypotheticalFast = { ...controls, fastModel: true };
   const fastBindingSelection = model.controls.fast.state === 'selectable'
@@ -239,51 +268,55 @@ export function resolveModelControls(
       fast = { ...fast, state: 'blocked', value: false, disabled: true, reason: 'Fast has no execution binding.' };
     } else {
       const resolution = resolveExecutionBinding(model, fastBindingSelection.binding, catalogModels);
-      if (resolution.state !== 'available') {
-        fast = { ...fast, state: 'blocked', value: false, disabled: true, reason: resolution.reason };
-      } else {
-        fast = {
-          ...fast,
-          bindingId: fastBindingSelection.binding.id,
-          effectiveModelId: resolution.effectiveModelId,
-        };
-      }
+      fast = applyBindingResolution(fast, resolution, fastBindingSelection.binding.id);
     }
   }
 
-  if (model.controls.context1m.state === 'selectable' || model.controls.context1m.state === 'fixed') {
-    const contextTierId = model.controls.context1m.tierId;
+  if (model.controls.maxContext.state === 'selectable' || model.controls.maxContext.state === 'fixed') {
+    const contextTierId = model.controls.maxContext.tierId;
     const tier = model.contextTiers.find((candidate) => candidate.id === contextTierId);
-    if (!tier || tier.entitlement === 'denied' || !isMaxContextTier(tier)) {
-      const reason = !tier
-        ? 'Max mode tier is missing.'
-        : tier.entitlement === 'denied'
-          ? 'Max mode tier is not entitled.'
-          : 'Max mode tier is below one million tokens.';
-      context1m = {
-        ...context1m,
+    const normalTier = resolveNormalTier(model);
+    if (!tier || tier.entitlement === 'denied') {
+      maxContext = {
+        ...maxContext,
         state: 'blocked',
         value: false,
         disabled: true,
-        reason,
+        reason: !tier ? 'Max mode tier is missing.' : 'Max mode tier is not entitled.',
+      };
+    } else if (!normalTier || contextTierWindowTokens(tier) === undefined || contextTierWindowTokens(normalTier) === undefined) {
+      maxContext = {
+        ...maxContext,
+        state: 'blocked',
+        value: false,
+        disabled: true,
+        reason: 'Max mode tier is missing a numeric window.',
+      };
+    } else if (!isEligibleMaxContextTier(tier, normalTier)) {
+      maxContext = {
+        ...maxContext,
+        state: 'blocked',
+        value: false,
+        disabled: true,
+        reason: 'Max mode tier is not larger than the default context window.',
       };
     }
   }
 
   if (fast.state === 'blocked') controls = { ...controls, fastModel: false };
-  if (context1m.state === 'blocked') controls = { ...controls, maxContextMode: false };
+  if (maxContext.state === 'blocked') controls = { ...controls, maxContextMode: false };
   const selectedBinding = selectBinding(model, controls);
   const resolved: ResolvedModelControls = {
     fast,
-    context1m,
+    maxContext,
     reasoning: model.controls.reasoning,
     catalogRevision: model.catalogRevision,
     routeRevision: model.routeRevision,
   };
   const blockedRequest = requestedFast && fast.state === 'blocked'
     ? { code: 'FAST_BLOCKED', message: fast.reason ?? 'Fast is unavailable.' }
-    : requestedContext && context1m.state === 'blocked'
-      ? { code: 'CONTEXT_1M_BLOCKED', message: context1m.reason ?? 'Max mode is unavailable.' }
+    : requestedContext && maxContext.state === 'blocked'
+      ? { code: 'MAX_CONTEXT_BLOCKED', message: maxContext.reason ?? 'Max mode is unavailable.' }
       : undefined;
   return {
     controls,

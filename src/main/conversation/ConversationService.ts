@@ -80,6 +80,8 @@ import {
   publishTraceProjection,
   ephemeralTraceSessionId,
 } from './ConversationTurnTerminal';
+import { upsertWorkBlock } from './ConversationWorkTrace';
+import { nowMs } from '@shared/utils/id';
 
 
 interface ConversationContextInput extends ConversationSendRequest {
@@ -210,6 +212,24 @@ export class ConversationService {
       branchState?.activeLeafBranchId ?? ROOT_BRANCH_ID,
       { occupiedTokens, compactionThresholdTokens },
     );
+    const lastAssistant = [...history].reverse().find((message) => message.role === 'assistant');
+    if (lastAssistant) {
+      lastAssistant.workTrace = upsertWorkBlock(lastAssistant.workTrace, `compaction-manual-${nowMs()}`, {
+        kind: 'compaction',
+        title: '手动压缩',
+        stage: 'context',
+        status: 'complete',
+        summary: '手动压缩',
+        compactionStats: {
+          provenance: 'manual',
+          messagesBefore: visibleMessages.length,
+          tokensBefore: occupiedTokens,
+        },
+        completedAt: nowMs(),
+      });
+      storageAdapter.writeConversationHistory(sessionId, history);
+      publishConversationTrace(sessionId, history, sessionId, publishTraceProjection);
+    }
     return { messages: history, contextView, occupiedTokens, compactionThresholdTokens };
   }
   async cancelActiveTurn(

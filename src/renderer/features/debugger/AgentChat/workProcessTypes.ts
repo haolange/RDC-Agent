@@ -48,6 +48,8 @@ export type WorkProcessIconKey =
   | 'taskGet'
   | 'taskList'
   | 'taskStop'
+  | 'imageRead'
+  | 'interpreter'
   | 'spark'
   | 'tool';
 
@@ -73,6 +75,11 @@ export type WorkProcessToolFamily =
   | 'shell'
   | 'git'
   | 'web'
+  | 'memory'
+  | 'skill'
+  | 'mcp'
+  | 'runtime'
+  | 'interpreter'
   | 'generic';
 
 export interface WorkProcessToolApproval {
@@ -96,6 +103,7 @@ export type WorkProcessRow =
     text: string;
     detailLines: string[];
     duration: string;
+    compactionProvenance?: import('@shared/types/conversation').ConversationCompactionProvenance;
   }
   | {
     type: 'tool';
@@ -139,6 +147,17 @@ export type WorkProcessRow =
       status?: number;
       bytes?: number;
     };
+    imagePreviews?: import('@shared/types/conversation').ConversationToolImagePreviewRef[];
+    chips?: string[];
+  }
+  | {
+    type: 'taskSnapshot';
+    id: string;
+    status: WorkProcessRowStatus;
+    completed: number;
+    total: number;
+    items: import('@shared/types/conversation').ConversationTaskSnapshotItem[];
+    duration: string;
   }
   | {
     type: 'toolAggregate';

@@ -26,7 +26,8 @@ import type {
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
-import { AssistantStreamBuilder, createProviderOutputRef } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import { StreamChannelRefs } from './internal/streamChannelRefs';
 import {
   composeAbortSignals,
   ensureOk,
@@ -41,9 +42,6 @@ import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import type { ProviderRequestAuthorizer } from '../../settings/AwsBedrockCredentials';
 
 const PROVIDER_API = 'bedrock-converse-stream';
-const TEXT_INDEX = 0;
-const THINKING_INDEX = 1;
-const TOOL_INDEX_BASE = 2;
 
 export interface BedrockConverseProviderOptions {
   /** AWS region for endpoint construction. */
@@ -218,15 +216,19 @@ export class BedrockConverseProvider implements ProviderStrategy {
       recordQuotaFromResponse(options.requestPlan, response);
       await ensureOk(response, PROVIDER_API);
 
-      const textRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:text', contentIndex: TEXT_INDEX });
-      const thinkingRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:thinking', contentIndex: THINKING_INDEX });
-      const toolRefs = new Map<number, ReturnType<typeof createProviderOutputRef>>();
+      const channels = new StreamChannelRefs(PROVIDER_API);
+      const textRefs = new Map<number, ReturnType<StreamChannelRefs['ref']>>();
+      const thinkingRefs = new Map<number, ReturnType<StreamChannelRefs['ref']>>();
+      const toolRefs = new Map<number, ReturnType<StreamChannelRefs['ref']>>();
       const toolNames = new Map<number, string>();
       const toolIds = new Map<number, string>();
-      let textStarted = false;
-      let thinkingStarted = false;
       let sawOutput = false;
       let finishReason: StopReason = 'stop';
+      const thinkingMeta = {
+        kind: 'raw' as const,
+        source: 'unknown' as const,
+        visibility: 'raw-collapsed' as const,
+      };
 
       for await (const event of parseBedrockSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
@@ -240,16 +242,13 @@ export class BedrockConverseProvider implements ProviderStrategy {
           const blockIndex = event.contentBlockStart.contentBlockIndex ?? 0;
           const start = event.contentBlockStart.start;
           if (start?.toolUse) {
-            const slot = TOOL_INDEX_BASE + blockIndex;
             const toolId = start.toolUse.toolUseId ?? '';
             const toolName = start.toolUse.name ?? '';
             toolIds.set(blockIndex, toolId);
             toolNames.set(blockIndex, toolName);
-            const toolRef = createProviderOutputRef({
-              protocol: PROVIDER_API,
+            const toolRef = channels.ref({
               providerBlockKey: `virtual:tool:${blockIndex}`,
               sourceIndex: blockIndex,
-              contentIndex: slot,
             });
             toolRefs.set(blockIndex, toolRef);
             sawOutput = true;
@@ -264,28 +263,30 @@ export class BedrockConverseProvider implements ProviderStrategy {
 
           if (delta?.text) {
             sawOutput = true;
-            if (!textStarted) {
+            let textRef = textRefs.get(blockIndex);
+            if (!textRef) {
+              textRef = channels.ref({
+                providerBlockKey: `output:text:${blockIndex}`,
+                sourceIndex: blockIndex,
+              });
+              textRefs.set(blockIndex, textRef);
               builder.startText(textRef);
-              textStarted = true;
             }
             builder.appendText(textRef, delta.text);
           }
 
           if (delta?.reasoningContent?.text) {
             sawOutput = true;
-            if (!thinkingStarted) {
-              builder.startThinking(thinkingRef, {
-                kind: 'raw',
-                source: 'unknown',
-                visibility: 'raw-collapsed',
+            let thinkingRef = thinkingRefs.get(blockIndex);
+            if (!thinkingRef) {
+              thinkingRef = channels.ref({
+                providerBlockKey: `output:thinking:${blockIndex}`,
+                sourceIndex: blockIndex,
               });
-              thinkingStarted = true;
+              thinkingRefs.set(blockIndex, thinkingRef);
+              builder.startThinking(thinkingRef, thinkingMeta);
             }
-            builder.appendThinking(thinkingRef, delta.reasoningContent.text, {
-              kind: 'raw',
-              source: 'unknown',
-              visibility: 'raw-collapsed',
-            });
+            builder.appendThinking(thinkingRef, delta.reasoningContent.text, thinkingMeta);
           }
 
           if (delta?.toolUse?.input) {
@@ -303,6 +304,17 @@ export class BedrockConverseProvider implements ProviderStrategy {
           const toolRef = toolRefs.get(blockIndex);
           if (toolRef) {
             builder.endToolCall(toolRef);
+            toolRefs.delete(blockIndex);
+          }
+          const textRef = textRefs.get(blockIndex);
+          if (textRef) {
+            builder.endText(textRef);
+            textRefs.delete(blockIndex);
+          }
+          const thinkingRef = thinkingRefs.get(blockIndex);
+          if (thinkingRef) {
+            builder.endThinking(thinkingRef, thinkingMeta);
+            thinkingRefs.delete(blockIndex);
           }
           continue;
         }

@@ -1,5 +1,7 @@
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import { isEffectiveModelPickerSelectable } from '@shared/utils/effectiveModelPicker';
+import { contextTierWindowTokens, resolveContextTierChoices } from '@shared/utils/contextTiers';
+import { formatTokenCount } from '@shared/utils/tokens';
 
 export interface ComposerModelPickerOption {
   providerId: string;
@@ -8,6 +10,7 @@ export interface ComposerModelPickerOption {
   label: string;
   aliases: string[];
   contextWindowTokens: number | null;
+  contextWindowLabel: string | null;
   hasReasoning: boolean;
 }
 
@@ -21,11 +24,24 @@ export function isComposerPickerModel(model: EffectiveModel): boolean {
   return isEffectiveModelPickerSelectable(model);
 }
 
-export function resolvePickerContextWindow(model: EffectiveModel): number | null {
-  const values = model.contextTiers
-    .map((tier) => tier.maxTotalTokens ?? tier.maxPromptTokens)
-    .filter((value): value is number => typeof value === 'number' && value > 0);
-  return values.length > 0 ? Math.max(...values) : null;
+export function resolvePickerContextWindow(model: EffectiveModel): {
+  tokens: number | null;
+  label: string | null;
+} {
+  const choices = resolveContextTierChoices(model);
+  const normal = choices.normalTier ? contextTierWindowTokens(choices.normalTier) : undefined;
+  const maximum = choices.maxTier ? contextTierWindowTokens(choices.maxTier) : undefined;
+  if (normal && maximum && maximum !== normal) {
+    return {
+      tokens: maximum,
+      label: `${formatTokenCount(normal)} → ${formatTokenCount(maximum)}`,
+    };
+  }
+  const tokens = maximum ?? normal ?? null;
+  return {
+    tokens,
+    label: tokens ? formatTokenCount(tokens) : null,
+  };
 }
 
 export function hasPickerReasoning(model: EffectiveModel): boolean {
@@ -37,13 +53,15 @@ export function toComposerPickerOption(
   providerLabel: string,
   model: EffectiveModel,
 ): ComposerModelPickerOption {
+  const window = resolvePickerContextWindow(model);
   return {
     providerId,
     providerLabel,
     modelId: model.modelId,
     label: model.label || model.modelId,
     aliases: model.aliases,
-    contextWindowTokens: resolvePickerContextWindow(model),
+    contextWindowTokens: window.tokens,
+    contextWindowLabel: window.label,
     hasReasoning: hasPickerReasoning(model),
   };
 }

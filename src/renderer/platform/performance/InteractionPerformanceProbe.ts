@@ -18,7 +18,7 @@ const PERFORMANCE_ATTRIBUTE = 'data-rdc-qa-performance';
 const EVENT_TIMING_THRESHOLD_MS = 16 as const;
 const COMPOSER_CONTROL_SELECTOR = [
   '[data-testid="composer-effort-fast-row"] [role="switch"]',
-  '[data-testid="composer-effort-one-million-row"] [role="switch"]',
+  '[data-testid="composer-effort-max-context-row"] [role="switch"]',
   '[data-testid="composer-effort-slider"]',
 ].join(',');
 

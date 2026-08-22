@@ -192,23 +192,23 @@ describe('Provider Catalog compiler', () => {
       label: 'Kimi K3',
       controls: {
         fast: { state: 'unsupported' },
-        context1m: { state: 'selectable' },
+        maxContext: { state: 'selectable' },
         reasoning: {
           kind: 'levels', supportsOff: false, levels: ['low', 'high', 'max'], defaultSelection: 'high',
         },
       },
       executionBindings: [{
-        id: 'context:max', when: { context1m: true },
+        id: 'context:max', when: { maxContext: true },
         actions: [{ kind: 'client-tier', tierId: 'max' }],
       }],
       liveProjection: {
-        entitlementDenialMatchers: [{ mode: 'one-million-context', statuses: [403] }],
+        entitlementDenialMatchers: [{ mode: 'max-context', statuses: [403] }],
       },
     });
     expect(surface?.models.find((model) => model.modelId === 'k3-256k')).toMatchObject({
       controls: {
         fast: { state: 'unsupported', fixedValue: false },
-        context1m: { state: 'unsupported', fixedValue: false },
+        maxContext: { state: 'unsupported', fixedValue: false },
         reasoning: {
           kind: 'levels', supportsOff: false, levels: ['low', 'high', 'max'], defaultSelection: 'high',
         },
@@ -232,7 +232,7 @@ describe('Provider Catalog compiler', () => {
       },
       controls: {
         fast: { state: 'unsupported', fixedValue: false },
-        context1m: { state: 'selectable', tierId: 'max' },
+        maxContext: { state: 'selectable', tierId: 'max' },
         reasoning: {
           kind: 'always-on', supportsOff: false, defaultSelection: 'max', lockedSelection: 'max',
         },
@@ -261,14 +261,14 @@ describe('Provider Catalog compiler', () => {
       availability: 'unknown',
       controls: {
         fast: { state: 'unsupported', fixedValue: false },
-        context1m: { state: 'selectable' },
+        maxContext: { state: 'selectable' },
         reasoning: { kind: 'always-on', supportsOff: false, lockedSelection: 'max' },
       },
     });
     expect(openCodeGo?.models.find((model) => model.modelId === 'deepseek-v4-pro')).toMatchObject({
       controls: {
         fast: { state: 'unsupported' },
-        context1m: { state: 'unsupported' },
+        maxContext: { state: 'unsupported' },
         reasoning: { kind: 'unknown', supportsOff: false },
       },
     });
@@ -332,7 +332,7 @@ describe('Provider Catalog compiler', () => {
     type ExpectedRow = readonly [
       modelId: string,
       contextTokens: number,
-      context1m: 'unknown' | 'unsupported' | 'selectable' | 'fixed',
+      maxContext: 'unknown' | 'unsupported' | 'selectable' | 'fixed',
       fast: 'unknown' | 'unsupported' | 'selectable',
       reasoningKind: 'unknown' | 'toggle' | 'always-on' | 'levels',
       supportsOff: boolean,
@@ -343,13 +343,13 @@ describe('Provider Catalog compiler', () => {
     const verify = (surfaceId: string, rows: readonly ExpectedRow[]) => {
       const surface = catalog.surfaces.get(surfaceId)?.surface;
       expect(surface, surfaceId).toBeDefined();
-      for (const [modelId, contextTokens, context1m, fast, reasoningKind, supportsOff, levels, defaultSelection, picker = 'primary'] of rows) {
+      for (const [modelId, contextTokens, maxContext, fast, reasoningKind, supportsOff, levels, defaultSelection, picker = 'primary'] of rows) {
         const model = surface?.models.find((entry) => entry.modelId === modelId);
         expect(model, `${surfaceId}/${modelId}`).toBeDefined();
         const defaultTier = model?.contextTiers.find((tier) => tier.id === 'default');
         expect(defaultTier?.maxPromptTokens ?? defaultTier?.maxTotalTokens, `${surfaceId}/${modelId} context`)
           .toBe(contextTokens);
-        expect(model?.controls.context1m.state, `${surfaceId}/${modelId} 1M`).toBe(context1m);
+        expect(model?.controls.maxContext.state, `${surfaceId}/${modelId} 1M`).toBe(maxContext);
         expect(model?.controls.fast.state, `${surfaceId}/${modelId} Fast`).toBe(fast);
         expect(model?.controls.reasoning, `${surfaceId}/${modelId} reasoning`).toMatchObject({
           kind: reasoningKind,
@@ -365,9 +365,9 @@ describe('Provider Catalog compiler', () => {
       ['gpt-5.6-sol', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-terra', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.6-luna', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['gpt-5.5', 256_000, 'unsupported', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
-      ['gpt-5.4-mini', 128_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
-      ['gpt-5.4', 256_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
+      ['gpt-5.5', 272_000, 'unsupported', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
+      ['gpt-5.4-mini', 272_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
+      ['gpt-5.4', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
       ['gpt-5.3-codex-spark', 256_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
     ]);
     const chatGptAccount = catalog.surfaces.get('chatgpt-account')?.surface;
@@ -594,7 +594,7 @@ describe('Provider Catalog compiler', () => {
       .find((model: Record<string, unknown>) => model.modelId === 'gemini-3.1-pro-preview');
     gemini.contextTiers.find((tier: Record<string, unknown>) => tier.id === 'one-million')
       .maxPromptTokens = 200_000;
-    expect(() => compileProviderCatalog(subMillionMax)).toThrow(/Max mode control references a sub-one-million context tier/u);
+    expect(() => compileProviderCatalog(subMillionMax)).toThrow(/Max mode control references a tier that is not larger than the default context window/u);
 
     const missingLiveDefaultTier = clone(input());
     mutableSurface(missingLiveDefaultTier, 'kimi-coding-plan').models
@@ -637,7 +637,7 @@ describe('Provider Catalog compiler', () => {
     overlapKimi.models.find((model: Record<string, unknown>) => model.modelId === 'k3')
       .executionBindings.push({
         id: 'context:conflict',
-        when: { context1m: true },
+        when: { maxContext: true },
         actions: [{ kind: 'request-patch', patch: { mode: 'normal' } }],
         entitlement: 'granted',
       });

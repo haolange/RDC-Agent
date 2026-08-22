@@ -44,7 +44,29 @@ export type ErrorCategory =
   | 'auth_error'
   | 'network_error'
   | 'server_error'
+  | 'stream_protocol'
   | 'unknown';
+
+/** Recovery abort that preserves Integrity stream-protocol identity. */
+export class AgentRecoveryAbortError extends Error {
+  readonly code = 'PROVIDER_STREAM_PROTOCOL_VIOLATION';
+  readonly streamCode?: string;
+
+  constructor(message: string, streamCode?: string) {
+    super(message);
+    this.name = 'AgentRecoveryAbortError';
+    this.streamCode = streamCode;
+  }
+}
+
+export function isProviderStreamProtocolError(error: unknown): error is Error & { code?: string } {
+  return error instanceof Error && error.name === 'ProviderStreamProtocolError';
+}
+
+function readProviderStreamCode(error: Error): string | undefined {
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'string' && code.startsWith('PROVIDER_STREAM_') ? code : undefined;
+}
 
 // =====================================================================
 // 默认值
@@ -86,6 +108,9 @@ export class ErrorRecovery {
 
   /** 分类错误。 */
   classifyError(error: Error): ErrorCategory {
+    if (isProviderStreamProtocolError(error) || error instanceof AgentRecoveryAbortError) {
+      return 'stream_protocol';
+    }
     const raw = `${error.message ?? ''} ${error.name ?? ''}`.toLowerCase();
     const status = this.extractStatusCode(error);
 
@@ -241,6 +266,16 @@ export class ErrorRecovery {
         return {
           type: 'retry',
           delayMs: this.getRetryDelay(this.state.recoveryCount),
+        };
+      }
+
+      case 'stream_protocol': {
+        const streamCode = readProviderStreamCode(error)
+          ?? (error instanceof AgentRecoveryAbortError ? error.streamCode : undefined)
+          ?? 'PROVIDER_STREAM_PROTOCOL_VIOLATION';
+        return {
+          type: 'abort',
+          reason: `${streamCode}: ${error.message}`,
         };
       }
 

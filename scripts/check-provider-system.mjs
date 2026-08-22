@@ -131,6 +131,7 @@ const contractTests = [
   'src/shared/provider-catalog/compiler.test.ts',
   'src/shared/utils/modelControls.test.ts',
   'src/main/settings/RequestPlanner.test.ts',
+  'src/main/settings/RequestPlanner.catalogOutput.test.ts',
   'src/main/settings/EffectiveModelResolver.test.ts',
   'src/main/settings/ProviderConnectionService.test.ts',
   'src/main/settings/ProviderRouteUrl.test.ts',

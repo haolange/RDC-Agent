@@ -50,7 +50,9 @@
 
 | 模块 | 路径（示意） | 边界 |
 | --- | --- | --- |
-| `ProcessSupervisor` | `src/main/runtime/` | 子进程 spawn/joinAll；仅在观察到 close/error 后移除 registry；超时未确认保留 `unconfirmed_orphan` |
+| `ProcessSupervisor` | `src/main/runtime/` | 子进程 spawn/joinAll；仅在观察到 close/error 后移除 registry；超时未确认保留 `unconfirmed_orphan`；`code_interpreter` 走 `shell` owner |
+| `ToolImagePreviewStore` | `src/main/conversation/ToolImagePreviewStore.ts` | session `image-previews` 缩略图；IPC `conversation:getToolImagePreview` 只读 + active-session gate；magic bytes 拒伪 |
+| `tooling.codeInterpreter` | `src/shared/types/settings.ts` + Settings Tools | 本机边界、project 不可覆盖；未启用 `CODE_INTERPRETER_DISABLED` |
 | `TurnCoordinator` / `TurnHandle` | `src/main/workflow/debugger/` | 每 session 活跃 turn；generation 丢弃迟到 event |
 | `ShutdownCoordinator` | `src/main/lifecycle/` | before-quit 限时 shutdownAll |
 | `MemoryStore` | `src/main/agent-runtime/memory/` | 进程内 realpath 队列 + `.memory.lock`（`directoryFileLock`：活 pid 永不回收，死 pid / 损坏锁回收）跨进程互斥 |
@@ -185,7 +187,8 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - **[AUTO] [BROWSER-QA]** Agent Loop / Tasks 改动必须覆盖相同指纹第二轮纠偏、第三轮终止、revision/result/args 变化复位、max-turn typed error、Ask Tasks 只读、Plan/Edit Tasks 可写、text-only route 不宣称工具、`tool_search` authoritative no-match；Browser 真实会话至少命中一次三轮无进展终止并确认没有 `CONVERSATION_LLM_REQUEST_FAILED`。
 - **[BROWSER-QA]** Provider/model/control 改动先 fresh discovery，再对最终 selectable 集合逐模型发最小真实请求；按 `provider + protocol + adapter + reasoning mapping + context activation + fast binding + continuation` 去重深测。账户 denial 保持不可选，429 与明确 quota 的 402 记录短期 expiry，5xx 保持可恢复且不得伪装成功。容量来源必须区分 source-backed 与真实 activation，禁止伪称百万 token 满窗压测。
 - **[AUTO]** HAL adapter 的 reasoning level 映射必须经 `ProviderReasoningMapper` 统一处理：manifest `reasoningEfforts` → wire effort 参数；新增 adapter 时确认 reasoning 投递路径经 `check:reasoning-delivery` 验证。
-- **[AUTO]** Builtin 工具目录、manifest token 展开与 `REJECTED_TOOL_TOKENS` 契约验证使用 `pnpm run check:tool-system`。
+- **[AUTO]** Builtin 工具目录、manifest token 展开与 `REJECTED_TOOL_TOKENS` 契约验证使用 `pnpm run check:tool-system`（当前 39 ids，含 `read_image` / `code_interpreter`）。
+- **[AUTO] [BROWSER-QA]** `read_image` / `code_interpreter` / Tasks 快照 / Compact provenance 改动后执行 `check:tool-system`、`check:work-process`、`check:work-process-tool-coverage`、`check:browser-capability`；Browser QA 覆盖 vision fail-closed、解释器产物缩略图、相邻/不相邻任务快照与手动 `/compact` 卡片。
 - **[AUTO]** Settings Agents 路由契约验证使用 `pnpm run check:settings-agents`。
 - **[BROWSER-QA]** 产品级本地验收通过真实浏览器会话完成，并指向真实 project 和 `.rdc`；RDX/RenderDoc 失败必须 fail-closed 并显示诊断。
 - **[BROWSER-QA]** 涉及工作台交互、页面结构、样式引用或共享契约的改动后，至少补一次关键 E2E smoke 或等价人工回归，确认主界面、关键面板和主要交互未退化。

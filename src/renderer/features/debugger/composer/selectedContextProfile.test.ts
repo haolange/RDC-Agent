@@ -39,7 +39,7 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
     defaultBudgetTokens: 256_000,
     controls: {
       fast: { state: 'unsupported', fixedValue: false },
-      context1m: { state: 'unsupported', fixedValue: false },
+      maxContext: { state: 'unsupported', fixedValue: false },
       reasoning: noReasoning,
     },
     toolCalling: { state: 'supported' },
@@ -57,7 +57,7 @@ describe('resolveSelectedContextProfile', () => {
       modelId: 'base',
       contextWindowTokens: 256_000,
       contextBudgetTokens: 256_000,
-      maxOutputTokens: 0,
+      maxOutputTokens: 256_000,
       compactionThresholdTokens: 204_800,
     });
   });
@@ -83,7 +83,7 @@ describe('resolveSelectedContextProfile', () => {
       ],
       controls: {
         fast: { state: 'unsupported', fixedValue: false },
-        context1m: {
+        maxContext: {
           state: 'selectable',
           defaultValue: false,
           entitlement: 'granted',

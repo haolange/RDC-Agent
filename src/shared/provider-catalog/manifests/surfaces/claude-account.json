@@ -125,7 +125,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "selectable",
           "defaultValue": false,
           "tierId": "max",
@@ -210,7 +210,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "selectable",
           "defaultValue": false,
           "tierId": "max",
@@ -296,7 +296,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "selectable",
           "defaultValue": false,
           "tierId": "max",
@@ -372,7 +372,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },

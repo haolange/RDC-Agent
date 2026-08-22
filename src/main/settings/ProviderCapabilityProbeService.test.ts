@@ -30,7 +30,7 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
     defaultBudgetTokens: 272_000,
     controls: {
       fast: { state: 'unsupported', fixedValue: false },
-      context1m: { state: 'unsupported', fixedValue: false },
+      maxContext: { state: 'unsupported', fixedValue: false },
       reasoning: {
         kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', lockedSelection: 'off',
         wireProfile: { kind: 'none' },
@@ -60,7 +60,7 @@ function plan(
   request: LlmModelCapabilityProbeRequest,
   effectiveModel: EffectiveModel,
 ): Extract<RequestPlanningResult, { ok: true }> {
-  const oneMillionTier = effectiveModel.contextTiers.at(-1)!;
+  const maxTier = effectiveModel.contextTiers.at(-1)!;
   const requestPlan: RequestPlan = createTestRequestPlan({
     providerId: request.providerId,
     adapterId: providerAdapterIdForProtocol(effectiveModel.route.protocol),
@@ -72,17 +72,17 @@ function plan(
       ? [effectiveModel.executionBindings[0].id]
       : [],
     route: effectiveModel.route,
-    headers: request.mode === 'one-million-context' && oneMillionTier.activation.kind === 'header'
-      ? oneMillionTier.activation.headers
+    headers: request.mode === 'max-context' && maxTier.activation.kind === 'header'
+      ? maxTier.activation.headers
       : {},
     bodyPatch: {},
-    contextBudgetTokens: request.mode === 'one-million-context'
-      ? Math.min(1_000_000, oneMillionTier.maxPromptTokens ?? effectiveModel.defaultBudgetTokens)
+    contextBudgetTokens: request.mode === 'max-context'
+      ? Math.min(1_000_000, maxTier.maxPromptTokens ?? effectiveModel.defaultBudgetTokens)
       : effectiveModel.defaultBudgetTokens,
-    contextMode: request.mode === 'one-million-context' ? 'one-million' : 'normal',
-    contextWindowTokens: oneMillionTier.maxTotalTokens
-      ?? (oneMillionTier.maxPromptTokens ?? effectiveModel.defaultBudgetTokens) + (oneMillionTier.maxOutputTokens ?? 0),
-    activeTierId: request.mode === 'one-million-context' ? oneMillionTier.id : effectiveModel.contextTiers[0].id,
+    contextMode: request.mode === 'max-context' ? 'one-million' : 'normal',
+    contextWindowTokens: maxTier.maxTotalTokens
+      ?? (maxTier.maxPromptTokens ?? effectiveModel.defaultBudgetTokens) + (maxTier.maxOutputTokens ?? 0),
+    activeTierId: request.mode === 'max-context' ? maxTier.id : effectiveModel.contextTiers[0].id,
     fastMode: request.mode === 'fast',
     reasoningWire: { selection: 'off', control: effectiveModel.controls.reasoning },
   });
@@ -91,7 +91,7 @@ function plan(
     plan: requestPlan,
     controls: {
       reasoningLevel: 'off',
-      maxContextMode: request.mode === 'one-million-context',
+      maxContextMode: request.mode === 'max-context',
       fastModel: request.mode === 'fast',
     },
     warnings: [],
@@ -204,23 +204,23 @@ describe('ProviderCapabilityProbeService', () => {
   });
 
 
-  it('keeps an implicit unknown 1M tier inconclusive without sending a fake proof request', async () => {
+  it('sends a real request for an implicit unknown Max tier instead of short-circuiting', async () => {
     const fixture = dependencies(model({
       contextTiers: [
         ...model().contextTiers,
-        { id: 'long', label: '1M', maxPromptTokens: 922_000, maxOutputTokens: 128_000, activation: { kind: 'implicit' }, entitlement: 'unknown' },
+        { id: 'long', label: 'Max', maxPromptTokens: 872_000, activation: { kind: 'implicit' }, entitlement: 'unknown' },
       ],
       controls: {
         ...model().controls,
-        context1m: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'long' },
+        maxContext: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'long' },
       },
     }));
     const service = new ProviderCapabilityProbeService(fixture.value);
 
-    await expect(service.test({ providerId: 'provider-a', modelId: 'model-a', mode: 'one-million-context' })).resolves.toMatchObject({
-      success: false, status: 'inconclusive', requestSent: false,
+    await expect(service.test({ providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' })).resolves.toMatchObject({
+      success: true, status: 'verified', requestSent: true,
     });
-    expect(fixture.execute).not.toHaveBeenCalled();
+    expect(fixture.execute).toHaveBeenCalledOnce();
   });
 
   it('sends and records an explicit header-activated unknown 1M tier probe', async () => {
@@ -234,23 +234,23 @@ describe('ProviderCapabilityProbeService', () => {
       ],
       controls: {
         ...model().controls,
-        context1m: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'long' },
+        maxContext: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'long' },
       },
     }));
     const service = new ProviderCapabilityProbeService(fixture.value);
 
-    await expect(service.test({ providerId: 'provider-a', modelId: 'model-a', mode: 'one-million-context' })).resolves.toMatchObject({
+    await expect(service.test({ providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' })).resolves.toMatchObject({
       success: true, status: 'verified', requestSent: true,
     });
     expect(fixture.execute).toHaveBeenCalledOnce();
     expect(fixture.recordSuccess).toHaveBeenCalledOnce();
     expect(buildProbeSuccessPatch(
-      { providerId: 'provider-a', modelId: 'model-a', mode: 'one-million-context' },
+      { providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' },
       fixture.resolved,
-      plan({ providerId: 'provider-a', modelId: 'model-a', mode: 'one-million-context' }, fixture.resolved.model).plan,
+      plan({ providerId: 'provider-a', modelId: 'model-a', mode: 'max-context' }, fixture.resolved.model).plan,
     )).toMatchObject({
       modelId: 'model-a',
-      controls: { context1m: expect.objectContaining({ entitlement: 'granted' }) },
+      controls: { maxContext: expect.objectContaining({ entitlement: 'granted' }) },
       contextTiers: expect.arrayContaining([expect.objectContaining({ id: 'long', entitlement: 'granted' })]),
     });
   });

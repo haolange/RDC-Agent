@@ -71,7 +71,7 @@ function effectiveModel(provider, modelId, overrides = {}) {
     defaultBudgetTokens: 128000,
     controls: {
       fast: { state: 'unsupported', fixedValue: false },
-      context1m: { state: 'unsupported', fixedValue: false },
+      maxContext: { state: 'unsupported', fixedValue: false },
       reasoning: { kind: 'toggle', supportsOff: true, levels: [], defaultSelection: 'on', wireProfile: { kind: 'none' } },
     },
     toolCalling: { state: 'supported' },
@@ -117,7 +117,7 @@ const noReasoningProvider = configuredProvider('openai', 'OpenAICompatibleChatCo
 assert(resolveProviderReasoningContract(noReasoningProvider, effectiveModel(noReasoningProvider, 'test-model', {
   controls: {
     fast: { state: 'unsupported', fixedValue: false },
-    context1m: { state: 'unsupported', fixedValue: false },
+    maxContext: { state: 'unsupported', fixedValue: false },
     reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
   },
 })).semantic === 'none', 'models without reasoning capability must be none');

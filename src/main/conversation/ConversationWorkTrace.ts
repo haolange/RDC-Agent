@@ -23,6 +23,7 @@ const WORK_BLOCK_KINDS = new Set<ConversationWorkBlock['kind']>([
   'diagnostic',
   'output',
   'command',
+  'task_snapshot',
 ]);
 
 interface LoopTraceOptions {

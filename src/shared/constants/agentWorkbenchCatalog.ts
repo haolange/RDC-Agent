@@ -33,6 +33,15 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     approvalRequired: false,
   },
   {
+    id: 'read_image',
+    label: 'Read Image',
+    permission: 'readonly',
+    inputSchema: { type: 'object', required: ['path'], properties: { path: { type: 'string' } } },
+    resultSummary: 'Reads a workspace image for vision-capable routes.',
+    icon: 'image',
+    approvalRequired: false,
+  },
+  {
     id: 'glob',
     label: 'Glob',
     permission: 'readonly',
@@ -450,6 +459,22 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     resultSummary: 'Reads current RDC/RDX runtime context.',
     icon: 'monitor-dot',
     approvalRequired: false,
+  },
+  {
+    id: 'code_interpreter',
+    label: 'Code Interpreter',
+    permission: 'approval',
+    inputSchema: {
+      type: 'object',
+      required: ['code'],
+      properties: {
+        code: { type: 'string' },
+        language: { type: 'string' },
+      },
+    },
+    resultSummary: 'Runs approved interpreter code in the project workspace and returns stdout plus artifacts.',
+    icon: 'terminal-square',
+    approvalRequired: true,
   },
 ];
 

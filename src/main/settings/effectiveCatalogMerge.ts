@@ -8,7 +8,7 @@ import type {
 } from '@shared/types/providerCapability';
 import type { LlmProviderCatalogOwnership } from '@shared/types/settings';
 import type { ReasoningControl } from '@shared/types/modelCapability';
-import { contextTierPromptCap } from '@shared/utils/contextTiers';
+import { contextTierPromptCap, resolveContextTierChoices } from '@shared/utils/contextTiers';
 import { isAdmittedDiscoveredModel, normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 import { resolveExecutionBinding, resolveModelControls } from '@shared/utils/modelControls';
 import type {
@@ -92,7 +92,7 @@ function createConservativeModel(
     defaultBudgetTokens: 0,
     controls: {
       fast: { state: 'unknown', defaultValue: false },
-      context1m: { state: 'unsupported', fixedValue: false },
+      maxContext: { state: 'unsupported', fixedValue: false },
       reasoning: createUnknownReasoning(),
     },
     toolCalling: { state: 'unknown' },
@@ -113,7 +113,7 @@ function createConservativeModel(
       evidence('contextTiers.default.entitlement'),
       evidence('defaultBudgetTokens'),
       evidence('controls.fast.state'),
-      evidence('controls.context1m.state'),
+      evidence('controls.maxContext.state'),
       evidence('controls.reasoning.kind'),
       evidence('controls.reasoning.supportsOff'),
       evidence('controls.reasoning.levels'),
@@ -260,7 +260,7 @@ function mergeContextTiers(
       activation: { kind: 'implicit' } as const,
       entitlement: 'unknown' as const,
     };
-    const contextControl = target.controls.context1m;
+    const contextControl = target.controls.maxContext;
     const protectsCatalogMaxTier = layer.source === 'entitlement'
       && (contextControl.state === 'fixed' || contextControl.state === 'selectable')
       && contextControl.tierId === patch.id;
@@ -517,8 +517,7 @@ export function mergeEffectiveCatalog(request: EffectiveCatalogRequest): Effecti
       : undefined;
     const preferredRouteOptionId = preferredRouteOption ? model.preferredRouteOptionId : undefined;
     const projectedRoute = preferredRouteOption?.route ?? model.route;
-    const defaultTier = model.contextTiers.find((tier) => tier.id === 'default' && tier.entitlement !== 'denied')
-      ?? model.contextTiers.find((tier) => tier.entitlement !== 'denied');
+    const defaultTier = resolveContextTierChoices(model).normalTier;
     const derivedDefaultBudgetTokens = model.defaultBudgetTokens > 0
       ? model.defaultBudgetTokens
       : defaultTier ? contextTierPromptCap(defaultTier) ?? 0 : 0;

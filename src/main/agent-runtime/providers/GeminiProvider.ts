@@ -25,7 +25,12 @@ import type {
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
-import { AssistantStreamBuilder, createProviderOutputRef } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import {
+  AlternatingTextThinkingChannels,
+  StreamChannelRefs,
+  closeSwitchedChannel,
+} from './internal/streamChannelRefs';
 import {
   composeAbortSignals,
   ensureOk,
@@ -151,15 +156,11 @@ export class GeminiProvider implements ProviderStrategy {
       recordQuotaFromResponse(options.requestPlan, response);
       await ensureOk(response, PROVIDER_API);
 
-      const TEXT_INDEX = 0;
-      const THINKING_INDEX = 1;
       let toolCallCounter = 0;
-      const textRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:text', contentIndex: TEXT_INDEX });
-      const thinkingRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:thinking', contentIndex: THINKING_INDEX });
+      const channels = new StreamChannelRefs(PROVIDER_API);
+      const alternating = new AlternatingTextThinkingChannels(channels);
       const summarySource = reasoningProjectionSource(options.requestPlan, 'summary');
       const signatureSource = reasoningProjectionSource(options.requestPlan, 'opaque');
-      let textStarted = false;
-      let thinkingStarted = false;
       let finishReason: string | null = null;
       let sawOutput = false;
 
@@ -204,11 +205,17 @@ export class GeminiProvider implements ProviderStrategy {
                     containerBinding: { providerBlockKey: partBindingKey },
                   })
                 : undefined;
-              if (!thinkingStarted) {
-                builder.startThinking(thinkingRef, { kind: 'summary', source: summarySource, visibility: 'summary', continuation });
-                thinkingStarted = true;
+              const switched = alternating.ensure('thinking');
+              closeSwitchedChannel(builder, switched.close);
+              if (switched.started) {
+                builder.startThinking(switched.ref, {
+                  kind: 'summary',
+                  source: summarySource,
+                  visibility: 'summary',
+                  continuation,
+                });
               }
-              builder.appendThinking(thinkingRef, textPart.text, {
+              builder.appendThinking(switched.ref, textPart.text, {
                 kind: 'summary',
                 source: summarySource,
                 visibility: 'summary',
@@ -216,23 +223,22 @@ export class GeminiProvider implements ProviderStrategy {
               });
             } else {
               sawOutput = true;
-              if (!textStarted) { builder.startText(textRef); textStarted = true; }
-              builder.appendText(textRef, textPart.text);
+              const switched = alternating.ensure('text');
+              closeSwitchedChannel(builder, switched.close);
+              if (switched.started) builder.startText(switched.ref);
+              builder.appendText(switched.ref, textPart.text);
             }
             continue;
           }
           if ('functionCall' in part) {
             const fc = (part as GeminiFunctionCallPart).functionCall;
-            const slot = 2 + toolCallCounter;
             toolCallCounter += 1;
-            const callId = 'gemini-call-' + Date.now() + '-' + slot;
+            const callId = 'gemini-call-' + Date.now() + '-' + toolCallCounter;
             sawOutput = true;
             if (thoughtSignature) {
-              const signatureRef = createProviderOutputRef({
-                protocol: PROVIDER_API,
+              const signatureRef = channels.ref({
                 providerBlockKey: partBindingKey + ':thought-signature',
                 sourceIndex: partIndex,
-                contentIndex: 10_000 + toolCallCounter,
               });
               const continuation = createContinuationArtifact(options.requestPlan, {
                 type: 'thought_signature',
@@ -247,7 +253,10 @@ export class GeminiProvider implements ProviderStrategy {
               });
               builder.endThinking(signatureRef);
             }
-            const toolRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: `function:${toolCallCounter - 1}`, sourceIndex: toolCallCounter - 1, contentIndex: slot });
+            const toolRef = channels.ref({
+              providerBlockKey: `function:${toolCallCounter - 1}`,
+              sourceIndex: toolCallCounter - 1,
+            });
             builder.startToolCall(toolRef, callId, fc.name);
             const args = JSON.stringify(fc.args ?? {});
             builder.appendToolCallArgs(toolRef, args);

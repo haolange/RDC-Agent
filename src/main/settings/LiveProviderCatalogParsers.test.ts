@@ -69,7 +69,7 @@ describe('live Provider Catalog parsers', () => {
     expect(parsed.contributions.find((model) => model.modelId === 'k3')).toMatchObject({
       controls: {
         fast: { state: 'unsupported', fixedValue: false },
-        context1m: { state: 'selectable', tierId: 'max' },
+        maxContext: { state: 'selectable', tierId: 'max' },
         reasoning: {
           kind: 'levels', supportsOff: false, levels: ['low', 'high', 'max'], defaultSelection: 'max',
         },
@@ -99,7 +99,7 @@ describe('live Provider Catalog parsers', () => {
     expect(maxOnly).toMatchObject({
       controls: {
         fast: { state: 'unsupported', fixedValue: false },
-        context1m: { state: 'selectable', entitlement: 'unknown', tierId: 'max' },
+        maxContext: { state: 'selectable', entitlement: 'unknown', tierId: 'max' },
         reasoning: { kind: 'always-on', supportsOff: false, levels: ['max'], defaultSelection: 'max' },
       },
     });
@@ -128,7 +128,7 @@ describe('live Provider Catalog parsers', () => {
 
     expect(contribution.route).toMatchObject(k3.route);
     expect(contribution.route?.contracts?.reasoning).toMatchObject({ semantic: 'raw', displayLabel: 'Raw reasoning' });
-    expect(contribution.controls?.context1m).toMatchObject({
+    expect(contribution.controls?.maxContext).toMatchObject({
       state: 'selectable',
       defaultValue: false,
       entitlement: 'unknown',
@@ -170,7 +170,7 @@ describe('live Provider Catalog parsers', () => {
       defaultBudgetTokens: 256_000,
       controls: {
         fast: { state: 'unsupported', fixedValue: false },
-        context1m: { state: 'selectable', tierId: 'max' },
+        maxContext: { state: 'selectable', tierId: 'max' },
         reasoning: {
           kind: 'always-on', supportsOff: false, defaultSelection: 'max', lockedSelection: 'max',
         },
@@ -189,7 +189,7 @@ describe('live Provider Catalog parsers', () => {
       defaultBudgetTokens: 256_000,
       controls: {
         fast: { state: 'unsupported', fixedValue: false },
-        context1m: { state: 'selectable', tierId: 'max' },
+        maxContext: { state: 'selectable', tierId: 'max' },
         reasoning: {
           kind: 'always-on', supportsOff: false, defaultSelection: 'max', lockedSelection: 'max',
         },
@@ -252,7 +252,7 @@ describe('live Provider Catalog parsers', () => {
           entitlement: 'unknown',
         })],
         controls: expect.objectContaining({
-          context1m: expect.objectContaining({
+          maxContext: expect.objectContaining({
             state: 'fixed',
             fixedValue: true,
             entitlement: 'unknown',
@@ -290,14 +290,28 @@ describe('live Provider Catalog parsers', () => {
     const sol = parsed.contributions.find((model) => model.modelId === 'gpt-5.6-sol');
     expect(sol).toMatchObject({
       availability: 'available',
-      defaultBudgetTokens: 256_000,
-      contextTiers: [{ id: 'default', maxPromptTokens: 256_000 }],
+      defaultBudgetTokens: 272_000,
+      contextTiers: [
+        { id: 'default', maxPromptTokens: 272_000 },
+        { id: 'max', maxPromptTokens: 872_000, entitlement: 'unknown' },
+      ],
     });
     expect(sol?.controls).toBeUndefined();
     expect(sol?.executionBindings).toBeUndefined();
     expect(parsed.contributions.find((model) => model.modelId === 'gpt-5.4')?.contextTiers).toEqual([
-      expect.objectContaining({ id: 'default', maxPromptTokens: 256_000, entitlement: 'granted' }),
+      expect.objectContaining({ id: 'default', maxPromptTokens: 272_000, entitlement: 'granted' }),
       expect.objectContaining({ id: 'max', maxPromptTokens: 1_000_000, entitlement: 'unknown' }),
+    ]);
+  });
+
+  it('accepts a Codex Max window below one million when it is larger than the default', () => {
+    const parsed = parseChatGptAccountCatalog({ models: [{
+      slug: 'gpt-5.6-sol', visibility: 'list', supported_in_api: true,
+      context_window: 272_000, max_context_window: 872_000,
+    }] });
+    expect(parsed.contributions[0].contextTiers).toEqual([
+      expect.objectContaining({ id: 'default', maxPromptTokens: 272_000 }),
+      expect.objectContaining({ id: 'max', maxPromptTokens: 872_000, entitlement: 'unknown' }),
     ]);
   });
 
@@ -383,12 +397,55 @@ describe('live Provider Catalog parsers', () => {
         defaultBudgetTokens: 200_000,
         controls: expect.objectContaining({
           fast: { state: 'unsupported', fixedValue: false },
-          context1m: { state: 'unsupported', fixedValue: false },
+          maxContext: { state: 'unsupported', fixedValue: false },
         }),
       })]);
 
     }
   });
+  it('keeps compiled Kimi output caps unless live reports a positive max output', () => {
+    const surface = structuredClone(KIMI_SURFACE);
+    const k3 = surface.models.find((model) => model.modelId === 'k3');
+    const defaultTier = k3?.contextTiers.find((tier) => tier.id === 'default');
+    if (!k3 || !defaultTier) throw new Error('Missing Kimi K3 compiled default tier');
+    defaultTier.maxOutputTokens = 32_000;
+
+    const without = parseKimiCodeCatalogWithSurface({ data: [{
+      id: 'k3', context_length: 256_000,
+    }] }, surface).contributions[0];
+    expect(without.contextTiers?.find((tier) => tier.id === 'default')).toMatchObject({
+      maxPromptTokens: 256_000,
+      maxOutputTokens: 32_000,
+    });
+
+    const withOutput = parseKimiCodeCatalogWithSurface({ data: [{
+      id: 'k3', context_length: 256_000, max_output_tokens: 8_000,
+    }] }, surface).contributions[0];
+    expect(withOutput.contextTiers?.find((tier) => tier.id === 'default')).toMatchObject({
+      maxPromptTokens: 256_000,
+      maxOutputTokens: 8_000,
+    });
+  });
+
+  it('writes ChatGPT output caps only when the live row reports them', () => {
+    const parsed = parseChatGptAccountCatalog({ models: [{
+      slug: 'gpt-5.4-mini', visibility: 'list', supported_in_api: true,
+      context_window: 272_000,
+    }] });
+    expect(parsed.contributions[0].contextTiers?.[0]).toEqual(expect.objectContaining({
+      maxPromptTokens: 272_000,
+    }));
+    expect(parsed.contributions[0].contextTiers?.[0]).not.toHaveProperty('maxOutputTokens');
+
+    const withOutput = parseChatGptAccountCatalog({ models: [{
+      slug: 'gpt-5.4-mini', visibility: 'list', supported_in_api: true,
+      context_window: 272_000, max_output_tokens: 16_384,
+    }] });
+    expect(withOutput.contributions[0].contextTiers).toEqual([
+      expect.objectContaining({ id: 'default', maxPromptTokens: 272_000, maxOutputTokens: 16_384 }),
+    ]);
+  });
+
   it('filters media models and canonicalizes proven aliases', () => {
     const parsed = parseGrokAccountCatalog({ data: [
       { id: 'grok-4.3', context_window: 1_000_000 },

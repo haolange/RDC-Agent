@@ -32,6 +32,7 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'conversation:clearHistory': 'mutation',
   'conversation:undoLastTurn': 'mutation',
   'conversation:compactHistory': 'mutation',
+  'conversation:getToolImagePreview': 'read',
   'workflow:getState': 'read',
   'workflow:resume': 'mutation',
   'workflow:stop': 'mutation',

@@ -490,7 +490,9 @@ export async function completeProfileTurn(
         ? 'Agent loop stopped after three identical tool rounds.'
         : llmDiagnostic.code === 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED'
           ? 'Agent loop stopped at the configured turn limit.'
-          : 'Model request failed; diagnostic recorded.'
+          : llmDiagnostic.code === 'CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION'
+            ? 'Provider stream protocol integrity check failed.'
+            : 'Model request failed; diagnostic recorded.'
     : 'Final answer generated.';
 
   const traceWithOutput = upsertWorkBlock(assistantMessage.workTrace, 'assistant-output', {

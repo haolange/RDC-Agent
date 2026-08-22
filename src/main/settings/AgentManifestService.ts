@@ -206,8 +206,8 @@ const createSeedDefinition = (
     : agentId === 'plan'
       ? ['read', 'search', 'web', 'askUser', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search']
       : agentId === 'edit'
-        ? ['read', 'search', 'web', 'bash', 'write', 'edit', 'git', 'file-manage', 'askUser', 'handoff', 'task', 'output', 'memory', 'memory-write', 'skill', 'mcp', 'subagent', 'tool_search']
-        : ['read', 'search', 'web', 'bash', 'askUser', 'handoff', 'task', 'output', 'memory', 'rdxContext', 'subagent', 'tool_search'];
+        ? ['read', 'search', 'web', 'bash', 'interpreter', 'write', 'edit', 'git', 'file-manage', 'askUser', 'handoff', 'task', 'output', 'memory', 'memory-write', 'skill', 'mcp', 'subagent', 'tool_search']
+        : ['read', 'search', 'web', 'bash', 'interpreter', 'askUser', 'handoff', 'task', 'output', 'memory', 'rdxContext', 'subagent', 'tool_search'];
   return {
     id: agentId,
     fileName: fileNameForId(agentId),

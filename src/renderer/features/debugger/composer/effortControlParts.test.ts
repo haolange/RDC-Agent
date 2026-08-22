@@ -5,7 +5,7 @@ import {
   buildDisplaySelections,
   buildEffortPillPresentation,
   clampSliderRatio,
-  EffortOneMillionContextSwitchRow,
+  EffortMaxContextSwitchRow,
   findAdjacentSupportedLevel,
   getStopPosition,
   ReasoningLevelIcon,
@@ -126,9 +126,9 @@ describe('effortControlParts', () => {
   it('keeps reasoning, Max mode, and Fast mode as separate pill states', () => {
     const presentation = buildEffortPillPresentation({
       reasoningLabel: 'Max',
-      oneMillionContextMode: true,
-      oneMillionContextLabel: 'Max mode',
-      oneMillionContextBadgeLabel: 'Max mode',
+      maxContextMode: true,
+      maxContextLabel: 'Max mode',
+      maxContextBadgeLabel: 'Max mode',
       fastModel: true,
       fastModelLabel: 'Fast mode',
       fastModelBadgeLabel: '2x',
@@ -137,14 +137,14 @@ describe('effortControlParts', () => {
     expect(presentation.label).toBe('Max');
     expect(presentation.title).toBe('Max | Max mode | Fast mode');
     expect(presentation.badges).toEqual([
-      { mode: 'one-million-context', label: 'Max mode', title: 'Max mode' },
+      { mode: 'max-context', label: 'Max mode', title: 'Max mode' },
       { mode: 'fast', label: '2x', title: 'Fast mode' },
     ]);
     expect(presentation.label).not.toContain('Max mode');
   });
 
   it('projects unavailable Max mode entitlement as Disabled in the switch accessible name', () => {
-    const markup = renderToStaticMarkup(React.createElement(EffortOneMillionContextSwitchRow, {
+    const markup = renderToStaticMarkup(React.createElement(EffortMaxContextSwitchRow, {
       label: 'Max mode',
       statusLabel: 'Disabled',
       available: false,
@@ -159,7 +159,7 @@ describe('effortControlParts', () => {
   });
 
   it('renders fixed Max mode as active and disabled instead of flashing off', () => {
-    const markup = renderToStaticMarkup(React.createElement(EffortOneMillionContextSwitchRow, {
+    const markup = renderToStaticMarkup(React.createElement(EffortMaxContextSwitchRow, {
       label: 'Max mode',
       statusLabel: 'Fixed',
       available: false,

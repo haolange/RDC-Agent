@@ -15,6 +15,7 @@ import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
 import { AssistantStreamBuilder, createProviderOutputRef, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
+import { ResponsesItemChannels } from './internal/responsesItemChannels';
 import {
   composeAbortSignals,
   ensureOk,
@@ -33,9 +34,6 @@ import { createProviderStateRef, findLatestProviderState } from '../reasoning/Pr
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const PROVIDER_API = 'openai-responses';
-const TEXT_INDEX = 0;
-const REASONING_INDEX = 1;
-const TOOL_INDEX_BASE = 2;
 const RESPONSES_REASONING_INCLUDE = 'reasoning.encrypted_content';
 
 export interface OpenAIResponsesProviderOptions {
@@ -142,30 +140,19 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
       recordQuotaFromResponse(options.requestPlan, response);
       await ensureOk(response, PROVIDER_API);
 
-      const toolSlotsByItemId = new Map<string, number>();
-      const toolArgBuffers = new Map<number, string>();
-      let currentReasoningArtifact: ProviderContinuationArtifact | undefined;
+      const toolArgBuffers = new Map<string, string>();
       const summarySource = reasoningProjectionSource(options.requestPlan, 'summary');
       const rawSource = reasoningProjectionSource(options.requestPlan, 'raw');
       const opaqueSource = reasoningProjectionSource(options.requestPlan, 'opaque');
       const deepSeekResponses = isDeepSeekResponsesPlan(options.requestPlan);
-      const textRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:text', contentIndex: TEXT_INDEX });
-      const reasoningRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:reasoning', contentIndex: REASONING_INDEX });
-      const toolRefs = new Map<number, ReturnType<typeof createProviderOutputRef>>();
-      const toolStartedSlots = new Set<number>();
-      let textStarted = false;
-      let thinkingStarted = false;
-      let thinkingClosed = false;
-      let thinkingMode: 'summary' | 'raw' | 'opaque' | null = null;
+      const items = new ResponsesItemChannels({
+        protocol: PROVIDER_API,
+        builder,
+        sources: { summary: summarySource, raw: rawSource, opaque: opaqueSource },
+        deepSeekResponses,
+      });
+      const toolStarted = new Set<string>();
       let rawReasoningText = '';
-      const toolRefFor = (slot: number, itemId?: string) => {
-        const existing = toolRefs.get(slot);
-        if (existing) return existing;
-        const sourceIndex = slot - TOOL_INDEX_BASE;
-        const ref = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: `output:tool:${sourceIndex}`, sourceIndex, itemId, contentIndex: slot });
-        toolRefs.set(slot, ref);
-        return ref;
-      };
       let sawToolCall = false;
       let sawOutput = false;
       let finishReason: StopReason = 'stop';
@@ -175,6 +162,7 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
         providerBlockKey: 'response:terminal',
         contentIndex: 1_000_000,
       });
+      const toolKey = (outputIndex: number, itemId?: string) => itemId || `index:${outputIndex}`;
 
       for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
@@ -194,220 +182,133 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
             const delta = readString(event.delta) || readString(event.text);
             if (delta) {
               sawOutput = true;
-              if (!textStarted) { builder.startText(textRef); textStarted = true; }
-              builder.appendText(textRef, delta);
+              items.appendText(items.identityFromEvent(event), delta);
             }
             break;
           }
           case 'response.output_text.done':
-            if (textStarted) builder.endText(textRef);
             break;
           case 'response.reasoning_summary_text.delta': {
             const delta = readString(event.delta) || readString(event.text);
             if (delta) {
               sawOutput = true;
-              if (!thinkingStarted) {
-                builder.startThinking(reasoningRef, {
-                  kind: 'summary', source: summarySource, visibility: 'summary',
-                  continuation: currentReasoningArtifact,
-                });
-                thinkingStarted = true;
-                thinkingMode = 'summary';
-              }
-              builder.appendThinking(reasoningRef, delta, {
-                kind: 'summary',
-                source: summarySource,
-                visibility: 'summary',
-                continuation: currentReasoningArtifact,
-              });
+              items.appendReasoning(
+                items.identityFromEvent(event),
+                delta,
+                'summary',
+                undefined,
+                readNumber(event.summary_index) ?? undefined,
+              );
             }
             break;
           }
-          case 'response.reasoning_summary_text.done':
-            if (!thinkingStarted) {
-              builder.startThinking(reasoningRef, {
-                kind: 'summary', source: summarySource, visibility: 'summary',
-                continuation: currentReasoningArtifact,
-              });
-              thinkingStarted = true;
-              thinkingMode = 'summary';
-            }
-            builder.endThinking(reasoningRef, {
-              kind: 'summary',
-              source: summarySource,
-              visibility: 'summary',
-              continuation: currentReasoningArtifact,
-            });
-            thinkingClosed = true;
+          case 'response.reasoning_summary_text.done': {
+            const identity = items.identityFromEvent(event);
+            items.startReasoning(identity, 'summary');
             break;
+          }
           case 'response.reasoning_text.delta': {
             const delta = readString(event.delta) || readString(event.text);
             if (delta) {
               sawOutput = true;
               rawReasoningText += delta;
-              if (!thinkingStarted) {
-                builder.startThinking(reasoningRef, {
-                  kind: 'raw', source: rawSource, visibility: 'raw-collapsed',
-                  continuation: currentReasoningArtifact,
-                });
-                thinkingStarted = true;
-                thinkingMode = 'raw';
-              }
-              builder.appendThinking(reasoningRef, delta, {
-                kind: 'raw', source: rawSource, visibility: 'raw-collapsed',
-                continuation: currentReasoningArtifact,
-              });
+              items.appendReasoning(items.identityFromEvent(event), delta, 'raw');
             }
             break;
           }
           case 'response.reasoning_text.done': {
+            const identity = items.identityFromEvent(event);
             const fullText = readString(event.text) || readString(event.reasoning_text);
             if (fullText && !rawReasoningText) {
               sawOutput = true;
               rawReasoningText = fullText;
-              if (!thinkingStarted) {
-                builder.startThinking(reasoningRef, {
-                  kind: 'raw', source: rawSource, visibility: 'raw-collapsed',
-                  continuation: currentReasoningArtifact,
-                });
-                thinkingStarted = true;
-                thinkingMode = 'raw';
-              }
-              builder.appendThinking(reasoningRef, fullText, {
-                kind: 'raw', source: rawSource, visibility: 'raw-collapsed',
-                continuation: currentReasoningArtifact,
-              });
+              items.appendReasoning(identity, fullText, 'raw');
+            } else {
+              items.startReasoning(identity, 'raw');
             }
             break;
           }
           case 'response.output_item.added': {
-            const outputIndex = readNumber(event.output_index) ?? 0;
             const item = readRecord(event.item);
+            const identity = items.identityFromEvent(event, item);
             const reasoningArtifact = createResponsesReasoningArtifact(options.requestPlan, item);
             if (reasoningArtifact) {
-              currentReasoningArtifact = reasoningArtifact;
               if (!deepSeekResponses) {
                 sawOutput = true;
-                if (!thinkingStarted) {
-                  builder.startThinking(reasoningRef, {
-                    kind: 'opaque',
-                    source: opaqueSource,
-                    visibility: 'hidden',
-                    continuation: currentReasoningArtifact,
-                  });
-                  thinkingStarted = true;
-                  thinkingMode = 'opaque';
-                } else if (!thinkingClosed) {
-                  builder.updateThinking(reasoningRef, {
-                    kind: thinkingMode ?? 'opaque',
-                    source: thinkingMode === 'summary' ? summarySource : opaqueSource,
-                    visibility: thinkingMode === 'summary' ? 'summary' : 'hidden',
-                    continuation: currentReasoningArtifact,
-                  });
-                }
+                items.startReasoning(identity, 'opaque', reasoningArtifact);
+              } else {
+                items.startReasoning(identity, 'raw', reasoningArtifact);
               }
             } else if (readString(item?.type) === 'function_call') {
-              const slot = TOOL_INDEX_BASE + outputIndex;
-              const itemId = readString(item?.id);
-              if (itemId) toolSlotsByItemId.set(itemId, slot);
               sawToolCall = true;
               sawOutput = true;
-              const toolRef = toolRefFor(slot, itemId || undefined);
+              const toolRef = items.toolRef(identity);
               builder.startToolCall(
                 toolRef,
                 readString(item?.call_id) || readString(item?.id) || '',
                 readString(item?.name) || '',
               );
-              toolStartedSlots.add(slot);
+              toolStarted.add(toolKey(identity.outputIndex, identity.itemId));
             }
             break;
           }
           case 'response.function_call_arguments.delta': {
-            const slot = resolveToolSlot(event, toolSlotsByItemId);
+            const identity = items.identityFromEvent(event);
             const delta = readString(event.delta);
-            if (slot !== null && delta) {
-              toolArgBuffers.set(slot, `${toolArgBuffers.get(slot) ?? ''}${delta}`);
-              builder.appendToolCallArgs(toolRefFor(slot, readString(event.item_id) || undefined), delta);
+            if (delta) {
+              const key = toolKey(identity.outputIndex, identity.itemId);
+              toolArgBuffers.set(key, `${toolArgBuffers.get(key) ?? ''}${delta}`);
+              builder.appendToolCallArgs(items.toolRef(identity), delta);
             }
             break;
           }
           case 'response.function_call_arguments.done': {
-            const slot = resolveToolSlot(event, toolSlotsByItemId);
+            const identity = items.identityFromEvent(event);
             const args = readString(event.arguments);
-            if (slot !== null && args && !toolArgBuffers.get(slot)) {
-              toolArgBuffers.set(slot, args);
-              builder.appendToolCallArgs(toolRefFor(slot, readString(event.item_id) || undefined), args);
+            const key = toolKey(identity.outputIndex, identity.itemId);
+            if (args && !toolArgBuffers.get(key)) {
+              toolArgBuffers.set(key, args);
+              builder.appendToolCallArgs(items.toolRef(identity), args);
             }
             break;
           }
           case 'response.output_item.done': {
-            const outputIndex = readNumber(event.output_index) ?? 0;
             const item = readRecord(event.item);
+            const identity = items.identityFromEvent(event, item);
             const reasoningArtifact = createResponsesReasoningArtifact(options.requestPlan, item);
             if (reasoningArtifact) {
-              currentReasoningArtifact = reasoningArtifact;
               if (deepSeekResponses) {
                 const itemReasoningText = readDeepSeekReasoningText(item);
                 if (itemReasoningText && !rawReasoningText) {
                   sawOutput = true;
                   rawReasoningText = itemReasoningText;
-                  if (!thinkingStarted) {
-                    builder.startThinking(reasoningRef, {
-                      kind: 'raw', source: rawSource, visibility: 'raw-collapsed',
-                      continuation: currentReasoningArtifact,
-                    });
-                    thinkingStarted = true;
-                    thinkingMode = 'raw';
-                  }
-                  builder.appendThinking(reasoningRef, itemReasoningText, {
-                    kind: 'raw', source: rawSource, visibility: 'raw-collapsed',
-                    continuation: currentReasoningArtifact,
-                  });
+                  items.appendReasoning(identity, itemReasoningText, 'raw', reasoningArtifact);
                 }
-                if (thinkingStarted && !thinkingClosed && thinkingMode === 'raw') {
-                  builder.endThinking(reasoningRef, {
-                    kind: 'raw', source: rawSource, visibility: 'raw-collapsed',
-                    continuation: currentReasoningArtifact,
-                  });
-                  thinkingClosed = true;
-                }
+                items.closeReasoning(identity, reasoningArtifact);
               } else {
                 sawOutput = true;
-                if (!thinkingStarted) {
-                  builder.startThinking(reasoningRef, {
-                    kind: 'opaque',
-                    source: opaqueSource,
-                    visibility: 'hidden',
-                    continuation: currentReasoningArtifact,
-                  });
-                  thinkingStarted = true;
-                  thinkingMode = 'opaque';
-                } else if (!thinkingClosed) builder.updateThinking(reasoningRef, {
-                  kind: 'opaque',
-                  source: opaqueSource,
-                  visibility: 'hidden',
-                  continuation: currentReasoningArtifact,
-                });
+                items.startReasoning(identity, 'opaque', reasoningArtifact);
+                items.closeReasoning(identity, reasoningArtifact);
               }
             } else if (readString(item?.type) === 'function_call') {
-              const slot = TOOL_INDEX_BASE + outputIndex;
-              const itemId = readString(item?.id);
-              if (itemId) toolSlotsByItemId.set(itemId, slot);
               sawToolCall = true;
               sawOutput = true;
-              const toolRef = toolRefFor(slot, itemId || undefined);
-              if (toolStartedSlots.has(slot)) {
+              const toolRef = items.toolRef(identity);
+              const key = toolKey(identity.outputIndex, identity.itemId);
+              if (toolStarted.has(key)) {
                 builder.updateToolCall(toolRef, readString(item?.call_id) || readString(item?.id) || '', readString(item?.name) || '');
               } else {
                 builder.startToolCall(toolRef, readString(item?.call_id) || readString(item?.id) || '', readString(item?.name) || '');
-                toolStartedSlots.add(slot);
+                toolStarted.add(key);
               }
               const args = readString(item?.arguments);
-              if (args && !toolArgBuffers.get(slot)) {
-                toolArgBuffers.set(slot, args);
+              if (args && !toolArgBuffers.get(key)) {
+                toolArgBuffers.set(key, args);
                 builder.appendToolCallArgs(toolRef, args);
               }
               builder.endToolCall(toolRef);
+            } else if (readString(item?.type) === 'message') {
+              items.closeText(identity);
             }
             break;
           }
@@ -417,22 +318,10 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
               applyCompletedUsage(builder, completed);
               const providerState = createProviderStateRef(options.requestPlan, completed.id);
               if (providerState) builder.setProviderState(providerState);
-              const completedArtifact = findResponsesReasoningArtifact(options.requestPlan, completed.output);
-              if (completedArtifact) {
-                currentReasoningArtifact = completedArtifact;
-                if (thinkingStarted && !thinkingClosed) {
-                  const kind = thinkingMode ?? (deepSeekResponses ? 'raw' : 'opaque');
-                  const source = kind === 'raw' ? rawSource : kind === 'summary' ? summarySource : opaqueSource;
-                  const visibility = kind === 'raw' ? 'raw-collapsed' : kind === 'summary' ? 'summary' : 'hidden';
-                  builder.endThinking(reasoningRef, {
-                    kind,
-                    source,
-                    visibility,
-                    continuation: currentReasoningArtifact,
-                  });
-                  thinkingClosed = true;
-                }
-              }
+              items.applyCompletedReasoning(completed.output, (item) => (
+                createResponsesReasoningArtifact(options.requestPlan, item)
+              ));
+              items.closeRemaining();
               finishReason = completed.status === 'incomplete' ? 'length' : sawToolCall ? 'toolUse' : 'stop';
             }
             if (!sawOutput) {
@@ -445,16 +334,11 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
             const incomplete = readRecord(event.response) as ResponsesCompletedPayload | null;
             if (incomplete) {
               applyCompletedUsage(builder, incomplete);
-              const incompleteArtifact = findResponsesReasoningArtifact(options.requestPlan, incomplete.output);
-              if (incompleteArtifact) currentReasoningArtifact = incompleteArtifact;
+              items.applyCompletedReasoning(incomplete.output, (item) => (
+                createResponsesReasoningArtifact(options.requestPlan, item)
+              ));
             }
-            if (thinkingStarted && !thinkingClosed) {
-              const kind = thinkingMode ?? (deepSeekResponses ? 'raw' : 'opaque');
-              const source = kind === 'raw' ? rawSource : kind === 'summary' ? summarySource : opaqueSource;
-              const visibility = kind === 'raw' ? 'raw-collapsed' : kind === 'summary' ? 'summary' : 'hidden';
-              builder.endThinking(reasoningRef, { kind, source, visibility, continuation: currentReasoningArtifact });
-              thinkingClosed = true;
-            }
+            items.closeRemaining();
             finishReason = 'length';
             if (!sawOutput) {
               throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
@@ -481,12 +365,7 @@ export class OpenAIResponsesProvider implements ProviderStrategy {
       if (!sawOutput) {
         throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
       }
-      if (thinkingStarted && !thinkingClosed) {
-        const kind = thinkingMode ?? (deepSeekResponses ? 'raw' : 'opaque');
-        const source = kind === 'raw' ? rawSource : kind === 'summary' ? summarySource : opaqueSource;
-        const visibility = kind === 'raw' ? 'raw-collapsed' : kind === 'summary' ? 'summary' : 'hidden';
-        builder.endThinking(reasoningRef, { kind, source, visibility, continuation: currentReasoningArtifact });
-      }
+      items.closeRemaining();
       builder.done(finishReason);
     } catch (err) {
       const thrown = normalizeError(err);
@@ -719,18 +598,6 @@ function createResponsesReasoningArtifact(
   });
 }
 
-function findResponsesReasoningArtifact(
-  requestPlan: RequestPlan,
-  output: unknown[] | undefined,
-): ProviderContinuationArtifact | undefined {
-  if (!Array.isArray(output)) return undefined;
-  for (const item of output) {
-    const artifact = createResponsesReasoningArtifact(requestPlan, readRecord(item));
-    if (artifact) return artifact;
-  }
-  return undefined;
-}
-
 function isDeepSeekResponsesPlan(requestPlan: RequestPlan): boolean {
   return requestPlan.executionIdentity.protocolDialect === 'DeepSeekResponses';
 }
@@ -744,15 +611,6 @@ function readDeepSeekReasoningText(item: Record<string, unknown> | null | undefi
     const text = readString(value?.text) || readString(value?.content);
     return text ? [text] : [];
   }).join('');
-}
-
-function resolveToolSlot(event: Record<string, unknown>, toolSlotsByItemId: Map<string, number>): number | null {
-  const itemId = readString(event.item_id);
-  if (itemId && toolSlotsByItemId.has(itemId)) {
-    return toolSlotsByItemId.get(itemId) ?? null;
-  }
-  const outputIndex = readNumber(event.output_index);
-  return outputIndex === null ? null : TOOL_INDEX_BASE + outputIndex;
 }
 
 function parseJsonObject(raw: string): Record<string, unknown> | null {

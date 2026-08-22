@@ -25,6 +25,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     clearHistory: 'conversation:clearHistory',
     undoLastTurn: 'conversation:undoLastTurn',
     compactHistory: 'conversation:compactHistory',
+    getToolImagePreview: 'conversation:getToolImagePreview',
   },
   workflow: {
     getState: 'workflow:getState',

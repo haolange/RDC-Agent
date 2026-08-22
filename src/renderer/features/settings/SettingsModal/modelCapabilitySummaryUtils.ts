@@ -124,16 +124,16 @@ export function formatContextCapability(model: EffectiveModel | null, t: Transla
   if (!model) return t('settings.providers.capability.unknown');
   const choices = resolveContextTierChoices(model);
   const normal = formatTierLimit(choices.normalTier, t);
-  if (!choices.oneMillionTier) return normal;
-  if (choices.oneMillionTier.id === choices.normalTier?.id) {
-    return choices.oneMillionUnverified
-      ? t('settings.providers.capability.contextOneMillionUnverified', { window: normal })
-      : t('settings.providers.capability.contextOneMillion', { window: normal });
+  if (!choices.maxTier) return normal;
+  if (choices.maxTier.id === choices.normalTier?.id) {
+    return choices.maxTierUnverified
+      ? t('settings.providers.capability.contextMaxUnverified', { window: normal })
+      : t('settings.providers.capability.contextMax', { window: normal });
   }
-  const oneMillion = formatTierLimit(choices.oneMillionTier, t);
-  return choices.oneMillionUnverified
-    ? t('settings.providers.capability.contextRangeUnverified', { base: normal, maximum: oneMillion })
-    : t('settings.providers.capability.contextRange', { base: normal, maximum: oneMillion });
+  const maxTierLimit = formatTierLimit(choices.maxTier, t);
+  return choices.maxTierUnverified
+    ? t('settings.providers.capability.contextRangeUnverified', { base: normal, maximum: maxTierLimit })
+    : t('settings.providers.capability.contextRange', { base: normal, maximum: maxTierLimit });
 }
 
 export function buildContextTierRows(model: EffectiveModel | null, t: Translate): ContextTierRow[] {
@@ -141,8 +141,8 @@ export function buildContextTierRows(model: EffectiveModel | null, t: Translate)
   const choices = resolveContextTierChoices(model);
   return model.contextTiers.map((tier) => ({
     id: tier.id,
-    label: tier.id === choices.oneMillionTier?.id
-      ? t('settings.providers.capability.oneMillionTierLabel', { label: tier.label })
+    label: tier.id === choices.maxTier?.id
+      ? t('settings.providers.capability.maxTierLabel', { label: tier.label })
       : tier.label,
     limit: formatTierLimit(tier, t),
     entitlement: formatEntitlement(tier.entitlement, t),
@@ -172,7 +172,7 @@ export function formatReasoningCapability(model: EffectiveModel | null, t: Trans
 export function formatFastControl(model: EffectiveModel | null, t: Translate): string {
   if (!model || model.controls.fast.state === 'unknown') return t('settings.providers.capability.unknown');
   if (model.controls.fast.state === 'unsupported') return t('settings.providers.capability.unsupported');
-  if (model.controls.fast.state === 'provider-managed') return t('composer.effort.levelOff');
+  if (model.controls.fast.state === 'provider-managed') return t('composer.effort.providerManaged');
   if (model.controls.fast.state === 'fixed') {
     const activation = t('settings.providers.capability.lockedValue', {
       value: t('settings.providers.capability.fastMode'),

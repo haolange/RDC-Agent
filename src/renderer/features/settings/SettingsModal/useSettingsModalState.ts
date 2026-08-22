@@ -6,6 +6,7 @@ import type {
   LlmProviderEntry,
   RdxActionSettingsMap,
   RdxCliInvokerSettings,
+  CodeInterpreterSettings,
 } from '@shared/types/settings';
 import type { ProviderConnectionDraft, SettingsSection } from './types';
 import { cloneProvider, cloneRoute } from './utils';
@@ -17,6 +18,9 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
   const [agentRouteDrafts, setAgentRouteDrafts] = useState<LlmAgentRoute[]>(settings.llm.agentRoutes.map(cloneRoute));
   const [rdxCliDraft, setRdxCliDraft] = useState<RdxCliInvokerSettings>(settings.tooling.rdxCli);
   const [rdxActionsDraft, setRdxActionsDraft] = useState<RdxActionSettingsMap>(cloneRdxActions(settings.tooling.rdxActions));
+  const [codeInterpreterDraft, setCodeInterpreterDraft] = useState<CodeInterpreterSettings>(
+    settings.tooling.codeInterpreter,
+  );
   const [agentManifestDrafts, setAgentManifestDrafts] = useState<AgentManifestDraft[]>(
     settings.agents.definitions.map((definition) => ({ ...definition })),
   );
@@ -42,6 +46,7 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setAgentRouteDrafts(settings.llm.agentRoutes.map(cloneRoute));
     setRdxCliDraft(settings.tooling.rdxCli);
     setRdxActionsDraft(cloneRdxActions(settings.tooling.rdxActions));
+    setCodeInterpreterDraft(settings.tooling.codeInterpreter);
     setAgentManifestDrafts(settings.agents.definitions.map((definition) => ({ ...definition })));
     setGlobalInstructionsDraft(settings.agents.globalInstructions);
     setSelectedProviderId(providers[0]?.id ?? null);
@@ -63,6 +68,8 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setRdxCliDraft,
     rdxActionsDraft,
     setRdxActionsDraft,
+    codeInterpreterDraft,
+    setCodeInterpreterDraft,
     agentManifestDrafts,
     setAgentManifestDrafts,
     globalInstructionsDraft,

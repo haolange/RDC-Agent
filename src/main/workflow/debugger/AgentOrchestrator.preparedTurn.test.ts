@@ -70,7 +70,7 @@ const effectiveModel: EffectiveModel = {
   defaultBudgetTokens: 256_000,
   controls: {
     fast: { state: 'unsupported', fixedValue: false },
-    context1m: { state: 'unsupported', fixedValue: false },
+    maxContext: { state: 'unsupported', fixedValue: false },
     reasoning: requestPlan.reasoningWire.control,
   },
   toolCalling: { state: 'supported' },

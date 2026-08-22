@@ -165,7 +165,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "selectable",
           "defaultValue": false,
           "tierId": "default",

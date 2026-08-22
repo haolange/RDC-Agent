@@ -748,6 +748,7 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 /* Asked / ask_user: same card chrome rhythm as unified tool cards */
 .work-process-summary-card,
 .work-process-task,
+.work-process-task-snapshot,
 .work-process-subagent,
 .work-process-approval {
   border: var(--transcript-card-border);

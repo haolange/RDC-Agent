@@ -1335,13 +1335,27 @@ html[data-resolved-theme='light'] .app-main {
   max-height: min(24rem, calc(100vh - var(--space-16)));
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
   padding: var(--space-2);
-  overflow: auto;
+  overflow: hidden;
+  isolation: isolate;
   border: 1px solid var(--token-border-default);
   border-radius: var(--radius-xl);
   background: var(--token-bg-overlay);
   box-shadow: var(--token-shadow-popover);
+}
+
+.composer-model-head {
+  position: relative;
+  z-index: 2;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-bottom: var(--space-2);
+  overflow: hidden;
+  border-bottom: 1px solid var(--token-border-muted);
+  background: var(--token-bg-overlay);
 }
 
 .composer-model-search {
@@ -1350,7 +1364,7 @@ html[data-resolved-theme='light'] .app-main {
   padding: 0 var(--space-3);
   border: 1px solid var(--token-border-default);
   border-radius: var(--control-radius);
-  background: var(--token-surface-sunken);
+  background: var(--token-bg-raised);
   color: var(--token-text-body);
   font-size: var(--text-sm);
 }
@@ -1360,10 +1374,32 @@ html[data-resolved-theme='light'] .app-main {
   outline: none;
 }
 
+.composer-model-list {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  margin-top: var(--space-1);
+  padding: var(--space-1) var(--space-1) 0 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  isolation: isolate;
+  contain: paint;
+  border-radius: var(--radius-md);
+  overscroll-behavior: contain;
+}
+
 .composer-model-group {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--token-bg-raised) 55%, var(--token-bg-overlay));
 }
 
 .composer-model-group-label,
@@ -1375,6 +1411,10 @@ html[data-resolved-theme='light'] .app-main {
   font-weight: var(--font-semibold);
 }
 
+.composer-model-empty {
+  flex-shrink: 0;
+}
+
 .composer-model-item {
   display: flex;
   flex-direction: column;
@@ -1384,7 +1424,7 @@ html[data-resolved-theme='light'] .app-main {
   padding: var(--space-2) var(--space-3);
   border: 0;
   border-radius: var(--control-radius);
-  background: var(--token-interactive-rest);
+  background: var(--token-bg-raised);
   color: var(--token-text-body);
   text-align: left;
   cursor: pointer;

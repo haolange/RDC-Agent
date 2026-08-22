@@ -51,6 +51,7 @@ import {
   DEFAULT_LAYOUT,
   DEFAULT_PROFILE,
   DEFAULT_RDX_ACTIONS,
+  DEFAULT_CODE_INTERPRETER,
   DEFAULT_RDX_CLI_INVOKER,
   LEFT_DEFAULTS,
   RIGHT_DEFAULTS,
@@ -61,6 +62,7 @@ import {
 import {
   sanitizeAgentPermissionSettings,
   sanitizeAgentRuntimeContextSettings,
+  sanitizeCodeInterpreterSettings,
   sanitizeRdxActionsSettings,
   sanitizeRdxCliInvokerSettings,
   sanitizeSidebar,
@@ -344,6 +346,10 @@ export class SettingsService {
         rdxActions: sanitizeRdxActionsSettings({
           ...(currentPersisted.tooling?.rdxActions ?? DEFAULT_RDX_ACTIONS),
           ...(patch.tooling?.rdxActions ?? {}),
+        }),
+        codeInterpreter: sanitizeCodeInterpreterSettings({
+          ...(currentPersisted.tooling?.codeInterpreter ?? DEFAULT_CODE_INTERPRETER),
+          ...(patch.tooling?.codeInterpreter ?? {}),
         }),
       },
       agentRuntime: {
