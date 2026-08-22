@@ -209,6 +209,26 @@ describe('live Provider Catalog parsers', () => {
     expect(parsed.contributions.every((model) => !model.modelId.startsWith('cline-pass/'))).toBe(true);
   });
 
+  it('projects live recommended-models vendor ids onto ClinePass catalog ids', () => {
+    const parsed = parseClinePassCatalog({
+      recommended: [
+        { id: 'moonshotai/kimi-k3', name: 'moonshotai/kimi-k3' },
+        { id: 'anthropic/claude-opus-5', name: 'anthropic/claude-opus-5' },
+        { id: 'z-ai/glm-5.3', name: 'GLM-5.3 live' },
+      ],
+    }, surface('cline-pass'));
+    expect(parsed.models.map((model) => model.id).sort()).toEqual([
+      'cline-pass/glm-5.3',
+      'cline-pass/kimi-k3',
+    ]);
+    expect(parsed.contributions).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        modelId: 'cline-pass/kimi-k3',
+        label: 'Kimi K3',
+      }),
+    ]));
+  });
+
   it('projects only ClinePass models onto the ClinePass plan surface', () => {
     const parsed = parseClinePassCatalog(fixture('cline-pass.json'), surface('cline-pass'));
     expect(parsed.models.map((model) => model.id).sort()).toEqual([

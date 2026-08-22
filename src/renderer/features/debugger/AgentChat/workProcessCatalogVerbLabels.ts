@@ -87,4 +87,6 @@ export const CATALOG_VERB_LABEL_KEYS: Record<string, TranslationKey> = {
   '交接': 'chat.workProcessGroupHandoff',
   '子代理': 'chat.workProcessGroupSubagent',
   '动作': 'chat.workProcessGroupActionUnit',
+  '已发布输出': 'chat.workProcessVerb.outputRegisterComplete',
+  '正在发布输出': 'chat.workProcessVerb.outputRegisterRunning',
 };

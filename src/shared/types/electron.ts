@@ -369,6 +369,14 @@ export interface ElectronAPI {
       currentRun?: RunSummary | null;
       error?: string;
     }>;
+    setModelOverride: (
+      id: string,
+      modelOverride: SessionRecord['modelOverride'],
+    ) => Promise<{
+      success: boolean;
+      session?: SessionRecord;
+      error?: string;
+    }>;
     attachments: {
       list: (sessionId: string) => Promise<{
         attachments: SessionAttachmentRecord[];

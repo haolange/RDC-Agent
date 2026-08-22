@@ -32,6 +32,7 @@ const ConfigurationCommitSchema = z.object({
   agentId: ipcNonEmptyString(200, 'agentId'),
   agentCommitHash: ipcString(128, 'agentCommitHash').optional(),
   providerId: ipcString(200, 'providerId').optional(),
+  modelId: ipcString(200, 'modelId').optional(),
   providerCommitHash: ipcString(128, 'providerCommitHash').optional(),
   providerCatalogRevision: ipcString(128, 'providerCatalogRevision').optional(),
   routeRevision: ipcString(128, 'routeRevision').optional(),

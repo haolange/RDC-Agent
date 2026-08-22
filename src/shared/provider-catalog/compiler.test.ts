@@ -362,9 +362,9 @@ describe('Provider Catalog compiler', () => {
     };
 
     verify('chatgpt-account', [
-      ['gpt-5.6-sol', 256_000, 'unsupported', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['gpt-5.6-terra', 256_000, 'unsupported', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
-      ['gpt-5.6-luna', 256_000, 'unsupported', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
+      ['gpt-5.6-sol', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
+      ['gpt-5.6-terra', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
+      ['gpt-5.6-luna', 272_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh', 'max'], 'medium'],
       ['gpt-5.5', 256_000, 'unsupported', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
       ['gpt-5.4-mini', 128_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
       ['gpt-5.4', 256_000, 'selectable', 'selectable', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
@@ -436,6 +436,7 @@ describe('Provider Catalog compiler', () => {
       ['grok-4.20-0309-reasoning', 1_000_000, 'fixed', 'unsupported', 'always-on', false, [], 'on'],
       ['grok-4.20-multi-agent-0309', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'medium'],
       ['grok-4.3', 500_000, 'selectable', 'unsupported', 'levels', true, ['low', 'medium', 'high'], 'medium'],
+      ['grok-4.6', 500_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high', 'xhigh'], 'high'],
       ['grok-4.5', 500_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'medium', 'high'], 'medium'],
       ['grok-build-0.1', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on'],
     ]);
@@ -469,22 +470,27 @@ describe('Provider Catalog compiler', () => {
 
     verify('volcengine-coding-plan', [
       ['doubao-seed-2.0-lite', 131_072, 'unsupported', 'unsupported', 'levels', true, ['minimal', 'low', 'medium', 'high'], 'medium'],
+      ['doubao-seed-2.1-turbo', 131_072, 'unsupported', 'unsupported', 'levels', true, ['minimal', 'low', 'medium', 'high'], 'medium'],
       ['doubao-seed-2.0-pro', 131_072, 'unsupported', 'unsupported', 'levels', true, ['minimal', 'low', 'medium', 'high'], 'medium'],
       ['doubao-seed-2.0-code', 131_072, 'unsupported', 'unsupported', 'levels', true, ['minimal', 'low', 'medium', 'high'], 'medium'],
+      ['glm-5.3', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
       ['glm-5.2', 1_000_000, 'fixed', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
       ['deepseek-v4-pro', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
       ['deepseek-v4-flash', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
       ['kimi-k2.7-code', 256_000, 'unsupported', 'selectable', 'always-on', false, [], 'on'],
       ['kimi-k2.7-code-highspeed', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on', 'internal'],
+      ['minimax-m3', 204_800, 'unsupported', 'unsupported', 'unknown', false, [], 'on'],
     ]);
 
     verify('cline-pass', [
+      ['cline-pass/glm-5.3', 200_000, 'unsupported', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
       ['cline-pass/glm-5.2', 200_000, 'unsupported', 'unsupported', 'levels', true, ['high', 'max'], 'high'],
       ['cline-pass/kimi-k3', 256_000, 'unsupported', 'unsupported', 'levels', false, ['low', 'high', 'max'], 'high'],
       ['cline-pass/kimi-k2.7-code', 256_000, 'unsupported', 'unsupported', 'always-on', false, [], 'on'],
       ['cline-pass/kimi-k2.6', 256_000, 'unsupported', 'unsupported', 'toggle', true, [], 'on'],
       ['cline-pass/deepseek-v4-pro', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
       ['cline-pass/deepseek-v4-flash', 1_000_000, 'fixed', 'unsupported', 'levels', false, ['high', 'max'], 'high'],
+      ['cline-pass/qwen3.8-max', 1_000_000, 'fixed', 'unsupported', 'unknown', false, [], 'on'],
       ['cline-pass/qwen3.7-plus', 128_000, 'unsupported', 'unsupported', 'unknown', false, [], 'on'],
     ]);
     const volcengine = catalog.surfaces.get('volcengine-coding-plan')?.surface;
@@ -495,14 +501,13 @@ describe('Provider Catalog compiler', () => {
       });
     }
     expect(volcengine?.models.find((model) => model.modelId === 'kimi-k2.7-code')).toMatchObject({
-      availability: 'unavailable',
-      unavailableReason: expect.stringContaining('user-observed'),
+      availability: 'available',
       executionBindings: [{
         actions: [{ kind: 'model-switch', targetModelId: 'kimi-k2.7-code-highspeed' }],
       }],
     });
     expect(volcengine?.models.find((model) => model.modelId === 'kimi-k2.7-code-highspeed')).toMatchObject({
-      availability: 'unavailable',
+      availability: 'available',
       selection: { pickerVisibility: 'internal' },
     });
   });

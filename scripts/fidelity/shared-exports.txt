@@ -330,6 +330,7 @@ EffectiveAvailability
 EffectiveAvailabilitySchema
 EffectiveCatalogSnapshot
 EffectiveModel
+EffectiveModelPickerCandidate
 EffectiveResourceStatus
 ElectronAPI
 EntitlementState
@@ -416,6 +417,7 @@ IntakeContext
 INVESTIGATOR_AGENTS
 isAgentIconPreset
 isAlphanumeric
+isEffectiveModelPickerSelectable
 isHexColor
 isLlmProviderProtocol
 isMaxContextTier
@@ -789,6 +791,7 @@ SessionApi
 SessionAttachmentKind
 SessionAttachmentRecord
 SessionContext
+SessionModelOverride
 SessionRecord
 SessionScope
 SessionScopedPayload

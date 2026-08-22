@@ -311,7 +311,7 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     id: 'agent_handoff',
     label: 'Agent Handoff',
     permission: 'readonly',
-    inputSchema: { type: 'object', required: ['prompt'], properties: { agent: { type: 'string' }, label: { type: 'string' }, prompt: { type: 'string' } } },
+    inputSchema: { type: 'object', required: ['agent'], properties: { agent: { type: 'string' }, label: { type: 'string' }, prompt: { type: 'string' } } },
     resultSummary: 'Creates an implementation or specialist handoff summary.',
     icon: 'route',
     approvalRequired: false,
@@ -323,7 +323,11 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     inputSchema: {
       type: 'object',
       required: ['task'],
-      properties: { task: { type: 'string' }, profile: { type: 'string' } },
+      properties: {
+        task: { type: 'string' },
+        profile: { type: 'string' },
+        model: { type: 'string' },
+      },
     },
     resultSummary: 'Delegates a sub-task to an isolated sub-agent and returns its answer.',
     icon: 'bot',

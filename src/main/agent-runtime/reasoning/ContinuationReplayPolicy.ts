@@ -124,9 +124,12 @@ function sameProviderBoundary(artifact: ProviderContinuationArtifact, target: Re
 }
 
 function providerStateMatches(artifact: ProviderContinuationArtifact, target: RequestPlan): boolean {
+  const next = target.executionIdentity;
   return target.statePlan.mode === 'provider-managed'
     && target.contracts.reasoning.continuation === 'provider-managed'
-    && sameProviderBoundary(artifact, target);
+    && sameProviderBoundary(artifact, target)
+    && artifact.origin.effectiveModelId === next.effectiveModelId
+    && artifact.origin.canonicalModelId === next.canonicalModelId;
 }
 
 function containerMatches(

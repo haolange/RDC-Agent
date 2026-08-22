@@ -27,7 +27,12 @@ import {
   SessionIdOnlyArgsSchema,
   SessionListArgsSchema,
   SessionRenameArgsSchema,
+  SessionSetModelOverrideArgsSchema,
 } from './validation/projectSessionSchemas';
+import { isEffectiveModelPickerSelectable } from '@shared/utils/effectiveModelPicker';
+import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
+import { resolveEffectiveModel } from '../settings/EffectiveModelResolver';
+import { settingsService } from '../settings/SettingsService';
 
 const STALE_RECOVERABLE_RUN_STATUSES: Array<RunSummary['status']> = [
   'planning',
@@ -306,6 +311,37 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         session,
         currentRun,
       };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('session:setModelOverride', async (_event, ...rawArgs: unknown[]) => {
+    try {
+      const [id, modelOverride] = parseIpcArgs(SessionSetModelOverrideArgsSchema, rawArgs, {
+        label: 'session:setModelOverride',
+        maxBytes: 4 * 1024,
+      });
+      const session = storageAdapter.readSession(id);
+      if (!session) {
+        return { success: false, error: `Session not found: ${id}` };
+      }
+      if (modelOverride) {
+        await loadProviderSurface(modelOverride.providerId);
+        const model = resolveEffectiveModel(
+          modelOverride.providerId,
+          modelOverride.modelId,
+          settingsService.getAll(),
+        );
+        if (!model || !isEffectiveModelPickerSelectable(model)) {
+          return {
+            success: false,
+            error: `MODEL_UNAVAILABLE: ${modelOverride.providerId}:${modelOverride.modelId}`,
+          };
+        }
+      }
+      const updated = storageAdapter.updateSession(id, { modelOverride });
+      return { success: true, session: updated };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
     }

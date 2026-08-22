@@ -826,6 +826,12 @@
   /* ── Elevation (macOS-style depth) ──
    *  Components express depth through these tokens instead of hard 1px borders.
    *  `*-edge` appends a glassy top highlight; pair it after the shadow. */
+  --transcript-card-radius:    var(--radius-md);
+  --transcript-card-padding:   var(--space-2) var(--space-3);
+  --transcript-card-border:    1px solid var(--token-border-muted);
+  --transcript-card-surface:   var(--token-surface-sunken);
+  --transcript-card-shadow:    var(--shadow-panel-hover);
+
   --token-shadow-raised:       var(--shadow-sm);
   --token-shadow-card:         var(--shadow-md);
   --token-shadow-popover:      var(--shadow-lg);

@@ -35,6 +35,9 @@ composer-markdown-tab-preview
 composer-markdown-tab-write
 composer-markdown-toolbar
 composer-mode-pill
+composer-model-item-${option.providerId}-${option.modelId}
+composer-model-pill
+composer-model-search
 composer-permission-pill
 composer-skill-chip
 composer-tool-approval-panel
@@ -47,6 +50,7 @@ context-breakdown-cost
 context-breakdown-projected-note
 context-breakdown-run-meter
 context-breakdown-window-note
+conversation-edit-preview
 conversation-thread
 empty-workbench-prompt
 empty-workbench-tool-${toolMode}
@@ -103,6 +107,7 @@ settings-modal
 settings-model-cascade-trigger
 settings-model-option-custom-${option.canonicalId}
 settings-nav-${section.id}
+settings-nav-search
 settings-provider-app-managed-models
 settings-provider-auth-mode-${mode}
 settings-provider-auth-state
@@ -151,6 +156,8 @@ settings-rdx-actions
 settings-rdx-block
 settings-runtime-editor
 settings-runtime-scope
+settings-search-result-${entry.id}
+settings-search-results
 settings-workspace-body
 sidebar-footer
 sidebar-knowledge-center-trigger

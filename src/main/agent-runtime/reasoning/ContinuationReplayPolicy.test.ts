@@ -193,6 +193,26 @@ describe('ContinuationReplayPolicy', () => {
     }).action).toBe('replay');
   });
 
+  it('drops provider-managed continuation when the effective model changes', () => {
+    const source = plan({
+      modelId: 'model-a',
+      policy: 'provider-managed',
+      artifactPolicy: 'provider-managed',
+      artifactScope: 'provider-managed',
+      stateMode: 'provider-managed',
+    });
+    const target = plan({
+      modelId: 'model-b',
+      policy: 'provider-managed',
+      artifactPolicy: 'provider-managed',
+      artifactScope: 'provider-managed',
+      stateMode: 'provider-managed',
+    });
+    const artifact = createContinuationArtifact(source, { type: 'response_state', opaqueState: 'state-id' });
+    expect(decideContinuationReplay(artifact, target, { sameToolLoop: false }))
+      .toEqual({ action: 'drop', reason: 'execution-mismatch' });
+  });
+
   it('separates provider-managed state from replayable artifacts', () => {
     const source = plan({
       policy: 'provider-managed',

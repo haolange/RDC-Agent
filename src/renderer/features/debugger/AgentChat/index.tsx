@@ -8,6 +8,8 @@ import {
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { ConversationThread } from './ConversationThread';
 import './AgentChat.css';
+import './AgentChat.markdown.css';
+import './AgentChat.extras.css';
 import './markdown-code.css';
 
 const STICKY_SCROLL_THRESHOLD = 96;

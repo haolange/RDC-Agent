@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 import type { ConversationMessage } from '@shared/types/conversation';
 import { getElectronApi } from '../../../platform/getElectronApi';
 import { useConversationStore } from '../../../stores/conversationStore';
@@ -12,8 +12,11 @@ import {
 } from '../composer/composerSendHelpers';
 import { useTurnControlsStore } from '../composer/useTurnControls';
 import { createConversationRequestId } from '../composer/composerSendFlow';
+import { buildConversationConfigurationCommit } from '../composer/composerConfigurationCommit';
+import { toConversationMode } from '../composer/composerSendHelpers';
 import { useComposerSessionContextStore } from '../composer/composerSessionContext';
-import { useAppSettingsStore } from '../../../stores/appSettingsStore';
+import { useLayoutStore } from '../../../stores/layoutStore';
+import { readComposerEffectiveModel } from '../composer/useComposerEffectiveModel';
 import { buildOptimisticRewriteSnapshot } from './optimisticRewriteSnapshot';
 
 export function isRewriteTurnStillCurrent(turnId: string, activeLeafBranchId?: string | null): boolean {
@@ -25,7 +28,6 @@ export function isRewriteTurnStillCurrent(turnId: string, activeLeafBranchId?: s
 }
 
 export function useUserMessageRewrite(message: ConversationMessage) {
-  const conversationMessages = useConversationStore((state) => state.conversationMessages);
   const setConversationMessages = useConversationStore((state) => state.setConversationMessages);
   const setBranchState = useConversationStore((state) => state.setBranchState);
   const setConversationSnapshot = useConversationStore((state) => state.setConversationSnapshot);
@@ -37,11 +39,6 @@ export function useUserMessageRewrite(message: ConversationMessage) {
   const setRuns = useSessionStore((state) => state.setRuns);
   const setTracePresentation = useWorkflowStore((state) => state.setTracePresentation);
 
-  const pairedAssistant = useMemo(
-    () => conversationMessages.find((entry) => entry.turnId === message.turnId && entry.role === 'assistant') ?? null,
-    [conversationMessages, message.turnId],
-  );
-
   return useCallback(async (nextContent: string) => {
     const electronAPI = getElectronApi();
     if (!electronAPI) {
@@ -51,7 +48,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
     const previousMessages = useConversationStore.getState().allConversationMessages;
     const previousBranchState = useConversationStore.getState().branchState;
     const requestId = createConversationRequestId();
-    const rewriteAgentId = pairedAssistant?.agentId ?? message.agentId ?? message.modeContext ?? 'ask';
+    const rewriteAgentId = useLayoutStore.getState().selectedAgentId || 'ask';
     const turnOwnership = {
       sessionId: message.sessionId ?? 'no-session',
       requestId,
@@ -76,7 +73,15 @@ export function useUserMessageRewrite(message: ConversationMessage) {
     });
 
     try {
-      const agentCommit = await useAppSettingsStore.getState().flushAgentDefinitionSaves(rewriteAgentId);
+      const configuration = await buildConversationConfigurationCommit({
+        selectedAgentId: rewriteAgentId,
+        getEffectiveCatalog: (providerId) => electronAPI.settings.getEffectiveCatalog(providerId),
+        modelOverride: readComposerEffectiveModel(
+          rewriteAgentId,
+          useProjectStore.getState().currentSession,
+          currentProject?.projectId,
+        ),
+      });
       const result = await electronAPI.conversation.rewriteFromMessage({
         requestId,
         messageId: message.id,
@@ -84,7 +89,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         sessionId: message.sessionId,
         currentRunId: message.runId ?? null,
         replayDeviceId: null,
-        mode: message.modeContext ?? 'ask',
+        mode: toConversationMode(useLayoutStore.getState().currentMode),
         agentId: rewriteAgentId,
         message: nextContent,
         attachments: message.attachments?.map((attachment) => ({
@@ -94,11 +99,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
           size: attachment.size,
         })) ?? [],
         turnControls: { ...useTurnControlsStore.getState().turnControls },
-        configurationCommit: {
-          agentId: rewriteAgentId,
-          agentCommitHash: agentCommit?.commitHash,
-          providerId: agentCommit?.route?.providerId,
-        },
+        configurationCommit: configuration.configurationCommit,
       });
 
       if (useConversationStore.getState().consumeRevokedRequest(requestId)) {
@@ -171,7 +172,6 @@ export function useUserMessageRewrite(message: ConversationMessage) {
   }, [
     currentProject,
     message,
-    pairedAssistant,
     setBranchState,
     setConversationMessages,
     setConversationSnapshot,

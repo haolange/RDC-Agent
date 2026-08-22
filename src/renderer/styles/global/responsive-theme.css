@@ -189,13 +189,15 @@
   }
 
   .composer-agent-menu,
-  .composer-permission-menu {
+  .composer-permission-menu,
+  .composer-model-menu {
     flex: 1 1 0;
     min-width: 0;
   }
 
   .composer-agent-pill,
-  .composer-permission-pill {
+  .composer-permission-pill,
+  .composer-model-pill {
     width: 100%;
     min-width: 0;
   }
@@ -351,6 +353,7 @@ body {
 .composer-attach-button,
 .composer-agent-pill,
 .composer-permission-pill,
+.composer-model-pill,
 .composer-effort-pill,
 .composer-usage-indicator {
   border-color: var(--token-border-default);

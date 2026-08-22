@@ -38,7 +38,7 @@ describe('buildWorkProcessPresentation', () => {
         { id: 'compact-2', kind: 'compaction', title: 'Context compacted', summary: 'new counts', status: 'complete', toolCalls: [], startedAt: now + 10, completedAt: now + 15 },
       ],
     });
-    expect(presentation.rows).toEqual([expect.objectContaining({ id: 'compact-2', type: 'summary', text: 'Earlier work summarized' })]);
+    expect(presentation.rows).toEqual([expect.objectContaining({ id: 'compact-2', type: 'summary', text: '上下文压缩' })]);
   });
 
   it('uses authoritative task event rows instead of duplicating task tool receipts', () => {

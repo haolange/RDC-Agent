@@ -35,6 +35,10 @@ import {
   resolveEnabledAgentDefinition,
 } from './ConversationRoutePreflight';
 import type { CompleteProfileTurnInput } from './ConversationTurnRunner';
+import {
+  createContinuationDropNotice,
+  shouldAnnounceContinuationDrop,
+} from './ConversationContinuationNotice';
 
 export interface ConversationTurnStarterHost {
   getPreparingRequestByRequestId(requestId: string): {
@@ -75,6 +79,7 @@ export async function startProfileTurn(
   preparationController: AbortController = new AbortController(),
   configurationCommit?: ConversationSendRequest['configurationCommit'],
   requestFingerprint?: string,
+  excludeTurnId?: string,
 ): Promise<ConversationTurnResult> {
   const pendingProjectRootPath = context.projectId
     ? storageAdapter.getProjectById(context.projectId)?.rootPath ?? null
@@ -109,14 +114,19 @@ export async function startProfileTurn(
   }
   throwIfPreparationCancelled();
 
+  const modelOverride = context.session?.modelOverride
+    ?? (configurationCommit?.providerId && configurationCommit.modelId
+      ? { providerId: configurationCommit.providerId, modelId: configurationCommit.modelId }
+      : null);
   const configuredRoute = settingsService.getAll().llm.agentRoutes.find((entry) => entry.agentId === conversationAgentId);
-  if (configuredRoute?.providerId) {
-    const surface = await loadProviderSurface(configuredRoute.providerId);
-    if (!surface) throw new Error(`PROVIDER_UNAVAILABLE: ${configuredRoute.providerId} is not in the compiled Catalog.`);
+  const surfaceProviderId = modelOverride?.providerId ?? configuredRoute?.providerId;
+  if (surfaceProviderId) {
+    const surface = await loadProviderSurface(surfaceProviderId);
+    if (!surface) throw new Error(`PROVIDER_UNAVAILABLE: ${surfaceProviderId} is not in the compiled Catalog.`);
   }
   throwIfPreparationCancelled();
 
-  let routePreflight = resolveAgentRoutePreflight(conversationAgentId);
+  let routePreflight = resolveAgentRoutePreflight(conversationAgentId, undefined, modelOverride);
   if (!routePreflight.ok) {
     const code = routePreflight.diagnostic.code === 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
       ? 'PROVIDER_UNAVAILABLE'
@@ -136,7 +146,7 @@ export async function startProfileTurn(
   const credentialRequestState = host.getPreparingRequestByRequestId(requestId);
   if (credentialRequestState) credentialRequestState.credentialHandle = credentialHandle;
   throwIfPreparationCancelled();
-  routePreflight = resolveAgentRoutePreflight(conversationAgentId);
+  routePreflight = resolveAgentRoutePreflight(conversationAgentId, undefined, modelOverride);
   if (!routePreflight.ok) {
     const code = routePreflight.diagnostic.code === 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
       ? 'PROVIDER_UNAVAILABLE'
@@ -207,6 +217,7 @@ export async function startProfileTurn(
     attachmentPaths: pendingAttachmentDescriptors.map((attachment) => attachment.filePath),
     messageText: effectiveMessage,
     preloadSkillIds,
+    excludeTurnId,
   });
   const preparedBranchState = branchContext?.branchState ?? (context.session
     ? storageAdapter.readConversationBranchState(context.session.sessionId)
@@ -252,6 +263,7 @@ export async function startProfileTurn(
   let turnRunId: string | null = null;
   let userMessage: ConversationMessage;
   let assistantDraftMessage: ConversationMessage;
+  let continuationNotice: ConversationMessage | null = null;
   try {
     const attachmentPaths = pendingAttachments.map((entry) => entry.sourcePath);
     if (!workingSession && context.projectId) {
@@ -313,6 +325,25 @@ export async function startProfileTurn(
       branchId,
       preparedContext: preparedTurn.summary,
     });
+    const previousPrepared = excludeTurnId && sessionIdForBranch
+      ? persistedHistoryBeforeCommit.find((entry) => (
+        entry.turnId === excludeTurnId && entry.role === 'assistant' && entry.preparedContext
+      ))?.preparedContext
+      : undefined;
+    continuationNotice = previousPrepared && shouldAnnounceContinuationDrop(previousPrepared, planning.plan)
+      ? createContinuationDropNotice({
+          requestId,
+          turnId,
+          sessionId: sessionIdForBranch,
+          projectId: context.projectId,
+          modeContext: requestedMode,
+          branchId,
+          forkId: branchContext?.forkId,
+          variantIndex: branchContext?.variantIndex,
+          previous: previousPrepared.route,
+          next: planning.plan,
+        })
+      : null;
     if (sessionIdForBranch && branchState && branchContext) {
       const nextBranchState = structuredClone(branchState);
       const fork = nextBranchState.forks.find((entry) => entry.forkId === branchContext.forkId);
@@ -331,7 +362,12 @@ export async function startProfileTurn(
       branchState = nextBranchState;
     }
     if (sessionIdForBranch) {
-      const committedHistory = [...persistedHistoryBeforeCommit, userMessage, assistantDraftMessage];
+      const committedHistory = [
+        ...persistedHistoryBeforeCommit,
+        userMessage,
+        ...(continuationNotice ? [continuationNotice] : []),
+        assistantDraftMessage,
+      ];
       if (stagedSessionCommit) {
         workingSession = storageAdapter.commitStagedConversationSession(
           stagedSessionCommit,
@@ -359,7 +395,13 @@ export async function startProfileTurn(
       turnRunId = createdRun.runId;
       userMessage = { ...userMessage, runId: turnRunId };
       assistantDraftMessage = { ...assistantDraftMessage, runId: turnRunId };
+      if (continuationNotice) {
+        continuationNotice = { ...continuationNotice, runId: turnRunId };
+      }
       storageAdapter.appendConversationMessage(workingSession.sessionId, userMessage);
+      if (continuationNotice) {
+        storageAdapter.appendConversationMessage(workingSession.sessionId, continuationNotice);
+      }
       storageAdapter.appendConversationMessage(workingSession.sessionId, assistantDraftMessage);
     }
   } catch (error) {
@@ -380,7 +422,7 @@ export async function startProfileTurn(
         storageAdapter.readConversationHistory(workingSession.sessionId),
         branchState,
       )
-    : [userMessage, assistantDraftMessage];
+    : [userMessage, ...(continuationNotice ? [continuationNotice] : []), assistantDraftMessage];
   const traceSessionId = workingSession?.sessionId ?? host.ephemeralTraceSessionId(turnId);
   let tracePresentation = await traceService.buildConversationPresentation(
     traceSessionId,

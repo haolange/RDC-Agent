@@ -48,6 +48,8 @@ export interface AgentTurnOptions {
 
 export interface AgentProfileTurnOptions extends AgentTurnOptions {
   sessionId?: string;
+  /** Child-turn model only. Parent session override is never inherited. */
+  modelOverride?: { providerId: string; modelId: string } | null;
   /** Durable run that owns user-visible outputs from this turn. */
   runId?: string;
   systemPrompt?: string;

@@ -38,7 +38,7 @@ export const PolicySettings: React.FC<{
   );
 
   return (
-    <section className="settings-page settings-page-policy">
+    <section className="settings-page settings-page-policy" data-settings-search="policy">
       <div className="settings-browser-block settings-tool-card" data-testid="settings-agent-runtime-block">
         <div className="settings-browser-section-head">
           <div>
@@ -46,7 +46,7 @@ export const PolicySettings: React.FC<{
             <div className="settings-help-text">{t('settings.compactionThresholdHint')}</div>
           </div>
         </div>
-        <label className="settings-field">
+        <label className="settings-field" data-settings-search="compaction">
           <span className="settings-field-label">{t('settings.compactionThreshold')}</span>
           <select
             className="input"

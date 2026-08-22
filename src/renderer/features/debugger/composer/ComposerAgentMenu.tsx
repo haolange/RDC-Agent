@@ -1,13 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { ModeGlyph } from '../../../ui/ModeGlyph';
 import { useI18n } from '../../../i18n';
 import type { AgentMode, ModeConfig } from '@shared/types/layout';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
+import { useComposerMenu } from './useComposerMenuRegistry';
 
 export const ComposerAgentMenu: React.FC<{
-  modeMenuRef: React.Ref<HTMLDivElement>;
-  modeMenuOpen: boolean;
-  setModeMenuOpen: React.Dispatch<React.SetStateAction<boolean>>;
   currentMode: AgentMode;
   currentModeConfig: ModeConfig;
   currentModeLabel: string;
@@ -19,9 +17,6 @@ export const ComposerAgentMenu: React.FC<{
   setSelectedAgentId: (agentId: string) => void;
   setCurrentMode: (mode: AgentMode) => void;
 }> = ({
-  modeMenuRef,
-  modeMenuOpen,
-  setModeMenuOpen,
   currentMode,
   currentModeConfig,
   currentModeLabel,
@@ -34,19 +29,24 @@ export const ComposerAgentMenu: React.FC<{
   setCurrentMode,
 }) => {
   const { t } = useI18n();
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menu = useComposerMenu('agent');
   const popupRef = useRef<HTMLDivElement>(null);
+  const setRootRef = useCallback((node: HTMLDivElement | null) => {
+    menu.setRoot(node);
+  }, [menu]);
+  const setTriggerRef = useCallback((node: HTMLButtonElement | null) => {
+    menu.setTrigger(node);
+  }, [menu]);
 
   useEffect(() => {
-    if (!modeMenuOpen) return;
+    if (!menu.open) return;
     const selected = popupRef.current?.querySelector<HTMLButtonElement>('[data-selected="true"]');
     const first = popupRef.current?.querySelector<HTMLButtonElement>('[role="menuitemradio"]');
     (selected ?? first)?.focus({ preventScroll: true });
-  }, [modeMenuOpen]);
+  }, [menu.open]);
 
   const closeAndRestoreFocus = () => {
-    setModeMenuOpen(false);
-    globalThis.requestAnimationFrame(() => triggerRef.current?.focus({ preventScroll: true }));
+    menu.close();
   };
 
   const selectAgent = (agent: AgentManifestDefinition) => {
@@ -86,15 +86,15 @@ export const ComposerAgentMenu: React.FC<{
   };
 
   return (
-    <div ref={modeMenuRef} className="composer-agent-menu">
+    <div ref={setRootRef} className="composer-agent-menu">
       <button
-        ref={triggerRef}
+        ref={setTriggerRef}
         type="button"
-        className={`composer-agent-pill ${modeMenuOpen ? 'open' : ''}`}
+        className={`composer-agent-pill ${menu.open ? 'open' : ''}`}
         data-testid="composer-mode-pill"
-        onClick={() => setModeMenuOpen((current) => !current)}
+        onClick={() => menu.toggle()}
         aria-haspopup="menu"
-        aria-expanded={modeMenuOpen}
+        aria-expanded={menu.open}
         title={selectedAgentCapability || currentModeLabel}
       >
         <span className="composer-agent-pill-icon" aria-hidden="true">
@@ -107,7 +107,7 @@ export const ComposerAgentMenu: React.FC<{
           </svg>
         </span>
       </button>
-      {modeMenuOpen ? (
+      {menu.open ? (
         <div
           ref={popupRef}
           className="composer-agent-menu-popup"

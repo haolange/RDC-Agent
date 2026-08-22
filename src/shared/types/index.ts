@@ -216,6 +216,7 @@ export type {
   RunRecord,
   RunSummary,
   SessionAttachmentRecord,
+  SessionModelOverride,
   SessionRecord,
 } from './session';
 export type {

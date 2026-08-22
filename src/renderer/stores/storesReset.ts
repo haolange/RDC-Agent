@@ -6,6 +6,7 @@ import { useSessionStore } from './sessionStore';
 import { useSessionProjectionStore } from './sessionProjectionStore';
 import { useWorkflowStore } from './workflowStore';
 import { useComposerSessionContextStore } from '../features/debugger/composer/composerSessionContext';
+import { useComposerModelDraftStore } from '../features/debugger/composer/composerModelDraft';
 
 /** Resets session-scoped slices (used by case:new and E2E harness). */
 export function resetWorkbenchStores(): void {
@@ -24,6 +25,7 @@ export function resetWorkbenchStores(): void {
   useSessionProjectionStore.getState().reset();
   useComposerSessionContextStore.getState().resetForSessionSwitch();
   useComposerSessionContextStore.getState().setLastSent(null);
+  useComposerModelDraftStore.getState().reset();
   useSessionStore.setState({
     runs: [],
     currentRun: null,

@@ -18,6 +18,13 @@
 
 - commentary 散文（markdown，不进 thinking 槽）。
 
+## 统一卡壳
+
+- 审批卡、tool 卡、Asked 卡、Sub Agent 子行、Task 行、Compact 摘要共用 `--transcript-card-*`（radius / padding / border / surface / shadow）。
+- Compact 是正式卡片（`work-process-summary-card`），标题走 i18n `chat.workProcessCompactTitle`，保留 token/message 计数。
+- Task 状态、审批 risk、`output_register`「已发布输出」走 i18n，禁止硬编码英文 `Blocked` / `In progress` 或 `` `${risk} risk` ``。
+- 禁止 primitive token 直用与奇数 px；审批动作使用 `<Button>`。
+
 ## Tool 卡片
 
 - 统一单披露 tool 卡片：header icon+动词 + **结果优先** 族 body。

@@ -6,6 +6,7 @@ interface UserMessageEditFormProps {
   value: string;
   error: string;
   submitting: boolean;
+  executionPreview: string;
   onChange: (value: string) => void;
   onCancel: () => void;
   onSubmit: () => void;
@@ -15,15 +16,16 @@ export const UserMessageEditForm: React.FC<UserMessageEditFormProps> = ({
   value,
   error,
   submitting,
+  executionPreview,
   onChange,
   onCancel,
   onSubmit,
 }) => {
-  const { language } = useI18n();
+  const { t } = useI18n();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const cancelLabel = language === 'zh-CN' ? '取消' : 'Cancel';
-  const sendLabel = language === 'zh-CN' ? '发送' : 'Send';
-  const sendingLabel = language === 'zh-CN' ? '发送中' : 'Sending';
+  const cancelLabel = t('chat.rewriteCancel');
+  const sendLabel = t('chat.rewriteSend');
+  const sendingLabel = t('chat.rewriteSending');
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -50,6 +52,7 @@ export const UserMessageEditForm: React.FC<UserMessageEditFormProps> = ({
 
   return (
     <form className="conversation-edit-form" onSubmit={submit}>
+      <p className="conversation-edit-preview" data-testid="conversation-edit-preview">{executionPreview}</p>
       <textarea
         ref={textareaRef}
         className="input conversation-edit-textarea"

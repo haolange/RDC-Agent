@@ -30,6 +30,10 @@ export {
   splitCanonicalAgentModelId,
   type CanonicalAgentModelId,
 } from './agentModelRoute';
+export {
+  isEffectiveModelPickerSelectable,
+  type EffectiveModelPickerCandidate,
+} from './effectiveModelPicker';
 export { charsToTokens } from './tokens';
 export {
   resolveCompactionThresholdTokens,

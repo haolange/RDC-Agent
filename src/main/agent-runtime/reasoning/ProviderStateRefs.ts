@@ -75,7 +75,9 @@ export function providerStateReuseReason(
       ? 'reusable'
       : 'compatibility-group-mismatch';
   }
-  if (crossModel === 'provider-managed') return 'reusable';
+  if (crossModel === 'provider-managed') {
+    return sameModelExecution(state, target) ? 'reusable' : 'model-mismatch';
+  }
   return 'provider-boundary-mismatch';
 }
 

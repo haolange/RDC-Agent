@@ -146,6 +146,15 @@ export const SessionRecordSchema: ZodType<SessionRecord> = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
   lastRunId: z.string().optional(),
+  turnControls: z.object({
+    reasoningLevel: z.string(),
+    maxContextMode: z.boolean(),
+    fastModel: z.boolean(),
+  }).optional(),
+  modelOverride: z.object({
+    providerId: z.string().min(1),
+    modelId: z.string().min(1),
+  }).nullable().optional(),
 }).passthrough() as ZodType<SessionRecord>;
 
 export const SessionEvidenceV1Schema = z.object({

@@ -14,6 +14,14 @@ type PreparationPhase = 'idle' | 'preparing' | 'current' | 'actual';
 
 const METER_UNAVAILABLE = '—';
 
+export interface ContextUsageMenuController {
+  open: boolean;
+  toggle: () => void;
+  close: () => void;
+  setRoot: (node: HTMLElement | null) => void;
+  setTrigger: (node: HTMLElement | null) => void;
+}
+
 export const ContextUsageIndicator: React.FC<{
   usage: RunContextUsageSummary | null;
   prepared: PreparedTurnContextSummary | null;
@@ -21,10 +29,19 @@ export const ContextUsageIndicator: React.FC<{
   selectedProfile: ContextUsageSelectedProfile | null;
   stale?: boolean;
   estimated?: boolean;
-}> = ({ usage, prepared, phase, selectedProfile, stale = false, estimated = false }) => {
+  menu?: ContextUsageMenuController;
+}> = ({ usage, prepared, phase, selectedProfile, stale = false, estimated = false, menu }) => {
   const { t } = useI18n();
-  const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = menu?.open ?? localOpen;
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const assignRoot = useCallback((node: HTMLDivElement | null) => {
+    menu?.setRoot(node);
+  }, [menu]);
+  const assignTrigger = useCallback((node: HTMLButtonElement | null) => {
+    triggerRef.current = node;
+    menu?.setTrigger(node);
+  }, [menu]);
   const showPrepared = phase === 'current' && prepared !== null;
   const previewActive = estimated && !showPrepared && usage !== null;
   const showEstimatedRing = previewActive && phase !== 'preparing';
@@ -48,9 +65,20 @@ export const ContextUsageIndicator: React.FC<{
   const percentLabel = showEstimatedRing ? `~${normalizedPercent}%` : `${normalizedPercent}%`;
 
   const closePopover = useCallback(() => {
-    setOpen(false);
+    if (menu) {
+      menu.close();
+      return;
+    }
+    setLocalOpen(false);
     window.requestAnimationFrame(() => triggerRef.current?.focus());
-  }, []);
+  }, [menu]);
+  const togglePopover = useCallback(() => {
+    if (menu) {
+      menu.toggle();
+      return;
+    }
+    setLocalOpen((current) => !current);
+  }, [menu]);
 
   const windowLabel = phase === 'preparing'
     ? t('contextBreakdown.preparing')
@@ -79,9 +107,9 @@ export const ContextUsageIndicator: React.FC<{
       : METER_UNAVAILABLE;
 
   return (
-    <div className="composer-usage">
+    <div ref={assignRoot} className="composer-usage">
       <button
-        ref={triggerRef}
+        ref={assignTrigger}
         type="button"
         className={`composer-usage-indicator${stale && !showPrepared ? ' is-stale' : ''}${phase === 'preparing' ? ' is-pending' : ''}${showEstimatedRing ? ' is-estimated' : ''}`}
         data-testid="composer-usage-indicator"
@@ -90,7 +118,7 @@ export const ContextUsageIndicator: React.FC<{
         aria-haspopup="dialog"
         aria-expanded={open}
         title={windowLabel}
-        onClick={() => (open ? closePopover() : setOpen(true))}
+        onClick={togglePopover}
       >
         <svg className="composer-usage-ring" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true">
           <circle className="composer-usage-ring-track" cx="18" cy="18" r={radius} />

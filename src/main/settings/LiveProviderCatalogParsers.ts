@@ -6,7 +6,11 @@ import type {
   ReasoningControl,
 } from '@shared/types/modelCapability';
 import type { LlmProviderModel, LlmProviderProtocol } from '@shared/types/settings';
-import { extractDiscoveredModelIdentity, isAdmittedDiscoveredModel } from './DiscoveryAdmission';
+import {
+  extractDiscoveredModelIdentity,
+  isAdmittedDiscoveredModel,
+  normalizeDiscoveredModelMatchKey,
+} from './DiscoveryAdmission';
 import { projectLiveModelObservations, type LiveModelObservation } from './LiveProviderCatalogProjection';
 
 export interface GrokBuilderCatalogDiagnostic {
@@ -395,23 +399,53 @@ function clineUsageCatalogRecords(payload: unknown): Record<string, unknown>[] {
   return records(payload);
 }
 
+function objectRows(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value)
+    ? value.filter((entry): entry is Record<string, unknown> => Boolean(entry) && typeof entry === 'object')
+    : [];
+}
+
 /**
- * ClinePass plan models come from `recommended-models.clinePass` only.
- * Do not admit `free` / `recommended` buckets — those are not the plan surface.
+ * Live `/ai/cline/recommended-models` now returns `{ recommended: [...] }` with
+ * vendor-prefixed ids. Older fixtures still use `clinePass` plus `cline-pass/*`.
+ * Prefer the plan bucket when both exist.
  */
 function clinePassCatalogRecords(payload: unknown): Record<string, unknown>[] {
   if (!payload || typeof payload !== 'object') return [];
   const root = payload as Record<string, unknown>;
-  if (Array.isArray(root.clinePass)) {
-    return root.clinePass.filter(
-      (value): value is Record<string, unknown> => Boolean(value) && typeof value === 'object',
-    );
-  }
-  // Fixture / OpenAI-shaped payloads used by unit tests.
+  if (Array.isArray(root.clinePass)) return objectRows(root.clinePass);
+  if (Array.isArray(root.recommended)) return objectRows(root.recommended);
   return records(payload).filter((value) => {
     const id = modelId(value);
     return id ? isClinePassCatalogRow(value, id) : false;
   });
+}
+
+function clinePassCanonicalObservation(observation: LiveModelObservation): LiveModelObservation {
+  const rawId = observation.modelId;
+  if (rawId.toLowerCase().startsWith('cline-pass/')) return observation;
+  const suffix = rawId.includes('/') ? rawId.slice(rawId.lastIndexOf('/') + 1) : rawId;
+  return {
+    ...observation,
+    modelId: `cline-pass/${suffix}`,
+    aliases: [...new Set([...(observation.aliases ?? []), rawId])],
+  };
+}
+
+function matchesClinePassManifest(
+  surface: ProviderSurfaceDefinition,
+  observation: LiveModelObservation,
+): boolean {
+  const keys = new Set(
+    [observation.modelId, ...(observation.aliases ?? [])]
+      .map(normalizeDiscoveredModelMatchKey)
+      .filter(Boolean),
+  );
+  return surface.models.some((model) => (
+    [model.modelId, ...model.aliases]
+      .map(normalizeDiscoveredModelMatchKey)
+      .some((key) => key && keys.has(key))
+  ));
 }
 
 /** Cline usage/API catalog: admit non-ClinePass models only. */
@@ -434,12 +468,14 @@ export function parseClinePassCatalog(
 ): ParsedLiveCatalog {
   const observations = clinePassCatalogRecords(payload).flatMap((value) => {
     const observation = observationFromCatalogRow(value);
-    if (!observation || !isClinePassCatalogRow(value, observation.modelId)) return [];
+    if (!observation) return [];
+    const canonical = clinePassCanonicalObservation(observation);
+    if (!matchesClinePassManifest(surface, canonical)) return [];
     // Live rows often set name === id (`cline-pass/...`); drop that so projection keeps manifest labels.
-    if (observation.upstreamLabel?.toLowerCase() === observation.modelId.toLowerCase()) {
-      return [{ ...observation, upstreamLabel: undefined }];
+    if (canonical.upstreamLabel?.toLowerCase() === canonical.modelId.toLowerCase()) {
+      return [{ ...canonical, upstreamLabel: undefined }];
     }
-    return [observation];
+    return [canonical];
   });
   return asResult(projectLiveModelObservations(surface, observations));
 }

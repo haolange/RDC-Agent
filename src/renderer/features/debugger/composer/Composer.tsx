@@ -11,6 +11,7 @@ import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import type { ComposerController } from './useComposer';
 import { PermissionModeSelector } from './PermissionModeSelector';
 import { EffortControl } from './EffortControl';
+import { ComposerModelOverrideMenu } from './ComposerModelOverrideMenu';
 import { ToolApprovalRequestPanel, usePendingToolApprovalRequest } from './ToolApprovalRequestPanel';
 import { UserInputRequestPanel, usePendingUserInputRequest } from './UserInputRequestPanel';
 import { SlashCommandPopover } from './SlashCommandPopover';
@@ -18,6 +19,7 @@ import { useSlashCommand } from './useSlashCommand';
 import { ComposerMarkdownInput, type ComposerMarkdownMode } from './ComposerMarkdownInput';
 import { ComposerMarkdownModeTabs } from './ComposerMarkdownModeTabs';
 import { ComposerAgentMenu } from './ComposerAgentMenu';
+import { ComposerMenuRegistryProvider, useComposerMenu } from './useComposerMenuRegistry';
 import { ComposerAttachmentChips } from './ComposerAttachmentChips';
 import { buildComposerSessionScopeKey } from './composerSessionScope';
 import { useComposerSessionContextStore } from './composerSessionContext';
@@ -30,6 +32,13 @@ export interface ComposerProps {
 function getAgentCapability(agentId: string, definitions: AgentManifestDefinition[]): string {
   const manifest = definitions.find((d) => d.id === agentId);
   return manifest?.description ?? '';
+}
+
+function RegisteredContextUsageIndicator(
+  props: Omit<React.ComponentProps<typeof ContextUsageIndicator>, 'menu'>,
+): React.ReactElement {
+  const menu = useComposerMenu('usage');
+  return <ContextUsageIndicator {...props} menu={menu} />;
 }
 
 export const Composer: React.FC<ComposerProps> = ({
@@ -68,10 +77,7 @@ export const Composer: React.FC<ComposerProps> = ({
     pendingAttachments,
     pendingSkillIds,
     removePendingSkill,
-    modeMenuOpen,
-    setModeMenuOpen,
     promptInputRef,
-    modeMenuRef,
     currentMode,
     currentModeConfig,
     currentModeLabel,
@@ -132,6 +138,7 @@ export const Composer: React.FC<ComposerProps> = ({
   }
 
   return (
+    <ComposerMenuRegistryProvider>
     <div
       className={`composer-shell ${isComposerBusy ? 'is-running' : ''}${composerMarkdown ? ' has-markdown-mode' : ''}`}
       {...composeAccentStyle}
@@ -202,9 +209,6 @@ export const Composer: React.FC<ComposerProps> = ({
             </svg>
           </button>
           <ComposerAgentMenu
-            modeMenuRef={modeMenuRef}
-            modeMenuOpen={modeMenuOpen}
-            setModeMenuOpen={setModeMenuOpen}
             currentMode={currentMode}
             currentModeConfig={currentModeConfig}
             currentModeLabel={currentModeLabel}
@@ -219,12 +223,16 @@ export const Composer: React.FC<ComposerProps> = ({
           <PermissionModeSelector />
         </div>
         <div className="composer-toolbar-group composer-toolbar-group-right">
+          <ComposerModelOverrideMenu
+            agentId={selectedAgentId}
+            currentSession={currentSession}
+          />
           <EffortControl
             agentId={selectedAgentId}
             currentSession={currentSession}
             disabled={isComposerBusy}
           />
-          <ContextUsageIndicator
+          <RegisteredContextUsageIndicator
             usage={lastKnownUsage}
             prepared={preparedTurnContext}
             phase={conversationPreparationPhase}
@@ -255,5 +263,6 @@ export const Composer: React.FC<ComposerProps> = ({
         </div>
       </div>
     </div>
+    </ComposerMenuRegistryProvider>
   );
 };

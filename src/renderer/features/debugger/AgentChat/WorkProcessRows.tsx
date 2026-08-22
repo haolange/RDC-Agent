@@ -9,24 +9,31 @@ import { ToolRow } from './WorkProcessRowParts';
 
 export { ToolRow };
 
-export const SummaryRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'summary' }> }> = ({ row }) => (
-  <li className={`work-process-step is-appear status-${row.status} kind-summary`} data-testid="work-process-block">
-    <WorkProcessRailIcon variant="step" status={row.status} />
-    <div className="work-process-step-content">
-      {row.detailLines.length > 0 ? (
-        <details className="work-process-disclosure">
-          <summary className="work-process-summary-line">
-            <span className="work-process-step-summary">{row.text}</span>
-            <span className="work-process-row-caret" aria-hidden="true" />
-          </summary>
-          <pre className="work-process-row-pre">{row.detailLines.join('\n')}</pre>
-        </details>
-      ) : (
-        <p className="work-process-step-summary">{row.text}</p>
-      )}
-    </div>
-  </li>
-);
+export const SummaryRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'summary' }> }> = ({ row }) => {
+  const label = useWorkProcessLabel();
+  const title = label(row.text);
+  return (
+    <li className={`work-process-step is-appear status-${row.status} kind-summary`} data-testid="work-process-block">
+      <WorkProcessRailIcon variant="step" status={row.status} />
+      <div className="work-process-step-content">
+        <div className="work-process-summary-card">
+          {row.detailLines.length > 0 ? (
+            <details className="work-process-disclosure">
+              <summary className="work-process-summary-line">
+                <span className="work-process-step-summary">{title}</span>
+                <span className="work-process-row-caret" aria-hidden="true" />
+              </summary>
+              <pre className="work-process-row-pre">{row.detailLines.join('\n')}</pre>
+            </details>
+          ) : (
+            <p className="work-process-step-summary">{title}</p>
+          )}
+          {row.duration ? <span className="work-process-summary-duration">{row.duration}</span> : null}
+        </div>
+      </div>
+    </li>
+  );
+};
 
 export const DiagnosticRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'diagnostic' }> }> = ({ row }) => (
   <li
@@ -125,7 +132,7 @@ export const ApprovalRow: React.FC<{ row: Extract<WorkProcessRow, { type: 'appro
         <span className="work-process-approval-message">{row.message}</span>
       </span>
       <span className="work-process-tool-meta">
-        {row.metaLines.map((line) => <span key={line}>{line}</span>)}
+        {row.metaLines.map((line) => <span key={line}>{label(line)}</span>)}
         {row.duration ? <span>{row.duration}</span> : null}
         {statusLabel ? <span>{statusLabel}</span> : null}
       </span>
