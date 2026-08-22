@@ -3,9 +3,10 @@ import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapabilit
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   contextTierBudgetTokens,
+  contextTierPromptCap,
   contextTierWindowTokens,
-  ONE_MILLION_CONTEXT_TOKENS,
   resolveContextTierChoices,
+  resolvePlanningOutputTokens,
 } from '@shared/utils/contextTiers';
 import { resolveCompactionThresholdTokens } from '@shared/utils/contextBudget';
 import { resolveModelControls } from '@shared/utils/modelControls';
@@ -30,12 +31,12 @@ export function resolveSelectedContextProfile(
 
   const evaluation = resolveModelControls(model, controls);
   const choices = resolveContextTierChoices(model);
-  const oneMillionMode = evaluation.resolved.context1m.value;
-  const selectedTier = oneMillionMode ? choices.oneMillionTier : choices.normalTier;
+  const maxMode = evaluation.resolved.maxContext.value;
+  const selectedTier = maxMode ? choices.maxTier : choices.normalTier;
   if (!selectedTier) return null;
 
-  const requestedBudget = oneMillionMode
-    ? ONE_MILLION_CONTEXT_TOKENS
+  const requestedBudget = maxMode
+    ? (contextTierPromptCap(selectedTier) ?? contextTierWindowTokens(selectedTier) ?? model.defaultBudgetTokens)
     : model.defaultBudgetTokens;
   const contextBudgetTokens = contextTierBudgetTokens(selectedTier, requestedBudget);
   if (!Number.isFinite(contextBudgetTokens) || contextBudgetTokens <= 0) {
@@ -43,7 +44,7 @@ export function resolveSelectedContextProfile(
   }
 
   const contextWindowTokens = contextTierWindowTokens(selectedTier) ?? contextBudgetTokens;
-  const maxOutputTokens = selectedTier.maxOutputTokens ?? 0;
+  const maxOutputTokens = resolvePlanningOutputTokens(selectedTier, contextWindowTokens);
   return {
     providerId: model.providerId,
     modelId: model.modelId,

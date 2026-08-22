@@ -65,6 +65,10 @@ const TARGET_KEYS = [
   'target',
   'pattern',
   'query',
+  'code',
+  'key',
+  'skill_id',
+  'skillId',
   'url',
   'command',
   'cmd',
@@ -74,8 +78,6 @@ const TARGET_KEYS = [
   'input',
   'subject',
   'taskId',
-  'skill_id',
-  'skillId',
   'name',
   'agent',
   'source',
@@ -386,8 +388,10 @@ const createToolRow = (call: ConversationToolCall): WorkProcessRow => {
     previewKind: unwrapped.previewKind,
     commandText: unwrapped.commandText,
     pathChip: unwrapped.pathChip,
+    chips: unwrapped.chips,
     diagnosticCaption,
     approval,
+    imagePreviews: call.imagePreviews,
     ...webPresentation,
   };
 };
@@ -661,6 +665,7 @@ export type UnwrappedToolContent = {
   bodyLines?: string[];
   commandText?: string;
   pathChip?: string;
+  chips?: string[];
 };
 
 const FILE_TOOL_NAMES = /^(?:read_file|write_file|edit_file|delete_file|move_file|copy_file|read)$/;
@@ -713,6 +718,17 @@ export const unwrapToolContentLayer = (
     };
   }
 
+  if (normalized === 'code_interpreter') {
+    const code = sanitizeContentText(stringifyPreview(argsRecord?.code ?? details?.code));
+    const previewLines = filterEnvelopeLines(createDetailLines(contentText, SHELL_PREVIEW_MAX_LINES));
+    return {
+      previewKind: 'shell',
+      commandText: code || undefined,
+      bodyText: code || contentText || undefined,
+      previewLines,
+    };
+  }
+
   if (normalized === 'skill_read') {
     const description = sanitizeContentText(
       stringifyPreview(details?.description)
@@ -729,11 +745,89 @@ export const unwrapToolContentLayer = (
     const previewLines = description
       ? [compactText(description.replace(/\s+/g, ' ').trim(), SKILL_DESCRIPTION_MAX)]
       : [];
+    const skillName = sanitizeContentText(stringifyPreview(
+      details?.skillId ?? argsRecord?.skill_id ?? argsRecord?.skillId,
+    ));
     return {
       previewKind: 'skill',
       pathChip: pathChip || undefined,
       bodyText: previewLines[0] || undefined,
       previewLines,
+      chips: skillName ? [skillName] : undefined,
+    };
+  }
+
+  if (normalized === 'skills') {
+    const names = collectReadableText(record?.skills ?? details?.skills ?? record?.items, 6);
+    return {
+      previewKind: 'generic',
+      chips: names.slice(0, 4),
+      bodyText: names.length > 0 ? `${names.length} skills` : contentText || undefined,
+      previewLines: names,
+    };
+  }
+
+  if (normalized.startsWith('memory_')) {
+    const subject = sanitizeContentText(stringifyPreview(
+      argsRecord?.key ?? argsRecord?.query ?? details?.key ?? details?.query ?? argsRecord?.path,
+    ));
+    const scope = sanitizeContentText(stringifyPreview(argsRecord?.scope ?? details?.scope));
+    const chips = [subject, scope].filter(Boolean);
+    const previewLines = filterEnvelopeLines(createDetailLines(contentText, 6));
+    return {
+      previewKind: 'generic',
+      chips,
+      bodyText: previewLines[0] || subject || undefined,
+      previewLines,
+    };
+  }
+
+  if (normalized === 'mcp' || normalized.startsWith('mcp__')) {
+    const target = formatMcpTarget(toolName);
+    const [server, tool] = target.split('/');
+    const chips = [server ? `MCP · ${server}` : 'MCP', tool].filter(Boolean);
+    const previewLines = filterEnvelopeLines(createDetailLines(contentText, 6));
+    const pathChip = sanitizeContentText(stringifyPreview(argsRecord?.path ?? details?.path));
+    return {
+      previewKind: 'generic',
+      chips,
+      pathChip: pathChip || undefined,
+      bodyText: previewLines[0] || target || undefined,
+      previewLines,
+    };
+  }
+
+  if (normalized === 'tool_search') {
+    const hits = collectReadableText(record?.matches ?? record?.tools ?? details?.matches, 8);
+    return {
+      previewKind: 'generic',
+      bodyText: hits.length > 0 ? `${hits.length} tools` : contentText || undefined,
+      bodyLines: hits.slice(0, 3),
+      previewLines: hits,
+    };
+  }
+
+  if (normalized === 'output_register' || normalized === 'plan_artifact') {
+    const pathChip = sanitizeContentText(stringifyPreview(
+      argsRecord?.path ?? details?.path ?? details?.outputPath,
+    ));
+    return {
+      previewKind: 'generic',
+      pathChip: pathChip || undefined,
+      bodyText: pathChip || contentText || undefined,
+      previewLines: filterEnvelopeLines(createDetailLines(contentText, 6)),
+    };
+  }
+
+  if (normalized === 'rdx_context' || normalized === 'agent_handoff') {
+    const target = sanitizeContentText(stringifyPreview(
+      argsRecord?.target ?? argsRecord?.agent ?? details?.target,
+    ));
+    return {
+      previewKind: 'generic',
+      chips: target ? [target] : undefined,
+      bodyText: contentText || target || undefined,
+      previewLines: filterEnvelopeLines(createDetailLines(contentText, 6)),
     };
   }
 

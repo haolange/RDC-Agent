@@ -3,11 +3,11 @@ import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   buildInitialTurnControls,
   hasSelectableFastMode,
-  hasSelectableOneMillionContext,
+  hasSelectableMaxContext,
   isFastModeDenied,
   isFastModeUnverified,
-  isOneMillionContextDenied,
-  isOneMillionContextUnverified,
+  isMaxContextDenied,
+  isMaxContextUnverified,
   sanitizeTurnControls,
 } from './turnControlsUtils';
 
@@ -32,7 +32,7 @@ const levelsCapability: EffectiveModel = {
       wireProfile: { kind: 'none' },
     },
     fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
-    context1m: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'max' },
+    maxContext: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'max' },
   },
   executionBindings: [{
     id: 'fast:priority', when: { fast: true }, actions: [{ kind: 'request-patch', patch: { service_tier: 'priority' } }], entitlement: 'granted',
@@ -65,7 +65,7 @@ describe('turnControlsUtils', () => {
       controls: {
         ...levelsCapability.controls,
         fast: { state: 'unsupported', fixedValue: false },
-        context1m: { state: 'unsupported', fixedValue: false },
+        maxContext: { state: 'unsupported', fixedValue: false },
       },
     })).toEqual({
       reasoningLevel: 'medium',
@@ -129,7 +129,7 @@ describe('turnControlsUtils', () => {
       ...levelsCapability,
       controls: {
         ...levelsCapability.controls,
-        context1m: { state: 'fixed' as const, fixedValue: true, tierId: 'max' },
+        maxContext: { state: 'fixed' as const, fixedValue: true, tierId: 'max' },
         fast: { state: 'fixed' as const, fixedValue: true, entitlement: 'granted' as const },
       },
     };
@@ -138,23 +138,23 @@ describe('turnControlsUtils', () => {
       maxContextMode: true,
       fastModel: true,
     });
-    expect(hasSelectableOneMillionContext(fixedModes)).toBe(false);
+    expect(hasSelectableMaxContext(fixedModes)).toBe(false);
   });
 
-  it('shows a higher unknown tier as unverified while keeping it non-selectable', () => {
+  it('shows a higher unknown tier as unverified but still selectable', () => {
     const unknownTier = {
       ...levelsCapability,
       controls: {
         ...levelsCapability.controls,
-        context1m: { ...levelsCapability.controls.context1m, entitlement: 'unknown' as const },
+        maxContext: { ...levelsCapability.controls.maxContext, entitlement: 'unknown' as const },
       },
       contextTiers: levelsCapability.contextTiers.map((tier, index) => (
         index === 1 ? { ...tier, entitlement: 'unknown' as const } : tier
       )),
     };
-    expect(hasSelectableOneMillionContext(unknownTier)).toBe(false);
-    expect(isOneMillionContextUnverified(unknownTier)).toBe(true);
-    expect(hasSelectableOneMillionContext({
+    expect(hasSelectableMaxContext(unknownTier)).toBe(true);
+    expect(isMaxContextUnverified(unknownTier)).toBe(true);
+    expect(hasSelectableMaxContext({
       ...unknownTier,
       contextTiers: unknownTier.contextTiers.map((tier, index) => (
         index === 1 ? { ...tier, entitlement: 'denied' as const } : tier
@@ -168,12 +168,12 @@ describe('turnControlsUtils', () => {
       controls: {
         ...levelsCapability.controls,
         fast: { state: 'selectable' as const, defaultValue: false, entitlement: 'denied' as const },
-        context1m: { state: 'selectable' as const, defaultValue: false, entitlement: 'denied' as const, tierId: 'max' },
+        maxContext: { state: 'selectable' as const, defaultValue: false, entitlement: 'denied' as const, tierId: 'max' },
       },
     };
     expect(hasSelectableFastMode(deniedFast)).toBe(false);
     expect(isFastModeDenied(deniedFast)).toBe(true);
-    expect(isOneMillionContextDenied(deniedFast)).toBe(true);
+    expect(isMaxContextDenied(deniedFast)).toBe(true);
 
     const unverifiedFast = {
       ...levelsCapability,
@@ -182,7 +182,7 @@ describe('turnControlsUtils', () => {
         fast: { state: 'selectable' as const, defaultValue: false, entitlement: 'unknown' as const },
       },
     };
-    expect(hasSelectableFastMode(unverifiedFast)).toBe(false);
+    expect(hasSelectableFastMode(unverifiedFast)).toBe(true);
     expect(isFastModeUnverified(unverifiedFast)).toBe(true);
 
     const unsupported = {
@@ -190,10 +190,10 @@ describe('turnControlsUtils', () => {
       controls: {
         ...levelsCapability.controls,
         fast: { state: 'unsupported' as const, fixedValue: false },
-        context1m: { state: 'unsupported' as const, fixedValue: false },
+        maxContext: { state: 'unsupported' as const, fixedValue: false },
       },
     };
     expect(hasSelectableFastMode(unsupported)).toBe(false);
-    expect(hasSelectableOneMillionContext(unsupported)).toBe(false);
+    expect(hasSelectableMaxContext(unsupported)).toBe(false);
   });
 });

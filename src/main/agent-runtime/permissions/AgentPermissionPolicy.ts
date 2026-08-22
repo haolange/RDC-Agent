@@ -42,7 +42,7 @@ export interface AgentPermissionDecisionInput {
   compiledPolicy?: CompiledPolicy;
 }
 
-const READ_ONLY_FILE_TOOLS = new Set(['read_file', 'glob', 'grep']);
+const READ_ONLY_FILE_TOOLS = new Set(['read_file', 'read_image', 'glob', 'grep']);
 const MUTATION_TOOLS = new Set([
   'write_file',
   'edit_file',
@@ -50,6 +50,7 @@ const MUTATION_TOOLS = new Set([
   'move_file',
   'delete_file',
   'notebook_edit',
+  'code_interpreter',
 ]);
 const NETWORK_TOOL_NAMES = new Set(['web_fetch', 'web_search']);
 const DEFAULT_ROUTINE_COMMAND_PREFIXES = [
@@ -148,6 +149,7 @@ function inferPathTargetFromGlobPattern(pattern: string): string {
 function extractPathTargets(toolName: string, toolCall: ToolCall): string[] {
   if (
     toolName === 'read_file'
+    || toolName === 'read_image'
     || toolName === 'write_file'
     || toolName === 'edit_file'
     || toolName === 'delete_file'

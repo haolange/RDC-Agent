@@ -446,6 +446,12 @@ function modeEnvironment(mode, rebuildSettingsOnly) {
   };
   delete env.ELECTRON_RENDERER_URL;
   if (env.RDC_AGENT_USER_DATA?.trim()) mkdirSync(path.resolve(env.RDC_AGENT_USER_DATA), { recursive: true });
+  const useDisposableBrowserHome = headless
+    && !env.RDC_AGENT_USER_DATA?.trim()
+    && env.RDC_AGENT_USE_CANONICAL_USERDATA !== '1';
+  if (useDisposableBrowserHome) {
+    delete env.RDC_AGENT_HOME;
+  }
   return env;
 }
 

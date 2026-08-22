@@ -42,6 +42,7 @@
 | Skill `allowedTools` 收窄 | Security（授权面） | `∩ skill ∩ runtime` |
 | Capability `unknown` → text-only | Security（能力面） | 禁止猜测 native tools |
 | Provider channel collision / 无 final_answer | Integrity | 终止 step + 诊断 |
+| `PROVIDER_STREAM_*` 协议违规 | Integrity | 不重试；`CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION`；不得误报账号/额度 |
 | Agent 连续三轮相同工具结果 | Integrity | `AGENT_NO_PROGRESS` → `CONVERSATION_AGENT_LOOP_STALLED`；不得误报 Provider failure |
 | Agent 达到 maxTurns 仍要求 continuation | Integrity | `AGENT_MAX_TURNS_EXCEEDED` → `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`；不得静默完成 |
 | JSONL 坏行 diagnostics | Integrity | 不静默当成功；调用方 assert |

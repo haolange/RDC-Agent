@@ -92,7 +92,8 @@ export const extractConversationToolResourceRefs = (
     if (value) refs.push(pathRef(value, classifyPath(value, fallback)));
   };
 
-  if (['read_file', 'write_file', 'edit_file', 'delete_file'].includes(normalizedName)) addPath('path', 'file');
+  if (['read_file', 'read_image', 'write_file', 'edit_file', 'delete_file'].includes(normalizedName)) addPath('path', 'file');
+  if (normalizedName === 'code_interpreter') addPath('cwd', 'directory');
   if (normalizedName === 'notebook_edit') addPath('notebook_path', 'file');
   if (normalizedName === 'copy_file' || normalizedName === 'move_file') {
     addPath('source', 'file');

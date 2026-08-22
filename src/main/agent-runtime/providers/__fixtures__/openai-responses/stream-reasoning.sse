@@ -1,6 +1,19 @@
-data: {"type":"response.reasoning.delta","delta":"plan next step"}
+data: {"type":"response.output_item.added","output_index":0,"item":{"type":"reasoning","id":"rs_1"}}
 
-data: {"type":"response.output_text.delta","delta":"Hello"}
+data: {"type":"response.reasoning_summary_text.delta","output_index":0,"item_id":"rs_1","summary_index":0,"delta":"plan next step"}
+
+data: {"type":"response.reasoning_summary_text.done","output_index":0,"item_id":"rs_1","summary_index":0}
+
+data: {"type":"response.output_item.done","output_index":0,"item":{"type":"reasoning","id":"rs_1"}}
+
+data: {"type":"response.output_item.added","output_index":1,"item":{"type":"message","id":"msg_1"}}
+
+data: {"type":"response.output_text.delta","output_index":1,"item_id":"msg_1","delta":"Hello"}
+
+data: {"type":"response.output_text.done","output_index":1,"item_id":"msg_1"}
+
+data: {"type":"response.output_item.done","output_index":1,"item":{"type":"message","id":"msg_1"}}
+
+data: {"type":"response.completed","response":{"id":"resp_1","status":"completed","output":[{"type":"reasoning","id":"rs_1"},{"type":"message","id":"msg_1"}]}}
 
 data: [DONE]
-

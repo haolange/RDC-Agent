@@ -12,6 +12,7 @@ import type {
   RdxActionSettingsMap,
   RdxCliInvokerSettings,
   RdxShellActionSettings,
+  CodeInterpreterSettings,
   SidebarLayoutPreference,
   ToolingSettings,
   WindowLayoutPreference,
@@ -27,6 +28,7 @@ import {
 import {
   DEFAULT_AGENT_RUNTIME,
   DEFAULT_LAYOUT,
+  DEFAULT_CODE_INTERPRETER,
   DEFAULT_RDX_ACTIONS,
   DEFAULT_RDX_CLI_INVOKER,
   LEFT_DEFAULTS,
@@ -119,11 +121,32 @@ export function sanitizeRdxActionsSettings(value: unknown): RdxActionSettingsMap
   };
 }
 
+export function sanitizeCodeInterpreterSettings(
+  value: unknown,
+  fallback: CodeInterpreterSettings = DEFAULT_CODE_INTERPRETER,
+): CodeInterpreterSettings {
+  const candidate = value && typeof value === 'object' ? value as Partial<CodeInterpreterSettings> : {};
+  const timeoutMs = typeof candidate.timeoutMs === 'number' && Number.isFinite(candidate.timeoutMs)
+    ? clamp(Math.trunc(candidate.timeoutMs), 1000, 600000)
+    : fallback.timeoutMs;
+  return {
+    enabled: typeof candidate.enabled === 'boolean' ? candidate.enabled : fallback.enabled,
+    command: typeof candidate.command === 'string' ? candidate.command.trim() : fallback.command,
+    argsPrefix: sanitizeStringArray(candidate.argsPrefix ?? fallback.argsPrefix),
+    timeoutMs,
+    env: sanitizeStringRecord(candidate.env ?? fallback.env),
+    artifactsEnabled: typeof candidate.artifactsEnabled === 'boolean'
+      ? candidate.artifactsEnabled
+      : fallback.artifactsEnabled,
+  };
+}
+
 export function sanitizeToolingSettings(value: unknown): ToolingSettings {
   const candidate = value && typeof value === 'object' ? value as Partial<ToolingSettings> : {};
   return {
     rdxCli: sanitizeRdxCliInvokerSettings(candidate.rdxCli),
     rdxActions: sanitizeRdxActionsSettings(candidate.rdxActions),
+    codeInterpreter: sanitizeCodeInterpreterSettings(candidate.codeInterpreter),
   };
 }
 

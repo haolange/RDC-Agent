@@ -20,6 +20,7 @@ export interface WorkProcessToolDisplay {
 
 export const WORK_PROCESS_TOOL_DISPLAY_CATALOG: Record<string, WorkProcessToolDisplay> = {
   read_file: { icon: 'fileRead', groupKind: 'explore', category: '文件读取', groupTitle: '探索', groupUnit: '文件', completeVerb: '已读取', runningVerb: '正在读取' },
+  read_image: { icon: 'imageRead', groupKind: 'explore', category: '图片查看', groupTitle: '探索', groupUnit: '图片', completeVerb: '已查看图片', runningVerb: '正在查看图片' },
   glob: { icon: 'fileGlob', groupKind: 'explore', category: '文件列举', groupTitle: '探索', groupUnit: '文件', completeVerb: '已列出', runningVerb: '正在列出' },
   grep: { icon: 'codeSearch', groupKind: 'search', category: '代码搜索', groupTitle: '搜索', groupUnit: '查询', completeVerb: '已搜索代码', runningVerb: '正在搜索代码' },
   web_fetch: { icon: 'webFetch', groupKind: 'web', category: '网页抓取', groupTitle: '联网', groupUnit: '页面', completeVerb: '已抓取', runningVerb: '正在抓取', approval: true },
@@ -39,6 +40,7 @@ export const WORK_PROCESS_TOOL_DISPLAY_CATALOG: Record<string, WorkProcessToolDi
   git_commit: { icon: 'gitCommit', groupKind: 'git', category: 'Git 提交', groupTitle: 'Git', groupUnit: '提交', completeVerb: '已提交', runningVerb: '正在提交', mutation: true, approval: true },
   ask_user: { icon: 'question', groupKind: 'interaction', category: '人机交互', groupTitle: '询问', groupUnit: '问题', completeVerb: '已回答', runningVerb: '等待用户' },
   tool_search: { icon: 'toolSearch', groupKind: 'runtime', category: '工具发现', groupTitle: '工具发现', groupUnit: '查询', completeVerb: '已搜索工具', runningVerb: '正在搜索工具' },
+  code_interpreter: { icon: 'interpreter', groupKind: 'command', category: '解释器', groupTitle: '解释器', groupUnit: '脚本', completeVerb: '已运行解释器', runningVerb: '正在运行解释器', approval: true, errorAccent: true },
   agent_handoff: { icon: 'handoff', groupKind: 'collaboration', category: '代理交接', groupTitle: '交接', groupUnit: '交接', completeVerb: '已准备交接', runningVerb: '正在准备交接' },
   plan_artifact: { icon: 'planArtifact', groupKind: 'runtime', category: '计划产物', groupTitle: '产物', groupUnit: '产物', completeVerb: '已生成计划', runningVerb: '正在生成计划' },
   output_register: { icon: 'outputPublish', groupKind: 'runtime', category: '输出发布', groupTitle: '输出', groupUnit: '文件', completeVerb: '已发布输出', runningVerb: '正在发布输出', mutation: true },
@@ -113,6 +115,7 @@ const FILE_FAMILY_TOOLS = new Set([
   'move_file',
   'copy_file',
   'notebook_edit',
+  'read_image',
 ]);
 
 const SEARCH_FAMILY_TOOLS = new Set(['glob', 'grep']);
@@ -132,7 +135,18 @@ export const getToolFamily = (toolName: string): WorkProcessToolFamily => {
   if (FILE_FAMILY_TOOLS.has(normalized) || normalized === 'read') return 'file';
   if (SEARCH_FAMILY_TOOLS.has(normalized)) return 'search';
   if (normalized === 'bash' || normalized.includes('shell')) return 'shell';
+  if (normalized === 'code_interpreter') return 'interpreter';
   if (GIT_FAMILY_TOOLS.has(normalized) || normalized.startsWith('git_')) return 'git';
   if (normalized === 'web_search' || normalized === 'web_fetch') return 'web';
+  if (normalized.startsWith('memory_')) return 'memory';
+  if (normalized === 'skills' || normalized === 'skill_read') return 'skill';
+  if (normalized === 'mcp' || normalized.startsWith('mcp__')) return 'mcp';
+  if (
+    normalized === 'tool_search'
+    || normalized === 'plan_artifact'
+    || normalized === 'output_register'
+    || normalized === 'rdx_context'
+    || normalized === 'agent_handoff'
+  ) return 'runtime';
   return 'generic';
 };

@@ -68,17 +68,17 @@ describe('Copilot account catalog parser', () => {
     expect(parseCopilotBillingContribution('gpt-5.5', catalog.billingByModel['gpt-5.5']))
       .toMatchObject({
         controls: {
-          context1m: { state: 'selectable', tierId: 'long_context', entitlement: 'unknown' },
+          maxContext: { state: 'selectable', tierId: 'long_context', entitlement: 'unknown' },
         },
         executionBindings: [{
           id: 'context:copilot-long-context',
-          when: { context1m: true },
+          when: { maxContext: true },
           actions: [{ kind: 'client-tier', tierId: 'long_context' }],
           entitlement: 'unknown',
         }],
       });
     expect(parseCopilotBillingContribution('gpt-5-mini', catalog.billingByModel['gpt-5-mini']))
-      .toMatchObject({ controls: { context1m: { state: 'unsupported', fixedValue: false } } });
+      .toMatchObject({ controls: { maxContext: { state: 'unsupported', fixedValue: false } } });
   });
 
   it('parses a Gemini 3.5 billing threshold without declaring structural controls', () => {

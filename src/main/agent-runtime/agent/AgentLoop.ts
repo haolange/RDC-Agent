@@ -28,7 +28,12 @@ import type {
   UserMessage,
 } from '../core/types';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
-import { ErrorRecovery, type RecoveryAction } from './ErrorRecovery';
+import {
+  AgentRecoveryAbortError,
+  ErrorRecovery,
+  isProviderStreamProtocolError,
+  type RecoveryAction,
+} from './ErrorRecovery';
 import type { CompressResult } from './ContextManager';
 import {
   AgentLoopTerminationError,
@@ -547,11 +552,21 @@ async function streamAssistantResponseWithRecovery(
           continue;
         }
         case 'abort': {
-          throw new Error(`[Recovery abort] ${action.reason}`);
+          throw createRecoveryAbortError(error, action.reason);
         }
       }
     }
   }
+}
+
+function createRecoveryAbortError(original: Error, reason: string): Error {
+  if (isProviderStreamProtocolError(original) || original instanceof AgentRecoveryAbortError) {
+    const streamCode = original instanceof AgentRecoveryAbortError
+      ? original.streamCode
+      : typeof original.code === 'string' ? original.code : undefined;
+    return new AgentRecoveryAbortError(`[Recovery abort] ${reason}`, streamCode);
+  }
+  return new Error(`[Recovery abort] ${reason}`);
 }
 
 function createAbortError(): Error {

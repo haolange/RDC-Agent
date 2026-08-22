@@ -96,7 +96,7 @@ export class ContextManager {
         result.push(msg as Message);
       }
     }
-    return result;
+    return bridgeToolResultImages(result);
   }
 
   /**
@@ -624,6 +624,38 @@ export class ContextManager {
   }
 
 
+}
+
+function bridgeToolResultImages(messages: Message[]): Message[] {
+  const next: Message[] = [];
+  for (const message of messages) {
+    if (message.role !== 'toolResult') {
+      next.push(message);
+      continue;
+    }
+    const images = message.content.filter((block): block is ImageContent => block.type === 'image' && Boolean(block.data));
+    if (images.length === 0) {
+      next.push(message);
+      continue;
+    }
+    const textBlocks = message.content.filter((block): block is TextContent => block.type === 'text');
+    next.push({
+      ...message,
+      content: [
+        ...textBlocks,
+        { type: 'text', text: `[${images.length} image(s) delivered as following user content]` },
+      ],
+    });
+    next.push({
+      role: 'user',
+      content: [
+        { type: 'text', text: `Images from tool ${message.toolName}:` },
+        ...images,
+      ],
+      timestamp: message.timestamp,
+    });
+  }
+  return next;
 }
 
 function messagesEqual(left: AgentMessage[], right: AgentMessage[]): boolean {

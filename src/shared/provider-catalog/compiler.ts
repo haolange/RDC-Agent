@@ -22,7 +22,7 @@ import {
   type ProviderContractBundle,
   type ProviderContractBundlePatch,
 } from './modelManifestSchema';
-import { isMaxContextTier } from '../utils/contextTiers';
+import { contextTierWindowTokens, isEligibleMaxContextTier } from '../utils/contextTiers';
 import { createFailClosedProviderContracts } from './providerContracts';
 
 export const PROVIDER_CATALOG_SCHEMA_VERSION = 2 as const;
@@ -178,23 +178,23 @@ function selectorKey(binding: ExecutionBinding): string {
 
 function bindingSpecificity(binding: ExecutionBinding): number {
   return Number(binding.when.fast !== undefined)
-    + Number(binding.when.context1m !== undefined)
+    + Number(binding.when.maxContext !== undefined)
     + Number(Boolean(binding.when.reasoning));
 }
 
 function bindingDimensions(binding: ExecutionBinding): string {
   return [
     binding.when.fast !== undefined ? 'fast' : '',
-    binding.when.context1m !== undefined ? 'context1m' : '',
+    binding.when.maxContext !== undefined ? 'maxContext' : '',
     binding.when.reasoning ? 'reasoning' : '',
   ].filter(Boolean).join('|');
 }
 
 function bindingsCanOverlap(left: ExecutionBinding, right: ExecutionBinding): boolean {
   if (left.when.fast !== undefined && right.when.fast !== undefined && left.when.fast !== right.when.fast) return false;
-  if (left.when.context1m !== undefined
-    && right.when.context1m !== undefined
-    && left.when.context1m !== right.when.context1m) return false;
+  if (left.when.maxContext !== undefined
+    && right.when.maxContext !== undefined
+    && left.when.maxContext !== right.when.maxContext) return false;
   if (left.when.reasoning && right.when.reasoning
     && !left.when.reasoning.some((selection) => right.when.reasoning?.includes(selection))) return false;
   if (left.routeOptionIds && right.routeOptionIds
@@ -319,13 +319,19 @@ function validateModel(
   if (tierIds.size !== model.contextTiers.length) {
     errors.push(`${surface.id}/${model.modelId} has duplicate context tier ids`);
   }
-  const contextControl = model.controls.context1m;
+  const contextControl = model.controls.maxContext;
+  const normalTier = model.contextTiers.find((tier) => tier.id === 'default')
+    ?? model.contextTiers[0];
   if (contextControl.state === 'selectable' || contextControl.state === 'fixed') {
     const contextTier = model.contextTiers.find((tier) => tier.id === contextControl.tierId);
     if (!contextTier) {
       errors.push(`${surface.id}/${model.modelId} Max mode control references a missing context tier`);
-    } else if (!isMaxContextTier(contextTier)) {
-      errors.push(`${surface.id}/${model.modelId} Max mode control references a sub-one-million context tier`);
+    } else if (!normalTier
+      || contextTierWindowTokens(contextTier) === undefined
+      || contextTierWindowTokens(normalTier) === undefined) {
+      errors.push(`${surface.id}/${model.modelId} Max mode control references a context tier without a numeric window`);
+    } else if (!isEligibleMaxContextTier(contextTier, normalTier)) {
+      errors.push(`${surface.id}/${model.modelId} Max mode control references a tier that is not larger than the default context window`);
     }
   }
   const liveContext = model.liveProjection?.context;
@@ -335,11 +341,15 @@ function validateModel(
     }
     if (liveContext.maxTierId) {
       const maxTier = model.contextTiers.find((tier) => tier.id === liveContext.maxTierId);
-      if (!maxTier || !isMaxContextTier(maxTier)) {
+      if (!maxTier
+        || !normalTier
+        || contextTierWindowTokens(maxTier) === undefined
+        || contextTierWindowTokens(normalTier) === undefined
+        || !isEligibleMaxContextTier(maxTier, normalTier)) {
         errors.push(`${surface.id}/${model.modelId} live context projection references an invalid Max tier`);
       }
       const maxBindings = (model.executionBindings ?? []).filter((binding) => (
-        binding.when.context1m === true
+        binding.when.maxContext === true
         && binding.actions.some((action) => (
           (action.kind === 'client-tier' && action.tierId === liveContext.maxTierId)
           || action.kind === 'model-switch'

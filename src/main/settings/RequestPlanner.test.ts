@@ -42,7 +42,7 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
     defaultBudgetTokens: 240_000,
     controls: {
       fast: { state: 'unsupported', fixedValue: false },
-      context1m: { state: 'unsupported', fixedValue: false },
+      maxContext: { state: 'unsupported', fixedValue: false },
       reasoning: { ...reasoning, levels: [...reasoning.levels] },
     },
     toolCalling: { state: 'supported' },
@@ -285,7 +285,7 @@ describe('planModelRequest', () => {
       }],
       controls: {
         ...model().controls,
-        context1m: { state: 'fixed', fixedValue: true, tierId: 'fixed-1m' },
+        maxContext: { state: 'fixed', fixedValue: true, tierId: 'fixed-1m' },
       },
     });
     const result = planModelRequest({ model: fixed, catalogModels: [fixed] });
@@ -314,7 +314,7 @@ describe('planModelRequest', () => {
       ],
       controls: {
         ...model().controls,
-        context1m: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'long' },
+        maxContext: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'long' },
       },
     });
     const result = planModelRequest({ model: long, catalogModels: [long], controls: { maxContextMode: true } });
@@ -366,6 +366,25 @@ describe('planModelRequest', () => {
     expect(result.plan.compactionThresholdTokens).toBe(748_800);
   });
 
+  it('derives output tokens from the window when the tier omits maxOutputTokens', () => {
+    const promptOnly = model({
+      contextTiers: [{
+        id: 'default',
+        label: 'Codex service limit',
+        maxPromptTokens: 272_000,
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
+      }],
+      defaultBudgetTokens: 272_000,
+    });
+    const result = planModelRequest({ model: promptOnly, catalogModels: [promptOnly] });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.plan.contextWindowTokens).toBe(272_000);
+    expect(result.plan.maxOutputTokens).toBe(272_000);
+    expect(result.plan.contextBudgetTokens).toBe(272_000);
+  });
+
   it('uses a model-switch reasoning Max binding and suppresses duplicate wire effort', () => {
     const base = model({
       executionBindings: [{
@@ -399,11 +418,11 @@ describe('planModelRequest', () => {
       controls: {
         ...model().controls,
         fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
-        context1m: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'long' },
+        maxContext: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'long' },
       },
       executionBindings: [
         { id: 'fast', when: { fast: true }, actions: [{ kind: 'request-patch', patch: { mode: 'fast' } }], entitlement: 'granted' },
-        { id: 'fast+1m', when: { fast: true, context1m: true }, actions: [{ kind: 'request-patch', patch: { mode: 'fast-long' } }], entitlement: 'granted' },
+        { id: 'fast+1m', when: { fast: true, maxContext: true }, actions: [{ kind: 'request-patch', patch: { mode: 'fast-long' } }], entitlement: 'granted' },
       ],
     });
     const result = planModelRequest({

@@ -2,6 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../sessions', () => ({
   rdxSessionService: { snapshotOpenedCaptureForSession: vi.fn(() => null) },
 }));
+vi.mock('./ConversationTurnTerminal', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./ConversationTurnTerminal')>();
+  return {
+    ...actual,
+    publishConversationTrace: vi.fn(),
+    publishTraceProjection: vi.fn(),
+  };
+});
 
 import type { ConversationMessage } from '@shared/types/conversation';
 import { createDefaultBranchState } from './ConversationBranchResolver';
@@ -29,7 +37,7 @@ const message = (
 });
 
 describe('ConversationService derived compaction', () => {
-  it('persists a context view without rewriting the canonical transcript', async () => {
+  it('writes a manual compaction work block without rewriting message text', async () => {
     const history = [
       message('user-1', 'turn-1', 'user', 'Inspect the capture.', 1),
       message('assistant-1', 'turn-1', 'assistant', 'Found event 42.', 2),
@@ -40,7 +48,7 @@ describe('ConversationService derived compaction', () => {
     vi.spyOn(storageAdapter, 'readConversationBranchState')
       .mockReturnValue(createDefaultBranchState('session-1'));
     vi.spyOn(storageAdapter, 'readSessionUsage').mockReturnValue(null);
-    const writeHistory = vi.spyOn(storageAdapter, 'writeConversationHistory');
+    const writeHistory = vi.spyOn(storageAdapter, 'writeConversationHistory').mockImplementation(() => undefined);
     vi.spyOn(sessionContextJournal, 'readEntries').mockReturnValue([
       { turnId: 'turn-1' } as SessionContextTurnEntry,
       { turnId: 'turn-2' } as SessionContextTurnEntry,
@@ -57,6 +65,13 @@ describe('ConversationService derived compaction', () => {
       'branch-root',
       { occupiedTokens: 0, compactionThresholdTokens: 0 },
     );
-    expect(writeHistory).not.toHaveBeenCalled();
+    expect(writeHistory).toHaveBeenCalledTimes(1);
+    expect(history[3]?.workTrace?.blocks).toEqual([
+      expect.objectContaining({
+        kind: 'compaction',
+        title: '手动压缩',
+        compactionStats: expect.objectContaining({ provenance: 'manual' }),
+      }),
+    ]);
   });
 });

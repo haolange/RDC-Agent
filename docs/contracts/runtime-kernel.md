@@ -105,11 +105,13 @@ interface AssistantMessageDiagnostic {
 
 `isRetryableAssistantError(message)` 遍历 `diagnostics` 并对每个 `error` 调用 `classifyProviderError`，任一 retryable 则整条消息可重试。诊断信息不进入 IPC / renderer / Trace，仅供主进程重试决策与脱敏日志使用。
 
-Agent loop 终止与 Provider 失败互斥：`AGENT_NO_PROGRESS` → `CONVERSATION_AGENT_LOOP_STALLED`；`AGENT_MAX_TURNS_EXCEEDED` → `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`。只有真实网络、鉴权、配额或 wire 故障才产生 `CONVERSATION_LLM_REQUEST_FAILED`。
+Agent loop 终止与 Provider 失败互斥：`AGENT_NO_PROGRESS` → `CONVERSATION_AGENT_LOOP_STALLED`；`AGENT_MAX_TURNS_EXCEEDED` → `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`；`PROVIDER_STREAM_*` → `CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION`。只有真实网络、鉴权、配额或 wire 故障才产生 `CONVERSATION_LLM_REQUEST_FAILED`。
 
 ## Tools 与 Permission（执行侧）
 
-Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（36 ids）。Manifest token 经 `CANONICAL_TOOL_TOKEN_EXPANSIONS` 展开；`REJECTED_TOOL_TOKENS` 拒绝无静默 fallback。
+Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（39 ids，含 `read_image` / `code_interpreter`）。Manifest token 经 `CANONICAL_TOOL_TOKEN_EXPANSIONS` 展开（`read` 含 `read_file`+`read_image`，`interpreter`/`image` 为专用 token）；`REJECTED_TOOL_TOKENS` 拒绝无静默 fallback。
+
+`read_image` 在 `visionInputMode !== 'native'` 时 `VISION_INPUT_UNSUPPORTED`。tool-result 图像由 `ContextManager.convertToLlm` 剥出并桥成紧随的 user image part；UI 缩略图只走 session `image-previews` + `conversation:getToolImagePreview`，禁止把大 base64 写入 `resultPreview`。`code_interpreter` 执行 Settings 配置的外部解释器，未启用 fail-closed。
 
 `native-structured` 路由：core schema 常驻；extended / `mcp__*` deferred，经 `tool_search` 等契约路径激活。未激活调用 → `TOOL_NOT_ACTIVATED`。Tasks 工具按 Agent 角色过滤后预激活：Ask 仅 `task_list` / `task_get`，Plan/Edit 等具备 mutation 权限的 profile 才可获得 `task_create` / `task_update` / `task_stop`。
 

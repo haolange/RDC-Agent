@@ -3,6 +3,8 @@
  */
 export { bashTool } from './BashTool';
 export { readFileTool } from './ReadFileTool';
+export { readImageTool } from './ReadImageTool';
+export { codeInterpreterTool } from './CodeInterpreterTool';
 export { writeFileTool } from './WriteFileTool';
 export { editFileTool } from './EditFileTool';
 export { globTool } from './GlobTool';
@@ -16,6 +18,8 @@ export * from './toolLimits';
 import type { AgentTool } from '../../agent/AgentTool';
 import { bashTool } from './BashTool';
 import { readFileTool } from './ReadFileTool';
+import { readImageTool } from './ReadImageTool';
+import { codeInterpreterTool } from './CodeInterpreterTool';
 import { writeFileTool } from './WriteFileTool';
 import { editFileTool } from './EditFileTool';
 import { globTool } from './GlobTool';
@@ -30,6 +34,7 @@ export function getPrimitiveTools(): AgentTool[] {
   return [
     bashTool as unknown as AgentTool,
     readFileTool as unknown as AgentTool,
+    readImageTool as unknown as AgentTool,
     writeFileTool as unknown as AgentTool,
     editFileTool as unknown as AgentTool,
     globTool as unknown as AgentTool,
@@ -46,5 +51,6 @@ export function getPrimitiveTools(): AgentTool[] {
     moveFileTool as unknown as AgentTool,
     copyFileTool as unknown as AgentTool,
     notebookEditTool as unknown as AgentTool,
+    codeInterpreterTool as unknown as AgentTool,
   ];
 }

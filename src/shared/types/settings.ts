@@ -320,9 +320,19 @@ export interface RdxShellActionSettings {
 
 export type RdxActionSettingsMap = Record<RdxActionId, RdxShellActionSettings>;
 
+export interface CodeInterpreterSettings {
+  enabled: boolean;
+  command: string;
+  argsPrefix: string[];
+  timeoutMs: number;
+  env: Record<string, string>;
+  artifactsEnabled: boolean;
+}
+
 export interface ToolingSettings {
   rdxCli: RdxCliInvokerSettings;
   rdxActions: RdxActionSettingsMap;
+  codeInterpreter: CodeInterpreterSettings;
 }
 
 export type AgentPermissionMode =
@@ -556,6 +566,7 @@ export type AppSettingsPatch = Partial<{
   tooling: Partial<{
     rdxCli: Partial<RdxCliInvokerSettings>;
     rdxActions: Partial<Record<RdxActionId, Partial<RdxShellActionSettings>>>;
+    codeInterpreter: Partial<CodeInterpreterSettings>;
   }>;
   agentRuntime: Partial<{
     permissions: Partial<AgentPermissionSettings>;
@@ -613,7 +624,7 @@ export interface LlmProviderConnectionResult {
   error?: string;
 }
 
-export type LlmModelCapabilityProbeMode = 'default' | 'one-million-context' | 'fast';
+export type LlmModelCapabilityProbeMode = 'default' | 'max-context' | 'fast';
 
 export interface LlmModelCapabilityProbeRequest {
   providerId: LlmProviderId;

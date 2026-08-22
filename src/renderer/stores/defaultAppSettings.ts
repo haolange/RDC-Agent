@@ -58,6 +58,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
       closeRuntime: createEmptyRdxAction(),
       openPreview: createEmptyRdxAction(),
     },
+    codeInterpreter: {
+      enabled: false,
+      command: '',
+      argsPrefix: [],
+      timeoutMs: 60000,
+      env: {},
+      artifactsEnabled: true,
+    },
   },
   agentRuntime: {
     permissions: {

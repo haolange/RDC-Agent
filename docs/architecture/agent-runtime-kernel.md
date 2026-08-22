@@ -36,7 +36,7 @@ General agent tools are mediated by `AgentPermissionPolicy` before execution. Th
 
 `LoopProgressGuard` 在每次工具结果回灌后构建稳定指纹：有序工具名、规范化参数、成功/失败、语义结果和 `LoopRuntimeState.revision`；call id、时间戳与耗时不参与。第二个连续相同指纹只为下一次 LLM 请求追加一次易失 `<runtime_no_progress>` 指令，第三次仍相同抛出 `AGENT_NO_PROGRESS`。任一参数、结果或 revision 变化都复位计数。
 
-Agent 达到 `maxTurns` 时，只有已经获得 canonical final 才能正常完成；若 Provider 仍要求 continuation，则抛出 `AGENT_MAX_TURNS_EXCEEDED`。Conversation 分别映射为 `CONVERSATION_AGENT_LOOP_STALLED` 与 `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`，和 `CONVERSATION_LLM_REQUEST_FAILED` 互斥。Work Process 的完成摘要由真实 tool result 统计成功、失败、跳过，模型自述不能覆盖 runtime 证据。
+Agent 达到 `maxTurns` 时，只有已经获得 canonical final 才能正常完成；若 Provider 仍要求 continuation，则抛出 `AGENT_MAX_TURNS_EXCEEDED`。Conversation 分别映射为 `CONVERSATION_AGENT_LOOP_STALLED` 与 `CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED`；流式协议完整性违规映射为 `CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION`。三者都和 `CONVERSATION_LLM_REQUEST_FAILED` 互斥。Work Process 的完成摘要由真实 tool result 统计成功、失败、跳过，模型自述不能覆盖 runtime 证据。
 
 ## Provider Event Normalization
 
@@ -51,7 +51,7 @@ Provider-private protocols are normalized before reaching Conversation or Work P
 - Route capability diagnostics use structured `code + severity + message + surface`: unverified native tools are runtime-log-only `info`, explicit unsupported is a Work Process `warning`, and unavailable/disabled routes are Work Process `error`. Textual tool calls and empty no-tool responses remain diagnostics, never executable tool evidence.
 
 Work Process renders these normalized events only. It must not infer reasoning, tools, or results from the assistant body.
-Each adapter assigns a stable `ProviderOutputRef` before a provider block enters the runtime. An ordered typed slot registry owns the block lifecycle: one source ref can be claimed once as `thinking`, `text`, or `tool_call`, then accepts only same-kind deltas until close. Reusing that ref for another channel, emitting a delta before start or after close, changing an Anthropic content-index type, or emitting semantic events after the provider terminal marker raises `PROVIDER_STREAM_CHANNEL_COLLISION` or the corresponding structured protocol diagnostic and terminates the provider step. OpenAI-compatible virtual thinking, text, and tool slots use separate namespaces. Distinct provider refs are never merged or hidden because their text happens to match.
+Each adapter assigns a stable `ProviderOutputRef` before a provider block enters the runtime. The ref must carry the provider's own block identity: protocol-supplied indexes or item ids when present, otherwise consecutive same-kind deltas share one ref and a kind switch closes that segment. An ordered typed slot registry owns the block lifecycle: one source ref can be claimed once as `thinking`, `text`, or `tool_call`, then accepts only same-kind deltas until close. Reusing a closed ref, emitting a delta before start or after close, changing an Anthropic content-index type, or emitting semantic events after the provider terminal marker raises `PROVIDER_STREAM_CHANNEL_COLLISION` / `PROVIDER_STREAM_BLOCK_CLOSED` or the corresponding structured protocol diagnostic and terminates the provider step. OpenAI-compatible virtual thinking, text, and tool slots use separate namespaces. Distinct provider refs are never merged or hidden because their text happens to match.
 
 ## Reasoning Artifact Boundary
 

@@ -39,7 +39,7 @@ function request(overrides: Partial<EffectiveCatalogRequest> = {}): EffectiveCat
         }],
         controls: {
           fast: { state: 'unsupported', fixedValue: false },
-          context1m: { state: 'unsupported', fixedValue: false },
+          maxContext: { state: 'unsupported', fixedValue: false },
         },
         toolCalling: { state: 'supported' },
       }],
@@ -179,7 +179,7 @@ describe('EffectiveCatalogService', () => {
           }],
           controls: {
             fast: { state: 'unsupported', fixedValue: false },
-            context1m: { state: 'fixed', fixedValue: true, tierId: 'default' },
+            maxContext: { state: 'fixed', fixedValue: true, tierId: 'default' },
           },
         }],
       },
@@ -203,7 +203,7 @@ describe('EffectiveCatalogService', () => {
       maxTotalTokens: 1_000_000,
       entitlement: 'granted',
     });
-    expect(model.resolvedControls?.context1m).toMatchObject({
+    expect(model.resolvedControls?.maxContext).toMatchObject({
       state: 'fixed',
       value: true,
       disabled: true,

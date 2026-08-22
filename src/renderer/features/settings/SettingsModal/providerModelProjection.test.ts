@@ -11,7 +11,7 @@ function effectiveModel(modelId: string, label: string): EffectiveModel {
     defaultBudgetTokens: 128_000,
     controls: {
       fast: { state: 'unknown', defaultValue: false },
-      context1m: { state: 'unsupported', fixedValue: false },
+      maxContext: { state: 'unsupported', fixedValue: false },
       reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
     },
     toolCalling: { state: 'unknown' }, visionInput: { state: 'unknown' }, structuredOutput: { state: 'unknown' },

@@ -3,6 +3,10 @@ import type { TranslationKey } from '../../../i18n';
 export const CATALOG_VERB_LABEL_KEYS: Record<string, TranslationKey> = {
   '已读取': 'chat.workProcessVerb.readComplete',
   '正在读取': 'chat.workProcessVerb.readRunning',
+  '已查看图片': 'chat.workProcessVerb.imageComplete',
+  '正在查看图片': 'chat.workProcessVerb.imageRunning',
+  '已运行解释器': 'chat.workProcessVerb.interpreterComplete',
+  '正在运行解释器': 'chat.workProcessVerb.interpreterRunning',
   '已列出': 'chat.workProcessVerb.globComplete',
   '正在列出': 'chat.workProcessVerb.globRunning',
   '已搜索代码': 'chat.workProcessVerb.grepComplete',

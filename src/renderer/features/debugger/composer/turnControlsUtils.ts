@@ -3,7 +3,8 @@ import type {
 } from '@shared/types/modelCapability';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
-  ONE_MILLION_CONTEXT_TOKENS,
+  contextTierWindowTokens,
+  resolveContextTierChoices,
 } from '@shared/utils/contextTiers';
 import { resolveModelControls } from '@shared/utils/modelControls';
 
@@ -25,29 +26,27 @@ export function sanitizeTurnControls(
   return resolveModelControls(capability, controls).controls;
 }
 
-export function hasSelectableOneMillionContext(capability: EffectiveModel | null): boolean {
+export function hasSelectableMaxContext(capability: EffectiveModel | null): boolean {
   if (!capability) return false;
-  const resolved = resolveModelControls(capability).resolved.context1m;
+  const resolved = resolveModelControls(capability).resolved.maxContext;
   return resolved.state === 'selectable' && !resolved.disabled;
 }
 
-export function oneMillionContextTokens(capability: EffectiveModel | null): number | undefined {
+export function maxContextTokens(capability: EffectiveModel | null): number | undefined {
   if (!capability) return undefined;
-  return capability.controls.context1m.state === 'unsupported'
-    || capability.controls.context1m.state === 'unknown'
-    ? undefined
-    : ONE_MILLION_CONTEXT_TOKENS;
+  const maxTier = resolveContextTierChoices(capability).maxTier;
+  return maxTier ? contextTierWindowTokens(maxTier) : undefined;
 }
 
-export function isOneMillionContextUnverified(capability: EffectiveModel | null): boolean {
+export function isMaxContextUnverified(capability: EffectiveModel | null): boolean {
   if (!capability) return false;
-  const control = capability.controls.context1m;
+  const control = capability.controls.maxContext;
   return control.state === 'selectable' && control.entitlement === 'unknown';
 }
 
-export function isOneMillionContextDenied(capability: EffectiveModel | null): boolean {
+export function isMaxContextDenied(capability: EffectiveModel | null): boolean {
   if (!capability) return false;
-  const control = capability.controls.context1m;
+  const control = capability.controls.maxContext;
   return control.state === 'selectable' && control.entitlement === 'denied';
 }
 

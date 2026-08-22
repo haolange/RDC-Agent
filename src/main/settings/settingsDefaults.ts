@@ -9,6 +9,7 @@ import type {
   RdxActionSettingsMap,
   RdxCliInvokerSettings,
   RdxShellActionSettings,
+  CodeInterpreterSettings,
   ToolingSettings,
   UiPreferences,
   LlmProviderEntry,
@@ -43,6 +44,7 @@ export interface PersistedSettingsPayload {
   tooling?: {
     rdxCli?: Partial<RdxCliInvokerSettings>;
     rdxActions?: Partial<Record<RdxActionId, Partial<RdxShellActionSettings>>>;
+    codeInterpreter?: Partial<CodeInterpreterSettings>;
   };
   agentRuntime?: {
     permissions?: Partial<AgentPermissionSettings>;
@@ -140,9 +142,19 @@ export const DEFAULT_RDX_ACTIONS: RdxActionSettingsMap = {
   openPreview: createDefaultRdxAction(),
 };
 
+export const DEFAULT_CODE_INTERPRETER: CodeInterpreterSettings = {
+  enabled: false,
+  command: '',
+  argsPrefix: [],
+  timeoutMs: 60000,
+  env: {},
+  artifactsEnabled: true,
+};
+
 export const DEFAULT_TOOLING: ToolingSettings = {
   rdxCli: DEFAULT_RDX_CLI_INVOKER,
   rdxActions: DEFAULT_RDX_ACTIONS,
+  codeInterpreter: DEFAULT_CODE_INTERPRETER,
 };
 
 export const DEFAULT_AGENT_RUNTIME: AgentRuntimeSettings = {

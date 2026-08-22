@@ -4,7 +4,7 @@ import { buildEffortCapabilityStatusLabels } from './effortControlStatusLabels';
 
 const capability = {
   controls: {
-    context1m: { state: 'fixed', fixedValue: true },
+    maxContext: { state: 'fixed', fixedValue: true },
     fast: { state: 'unsupported', fixedValue: false },
   },
 } as EffectiveModel;
@@ -17,11 +17,11 @@ describe('buildEffortCapabilityStatusLabels', () => {
       capability,
       capabilityReady: true,
       capabilityStateLabel: undefined,
-      oneMillionUnverified: false,
+      maxTierUnverified: false,
       fastUnverified: false,
       t,
     })).toEqual({
-      oneMillionContextStatusLabel: 'composer.effort.fixed',
+      maxContextStatusLabel: 'composer.effort.fixed',
       fastModelStatusLabel: 'composer.effort.unsupported',
     });
   });
@@ -31,11 +31,11 @@ describe('buildEffortCapabilityStatusLabels', () => {
       capability: null,
       capabilityReady: false,
       capabilityStateLabel: 'Loading capability',
-      oneMillionUnverified: false,
+      maxTierUnverified: false,
       fastUnverified: false,
       t,
     })).toEqual({
-      oneMillionContextStatusLabel: 'Loading capability',
+      maxContextStatusLabel: 'Loading capability',
       fastModelStatusLabel: 'Loading capability',
     });
   });

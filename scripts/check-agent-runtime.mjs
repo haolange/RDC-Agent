@@ -55,7 +55,7 @@ function effectiveModel(provider, modelId, overrides = {}) {
     defaultBudgetTokens: 128000,
     controls: {
       fast: { state: 'unsupported', fixedValue: false },
-      context1m: { state: 'unsupported', fixedValue: false },
+      maxContext: { state: 'unsupported', fixedValue: false },
       reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
     },
     toolCalling: { state: 'supported' },

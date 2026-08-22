@@ -246,6 +246,22 @@ const renderIconPath = (icon: WorkProcessIconKey): ReactElement => {
           <rect x="16" y="15" width="4" height="4" rx="0.5" />
         </>
       );
+    case 'imageRead':
+      return (
+        <>
+          <path d="M5 6h14v12H5V6Z" />
+          <path d="m5 15 4-4 3 3 2-2 5 5" />
+          <circle cx="9" cy="10" r="1" />
+        </>
+      );
+    case 'interpreter':
+      return (
+        <>
+          <path d="M6 5h12v14H6V5Z" />
+          <path d="M9 9h6M9 12h4" />
+          <path d="M9 16h2" />
+        </>
+      );
     case 'spark':
       return <path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Zm6 11 .8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8L18 14Z" />;
     case 'tool':

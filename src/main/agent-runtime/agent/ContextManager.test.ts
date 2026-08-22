@@ -66,6 +66,32 @@ describe('ContextManager', () => {
       expect(result[2].role).toBe('toolResult');
     });
 
+    it('bridges tool-result images into a following user message', () => {
+      const cm = createContextManager();
+      const withImage: ToolResultMessage = {
+        role: 'toolResult',
+        toolCallId: 'img-1',
+        toolName: 'read_image',
+        content: [
+          { type: 'text', text: 'Viewed image frame.png' },
+          { type: 'image', data: 'aaa', mimeType: 'image/png' },
+        ],
+        isError: false,
+        timestamp: Date.now(),
+      };
+      const result = cm.convertToLlm([user('look'), withImage]);
+      expect(result).toHaveLength(3);
+      expect(result[1]).toMatchObject({
+        role: 'toolResult',
+        toolName: 'read_image',
+      });
+      expect(result[1].role === 'toolResult' && result[1].content.every((block) => block.type !== 'image')).toBe(true);
+      expect(result[2]).toMatchObject({ role: 'user' });
+      expect(result[2].role === 'user' && Array.isArray(result[2].content)).toBe(true);
+      if (result[2].role !== 'user' || !Array.isArray(result[2].content)) throw new Error('expected user image bridge');
+      expect(result[2].content.some((block) => block.type === 'image')).toBe(true);
+    });
+
     it('应过滤掉自定义消息', () => {
       const cm = createContextManager();
       const custom: AgentMessage = {

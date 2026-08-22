@@ -31,7 +31,7 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
     defaultBudgetTokens: 256_000,
     controls: {
       fast: { state: 'unsupported', fixedValue: false },
-      context1m: { state: 'unsupported', fixedValue: false },
+      maxContext: { state: 'unsupported', fixedValue: false },
       reasoning: noReasoning,
     },
     toolCalling: { state: 'supported' },
@@ -47,7 +47,7 @@ describe('resolveModelControls', () => {
     const base = model({
       controls: {
         fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
-        context1m: { state: 'unsupported', fixedValue: false },
+        maxContext: { state: 'unsupported', fixedValue: false },
         reasoning: noReasoning,
       },
       executionBindings: [{
@@ -86,7 +86,7 @@ describe('resolveModelControls', () => {
     const base = model({
       controls: {
         fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
-        context1m: { state: 'unsupported', fixedValue: false },
+        maxContext: { state: 'unsupported', fixedValue: false },
         reasoning: noReasoning,
       },
       executionBindings: [{
@@ -102,11 +102,11 @@ describe('resolveModelControls', () => {
     expect(result.error?.code).toBe('FAST_BLOCKED');
   });
 
-  it('keeps structurally selectable controls disabled until account entitlement is verified', () => {
+  it('keeps structurally selectable unverified controls available with an unverified reason', () => {
     const unverified = model({
       controls: {
         fast: { state: 'selectable', defaultValue: false, entitlement: 'unknown' },
-        context1m: { state: 'unsupported', fixedValue: false },
+        maxContext: { state: 'unsupported', fixedValue: false },
         reasoning: noReasoning,
       },
       executionBindings: [{
@@ -118,11 +118,12 @@ describe('resolveModelControls', () => {
     });
 
     const result = resolveModelControls(unverified, { fastModel: true }, [unverified]);
-    expect(result.controls.fastModel).toBe(false);
+    expect(result.controls.fastModel).toBe(true);
     expect(result.resolved.fast).toMatchObject({
-      state: 'blocked', value: false, disabled: true, entitlement: 'unknown',
+      state: 'selectable', value: true, disabled: false, entitlement: 'unknown',
     });
-    expect(result.error?.code).toBe('FAST_BLOCKED');
+    expect(result.resolved.fast.reason).toContain('not yet verified');
+    expect(result.error).toBeUndefined();
   });
 
   it('projects fixed, selectable and unsupported 1M states without numeric guessing', () => {
@@ -137,7 +138,7 @@ describe('resolveModelControls', () => {
       contextTiers: [tier],
       controls: {
         fast: { state: 'unsupported', fixedValue: false },
-        context1m: { state: 'fixed', fixedValue: true, tierId: 'one-million' },
+        maxContext: { state: 'fixed', fixedValue: true, tierId: 'one-million' },
         reasoning: noReasoning,
       },
     });
@@ -145,44 +146,52 @@ describe('resolveModelControls', () => {
       contextTiers: [model().contextTiers[0], tier],
       controls: {
         fast: { state: 'unsupported', fixedValue: false },
-        context1m: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'one-million' },
+        maxContext: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'one-million' },
         reasoning: noReasoning,
       },
     });
-    expect(resolveModelControls(fixed).resolved.context1m)
+    expect(resolveModelControls(fixed).resolved.maxContext)
       .toMatchObject({ state: 'fixed', value: true, disabled: true, tierId: 'one-million' });
-    expect(resolveModelControls(selectable, { maxContextMode: true }).resolved.context1m)
+    expect(resolveModelControls(selectable, { maxContextMode: true }).resolved.maxContext)
       .toMatchObject({ state: 'selectable', value: true, disabled: false, tierId: 'one-million' });
-    expect(resolveModelControls(model(), { maxContextMode: true }).resolved.context1m)
+    expect(resolveModelControls(model(), { maxContextMode: true }).resolved.maxContext)
       .toMatchObject({ state: 'unsupported', value: false, disabled: true });
   });
 
-  it('blocks only Max mode when its merged tier is below one million tokens', () => {
-    const subMillion = model({
-      contextTiers: [{
-        id: 'default',
-        label: 'Default',
-        maxPromptTokens: 200_000,
-        maxOutputTokens: 64_000,
-        activation: { kind: 'implicit' },
-        entitlement: 'granted',
-      }],
+  it('blocks Max mode when the pointed tier is not larger than the default window', () => {
+    const smallerMax = model({
+      contextTiers: [
+        {
+          id: 'default',
+          label: 'Default',
+          maxTotalTokens: 256_000,
+          activation: { kind: 'implicit' },
+          entitlement: 'granted',
+        },
+        {
+          id: 'max',
+          label: 'Max',
+          maxTotalTokens: 200_000,
+          activation: { kind: 'implicit' },
+          entitlement: 'granted',
+        },
+      ],
       controls: {
         fast: { state: 'unsupported', fixedValue: false },
-        context1m: { state: 'fixed', fixedValue: true, tierId: 'default' },
+        maxContext: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'max' },
         reasoning: noReasoning,
       },
     });
 
-    const result = resolveModelControls(subMillion, { maxContextMode: true });
-    expect(result.resolved.context1m).toMatchObject({
+    const result = resolveModelControls(smallerMax, { maxContextMode: true });
+    expect(result.resolved.maxContext).toMatchObject({
       state: 'blocked',
       value: false,
       disabled: true,
-      reason: 'Max mode tier is below one million tokens.',
+      reason: 'Max mode tier is not larger than the default context window.',
     });
     expect(result.controls.maxContextMode).toBe(false);
-    expect(result.error?.code).toBe('CONTEXT_1M_BLOCKED');
+    expect(result.error?.code).toBe('MAX_CONTEXT_BLOCKED');
   });
 
   it('chooses the most specific Fast + Max binding', () => {
@@ -199,12 +208,12 @@ describe('resolveModelControls', () => {
       ],
       controls: {
         fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
-        context1m: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'one-million' },
+        maxContext: { state: 'selectable', defaultValue: false, entitlement: 'granted', tierId: 'one-million' },
         reasoning: noReasoning,
       },
       executionBindings: [
         { id: 'fast', when: { fast: true }, actions: [{ kind: 'request-patch', patch: { speed: 'fast' } }], entitlement: 'granted' },
-        { id: 'fast+1m', when: { fast: true, context1m: true }, actions: [{ kind: 'request-patch', patch: { speed: 'fast-long' } }], entitlement: 'granted' },
+        { id: 'fast+1m', when: { fast: true, maxContext: true }, actions: [{ kind: 'request-patch', patch: { speed: 'fast-long' } }], entitlement: 'granted' },
       ],
     });
     expect(resolveModelControls(combined, { fastModel: true, maxContextMode: true }).binding?.id)

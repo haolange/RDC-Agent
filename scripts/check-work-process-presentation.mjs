@@ -911,9 +911,14 @@ const componentSource = [
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessRows.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessRowParts.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessToolCardParts.tsx', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessFamilyLayers.tsx', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessHighlightedCode.tsx', 'utf8'),
   fs.readFileSync('src/renderer/features/debugger/AgentChat/WorkProcessIcons.tsx', 'utf8'),
 ].join('\n');
-const cssSource = fs.readFileSync('src/renderer/features/debugger/AgentChat/AgentChat.css', 'utf8');
+const cssSource = [
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/AgentChat.css', 'utf8'),
+  fs.readFileSync('src/renderer/features/debugger/AgentChat/AgentChat.extras.css', 'utf8'),
+].join('\n');
 const appShellSource = fs.readFileSync('src/renderer/styles/global/app-shell.css', 'utf8');
 const responsiveThemeSource = fs.readFileSync('src/renderer/styles/global/responsive-theme.css', 'utf8');
 const presentationSource = [
@@ -1263,6 +1268,13 @@ assert(presentationSource.includes("previewKind: 'shell'"), 'shell preview kind 
 assert(componentSource.includes('work-process-shell-command'), 'shell tools should render a command pane');
 assert(componentSource.includes('work-process-shell-stdout'), 'shell tools should render stdout');
 assert(componentSource.includes('work-process-path-chip'), 'skill_read should render a path chip');
+assert(componentSource.includes('FamilyLayerBody'), 'memory/skill/mcp/runtime/interpreter must use dedicated family layers');
+assert(componentSource.includes('WorkProcessHighlightedCode'), 'interpreter cards must highlight code with the shared highlighter');
+assert(componentSource.includes("family === 'memory'"), 'memory family must have a dedicated layer');
+assert(componentSource.includes("family === 'skill'"), 'skill family must have a dedicated layer');
+assert(componentSource.includes("family === 'mcp'"), 'mcp family must have a dedicated layer');
+assert(componentSource.includes("family === 'runtime'"), 'runtime family must have a dedicated layer');
+assert(cssSource.includes('.work-process-highlighted-code'), 'interpreter highlight styling should exist');
 assert(!componentSource.includes('work-process-console-title'), 'Console output must not appear as a visible nested sub-label');
 assert(!componentSource.includes('work-process-console-head'), 'Console chrome head with visible title must be removed');
 assert(cssSource.includes('.work-process-shell-command'), 'shell command styling should exist');

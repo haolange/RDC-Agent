@@ -28,6 +28,7 @@ import {
   DEFAULT_AGENT_RUNTIME,
   DEFAULT_LAYOUT,
   DEFAULT_PROFILE,
+  DEFAULT_CODE_INTERPRETER,
   DEFAULT_RDX_ACTIONS,
   DEFAULT_RDX_CLI_INVOKER,
   EMPTY_PATHS,
@@ -147,7 +148,7 @@ export function createDefaultRuntimeSettings(): AppSettings {
     appearance: DEFAULT_APPEARANCE,
     layout: DEFAULT_LAYOUT,
     profile: DEFAULT_PROFILE,
-    tooling: { rdxCli: DEFAULT_RDX_CLI_INVOKER, rdxActions: DEFAULT_RDX_ACTIONS },
+    tooling: { rdxCli: DEFAULT_RDX_CLI_INVOKER, rdxActions: DEFAULT_RDX_ACTIONS, codeInterpreter: DEFAULT_CODE_INTERPRETER },
     agentRuntime: DEFAULT_AGENT_RUNTIME,
     llm: {
       providers: [],

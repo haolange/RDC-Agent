@@ -1,41 +1,17 @@
 import React from 'react';
 import { useI18n } from '../../../i18n';
-import { getElectronApi } from '../../../platform/getElectronApi';
-import { Button } from '../../../ui/Button';
 import { useWorkProcessLabel } from './workProcessUseLabel';
 import type { ToolRowModel } from './workProcessToolTypes';
 import { SourcePills, WebPageDestination } from './WorkProcessWebParts';
+import { WorkProcessImageThumbs } from './WorkProcessImageThumbs';
+import {
+  CopyPathButton,
+  FamilyLayerBody,
+  FamilyLayerDetail,
+  isDedicatedFamily,
+} from './WorkProcessFamilyLayers';
 
 export type { ToolRowModel } from './workProcessToolTypes';
-
-const CopyPathButton: React.FC<{ path: string }> = ({ path }) => {
-  const { language } = useI18n();
-  const [copied, setCopied] = React.useState(false);
-  const copyLabel = language === 'zh-CN' ? '复制' : 'Copy';
-  const copiedLabel = language === 'zh-CN' ? '已复制' : 'Copied';
-
-  const onCopy = async (event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!path) return;
-    await getElectronApi()?.appShell.copyText(path);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1200);
-  };
-
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="work-process-tool-card-copy"
-      onClick={onCopy}
-      aria-label={copied ? copiedLabel : copyLabel}
-      title={copied ? copiedLabel : copyLabel}
-    >
-      {copied ? '✓' : '⧉'}
-    </Button>
-  );
-};
 
 const resolveBodyText = (row: ToolRowModel): string => {
   if (row.bodyText?.trim()) return row.bodyText.trim();
@@ -63,9 +39,13 @@ const resolveCollapsedSampleLines = (row: ToolRowModel): string[] => {
 };
 
 export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
+  if (isDedicatedFamily(row.family)) return <FamilyLayerBody row={row} />;
+
   const bodyText = resolveBodyText(row);
   const sampleLines = resolveCollapsedSampleLines(row);
-  if (!bodyText && sampleLines.length === 0 && !row.sourcePills?.length && !row.pageChip) return null;
+  if (!bodyText && sampleLines.length === 0 && !row.sourcePills?.length && !row.pageChip && !row.imagePreviews?.length) {
+    return null;
+  }
 
   if (row.family === 'web') {
     const fetchTitle = row.pageChip?.title?.trim();
@@ -87,6 +67,7 @@ export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
     const copyPath = row.pathChip?.trim() || row.target;
     return (
       <div className="work-process-tool-card-body family-file">
+        {row.imagePreviews?.length ? <WorkProcessImageThumbs previews={row.imagePreviews} /> : null}
         <code className="work-process-tool-card-path" title={bodyText || copyPath}>{bodyText}</code>
         {copyPath ? <CopyPathButton path={copyPath} /> : null}
       </div>
@@ -120,12 +101,20 @@ export const CardBody: React.FC<{ row: ToolRowModel }> = ({ row }) => {
 
   return (
     <div className={`work-process-tool-card-body family-${row.family}`}>
-      <span className="work-process-tool-card-body-text" title={bodyText}>{bodyText}</span>
+      {row.chips?.length ? (
+        <div className="work-process-tool-chips">
+          {row.chips.map((chip) => <span key={chip} className="work-process-path-chip">{chip}</span>)}
+        </div>
+      ) : null}
+      {bodyText ? <span className="work-process-tool-card-body-text" title={bodyText}>{bodyText}</span> : null}
+      {row.imagePreviews?.length ? <WorkProcessImageThumbs previews={row.imagePreviews} /> : null}
     </div>
   );
 };
 
 export const FamilyDetail: React.FC<{ row: ToolRowModel }> = ({ row }) => {
+  if (isDedicatedFamily(row.family)) return <FamilyLayerDetail row={row} />;
+
   const lines = row.previewLines;
   if (row.family === 'shell' || row.family === 'git') {
     if (!row.commandText && lines.length === 0) return null;

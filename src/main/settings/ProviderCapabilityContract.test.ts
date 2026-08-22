@@ -22,8 +22,8 @@ interface FrozenEffectiveModel {
   protocol: LlmProviderProtocol;
   defaultBudgetTokens: number;
   normalPromptCapTokens: number | null;
-  oneMillionPromptCapTokens: number | null;
-  oneMillionActivation: string | null;
+  maxTierPromptCapTokens: number | null;
+  maxTierActivation: string | null;
   fastState: string;
 }
 
@@ -53,8 +53,8 @@ describe('final provider capability contracts', () => {
         protocol: model?.route.protocol,
         defaultBudgetTokens: model?.defaultBudgetTokens,
         normalPromptCapTokens: choices.normalTier?.maxPromptTokens ?? null,
-        oneMillionPromptCapTokens: choices.oneMillionTier?.maxPromptTokens ?? null,
-        oneMillionActivation: choices.oneMillionTier?.activation?.kind ?? null,
+        maxTierPromptCapTokens: choices.maxTier?.maxPromptTokens ?? null,
+        maxTierActivation: choices.maxTier?.activation?.kind ?? null,
         fastState: model.controls.fast.state,
       };
     });

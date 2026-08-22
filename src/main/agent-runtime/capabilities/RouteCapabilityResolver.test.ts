@@ -59,7 +59,7 @@ function model(patch: Partial<EffectiveModel> = {}): EffectiveModel {
     defaultBudgetTokens: 256_000,
     controls: {
       fast: { state: 'unsupported', fixedValue: false },
-      context1m: { state: 'unsupported', fixedValue: false },
+      maxContext: { state: 'unsupported', fixedValue: false },
       reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
     },
     toolCalling: { state: 'unknown' },
@@ -75,7 +75,7 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
     const rawModel = model({
       controls: {
         fast: { state: 'unsupported', fixedValue: false },
-        context1m: { state: 'unsupported', fixedValue: false },
+        maxContext: { state: 'unsupported', fixedValue: false },
         reasoning: {
           kind: 'toggle',
           supportsOff: true,

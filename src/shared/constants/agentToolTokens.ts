@@ -3,10 +3,11 @@
  * Single source of truth for seed manifests, allowlist expansion, and Settings diagnostics.
  */
 
-/** All builtin AgentTool ids after search_codebase removal (36). */
+/** All builtin AgentTool ids after search_codebase removal (39). */
 export const BUILTIN_AGENT_TOOL_IDS = [
   'bash',
   'read_file',
+  'read_image',
   'write_file',
   'edit_file',
   'glob',
@@ -42,6 +43,7 @@ export const BUILTIN_AGENT_TOOL_IDS = [
   'subagent',
   'rdx_context',
   'tool_search',
+  'code_interpreter',
 ] as const;
 
 export type BuiltinAgentToolId = (typeof BUILTIN_AGENT_TOOL_IDS)[number];
@@ -57,6 +59,7 @@ export type BuiltinAgentToolTier = 'core' | 'extended';
 export const BUILTIN_AGENT_TOOL_TIERS: Record<BuiltinAgentToolId, BuiltinAgentToolTier> = {
   bash: 'core',
   read_file: 'core',
+  read_image: 'core',
   write_file: 'core',
   edit_file: 'core',
   glob: 'core',
@@ -92,6 +95,7 @@ export const BUILTIN_AGENT_TOOL_TIERS: Record<BuiltinAgentToolId, BuiltinAgentTo
   subagent: 'extended',
   rdx_context: 'core',
   tool_search: 'core',
+  code_interpreter: 'extended',
 };
 
 export function getBuiltinToolTier(toolName: string): BuiltinAgentToolTier | null {
@@ -102,7 +106,10 @@ export function getBuiltinToolTier(toolName: string): BuiltinAgentToolTier | nul
 
 /** Manifest-facing canonical tokens → concrete tool ids. */
 export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
-  read: ['read_file'],
+  read: ['read_file', 'read_image'],
+  image: ['read_image'],
+  interpreter: ['code_interpreter'],
+  code_interpreter: ['code_interpreter'],
   search: ['glob', 'grep'],
   web: ['web_fetch', 'web_search'],
   git: ['git_status', 'git_diff', 'git_log', 'git_add', 'git_unstage', 'git_commit'],

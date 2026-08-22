@@ -24,7 +24,12 @@ import type {
 } from '../core/types';
 import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
-import { AssistantStreamBuilder, createProviderOutputRef } from './internal/AssistantStreamBuilder';
+import { AssistantStreamBuilder } from './internal/AssistantStreamBuilder';
+import {
+  AlternatingTextThinkingChannels,
+  StreamChannelRefs,
+  closeSwitchedChannel,
+} from './internal/streamChannelRefs';
 import {
   composeAbortSignals,
   ensureOk,
@@ -129,13 +134,14 @@ export class OllamaProvider implements ProviderStrategy {
       recordQuotaFromResponse(options.requestPlan, response);
       await ensureOk(response, PROVIDER_API);
 
-      const TEXT_INDEX = 0;
-      const THINKING_INDEX = 1;
       let toolCallCounter = 0;
-      const textRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:text', contentIndex: TEXT_INDEX });
-      const thinkingRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:thinking', contentIndex: THINKING_INDEX });
-      let textStarted = false;
-      let thinkingStarted = false;
+      const channels = new StreamChannelRefs(PROVIDER_API);
+      const alternating = new AlternatingTextThinkingChannels(channels);
+      const thinkingMeta = {
+        kind: 'unknown' as const,
+        source: 'ollama-raw' as const,
+        visibility: 'raw-collapsed' as const,
+      };
       let doneReason: string | null = null;
       let lastChunk: OllamaChunk | null = null;
       let sawOutput = false;
@@ -154,30 +160,29 @@ export class OllamaProvider implements ProviderStrategy {
         if (message) {
           if (typeof message.thinking === 'string' && message.thinking.length > 0) {
             sawOutput = true;
-            if (!thinkingStarted) {
-              builder.startThinking(thinkingRef, { kind: 'unknown', source: 'ollama-raw', visibility: 'raw-collapsed' });
-              thinkingStarted = true;
-            }
-            builder.appendThinking(thinkingRef, message.thinking, {
-              kind: 'unknown',
-              source: 'ollama-raw',
-              visibility: 'raw-collapsed',
-            });
+            const switched = alternating.ensure('thinking');
+            closeSwitchedChannel(builder, switched.close);
+            if (switched.started) builder.startThinking(switched.ref, thinkingMeta);
+            builder.appendThinking(switched.ref, message.thinking, thinkingMeta);
           }
           if (typeof message.content === 'string' && message.content.length > 0) {
             sawOutput = true;
-            if (!textStarted) { builder.startText(textRef); textStarted = true; }
-            builder.appendText(textRef, message.content);
+            const switched = alternating.ensure('text');
+            closeSwitchedChannel(builder, switched.close);
+            if (switched.started) builder.startText(switched.ref);
+            builder.appendText(switched.ref, message.content);
           }
           if (Array.isArray(message.tool_calls)) {
             for (const tc of message.tool_calls) {
               const fn = tc.function;
               if (!fn || !fn.name) continue;
-              const slot = 2 + toolCallCounter;
               toolCallCounter += 1;
-              const callId = `ollama-call-${Date.now()}-${slot}`;
+              const callId = `ollama-call-${Date.now()}-${toolCallCounter}`;
               sawOutput = true;
-              const toolRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: `function:${toolCallCounter - 1}`, sourceIndex: toolCallCounter - 1, contentIndex: slot });
+              const toolRef = channels.ref({
+                providerBlockKey: `function:${toolCallCounter - 1}`,
+                sourceIndex: toolCallCounter - 1,
+              });
               builder.startToolCall(toolRef, callId, fn.name);
               const argsRaw =
                 typeof fn.arguments === 'string'

@@ -65,7 +65,15 @@ describe('resolveTurnOutputTokens', () => {
     expect(resolveTurnOutputTokens({
       contextWindowTokens: 200_000,
       maxOutputTokens: 0,
-      promptTokens: 1_000,
+      promptTokens: 199_500,
     })).toBeNull();
+  });
+
+  it('treats a missing output cap as the remaining window', () => {
+    expect(resolveTurnOutputTokens({
+      contextWindowTokens: 200_000,
+      maxOutputTokens: 0,
+      promptTokens: 1_000,
+    })).toBe(197_976);
   });
 });

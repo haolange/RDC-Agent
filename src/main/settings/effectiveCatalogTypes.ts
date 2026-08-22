@@ -40,7 +40,7 @@ export interface CatalogModelContribution {
   cacheContract?: EffectiveModel['cacheContract'];
   controls?: {
     fast?: ControlDefinition;
-    context1m?: ControlDefinition;
+    maxContext?: ControlDefinition;
     reasoning?: Partial<ReasoningControl>;
   };
   executionBindings?: ExecutionBindingDefinition[];

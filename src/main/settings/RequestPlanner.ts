@@ -22,8 +22,8 @@ import {
   contextTierBudgetTokens,
   contextTierPromptCap,
   contextTierWindowTokens,
-  ONE_MILLION_CONTEXT_TOKENS,
   resolveContextTierChoices,
+  resolvePlanningOutputTokens,
 } from '@shared/utils/contextTiers';
 import {
   resolveCompactionThresholdTokens,
@@ -125,15 +125,15 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
   if (evaluation.error) {
     const code: RequestPlanningErrorCode = evaluation.error.code === 'PLAN_CONFLICT'
       ? 'PLAN_CONFLICT'
-      : evaluation.error.code === 'CONTEXT_1M_BLOCKED'
+      : evaluation.error.code === 'MAX_CONTEXT_BLOCKED'
         ? 'NO_USABLE_CONTEXT_TIER'
         : 'MODEL_UNAVAILABLE';
     return planningError(code, evaluation.error.message, controls);
   }
 
   const tierChoices = resolveContextTierChoices(model);
-  const oneMillionMode = evaluation.resolved.context1m.value;
-  let activeTier = oneMillionMode ? tierChoices.oneMillionTier : tierChoices.normalTier;
+  const maxMode = evaluation.resolved.maxContext.value;
+  let activeTier = maxMode ? tierChoices.maxTier : tierChoices.normalTier;
   if (!activeTier || activeTier.entitlement === 'denied') {
     return planningError('NO_USABLE_CONTEXT_TIER', `${model.modelId} has no usable context tier`, controls);
   }
@@ -305,10 +305,10 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
   if (bindingHeaderConflict) {
     return planningError('PLAN_CONFLICT', `Execution binding conflicts at header ${bindingHeaderConflict}`, controls);
   }
-  if (oneMillionMode && tierChoices.oneMillionUnverified) {
+  if (maxMode && tierChoices.maxTierUnverified) {
     warnings.push('Max mode entitlement is unverified');
   } else if (activeTier.entitlement === 'unknown') {
-    warnings.push(oneMillionMode
+    warnings.push(maxMode
       ? 'Max mode entitlement is unverified'
       : `Context tier ${activeTier.label} is unverified`);
   }
@@ -343,11 +343,11 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
     );
   }
 
-  const requestedBudget = oneMillionMode
-    ? ONE_MILLION_CONTEXT_TOKENS
+  const requestedBudget = maxMode
+    ? (contextTierPromptCap(activeTier) ?? contextWindowTokens)
     : model.defaultBudgetTokens;
   const contextBudgetTokens = contextTierBudgetTokens(activeTier, requestedBudget);
-  const maxOutputTokens = activeTier.maxOutputTokens ?? 0;
+  const maxOutputTokens = resolvePlanningOutputTokens(activeTier, contextWindowTokens);
   const compactionThresholdPercent = sanitizeCompactionThresholdPercent(
     input.compactionThresholdPercent,
     DEFAULT_CONTEXT_COMPACTION_PERCENT,
@@ -398,7 +398,7 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
     provenance: model.provenance,
   });
   const appliedBindingIds = binding ? [binding.id] : [];
-  const contextMode = oneMillionMode ? 'one-million' as const : 'normal' as const;
+  const contextMode = maxMode ? 'one-million' as const : 'normal' as const;
   const toolLoopPhase = input.toolLoopPhase ?? 'top-level';
   const contractHash = revisionFor(contracts);
   const credentialScopeHash = revisionFor({

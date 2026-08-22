@@ -27,6 +27,8 @@ const LABEL_TO_KEY: Record<string, TranslationKey> = {
   '问题数据不完整': 'chat.workProcessAskIncomplete',
   '已阻断': 'chat.workProcessToolBlocked',
   '上下文压缩': 'chat.workProcessCompactTitle',
+  '自动压缩': 'chat.workProcessCompactAuto',
+  '手动压缩': 'chat.workProcessCompactManual',
   '风险：low': 'chat.workProcessRiskLow',
   '风险：medium': 'chat.workProcessRiskMedium',
   '风险：high': 'chat.workProcessRiskHigh',

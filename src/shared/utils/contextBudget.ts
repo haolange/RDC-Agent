@@ -56,11 +56,13 @@ export function resolveTurnOutputTokens(input: {
 }): number | null {
   const { contextWindowTokens, maxOutputTokens, promptTokens } = input;
   if (!Number.isFinite(contextWindowTokens) || contextWindowTokens <= 0) return null;
-  if (!Number.isFinite(maxOutputTokens) || maxOutputTokens <= 0) return null;
+  if (!Number.isFinite(maxOutputTokens) || maxOutputTokens < 0) return null;
   const occupied = Number.isFinite(promptTokens) ? Math.max(0, promptTokens) : 0;
   const safety = Math.max(1024, Math.ceil(occupied * 0.02));
   const remaining = contextWindowTokens - occupied - safety;
-  const resolved = Math.min(maxOutputTokens, remaining);
+  if (!Number.isFinite(remaining) || remaining <= 0) return null;
+  const outputCap = maxOutputTokens > 0 ? maxOutputTokens : remaining;
+  const resolved = Math.min(outputCap, remaining);
   if (!Number.isFinite(resolved) || resolved <= 0) return null;
   return Math.floor(resolved);
 }

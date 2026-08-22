@@ -91,6 +91,17 @@ function contextTokens(value: Record<string, unknown>): number | undefined {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
+function outputTokens(value: Record<string, unknown>): number | undefined {
+  const limits = record(value.limits);
+  return positiveInteger(value.max_output_tokens)
+    ?? positiveInteger(value.max_completion_tokens)
+    ?? positiveInteger(value.maxOutputTokens)
+    ?? positiveInteger(value.max_output_length)
+    ?? positiveInteger(limits.max_output_tokens)
+    ?? positiveInteger(limits.max_completion_tokens)
+    ?? positiveInteger(limits.maxOutputTokens);
+}
+
 function mergeContributions(contributions: CatalogModelContribution[]): CatalogModelContribution[] {
   const byId = new Map<string, CatalogModelContribution>();
   for (const contribution of contributions) {
@@ -272,6 +283,7 @@ function observationFromCatalogRow(value: Record<string, unknown>): LiveModelObs
   const toolCalling = explicitCapabilityState(value.supports_tool_call ?? value.supports_tools ?? value.tool_call);
   const visionInput = explicitCapabilityState(value.supports_image ?? value.supports_vision ?? value.image);
   const structuredOutput = explicitCapabilityState(value.supports_structured_output ?? value.structured_output);
+  const maxOutputTokens = outputTokens(value);
   return {
     modelId: identity.id,
     ...(identity.aliases.length ? { aliases: identity.aliases } : {}),
@@ -279,6 +291,7 @@ function observationFromCatalogRow(value: Record<string, unknown>): LiveModelObs
     availability: 'available',
     protocol: explicitProtocol(value),
     contextWindowTokens: contextTokens(value),
+    ...(maxOutputTokens ? { maxOutputTokens } : {}),
     reasoning: observedReasoning(value),
     ...(toolCalling ? { toolCalling } : {}),
     ...(visionInput ? { visionInput } : {}),
@@ -317,20 +330,22 @@ export function parseChatGptAccountCatalog(payload: unknown): ParsedLiveCatalog 
     ) return [];
     const contextWindow = positiveInteger(value.context_window);
     const maxContextWindow = positiveInteger(value.max_context_window);
-    const supportsOneMillion = Boolean(maxContextWindow && maxContextWindow >= 1_000_000);
+    const observedOutputTokens = outputTokens(value);
     const effectiveContextWindow = contextWindow;
     const contextTiers: NonNullable<CatalogModelContribution['contextTiers']> = [{
       id: 'default',
       label: 'Codex service limit',
       ...(effectiveContextWindow ? { maxPromptTokens: effectiveContextWindow } : {}),
+      ...(observedOutputTokens ? { maxOutputTokens: observedOutputTokens } : {}),
       activation: { kind: 'implicit' },
       entitlement: 'granted',
     }];
-    if (supportsOneMillion && contextWindow && maxContextWindow && maxContextWindow > contextWindow) {
+    if (contextWindow && maxContextWindow && maxContextWindow > contextWindow) {
       contextTiers.push({
         id: 'max',
         label: 'Maximum Codex limit',
         maxPromptTokens: maxContextWindow,
+        ...(observedOutputTokens ? { maxOutputTokens: observedOutputTokens } : {}),
         activation: { kind: 'implicit' },
         entitlement: 'unknown',
       });
@@ -559,12 +574,14 @@ export function parseOpenRouterAccountCatalog(
         .map((entry) => text(entry)?.toLowerCase())
         .filter(Boolean)
       : [];
+    const maxOutputTokens = outputTokens(value);
     return [{
       modelId: identity.id,
       ...(identity.aliases.length ? { aliases: identity.aliases } : {}),
       upstreamLabel: text(value.name),
       availability: 'available',
       contextWindowTokens: contextTokens(value),
+      ...(maxOutputTokens ? { maxOutputTokens } : {}),
       toolCalling: supportedParameters.includes('tools') ? { state: 'supported' } : { state: 'unknown' },
       visionInput: inputModalities.length === 0
         ? { state: 'unknown' }
@@ -582,16 +599,22 @@ export function parseGrokAccountCatalog(payload: unknown): ParsedLiveCatalog {
   const contributions = records(payload).flatMap((value): CatalogModelContribution[] => {
     const identity = liveIdentity(value);
     if (!identity) return [];
+    const windowTokens = contextTokens(value);
+    const maxOutputTokens = outputTokens(value);
     return [{
       modelId: identity.id,
       ...(identity.aliases.length > 0 ? { aliases: identity.aliases } : {}),
       label: text(value.label) ?? identity.id,
       availability: 'available',
       contextTiers: [{
-        id: 'default', label: 'Default', maxPromptTokens: contextTokens(value),
-        activation: { kind: 'implicit' }, entitlement: 'granted',
+        id: 'default',
+        label: 'Default',
+        maxPromptTokens: windowTokens,
+        ...(maxOutputTokens ? { maxOutputTokens } : {}),
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
       }],
-      ...(contextTokens(value) ? { defaultBudgetTokens: contextTokens(value) } : {}),
+      ...(windowTokens ? { defaultBudgetTokens: windowTokens } : {}),
       toolCalling: capabilityState(record(value.capabilities).tool_calls),
       visionInput: capabilityState(record(value.capabilities).vision),
       structuredOutput: capabilityState(record(value.capabilities).structured_output),

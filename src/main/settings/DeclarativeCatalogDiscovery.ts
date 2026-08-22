@@ -203,7 +203,9 @@ export function toDeclarativeCatalogContributions(
             ...(model.contextWindowKind === 'prompt'
               ? { maxPromptTokens: model.contextWindow }
               : { maxTotalTokens: model.contextWindow }),
-            maxOutputTokens: model.maxOutputTokens,
+            ...(typeof model.maxOutputTokens === 'number' && model.maxOutputTokens > 0
+              ? { maxOutputTokens: model.maxOutputTokens }
+              : {}),
             activation: { kind: 'implicit' as const },
             entitlement: model.contextWindowAuthority === 'model-catalog' ? 'unknown' : 'granted',
           }],
@@ -216,25 +218,17 @@ export function toDeclarativeCatalogContributions(
           controls: {
             ...(model.contextWindowAuthority === 'model-catalog'
               ? {
-                  context1m: {
+                  maxContext: {
                     state: 'unknown' as const,
                     defaultValue: false,
                     reason: 'The live catalog reports a model maximum; account entitlement is not verified.'
                   },
                 }
-              : model.contextWindow >= 1_000_000
-              ? {
-                  context1m: {
-                    state: 'fixed' as const,
-                    fixedValue: true,
-                    tierId: 'default',
-                  },
-                }
               : {
-                  context1m: {
+                  maxContext: {
                     state: 'unsupported' as const,
                     fixedValue: false,
-                    reason: 'The live provider catalog reports a context window below 1M.',
+                    reason: 'The live provider catalog does not report a distinct Max context tier.',
                   },
                 }),
           },

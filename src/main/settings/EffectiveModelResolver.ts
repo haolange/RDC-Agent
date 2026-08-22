@@ -46,8 +46,8 @@ const CONSERVATIVE_REASONING: ReasoningControl = {
 function executionBindingMatchesPlan(binding: ExecutionBindingDefinition, plan: RequestPlan): boolean {
   if (binding.when.fast !== undefined && binding.when.fast !== plan.fastMode) return false;
   if (
-    binding.when.context1m !== undefined
-    && binding.when.context1m !== (plan.contextMode === 'one-million')
+    binding.when.maxContext !== undefined
+    && binding.when.maxContext !== (plan.contextMode === 'one-million')
   ) return false;
   return !binding.when.reasoning
     || (plan.reasoningWire.selection !== 'unknown'
@@ -108,7 +108,7 @@ export function buildCatalogModelContribution(
     defaultBudgetTokens: 0,
     controls: {
       fast: { state: 'unknown', defaultValue: false, reason: 'Fast capability has not been verified.' },
-      context1m: { state: 'unknown', defaultValue: false, reason: 'Max mode capability has not been verified.' },
+      maxContext: { state: 'unknown', defaultValue: false, reason: 'Max mode capability has not been verified.' },
       reasoning: CONSERVATIVE_REASONING,
     },
     toolCalling: { state: 'unknown' },
@@ -347,6 +347,13 @@ function modelOverrideToContribution(modelId: string, override: ModelOverride): 
   if (override.contextWindow !== undefined) {
     contribution.defaultBudgetTokens = override.contextWindow;
   }
+  if (override.contextWindow !== undefined || override.maxTokens !== undefined) {
+    contribution.contextTiers = [{
+      id: 'default',
+      ...(override.contextWindow !== undefined ? { maxPromptTokens: override.contextWindow } : {}),
+      ...(override.maxTokens !== undefined ? { maxOutputTokens: override.maxTokens } : {}),
+    }];
+  }
   if (override.cost) {
     contribution.cost = { ...override.cost };
   }
@@ -387,13 +394,15 @@ function customModelToContribution(custom: CustomModel, provider: LlmProviderEnt
       id: 'default',
       label: 'Default',
       maxPromptTokens: custom.contextWindow,
-      maxOutputTokens: custom.maxTokens,
+      ...(typeof custom.maxTokens === 'number' && custom.maxTokens > 0
+        ? { maxOutputTokens: custom.maxTokens }
+        : {}),
       activation: { kind: 'implicit' },
       entitlement: 'unknown',
     }],
     controls: {
       fast: { state: 'unknown', defaultValue: false },
-      context1m: { state: 'unsupported', fixedValue: false },
+      maxContext: { state: 'unsupported', fixedValue: false },
       reasoning: custom.reasoning
         ? { kind: 'unknown', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } }
         : { kind: 'none', supportsOff: false, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
@@ -661,14 +670,14 @@ export function planEffectiveModelCapabilityProbe(input: {
       binding.when.fast === true ? { ...binding, entitlement: 'granted' as const } : binding
     ));
   }
-  if (input.mode === 'one-million-context' && selected.controls.context1m.state === 'selectable') {
-    selected.controls.context1m.entitlement = 'granted';
-    const maxTierId = selected.controls.context1m.tierId;
+  if (input.mode === 'max-context' && selected.controls.maxContext.state === 'selectable') {
+    selected.controls.maxContext.entitlement = 'granted';
+    const maxTierId = selected.controls.maxContext.tierId;
     selected.contextTiers = selected.contextTiers.map((tier) => (
       tier.id === maxTierId ? { ...tier, entitlement: 'granted' as const } : tier
     ));
     selected.executionBindings = selected.executionBindings?.map((binding) => (
-      binding.when.context1m === true ? { ...binding, entitlement: 'granted' as const } : binding
+      binding.when.maxContext === true ? { ...binding, entitlement: 'granted' as const } : binding
     ));
   }
   return planModelRequest({

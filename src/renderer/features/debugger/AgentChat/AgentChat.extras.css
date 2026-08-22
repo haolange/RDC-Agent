@@ -160,7 +160,6 @@
   gap: var(--space-1);
 }
 
-.work-process-child-tool,
 .work-process-child-summary,
 .work-process-child-diagnostic {
   display: flex;
@@ -169,22 +168,6 @@
   padding: var(--space-1) var(--space-2);
   font-size: var(--text-xs);
   color: var(--token-text-body);
-}
-
-.work-process-child-verb {
-  color: var(--token-text-caption);
-  font-weight: 500;
-}
-
-.work-process-child-target {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.work-process-child-duration {
-  color: var(--token-text-caption);
 }
 
 .work-process-child-message,
@@ -292,4 +275,153 @@
 
 .work-process-task-status.status-running {
   color: var(--token-status-info);
+}
+
+.work-process-tool-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.work-process-tool-thumb-button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: var(--cursor-pointer, pointer);
+}
+
+.work-process-tool-thumb {
+  width: var(--space-16);
+  height: var(--space-16);
+  border: var(--transcript-card-border);
+  border-radius: var(--transcript-card-radius);
+  object-fit: cover;
+  background: var(--token-surface-sunken);
+}
+
+.work-process-tool-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: var(--space-6);
+  border: none;
+  background: var(--token-bg-overlay);
+  cursor: var(--cursor-pointer, pointer);
+}
+
+.work-process-tool-lightbox-image {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: var(--transcript-card-radius);
+  border: var(--transcript-card-border);
+}
+
+.work-process-tool-thumb.is-pending {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+}
+
+.work-process-task-snapshot {
+  border: var(--transcript-card-border);
+  border-radius: var(--transcript-card-radius);
+  background: var(--transcript-card-surface);
+  overflow: hidden;
+}
+
+.work-process-task-snapshot-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+}
+
+.work-process-task-snapshot-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+}
+
+.work-process-task-snapshot-mark {
+  width: var(--space-3);
+  height: var(--space-3);
+  margin-top: var(--space-1);
+  border: 1px solid var(--token-border-muted);
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.work-process-task-snapshot-item.task-completed .work-process-task-snapshot-mark {
+  background: var(--token-status-success);
+  border-color: var(--token-status-success);
+}
+
+.work-process-task-snapshot-item.task-completed .work-process-task-snapshot-title {
+  color: var(--token-text-muted);
+  text-decoration: line-through;
+}
+
+.work-process-tool-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.work-process-tool-card-body.family-interpreter,
+.work-process-tool-card-body.family-memory,
+.work-process-tool-card-body.family-skill,
+.work-process-tool-card-body.family-mcp,
+.work-process-tool-card-body.family-runtime {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.work-process-highlighted-code {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--token-bg-app);
+  color: var(--token-text-body);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: calc(var(--text-xs) * 1.6 * 12);
+  overflow-y: auto;
+}
+
+.work-process-highlighted-code.is-collapsed {
+  max-height: calc(var(--text-xs) * 1.6 * 3);
+  overflow: hidden;
+}
+
+.work-process-highlighted-code .hljs {
+  display: block;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.work-process-family-path {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.work-process-family-stdout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
 }

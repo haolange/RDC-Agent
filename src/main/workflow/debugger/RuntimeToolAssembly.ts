@@ -86,20 +86,30 @@ export class RuntimeToolAssembly {
         traceProjectionRefreshService.schedule(resolvedSessionId);
       }
       const sink = turnHandle?.eventSink ?? this.deps.getActiveTurn(resolvedSessionId)?.eventSink;
-      if (!sink?.onEvent) return;
+      const onEvent = sink?.onEvent;
+      if (!onEvent) return;
       if (turnHandle && !turnHandle.isLive(turnHandle.generation)) return;
-      sink.onEvent({
-        id: generateEventId('agent-event'),
-        type: type === 'created' ? 'task.created' : 'task.updated',
-        timestamp: nowMs(),
-        sessionId: sink.sessionId ?? null,
-        agentId: sink.agentId,
-        payload: {
-          taskId: task.id,
-          title: task.subject,
-          status: task.status,
-          statusReason: task.statusReason,
-        },
+      void registry.listTasks().then((tasks) => {
+        if (turnHandle && !turnHandle.isLive(turnHandle.generation)) return;
+        onEvent({
+          id: generateEventId('agent-event'),
+          type: type === 'created' ? 'task.created' : 'task.updated',
+          timestamp: nowMs(),
+          sessionId: sink.sessionId ?? null,
+          agentId: sink.agentId,
+          payload: {
+            taskId: task.id,
+            title: task.subject,
+            status: task.status,
+            statusReason: task.statusReason,
+            snapshot: tasks.map((entry) => ({
+              taskId: entry.id,
+              title: entry.subject,
+              status: entry.status,
+              statusReason: entry.statusReason,
+            })),
+          },
+        });
       });
     };
     return createTaskTools(registry);

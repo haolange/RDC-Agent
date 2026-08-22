@@ -4,7 +4,8 @@
   border: 0;
 }
 
-.markdown-body pre code.hljs {
+:is(.markdown-body, .work-process-highlighted-code) pre code.hljs,
+.work-process-highlighted-code code.hljs {
   display: block;
   overflow-x: auto;
   padding: 0;
@@ -15,74 +16,74 @@
   line-height: 1.6;
 }
 
-.markdown-body .hljs-comment,
-.markdown-body .hljs-quote {
+:is(.markdown-body, .work-process-highlighted-code) .hljs-comment,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-quote {
   color: var(--token-text-caption);
   font-style: italic;
 }
 
-.markdown-body .hljs-keyword,
-.markdown-body .hljs-selector-tag,
-.markdown-body .hljs-built_in,
-.markdown-body .hljs-name {
+:is(.markdown-body, .work-process-highlighted-code) .hljs-keyword,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-selector-tag,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-built_in,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-name {
   color: var(--token-text-link);
 }
 
-.markdown-body .hljs-string,
-.markdown-body .hljs-regexp,
-.markdown-body .hljs-symbol,
-.markdown-body .hljs-bullet {
+:is(.markdown-body, .work-process-highlighted-code) .hljs-string,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-regexp,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-symbol,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-bullet {
   color: var(--token-status-success);
 }
 
-.markdown-body .hljs-number,
-.markdown-body .hljs-literal,
-.markdown-body .hljs-variable,
-.markdown-body .hljs-template-variable,
-.markdown-body .hljs-attribute {
+:is(.markdown-body, .work-process-highlighted-code) .hljs-number,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-literal,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-variable,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-template-variable,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-attribute {
   color: var(--token-status-warning);
 }
 
-.markdown-body .hljs-title,
-.markdown-body .hljs-section,
-.markdown-body .hljs-type,
-.markdown-body .hljs-class .hljs-title {
+:is(.markdown-body, .work-process-highlighted-code) .hljs-title,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-section,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-type,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-class .hljs-title {
   color: var(--token-status-info);
 }
 
-.markdown-body .hljs-meta,
-.markdown-body .hljs-meta .hljs-keyword {
+:is(.markdown-body, .work-process-highlighted-code) .hljs-meta,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-meta .hljs-keyword {
   color: var(--token-text-caption);
 }
 
-.markdown-body .hljs-function,
-.markdown-body .hljs-title.function_ {
+:is(.markdown-body, .work-process-highlighted-code) .hljs-function,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-title.function_ {
   color: var(--token-text-heading);
 }
 
-.markdown-body .hljs-params,
-.markdown-body .hljs-property {
+:is(.markdown-body, .work-process-highlighted-code) .hljs-params,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-property {
   color: var(--token-text-body);
 }
 
-.markdown-body .hljs-tag,
-.markdown-body .hljs-selector-id,
-.markdown-body .hljs-selector-class {
+:is(.markdown-body, .work-process-highlighted-code) .hljs-tag,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-selector-id,
+:is(.markdown-body, .work-process-highlighted-code) .hljs-selector-class {
   color: var(--token-text-link);
 }
 
-.markdown-body .hljs-emphasis {
+:is(.markdown-body, .work-process-highlighted-code) .hljs-emphasis {
   font-style: italic;
 }
 
-.markdown-body .hljs-strong {
+:is(.markdown-body, .work-process-highlighted-code) .hljs-strong {
   font-weight: var(--font-semibold);
 }
 
-.markdown-body .hljs-addition {
+:is(.markdown-body, .work-process-highlighted-code) .hljs-addition {
   color: var(--token-status-success);
 }
 
-.markdown-body .hljs-deletion {
+:is(.markdown-body, .work-process-highlighted-code) .hljs-deletion {
   color: var(--token-status-error);
 }

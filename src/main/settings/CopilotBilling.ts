@@ -143,7 +143,7 @@ export function parseCopilotBillingContribution(
     modelId,
     contextTiers,
     controls: {
-      context1m: longContext
+      maxContext: longContext
         ? {
             state: 'selectable',
             defaultValue: false,
@@ -164,7 +164,7 @@ export function parseCopilotBillingContribution(
     ...(longContext ? {
       executionBindings: [{
         id: 'context:copilot-long-context',
-        when: { context1m: true },
+        when: { maxContext: true },
         actions: [{ kind: 'client-tier', tierId: longContext.id }],
         entitlement: longContext.entitlement,
       }],

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import type { WorkProcessRow } from './workProcessPresentation';
 import { getRowStatusLabel } from './workProcessPresentation';
+import { ToolRow } from './WorkProcessRowParts';
+import { TaskRow } from './TaskRow';
+import { TaskSnapshotCard } from './TaskSnapshotCard';
 
 interface SubagentRowProps {
   row: Extract<WorkProcessRow, { type: 'subagent' }>;
@@ -41,19 +44,8 @@ export const SubagentRow: React.FC<SubagentRowProps> = ({ row }) => {
 };
 
 const renderChildRow = (row: WorkProcessRow): React.ReactNode => {
-  // 子 row 渲染委托回 WorkProcess 的 renderRow（避免循环 import，用 lazy require 模式）
-  // 这里用简化渲染：tool/summary/diagnostic 各自轻量展示
-  if (row.type === 'tool') {
-    return (
-      <li key={row.id} className={`work-process-tool-card work-process-child-tool status-${row.status}`}>
-        <span className="work-process-tool-card-header">
-          <span className="work-process-tool-card-verb work-process-child-verb">{row.verb}</span>
-          <span className="work-process-tool-card-meta work-process-child-target">{row.target || row.toolName}</span>
-          {row.duration ? <span className="work-process-child-duration">{row.duration}</span> : null}
-        </span>
-      </li>
-    );
-  }
+  if (row.type === 'tool') return <ToolRow key={row.id} row={row} />;
+  if (row.type === 'taskSnapshot') return <TaskSnapshotCard key={row.id} row={row} />;
   if (row.type === 'subagent') {
     return <SubagentRow key={row.id} row={row} />;
   }
@@ -79,13 +71,7 @@ const renderChildRow = (row: WorkProcessRow): React.ReactNode => {
       </li>
     );
   }
-  if (row.type === 'task') {
-    return (
-      <li key={row.id} className={`work-process-child-summary status-${row.status}`}>
-        <span className="work-process-child-text">{row.title}</span>
-      </li>
-    );
-  }
+  if (row.type === 'task') return <TaskRow key={row.id} row={row} />;
   if (row.type === 'section') {
     // 子 agent 的简化扁平视图：把小节内步骤直接展开为子 row。
     return (

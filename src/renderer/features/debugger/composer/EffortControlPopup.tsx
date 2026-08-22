@@ -5,7 +5,7 @@ import { useDynStyle } from '../../../lib/useDynStyle';
 import {
   EFFORT_LABEL_KEYS,
   EffortFastModeSwitchRow,
-  EffortOneMillionContextSwitchRow,
+  EffortMaxContextSwitchRow,
   getStopPosition,
 } from './effortControlParts';
 import { EFFORT_THUMB_WIDTH_PX, thumbInsetPercent } from './effortSliderGeometry';
@@ -52,11 +52,11 @@ export const EffortControlPopup: React.FC<{
   tooltipLabel: string;
   trackWidthPx: number;
   positionTransitionsReady: boolean;
-  oneMillionContextAvailable: boolean;
-  oneMillionContextStatusLabel?: string;
+  maxContextAvailable: boolean;
+  maxContextStatusLabel?: string;
   fastModelAvailable: boolean;
   fastModelStatusLabel?: string;
-  oneMillionContextMode: boolean;
+  maxContextMode: boolean;
   fastModel: boolean;
   t: (key: TranslationKey) => string;
   onTrackPointerDown: (event: React.PointerEvent<HTMLDivElement>) => void;
@@ -64,7 +64,7 @@ export const EffortControlPopup: React.FC<{
   onTrackPointerUp: (event: React.PointerEvent<HTMLDivElement>) => void;
   onTrackClick: (event: React.MouseEvent<HTMLDivElement>) => void;
   onThumbKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
-  onToggleOneMillionContext: () => void;
+  onToggleMaxContext: () => void;
   onToggleFastModel: () => void;
   onMaxTimelineComplete: (revision: number) => void;
 }> = ({
@@ -90,11 +90,11 @@ export const EffortControlPopup: React.FC<{
   tooltipLabel,
   trackWidthPx,
   positionTransitionsReady,
-  oneMillionContextAvailable,
-  oneMillionContextStatusLabel,
+  maxContextAvailable,
+  maxContextStatusLabel,
   fastModelAvailable,
   fastModelStatusLabel,
-  oneMillionContextMode,
+  maxContextMode,
   fastModel,
   t,
   onTrackPointerDown,
@@ -102,7 +102,7 @@ export const EffortControlPopup: React.FC<{
   onTrackPointerUp,
   onTrackClick,
   onThumbKeyDown,
-  onToggleOneMillionContext,
+  onToggleMaxContext,
   onToggleFastModel,
   onMaxTimelineComplete,
 }) => {
@@ -215,12 +215,12 @@ export const EffortControlPopup: React.FC<{
 
     <div className="composer-effort-popup-divider" aria-hidden="true" />
 
-    <EffortOneMillionContextSwitchRow
-      label={t('composer.effort.oneMillionContext')}
-      statusLabel={oneMillionContextStatusLabel}
-      available={oneMillionContextAvailable}
-      active={oneMillionContextMode}
-      onToggle={onToggleOneMillionContext}
+    <EffortMaxContextSwitchRow
+      label={t('composer.effort.maxContext')}
+      statusLabel={maxContextStatusLabel}
+      available={maxContextAvailable}
+      active={maxContextMode}
+      onToggle={onToggleMaxContext}
     />
 
     <EffortFastModeSwitchRow

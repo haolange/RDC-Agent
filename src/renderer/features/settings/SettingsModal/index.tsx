@@ -40,6 +40,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     setRdxCliDraft,
     rdxActionsDraft,
     setRdxActionsDraft,
+    codeInterpreterDraft,
+    setCodeInterpreterDraft,
     agentManifestDrafts,
     setAgentManifestDrafts,
     globalInstructionsDraft,
@@ -219,8 +221,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                 <ToolsSettings
                   rdxCliDraft={rdxCliDraft}
                   rdxActionsDraft={rdxActionsDraft}
+                  codeInterpreterDraft={codeInterpreterDraft}
                   onRdxCliDraftChange={setRdxCliDraft}
                   onRdxActionsDraftChange={setRdxActionsDraft}
+                  onCodeInterpreterDraftChange={setCodeInterpreterDraft}
                   onSaveToolsConfig={handleSaveToolsConfig}
                   t={t}
                 /></section>

@@ -34,7 +34,39 @@ export type ConversationWorkBlockKind =
   | 'handoff'
   | 'diagnostic'
   | 'output'
-  | 'command';
+  | 'command'
+  | 'task_snapshot';
+
+export type ConversationCompactionProvenance = 'auto' | 'manual';
+
+export interface ConversationTaskSnapshotItem {
+  taskId: string;
+  title: string;
+  status: ConversationTaskStatus;
+  statusReason?: string;
+}
+
+export interface ConversationTaskSnapshot {
+  completed: number;
+  total: number;
+  items: ConversationTaskSnapshotItem[];
+}
+
+export interface ConversationCompactionStats {
+  provenance: ConversationCompactionProvenance;
+  messagesBefore?: number;
+  messagesAfter?: number;
+  tokensBefore?: number;
+  tokensAfter?: number;
+}
+
+export interface ConversationToolImagePreviewRef {
+  previewId: string;
+  fileName: string;
+  mimeType: string;
+  width?: number;
+  height?: number;
+}
 
 export type ConversationToolCallStatus = 'pending' | 'running' | 'complete' | 'error' | 'skipped';
 
@@ -73,6 +105,7 @@ export type ConversationMessageDiagnosticCode =
   | 'CONVERSATION_LLM_ROUTE_MISSING'
   | 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
   | 'CONVERSATION_LLM_REQUEST_FAILED'
+  | 'CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION'
   | 'CONVERSATION_AGENT_LOOP_STALLED'
   | 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED'
   | 'MODEL_CONTINUATION_DROPPED';
@@ -100,6 +133,8 @@ export interface ConversationToolCall {
   resultPreview?: string;
   /** Canonical, non-sensitive resources proven by this tool result. */
   resourceRefs?: ConversationToolResourceRef[];
+  /** Session-scoped thumbnail refs; renderer fetches pixels via conversation:getToolImagePreview. */
+  imagePreviews?: ConversationToolImagePreviewRef[];
   error?: string;
   approval?: ConversationToolApproval;
   startedAt: number;
@@ -137,6 +172,9 @@ export interface ConversationWorkBlock {
   /** Present only for TaskRegistry-backed work blocks; never synthesized by the renderer. */
   taskStatus?: ConversationTaskStatus;
   taskStatusReason?: string;
+  /** Adjacent task_* mutations merge into one snapshot; non-adjacent snapshots keep loop history. */
+  taskSnapshot?: ConversationTaskSnapshot;
+  compactionStats?: ConversationCompactionStats;
   /** Non-loop summary text; LLM turn output lives in result and never contains provider thinking text. */
   summary?: string;
   /** Diagnostic blocks only: preserves runtime severity through storage and renderer projection. */

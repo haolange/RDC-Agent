@@ -157,7 +157,7 @@ describe('data-only provider discovery fixtures', () => {
 
     expect(project('github-models', githubSurface)).toMatchObject({
       contextTiers: [{ maxPromptTokens: 1_048_576, maxOutputTokens: 32_768, entitlement: 'unknown' }],
-      controls: { context1m: { state: 'unknown', defaultValue: false } },
+      controls: { maxContext: { state: 'unknown', defaultValue: false } },
       toolCalling: { state: 'supported' },
       visionInput: { state: 'supported' },
       structuredOutput: { state: 'supported' },
@@ -174,5 +174,6 @@ describe('data-only provider discovery fixtures', () => {
       toolCalling: { state: 'supported' },
       visionInput: { state: 'unsupported' },
     });
+    expect(project('fireworks-ai', fireworksSurface).contextTiers?.[0]).not.toHaveProperty('maxOutputTokens');
   });
 });

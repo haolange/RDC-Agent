@@ -30,8 +30,8 @@ const t = (key: string, params?: Record<string, string | number>): string => {
     'settings.providers.capability.activationRequest': 'Request parameter',
     'settings.providers.capability.sourceCatalog': 'catalog',
     'settings.providers.capability.sourceObserved': 'observed',
-    'composer.effort.providerManaged': 'Disabled',
-    'composer.effort.levelOff': 'Disabled',
+    'composer.effort.providerManaged': 'Provider-managed',
+    'composer.effort.levelOff': 'Off',
     'composer.effort.levelOn': 'On',
     'composer.effort.levelLow': 'Low',
     'composer.effort.levelMedium': 'Medium',
@@ -44,7 +44,7 @@ const t = (key: string, params?: Record<string, string | number>): string => {
   if (key === 'settings.providers.capability.activationWithEntitlement') return `${params?.activation} · ${params?.entitlement}`;
   if (key === 'settings.providers.capability.contextRange') return `${params?.base} -> ${params?.maximum}`;
   if (key === 'settings.providers.capability.contextRangeUnverified') return `${params?.base} -> ${params?.maximum} (Unverified)`;
-  if (key === 'settings.providers.capability.oneMillionTierLabel') return `${params?.label} · Max mode`;
+  if (key === 'settings.providers.capability.maxTierLabel') return `${params?.label} · Max mode`;
   if (key === 'settings.providers.capability.sources') return `${params?.sources} @ ${params?.date}`;
   return labels[key] ?? key;
 };
@@ -74,7 +74,7 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
     defaultBudgetTokens: 262_144,
     controls: {
       fast: { state: 'selectable', defaultValue: false, entitlement: 'granted' },
-      context1m: { state: 'unsupported', fixedValue: false },
+      maxContext: { state: 'unsupported', fixedValue: false },
       reasoning,
     },
     executionBindings: [{
@@ -83,7 +83,7 @@ function model(overrides: Partial<EffectiveModel> = {}): EffectiveModel {
     }],
     resolvedControls: {
       fast: { state: 'selectable', value: false, defaultValue: false, disabled: false, bindingId: 'fast:model-a-fast', effectiveModelId: 'model-a-fast' },
-      context1m: { state: 'unsupported', value: false, defaultValue: false, disabled: true },
+      maxContext: { state: 'unsupported', value: false, defaultValue: false, disabled: true },
       reasoning,
     },
     toolCalling: { state: 'supported' },
@@ -98,24 +98,24 @@ describe('modelCapabilitySummaryUtils', () => {
   it('formats the revisioned EffectiveModel projection', () => {
     const chips = buildCapabilityChips(model(), t);
     expect(chips).toContainEqual(expect.objectContaining({ label: 'Context', value: '262.1k' }));
-    expect(chips).toContainEqual(expect.objectContaining({ label: 'Reasoning', value: 'Disabled, On' }));
+    expect(chips).toContainEqual(expect.objectContaining({ label: 'Reasoning', value: 'Off, On' }));
     expect(chips).toContainEqual(expect.objectContaining({ label: 'Fast', value: 'Model model-a-fast' }));
     expect(chips).toContainEqual(expect.objectContaining({ label: 'Tools', value: 'Supported' }));
   });
 
-  it('formats locked, provider-managed and unknown control semantics as Disabled', () => {
+  it('formats locked, provider-managed and unknown control semantics distinctly', () => {
     expect(formatFastControl(model({
       controls: { ...model().controls, fast: { state: 'fixed', fixedValue: true, entitlement: 'granted' } },
     }), t)).toBe('Fast (Locked)');
     expect(formatFastControl(model({
       controls: { ...model().controls, fast: { state: 'provider-managed', fixedValue: true } },
-    }), t)).toBe('Disabled');
+    }), t)).toBe('Provider-managed');
     expect(formatReasoningCapability(model({
       controls: {
         ...model().controls,
         reasoning: { kind: 'unknown', supportsOff: false, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
       },
-    }), t)).toBe('Disabled');
+    }), t)).toBe('Off');
   });
 
   it('formats fixed always-on reasoning', () => {
@@ -138,7 +138,7 @@ describe('modelCapabilitySummaryUtils', () => {
       ],
       controls: {
         ...model().controls,
-        context1m: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'long' },
+        maxContext: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'long' },
       },
     });
     expect(formatContextCapability(effective, t)).toBe('272k -> 1.1M (Unverified)');

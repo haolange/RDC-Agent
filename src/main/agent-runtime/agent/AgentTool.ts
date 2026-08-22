@@ -20,6 +20,8 @@ export interface ToolExecutionContext {
   projectRootPath: string | null;
   projectId: string | null;
   sessionId: string | null;
+  /** Frozen route vision capability; image tools fail closed when not native. */
+  visionInputMode?: 'native' | 'disabled';
   /** Per-call temporary path roots; never module-global. */
   temporaryAllowedPathRoots?: readonly string[];
 }

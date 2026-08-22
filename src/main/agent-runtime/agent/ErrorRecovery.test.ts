@@ -97,6 +97,13 @@ describe('ErrorRecovery', () => {
       expect(recovery.classifyError(makeErr('something weird happened'))).toBe('unknown');
     });
 
+    it('ProviderStreamProtocolError 应分类为 stream_protocol', () => {
+      const error = makeErr('Provider emitted delta after closing virtual:reasoning.');
+      error.name = 'ProviderStreamProtocolError';
+      (error as { code?: string }).code = 'PROVIDER_STREAM_BLOCK_CLOSED';
+      expect(recovery.classifyError(error)).toBe('stream_protocol');
+    });
+
     it('应从消息中提取 status code', () => {
       expect(recovery.classifyError(makeErr('HTTP 429 error'))).toBe('rate_limit');
     });
@@ -202,6 +209,19 @@ describe('ErrorRecovery', () => {
     it('unknown error 应 abort', () => {
       const action = recovery.decide(makeErr('???'));
       expect(action.type).toBe('abort');
+    });
+
+    it('stream_protocol 应 abort 且不重试', () => {
+      const error = makeErr('Provider emitted delta after closing virtual:reasoning.');
+      error.name = 'ProviderStreamProtocolError';
+      (error as { code?: string }).code = 'PROVIDER_STREAM_BLOCK_CLOSED';
+      const action = recovery.decide(error);
+      expect(action).toEqual({
+        type: 'abort',
+        reason: 'PROVIDER_STREAM_BLOCK_CLOSED: Provider emitted delta after closing virtual:reasoning.',
+      });
+      recovery.noteRetryAttempt();
+      expect(recovery.decide(error).type).toBe('abort');
     });
   });
 

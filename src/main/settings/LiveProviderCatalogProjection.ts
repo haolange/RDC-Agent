@@ -7,6 +7,7 @@ import type {
   ReasoningWireProfile,
 } from '@shared/types/modelCapability';
 import type { LlmProviderProtocol } from '@shared/types/settings';
+import { contextTierPromptCap, contextTierWindowTokens, resolveContextTierChoices } from '@shared/utils/contextTiers';
 import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
 
 export interface LiveModelObservation {
@@ -17,6 +18,7 @@ export interface LiveModelObservation {
   unavailableReason?: string;
   protocol?: LlmProviderProtocol;
   contextWindowTokens?: number;
+  maxOutputTokens?: number;
   reasoning?: {
     supported?: boolean;
     efforts?: NamedReasoningLevel[];
@@ -166,30 +168,40 @@ function projectContext(
   if (!observedTier) return {};
   const contextTiers: NonNullable<CatalogModelContribution['contextTiers']> = model.contextTiers.map((tier) => (
     tier.id === observedTier.id
-      ? { ...tier, maxPromptTokens: tokens, entitlement: 'granted' as const }
+      ? {
+          ...tier,
+          maxPromptTokens: tokens,
+          entitlement: 'granted' as const,
+          ...(typeof observation.maxOutputTokens === 'number' && observation.maxOutputTokens > 0
+            ? { maxOutputTokens: observation.maxOutputTokens }
+            : {}),
+        }
       : tier
   ));
   if (!policy.maxTierId) return { contextTiers };
   const maxTier = model.contextTiers.find((tier) => tier.id === policy.maxTierId);
   if (!maxTier) return { contextTiers };
+  const defaultWindow = contextTierWindowTokens(
+    model.contextTiers.find((tier) => tier.id === 'default') ?? model.contextTiers[0],
+  );
   const maxEntitlement = policy.entitlementAuthority === 'manifest'
     ? maxTier.entitlement
     : policy.entitlementAuthority === 'catalog-observation' && observedTier.id === maxTier.id
-      ? tokens >= 1_000_000 ? 'granted' as const : 'denied' as const
+      ? defaultWindow !== undefined && tokens > defaultWindow ? 'granted' as const : 'denied' as const
       : 'unknown' as const;
   const maxTierIndex = contextTiers.findIndex((tier) => tier.id === maxTier.id);
   contextTiers[maxTierIndex] = { ...contextTiers[maxTierIndex], entitlement: maxEntitlement };
   const executionBindings = (model.executionBindings ?? []).map((binding) => (
-    binding.when.context1m === true
+    binding.when.maxContext === true
       ? { ...binding, entitlement: maxEntitlement }
       : binding
   ));
   return {
     contextTiers,
     controls: {
-      context1m: model.controls.context1m.state === 'selectable'
-        ? { ...model.controls.context1m, entitlement: maxEntitlement }
-        : model.controls.context1m,
+      maxContext: model.controls.maxContext.state === 'selectable'
+        ? { ...model.controls.maxContext, entitlement: maxEntitlement }
+        : model.controls.maxContext,
     },
     executionBindings,
   };
@@ -202,6 +214,8 @@ function resolveProjectedDefaultBudget(
   contextTiers: ReadonlyArray<{ id: string; maxPromptTokens?: number }> | undefined,
 ): number {
   if (model.defaultBudgetTokens > 0) return model.defaultBudgetTokens;
+  const normalCap = contextTierPromptCap(resolveContextTierChoices(model).normalTier ?? model.contextTiers[0]);
+  if (normalCap && normalCap > 0) return normalCap;
   const observed = observation.contextWindowTokens;
   if (typeof observed === 'number' && observed > 0) return observed;
   const tiers = contextTiers ?? model.contextTiers;
@@ -302,8 +316,14 @@ function projectDynamicModel(
     },
     ...(observation.contextWindowTokens ? {
       contextTiers: [{
-        id: 'default', label: 'Provider catalog limit', maxPromptTokens: observation.contextWindowTokens,
-        activation: { kind: 'implicit' }, entitlement: 'granted',
+        id: 'default',
+        label: 'Provider catalog limit',
+        maxPromptTokens: observation.contextWindowTokens,
+        ...(typeof observation.maxOutputTokens === 'number' && observation.maxOutputTokens > 0
+          ? { maxOutputTokens: observation.maxOutputTokens }
+          : {}),
+        activation: { kind: 'implicit' },
+        entitlement: 'granted',
       }],
       defaultBudgetTokens: observation.contextWindowTokens,
     } : {}),

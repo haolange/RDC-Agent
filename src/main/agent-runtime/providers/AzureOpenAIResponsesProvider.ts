@@ -26,6 +26,7 @@ import { applyRequestPlanBody, requestPlanHeaders } from './requestPlanWire';
 import { partitionSystemPrompt } from './promptCacheWire';
 import { recordQuotaFromResponse } from '../../settings/ProviderQuota';
 import { AssistantStreamBuilder, createProviderOutputRef, ProviderStreamProtocolError } from './internal/AssistantStreamBuilder';
+import { ResponsesItemChannels } from './internal/responsesItemChannels';
 import {
   composeAbortSignals,
   ensureOk,
@@ -43,9 +44,6 @@ import { createProviderStateRef, findLatestProviderState } from '../reasoning/Pr
 
 const DEFAULT_API_VERSION = '2024-10-21';
 const PROVIDER_API = 'azure-openai-responses';
-const TEXT_INDEX = 0;
-const REASONING_INDEX = 1;
-const TOOL_INDEX_BASE = 2;
 const RESPONSES_REASONING_INCLUDE = 'reasoning.encrypted_content';
 
 export interface AzureOpenAIResponsesProviderOptions {
@@ -149,26 +147,15 @@ export class AzureOpenAIResponsesProvider implements ProviderStrategy {
       recordQuotaFromResponse(options.requestPlan, response);
       await ensureOk(response, PROVIDER_API);
 
-      const toolSlotsByItemId = new Map<string, number>();
-      const toolArgBuffers = new Map<number, string>();
-      let currentReasoningArtifact: ProviderContinuationArtifact | undefined;
+      const toolArgBuffers = new Map<string, string>();
       const summarySource = reasoningProjectionSource(options.requestPlan, 'summary');
       const opaqueSource = reasoningProjectionSource(options.requestPlan, 'opaque');
-      const textRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:text', contentIndex: TEXT_INDEX });
-      const reasoningRef = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: 'virtual:reasoning', contentIndex: REASONING_INDEX });
-      const toolRefs = new Map<number, ReturnType<typeof createProviderOutputRef>>();
-      const toolStartedSlots = new Set<number>();
-      let textStarted = false;
-      let thinkingStarted = false;
-      let thinkingClosed = false;
-      const toolRefFor = (slot: number, itemId?: string) => {
-        const existing = toolRefs.get(slot);
-        if (existing) return existing;
-        const sourceIndex = slot - TOOL_INDEX_BASE;
-        const ref = createProviderOutputRef({ protocol: PROVIDER_API, providerBlockKey: `output:tool:${sourceIndex}`, sourceIndex, itemId, contentIndex: slot });
-        toolRefs.set(slot, ref);
-        return ref;
-      };
+      const items = new ResponsesItemChannels({
+        protocol: PROVIDER_API,
+        builder,
+        sources: { summary: summarySource, raw: summarySource, opaque: opaqueSource },
+      });
+      const toolStarted = new Set<string>();
       let sawToolCall = false;
       let sawOutput = false;
       let finishReason: StopReason = 'stop';
@@ -178,6 +165,7 @@ export class AzureOpenAIResponsesProvider implements ProviderStrategy {
         providerBlockKey: 'response:terminal',
         contentIndex: 1_000_000,
       });
+      const toolKey = (outputIndex: number, itemId?: string) => itemId || `index:${outputIndex}`;
 
       for await (const data of parseSSE(response, composed.signal, { providerApi: PROVIDER_API, ...options })) {
         if (composed.signal.aborted) break;
@@ -197,145 +185,96 @@ export class AzureOpenAIResponsesProvider implements ProviderStrategy {
             const delta = readString(event.delta) || readString(event.text);
             if (delta) {
               sawOutput = true;
-              if (!textStarted) { builder.startText(textRef); textStarted = true; }
-              builder.appendText(textRef, delta);
+              items.appendText(items.identityFromEvent(event), delta);
             }
             break;
           }
           case 'response.output_text.done':
-            if (textStarted) builder.endText(textRef);
             break;
           case 'response.reasoning_summary_text.delta': {
             const delta = readString(event.delta) || readString(event.text);
             if (delta) {
               sawOutput = true;
-              if (!thinkingStarted) {
-                builder.startThinking(reasoningRef, {
-                  kind: 'summary', source: summarySource, visibility: 'summary',
-                  continuation: currentReasoningArtifact,
-                });
-                thinkingStarted = true;
-              }
-              builder.appendThinking(reasoningRef, delta, {
-                kind: 'summary',
-                source: summarySource,
-                visibility: 'summary',
-                continuation: currentReasoningArtifact,
-              });
+              items.appendReasoning(
+                items.identityFromEvent(event),
+                delta,
+                'summary',
+                undefined,
+                readNumber(event.summary_index) ?? undefined,
+              );
             }
             break;
           }
           case 'response.reasoning_summary_text.done':
-            if (!thinkingStarted) {
-              builder.startThinking(reasoningRef, {
-                kind: 'summary', source: summarySource, visibility: 'summary',
-                continuation: currentReasoningArtifact,
-              });
-              thinkingStarted = true;
-            }
-            builder.endThinking(reasoningRef, {
-              kind: 'summary',
-              source: summarySource,
-              visibility: 'summary',
-              continuation: currentReasoningArtifact,
-            });
-            thinkingClosed = true;
+            items.startReasoning(items.identityFromEvent(event), 'summary');
             break;
           case 'response.output_item.added': {
-            const outputIndex = readNumber(event.output_index) ?? 0;
             const item = readRecord(event.item);
+            const identity = items.identityFromEvent(event, item);
             const reasoningArtifact = createResponsesReasoningArtifact(options.requestPlan, item);
             if (reasoningArtifact) {
-              currentReasoningArtifact = reasoningArtifact;
               sawOutput = true;
-              if (!thinkingStarted) {
-                builder.startThinking(reasoningRef, {
-                  kind: 'opaque',
-                  source: opaqueSource,
-                  visibility: 'hidden',
-                  continuation: currentReasoningArtifact,
-                });
-                thinkingStarted = true;
-              } else if (!thinkingClosed) builder.updateThinking(reasoningRef, {
-                kind: 'opaque',
-                source: opaqueSource,
-                visibility: 'hidden',
-                continuation: currentReasoningArtifact,
-              });
+              items.startReasoning(identity, 'opaque', reasoningArtifact);
             } else if (readString(item?.type) === 'function_call') {
-              const slot = TOOL_INDEX_BASE + outputIndex;
-              const itemId = readString(item?.id);
-              if (itemId) toolSlotsByItemId.set(itemId, slot);
               sawToolCall = true;
               sawOutput = true;
-              const toolRef = toolRefFor(slot, itemId || undefined);
+              const toolRef = items.toolRef(identity);
               builder.startToolCall(
                 toolRef,
                 readString(item?.call_id) || readString(item?.id) || '',
                 readString(item?.name) || '',
               );
-              toolStartedSlots.add(slot);
+              toolStarted.add(toolKey(identity.outputIndex, identity.itemId));
             }
             break;
           }
           case 'response.function_call_arguments.delta': {
-            const slot = resolveToolSlot(event, toolSlotsByItemId);
+            const identity = items.identityFromEvent(event);
             const delta = readString(event.delta);
-            if (slot !== null && delta) {
-              toolArgBuffers.set(slot, `${toolArgBuffers.get(slot) ?? ''}${delta}`);
-              builder.appendToolCallArgs(toolRefFor(slot, readString(event.item_id) || undefined), delta);
+            if (delta) {
+              const key = toolKey(identity.outputIndex, identity.itemId);
+              toolArgBuffers.set(key, `${toolArgBuffers.get(key) ?? ''}${delta}`);
+              builder.appendToolCallArgs(items.toolRef(identity), delta);
             }
             break;
           }
           case 'response.function_call_arguments.done': {
-            const slot = resolveToolSlot(event, toolSlotsByItemId);
+            const identity = items.identityFromEvent(event);
             const args = readString(event.arguments);
-            if (slot !== null && args && !toolArgBuffers.get(slot)) {
-              toolArgBuffers.set(slot, args);
-              builder.appendToolCallArgs(toolRefFor(slot, readString(event.item_id) || undefined), args);
+            const key = toolKey(identity.outputIndex, identity.itemId);
+            if (args && !toolArgBuffers.get(key)) {
+              toolArgBuffers.set(key, args);
+              builder.appendToolCallArgs(items.toolRef(identity), args);
             }
             break;
           }
           case 'response.output_item.done': {
-            const outputIndex = readNumber(event.output_index) ?? 0;
             const item = readRecord(event.item);
+            const identity = items.identityFromEvent(event, item);
             const reasoningArtifact = createResponsesReasoningArtifact(options.requestPlan, item);
             if (reasoningArtifact) {
-              currentReasoningArtifact = reasoningArtifact;
               sawOutput = true;
-              if (!thinkingStarted) {
-                builder.startThinking(reasoningRef, {
-                  kind: 'opaque',
-                  source: opaqueSource,
-                  visibility: 'hidden',
-                  continuation: currentReasoningArtifact,
-                });
-                thinkingStarted = true;
-              } else if (!thinkingClosed) builder.updateThinking(reasoningRef, {
-                kind: 'opaque',
-                source: opaqueSource,
-                visibility: 'hidden',
-                continuation: currentReasoningArtifact,
-              });
+              items.startReasoning(identity, 'opaque', reasoningArtifact);
+              items.closeReasoning(identity, reasoningArtifact);
             } else if (readString(item?.type) === 'function_call') {
-              const slot = TOOL_INDEX_BASE + outputIndex;
-              const itemId = readString(item?.id);
-              if (itemId) toolSlotsByItemId.set(itemId, slot);
               sawToolCall = true;
               sawOutput = true;
-              const toolRef = toolRefFor(slot, itemId || undefined);
-              if (toolStartedSlots.has(slot)) {
+              const toolRef = items.toolRef(identity);
+              const key = toolKey(identity.outputIndex, identity.itemId);
+              if (toolStarted.has(key)) {
                 builder.updateToolCall(toolRef, readString(item?.call_id) || readString(item?.id) || '', readString(item?.name) || '');
               } else {
                 builder.startToolCall(toolRef, readString(item?.call_id) || readString(item?.id) || '', readString(item?.name) || '');
-                toolStartedSlots.add(slot);
+                toolStarted.add(key);
               }
               const args = readString(item?.arguments);
-              if (args && !toolArgBuffers.get(slot)) {
-                toolArgBuffers.set(slot, args);
+              if (args && !toolArgBuffers.get(key)) {
+                toolArgBuffers.set(key, args);
                 builder.appendToolCallArgs(toolRef, args);
               }
               builder.endToolCall(toolRef);
+            } else if (readString(item?.type) === 'message') {
+              items.closeText(identity);
             }
             break;
           }
@@ -345,16 +284,10 @@ export class AzureOpenAIResponsesProvider implements ProviderStrategy {
               applyCompletedUsage(builder, completed);
               const providerState = createProviderStateRef(options.requestPlan, completed.id);
               if (providerState) builder.setProviderState(providerState);
-              const completedArtifact = findResponsesReasoningArtifact(options.requestPlan, completed.output);
-              if (completedArtifact) {
-                currentReasoningArtifact = completedArtifact;
-                if (thinkingStarted && !thinkingClosed) builder.updateThinking(reasoningRef, {
-                  kind: 'summary',
-                  source: summarySource,
-                  visibility: 'summary',
-                  continuation: currentReasoningArtifact,
-                });
-              }
+              items.applyCompletedReasoning(completed.output, (item) => (
+                createResponsesReasoningArtifact(options.requestPlan, item)
+              ));
+              items.closeRemaining();
               finishReason = completed.status === 'incomplete' ? 'length' : sawToolCall ? 'toolUse' : 'stop';
             }
             if (!sawOutput) {
@@ -363,13 +296,15 @@ export class AzureOpenAIResponsesProvider implements ProviderStrategy {
             providerTerminalSeen = true;
             break;
           }
-          case 'response.incomplete':
+          case 'response.incomplete': {
+            items.closeRemaining();
             finishReason = 'length';
             if (!sawOutput) {
               throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
             }
             providerTerminalSeen = true;
             break;
+          }
           case 'response.failed': {
             const failed = readRecord(event.response);
             const error = readRecord(failed?.error);
@@ -389,6 +324,7 @@ export class AzureOpenAIResponsesProvider implements ProviderStrategy {
       if (!sawOutput) {
         throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
       }
+      items.closeRemaining();
       builder.done(finishReason);
     } catch (err) {
       const thrown = normalizeError(err);
@@ -607,27 +543,6 @@ function createResponsesReasoningArtifact(
     encryptedContent: encryptedContent || undefined,
     raw: item ?? undefined,
   });
-}
-
-function findResponsesReasoningArtifact(
-  requestPlan: RequestPlan,
-  output: unknown[] | undefined,
-): ProviderContinuationArtifact | undefined {
-  if (!Array.isArray(output)) return undefined;
-  for (const item of output) {
-    const artifact = createResponsesReasoningArtifact(requestPlan, readRecord(item));
-    if (artifact) return artifact;
-  }
-  return undefined;
-}
-
-function resolveToolSlot(event: Record<string, unknown>, toolSlotsByItemId: Map<string, number>): number | null {
-  const itemId = readString(event.item_id);
-  if (itemId && toolSlotsByItemId.has(itemId)) {
-    return toolSlotsByItemId.get(itemId) ?? null;
-  }
-  const outputIndex = readNumber(event.output_index);
-  return outputIndex === null ? null : TOOL_INDEX_BASE + outputIndex;
 }
 
 function parseJsonObject(raw: string): Record<string, unknown> | null {

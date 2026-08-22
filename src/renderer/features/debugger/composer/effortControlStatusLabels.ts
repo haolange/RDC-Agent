@@ -1,41 +1,41 @@
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import {
   isFastModeDenied,
-  isOneMillionContextDenied,
+  isMaxContextDenied,
 } from './turnControlsUtils';
 
 export function buildEffortCapabilityStatusLabels(input: {
   capability: EffectiveModel | null;
   capabilityReady: boolean;
   capabilityStateLabel: string | undefined;
-  oneMillionUnverified: boolean;
+  maxTierUnverified: boolean;
   fastUnverified: boolean;
   t: (key:
     | 'composer.effort.fixed'
-    | 'composer.effort.levelOff'
+    | 'composer.effort.unverified'
     | 'composer.effort.unsupported'
     | 'composer.effort.currentAccountUnavailable') => string;
 }): {
-  oneMillionContextStatusLabel: string | undefined;
+  maxContextStatusLabel: string | undefined;
   fastModelStatusLabel: string | undefined;
 } {
   const { capability, capabilityReady, capabilityStateLabel, t } = input;
-  const oneMillionCapability = capability?.resolvedControls?.context1m
-    ?? capability?.controls.context1m
+  const maxContextCapability = capability?.resolvedControls?.maxContext
+    ?? capability?.controls.maxContext
     ?? null;
   const fastCapability = capability?.resolvedControls?.fast
     ?? capability?.controls.fast
     ?? null;
 
-  const oneMillionContextStatusLabel = !capabilityReady
+  const maxContextStatusLabel = !capabilityReady
     ? capabilityStateLabel
-    : oneMillionCapability?.state === 'fixed'
+    : maxContextCapability?.state === 'fixed'
       ? t('composer.effort.fixed')
-      : oneMillionCapability?.state === 'unsupported'
+      : maxContextCapability?.state === 'unsupported'
         ? t('composer.effort.unsupported')
-        : input.oneMillionUnverified
-          ? t('composer.effort.levelOff')
-          : isOneMillionContextDenied(capability)
+        : input.maxTierUnverified
+          ? t('composer.effort.unverified')
+          : isMaxContextDenied(capability)
             ? t('composer.effort.currentAccountUnavailable')
             : undefined;
 
@@ -46,10 +46,10 @@ export function buildEffortCapabilityStatusLabels(input: {
       : fastCapability?.state === 'unsupported'
         ? t('composer.effort.unsupported')
         : input.fastUnverified
-          ? t('composer.effort.levelOff')
+          ? t('composer.effort.unverified')
           : isFastModeDenied(capability)
             ? t('composer.effort.currentAccountUnavailable')
             : undefined;
 
-  return { oneMillionContextStatusLabel, fastModelStatusLabel };
+  return { maxContextStatusLabel, fastModelStatusLabel };
 }

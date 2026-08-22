@@ -161,7 +161,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "tierId": "default",
@@ -236,7 +236,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "tierId": "default",
@@ -317,7 +317,7 @@
           "defaultValue": false,
           "entitlement": "unknown"
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "tierId": "default",
@@ -416,7 +416,7 @@
           "defaultValue": false,
           "entitlement": "unknown"
         },
-        "context1m": {
+        "maxContext": {
           "state": "fixed",
           "fixedValue": true,
           "tierId": "default",
@@ -515,7 +515,7 @@
           "state": "unsupported",
           "fixedValue": false
         },
-        "context1m": {
+        "maxContext": {
           "state": "unsupported",
           "fixedValue": false
         },
