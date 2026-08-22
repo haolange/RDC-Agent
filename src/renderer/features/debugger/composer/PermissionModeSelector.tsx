@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useCallback } from 'react';
 import type { AgentPermissionMode } from '@shared/types/settings';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
+import { useComposerMenu } from './useComposerMenuRegistry';
 
 const PERMISSION_MODES: Array<{
   id: AgentPermissionMode;
@@ -40,28 +41,35 @@ const PERMISSION_MODES: Array<{
 ];
 
 export const PermissionModeSelector: React.FC = () => {
-  const [open, setOpen] = useState(false);
+  const menu = useComposerMenu('permission');
   const mode = useAppSettingsStore((state) => state.settings.agentRuntime?.permissions?.mode ?? 'default');
   const setMode = useAppSettingsStore((state) => state.setAgentPermissionMode);
   const current = PERMISSION_MODES.find((entry) => entry.id === mode) ?? PERMISSION_MODES[0];
+  const setRootRef = useCallback((node: HTMLDivElement | null) => {
+    menu.setRoot(node);
+  }, [menu]);
+  const setTriggerRef = useCallback((node: HTMLButtonElement | null) => {
+    menu.setTrigger(node);
+  }, [menu]);
 
   const selectMode = (nextMode: AgentPermissionMode) => {
-    setOpen(false);
+    menu.close();
     if (nextMode === mode) return;
     void setMode(nextMode);
   };
 
   return (
-    <div className="composer-permission-menu">
+    <div ref={setRootRef} className="composer-permission-menu">
       <button
+        ref={setTriggerRef}
         type="button"
-        className={`composer-permission-pill ${open ? 'open' : ''}`}
+        className={`composer-permission-pill ${menu.open ? 'open' : ''}`}
         data-testid="composer-permission-pill"
         data-mode={current.id}
         aria-haspopup="menu"
-        aria-expanded={open}
+        aria-expanded={menu.open}
         title={`当前模式：${current.labelZh}（${current.descriptionZh}）`}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => menu.toggle()}
       >
         <span className="composer-permission-pill-label">{current.label}</span>
         <span className="composer-permission-pill-caret" aria-hidden="true">
@@ -70,7 +78,7 @@ export const PermissionModeSelector: React.FC = () => {
           </svg>
         </span>
       </button>
-      {open ? (
+      {menu.open ? (
         <div className="composer-permission-popup" role="menu">
           {PERMISSION_MODES.map((entry) => (
             <button

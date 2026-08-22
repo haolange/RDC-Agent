@@ -165,7 +165,7 @@ export function buildPresentationUnits(
           status: block.status,
           // Token/message counts describe the runtime, not useful progress for the
           // person reading the work trace. Raw compaction evidence remains in logs.
-          text: 'Earlier work summarized',
+          text: '上下文压缩',
           detailLines: [],
           duration: formatDurationMs(block.startedAt, block.completedAt),
         }],

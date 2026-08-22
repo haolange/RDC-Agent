@@ -11,7 +11,10 @@ import { MessageAttachments } from './MessageAttachments';
 import { MessageMarkdown } from './MessageMarkdown';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
+import { useLayoutStore } from '../../../stores/layoutStore';
+import { useProjectStore } from '../../../stores/projectStore';
 import { useI18n } from '../../../i18n';
+import { useComposerEffectiveModel } from '../composer/useComposerEffectiveModel';
 
 interface MessageBubbleProps {
   message: ConversationMessage;
@@ -90,6 +93,17 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
   const [editError, setEditError] = useState('');
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false);
   const rewriteMessage = useUserMessageRewrite(message);
+  const { t } = useI18n();
+  const selectedAgentId = useLayoutStore((state) => state.selectedAgentId);
+  const agentDefinitions = useAppSettingsStore((state) => state.settings.agents.definitions);
+  const selectedAgent = agentDefinitions.find((agent) => agent.id === selectedAgentId);
+  const currentSession = useProjectStore((state) => state.currentSession);
+  const { effective } = useComposerEffectiveModel(selectedAgentId, currentSession);
+  const executionPreview = t('chat.rewriteWillUse', {
+    agent: selectedAgent?.name ?? selectedAgentId,
+    provider: effective?.providerId ?? '—',
+    model: effective?.modelId ?? '—',
+  });
 
   const beginEdit = () => {
     setDraft(message.content);
@@ -138,6 +152,7 @@ const UserBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => 
               value={draft}
               error={editError}
               submitting={isSubmittingEdit}
+              executionPreview={executionPreview}
               onChange={setDraft}
               onCancel={cancelEdit}
               onSubmit={() => void submitEdit()}
@@ -218,17 +233,23 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
   );
 };
 
-const SystemBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => (
-  <article
-    className="conversation-message conversation-message-system"
-    data-testid="message-bubble-system"
-    data-message-id={message.id}
-  >
-    <div className="conversation-bubble conversation-bubble-system">
-      <span className="conversation-bubble-text">{message.content}</span>
-    </div>
-  </article>
-);
+const SystemBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => {
+  const { t } = useI18n();
+  const text = message.diagnostic?.code === 'MODEL_CONTINUATION_DROPPED'
+    ? t('chat.modelContinuationDropped')
+    : message.content;
+  return (
+    <article
+      className="conversation-message conversation-message-system"
+      data-testid="message-bubble-system"
+      data-message-id={message.id}
+    >
+      <div className="conversation-bubble conversation-bubble-system">
+        <span className="conversation-bubble-text">{text}</span>
+      </div>
+    </article>
+  );
+};
 
 const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ message }) => {
   if (message.role === 'user') {

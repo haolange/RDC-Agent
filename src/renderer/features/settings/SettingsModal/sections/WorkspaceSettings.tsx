@@ -36,9 +36,9 @@ export const WorkspaceSettings: React.FC<{ overview: RdxRuntimeOverview | null; 
     </div>
   </div>;
 
-  return <section className="settings-page settings-page-workspace">
+  return <section className="settings-page settings-page-workspace" data-settings-search="workspace">
     <div className="settings-workspace-page scrollbar-thin" data-testid="settings-workspace-body">
-      <div className="settings-workspace-hero settings-workspace-root-card">
+      <div className="settings-workspace-hero settings-workspace-root-card" data-settings-search="runtime-root">
         <div className="settings-workspace-hero-copy"><div className="settings-field-label">{t('settings.workspaceRuntimeRoot')}</div></div>
         <div className="settings-path-value settings-workspace-root-value">{overview?.userRoot ?? (loading ? t('settings.pathLoading') : t('settings.pathUnavailable'))}</div>
         <div className="settings-path-actions settings-workspace-root-actions"><button type="button" className="button button-secondary" onClick={() => overview?.userRoot && void getElectronApi()?.appShell.openPath(overview.userRoot)}>{t('settings.reveal')}</button></div>

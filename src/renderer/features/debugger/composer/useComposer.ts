@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import type { ModeConfig } from '@shared/types/layout';
 import { AGENT_MODES, resolveAgentDisplay } from '@shared/constants/agents';
 import { COMPOSE_ACCENT_FALLBACK } from '@shared/theme/composeAccent';
@@ -28,10 +28,7 @@ export function useComposer(options: {
   const { showNotice, effectiveLeftCollapsed, leftToggleDisabled, toggleLeftSidebar, openSettings } = options;
   const { t, language } = useI18n();
 
-  const [modeMenuOpen, setModeMenuOpen] = useState(false);
-
   const promptInputRef = useRef<HTMLTextAreaElement>(null);
-  const modeMenuRef = useRef<HTMLDivElement>(null);
 
   const currentProject = useProjectStore((state) => state.currentProject);
   const currentSession = useProjectStore((state) => state.currentSession);
@@ -43,9 +40,12 @@ export function useComposer(options: {
   const conversationMessages = useConversationStore((state) => state.conversationMessages);
   const currentMode = useLayoutStore((state) => state.currentMode);
   const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
+  const selectedAgentId = useLayoutStore((state) => state.selectedAgentId);
+  const setSelectedAgentId = useCallback((agentId: string) => {
+    useLayoutStore.getState().setSelectedAgentId(agentId);
+  }, []);
   const agentDefinitions = useAppSettingsStore((state) => state.settings.agents.definitions);
   const userInvocableAgents = agentDefinitions.filter((agent) => agent.enabled && agent.userInvocable);
-  const [selectedAgentId, setSelectedAgentId] = useState(userInvocableAgents[0]?.id ?? 'ask');
 
   const devices = useDeviceStore((state) => state.devices);
   const selectedDevice = useDeviceStore((state) => state.selectedDevice);
@@ -131,9 +131,6 @@ export function useComposer(options: {
     : (!hasMessageContent && !hasPendingAttachments);
 
   useComposerDomEffects({
-    modeMenuOpen,
-    setModeMenuOpen,
-    modeMenuRef,
     promptInputRef,
     currentMode,
     promptValue,
@@ -150,10 +147,7 @@ export function useComposer(options: {
     setPendingAttachments: attachments.setPendingAttachments,
     pendingSkillIds: pendingSkills.pendingSkillIds,
     removePendingSkill: pendingSkills.removePendingSkill,
-    modeMenuOpen,
-    setModeMenuOpen,
     promptInputRef,
-    modeMenuRef,
     currentMode,
     currentModeConfig,
     currentModeLabel,

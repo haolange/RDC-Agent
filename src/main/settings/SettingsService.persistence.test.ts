@@ -229,6 +229,7 @@ describe('SettingsService provider persistence', () => {
       'grok-4.20-0309-reasoning',
       'grok-4.20-multi-agent-0309',
       'grok-4.3',
+      'grok-4.6',
       'grok-4.5',
       'grok-build-0.1',
     ];
@@ -258,6 +259,7 @@ describe('SettingsService provider persistence', () => {
       'grok-4.20-0309-reasoning',
       'grok-4.20-multi-agent-0309',
       'grok-4.3',
+      'grok-4.6',
       'grok-4.5',
       'grok-build-0.1',
       'grok-composer-2.5-fast',
@@ -328,8 +330,7 @@ describe('SettingsService provider persistence', () => {
       availabilityReason: expect.stringContaining('does not support the Coding Plan feature'),
     });
     expect(models.find((model) => model.id === 'kimi-k2.7-code')).toMatchObject({
-      availability: 'unavailable',
-      availabilityReason: expect.stringContaining('user-observed'),
+      availability: 'available',
     });
   });
 

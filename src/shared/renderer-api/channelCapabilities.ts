@@ -112,6 +112,7 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'session:rename': 'mutation',
   'session:remove': 'mutation',
   'session:select': 'mutation',
+  'session:setModelOverride': 'mutation',
   'session:attachments:list': 'read',
   'session:attachments:import': 'mutation',
   'run:list': 'read',

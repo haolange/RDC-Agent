@@ -1,0 +1,87 @@
+import { describe, expect, it } from 'vitest';
+import type { EffectiveModel } from '@shared/types/providerCapability';
+import {
+  filterComposerPickerOptions,
+  groupComposerPickerOptions,
+  hasPickerReasoning,
+  isComposerPickerModel,
+  resolvePickerContextWindow,
+  toComposerPickerOption,
+} from './composerModelPicker';
+
+function model(partial: Record<string, unknown> & { modelId: string }): EffectiveModel {
+  return {
+    providerId: 'openai',
+    label: typeof partial.label === 'string' ? partial.label : partial.modelId,
+    aliases: [],
+    enabled: true,
+    availability: 'available',
+    presencePolicy: 'maintained',
+    contextTiers: [],
+    defaultBudgetTokens: 8192,
+    controls: {
+      fast: { state: 'unsupported' },
+      context1m: { state: 'unsupported' },
+      reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
+    },
+    route: { protocol: 'openai-responses', source: 'catalog' },
+    toolCalling: { state: 'supported' },
+    visionInput: { state: 'unsupported' },
+    structuredOutput: { state: 'unsupported' },
+    provenance: [],
+    ...partial,
+  } as unknown as EffectiveModel;
+}
+
+describe('composerModelPicker', () => {
+  it('hides unavailable, disabled, and internal models', () => {
+    expect(isComposerPickerModel(model({ modelId: 'ok' }))).toBe(true);
+    expect(isComposerPickerModel(model({ modelId: 'unverified', availability: 'unknown' }))).toBe(true);
+    expect(isComposerPickerModel(model({ modelId: 'off', enabled: false }))).toBe(false);
+    expect(isComposerPickerModel(model({ modelId: 'gone', availability: 'unavailable' }))).toBe(false);
+    expect(isComposerPickerModel(model({
+      modelId: 'hidden',
+      selection: { pickerVisibility: 'internal' },
+    }))).toBe(false);
+  });
+
+  it('uses the largest published context window and reasoning kinds', () => {
+    const entry = model({
+      modelId: 'gpt',
+      contextTiers: [
+        { id: 'base', label: 'base', maxPromptTokens: 128000, activation: { kind: 'implicit' }, entitlement: 'granted' },
+        { id: 'max', label: 'max', maxTotalTokens: 272000, activation: { kind: 'implicit' }, entitlement: 'granted' },
+      ],
+      controls: {
+        fast: { kind: 'none' },
+        context1m: { kind: 'none' },
+        reasoning: {
+          kind: 'levels',
+          supportsOff: true,
+          levels: ['low', 'medium', 'high'],
+          defaultSelection: 'medium',
+          wireProfile: { kind: 'openai-responses' },
+        },
+      },
+    });
+    expect(resolvePickerContextWindow(entry)).toBe(272000);
+    expect(hasPickerReasoning(entry)).toBe(true);
+  });
+
+  it('filters by provider, model, label, and alias', () => {
+    const options = [
+      toComposerPickerOption('openai', 'OpenAI', model({
+        modelId: 'gpt-5.6-sol',
+        label: 'GPT-5.6 Sol',
+        aliases: ['sol'],
+      })),
+      toComposerPickerOption('kimi-coding-plan', 'Kimi Coding', model({
+        modelId: 'k3',
+        label: 'Kimi K3',
+      })),
+    ];
+    expect(filterComposerPickerOptions(options, 'sol').map((item) => item.modelId)).toEqual(['gpt-5.6-sol']);
+    expect(filterComposerPickerOptions(options, 'kimi').map((item) => item.modelId)).toEqual(['k3']);
+    expect(groupComposerPickerOptions(options)).toHaveLength(2);
+  });
+});

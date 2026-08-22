@@ -4,8 +4,8 @@ import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
-import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useConversationStore } from '../../../stores/conversationStore';
+import { buildConversationConfigurationCommit } from './composerConfigurationCommit';
 import { useSessionStore } from '../../../stores/sessionStore';
 import {
   applyConversationTurnResult,
@@ -21,6 +21,8 @@ import {
   useComposerSessionContextStore,
 } from './composerSessionContext';
 import { useProjectStore } from '../../../stores/projectStore';
+import { persistComposerDraftToSession } from './sessionModelOverride';
+import { readComposerEffectiveModel } from './useComposerEffectiveModel';
 
 export function createConversationRequestId(): string {
   return globalThis.crypto?.randomUUID?.()
@@ -158,15 +160,15 @@ export async function sendComposerConversationTurn(options: {
   };
 
   try {
-    const agentCommit = await useAppSettingsStore.getState().flushAgentDefinitionSaves(selectedAgentId);
-    const providerId = agentCommit?.route?.providerId;
-    const providerCommit = providerId
-      ? await useAppSettingsStore.getState().flushProviderSaves(providerId)
-      : null;
-    const effectiveCatalog = providerId
-      ? await electronAPI.settings.getEffectiveCatalog(providerId)
-      : null;
-    const selectedModel = effectiveCatalog?.models.find((model) => model.modelId === agentCommit?.route?.modelId);
+    const configuration = await buildConversationConfigurationCommit({
+      selectedAgentId,
+      getEffectiveCatalog: (providerId) => electronAPI.settings.getEffectiveCatalog(providerId),
+      modelOverride: readComposerEffectiveModel(
+        selectedAgentId,
+        currentSession,
+        currentProject?.projectId,
+      ),
+    });
     const conversationMode = toConversationMode(currentMode);
     const turnControls = { ...useTurnControlsStore.getState().turnControls };
     const result = await electronAPI.conversation.sendMessage({
@@ -181,14 +183,7 @@ export async function sendComposerConversationTurn(options: {
       attachments: toConversationAttachmentInputs(sentAttachments),
       preloadSkillIds: sentSkillIds,
       turnControls,
-      configurationCommit: {
-        agentId: selectedAgentId,
-        agentCommitHash: agentCommit?.commitHash,
-        providerId,
-        providerCommitHash: providerCommit?.commitHash,
-        providerCatalogRevision: effectiveCatalog?.catalogRevision ?? providerCommit?.catalogRevision ?? undefined,
-        routeRevision: selectedModel?.routeRevision,
-      },
+      configurationCommit: configuration.configurationCommit,
     });
 
     if (finishRevokedOrCancelled()) {
@@ -244,6 +239,10 @@ export async function sendComposerConversationTurn(options: {
       setConversationSnapshot,
       upsertConversationMessages,
     });
+    await persistComposerDraftToSession(
+      turn.session?.sessionId ?? committedSessionId,
+      currentProject?.projectId,
+    );
 
     await syncE2EConversationState({
       electronAPI,

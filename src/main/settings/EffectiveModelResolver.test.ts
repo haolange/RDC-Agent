@@ -82,7 +82,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       availability: 'unknown',
       controls: {
         fast: { state: 'selectable', defaultValue: false },
-        context1m: { state: 'unsupported', fixedValue: false },
+        context1m: { state: 'selectable', defaultValue: false, entitlement: 'unknown', tierId: 'max' },
         reasoning: {
           levels: ['low', 'medium', 'high', 'xhigh', 'max'],
           defaultSelection: 'medium',

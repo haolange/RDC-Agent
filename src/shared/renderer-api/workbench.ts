@@ -48,6 +48,9 @@ export function createSessionApi(transport: RendererApiTransport): SessionApi {
     rename: (id, title) => transport.invoke(INVOKE.session.rename, id, title),
     remove: (id) => transport.invoke(INVOKE.session.remove, id),
     select: (id) => transport.invoke(INVOKE.session.select, id),
+    setModelOverride: (id, modelOverride) => (
+      transport.invoke(INVOKE.session.setModelOverride, id, modelOverride)
+    ),
     attachments: {
       list: (sessionId) => transport.invoke(INVOKE.session.listAttachments, sessionId),
       import: (sessionId, filePaths) => (

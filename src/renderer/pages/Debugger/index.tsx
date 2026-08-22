@@ -2,6 +2,7 @@ import React from 'react';
 import type { AgentMode } from '@shared/types/layout';
 import { AgentChat } from '../../features/debugger/AgentChat';
 import './Debugger.css';
+import './Debugger.composer-panels.css';
 
 export const DebuggerPage: React.FC<{ mode: AgentMode }> = ({ mode }) => {
   return (

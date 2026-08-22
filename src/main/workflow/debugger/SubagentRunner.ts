@@ -20,6 +20,7 @@ import {
 } from './TurnCoordinator';
 import type { AgentProfileTurnOptions } from './orchestratorTypes';
 import { createEphemeralScopeId } from './executionScope';
+import { resolveSubagentModelOverride } from './subagentModelArg';
 
 export interface SubagentRunnerDeps {
   sendProfileMessage: (
@@ -45,6 +46,7 @@ export class SubagentRunner {
     projectId?: string | null;
     parentTurn?: TurnHandle | null;
     signal?: AbortSignal | null;
+    model?: string;
   }): Promise<{ text: string; status: SubagentResultStatus; subagentId: string }> {
     // Resolve and authorize the exact project profile before mutating parent budgets or emitting a child event.
     const childSettings = settingsService.getAll();
@@ -59,6 +61,16 @@ export class SubagentRunner {
     const definition = effectiveProfiles.find((entry) => entry.id === input.targetProfile && entry.enabled);
     if (!definition) {
       throw new Error('AGENT_PROFILE_UNAVAILABLE: ' + input.targetProfile);
+    }
+    let modelOverride: { providerId: string; modelId: string } | undefined;
+    try {
+      modelOverride = resolveSubagentModelOverride(input.model, childSettings);
+    } catch (error) {
+      return {
+        text: error instanceof Error ? error.message : String(error),
+        status: 'failed',
+        subagentId: generateEventId('subagent'),
+      };
     }
     const effectiveProfileIds = effectiveProfiles.filter((entry) => entry.enabled).map((entry) => entry.id);
     const systemPrompt = definition.instructions?.trim() || this.deps.systemPromptForAgent(input.targetProfile);
@@ -155,6 +167,7 @@ export class SubagentRunner {
           signal: childAbort.signal,
           policyBudget,
           subagentBudget: childBudget,
+          modelOverride: modelOverride ?? null,
           onEvent: (event: SharedAgentEvent) => {
             if (input.parentTurn && !input.parentTurn.isLive(input.parentTurn.generation)) {
               return;
@@ -293,18 +306,19 @@ export class SubagentRunner {
     const runSubagent = this.runSubagent.bind(this);
     const capturedTurn = turnHandle ?? getActiveTurn(sessionId);
     const runSubagentTool: AgentTool<
-      { task: string; profile?: string },
+      { task: string; profile?: string; model?: string },
       { subagentId: string; profile: string; status: string }
     > = {
       name: 'subagent',
       label: 'Subagent',
-      description: 'Delegate a sub-task to an isolated sub-agent. The sub-agent runs to completion (serial, not parallel) and returns its final answer. Use profile to target a specific agent profile (defaults to "ask" read-only).',
+      description: 'Delegate a sub-task to an isolated sub-agent. The sub-agent runs to completion (serial, not parallel) and returns its final answer. Use profile to target a specific agent profile (defaults to "ask" read-only). Optional model is a canonical providerId:modelId and does not inherit the parent session override.',
       parameters: {
         type: 'object',
         required: ['task'],
         properties: {
           task: { type: 'string', description: 'The task description for the sub-agent.' },
           profile: { type: 'string', description: 'Target profile id. Defaults to "ask" (read-only).' },
+          model: { type: 'string', description: 'Optional canonical providerId:modelId. Fail-closed if the model is not available.' },
         },
       },
       permissionHint: 'readonly',
@@ -316,6 +330,7 @@ export class SubagentRunner {
           parentToolCallId: toolCallId,
           targetProfile,
           task: args.task,
+          model: typeof args.model === 'string' ? args.model : undefined,
           parentSessionId: sessionId ?? null,
           parentOnEvent: turn?.eventSink?.onEvent,
           projectRootPath: turn?.eventSink?.projectRootPath ?? null,

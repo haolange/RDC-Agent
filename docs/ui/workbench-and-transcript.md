@@ -25,7 +25,7 @@ Workbench page shell、Local utilities、composer、transcript 共用 `--workben
 
 Loop thinking：quiet spark + `正在思考` / `Thinking`（运行中默认展开）→ `已思考 · {duration}` / `Thought for`（完成后默认折叠）；手动开合 sticky 覆盖。禁止 `深度思考` / settled `思考了`。Readable `raw`/`summary`/`unknown` 共用标签；opaque/hidden 永不渲染 CoT 占位句。
 
-Commentary：markdown 散文，不进 thinking 槽。Tool：统一单披露卡片（icon+动词 + **结果优先** body；展开内容层 + Raw；默认不展开 Raw；无 `toolGroup` 双层壳）。同 loop 连续 tool 外距 `--space-2`；thinking/commentary → 首 tool 与相邻 loop 顶距 `--space-3`。≥8 连续 tools 聚合成摘要行。
+Commentary：markdown 散文，不进 thinking 槽。Tool / Asked / Sub Agent / Task / Compact / 审批卡共用 `--transcript-card-*` 卡壳。Tool：统一单披露卡片（icon+动词 + **结果优先** body；展开内容层 + Raw；默认不展开 Raw；无 `toolGroup` 双层壳）。同 loop 连续 tool 外距 `--space-2`；thinking/commentary → 首 tool 与相邻 loop 顶距 `--space-3`。≥8 连续 tools 聚合成摘要行。Compact 是正式卡片，标题走 i18n。
 
 `web_search`：favicon + 域名 source pills（title 仅 tooltip）。`web_fetch`：Fetched page/已抓取 + 异形 page chip；favicon 仅经 `web:resolveFavicon` → data URL。`mcp__*` header glyph = `plug`。
 
@@ -39,7 +39,11 @@ Active Signal：tokenized clipped-gradient 能量扫光；仅用于权威 runnin
 
 ## Composer 控件
 
-左：attach / agent / permission；右：effort / context usage / send-stop。Permission 不得挨着 send 伪装成执行动作。
+左：attach / agent / permission；右：model / effort / context usage / send-stop。Permission 不得挨着 send 伪装成执行动作。Model 在 Effort 之前，规格复用现有 pill；菜单顶部搜索、按 provider 分组。显示并选择当前对话模型；无 session 时可先选（只记草稿，不建 session）；有 session 则写入 `modelOverride`。不写回 `.agent.md`，切 Agent 不清模型。
+
+底栏弹窗（Agent / Permission / Effort / Usage / Model）走单一互斥注册表：任意时刻只开一个；Escape 关闭并把焦点还给 trigger；点空白关闭。
+
+Edit-and-resend 使用 Composer 当前 agent + 当前对话模型，编辑框上方显示「将使用：agent · provider/model」。跨模型时 transcript 插入系统提示，说明推理续接已丢弃。
 
 Effort：能力驱动 reasoning rail + `Max mode` + `Fast mode`。关档文案统一 `Disabled` / `禁用`。`unknown` / `none` → 同关态外观并灰掉不可调；`always-on` / fixed → 锁定开；wire `xhigh` 显示 `Extra`；产品最高档 `Max`。Max/Fast entitlement 未知时关态灰掉且状态文案亦为 `Disabled`。滑杆 inset 几何，松手 snap。Compose 色跟 agent `accent`（`--composer-effort-*`），禁止只用全局 `--token-border-focus`。
 

@@ -696,6 +696,7 @@ export class ConversationService {
       preparationController,
       input.configurationCommit,
       requestFingerprint,
+      targetMessage.turnId,
     );
   }
 
@@ -838,6 +839,7 @@ export class ConversationService {
     preparationController: AbortController = new AbortController(),
     configurationCommit?: ConversationSendRequest['configurationCommit'],
     requestFingerprint?: string,
+    excludeTurnId?: string,
   ): Promise<ConversationTurnResult> {
     return runStartProfileTurn(
       this.createTurnStarterHost(),
@@ -854,6 +856,7 @@ export class ConversationService {
       preparationController,
       configurationCommit,
       requestFingerprint,
+      excludeTurnId,
     );
   }
 

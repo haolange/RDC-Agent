@@ -43,6 +43,9 @@
 - Actual / Last actual 在弹层宽度大于 `33rem` 时保持等宽三列独立圆角卡片 Tokens | Cache | Reasoning（Cache：省 tokens、最近一轮%、累计%、命中/未命中；缺遥测显示 `—`，禁止假 0 / 假 0%；Cache 卡内 stats 可折成 2×2）；卡片间距用 `--space-3`，禁止分隔线连体与 `clamp` 归零 gap；只有真实窄屏才纵向单列堆叠。
 - 缩窗只在发送 preflight 内派生压缩视图而不提前改写历史。
 
+- Composer 底栏 Model override 与 Agent / Permission / Effort / Usage 互斥；390px 不越界。
+- Settings 左侧导航可搜索并跳转高亮；顺序为 Models → Agents → Skills。
+
 ## Composer Effort 滑杆
 
 - First visible Effort popup frame must use measured inset geometry; measurement correction must not transition left or transform, while normal snap and Max lifecycle timing remain unchanged.

@@ -61,6 +61,7 @@
 | `AgentOrchestrator` | `src/main/workflow/debugger/AgentOrchestrator.ts` | façade 少于 800 行；职责外提；`pnpm run check:orchestrator-facade` |
 | `RdxRuntimeContextRegistry` | `src/main/sessions/` | **仅** per-session lease；禁止 `legacyGlobalMirror` / `getRdxRuntimeContext` |
 | Session Projection | `src/renderer/stores/sessionProjectionStore.ts` + `sessionEventGate` | 仅投影 `currentSession`；IPC 事件须 gate；后台 cache；Composer restore / Stop / Agent 运行态绑 `sessionId + requestId + agentId`；`pnpm run check:session-projection` |
+| Session `modelOverride` | `SessionRecord` + `session:setModelOverride` + `resolveAgentRoutePreflight` | 当前对话模型（Agent 路由仅作未点选种子）；Composer 底栏与 `/model` 共用；无 session 时只记草稿，不建 session；切 Agent **不清**模型；**不传** sub agent；注入点在选出 route 之后、查 EffectiveCatalog 之前；选择器与 Settings 对齐（`unknown` 可选，`unavailable`/`internal`/disabled fail-closed）；发送时 RequestPlanner 再校验可执行性 |
 | `bridgeSecurity` | `src/main/browserAppBridge/` | **仅** `RDC_AGENT_BROWSER_QA=1`；bearer + Origin + canonical renderer channel + 已注册 handler；未知/内部/明文 secret channel fail-closed |
 | `McpTrustService` | `src/main/settings/` | project 不可覆盖 user executable；needsRetrust |
 | IPC Zod | `src/main/ipc/validation/` | **全量** handler `parseIpcArgs`；approvalToken 单次消费 |
@@ -79,7 +80,9 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - 涉及页面结构、面板布局、状态展示、样式引用或视觉资源路径时，必须确认属于明确的产品变更；如果不是，应保持现有效果不变。
 - 修复结构问题时，不要顺手做与任务无关的视觉改版、布局重排或交互重定义。
 - 涉及 `src/renderer` 的改动，除检查类型和功能外，还要检查界面入口是否完整、关键面板是否可渲染、现有交互是否可达。
-- Settings 内 General / Appearance / Workspace / Models 与 Agents / Skills / Tools / Hooks / Policy 为同级导航；Appearance 承载 System/Light/Dark、Light/Dark 独立 chrome（预设、accent/surface/ink、contrast、字体、Import/Copy `rdx-theme-v1:`）、`fontScale`、`composerMarkdown`、`usePointerCursors`、`reduceMotion`；Language 留在 General。禁止恢复 translucent / semi-transparent sidebar。禁止恢复 `oklch-themes.css`、`styles/tokens/*` 双轨或解析 `codex-theme-v1:`。scoped 编辑条不展示装饰性 “RDX Runtime” kicker；User | Project 独占作用域行且横向 `1fr 1fr` 拉满均分。Skills/MCP/Hooks/Policy 内容区为 Import + New 列表与右侧详情编辑器；Policy 内容区顶部另有用户级 Agent Runtime 块（压缩阈值 50–90、步长 5），项目 policy `limits.contextCompactionPercent` 只能收紧。Agents 不在 scope 条上放 New（仅 Agents 工具栏 Import + New Agent）。禁止恢复 Settings「诊断信息 / Diagnostics」导航；禁止把 Request Inspector 挂到 Work Process 或右侧默认 Session/Trace 面板。Workspace「RDX Runtime 根目录」与 Control Panel「RDX 运行时上下文」职责不同，不得一并删除。
+- Settings 内 General / Appearance / Workspace / Models / Agents / Skills / Tools / Hooks / Policy 为同级导航，顺序即此；左侧导航顶部有深度搜索（section + 字段标题 + 中英关键词），命中后跳转并高亮目标控件，方向键 / Home / End 为 roving tabindex。Appearance 承载 System/Light/Dark、Light/Dark 独立 chrome（预设、accent/surface/ink、contrast、字体、Import/Copy `rdx-theme-v1:`）、`fontScale`、`composerMarkdown`、`usePointerCursors`、`reduceMotion`；Language 留在 General。禁止恢复 translucent / semi-transparent sidebar。禁止恢复 `oklch-themes.css`、`styles/tokens/*` 双轨或解析 `codex-theme-v1:`。scoped 编辑条不展示装饰性 “RDX Runtime” kicker；User | Project 独占作用域行且横向 `1fr 1fr` 拉满均分。Skills/MCP/Hooks/Policy 内容区为 Import + New 列表与右侧详情编辑器；Policy 内容区顶部另有用户级 Agent Runtime 块（压缩阈值 50–90、步长 5），项目 policy `limits.contextCompactionPercent` 只能收紧。Agents 不在 scope 条上放 New（仅 Agents 工具栏 Import + New Agent）。禁止恢复 Settings「诊断信息 / Diagnostics」导航；禁止把 Request Inspector 挂到 Work Process 或右侧默认 Session/Trace 面板。Workspace「RDX Runtime 根目录」与 Control Panel「RDX 运行时上下文」职责不同，不得一并删除。
+- Composer 底栏右侧在 Effort 之前有当前对话的 Provider→Model 按钮（搜索、按 provider 分组）；永远可点，无 session 时只记草稿，切 Agent 不清模型，不写回 `.agent.md`。底栏弹窗（Agent / Permission / Effort / Usage / Model）走单一互斥注册表：任意时刻只开一个，Escape 关闭并把焦点还给 trigger，点空白关闭。
+- subagent 工具可选 `model`（canonical `providerId:modelId`，冒号）；不在 EffectiveCatalog available 或 `pickerVisibility === 'internal'` 则 fail-closed，不继承父 session override。
 
 ## 设计系统约束（agent 写 CSS 必读）
 
@@ -99,7 +102,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - Electron 窗口通过 `preload -> IPC transport` 进入主进程；浏览器真实会话通过 `localhost HTTP/SSE transport -> IPC handler registry` 进入主进程。除 transport 与原生窗口容器外，两条路径的 API、状态、持久化与审批语义必须一致，禁止恢复手写 Browser API、拒绝桩或第二套 channel 规则。
 - 涉及 UI/UX、布局、消息流、状态展示、样式、面板可达性的改动，优先用浏览器真实会话和内置浏览器点击/截图验证。
 - 产品级浏览器评审必须至少覆盖：Workbench 初始状态、Project/Session 入口、`.rdc` 导入或打开状态、Settings > Providers、Settings > Agents、语言/Appearance 持久化、Terminal、Memory approval、Tool Approval、Command、MCP/Hook trust/revoke、桌面与窄屏视口、水平溢出检查、长路径/中文文件名显示、按钮 disabled/active 状态和前后端数据一致性；未知/内部/明文 secret channel 的 fail-closed 面须单独抽检。
-- 约 390px 窄屏验收必须确认 `.app-body` 不保留桌面最小宽度、Composer 控件无重叠且全部可达、Agent 菜单不越界、selected/running 语义分离、Arrow/Home/End/Escape 与焦点返回正确，并在 reduced-motion 下确认运行状态点不播放动画。
+- 约 390px 窄屏验收必须确认 `.app-body` 不保留桌面最小宽度、Composer 控件无重叠且全部可达、Agent / Permission / Effort / Usage / Model 菜单仍在 viewport 内且不越界、selected/running 语义分离、Arrow/Home/End/Escape 与焦点返回正确，并在 reduced-motion 下确认运行状态点不播放动画。
 - Composer 性能回归：先经 `/qa` 进入后在同源加 `?qaPerformance=1`（或带有效鉴权打开 `/app?qaPerformance=1`），读取 `data-rdc-qa-performance`；以原生 Event Timing 的 click-to-next-paint p95 和 Long Task 为准；16 ms 以下未上报 entry 按阈值保守计入，不支持 Event Timing 时 fail-closed。不得用 Browser 工具调用往返时间或后台节流的 RAF cadence 替代 renderer 指标；默认 `/app` 不得安装该探针的 listener 或 observer。
 - 本地契约烟测：`pnpm run smoke:agent-browser`（失败 exit≠0；不并入默认 pack）。
 - 涉及 `src/main`、`src/preload`、窗口、IPC 注册、workspace 权限、RDX CLI invoker 或 `RenderDoc` 本地链路时，补真实启动检查或内置浏览器真实会话；禁止把 Playwright/Electron E2E 作为门禁。

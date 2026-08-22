@@ -278,7 +278,11 @@ export function createConversationDiagnostic(input: {
   };
 }
 
-export function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?: AgentRole): AgentRoutePreflight {
+export function resolveAgentRoutePreflight(
+  agentId: AgentRole,
+  fallbackAgentId?: AgentRole,
+  modelOverride?: { providerId: string; modelId: string } | null,
+): AgentRoutePreflight {
   const settings = settingsService.getAll();
   const primaryRoute = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
   const fallbackRoute = fallbackAgentId
@@ -287,7 +291,9 @@ export function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?:
   const route = primaryRoute?.providerId && primaryRoute.modelId ? primaryRoute : fallbackRoute;
   const routeAgentId = route?.agentId ?? agentId;
   const label = getAgentLabel(agentId);
-  if (!route?.providerId || !route.modelId) {
+  const providerId = modelOverride?.providerId || route?.providerId;
+  const modelId = modelOverride?.modelId || route?.modelId;
+  if (!providerId || !modelId) {
     return {
       ok: false,
       diagnostic: createConversationDiagnostic({
@@ -299,7 +305,7 @@ export function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?:
     };
   }
 
-  const provider = settings.llm.providers.find((entry) => entry.id === route.providerId);
+  const provider = settings.llm.providers.find((entry) => entry.id === providerId);
   if (!provider || !provider.enabled || !provider.isConfigured) {
     return {
       ok: false,
@@ -307,9 +313,9 @@ export function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?:
         agentId,
         code: 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE',
         severity: 'error',
-        userMessage: `当前 ${label} 链路的 provider 不可用：${route.providerId}。请检查该服务商的连接状态、账号或密钥后重试。`,
-        providerId: route.providerId,
-        modelId: route.modelId,
+        userMessage: `当前 ${label} 链路的 provider 不可用：${providerId}。请检查该服务商的连接状态、账号或密钥后重试。`,
+        providerId,
+        modelId,
         technicalMessage: provider?.lastError ?? provider?.unavailableReason,
       }),
     };
@@ -322,15 +328,15 @@ export function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?:
         agentId,
         code: 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE',
         severity: 'error',
-        userMessage: `Current ${label} route provider is not verified: ${route.providerId}. Verify the provider in Settings before running agent tools.`,
-        providerId: route.providerId,
-        modelId: route.modelId,
+        userMessage: `Current ${label} route provider is not verified: ${providerId}. Verify the provider in Settings before running agent tools.`,
+        providerId,
+        modelId,
         technicalMessage: provider.lastError ?? provider.unavailableReason,
       }),
     };
   }
 
-  const selection = resolveEffectiveModelSelection(route.providerId, route.modelId, settings);
+  const selection = resolveEffectiveModelSelection(providerId, modelId, settings);
   const effectiveModel = selection.model;
   if (!effectiveModel) {
     const recommendationText = selection.recommendations.map((entry) => entry.modelId).join(', ');
@@ -340,10 +346,10 @@ export function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?:
         agentId,
         code: 'CONVERSATION_LLM_ROUTE_MISSING',
         severity: 'warning',
-        userMessage: `当前 ${label} 路由的模型不可用：${route.providerId}/${route.modelId}。请在 Settings 中刷新模型目录或显式选择同一 provider 的其它模型。`,
-        providerId: route.providerId,
-        modelId: route.modelId,
-        technicalMessage: `MODEL_UNAVAILABLE: ${route.providerId}/${route.modelId} is absent, disabled, or unavailable in the effective catalog.${recommendationText ? ` Recommendations: ${recommendationText}.` : ''}`,
+        userMessage: `当前 ${label} 路由的模型不可用：${providerId}/${modelId}。请在 Settings 中刷新模型目录或显式选择同一 provider 的其它模型。`,
+        providerId,
+        modelId,
+        technicalMessage: `MODEL_UNAVAILABLE: ${providerId}/${modelId} is absent, disabled, or unavailable in the effective catalog.${recommendationText ? ` Recommendations: ${recommendationText}.` : ''}`,
         recommendations: selection.recommendations,
       }),
     };
@@ -354,7 +360,7 @@ export function resolveAgentRoutePreflight(agentId: AgentRole, fallbackAgentId?:
     ok: true,
     agentId,
     routeAgentId,
-    providerId: route.providerId,
+    providerId,
     modelId: effectiveModelId,
     routeCapability: resolveAgentRouteCapability(
       provider,

@@ -43,7 +43,7 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
   const dark = settings.appearance.chromeThemes.dark;
 
   return (
-    <section className="settings-page settings-page-appearance" data-testid="settings-appearance-page">
+    <section className="settings-page settings-page-appearance" data-testid="settings-appearance-page" data-settings-search="appearance">
       <div className="appearance-mode-grid" role="group" aria-label={t('userMenu.theme')}>
         {(['system', 'light', 'dark'] as AppTheme[]).map((mode) => (
           <ThemeModeTile
@@ -111,7 +111,7 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
             </div>
           </div>
 
-          <div className="settings-preference-row">
+          <div className="settings-preference-row" data-settings-search="font-scale">
             <div className="settings-preference-copy settings-option-block">
               <div className="settings-field-label">{t('userMenu.fontScale')}</div>
             </div>

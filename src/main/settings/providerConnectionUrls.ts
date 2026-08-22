@@ -129,11 +129,17 @@ export const resolveCodingPlanModelsUrl = (baseUrl: string): string => {
  * Cline does not expose OpenAI-style `/models`. Usage lists live at
  * `/ai/cline/models`; ClinePass plan models live at `/ai/cline/recommended-models`.
  */
+function resolveClineAppBaseUrl(baseUrl: string): string {
+  const trimmed = baseUrl.trim().replace(/\/+$/, '');
+  // Host-only origins 404; the live app prefix is `/api/v1`.
+  return /^https:\/\/api\.cline\.bot$/i.test(trimmed) ? `${trimmed}/api/v1` : trimmed;
+}
+
 export const resolveClineCatalogUrl = (
   baseUrl: string,
   catalog: 'usage' | 'pass',
 ): string => {
-  const trimmed = baseUrl.trim().replace(/\/+$/, '');
+  const trimmed = resolveClineAppBaseUrl(baseUrl);
   return catalog === 'pass'
     ? `${trimmed}/ai/cline/recommended-models`
     : `${trimmed}/ai/cline/models`;
@@ -141,7 +147,7 @@ export const resolveClineCatalogUrl = (
 
 /** Account probe for Cline API keys; catalog endpoints do not validate credentials. */
 export const resolveClineCredentialProbeUrl = (baseUrl: string): string =>
-  `${baseUrl.trim().replace(/\/+$/, '')}/users/me`;
+  `${resolveClineAppBaseUrl(baseUrl)}/users/me`;
 
 export const resolveGoogleVertexOpenAiBaseUrl = (baseUrl: string): string => {
   const trimmed = baseUrl.trim().replace(/\/+$/u, '');

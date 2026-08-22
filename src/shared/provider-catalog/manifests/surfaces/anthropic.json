@@ -129,6 +129,8 @@
           "id": "default",
           "label": "Max mode",
           "maxPromptTokens": 1000000,
+          "maxOutputTokens": 128000,
+          "maxTotalTokens": 1000000,
           "activation": {
             "kind": "implicit"
           },
@@ -286,7 +288,7 @@
           "entitlement": "granted"
         }
       ],
-      "defaultBudgetTokens": 1000000,
+      "defaultBudgetTokens": 128000,
       "cost": {
         "input": 5,
         "output": 25

@@ -11,7 +11,7 @@ import { ToolsSettings } from './sections/ToolsSettings';
 import { McpStatusDashboard } from './sections/McpStatusDashboard';
 import { McpTrustPanel } from './sections/McpTrustPanel';
 import { ProviderConnectDialog } from './sections/ProviderConnectDialog';
-import { SettingsNavIcon } from './SettingsNavIcon';
+import { SettingsCenterNav } from './SettingsCenterNav';
 import { useRdxRuntimeOverview } from './useRdxRuntimeOverview';
 import { RuntimeScopePanel } from './sections/RuntimeScopePanel';
 import { HooksSettings } from './sections/HooksSettings';
@@ -117,20 +117,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
               </div>
             </div>
 
-            <div className="settings-center-nav">
-              {sections.map((section) => (
-                <button
-                  key={section.id}
-                  type="button"
-                  className={`settings-center-nav-item ${activeSection === section.id ? 'active' : ''}`}
-                  data-testid={`settings-nav-${section.id}`}
-                  onClick={() => setActiveSection(section.id)}
-                >
-                  <SettingsNavIcon section={section.id} />
-                  <span>{section.label}</span>
-                </button>
-              ))}
-            </div>
+            <SettingsCenterNav
+              sections={sections}
+              activeSection={activeSection}
+              onSelectSection={setActiveSection}
+              t={t}
+            />
 
           </div>
 
@@ -199,13 +191,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
               )}
 
               {activeSection === 'skills' && (
-                <section className="settings-page settings-page-skills">
+                <section className="settings-page settings-page-skills" data-settings-search="skills">
                   <RuntimeScopePanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} kinds={['skill']} onChanged={runtime.setOverview} />
                 </section>
               )}
 
               {activeSection === 'agents' && (
-                <section className="settings-page settings-page-agents">
+                <section className="settings-page settings-page-agents" data-settings-search="agents">
                 <RuntimeScopePanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} kinds={['agent']} showResourceStrip={false} onChanged={runtime.setOverview} />
                 <AgentsSettings
                   settings={settings}
@@ -220,7 +212,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
               )}
 
               {activeSection === 'tools' && (
-                <section className="settings-page settings-page-tools">
+                <section className="settings-page settings-page-tools" data-settings-search="tools">
                 <RuntimeScopePanel overview={runtime.overview} scope={resourceScope} onScopeChange={setResourceScope} kinds={['mcp']} onChanged={runtime.setOverview} />
                 <McpTrustPanel overview={runtime.overview} onChanged={runtime.setOverview} />
                 <McpStatusDashboard />

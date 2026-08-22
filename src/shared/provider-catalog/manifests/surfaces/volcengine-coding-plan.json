@@ -366,6 +366,100 @@
       "factSourceId": "rdc-agent:volcengine-coding-plan:0"
     },
     {
+      "modelId": "doubao-seed-2.1-turbo",
+      "label": "doubao-seed-2.1-turbo",
+      "aliases": [],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 131072,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "volcengine",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v3",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "volcengine",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high"
+            },
+            "onMode": "enabled",
+            "onBudgetTokens": 4096,
+            "offMode": "disabled"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:volcengine-coding-plan:0"
+    },
+    {
       "modelId": "doubao-seed-code",
       "label": "doubao-seed-code",
       "aliases": [
@@ -385,6 +479,89 @@
         }
       ],
       "defaultBudgetTokens": 131072,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "volcengine",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v3",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "volcengine",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "reasoning": {
+          "kind": "unknown",
+          "supportsOff": false,
+          "levels": [],
+          "defaultState": "provider-managed",
+          "defaultSelection": "on",
+          "wireProfile": {
+            "kind": "none"
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:volcengine-coding-plan:0"
+    },
+    {
+      "modelId": "minimax-m3",
+      "label": "minimax-m3",
+      "aliases": [
+        "MiniMax-M3"
+      ],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 204800,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 204800,
       "toolCalling": {
         "state": "supported"
       },
@@ -620,8 +797,7 @@
       "modelId": "kimi-k2.7-code",
       "label": "kimi-k2.7-code",
       "aliases": [],
-      "availability": "unavailable",
-      "unavailableReason": "Unavailable in the user-observed Volcengine Ark Coding Plan control panel.",
+      "availability": "available",
       "contextTiers": [
         {
           "id": "default",
@@ -720,8 +896,7 @@
       "modelId": "kimi-k2.7-code-highspeed",
       "label": "kimi-k2.7-code-highspeed",
       "aliases": [],
-      "availability": "unavailable",
-      "unavailableReason": "Internal Fast variant unavailable in the user-observed Volcengine Ark Coding Plan control panel.",
+      "availability": "available",
       "contextTiers": [
         {
           "id": "default",
@@ -967,11 +1142,104 @@
       "factSourceId": "rdc-agent:volcengine-coding-plan:0"
     },
     {
-      "modelId": "glm-5.2",
-      "label": "glm-5.2",
+      "modelId": "glm-5.3",
+      "label": "glm-5.3",
       "aliases": [
         "glm-latest"
       ],
+      "availability": "available",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Default",
+          "maxPromptTokens": 1000000,
+          "maxTotalTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unsupported"
+      },
+      "structuredOutput": {
+        "state": "supported"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "maintained",
+      "route": {
+        "protocol": "AnthropicMessages",
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v1",
+        "source": "catalog"
+      },
+      "routeOptions": [
+        {
+          "id": "AnthropicMessages",
+          "route": {
+            "protocol": "AnthropicMessages",
+            "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v1",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "volcengine",
+          "protocolOwner": "anthropic"
+        },
+        {
+          "id": "OpenAICompatibleChatCompletions",
+          "route": {
+            "protocol": "OpenAICompatibleChatCompletions",
+            "baseUrl": "https://ark.cn-beijing.volces.com/api/coding/v3",
+            "source": "catalog"
+          },
+          "availability": "available",
+          "endpointOwner": "volcengine",
+          "protocolOwner": "openai"
+        }
+      ],
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "context1m": {
+          "state": "fixed",
+          "fixedValue": true,
+          "tierId": "default"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": true,
+          "levels": [
+            "high",
+            "max"
+          ],
+          "defaultSelection": "high",
+          "wireProfile": {
+            "kind": "anthropic",
+            "on": "high",
+            "levels": {
+              "high": "high",
+              "max": "max"
+            },
+            "onMode": "enabled",
+            "offMode": "disabled",
+            "onBudgetTokens": 4096
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:volcengine-coding-plan:0"
+    },
+    {
+      "modelId": "glm-5.2",
+      "label": "glm-5.2",
+      "aliases": [],
       "availability": "available",
       "contextTiers": [
         {
@@ -1788,15 +2056,96 @@
         }
       },
       "factSourceId": "rdc-agent:volcengine-coding-plan:0"
+    },
+    {
+      "modelId": "doubao-seed-2.1-turbo",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "minimal",
+              "low",
+              "medium",
+              "high"
+            ],
+            "defaultSelection": "medium",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "medium",
+              "levels": {
+                "minimal": "minimal",
+                "low": "low",
+                "medium": "medium",
+                "high": "high"
+              },
+              "onMode": "thinking-enabled",
+              "offMode": "thinking-disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:volcengine-coding-plan:0"
+    },
+    {
+      "modelId": "minimax-m3",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "always-on",
+            "supportsOff": false,
+            "levels": [],
+            "defaultSelection": "on",
+            "lockedSelection": "on",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "high",
+              "onMode": "thinking-enabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:volcengine-coding-plan:0"
+    },
+    {
+      "modelId": "glm-5.3",
+      "protocol": "OpenAICompatibleChatCompletions",
+      "patch": {
+        "controls": {
+          "reasoning": {
+            "kind": "levels",
+            "supportsOff": true,
+            "levels": [
+              "high",
+              "max"
+            ],
+            "defaultSelection": "high",
+            "wireProfile": {
+              "kind": "openai-compatible",
+              "on": "high",
+              "levels": {
+                "high": "high",
+                "max": "max"
+              },
+              "onMode": "thinking-enabled",
+              "offMode": "thinking-disabled"
+            }
+          }
+        }
+      },
+      "factSourceId": "rdc-agent:volcengine-coding-plan:0"
     }
   ],
   "recommendedModels": [
-    "doubao-seed-2.0-code",
-    "doubao-seed-2.0-pro",
-    "glm-5.2",
+    "doubao-seed-2.1-turbo",
+    "doubao-seed-2.0-lite",
+    "glm-5.3",
     "kimi-k2.7-code",
     "deepseek-v4-pro",
-    "minimax-m2.7"
+    "minimax-m3"
   ],
   "docsUrl": "https://www.volcengine.com/docs/82379/1928261"
 }

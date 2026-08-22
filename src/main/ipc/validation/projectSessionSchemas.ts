@@ -40,6 +40,14 @@ export const SessionIdOnlyArgsSchema = z.tuple([
   ipcId(128, 'sessionId'),
 ]);
 
+export const SessionSetModelOverrideArgsSchema = z.tuple([
+  ipcId(128, 'sessionId'),
+  z.object({
+    providerId: ipcNonEmptyString(128, 'providerId'),
+    modelId: ipcNonEmptyString(256, 'modelId'),
+  }).nullable(),
+]);
+
 
 export const SessionAttachmentsImportArgsSchema = z.tuple([
   ipcId(128, 'sessionId'),

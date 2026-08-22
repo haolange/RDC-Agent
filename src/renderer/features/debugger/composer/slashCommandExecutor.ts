@@ -5,12 +5,12 @@ import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type { AgentPermissionMode, AppTheme } from '@shared/types/settings';
 import { formatTokenCount } from '@shared/utils/tokens';
 import { translate } from '../../../i18n';
-import {
-  nextAgentDefinitionClientRevision,
-  useAppSettingsStore,
-} from '../../../stores/appSettingsStore';
+import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
+import { commitComposerModelChoice } from './sessionModelOverride';
+import { resolveComposerModelOverride } from './resolveComposerModelOverride';
+import { readComposerEffectiveModel } from './useComposerEffectiveModel';
 
 interface SlashCommandContext {
   currentSession: SessionRecord | null;
@@ -79,32 +79,23 @@ async function loadSession(sessionId: string, context: SlashCommandContext): Pro
 }
 
 async function switchModel(modelId: string, context: SlashCommandContext): Promise<void> {
-  const appSettingsStore = useAppSettingsStore.getState();
-  const settings = appSettingsStore.settings;
-  const matches = settings.agents.modelOptions.filter((option) => (
-    option.status === 'ready'
-    && (option.canonicalId === modelId || option.modelId === modelId)
-  ));
-  if (matches.length !== 1) {
-    if (matches.length > 1) {
-      context.showNotice(`Model id is ambiguous; use provider:model: ${modelId}`);
-      return;
-    }
-    context.showNotice(`Model is not configured or enabled: ${modelId}`);
-    context.openSettings('models');
+  const language = useAppSettingsStore.getState().settings.appearance.language;
+  const override = resolveComposerModelOverride(
+    modelId,
+    useAppSettingsStore.getState().settings.agents.modelOptions,
+  );
+  if (!override) {
+    context.showNotice(translate(language, 'composer.model.invalidArg'));
     return;
   }
-
-  const definition = settings.agents.definitions.find((entry) => entry.id === context.selectedAgentId);
-  if (!definition) {
-    context.showNotice(`Agent definition not found: ${context.selectedAgentId}`);
-    return;
+  const result = await commitComposerModelChoice(
+    override,
+    context.currentSession?.sessionId,
+    context.currentProject?.projectId,
+  );
+  if (!result.ok) {
+    context.showNotice(translate(language, 'composer.model.saveFailed'));
   }
-  const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = definition;
-  await appSettingsStore.saveAgentDefinition({
-    draft: { ...draft, models: [matches[0].canonicalId] },
-    clientRevision: nextAgentDefinitionClientRevision(),
-  });
 }
 
 async function handleUiAction(action: CommandUiAction, context: SlashCommandContext): Promise<void> {
@@ -249,7 +240,11 @@ export async function executeSlashCommand(input: string, context: SlashCommandCo
 
   try {
     const settings = useAppSettingsStore.getState().settings;
-    const currentRoute = settings.llm.agentRoutes.find((route) => route.agentId === context.selectedAgentId);
+    const effectiveModel = readComposerEffectiveModel(
+      context.selectedAgentId,
+      context.currentSession,
+      context.currentProject?.projectId,
+    );
     const response = await electronAPI.command.execute({
       input,
       context: {
@@ -258,7 +253,9 @@ export async function executeSlashCommand(input: string, context: SlashCommandCo
         workspaceRoot: context.currentProject?.rootPath,
         agentId: context.selectedAgentId,
         currentMode: context.selectedAgentId,
-        currentModelId: currentRoute?.modelId,
+        currentModelId: effectiveModel
+          ? `${effectiveModel.providerId}:${effectiveModel.modelId}`
+          : undefined,
         currentTheme: settings.appearance.theme,
       },
     });

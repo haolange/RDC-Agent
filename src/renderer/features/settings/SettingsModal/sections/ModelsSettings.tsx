@@ -18,7 +18,7 @@ interface ModelsSettingsProps {
 }
 
 export const ModelsSettings: React.FC<ModelsSettingsProps> = (props) => (
-  <section className="settings-page settings-page-models">
+  <section className="settings-page settings-page-models" data-settings-search="models">
     <div className="settings-models-page">
       <ProvidersSettings {...props} />
     </div>

@@ -62,7 +62,15 @@ export function useEffectiveModelCapability(
       }
 
       try {
-        const resolved = await electronAPI.settings.getEffectiveModel(agentId);
+        let resolved = await electronAPI.settings.getEffectiveModel(agentId);
+        if (
+          !resolved
+          || resolved.providerId !== routeProviderId
+          || resolved.modelId !== routeModelId
+        ) {
+          const catalog = await electronAPI.settings.getEffectiveCatalog(routeProviderId);
+          resolved = catalog?.models.find((model) => model.modelId === routeModelId) ?? null;
+        }
         if (cancelled || !requestGateRef.current.isCurrent(requestRevision)) return;
         const next = validateCapabilityResolution(
           { providerId: routeProviderId, modelId: routeModelId },

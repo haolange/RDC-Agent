@@ -157,6 +157,19 @@ composer-markdown-preview-empty
 composer-markdown-stage
 composer-markdown-tab
 composer-markdown-toolbar
+composer-model-badge
+composer-model-empty
+composer-model-group
+composer-model-group-label
+composer-model-item
+composer-model-item-label
+composer-model-item-meta
+composer-model-menu
+composer-model-pill
+composer-model-pill-caret
+composer-model-pill-label
+composer-model-popup
+composer-model-search
 composer-permission-menu
 composer-permission-menu-desc
 composer-permission-menu-item
@@ -265,6 +278,7 @@ conversation-bubble-user
 conversation-edit-actions
 conversation-edit-error
 conversation-edit-form
+conversation-edit-preview
 conversation-edit-textarea
 conversation-message
 conversation-message-assistant
@@ -678,6 +692,7 @@ settings-center-nav
 settings-center-nav-icon
 settings-center-nav-item
 settings-center-panel
+settings-center-search
 settings-center-sidebar
 settings-checkbox-row
 settings-choice-group
@@ -876,6 +891,9 @@ settings-runtime-scope-body--split
 settings-runtime-scope-head
 settings-runtime-scope-switch
 settings-save-status
+settings-search-result
+settings-search-result-section
+settings-search-results
 settings-secret-field
 settings-secret-input
 settings-secret-status
@@ -1011,6 +1029,8 @@ work-process-subagent-profile
 work-process-subagent-status
 work-process-subagent-summary
 work-process-summary
+work-process-summary-card
+work-process-summary-duration
 work-process-summary-line
 work-process-task
 work-process-task-content

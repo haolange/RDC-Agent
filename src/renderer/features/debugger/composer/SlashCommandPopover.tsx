@@ -93,6 +93,7 @@ export const SlashCommandPopover: React.FC<SlashCommandPopoverProps> = ({
           onMouseEnter={() => setSelectedIndex(idx)}
         >
           <span className="slash-command-name">/{cmd.name}</span>
+          <span className="slash-command-desc">{cmd.description}</span>
           <span className="slash-command-cat">{cmd.category}</span>
         </div>
       ))}

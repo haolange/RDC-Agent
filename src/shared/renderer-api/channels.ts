@@ -129,6 +129,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     rename: 'session:rename',
     remove: 'session:remove',
     select: 'session:select',
+    setModelOverride: 'session:setModelOverride',
     listAttachments: 'session:attachments:list',
     importAttachments: 'session:attachments:import',
   },

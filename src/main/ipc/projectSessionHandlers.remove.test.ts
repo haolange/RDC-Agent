@@ -15,6 +15,7 @@ const { handlers, syncSessionSlots, storage } = vi.hoisted(() => ({
 }));
 
 vi.mock('electron', () => ({
+  app: { getPath: () => process.cwd() },
   dialog: {},
   ipcMain: {
     handle: (channel: string, listener: (...args: unknown[]) => unknown) => {

@@ -31,6 +31,16 @@
       "accountScope": "observed-account",
       "surfaceBuild": "Codex Desktop 26.707.9981.0",
       "plan": "unrecorded"
+    },
+    {
+      "id": "rdc-agent:chatgpt-account:gpt56-long-context",
+      "sourceKind": "rdc-agent",
+      "sourceRevision": "https://github.com/openai/codex/blob/main/codex-rs/models-manager/models.json",
+      "observedAt": "2026-08-22",
+      "refreshedAt": "2026-08-22T03:40:00+08:00",
+      "surface": "chatgpt-account",
+      "accountScope": "observed-account",
+      "surfaceBuild": "Codex models.json max_context_window=872000 for gpt-5.6-sol/terra/luna"
     }
   ],
   "defaultFactSourceId": "rdc-agent:chatgpt-account:0",
@@ -86,14 +96,23 @@
         {
           "id": "default",
           "label": "Codex service limit",
-          "maxPromptTokens": 256000,
+          "maxPromptTokens": 272000,
           "activation": {
             "kind": "implicit"
           },
           "entitlement": "granted"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
         }
       ],
-      "defaultBudgetTokens": 256000,
+      "defaultBudgetTokens": 272000,
       "toolCalling": {
         "state": "supported"
       },
@@ -120,8 +139,10 @@
           "label": "Fast"
         },
         "context1m": {
-          "state": "unsupported",
-          "fixedValue": false
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "max",
+          "entitlement": "unknown"
         },
         "reasoning": {
           "kind": "levels",
@@ -183,7 +204,11 @@
           "entitlement": "granted"
         }
       ],
-      "factSourceId": "rdc-agent:chatgpt-account:0"
+      "factSourceId": "rdc-agent:chatgpt-account:0",
+      "fieldFactSourceIds": {
+        "contextTiers": "rdc-agent:chatgpt-account:gpt56-long-context",
+        "controls": "rdc-agent:chatgpt-account:gpt56-long-context"
+      }
     },
     {
       "modelId": "gpt-5.6-terra",
@@ -194,14 +219,23 @@
         {
           "id": "default",
           "label": "Codex service limit",
-          "maxPromptTokens": 256000,
+          "maxPromptTokens": 272000,
           "activation": {
             "kind": "implicit"
           },
           "entitlement": "granted"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
         }
       ],
-      "defaultBudgetTokens": 256000,
+      "defaultBudgetTokens": 272000,
       "toolCalling": {
         "state": "supported"
       },
@@ -228,8 +262,10 @@
           "label": "Fast"
         },
         "context1m": {
-          "state": "unsupported",
-          "fixedValue": false
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "max",
+          "entitlement": "unknown"
         },
         "reasoning": {
           "kind": "levels",
@@ -291,7 +327,11 @@
           "entitlement": "granted"
         }
       ],
-      "factSourceId": "rdc-agent:chatgpt-account:0"
+      "factSourceId": "rdc-agent:chatgpt-account:0",
+      "fieldFactSourceIds": {
+        "contextTiers": "rdc-agent:chatgpt-account:gpt56-long-context",
+        "controls": "rdc-agent:chatgpt-account:gpt56-long-context"
+      }
     },
     {
       "modelId": "gpt-5.6-luna",
@@ -302,14 +342,23 @@
         {
           "id": "default",
           "label": "Codex service limit",
-          "maxPromptTokens": 256000,
+          "maxPromptTokens": 272000,
           "activation": {
             "kind": "implicit"
           },
           "entitlement": "granted"
+        },
+        {
+          "id": "max",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "unknown"
         }
       ],
-      "defaultBudgetTokens": 256000,
+      "defaultBudgetTokens": 272000,
       "toolCalling": {
         "state": "supported"
       },
@@ -336,8 +385,10 @@
           "label": "Fast"
         },
         "context1m": {
-          "state": "unsupported",
-          "fixedValue": false
+          "state": "selectable",
+          "defaultValue": false,
+          "tierId": "max",
+          "entitlement": "unknown"
         },
         "reasoning": {
           "kind": "levels",
@@ -399,7 +450,11 @@
           "entitlement": "granted"
         }
       ],
-      "factSourceId": "rdc-agent:chatgpt-account:0"
+      "factSourceId": "rdc-agent:chatgpt-account:0",
+      "fieldFactSourceIds": {
+        "contextTiers": "rdc-agent:chatgpt-account:gpt56-long-context",
+        "controls": "rdc-agent:chatgpt-account:gpt56-long-context"
+      }
     },
     {
       "modelId": "gpt-5.5",

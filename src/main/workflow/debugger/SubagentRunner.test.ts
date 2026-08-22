@@ -25,6 +25,21 @@ vi.mock('../../settings/AgentManifestService', () => ({
   },
 }));
 
+vi.mock('../../settings/EffectiveModelResolver', () => ({
+  resolveEffectiveModel: (providerId: string, modelId: string) => {
+    if (providerId === 'openai' && modelId === 'gpt-5.6-sol') {
+      return {
+        providerId,
+        modelId,
+        enabled: true,
+        availability: 'available',
+        selection: { pickerVisibility: 'primary' },
+      };
+    }
+    return null;
+  },
+}));
+
 import { SubagentRunner } from './SubagentRunner';
 import { createSubagentBudgetState, type TurnHandle } from './TurnCoordinator';
 
@@ -224,5 +239,49 @@ describe('SubagentRunner', () => {
     const result = await tool.execute('tc-1', { task: 'do work', profile: 'ask' });
     expect(result.details).toMatchObject({ profile: 'ask', status: 'complete' });
     expect(result.content[0]).toMatchObject({ type: 'text', text: 'child done' });
+  });
+
+  it('rejects an invalid model without sending a child turn', async () => {
+    const sendProfileMessage = vi.fn(async () => 'should-not-run');
+    const runner = new SubagentRunner({
+      sendProfileMessage,
+      systemPromptForAgent: () => 'fallback',
+      getActiveTurn: () => null,
+    });
+    const result = await runner.runSubagent({
+      parentAgentId: 'debugger',
+      parentToolCallId: 'parent-tool',
+      targetProfile: 'ask',
+      task: 'inspect',
+      model: 'not-canonical',
+    });
+    expect(result.status).toBe('failed');
+    expect(result.text).toMatch(/MODEL_INVALID/);
+    expect(sendProfileMessage).not.toHaveBeenCalled();
+  });
+
+  it('forwards a resolved model override and does not inherit a parent session override', async () => {
+    const sendProfileMessage = vi.fn(async () => 'child done');
+    const runner = new SubagentRunner({
+      sendProfileMessage,
+      systemPromptForAgent: () => 'fallback',
+      getActiveTurn: () => null,
+    });
+    await runner.runSubagent({
+      parentAgentId: 'debugger',
+      parentToolCallId: 'parent-tool',
+      targetProfile: 'ask',
+      task: 'inspect',
+      parentSessionId: 'parent',
+      model: 'openai:gpt-5.6-sol',
+    });
+    expect(sendProfileMessage).toHaveBeenCalledWith(
+      'ask',
+      'inspect',
+      expect.objectContaining({
+        modelOverride: { providerId: 'openai', modelId: 'gpt-5.6-sol' },
+        sessionId: expect.stringContaining('::subagent::'),
+      }),
+    );
   });
 });

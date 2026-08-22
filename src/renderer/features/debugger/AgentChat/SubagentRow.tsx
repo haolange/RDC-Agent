@@ -45,10 +45,12 @@ const renderChildRow = (row: WorkProcessRow): React.ReactNode => {
   // 这里用简化渲染：tool/summary/diagnostic 各自轻量展示
   if (row.type === 'tool') {
     return (
-      <li key={row.id} className={`work-process-child-tool status-${row.status}`}>
-        <span className="work-process-child-verb">{row.verb}</span>
-        <span className="work-process-child-target">{row.target || row.toolName}</span>
-        {row.duration ? <span className="work-process-child-duration">{row.duration}</span> : null}
+      <li key={row.id} className={`work-process-tool-card work-process-child-tool status-${row.status}`}>
+        <span className="work-process-tool-card-header">
+          <span className="work-process-tool-card-verb work-process-child-verb">{row.verb}</span>
+          <span className="work-process-tool-card-meta work-process-child-target">{row.target || row.toolName}</span>
+          {row.duration ? <span className="work-process-child-duration">{row.duration}</span> : null}
+        </span>
       </li>
     );
   }

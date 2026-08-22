@@ -17,7 +17,7 @@ import {
 const fixtureRoot = path.join(__dirname, 'fixtures', 'provider-catalogs');
 const cases = [
   ['longcat', ['LongCat-2.0']],
-  ['opencode-zen', ['claude-opus-4-8', 'gpt-5.5', 'minimax-m3', 'qwen3.6-plus']],
+  ['opencode-zen', ['claude-opus-4-8', 'gemini-3.5-flash', 'gpt-5.5', 'minimax-m3', 'qwen3.6-plus']],
   ['together-ai', ['openai/gpt-oss-120b', 'Qwen/Qwen3-Coder']],
   ['fireworks-ai', ['accounts/fireworks/models/deepseek-v4-pro']],
   ['novita-ai', ['meta-llama/llama-3.3-70b-instruct']],
@@ -88,6 +88,7 @@ describe('data-only provider discovery fixtures', () => {
     expect(contributions.find((model) => model.modelId === 'claude-opus-4-8')?.route?.protocol).toBe('AnthropicMessages');
     expect(contributions.find((model) => model.modelId === 'qwen3.6-plus')?.route?.protocol).toBe('AnthropicMessages');
     expect(contributions.find((model) => model.modelId === 'minimax-m3')?.route?.protocol).toBe('OpenAICompatibleChatCompletions');
+    expect(contributions.find((model) => model.modelId === 'gemini-3.5-flash')?.route?.protocol).toBe('OpenAICompatibleChatCompletions');
   });
 
   it('treats a protocol-less candidate list as availability evidence without replacing model-owned routes', () => {

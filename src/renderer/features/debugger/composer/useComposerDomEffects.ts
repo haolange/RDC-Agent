@@ -4,9 +4,6 @@ import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import { assignDynStyle } from '../../../lib/useDynStyle';
 
 export function useComposerDomEffects(input: {
-  modeMenuOpen: boolean;
-  setModeMenuOpen: (open: boolean) => void;
-  modeMenuRef: RefObject<HTMLDivElement | null>;
   promptInputRef: RefObject<HTMLTextAreaElement | null>;
   currentMode: AgentMode;
   promptValue: string;
@@ -16,9 +13,6 @@ export function useComposerDomEffects(input: {
   setCurrentMode: (mode: AgentMode) => void;
 }): void {
   const {
-    modeMenuOpen,
-    setModeMenuOpen,
-    modeMenuRef,
     promptInputRef,
     currentMode,
     promptValue,
@@ -34,30 +28,6 @@ export function useComposerDomEffects(input: {
     setSelectedAgentId(fallback.id);
     setCurrentMode(fallback.id as AgentMode);
   }, [selectedAgentId, setCurrentMode, setSelectedAgentId, userInvocableAgents]);
-
-  useEffect(() => {
-    if (!modeMenuOpen) return;
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target as Node | null;
-      if (!modeMenuRef.current?.contains(target)) {
-        setModeMenuOpen(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setModeMenuOpen(false);
-      }
-    };
-
-    window.addEventListener('pointerdown', handlePointerDown);
-    window.addEventListener('keydown', handleEscape);
-    return () => {
-      window.removeEventListener('pointerdown', handlePointerDown);
-      window.removeEventListener('keydown', handleEscape);
-    };
-  }, [modeMenuOpen, modeMenuRef, setModeMenuOpen]);
 
   useEffect(() => {
     const textarea = promptInputRef.current;

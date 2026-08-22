@@ -83,11 +83,17 @@ describe('ProviderStateRefs', () => {
     expect(verifyProviderStateRef({ ...state!, value: 'response_2' })).toBe(false);
   });
 
+  it('reuses provider-managed state only when the effective model stays the same', () => {
+    const source = plan('model-a', 'provider-managed');
+    const state = createProviderStateRef(source, 'response_1');
+    expect(providerStateReuseReason(state, plan('model-a', 'provider-managed'))).toBe('reusable');
+  });
+
   it('enforces exact provider boundaries before applying cross-model policy', () => {
     const source = plan('model-a', 'provider-managed');
     const state = createProviderStateRef(source, 'response_1');
     const target = plan('model-b', 'provider-managed');
-    expect(providerStateReuseReason(state, target)).toBe('reusable');
+    expect(providerStateReuseReason(state, target)).toBe('model-mismatch');
 
     const otherEndpoint: RequestPlan = {
       ...target,

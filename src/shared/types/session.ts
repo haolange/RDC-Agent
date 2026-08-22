@@ -33,6 +33,11 @@ export interface ProjectRecord {
   lastSessionId?: string;
 }
 
+export interface SessionModelOverride {
+  providerId: string;
+  modelId: string;
+}
+
 export interface SessionRecord {
   sessionId: string;
   projectId: string;
@@ -43,6 +48,7 @@ export interface SessionRecord {
   updatedAt: number;
   lastRunId?: string;
   turnControls?: ConversationTurnControls;
+  modelOverride?: SessionModelOverride | null;
 }
 
 /** Explicit project/session ownership for stateful RDX operations and events. */

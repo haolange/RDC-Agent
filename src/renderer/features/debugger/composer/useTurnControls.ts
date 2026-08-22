@@ -13,6 +13,7 @@ import {
   resolvedCapability,
 } from './capabilityResolution';
 import { useEffectiveModelCapability } from './useEffectiveModelCapability';
+import { useComposerEffectiveModel } from './useComposerEffectiveModel';
 
 interface TurnControlsState {
   turnControls: ConversationTurnControls;
@@ -50,22 +51,23 @@ export function useTurnControls(agentId: string, currentSession: SessionRecord |
   const setCapabilityState = useTurnControlsStore((state) => state.setCapabilityState);
   const rememberControls = useTurnControlsStore((state) => state.rememberControls);
   const clearRememberedControls = useTurnControlsStore((state) => state.clearRememberedControls);
-  const routeFingerprint = useAppSettingsStore((state) => {
-    const route = state.settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
-    const provider = route
-      ? state.settings.llm.providers.find((entry) => entry.id === route.providerId)
-      : null;
-    const preference = provider?.models.find((entry) => entry.id === route?.modelId);
-    return route && provider
-      ? [
-          route.providerId,
-          route.modelId,
-          provider.activeAccountId ?? `anonymous:${provider.id}`,
-          provider.protocol,
-          preference?.preferredRouteOptionId ?? '',
-        ].join('\u001f')
-      : '';
-  });
+  const settings = useAppSettingsStore((state) => state.settings);
+  const { effective } = useComposerEffectiveModel(agentId, currentSession);
+  const providerId = effective?.providerId;
+  const modelId = effective?.modelId;
+  const provider = providerId
+    ? settings.llm.providers.find((entry) => entry.id === providerId)
+    : null;
+  const preference = provider?.models.find((entry) => entry.id === modelId);
+  const routeFingerprint = providerId && modelId && provider
+    ? [
+        providerId,
+        modelId,
+        provider.activeAccountId ?? `anonymous:${provider.id}`,
+        provider.protocol,
+        preference?.preferredRouteOptionId ?? '',
+      ].join('\u001f')
+    : '';
   const routeSyncState = useAppSettingsStore((state) => state.agentRouteSyncById[agentId]);
   const settingsHydrated = useAppSettingsStore((state) => state.hydrated);
   const sessionId = currentSession?.sessionId ?? null;

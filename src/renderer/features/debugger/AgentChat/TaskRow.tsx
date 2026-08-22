@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '../../../i18n';
 import type { WorkProcessRow } from './workProcessPresentation';
 
 interface TaskRowProps {
@@ -15,12 +16,15 @@ const TaskStateIcon: React.FC<{ status: string }> = ({ status }) => {
 
 /** A task event is rendered once as a compact Todo-like state row. */
 export const TaskRow: React.FC<TaskRowProps> = ({ row }) => {
+  const { t } = useI18n();
   const statusLabel = row.taskStatus === 'blocked'
-    ? row.taskStatusReason ? `Blocked · ${row.taskStatusReason}` : 'Blocked'
+    ? row.taskStatusReason
+      ? t('chat.workProcessTaskBlockedReason', { reason: row.taskStatusReason })
+      : t('chat.workProcessTaskBlocked')
     : row.taskStatus === 'in_progress'
-      ? 'In progress'
+      ? t('chat.workProcessTaskInProgress')
       : row.taskStatus === 'cancelled'
-        ? 'Cancelled'
+        ? t('chat.workProcessTaskCancelled')
         : '';
 
   return (

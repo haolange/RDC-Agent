@@ -41,7 +41,7 @@ export const HooksSettings: React.FC<{
   };
 
   return (
-    <section className="settings-page settings-page-hooks">
+    <section className="settings-page settings-page-hooks" data-settings-search="hooks">
       <RuntimeScopePanel
         overview={overview}
         scope={scope}

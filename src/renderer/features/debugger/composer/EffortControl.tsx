@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useComposerMenu } from './useComposerMenuRegistry';
 import type { ReasoningSelection } from '@shared/types/modelCapability';
 import { formatTokenCount } from '@shared/utils/tokens';
 import { useI18n } from '../../../i18n';
@@ -41,10 +42,11 @@ export const EffortControl: React.FC<{
 }> = ({ agentId, currentSession, disabled = false }) => {
   const { t } = useI18n();
   const { turnControls, capability, capabilityState, retryCapability, updateTurnControls } = useTurnControls(agentId, currentSession);
-  const [open, setOpen] = useState(false);
+  const menu = useComposerMenu('effort');
+  const open = menu.open;
   const [dragRatio, setDragRatio] = useState<number | null>(null);
   const [snapLevel, setSnapLevel] = useState<ReasoningSelection | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const dragActiveRef = useRef(false);
@@ -155,22 +157,13 @@ export const EffortControl: React.FC<{
     fastModelLabel: t('composer.effort.fastModel'),
     fastModelBadgeLabel: t('composer.effort.fastMultiplier'),
   });
-  const closeMenu = useCallback(() => setOpen(false), []);
-  useEffect(() => {
-    if (!open) return undefined;
-    const onPointer = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) closeMenu();
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') closeMenu();
-    };
-    window.addEventListener('pointerdown', onPointer);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('pointerdown', onPointer);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [closeMenu, open]);
+  const assignMenuRoot = useCallback((node: HTMLDivElement | null) => {
+    menuRef.current = node;
+    menu.setRoot(node);
+  }, [menu]);
+  const assignMenuTrigger = useCallback((node: HTMLButtonElement | null) => {
+    menu.setTrigger(node);
+  }, [menu]);
 
   const trackObserveKey = [
     capabilityStateLabel ?? '',
@@ -217,8 +210,9 @@ export const EffortControl: React.FC<{
   });
 
   return (
-    <div ref={menuRef} className="composer-effort-menu">
+    <div ref={assignMenuRoot} className="composer-effort-menu">
       <button
+        ref={assignMenuTrigger}
         type="button"
         className={`composer-effort-pill ${open ? 'open' : ''}${selectedLevel === 'max' ? ' is-level-max' : ''}`}
         data-testid="composer-effort-pill"
@@ -227,7 +221,7 @@ export const EffortControl: React.FC<{
         disabled={disabled}
         title={pillPresentation.title}
         aria-label={pillPresentation.title}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => menu.toggle()}
       >
         <span className="composer-effort-pill-icon" aria-hidden="true">
           <ReasoningLevelIcon level={selectedLevel} />

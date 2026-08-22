@@ -3,6 +3,7 @@ import type { ConversationMessage } from '@shared/types/conversation';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { ActiveSignalText } from '../../../ui/ActiveSignalText';
 import { useI18n } from '../../../i18n';
+import { Button } from '../../../ui/Button';
 import { useToolApprovalSubmit } from './useToolApprovalSubmit';
 
 export interface PendingToolApprovalRequest {
@@ -80,26 +81,32 @@ export const ToolApprovalRequestPanel: React.FC<{
       </div>
       <div className="composer-tool-approval-meta" aria-label="Approval context">
         <span>{request.toolName}</span>
-        <span>{request.risk} risk</span>
+        <span>{t((
+          {
+            low: 'composer.toolApprovalRisk.low',
+            medium: 'composer.toolApprovalRisk.medium',
+            high: 'composer.toolApprovalRisk.high',
+          } as const
+        )[request.risk])}</span>
         {request.reviewer ? <span>{request.reviewer}</span> : null}
       </div>
       <div className="composer-tool-approval-actions">
-        <button
-          type="button"
-          className="button button-secondary composer-tool-approval-deny"
+        <Button
+          variant="secondary"
+          className="composer-tool-approval-deny"
           disabled={isSubmitting}
           onClick={() => void submitDecision(false)}
         >
           {t('composer.toolApprovalDeny')}
-        </button>
-        <button
-          type="button"
-          className="button button-primary composer-tool-approval-approve"
+        </Button>
+        <Button
+          variant="primary"
+          className="composer-tool-approval-approve"
           disabled={isSubmitting}
           onClick={() => void submitDecision(true)}
         >
           {t('composer.toolApprovalApproveOnce')}
-        </button>
+        </Button>
       </div>
       {error ? (
         <p className="composer-user-input-error" role="alert">

@@ -32,7 +32,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
   t,
 }) => {
   return (
-    <section className="settings-page settings-page-general">
+    <section className="settings-page settings-page-general" data-settings-search="general">
       <div className="settings-general-grid settings-general-grid--rows">
         <div className="settings-general-top-row">
           <ProfileSettings
@@ -50,7 +50,7 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
               </div>
             </div>
             <div className="settings-preference-list settings-appearance-list">
-              <div className="settings-preference-row">
+              <div className="settings-preference-row" data-settings-search="language">
                 <div className="settings-preference-copy settings-option-block">
                   <div className="settings-field-label">{t('userMenu.language')}</div>
                 </div>

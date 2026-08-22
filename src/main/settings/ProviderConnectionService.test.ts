@@ -62,7 +62,13 @@ describe('resolveClineCatalogUrl', () => {
     expect(resolveClineCatalogUrl('https://api.cline.bot/api/v1/', 'pass')).toBe(
       'https://api.cline.bot/api/v1/ai/cline/recommended-models',
     );
+    expect(resolveClineCatalogUrl('https://api.cline.bot', 'pass')).toBe(
+      'https://api.cline.bot/api/v1/ai/cline/recommended-models',
+    );
     expect(resolveClineCredentialProbeUrl('https://api.cline.bot/api/v1')).toBe(
+      'https://api.cline.bot/api/v1/users/me',
+    );
+    expect(resolveClineCredentialProbeUrl('https://api.cline.bot')).toBe(
       'https://api.cline.bot/api/v1/users/me',
     );
   });

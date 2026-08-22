@@ -386,9 +386,11 @@ export class AgentOrchestrator {
       let routeMap = new Map(settings.llm.agentRoutes.map((route) => [route.agentId, route]));
       const routeAgentId = options?.routeAgentId ?? agentId;
       let route = routeMap.get(routeAgentId);
+      const modelOverride = options?.modelOverride ?? null;
       const frozenRequestPlan = options?.requestPlan;
       const credentialProviderId = frozenRequestPlan?.providerId
         ?? preparedTurn?.summary.route.providerId
+        ?? modelOverride?.providerId
         ?? route?.providerId;
       if (credentialProviderId && !preparedTurn && process.env.RDC_AGENT_TEST_MODE !== '1') {
         ownedCredentialHandle = await this.refreshProviderRuntimeCredentials(credentialProviderId);
@@ -412,8 +414,12 @@ export class AgentOrchestrator {
         : effectiveProfiles.filter((definition) => definition.enabled).map((definition) => definition.id);
       const config: AgentConfig = {
         ...fallbackConfig,
-        modelProvider: frozenRequestPlan?.providerId ?? route?.providerId ?? fallbackConfig.modelProvider,
-        modelName: frozenRequestPlan?.effectiveModelId ?? route?.modelId ?? fallbackConfig.modelName,
+        modelProvider: frozenRequestPlan?.providerId
+          ?? (modelOverride ? modelOverride.providerId : route?.providerId)
+          ?? fallbackConfig.modelProvider,
+        modelName: frozenRequestPlan?.effectiveModelId
+          ?? (modelOverride ? modelOverride.modelId : route?.modelId)
+          ?? fallbackConfig.modelName,
         systemPrompt: options?.systemPrompt || effectiveProfile?.instructions || fallbackConfig.systemPrompt,
         temperature: options?.temperature ?? fallbackConfig.temperature,
       };

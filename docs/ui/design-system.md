@@ -70,11 +70,19 @@ Session 右侧栏四张卡（Progress / Outputs / Context / Capture）的空态�
 - 语义：Progress=上升台阶（蓝→青→绿→琥珀，最高块带进行中光点）；Outputs=虚线收集框+悬浮玻璃文件；Context=异色玻璃节点发光连线网；Capture=玻璃 capture 卡+播放徽标+REC 点。文案保持一句 honest copy，图形不承载文字。
 - gradient/filter 的 `id` 必须带场景前缀（`rr-eg-<scene>-*`），保证四卡同屏唯一；不引入 svgr/图片资产双轨。
 
+## Transcript 卡壳
+
+审批卡、Work Process tool 卡、Asked 卡、Sub Agent 子行、Task 行与 Compact 摘要共用同一组变量（定义在 `design-system.css`）：`--transcript-card-radius` / `--transcript-card-padding` / `--transcript-card-border` / `--transcript-card-surface` / `--transcript-card-shadow`。禁止再为某一类卡另起一套 radius/padding/border/背景。
+
+## 模态尺寸
+
+知识中心与 Settings 用视窗比例驱动：约 `min(92vw, 1920px) × min(90vh, 1240px)`，带最小尺寸下限；960 堆叠，640 全屏。禁止再写互相覆盖的多段 media query。`--settings-content-max` 随大屏上调，避免内容挤在中间一条。
+
 ## 窄屏 Workbench
 
 - `<=720px` 时桌面工作区最小宽度必须解除，主区与 Composer 以真实 viewport 收缩，不得用 `overflow: hidden` 掩盖被裁掉的桌面宽度。
-- `<=480px` 时 Composer Footer 使用两层、每层不换行的工具栏：Attach / Agent / Permission 在第一层，Effort / Usage / Send 在第二层；所有控件必须可点击，不得互相覆盖。
-- Agent 菜单在窄屏锚定到 Composer 上方并完整位于 viewport 内；running 与 selected 分列，约 8px 状态点使用 semantic status token，`prefers-reduced-motion: reduce` 时停止动画。
+- `<=480px` 时 Composer Footer 使用两层、每层不换行的工具栏：Attach / Agent / Permission 在第一层，Model / Effort / Usage / Send 在第二层；所有控件必须可点击，不得互相覆盖。
+- Agent / Permission / Effort / Usage / Model 菜单在窄屏锚定到 Composer 上方并完整位于 viewport 内；同一时刻只开一个；running 与 selected 分列，约 8px 状态点使用 semantic status token，`prefers-reduced-motion: reduce` 时停止动画。
 - Browser 验收至少覆盖约 390px viewport、水平溢出、菜单 selected/running、键盘导航、Escape 焦点返回及 reduced-motion。
 
 ## 视觉参考

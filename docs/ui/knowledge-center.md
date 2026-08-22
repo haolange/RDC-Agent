@@ -1,6 +1,6 @@
 # Knowledge Center
 
-知识中心是 Workbench 左侧边栏底部、用户条上方的常驻入口，打开比 Settings 更大的毛玻璃模态，浏览 User space 与全部已注册 Project 的 `knowledge/` markdown 卡片。
+知识中心是 Workbench 左侧边栏底部、用户条上方的常驻入口，打开视窗比例驱动的毛玻璃模态（约 `min(92vw, 1920px) × min(90vh, 1240px)`，带最小尺寸下限；窄屏堆叠/全屏），浏览 User space 与全部已注册 Project 的 `knowledge/` markdown 卡片。
 
 ## 产品边界
 

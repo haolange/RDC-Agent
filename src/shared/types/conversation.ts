@@ -74,7 +74,8 @@ export type ConversationMessageDiagnosticCode =
   | 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
   | 'CONVERSATION_LLM_REQUEST_FAILED'
   | 'CONVERSATION_AGENT_LOOP_STALLED'
-  | 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED';
+  | 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED'
+  | 'MODEL_CONTINUATION_DROPPED';
 
 export interface ConversationMessageDiagnostic {
   code: ConversationMessageDiagnosticCode;
@@ -239,6 +240,7 @@ export interface ConversationSendRequest {
     agentId: string;
     agentCommitHash?: string;
     providerId?: string;
+    modelId?: string;
     providerCommitHash?: string;
     providerCatalogRevision?: string;
     routeRevision?: string;
