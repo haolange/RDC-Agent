@@ -112,12 +112,11 @@ describe('canonical renderer API', () => {
     const transport = new RecordingTransport();
     const api = createRendererApi('win32', transport);
 
+    await api.appShell.copyText('copied');
+    await api.appShell.readClipboardText();
     await api.settings.set({ appearance: { language: 'en' } });
     await api.settings.getModelsOverride();
     await api.settings.setModelsOverride({ schemaVersion: 1, providers: {} });
-    await api.terminal.listTabs();
-    await api.terminal.createTab({ sessionId: 'session-1' });
-    await api.terminal.write('terminal-1', 'dir\r');
     await api.memory.issueApprovalToken({ action: 'memory.write', scope: 'user' });
     await api.memory.list('user');
     await api.command.execute({ input: '/help' });
@@ -135,12 +134,11 @@ describe('canonical renderer API', () => {
     await api.rdxRuntime.testHook('tool.before-call', 'D:\\project', 'hook-1');
 
     expect(transport.invocations.map(({ channel }) => channel)).toEqual([
+      'app:copyText',
+      'app:readClipboardText',
       'settings:set',
       'settings:getModelsOverride',
       'settings:setModelsOverride',
-      'terminal:listTabs',
-      'terminal:createTab',
-      'terminal:write',
       'memory:issueApprovalToken',
       'memory:list',
       'command:execute',

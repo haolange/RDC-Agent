@@ -311,6 +311,18 @@ export class StorageAdapter implements StorageHost {
     return this.context.writeSessionUsage(sessionId, usage);
   }
 
+  getSessionShellStatePath(sessionId: string): string | null {
+    return this.context.getSessionShellStatePath(sessionId);
+  }
+
+  readSessionShellCwd(sessionId: string): string | null {
+    return this.context.readSessionShellCwd(sessionId);
+  }
+
+  writeSessionShellCwd(sessionId: string, cwd: string): void {
+    return this.context.writeSessionShellCwd(sessionId, cwd);
+  }
+
   writeSessionContextJournal(sessionId: string, entries: SessionContextTurnEntry[]): void {
     return this.context.writeSessionContextJournal(sessionId, entries);
   }

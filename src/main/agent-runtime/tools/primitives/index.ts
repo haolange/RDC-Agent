@@ -1,7 +1,7 @@
 /**
  * Primitive 工具集合统一导出。
  */
-export { bashTool } from './BashTool';
+export { shellTool } from './ShellTool';
 export { readFileTool } from './ReadFileTool';
 export { readImageTool } from './ReadImageTool';
 export { codeInterpreterTool } from './CodeInterpreterTool';
@@ -12,11 +12,11 @@ export { grepTool } from './GrepTool';
 export { gitAddTool, gitCommitTool, gitDiffTool, gitLogTool, gitStatusTool, gitUnstageTool } from './GitTool';
 export { webFetchTool, webSearchTool } from './WebTools';
 export { assertTextReadable, truncateOutput } from './_shared';
-export { matchBashHardDeny } from './bashHardDeny';
+export { matchShellHardDeny } from './shellHardDeny';
 export * from './toolLimits';
 
 import type { AgentTool } from '../../agent/AgentTool';
-import { bashTool } from './BashTool';
+import { shellTool } from './ShellTool';
 import { readFileTool } from './ReadFileTool';
 import { readImageTool } from './ReadImageTool';
 import { codeInterpreterTool } from './CodeInterpreterTool';
@@ -32,7 +32,7 @@ import { notebookEditTool } from '../system';
 /** 获取所有内置 primitive 工具。 */
 export function getPrimitiveTools(): AgentTool[] {
   return [
-    bashTool as unknown as AgentTool,
+    shellTool as unknown as AgentTool,
     readFileTool as unknown as AgentTool,
     readImageTool as unknown as AgentTool,
     writeFileTool as unknown as AgentTool,

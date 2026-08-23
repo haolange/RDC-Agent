@@ -3,7 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import type { AgentTool } from '../../agent/AgentTool';
 import { requireMutationWorkspaceRoot, truncateOutput } from './_shared';
-import { BASH_MAX_OUTPUT_BYTES } from './toolLimits';
+import { SHELL_MAX_OUTPUT_BYTES } from './toolLimits';
 import { processSupervisor } from '../../../runtime/ProcessSupervisor';
 import { settingsService } from '../../../settings/SettingsService';
 import { recordToolImagePreview } from '../../../conversation/ToolImagePreviewStore';
@@ -91,15 +91,15 @@ export const codeInterpreterTool: AgentTool<InterpreterParams, InterpreterDetail
       isolateProcessGroup: process.platform !== 'win32',
       timeoutMs: settings.timeoutMs,
       abortSignal: signal,
-      ringBufferBytes: BASH_MAX_OUTPUT_BYTES * 2,
+      ringBufferBytes: SHELL_MAX_OUTPUT_BYTES * 2,
     });
     supervised.child.stdout?.on('data', (chunk: Buffer | string) => {
       stdout += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
-      onUpdate?.({ content: [{ type: 'text', text: truncateOutput(stdout, BASH_MAX_OUTPUT_BYTES) }] });
+      onUpdate?.({ content: [{ type: 'text', text: truncateOutput(stdout, SHELL_MAX_OUTPUT_BYTES) }] });
     });
     supervised.child.stderr?.on('data', (chunk: Buffer | string) => {
       stdout += typeof chunk === 'string' ? chunk : chunk.toString('utf8');
-      onUpdate?.({ content: [{ type: 'text', text: truncateOutput(stdout, BASH_MAX_OUTPUT_BYTES) }] });
+      onUpdate?.({ content: [{ type: 'text', text: truncateOutput(stdout, SHELL_MAX_OUTPUT_BYTES) }] });
     });
     const info = await supervised.join(settings.timeoutMs);
     stdout = supervised.stdout.toString() || stdout;
@@ -110,7 +110,7 @@ export const codeInterpreterTool: AgentTool<InterpreterParams, InterpreterDetail
       : [];
     const failed = info.reason !== 'exit' || info.code !== 0;
     const content: Array<{ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string }> = [
-      { type: 'text', text: truncateOutput(combined || (failed ? '[interpreter failed]' : '[ok]'), BASH_MAX_OUTPUT_BYTES) },
+      { type: 'text', text: truncateOutput(combined || (failed ? '[interpreter failed]' : '[ok]'), SHELL_MAX_OUTPUT_BYTES) },
     ];
     if (context?.visionInputMode === 'native') {
       for (const preview of imagePreviews) {
@@ -127,7 +127,7 @@ export const codeInterpreterTool: AgentTool<InterpreterParams, InterpreterDetail
         language: 'python',
         exitCode: info.code,
         durationMs: Date.now() - startedAt,
-        truncated: Buffer.byteLength(combined, 'utf8') > BASH_MAX_OUTPUT_BYTES,
+        truncated: Buffer.byteLength(combined, 'utf8') > SHELL_MAX_OUTPUT_BYTES,
         cwd,
         artifactsDir,
         imagePreviews,

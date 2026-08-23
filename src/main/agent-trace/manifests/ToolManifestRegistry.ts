@@ -9,7 +9,7 @@ const PRIMITIVE_MANIFESTS: ToolManifest[] = [
     renderer: { key: 'tool.file.read', defaultCollapsed: true, supportsPreview: true, supportsRawJson: true },
   },
   {
-    toolName: 'bash',
+    toolName: 'shell',
     displayName: '运行命令',
     category: 'shell',
     renderer: { key: 'tool.shell.run', defaultCollapsed: false, supportsPreview: true, supportsRawJson: true },

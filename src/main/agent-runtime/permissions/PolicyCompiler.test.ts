@@ -12,12 +12,12 @@ import {
 describe('PolicyCompiler', () => {
   it('compiles deniedTools, approval floors, and limits', () => {
     const compiled = compilePolicyFromRestrictive({
-      deniedTools: ['Bash', 'web-search'],
+      deniedTools: ['Shell', 'web-search'],
       approval: 'mutation',
       approvalFloorByTool: { read_file: 'user' },
       limits: { maxTurns: 12, maxToolCalls: 40, maxSubagents: 2, maxChildDepth: 3, maxWallTimeMs: 60000 },
     });
-    expect(isToolDeniedByPolicy(compiled, 'bash')).toBe(true);
+    expect(isToolDeniedByPolicy(compiled, 'shell')).toBe(true);
     expect(isToolDeniedByPolicy(compiled, 'web_search')).toBe(true);
     expect(isToolDeniedByPolicy(compiled, 'read_file')).toBe(false);
     expect(compiled.approvalFloorByTool.read_file).toBe('user');

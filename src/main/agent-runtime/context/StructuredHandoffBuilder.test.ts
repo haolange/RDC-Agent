@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentMessage, AssistantMessage } from '../core/types';
 import {
-  buildDerivedContextView,
+  assembleDerivedContextView,
   computeContextSourceHash,
   createStructuredHandoffMessage,
+  parseModelHandoffSections,
+  serializeHandoffSourceTranscript,
+  testHandoffSections,
 } from './StructuredHandoffBuilder';
 
 const assistant = (): AssistantMessage => ({
@@ -27,7 +30,7 @@ const assistant = (): AssistantMessage => ({
 });
 
 describe('StructuredHandoffBuilder', () => {
-  it('creates a deterministic, typed, redacted projection without reasoning artifacts', () => {
+  it('serializes a redacted transcript without reasoning artifacts', () => {
     const messages: AgentMessage[] = [
       {
         role: 'user',
@@ -44,9 +47,43 @@ describe('StructuredHandoffBuilder', () => {
         timestamp: 3,
       },
     ];
-    const before = structuredClone(messages);
-    const options = {
-      scope: 'session' as const,
+    const transcript = serializeHandoffSourceTranscript(messages);
+    expect(transcript).not.toContain('secret-value');
+    expect(transcript).not.toContain('bearer-secret');
+    expect(transcript).not.toContain('url-secret');
+    expect(transcript).not.toContain('private chain detail');
+    expect(transcript).toContain('REDACTED');
+    expect(transcript).toContain('read_file');
+  });
+
+  it('parses model-generated sections and assembles a typed view', () => {
+    const messages: AgentMessage[] = [
+      { role: 'user', content: 'Inspect the capture.', timestamp: 1 },
+      assistant(),
+    ];
+    const sections = parseModelHandoffSections([
+      '## Goal',
+      'Inspect the capture.',
+      '## Constraints',
+      '- Must not leak secrets',
+      '## Progress',
+      '### Done',
+      '- Opened the file',
+      '### In Progress',
+      '- Reading events',
+      '### Blocked',
+      '- Need replay device',
+      '## Key Decisions',
+      '- Use the latest capture',
+      '## Errors and Failed Attempts',
+      '- First read failed',
+      '## Next Steps',
+      '- Verify output',
+      '## Critical Context',
+      '- See D:\\Captures\\scene.rdc',
+    ].join('\n'));
+    const view = assembleDerivedContextView(messages, {
+      scope: 'session',
       sessionId: 'session-1',
       branchId: 'branch-1',
       sourceTurnIds: ['turn-1'],
@@ -54,38 +91,38 @@ describe('StructuredHandoffBuilder', () => {
       createdAt: 10,
       maxFactsPerGroup: 4,
       maxResourceRefs: 8,
-    };
-    const first = buildDerivedContextView(messages, options);
-    const second = buildDerivedContextView(messages, options);
-    const serialized = JSON.stringify(first.handoff);
-
-    expect(first).toEqual(second);
-    expect(messages).toEqual(before);
-    expect(first.sourceHash).toBe(computeContextSourceHash(messages, ['turn-1']));
-    expect(serialized).not.toContain('secret-value');
-    expect(serialized).not.toContain('bearer-secret');
-    expect(serialized).not.toContain('url-secret');
-    expect(serialized).not.toContain('tool-secret');
-    expect(serialized).not.toContain('private chain detail');
-    expect(serialized).toContain('REDACTED');
-    expect(first.handoff.resourceRefs).toEqual(expect.arrayContaining([
+      sections,
+    });
+    expect(view.handoff.derivation).toBe('model-generated');
+    expect(view.handoff.objective).toContain('Inspect the capture');
+    expect(view.handoff.progress?.blocked[0]?.text).toContain('replay device');
+    expect(view.handoff.failedAttempts?.[0]?.text).toContain('First read failed');
+    expect(view.sourceHash).toBe(computeContextSourceHash(messages, ['turn-1']));
+    expect(JSON.stringify(view.handoff)).not.toContain('tool-secret');
+    expect(JSON.stringify(view.handoff)).not.toContain('private chain detail');
+    expect(view.handoff.resourceRefs).toEqual(expect.arrayContaining([
       expect.objectContaining({ kind: 'tool-call', value: 'read_file' }),
       expect.objectContaining({ kind: 'path', value: expect.stringContaining('scene.rdc') }),
     ]));
-
-    const message = createStructuredHandoffMessage(first);
-    expect(message.derivedContext).toEqual({
-      viewId: first.viewId,
-      handoffId: first.handoff.handoffId,
-      sourceHash: first.sourceHash,
-    });
+    const message = createStructuredHandoffMessage(view);
     expect(message.content).toContain('[Derived context; not a user request]');
+    expect(message.derivedContext).toEqual({
+      viewId: view.viewId,
+      handoffId: view.handoff.handoffId,
+      sourceHash: view.sourceHash,
+    });
   });
 
   it('supports a minimal non-expanding projection candidate', () => {
-    const view = buildDerivedContextView(
+    const view = assembleDerivedContextView(
       [{ role: 'user', content: 'Objective only', timestamp: 1 }],
-      { scope: 'ephemeral', createdAt: 1, maxFactsPerGroup: 0, maxResourceRefs: 0 },
+      {
+        scope: 'ephemeral',
+        createdAt: 1,
+        maxFactsPerGroup: 0,
+        maxResourceRefs: 0,
+        sections: testHandoffSections('Objective only'),
+      },
     );
     expect(view.handoff.decisions).toEqual([]);
     expect(view.handoff.constraints).toEqual([]);

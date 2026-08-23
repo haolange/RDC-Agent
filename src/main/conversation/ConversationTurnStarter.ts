@@ -386,11 +386,15 @@ export async function startProfileTurn(
       branchId,
       preparedContext: preparedTurn.summary,
     });
-    const previousPrepared = excludeTurnId && sessionIdForBranch
-      ? persistedHistoryBeforeCommit.find((entry) => (
-        entry.turnId === excludeTurnId && entry.role === 'assistant' && entry.preparedContext
-      ))?.preparedContext
-      : undefined;
+    const previousPrepared = !sessionIdForBranch
+      ? undefined
+      : excludeTurnId
+        ? persistedHistoryBeforeCommit.find((entry) => (
+          entry.turnId === excludeTurnId && entry.role === 'assistant' && entry.preparedContext
+        ))?.preparedContext
+        : [...persistedHistoryBeforeCommit].reverse().find((entry) => (
+          entry.role === 'assistant' && entry.preparedContext && entry.status === 'complete'
+        ))?.preparedContext;
     continuationNotice = previousPrepared && shouldAnnounceContinuationDrop(previousPrepared, planning.plan)
       ? createContinuationDropNotice({
           requestId,

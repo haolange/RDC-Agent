@@ -86,6 +86,16 @@ Session 右侧栏四张卡（Progress / Outputs / Context / Capture）的空态�
 
 知识中心与 Settings 用视窗比例驱动：约 `min(92vw, 1920px) × min(90vh, 1240px)`，带最小尺寸下限；960 堆叠，640 全屏。禁止再写互相覆盖的多段 media query。`--settings-content-max` 随大屏上调，避免内容挤在中间一条。
 
+## 右键上下文菜单
+
+全应用文本面使用自绘 `ContextMenu`（`src/renderer/ui/ContextMenu`），不走原生 `Menu.popup`，以保证 Browser / Desktop parity。
+
+- 背景 `--token-bg-overlay`，边框 `--token-border-card`，阴影 `--token-shadow-popover`，hover `--token-interactive-hover`，灰项 `--token-text-disabled`，分隔线 `--token-border-muted`，层级 `--z-popover`。
+- 可编辑区：撤销 / 重做 / 剪切 / 复制 / 粘贴 / 粘贴并清理格式 / 全选；只读区：复制 / 全选。快捷键按平台显示 `Ctrl` 或 `⌘`。
+- 定位走 `useDynStyle`（CSP `style-src-attr 'none'`）；靠近视口右/下边缘翻转；约 390px 必须完整在 viewport 内。
+- `role="menu"` + `role="menuitem"`；Arrow / Home / End / Enter / Escape；Escape 把焦点还给原元素；`prefers-reduced-motion` 下不播入场动画。
+- 侧栏 Session/Project 自有菜单用 `data-owns-context-menu` 排除。
+
 ## 窄屏 Workbench
 
 - `<=720px` 时桌面工作区最小宽度必须解除，主区与 Composer 以真实 viewport 收缩，不得用 `overflow: hidden` 掩盖被裁掉的桌面宽度。

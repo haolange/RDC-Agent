@@ -57,6 +57,23 @@ jobs:
       - run: pnpm run check:contracts
       - run: pnpm run build
 
+  macos-shell:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.0'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm exec vitest run src/main/runtime src/main/agent-runtime/tools/primitives
+
   launcher-fresh-checkout:
     strategy:
       fail-fast: false

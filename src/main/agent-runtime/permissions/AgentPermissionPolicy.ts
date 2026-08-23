@@ -5,11 +5,13 @@ import type { CompiledPolicy } from '@shared/types/rdxRuntime';
 import type { AgentTool } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
 import { settingsService } from '../../settings/SettingsService';
-import { matchBashHardDeny } from '../tools/primitives/bashHardDeny';
+import { matchShellHardDeny } from '../tools/primitives/shellHardDeny';
 import {
-  bashAstAnalyzer,
   matchesDeniedCommandPrefix,
-} from './BashAstAnalyzer';
+  shellCommandRiskAnalyzer,
+} from './ShellCommandRiskAnalyzer';
+import { resolveConfiguredShell } from '../../runtime/resolveConfiguredShell';
+import type { ShellKind } from '../../runtime/ShellResolver';
 import {
   isToolDeniedByPolicy,
   resolvePolicyApprovalFloor,
@@ -55,18 +57,37 @@ const MUTATION_TOOLS = new Set([
   'code_interpreter',
 ]);
 const NETWORK_TOOL_NAMES = new Set(['web_fetch', 'web_search']);
-const DEFAULT_ROUTINE_COMMAND_PREFIXES = [
+const WINDOWS_ROUTINE_COMMAND_PREFIXES = [
   'dir',
   'ls',
   'type',
+  'get-childitem',
+  'get-content',
+  'get-location',
+  'pwd',
+  'echo',
+  'write-output',
+  'select-string',
+  'git status',
+  'git diff',
+  'git show',
+  'git log',
+  'rg',
+  'node scripts/check-',
+  'pnpm run check:',
+  'pnpm run typecheck',
+];
+
+const POSIX_ROUTINE_COMMAND_PREFIXES = [
+  'ls',
   'cat',
   'pwd',
   'head',
   'tail',
-  'findstr',
-  'find ',
-  'where',
   'echo',
+  'find',
+  'which',
+  'where',
   'git status',
   'git diff',
   'git show',
@@ -202,14 +223,27 @@ function isCommandDeniedByRule(command: string, permissions: AgentPermissionSett
 }
 
 function isCommandAllowedByRule(command: string, permissions: AgentPermissionSettings): boolean {
-  const normalized = command.trim().toLowerCase();
-  return permissions.allowedCommandPrefixes.some((prefix) => normalized.startsWith(prefix.trim().toLowerCase()));
+  return permissions.allowedCommandPrefixes.some((prefix) => matchesDeniedCommandPrefix(command, prefix));
+}
+
+function routineCommandPrefixes(): string[] {
+  const kind = resolveShellKind();
+  return kind === 'pwsh' || kind === 'windows-powershell'
+    ? WINDOWS_ROUTINE_COMMAND_PREFIXES
+    : POSIX_ROUTINE_COMMAND_PREFIXES;
 }
 
 function isRoutineCommand(command: string, permissions: AgentPermissionSettings): boolean {
   if (isCommandAllowedByRule(command, permissions)) return true;
-  const normalized = command.trim().toLowerCase();
-  return DEFAULT_ROUTINE_COMMAND_PREFIXES.some((prefix) => normalized.startsWith(prefix));
+  return routineCommandPrefixes().some((prefix) => matchesDeniedCommandPrefix(command, prefix));
+}
+
+function resolveShellKind(): ShellKind {
+  try {
+    return resolveConfiguredShell().kind;
+  } catch {
+    return process.platform === 'win32' ? 'pwsh' : 'bash';
+  }
 }
 
 function isDangerousCommand(command: string): boolean {
@@ -299,17 +333,12 @@ export class AgentPermissionPolicyService {
       return denied(`Policy deniedTools blocked tool "${input.toolCall.name}".`, 'high');
     }
 
-    // Catastrophic bash patterns are hard-denied in every mode, including full-access.
-    if (toolName === 'bash') {
+    // Catastrophic shell patterns are hard-denied in every mode, including full-access.
+    if (toolName === 'shell') {
       const command = extractStringArg(input.toolCall, 'command');
-      const hardDeny = matchBashHardDeny(command);
+      const hardDeny = matchShellHardDeny(command, resolveShellKind());
       if (hardDeny) {
         return denied(`Shell command hard-denied (matched "${hardDeny}").`, 'high');
-      }
-      // Structural / AST risk classifier (not a security boundary).
-      const analysis = bashAstAnalyzer.analyze(command);
-      if (analysis.risk === 'critical') {
-        return denied(`Shell risk classifier denied: ${analysis.reason}`, 'high');
       }
     }
 
@@ -334,7 +363,7 @@ export class AgentPermissionPolicyService {
       return { action: 'allow', risk: 'low', temporaryPathRoots: ['*'] };
     }
 
-    if (toolName === 'bash' && isCommandDeniedByRule(extractStringArg(input.toolCall, 'command'), permissions)) {
+    if (toolName === 'shell' && isCommandDeniedByRule(extractStringArg(input.toolCall, 'command'), permissions)) {
       return denied('Custom policy denied this command prefix (word-boundary match).');
     }
 
@@ -366,13 +395,13 @@ export class AgentPermissionPolicyService {
       );
     }
 
-    if (toolName === 'bash') {
+    if (toolName === 'shell') {
       const command = extractStringArg(input.toolCall, 'command');
       if (!command) return denied('Shell command is empty.', 'medium');
       if (isCommandAllowedByRule(command, permissions)) {
         return { action: 'allow', risk: 'low', temporaryPathRoots: [] };
       }
-      const analysis = bashAstAnalyzer.analyze(command);
+      const analysis = shellCommandRiskAnalyzer.analyze(command);
       if (analysis.risk === 'high' || isDangerousCommand(command)) {
         return request(mode, `Shell command requires review: ${command}`, 'high');
       }

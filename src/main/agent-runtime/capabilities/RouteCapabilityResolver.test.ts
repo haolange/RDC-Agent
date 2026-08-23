@@ -6,8 +6,11 @@ import type { ProviderReasoningContract } from '@shared/provider-catalog/modelMa
 import {
   claimStructuredToolCallingEvidence,
   describeRouteCapabilityDiagnostic,
+  isExplicitStructuredToolCallingRejection,
   resolveAgentRouteCapability,
+  type StructuredToolCallingEvidenceGate,
 } from './RouteCapabilityResolver';
+import { ProviderHttpError } from '../providers/internal/http';
 
 const provider = {
   id: 'test-provider',
@@ -134,18 +137,20 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
       .toBe('unknown');
   });
 
-  it('fails closed for unknown tools (text-only, not native-structured)', () => {
+  it('fails closed for unknown tools with a distinct unverified diagnostic', () => {
     const capability = resolveAgentRouteCapability(provider, 'model-a', model());
     expect(capability).toMatchObject({
       toolCallingMode: 'text-only',
+      toolCallingEvidence: 'unknown',
       toolCallingUnverified: false,
     });
     expect(describeRouteCapabilityDiagnostic(capability, 3)).toEqual({
-      code: 'route_tool_calling_unsupported',
+      code: 'route_tool_calling_unknown',
       severity: 'warning',
-      message: expect.stringContaining('explicitly does not support'),
+      message: expect.stringContaining('has not confirmed native tool calling'),
       surface: 'work-process',
     });
+    expect(describeRouteCapabilityDiagnostic(capability, 3)?.message).not.toContain('explicitly does not support');
   });
 
   it('fails closed for unknown vision and uses prompt fallback for unknown structured output', () => {
@@ -162,6 +167,7 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
       structuredOutput: { state: 'supported' },
     }))).toMatchObject({
       toolCallingMode: 'text-only',
+      toolCallingEvidence: 'unsupported',
       toolCallingUnverified: false,
       visionInputMode: 'native',
       structuredOutputMode: 'native',
@@ -175,6 +181,7 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
       model({ toolCalling: { state: 'supported' } }),
     )).toMatchObject({
       toolCallingMode: 'native-structured',
+      toolCallingEvidence: 'supported',
       toolCallingUnverified: false,
     });
   });
@@ -217,16 +224,24 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
     });
   });
 
-  it('claims observed evidence only once for a structured adapter tool-call end event', () => {
-    const capability = {
-      ...resolveAgentRouteCapability(provider, 'model-a', model({ toolCalling: { state: 'supported' } })),
-      toolCallingUnverified: true,
-    };
-    const gate = { recorded: false };
+  it('claims observed evidence only after a native tool-call and successful tool-result', () => {
+    const capability = resolveAgentRouteCapability(provider, 'model-a', model({
+      toolCalling: { state: 'supported' },
+    }));
+    const gate: StructuredToolCallingEvidenceGate = { recorded: false };
     expect(claimStructuredToolCallingEvidence('text_delta', capability, gate)).toBe(false);
-    expect(claimStructuredToolCallingEvidence('toolcall_end', capability, gate)).toBe(true);
     expect(claimStructuredToolCallingEvidence('toolcall_end', capability, gate)).toBe(false);
+    expect(gate.sawStructuredToolCall).toBe(true);
+    expect(claimStructuredToolCallingEvidence('tool_execution_end', capability, gate)).toBe(true);
+    expect(claimStructuredToolCallingEvidence('tool_execution_end', capability, gate)).toBe(false);
     expect(gate.recorded).toBe(true);
+  });
+
+  it('does not claim evidence from a tool result without a prior structured tool-call', () => {
+    const capability = resolveAgentRouteCapability(provider, 'model-a', model({
+      toolCalling: { state: 'supported' },
+    }));
+    expect(claimStructuredToolCallingEvidence('tool_execution_end', capability, { recorded: false })).toBe(false);
   });
 
   it('does not treat text-only tool-shaped output as capability evidence', () => {
@@ -244,9 +259,39 @@ describe('resolveAgentRouteCapability effective-state policy', () => {
       toolCalling: { state }, visionInput: { state }, structuredOutput: { state },
     }))).toMatchObject({
       toolCallingMode: tools,
+      toolCallingEvidence: state,
       toolCallingUnverified: unverified,
       visionInputMode: vision,
       structuredOutputMode: structured,
     });
+  });
+
+  it('classifies only explicit tool-parameter rejections as unsupported evidence', () => {
+    expect(isExplicitStructuredToolCallingRejection(
+      new ProviderHttpError('openai', 400, 'this model does not support tools'),
+    )).toBe(true);
+    expect(isExplicitStructuredToolCallingRejection(
+      new ProviderHttpError('openai', 429, 'this model does not support tools'),
+    )).toBe(false);
+    expect(isExplicitStructuredToolCallingRejection(
+      new ProviderHttpError('openai', 503, 'unknown parameter: tools'),
+    )).toBe(false);
+    expect(isExplicitStructuredToolCallingRejection(
+      new ProviderHttpError('openai', 400, 'insufficient_quota'),
+    )).toBe(false);
+    expect(isExplicitStructuredToolCallingRejection(
+      new ProviderHttpError(
+        'openai-responses',
+        400,
+        'Client-side tools for multi-agent models require beta access',
+      ),
+    )).toBe(true);
+    expect(isExplicitStructuredToolCallingRejection(
+      new ProviderHttpError(
+        'anthropic-messages',
+        400,
+        'The parameter `max_tokens` specified in the request is not valid',
+      ),
+    )).toBe(false);
   });
 });

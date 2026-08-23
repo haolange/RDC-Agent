@@ -129,15 +129,21 @@ if (connectionSource.includes("provider.id === 'moonshot'")) {
 
 const contractTests = [
   'src/shared/provider-catalog/compiler.test.ts',
+  'src/shared/provider-catalog/agentToolCapabilityAudit.test.ts',
+  'src/shared/utils/agentToolCapability.test.ts',
   'src/shared/utils/modelControls.test.ts',
   'src/main/settings/RequestPlanner.test.ts',
   'src/main/settings/RequestPlanner.catalogOutput.test.ts',
   'src/main/settings/EffectiveModelResolver.test.ts',
+  'src/main/conversation/ConversationRoutePreflight.test.ts',
+  'src/main/settings/AgentManifestService.seed.test.ts',
   'src/main/settings/ProviderConnectionService.test.ts',
   'src/main/settings/ProviderRouteUrl.test.ts',
   'src/main/settings/ProviderCapabilityContract.test.ts',
   'src/main/settings/LiveProviderCatalogParsers.test.ts',
   'src/main/settings/CopilotBilling.test.ts',
+  'src/main/settings/EffectiveCatalogService.test.ts',
+  'src/main/testing/contracts/providerWireFixture.test.ts',
 ];
 const vitest = path.join(repoRoot, 'node_modules/vitest/vitest.mjs');
 const result = spawnSync(process.execPath, [vitest, 'run', ...contractTests], {
@@ -147,5 +153,13 @@ const result = spawnSync(process.execPath, [vitest, 'run', ...contractTests], {
 });
 if (result.error) fail(result.error.message);
 if (result.status !== 0) process.exit(result.status ?? 1);
+
+const toolCapability = spawnSync(process.execPath, [path.join(repoRoot, 'scripts/check-agent-tool-capability.mjs')], {
+  cwd: repoRoot,
+  env: process.env,
+  stdio: 'inherit',
+});
+if (toolCapability.error) fail(toolCapability.error.message);
+if ((toolCapability.status ?? 1) !== 0) process.exit(toolCapability.status ?? 1);
 
 console.log('[provider-system] compiled Catalog, control resolution, discovery, route, and wire contracts passed.');

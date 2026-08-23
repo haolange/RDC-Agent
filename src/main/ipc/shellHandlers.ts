@@ -197,4 +197,11 @@ export function registerShellHandlers(): void {
     clipboard.writeText(text ?? '');
     return { success: true };
   });
+
+  ipcMain.handle('app:readClipboardText', async (_event, ...rawArgs: unknown[]) => {
+    parseIpcArgs(EmptyArgsSchema, rawArgs, {
+      label: 'app:readClipboardText',
+    });
+    return { success: true, text: clipboard.readText() };
+  });
 }

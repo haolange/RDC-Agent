@@ -89,7 +89,7 @@ Fast、1M 和 reasoning 的执行方式只在 `ExecutionBinding` 中声明一次
 
 最具体 selector 胜出；同等具体度冲突在编译期失败。Fast 为 model variant 时，target 只存在于 `model-switch` action；Fast 为 service tier 或 request patch 时不改变模型 ID。Reasoning Max 可以是普通 wire effort，也可以由 `reasoning=max` binding 切换真实模型。固定 1M 始终解析为开启且 disabled；unsupported 始终关闭且 disabled。
 
-`ModelSelection.pickerVisibility` 与 execution role 解耦。Doubao Lite 可以既是 primary model，又作为其他模型的执行 target；Kimi highspeed、Opus Fast 等纯内部 target 才隐藏。关联必须来自 live metadata 或精确 manifest fact，禁止后缀猜测。
+`ModelSelection.pickerVisibility` 与 execution role 解耦。Doubao Lite 可以既是 primary model，又作为其他模型的执行 target；Kimi highspeed、Opus Fast 等纯内部 target 才隐藏。关联必须来自 live metadata 或精确 manifest fact，禁止后缀猜测。Agent/Composer 可执行集合再叠加共享 `isAgentToolExecutableModel` gate：只有 source-backed `toolCalling.supported` 且 route 有已实现 structured-tool adapter 的模型可被选择；Settings catalog 仍展示完整事实。
 
 `ResolvedModelControls` 由 UI 与 Planner 共用。selectable control 若没有执行路径、target 缺失或 denied、route 不兼容，则统一解析为 `blocked`；Composer 与发送阶段必须返回相同原因。`RequestPlan` 记录 selected/effective model、adapter、binding IDs、protocol、catalog/route revision 与公开 wire patch。
 
@@ -168,7 +168,7 @@ Connection Test、Connect 与已配置 Refresh 共用同一条 credential-scoped
 | `google-gemini` | GoogleGemini | http |
 | `google-vertex-anthropic` | GoogleVertexAnthropic | http |
 | `google-vertex-gemini` | GoogleVertexGemini | http |
-| `mistral-conversations` | MistralConversations | http |
+| `mistral-conversations` | MistralConversations | http（无 selectable surface；保持不可选） |
 | `ollama-openai-compatible` | OllamaOpenAICompatibleChatCompletions | http |
 | `openai-compatible` | OpenAICompatibleChatCompletions | http |
 | `openai-responses` | OpenAIResponses | http |
@@ -178,7 +178,7 @@ Connection Test、Connect 与已配置 Refresh 共用同一条 credential-scoped
 
 Phase 7 新增的三个 HAL adapter：
 
-- **Mistral Conversations**（`MistralProvider.ts`）：适配 Mistral Conversations API 协议，支持 `conversation_id` 续接与 SSE 流式。
+- **Mistral Conversations**（`MistralProvider.ts`）：adapter 源码仍在，但当前没有 compiled selectable surface；产品面保持不可选，不得把它写成已上线续接能力。
 - **Azure OpenAI Responses**（`AzureOpenAIResponsesProvider.ts`）：适配 Azure OpenAI Responses API，支持 API version 查询参数、deployment 路径与 Azure AD 认证。
 - **Bedrock Converse Stream**（`BedrockConverseProvider.ts`）：适配 AWS Bedrock Converse Stream API，使用 SigV4 签名、`cachePoint` 缓存标记与原生 SSE 事件流解析。
 

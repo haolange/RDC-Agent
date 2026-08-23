@@ -94,7 +94,7 @@ describe('ContextUsageIndicator', () => {
       }),
     );
     expect(idle).toContain('title="contextBreakdown.noUsageYet 1M"');
-    expect(idle).toContain('composer-usage-ring-threshold');
+    expect(idle).not.toContain('composer-usage-ring-threshold');
   });
 
   it('shows a projected percent after the selected model window changes', () => {

@@ -10,9 +10,13 @@ import { readdirSync, readFileSync, statSync } from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
+import { PROTOCOL_WIRE_FIXTURE_COVERAGE } from '@shared/provider-catalog/protocolWireFixtureCoverage';
 import type { LlmProviderProtocol } from '@shared/types/settings';
 import type { ProviderAdapterId } from '@shared/provider-catalog/implementationRegistry';
 import type { RequestPlan } from '@shared/types/providerCapability';
+import { buildProviderOperationTarget } from '../../agent-runtime/providers/ProviderOperationRegistry';
+import { buildAnthropicMessagesUrl } from '../../agent-runtime/providers/AnthropicProvider';
+import { buildGeminiStreamUrl } from '../../agent-runtime/providers/GeminiProvider';
 import { createTestRequestPlan } from '../createTestRequestPlan';
 import type { Context, Model } from '../../agent-runtime/core/types';
 import { EventStream } from '../../agent-runtime/core/EventStream';
@@ -61,6 +65,7 @@ interface AdapterFixtureSpec {
   transport: StreamTransport;
   providerId: string;
   modelId: string;
+  connectionValues?: Readonly<Record<string, string>>;
 }
 
 const ADAPTER_FIXTURES: readonly AdapterFixtureSpec[] = [
@@ -144,6 +149,71 @@ const ADAPTER_FIXTURES: readonly AdapterFixtureSpec[] = [
     transport: 'sse',
     providerId: 'amazon-bedrock',
     modelId: 'fixture-bedrock',
+  },
+  {
+    dir: 'azure-openai-chat',
+    adapterId: 'azure-openai-chat',
+    protocol: 'AzureOpenAIChatCompletions',
+    streamFile: 'stream.sse',
+    transport: 'sse',
+    providerId: 'azure',
+    modelId: 'fixture-azure-chat',
+  },
+  {
+    dir: 'openrouter-chat',
+    adapterId: 'openrouter-chat',
+    protocol: 'OpenRouterChatCompletions',
+    streamFile: 'stream.sse',
+    transport: 'sse',
+    providerId: 'openrouter',
+    modelId: 'fixture-openrouter',
+  },
+  {
+    dir: 'google-vertex-gemini',
+    adapterId: 'google-vertex-gemini',
+    protocol: 'GoogleVertexGemini',
+    streamFile: 'stream.sse',
+    transport: 'sse',
+    providerId: 'google-vertex',
+    modelId: 'fixture-vertex-gemini',
+  },
+  {
+    dir: 'google-vertex-anthropic',
+    adapterId: 'google-vertex-anthropic',
+    protocol: 'GoogleVertexAnthropic',
+    streamFile: 'stream.sse',
+    transport: 'sse',
+    providerId: 'google-vertex-anthropic',
+    modelId: 'fixture-vertex-anthropic',
+  },
+  {
+    dir: 'gitlab-duo',
+    adapterId: 'gitlab-duo',
+    protocol: 'GitLabDuo',
+    streamFile: 'stream.jsonl',
+    transport: 'jsonl',
+    providerId: 'gitlab',
+    modelId: 'fixture-duo',
+  },
+  {
+    dir: 'sap-ai-core-orchestration',
+    adapterId: 'sap-ai-core-orchestration',
+    protocol: 'SapAiCoreOrchestration',
+    streamFile: 'stream.jsonl',
+    transport: 'jsonl',
+    providerId: 'sap-ai-core',
+    modelId: 'fixture-sap-orchestration',
+    connectionValues: { AICORE_DEPLOYMENT_ID: 'fixture-deployment' },
+  },
+  {
+    dir: 'sap-ai-core-foundation-models',
+    adapterId: 'sap-ai-core-foundation-models',
+    protocol: 'SapAiCoreFoundationModels',
+    streamFile: 'stream.jsonl',
+    transport: 'jsonl',
+    providerId: 'sap-ai-core',
+    modelId: 'fixture-sap-foundation',
+    connectionValues: { AICORE_DEPLOYMENT_ID: 'fixture-deployment' },
   },
 ];
 
@@ -351,6 +421,49 @@ function assertTextAndToolCall(spec: AdapterFixtureSpec, events: Record<string, 
       expect(JSON.stringify(events)).toMatch(/read_file/);
       break;
     }
+    case 'azure-openai-chat':
+    case 'openrouter-chat': {
+      const hasText = events.some((event) => {
+        const choice = (event.choices as Array<Record<string, unknown>> | undefined)?.[0];
+        const delta = choice?.delta as Record<string, unknown> | undefined;
+        return typeof delta?.content === 'string' && delta.content.length > 0;
+      });
+      const hasTool = events.some((event) => {
+        const choice = (event.choices as Array<Record<string, unknown>> | undefined)?.[0];
+        const delta = choice?.delta as Record<string, unknown> | undefined;
+        return Array.isArray(delta?.tool_calls) && delta.tool_calls.length > 0;
+      });
+      expect(hasText).toBe(true);
+      expect(hasTool).toBe(true);
+      break;
+    }
+    case 'google-vertex-gemini': {
+      const parts = events.flatMap((event) => {
+        const candidate = (event.candidates as Array<Record<string, unknown>> | undefined)?.[0];
+        const content = candidate?.content as Record<string, unknown> | undefined;
+        return (content?.parts as Array<Record<string, unknown>> | undefined) ?? [];
+      });
+      expect(parts.some((part) => typeof part.text === 'string')).toBe(true);
+      expect(parts.some((part) => part.functionCall && typeof part.functionCall === 'object')).toBe(true);
+      break;
+    }
+    case 'google-vertex-anthropic': {
+      const types = events.map((event) => event.type);
+      expect(types).toContain('content_block_start');
+      expect(types).toContain('content_block_delta');
+      expect(events.some((event) => {
+        const block = event.content_block as Record<string, unknown> | undefined;
+        return block?.type === 'tool_use' || block?.type === 'text';
+      })).toBe(true);
+      break;
+    }
+    case 'gitlab-duo':
+    case 'sap-ai-core-orchestration':
+    case 'sap-ai-core-foundation-models': {
+      expect(events.some((event) => event.type === 'text-delta')).toBe(true);
+      expect(events.some((event) => event.type === 'tool-call')).toBe(true);
+      break;
+    }
     default:
       throw new Error(`Unhandled fixture dir: ${spec.dir}`);
   }
@@ -425,12 +538,72 @@ function assertWireBody(spec: AdapterFixtureSpec, plan: RequestPlan): void {
       expect(messages.some((message) => message.role === 'user')).toBe(true);
       break;
     }
+    case 'azure-openai-chat': {
+      const messages = openAICompatibleTesting.toOpenAIMessages(FIXTURE_CONTEXT, plan);
+      expect(messages.some((message) => message.role === 'user')).toBe(true);
+      expect(openAICompatibleTesting.buildChatCompletionsUrl(plan.route.baseUrl ?? '', {
+        'api-version': '2024-10-21',
+      })).toMatch(/\/chat\/completions\?api-version=/);
+      break;
+    }
+    case 'openrouter-chat': {
+      const messages = openAICompatibleTesting.toOpenAIMessages(FIXTURE_CONTEXT, plan);
+      expect(messages.some((message) => message.role === 'user')).toBe(true);
+      expect(openAICompatibleTesting.buildChatCompletionsUrl(plan.route.baseUrl ?? '')).toMatch(/\/chat\/completions$/);
+      break;
+    }
+    case 'google-vertex-gemini': {
+      const { systemInstruction, contents } = geminiTesting.toGeminiContents(FIXTURE_CONTEXT, plan);
+      expect(systemInstruction).toBe('Stay precise.');
+      expect(contents[0]).toMatchObject({ role: 'user' });
+      expect(buildGeminiStreamUrl(plan.route.baseUrl ?? '', spec.modelId, 'unused', 'vertex'))
+        .toMatch(/:streamGenerateContent\?alt=sse$/);
+      break;
+    }
+    case 'google-vertex-anthropic': {
+      const { system, messages } = anthropicTesting.toAnthropicMessages(FIXTURE_CONTEXT, plan);
+      expect(typeof system === 'string' || Array.isArray(system)).toBe(true);
+      expect(messages.some((message) => message.role === 'user')).toBe(true);
+      expect(buildAnthropicMessagesUrl(plan.route.baseUrl ?? '', spec.modelId, 'vertex'))
+        .toMatch(/:streamRawPredict$/);
+      break;
+    }
+    case 'gitlab-duo':
+    case 'sap-ai-core-orchestration':
+    case 'sap-ai-core-foundation-models': {
+      const target = buildProviderOperationTarget({
+        adapterId: spec.adapterId,
+        protocol: spec.protocol,
+        baseUrl: plan.route.baseUrl ?? 'https://example.test',
+        modelId: spec.modelId,
+        connectionValues: spec.connectionValues,
+      });
+      expect(target.transport).toBe('sdk');
+      if (spec.dir === 'gitlab-duo') {
+        expect(target.url).toMatch(/duo_workflows\/ws/);
+      } else if (spec.dir === 'sap-ai-core-orchestration') {
+        expect(target.url).toMatch(/\/inference\/deployments\/fixture-deployment\/v2\/completion$/);
+      } else {
+        expect(target.url).toMatch(/\/inference\/deployments\/fixture-deployment\/chat\/completions$/);
+      }
+      break;
+    }
     default:
       throw new Error(`Unhandled fixture dir: ${spec.dir}`);
   }
 }
 
 describe('providerWireFixture matrix', () => {
+  it('covers every native protocol in the shared fixture map', () => {
+    const dirs = new Set(ADAPTER_FIXTURES.map((spec) => spec.dir));
+    for (const [protocol, coverage] of Object.entries(PROTOCOL_WIRE_FIXTURE_COVERAGE)) {
+      expect(dirs.has(coverage.dir), protocol).toBe(true);
+      expect(ADAPTER_FIXTURES.some((spec) => (
+        spec.protocol === protocol && spec.adapterId === coverage.adapterId
+      ))).toBe(true);
+    }
+  });
+
   it('keeps a closed fixture tree for every required adapter', () => {
     const dirs = readdirSync(FIXTURE_ROOT).filter((name) => {
       try {

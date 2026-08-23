@@ -651,7 +651,7 @@ describe('buildWorkProcessPresentation', () => {
         result: { status: 'complete', outputPhase: 'commentary', toolCallIds: ['ok', 'failed', 'skipped'] },
         toolCalls: [
           { id: 'ok', toolName: 'read_file', status: 'complete', startedAt: now, completedAt: now + 1 },
-          { id: 'failed', toolName: 'bash', status: 'error', error: 'exit 1', startedAt: now + 2, completedAt: now + 3 },
+          { id: 'failed', toolName: 'shell', status: 'error', error: 'exit 1', startedAt: now + 2, completedAt: now + 3 },
           { id: 'skipped', toolName: 'web_search', status: 'skipped', startedAt: now + 4, completedAt: now + 5 },
         ],
         startedAt: now,
@@ -725,7 +725,7 @@ describe('buildWorkProcessPresentation', () => {
           toolCalls: [
             {
               id: 'tool-git',
-              toolName: 'bash',
+              toolName: 'shell',
               status: 'error',
               argsPreview: JSON.stringify({ command: 'git rev-parse --show-toplevel' }),
               resultPreview: JSON.stringify({
@@ -890,21 +890,21 @@ describe('buildWorkProcessPresentation', () => {
     expect(buildWorkProcessPresentation(trace)).toEqual(buildWorkProcessPresentation(trace));
   });
 
-  it('unwraps bash envelope into shell content-layer preview without ok/trace_id', () => {
+  it('unwraps shell envelope into shell content-layer preview without ok/trace_id', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'complete',
       updatedAt: now + 500,
       blocks: [
         {
-          id: 'runtime-loop-bash',
+          id: 'runtime-loop-shell',
           kind: 'llm_turn',
           title: 'LLM turn',
           status: 'complete',
-          result: { text: 'Checked types.', status: 'complete', toolCallIds: ['tool-bash'] },
+          result: { text: 'Checked types.', status: 'complete', toolCallIds: ['tool-shell'] },
           toolCalls: [
             {
-              id: 'tool-bash',
-              toolName: 'bash',
+              id: 'tool-shell',
+              toolName: 'shell',
               status: 'complete',
               argsPreview: JSON.stringify({ command: 'npm run typecheck' }),
               resultPreview: JSON.stringify({
@@ -914,7 +914,7 @@ describe('buildWorkProcessPresentation', () => {
                   details: { command: 'npm run typecheck', exitCode: 0, durationMs: 120 },
                 },
                 duration_ms: 120,
-                trace_id: 'tool-bash',
+                trace_id: 'tool-shell',
               }),
               startedAt: now,
               completedAt: now + 120,
@@ -926,22 +926,22 @@ describe('buildWorkProcessPresentation', () => {
       ],
     });
 
-    const bashRow = flattenWorkRows(presentation.rows).find(
-      (row) => row.type === 'tool' && row.toolName === 'bash',
+    const shellRow = flattenWorkRows(presentation.rows).find(
+      (row) => row.type === 'tool' && row.toolName === 'shell',
     );
-    expect(bashRow).toMatchObject({
+    expect(shellRow).toMatchObject({
       type: 'tool',
       family: 'shell',
       previewKind: 'shell',
       commandText: 'npm run typecheck',
     });
-    if (!bashRow || bashRow.type !== 'tool') throw new Error('expected bash tool row');
-    const preview = bashRow.previewLines.join('\n');
+    if (!shellRow || shellRow.type !== 'tool') throw new Error('expected shell tool row');
+    const preview = shellRow.previewLines.join('\n');
     expect(preview).toContain('Found 0 errors.');
     expect(preview).not.toContain('trace_id');
     expect(preview).not.toContain('duration_ms');
     expect(preview).not.toMatch(/"ok"\s*:/);
-    expect(bashRow.rawLines.join('\n')).toContain('trace_id');
+    expect(shellRow.rawLines.join('\n')).toContain('trace_id');
   });
 
   it('projects skill_read as a short description plus path chip, not full markdown', () => {
@@ -1194,10 +1194,10 @@ describe('buildWorkProcessPresentation', () => {
           toolCalls: [], startedAt: now, completedAt: now + 5,
         },
         {
-          id: 'loop-bash', kind: 'llm_turn', title: 'LLM turn', status: 'complete',
-          result: { text: 'ran', status: 'complete', toolCallIds: ['bash-1'] },
+          id: 'loop-shell', kind: 'llm_turn', title: 'LLM turn', status: 'complete',
+          result: { text: 'ran', status: 'complete', toolCallIds: ['shell-1'] },
           toolCalls: [{
-            id: 'bash-1', toolName: 'bash', status: 'complete',
+            id: 'shell-1', toolName: 'shell', status: 'complete',
             argsPreview: JSON.stringify({ command: 'dir' }),
             resultPreview: JSON.stringify({ ok: true, data: { content: [{ type: 'text', text: 'ok' }] } }),
             startedAt: now + 10, completedAt: now + 20,

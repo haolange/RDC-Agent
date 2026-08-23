@@ -1,7 +1,7 @@
 ---
 name: verify
 description: Verify a change through repository checks and the real product surface affected by it.
-allowed-tools: [read_file, glob, grep, bash]
+allowed-tools: [read_file, glob, grep, shell]
 ---
 
 # Verify

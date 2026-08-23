@@ -33,9 +33,9 @@ describe('ScopedResourceResolver', () => {
   it('merges only tighter project policy', () => {
     const resolver = new ScopedResourceResolver();
     expect(resolver.tightenPolicy(
-      { deniedTools: ['bash'], approval: 'destructive', limits: { maxTurns: 20 } },
+      { deniedTools: ['shell'], approval: 'destructive', limits: { maxTurns: 20 } },
       { deniedTools: ['web_search'], approval: 'all', limits: { maxTurns: 10 } },
-    )).toEqual({ deniedTools: ['bash', 'web_search'], approval: 'all', limits: { maxTurns: 10 } });
+    )).toEqual({ deniedTools: ['shell', 'web_search'], approval: 'all', limits: { maxTurns: 10 } });
     expect(() => resolver.tightenPolicy(
       { approval: 'mutation', limits: { maxTurns: 10 } },
       { approval: 'none', limits: { maxTurns: 20 } },

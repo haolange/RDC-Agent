@@ -39,12 +39,10 @@ import type {
   ConversationSwitchBranchRequest,
   ConversationSwitchBranchResult,
 } from '@shared/types/conversationBranch';
-import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
 import type { AgentRole } from '@shared/types/agent';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { AppMode, SessionRecord } from '@shared/types/session';
 import { generateEventId } from '@shared/utils/id';
-import { resolveCompactionThresholdTokens } from '@shared/utils/contextBudget';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
@@ -52,10 +50,9 @@ import { traceService } from '../agent-trace/TraceService';
 import { replayDeviceService } from '../captures/ReplayDeviceService';
 import { rdxSessionService } from '../sessions';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import { resolveCompactionPercentForSession } from '../settings/compactionPercent';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 import { sessionContextJournal } from './SessionContextJournal';
-import type { DerivedContextView } from '@shared/types/semanticContext';
+import { compactConversationHistory } from './ConversationHistoryCompaction';
 import {
   createDefaultBranchState,
   normalizeBranchId,
@@ -80,9 +77,6 @@ import {
   publishTraceProjection,
   ephemeralTraceSessionId,
 } from './ConversationTurnTerminal';
-import { upsertWorkBlock } from './ConversationWorkTrace';
-import { nowMs } from '@shared/utils/id';
-
 
 interface ConversationContextInput extends ConversationSendRequest {
   fallbackProjectId?: string | null;
@@ -178,59 +172,8 @@ export class ConversationService {
     return nextHistory;
   }
 
-  async compactHistory(sessionId: string): Promise<{
-    messages: ConversationMessage[];
-    contextView: DerivedContextView | null;
-    occupiedTokens: number;
-    compactionThresholdTokens: number;
-  }> {
-    const history = storageAdapter.readConversationHistory(sessionId);
-    const branchState = this.readRepairedBranchState(sessionId, history);
-    const visibleMessages = branchState
-      ? resolveVisibleConversationMessages(history, branchState)
-      : history;
-    const journalTurnIds = new Set(sessionContextJournal.readEntries(sessionId).map((entry) => entry.turnId));
-    const visibleTurnIds = Array.from(new Set(
-      visibleMessages
-        .map((message) => message.turnId)
-        .filter((turnId) => journalTurnIds.has(turnId)),
-    ));
-    const usage = storageAdapter.readSessionUsage(sessionId);
-    const occupiedTokens = usage?.occupiedTokens ?? 0;
-    const compactionThresholdTokens = typeof usage?.compactionThresholdTokens === 'number'
-      && usage.compactionThresholdTokens > 0
-      ? usage.compactionThresholdTokens
-      : typeof usage?.promptBudgetTokens === 'number' && usage.promptBudgetTokens > 0
-        ? resolveCompactionThresholdTokens(
-          usage.promptBudgetTokens,
-          resolveCompactionPercentForSession(sessionId),
-        )
-        : 0;
-    const contextView = sessionContextJournal.createDerivedView(
-      sessionId,
-      visibleTurnIds,
-      branchState?.activeLeafBranchId ?? ROOT_BRANCH_ID,
-      { occupiedTokens, compactionThresholdTokens },
-    );
-    const lastAssistant = [...history].reverse().find((message) => message.role === 'assistant');
-    if (lastAssistant) {
-      lastAssistant.workTrace = upsertWorkBlock(lastAssistant.workTrace, `compaction-manual-${nowMs()}`, {
-        kind: 'compaction',
-        title: '手动压缩',
-        stage: 'context',
-        status: 'complete',
-        summary: '手动压缩',
-        compactionStats: {
-          provenance: 'manual',
-          messagesBefore: visibleMessages.length,
-          tokensBefore: occupiedTokens,
-        },
-        completedAt: nowMs(),
-      });
-      storageAdapter.writeConversationHistory(sessionId, history);
-      publishConversationTrace(sessionId, history, sessionId, publishTraceProjection);
-    }
-    return { messages: history, contextView, occupiedTokens, compactionThresholdTokens };
+  compactHistory(sessionId: string) {
+    return compactConversationHistory(sessionId);
   }
   async cancelActiveTurn(
     request: ConversationCancelActiveTurnRequest = {},

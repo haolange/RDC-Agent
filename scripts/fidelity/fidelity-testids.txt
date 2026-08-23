@@ -45,7 +45,6 @@ composer-permission-pill
 composer-skill-chip
 composer-tool-approval-panel
 composer-usage-indicator
-composer-usage-ring-threshold
 composer-user-input-panel
 context-breakdown
 context-breakdown-bar-threshold

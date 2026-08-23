@@ -7,6 +7,20 @@ vi.mock('electron', () => ({
   },
 }));
 
+vi.mock('../../runtime/resolveConfiguredShell', () => ({
+  resolveConfiguredShell: () => ({
+    executable: 'pwsh',
+    kind: 'pwsh',
+    version: '7.5.1',
+  }),
+}));
+
+vi.mock('../../sessions/StorageAdapter', () => ({
+  storageAdapter: {
+    readSessionShellCwd: () => null,
+  },
+}));
+
 vi.mock('../../settings/SettingsService', () => ({
   settingsService: {
     getAll: () => ({
@@ -103,6 +117,7 @@ vi.mock('../../agent-runtime/capabilities/RouteCapabilityResolver', () => ({
     reasoningDelivery: 'none',
     supportsStreaming: true,
     supportsToolResults: true,
+    toolCallingEvidence: 'supported',
     toolCallingUnverified: false,
     visionInputMode: 'disabled',
     structuredOutputMode: 'native',
@@ -171,7 +186,7 @@ describe('PromptPlanForTurn', () => {
       projectRootPath: 'D:/Project',
       providerId: 'p',
       modelId: 'm',
-      toolAllowlist: ['bash'],
+      toolAllowlist: ['shell'],
       contextWindowTokens: 1000,
       capability: {
         providerId: 'p',

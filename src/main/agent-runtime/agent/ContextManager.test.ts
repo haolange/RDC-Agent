@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { ContextManager, estimateImageTokensFromBase64Length } from './ContextManager';
 import { TokenizerService } from '../core/TokenizerService';
+import { assembleDerivedContextView, testHandoffSections } from '../context/StructuredHandoffBuilder';
 import type {
   AgentMessage,
   AssistantMessage,
@@ -42,7 +43,21 @@ function toolResult(toolCallId: string, toolName: string, text: string): ToolRes
 function createContextManager(
   config: Partial<ConstructorParameters<typeof ContextManager>[0]> = {},
 ): ContextManager {
-  return new ContextManager({ contextTokenLimit: 64_000, ...config });
+  return new ContextManager({
+    contextTokenLimit: 64_000,
+    createDerivedView: (source, options) => assembleDerivedContextView(source, {
+      scope: 'ephemeral',
+      createdAt: options.createdAt,
+      maxFactsPerGroup: options.maxFactsPerGroup,
+      maxResourceRefs: options.maxResourceRefs,
+      sections: testHandoffSections(
+        source.find((message) => message.role === 'user')
+          ? String((source.find((message) => message.role === 'user') as UserMessage).content)
+          : 'Compacted context',
+      ),
+    }),
+    ...config,
+  });
 }
 
 describe('ContextManager', () => {
@@ -57,7 +72,7 @@ describe('ContextManager', () => {
       const msgs: AgentMessage[] = [
         user('hello'),
         assistant('hi'),
-        toolResult('tc1', 'bash', 'output'),
+        toolResult('tc1', 'shell', 'output'),
       ];
       const result = cm.convertToLlm(msgs);
       expect(result).toHaveLength(3);
@@ -283,9 +298,9 @@ describe('ContextManager', () => {
       });
       const msgs: AgentMessage[] = [
         user('hello'),
-        toolResult('tc1', 'bash', 'output1-'.repeat(200)),
+        toolResult('tc1', 'shell', 'output1-'.repeat(200)),
         assistant('ok'),
-        toolResult('tc2', 'bash', 'output2'),
+        toolResult('tc2', 'shell', 'output2'),
       ];
       const result = await cm.compress(msgs);
       // 第一个工具结果应被 compacted
@@ -310,14 +325,14 @@ describe('ContextManager', () => {
         contextTokenLimit: 80,
       });
       const failed: ToolResultMessage = {
-        ...toolResult('tc1', 'bash', `Command failed: exit code 2 — permission denied ${'x'.repeat(400)}`),
+        ...toolResult('tc1', 'shell', `Command failed: exit code 2 — permission denied ${'x'.repeat(400)}`),
         isError: true,
       };
       const msgs: AgentMessage[] = [
         user('hello'),
         failed,
         assistant('ok'),
-        toolResult('tc2', 'bash', 'output2'),
+        toolResult('tc2', 'shell', 'output2'),
       ];
       const result = await cm.compress(msgs);
       const firstTR = result.messages[1] as ToolResultMessage;

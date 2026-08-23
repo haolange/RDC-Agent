@@ -21,7 +21,7 @@ describe('ConversationToolResourceRefs', () => {
       expect.objectContaining({ kind: 'file', label: 'a.md', path: 'D:/project/a.md' }),
       expect.objectContaining({ kind: 'file', label: 'a.md', path: 'D:/project/docs/a.md' }),
     ]);
-    expect(extractConversationToolResourceRefs('bash', success({ cwd: 'D:/project' }))).toEqual([
+    expect(extractConversationToolResourceRefs('shell', success({ cwd: 'D:/project' }))).toEqual([
       expect.objectContaining({ kind: 'directory', label: 'project', path: 'D:/project' }),
     ]);
   });

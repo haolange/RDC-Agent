@@ -1,8 +1,9 @@
 import React, { useState, type Dispatch, type SetStateAction } from 'react';
-import type { CodeInterpreterSettings, RdxActionSettingsMap, RdxCliInvokerSettings } from '@shared/types/settings';
+import type { AgentShellSettings, CodeInterpreterSettings, RdxActionSettingsMap, RdxCliInvokerSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import { RdxCliInvokerSettingsFields } from './RdxCliInvokerSettingsFields';
 import { CodeInterpreterSettingsFields } from './CodeInterpreterSettingsFields';
+import { ShellSettingsFields } from './ShellSettingsFields';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -10,9 +11,11 @@ interface ToolsSettingsProps {
   rdxCliDraft: RdxCliInvokerSettings;
   rdxActionsDraft: RdxActionSettingsMap;
   codeInterpreterDraft: CodeInterpreterSettings;
+  shellDraft: AgentShellSettings;
   onRdxCliDraftChange: Dispatch<SetStateAction<RdxCliInvokerSettings>>;
   onRdxActionsDraftChange: Dispatch<SetStateAction<RdxActionSettingsMap>>;
   onCodeInterpreterDraftChange: Dispatch<SetStateAction<CodeInterpreterSettings>>;
+  onShellDraftChange: Dispatch<SetStateAction<AgentShellSettings>>;
   onSaveToolsConfig: () => void | Promise<void>;
   t: Translate;
 }
@@ -21,9 +24,11 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
   rdxCliDraft,
   rdxActionsDraft,
   codeInterpreterDraft,
+  shellDraft,
   onRdxCliDraftChange,
   onRdxActionsDraftChange,
   onCodeInterpreterDraftChange,
+  onShellDraftChange,
   onSaveToolsConfig,
   t,
 }) => {
@@ -45,6 +50,11 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
           t={t}
         />
       </div>
+      <ShellSettingsFields
+        draft={shellDraft}
+        onChange={onShellDraftChange}
+        t={t}
+      />
       <CodeInterpreterSettingsFields
         draft={codeInterpreterDraft}
         onChange={onCodeInterpreterDraftChange}

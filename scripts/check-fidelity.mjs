@@ -144,7 +144,10 @@ requireCssContract(
     && contextUsageIndicator.includes('composer-usage-value-number')
     && !contextUsageIndicator.includes('composer-usage-value-label')
     && !contextUsageIndicator.includes('preparingBadge')
-    && !contextUsageIndicator.includes('NextRequestContextProjection'),
+    && !contextUsageIndicator.includes('NextRequestContextProjection')
+    && !contextUsageIndicator.includes('composer-usage-ring-threshold')
+    && !contextUsageIndicator.includes('thresholdRatio')
+    && !contextUsageIndicator.includes('thresholdDashoffset'),
   'Composer context ring must stay percent-first; Preparing / Current request / Last actual / Projected live in title and popover, never as in-ring badges or draft-time prediction.',
 );
 requireCssContract(
@@ -157,7 +160,6 @@ requireCssContract(
     && contextBreakdownPopover.includes("t('contextBreakdown.budgetNote.generatable'")
     && contextBreakdownPopover.includes('context-breakdown-window-note')
     && contextBreakdownPopover.includes('context-breakdown-bar-threshold')
-    && contextUsageIndicator.includes('composer-usage-ring-threshold')
     && contextBreakdownPopover.includes("t('contextBreakdown.noUsageYet')")
     && contextBreakdownPopover.includes('const showUsage = !showPrepared && usage !== null;')
     && contextBreakdownPopover.includes('className="context-breakdown-hero"')

@@ -23,7 +23,16 @@ import {
   type ProviderContractBundlePatch,
 } from './modelManifestSchema';
 import { contextTierWindowTokens, isEligibleMaxContextTier } from '../utils/contextTiers';
+import { hasImplementedStructuredToolAdapter } from '../utils/agentToolCapability';
 import { createFailClosedProviderContracts } from './providerContracts';
+
+export function dedicatedToolCallingFactSourceIds(
+  surface: Pick<ProviderSurfaceManifest, 'factSources'>,
+): string[] {
+  return surface.factSources
+    .filter((source) => source.id.includes(':tools-'))
+    .map((source) => source.id);
+}
 
 export const PROVIDER_CATALOG_SCHEMA_VERSION = 2 as const;
 export const MODELS_DEV_IDENTITY_COUNT = 166 as const;
@@ -303,6 +312,17 @@ function validateModel(
 ): void {
   if (!factSourceIds.has(model.factSourceId)) {
     errors.push(`${surface.id}/${model.modelId} references unknown fact source ${model.factSourceId}`);
+  }
+  if (model.toolCalling.state === 'supported') {
+    const protocol = model.route.protocol;
+    if (!hasImplementedStructuredToolAdapter(protocol)) {
+      errors.push(`${surface.id}/${model.modelId} marks toolCalling supported but ${protocol} has no implemented structured-tool adapter`);
+    }
+    const dedicatedToolsSources = dedicatedToolCallingFactSourceIds(surface);
+    const boundToolsSource = model.fieldFactSourceIds?.toolCalling;
+    if (dedicatedToolsSources.length > 0 && (!boundToolsSource || !dedicatedToolsSources.includes(boundToolsSource))) {
+      errors.push(`${surface.id}/${model.modelId} marks toolCalling supported without binding the dedicated tools fact source`);
+    }
   }
   const modelFieldRoots = new Set(Object.keys(model).filter((key) => (
     key !== 'factSourceId' && key !== 'fieldFactSourceIds'

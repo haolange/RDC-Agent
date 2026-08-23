@@ -571,14 +571,6 @@ html[data-resolved-theme='light'] .app-main {
   transition: stroke-dashoffset var(--transition-fast), stroke var(--transition-fast);
 }
 
-.composer-usage-ring-threshold {
-  fill: none;
-  stroke: var(--token-text-caption);
-  stroke-width: 3.5;
-  stroke-linecap: butt;
-  pointer-events: none;
-}
-
 .composer-usage-value {
   position: absolute;
   inset: 0;

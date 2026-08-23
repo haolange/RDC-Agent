@@ -212,6 +212,30 @@ describe('planModelRequest', () => {
     expect(result.code).toBe('MODEL_UNAVAILABLE');
   });
 
+  it('fail-closes Agent planning when native tool calling is unknown or unsupported', () => {
+    const unverified = planModelRequest({
+      model: model({ toolCalling: { state: 'unknown' } }),
+    });
+    expect(unverified).toMatchObject({
+      ok: false,
+      code: 'MODEL_UNAVAILABLE',
+      message: expect.stringContaining('MODEL_TOOLS_UNVERIFIED'),
+    });
+    const unsupported = planModelRequest({
+      model: model({ toolCalling: { state: 'unsupported' } }),
+    });
+    expect(unsupported).toMatchObject({
+      ok: false,
+      code: 'MODEL_UNAVAILABLE',
+      message: expect.stringContaining('MODEL_TOOLS_UNSUPPORTED'),
+    });
+    const probe = planModelRequest({
+      model: model({ toolCalling: { state: 'unknown' } }),
+      requireAgentToolEligibility: false,
+    });
+    expect(probe.ok).toBe(true);
+  });
+
   it('returns the same protocol-conflict reason in Composer resolution and planning', () => {
     const openAi = {
       id: 'openai',

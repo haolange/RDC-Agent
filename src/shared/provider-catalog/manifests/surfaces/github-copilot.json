@@ -55,6 +55,15 @@
       "accountScope": "observed-account"
     },
     {
+      "id": "provider-docs:github-copilot:tools-2026-08-23",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "github-copilot-api-tools-2026-08-23",
+      "observedAt": "2026-08-23",
+      "refreshedAt": "2026-08-23T00:00:00+08:00",
+      "surface": "github-copilot",
+      "accountScope": "account-entitled"
+    },
+    {
       "id": "models.dev:github-copilot:1",
       "sourceKind": "models.dev",
       "sourceRevision": "d4f2aad138021cdd9052d910e326e7c1b40a627adfb5ecdc085764ab372d4733",
@@ -125,77 +134,7 @@
       ],
       "defaultBudgetTokens": 1000000,
       "toolCalling": {
-        "state": "unknown"
-      },
-      "visionInput": {
-        "state": "unknown"
-      },
-      "structuredOutput": {
-        "state": "unknown"
-      },
-      "selection": {
-        "pickerVisibility": "primary"
-      },
-      "presencePolicy": "account-entitled",
-      "route": {
-        "protocol": "OpenAICompatibleChatCompletions",
-        "baseUrl": "https://api.githubcopilot.com",
-        "source": "catalog"
-      },
-      "controls": {
-        "fast": {
-          "state": "unsupported",
-          "fixedValue": false
-        },
-        "maxContext": {
-          "state": "fixed",
-          "fixedValue": true,
-          "entitlement": "granted",
-          "tierId": "default"
-        },
-        "reasoning": {
-          "kind": "levels",
-          "supportsOff": false,
-          "levels": [
-            "low",
-            "medium",
-            "high",
-            "max"
-          ],
-          "defaultSelection": "medium",
-          "wireProfile": {
-            "kind": "openai-compatible",
-            "on": "medium",
-            "levels": {
-              "low": "low",
-              "medium": "medium",
-              "high": "high",
-              "max": "max"
-            }
-          }
-        }
-      },
-      "factSourceId": "user-observation:github-copilot:2026-07-14"
-    },
-    {
-      "modelId": "claude-opus-4.6",
-      "label": "claude-opus-4.6",
-      "aliases": [],
-      "availability": "unavailable",
-      "contextTiers": [
-        {
-          "id": "default",
-          "label": "Max mode",
-          "maxPromptTokens": 1000000,
-          "activation": {
-            "kind": "implicit"
-          },
-          "entitlement": "granted"
-        }
-      ],
-      "defaultBudgetTokens": 1000000,
-      "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -246,7 +185,83 @@
         }
       },
       "factSourceId": "user-observation:github-copilot:2026-07-14",
-      "unavailableReason": "Unavailable for the observed GitHub Copilot subscription tier."
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
+    },
+    {
+      "modelId": "claude-opus-4.6",
+      "label": "claude-opus-4.6",
+      "aliases": [],
+      "availability": "unavailable",
+      "contextTiers": [
+        {
+          "id": "default",
+          "label": "Max mode",
+          "maxPromptTokens": 1000000,
+          "activation": {
+            "kind": "implicit"
+          },
+          "entitlement": "granted"
+        }
+      ],
+      "defaultBudgetTokens": 1000000,
+      "toolCalling": {
+        "state": "supported"
+      },
+      "visionInput": {
+        "state": "unknown"
+      },
+      "structuredOutput": {
+        "state": "unknown"
+      },
+      "selection": {
+        "pickerVisibility": "primary"
+      },
+      "presencePolicy": "account-entitled",
+      "route": {
+        "protocol": "OpenAICompatibleChatCompletions",
+        "baseUrl": "https://api.githubcopilot.com",
+        "source": "catalog"
+      },
+      "controls": {
+        "fast": {
+          "state": "unsupported",
+          "fixedValue": false
+        },
+        "maxContext": {
+          "state": "fixed",
+          "fixedValue": true,
+          "entitlement": "granted",
+          "tierId": "default"
+        },
+        "reasoning": {
+          "kind": "levels",
+          "supportsOff": false,
+          "levels": [
+            "low",
+            "medium",
+            "high",
+            "max"
+          ],
+          "defaultSelection": "medium",
+          "wireProfile": {
+            "kind": "openai-compatible",
+            "on": "medium",
+            "levels": {
+              "low": "low",
+              "medium": "medium",
+              "high": "high",
+              "max": "max"
+            }
+          }
+        }
+      },
+      "factSourceId": "user-observation:github-copilot:2026-07-14",
+      "unavailableReason": "Unavailable for the observed GitHub Copilot subscription tier.",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
     },
     {
       "modelId": "claude-opus-4.8",
@@ -266,7 +281,7 @@
       ],
       "defaultBudgetTokens": 1000000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -318,7 +333,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:github-copilot:2026-07-14"
+      "factSourceId": "user-observation:github-copilot:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
     },
     {
       "modelId": "claude-opus-4.8-fast",
@@ -338,7 +356,7 @@
       ],
       "defaultBudgetTokens": 1000000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -428,7 +446,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:github-copilot:2026-07-14"
+      "factSourceId": "user-observation:github-copilot:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
     },
     {
       "modelId": "claude-opus-5",
@@ -451,7 +472,7 @@
       ],
       "defaultBudgetTokens": 1000000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -490,7 +511,10 @@
           }
         }
       },
-      "factSourceId": "provider-docs:github-copilot:2026-07-24"
+      "factSourceId": "provider-docs:github-copilot:2026-07-24",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
     },
     {
       "modelId": "claude-sonnet-5",
@@ -510,7 +534,7 @@
       ],
       "defaultBudgetTokens": 1000000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -562,7 +586,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:github-copilot:2026-07-14"
+      "factSourceId": "user-observation:github-copilot:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
     },
     {
       "modelId": "claude-fable-5",
@@ -582,7 +609,7 @@
       ],
       "defaultBudgetTokens": 1000000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -634,7 +661,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:github-copilot:2026-07-14"
+      "factSourceId": "user-observation:github-copilot:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
     },
     {
       "modelId": "gpt-5.4-mini",
@@ -654,7 +684,7 @@
       ],
       "defaultBudgetTokens": 128000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -703,7 +733,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:github-copilot:2026-07-14"
+      "factSourceId": "user-observation:github-copilot:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
     },
     {
       "modelId": "gpt-5.4",
@@ -732,7 +765,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -783,7 +816,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:github-copilot:2026-07-14"
+      "factSourceId": "user-observation:github-copilot:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
     },
     {
       "modelId": "gpt-5.5",
@@ -812,7 +848,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -863,7 +899,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:github-copilot:2026-07-14"
+      "factSourceId": "user-observation:github-copilot:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
     },
     {
       "modelId": "gpt-5.6-luna",
@@ -892,7 +931,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -945,7 +984,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:github-copilot:2026-07-14"
+      "factSourceId": "user-observation:github-copilot:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
     },
     {
       "modelId": "gpt-5.6-sol",
@@ -974,7 +1016,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -1027,7 +1069,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:github-copilot:2026-07-14"
+      "factSourceId": "user-observation:github-copilot:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
     },
     {
       "modelId": "gpt-5.6-terra",
@@ -1056,7 +1101,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -1109,7 +1154,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:github-copilot:2026-07-14"
+      "factSourceId": "user-observation:github-copilot:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
     },
     {
       "modelId": "gemini-3.1-pro-preview",
@@ -1138,7 +1186,7 @@
       ],
       "defaultBudgetTokens": 200000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -1186,7 +1234,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:github-copilot:2026-07-14"
+      "factSourceId": "user-observation:github-copilot:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
     },
     {
       "modelId": "gemini-3.5-flash",
@@ -1206,7 +1257,7 @@
       ],
       "defaultBudgetTokens": 1000000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -1254,7 +1305,10 @@
           }
         }
       },
-      "factSourceId": "runtime-observation:github-copilot-gemini-3.5:2026-08-01"
+      "factSourceId": "runtime-observation:github-copilot-gemini-3.5:2026-08-01",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
     },
     {
       "modelId": "kimi-k2.7-code",
@@ -1274,7 +1328,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -1310,7 +1364,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:github-copilot:2026-07-14"
+      "factSourceId": "user-observation:github-copilot:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:github-copilot:tools-2026-08-23"
+      }
     }
   ],
   "protocolOverrides": [

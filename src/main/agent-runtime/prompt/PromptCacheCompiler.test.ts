@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { CachePlan, RequestPlan } from '@shared/types/providerCapability';
 import type { PromptPlan } from '@shared/types/rdxRuntime';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
-import { buildDerivedContextView } from '../context/StructuredHandoffBuilder';
+import { assembleDerivedContextView, testHandoffSections } from '../context/StructuredHandoffBuilder';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import { PromptCacheCompiler } from './PromptCacheCompiler';
 
@@ -92,13 +92,13 @@ const openAiCachePlan: CachePlan = {
 describe('PromptCacheCompiler', () => {
   it('keeps request routing keys stable while derived context changes', () => {
     const compiler = new PromptCacheCompiler();
-    const firstView = buildDerivedContextView(
+    const firstView = assembleDerivedContextView(
       [{ role: 'user', content: 'first context', timestamp: 1 }],
-      { scope: 'ephemeral', createdAt: 1 },
+      { scope: 'ephemeral', createdAt: 1, sections: testHandoffSections('first context') },
     );
-    const secondView = buildDerivedContextView(
+    const secondView = assembleDerivedContextView(
       [{ role: 'user', content: 'second context', timestamp: 2 }],
-      { scope: 'ephemeral', createdAt: 2 },
+      { scope: 'ephemeral', createdAt: 2, sections: testHandoffSections('second context') },
     );
     const first = compiler.compile({
       promptPlan: promptPlan(),

@@ -37,6 +37,10 @@ import {
   parseJsonLines,
   ProviderHttpError,
 } from './internal/http';
+import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
+import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
+import { reasoningProjectionSource } from './reasoningProjection';
+import type { RequestPlan } from '@shared/types/providerCapability';
 
 const DEFAULT_BASE_URL = 'http://localhost:11434';
 const PROVIDER_API = 'ollama';
@@ -137,11 +141,8 @@ export class OllamaProvider implements ProviderStrategy {
       let toolCallCounter = 0;
       const channels = new StreamChannelRefs(PROVIDER_API);
       const alternating = new AlternatingTextThinkingChannels(channels);
-      const thinkingMeta = {
-        kind: 'unknown' as const,
-        source: 'ollama-raw' as const,
-        visibility: 'raw-collapsed' as const,
-      };
+      const thinkingSource = reasoningProjectionSource(options.requestPlan, 'raw');
+      let thinkingBuffer = '';
       let doneReason: string | null = null;
       let lastChunk: OllamaChunk | null = null;
       let sawOutput = false;
@@ -160,6 +161,17 @@ export class OllamaProvider implements ProviderStrategy {
         if (message) {
           if (typeof message.thinking === 'string' && message.thinking.length > 0) {
             sawOutput = true;
+            thinkingBuffer += message.thinking;
+            const continuation = createContinuationArtifact(options.requestPlan, {
+              type: 'thinking',
+              reasoningContent: thinkingBuffer,
+            });
+            const thinkingMeta = {
+              kind: 'raw' as const,
+              source: thinkingSource,
+              visibility: 'raw-collapsed' as const,
+              continuation,
+            };
             const switched = alternating.ensure('thinking');
             closeSwitchedChannel(builder, switched.close);
             if (switched.started) builder.startThinking(switched.ref, thinkingMeta);
@@ -232,7 +244,7 @@ export class OllamaProvider implements ProviderStrategy {
     context: Context,
     options: StreamOptions,
   ): Record<string, unknown> {
-    const messages = toOllamaMessages(context);
+    const messages = toOllamaMessages(context, options.requestPlan);
     const body: Record<string, unknown> = {
       model: model.id,
       messages,
@@ -259,6 +271,7 @@ export class OllamaProvider implements ProviderStrategy {
 interface OllamaMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
+  thinking?: string;
   images?: string[];
   tool_calls?: Array<{
     function: { name: string; arguments: Record<string, unknown> };
@@ -266,18 +279,18 @@ interface OllamaMessage {
   tool_name?: string;
 }
 
-function toOllamaMessages(context: Context): OllamaMessage[] {
+function toOllamaMessages(context: Context, requestPlan?: RequestPlan): OllamaMessage[] {
   const out: OllamaMessage[] = [];
   if (context.systemPrompt && context.systemPrompt.trim()) {
     out.push({ role: 'system', content: context.systemPrompt });
   }
   for (const message of context.messages) {
-    out.push(...convertMessage(message));
+    out.push(...convertMessage(message, requestPlan));
   }
   return out;
 }
 
-function convertMessage(message: Message): OllamaMessage[] {
+function convertMessage(message: Message, requestPlan?: RequestPlan): OllamaMessage[] {
   if (message.role === 'user') {
     if (typeof message.content === 'string') {
       return [{ role: 'user', content: message.content }];
@@ -295,16 +308,25 @@ function convertMessage(message: Message): OllamaMessage[] {
 
   if (message.role === 'assistant') {
     const texts: string[] = [];
+    const thinking: string[] = [];
     const toolCalls: Required<OllamaMessage>['tool_calls'] = [];
     for (const block of message.content) {
       if (block.type === 'text') texts.push(block.text);
-      else if (block.type === 'toolCall') {
+      else if (block.type === 'thinking' && requestPlan) {
+        const sameToolLoop = message.content.some((candidate) => candidate.type === 'toolCall');
+        const decision = decideContinuationReplay(block.continuation, requestPlan, { sameToolLoop });
+        if (
+          decision.action === 'replay'
+          && block.continuation?.reasoningContent
+        ) thinking.push(block.continuation.reasoningContent);
+      } else if (block.type === 'toolCall') {
         toolCalls.push({
           function: { name: block.name, arguments: block.arguments ?? {} },
         });
       }
     }
     const out: OllamaMessage = { role: 'assistant', content: texts.join('') };
+    if (thinking.length > 0) out.thinking = thinking.join('');
     if (toolCalls.length > 0) out.tool_calls = toolCalls;
     return [out];
   }

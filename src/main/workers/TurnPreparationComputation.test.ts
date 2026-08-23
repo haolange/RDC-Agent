@@ -12,7 +12,7 @@ describe('turn preparation worker computation', () => {
     const result = await computeTurnPreparation({
       messages,
       modelId: 'model',
-      messageBudget: 1_000,
+      messageBudget: 80,
       imageTokenAdjustment: 0,
     });
 

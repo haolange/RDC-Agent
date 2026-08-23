@@ -3,11 +3,13 @@
  *
  * Core runtime events are translated into this shared shape by
  * src/main/agent-runtime/AgentEventBridge.ts before renderer projection.
- */import type { AgentRole } from './agent';
+ */
+import type { AgentRole } from './agent';
 import type { LLMStreamEvent, ToolCall } from './llm';
 import type { MCPTransport } from './mcp';
 import type { AgentPromptProfile, AgentToolPolicy } from './profile';
 import type { ProviderOutputRef, ThinkingArtifact } from './reasoning';
+import type { CapabilityState } from './providerCapability';
 import type { ProviderReasoningContract } from './rdxRuntime';
 import type {
   ConversationAskUserAnswer,
@@ -37,6 +39,8 @@ export interface AgentRouteCapability {
   reasoningContract: ProviderReasoningContract;
   supportsStreaming: boolean;
   supportsToolResults: boolean;
+  /** Catalog/runtime evidence for native tool calling. Independent from execution mode. */
+  toolCallingEvidence: CapabilityState['state'];
   /** True when tool use is fail-open because catalog evidence is not yet conclusive. */
   toolCallingUnverified: boolean;
   visionInputMode: 'native' | 'disabled';

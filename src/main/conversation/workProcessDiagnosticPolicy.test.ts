@@ -5,6 +5,9 @@ describe('shouldProjectDiagnosticToWorkProcess', () => {
   it('keeps user-facing fail-closed diagnostics in Work Process', () => {
     expect(shouldProjectDiagnosticToWorkProcess('mcp_connection_failed')).toBe(true);
     expect(shouldProjectDiagnosticToWorkProcess('MODEL_UNAVAILABLE')).toBe(true);
+    expect(shouldProjectDiagnosticToWorkProcess('route_tool_calling_unknown')).toBe(true);
+    expect(shouldProjectDiagnosticToWorkProcess('route_tool_calling_unsupported')).toBe(true);
+    expect(shouldProjectDiagnosticToWorkProcess('route_tool_calling_disabled')).toBe(true);
     expect(shouldProjectDiagnosticToWorkProcess(undefined)).toBe(true);
   });
 

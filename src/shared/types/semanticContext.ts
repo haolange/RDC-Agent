@@ -17,16 +17,27 @@ export interface StructuredHandoffResourceRef {
   sourceRef?: string;
 }
 
+export type StructuredHandoffDerivation = 'model-generated' | 'deterministic-extractive';
+
+export interface StructuredHandoffProgress {
+  done: StructuredHandoffFact[];
+  inProgress: StructuredHandoffFact[];
+  blocked: StructuredHandoffFact[];
+}
+
 export interface StructuredHandoff {
   schemaVersion: 1;
   handoffId: string;
   kind: StructuredHandoffKind;
-  derivation: 'deterministic-extractive';
+  derivation: StructuredHandoffDerivation;
   objective: string;
   decisions: StructuredHandoffFact[];
   constraints: StructuredHandoffFact[];
   facts: StructuredHandoffFact[];
   openWork: StructuredHandoffFact[];
+  progress?: StructuredHandoffProgress;
+  failedAttempts?: StructuredHandoffFact[];
+  nextSteps?: StructuredHandoffFact[];
   resourceRefs: StructuredHandoffResourceRef[];
   source: {
     sessionId?: string;

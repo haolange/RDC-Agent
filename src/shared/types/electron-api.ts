@@ -22,7 +22,6 @@ export type {
   RuntimeLogApi,
   SessionApi,
   SettingsApi,
-  TerminalApi,
   ToolApi,
   WindowControlsApi,
   WorkflowApi,

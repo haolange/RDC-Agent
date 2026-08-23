@@ -37,9 +37,9 @@ export class ToolResultSummarizer {
         return `[read_file] ${lineCount} lines (truncated summary)`;
       },
     });
-    // bash 结果：只保留退出码和首行
+    // shell 结果：只保留退出码和首行
     this.rules.push({
-      match: (name, r) => name === 'bash' && !!firstText(r),
+      match: (name, r) => name === 'shell' && !!firstText(r),
       summarize: (name, r) => {
         const firstLine = firstText(r)?.split('\n')[0] ?? '';
         return `[${name}] ${firstLine.slice(0, 80)}...`;

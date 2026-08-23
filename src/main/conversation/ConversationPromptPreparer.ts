@@ -77,6 +77,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? undefined),
     tools: allowedToolNames,
     workDir: projectRootPath ?? '',
+    sessionId: input.context.session?.sessionId ?? null,
     routeCapability: input.routePreflight.routeCapability,
     effectiveModel: input.effectiveModel ?? undefined,
     permissionSettings: runtimeSettings.agentRuntime.permissions,

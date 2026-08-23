@@ -19,11 +19,13 @@ import { effectiveCatalogService } from '../settings/EffectiveCatalogService';
 import { providerCapabilityProbeService } from '../settings/ProviderCapabilityProbeService';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
+import { formatShellInterpreterLabel, shellResolver } from '../runtime/ShellResolver';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
 import { EmptyArgsSchema } from './validation/commonIpcSchemas';
 import {
   SettingsGetEffectiveCatalogArgsSchema,
+  SettingsGetResolvedShellArgsSchema,
   SettingsHasProviderSecretArgsSchema,
   SettingsImportAgentManifestArgsSchema,
   SettingsProviderIdArgsSchema,
@@ -333,6 +335,29 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
     if (!patch.llm) return settledSettings;
     for (const providerId of changedProviderIds) await broadcastCatalog(providerId);
     return withEffectiveAgentModelOptions(settledSettings);
+  });
+
+  ipcMain.handle('settings:getResolvedShell', async (_event, ...rawArgs: unknown[]) => {
+    const [executable] = parseIpcArgs(SettingsGetResolvedShellArgsSchema, rawArgs, {
+      label: 'settings:getResolvedShell',
+      maxBytes: 8 * 1024,
+    });
+    try {
+      const resolved = shellResolver.resolve(executable);
+      return {
+        ok: true,
+        kind: resolved.kind,
+        version: resolved.version,
+        versionMajor: resolved.versionMajor,
+        executable: resolved.executable,
+        label: formatShellInterpreterLabel(resolved.kind),
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   });
 
   ipcMain.handle('settings:getModelsOverride', async (_event, ...rawArgs: unknown[]) => {

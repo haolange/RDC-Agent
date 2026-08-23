@@ -65,7 +65,7 @@ export function useAppBootstrap(options: {
         const [appSettings, appMeta, isMaximized] = await Promise.all([
           electronAPI.settings.get(),
           electronAPI.appMeta.get(),
-          electronAPI.windowControls.isMaximized(),
+          electronAPI.windowControls.isMaximized().catch(() => false),
         ]);
 
         hydrateSettings(appSettings, appMeta.systemTheme);

@@ -8,16 +8,17 @@
       "contracts": {
         "protocolDialect": "OllamaOpenAICompatibleChatCompletions",
         "protocolVersion": "unspecified",
-        "compatibilityGroup": "none",
+        "compatibilityGroup": "ollama:OllamaOpenAICompatibleChatCompletions",
         "reasoning": {
-          "semantic": "unknown",
-          "source": "profile-explicit-unknown",
-          "displayLabel": "Provider reasoning",
-          "carrier": "unknown",
-          "artifactFormat": "unknown",
-          "artifactVersion": "unknown",
-          "compatibilityGroup": "none",
-          "continuation": "unknown",
+          "semantic": "raw",
+          "source": "provider-docs:ollama-thinking",
+          "evidence": "https://docs.ollama.com/capabilities/thinking",
+          "displayLabel": "Raw reasoning",
+          "carrier": "reasoning-content",
+          "artifactFormat": "ollama.chat.thinking",
+          "artifactVersion": "v1",
+          "compatibilityGroup": "ollama:OllamaOpenAICompatibleChatCompletions",
+          "continuation": "exact-execution",
           "projectionSources": {
             "raw": "ollama-raw"
           }
@@ -39,10 +40,11 @@
           "ttl": "unknown"
         },
         "toolLoop": {
-          "artifactPolicy": "discard",
-          "artifactScope": "none",
+          "artifactPolicy": "preserve-exact",
+          "artifactScope": "all-assistant-turns",
           "ordering": "assistant-tool-result",
-          "modelSwitch": "pin-until-terminal"
+          "modelSwitch": "pin-until-terminal",
+          "evidence": "https://docs.ollama.com/capabilities/tool-calling"
         },
         "streaming": {
           "transport": "sse",

@@ -25,6 +25,12 @@ import {
 } from '../../agent-runtime/EffectiveRuntimePlan';
 import { compileEffectivePolicy } from '../../agent-runtime/permissions/PolicyCompiler';
 import { sessionContextJournal } from '../../conversation/SessionContextJournal';
+import {
+  isWithinSessionCompactionLine,
+  persistGeneratedSessionCompaction,
+} from '../../agent-runtime/context/CompactionHandoffService';
+import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
+import { storageAdapter } from '../../sessions/StorageAdapter';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import { mcpDescriptorHash } from '../../settings/McpTrustService';
 import { settingsService } from '../../settings/SettingsService';
@@ -134,7 +140,7 @@ export class TurnPreparationService {
       modelId: input.requestPlan.effectiveModelId,
       protocol: input.requestPlan.route.protocol,
     };
-    const materialized = input.sessionId
+    let materialized = input.sessionId
       ? sessionContextJournal.materialize(
           input.sessionId,
           input.visibleTurnIds,
@@ -197,6 +203,29 @@ export class TurnPreparationService {
       input.requestPlan.contextBudgetTokens,
       contextCompactionPercent,
     );
+    if (input.sessionId && materialized.derivedContextStatus !== 'applied') {
+      const occupiedTokens = storageAdapter.readSessionUsage(input.sessionId)?.occupiedTokens ?? 0;
+      if (!isWithinSessionCompactionLine(
+        occupiedTokens,
+        compactionThreshold,
+        input.visibleTurnIds.length,
+      )) {
+        await persistGeneratedSessionCompaction({
+          sessionId: input.sessionId,
+          history: storageAdapter.readConversationHistory(input.sessionId),
+          visibleTurnIds: input.visibleTurnIds,
+          branchId: input.activeBranchId ?? ROOT_BRANCH_ID,
+          occupiedTokens,
+          compactionThresholdTokens: compactionThreshold,
+        });
+        materialized = sessionContextJournal.materialize(
+          input.sessionId,
+          input.visibleTurnIds,
+          input.requestPlan,
+          input.activeBranchId ?? undefined,
+        );
+      }
+    }
     const messageBudget = compactionThreshold - fixedTokens - input.imageTokenAdjustment;
     if (messageBudget <= 0) {
       throw new Error(

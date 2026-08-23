@@ -15,7 +15,7 @@
 2. 将设计书中的 `General Agent = Execution Orchestrator` 具像化为一个真实的 `general.agent.md` Profile，而不是把它等同于裸 Agent Loop。
 3. 将 `Debugger`、`Analyzer`、`Optimizer` 具像化为三个顶层 `Planning Orchestrator` Profile；每个 Profile 通过自己的 Coordinator Skill、辅助 Skill、Hook、计划 Artifact 与 Handoff 形成自己的流程和分工体系。
 4. 由 Mission Profile 负责“理解目标、澄清、有限探测、编排与计划”，由 General Profile 负责“Task 分解、Shell 执行、Sub-Agent 调度、验证、报告与知识候选产物”。
-5. RDX 始终是外部 CLI。Agent 像人类一样通过通用 `bash`/Shell 调用它，通过定向 `--help` 发现用法；绝不把约 194 个 RDX 命令注册为 194 个 Agent Tool、MCP Tool 或 Primitive。
+5. RDX 始终是外部 CLI。Agent 像人类一样通过通用 `shell` 调用它，通过定向 `--help` 发现用法；绝不把约 194 个 RDX 命令注册为 194 个 Agent Tool、MCP Tool 或 Primitive。
 6. 通用 Task 保持通用；RenderDoc 的证据、假设、实验、世界模型等只存在于垂直 Artifact 内容与垂直投影中，不进入 `TaskRecord`、Agent Profile 或平台级统一 Investigation Graph。
 7. Team Agent 继续采用单进程、多 Context、直接事件与函数返回；不引入多进程 Mailbox、Blackboard、SharedMemory 或 MessageBus 体系。
 8. Knowledge 是本库通用 Agent Runtime 的一等扩展能力：Agent 通过一组紧凑、deferred 的 `knowledge_*` Tool 显式浏览、检索、精读、编译临时 Pack 和创建 Session Candidate；Knowledge Center、TUI 与 Agent 共用同一主进程服务，不自动抽取 Memory、不自动写入知识库，也不把全量知识索引自动塞进 Prompt。
@@ -48,7 +48,7 @@
 | Agent Runtime / Loop | Profile 下方的通用执行引擎，不等同于 General Agent |
 | Planning Orchestrator | `debugger` / `analyzer` / `optimizer` Profile + 各自 Coordinator Skill |
 | Coordinator | Profile instructions + 预加载根 Skill + 按需 Skill + Hook + Task + Artifact + Handoff 的组合，不新增通用 Coordinator 字段 |
-| rdc-cli Tool Surface | Agent 通过 `bash` 调用的外部 CLI Surface，不是 Provider Tool Schema |
+| rdc-cli Tool Surface | Agent 通过 `shell` 调用的外部 CLI Surface，不是 Provider Tool Schema |
 | Investigation Kernel | 垂直领域语义、Artifact 模板和评审规则，不是平台级 Graph Service |
 | Investigation Graph | 仅在 Analyzer 等具体 Artifact 中按需形成的领域图，不是所有 Agent 共用的状态数据库 |
 | Task / WorkItem | 现有 `TaskCreate/TaskUpdate/TaskGet/TaskList/TaskStop`；不恢复 `TodoWrite`，不新增第二套 Store |
@@ -267,7 +267,7 @@ Workbench、Work Process、Right Rail、Knowledge Center、Settings、权限审�
 
 - `ask_user` 继续是通用工具。
 - 计划继续是一种 Profile 能力和 Artifact，不是权限。
-- 文件修改继续由 General 的通用 write/edit/bash/git 能力承担。
+- 文件修改继续由 General 的通用 write/edit/shell/git 能力承担。
 - 用户自定义 Agent Profile 继续存在。
 - 实现迁移时不得静默删除用户可能修改过的旧 `.agent.md` 文件；应停止新安装 seed，并提供一次明确的导出/保留/移除选择。该迁移是数据安全边界，不用兼容 shim 掩盖。
 
@@ -303,7 +303,7 @@ General 是通用执行 Agent 的真实 Profile。它不是 Edit 改名，也不
 #### 基础能力
 
 - read/search/web
-- bash
+- shell
 - write/edit/file-manage
 - git
 - ask_user
@@ -317,7 +317,7 @@ General 是通用执行 Agent 的真实 Profile。它不是 Edit 改名，也不
 - 通用 MCP
 - 只读 `rdx_context`
 
-RDX 执行仍走 `bash`，`rdx_context` 只提供当前应用持有的 project/session/capture/runtime 摘要。
+RDX 执行仍走 `shell`，`rdx_context` 只提供当前应用持有的 project/session/capture/runtime 摘要。
 
 #### 保持通用性的关键设计
 
@@ -354,7 +354,7 @@ Debugger 是故障调查的 Planning Orchestrator，目标是把模糊症状收�
 - 生成 Debugger Plan Artifact；
 - Handoff 到 General。
 
-它可以用 `bash` 做有限、只为规划服务的 RDX 查询，但不应自行完成全部调查、修复和报告。
+它可以用 `shell` 做有限、只为规划服务的 RDX 查询，但不应自行完成全部调查、修复和报告。
 
 ### 6.5 Analyzer Profile
 
@@ -398,7 +398,7 @@ name: General
 description: General execution orchestrator for research, coding, automation, and planned RenderDoc work.
 target: rdc-agent
 user-invocable: true
-tools: [read, search, web, bash, write, edit, git, file-manage, askUser, handoff, task, memory, memory-write, knowledge, skill, mcp, subagent, tool_search, rdxContext]
+tools: [read, search, web, shell, write, edit, git, file-manage, askUser, handoff, task, memory, memory-write, knowledge, skill, mcp, subagent, tool_search, rdxContext]
 skills: [execution-orchestrator]
 agents: [debugger, analyzer, optimizer]
 handoffs:
@@ -416,7 +416,7 @@ name: Debugger
 description: Planning orchestrator for evidence-driven RenderDoc debugging.
 target: rdc-agent
 user-invocable: true
-tools: [read, search, web, bash, askUser, handoff, task, memory, knowledge, planArtifact, skill, subagent, tool_search, rdxContext]
+tools: [read, search, web, shell, askUser, handoff, task, memory, knowledge, planArtifact, skill, subagent, tool_search, rdxContext]
 skills: [debugger-coordinator]
 agents: [debugger, general]
 handoffs:
@@ -549,7 +549,7 @@ General 收到 Handoff 后：
 3. 使用通用 Task API 创建真实任务与依赖。
 4. 区分 Live / Offline / External Research 执行形态。
 5. 按需调用 `$rdx-cli-shell` 等 Skill。
-6. 通过 `bash` 定向查询 RDX help 并执行命令。
+6. 通过 `shell` 定向查询 RDX help 并执行命令。
 7. 将长输出保存为 Artifact，只把摘要和引用留在主 Context。
 8. 需要独立推理时派生 Sub-Agent。
 9. 合并结果并调用 Skeptic。
@@ -663,7 +663,7 @@ Hook 不做：
 | Hook | 事件 | Matcher | 行为 |
 | --- | --- | --- | --- |
 | `mission-plan-handoff-check` | `agent.before-handoff` | debugger/analyzer/optimizer | 确认目标为 General 时存在可读 Plan Artifact 引用 |
-| `rdx-shell-audit` | `tool.before-call` / `tool.after-call` | General + bash | 仅当命令确实是配置的 RDX CLI 时记录脱敏摘要；普通 Shell 直接 skip |
+| `rdx-shell-audit` | `tool.before-call` / `tool.after-call` | General + shell | 仅当命令确实是配置的 RDX CLI 时记录脱敏摘要；普通 Shell 直接 skip |
 | `artifact-integrity` | `turn.after-end` | General | 对本轮声明 ready 的垂直 Artifact 检查路径、hash、来源与空文件 |
 | `report-contract` | `session.after-end` | 四个 Profile | 验证报告是否包含结论、证据、局限和失败项；缺失时 warn |
 
@@ -686,7 +686,7 @@ Hook 不做：
 
 ```text
 Agent
-  -> bash
+  -> shell
   -> ShellInvocationService
   -> system-installed/configured RDX CLI
   -> stdout/stderr/artifact paths
@@ -1427,7 +1427,7 @@ sequenceDiagram
   M->>G: agent_handoff + $skills + artifact ref
   W-->>U: Debugger → General 控制转移行
   G->>G: 创建 Task
-  G->>R: bash 调用外部 CLI
+  G->>R: shell 调用外部 CLI
   R-->>G: stdout/stderr/artifact refs
   G->>W: Task/Sub-Agent/Tool/Artifact 事件
   G-->>U: 最终报告
@@ -1745,7 +1745,7 @@ Project 未打开时不显示虚构 Project Space。
 - 仍只有 Default/Auto/FullAccess/Custom。
 - Profile tools 是能力上限，Permission 是每次调用裁决。
 - FullAccess 不能凭空获得 Profile 没有的 Tool。
-- Mission 使用 bash 探测时仍受 Permission。
+- Mission 使用 shell 探测时仍受 Permission。
 - Hook block 不能被 FullAccess 绕过，除非 Hook 本身被用户禁用/修改并通过既有信任规则。
 - Plan 不是 Permission。
 
@@ -1787,7 +1787,7 @@ Mission turn
 ### 17.3 RDX
 
 ```text
-General tool_call: bash
+General tool_call: shell
   -> Permission evaluation
   -> tool.before-call Hooks
   -> ShellInvocationService

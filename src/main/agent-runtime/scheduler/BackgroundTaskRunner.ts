@@ -11,7 +11,7 @@
  *
  * 设计要点：
  * - 单例：全局共享一个实例（通过 `getBackgroundTaskRunner()` 获取），
- *   方便在 BashTool 等工具调用点直接调度。
+ *   方便在 ShellTool 等工具调用点直接调度。
  * - 输出截断：单个任务的 output 上限为 10000 字符，超过时只保留最后 10000。
  * - 通知幂等：`notified` 字段避免相同任务被多次注入。
  */
@@ -235,7 +235,7 @@ let singleton: BackgroundTaskRunner | null = null;
 /**
  * 获取 BackgroundTaskRunner 单例。
  *
- * BashTool 等调用点通过此工厂函数取得 runner，避免显式注入依赖。
+ * ShellTool 等调用点通过此工厂函数取得 runner，避免显式注入依赖。
  */
 export function getBackgroundTaskRunner(): BackgroundTaskRunner {
   if (singleton === null) {

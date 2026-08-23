@@ -150,9 +150,9 @@ describe('ToolExecutorFactory', () => {
 
   it('createToolExecutor denies tools listed in compiled policy', async () => {
     const toolMap = new Map([
-      ['bash', {
-        name: 'bash',
-        description: 'bash',
+      ['shell', {
+        name: 'shell',
+        description: 'shell',
         parameters: { type: 'object', properties: {} },
         execute: vi.fn(async () => ({ content: [] })),
       }],
@@ -165,9 +165,9 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true,
       matchesToolAllowlist: () => true,
     });
-    const executor = factory.createToolExecutor('ask', ['bash'], undefined, null, {
+    const executor = factory.createToolExecutor('ask', ['shell'], undefined, null, {
       effectivePlan: {
-        toolAllowlist: ['bash'],
+        toolAllowlist: ['shell'],
         skillIntersection: null,
         permissionSettings: {
           mode: 'default',
@@ -176,7 +176,7 @@ describe('ToolExecutorFactory', () => {
           allowedCommandPrefixes: [],
           deniedCommandPrefixes: [],
         },
-        policy: { deniedTools: ['bash'], limits: { maxTurns: 5 } },
+        policy: { deniedTools: ['shell'], limits: { maxTurns: 5 } },
         projectId: null,
         projectRootPath: null,
       } as never,
@@ -184,7 +184,7 @@ describe('ToolExecutorFactory', () => {
     const result = await executor.execute({
       type: 'toolCall',
       id: 'tc-policy',
-      name: 'bash',
+      name: 'shell',
       arguments: {},
     });
     expect(result.isError).toBe(true);
@@ -193,9 +193,9 @@ describe('ToolExecutorFactory', () => {
 
   it('createToolExecutor denies tools outside skill intersection', async () => {
     const toolMap = new Map([
-      ['bash', {
-        name: 'bash',
-        description: 'bash',
+      ['shell', {
+        name: 'shell',
+        description: 'shell',
         parameters: { type: 'object', properties: {} },
         execute: vi.fn(async () => ({ content: [] })),
       }],
@@ -208,9 +208,9 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true,
       matchesToolAllowlist: () => false,
     });
-    const executor = factory.createToolExecutor('ask', ['bash'], undefined, null, {
+    const executor = factory.createToolExecutor('ask', ['shell'], undefined, null, {
       effectivePlan: {
-        toolAllowlist: ['bash'],
+        toolAllowlist: ['shell'],
         skillIntersection: ['read_file'],
         permissionSettings: {
           mode: 'default',
@@ -227,7 +227,7 @@ describe('ToolExecutorFactory', () => {
     const result = await executor.execute({
       type: 'toolCall',
       id: 'tc-skill',
-      name: 'bash',
+      name: 'shell',
       arguments: {},
     });
     expect(result.isError).toBe(true);

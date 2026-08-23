@@ -47,12 +47,13 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
   const chips = buildCapabilityChips(effectiveModel, t);
   const tiers = buildContextTierRows(effectiveModel, t);
   const pricing = buildPricingRows(effectiveModel, t);
-  const reasoningUnverified = effectiveModel?.controls.reasoning.kind === 'unknown';
+  const reasoning = effectiveModel?.controls.reasoning;
+  const reasoningUnverified = reasoning?.kind === 'unknown';
   const reasoningDefaultUnverified = reasoningUnverified
-    || effectiveModel?.controls.reasoning.defaultState === 'unknown'
-    || effectiveModel?.controls.reasoning.defaultState === 'provider-managed';
-  const reasoningOptions = reasoningUnverified ? [] : getReasoningSelectionOrder(effectiveModel?.controls.reasoning);
-  const defaultReasoning = effectiveModel?.controls.reasoning.defaultSelection ?? 'off';
+    || reasoning?.defaultState === 'unknown'
+    || reasoning?.defaultState === 'provider-managed';
+  const reasoningOptions = reasoningUnverified ? [] : getReasoningSelectionOrder(reasoning);
+  const defaultReasoning = reasoning?.defaultSelection ?? 'off';
   const routeOptions = effectiveModel?.routeOptions ?? [];
   const effectiveRouteOption = routeOptions.find((option) => option.routeRevision === effectiveModel?.routeRevision)
     ?? routeOptions.find((option) => option.route.protocol === effectiveModel?.route.protocol);
@@ -61,13 +62,8 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
     ?? effectiveRouteOption?.id
     ?? routeOptions[0]?.id
     ?? '';
-  const routeOptionMeta = (option: NonNullable<EffectiveModel['routeOptions']>[number]): string => (
-    buildRouteOptionMeta(
-      option,
-      provider.serviceOperator,
-      (owner) => t('settings.providers.capability.protocolOwner', { owner }),
-    )
-  );
+  const routeOptionMeta = (option: NonNullable<EffectiveModel['routeOptions']>[number]): string =>
+    buildRouteOptionMeta(option, provider.serviceOperator, (owner) => t('settings.providers.capability.protocolOwner', { owner }));
   const contextChoices = effectiveModel ? resolveContextTierChoices(effectiveModel) : null;
   const probeModes: LlmModelCapabilityProbeMode[] = effectiveModel ? [
     'default',
@@ -75,13 +71,9 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
     ...(effectiveModel.controls.fast.state === 'selectable' ? ['fast' as const] : []),
   ] : [];
   const updateBudget = (raw: string) => {
-    if (!raw.trim()) {
-      onModelChange({ defaultBudgetTokens: undefined });
-      return;
-    }
     const parsed = Number(raw);
     onModelChange({
-      defaultBudgetTokens: Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined,
+      defaultBudgetTokens: raw.trim() && Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined,
     });
   };
   const runProbe = async (mode: LlmModelCapabilityProbeMode) => {
@@ -105,9 +97,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
       setProbeMode(null);
     }
   };
-  const probeStatus = probeResult
-    ? t(`settings.providers.capability.probeStatus.${probeResult.status}`)
-    : '';
+  const probeStatus = probeResult ? t(`settings.providers.capability.probeStatus.${probeResult.status}`) : '';
 
   return (
     <div className="settings-model-capability-panel" data-testid={`settings-provider-model-capability-panel-${model.id}`}>
@@ -127,7 +117,11 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
           </div>
           {effectiveModel.toolCalling.state === 'unknown' ? (
             <div className="settings-model-capability-note" data-testid="settings-provider-tool-calling-unverified">{t('settings.providers.capability.toolCallingUnverifiedHint')}</div>
-          ) : null}
+          ) : effectiveModel.toolCalling.state === 'unsupported' ? (
+            <div className="settings-model-capability-note" data-testid="settings-provider-tool-calling-unsupported">{t('settings.providers.capability.toolCallingUnsupportedHint')}</div>
+          ) : (
+            <div className="settings-model-capability-note" data-testid="settings-provider-tool-calling-supported">{t('settings.providers.capability.toolCallingVerifiedHint')}</div>
+          )}
 
           <div className="settings-model-capability-tiers" data-testid={`settings-provider-model-tiers-${model.id}`}>
             <span className="settings-model-capability-section-label">{t('settings.providers.capability.contextTiers')}</span>

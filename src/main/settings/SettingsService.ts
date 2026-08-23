@@ -12,6 +12,7 @@
  */
 import type {
   AppRuntimePaths,
+  AgentShellSettings,
   AppSettings,
   AppSettingsPatch,
   LlmProviderAuthMode,
@@ -41,6 +42,7 @@ import {
   type ProviderCredentialView,
 } from './settingsProviderSanitize';
 import { appPathService } from '../runtime/AppPathService';
+import { shellResolver } from '../runtime/ShellResolver';
 import { executionProfileService } from './ExecutionProfileService';
 import { agentManifestService } from './AgentManifestService';
 import { providerCatalogService } from './ProviderCatalogService';
@@ -53,6 +55,7 @@ import {
   DEFAULT_RDX_ACTIONS,
   DEFAULT_CODE_INTERPRETER,
   DEFAULT_RDX_CLI_INVOKER,
+  DEFAULT_SHELL_TOOLING,
   LEFT_DEFAULTS,
   RIGHT_DEFAULTS,
   SETTINGS_SCHEMA_VERSION,
@@ -62,6 +65,7 @@ import {
 import {
   sanitizeAgentPermissionSettings,
   sanitizeAgentRuntimeContextSettings,
+  sanitizeAgentShellSettings,
   sanitizeCodeInterpreterSettings,
   sanitizeRdxActionsSettings,
   sanitizeRdxCliInvokerSettings,
@@ -120,6 +124,7 @@ export class SettingsService {
     result: ReturnType<typeof rebuildPersistedSettings>,
   ): void {
     writeSettings(result.settings);
+    shellResolver.clearCache();
     deleteSecretsAfterCommit(result.secretRefsToDelete, paths.userRdxRoot);
   }
 
@@ -351,6 +356,7 @@ export class SettingsService {
           ...(currentPersisted.tooling?.codeInterpreter ?? DEFAULT_CODE_INTERPRETER),
           ...(patch.tooling?.codeInterpreter ?? {}),
         }),
+        shell: this.mergeAgentShellSettings(currentPersisted.tooling?.shell, patch.tooling?.shell),
       },
       agentRuntime: {
         permissions: sanitizeAgentPermissionSettings({
@@ -487,6 +493,21 @@ export class SettingsService {
 
   getSettingsPath(): string {
     return appPathService.getRuntimePaths().settingsPath;
+  }
+
+  private mergeAgentShellSettings(
+    current: AgentShellSettings | undefined,
+    patch: Partial<AgentShellSettings> | undefined,
+  ): AgentShellSettings {
+    const next = sanitizeAgentShellSettings({
+      ...(current ?? DEFAULT_SHELL_TOOLING),
+      ...(patch ?? {}),
+    });
+    const previous = current?.executable ?? DEFAULT_SHELL_TOOLING.executable;
+    if (previous !== next.executable) {
+      shellResolver.clearCache();
+    }
+    return next;
   }
 }
 

@@ -329,10 +329,33 @@ export interface CodeInterpreterSettings {
   artifactsEnabled: boolean;
 }
 
+/** Machine-local agent shell override. Project scope cannot replace this. */
+export interface AgentShellSettings {
+  /** Absolute executable path. Empty = auto-detect. */
+  executable: string;
+}
+
+export type AgentShellKind = 'pwsh' | 'windows-powershell' | 'zsh' | 'bash' | 'sh';
+
+export type ResolvedShellSnapshot =
+  | {
+      ok: true;
+      kind: AgentShellKind;
+      version: string;
+      versionMajor: number | null;
+      executable: string;
+      label: string;
+    }
+  | {
+      ok: false;
+      error: string;
+    };
+
 export interface ToolingSettings {
   rdxCli: RdxCliInvokerSettings;
   rdxActions: RdxActionSettingsMap;
   codeInterpreter: CodeInterpreterSettings;
+  shell: AgentShellSettings;
 }
 
 export type AgentPermissionMode =
@@ -567,6 +590,7 @@ export type AppSettingsPatch = Partial<{
     rdxCli: Partial<RdxCliInvokerSettings>;
     rdxActions: Partial<Record<RdxActionId, Partial<RdxShellActionSettings>>>;
     codeInterpreter: Partial<CodeInterpreterSettings>;
+    shell: Partial<AgentShellSettings>;
   }>;
   agentRuntime: Partial<{
     permissions: Partial<AgentPermissionSettings>;

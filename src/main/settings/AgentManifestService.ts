@@ -24,6 +24,7 @@ import {
 } from '@shared/constants/agents';
 import { COMPOSE_ACCENT_FALLBACK, normalizeAgentAccent } from '@shared/theme/composeAccent';
 import { canonicalAgentModelId, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
+import { classifyAgentToolEligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 
 const normalizeManifestAccent = (value: unknown, fallback: string): string =>
   normalizeAgentAccent(value, fallback);
@@ -206,8 +207,8 @@ const createSeedDefinition = (
     : agentId === 'plan'
       ? ['read', 'search', 'web', 'askUser', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search']
       : agentId === 'edit'
-        ? ['read', 'search', 'web', 'bash', 'interpreter', 'write', 'edit', 'git', 'file-manage', 'askUser', 'handoff', 'task', 'output', 'memory', 'memory-write', 'skill', 'mcp', 'subagent', 'tool_search']
-        : ['read', 'search', 'web', 'bash', 'interpreter', 'askUser', 'handoff', 'task', 'output', 'memory', 'rdxContext', 'subagent', 'tool_search'];
+        ? ['read', 'search', 'web', 'shell', 'interpreter', 'write', 'edit', 'git', 'file-manage', 'askUser', 'handoff', 'task', 'output', 'memory', 'memory-write', 'skill', 'mcp', 'subagent', 'tool_search']
+        : ['read', 'search', 'web', 'shell', 'interpreter', 'askUser', 'handoff', 'task', 'output', 'memory', 'rdxContext', 'subagent', 'tool_search'];
   return {
     id: agentId,
     fileName: fileNameForId(agentId),
@@ -525,25 +526,33 @@ export class AgentManifestService {
       const providerUnavailable = !provider.enabled || !provider.isConfigured;
       const modelDisabled = model.enabled === false;
       const missingVerifiedBudget = !Number.isFinite(model.defaultBudgetTokens) || model.defaultBudgetTokens <= 0;
+      const eligibility = classifyAgentToolEligibility(model);
+      const toolExecutable = eligibility === 'executable' && !missingVerifiedBudget;
       const status: AgentModelOption['status'] = providerUnavailable
         ? 'provider-unavailable'
         : modelDisabled
           ? 'model-disabled'
-          : model.availability === 'available' && !missingVerifiedBudget
-            ? 'ready'
-            : model.availability === 'unavailable'
-              ? 'model-unavailable'
+          : model.availability === 'unavailable' || eligibility === 'unsupported' || eligibility === 'no-adapter'
+            ? 'model-unavailable'
+            : model.availability === 'available' && toolExecutable
+              ? 'ready'
               : 'model-unverified';
       const disabledReason = status === 'provider-unavailable'
         ? providerUnavailableReason(provider)
         : status === 'model-disabled'
           ? 'Model is disabled.'
           : status === 'model-unavailable'
-            ? model.unavailableReason ?? 'Model is unavailable for this account and route.'
+            ? eligibility === 'unsupported'
+              ? 'This provider route explicitly does not support native structured agent tools.'
+              : eligibility === 'no-adapter'
+                ? 'This provider route has no implemented native structured-tool adapter.'
+                : model.unavailableReason ?? 'Model is unavailable for this account and route.'
             : status === 'model-unverified'
               ? missingVerifiedBudget
                 ? 'Model has no verified positive context budget and cannot be executed safely.'
-                : 'Model availability has not been verified for this account and route.'
+                : eligibility === 'unknown'
+                  ? 'Native tool calling is not confirmed for this provider route, so the model is not an Agent-executable choice.'
+                  : 'Model availability has not been verified for this account and route.'
               : undefined;
       // models.json user overrides are the only layer that carries sourceKind 'user'.
       const isUserOverride = model.provenance.some((evidence) => (
@@ -573,7 +582,7 @@ export class AgentManifestService {
         for (const model of snapshot?.models ?? []) {
           if (model.selection?.pickerVisibility === 'internal') continue;
           const canonicalId = canonicalAgentModelId(provider.id, model.modelId);
-          const executable = model.availability === 'available'
+          const executable = isAgentToolExecutableModel(model)
             && Number.isFinite(model.defaultBudgetTokens)
             && model.defaultBudgetTokens > 0;
           if (executable || referenced.has(canonicalId)) {
@@ -582,24 +591,43 @@ export class AgentManifestService {
         }
         continue;
       }
+      const snapshot = catalogs.find((catalog) => (
+        catalog.providerId === provider.id
+        && catalog.accountId === (provider.activeAccountId ?? `anonymous:${provider.id}`)
+      ));
       for (const model of provider.models) {
         const canonicalId = canonicalAgentModelId(provider.id, model.id);
+        const effective = snapshot?.models.find((entry) => (
+          entry.modelId === model.id || entry.aliases.includes(model.id)
+        ));
+        if (effective) {
+          const executable = isAgentToolExecutableModel(effective)
+            && Number.isFinite(effective.defaultBudgetTokens)
+            && effective.defaultBudgetTokens > 0;
+          if (executable || referenced.has(canonicalId)) {
+            addOption(fromEffectiveModel(provider, effective));
+          }
+          continue;
+        }
+        if (!referenced.has(canonicalId)) continue;
         const providerUnavailable = !provider.enabled || !provider.isConfigured;
         const disabled = model.enabled === false;
         const status: AgentModelOption['status'] = providerUnavailable
           ? 'provider-unavailable'
-          : disabled ? 'model-disabled' : 'ready';
+          : disabled ? 'model-disabled' : 'model-unverified';
         addOption({
           canonicalId,
           providerId: provider.id,
           providerLabel: provider.label || provider.id,
           modelId: model.id,
           modelLabel: model.label || model.id,
-          configured: status === 'ready',
+          configured: false,
           status,
           ...(status === 'provider-unavailable'
             ? { disabledReason: providerUnavailableReason(provider) }
-            : status === 'model-disabled' ? { disabledReason: 'Model is disabled.' } : {}),
+            : status === 'model-disabled'
+              ? { disabledReason: 'Model is disabled.' }
+              : { disabledReason: 'Native tool calling is not confirmed for this provider route, so the model is not an Agent-executable choice.' }),
         });
       }
     }

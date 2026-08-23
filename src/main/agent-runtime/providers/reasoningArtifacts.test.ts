@@ -381,6 +381,70 @@ describe('provider continuation artifact delivery', () => {
     });
   });
 
+  it('emits empty reasoning_content on later assistant turns when the contract requires it', () => {
+    const result = openAICompatibleTesting.toOpenAIMessages({
+      ...baseContext,
+      tools: [{
+        name: 'read_file',
+        description: 'Read a file',
+        parameters: { type: 'object', properties: {} },
+      }],
+      messages: [assistant([{ type: 'text', text: 'no thinking this turn' }])],
+    }, reasoningContentPlan);
+
+    expect(result[0]).toMatchObject({
+      role: 'assistant',
+      content: 'no thinking this turn',
+      reasoning_content: '',
+    });
+  });
+
+  it('replays Ollama thinking on the matching execution contract', () => {
+    const ollamaPlan = createPlan({
+      providerId: 'ollama',
+      adapterId: 'ollama-openai-compatible',
+      protocol: 'OllamaOpenAICompatibleChatCompletions',
+      modelId: 'qwen2.5-coder:14b',
+      reasoning: {
+        semantic: 'raw',
+        displayLabel: 'Raw reasoning',
+        carrier: 'reasoning-content',
+        artifactFormat: 'ollama.chat.thinking',
+        artifactVersion: 'v1',
+        compatibilityGroup: 'ollama:OllamaOpenAICompatibleChatCompletions',
+        continuation: 'exact-execution',
+      },
+      toolLoop: {
+        artifactPolicy: 'preserve-exact',
+        artifactScope: 'all-assistant-turns',
+        ordering: 'assistant-tool-result',
+      },
+    });
+    const continuation = createContinuationArtifact(ollamaPlan, {
+      type: 'thinking',
+      reasoningContent: 'native thinking',
+    });
+    const replayed = ollamaTesting.toOllamaMessages({
+      ...baseContext,
+      messages: [assistant([
+        {
+          type: 'thinking',
+          kind: 'raw',
+          source: 'ollama-raw',
+          visibility: 'raw-collapsed',
+          continuation,
+        },
+        { type: 'text', text: 'visible answer' },
+        { type: 'toolCall', id: 'tool_1', name: 'read_file', arguments: {} },
+      ])],
+    }, ollamaPlan);
+    expect(replayed[0]).toMatchObject({
+      role: 'assistant',
+      thinking: 'native thinking',
+      content: 'visible answer',
+    });
+  });
+
   it('groups consecutive Anthropic tool results into the immediate next user message', () => {
     const result = anthropicTesting.toAnthropicMessages({
       ...baseContext,

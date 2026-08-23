@@ -14,7 +14,7 @@ Every change must define verification before implementation. Prefer:
 
 RDX tool execution is not a bundled bridge or repository resource. The current forward path is:
 
-`UI/agent -> Settings shell action or bash -> ShellInvocationService -> system-installed CLI -> JSON runtime context`
+`UI/agent -> Settings shell action or shell -> ShellInvocationService -> system-installed CLI -> JSON runtime context`
 
 Catalog/runtime summary configuration reads `settings.tooling.rdxCli`:
 
@@ -33,7 +33,7 @@ Open `.rdc` (`openCapture` / `openRemoteCapture`), connect remote, preview, and 
 
 The tool catalog is loaded from the configured `catalogPath`. Catalog metadata is exposed through `tool:getCatalog` and `tool:getRuntimeSummary`.
 
-Workbench right rail must **not** render a per-tool `rd.*` inventory, CLI catalog summary, tool count, or namespace counts. The session Capture area consumes the owner-session opened-capture and runtime context snapshot for `.rdc` selection, open/preview state, Replay Device, compact diagnostics, and Copy. contextId/replaySessionId/capture ids, lease/runtime owner, remoteId, and remote status remain owner-scoped agent data. Renderer code cannot invoke arbitrary tools; execution stays on Settings shell actions / bash -> `ShellInvocationService` -> external CLI.
+Workbench right rail must **not** render a per-tool `rd.*` inventory, CLI catalog summary, tool count, or namespace counts. The session Capture area consumes the owner-session opened-capture and runtime context snapshot for `.rdc` selection, open/preview state, Replay Device, compact diagnostics, and Copy. contextId/replaySessionId/capture ids, lease/runtime owner, remoteId, and remote status remain owner-scoped agent data. Renderer code cannot invoke arbitrary tools; execution stays on Settings shell actions / shell -> `ShellInvocationService` -> external CLI.
 
 ## Trace Contract
 
@@ -75,4 +75,4 @@ Do not add call-site constants for commands, catalog paths, or environment varia
 
 ## Right Rail projection
 
-Workbench Right Rail has two target-specific forms: a selected Project shows only `Import .rdc` and project inputs; a selected Session shows `Progress / Outputs / Context / Capture`, with Capture always visible. It must not render a per-tool `rd.*` inventory, standalone Memory panel, duplicate Skills catalog, CLI catalog summary, tool count, or namespace counts. Context only presents real task resources: attachments, references, tools, and used capabilities. Capture presents an honest empty state when no project input exists; otherwise it presents owner-session `.rdc` selection/open/preview/refresh/copy/clear and Replay Device. contextId/replaySessionId/capture ids, lease/runtime owner, and remoteId/remote status remain owner-scoped runtime data for agent consumption rather than visible inventory. Diagnostics stay deduplicated and actionable. CLI unavailable is only a diagnostic for failed open/preview shell actions; the sidebar does not expose CLI catalog metadata. Renderer code cannot invoke arbitrary tools or reconstruct runtime state; execution stays on Settings shell actions / bash -> `ShellInvocationService` -> external CLI. Attachments and uploads are Task Context inputs; Outputs require explicit `output_register` publication of a completed project file into the owning run and use only user-facing source labels.
+Workbench Right Rail has two target-specific forms: a selected Project shows only `Import .rdc` and project inputs; a selected Session shows `Progress / Outputs / Context / Capture`, with Capture always visible. It must not render a per-tool `rd.*` inventory, standalone Memory panel, duplicate Skills catalog, CLI catalog summary, tool count, or namespace counts. Context only presents real task resources: attachments, references, tools, and used capabilities. Capture presents an honest empty state when no project input exists; otherwise it presents owner-session `.rdc` selection/open/preview/refresh/copy/clear and Replay Device. contextId/replaySessionId/capture ids, lease/runtime owner, and remoteId/remote status remain owner-scoped runtime data for agent consumption rather than visible inventory. Diagnostics stay deduplicated and actionable. CLI unavailable is only a diagnostic for failed open/preview shell actions; the sidebar does not expose CLI catalog metadata. Renderer code cannot invoke arbitrary tools or reconstruct runtime state; execution stays on Settings shell actions / shell -> `ShellInvocationService` -> external CLI. Attachments and uploads are Task Context inputs; Outputs require explicit `output_register` publication of a completed project file into the owning run and use only user-facing source labels.

@@ -251,9 +251,13 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   max-width: 100%;
 }
 
-/* System bubble: centred warning */
+/* System notice: centred annotation; slash-command output stretches left. */
 .conversation-message-system {
   align-items: center;
+}
+
+.conversation-message-system.is-command {
+  align-items: stretch;
 }
 
 .conversation-message-time {
@@ -342,12 +346,84 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 }
 
 .conversation-bubble-system {
-  background: color-mix(in srgb, var(--token-status-error) 8%, transparent);
-  border: 1px solid color-mix(in srgb, var(--token-status-error) 22%, transparent);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: min(40rem, 100%);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.conversation-bubble-system.severity-error {
   color: var(--token-status-error);
+}
+
+.conversation-system-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--token-text-muted);
+}
+
+.conversation-bubble-system.severity-warning .conversation-system-dot {
+  background: var(--token-status-warning);
+}
+
+.conversation-bubble-system.severity-error .conversation-system-dot {
+  background: var(--token-status-error);
+}
+
+.conversation-system-text {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.conversation-bubble-system.is-command {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: min(42rem, 100%);
+  padding: var(--transcript-card-padding);
+  border: var(--transcript-card-border);
   border-radius: var(--transcript-card-radius);
-  padding: var(--space-2) var(--space-4);
+  background: var(--transcript-card-surface);
+  color: var(--token-text-body);
   font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.conversation-bubble-system.is-command.severity-error {
+  border-color: color-mix(in srgb, var(--token-status-error) 36%, var(--token-border-muted));
+}
+
+.conversation-system-command-label {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--token-text-caption);
+}
+
+.conversation-bubble-system.is-command.severity-error .conversation-system-command-label {
+  color: var(--token-status-error);
+}
+
+.conversation-system-command-body {
+  min-width: 0;
+}
+
+.conversation-system-command-body .markdown-body {
+  font-size: inherit;
+  line-height: 1.55;
+}
+
+.conversation-system-command-body .markdown-body > :last-child {
+  margin-bottom: 0;
 }
 
 .conversation-bubble-text {

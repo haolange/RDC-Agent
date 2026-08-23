@@ -10,7 +10,6 @@ import { IpcApprovalTokenService } from './IpcApprovalTokenService';
 import {
   MemoryWriteArgsSchema,
   SettingsGetEffectiveCatalogArgsSchema,
-  TerminalWriteArgsSchema,
   WorkflowStopArgsSchema,
 } from './ipcSchemas';
 import { EmptyArgsSchema } from './commonIpcSchemas';
@@ -61,12 +60,6 @@ describe('parseIpcArgs', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(IpcValidationError);
     }
-  });
-
-  it('rejects oversized terminal write data', () => {
-    expect(() => parseIpcArgs(TerminalWriteArgsSchema, ['tab-1', 'y'.repeat(65 * 1024)], {
-      label: 'terminal:write',
-    })).toThrow(IpcValidationError);
   });
 
   it('rejects invalid run id format', () => {

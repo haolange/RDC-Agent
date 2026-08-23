@@ -112,7 +112,14 @@ export const ComposerModelOverrideMenu: React.FC<{
         </span>
       </button>
       {menu.open ? (
-        <div className="composer-model-popup" role="menu" onKeyDown={handleMenuKeyDown}>
+        <div
+          className="composer-model-popup"
+          role="menu"
+          data-testid="composer-model-popup"
+          data-option-count={options.length}
+          data-loading={loading ? '1' : '0'}
+          onKeyDown={handleMenuKeyDown}
+        >
           <div className="composer-model-head">
             <input
               ref={searchRef}

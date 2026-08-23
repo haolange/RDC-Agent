@@ -5,6 +5,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     getAvatarDataUrl: 'app:getAvatarDataUrl',
     openPath: 'app:openPath',
     copyText: 'app:copyText',
+    readClipboardText: 'app:readClipboardText',
     resolveFavicon: 'web:resolveFavicon',
     selectFiles: 'dialog:selectFiles',
     selectRdcFiles: 'dialog:selectRdcFiles',
@@ -106,6 +107,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     getProviderDefinitionCommit: 'settings:getProviderDefinitionCommit',
     getModelsOverride: 'settings:getModelsOverride',
     setModelsOverride: 'settings:setModelsOverride',
+    getResolvedShell: 'settings:getResolvedShell',
     set: 'settings:set',
   },
   project: {
@@ -140,12 +142,6 @@ export const RENDERER_INVOKE_CHANNEL = {
   },
   runtime: {
     listLogs: 'runtimeLog:list',
-    listTerminalTabs: 'terminal:listTabs',
-    createTerminalTab: 'terminal:createTab',
-    closeTerminalTab: 'terminal:closeTab',
-    activateTerminalTab: 'terminal:activateTab',
-    writeTerminal: 'terminal:write',
-    resizeTerminal: 'terminal:resize',
   },
   capture: {
     list: 'capture:list',
@@ -208,9 +204,6 @@ export const RENDERER_EVENT_CHANNEL = {
   },
   runtime: {
     logAppended: 'runtime:logAppended',
-    terminalData: 'terminal:data',
-    terminalExit: 'terminal:exit',
-    terminalTabsChanged: 'terminal:tabsChanged',
   },
 } as const;
 

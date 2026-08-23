@@ -36,7 +36,7 @@ function classifyTool(row: ToolRow): AggregateBucket {
   if (/^edit_file$|^notebook_edit$|^edit$/.test(name)) return 'edited';
   if (/^delete_file$|^delete$/.test(name)) return 'deleted';
   if (/^read_file$|^read$|^memory_read$|^skill_read$|^rdx_context$/.test(name)) return 'read';
-  if (/^bash$|^shell$/.test(name)) return 'ran';
+  if (/^shell$/.test(name)) return 'ran';
   if (/^glob$|^task_list$|^skills$|^mcp$/.test(name)) return 'listed';
   if (/^grep$|^web_search$|^web_fetch$|^memory_search$|^tool_search$/.test(name)) return 'searched';
   return KIND_TO_BUCKET[row.groupKind] ?? 'other';

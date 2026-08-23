@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { useClipboardBridge } from '../../../hooks/useClipboardBridge';
 import { useI18n } from '../../../i18n';
 
 interface MarkdownCodeBlockProps {
@@ -13,17 +14,14 @@ export const MarkdownCodeBlock: React.FC<MarkdownCodeBlockProps> = ({
   children,
 }) => {
   const { t } = useI18n();
+  const { copyText } = useClipboardBridge();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
-    } catch {
-      setCopied(false);
-    }
-  }, [code]);
+    const didCopy = await copyText(code);
+    setCopied(didCopy);
+    if (didCopy) window.setTimeout(() => setCopied(false), 1600);
+  }, [code, copyText]);
 
   const label = language.trim() || t('chat.markdownCodePlain');
 

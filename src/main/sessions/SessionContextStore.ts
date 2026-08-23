@@ -3,7 +3,14 @@ import * as path from 'path';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '@shared/utils/jsonl';
 import type { RunContextUsageSummary } from '@shared/types/session';
 import type { SessionContextTurnEntry } from '../conversation/SessionContextJournal';
-import { SESSION_USAGE_MIGRATIONS, toSessionUsageManifest } from './storageSchema';
+import {
+  SESSION_CONTEXT_VIEW_MIGRATIONS,
+  SESSION_SHELL_STATE_MIGRATIONS,
+  SESSION_USAGE_MIGRATIONS,
+  toSessionContextViewManifest,
+  toSessionShellStateManifest,
+  toSessionUsageManifest,
+} from './storageSchema';
 
 
 export class SessionContextStore {
@@ -22,6 +29,32 @@ export class SessionContextStore {
     const usagePath = this.getSessionUsagePath(sessionId);
     if (!usagePath) return null;
     return this.host.io.readJson(usagePath, SESSION_USAGE_MIGRATIONS)?.usage ?? null;
+  }
+
+  getSessionShellStatePath(sessionId: string): string | null {
+    const location = this.host.sessions.findSessionLocation(sessionId);
+    if (!location) return null;
+    return path.join(location.sessionPath, 'shell-state.json');
+  }
+
+  readSessionShellCwd(sessionId: string): string | null {
+    if (sessionId.includes('::subagent::')) {
+      return null;
+    }
+    const statePath = this.getSessionShellStatePath(sessionId);
+    if (!statePath) return null;
+    return this.host.io.readJson(statePath, SESSION_SHELL_STATE_MIGRATIONS)?.state.cwd ?? null;
+  }
+
+  writeSessionShellCwd(sessionId: string, cwd: string): void {
+    if (sessionId.includes('::subagent::')) {
+      return;
+    }
+    const statePath = this.getSessionShellStatePath(sessionId);
+    if (!statePath) {
+      throw new Error(`Session not found for shell state: ${sessionId}`);
+    }
+    this.host.io.writeJsonAtomic(statePath, toSessionShellStateManifest({ cwd }));
   }
 
   writeSessionUsage(sessionId: string, usage: RunContextUsageSummary): void {
@@ -52,9 +85,8 @@ export class SessionContextStore {
 
   readSessionDerivedContextView(sessionId: string): import('@shared/types/semanticContext').DerivedContextView | null {
     const viewPath = this.getSessionDerivedContextViewPath(sessionId);
-    return fs.existsSync(viewPath)
-      ? this.host.io.readJson<import('@shared/types/semanticContext').DerivedContextView>(viewPath)
-      : null;
+    if (!fs.existsSync(viewPath)) return null;
+    return this.host.io.readJson(viewPath, SESSION_CONTEXT_VIEW_MIGRATIONS)?.view ?? null;
   }
 
   writeSessionDerivedContextView(
@@ -64,7 +96,10 @@ export class SessionContextStore {
     if (view.scope !== 'session' || view.sessionId !== sessionId) {
       throw new Error('Derived context view session ownership mismatch.');
     }
-    this.host.io.writeJsonAtomic(this.getSessionDerivedContextViewPath(sessionId), view);
+    this.host.io.writeJsonAtomic(
+      this.getSessionDerivedContextViewPath(sessionId),
+      toSessionContextViewManifest(view),
+    );
   }
 
   clearSessionDerivedContextView(sessionId: string): void {

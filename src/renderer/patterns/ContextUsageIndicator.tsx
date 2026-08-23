@@ -2,7 +2,6 @@ import React, { useCallback, useRef, useState } from 'react';
 import type { PreparedTurnContextSummary, RunContextUsageSummary } from '@shared/types/session';
 import { ContextBreakdownPopover } from './ContextBreakdownPopover';
 import {
-  resolveDisplayedCompactionThreshold,
   resolveDisplayedPromptBudget,
   type ContextUsageSelectedProfile,
 } from './contextUsageDisplay';
@@ -48,20 +47,9 @@ export const ContextUsageIndicator: React.FC<{
   const usagePercent = showPrepared ? prepared.usagePercent : usage?.usagePercent ?? 0;
   const normalizedPercent = Math.max(0, Math.min(100, usagePercent));
   const windowTokens = resolveDisplayedPromptBudget(showPrepared, prepared, usage, selectedProfile);
-  const thresholdTokens = resolveDisplayedCompactionThreshold(
-    showPrepared, prepared, usage, selectedProfile,
-  );
-  const thresholdRatio = typeof thresholdTokens === 'number'
-    && typeof windowTokens === 'number'
-    && windowTokens > 0
-    ? Math.max(0, Math.min(1, thresholdTokens / windowTokens))
-    : null;
   const radius = 14;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - (normalizedPercent / 100));
-  const thresholdDashoffset = thresholdRatio == null
-    ? 0
-    : circumference * (1 - thresholdRatio);
   const percentLabel = showEstimatedRing ? `~${normalizedPercent}%` : `${normalizedPercent}%`;
 
   const closePopover = useCallback(() => {
@@ -130,17 +118,6 @@ export const ContextUsageIndicator: React.FC<{
             strokeDasharray={`${circumference} ${circumference}`}
             strokeDashoffset={dashOffset}
           />
-          {thresholdRatio != null ? (
-            <circle
-              className="composer-usage-ring-threshold"
-              data-testid="composer-usage-ring-threshold"
-              cx="18"
-              cy="18"
-              r={radius}
-              strokeDasharray={`2 ${circumference - 2}`}
-              strokeDashoffset={thresholdDashoffset}
-            />
-          ) : null}
         </svg>
         <span className="composer-usage-value">
           <span className="composer-usage-value-number">{valueText}</span>

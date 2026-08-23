@@ -31,6 +31,11 @@ import {
 } from '@shared/utils/contextBudget';
 import { resolveModelControls } from '@shared/utils/modelControls';
 import { providerAdapterIdForProtocol } from '@shared/provider-catalog/implementationRegistry';
+import {
+  classifyAgentToolEligibility,
+  describeAgentToolIneligibility,
+  isAgentToolExecutableModel,
+} from '@shared/utils/agentToolCapability';
 
 import { createFailClosedProviderContracts } from '@shared/provider-catalog/providerContracts';
 export interface RequestPlannerInput {
@@ -46,6 +51,11 @@ export interface RequestPlannerInput {
   /** Provider-managed state is opt-in. Local stateless is the product default. */
   stateMode?: ProviderStateMode;
   toolLoopPhase?: ToolLoopPhase;
+  /**
+   * Agent send path defaults to true. Capability probes set false so
+   * unknown-tool catalog rows remain probeable without becoming Agent-executable.
+   */
+  requireAgentToolEligibility?: boolean;
 }
 
 function valuesEqual(left: JsonValue, right: JsonValue): boolean {
@@ -121,6 +131,15 @@ export function planModelRequest(input: RequestPlannerInput): RequestPlanningRes
         ?? `${model.modelId} is ${model.availability === 'unknown' ? 'not yet verified' : 'unavailable'}`,
       controls,
     );
+  }
+  if (input.requireAgentToolEligibility !== false && !isAgentToolExecutableModel(model)) {
+    const eligibility = classifyAgentToolEligibility(model);
+    const detail = eligibility === 'executable'
+      ? {
+          technicalMessage: `MODEL_UNAVAILABLE: ${model.providerId}/${model.modelId} is not Agent-executable.`,
+        }
+      : describeAgentToolIneligibility(eligibility, model.providerId, model.modelId);
+    return planningError('MODEL_UNAVAILABLE', detail.technicalMessage, controls);
   }
   if (evaluation.error) {
     const code: RequestPlanningErrorCode = evaluation.error.code === 'PLAN_CONFLICT'

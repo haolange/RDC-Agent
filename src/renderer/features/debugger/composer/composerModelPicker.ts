@@ -1,5 +1,5 @@
 import type { EffectiveModel } from '@shared/types/providerCapability';
-import { isEffectiveModelPickerSelectable } from '@shared/utils/effectiveModelPicker';
+import { isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 import { contextTierWindowTokens, resolveContextTierChoices } from '@shared/utils/contextTiers';
 import { formatTokenCount } from '@shared/utils/tokens';
 
@@ -21,7 +21,7 @@ export interface ComposerModelPickerGroup {
 }
 
 export function isComposerPickerModel(model: EffectiveModel): boolean {
-  return isEffectiveModelPickerSelectable(model);
+  return isAgentToolExecutableModel(model);
 }
 
 export function resolvePickerContextWindow(model: EffectiveModel): {

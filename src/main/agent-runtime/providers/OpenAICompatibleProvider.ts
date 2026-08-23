@@ -39,6 +39,7 @@ import type { ProviderRequestAuthorizer } from '../../settings/AwsBedrockCredent
 import type { RequestPlan } from '@shared/types/providerCapability';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
 import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
+import { requiresAssistantReasoningContent } from './reasoningContentReplay';
 
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const PROVIDER_API = 'openai-compatible';
@@ -421,13 +422,21 @@ function toOpenAIMessages(
   } else if (prompt.combinedText) {
     out.push({ role: 'system', content: prompt.combinedText });
   }
+  const requireReasoningContent = requiresAssistantReasoningContent(
+    requestPlan,
+    Boolean(context.tools && context.tools.length > 0),
+  );
   for (const message of context.messages) {
-    out.push(...convertMessage(message, requestPlan));
+    out.push(...convertMessage(message, requestPlan, requireReasoningContent));
   }
   return out;
 }
 
-function convertMessage(message: Message, requestPlan: RequestPlan): OpenAIMessage[] {
+function convertMessage(
+  message: Message,
+  requestPlan: RequestPlan,
+  requireReasoningContent: boolean,
+): OpenAIMessage[] {
   if (message.role === 'user') {
     if (typeof message.content === 'string') {
       return [{ role: 'user', content: message.content }];
@@ -477,6 +486,7 @@ function convertMessage(message: Message, requestPlan: RequestPlan): OpenAIMessa
     };
     if (toolCalls.length > 0) out.tool_calls = toolCalls;
     if (reasoning.length > 0) out.reasoning_content = reasoning.join('');
+    else if (requireReasoningContent) out.reasoning_content = '';
     return [out];
   }
 

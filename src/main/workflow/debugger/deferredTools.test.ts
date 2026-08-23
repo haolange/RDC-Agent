@@ -31,7 +31,7 @@ describe('isDeferredToolName', () => {
 
   it('keeps core builtin and unknown tools injected', () => {
     expect(isDeferredToolName('read_file')).toBe(false);
-    expect(isDeferredToolName('bash')).toBe(false);
+    expect(isDeferredToolName('shell')).toBe(false);
     expect(isDeferredToolName('tool_search')).toBe(false);
     expect(isDeferredToolName('skills')).toBe(false);
     expect(isDeferredToolName('skill_read')).toBe(false);
@@ -115,7 +115,7 @@ describe('extractDeferredToolNamesFromToolSearchDetails', () => {
         { name: 'read_file' },
         { name: 'mcp__server__tool' },
         { name: 'memory_write' },
-        { name: 'bash' },
+        { name: 'shell' },
       ],
     })).toEqual(['mcp__server__tool', 'memory_write']);
   });

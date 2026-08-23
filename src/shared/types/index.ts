@@ -21,7 +21,6 @@ export type {
   RuntimeLogApi,
   SessionApi,
   SettingsApi,
-  TerminalApi,
   McpApi,
   ToolApi,
   WindowControlsApi,
@@ -197,8 +196,10 @@ export type {
   DerivedContextView,
   PromptStablePrefix,
   StructuredHandoff,
+  StructuredHandoffDerivation,
   StructuredHandoffFact,
   StructuredHandoffKind,
+  StructuredHandoffProgress,
   StructuredHandoffResourceRef,
 } from './semanticContext';
 export type {
@@ -257,7 +258,6 @@ export type {
   AppLanguage,
   FontScale,
 } from './settings';
-export type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
 export type { ToolCallResult, ToolCatalog, ToolRuntimeSummary, ToolTraceEntry } from './tool';
 export type {
   IntakeContext,

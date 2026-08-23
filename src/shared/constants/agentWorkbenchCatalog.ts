@@ -78,7 +78,7 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     approvalRequired: false,
   },
   {
-    id: 'bash',
+    id: 'shell',
     label: 'Shell',
     permission: 'approval',
     inputSchema: { type: 'object', required: ['command'], properties: { command: { type: 'string' } } },

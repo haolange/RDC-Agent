@@ -88,6 +88,7 @@ const routeCapability = {
   reasoningContract: createNoneReasoningContract('test'),
   supportsStreaming: true,
   supportsToolResults: true,
+  toolCallingEvidence: 'supported' as const,
   toolCallingUnverified: false,
   visionInputMode: 'native' as const,
   structuredOutputMode: 'native' as const,

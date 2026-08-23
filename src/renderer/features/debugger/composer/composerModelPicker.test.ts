@@ -24,7 +24,7 @@ function model(partial: Record<string, unknown> & { modelId: string }): Effectiv
       maxContext: { state: 'unsupported' },
       reasoning: { kind: 'none', supportsOff: true, levels: [], defaultSelection: 'off', wireProfile: { kind: 'none' } },
     },
-    route: { protocol: 'openai-responses', source: 'catalog' },
+    route: { protocol: 'OpenAIResponses', source: 'catalog' },
     toolCalling: { state: 'supported' },
     visionInput: { state: 'unsupported' },
     structuredOutput: { state: 'unsupported' },
@@ -34,9 +34,17 @@ function model(partial: Record<string, unknown> & { modelId: string }): Effectiv
 }
 
 describe('composerModelPicker', () => {
-  it('hides unavailable, disabled, and internal models', () => {
+  it('admits only Agent-executable models with source-backed tools', () => {
     expect(isComposerPickerModel(model({ modelId: 'ok' }))).toBe(true);
-    expect(isComposerPickerModel(model({ modelId: 'unverified', availability: 'unknown' }))).toBe(true);
+    expect(isComposerPickerModel(model({
+      modelId: 'unverified',
+      availability: 'unknown',
+      toolCalling: { state: 'unknown' },
+    }))).toBe(false);
+    expect(isComposerPickerModel(model({
+      modelId: 'unsupported',
+      toolCalling: { state: 'unsupported' },
+    }))).toBe(false);
     expect(isComposerPickerModel(model({ modelId: 'off', enabled: false }))).toBe(false);
     expect(isComposerPickerModel(model({ modelId: 'gone', availability: 'unavailable' }))).toBe(false);
     expect(isComposerPickerModel(model({

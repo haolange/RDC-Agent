@@ -49,7 +49,26 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       loadProviderSurface('minimax-global'),
       loadProviderSurface('cortecs'),
       loadProviderSurface('custom-endpoint'),
+      loadProviderSurface('cline-pass'),
     ]);
+  });
+
+  it('projects the dedicated tools fact source onto Cline Pass kimi-k2.7-code', () => {
+    const contribution = buildCatalogModelContribution(
+      provider('cline-pass', 'OpenAICompatibleChatCompletions'),
+      'cline-pass/kimi-k2.7-code',
+    );
+    expect(contribution).toMatchObject({
+      modelId: 'cline-pass/kimi-k2.7-code',
+      toolCalling: { state: 'supported' },
+      fieldFactSources: {
+        toolCalling: {
+          sourceKind: 'provider-docs',
+          sourceRevision: 'cline-pass-openai-tools-passthrough-2026-08-23',
+          detail: 'Compiled field fact source rdc-agent:cline-pass:tools-2026-08-23',
+        },
+      },
+    });
   });
 
   it('loads ChatGPT controls and execution binding from the manifest', () => {
@@ -324,6 +343,7 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
       model: model!,
       catalogModels: snapshot.models,
       controls: { fastModel: true, reasoningLevel: 'off', maxContextMode: false },
+      requireAgentToolEligibility: false,
     })).toMatchObject({
       ok: true,
       plan: {
@@ -368,11 +388,13 @@ describe('EffectiveModelResolver compiled Catalog projection', () => {
         modelId: 'model-current', label: 'Current', aliases: ['model-old'], availability: 'available',
         contextTiers: [{ id: 'default', label: 'Default', maxPromptTokens: 128_000, activation: { kind: 'implicit' }, entitlement: 'granted' }],
         defaultBudgetTokens: 128_000,
+        toolCalling: { state: 'supported' },
       },
       {
         modelId: 'model-next', label: 'Next', availability: 'available',
         contextTiers: [{ id: 'default', label: 'Default', maxPromptTokens: 128_000, activation: { kind: 'implicit' }, entitlement: 'granted' }],
         defaultBudgetTokens: 128_000,
+        toolCalling: { state: 'supported' },
       },
     ]);
     expect(resolveEffectiveModelSelection('custom-provider-alias-test', 'model-old', settings)).toMatchObject({

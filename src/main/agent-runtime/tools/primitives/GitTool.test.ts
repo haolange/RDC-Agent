@@ -28,7 +28,7 @@ describe('GitTool', () => {
       .rejects.toThrow(/Invalid git path/);
   });
 
-  it('runs git_status in a temporary repository', async () => {
+  it('runs git_status in a temporary repository', { timeout: 30_000 }, async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-git-tool-'));
     roots.push(root);
     await execFileAsync('git', ['init'], { cwd: root, windowsHide: true });

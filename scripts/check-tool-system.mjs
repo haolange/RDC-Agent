@@ -104,6 +104,9 @@ function main() {
   );
   assert(REJECTED_TOOL_TOKENS.todo, 'REJECTED_TOOL_TOKENS must include todo');
   assert(REJECTED_TOOL_TOKENS.search_codebase, 'REJECTED_TOOL_TOKENS must include search_codebase');
+  assert(REJECTED_TOOL_TOKENS.bash, 'REJECTED_TOOL_TOKENS must include bash');
+  assert(BUILTIN_AGENT_TOOL_IDS.includes('shell'), 'BUILTIN_AGENT_TOOL_IDS must include shell');
+  assert(!BUILTIN_AGENT_TOOL_IDS.includes('bash'), 'BUILTIN_AGENT_TOOL_IDS must not include bash');
 
   // Core/extended tool tiering contracts.
   for (const id of BUILTIN_AGENT_TOOL_IDS) {
@@ -265,17 +268,29 @@ function main() {
     'utf8',
   );
   assert(
-    permissionPolicy.includes('matchBashHardDeny'),
-    'AgentPermissionPolicy must hard-deny catastrophic bash via matchBashHardDeny',
+    permissionPolicy.includes('matchShellHardDeny'),
+    'AgentPermissionPolicy must hard-deny catastrophic shell via matchShellHardDeny',
   );
 
-  const bashTool = fs.readFileSync(
-    path.join(repoRoot, 'src/main/agent-runtime/tools/primitives/BashTool.ts'),
+  const shellTool = fs.readFileSync(
+    path.join(repoRoot, 'src/main/agent-runtime/tools/primitives/ShellTool.ts'),
     'utf8',
   );
   assert(
-    bashTool.includes('run_in_background is disabled'),
-    'bash must fail-closed on run_in_background until background delivery is wired',
+    !shellTool.includes('run_in_background'),
+    'shell must not declare a disabled run_in_background parameter',
+  );
+  assert(
+    shellTool.includes("name: 'shell'"),
+    'builtin command tool id must be shell',
+  );
+  assert(
+    shellTool.includes("spawn('agent-shell'") || shellTool.includes('spawn(\'agent-shell\''),
+    'shell must spawn under the agent-shell process owner',
+  );
+  assert(
+    shellTool.includes('get description()'),
+    'shell description must be a dynamic getter',
   );
 
   console.log('[tool-system] OK');

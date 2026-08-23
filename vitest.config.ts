@@ -39,7 +39,6 @@ export default defineConfig({
         'src/main/workers/TurnPreparationWorkerPool.ts',
         // Desktop shell / external CLI / local device / media — Electron or OS-bound.
         'src/main/tools/**',
-        'src/main/runtime/TerminalSessionService.ts',
         'src/main/runtime/KnowledgeBrowseService.ts',
         'src/main/media/**',
         'src/main/captures/**',

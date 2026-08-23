@@ -7,7 +7,6 @@ import type {
   RunApi,
   RuntimeLogApi,
   SessionApi,
-  TerminalApi,
 } from '../types/electron-api';
 import { RENDERER_INVOKE_CHANNEL as INVOKE } from './channels';
 import type { RendererApiTransport } from './transport';
@@ -60,17 +59,6 @@ export function createRunApi(transport: RendererApiTransport): RunApi {
 
 export function createRuntimeLogApi(transport: RendererApiTransport): RuntimeLogApi {
   return { list: (request) => transport.invoke(INVOKE.runtime.listLogs, request) };
-}
-
-export function createTerminalApi(transport: RendererApiTransport): TerminalApi {
-  return {
-    listTabs: () => transport.invoke(INVOKE.runtime.listTerminalTabs),
-    createTab: (request) => transport.invoke(INVOKE.runtime.createTerminalTab, request),
-    closeTab: (tabId) => transport.invoke(INVOKE.runtime.closeTerminalTab, tabId),
-    activateTab: (tabId) => transport.invoke(INVOKE.runtime.activateTerminalTab, tabId),
-    write: (tabId, data) => transport.invoke(INVOKE.runtime.writeTerminal, tabId, data),
-    resize: (tabId, cols, rows) => transport.invoke(INVOKE.runtime.resizeTerminal, tabId, cols, rows),
-  };
 }
 
 export function createCaptureApi(transport: RendererApiTransport): CaptureApi {

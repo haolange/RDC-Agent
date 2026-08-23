@@ -5,7 +5,7 @@
 
 /** All builtin AgentTool ids after search_codebase removal (39). */
 export const BUILTIN_AGENT_TOOL_IDS = [
-  'bash',
+  'shell',
   'read_file',
   'read_image',
   'write_file',
@@ -57,7 +57,7 @@ export const BUILTIN_AGENT_TOOL_ID_SET = new Set<string>(BUILTIN_AGENT_TOOL_IDS)
 export type BuiltinAgentToolTier = 'core' | 'extended';
 
 export const BUILTIN_AGENT_TOOL_TIERS: Record<BuiltinAgentToolId, BuiltinAgentToolTier> = {
-  bash: 'core',
+  shell: 'core',
   read_file: 'core',
   read_image: 'core',
   write_file: 'core',
@@ -113,7 +113,7 @@ export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
   search: ['glob', 'grep'],
   web: ['web_fetch', 'web_search'],
   git: ['git_status', 'git_diff', 'git_log', 'git_add', 'git_unstage', 'git_commit'],
-  bash: ['bash'],
+  shell: ['shell'],
   write: ['write_file'],
   edit: ['edit_file'],
   askUser: ['ask_user'],
@@ -142,6 +142,7 @@ export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
 export const REJECTED_TOOL_TOKENS: Record<string, string> = {
   todo: 'Use canonical token "task" instead of removed token "todo".',
   search_codebase: 'Tool "search_codebase" was removed; use glob/grep.',
+  bash: 'Use canonical token "shell" instead of removed token "bash".',
 };
 
 export interface ToolTokenDiagnostic {

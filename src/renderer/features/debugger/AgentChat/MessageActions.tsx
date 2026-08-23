@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
-import { getElectronApi } from '../../../platform/getElectronApi';
+import { useClipboardBridge } from '../../../hooks/useClipboardBridge';
 import { useI18n } from '../../../i18n';
 import { MessageVariantNavigator } from './MessageVariantNavigator';
 
@@ -18,13 +18,14 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
   onCopy,
   onEditResend,
 }) => {
-  const { language } = useI18n();
+  const { t } = useI18n();
+  const { copyText } = useClipboardBridge();
   const [copied, setCopied] = useState(false);
   const resetTimerRef = useRef<number | null>(null);
-  const copyLabel = language === 'zh-CN' ? '复制' : 'Copy';
-  const copiedLabel = language === 'zh-CN' ? '已复制' : 'Copied';
-  const copyMessageLabel = language === 'zh-CN' ? '复制消息' : 'Copy message';
-  const editResendLabel = language === 'zh-CN' ? '编辑并重新发送' : 'Edit and resend';
+  const copyLabel = t('chat.markdownCopyCode');
+  const copiedLabel = t('chat.markdownCopied');
+  const copyMessageLabel = t('chat.copyMessage');
+  const editResendLabel = t('chat.editResend');
 
   useEffect(() => () => {
     if (resetTimerRef.current !== null) {
@@ -34,21 +35,7 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
 
   const handleCopy = useCallback(async () => {
     if (!message.content) return;
-    let didCopy = false;
-    try {
-      await getElectronApi()?.appShell.copyText(message.content);
-      didCopy = true;
-    } catch {
-      didCopy = false;
-    }
-    if (!didCopy) {
-      try {
-        await navigator.clipboard.writeText(message.content);
-        didCopy = true;
-      } catch {
-        didCopy = false;
-      }
-    }
+    const didCopy = await copyText(message.content);
     await onCopy?.(message.content);
     if (!didCopy) return;
     setCopied(true);
@@ -56,7 +43,7 @@ export const MessageActions: React.FC<MessageActionsProps> = ({
       window.clearTimeout(resetTimerRef.current);
     }
     resetTimerRef.current = window.setTimeout(() => setCopied(false), 1200);
-  }, [message.content, onCopy]);
+  }, [copyText, message.content, onCopy]);
 
   const handleEditResend = useCallback(() => {
     if (onEditResend && message.content) {
