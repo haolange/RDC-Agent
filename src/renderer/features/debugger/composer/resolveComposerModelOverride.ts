@@ -3,7 +3,7 @@ import type { SessionModelOverride } from '@shared/types/session';
 import { splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
 
 export function isComposerOverrideOption(option: Pick<AgentModelOption, 'status'>): boolean {
-  return option.status === 'ready' || option.status === 'model-unverified';
+  return option.status === 'ready';
 }
 
 export function resolveComposerModelOverride(

@@ -66,6 +66,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
       env: {},
       artifactsEnabled: true,
     },
+    shell: {
+      executable: '',
+    },
   },
   agentRuntime: {
     permissions: {

@@ -258,6 +258,7 @@ export class AgentOrchestrator {
       const activeContextWindow = planning.plan.contextWindowTokens;
       const promptPlan = this.promptPlan.buildPromptPlanForAgentTurn({
         agentId,
+        sessionId: context?.sessionId ?? null,
         projectRootPath: context?.projectRootPath ?? null,
         providerId: config.modelProvider,
         modelId: config.modelName,
@@ -478,6 +479,7 @@ export class AgentOrchestrator {
       const activeContextWindow = planning.plan.contextWindowTokens;
       const promptPlan = options?.promptPlan ?? this.promptPlan.buildPromptPlanForAgentTurn({
         agentId,
+        sessionId: options?.sessionId ?? null,
         projectRootPath: options?.projectRootPath ?? null,
         providerId: routeProviderId,
         modelId: routeModelId,

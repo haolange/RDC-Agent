@@ -1,8 +1,9 @@
 import type { DerivedContextView } from '@shared/types/semanticContext';
 import {
-  buildDerivedContextView,
+  assembleDerivedContextView,
   computeContextSourceHash,
   createStructuredHandoffMessage,
+  type ModelHandoffSections,
 } from '../agent-runtime/context/StructuredHandoffBuilder';
 import type { AgentRole } from '@shared/types/agent';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
@@ -52,8 +53,8 @@ export interface SessionContextMaterialization {
 }
 
 /**
- * Continuation 制品回放的 turn 数上限：只回放最近 N 个可见 turn 内的制品，
- * 更旧的落盘保留但不回放（防连续长会话 token bomb）。
+ * Continuation 制品回放的 turn 数上限：optional 制品只回放最近 N 个可见 turn。
+ * 协议 required 制品不受该窗口限制，只随 compaction 边界终止。
  */
 export const CONTINUATION_RETENTION_TURNS = 8;
 
@@ -72,7 +73,7 @@ export const filterSessionContextMessageArtifacts = (
       blocks.push(block);
       return blocks;
     }
-    const decision = withinRetention
+    const decision = withinRetention || block.continuation?.requirement === 'required'
       ? decideContinuationReplay(block.continuation, requestPlan, { sameToolLoop: false })
       : { action: 'drop' as const, reason: 'retention-expired' as const };
     decisions.push({
@@ -177,8 +178,8 @@ export class SessionContextJournal {
     let filteredArtifactCount = 0;
     let replayedArtifactCount = 0;
     const artifactDecisions: SessionContextArtifactDecision[] = [];
-    // Retention 上限：只有最近 N 个可见 turn 的制品才进入回放决策，
-    // 更旧的制品留在 journal 但按 retention-expired 丢弃。
+    // Retention 上限：最近 N 个可见 turn 的制品进入回放；更旧的 optional
+    // 制品按 retention-expired 丢弃，required 制品仍走 replay policy。
     const retentionStartIndex = Math.max(0, visibleTurnIds.length - CONTINUATION_RETENTION_TURNS);
     const retainedForReplay = new Set(visibleTurnIds.slice(retentionStartIndex));
     const messages = materializedTurnIds.flatMap((turnId) => {
@@ -211,11 +212,15 @@ export class SessionContextJournal {
     branchId: string,
     occupancy: { occupiedTokens: number; compactionThresholdTokens: number },
     keepRecentTurns = 3,
+    sections?: ModelHandoffSections,
   ): DerivedContextView | null {
     const withinCompactionLine = occupancy.occupiedTokens <= occupancy.compactionThresholdTokens;
     if (withinCompactionLine || visibleTurnIds.length <= keepRecentTurns) {
       storageAdapter.clearSessionDerivedContextView(sessionId);
       return null;
+    }
+    if (!sections) {
+      throw new Error('COMPACTION_SECTIONS_REQUIRED: model-generated handoff sections are missing.');
     }
     const entries = this.readEntries(sessionId);
     const entryByTurn = new Map(entries.map((entry) => [entry.turnId, entry]));
@@ -230,13 +235,14 @@ export class SessionContextJournal {
     const messageSourceRefs = sourceEntries.flatMap((entry) =>
       entry.messages.map((_, index) => 'turn:' + entry.turnId + ':message:' + index),
     );
-    const view = buildDerivedContextView(sourceMessages, {
+    const view = assembleDerivedContextView(sourceMessages, {
       scope: 'session',
       sessionId,
       branchId,
       sourceTurnIds,
       retainedTurnIds,
       messageSourceRefs,
+      sections,
     });
     storageAdapter.writeSessionDerivedContextView(sessionId, view);
     return view;

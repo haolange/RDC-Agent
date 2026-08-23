@@ -26,10 +26,7 @@ import type {
 import type { DerivedContextView } from '@shared/types/semanticContext';
 import { charsToTokens } from '@shared/utils/tokens';
 import { TokenizerService } from '../core/TokenizerService';
-import {
-  buildDerivedContextView,
-  createStructuredHandoffMessage,
-} from '../context/StructuredHandoffBuilder';
+import { createStructuredHandoffMessage } from '../context/StructuredHandoffBuilder';
 import { ToolResultSummarizer } from '../tools/ToolResultSummarizer';
 
 /** 上下文压缩配置。 */
@@ -46,6 +43,11 @@ export interface ContextManagerConfig {
   tokenizer?: TokenizerService;
   /** 当前模型 ID（用于选择正确的编码器）。 */
   modelId?: string;
+  /** Session/test-provided model-generated handoff assembler. */
+  createDerivedView?: (
+    source: AgentMessage[],
+    options: { createdAt: number; maxFactsPerGroup: number; maxResourceRefs: number },
+  ) => DerivedContextView | null;
 }
 
 const DEFAULT_TOOL_RESULT_BUDGET = 200 * 1024;
@@ -429,11 +431,8 @@ export class ContextManager {
       { maxFactsPerGroup: 1, maxResourceRefs: 2 },
       { maxFactsPerGroup: 0, maxResourceRefs: 0 },
     ]) {
-      const view = buildDerivedContextView(source, {
-        scope: 'ephemeral',
-        createdAt,
-        ...candidate,
-      });
+      const view = this.config.createDerivedView?.(source, { createdAt, ...candidate }) ?? null;
+      if (!view) continue;
       const message = createStructuredHandoffMessage(view);
       if (this.estimateTokens([message]) < sourceTokens) return { view, message };
     }

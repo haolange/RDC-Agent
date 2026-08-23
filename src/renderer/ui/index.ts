@@ -1,6 +1,7 @@
 export { Badge, type BadgeProps, type BadgeTone } from './Badge';
 export { Button, type ButtonProps, type ButtonVariant } from './Button';
 export { ConfirmationDialog, type ConfirmationDialogProps } from './ConfirmationDialog';
+export { ContextMenu, type ContextMenuProps } from './ContextMenu';
 export { ActiveSignalText, type ActiveSignalTone } from './ActiveSignalText';
 export { FaviconImage } from './FaviconImage';
 export { DropdownSelect } from './DropdownSelect';

@@ -59,7 +59,7 @@ const FIXTURES = {
       results: [{ title: 'RenderDoc', url: 'https://renderdoc.org/', snippet: 'Graphics debugger.' }],
     }),
   },
-  bash: {
+  shell: {
     argsPreview: JSON.stringify({ command: 'pnpm run typecheck' }),
     resultPreview: toolEnvelope('OK', { command: 'pnpm run typecheck', exitCode: 0, durationMs: 120, truncated: false, cwd: '.' }),
   },

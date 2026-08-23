@@ -28,7 +28,7 @@ import {
   SessionRenameArgsSchema,
   SessionSetModelOverrideArgsSchema,
 } from './validation/projectSessionSchemas';
-import { isEffectiveModelPickerSelectable } from '@shared/utils/effectiveModelPicker';
+import { classifyAgentToolEligibility, describeAgentToolIneligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { resolveEffectiveModel } from '../settings/EffectiveModelResolver';
 import { settingsService } from '../settings/SettingsService';
@@ -333,10 +333,16 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
           modelOverride.modelId,
           settingsService.getAll(),
         );
-        if (!model || !isEffectiveModelPickerSelectable(model)) {
+        if (!model || !isAgentToolExecutableModel(model)) {
+          const eligibility = model
+            ? classifyAgentToolEligibility(model)
+            : 'unavailable';
+          const detail = eligibility === 'executable'
+            ? `MODEL_UNAVAILABLE: ${modelOverride.providerId}:${modelOverride.modelId}`
+            : describeAgentToolIneligibility(eligibility, modelOverride.providerId, modelOverride.modelId).technicalMessage;
           return {
             success: false,
-            error: `MODEL_UNAVAILABLE: ${modelOverride.providerId}:${modelOverride.modelId}`,
+            error: detail,
           };
         }
       }

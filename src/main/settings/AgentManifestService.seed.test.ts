@@ -71,7 +71,7 @@ describe('AgentManifestService seed manifests', () => {
         reasoning: { kind: 'unknown' as const, supportsOff: false, levels: [], defaultSelection: 'off' as const, wireProfile: { kind: 'none' as const } },
       },
       selection: { pickerVisibility: 'primary' as const },
-      toolCalling: { state: 'unknown' as const }, visionInput: { state: 'unknown' as const }, structuredOutput: { state: 'unknown' as const },
+      toolCalling: { state: 'supported' as const }, visionInput: { state: 'unknown' as const }, structuredOutput: { state: 'unknown' as const },
       provenance: [],
     };
     const catalog = {
@@ -79,6 +79,7 @@ describe('AgentManifestService seed manifests', () => {
       generatedAt: '2026-07-14T00:00:00.000Z', stale: false, refreshing: false,
       models: [
         { ...baseModel, modelId: 'gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro', availability: 'available' as const },
+        { ...baseModel, modelId: 'unknown-tools', label: 'Unknown tools', availability: 'available' as const, toolCalling: { state: 'unknown' as const } },
         {
           ...baseModel,
           modelId: 'claude-opus-4.8-fast',
@@ -103,6 +104,7 @@ describe('AgentManifestService seed manifests', () => {
       expect.objectContaining({ modelId: 'claude-sonnet-5', configured: false, status: 'model-unavailable', disabledReason: 'Not returned by this account.' }),
     ]);
     expect(projected.modelOptions.some((option) => option.modelId === 'persisted-only')).toBe(false);
+    expect(projected.modelOptions.some((option) => option.modelId === 'unknown-tools')).toBe(false);
     expect(projected.modelOptions.some((option) => option.modelId === 'unverified-model')).toBe(false);
     expect(projected.modelOptions.some((option) => option.modelId === 'zero-budget-model')).toBe(false);
     expect(projected.modelOptions.some((option) => option.modelId === 'claude-opus-4.8-fast')).toBe(false);

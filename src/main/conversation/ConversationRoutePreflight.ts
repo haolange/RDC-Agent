@@ -20,6 +20,11 @@ import type {
 } from '@shared/types/session';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import { generateEventId, nowMs } from '@shared/utils/id';
+import {
+  classifyAgentToolEligibility,
+  describeAgentToolIneligibility,
+  isAgentToolExecutableModel,
+} from '@shared/utils/agentToolCapability';
 import { AGENT_DISPLAY_NAMES } from '@shared/constants/agents';
 import { normalizeToolName } from '../workflow/debugger/DebuggerRuntimePolicy';
 import { resolveAgentRouteCapability } from '../agent-runtime/capabilities/RouteCapabilityResolver';
@@ -359,6 +364,32 @@ export function resolveAgentRoutePreflight(
     };
   }
   const effectiveModelId = effectiveModel.modelId;
+  if (!isAgentToolExecutableModel(effectiveModel)) {
+    const eligibility = classifyAgentToolEligibility(effectiveModel);
+    const detail = eligibility === 'executable'
+      ? {
+          technicalCode: 'MODEL_UNAVAILABLE',
+          userMessage: `当前 ${label} 路由的模型不可执行：${providerId}/${effectiveModelId}。`,
+          technicalMessage: `MODEL_UNAVAILABLE: ${providerId}/${effectiveModelId} is not Agent-executable.`,
+        }
+      : describeAgentToolIneligibility(eligibility, providerId, effectiveModelId);
+    const recommendationText = selection.recommendations.map((entry) => entry.modelId).join(', ');
+    return {
+      ok: false,
+      diagnostic: createConversationDiagnostic({
+        agentId,
+        code: 'CONVERSATION_LLM_TOOLS_UNAVAILABLE',
+        severity: 'warning',
+        userMessage: recommendationText
+          ? `${detail.userMessage} 可改选：${recommendationText}。`
+          : detail.userMessage,
+        providerId,
+        modelId: effectiveModelId,
+        technicalMessage: `${detail.technicalMessage}${recommendationText ? ` Recommendations: ${recommendationText}.` : ''}`,
+        recommendations: selection.recommendations,
+      }),
+    };
+  }
 
   return {
     ok: true,

@@ -101,7 +101,7 @@ export const extractConversationToolResourceRefs = (
   }
   if (normalizedName === 'glob') addPath('cwd', 'directory');
   if (normalizedName === 'grep') addPath('root', 'directory');
-  if (normalizedName === 'bash') addPath('cwd', 'directory');
+  if (normalizedName === 'shell') addPath('cwd', 'directory');
 
   if (normalizedName === 'skill_read') {
     const skillId = stringValue(details, 'skillId');

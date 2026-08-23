@@ -1,5 +1,5 @@
 /**
- * Zod schemas for priority IPC channels (settings / terminal / workflow / memory).
+ * Zod schemas for priority IPC channels (settings / workflow / memory).
  */
 import { z } from 'zod';
 import { ipcId, ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
@@ -72,28 +72,8 @@ export const SettingsImportAgentManifestArgsSchema = z.tuple([
   ipcNonEmptyString(4096, 'filePath'),
 ]);
 
-export const TerminalCreateTabArgsSchema = z.tuple([
-  z.object({
-    cwd: z.union([ipcString(4096, 'cwd'), z.null()]).optional(),
-    sessionId: z.union([ipcId(128, 'sessionId'), z.null()]).optional(),
-    projectId: z.union([ipcId(128, 'projectId'), z.null()]).optional(),
-    runId: z.union([ipcId(128, 'runId'), z.null()]).optional(),
-  }).strict().optional(),
-]);
-
-export const TerminalTabIdArgsSchema = z.tuple([
-  ipcId(128, 'tabId'),
-]);
-
-export const TerminalWriteArgsSchema = z.tuple([
-  ipcId(128, 'tabId'),
-  ipcString(64 * 1024, 'data'),
-]);
-
-export const TerminalResizeArgsSchema = z.tuple([
-  ipcId(128, 'tabId'),
-  z.number().int().min(1).max(512),
-  z.number().int().min(1).max(512),
+export const SettingsGetResolvedShellArgsSchema = z.tuple([
+  ipcString(4096, 'executable'),
 ]);
 
 export const RuntimeLogListArgsSchema = z.tuple([

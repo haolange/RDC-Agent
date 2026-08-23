@@ -91,7 +91,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     id: 'tools',
     section: 'tools',
     titleKey: 'settings.toolsAndExtensions',
-    keywords: ['tools', 'mcp', 'cli', '工具', '扩展'],
+    keywords: ['tools', 'mcp', 'cli', 'shell', 'pwsh', 'powershell', '工具', '扩展', '终端'],
+    target: 'tools',
+  },
+  {
+    id: 'agent-shell',
+    section: 'tools',
+    titleKey: 'settings.shellTitle',
+    keywords: ['shell', 'pwsh', 'powershell', 'bash', 'zsh', 'terminal', '终端', '命令'],
     target: 'tools',
   },
   {

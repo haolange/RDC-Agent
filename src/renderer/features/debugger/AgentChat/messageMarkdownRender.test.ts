@@ -1,6 +1,6 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import Markdown from 'react-markdown';
+import Markdown, { type Options } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeHighlight from 'rehype-highlight';
@@ -10,7 +10,7 @@ import { normalizeAssistantMarkdown } from './normalizeAssistantMarkdown';
 
 function renderMarkdown(content: string, extras?: { highlight?: boolean; katex?: boolean }): string {
   const normalized = normalizeAssistantMarkdown(content);
-  const rehypePlugins = [];
+  const rehypePlugins: NonNullable<Options['rehypePlugins']> = [];
   if (extras?.katex) rehypePlugins.push(rehypeKatex);
   if (extras?.highlight) rehypePlugins.push([rehypeHighlight, { detect: true, ignoreMissing: true }]);
   return renderToStaticMarkup(

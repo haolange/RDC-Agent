@@ -79,6 +79,7 @@ export function createSettingsApi(transport: RendererApiTransport): SettingsApi 
     ),
     getModelsOverride: () => transport.invoke(INVOKE.settings.getModelsOverride),
     setModelsOverride: (overrides) => transport.invoke(INVOKE.settings.setModelsOverride, overrides),
+    getResolvedShell: (executable) => transport.invoke(INVOKE.settings.getResolvedShell, executable),
     set: (settings) => transport.invoke(INVOKE.settings.set, settings),
   };
 }

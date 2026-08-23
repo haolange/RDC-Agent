@@ -1,0 +1,8 @@
+{"type":"text-start","id":"text-1"}
+{"type":"text-delta","id":"text-1","text":"Hello world"}
+{"type":"text-end","id":"text-1"}
+{"type":"tool-input-start","id":"call-1","toolName":"read_file"}
+{"type":"tool-input-delta","id":"call-1","delta":"{\"path\":\"README.md\"}"}
+{"type":"tool-input-end","id":"call-1"}
+{"type":"tool-call","toolCallId":"call-1","toolName":"read_file","input":{"path":"README.md"}}
+{"type":"finish","finishReason":"tool-calls"}

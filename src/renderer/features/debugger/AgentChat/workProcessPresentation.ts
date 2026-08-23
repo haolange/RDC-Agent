@@ -688,7 +688,7 @@ export const unwrapToolContentLayer = (
   const argsRecord = toRecord(parsePreview(argsPreview));
   const contentText = sanitizeContentText(extractContentLayerText(parsed, raw));
 
-  if (normalized === 'bash' || normalized.includes('shell')) {
+  if (normalized === 'shell' || normalized.includes('shell')) {
     const commandText = sanitizeContentText(
       stringifyPreview(
         argsRecord?.command
@@ -1107,7 +1107,7 @@ const enhanceToolPreviewLines = (
   const normalized = normalizeToolName(toolName);
   const record = toRecord(parsed);
 
-  if (normalized === 'bash' || normalized.includes('shell')) {
+  if (normalized === 'shell' || normalized.includes('shell')) {
     const stdout = stringifyPreview(
       record?.stdout
       ?? readNestedValue(record ?? {}, ['result', 'stdout'])

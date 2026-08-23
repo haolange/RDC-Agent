@@ -547,6 +547,14 @@ describe('Provider Catalog compiler', () => {
     ]);
     expect(pro?.routeOptions?.map((option) => option.route.protocol)).not.toContain('OpenAIResponses');
     expect(deepseek?.models.every((model) => model.aliases.length === 0)).toBe(true);
+    expect(deepseek?.routes.map((route) => ({
+      protocol: route.protocol,
+      artifactScope: route.contracts.toolLoop.artifactScope,
+    }))).toEqual([
+      { protocol: 'OpenAIResponses', artifactScope: 'all-assistant-turns' },
+      { protocol: 'OpenAICompatibleChatCompletions', artifactScope: 'all-assistant-turns' },
+      { protocol: 'AnthropicMessages', artifactScope: 'all-assistant-turns' },
+    ]);
   });
 
   it('requires explicit typed connection schemas instead of a runtime API-key fallback', () => {
@@ -658,6 +666,14 @@ describe('Provider Catalog compiler', () => {
       guessedWindow: 'rdc-agent:chatgpt-account:0',
     };
     expect(() => compileProviderCatalog(unknownFactField)).toThrow(/maps an unknown fact field/u);
+
+    const missingToolsFact = clone(input());
+    const clinePass = mutableSurface(missingToolsFact, 'cline-pass');
+    const supportedCline = clinePass.models.find((model: Record<string, unknown>) => (
+      (model.toolCalling as { state?: string } | undefined)?.state === 'supported'
+    ));
+    delete supportedCline.fieldFactSourceIds;
+    expect(() => compileProviderCatalog(missingToolsFact)).toThrow(/dedicated tools fact source/u);
 
     const credentialPatch = clone(input());
     mutableSurface(credentialPatch, 'chatgpt-account').models[0].executionBindings[0].actions = [{

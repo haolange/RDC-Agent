@@ -26,6 +26,7 @@ export function createAppShellApi(transport: RendererApiTransport): AppShellApi 
     getAvatarDataUrl: (avatarPath) => transport.invoke(INVOKE.shell.getAvatarDataUrl, avatarPath),
     openPath: (targetPath) => transport.invoke(INVOKE.shell.openPath, targetPath),
     copyText: (text) => transport.invoke(INVOKE.shell.copyText, text),
+    readClipboardText: () => transport.invoke(INVOKE.shell.readClipboardText),
   };
 }
 

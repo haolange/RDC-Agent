@@ -1,4 +1,5 @@
 import { createRequire } from 'module';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -116,6 +117,10 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   }));
   assert(grokCapability.toolCallingMode === 'text-only', 'grok-account must fail closed while structured tool calling remains unverified.');
   assert(grokCapability.supportsToolResults === false, 'Unverified grok-account routes must not receive synthetic tool-result support.');
+  assert(
+    describeRouteCapabilityDiagnostic(grokCapability, 2)?.code === 'route_tool_calling_unknown',
+    'unknown tool calling must use the unknown diagnostic, not unsupported.',
+  );
 
   const openRouter = configuredProvider('openrouter', ['anthropic/claude-haiku-latest']);
   const openRouterCapability = resolveAgentRouteCapability(openRouter, 'anthropic/claude-haiku-latest', effectiveModel(openRouter, 'anthropic/claude-haiku-latest', {
@@ -131,7 +136,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(disabledCapability.toolCallingMode === 'disabled', 'missing providers must fail closed.');
 
   const sharedTypes = read('src/shared/types/agentRuntime.ts');
-  for (const token of ['ToolCallingMode', 'ReasoningVisibility', 'ReasoningDelivery', 'AgentRouteCapability', 'native-structured', 'text-only', 'disabled', 'account-oauth']) {
+  for (const token of ['ToolCallingMode', 'ReasoningVisibility', 'ReasoningDelivery', 'AgentRouteCapability', 'toolCallingEvidence', 'native-structured', 'text-only', 'disabled', 'account-oauth']) {
     assert(sharedTypes.includes(token), `shared agent runtime types must expose ${token}.`);
   }
 
@@ -157,7 +162,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assertIncludesNone(
     planTools,
     // 'agent' 是宽泛 token；Plan 通过 handoff/subagent 精确协作，不需要它。
-    ['bash', 'write', 'edit', 'rdxContext', 'agent'],
+    ['bash', 'shell', 'write', 'edit', 'rdxContext', 'agent'],
     'Plan seed tools',
   );
   assert(agentManifestService.includes("handoffs: agentId === 'plan'"), 'Plan must own a dedicated handoff entry.');
@@ -178,6 +183,8 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(orchestrator.includes('activeToolDefinitions'), 'AgentOrchestrator must register only effective tool schemas.');
   assert(orchestrator.includes('describeRouteCapabilityDiagnostic'), 'AgentOrchestrator must consume structured route capability diagnostics.');
   assert(orchestrator.includes('recordObservedToolCallingSupport'), 'AgentOrchestrator must persist successful structured tool evidence.');
+  assert(orchestrator.includes('recordObservedToolCallingUnsupported'), 'AgentOrchestrator must persist explicit tool-calling rejection evidence.');
+  assert(orchestrator.includes('isExplicitStructuredToolCallingRejection'), 'AgentOrchestrator must classify explicit tool-calling rejections.');
   assert(orchestrator.includes('textual_tool_call_not_executed'), 'AgentOrchestrator must normalize textual tool call diagnostics.');
   assert(orchestrator.includes('empty_response_without_tool_call'), 'AgentOrchestrator must normalize empty response diagnostics.');
   assert(orchestrator.includes('agentPermissionPolicyService.evaluate'), 'AgentOrchestrator must mediate tools through AgentPermissionPolicy.');
@@ -189,10 +196,12 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(!orchestrator.includes('onRequest: promptPlan ?'), 'RequestEnvelope creation must not be optional on provider calls.');
 
   const routeCapabilityResolver = read('src/main/agent-runtime/capabilities/RouteCapabilityResolver.ts');
-  assert(routeCapabilityResolver.includes('route_tool_calling_unverified'), 'Unknown native tool support must use the unverified diagnostic code.');
+  assert(routeCapabilityResolver.includes('route_tool_calling_unknown'), 'Unknown native tool support must use the unknown diagnostic code.');
   assert(routeCapabilityResolver.includes('route_tool_calling_unsupported'), 'Explicit unsupported tool support must use the unsupported diagnostic code.');
   assert(routeCapabilityResolver.includes('route_tool_calling_disabled'), 'Unavailable routes must use the disabled diagnostic code.');
-  assert(routeCapabilityResolver.includes("surface: 'runtime-log'"), 'Unverified native tool support must remain runtime-log only.');
+  assert(routeCapabilityResolver.includes('has not confirmed native tool calling'), 'Unknown tool calling must not reuse the explicit-unsupported wording.');
+  assert(!read('src/renderer/features/debugger/composer/composerModelPicker.ts').includes('isEffectiveModelPickerSelectable'), 'Composer picker must use the Agent tool-eligibility gate.');
+  assert(read('src/renderer/features/debugger/composer/composerModelPicker.ts').includes('isAgentToolExecutableModel'), 'Composer picker must share the Agent tool-eligibility gate.');
 
   assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/LLMAdapterProvider.ts')), 'Legacy LLMAdapterProvider must be removed from agent runtime.');
   assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/cli/StandaloneCli.ts')), 'The unshipped mock StandaloneCli must not return as a second runtime path.');
@@ -282,7 +291,7 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   }
 
   const permissionPolicy = read('src/main/agent-runtime/permissions/AgentPermissionPolicy.ts');
-  for (const token of ['full-access', 'auto_review', 'DEFAULT_ROUTINE_COMMAND_PREFIXES', 'readableRoots', 'writableRoots', 'commandUsesExternalPath']) {
+  for (const token of ['full-access', 'auto_review', 'POSIX_ROUTINE_COMMAND_PREFIXES', 'WINDOWS_ROUTINE_COMMAND_PREFIXES', 'routineCommandPrefixes', 'readableRoots', 'writableRoots', 'commandUsesExternalPath']) {
     assert(permissionPolicy.includes(token), `AgentPermissionPolicy must cover ${token}.`);
   }
 
@@ -295,6 +304,18 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
 
   const globTool = read('src/main/agent-runtime/tools/primitives/GlobTool.ts');
   assert(globTool.includes('splitExternalPattern'), 'Glob tool must resolve approved external path patterns.');
+
+  assert(fs.existsSync(path.join(repoRoot, 'src/shared/provider-catalog/agentToolCapabilityAudit.test.ts')), 'Catalog tool-calling audit must exist.');
+  assert(fs.existsSync(path.join(repoRoot, 'src/shared/provider-catalog/protocolWireFixtureCoverage.ts')), 'Native protocol wire-fixture coverage map must exist.');
+  const toolCapability = spawnSync(process.execPath, [path.join(repoRoot, 'scripts/check-agent-tool-capability.mjs')], {
+    cwd: repoRoot,
+    env: process.env,
+    stdio: 'inherit',
+  });
+  if (toolCapability.error) throw toolCapability.error;
+  if ((toolCapability.status ?? 1) !== 0) {
+    throw new Error('Shared Agent tool-capability check failed.');
+  }
 
   console.log('[agent-runtime] OK');
 }

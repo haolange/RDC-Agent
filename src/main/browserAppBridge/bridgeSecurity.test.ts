@@ -82,11 +82,11 @@ describe('browserAppBridge security', () => {
   });
 
   it('requires full-access opt-in for high-risk browser channels', () => {
-    for (const channel of ['command:execute', 'settings:set', 'rdx-runtime:trustMcp', 'rdx-runtime:revokeMcp', 'terminal:write', 'memory:issueApprovalToken']) {
+    for (const channel of ['command:execute', 'settings:set', 'rdx-runtime:trustMcp', 'rdx-runtime:revokeMcp', 'memory:issueApprovalToken']) {
       expect(isBridgeChannelAllowed(channel), channel).toBe(false);
     }
     process.env.RDC_AGENT_BROWSER_QA_FULL_ACCESS = '1';
-    for (const channel of ['command:execute', 'settings:set', 'rdx-runtime:trustMcp', 'rdx-runtime:revokeMcp', 'terminal:write', 'memory:issueApprovalToken']) {
+    for (const channel of ['command:execute', 'settings:set', 'rdx-runtime:trustMcp', 'rdx-runtime:revokeMcp', 'memory:issueApprovalToken']) {
       expect(isBridgeChannelAllowed(channel), channel).toBe(true);
     }
     // desktop-only stays denied even with FULL_ACCESS
@@ -94,6 +94,7 @@ describe('browserAppBridge security', () => {
     expect(isBridgeChannelAllowed('web:resolveFavicon')).toBe(false);
     expect(isBridgeChannelAllowed('dialog:selectDirectory')).toBe(true);
     expect(isBridgeChannelAllowed('app:copyText')).toBe(true);
+    expect(isBridgeChannelAllowed('app:readClipboardText')).toBe(true);
   });
 
   it('fails closed for unknown, internal, raw-secret, and unregistered channels', () => {

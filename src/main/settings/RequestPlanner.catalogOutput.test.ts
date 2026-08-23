@@ -115,6 +115,7 @@ function expectSendableOutput(model: EffectiveModel, catalogModels: EffectiveMod
     catalogModels: catalogModels.map((entry) => (
       entry.modelId === model.modelId ? sendable : entry
     )),
+    requireAgentToolEligibility: false,
   });
   expect(result.ok, `${model.providerId}/${model.modelId} ${result.ok ? '' : result.message}`).toBe(true);
   if (!result.ok) return;
@@ -135,7 +136,11 @@ describe('catalog output planning', () => {
         .filter((model) => model.availability === 'available' && model.defaultBudgetTokens > 0)
         .map((model) => compiledToEffective(surfaceId, model));
       for (const model of models) {
-        const result = planModelRequest({ model, catalogModels: models });
+        const result = planModelRequest({
+          model,
+          catalogModels: models,
+          requireAgentToolEligibility: false,
+        });
         if (!result.ok) {
           failures.push(`${surfaceId}/${model.modelId}: ${result.code} ${result.message}`);
           continue;
@@ -176,6 +181,7 @@ describe('catalog output planning', () => {
     const planned = planModelRequest({
       model: { ...model, availability: 'available', enabled: true },
       catalogModels: [model],
+      requireAgentToolEligibility: false,
     });
     expect(planned).toMatchObject({ ok: true, plan: { maxOutputTokens: 272_000, contextWindowTokens: 272_000 } });
   });
@@ -237,6 +243,7 @@ describe('catalog output planning', () => {
     const fireworksPlan = planModelRequest({
       model: { ...fireworksModel, availability: 'available', enabled: true },
       catalogModels: [fireworksModel],
+      requireAgentToolEligibility: false,
     });
     expect(fireworksPlan).toMatchObject({
       ok: true,
@@ -257,6 +264,7 @@ describe('catalog output planning', () => {
     const githubPlan = planModelRequest({
       model: { ...githubModel, availability: 'available', enabled: true },
       catalogModels: [githubModel],
+      requireAgentToolEligibility: false,
     });
     expect(githubPlan).toMatchObject({
       ok: true,
@@ -289,6 +297,7 @@ describe('catalog output planning', () => {
     const planned = planModelRequest({
       model: { ...model, availability: 'available', enabled: true },
       catalogModels: [model],
+      requireAgentToolEligibility: false,
     });
     expect(planned).toMatchObject({
       ok: true,

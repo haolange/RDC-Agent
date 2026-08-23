@@ -38,7 +38,7 @@
 - 切换和输入不触发 Context preview IPC。
 - 发送后计量相位依次为 `Preparing` / `Current request ~` / provider `Actual`。
   - 圆环环面只显示 `%` / `—` / `…`，阶段文案仅在 title/aria 与 Context breakdown 弹层。
-  - 环与分段条显示压缩线刻度；说明行拼接压缩线、条件完整窗口与本轮可生成。
+  - 分段条显示压缩线刻度，圆环不标压缩位置；说明行拼接压缩线、条件完整窗口与本轮可生成。
   - 弹层始终使用同一 hero、分段条、Tokens | Cache | Reasoning 和 Details 结构：Preparing 尚无新快照时保留最近真实计量，Current request 显示 prepared 预估，完全无遥测显示 `—`，不制造假 0 或切换到独立空态。
 - Actual / Last actual 在弹层宽度大于 `33rem` 时保持等宽三列独立圆角卡片 Tokens | Cache | Reasoning（Cache：省 tokens、最近一轮%、累计%、命中/未命中；缺遥测显示 `—`，禁止假 0 / 假 0%；Cache 卡内 stats 可折成 2×2）；卡片间距用 `--space-3`，禁止分隔线连体与 `clamp` 归零 gap；只有真实窄屏才纵向单列堆叠。
 - 缩窗只在发送 preflight 内派生压缩视图而不提前改写历史。
@@ -53,6 +53,13 @@
 - 白方块全程落在 track 内（inset 几何，无端点 transform 突变）。
 - 弹层拖拽无横向滚动条与布局跳动。
 - 松手仍 snap 到最近档位并短动画回位。
+
+## 右键上下文菜单
+
+- Composer textarea 与 Markdown CodeMirror 两轨均可弹出完整可编辑菜单；无选区时剪切/复制灰；剪贴板空时两个粘贴灰。
+- Settings 输入框、transcript 正文/代码块、Runtime Log 抽屉走同一套菜单；只读面只有复制/全选。
+- 「粘贴并清理格式」去掉 zero-width / NBSP / 智能引号 / 全角标点，且与「粘贴」不是同义重复。
+- 390px 窄屏菜单完整位于 viewport 内并在边缘翻转；Arrow / Home / End / Enter / Escape 与焦点返回正确；`prefers-reduced-motion` 下无入场动画。
 
 ## 验证命令
 

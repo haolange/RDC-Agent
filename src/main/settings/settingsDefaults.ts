@@ -9,6 +9,7 @@ import type {
   RdxActionSettingsMap,
   RdxCliInvokerSettings,
   RdxShellActionSettings,
+  AgentShellSettings,
   CodeInterpreterSettings,
   ToolingSettings,
   UiPreferences,
@@ -45,6 +46,7 @@ export interface PersistedSettingsPayload {
     rdxCli?: Partial<RdxCliInvokerSettings>;
     rdxActions?: Partial<Record<RdxActionId, Partial<RdxShellActionSettings>>>;
     codeInterpreter?: Partial<CodeInterpreterSettings>;
+    shell?: Partial<AgentShellSettings>;
   };
   agentRuntime?: {
     permissions?: Partial<AgentPermissionSettings>;
@@ -151,10 +153,15 @@ export const DEFAULT_CODE_INTERPRETER: CodeInterpreterSettings = {
   artifactsEnabled: true,
 };
 
+export const DEFAULT_SHELL_TOOLING: AgentShellSettings = {
+  executable: '',
+};
+
 export const DEFAULT_TOOLING: ToolingSettings = {
   rdxCli: DEFAULT_RDX_CLI_INVOKER,
   rdxActions: DEFAULT_RDX_ACTIONS,
   codeInterpreter: DEFAULT_CODE_INTERPRETER,
+  shell: DEFAULT_SHELL_TOOLING,
 };
 
 export const DEFAULT_AGENT_RUNTIME: AgentRuntimeSettings = {

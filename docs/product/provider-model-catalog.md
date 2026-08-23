@@ -2,7 +2,7 @@
 
 > 权威矩阵（2026-08-02）。Manifest 固化一手资料可确定的结构事实，credential-scoped discovery 决定账户可见性，真实 wire probe 验证 route / control / continuation；三者合并为 Effective Catalog。
 > `Context Window` 表示常规上下文预算；`1M Max` 单独表示是否支持 1M / Max mode。  
-> 「不清楚」或三角证据未齐 → fail-closed：manifest 用 `unknown` / `unsupported` / `none`（按证据选择）；Composer UI 呈现灰掉的 `Disabled` / `禁用`，不发明档位。  
+> 「不清楚」或三角证据未齐 → fail-closed：manifest 用 `unknown` / `unsupported` / `none`（按证据选择）。Agent/Composer 可执行集合只纳入 source-backed `toolCalling.supported` 且具备已实现 structured-tool adapter 的模型；`unknown`/`unsupported` 仍留在 Settings catalog 供审计，但不作为 Agent 选择项。  
 > 同名模型在不同 Provider surface 上的 Fast / 1M / 推理控件彼此独立，不可跨 surface 抄写。  
 > 一手资料不能替代账号 entitlement 或 wire 证据；live discovery 也不能发明协议、控件或 continuation。source-backed 容量与真实满窗压测必须明确区分。
 
@@ -21,7 +21,7 @@
 | GoogleGemini | `google-gemini` | — |
 | GoogleVertexAnthropic | `google-vertex-anthropic` | — |
 | GoogleVertexGemini | `google-vertex-gemini` | — |
-| MistralConversations | `mistral-conversations` | HAL Phase 7 |
+| MistralConversations | `mistral-conversations` | HAL Phase 7（adapter 保留，无 selectable surface） |
 | OllamaOpenAICompatibleChatCompletions | `ollama-openai-compatible` | — |
 | OpenAICompatibleChatCompletions | `openai-compatible` | — |
 | OpenAIResponses | `openai-responses` | — |

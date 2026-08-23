@@ -36,6 +36,7 @@ export class PromptPlanForTurn {
   buildPromptPlanForAgentTurn(input: {
     agentId: AgentRole;
     projectRootPath: string | null;
+    sessionId?: string | null;
     providerId: string;
     modelId: string;
     toolAllowlist: string[];
@@ -108,6 +109,7 @@ export class PromptPlanForTurn {
       skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? undefined),
       tools,
       workDir: projectRootPath ?? '',
+      sessionId: input.sessionId ?? null,
       routeCapability,
       effectiveModel: input.capability,
       permissionSettings,

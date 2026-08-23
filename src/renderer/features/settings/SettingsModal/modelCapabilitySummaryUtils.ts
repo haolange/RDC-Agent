@@ -221,7 +221,7 @@ function formatToolCallingState(state: CapabilityState | undefined, t: Translate
 }
 
 function toolCallingTone(state: CapabilityState | undefined): CapabilityChip['tone'] {
-  if (!state || state.state === 'unknown') return 'default';
+  if (!state || state.state === 'unknown') return 'warning';
   return stateTone(state);
 }
 

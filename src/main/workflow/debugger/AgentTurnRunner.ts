@@ -28,6 +28,7 @@ import {
 import {
   claimStructuredToolCallingEvidence,
   describeRouteCapabilityDiagnostic,
+  isExplicitStructuredToolCallingRejection,
   resolveAgentRouteCapability,
 } from '../../agent-runtime/capabilities/RouteCapabilityResolver';
 import {
@@ -50,6 +51,7 @@ import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import {
   recordEffectivePlanSuccess,
   recordObservedToolCallingSupport,
+  recordObservedToolCallingUnsupported,
   resolveEffectiveModel,
 } from '../../settings/EffectiveModelResolver';
 import { debuggerLlmService } from '../../settings/DebuggerLlmService';
@@ -551,35 +553,42 @@ export class AgentTurnRunner {
         }
         if (ev.type === 'toolcall_end') {
           sawStructuredToolCall = true;
-          if (claimStructuredToolCallingEvidence(
+          claimStructuredToolCallingEvidence(
             ev.type,
             routeCapability,
             structuredToolCallingEvidenceGate,
-          )) {
-            try {
-              recordObservedToolCallingSupport(
-                input.providerId,
-                effectiveModel?.modelId ?? input.modelId,
-                settingsService.getAll(),
-                requestPlan.route.protocol,
-              );
-            } catch (error) {
-              runtimeLogService.log({
-                scope: 'session',
-                namespace: 'agent',
-                severity: 'warning',
-                title: 'Tool capability evidence was not persisted',
-                summary: error instanceof Error ? error.message : String(error),
-                sessionId: executionScopeId,
-                projectId: input.projectId,
-                runId: input.runId,
-                raw: {
-                  providerId: input.providerId,
-                  modelId: effectiveModel?.modelId ?? input.modelId,
-                  protocol: requestPlan.route.protocol,
-                },
-              });
-            }
+          );
+        }
+      }
+      if (event.type === 'tool_execution_end' && !event.result.isError) {
+        if (claimStructuredToolCallingEvidence(
+          event.type,
+          routeCapability,
+          structuredToolCallingEvidenceGate,
+        )) {
+          try {
+            recordObservedToolCallingSupport(
+              input.providerId,
+              effectiveModel?.modelId ?? input.modelId,
+              settingsService.getAll(),
+              requestPlan.route.protocol,
+            );
+          } catch (error) {
+            runtimeLogService.log({
+              scope: 'session',
+              namespace: 'agent',
+              severity: 'warning',
+              title: 'Tool capability evidence was not persisted',
+              summary: error instanceof Error ? error.message : String(error),
+              sessionId: executionScopeId,
+              projectId: input.projectId,
+              runId: input.runId,
+              raw: {
+                providerId: input.providerId,
+                modelId: effectiveModel?.modelId ?? input.modelId,
+                protocol: requestPlan.route.protocol,
+              },
+            });
           }
         }
       }
@@ -736,6 +745,33 @@ export class AgentTurnRunner {
       return responseText;
     } catch (error) {
       terminalStatus = input.options?.signal?.aborted || turnHandle.isAborted ? 'stopped' : 'error';
+      if (terminalStatus === 'error' && isExplicitStructuredToolCallingRejection(error)) {
+        try {
+          recordObservedToolCallingUnsupported(
+            input.providerId,
+            effectiveModel?.modelId ?? input.modelId,
+            settingsService.getAll(),
+            requestPlan.route.protocol,
+            error instanceof Error ? error.message : String(error),
+          );
+        } catch (persistError) {
+          runtimeLogService.log({
+            scope: 'session',
+            namespace: 'agent',
+            severity: 'warning',
+            title: 'Tool capability rejection was not persisted',
+            summary: persistError instanceof Error ? persistError.message : String(persistError),
+            sessionId: executionScopeId,
+            projectId: input.projectId,
+            runId: input.runId,
+            raw: {
+              providerId: input.providerId,
+              modelId: effectiveModel?.modelId ?? input.modelId,
+              protocol: requestPlan.route.protocol,
+            },
+          });
+        }
+      }
       throw error;
     } finally {
       if (turnHandle.isAborted) {

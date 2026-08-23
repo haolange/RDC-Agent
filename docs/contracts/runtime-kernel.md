@@ -47,7 +47,11 @@ Scoped Runtime Resolution
   -> Provider Wire Request
 ```
 
-`PromptPlan` 每段含 id、kind、scope、source path/hash、precedence、content、token estimate、`stable|volatile`。稳定前缀指纹锚定 prompt-cache。Session 重建路径：`conversation.jsonl` + `conversation-branches.json` + `session-context.jsonl`。
+`PromptPlan` 每段含 id、kind、scope、source path/hash、precedence、content、token estimate、`stable|volatile`。稳定前缀指纹锚定 prompt-cache。Session 重建路径：`conversation.jsonl` + `conversation-branches.json` + `session-context.jsonl`。`context-view.json` 现写 `{ schemaVersion: '1', view }`；缺版本裸 view 走 `SESSION_CONTEXT_VIEW_MIGRATIONS`。`shell-state.json` 现写 `{ schemaVersion: '1', state: { cwd } }`，只存 cwd；缺版本或损坏 fail-closed / quarantine，未知更高版本 `STORAGE_SCHEMA_UNSUPPORTED`。
+
+切模型不自动 compact、不写迁移事务。`ContinuationReplayPolicy` 按 compiled execution identity 决定同绑定回放 / 跨绑定 drop；普通 Send 与 rewrite 在将丢弃 continuation 制品时插入同一条系统通知。optional 制品保留最近 8 个可见 turn；`requirement: required` 制品不受该窗口过期，只随 compaction 边界终止。
+
+manual `/compact` 与预算触发 auto-compact 共用同一条 LLM 结构化 handoff：`PromptPlan → RequestEnvelope → adapter`，单轮、无工具、禁用 cache write，`StructuredHandoff.derivation = 'model-generated'`。LLM 失败显式报错，不静默回退确定性抽取。低于压缩线返回 `status: 'noop'`，不得写 `complete` 压缩工作块。
 
 发送是 next-turn 事务：`preparing → committing → running → terminal`。Preflight 冻结 catalog/route/controls/`PromptPlan`/tools/attachments，并创建主进程 opaque credential lease。失败/取消的 preflight 不留 Session/journal/lease 残渣。Composer 附件先经 `conversation:stageAttachments` 写入 `{userData}/state/staging/attachments/`（进程启动清空）；turn commit 才拷进 session `attachments/`。`ConversationAttachmentMaterializer` 按 image / text / pdf / binary 四层物化：image 走 native vision；text/pdf 按 `min(固定上限, contextBudgetTokens * ratio)` 均分后 inline，prepare 冻结最终 session 逻辑路径与正文，run 只补 image 字节；binary 只给元数据。扫描件 PDF 无文本层写诊断；加载失败 / 加密不伪装成扫描件。SVG 硬拒。
 
@@ -109,7 +113,7 @@ Agent loop 终止与 Provider 失败互斥：`AGENT_NO_PROGRESS` → `CONVERSATI
 
 ## Tools 与 Permission（执行侧）
 
-Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（39 ids，含 `read_image` / `code_interpreter`）。Manifest token 经 `CANONICAL_TOOL_TOKEN_EXPANSIONS` 展开（`read` 含 `read_file`+`read_image`，`interpreter`/`image` 为专用 token）；`REJECTED_TOOL_TOKENS` 拒绝无静默 fallback。
+Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（39 ids，含 `shell` / `read_image` / `code_interpreter`）。Manifest token 经 `CANONICAL_TOOL_TOKEN_EXPANSIONS` 展开（`read` 含 `read_file`+`read_image`，`interpreter`/`image`/`shell` 为专用 token）；`REJECTED_TOOL_TOKENS` 拒绝无静默 fallback（含旧 token `bash`）。
 
 `read_image` 在 `visionInputMode !== 'native'` 时 `VISION_INPUT_UNSUPPORTED`。tool-result 图像由 `ContextManager.convertToLlm` 剥出并桥成紧随的 user image part；UI 缩略图只走 session `image-previews` + `conversation:getToolImagePreview`，禁止把大 base64 写入 `resultPreview`。`code_interpreter` 执行 Settings 配置的外部解释器，未启用 fail-closed。
 
@@ -123,7 +127,7 @@ Temporary 外部路径只经当前 `ToolExecutionContext.temporaryAllowedPathRoo
 
 Slash 命令是 runtime 输入，不绕过 profile 权限。基线：`/help` `/compact` `/context` `/memory` `/agents` `/skills` `/mcp` `/status` `/model`。
 
-权限模式：`Default` / `Auto-review` / `Full access` / `Custom(config.toml)`；主进程权威。即使 Full access：二进制/`.rdc` 拒绝进对话、realpath 约束、灾难性 shell 硬拒绝、`web_*` SSRF fail-closed、`bash run_in_background` 未闭环前禁用。
+权限模式：`Default` / `Auto-review` / `Full access` / `Custom(config.toml)`；主进程权威。即使 Full access：二进制/`.rdc` 拒绝进对话、realpath 约束、灾难性 shell 硬拒绝（按平台分集）、`web_*` SSRF fail-closed。agent `shell` 每次新进程，不提供 `run_in_background`。
 
 ## Skills 工具收窄
 
@@ -143,12 +147,12 @@ RDX runtime context 仅绑定 per-session lease（`RdxRuntimeContextRegistry`）
 
 ## Model Capability（摘要）
 
-`EffectiveCatalogService` 是唯一能力权威。Composer 跟已提交 Agent route revision，不跟乐观 Settings 投影。Context 计量相位：`Preparing` → `Current request ~` → `Actual` / idle `Last actual`。缩窗只在 send preflight 派生压缩视图。完整 UI 计量与控件语义见 `docs/ui/workbench-and-transcript.md`。
+`EffectiveCatalogService` 是唯一能力权威。Composer 跟已提交 Agent route revision，不跟乐观 Settings 投影。Agent/Composer 可执行模型必须通过共享 `isAgentToolExecutableModel` gate（source-backed `toolCalling.supported` + 已实现 structured-tool adapter + 账户 available）；`unknown`/`unsupported` 只留在 Settings catalog。Context 计量相位：`Preparing` → `Current request ~` → `Actual` / idle `Last actual`。缩窗只在 send preflight 派生压缩视图。完整 UI 计量与控件语义见 `docs/ui/workbench-and-transcript.md`。
 
 ## 相关源码
 
 - `src/main/workflow/debugger/` — Orchestrator façade、TurnCoordinator、DeferredTools
-- `src/main/agent-runtime/EffectiveRuntimePlan.ts` — schemaVersion 2 冻结 plan
+- `src/main/agent-runtime/EffectiveRuntimePlan.ts` — schemaVersion 3 冻结 plan
 - `src/main/sessions/RdxRuntimeContextRegistry.ts` — per-session RDX lease
 - `src/main/runtime/ProcessSupervisor.ts`、`src/main/lifecycle/ShutdownCoordinator.ts`
 - `src/main/agent-runtime/` — prompt、providers、permissions、tools

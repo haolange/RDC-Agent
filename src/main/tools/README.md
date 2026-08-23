@@ -4,7 +4,7 @@
 
 The forward path is:
 
-`UI/agent -> Settings shell action or bash -> ShellInvocationService -> system-installed CLI`
+`UI/agent -> Settings shell action or the agent shell tool -> ShellInvocationService -> system-installed CLI`
 
 Rules:
 

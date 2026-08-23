@@ -36,6 +36,7 @@ import type { RuntimeLogEntry, RuntimeLogScope } from './runtimeLog';
 import type {
   AppSettings,
   AppSettingsPatch,
+  ResolvedShellSnapshot,
   LlmProviderAccountStatus,
   LlmProviderAccountLoginStartRequest,
   LlmProviderAccountLoginFinishRequest,
@@ -65,7 +66,6 @@ import type {
   SessionScope,
   SessionScopedPayload,
 } from './session';
-import type { TerminalCreateTabRequest, TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from './terminal';
 import type { ToolCatalog, ToolRuntimeSummary } from './tool';
 import type { MCPServerStatusSummary } from './mcp';
 import type { CommandExecuteRequest, CommandListResult, CommandResult } from './command';
@@ -140,6 +140,10 @@ export interface ElectronAPI {
     copyText: (text: string) => Promise<{
       success: boolean;
     }>;
+    readClipboardText: () => Promise<{
+      success: boolean;
+      text: string;
+    }>;
   };
 
   web: {
@@ -171,6 +175,7 @@ export interface ElectronAPI {
     }>;
     compactHistory: (sessionId: string) => Promise<{
       success: boolean;
+      status?: 'noop' | 'compacted';
       messages: ConversationMessage[];
       contextView?: import('./semanticContext').DerivedContextView | null;
       occupiedTokens?: number;
@@ -312,6 +317,7 @@ export interface ElectronAPI {
     getProviderDefinitionCommit: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;
     getModelsOverride: () => Promise<ModelsOverride>;
     setModelsOverride: (overrides: ModelsOverride) => Promise<ModelsOverride>;
+    getResolvedShell: (executable: string) => Promise<ResolvedShellSnapshot>;
     set: (settings: AppSettingsPatch) => Promise<AppSettings>;
   };
 
@@ -408,15 +414,6 @@ export interface ElectronAPI {
     }>;
   };
 
-  terminal: {
-    listTabs: () => Promise<{ tabs: TerminalTabRecord[] }>;
-    createTab: (request?: TerminalCreateTabRequest) => Promise<{ success: boolean; tab?: TerminalTabRecord; tabs: TerminalTabRecord[]; error?: string }>;
-    closeTab: (tabId: string) => Promise<{ success: boolean; tabs: TerminalTabRecord[]; error?: string }>;
-    activateTab: (tabId: string) => Promise<{ success: boolean; tabs: TerminalTabRecord[]; error?: string }>;
-    write: (tabId: string, data: string) => Promise<{ success: boolean; error?: string }>;
-    resize: (tabId: string, cols: number, rows: number) => Promise<{ success: boolean; error?: string }>;
-  };
-
   capture: {
     list: (scope: SessionScope) => Promise<{ captures: CaptureDescriptor[] }>;
     select: (request: SessionScope & { captureId: string }) => Promise<{
@@ -479,9 +476,6 @@ export interface ElectronAPI {
     onProjectInputsChanged: (callback: (payload: { projectId: string; inputs: ProjectInputRecord[] }) => void) => () => void;
     onOpenedCaptureStateChanged: (callback: (state: SessionScopedPayload<OpenedCaptureState | null>) => void) => () => void;
     onRuntimeLogAppended: (callback: (entry: RuntimeLogEntry) => void) => () => void;
-    onTerminalData: (callback: (event: TerminalDataEvent) => void) => () => void;
-    onTerminalExit: (callback: (event: TerminalExitEvent) => void) => () => void;
-    onTerminalTabsChanged: (callback: (payload: { tabs: TerminalTabRecord[] }) => void) => () => void;
     onAppThemeChanged: (callback: (theme: ResolvedTheme) => void) => () => void;
     removeAllListeners: (channel: string) => void;
   };

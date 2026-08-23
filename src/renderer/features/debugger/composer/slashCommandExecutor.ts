@@ -178,7 +178,7 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
       if (result.success) {
         context.setConversationMessages(result.messages);
         const language = useAppSettingsStore.getState().settings.appearance.language;
-        context.showNotice(result.contextView
+        context.showNotice(result.status === 'compacted' && result.contextView
           ? translate(language, 'composer.compact.created', {
             count: result.contextView.sourceTurnIds.length,
           })

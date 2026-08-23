@@ -12,6 +12,7 @@ import type {
   RdxActionSettingsMap,
   RdxCliInvokerSettings,
   RdxShellActionSettings,
+  AgentShellSettings,
   CodeInterpreterSettings,
   SidebarLayoutPreference,
   ToolingSettings,
@@ -31,6 +32,7 @@ import {
   DEFAULT_CODE_INTERPRETER,
   DEFAULT_RDX_ACTIONS,
   DEFAULT_RDX_CLI_INVOKER,
+  DEFAULT_SHELL_TOOLING,
   LEFT_DEFAULTS,
   RIGHT_DEFAULTS,
   VALID_PERMISSION_MODES,
@@ -141,12 +143,23 @@ export function sanitizeCodeInterpreterSettings(
   };
 }
 
+export function sanitizeAgentShellSettings(
+  value: unknown,
+  fallback: AgentShellSettings = DEFAULT_SHELL_TOOLING,
+): AgentShellSettings {
+  const candidate = value && typeof value === 'object' ? value as Partial<AgentShellSettings> : {};
+  return {
+    executable: typeof candidate.executable === 'string' ? candidate.executable.trim() : fallback.executable,
+  };
+}
+
 export function sanitizeToolingSettings(value: unknown): ToolingSettings {
   const candidate = value && typeof value === 'object' ? value as Partial<ToolingSettings> : {};
   return {
     rdxCli: sanitizeRdxCliInvokerSettings(candidate.rdxCli),
     rdxActions: sanitizeRdxActionsSettings(candidate.rdxActions),
     codeInterpreter: sanitizeCodeInterpreterSettings(candidate.codeInterpreter),
+    shell: sanitizeAgentShellSettings(candidate.shell),
   };
 }
 

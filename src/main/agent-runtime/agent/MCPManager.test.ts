@@ -15,7 +15,7 @@ describe('MCPManager', () => {
   describe('工具名称解析', () => {
     it('isMCPTool 应识别 mcp__ 前缀', () => {
       expect(manager.isMCPTool('mcp__server__tool')).toBe(true);
-      expect(manager.isMCPTool('bash')).toBe(false);
+      expect(manager.isMCPTool('shell')).toBe(false);
       expect(manager.isMCPTool('read_file')).toBe(false);
       expect(manager.isMCPTool('')).toBe(false);
     });
@@ -28,7 +28,7 @@ describe('MCPManager', () => {
     });
 
     it('parsePrefixedName 对无效名称返回 null', () => {
-      expect(manager.parsePrefixedName('bash')).toBeNull();
+      expect(manager.parsePrefixedName('shell')).toBeNull();
       expect(manager.parsePrefixedName('mcp__')).toBeNull();
       expect(manager.parsePrefixedName('mcp____')).toBeNull();
       expect(manager.parsePrefixedName('')).toBeNull();

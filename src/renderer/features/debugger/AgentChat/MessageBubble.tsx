@@ -9,6 +9,7 @@ import { UserMessageEditForm } from './UserMessageEditForm';
 import { useUserMessageRewrite } from './useUserMessageRewrite';
 import { MessageAttachments } from './MessageAttachments';
 import { MessageMarkdown } from './MessageMarkdown';
+import { SystemMessage } from './SystemMessage';
 import { useConversationStore } from '../../../stores/conversationStore';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useLayoutStore } from '../../../stores/layoutStore';
@@ -233,24 +234,6 @@ const AssistantBubble: React.FC<{ message: ConversationMessage }> = ({ message }
   );
 };
 
-const SystemBubble: React.FC<{ message: ConversationMessage }> = ({ message }) => {
-  const { t } = useI18n();
-  const text = message.diagnostic?.code === 'MODEL_CONTINUATION_DROPPED'
-    ? t('chat.modelContinuationDropped')
-    : message.content;
-  return (
-    <article
-      className="conversation-message conversation-message-system"
-      data-testid="message-bubble-system"
-      data-message-id={message.id}
-    >
-      <div className="conversation-bubble conversation-bubble-system">
-        <span className="conversation-bubble-text">{text}</span>
-      </div>
-    </article>
-  );
-};
-
 const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ message }) => {
   if (message.role === 'user') {
     return <UserBubble message={message} />;
@@ -258,7 +241,7 @@ const MessageBubbleInner: React.FC<MessageBubbleProps> = ({ message }) => {
   if (message.role === 'assistant') {
     return <AssistantBubble message={message} />;
   }
-  return <SystemBubble message={message} />;
+  return <SystemMessage message={message} />;
 };
 
 export const MessageBubble = React.memo(MessageBubbleInner);

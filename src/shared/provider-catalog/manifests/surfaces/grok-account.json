@@ -40,6 +40,15 @@
       "refreshedAt": "2026-08-01",
       "surface": "grok-account",
       "accountScope": "observed-account"
+    },
+    {
+      "id": "provider-docs:grok-account:tools-2026-08-23",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "xai-responses-function-calling-2026-08-23",
+      "observedAt": "2026-08-23",
+      "refreshedAt": "2026-08-23T00:00:00+08:00",
+      "surface": "grok-account",
+      "accountScope": "observed-account"
     }
   ],
   "defaultFactSourceId": "user-observation:grok-account:2026-07-14",
@@ -132,7 +141,7 @@
       ],
       "defaultBudgetTokens": 1000000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -170,7 +179,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:grok-account:2026-07-14"
+      "factSourceId": "user-observation:grok-account:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:grok-account:tools-2026-08-23"
+      }
     },
     {
       "modelId": "grok-4.20-0309-reasoning",
@@ -191,7 +203,7 @@
       ],
       "defaultBudgetTokens": 1000000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -230,7 +242,10 @@
           }
         }
       },
-      "factSourceId": "runtime-observation:grok-account-fixed-reasoning:2026-08-01"
+      "factSourceId": "runtime-observation:grok-account-fixed-reasoning:2026-08-01",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:grok-account:tools-2026-08-23"
+      }
     },
     {
       "modelId": "grok-4.20-multi-agent-0309",
@@ -251,7 +266,7 @@
       ],
       "defaultBudgetTokens": 1000000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -301,7 +316,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:grok-account:2026-07-14"
+      "factSourceId": "user-observation:grok-account:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:grok-account:tools-2026-08-23"
+      }
     },
     {
       "modelId": "grok-4.3",
@@ -332,7 +350,7 @@
       ],
       "defaultBudgetTokens": 500000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -396,7 +414,10 @@
           "entitlement": "granted"
         }
       ],
-      "factSourceId": "user-observation:grok-account:2026-07-14"
+      "factSourceId": "user-observation:grok-account:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:grok-account:tools-2026-08-23"
+      }
     },
     {
       "modelId": "grok-4.6",
@@ -416,7 +437,7 @@
       ],
       "defaultBudgetTokens": 500000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -464,7 +485,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:grok-account:2026-07-14"
+      "factSourceId": "user-observation:grok-account:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:grok-account:tools-2026-08-23"
+      }
     },
     {
       "modelId": "grok-4.5",
@@ -484,7 +508,7 @@
       ],
       "defaultBudgetTokens": 500000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -530,7 +554,10 @@
           }
         }
       },
-      "factSourceId": "user-observation:grok-account:2026-07-14"
+      "factSourceId": "user-observation:grok-account:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:grok-account:tools-2026-08-23"
+      }
     },
     {
       "modelId": "grok-build-0.1",
@@ -550,7 +577,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -587,7 +614,10 @@
           }
         }
       },
-      "factSourceId": "runtime-observation:grok-account-fixed-reasoning:2026-08-01"
+      "factSourceId": "runtime-observation:grok-account-fixed-reasoning:2026-08-01",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:grok-account:tools-2026-08-23"
+      }
     },
     {
       "modelId": "grok-composer-2.5-fast",
@@ -607,7 +637,7 @@
       ],
       "defaultBudgetTokens": 200000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -659,7 +689,10 @@
           "structuredOutput"
         ]
       },
-      "factSourceId": "user-observation:grok-account:2026-07-14"
+      "factSourceId": "user-observation:grok-account:2026-07-14",
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:grok-account:tools-2026-08-23"
+      }
     }
   ],
   "protocolOverrides": [],

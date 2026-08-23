@@ -18,6 +18,9 @@ import { charsToTokens } from '@shared/utils/tokens';
 import { generateEventId } from '@shared/utils/id';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
 import { resolveSkillCatalogBudget } from '../capabilities/SkillCatalogBudget';
+import { formatShellInterpreterLabel } from '../../runtime/ShellResolver';
+import { resolveConfiguredShell } from '../../runtime/resolveConfiguredShell';
+import { storageAdapter } from '../../sessions/StorageAdapter';
 
 const CORE_FILES = ['identity-collaboration.md', 'agent-loop.md', 'tool-evidence.md', 'completion.md'];
 
@@ -29,6 +32,7 @@ export interface PromptPlanInput {
   skillCatalog: SkillMetadata[];
   tools: string[];
   workDir: string;
+  sessionId?: string | null;
   routeCapability: AgentRouteCapability;
   effectiveModel?: EffectiveModel;
   permissionSettings: AgentPermissionSettings;
@@ -164,13 +168,16 @@ export class PromptPlanBuilder {
       `Agent id: ${input.profile.id}`,
       `Model route: ${input.routeCapability.providerId}/${input.routeCapability.modelId}`,
       `Tool calling: ${input.routeCapability.toolCallingMode}`,
-      `Tool calling evidence: ${input.routeCapability.toolCallingUnverified ? 'unverified' : 'verified'}`,
+      `Tool calling evidence: ${input.routeCapability.toolCallingEvidence}`,
       `Vision input: ${input.routeCapability.visionInputMode}`,
       `Structured output: ${input.routeCapability.structuredOutputMode}`,
       ...(input.routeCapability.structuredOutputMode === 'prompt-fallback'
         ? ['When a structured response is requested, follow the requested schema in the prompt; no native structured-output contract is available.']
         : []),
       `Project root: ${input.workDir || '(none)'}`,
+      `Host OS: ${process.platform}`,
+      `Shell: ${resolvePromptShellLabel()}`,
+      `Shell cwd: ${resolvePromptShellCwd(input.sessionId, input.workDir)}`,
       `Permission mode: ${permission.mode}`,
       `Additional readable roots: ${permission.readableRoots.join(', ') || '(none)'}`,
       `Additional writable roots: ${permission.writableRoots.join(', ') || '(none)'}`,
@@ -218,6 +225,27 @@ export class PromptPlanBuilder {
       diagnostics,
     };
   }
+}
+
+function resolvePromptShellLabel(): string {
+  try {
+    const resolved = resolveConfiguredShell();
+    return `${formatShellInterpreterLabel(resolved.kind)} ${resolved.version}`.trim();
+  } catch {
+    return 'unavailable';
+  }
+}
+
+function resolvePromptShellCwd(sessionId: string | null | undefined, workDir: string): string {
+  if (sessionId) {
+    try {
+      const persisted = storageAdapter.readSessionShellCwd(sessionId);
+      if (persisted) return persisted;
+    } catch {
+      /* session may not exist yet */
+    }
+  }
+  return workDir || '(none)';
 }
 
 export const promptPlanBuilder = new PromptPlanBuilder();

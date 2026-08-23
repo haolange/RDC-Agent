@@ -17,6 +17,7 @@ const routeCapability = {
   reasoningContract: createNoneReasoningContract('test'),
   supportsStreaming: true,
   supportsToolResults: true,
+  toolCallingEvidence: 'supported' as const,
   toolCallingUnverified: false,
   visionInputMode: 'disabled' as const,
   structuredOutputMode: 'native' as const,
@@ -32,13 +33,13 @@ const basePermission = {
 
 describe('EffectiveRuntimePlan', () => {
   it('freezes permission/policy/tool allowlist under a stable fingerprint', () => {
-    const policy = compilePolicyFromRestrictive({ deniedTools: ['bash'], limits: { maxTurns: 7 } });
+    const policy = compilePolicyFromRestrictive({ deniedTools: ['shell'], limits: { maxTurns: 7 } });
     const plan = buildEffectiveRuntimePlan({
       agentId: 'ask',
       projectRootPath: 'D:/Project',
       projectId: 'proj-1',
       profile: { skills: ['inspect'] },
-      toolAllowlist: ['read_file', 'bash'],
+      toolAllowlist: ['read_file', 'shell'],
       permissionSettings: basePermission,
       routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'exec-fp' } },
@@ -53,7 +54,7 @@ describe('EffectiveRuntimePlan', () => {
     expect(plan.schemaVersion).toBe(3);
     expect(plan.planId).toMatch(/^plan_/);
     expect(plan.fingerprint).toHaveLength(24);
-    expect(plan.policy.deniedTools).toContain('bash');
+    expect(plan.policy.deniedTools).toContain('shell');
     expect(plan.profileSkills).toEqual(['inspect']);
     expect(plan.skillIntersection).toEqual(['read_file']);
     expect(plan.visibleToolNames).toEqual(['read_file']);
@@ -67,7 +68,7 @@ describe('EffectiveRuntimePlan', () => {
       projectRootPath: 'D:/Project',
       projectId: 'proj-1',
       profile: { skills: ['inspect'] },
-      toolAllowlist: ['read_file', 'bash'],
+      toolAllowlist: ['read_file', 'shell'],
       permissionSettings: basePermission,
       routeCapability: plan.routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'exec-fp' } },
@@ -127,7 +128,7 @@ describe('EffectiveRuntimePlan', () => {
   });
 
   it('does not change frozen plan content when settings inputs would have drifted', () => {
-    const policy = compilePolicyFromRestrictive({ deniedTools: ['bash'], limits: { maxTurns: 5 } });
+    const policy = compilePolicyFromRestrictive({ deniedTools: ['shell'], limits: { maxTurns: 5 } });
     const plan = buildEffectiveRuntimePlan({
       agentId: 'ask',
       projectRootPath: 'D:/Project',
@@ -154,7 +155,7 @@ describe('EffectiveRuntimePlan', () => {
       readableRoots: ['D:/Other'],
     };
     const driftedPolicy = compilePolicyFromRestrictive({
-      deniedTools: ['read_file', 'bash'],
+      deniedTools: ['read_file', 'shell'],
       limits: { maxTurns: 99 },
     });
     // Rebuild with drifted inputs produces a different fingerprint — proving the
@@ -163,14 +164,14 @@ describe('EffectiveRuntimePlan', () => {
       agentId: 'ask',
       projectRootPath: 'D:/Project',
       profile: { skills: ['other'] },
-      toolAllowlist: ['bash'],
+      toolAllowlist: ['shell'],
       permissionSettings: driftedPermission,
       routeCapability,
       requestPlan: { executionIdentity: { fingerprint: 'stable' } },
       promptPlan: { systemPrompt: 'system' },
       policy: driftedPolicy,
       skillIntersection: null,
-      visibleToolNames: ['bash'],
+      visibleToolNames: ['shell'],
       activatedDeferredTools: [],
       mcpDescriptorHash: 'changed',
     });
@@ -180,7 +181,7 @@ describe('EffectiveRuntimePlan', () => {
     expect(plan.profileSkills).toEqual(['inspect']);
     expect(plan.toolAllowlist).toEqual(['read_file']);
     expect(plan.skillIntersection).toEqual(['read_file']);
-    expect(plan.policy.deniedTools).toContain('bash');
+    expect(plan.policy.deniedTools).toContain('shell');
     expect(plan.policy.deniedTools).not.toContain('read_file');
     expect(drifted.fingerprint).not.toBe(plan.fingerprint);
     expect(drifted.policyFingerprint).not.toBe(plan.policyFingerprint);
@@ -205,7 +206,7 @@ describe('EffectiveRuntimePlan', () => {
     });
     expect(activeToolNamesForPlan([
       { name: 'read_file', description: '', parameters: { type: 'object', properties: {} } },
-      { name: 'bash', description: '', parameters: { type: 'object', properties: {} } },
+      { name: 'shell', description: '', parameters: { type: 'object', properties: {} } },
     ], plan)).toEqual(['read_file']);
 
     const openPlan = buildEffectiveRuntimePlan({

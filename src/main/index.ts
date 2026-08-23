@@ -16,7 +16,6 @@ import { settingsService } from './settings/SettingsService';
 import { rdxCliInvokerService } from './tools/RdxCliInvokerService';
 import { replayDeviceService } from './captures/ReplayDeviceService';
 import { runtimeLogService } from './runtime/RuntimeLogService';
-import { terminalSessionService } from './runtime/TerminalSessionService';
 import { rendererEventHub } from './browserAppBridge/rendererEventHub';
 import {
   shouldStartBrowserAppBridge,
@@ -77,13 +76,6 @@ function registerShutdownDisposables(): void {
     phase: 'terminate_processes',
     dispose: async () => {
       await agentOrchestrator.disconnectAllMcpServers();
-    },
-  });
-  shutdownCoordinator.register({
-    id: 'terminal.dispose-all',
-    phase: 'terminate_processes',
-    dispose: () => {
-      terminalSessionService.disposeAll();
     },
   });
   shutdownCoordinator.register({

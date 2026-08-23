@@ -16,7 +16,7 @@ const TRACE: ConversationWorkTrace = {
     startedAt: 1,
     toolCalls: [
       { id: 'ok', toolName: 'read_file', status: 'complete', startedAt: 1, completedAt: 2 },
-      { id: 'failed', toolName: 'bash', status: 'error', error: 'exit 1', startedAt: 2, completedAt: 3 },
+      { id: 'failed', toolName: 'shell', status: 'error', error: 'exit 1', startedAt: 2, completedAt: 3 },
       { id: 'pending', toolName: 'task_list', status: 'pending', startedAt: 3 },
       { id: 'running', toolName: 'web_search', status: 'running', startedAt: 4 },
     ],

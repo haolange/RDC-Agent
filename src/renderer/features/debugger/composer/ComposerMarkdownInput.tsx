@@ -1,9 +1,10 @@
-import React, { useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown } from '@codemirror/lang-markdown';
 import { EditorView, keymap, placeholder as cmPlaceholder } from '@codemirror/view';
 import { Prec, type Extension } from '@codemirror/state';
 import { indentWithTab } from '@codemirror/commands';
+import { registerCodeMirrorView } from '../../../lib/contextMenuCommands';
 import { assignDynStyle } from '../../../lib/useDynStyle';
 import { MessageMarkdown } from '../AgentChat/MessageMarkdown';
 import './ComposerMarkdownInput.css';
@@ -102,6 +103,10 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
 }) => {
   const hostRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => () => {
+    if (hostRef.current) registerCodeMirrorView(hostRef.current, null);
+  }, []);
+
   const syncHostHeight = useCallback(() => {
     const host = hostRef.current;
     if (!host) {
@@ -197,6 +202,9 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
             }}
             extensions={extensions}
             onChange={onChange}
+            onCreateEditor={(view) => {
+              if (hostRef.current) registerCodeMirrorView(hostRef.current, view);
+            }}
             editable={!disabled && mode === 'write'}
             aria-label={placeholder}
           />

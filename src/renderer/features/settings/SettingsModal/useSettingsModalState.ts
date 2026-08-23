@@ -6,6 +6,7 @@ import type {
   LlmProviderEntry,
   RdxActionSettingsMap,
   RdxCliInvokerSettings,
+  AgentShellSettings,
   CodeInterpreterSettings,
 } from '@shared/types/settings';
 import type { ProviderConnectionDraft, SettingsSection } from './types';
@@ -21,6 +22,7 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
   const [codeInterpreterDraft, setCodeInterpreterDraft] = useState<CodeInterpreterSettings>(
     settings.tooling.codeInterpreter,
   );
+  const [shellDraft, setShellDraft] = useState<AgentShellSettings>(settings.tooling.shell);
   const [agentManifestDrafts, setAgentManifestDrafts] = useState<AgentManifestDraft[]>(
     settings.agents.definitions.map((definition) => ({ ...definition })),
   );
@@ -47,6 +49,7 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setRdxCliDraft(settings.tooling.rdxCli);
     setRdxActionsDraft(cloneRdxActions(settings.tooling.rdxActions));
     setCodeInterpreterDraft(settings.tooling.codeInterpreter);
+    setShellDraft(settings.tooling.shell);
     setAgentManifestDrafts(settings.agents.definitions.map((definition) => ({ ...definition })));
     setGlobalInstructionsDraft(settings.agents.globalInstructions);
     setSelectedProviderId(providers[0]?.id ?? null);
@@ -70,6 +73,8 @@ export const useSettingsModalState = (open: boolean, settings: AppSettings) => {
     setRdxActionsDraft,
     codeInterpreterDraft,
     setCodeInterpreterDraft,
+    shellDraft,
+    setShellDraft,
     agentManifestDrafts,
     setAgentManifestDrafts,
     globalInstructionsDraft,

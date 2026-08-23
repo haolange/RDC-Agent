@@ -19,8 +19,8 @@ describe('cancel turn stability', () => {
     const requestPromise = agentToolApprovalRequestService.request({
       agentId: 'debugger',
       turnId,
-      toolCallId: 'tool-bash',
-      toolName: 'bash',
+      toolCallId: 'tool-shell',
+      toolName: 'shell',
       reason: 'Run command?',
       risk: 'medium',
       context: eventContext,
@@ -37,7 +37,7 @@ describe('cancel turn stability', () => {
     expect(events[1]?.payload).toMatchObject({
       status: 'cancelled',
       kind: 'tool',
-      toolCallId: 'tool-bash',
+      toolCallId: 'tool-shell',
     });
   });
 

@@ -50,25 +50,28 @@
 
 | 模块 | 路径（示意） | 边界 |
 | --- | --- | --- |
-| `ProcessSupervisor` | `src/main/runtime/` | 子进程 spawn/joinAll；仅在观察到 close/error 后移除 registry；超时未确认保留 `unconfirmed_orphan`；`code_interpreter` 走 `shell` owner |
+| `ProcessSupervisor` | `src/main/runtime/` | 子进程 spawn/joinAll；仅在观察到 close/error 后移除 registry；超时未确认保留 `unconfirmed_orphan`；`code_interpreter` 走 `shell` owner；agent `shell` 工具走 `agent-shell` owner |
 | `ToolImagePreviewStore` | `src/main/conversation/ToolImagePreviewStore.ts` | session `image-previews` 缩略图；IPC `conversation:getToolImagePreview` 只读 + active-session gate；magic bytes 拒伪 |
 | `AttachmentStagingService` | `src/main/conversation/AttachmentStagingService.ts` | Composer 附件 path/bytes 暂存；硬拒 `.rdc`/可执行/SVG；path 源先 `stats.size` 再读；累计配额 + TTL；预览走 `conversation:getAttachmentPreview`（realpath + composer scope） |
 | `tooling.codeInterpreter` | `src/shared/types/settings.ts` + Settings Tools | 本机边界、project 不可覆盖；未启用 `CODE_INTERPRETER_DISABLED` |
+| `tooling.shell` | `src/shared/types/settings.ts` + Settings Tools | 本机边界、project 不可覆盖；空路径则 `ShellResolver` 自动探测（Windows：pwsh 7 → 5.1；POSIX：`$SHELL`∈zsh/bash/sh/dash → `/bin/zsh` → `/bin/bash` → `/bin/sh`）；fish/csh/nu 等 fail-closed；全失败 `SHELL_UNAVAILABLE`；Settings 只读诊断走 `settings:getResolvedShell` |
 | `TurnCoordinator` / `TurnHandle` | `src/main/workflow/debugger/` | 每 session 活跃 turn；generation 丢弃迟到 event |
 | `ShutdownCoordinator` | `src/main/lifecycle/` | before-quit 限时 shutdownAll |
 | `MemoryStore` | `src/main/agent-runtime/memory/` | 进程内 realpath 队列 + `.memory.lock`（`directoryFileLock`：活 pid 永不回收，死 pid / 损坏锁回收）跨进程互斥 |
-| `StorageIo` / `storageSchema` | `src/main/sessions/` | zod runtime 校验 + `schemaVersion` migration registry；未知更高版本 `STORAGE_SCHEMA_UNSUPPORTED`；`attachments.json` 现写 `{ schemaVersion, attachments }`，缺版本纯数组仍 Zod 校验；`usage.json` 现写 `{ schemaVersion: '2', usage }`，v1 `outputReserveTokens` 经 `SESSION_USAGE_MIGRATIONS` 迁到 `maxOutputTokens` |
-| 上下文预算 / 压缩阈值 / 动态输出上限 | `src/shared/utils/contextBudget.ts` + `contextTiers.ts` | prompt 上限不扣输出；压缩百分比 `min(用户, policy)`；每次 LLM call 现算 `max_tokens`；门禁含 `check:fidelity` 与 Browser QA 环/刻度 |
+| `StorageIo` / `storageSchema` | `src/main/sessions/` | zod runtime 校验 + `schemaVersion` migration registry；未知更高版本 `STORAGE_SCHEMA_UNSUPPORTED`；`attachments.json` 现写 `{ schemaVersion, attachments }`，缺版本纯数组仍 Zod 校验；`usage.json` 现写 `{ schemaVersion: '2', usage }`，v1 `outputReserveTokens` 经 `SESSION_USAGE_MIGRATIONS` 迁到 `maxOutputTokens`；`context-view.json` 现写 `{ schemaVersion: '1', view }`，缺版本裸 view 经 `SESSION_CONTEXT_VIEW_MIGRATIONS` 包一层 |
+| `SessionContextJournal` | `src/main/conversation/SessionContextJournal.ts` | canonical 中性历史；`ContinuationReplayPolicy` 同绑定回放 / 跨绑定 drop；optional 制品 8 轮 retention，`requirement: required` 豁免窗口、只随 compaction 终止；切模型不自动 compact |
+| 结构化压缩 | `src/main/agent-runtime/context/` | `/compact` 与预算触发共用 LLM `StructuredHandoff`（`derivation: 'model-generated'`，经 PromptPlan 单轮无工具）；失败不静默回退；低于阈值返回 `status: 'noop'`，不写 complete 工作块 |
+| 上下文预算 / 压缩阈值 / 动态输出上限 | `src/shared/utils/contextBudget.ts` + `contextTiers.ts` | prompt 上限不扣输出；压缩百分比 `min(用户, policy)`；每次 LLM call 现算 `max_tokens`；门禁含 `check:fidelity` 与 Browser QA 分段条压缩线 |
 | `EffectiveRuntimePlan` | `src/main/agent-runtime/` | `schemaVersion: 3`；`prepareTurn` 完整冻结（含附件 manifest 指纹）；Prompt 与 Executor 共用 |
 | `LoopProgressGuard` / `AgentLoopTerminationError` | `src/main/agent-runtime/agent/` | 第二轮相同工具结果注入不落盘纠偏；第三轮 `AGENT_NO_PROGRESS`；仍需 continuation 的 max-turn 抛 `AGENT_MAX_TURNS_EXCEEDED`，不得静默完成或误报 Provider failure |
 | `AgentOrchestrator` | `src/main/workflow/debugger/AgentOrchestrator.ts` | façade 少于 800 行；职责外提；`pnpm run check:orchestrator-facade` |
 | `RdxRuntimeContextRegistry` | `src/main/sessions/` | **仅** per-session lease；禁止 `legacyGlobalMirror` / `getRdxRuntimeContext` |
 | Session Projection | `src/renderer/stores/sessionProjectionStore.ts` + `sessionEventGate` | 仅投影 `currentSession`；IPC 事件须 gate；后台 cache；Composer restore / Stop / Agent 运行态绑 `sessionId + requestId + agentId`；`pnpm run check:session-projection` |
-| Session `modelOverride` | `SessionRecord` + `session:setModelOverride` + `resolveAgentRoutePreflight` | 当前对话模型（Agent 路由仅作未点选种子）；Composer 底栏与 `/model` 共用；无 session 时只记草稿，不建 session；切 Agent **不清**模型；**不传** sub agent；注入点在选出 route 之后、查 EffectiveCatalog 之前；选择器与 Settings 对齐（`unknown` 可选，`unavailable`/`internal`/disabled fail-closed）；发送时 RequestPlanner 再校验可执行性 |
+| Session `modelOverride` | `SessionRecord` + `session:setModelOverride` + `resolveAgentRoutePreflight` | 当前对话模型（Agent 路由仅作未点选种子）；Composer 底栏与 `/model` 共用；无 session 时只记草稿，不建 session；切 Agent **不清**模型；**不传** sub agent；注入点在选出 route 之后、查 EffectiveCatalog 之前；Agent/Composer 选择器仅纳入 `toolCalling.state === 'supported'` 且具备已实现 structured-tool adapter 的模型；`unknown`/`unsupported`/`unavailable`/`internal`/disabled fail-closed，不静默回退；Settings catalog 仍展示完整可审计事实；发送时 RequestPlanner 再校验可执行性 |
 | `bridgeSecurity` | `src/main/browserAppBridge/` | **仅** `RDC_AGENT_BROWSER_QA=1`；bearer + Origin + canonical renderer channel + 已注册 handler；未知/内部/明文 secret channel fail-closed |
 | `McpTrustService` | `src/main/settings/` | project 不可覆盖 user executable；needsRetrust |
 | IPC Zod | `src/main/ipc/validation/` | **全量** handler `parseIpcArgs`；approvalToken 单次消费 |
-| `BashAstAnalyzer` | `src/main/agent-runtime/permissions/` | 风险分类器**不是**安全边界；PermissionPolicy 才是 |
+| `ShellCommandRiskAnalyzer` | `src/main/agent-runtime/permissions/` | 风险分类器**不是**安全边界，最高只评 `high` 做审批路由；PermissionPolicy + `shellHardDeny` 才是 enforcement；硬拒绝按平台分集 |
 | Secret / `safeStorage` | `src/main/settings/SecretStorageService.ts` | 不可用则 fail-closed；禁止明文 IPC；对外仅 `{ hasSecret, maskedPreview? }` |
 | Electron sandbox / CSP | BrowserWindow + preload | `sandbox:true`；permission deny-by-default；CSP：`style-src 'self'`（无 `unsafe-inline`）+ `style-src-attr 'none'`；动态样式走 constructable stylesheet（`useDynStyle`） |
 
@@ -99,7 +102,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 
 ## 浏览器真实会话边界
 
-- agent 日常 UI/功能验证默认使用 headless Browser QA：`pnpm run start:agent-browser`（`RDC_AGENT_HEADLESS=1` + `RDC_AGENT_BROWSER_QA=1`），每次默认使用经过校验的 disposable `os.tmpdir()/rdc-agent/qa-*` userData；只有显式 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 才进入真实共享数据。再用主进程日志输出的 **one-time `http://127.0.0.1:<port>/qa?qaBootstrap=...`** 打开同一套 renderer（`/qa` Set-Cookie 后进干净同源 `/app`）。**优先 `/qa`**；桥接鉴权不接受任何 URL token；`browser-dev` 下 Vite 由 bridge 同源反代（含 HMR），不得直开 Vite 端口、无跨端口 challenge；`high-impact` channel（含 `terminal:*`、`command:execute`、`settings:set`、MCP trust/revoke 等）在无 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时必须 fail-closed；`desktop-only` 永拒。门禁：`pnpm run check:browser-capability`。
+- agent 日常 UI/功能验证默认使用 headless Browser QA：`pnpm run start:agent-browser`（`RDC_AGENT_HEADLESS=1` + `RDC_AGENT_BROWSER_QA=1`），每次默认使用经过校验的 disposable `os.tmpdir()/rdc-agent/qa-*` userData；只有显式 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 才进入真实共享数据。再用主进程日志输出的 **one-time `http://127.0.0.1:<port>/qa?qaBootstrap=...`** 打开同一套 renderer（`/qa` Set-Cookie 后进干净同源 `/app`）。**优先 `/qa`**；桥接鉴权不接受任何 URL token；`browser-dev` 下 Vite 由 bridge 同源反代（含 HMR），不得直开 Vite 端口、无跨端口 challenge；`high-impact` channel（含 `command:execute`、`settings:set`、MCP trust/revoke 等）在无 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时必须 fail-closed；`desktop-only` 永拒。门禁：`pnpm run check:browser-capability`。
 - 浏览器真实会话通过 localhost bridge 连接真实 `main process`、workspace、settings、LLM runtime、事件流和已配置的 RDX CLI invoker；不得新增渲染层本地样本或演示场景作为验收入口。
 - Bridge 为 **debug-only** 安全边界（`bridgeSecurity`）：非 `RDC_AGENT_BROWSER_QA=1` 不得启动，且**不进 release 默认路径**。Browser 与 Desktop 必须共用 `src/shared/renderer-api` 的唯一 `ElectronAPI` 工厂、channel manifest 与 main handler registry；所有 preload 公开产品能力均保持 parity，未知/内部/未注册 channel 及不存在的明文 secret 读取 fail-closed。矩阵见 `docs/architecture/browser-qa-surface.md`。
 - Electron 窗口通过 `preload -> IPC transport` 进入主进程；浏览器真实会话通过 `localhost HTTP/SSE transport -> IPC handler registry` 进入主进程。除 transport 与原生窗口容器外，两条路径的 API、状态、持久化与审批语义必须一致，禁止恢复手写 Browser API、拒绝桩或第二套 channel 规则。
@@ -188,7 +191,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - **[AUTO] [BROWSER-QA]** Agent Loop / Tasks 改动必须覆盖相同指纹第二轮纠偏、第三轮终止、revision/result/args 变化复位、max-turn typed error、Ask Tasks 只读、Plan/Edit Tasks 可写、text-only route 不宣称工具、`tool_search` authoritative no-match；Browser 真实会话至少命中一次三轮无进展终止并确认没有 `CONVERSATION_LLM_REQUEST_FAILED`。
 - **[BROWSER-QA]** Provider/model/control 改动先 fresh discovery，再对最终 selectable 集合逐模型发最小真实请求；按 `provider + protocol + adapter + reasoning mapping + context activation + fast binding + continuation` 去重深测。账户 denial 保持不可选，429 与明确 quota 的 402 记录短期 expiry，5xx 保持可恢复且不得伪装成功。容量来源必须区分 source-backed 与真实 activation，禁止伪称百万 token 满窗压测。
 - **[AUTO]** HAL adapter 的 reasoning level 映射必须经 `ProviderReasoningMapper` 统一处理：manifest `reasoningEfforts` → wire effort 参数；新增 adapter 时确认 reasoning 投递路径经 `check:reasoning-delivery` 验证。
-- **[AUTO]** Builtin 工具目录、manifest token 展开与 `REJECTED_TOOL_TOKENS` 契约验证使用 `pnpm run check:tool-system`（当前 39 ids，含 `read_image` / `code_interpreter`）。
+- **[AUTO]** Builtin 工具目录、manifest token 展开与 `REJECTED_TOOL_TOKENS` 契约验证使用 `pnpm run check:tool-system`（当前 39 ids，含 `shell` / `read_image` / `code_interpreter`；旧 token `bash` 硬拒）。
 - **[AUTO] [BROWSER-QA]** `read_image` / `code_interpreter` / Tasks 快照 / Compact provenance 改动后执行 `check:tool-system`、`check:work-process`、`check:work-process-tool-coverage`、`check:browser-capability`；Browser QA 覆盖 vision fail-closed、解释器产物缩略图、相邻/不相邻任务快照与手动 `/compact` 卡片。
 - **[AUTO] [BROWSER-QA]** Composer 附件管道改动后执行 `check:shared-exports`、`check:browser-capability`、`check:fidelity`、`check:session-projection`、`check:right-rail`、`check:appearance`；Browser QA 覆盖空态、单图/多图、大文本、PDF、二进制、超限拒绝、`.rdc` 引导、vision 前置警告、移除、transcript 缩略图打开、Right Rail Context、Preparing Stop 回填、跨 session、390px 窄屏。
 - **[AUTO]** Settings Agents 路由契约验证使用 `pnpm run check:settings-agents`。

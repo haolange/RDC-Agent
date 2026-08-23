@@ -19,6 +19,17 @@ export interface StorageMigration<T> {
   migrate?: (raw: unknown) => unknown;
 }
 
+function isBareDerivedContextView(raw: unknown): boolean {
+  return Boolean(
+    raw
+    && typeof raw === 'object'
+    && !Array.isArray(raw)
+    && 'viewId' in raw
+    && 'handoff' in raw
+    && !('view' in raw),
+  );
+}
+
 function readSchemaVersion(raw: unknown): string | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const record = raw as Record<string, unknown>;
@@ -56,7 +67,9 @@ export function parseStoredDocument<T>(
     throw new StorageSchemaError(`STORAGE_SCHEMA: no migrations registered for ${filePath}`);
   }
   const current = migrations[migrations.length - 1]!;
-  let version = readSchemaVersion(raw);
+  let version = isBareDerivedContextView(raw) && migrations.some((entry) => entry.schemaVersion === '0')
+    ? '0'
+    : readSchemaVersion(raw);
   if (version === null) {
     if (migrations.some((entry) => entry.schemaVersion === '0')) {
       version = '0';
@@ -426,5 +439,109 @@ export const SESSION_USAGE_MIGRATIONS: StorageMigration<SessionUsageDocument>[] 
   {
     schemaVersion: '2',
     schema: SessionUsageV2Schema as ZodType<SessionUsageDocument>,
+  },
+];
+
+const DerivedContextViewSchema = z.object({
+  schemaVersion: z.literal(1),
+  viewId: z.string().min(1),
+  scope: z.enum(['ephemeral', 'session']),
+  sessionId: z.string().optional(),
+  branchId: z.string().optional(),
+  sourceTurnIds: z.array(z.string()),
+  retainedTurnIds: z.array(z.string()),
+  sourceHash: z.string().min(1),
+  handoff: z.object({
+    schemaVersion: z.literal(1),
+    handoffId: z.string().min(1),
+    kind: z.string().min(1),
+    derivation: z.enum(['model-generated', 'deterministic-extractive']).optional(),
+    objective: z.string(),
+    decisions: z.array(z.unknown()),
+    constraints: z.array(z.unknown()),
+    facts: z.array(z.unknown()),
+    openWork: z.array(z.unknown()),
+    resourceRefs: z.array(z.unknown()),
+    source: z.object({
+      turnIds: z.array(z.string()),
+      messageCount: z.number(),
+      messageHashes: z.array(z.string()),
+      sourceHash: z.string().min(1),
+    }).passthrough(),
+    contentHash: z.string().min(1),
+  }).passthrough(),
+  createdAt: z.number(),
+}).passthrough();
+
+export interface SessionContextViewDocument {
+  schemaVersion: string;
+  view: import('@shared/types/semanticContext').DerivedContextView;
+}
+
+export const CURRENT_CONTEXT_VIEW_SCHEMA_VERSION = '1';
+
+export const SessionContextViewV1Schema = z.object({
+  schemaVersion: z.literal('1'),
+  view: DerivedContextViewSchema,
+});
+
+function migrateSessionContextViewV0(raw: unknown): unknown {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw) && 'viewId' in raw && 'handoff' in raw) {
+    const view = raw as { handoff?: Record<string, unknown> };
+    const handoff = view.handoff && typeof view.handoff === 'object' && !Array.isArray(view.handoff)
+      ? {
+          derivation: 'deterministic-extractive',
+          ...view.handoff,
+        }
+      : view.handoff;
+    return { schemaVersion: CURRENT_CONTEXT_VIEW_SCHEMA_VERSION, view: { ...view, handoff } };
+  }
+  return raw;
+}
+
+export function toSessionContextViewManifest(
+  view: import('@shared/types/semanticContext').DerivedContextView,
+): SessionContextViewDocument {
+  return { schemaVersion: CURRENT_CONTEXT_VIEW_SCHEMA_VERSION, view };
+}
+
+export const SESSION_CONTEXT_VIEW_MIGRATIONS: StorageMigration<SessionContextViewDocument>[] = [
+  {
+    schemaVersion: '0',
+    schema: z.object({}).passthrough() as unknown as ZodType<SessionContextViewDocument>,
+    migrate: migrateSessionContextViewV0,
+  },
+  {
+    schemaVersion: '1',
+    schema: SessionContextViewV1Schema as unknown as ZodType<SessionContextViewDocument>,
+  },
+];
+
+export interface SessionShellState {
+  cwd: string;
+}
+
+export interface SessionShellStateDocument {
+  schemaVersion: string;
+  state: SessionShellState;
+}
+
+export const CURRENT_SHELL_STATE_SCHEMA_VERSION = '1';
+
+export const SessionShellStateV1Schema = z.object({
+  schemaVersion: z.literal('1'),
+  state: z.object({
+    cwd: z.string().min(1),
+  }),
+});
+
+export function toSessionShellStateManifest(state: SessionShellState): SessionShellStateDocument {
+  return { schemaVersion: CURRENT_SHELL_STATE_SCHEMA_VERSION, state };
+}
+
+export const SESSION_SHELL_STATE_MIGRATIONS: StorageMigration<SessionShellStateDocument>[] = [
+  {
+    schemaVersion: '1',
+    schema: SessionShellStateV1Schema as ZodType<SessionShellStateDocument>,
   },
 ];

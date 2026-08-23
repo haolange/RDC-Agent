@@ -69,8 +69,11 @@ AgentSubagentChildPayload
 AgentSubagentEventPayload
 AgentTaskEventPayload
 AgentTimelineEntry
+AgentToolCallingEvidence
 AgentToolCompletedPayload
 AgentToolDeniedPayload
+AgentToolEligibility
+AgentToolEligibilityCandidate
 AgentToolPolicy
 AgentToolRequestedPayload
 AgentToolStartedPayload
@@ -165,6 +168,7 @@ charsToTokens
 ChromeThemesConfig
 clampReasoningLevel
 clampReasoningSelection
+classifyAgentToolEligibility
 CLIResult
 CodeInterpreterSettings
 CodePreview
@@ -317,7 +321,6 @@ CreateRunResponse
 createRuntimeLogApi
 createSessionApi
 createSettingsApi
-createTerminalApi
 createToolApi
 createTraceApi
 createWebApi
@@ -336,6 +339,7 @@ DerivedContextMessageRef
 DerivedContextView
 DeviceApi
 diagnoseManifestToolTokens
+describeAgentToolIneligibility
 DialogApi
 DiffPreview
 DiscoveryAdmission
@@ -424,6 +428,7 @@ HarnessTaskMutationType
 HarnessTaskPriority
 HarnessTaskStatus
 hasBridgeChannelCapability
+hasImplementedStructuredToolAdapter
 hexToRgb
 HookDefinition
 HookEvent
@@ -436,7 +441,9 @@ index.ts::*
 IntakeContext
 INVESTIGATOR_AGENTS
 isAgentIconPreset
+isAgentToolExecutableModel
 isAlphanumeric
+isCatalogVisibleAgentModel
 isEffectiveModelPickerSelectable
 isEligibleMaxContextTier
 isHexColor
@@ -851,14 +858,7 @@ TaskMutation
 TERMINAL_DEFAULT_HEIGHT
 TERMINAL_MAX_HEIGHT
 TERMINAL_MIN_HEIGHT
-TerminalApi
-TerminalCreateTabRequest
-TerminalDataEvent
-TerminalExitEvent
 TerminalLayoutPreference
-TerminalTabKind
-TerminalTabRecord
-TerminalTabStatus
 TextPreview
 THEME_PRESET_CATALOG
 THEME_PRESET_IDS
@@ -924,6 +924,7 @@ TraceRevisionResult
 TraceSessionResult
 TraceStatus
 TraceVisibility
+toolCallingEvidenceOf
 type
 UiPreferences
 UserMessageNode

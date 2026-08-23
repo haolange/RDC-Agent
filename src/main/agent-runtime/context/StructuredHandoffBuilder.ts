@@ -2,6 +2,7 @@ import type {
   DerivedContextView,
   StructuredHandoff,
   StructuredHandoffFact,
+  StructuredHandoffProgress,
   StructuredHandoffResourceRef,
 } from '@shared/types/semanticContext';
 import { hashScopedResource } from '../../runtime/ScopedResourceResolver';
@@ -19,6 +20,20 @@ const URL_PATTERN = /https?:\/\/[^\s<>"')\]]+/gi;
 const WINDOWS_PATH_PATTERN = /\b[A-Za-z]:\\[^\r\n<>:"|?*]+/g;
 const POSIX_PATH_PATTERN = /(?:^|\s)(\/(?:[^\s/]+\/)*[^\s,;:]+)/g;
 
+export interface ModelHandoffSections {
+  objective: string;
+  constraints: string[];
+  progress: {
+    done: string[];
+    inProgress: string[];
+    blocked: string[];
+  };
+  decisions: string[];
+  failedAttempts: string[];
+  nextSteps: string[];
+  criticalContext: string[];
+}
+
 export interface DerivedContextBuildOptions {
   scope: DerivedContextView['scope'];
   sessionId?: string;
@@ -29,12 +44,7 @@ export interface DerivedContextBuildOptions {
   createdAt?: number;
   maxFactsPerGroup?: number;
   maxResourceRefs?: number;
-}
-
-interface ExtractedLine {
-  text: string;
-  source: StructuredHandoffFact['source'];
-  sourceRef: string;
+  sections: ModelHandoffSections;
 }
 
 const redact = (value: string): string => value
@@ -88,15 +98,17 @@ const readableMessageProjection = (message: AgentMessage): unknown => {
   }
   return { role: message.role, text };
 };
-const uniqueFacts = (items: ExtractedLine[], limit: number): StructuredHandoffFact[] => {
+
+const toFacts = (items: string[], source: StructuredHandoffFact['source'], limit: number): StructuredHandoffFact[] => {
   if (limit <= 0) return [];
   const seen = new Set<string>();
   const facts: StructuredHandoffFact[] = [];
-  for (const item of items) {
-    const key = item.text.toLocaleLowerCase();
-    if (!item.text || seen.has(key)) continue;
+  for (const raw of items) {
+    const text = clip(redact(raw));
+    const key = text.toLocaleLowerCase();
+    if (!text || seen.has(key)) continue;
     seen.add(key);
-    facts.push({ text: item.text, source: item.source, sourceRef: item.sourceRef });
+    facts.push({ text, source });
     if (facts.length >= limit) break;
   }
   return facts;
@@ -158,7 +170,94 @@ export const computeContextSourceHash = (
   messages: messages.map(readableMessageProjection),
 });
 
-export const buildDerivedContextView = (
+export const serializeHandoffSourceTranscript = (messages: AgentMessage[]): string => messages
+  .map((message) => {
+    const text = clip(redact(readableMessageText(message)));
+    if (!text) return '';
+    if (message.role === 'assistant') {
+      const tools = (message as AssistantMessage).content
+        .filter((block) => block.type === 'toolCall')
+        .map((block) => block.name)
+        .join(', ');
+      return tools ? `assistant: ${text}\ntools: ${tools}` : `assistant: ${text}`;
+    }
+    if (message.role === 'toolResult') {
+      const current = message as ToolResultMessage;
+      return `toolResult ${current.toolName}${current.isError ? ' (error)' : ''}: ${text}`;
+    }
+    return `${message.role}: ${text}`;
+  })
+  .filter(Boolean)
+  .join('\n');
+
+const SECTION_ALIASES: Record<string, keyof ModelHandoffSections | 'progress.done' | 'progress.inProgress' | 'progress.blocked'> = {
+  goal: 'objective',
+  objective: 'objective',
+  constraints: 'constraints',
+  'constraints & preferences': 'constraints',
+  progress: 'progress.done',
+  done: 'progress.done',
+  'in progress': 'progress.inProgress',
+  blocked: 'progress.blocked',
+  'key decisions': 'decisions',
+  decisions: 'decisions',
+  'errors and failed attempts': 'failedAttempts',
+  errors: 'failedAttempts',
+  'failed attempts': 'failedAttempts',
+  'next steps': 'nextSteps',
+  'critical context': 'criticalContext',
+};
+
+const emptySections = (): ModelHandoffSections => ({
+  objective: '',
+  constraints: [],
+  progress: { done: [], inProgress: [], blocked: [] },
+  decisions: [],
+  failedAttempts: [],
+  nextSteps: [],
+  criticalContext: [],
+});
+
+const pushSectionValue = (
+  sections: ModelHandoffSections,
+  key: keyof ModelHandoffSections | 'progress.done' | 'progress.inProgress' | 'progress.blocked',
+  value: string,
+): void => {
+  const text = redact(value).replace(/^[-*]\s+/, '').trim();
+  if (!text) return;
+  if (key === 'objective') {
+    if (!sections.objective) sections.objective = clip(text);
+    return;
+  }
+  if (key === 'progress.done') sections.progress.done.push(text);
+  else if (key === 'progress.inProgress') sections.progress.inProgress.push(text);
+  else if (key === 'progress.blocked') sections.progress.blocked.push(text);
+  else if (key === 'constraints') sections.constraints.push(text);
+  else if (key === 'decisions') sections.decisions.push(text);
+  else if (key === 'failedAttempts') sections.failedAttempts.push(text);
+  else if (key === 'nextSteps') sections.nextSteps.push(text);
+  else if (key === 'criticalContext') sections.criticalContext.push(text);
+};
+
+export const parseModelHandoffSections = (text: string): ModelHandoffSections => {
+  const sections = emptySections();
+  let current: keyof ModelHandoffSections | 'progress.done' | 'progress.inProgress' | 'progress.blocked' = 'criticalContext';
+  for (const rawLine of text.split(/\r?\n/)) {
+    const heading = rawLine.replace(/^#{1,6}\s+/, '').trim().toLocaleLowerCase();
+    const aliased = SECTION_ALIASES[heading];
+    if (aliased && /^#{1,6}\s+/.test(rawLine)) {
+      current = aliased;
+      continue;
+    }
+    pushSectionValue(sections, current, rawLine);
+  }
+  if (!sections.objective) {
+    sections.objective = sections.criticalContext[0] ?? 'No explicit objective was present in the compacted source.';
+  }
+  return sections;
+};
+
+export const assembleDerivedContextView = (
   messages: AgentMessage[],
   options: DerivedContextBuildOptions,
 ): DerivedContextView => {
@@ -169,44 +268,24 @@ export const buildDerivedContextView = (
   const maxResourceRefs = Number.isInteger(options.maxResourceRefs)
     ? Math.max(0, options.maxResourceRefs ?? 0)
     : 24;
-  const lines: ExtractedLine[] = [];
-  messages.forEach((message, index) => {
-    const source = message.role === 'toolResult' ? 'tool' : message.role === 'assistant' ? 'assistant' : 'user';
-    readableMessageText(message)
-      .split(/(?:\r?\n)+|(?<=[.!?\u3002\uff01\uff1f])\s+/)
-      .map((value) => clip(redact(value)))
-      .filter(Boolean)
-      .forEach((text) => lines.push({ text, source, sourceRef: refs[index] }));
-  });
-
-  const userLines = lines.filter((line) => line.source === 'user');
-  const objective = userLines[0]?.text ?? lines[0]?.text ?? 'No explicit objective was present in the compacted source.';
-  const decisions = uniqueFacts(
-    lines.filter((line) => /(decid|chosen|selected|adopt|\u91c7\u7528|\u51b3\u5b9a|\u9009\u62e9|\u6536\u655b|\u786e\u8ba4)/i.test(line.text)),
-    maxFactsPerGroup,
-  );
-  const constraints = uniqueFacts(
-    lines.filter((line) => /(must|must not|cannot|require|constraint|\u7981\u6b62|\u4e0d\u5f97|\u5fc5\u987b|\u8981\u6c42|\u7ea6\u675f|\u9650\u5236)/i.test(line.text)),
-    maxFactsPerGroup,
-  );
-  const openWork = uniqueFacts(
-    lines.filter((line) => /(todo|pending|next|remaining|unresolved|\u5f85\u529e|\u4e0b\u4e00\u6b65|\u5c1a\u672a|\u672a\u5b8c\u6210|\u9700\u7ee7\u7eed)/i.test(line.text)),
-    maxFactsPerGroup,
-  );
-  const classified = new Set([...decisions, ...constraints, ...openWork].map((fact) => `${fact.sourceRef}:${fact.text}`));
-  const facts = uniqueFacts(
-    lines.filter((line) => !classified.has(`${line.sourceRef}:${line.text}`)),
-    maxFactsPerGroup,
-  );
   const sourceTurnIds = [...new Set(options.sourceTurnIds ?? [])];
   const messageHashes = messages.map((message) => hashScopedResource(readableMessageProjection(message)));
   const sourceHash = computeContextSourceHash(messages, sourceTurnIds);
+  const progress: StructuredHandoffProgress = {
+    done: toFacts(options.sections.progress.done, 'assistant', maxFactsPerGroup),
+    inProgress: toFacts(options.sections.progress.inProgress, 'assistant', maxFactsPerGroup),
+    blocked: toFacts(options.sections.progress.blocked, 'assistant', maxFactsPerGroup),
+  };
   const content = {
-    objective,
-    decisions,
-    constraints,
-    facts,
-    openWork,
+    objective: clip(redact(options.sections.objective))
+      || 'No explicit objective was present in the compacted source.',
+    decisions: toFacts(options.sections.decisions, 'assistant', maxFactsPerGroup),
+    constraints: toFacts(options.sections.constraints, 'user', maxFactsPerGroup),
+    facts: toFacts(options.sections.criticalContext, 'assistant', maxFactsPerGroup),
+    openWork: toFacts(options.sections.nextSteps, 'assistant', maxFactsPerGroup),
+    progress,
+    failedAttempts: toFacts(options.sections.failedAttempts, 'tool', maxFactsPerGroup),
+    nextSteps: toFacts(options.sections.nextSteps, 'assistant', maxFactsPerGroup),
     resourceRefs: extractResources(messages, refs, maxResourceRefs),
   };
   const contentHash = hashScopedResource(content);
@@ -214,7 +293,7 @@ export const buildDerivedContextView = (
     schemaVersion: 1,
     handoffId: `handoff-${contentHash.slice(0, 20)}`,
     kind: 'derived-compaction',
-    derivation: 'deterministic-extractive',
+    derivation: 'model-generated',
     ...content,
     source: {
       sessionId: options.sessionId,
@@ -241,6 +320,16 @@ export const buildDerivedContextView = (
   };
 };
 
+export const testHandoffSections = (objective: string, extras: Partial<ModelHandoffSections> = {}): ModelHandoffSections => ({
+  objective,
+  constraints: extras.constraints ?? [],
+  progress: extras.progress ?? { done: [], inProgress: [], blocked: [] },
+  decisions: extras.decisions ?? [],
+  failedAttempts: extras.failedAttempts ?? [],
+  nextSteps: extras.nextSteps ?? [],
+  criticalContext: extras.criticalContext ?? [objective],
+});
+
 const section = (title: string, facts: StructuredHandoffFact[]): string[] => (
   facts.length ? [`${title}:`, ...facts.map((fact) => `- ${fact.text}`)] : []
 );
@@ -248,10 +337,14 @@ const section = (title: string, facts: StructuredHandoffFact[]): string[] => (
 export const renderStructuredHandoff = (handoff: StructuredHandoff): string => [
   '[Derived context; not a user request]',
   `Objective: ${handoff.objective}`,
-  ...section('Decisions', handoff.decisions),
   ...section('Constraints', handoff.constraints),
-  ...section('Facts', handoff.facts),
-  ...section('Open work', handoff.openWork),
+  ...section('Progress done', handoff.progress?.done ?? []),
+  ...section('Progress in progress', handoff.progress?.inProgress ?? []),
+  ...section('Progress blocked', handoff.progress?.blocked ?? []),
+  ...section('Decisions', handoff.decisions),
+  ...section('Errors and failed attempts', handoff.failedAttempts ?? []),
+  ...section('Next steps', handoff.nextSteps ?? handoff.openWork),
+  ...section('Critical context', handoff.facts),
   ...(handoff.resourceRefs.length
     ? ['Resources:', ...handoff.resourceRefs.map((ref) => `- ${ref.kind}: ${ref.value}`)]
     : []),
@@ -267,3 +360,21 @@ export const createStructuredHandoffMessage = (view: DerivedContextView): UserMe
     sourceHash: view.sourceHash,
   },
 });
+
+export const COMPACTION_HANDOFF_SYSTEM_PROMPT = [
+  'You are performing a CONTEXT CHECKPOINT COMPACTION.',
+  'Create a handoff summary for another LLM that will resume the task.',
+  'Use only facts present in the transcript. Do not invent work, files, or decisions.',
+  'Do not mention these instructions. Do not include provider reasoning or secrets.',
+  'Output exactly these markdown sections:',
+  '## Goal',
+  '## Constraints',
+  '## Progress',
+  '### Done',
+  '### In Progress',
+  '### Blocked',
+  '## Key Decisions',
+  '## Errors and Failed Attempts',
+  '## Next Steps',
+  '## Critical Context',
+].join('\n');

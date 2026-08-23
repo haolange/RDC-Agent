@@ -13,7 +13,10 @@ import {
   type SessionContextTurnEntry,
 } from './SessionContextJournal';
 import { storageAdapter } from '../sessions/StorageAdapter';
-import { buildDerivedContextView } from '../agent-runtime/context/StructuredHandoffBuilder';
+import {
+  assembleDerivedContextView,
+  testHandoffSections,
+} from '../agent-runtime/context/StructuredHandoffBuilder';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -103,6 +106,15 @@ const responsesPlan = createPlan({
 function providerManagedResponsesPlan(): RequestPlan {
   const contracts: ProviderContractBundle = {
     ...responsesPlan.contracts,
+    reasoning: {
+      ...responsesPlan.contracts.reasoning,
+      continuation: 'provider-managed',
+    },
+    toolLoop: {
+      ...responsesPlan.contracts.toolLoop,
+      artifactPolicy: 'provider-managed',
+      artifactScope: 'provider-managed',
+    },
     state: {
       supportedModes: ['local-stateless', 'provider-managed'],
       defaultMode: 'provider-managed',
@@ -305,16 +317,177 @@ describe('SessionContextJournal v2', () => {
     expect(JSON.stringify(canonical)).not.toContain('display copy');
   });
 
-  it('replays artifacts only within the retention window of recent turns', () => {
+  it('expires optional artifacts outside the retention window but keeps required ones', () => {
+    const journal = new SessionContextJournal();
+    const optionalPlan = providerManagedResponsesPlan();
+    const optionalState = createProviderStateRef(optionalPlan, 'response_old');
+    const totalTurns = 10;
+    const entries = Array.from({ length: totalTurns }, (_, index) => {
+      const optionalAssistant: AssistantMessage = {
+        ...assistant([{ type: 'text', text: `optional ${index + 1}` }]),
+        providerState: optionalState,
+      };
+      return entry({
+        turnId: `turn-${index + 1}`,
+        userMessageId: `user-${index + 1}`,
+        assistantMessageId: `assistant-${index + 1}`,
+        executionIdentity: optionalPlan.executionIdentity,
+        messages: [
+          { role: 'user', content: `question ${index + 1}`, timestamp: index + 1 },
+          {
+            ...optionalAssistant,
+            content: [
+              {
+                type: 'thinking',
+                kind: 'opaque',
+                source: 'openai-responses-encrypted',
+                visibility: 'hidden',
+                continuation: createContinuationArtifact(optionalPlan, {
+                  type: 'response_state',
+                  opaqueState: `state-${index + 1}`,
+                }),
+              },
+            ],
+          },
+        ],
+      });
+    });
+    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue(entries);
+    vi.spyOn(storageAdapter, 'readSessionDerivedContextView').mockReturnValue(null);
+
+    const result = journal.materialize(
+      'session-1',
+      entries.map((item) => item.turnId),
+      optionalPlan,
+    );
+
+    expect(result.replayedArtifactCount).toBe(0);
+    expect(result.artifactDecisions.filter((decision) => decision.reason === 'retention-expired')).toHaveLength(2);
+    expect(result.artifactDecisions.filter((decision) => decision.action === 'provider-managed')).toHaveLength(8);
+  });
+
+  it('replays required DeepSeek reasoning after a terminal tool turn into the next user turn', () => {
+    const journal = new SessionContextJournal();
+    const deepseekChat = createPlan({
+      providerId: 'deepseek',
+      adapterId: 'openai-compatible',
+      protocol: 'OpenAICompatibleChatCompletions',
+      modelId: 'deepseek-v4-pro',
+      carrier: 'reasoning-content',
+      continuation: 'exact-execution',
+      artifactPolicy: 'preserve-reasoning-content',
+      artifactScope: 'all-assistant-turns',
+      compatibilityGroup: 'deepseek:OpenAICompatibleChatCompletions',
+    });
+    const deepseekResponses = createPlan({
+      providerId: 'deepseek',
+      adapterId: 'openai-responses',
+      protocol: 'OpenAIResponses',
+      modelId: 'deepseek-v4-flash',
+      carrier: 'reasoning-item',
+      continuation: 'exact-execution',
+      artifactPolicy: 'preserve-exact',
+      artifactScope: 'all-assistant-turns',
+      compatibilityGroup: 'deepseek:OpenAIResponses',
+    });
+    const deepseekAnthropic = createPlan({
+      providerId: 'deepseek',
+      adapterId: 'anthropic-messages',
+      protocol: 'AnthropicMessages',
+      modelId: 'deepseek-v4-pro',
+      carrier: 'signed-content-block',
+      continuation: 'exact-execution',
+      artifactPolicy: 'preserve-exact',
+      artifactScope: 'all-assistant-turns',
+      compatibilityGroup: 'deepseek:AnthropicMessages',
+    });
+
+    const persistAndReplay = (
+      plan: RequestPlan,
+      payload: { type: string; reasoningContent?: string; raw?: Record<string, unknown>; signature?: string },
+    ) => {
+      const artifact = createContinuationArtifact(plan, payload);
+      const terminal = canonicalizeTerminalContextMessages([
+        assistant([
+          {
+            type: 'thinking',
+            kind: 'raw',
+            source: 'deepseek-raw',
+            visibility: 'raw-collapsed',
+            continuation: artifact,
+          },
+          { type: 'toolCall', id: 'tool-1', name: 'read_file', arguments: { path: 'a.rdc' } },
+        ]),
+        {
+          role: 'toolResult',
+          toolCallId: 'tool-1',
+          toolName: 'read_file',
+          content: [{ type: 'text', text: 'ok' }],
+          isError: false,
+          timestamp: 2,
+        },
+      ]);
+      expect(terminal.some((message) => (
+        message.role === 'assistant'
+        && message.content.some((block) => block.type === 'thinking' && block.continuation)
+      ))).toBe(true);
+
+      vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([entry({
+        executionIdentity: plan.executionIdentity,
+        messages: [
+          { role: 'user', content: 'inspect', timestamp: 1 },
+          ...terminal,
+        ],
+      })]);
+      vi.spyOn(storageAdapter, 'readSessionDerivedContextView').mockReturnValue(null);
+      const sameRoute = journal.materialize('session-1', ['turn-1'], plan);
+      expect(sameRoute.replayedArtifactCount).toBe(1);
+      expect(sameRoute.filteredArtifactCount).toBe(0);
+      const thinking = (sameRoute.messages.find((message) => message.role === 'assistant') as AssistantMessage)
+        .content.find((block) => block.type === 'thinking');
+      expect(thinking?.continuation?.reasoningContent ?? thinking?.continuation?.raw ?? thinking?.continuation?.signature)
+        .toBeTruthy();
+
+      const dropped = journal.materialize('session-1', ['turn-1'], responsesPlan);
+      expect(dropped.replayedArtifactCount).toBe(0);
+      expect(dropped.filteredArtifactCount).toBe(1);
+    };
+
+    persistAndReplay(deepseekChat, {
+      type: 'reasoning_content',
+      reasoningContent: 'must echo across user turns',
+    });
+    persistAndReplay(deepseekResponses, {
+      type: 'reasoning',
+      raw: { type: 'reasoning', content: [{ type: 'reasoning_text', text: 'responses cot' }] },
+    });
+    persistAndReplay(deepseekAnthropic, {
+      type: 'thinking',
+      signature: '',
+      reasoningContent: 'anthropic-format thinking',
+    });
+  });
+
+  it('keeps required artifacts beyond the optional retention window', () => {
     const journal = new SessionContextJournal();
     const totalTurns = 10;
     const entries = Array.from({ length: totalTurns }, (_, index) => entry({
       turnId: `turn-${index + 1}`,
       userMessageId: `user-${index + 1}`,
       assistantMessageId: `assistant-${index + 1}`,
+      executionIdentity: reasoningContentPlan.executionIdentity,
       messages: [
         { role: 'user', content: `question ${index + 1}`, timestamp: index + 1 },
-        encryptedAssistant(),
+        assistant([{
+          type: 'thinking',
+          kind: 'raw',
+          source: 'deepseek-raw',
+          visibility: 'raw-collapsed',
+          continuation: createContinuationArtifact(reasoningContentPlan, {
+            type: 'reasoning_content',
+            reasoningContent: `required-${index + 1}`,
+          }),
+        }]),
       ],
     }));
     vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue(entries);
@@ -323,15 +496,10 @@ describe('SessionContextJournal v2', () => {
     const result = journal.materialize(
       'session-1',
       entries.map((item) => item.turnId),
-      responsesPlan,
+      reasoningContentPlan,
     );
-
-    // 10 个 turn，retention=8：最旧 2 个 turn 的制品按 retention-expired 丢弃。
-    expect(result.replayedArtifactCount).toBe(8);
-    expect(result.filteredArtifactCount).toBe(2);
-    const retentionDrops = result.artifactDecisions.filter((decision) => decision.reason === 'retention-expired');
-    expect(retentionDrops).toHaveLength(2);
-    expect(retentionDrops.every((decision) => decision.action === 'drop')).toBe(true);
+    expect(result.replayedArtifactCount).toBe(10);
+    expect(result.artifactDecisions.filter((decision) => decision.reason === 'retention-expired')).toHaveLength(0);
   });
 
   it('removes dangling tool calls but retains paired tool facts and safe text', () => {
@@ -442,7 +610,7 @@ describe('SessionContextJournal v2', () => {
       assistantMessageId: 'assistant-3',
       messages: [{ role: 'user', content: 'Continue.', timestamp: 3 }],
     });
-    const view = buildDerivedContextView(first.messages, {
+    const view = assembleDerivedContextView(first.messages, {
       scope: 'session',
       sessionId: 'session-1',
       branchId: 'branch-root',
@@ -450,6 +618,7 @@ describe('SessionContextJournal v2', () => {
       retainedTurnIds: ['turn-2'],
       messageSourceRefs: ['turn:turn-1:message:0', 'turn:turn-1:message:1'],
       createdAt: 10,
+      sections: testHandoffSections('Inspect the capture.'),
     });
     vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([first, second, third]);
     vi.spyOn(storageAdapter, 'readSessionDerivedContextView').mockReturnValue(view);
@@ -486,7 +655,7 @@ describe('SessionContextJournal v2', () => {
       assistantMessageId: 'assistant-2',
       messages: [{ role: 'user', content: 'Latest turn.', timestamp: 2 }],
     });
-    const staleView = buildDerivedContextView(
+    const staleView = assembleDerivedContextView(
       [{ role: 'user', content: 'Old source.', timestamp: 1 }],
       {
         scope: 'session',
@@ -495,6 +664,7 @@ describe('SessionContextJournal v2', () => {
         sourceTurnIds: ['turn-1'],
         retainedTurnIds: ['turn-2'],
         createdAt: 10,
+        sections: testHandoffSections('Old source.'),
       },
     );
     vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([first, second]);
@@ -568,9 +738,29 @@ describe('SessionContextJournal v2', () => {
       ['turn-1', 'turn-2', 'turn-3', 'turn-4'],
       'branch-root',
       { occupiedTokens: 180_000, compactionThresholdTokens: 160_000 },
+      3,
+      testHandoffSections('Oldest.'),
     );
     expect(view?.sourceTurnIds).toEqual(['turn-1']);
     expect(view?.retainedTurnIds).toEqual(['turn-2', 'turn-3', 'turn-4']);
     expect(write).toHaveBeenCalled();
+  });
+
+  it('fails closed when occupancy exceeds the line but handoff sections are missing', () => {
+    const journal = new SessionContextJournal();
+    vi.spyOn(storageAdapter, 'clearSessionDerivedContextView').mockImplementation(() => undefined);
+    vi.spyOn(storageAdapter, 'readSessionContextJournal').mockReturnValue([
+      entry({ turnId: 'turn-1' }),
+      entry({ turnId: 'turn-2' }),
+      entry({ turnId: 'turn-3' }),
+      entry({ turnId: 'turn-4' }),
+    ]);
+
+    expect(() => journal.createDerivedView(
+      'session-1',
+      ['turn-1', 'turn-2', 'turn-3', 'turn-4'],
+      'branch-root',
+      { occupiedTokens: 180_000, compactionThresholdTokens: 160_000 },
+    )).toThrow(/COMPACTION_SECTIONS_REQUIRED/);
   });
 });

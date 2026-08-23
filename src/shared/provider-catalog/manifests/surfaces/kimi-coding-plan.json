@@ -33,6 +33,16 @@
       "surface": "kimi-coding-plan",
       "accountScope": "credential-scoped",
       "plan": "Kimi Coding Plan"
+    },
+    {
+      "id": "provider-docs:kimi-coding-plan:tools-2026-08-23",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "moonshot-kimi-code-function-calling-2026-08-23",
+      "observedAt": "2026-08-23",
+      "refreshedAt": "2026-08-23T00:00:00+08:00",
+      "surface": "kimi-coding-plan",
+      "accountScope": "credential-scoped",
+      "plan": "Kimi Coding Plan"
     }
   ],
   "defaultFactSourceId": "rdc-agent:kimi-coding-plan:0",
@@ -140,7 +150,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "supported"
@@ -270,6 +280,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:kimi-coding-plan:tools-2026-08-23"
       }
     },
     {
@@ -299,7 +312,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "supported"
@@ -439,6 +452,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:kimi-coding-plan:tools-2026-08-23"
       }
     },
     {
@@ -459,7 +475,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "supported"
@@ -567,6 +583,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:kimi-coding-plan:tools-2026-08-23"
       }
     },
     {
@@ -587,7 +606,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "supported"
@@ -680,6 +699,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "provider-docs:kimi-coding-plan:tools-2026-08-23"
       }
     }
   ],

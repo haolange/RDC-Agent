@@ -44,7 +44,7 @@ const RUNTIME_TOOL_ALIASES: Record<string, string> = {
   git_add: 'git_add',
   git_unstage: 'git_unstage',
   git_commit: 'git_commit',
-  bash: 'bash',
+  shell: 'shell',
   write: 'write_file',
   write_file: 'write_file',
   edit: 'edit_file',
@@ -89,7 +89,7 @@ const RUNTIME_TOOL_ALIASES: Record<string, string> = {
 
 const ASK_DENIED_TOOL_PREFIXES = ['rd.', 'mcp.', 'mcp__'];
 const ASK_DENIED_TOOLS = new Set([
-  'bash',
+  'shell',
   'write',
   'write_file',
   'edit',
@@ -116,7 +116,7 @@ const ASK_DENIED_TOOLS = new Set([
 
 const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
   ...ASK_READONLY_TOOL_ALLOWLIST,
-  'bash',
+  'shell',
   'write_file',
   'edit_file',
   'ask_user',

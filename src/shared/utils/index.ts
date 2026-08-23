@@ -34,6 +34,17 @@ export {
   isEffectiveModelPickerSelectable,
   type EffectiveModelPickerCandidate,
 } from './effectiveModelPicker';
+export {
+  classifyAgentToolEligibility,
+  describeAgentToolIneligibility,
+  hasImplementedStructuredToolAdapter,
+  isAgentToolExecutableModel,
+  isCatalogVisibleAgentModel,
+  toolCallingEvidenceOf,
+  type AgentToolCallingEvidence,
+  type AgentToolEligibility,
+  type AgentToolEligibilityCandidate,
+} from './agentToolCapability';
 export { charsToTokens } from './tokens';
 export {
   resolveCompactionThresholdTokens,

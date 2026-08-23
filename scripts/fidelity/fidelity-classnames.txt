@@ -207,7 +207,6 @@ composer-usage
 composer-usage-indicator
 composer-usage-ring
 composer-usage-ring-progress
-composer-usage-ring-threshold
 composer-usage-ring-track
 composer-usage-value
 composer-usage-value-number

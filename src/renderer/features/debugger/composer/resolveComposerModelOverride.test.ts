@@ -21,19 +21,20 @@ describe('resolveComposerModelOverride', () => {
     option({ providerId: 'openai', modelId: 'hidden', status: 'model-unavailable' }),
   ];
 
-  it('accepts unverified account models by canonical id', () => {
-    expect(resolveComposerModelOverride('chatgpt-account:gpt-5.6-sol', options)).toEqual({
-      providerId: 'chatgpt-account',
+  it('accepts only ready Agent-executable models', () => {
+    expect(resolveComposerModelOverride('openai:gpt-5.6-sol', options)).toEqual({
+      providerId: 'openai',
       modelId: 'gpt-5.6-sol',
     });
+    expect(resolveComposerModelOverride('chatgpt-account:gpt-5.6-sol', options)).toBeNull();
+    expect(resolveComposerModelOverride('kimi-for-coding', options)).toBeNull();
   });
 
   it('rejects denied models and ambiguous bare ids', () => {
     expect(resolveComposerModelOverride('openai:hidden', options)).toBeNull();
-    expect(resolveComposerModelOverride('gpt-5.6-sol', options)).toBeNull();
-    expect(resolveComposerModelOverride('kimi-for-coding', options)).toEqual({
-      providerId: 'kimi-coding-plan',
-      modelId: 'kimi-for-coding',
+    expect(resolveComposerModelOverride('gpt-5.6-sol', options)).toEqual({
+      providerId: 'openai',
+      modelId: 'gpt-5.6-sol',
     });
   });
 });

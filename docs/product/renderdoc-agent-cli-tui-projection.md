@@ -253,7 +253,7 @@ $ rdx <group> <command> ...
 
 ### 7.2 人类终端
 
-如果 TUI 支持用户直接打开 Shell，直接输入的 `rdx` 与 Agent `bash` 应共享：
+如果 TUI 支持用户直接打开 Shell，直接输入的 `rdx` 与 Agent `shell` 应共享：
 
 - Settings command；
 - cwd；
@@ -411,7 +411,7 @@ TUI 不增加可配置 workspace root，不恢复旧目录 fallback。
 
 ```text
 PROVIDER   request failed
-POLICY     bash denied
+POLICY     shell denied
 HOOK       mission-plan-handoff-check blocked
 SHELL      exit 2
 RDX        context stale

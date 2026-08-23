@@ -25,7 +25,7 @@ export const WORK_PROCESS_TOOL_DISPLAY_CATALOG: Record<string, WorkProcessToolDi
   grep: { icon: 'codeSearch', groupKind: 'search', category: '代码搜索', groupTitle: '搜索', groupUnit: '查询', completeVerb: '已搜索代码', runningVerb: '正在搜索代码' },
   web_fetch: { icon: 'webFetch', groupKind: 'web', category: '网页抓取', groupTitle: '联网', groupUnit: '页面', completeVerb: '已抓取', runningVerb: '正在抓取', approval: true },
   web_search: { icon: 'webSearch', groupKind: 'search', category: '联网搜索', groupTitle: '搜索', groupUnit: '查询', completeVerb: '已联网搜索', runningVerb: '正在联网搜索', approval: true },
-  bash: { icon: 'terminal', groupKind: 'command', category: '命令', groupTitle: '命令', groupUnit: '命令', completeVerb: '已运行命令', runningVerb: '正在运行命令', approval: true, errorAccent: true },
+  shell: { icon: 'terminal', groupKind: 'command', category: '命令', groupTitle: '命令', groupUnit: '命令', completeVerb: '已运行命令', runningVerb: '正在运行命令', approval: true, errorAccent: true },
   write_file: { icon: 'fileWrite', groupKind: 'change', category: '文件写入', groupTitle: '变更', groupUnit: '文件', completeVerb: '已写入', runningVerb: '正在写入', mutation: true, approval: true },
   edit_file: { icon: 'fileEdit', groupKind: 'change', category: '文件编辑', groupTitle: '变更', groupUnit: '文件', completeVerb: '已编辑', runningVerb: '正在编辑', mutation: true, approval: true },
   delete_file: { icon: 'fileDelete', groupKind: 'change', category: '文件删除', groupTitle: '变更', groupUnit: '文件', completeVerb: '已删除', runningVerb: '正在删除', mutation: true, approval: true, errorAccent: true },
@@ -134,7 +134,7 @@ export const getToolFamily = (toolName: string): WorkProcessToolFamily => {
   const normalized = normalizeToolName(toolName);
   if (FILE_FAMILY_TOOLS.has(normalized) || normalized === 'read') return 'file';
   if (SEARCH_FAMILY_TOOLS.has(normalized)) return 'search';
-  if (normalized === 'bash' || normalized.includes('shell')) return 'shell';
+  if (normalized === 'shell' || normalized.includes('shell')) return 'shell';
   if (normalized === 'code_interpreter') return 'interpreter';
   if (GIT_FAMILY_TOOLS.has(normalized) || normalized.startsWith('git_')) return 'git';
   if (normalized === 'web_search' || normalized === 'web_fetch') return 'web';

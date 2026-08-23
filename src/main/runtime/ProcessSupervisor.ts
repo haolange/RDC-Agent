@@ -26,10 +26,9 @@ export type ProcessExitReason =
 export type ProcessOwner =
   | 'mcp'
   | 'shell'
-  | 'terminal'
   | 'hook'
   | 'replay'
-  | 'bash'
+  | 'agent-shell'
   | 'background'
   | 'daemon'
   | 'other';

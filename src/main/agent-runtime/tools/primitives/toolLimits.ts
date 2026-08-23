@@ -34,10 +34,10 @@ export const GREP_REGEX_TIMEOUT_MS = 200;
 /** Glob result output byte cap. */
 export const GLOB_MAX_OUTPUT_BYTES = 120 * 1024;
 
-/** Bash output / timeout clamps. */
-export const BASH_MAX_OUTPUT_BYTES = 50 * 1024;
-export const BASH_DEFAULT_TIMEOUT_MS = 120_000;
-export const BASH_MAX_TIMEOUT_MS = 600_000;
+/** Shell output / timeout clamps. */
+export const SHELL_MAX_OUTPUT_BYTES = 50 * 1024;
+export const SHELL_DEFAULT_TIMEOUT_MS = 120_000;
+export const SHELL_MAX_TIMEOUT_MS = 600_000;
 
 /** Git tool output / timeout. */
 export const GIT_MAX_OUTPUT_BYTES = 64 * 1024;

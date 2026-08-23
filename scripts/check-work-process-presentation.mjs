@@ -750,20 +750,20 @@ assert(webFetchRow?.pageChip?.title === 'Example Guide', 'web_fetch pageChip sho
 assert(!webFetchRow?.sourcePills?.length, 'web_fetch must not reuse search source pills');
 assert(webFetchRow?.icon !== webSearchRow?.icon, 'web_fetch and web_search icons must differ');
 
-const bashEnvelopePresentation = buildWorkProcessPresentation({
+const shellEnvelopePresentation = buildWorkProcessPresentation({
   status: 'complete',
   updatedAt: now + 9300,
   blocks: [
     {
-      id: 'runtime-loop-bash-envelope',
+      id: 'runtime-loop-shell-envelope',
       kind: 'llm_turn',
       title: 'LLM turn',
       status: 'complete',
-      result: { text: 'Ran typecheck.', status: 'complete', toolCallIds: ['tool-bash-envelope'] },
+      result: { text: 'Ran typecheck.', status: 'complete', toolCallIds: ['tool-shell-envelope'] },
       toolCalls: [
         {
-          id: 'tool-bash-envelope',
-          toolName: 'bash',
+          id: 'tool-shell-envelope',
+          toolName: 'shell',
           status: 'complete',
           argsPreview: JSON.stringify({ command: 'pnpm run typecheck' }),
           resultPreview: JSON.stringify({
@@ -773,7 +773,7 @@ const bashEnvelopePresentation = buildWorkProcessPresentation({
               details: { command: 'pnpm run typecheck', exitCode: 0 },
             },
             duration_ms: 90,
-            trace_id: 'tool-bash-envelope',
+            trace_id: 'tool-shell-envelope',
           }),
           startedAt: now + 8000,
           completedAt: now + 8090,
@@ -784,13 +784,13 @@ const bashEnvelopePresentation = buildWorkProcessPresentation({
     },
   ],
 });
-const bashEnvelopeRow = flattenRows(bashEnvelopePresentation.rows).find((row) => row.type === 'tool' && row.toolName === 'bash');
-assert(bashEnvelopeRow?.previewKind === 'shell', 'bash should project shell preview kind');
-assert(bashEnvelopeRow?.commandText === 'pnpm run typecheck', 'bash should expose commandText for the terminal header');
-assert(bashEnvelopeRow.previewLines.some((line) => line.includes('Found 0 errors.')), 'bash preview should keep stdout content layer');
-assert(!bashEnvelopeRow.previewLines.join('\n').includes('trace_id'), 'bash preview must not include envelope trace_id');
-assert(!bashEnvelopeRow.previewLines.join('\n').includes('duration_ms'), 'bash preview must not include envelope duration_ms');
-assert(bashEnvelopeRow.rawLines.join('\n').includes('trace_id'), 'bash raw tier should keep the full envelope');
+const shellEnvelopeRow = flattenRows(shellEnvelopePresentation.rows).find((row) => row.type === 'tool' && row.toolName === 'shell');
+assert(shellEnvelopeRow?.previewKind === 'shell', 'shell should project shell preview kind');
+assert(shellEnvelopeRow?.commandText === 'pnpm run typecheck', 'shell should expose commandText for the terminal header');
+assert(shellEnvelopeRow.previewLines.some((line) => line.includes('Found 0 errors.')), 'shell preview should keep stdout content layer');
+assert(!shellEnvelopeRow.previewLines.join('\n').includes('trace_id'), 'shell preview must not include envelope trace_id');
+assert(!shellEnvelopeRow.previewLines.join('\n').includes('duration_ms'), 'shell preview must not include envelope duration_ms');
+assert(shellEnvelopeRow.rawLines.join('\n').includes('trace_id'), 'shell raw tier should keep the full envelope');
 
 const skillEnvelopePresentation = buildWorkProcessPresentation({
   status: 'complete',

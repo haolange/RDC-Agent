@@ -178,15 +178,15 @@ describe('ConversationService work trace tool approvals', () => {
 
   it('cancels pending tool approvals when the work trace is stopped', () => {
     let trace = upsertRuntimeToolCall(undefined, {
-      id: 'tool-bash',
-      toolName: 'bash',
+      id: 'tool-shell',
+      toolName: 'shell',
       status: 'running',
       startedAt: 100,
     });
     trace = upsertRuntimeToolApproval(trace, {
-      approvalId: 'tool-approval-tool-bash',
-      toolCallId: 'tool-bash',
-      toolName: 'bash',
+      approvalId: 'tool-approval-tool-shell',
+      toolCallId: 'tool-shell',
+      toolName: 'shell',
       status: 'pending',
       reason: 'Run command?',
     });

@@ -26,11 +26,20 @@
   "catalogOwnership": "app-managed",
   "factSources": [
     {
+      "id": "provider-docs:deepseek:2026-08-23",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "thinking-mode-tools-all-turns@2026-08-23",
+      "observedAt": "2026-08-23",
+      "refreshedAt": "2026-08-23",
+      "surface": "deepseek",
+      "accountScope": "public-api"
+    },
+    {
       "id": "provider-docs:deepseek:2026-08-01",
       "sourceKind": "provider-docs",
       "sourceRevision": "v4-flash-responses-thinking-pricing@2026-08-01",
       "observedAt": "2026-08-01",
-      "refreshedAt": "2026-08-01",
+      "refreshedAt": "2026-08-23",
       "surface": "deepseek",
       "accountScope": "public-api"
     },
@@ -43,7 +52,7 @@
       "surface": "deepseek"
     }
   ],
-  "defaultFactSourceId": "provider-docs:deepseek:2026-08-01",
+  "defaultFactSourceId": "provider-docs:deepseek:2026-08-23",
   "connectionSchema": {
     "fields": [
       {
@@ -115,9 +124,9 @@
         },
         "toolLoop": {
           "artifactPolicy": "preserve-exact",
-          "artifactScope": "tool-call-turn",
+          "artifactScope": "all-assistant-turns",
           "ordering": "provider-native",
-          "evidence": "https://api-docs.deepseek.com/guides/responses_api/"
+          "evidence": "https://api-docs.deepseek.com/guides/thinking_mode/"
         },
         "streaming": {
           "transport": "sse",
@@ -152,7 +161,7 @@
         "compatibilityGroup": "deepseek:OpenAICompatibleChatCompletions",
         "toolLoop": {
           "artifactPolicy": "preserve-reasoning-content",
-          "artifactScope": "tool-call-turn",
+          "artifactScope": "all-assistant-turns",
           "ordering": "assistant-tool-result",
           "evidence": "https://api-docs.deepseek.com/guides/thinking_mode/"
         }
@@ -181,7 +190,13 @@
             "opaque": "anthropic-redacted-thinking"
           }
         },
-        "compatibilityGroup": "deepseek:AnthropicMessages"
+        "compatibilityGroup": "deepseek:AnthropicMessages",
+        "toolLoop": {
+          "artifactPolicy": "preserve-exact",
+          "artifactScope": "all-assistant-turns",
+          "ordering": "strict-block-order",
+          "evidence": "https://api-docs.deepseek.com/guides/thinking_mode/"
+        }
       }
     }
   ],

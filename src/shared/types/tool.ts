@@ -168,7 +168,6 @@ export type ToolLayer = 'primitive' | 'rdc' | 'system' | 'skill' | 'mcp' | 'ui';
 export type SystemToolName =
   | 'fs.read' | 'fs.glob' | 'fs.grep'
   | 'web.fetch' | 'web.search'
-  | 'bash.exec'
   | 'task.create' | 'task.update' | 'task.list';
 
 /** 分层工具定义 */

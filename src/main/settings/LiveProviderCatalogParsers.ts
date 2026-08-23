@@ -615,9 +615,15 @@ export function parseGrokAccountCatalog(payload: unknown): ParsedLiveCatalog {
         entitlement: 'granted',
       }],
       ...(windowTokens ? { defaultBudgetTokens: windowTokens } : {}),
-      toolCalling: capabilityState(record(value.capabilities).tool_calls),
-      visionInput: capabilityState(record(value.capabilities).vision),
-      structuredOutput: capabilityState(record(value.capabilities).structured_output),
+      ...(explicitCapabilityState(record(value.capabilities).tool_calls)
+        ? { toolCalling: explicitCapabilityState(record(value.capabilities).tool_calls) }
+        : {}),
+      ...(explicitCapabilityState(record(value.capabilities).vision)
+        ? { visionInput: capabilityState(record(value.capabilities).vision) }
+        : {}),
+      ...(explicitCapabilityState(record(value.capabilities).structured_output)
+        ? { structuredOutput: capabilityState(record(value.capabilities).structured_output) }
+        : {}),
     }];
   });
   return asResult(contributions);

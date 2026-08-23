@@ -26,7 +26,6 @@ import {
   createRunApi,
   createRuntimeLogApi,
   createSessionApi,
-  createTerminalApi,
   createTraceApi,
 } from './workbench';
 
@@ -61,7 +60,6 @@ export function createRendererApi(platform: NodeJS.Platform, transport: Renderer
     session: createSessionApi(transport),
     run: createRunApi(transport),
     runtimeLog: createRuntimeLogApi(transport),
-    terminal: createTerminalApi(transport),
     capture: createCaptureApi(transport),
     context: createContextApi(transport),
     events: createEventSubscriptionApi(transport),

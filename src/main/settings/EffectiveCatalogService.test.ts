@@ -577,6 +577,56 @@ describe('EffectiveCatalogService', () => {
     }
   });
 
+  it('does not let app-managed user overlays grant toolCalling support', async () => {
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
+    const catalog = request().catalog!;
+    const [model] = mergeEffectiveCatalog(request({
+      catalog: {
+        ...catalog,
+        models: [{
+          ...catalog.models[0],
+          toolCalling: { state: 'unknown' },
+        }],
+      },
+      user: {
+        source: 'user',
+        observedAt: '2026-01-06T00:00:00.000Z',
+        models: [{ modelId: 'model-a', toolCalling: { state: 'supported' } }],
+      },
+    }));
+    expect(model.toolCalling).toEqual({ state: 'unknown' });
+  });
+
+  it('keeps discovery candidates without a tool-calling conclusion unknown', async () => {
+    const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
+    const [model] = mergeEffectiveCatalog(request({
+      catalog: {
+        source: 'catalog',
+        observedAt: '2026-01-01T00:00:00.000Z',
+        models: [],
+      },
+      discovery: {
+        source: 'discovery',
+        observedAt: '2026-01-02T00:00:00.000Z',
+        models: [{
+          modelId: 'discovery-candidate',
+          label: 'Discovery candidate',
+          availability: 'available',
+          defaultBudgetTokens: 128_000,
+          contextTiers: [{
+            id: 'default',
+            label: 'Default',
+            maxPromptTokens: 128_000,
+            activation: { kind: 'implicit' },
+            entitlement: 'granted',
+          }],
+        }],
+      },
+    }));
+    expect(model.toolCalling).toEqual({ state: 'unknown' });
+    expect(model.availability).toBe('available');
+  });
+
   it('allows full user-managed overrides', async () => {
     const { mergeEffectiveCatalog } = await import('./effectiveCatalogMerge');
     const [model] = mergeEffectiveCatalog(request({
@@ -735,6 +785,25 @@ describe('EffectiveCatalogService', () => {
       field: 'toolCalling.state',
       source: 'observed',
       detail: 'real request',
+    }));
+  });
+
+  it('writes observed provenance even when catalog already marks toolCalling supported', async () => {
+    const { EffectiveCatalogService } = await import('./EffectiveCatalogService');
+    const service = new EffectiveCatalogService({ statePath, now: () => new Date('2026-08-23T00:00:00.000Z') });
+    service.getSnapshot(request());
+    service.recordObserved(
+      { providerId: 'provider-a', accountId: 'account-a', protocol: route.protocol },
+      'tool-calling:model-a:OpenAICompatibleChatCompletions',
+      [{ modelId: 'model-a', toolCalling: { state: 'supported' } }],
+      'Structured tool call completed through the active provider adapter.',
+    );
+    const [model] = service.getSnapshot(request()).models;
+    expect(model.toolCalling).toEqual({ state: 'supported' });
+    expect(model.provenance).toContainEqual(expect.objectContaining({
+      field: 'toolCalling.state',
+      source: 'observed',
+      detail: 'Structured tool call completed through the active provider adapter.',
     }));
   });
 

@@ -7,7 +7,6 @@ import type {
   RunContextUsageSummary,
   SessionScopedPayload,
 } from '../types/session';
-import type { TerminalDataEvent, TerminalExitEvent, TerminalTabRecord } from '../types/terminal';
 import type { TraceProjectionChangedPayload } from '../types/agenticTrace';
 import { RENDERER_EVENT_CHANNEL as EVENT } from './channels';
 import type { RendererApiTransport } from './transport';
@@ -75,17 +74,6 @@ export function createEventSubscriptionApi(transport: RendererApiTransport): Eve
     ),
     onRuntimeLogAppended: (callback) => (
       transport.subscribe(EVENT.runtime.logAppended, (entry) => callback(entry as RuntimeLogEntry))
-    ),
-    onTerminalData: (callback) => (
-      transport.subscribe(EVENT.runtime.terminalData, (event) => callback(event as TerminalDataEvent))
-    ),
-    onTerminalExit: (callback) => (
-      transport.subscribe(EVENT.runtime.terminalExit, (event) => callback(event as TerminalExitEvent))
-    ),
-    onTerminalTabsChanged: (callback) => (
-      transport.subscribe(EVENT.runtime.terminalTabsChanged, (payload) => (
-        callback(payload as { tabs: TerminalTabRecord[] })
-      ))
     ),
     onAppThemeChanged: (callback) => (
       transport.subscribe(EVENT.shell.themeChanged, (theme) => callback(theme as Parameters<typeof callback>[0]))

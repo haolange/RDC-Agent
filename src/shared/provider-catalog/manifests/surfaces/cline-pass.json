@@ -29,6 +29,15 @@
       "refreshedAt": "2026-07-23T00:00:00+08:00",
       "surface": "cline-pass",
       "accountScope": "credential-scoped"
+    },
+    {
+      "id": "rdc-agent:cline-pass:tools-2026-08-23",
+      "sourceKind": "provider-docs",
+      "sourceRevision": "cline-pass-openai-tools-passthrough-2026-08-23",
+      "observedAt": "2026-08-23",
+      "refreshedAt": "2026-08-23T00:00:00+08:00",
+      "surface": "cline-pass",
+      "accountScope": "credential-scoped"
     }
   ],
   "defaultFactSourceId": "rdc-agent:cline-pass:0",
@@ -87,7 +96,7 @@
       ],
       "defaultBudgetTokens": 200000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -137,6 +146,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "rdc-agent:cline-pass:tools-2026-08-23"
       }
     },
     {
@@ -157,7 +169,7 @@
       ],
       "defaultBudgetTokens": 200000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -207,6 +219,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "rdc-agent:cline-pass:tools-2026-08-23"
       }
     },
     {
@@ -227,7 +242,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -278,6 +293,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "rdc-agent:cline-pass:tools-2026-08-23"
       }
     },
     {
@@ -298,7 +316,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -346,6 +364,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "rdc-agent:cline-pass:tools-2026-08-23"
       }
     },
     {
@@ -366,7 +387,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -413,6 +434,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "rdc-agent:cline-pass:tools-2026-08-23"
       }
     },
     {
@@ -434,7 +458,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -487,6 +511,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "rdc-agent:cline-pass:tools-2026-08-23"
       }
     },
     {
@@ -508,7 +535,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -561,6 +588,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "rdc-agent:cline-pass:tools-2026-08-23"
       }
     },
     {
@@ -581,7 +611,7 @@
       ],
       "defaultBudgetTokens": 128000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -629,6 +659,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "rdc-agent:cline-pass:tools-2026-08-23"
       }
     },
     {
@@ -649,7 +682,7 @@
       ],
       "defaultBudgetTokens": 128000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -697,6 +730,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "rdc-agent:cline-pass:tools-2026-08-23"
       }
     },
     {
@@ -718,7 +754,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -769,6 +805,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "rdc-agent:cline-pass:tools-2026-08-23"
       }
     },
     {
@@ -790,7 +829,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -841,6 +880,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "rdc-agent:cline-pass:tools-2026-08-23"
       }
     },
     {
@@ -862,7 +904,7 @@
       ],
       "defaultBudgetTokens": 256000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -913,6 +955,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "rdc-agent:cline-pass:tools-2026-08-23"
       }
     },
     {
@@ -933,7 +978,7 @@
       ],
       "defaultBudgetTokens": 128000,
       "toolCalling": {
-        "state": "unknown"
+        "state": "supported"
       },
       "visionInput": {
         "state": "unknown"
@@ -981,6 +1026,9 @@
           "visionInput",
           "structuredOutput"
         ]
+      },
+      "fieldFactSourceIds": {
+        "toolCalling": "rdc-agent:cline-pass:tools-2026-08-23"
       }
     }
   ],

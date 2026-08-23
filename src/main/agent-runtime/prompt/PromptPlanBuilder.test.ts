@@ -4,6 +4,16 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 
 vi.mock('electron', () => ({ app: { getAppPath: () => process.cwd() } }));
+vi.mock('../../runtime/resolveConfiguredShell', () => ({
+  resolveConfiguredShell: () => {
+    throw new Error('SHELL_UNAVAILABLE: test stub');
+  },
+}));
+vi.mock('../../sessions/StorageAdapter', () => ({
+  storageAdapter: {
+    readSessionShellCwd: () => null,
+  },
+}));
 
 describe('PromptPlanBuilder', () => {
   it('builds a provenance-carrying plan without memory injection or hardcoded capabilities', async () => {
@@ -17,7 +27,7 @@ describe('PromptPlanBuilder', () => {
       scopedInstructions: { sources: [{ id: 'project:RDX.md', scope: 'project', sourcePath: 'D:/Project/RDX.md', sourceHash: 'hash', content: 'Project instruction', byteLength: 19, precedence: 0 }], totalBytes: 19, diagnostics: [] },
       preloadedSkills: [{ id: 'debug', name: 'debug', description: 'Debug', allowedTools: ['read_file'], scope: 'builtin', sourcePath: skillPath, sourceHash: 'skill-hash', effectiveStatus: 'effective', instructions: fs.readFileSync(skillPath, 'utf8') }],
       skillCatalog: [],
-      tools: ['read_file'], workDir: 'D:/Project', routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
+      tools: ['read_file'], workDir: 'D:/Project', routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
       permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
       currentDate: '2026-07-11', timeZone: 'Asia/Shanghai',
     });
@@ -31,6 +41,9 @@ describe('PromptPlanBuilder', () => {
     expect(plan.systemPrompt).not.toContain('# Available Skills');
     expect(plan.systemPrompt).toContain('Do not invent progress from stages or UI state.');
     expect(plan.systemPrompt).toContain('No Tasks tools are available in this turn.');
+    expect(plan.systemPrompt).toContain(`Host OS: ${process.platform}`);
+    expect(plan.systemPrompt).toContain('Shell: unavailable');
+    expect(plan.systemPrompt).toContain('Shell cwd: D:/Project');
   });
 
   it('describes Ask Tasks as read-only and tool_search no-match as authoritative', async () => {
@@ -45,7 +58,7 @@ describe('PromptPlanBuilder', () => {
       skillCatalog: [],
       tools: ['task_list', 'task_get', 'tool_search'],
       workDir: 'D:/Project',
-      routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
+      routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
       permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
       currentDate: '2026-08-01',
       timeZone: 'Asia/Shanghai',
@@ -68,7 +81,7 @@ describe('PromptPlanBuilder', () => {
       skillCatalog: [],
       tools: ['task_create', 'task_update', 'task_stop'],
       workDir: 'D:/Project',
-      routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
+      routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
       permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
       currentDate: '2026-08-01',
       timeZone: 'Asia/Shanghai',
@@ -89,7 +102,7 @@ describe('PromptPlanBuilder', () => {
       skillCatalog: [],
       tools: ['task_create', 'task_update', 'task_list', 'tool_search'],
       workDir: 'D:/Project',
-      routeCapability: { providerId: 'cline-pass', modelId: 'glm-5.2', toolCallingMode: 'text-only', reasoningVisibility: 'none', reasoningDelivery: 'none', reasoningContract: { semantic: 'none', source: 'none', displayLabel: 'None', carrier: 'none', artifactFormat: 'none', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'none' }, supportsStreaming: true, supportsToolResults: false, toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'prompt-fallback' },
+      routeCapability: { providerId: 'cline-pass', modelId: 'glm-5.2', toolCallingMode: 'text-only', reasoningVisibility: 'none', reasoningDelivery: 'none', reasoningContract: { semantic: 'none', source: 'none', displayLabel: 'None', carrier: 'none', artifactFormat: 'none', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'none' }, supportsStreaming: true, supportsToolResults: false, toolCallingEvidence: 'unknown', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'prompt-fallback' },
       permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
       currentDate: '2026-08-01',
       timeZone: 'Asia/Shanghai',
@@ -113,7 +126,7 @@ describe('PromptPlanBuilder', () => {
       preloadedSkills: [],
       skillCatalog: [{ id: 'debug', name: 'debug', description: 'Debug workflows', allowedTools: [], scope: 'builtin', sourcePath: 'skill://debug', sourceHash: 'h', effectiveStatus: 'effective' }],
       tools: ['read_file'], workDir: 'D:/Project',
-      routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
+      routeCapability: { providerId: 'deepseek', modelId: 'deepseek-v4', toolCallingMode: 'native-structured', reasoningVisibility: 'none', reasoningDelivery: 'stream-full', reasoningContract: { semantic: 'raw', source: 'deepseek-reasoning-content', displayLabel: 'Raw reasoning', carrier: 'reasoning-content', artifactFormat: 'deepseek.reasoning-content', artifactVersion: 'v1', compatibilityGroup: 'test', continuation: 'exact-execution' }, supportsStreaming: true, supportsToolResults: true, toolCallingEvidence: 'supported', toolCallingUnverified: false, visionInputMode: 'disabled', structuredOutputMode: 'native' },
       permissionSettings: { mode: 'default', readableRoots: [], writableRoots: [], allowedCommandPrefixes: [], deniedCommandPrefixes: [] },
       currentDate: '2026-07-11', timeZone: 'Asia/Shanghai',
       ...(contextWindowTokens !== undefined ? { contextWindowTokens } : {}),

@@ -23,6 +23,7 @@ import type {
   LlmProviderModel,
   LlmProviderProtocol,
 } from '@shared/types/settings';
+import { isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 import { planModelRequest } from './RequestPlanner';
 import { parseCopilotBillingContribution } from './CopilotBilling';
 import { normalizeDiscoveredModelMatchKey } from './DiscoveryAdmission';
@@ -555,10 +556,7 @@ export function selectEffectiveModelFromSnapshot(
   const model = exact ?? alias ?? null;
   const recommendedOrder = new Map(recommendedModelIds.map((id, index) => [id, index]));
   const recommendations = snapshot.models
-    .filter((entry) => entry.enabled !== false
-      && entry.availability === 'available'
-      && entry.selection?.pickerVisibility !== 'internal'
-      && entry.modelId !== model?.modelId)
+    .filter((entry) => entry.modelId !== model?.modelId && isAgentToolExecutableModel(entry))
     .sort((left, right) => (
       (recommendedOrder.get(left.modelId) ?? Number.MAX_SAFE_INTEGER)
       - (recommendedOrder.get(right.modelId) ?? Number.MAX_SAFE_INTEGER)
@@ -685,6 +683,7 @@ export function planEffectiveModelCapabilityProbe(input: {
     catalogModels: models,
     controls: input.controls,
     credentialScopeId: snapshot.accountId,
+    requireAgentToolEligibility: false,
   });
 }
 export function recordEffectivePlanSuccess(
@@ -745,6 +744,8 @@ export function recordEffectivePlanSuccess(
   }], `Successful request activated ${activated.join(' and ')}`);
 }
 
+export const OBSERVED_TOOL_CALLING_UNSUPPORTED_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 export function recordObservedToolCallingSupport(
   providerId: string,
   modelId: string,
@@ -753,7 +754,7 @@ export function recordObservedToolCallingSupport(
 ): boolean {
   const provider = settings.llm.providers.find((entry) => entry.id === providerId);
   const model = resolveEffectiveModel(providerId, modelId, settings);
-  if (!provider || !model || model.toolCalling.state !== 'unknown') return false;
+  if (!provider || !model) return false;
   effectiveCatalogService.recordObserved({
     providerId,
     accountId: provider.activeAccountId ?? `anonymous:${providerId}`,
@@ -762,5 +763,26 @@ export function recordObservedToolCallingSupport(
     modelId: model.modelId,
     toolCalling: { state: 'supported' },
   }], 'Structured tool call completed through the active provider adapter.');
+  return true;
+}
+
+export function recordObservedToolCallingUnsupported(
+  providerId: string,
+  modelId: string,
+  settings: AppSettings,
+  protocol: LlmProviderProtocol,
+  reason: string,
+): boolean {
+  const provider = settings.llm.providers.find((entry) => entry.id === providerId);
+  const model = resolveEffectiveModel(providerId, modelId, settings);
+  if (!provider || !model) return false;
+  effectiveCatalogService.recordObserved({
+    providerId,
+    accountId: provider.activeAccountId ?? `anonymous:${providerId}`,
+    protocol,
+  }, `tool-calling:${model.modelId}:${protocol}`, [{
+    modelId: model.modelId,
+    toolCalling: { state: 'unsupported', reason },
+  }], reason, OBSERVED_TOOL_CALLING_UNSUPPORTED_TTL_MS);
   return true;
 }
