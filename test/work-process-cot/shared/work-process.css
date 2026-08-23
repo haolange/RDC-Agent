@@ -584,8 +584,46 @@ summary {
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   line-height: 1.55;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.work-process-thinking-preview .markdown-body {
+  font-size: inherit;
+  line-height: inherit;
+  color: inherit;
+}
+
+.work-process-thinking-preview .markdown-body > :first-child {
+  margin-top: 0;
+}
+
+.work-process-thinking-preview .markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
+.work-process-thinking-preview .markdown-body h1,
+.work-process-thinking-preview .markdown-body h2,
+.work-process-thinking-preview .markdown-body h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: inherit;
+}
+
+.work-process-thinking-preview .markdown-body p {
+  margin: 0 0 var(--space-1);
+}
+
+.work-process-thinking-preview .markdown-body ul,
+.work-process-thinking-preview .markdown-body ol {
+  margin: 0 0 var(--space-1);
+  padding-left: var(--space-5);
+}
+
+.work-process-thinking-preview .markdown-body pre,
+.work-process-thinking-preview .markdown-body table {
+  margin: var(--space-1) 0;
+  font-size: var(--text-xs);
 }
 
 .work-process-thinking-state + .work-process-prose {

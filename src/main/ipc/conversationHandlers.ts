@@ -3,7 +3,6 @@ import type {
   ConversationAnswerToolApprovalRequest,
   ConversationAnswerUserInputRequest,
   ConversationCancelActiveTurnRequest,
-  ConversationPreflightErrorCode,
   ConversationRewriteFromMessageRequest,
   ConversationSendRequest,
   ConversationSendResult,
@@ -19,59 +18,27 @@ import {
   ConversationCancelActiveTurnArgsSchema,
   ConversationClearHistoryArgsSchema,
   ConversationCompactHistoryArgsSchema,
+  ConversationGetAttachmentPreviewArgsSchema,
   ConversationGetHistoryArgsSchema,
   ConversationGetToolImagePreviewArgsSchema,
+  ConversationReleaseAttachmentsArgsSchema,
   ConversationRewriteFromMessageArgsSchema,
   ConversationSendMessageArgsSchema,
+  ConversationStageAttachmentsArgsSchema,
   ConversationSwitchBranchArgsSchema,
   ConversationUndoLastTurnArgsSchema,
 } from './validation/conversationSchemas';
 import { readToolImagePreviewDataUrl } from '../conversation/ToolImagePreviewStore';
-
-const PREFLIGHT_ERROR_CODES = new Set<ConversationPreflightErrorCode>([
-  'REQUEST_CANCELLED',
-  'CONVERSATION_BUSY',
-  'AGENT_COMMIT_NOT_FOUND',
-  'AGENT_PROFILE_UNAVAILABLE',
-  'PROVIDER_UNAVAILABLE',
-  'MODEL_UNAVAILABLE',
-  'NO_USABLE_CONTEXT_TIER',
-  'PLAN_CONFLICT',
-  'CONSTRAINT_REJECTED',
-  'ATTACHMENT_INVALID',
-  'ATTACHMENT_UNSUPPORTED',
-  'PROMPT_PLAN_UNAVAILABLE',
-  'PROMPT_OVERHEAD_EXCEEDS_BUDGET',
-  'CONTEXT_CANNOT_FIT',
-  'TURN_COMMIT_FAILED',
-  'PREFLIGHT_FAILED',
-]);
-
-function toRejectedSendResult(requestId: string, error: unknown): ConversationSendResult {
-  const technicalMessage = error instanceof Error ? error.message : String(error);
-  const matchedCode = technicalMessage.match(/^([A-Z][A-Z0-9_]+):\s*/u)?.[1];
-  const code = matchedCode && PREFLIGHT_ERROR_CODES.has(matchedCode as ConversationPreflightErrorCode)
-    ? matchedCode as ConversationPreflightErrorCode
-    : 'PREFLIGHT_FAILED';
-  const message = technicalMessage.replace(/^([A-Z][A-Z0-9_]+):\s*/u, '').trim()
-    || 'The request could not be prepared.';
-  return {
-    status: 'rejected',
-    requestId,
-    phase: code === 'TURN_COMMIT_FAILED' ? 'commit' : 'preflight',
-    error: {
-      code,
-      message,
-      technicalMessage,
-      retryable: code === 'REQUEST_CANCELLED'
-        || code === 'CONVERSATION_BUSY'
-        || code === 'PROVIDER_UNAVAILABLE'
-        || code === 'PREFLIGHT_FAILED',
-    },
-  };
-}
+import { attachmentStagingService } from '../conversation/AttachmentStagingService';
+import {
+  assertAttachmentPreviewPath,
+  readAttachmentFilePreviewDataUrl,
+} from '../conversation/attachmentPreview';
+import { NATIVE_IMAGE_MIME_TYPES } from '../conversation/attachmentClassify';
+import { toRejectedSendResult } from '../conversation/conversationSendRejection';
 
 export function registerConversationHandlers(context: WorkbenchIpcContext): void {
+  attachmentStagingService.clearAll();
   const { state } = context;
 
   ipcMain.handle('conversation:sendMessage', async (_event, ...rawArgs: unknown[]) => {
@@ -237,6 +204,52 @@ export function registerConversationHandlers(context: WorkbenchIpcContext): void
         return { dataUrl: null, error: 'IMAGE_PREVIEW_SESSION_DENIED' };
       }
       return { dataUrl: readToolImagePreviewDataUrl(request.sessionId, request.previewId) };
+    } catch (error) {
+      return { dataUrl: null, error: error instanceof Error ? error.message : String(error) };
+    }
+  });
+
+  ipcMain.handle('conversation:stageAttachments', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(ConversationStageAttachmentsArgsSchema, rawArgs, {
+      label: 'conversation:stageAttachments',
+      maxBytes: 96 * 1024 * 1024,
+    });
+    return { attachments: await attachmentStagingService.stage(request.items, request.composerScopeKey) };
+  });
+
+  ipcMain.handle('conversation:releaseAttachments', async (_event, ...rawArgs: unknown[]) => {
+    const [request] = parseIpcArgs(ConversationReleaseAttachmentsArgsSchema, rawArgs, {
+      label: 'conversation:releaseAttachments',
+      maxBytes: 8 * 1024,
+    });
+    return { released: attachmentStagingService.release(request.stagingIds) };
+  });
+
+  ipcMain.handle('conversation:getAttachmentPreview', async (_event, ...rawArgs: unknown[]) => {
+    try {
+      const [request] = parseIpcArgs(ConversationGetAttachmentPreviewArgsSchema, rawArgs, {
+        label: 'conversation:getAttachmentPreview',
+        maxBytes: 4 * 1024,
+      });
+      if (request.sessionId) {
+        if (!state.currentSessionId || request.sessionId !== state.currentSessionId) {
+          return { dataUrl: null, error: 'IMAGE_PREVIEW_SESSION_DENIED' };
+        }
+        const attachment = storageAdapter.listSessionAttachments(request.sessionId)
+          .find((item) => item.attachmentId === request.previewId);
+        if (!attachment || !NATIVE_IMAGE_MIME_TYPES.has(attachment.mimeType)) {
+          return { dataUrl: null, error: 'IMAGE_PREVIEW_NOT_FOUND' };
+        }
+        const safePath = assertAttachmentPreviewPath(
+          storageAdapter.getSessionAttachmentsDir(request.sessionId),
+          attachment.filePath,
+        );
+        return { dataUrl: readAttachmentFilePreviewDataUrl(safePath, attachment.mimeType) };
+      }
+      if (!request.composerScopeKey) {
+        return { dataUrl: null, error: 'IMAGE_PREVIEW_SCOPE_DENIED' };
+      }
+      return { dataUrl: attachmentStagingService.readPreviewDataUrl(request.previewId, request.composerScopeKey) };
     } catch (error) {
       return { dataUrl: null, error: error instanceof Error ? error.message : String(error) };
     }

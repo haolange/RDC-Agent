@@ -18,6 +18,7 @@ interface ComposerMarkdownInputProps {
   value: string;
   onChange: (value: string) => void;
   onSend: () => void;
+  onPasteFiles?: (files: File[]) => void;
   placeholder: string;
   mode: ComposerMarkdownMode;
   disabled?: boolean;
@@ -94,6 +95,7 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
   value,
   onChange,
   onSend,
+  onPasteFiles,
   placeholder,
   mode,
   disabled = false,
@@ -142,6 +144,22 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
           },
         ]),
       ),
+      EditorView.domEventHandlers({
+        paste: (event) => {
+          if (!onPasteFiles) return false;
+          const files = Array.from(event.clipboardData?.files ?? []);
+          if (files.length === 0) return false;
+          event.stopPropagation();
+          const text = event.clipboardData?.getData('text/plain') ?? '';
+          if (text.trim()) {
+            onPasteFiles(files);
+            return false;
+          }
+          event.preventDefault();
+          onPasteFiles(files);
+          return true;
+        },
+      }),
       EditorView.editable.of(!disabled),
       EditorView.updateListener.of((update) => {
         if (!update.docChanged && !update.viewportChanged) {
@@ -152,7 +170,7 @@ export const ComposerMarkdownInput: React.FC<ComposerMarkdownInputProps> = ({
         }
         syncHostHeight();
       }),
-    ], [disabled, mode, onSend, placeholder, syncHostHeight]);
+    ], [disabled, mode, onPasteFiles, onSend, placeholder, syncHostHeight]);
 
   return (
     <div

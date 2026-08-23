@@ -26,6 +26,9 @@ export const RENDERER_INVOKE_CHANNEL = {
     undoLastTurn: 'conversation:undoLastTurn',
     compactHistory: 'conversation:compactHistory',
     getToolImagePreview: 'conversation:getToolImagePreview',
+    stageAttachments: 'conversation:stageAttachments',
+    releaseAttachments: 'conversation:releaseAttachments',
+    getAttachmentPreview: 'conversation:getAttachmentPreview',
   },
   workflow: {
     getState: 'workflow:getState',
@@ -131,8 +134,6 @@ export const RENDERER_INVOKE_CHANNEL = {
     remove: 'session:remove',
     select: 'session:select',
     setModelOverride: 'session:setModelOverride',
-    listAttachments: 'session:attachments:list',
-    importAttachments: 'session:attachments:import',
   },
   run: {
     list: 'run:list',

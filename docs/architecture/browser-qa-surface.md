@@ -7,7 +7,7 @@ Browser 与桌面 Electron 共用同一套 renderer、`ElectronAPI` 产品接口
 | Desktop | `preload` → `ipcRenderer` → `ipcMain` | 进程内信任边界 |
 | Browser | `BrowserAppBridge` → localhost HTTP/SSE → IPC handler registry | One-time `/qa` bootstrap → HttpOnly `rdcBridgeToken` cookie（同源 `/app`）；explicit Bearer for programmatic clients |
 
-Authoritative entry: the launcher logs one-time `GET /qa?qaBootstrap=...`; consume it once to mint the bridge cookie, then redirect to clean `/app` **on the same bridge origin**. In `browser-dev`, Vite is reverse-proxied through the bridge（含 HMR WebSocket）；浏览器不得直接打开 Vite 端口，也不再经跨端口 challenge / `rdcBridgeOrigin` query。Only `RDC_AGENT_BROWSER_QA=1` starts this surface; missing, repeated, or invalid bootstrap returns 401. JSON bodies are capped at 1 MiB.
+Authoritative entry: the launcher logs one-time `GET /qa?qaBootstrap=...`; consume it once to mint the bridge cookie, then redirect to clean `/app` **on the same bridge origin**. In `browser-dev`, Vite is reverse-proxied through the bridge（含 HMR WebSocket）；浏览器不得直接打开 Vite 端口，也不再经跨端口 challenge / `rdcBridgeOrigin` query。Only `RDC_AGENT_BROWSER_QA=1` starts this surface; missing, repeated, or invalid bootstrap returns 401. JSON bodies are capped at 1 MiB，唯一例外是 `conversation:stageAttachments`（经 `x-rdc-invoke-channel` 与 payload.channel 一致校验后上限 96 MiB），用于 Browser QA 的 bytes 拖放/粘贴/隐藏 file input。
 
 ## 单轨接口
 

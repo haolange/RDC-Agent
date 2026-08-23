@@ -139,7 +139,7 @@
           <span class="work-process-thinking-caption" data-thinking-label="1">${signal}</span>
           ${rowCaret(open)}
         </summary>
-        <div class="work-process-thinking-preview">${esc(thinking.preview || '')}</div>
+        <div class="work-process-thinking-preview"><div class="markdown-body">${thinking.html || esc(thinking.preview || '')}</div></div>
       </details>
     `;
   }

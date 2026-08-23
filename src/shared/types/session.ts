@@ -64,11 +64,14 @@ export interface SessionScopedPayload<T> extends SessionScope {
 
 export type SessionAttachmentKind = 'image' | 'file';
 
+export type SessionAttachmentLayer = 'image' | 'text' | 'pdf' | 'binary';
+
 export interface SessionAttachmentRecord {
   attachmentId: string;
   sessionId: string;
   projectId: string;
   kind: SessionAttachmentKind;
+  layer?: SessionAttachmentLayer;
   fileName: string;
   filePath: string;
   mimeType: string;

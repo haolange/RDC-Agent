@@ -216,6 +216,7 @@ export const SessionAttachmentRecordSchema = z.object({
   sessionId: z.string().min(1),
   projectId: z.string().min(1),
   kind: z.enum(['image', 'file']),
+  layer: z.enum(['image', 'text', 'pdf', 'binary']).optional(),
   fileName: z.string().min(1),
   filePath: z.string().min(1),
   mimeType: z.string().min(1),

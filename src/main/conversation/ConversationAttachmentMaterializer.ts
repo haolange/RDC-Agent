@@ -1,130 +1,60 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import type { ConversationAttachmentInput } from '@shared/types/conversation';
+import type { AttachmentLayer, ConversationAttachmentInput } from '@shared/types/conversation';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { SessionAttachmentRecord } from '@shared/types/session';
+import type { SessionAttachmentKind, SessionAttachmentRecord } from '@shared/types/session';
 import type { UserMessage } from '../agent-runtime/core/types';
+import type { FrozenAttachmentManifestEntry } from '../workflow/debugger/orchestratorTypes';
+import {
+  MAX_ATTACHMENT_BYTES_PER_FILE,
+  MAX_ATTACHMENT_COUNT,
+  MAX_ATTACHMENT_TOTAL_BYTES,
+  MAX_DECODED_IMAGE_BYTES,
+  NATIVE_IMAGE_MIME_TYPES,
+  assertSafeImageBytes,
+  classifyAttachmentBytes,
+  detectImageMagicMime,
+  inferAttachmentMimeType,
+} from './attachmentClassify';
+import {
+  extractPdfText,
+  extractUtf8Text,
+  resolveInlineTokenBudget,
+} from './AttachmentTextExtractor';
 
-export type AgentInputAttachment = Pick<
-  SessionAttachmentRecord,
-  'kind' | 'fileName' | 'filePath' | 'mimeType' | 'size'
->;
+export {
+  MAX_ATTACHMENT_BYTES_PER_FILE,
+  MAX_ATTACHMENT_COUNT,
+  MAX_ATTACHMENT_TOTAL_BYTES,
+  detectImageMagicMime,
+};
+
+export type AgentInputAttachment = {
+  attachmentId?: string;
+  kind: SessionAttachmentKind;
+  layer: AttachmentLayer;
+  fileName: string;
+  filePath: string;
+  readPath?: string;
+  mimeType: string;
+  size: number;
+};
 
 export interface MaterializedAgentUserInput {
   content: UserMessage['content'];
   imageTokenAdjustment: number;
+  inlineTokenBudget: number;
+  attachmentManifest: FrozenAttachmentManifestEntry[];
 }
 
-const NATIVE_IMAGE_MIME_TYPES = new Set([
-  'image/png',
-  'image/jpeg',
-  'image/gif',
-  'image/webp',
-]);
-
-const MAX_IMAGE_PIXELS = 40_000_000;
-const MAX_IMAGE_EDGE = 16_384;
-const MAX_ATTACHMENT_COUNT = 32;
-export const MAX_ATTACHMENT_BYTES_PER_FILE = 64 * 1024 * 1024;
-export const MAX_ATTACHMENT_TOTAL_BYTES = 256 * 1024 * 1024;
-const MAX_DECODED_IMAGE_BYTES = 128 * 1024 * 1024;
-
-function inferAttachmentMimeType(filePath: string, declaredMimeType?: string | null): string {
-  const declared = declaredMimeType?.trim().toLowerCase();
-  if (declared) return declared;
-  switch (path.extname(filePath).toLowerCase()) {
-    case '.png': return 'image/png';
-    case '.jpg':
-    case '.jpeg': return 'image/jpeg';
-    case '.gif': return 'image/gif';
-    case '.webp': return 'image/webp';
-    case '.svg': return 'image/svg+xml';
-    case '.bmp': return 'image/bmp';
-    case '.json': return 'application/json';
-    case '.txt':
-    case '.md': return 'text/plain';
-    default: return 'application/octet-stream';
-  }
+export interface MaterializeAgentUserInputOptions {
+  includeImageData?: boolean;
+  contextBudgetTokens?: number;
+  inlineTokenBudget?: number;
 }
 
-/** Detect image MIME from magic bytes. Returns null when unrecognized. */
-export function detectImageMagicMime(header: Buffer): string | null {
-  if (header.length >= 8
-    && header[0] === 0x89 && header[1] === 0x50 && header[2] === 0x4e && header[3] === 0x47
-    && header[4] === 0x0d && header[5] === 0x0a && header[6] === 0x1a && header[7] === 0x0a) {
-    return 'image/png';
-  }
-  if (header.length >= 3 && header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) {
-    return 'image/jpeg';
-  }
-  if (header.length >= 6) {
-    const sig = header.subarray(0, 6).toString('ascii');
-    if (sig === 'GIF87a' || sig === 'GIF89a') return 'image/gif';
-  }
-  if (header.length >= 12
-    && header.subarray(0, 4).toString('ascii') === 'RIFF'
-    && header.subarray(8, 12).toString('ascii') === 'WEBP') {
-    return 'image/webp';
-  }
-  // SVG is text — treat leading `<svg` / `<?xml` as svg for rejection path.
-  const headText = header.subarray(0, Math.min(header.length, 256)).toString('utf8').trimStart().toLowerCase();
-  if (headText.startsWith('<svg') || (headText.startsWith('<?xml') && headText.includes('<svg'))) {
-    return 'image/svg+xml';
-  }
-  return null;
-}
-
-function readImageDimensions(mimeType: string, bytes: Buffer): { width: number; height: number } | null {
-  try {
-    if (mimeType === 'image/png' && bytes.length >= 24) {
-      return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
-    }
-    if (mimeType === 'image/gif' && bytes.length >= 10) {
-      return { width: bytes.readUInt16LE(6), height: bytes.readUInt16LE(8) };
-    }
-    if (mimeType === 'image/webp' && bytes.length >= 30) {
-      const chunk = bytes.subarray(12, 16).toString('ascii');
-      if (chunk === 'VP8X' && bytes.length >= 30) {
-        const width = 1 + bytes.readUIntLE(24, 3);
-        const height = 1 + bytes.readUIntLE(27, 3);
-        return { width, height };
-      }
-      if (chunk === 'VP8 ' && bytes.length >= 30) {
-        const width = bytes.readUInt16LE(26) & 0x3fff;
-        const height = bytes.readUInt16LE(28) & 0x3fff;
-        return { width, height };
-      }
-    }
-    if (mimeType === 'image/jpeg') {
-      let offset = 2;
-      while (offset + 9 < bytes.length) {
-        if (bytes[offset] !== 0xff) break;
-        const marker = bytes[offset + 1];
-        if (marker === 0xd8 || marker === 0xd9) {
-          offset += 2;
-          continue;
-        }
-        const length = bytes.readUInt16BE(offset + 2);
-        if (marker >= 0xc0 && marker <= 0xc3 && offset + 8 < bytes.length) {
-          return {
-            height: bytes.readUInt16BE(offset + 5),
-            width: bytes.readUInt16BE(offset + 7),
-          };
-        }
-        offset += 2 + length;
-      }
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
-function assertSvgHasNoScript(bytes: Buffer): void {
-  const text = bytes.toString('utf8');
-  if (/<script[\s>]/i.test(text) || /\bon\w+\s*=/i.test(text) || /javascript:/i.test(text)) {
-    throw new Error('ATTACHMENT_MEDIA_UNSUPPORTED: SVG scripts and event handlers are blocked');
-  }
+function sourcePathOf(attachment: AgentInputAttachment): string {
+  return attachment.readPath ?? attachment.filePath;
 }
 
 export async function assertSafeImageAttachment(
@@ -133,16 +63,6 @@ export async function assertSafeImageAttachment(
   fileName: string,
 ): Promise<{ mimeType: string; size: number }> {
   if (declaredMimeType === 'image/svg+xml' || path.extname(filePath).toLowerCase() === '.svg') {
-    // SVG is never accepted as native vision input; scan scripts when the file exists.
-    try {
-      const bytes = await fs.promises.readFile(filePath);
-      assertSvgHasNoScript(bytes);
-    } catch (error) {
-      if (error instanceof Error && error.message.startsWith('ATTACHMENT_MEDIA_UNSUPPORTED')) {
-        throw error;
-      }
-      // Missing/unreadable SVG still fails closed as unsupported media.
-    }
     throw new Error(`ATTACHMENT_MEDIA_UNSUPPORTED: ${fileName} (image/svg+xml)`);
   }
   if (!NATIVE_IMAGE_MIME_TYPES.has(declaredMimeType)) {
@@ -150,39 +70,12 @@ export async function assertSafeImageAttachment(
   }
   const handle = await fs.promises.open(filePath, 'r');
   try {
-    const header = Buffer.alloc(64);
-    const { bytesRead } = await handle.read(header, 0, 64, 0);
-    const magicMime = detectImageMagicMime(header.subarray(0, bytesRead));
-    if (!magicMime) {
-      throw new Error(`ATTACHMENT_INVALID: ${fileName} magic bytes do not match a supported image`);
-    }
-    if (magicMime === 'image/svg+xml') {
-      throw new Error(`ATTACHMENT_MEDIA_UNSUPPORTED: ${fileName} (image/svg+xml)`);
-    }
-    if (magicMime !== declaredMimeType) {
-      throw new Error(
-        `ATTACHMENT_INVALID: ${fileName} declared ${declaredMimeType} but content is ${magicMime}`,
-      );
-    }
     const stats = await handle.stat();
-    // Read enough of the file for dimension headers (JPEG SOF may be deeper).
     const probeSize = Math.min(stats.size, 256 * 1024);
     const probe = Buffer.alloc(probeSize);
     await handle.read(probe, 0, probeSize, 0);
-    const dims = readImageDimensions(magicMime, probe);
-    if (dims) {
-      if (dims.width > MAX_IMAGE_EDGE || dims.height > MAX_IMAGE_EDGE) {
-        throw new Error(
-          `ATTACHMENT_INVALID: ${fileName} edge ${dims.width}x${dims.height} exceeds ${MAX_IMAGE_EDGE}`,
-        );
-      }
-      if (dims.width * dims.height > MAX_IMAGE_PIXELS) {
-        throw new Error(
-          `ATTACHMENT_INVALID: ${fileName} pixels ${dims.width * dims.height} exceed ${MAX_IMAGE_PIXELS}`,
-        );
-      }
-    }
-    return { mimeType: magicMime, size: stats.size };
+    assertSafeImageBytes(fileName, declaredMimeType, probe);
+    return { mimeType: declaredMimeType, size: stats.size };
   } finally {
     await handle.close();
   }
@@ -210,12 +103,40 @@ export async function resolvePendingAttachmentDescriptors(
       throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: total attachment bytes exceed ${MAX_ATTACHMENT_TOTAL_BYTES}.`);
     }
     const fileName = attachment.fileName || path.basename(filePath);
-    const mimeType = inferAttachmentMimeType(filePath, attachment.mimeType);
-    if (mimeType.startsWith('image/')) {
-      const checked = await assertSafeImageAttachment(filePath, mimeType, fileName);
-      resolved.push({ kind: 'image', fileName, filePath, mimeType: checked.mimeType, size: checked.size });
+    const header = Buffer.alloc(Math.min(stats.size, 64 * 1024));
+    const handle = await fs.promises.open(filePath, 'r');
+    try {
+      await handle.read(header, 0, header.length, 0);
+    } finally {
+      await handle.close();
+    }
+    const classification = classifyAttachmentBytes(
+      fileName,
+      header,
+      inferAttachmentMimeType(fileName, attachment.mimeType),
+    );
+    if (classification.rejectCode) {
+      throw new Error(`${classification.rejectCode}: ${classification.rejectMessage ?? fileName}`);
+    }
+    if (classification.layer === 'image') {
+      const checked = await assertSafeImageAttachment(filePath, classification.mimeType, fileName);
+      resolved.push({
+        kind: 'image',
+        layer: 'image',
+        fileName,
+        filePath,
+        mimeType: checked.mimeType,
+        size: checked.size,
+      });
     } else {
-      resolved.push({ kind: 'file', fileName, filePath, mimeType, size: stats.size });
+      resolved.push({
+        kind: 'file',
+        layer: classification.layer,
+        fileName,
+        filePath,
+        mimeType: classification.mimeType,
+        size: stats.size,
+      });
     }
   }
   return resolved;
@@ -228,27 +149,82 @@ export function imageTokenAdjustmentForContent(content: UserMessage['content']):
     if (block.type !== 'image') continue;
     const data = typeof block.data === 'string' ? block.data : '';
     if (!data) continue;
-    const byteLength = Math.max(0, Math.floor(data.length * 0.75));
-    extra += Math.max(256, Math.ceil(byteLength / 1024)) - 256;
+    extra += Math.max(256, Math.ceil(Math.max(0, Math.floor(data.length * 0.75)) / 1024)) - 256;
   }
   return extra;
+}
+
+function formatAttachmentLine(attachment: AgentInputAttachment): string {
+  return `- ${attachment.fileName} (${attachment.layer}, ${attachment.mimeType}, ${attachment.size} bytes): ${attachment.filePath}`;
+}
+
+async function buildInlineSection(
+  attachments: AgentInputAttachment[],
+  budgetTokens: number,
+): Promise<string> {
+  const extractable = attachments.filter((attachment) => attachment.layer === 'text' || attachment.layer === 'pdf');
+  if (extractable.length === 0) return '';
+  const sections: string[] = [];
+  for (const attachment of extractable) {
+    const extracted = attachment.layer === 'pdf'
+      ? await extractPdfText(sourcePathOf(attachment), budgetTokens)
+      : await extractUtf8Text(sourcePathOf(attachment), budgetTokens);
+    if (extracted.emptyReason) {
+      sections.push(
+        `### ${attachment.fileName}\n${extracted.emptyReason}\nFull file at ${attachment.filePath}`,
+      );
+      continue;
+    }
+    const fence = attachment.mimeType === 'application/json' ? 'json' : '';
+    const truncation = extracted.truncated
+      ? `\n… truncated, showing ${extracted.extractedBytes} of ${extracted.totalBytes} bytes, full file at ${attachment.filePath}`
+      : '';
+    sections.push(
+      `### ${attachment.fileName}\n\`\`\`${fence}\n${extracted.body}\n\`\`\`${truncation}`,
+    );
+  }
+  return `\n\nAttachment contents:\n${sections.join('\n\n')}`;
+}
+
+function toManifestEntry(attachment: AgentInputAttachment, index: number): FrozenAttachmentManifestEntry {
+  return {
+    attachmentId: attachment.attachmentId ?? `att_prepare_${index}`,
+    fileName: attachment.fileName,
+    filePath: attachment.filePath,
+    mimeType: attachment.mimeType,
+    size: attachment.size,
+    layer: attachment.layer,
+    kind: attachment.kind,
+  };
+}
+
+function normalizeOptions(
+  options?: boolean | MaterializeAgentUserInputOptions,
+): MaterializeAgentUserInputOptions {
+  if (typeof options === 'boolean') return { includeImageData: options };
+  return options ?? {};
 }
 
 export async function materializeAgentUserInput(
   message: string,
   attachments: AgentInputAttachment[],
   visionInputMode: AgentRouteCapability['visionInputMode'],
-  includeImageData: boolean,
+  options?: boolean | MaterializeAgentUserInputOptions,
 ): Promise<MaterializedAgentUserInput> {
+  const resolved = normalizeOptions(options);
   if (attachments.length === 0) {
-    return { content: message, imageTokenAdjustment: 0 };
+    return { content: message, imageTokenAdjustment: 0, inlineTokenBudget: 0, attachmentManifest: [] };
   }
   if (attachments.length > MAX_ATTACHMENT_COUNT) {
     throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: at most ${MAX_ATTACHMENT_COUNT} attachments are allowed.`);
   }
+  if (attachments.some((attachment) => !attachment.layer)) {
+    throw new Error('ATTACHMENT_INVALID: attachment layer is required.');
+  }
   let totalBytes = 0;
   for (const attachment of attachments) {
-    const stats = await fs.promises.stat(attachment.filePath).catch(() => null);
+    const sourcePath = sourcePathOf(attachment);
+    const stats = await fs.promises.stat(sourcePath).catch(() => null);
     const actualSize = stats?.isFile() ? stats.size : attachment.size;
     if (!Number.isFinite(actualSize) || actualSize < 0 || actualSize > MAX_ATTACHMENT_BYTES_PER_FILE) {
       throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: ${attachment.fileName} exceeds the per-file byte limit.`);
@@ -259,7 +235,7 @@ export async function materializeAgentUserInput(
     }
   }
 
-  const imageAttachments = attachments.filter((attachment) => attachment.kind === 'image');
+  const imageAttachments = attachments.filter((attachment) => attachment.layer === 'image');
   if (imageAttachments.length > 0 && visionInputMode !== 'native') {
     throw new Error('VISION_INPUT_UNSUPPORTED: the selected model route does not accept image attachments.');
   }
@@ -267,28 +243,31 @@ export async function materializeAgentUserInput(
     if (!NATIVE_IMAGE_MIME_TYPES.has(attachment.mimeType)) {
       throw new Error(`ATTACHMENT_MEDIA_UNSUPPORTED: ${attachment.fileName} (${attachment.mimeType})`);
     }
-    const exists = await fs.promises.stat(attachment.filePath).then((stats) => stats.isFile()).catch(() => false);
+    const sourcePath = sourcePathOf(attachment);
+    const exists = await fs.promises.stat(sourcePath).then((stats) => stats.isFile()).catch(() => false);
     if (exists) {
-      await assertSafeImageAttachment(attachment.filePath, attachment.mimeType, attachment.fileName);
-    } else if (includeImageData) {
+      await assertSafeImageAttachment(sourcePath, attachment.mimeType, attachment.fileName);
+    } else if (resolved.includeImageData) {
       throw new Error(`ATTACHMENT_NOT_FOUND: ${attachment.fileName}`);
     }
   }
 
-  const attachmentSummary = attachments
-    .map((attachment) => (
-      `- ${attachment.fileName} (${attachment.mimeType}, ${attachment.size} bytes): ${attachment.filePath}`
-    ))
-    .join('\n');
+  const extractableCount = attachments.filter((attachment) => (
+    attachment.layer === 'text' || attachment.layer === 'pdf'
+  )).length;
+  const inlineTokenBudget = resolved.inlineTokenBudget
+    ?? resolveInlineTokenBudget(extractableCount, resolved.contextBudgetTokens);
+  const summary = attachments.map(formatAttachmentLine).join('\n');
+  const inline = await buildInlineSection(attachments, inlineTokenBudget);
   const content: Extract<UserMessage['content'], unknown[]> = [{
     type: 'text',
-    text: `${message}\n\nAttachments available in this request:\n${attachmentSummary}`,
+    text: `${message}\n\nAttachments available in this request:\n${summary}${inline}`,
   }];
   let imageTokenAdjustment = 0;
   const imageData = new Map<string, string>();
-  if (includeImageData) {
+  if (resolved.includeImageData) {
     for (const attachment of imageAttachments) {
-      const bytes = await fs.promises.readFile(attachment.filePath);
+      const bytes = await fs.promises.readFile(sourcePathOf(attachment));
       if (bytes.byteLength > MAX_DECODED_IMAGE_BYTES) {
         throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: decoded image ${attachment.fileName} exceeds ${MAX_DECODED_IMAGE_BYTES} bytes.`);
       }
@@ -298,10 +277,89 @@ export async function materializeAgentUserInput(
   for (const attachment of imageAttachments) {
     content.push({
       type: 'image',
-      data: includeImageData ? (imageData.get(attachment.filePath) ?? '') : '',
+      data: resolved.includeImageData ? (imageData.get(attachment.filePath) ?? '') : '',
       mimeType: attachment.mimeType,
     });
     imageTokenAdjustment += Math.max(256, Math.ceil(attachment.size / 1024)) - 256;
   }
-  return { content, imageTokenAdjustment };
+  return {
+    content,
+    imageTokenAdjustment,
+    inlineTokenBudget,
+    attachmentManifest: attachments.map(toManifestEntry),
+  };
+}
+
+function sameManifestEntry(
+  expected: FrozenAttachmentManifestEntry,
+  actual: SessionAttachmentRecord,
+): boolean {
+  return expected.attachmentId === actual.attachmentId
+    && expected.fileName === actual.fileName
+    && expected.filePath === actual.filePath
+    && expected.mimeType === actual.mimeType
+    && expected.size === actual.size
+    && expected.layer === actual.layer
+    && expected.kind === actual.kind;
+}
+
+export async function hydrateFrozenUserContent(
+  frozen: UserMessage['content'],
+  manifest: FrozenAttachmentManifestEntry[],
+  importedAttachments: SessionAttachmentRecord[],
+): Promise<UserMessage['content']> {
+  if (manifest.length !== importedAttachments.length) {
+    throw new Error('ATTACHMENT_INVALID: frozen attachment manifest length does not match committed attachments.');
+  }
+  for (let index = 0; index < manifest.length; index += 1) {
+    const expected = manifest[index]!;
+    const actual = importedAttachments[index]!;
+    if (!sameManifestEntry(expected, actual)) {
+      throw new Error(`ATTACHMENT_INVALID: frozen attachment manifest mismatch for ${expected.fileName}.`);
+    }
+  }
+  if (typeof frozen === 'string') return frozen;
+  const imageByPath = new Map<string, string>();
+  for (const entry of manifest) {
+    if (entry.layer !== 'image') continue;
+    const exists = await fs.promises.stat(entry.filePath).then((stats) => stats.isFile()).catch(() => false);
+    if (!exists) {
+      throw new Error(`ATTACHMENT_NOT_FOUND: ${entry.fileName}`);
+    }
+    await assertSafeImageAttachment(entry.filePath, entry.mimeType, entry.fileName);
+    const bytes = await fs.promises.readFile(entry.filePath);
+    if (bytes.byteLength > MAX_DECODED_IMAGE_BYTES) {
+      throw new Error(`ATTACHMENT_LIMIT_EXCEEDED: decoded image ${entry.fileName} exceeds ${MAX_DECODED_IMAGE_BYTES} bytes.`);
+    }
+    imageByPath.set(entry.filePath, bytes.toString('base64'));
+  }
+  let imageIndex = 0;
+  const imageEntries = manifest.filter((entry) => entry.layer === 'image');
+  return frozen.map((block) => {
+    if (block.type !== 'image') return block;
+    const entry = imageEntries[imageIndex];
+    imageIndex += 1;
+    if (!entry) {
+      throw new Error('ATTACHMENT_INVALID: frozen image block has no matching manifest entry.');
+    }
+    return {
+      ...block,
+      data: imageByPath.get(entry.filePath) ?? '',
+      mimeType: entry.mimeType,
+    };
+  });
+}
+
+export function attachmentManifestFingerprintOf(
+  manifest: FrozenAttachmentManifestEntry[],
+): string {
+  return JSON.stringify(manifest.map((entry) => ({
+    attachmentId: entry.attachmentId,
+    fileName: entry.fileName,
+    filePath: entry.filePath,
+    mimeType: entry.mimeType,
+    size: entry.size,
+    layer: entry.layer,
+    kind: entry.kind,
+  })));
 }

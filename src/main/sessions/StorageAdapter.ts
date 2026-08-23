@@ -31,12 +31,14 @@ import { SessionContextStore } from './SessionContextStore';
 import type {
   ConversationHistoryCacheEntry,
   ExistingConversationTurnCommit,
+  ReservedStagedConversationSession,
   StagedConversationSessionCommit,
 } from './storageCommitTypes';
 import type { StorageHost } from './storageHost';
 
 export type {
   ExistingConversationTurnCommit,
+  ReservedStagedConversationSession,
   StagedConversationSessionCommit,
 } from './storageCommitTypes';
 
@@ -120,14 +122,34 @@ export class StorageAdapter implements StorageHost {
     return this.sessions.createSession(projectId, title, goal);
   }
 
+  allocateStagedConversationSession(
+    projectId: string,
+    title: string,
+    requestId: string,
+    turnId: string,
+  ): ReservedStagedConversationSession {
+    return this.sessions.allocateStagedConversationSession(projectId, title, requestId, turnId);
+  }
+
   beginStagedConversationSession(
     projectId: string,
     title: string,
     sourceAttachmentPaths: string[],
     requestId: string,
     turnId: string,
+    options?: {
+      reserved?: ReservedStagedConversationSession;
+      plannedAttachments?: SessionAttachmentRecord[];
+    },
   ): StagedConversationSessionCommit {
-    return this.sessions.beginStagedConversationSession(projectId, title, sourceAttachmentPaths, requestId, turnId);
+    return this.sessions.beginStagedConversationSession(
+      projectId,
+      title,
+      sourceAttachmentPaths,
+      requestId,
+      turnId,
+      options,
+    );
   }
 
   commitStagedConversationSession(
@@ -147,8 +169,15 @@ export class StorageAdapter implements StorageHost {
     sourceAttachmentPaths: string[],
     requestId: string,
     turnId: string,
+    plannedAttachments?: SessionAttachmentRecord[],
   ): ExistingConversationTurnCommit {
-    return this.history.beginExistingConversationTurnCommit(sessionId, sourceAttachmentPaths, requestId, turnId);
+    return this.history.beginExistingConversationTurnCommit(
+      sessionId,
+      sourceAttachmentPaths,
+      requestId,
+      turnId,
+      plannedAttachments,
+    );
   }
 
   commitExistingConversationTurn(

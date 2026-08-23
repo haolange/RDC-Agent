@@ -7,6 +7,7 @@ import type {
   AppMode,
   PreparedTurnContextSummary,
   RunSummary,
+  SessionAttachmentLayer,
   SessionAttachmentRecord,
   SessionRecord,
 } from './session';
@@ -108,7 +109,12 @@ export type ConversationMessageDiagnosticCode =
   | 'CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION'
   | 'CONVERSATION_AGENT_LOOP_STALLED'
   | 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED'
-  | 'MODEL_CONTINUATION_DROPPED';
+  | 'MODEL_CONTINUATION_DROPPED'
+  | 'ATTACHMENT_LIMIT_EXCEEDED'
+  | 'ATTACHMENT_MEDIA_UNSUPPORTED'
+  | 'ATTACHMENT_NOT_FOUND'
+  | 'ATTACHMENT_INVALID'
+  | 'VISION_INPUT_UNSUPPORTED';
 
 export interface ConversationMessageDiagnostic {
   code: ConversationMessageDiagnosticCode;
@@ -236,11 +242,83 @@ export interface ConversationMessage {
   preparedContext?: PreparedTurnContextSummary;
 }
 
+export type AttachmentLayer = SessionAttachmentLayer;
+
+export type AttachmentRejectCode =
+  | 'ATTACHMENT_CAPTURE_USE_PROJECT_IMPORT'
+  | 'ATTACHMENT_EXECUTABLE_DENIED'
+  | 'ATTACHMENT_LIMIT_EXCEEDED'
+  | 'ATTACHMENT_INVALID'
+  | 'ATTACHMENT_MEDIA_UNSUPPORTED'
+  | 'ATTACHMENT_NOT_FOUND';
+
+export interface ComposerAttachmentError {
+  code: AttachmentRejectCode;
+  message: string;
+}
+
+/** Renderer-facing record returned by conversation:stageAttachments. */
+export interface ComposerAttachmentDescriptor {
+  stagingId: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  layer: AttachmentLayer;
+  kind: SessionAttachmentRecord['kind'];
+  sourcePath: string;
+  previewId?: string;
+  error?: ComposerAttachmentError;
+}
+
+export interface ConversationAttachmentStagePathItem {
+  sourcePath: string;
+  fileName?: string;
+}
+
+export interface ConversationAttachmentStageBytesItem {
+  fileName: string;
+  mimeType?: string | null;
+  bytesBase64: string;
+}
+
+export type ConversationAttachmentStageItem =
+  | ConversationAttachmentStagePathItem
+  | ConversationAttachmentStageBytesItem;
+
+export interface ConversationStageAttachmentsRequest {
+  items: ConversationAttachmentStageItem[];
+  composerScopeKey: string;
+}
+
+export interface ConversationStageAttachmentsResult {
+  attachments: ComposerAttachmentDescriptor[];
+}
+
+export interface ConversationReleaseAttachmentsRequest {
+  stagingIds: string[];
+}
+
+export interface ConversationReleaseAttachmentsResult {
+  released: string[];
+}
+
+export interface ConversationGetAttachmentPreviewRequest {
+  previewId: string;
+  sessionId?: string;
+  composerScopeKey?: string;
+}
+
+export interface ConversationGetAttachmentPreviewResult {
+  dataUrl: string | null;
+  error?: string;
+}
+
 export interface ConversationAttachmentInput {
   sourcePath: string;
   fileName: string;
   mimeType?: string | null;
   size?: number | null;
+  stagingId?: string;
 }
 
 export interface ConversationErrorViewModel {
@@ -375,7 +453,10 @@ export type ConversationPreflightErrorCode =
   | 'PLAN_CONFLICT'
   | 'CONSTRAINT_REJECTED'
   | 'ATTACHMENT_INVALID'
-  | 'ATTACHMENT_UNSUPPORTED'
+  | 'ATTACHMENT_LIMIT_EXCEEDED'
+  | 'ATTACHMENT_MEDIA_UNSUPPORTED'
+  | 'ATTACHMENT_NOT_FOUND'
+  | 'VISION_INPUT_UNSUPPORTED'
   | 'PROMPT_PLAN_UNAVAILABLE'
   | 'PROMPT_OVERHEAD_EXCEEDS_BUDGET'
   | 'CONTEXT_CANNOT_FIT'

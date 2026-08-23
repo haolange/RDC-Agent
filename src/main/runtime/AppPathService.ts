@@ -45,6 +45,7 @@ export interface AppStatePaths {
   logPath: string;
   capturePreviewsPath: string;
   profileStatePath: string;
+  attachmentStagingPath: string;
 }
 
 /**
@@ -107,6 +108,7 @@ export class AppPathService {
       logPath: path.join(logsPath, LOG_FILE_NAME),
       capturePreviewsPath: path.join(userDataRoot, 'capture-previews'),
       profileStatePath: path.join(appStateRoot, 'profile'),
+      attachmentStagingPath: path.join(appStateRoot, 'staging', 'attachments'),
     };
   }
 
@@ -155,6 +157,7 @@ export class AppPathService {
       paths.logsPath,
       paths.capturePreviewsPath,
       paths.profileStatePath,
+      paths.attachmentStagingPath,
     ];
     directories.forEach((directory) => fs.mkdirSync(directory, { recursive: true }));
     this.runtimeInitMemo = { key: memoKey, paths };

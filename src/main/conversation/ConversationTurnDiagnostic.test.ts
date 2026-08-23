@@ -66,6 +66,15 @@ describe('conversation turn failure classification', () => {
     expect(diagnostic.userMessage).not.toContain('请检查该账号');
   });
 
+  it('does not disguise attachment failures as provider request failures', () => {
+    const diagnostic = createTurnFailedDiagnostic(
+      ROUTE,
+      new Error('VISION_INPUT_UNSUPPORTED: the selected model route does not accept image attachments.'),
+    );
+    expect(diagnostic.code).toBe('VISION_INPUT_UNSUPPORTED');
+    expect(diagnostic.userMessage).not.toContain('额度或网络');
+  });
+
   it('classifies raw ProviderStreamProtocolError the same way', () => {
     const error = new Error('Provider emitted delta after closing virtual:reasoning.');
     error.name = 'ProviderStreamProtocolError';

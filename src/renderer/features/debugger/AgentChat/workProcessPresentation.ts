@@ -94,7 +94,9 @@ const SKILL_DESCRIPTION_MAX = 180;
 const RAW_PAYLOAD_TARGET_KEYS = new Set(['content', 'text', 'body', 'payload']);
 const INTERNAL_BLOCK_IDS = new Set(['runtime-run', 'assistant-output', 'runtime-reasoning']);
 
-const normalizeThinkingDedupKey = (value: string): string => normalizeWorkProcessText(value).toLowerCase();
+const normalizeThinkingDedupKey = (value: string): string => (
+  normalizeWorkProcessText(value).replace(/\s+/g, ' ').toLowerCase()
+);
 
 const resolveReasoningState = (block: ConversationWorkBlock): ConversationReasoningState => {
   if (block.reasoningState) return block.reasoningState;

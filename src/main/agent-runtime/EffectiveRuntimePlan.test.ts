@@ -50,7 +50,7 @@ describe('EffectiveRuntimePlan', () => {
       mcpDescriptorHash: 'mcp-hash-1',
     });
 
-    expect(plan.schemaVersion).toBe(2);
+    expect(plan.schemaVersion).toBe(3);
     expect(plan.planId).toMatch(/^plan_/);
     expect(plan.fingerprint).toHaveLength(24);
     expect(plan.policy.deniedTools).toContain('bash');

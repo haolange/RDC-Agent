@@ -3,7 +3,6 @@ export const normalizeWorkProcessText = (value: string): string => {
   if (!trimmed) return '';
   return trimmed
     .replace(/\r\n/g, '\n')
-    .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
     .split('\n')
     .map((line) => line.trimEnd())

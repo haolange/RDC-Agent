@@ -17,12 +17,24 @@ import type { EffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimeP
 import type { PendingHandoff, PolicyBudgetState, SubagentBudgetState } from './TurnCoordinator';
 import type { McpConnectionLease } from './McpConnectionCoordinator';
 import type { AgentEventBridgeContext } from '../../agent-runtime/AgentEventBridge';
+import type { AttachmentLayer } from '@shared/types/conversation';
+import type { SessionAttachmentKind } from '@shared/types/session';
 import type {
   Message,
   ToolDefinition,
   UserMessage,
 } from '../../agent-runtime/core/types';
 import type { AgentTool } from '../../agent-runtime/agent/AgentTool';
+
+export interface FrozenAttachmentManifestEntry {
+  attachmentId: string;
+  fileName: string;
+  filePath: string;
+  mimeType: string;
+  size: number;
+  layer: AttachmentLayer;
+  kind: SessionAttachmentKind;
+}
 
 export interface AgentTurnContext {
   runId?: string;
@@ -103,6 +115,9 @@ export interface PreparedAgentTurnContext {
   selectedModelId: string;
   effectiveModel: EffectiveModel;
   toolAllowlist: string[];
+  frozenUserContent: UserMessage['content'];
+  attachmentManifest: FrozenAttachmentManifestEntry[];
+  inlineTokenBudget: number;
   initialMessages: Message[];
   contextDiagnostic: {
     selectedTurnCount: number;

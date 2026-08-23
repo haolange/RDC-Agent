@@ -31,7 +31,6 @@ export interface WorkbenchShellProps {
   nickname: string;
   avatarPath: string | undefined;
   composer: ComposerController;
-  hasOpenedCaptureForCurrentProject: boolean;
   showMainPromptBar: boolean;
   mainPage: ReactNode;
   t: (key: TranslationKey, params?: Record<string, string | number>) => string;
@@ -59,7 +58,6 @@ export function WorkbenchShell({
   nickname,
   avatarPath,
   composer,
-  hasOpenedCaptureForCurrentProject,
   showMainPromptBar,
   mainPage,
   t,
@@ -181,7 +179,6 @@ export function WorkbenchShell({
           <div className="main-input-bar">
             <Composer
               composer={composer}
-              hasOpenedCaptureForCurrentProject={hasOpenedCaptureForCurrentProject}
             />
           </div>
         )}

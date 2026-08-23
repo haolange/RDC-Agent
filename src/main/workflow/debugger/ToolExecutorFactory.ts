@@ -32,6 +32,7 @@ import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import type { TurnHandle } from './TurnCoordinator';
 import type { ResolvedRuntimeTools, ToolExecutorRuntimeContext } from './orchestratorTypes';
+import { storageAdapter } from '../../sessions/StorageAdapter';
 
 export interface ToolExecutorFactoryDeps {
   slots: AgentSlotRegistry;
@@ -197,12 +198,22 @@ export class ToolExecutorFactory {
         if (normalizedName === 'ask_user') {
           return this.executeAskUserTool(validatedToolCall, agentId, runtimeContext, signal);
         }
+        const sessionId = runtimeContext?.sessionId ?? null;
+        let sessionAttachmentsRoot: string | null = null;
+        if (sessionId) {
+          try {
+            sessionAttachmentsRoot = storageAdapter.getSessionAttachmentsDir(sessionId);
+          } catch {
+            sessionAttachmentsRoot = null;
+          }
+        }
         const permissionDecision = agentPermissionPolicyService.evaluate({
           tool,
           toolCall: validatedToolCall,
           projectRootPath: runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? null,
           ...(permissionSettings ? { permissionSettings } : {}),
           ...(compiledPolicy ? { compiledPolicy } : {}),
+          ...(sessionAttachmentsRoot ? { sessionAttachmentsRoot } : {}),
         });
         if (permissionDecision.action === 'deny') {
           return this.createPolicyDeniedToolResult(toolCall, agentId, permissionDecision.reason);

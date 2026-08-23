@@ -2,12 +2,12 @@ import { dialog, ipcMain } from 'electron';
 import type {
   ProjectInputRecord,
   RunSummary,
-  SessionAttachmentRecord,
   SessionRecord,
 } from '@shared/types/session';
 import { runExecutionService } from '../workflow/debugger/RunExecutionService';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
 import { storageAdapter } from '../sessions/StorageAdapter';
+import { attachmentStagingService } from '../conversation/AttachmentStagingService';
 import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { parseIpcArgs } from './validation/IpcPayloadGuard';
@@ -22,7 +22,6 @@ import {
   ProjectRenameArgsSchema,
   ProjectSelectArgsSchema,
   RunListArgsSchema,
-  SessionAttachmentsImportArgsSchema,
   SessionCreateArgsSchema,
   SessionIdOnlyArgsSchema,
   SessionListArgsSchema,
@@ -267,6 +266,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       }
 
       storageAdapter.removeSession(id);
+      attachmentStagingService.releaseBySessionId(id);
       agentOrchestrator.syncSessionSlots(id);
       const remainingSessions = storageAdapter.listSessions(session.projectId);
       const nextSession = remainingSessions[0] || null;
@@ -344,36 +344,6 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       return { success: true, session: updated };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };
-    }
-  });
-
-  ipcMain.handle('session:attachments:list', async (_event, ...rawArgs: unknown[]) => {
-    const [sessionId] = parseIpcArgs(SessionIdOnlyArgsSchema, rawArgs, {
-      label: 'session:attachments:list',
-      maxBytes: 4 * 1024,
-    });
-    return {
-      attachments: storageAdapter.listSessionAttachments(sessionId),
-    };
-  });
-
-
-  ipcMain.handle('session:attachments:import', async (_event, ...rawArgs: unknown[]) => {
-    try {
-      const [sessionId, filePaths] = parseIpcArgs(SessionAttachmentsImportArgsSchema, rawArgs, {
-        label: 'session:attachments:import',
-        maxBytes: 64 * 1024,
-      });
-      return {
-        success: true,
-        attachments: storageAdapter.importSessionAttachments(sessionId, filePaths),
-      };
-    } catch (error) {
-      return {
-        success: false,
-        attachments: [] as SessionAttachmentRecord[],
-        error: error instanceof Error ? error.message : String(error),
-      };
     }
   });
 

@@ -13,13 +13,11 @@ import { useWorkbenchLayout } from './useWorkbenchLayout';
 import { useAppBootstrap } from './bootstrap/useAppBootstrap';
 import { useIpcEventBridge, useSyncCapturesFromSnapshot } from './bootstrap/useIpcEventBridge';
 import { useLayoutStore } from '../stores/layoutStore';
-import { useCaptureStore } from '../stores/captureStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useI18n } from '../i18n';
-import { isOpenedCaptureOwnedBySession } from '../lib/sessionCaptureOwnership';
 import type { ResolvedTheme } from '@shared/types/settings';
 
 const App: React.FC = () => {
@@ -34,9 +32,7 @@ const App: React.FC = () => {
   const [runtimeTestMode, setRuntimeTestMode] = useState<boolean | null>(null);
 
   const currentProject = useProjectStore((state) => state.currentProject);
-  const currentSession = useProjectStore((state) => state.currentSession);
   const currentRun = useSessionStore((state) => state.currentRun);
-  const openedCapture = useCaptureStore((state) => state.openedCapture);
   const currentMode = useLayoutStore((state) => state.currentMode);
   const toggleLeftSidebar = useLayoutStore((state) => state.toggleLeftSidebar);
   const toggleRightPanel = useLayoutStore((state) => state.toggleRightPanel);
@@ -58,10 +54,6 @@ const App: React.FC = () => {
   const toggleTerminalOpen = useTerminalStore((state) => state.toggleOpen);
   const activityEntries = useTerminalStore((state) => state.entries);
 
-  const hasOpenedCaptureForCurrentProject = Boolean(
-    openedCapture?.status === 'open'
-    && isOpenedCaptureOwnedBySession(openedCapture, currentProject?.projectId, currentSession?.sessionId),
-  );
   const hasActiveDebugRun = Boolean(
     currentRun
     && ['planning', 'awaiting_input', 'awaiting_approval', 'queued', 'running', 'stopping'].includes(currentRun.status),
@@ -197,7 +189,6 @@ const App: React.FC = () => {
           nickname={nickname}
           avatarPath={avatarPath}
           composer={composer}
-          hasOpenedCaptureForCurrentProject={hasOpenedCaptureForCurrentProject}
           showMainPromptBar={Boolean(currentProject)}
           mainPage={<DebuggerPage mode={currentMode} />}
           t={t}

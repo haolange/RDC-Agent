@@ -21,7 +21,10 @@ appearance-theme-${props.mode}
 appearance-ui-font-${props.variant}
 chat-messages
 composer-attach-button
+composer-attach-file-input
+composer-attachment-card
 composer-attachments
+composer-drop-overlay
 composer-effort-capability-state
 composer-effort-fast-row
 composer-effort-max-context-row

@@ -16,10 +16,16 @@ import type {
   ConversationAnswerUserInputResult,
   ConversationAnswerToolApprovalRequest,
   ConversationAnswerToolApprovalResult,
+  ConversationGetAttachmentPreviewRequest,
+  ConversationGetAttachmentPreviewResult,
   ConversationMessage,
+  ConversationReleaseAttachmentsRequest,
+  ConversationReleaseAttachmentsResult,
   ConversationRewriteFromMessageRequest,
   ConversationSendRequest,
   ConversationSendResult,
+  ConversationStageAttachmentsRequest,
+  ConversationStageAttachmentsResult,
   ConversationStreamEvent,
   ConversationTurnResult,
 } from './conversation';
@@ -55,7 +61,6 @@ import type {
   RunContextUsageRequest,
   RunContextUsageSummary,
   RunSummary,
-  SessionAttachmentRecord,
   SessionRecord,
   SessionScope,
   SessionScopedPayload,
@@ -176,6 +181,15 @@ export interface ElectronAPI {
       dataUrl: string | null;
       error?: string;
     }>;
+    stageAttachments: (
+      request: ConversationStageAttachmentsRequest,
+    ) => Promise<ConversationStageAttachmentsResult>;
+    releaseAttachments: (
+      request: ConversationReleaseAttachmentsRequest,
+    ) => Promise<ConversationReleaseAttachmentsResult>;
+    getAttachmentPreview: (
+      request: ConversationGetAttachmentPreviewRequest,
+    ) => Promise<ConversationGetAttachmentPreviewResult>;
     onEvent: (callback: (event: ConversationStreamEvent) => void) => void;
     offEvent: (callback: (event: ConversationStreamEvent) => void) => void;
   };
@@ -381,16 +395,6 @@ export interface ElectronAPI {
       session?: SessionRecord;
       error?: string;
     }>;
-    attachments: {
-      list: (sessionId: string) => Promise<{
-        attachments: SessionAttachmentRecord[];
-      }>;
-      import: (sessionId: string, filePaths: string[]) => Promise<{
-        success: boolean;
-        attachments: SessionAttachmentRecord[];
-        error?: string;
-      }>;
-    };
 
   };
 

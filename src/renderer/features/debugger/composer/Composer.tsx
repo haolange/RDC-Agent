@@ -20,13 +20,15 @@ import { ComposerMarkdownInput, type ComposerMarkdownMode } from './ComposerMark
 import { ComposerMarkdownModeTabs } from './ComposerMarkdownModeTabs';
 import { ComposerAgentMenu } from './ComposerAgentMenu';
 import { ComposerMenuRegistryProvider, useComposerMenu } from './useComposerMenuRegistry';
-import { ComposerAttachmentChips } from './ComposerAttachmentChips';
+import { ComposerAttachIngest } from './ComposerAttachIngest';
+import { ComposerAttachmentTray } from './ComposerAttachmentTray';
 import { buildComposerSessionScopeKey } from './composerSessionScope';
 import { useComposerSessionContextStore } from './composerSessionContext';
+import { useComposerAttachmentDrop } from './useComposerAttachmentDrop';
+import { useComposerVisionCapability } from './useComposerVisionCapability';
 
 export interface ComposerProps {
   composer: ComposerController;
-  hasOpenedCaptureForCurrentProject: boolean;
 }
 
 function getAgentCapability(agentId: string, definitions: AgentManifestDefinition[]): string {
@@ -97,10 +99,20 @@ export const Composer: React.FC<ComposerProps> = ({
     primaryButtonDescription,
     handlePrimaryStop,
     handleAttachmentSelect,
+    handleFilesIngest,
     handlePendingAttachmentRemove,
+    fileInputRef,
+    isDropActive,
+    setIsDropActive,
     handlePromptSend,
     handlePromptKeyDown,
   } = composer;
+  const visionSupported = useComposerVisionCapability(selectedAgentId, currentSession);
+  const attachmentDrop = useComposerAttachmentDrop({
+    disabled: isComposerBusy,
+    setIsDropActive,
+    handleFilesIngest,
+  });
   const selectedAgentDefinition = userInvocableAgents.find((agent) => agent.id === selectedAgentId);
   const selectedAgentCapability = getAgentCapability(selectedAgentId, userInvocableAgents);
   const composeAccentVars = useMemo(
@@ -140,9 +152,19 @@ export const Composer: React.FC<ComposerProps> = ({
   return (
     <ComposerMenuRegistryProvider>
     <div
-      className={`composer-shell ${isComposerBusy ? 'is-running' : ''}${composerMarkdown ? ' has-markdown-mode' : ''}`}
+      className={`composer-shell ${isComposerBusy ? 'is-running' : ''}${composerMarkdown ? ' has-markdown-mode' : ''}${isDropActive ? ' is-drop-active' : ''}`}
       {...composeAccentStyle}
+      onDragOver={attachmentDrop.handleDragOver}
+      onDragLeave={attachmentDrop.handleDragLeave}
+      onDrop={attachmentDrop.handleDrop}
+      onPaste={attachmentDrop.handlePaste}
     >
+      <ComposerAttachIngest
+        fileInputRef={fileInputRef}
+        isDropActive={isDropActive}
+        dropHint={t('app.attachDropHint')}
+        onFiles={(files) => void handleFilesIngest(files)}
+      />
       {composerMarkdown ? (
         <ComposerMarkdownModeTabs
           mode={markdownMode}
@@ -150,14 +172,17 @@ export const Composer: React.FC<ComposerProps> = ({
           disabled={isComposerBusy}
         />
       ) : null}
-      <ComposerAttachmentChips
+      <ComposerAttachmentTray
         pendingSkillIds={pendingSkillIds}
         pendingAttachments={pendingAttachments}
+        composerScopeKey={composerScopeKey}
+        visionUnsupported={!visionSupported}
         removePendingSkill={removePendingSkill}
         handlePendingAttachmentRemove={handlePendingAttachmentRemove}
         armedSkillMeta={t('app.armedSkillMeta')}
         removeArmedSkillLabel={(skillId) => t('app.removeArmedSkill', { skillId })}
         removeAttachmentLabel={(fileName) => t('app.removeAttachment', { fileName })}
+        visionUnsupportedLabel={t('app.attachVisionUnsupported')}
       />
       <div className="composer-input-row">
         {composerMarkdown ? (
@@ -166,6 +191,7 @@ export const Composer: React.FC<ComposerProps> = ({
             value={promptValue}
             onChange={setPromptValue}
             onSend={() => void handlePromptSend()}
+            onPasteFiles={(files) => void handleFilesIngest(files)}
             placeholder={promptPlaceholder}
             mode={markdownMode}
             disabled={isComposerBusy}

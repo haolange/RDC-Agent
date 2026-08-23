@@ -39,7 +39,7 @@ Active Signal：tokenized clipped-gradient 能量扫光；仅用于权威 runnin
 
 ## Composer 控件
 
-左：attach / agent / permission；右：model / effort / context usage / send-stop。Permission 不得挨着 send 伪装成执行动作。Model 在 Effort 之前，规格复用现有 pill；菜单顶部搜索、按 provider 分组。显示并选择当前对话模型；无 session 时可先选（只记草稿，不建 session）；有 session 则写入 `modelOverride`。不写回 `.agent.md`，切 Agent 不清模型。
+左：attach / agent / permission；右：model / effort / context usage / send-stop。Permission 不得挨着 send 伪装成执行动作。`+` 只附加图片与文件（选择器 / 拖放 / 粘贴截图）。`.rdc` 不走 Composer，只从 Project 右栏 Import。待发附件渲染为输入框上方托盘：图片 72px 缩略图卡、文件类型字形 + 大小；hover / `:focus-within` 右上角叉移除。非法/超限卡片用错误描边；当前模型无 `visionInput` 时图片卡警告。已发送附件在用户气泡下显示可点击 pill（`app:openPath`）。Model 在 Effort 之前，规格复用现有 pill；菜单顶部搜索、按 provider 分组。显示并选择当前对话模型；无 session 时可先选（只记草稿，不建 session）；有 session 则写入 `modelOverride`。不写回 `.agent.md`，切 Agent 不清模型。
 
 底栏弹窗（Agent / Permission / Effort / Usage / Model）走单一互斥注册表：任意时刻只开一个；Escape 关闭并把焦点还给 trigger；点空白关闭。
 
@@ -59,7 +59,7 @@ Stacking：`composer < modal backdrop < modal < tooltip < notification`。
 
 ## Transcript Markdown
 
-`MessageMarkdown`：GFM、代码块 language+复制、KaTeX、Mermaid fail-closed；thinking/CoT 纯文本；禁用 raw HTML。
+`MessageMarkdown`：GFM、代码块 language+复制、KaTeX、Mermaid fail-closed；commentary、最终答案与 thinking/CoT 共用；禁用 raw HTML。
 
 ## Appearance（入口）
 

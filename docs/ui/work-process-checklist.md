@@ -61,8 +61,8 @@
 
 ## MessageMarkdown
 
-- commentary 与最终答案：GFM、代码块 language+复制、KaTeX、Mermaid fail-closed。
-- thinking/CoT 保持纯文本。
+- commentary、最终答案与 thinking/CoT：共用 `MessageMarkdown`（GFM、代码块 language+复制、KaTeX、Mermaid fail-closed）。
+- thinking 槽位用 `.work-process-thinking-preview .markdown-body` 作用域压到克制尺度。
 
 ## 验证命令
 

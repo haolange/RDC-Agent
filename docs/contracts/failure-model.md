@@ -33,9 +33,17 @@
 | Sandbox / permission deny-by-default | Security | Electron 面 |
 | CSP 绕过（`style-src`/`script-src` unsafe-inline、style attr） | Security | 生产无 unsafe-inline；`style-src-attr 'none'`；动态样式走 `useDynStyle` |
 | RDX context 无 session / lease 所有权不匹配 | Security | 仅 per-session lease；禁止 global mirror |
-| 在途 turn 读可变 Settings / 未冻结 plan | Integrity | `EffectiveRuntimePlan` schemaVersion 2 完整冻结 |
+| 在途 turn 读可变 Settings / 未冻结 plan | Integrity | `EffectiveRuntimePlan` schemaVersion 3 完整冻结 |
 | SSRF / private DNS（`web_fetch`/`web_search`） | Security | 每跳校验 + pin |
-| Attachment SVG 脚本 / 超限媒体 | Security | 拒绝 |
+| Attachment SVG 脚本 / 超限媒体 | Security | `ATTACHMENT_MEDIA_UNSUPPORTED` |
+| 附件数量/体积超限 | Security | `ATTACHMENT_LIMIT_EXCEEDED`；`retryable: false` |
+| 附件路径缺失 | Integrity | `ATTACHMENT_NOT_FOUND`；`retryable: false` |
+| 附件 manifest / magic 不匹配 | Integrity | `ATTACHMENT_INVALID`；`retryable: false` |
+| Composer 附加 `.rdc` | Security | `ATTACHMENT_CAPTURE_USE_PROJECT_IMPORT`；引导 Project 右栏 Import |
+| Composer 附加可执行文件 | Security | `ATTACHMENT_EXECUTABLE_DENIED` |
+| 附件预览跨 session / path escape | Security | `IMAGE_PREVIEW_SESSION_DENIED` / `IMAGE_PREVIEW_NOT_FOUND` |
+| 当前模型无 native vision | Integrity | `VISION_INPUT_UNSUPPORTED`；Composer 图片卡前置警告 |
+| PDF 无文本层（扫描件） | Integrity | 诊断行，不静默空 inline |
 | Policy 非法 / 弱于父级 | Security | `POLICY_INVALID` |
 | Capture `ownerSessionId` 不匹配 | Security | 防跨 session 继承 |
 | Deferred 未激活工具调用 | Security（授权面） | `TOOL_NOT_ACTIVATED` |

@@ -22,7 +22,7 @@ Work Process 的工具摘要只由 runtime tool result 计算 `succeeded / faile
 
 | 模块 | 职责 |
 | --- | --- |
-| `EffectiveRuntimePlan` | `schemaVersion: 2`；one exact User/Project profile snapshot (provenance, skills, handoffs, enabled ids), tools/skill intersection, deferred/MCP lease, permission/policy/route/request+prompt fingerprints；Prompt and Executor share it |
+| `EffectiveRuntimePlan` | `schemaVersion: 3`；one exact User/Project profile snapshot (provenance, skills, handoffs, enabled ids), tools/skill intersection, deferred/MCP lease, permission/policy/route/request+prompt fingerprints, attachment manifest fingerprint；Prompt and Executor share it |
 | `AgentOrchestrator` | façade（少于 800 行）；`ProfileTurnPreparation` 为 sendMessage/sendProfileMessage/subagent 唯一 prepare 入口；无 `preparedRuntime` → `TURN_NOT_PREPARED` |
 | `TurnCoordinator` / `TurnHandle` | Session ownership Active→Aborting→Orphaned→Settled；Orphaned 时 `beginTurn` → `TURN_ORPHANED`；`abortAndJoin` 等 stream + producerCompletion；late producer join |
 | `ProcessSupervisor` | spawn/joinAll；POSIX pgid；Windows `taskkill /T`；close-observed registry；timeout yields `unconfirmed_orphan` |
@@ -49,7 +49,7 @@ Scoped Runtime Resolution
 
 `PromptPlan` 每段含 id、kind、scope、source path/hash、precedence、content、token estimate、`stable|volatile`。稳定前缀指纹锚定 prompt-cache。Session 重建路径：`conversation.jsonl` + `conversation-branches.json` + `session-context.jsonl`。
 
-发送是 next-turn 事务：`preparing → committing → running → terminal`。Preflight 冻结 catalog/route/controls/`PromptPlan`/tools/attachments，并创建主进程 opaque credential lease。失败/取消的 preflight 不留 Session/journal/lease 残渣。
+发送是 next-turn 事务：`preparing → committing → running → terminal`。Preflight 冻结 catalog/route/controls/`PromptPlan`/tools/attachments，并创建主进程 opaque credential lease。失败/取消的 preflight 不留 Session/journal/lease 残渣。Composer 附件先经 `conversation:stageAttachments` 写入 `{userData}/state/staging/attachments/`（进程启动清空）；turn commit 才拷进 session `attachments/`。`ConversationAttachmentMaterializer` 按 image / text / pdf / binary 四层物化：image 走 native vision；text/pdf 按 `min(固定上限, contextBudgetTokens * ratio)` 均分后 inline，prepare 冻结最终 session 逻辑路径与正文，run 只补 image 字节；binary 只给元数据。扫描件 PDF 无文本层写诊断；加载失败 / 加密不伪装成扫描件。SVG 硬拒。
 
 用户 Stop 按相位分流：`preparing` → 干净撤销（Composer 恢复发送前草稿，transcript 不保留本轮）；`committing` / `running` → 单调落停（assistant/`workTrace` 进入 `stopped`，禁止再被迟到 `streaming` patch 或 optimistic 回滚打回运行中/发送前）。Main `ActiveConversationTurn.stop()` 落盘 pending 时不得再向 renderer emit `streaming`；权威终态由 `commitStoppedMessage` / terminal event 给出。Edit and resend 提交后 renderer 立即 optimistic 切入新 branch variant，IPC 返回后 reconcile。多 session 并行时 renderer 投影与 Composer 恢复规则见 [`session-projection.md`](session-projection.md)。
 

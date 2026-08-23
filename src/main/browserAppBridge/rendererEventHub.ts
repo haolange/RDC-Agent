@@ -1,4 +1,5 @@
 import type { ServerResponse } from 'http';
+import { attachmentStagingService } from '../conversation/AttachmentStagingService';
 
 type EventPayload = {
   channel: string;
@@ -31,6 +32,9 @@ export const rendererEventHub = {
     }
     response.writeHead(200, headers);
     response.write('retry: 1000\n\n');
+    if (clients.size === 0) {
+      attachmentStagingService.clearAll();
+    }
     clients.add(response);
 
     const heartbeat = setInterval(() => {

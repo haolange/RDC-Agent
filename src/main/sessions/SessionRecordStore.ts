@@ -32,7 +32,7 @@ import type {
   PersistedRunRecord,
   SessionEvidenceRecord,
 } from './storageTypes';
-import type { StagedConversationSessionCommit } from './storageCommitTypes';
+import type { ReservedStagedConversationSession, StagedConversationSessionCommit } from './storageCommitTypes';
 import { SessionRecordSchema, SESSION_EVIDENCE_MIGRATIONS, toSessionAttachmentManifest } from './storageSchema';
 import { reconcileProjectSessionTitles } from './sessionRecordReconcile';
 import { readPersistedRun as loadPersistedRun, toRunSummary, writeRunFiles as persistRunFiles } from './sessionRunPersistence';
@@ -161,13 +161,12 @@ export class SessionRecordStore {
     return session;
   }
 
-  beginStagedConversationSession(
+  allocateStagedConversationSession(
     projectId: string,
     title: string,
-    sourceAttachmentPaths: string[],
     requestId: string,
     turnId: string,
-  ): StagedConversationSessionCommit {
+  ): ReservedStagedConversationSession {
     const project = this.host.projects.getProjectById(projectId);
     if (!project) throw new Error(`Project not found: ${projectId}`);
     const timestamp = nowMs();
@@ -178,31 +177,76 @@ export class SessionRecordStore {
       sessionsRoot,
       `.turn-staging-${sanitizeToken(requestId).slice(0, 48) || generateShortId()}-${sessionId}`,
     );
+    return {
+      session: {
+        sessionId,
+        projectId,
+        title: this.normalizeSessionTitle(projectId, title),
+        goal: '',
+        sessionPath: finalPath,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      },
+      requestId,
+      turnId,
+      stagingPath,
+      finalPath,
+    };
+  }
+
+  beginStagedConversationSession(
+    projectId: string,
+    title: string,
+    sourceAttachmentPaths: string[],
+    requestId: string,
+    turnId: string,
+    options?: {
+      reserved?: ReservedStagedConversationSession;
+      plannedAttachments?: import('@shared/types/session').SessionAttachmentRecord[];
+    },
+  ): StagedConversationSessionCommit {
+    const reserved = options?.reserved ?? this.allocateStagedConversationSession(
+      projectId,
+      title,
+      requestId,
+      turnId,
+    );
+    const { session, stagingPath, finalPath } = reserved;
     if (fs.existsSync(stagingPath)) fs.rmSync(stagingPath, { recursive: true, force: true });
     this.host.io.ensureDir(path.join(stagingPath, 'attachments'));
     this.host.io.ensureDir(path.join(stagingPath, 'timeline'));
     this.host.io.ensureDir(path.join(stagingPath, 'runs'));
-    const session: SessionRecord = {
-      sessionId,
-      projectId,
-      title: this.normalizeSessionTitle(projectId, title),
-      goal: '',
-      sessionPath: finalPath,
-      createdAt: timestamp,
-      updatedAt: timestamp,
-    };
     try {
-      const attachments = this.host.history.copyAttachmentsForTurn(
-        session,
-        sourceAttachmentPaths,
-        path.join(stagingPath, 'attachments'),
-        path.join(finalPath, 'attachments'),
-      );
+      const attachments = options?.plannedAttachments
+        ? this.copyPlannedAttachments(
+          sourceAttachmentPaths,
+          options.plannedAttachments,
+          path.join(stagingPath, 'attachments'),
+        )
+        : this.host.history.copyAttachmentsForTurn(
+          session,
+          sourceAttachmentPaths,
+          path.join(stagingPath, 'attachments'),
+          path.join(finalPath, 'attachments'),
+        );
       return { session, requestId, turnId, stagingPath, finalPath, attachments };
     } catch (error) {
       fs.rmSync(stagingPath, { recursive: true, force: true });
       throw error;
     }
+  }
+
+  private copyPlannedAttachments(
+    sourceAttachmentPaths: string[],
+    planned: import('@shared/types/session').SessionAttachmentRecord[],
+    physicalAttachmentsDir: string,
+  ): import('@shared/types/session').SessionAttachmentRecord[] {
+    for (let index = 0; index < planned.length; index += 1) {
+      const sourcePath = path.resolve(sourceAttachmentPaths[index]!);
+      const targetPath = path.join(physicalAttachmentsDir, planned[index]!.fileName);
+      fs.copyFileSync(sourcePath, targetPath);
+    }
+    return planned;
   }
 
   commitStagedConversationSession(

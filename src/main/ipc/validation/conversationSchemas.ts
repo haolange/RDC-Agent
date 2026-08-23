@@ -26,7 +26,43 @@ const ConversationAttachmentInputSchema = z.object({
   fileName: ipcNonEmptyString(512, 'fileName'),
   mimeType: z.union([ipcString(200, 'mimeType'), z.null()]).optional(),
   size: z.union([z.number().int().nonnegative().max(500 * 1024 * 1024), z.null()]).optional(),
+  stagingId: ipcString(64, 'stagingId').optional(),
 }).strict();
+
+const ConversationAttachmentStagePathItemSchema = z.object({
+  sourcePath: ipcNonEmptyString(4096, 'sourcePath'),
+  fileName: ipcString(512, 'fileName').optional(),
+}).strict();
+
+const ConversationAttachmentStageBytesItemSchema = z.object({
+  fileName: ipcNonEmptyString(512, 'fileName'),
+  mimeType: z.union([ipcString(200, 'mimeType'), z.null()]).optional(),
+  bytesBase64: ipcNonEmptyString(96 * 1024 * 1024, 'bytesBase64'),
+}).strict();
+
+export const ConversationStageAttachmentsArgsSchema = z.tuple([
+  z.object({
+    items: z.array(z.union([
+      ConversationAttachmentStagePathItemSchema,
+      ConversationAttachmentStageBytesItemSchema,
+    ])).max(32),
+    composerScopeKey: ipcNonEmptyString(256, 'composerScopeKey'),
+  }).strict(),
+]);
+
+export const ConversationReleaseAttachmentsArgsSchema = z.tuple([
+  z.object({
+    stagingIds: z.array(ipcNonEmptyString(64, 'stagingId')).max(32),
+  }).strict(),
+]);
+
+export const ConversationGetAttachmentPreviewArgsSchema = z.tuple([
+  z.object({
+    previewId: ipcNonEmptyString(64, 'previewId'),
+    sessionId: ipcId(128, 'sessionId').optional(),
+    composerScopeKey: ipcString(256, 'composerScopeKey').optional(),
+  }).strict(),
+]);
 
 const ConfigurationCommitSchema = z.object({
   agentId: ipcNonEmptyString(200, 'agentId'),

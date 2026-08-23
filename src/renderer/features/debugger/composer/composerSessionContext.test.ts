@@ -34,6 +34,21 @@ describe('composerSessionContext', () => {
     expect(restored).toBe('hello from a');
   });
 
+  it('treats no-session and null as the same lastSent owner', () => {
+    useComposerSessionContextStore.getState().setLastSent({
+      sessionId: 'no-session',
+      projectId: 'project-1',
+      prompt: 'before session',
+      attachments: [],
+      skillIds: [],
+    });
+    let restored = '';
+    expect(restoreLastSentIfCurrentSession(null, (last) => {
+      restored = last.prompt;
+    })).toBe(true);
+    expect(restored).toBe('before session');
+  });
+
   it('resetForSessionSwitch clears active turn but keeps lastSent for owning restore', () => {
     useComposerSessionContextStore.getState().beginTurn({
       sessionId: 'session-a',

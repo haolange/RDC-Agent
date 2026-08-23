@@ -63,3 +63,11 @@ export interface StagedConversationSessionCommit {
   finalPath: string;
   attachments: SessionAttachmentRecord[];
 }
+
+export interface ReservedStagedConversationSession {
+  session: SessionRecord;
+  requestId: string;
+  turnId: string;
+  stagingPath: string;
+  finalPath: string;
+}
