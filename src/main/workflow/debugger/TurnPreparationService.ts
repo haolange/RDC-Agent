@@ -45,6 +45,7 @@ import type { WorkflowStage } from '@shared/types/workflow';
 import type { UserMessage, ToolDefinition } from '../../agent-runtime/core/types';
 import {
   countContinuationDecisions,
+  type FrozenAttachmentManifestEntry,
   type PreparedAgentTurnContext,
   type ResolvedRuntimeTools,
 } from './orchestratorTypes';
@@ -103,6 +104,9 @@ export class TurnPreparationService {
     turnId: string;
     agentId: AgentRole;
     content: UserMessage['content'];
+    frozenUserContent?: UserMessage['content'];
+    attachmentManifest?: FrozenAttachmentManifestEntry[];
+    inlineTokenBudget?: number;
     imageTokenAdjustment: number;
     providerId: string;
     selectedModelId: string;
@@ -306,6 +310,9 @@ export class TurnPreparationService {
       promptPlan: input.promptPlan,
       policy: compiledPolicy,
       skillIntersection,
+      attachmentManifestFingerprint: input.attachmentManifest
+        ? JSON.stringify(input.attachmentManifest)
+        : null,
       visibleToolNames: activeToolDefinitions.map((definition) => definition.name),
       activatedDeferredTools,
       mcpDescriptorHash: aggregateMcpDescriptorHash(profile, input.projectRootPath),
@@ -372,6 +379,9 @@ export class TurnPreparationService {
       selectedModelId: input.selectedModelId,
       effectiveModel: input.effectiveModel,
       toolAllowlist: [...input.toolAllowlist],
+      frozenUserContent: input.frozenUserContent ?? input.content,
+      attachmentManifest: input.attachmentManifest ?? [],
+      inlineTokenBudget: input.inlineTokenBudget ?? 0,
       initialMessages,
       contextDiagnostic: {
         selectedTurnCount: materialized.selectedTurnCount,

@@ -27,7 +27,7 @@ import { attachToolExecutionEvidence } from './ConversationToolEvidence';
 import type { ConversationLoopContinuationState } from '@shared/conversation/loopOutputPhase';
 import { beginAssistantContentLoopIfPending } from './ConversationLoopRuntimeState';
 import { EMPTY_CANONICAL_ASSISTANT_OUTPUT, requireCanonicalFinalAnswer } from './CanonicalAssistantOutput';
-import { materializeAgentUserInput } from './ConversationAttachmentMaterializer';
+import { hydrateFrozenUserContent } from './ConversationAttachmentMaterializer';
 import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
 import type {
   ActiveConversationTurn,
@@ -405,12 +405,13 @@ export async function completeProfileTurn(
         throw new Error(`MODEL_UNAVAILABLE: ${routePreflight.providerId}/${routePreflight.modelId}`);
       }
       const prepared = input.preparedPrompt;
-      const userInput = await materializeAgentUserInput(
-        input.rawMessage,
-        input.importedAttachments,
-        input.preparedTurn.runtime.routeCapability.visionInputMode,
-        true,
-      );
+      const userInput = {
+        content: await hydrateFrozenUserContent(
+          input.preparedTurn.frozenUserContent,
+          input.preparedTurn.attachmentManifest,
+          input.importedAttachments,
+        ),
+      };
       await agentOrchestrator.sendProfileMessage(
         conversationAgentId,
         input.rawMessage,

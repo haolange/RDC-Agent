@@ -71,7 +71,9 @@ export const WorkProcessSectionRow: React.FC<WorkProcessSectionRowProps> = ({
               {row.thinkingSource ? <span className="work-process-thinking-source">{row.thinkingSource}</span> : null}
               <span className="work-process-row-caret" aria-hidden="true" />
             </summary>
-            <div className="work-process-thinking-preview">{row.thinkingPreview}</div>
+            <div className="work-process-thinking-preview">
+              <MessageMarkdown content={row.thinkingPreview} />
+            </div>
           </details>
         ) : row.thinkingLabel ? (
           <p className={`${thinkingClassName} work-process-thinking-caption`}>

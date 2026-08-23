@@ -40,6 +40,8 @@ export interface AgentPermissionDecisionInput {
   permissionSettings?: AgentPermissionSettings;
   /** Turn 冻结的 CompiledPolicy；缺省视为空策略。 */
   compiledPolicy?: CompiledPolicy;
+  /** Current session attachments directory; readable by read-only file tools only. */
+  sessionAttachmentsRoot?: string | null;
 }
 
 const READ_ONLY_FILE_TOOLS = new Set(['read_file', 'read_image', 'glob', 'grep']);
@@ -338,6 +340,13 @@ export class AgentPermissionPolicyService {
 
     const configuredReadableRoots = permissions.readableRoots.map(resolveConfiguredRoot);
     const configuredWritableRoots = permissions.writableRoots.map(resolveConfiguredRoot);
+    const sessionAttachmentsRoot = input.sessionAttachmentsRoot
+      ? path.resolve(input.sessionAttachmentsRoot)
+      : null;
+    const readRoots = [
+      ...configuredReadableRoots,
+      ...(sessionAttachmentsRoot ? [sessionAttachmentsRoot] : []),
+    ];
 
     if (READ_ONLY_FILE_TOOLS.has(toolName)) {
       const targets = extractPathTargets(toolName, input.toolCall).map((target) => resolveToolTarget(target, workspaceRoot));
@@ -345,7 +354,7 @@ export class AgentPermissionPolicyService {
       if (externalTargets.length === 0) {
         return { action: 'allow', risk: 'low', temporaryPathRoots: [] };
       }
-      const allowedTargets = externalTargets.filter((target) => configuredReadableRoots.some((root) => isWithinRoot(target, root)));
+      const allowedTargets = externalTargets.filter((target) => readRoots.some((root) => isWithinRoot(target, root)));
       if (allowedTargets.length === externalTargets.length) {
         return { action: 'allow', risk: 'low', temporaryPathRoots: allowedTargets };
       }

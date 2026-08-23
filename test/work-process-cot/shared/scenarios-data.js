@@ -418,8 +418,8 @@
       },
       '12': {
         note: en
-          ? 'Commentary + final use Markdown; thinking preview stays plain text. Sticky open=true so you can see the literal ** / ` / #.'
-          : 'Commentary 与 final 使用 Markdown；thinking preview 保持纯文本。sticky open=true 以便看到字面 ** / ` / #。',
+          ? 'Commentary, final, and thinking preview all use Markdown. Sticky open=true so you can inspect rendered ** / ` / #.'
+          : 'Commentary、final 与 thinking preview 都走 Markdown。sticky open=true 以便查看渲染后的 ** / ` / #。',
         user: userPrompt('对比 Markdown 表面。', 'Contrast Markdown surfaces.'),
         wp: {
           status: 'complete',
@@ -433,8 +433,11 @@
               open: true,
               duration: '3s',
               preview: en
-                ? 'This **should not** render as bold. `code` stays literal. # Not a heading'
-                : '这里的 **不应** 加粗。`code` 保持字面。# 不是标题',
+                ? 'This **should** render as bold. `code` is inline. # Heading'
+                : '这里的 **应该** 加粗。`code` 是行内代码。# 标题',
+              html: en
+                ? '<p>This <strong>should</strong> render as bold. <code>code</code> is inline.</p><h3>Heading</h3>'
+                : '<p>这里的 <strong>应该</strong> 加粗。<code>code</code> 是行内代码。</p><h3>标题</h3>',
             },
             prose: {
               html: en

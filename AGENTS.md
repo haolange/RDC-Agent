@@ -52,13 +52,14 @@
 | --- | --- | --- |
 | `ProcessSupervisor` | `src/main/runtime/` | 子进程 spawn/joinAll；仅在观察到 close/error 后移除 registry；超时未确认保留 `unconfirmed_orphan`；`code_interpreter` 走 `shell` owner |
 | `ToolImagePreviewStore` | `src/main/conversation/ToolImagePreviewStore.ts` | session `image-previews` 缩略图；IPC `conversation:getToolImagePreview` 只读 + active-session gate；magic bytes 拒伪 |
+| `AttachmentStagingService` | `src/main/conversation/AttachmentStagingService.ts` | Composer 附件 path/bytes 暂存；硬拒 `.rdc`/可执行/SVG；path 源先 `stats.size` 再读；累计配额 + TTL；预览走 `conversation:getAttachmentPreview`（realpath + composer scope） |
 | `tooling.codeInterpreter` | `src/shared/types/settings.ts` + Settings Tools | 本机边界、project 不可覆盖；未启用 `CODE_INTERPRETER_DISABLED` |
 | `TurnCoordinator` / `TurnHandle` | `src/main/workflow/debugger/` | 每 session 活跃 turn；generation 丢弃迟到 event |
 | `ShutdownCoordinator` | `src/main/lifecycle/` | before-quit 限时 shutdownAll |
 | `MemoryStore` | `src/main/agent-runtime/memory/` | 进程内 realpath 队列 + `.memory.lock`（`directoryFileLock`：活 pid 永不回收，死 pid / 损坏锁回收）跨进程互斥 |
 | `StorageIo` / `storageSchema` | `src/main/sessions/` | zod runtime 校验 + `schemaVersion` migration registry；未知更高版本 `STORAGE_SCHEMA_UNSUPPORTED`；`attachments.json` 现写 `{ schemaVersion, attachments }`，缺版本纯数组仍 Zod 校验；`usage.json` 现写 `{ schemaVersion: '2', usage }`，v1 `outputReserveTokens` 经 `SESSION_USAGE_MIGRATIONS` 迁到 `maxOutputTokens` |
 | 上下文预算 / 压缩阈值 / 动态输出上限 | `src/shared/utils/contextBudget.ts` + `contextTiers.ts` | prompt 上限不扣输出；压缩百分比 `min(用户, policy)`；每次 LLM call 现算 `max_tokens`；门禁含 `check:fidelity` 与 Browser QA 环/刻度 |
-| `EffectiveRuntimePlan` | `src/main/agent-runtime/` | `schemaVersion: 2`；`prepareTurn` 完整冻结；Prompt 与 Executor 共用 |
+| `EffectiveRuntimePlan` | `src/main/agent-runtime/` | `schemaVersion: 3`；`prepareTurn` 完整冻结（含附件 manifest 指纹）；Prompt 与 Executor 共用 |
 | `LoopProgressGuard` / `AgentLoopTerminationError` | `src/main/agent-runtime/agent/` | 第二轮相同工具结果注入不落盘纠偏；第三轮 `AGENT_NO_PROGRESS`；仍需 continuation 的 max-turn 抛 `AGENT_MAX_TURNS_EXCEEDED`，不得静默完成或误报 Provider failure |
 | `AgentOrchestrator` | `src/main/workflow/debugger/AgentOrchestrator.ts` | façade 少于 800 行；职责外提；`pnpm run check:orchestrator-facade` |
 | `RdxRuntimeContextRegistry` | `src/main/sessions/` | **仅** per-session lease；禁止 `legacyGlobalMirror` / `getRdxRuntimeContext` |
@@ -165,7 +166,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 ---
 
 - **[MANUAL]** 开始实现前先写明本次验证方式；实现后按该方式验证并报告结果。无法运行的验证，必须说明原因和剩余风险。
-- **[AUTO]** `pnpm run test:coverage` 覆盖 node unit surface（`vitest.config.ts` 仅排除 Electron/OS 强绑定 glue；核心 runtime 计入覆盖率）；初始阈值 floor 见 `vitest.config.ts` thresholds，实测只升不降门禁见 `scripts/fidelity/coverage-ratchet.json` + `pnpm run check:coverage-ratchet`（当前基线约 lines 65 / functions 68 / branches 53）。集成面走 `check:contracts` + 浏览器真实会话；renderer 走 browser QA 与 `check:*`。
+- **[AUTO]** `pnpm run test:coverage` 覆盖 node unit surface（`vitest.config.ts` 仅排除 Electron/OS 强绑定 glue；核心 runtime 计入覆盖率）；初始阈值 floor 见 `vitest.config.ts` thresholds，实测只升不降门禁见 `scripts/fidelity/coverage-ratchet.json` + `pnpm run check:coverage-ratchet`（当前基线约 lines 68.89 / functions 70.51 / branches 55.95 / statements 66.74）。集成面走 `check:contracts` + 浏览器真实会话；renderer 走 browser QA 与 `check:*`。
 - **[AUTO]** 代码改动后执行 `pnpm run typecheck` 与 `pnpm run lint`（`no-unused-vars` / `exhaustive-deps` 为 error）。
 - **[AUTO]** 依赖、入口、构建、发布配置或仓库目录治理改动后执行 `pnpm run check:repository-hygiene`。
 - **[AUTO]** renderer 结构或 UI 锚点改动后执行 `pnpm run check:architecture`（含 Orchestrator façade &lt;800 与 `src/main` 单文件 ≤900）、`pnpm run check:fidelity`、`pnpm run check:shared-exports`。
@@ -189,6 +190,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - **[AUTO]** HAL adapter 的 reasoning level 映射必须经 `ProviderReasoningMapper` 统一处理：manifest `reasoningEfforts` → wire effort 参数；新增 adapter 时确认 reasoning 投递路径经 `check:reasoning-delivery` 验证。
 - **[AUTO]** Builtin 工具目录、manifest token 展开与 `REJECTED_TOOL_TOKENS` 契约验证使用 `pnpm run check:tool-system`（当前 39 ids，含 `read_image` / `code_interpreter`）。
 - **[AUTO] [BROWSER-QA]** `read_image` / `code_interpreter` / Tasks 快照 / Compact provenance 改动后执行 `check:tool-system`、`check:work-process`、`check:work-process-tool-coverage`、`check:browser-capability`；Browser QA 覆盖 vision fail-closed、解释器产物缩略图、相邻/不相邻任务快照与手动 `/compact` 卡片。
+- **[AUTO] [BROWSER-QA]** Composer 附件管道改动后执行 `check:shared-exports`、`check:browser-capability`、`check:fidelity`、`check:session-projection`、`check:right-rail`、`check:appearance`；Browser QA 覆盖空态、单图/多图、大文本、PDF、二进制、超限拒绝、`.rdc` 引导、vision 前置警告、移除、transcript 缩略图打开、Right Rail Context、Preparing Stop 回填、跨 session、390px 窄屏。
 - **[AUTO]** Settings Agents 路由契约验证使用 `pnpm run check:settings-agents`。
 - **[BROWSER-QA]** 产品级本地验收通过真实浏览器会话完成，并指向真实 project 和 `.rdc`；RDX/RenderDoc 失败必须 fail-closed 并显示诊断。
 - **[BROWSER-QA]** 涉及工作台交互、页面结构、样式引用或共享契约的改动后，至少补一次关键 E2E smoke 或等价人工回归，确认主界面、关键面板和主要交互未退化。

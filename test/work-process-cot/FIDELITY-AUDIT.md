@@ -13,7 +13,7 @@
 | Thinking 生命周期 | section running/pending → 标签「正在思考」+ 默认展开 + Active Signal（即使 thinkingStatus 已 complete） |
 | Thinking sticky open | completed 时尊重 `open: true`（场景 12） |
 | Thinking caret | CSS triangle `.work-process-row-caret` |
-| Commentary / Final | Markdown 槽；thinking 纯文本 `esc()` |
+| Commentary / Final / Thinking | 均走 Markdown 槽；thinking 包 `.markdown-body` |
 | Tool 卡 | 单披露；六族；结果优先；running 显示「进行中」；file Copy；Raw=参数/返回值 |
 | mcp__* | 「已调用 MCP」；裸名 `mcp` 仍为「已查询 MCP」 |
 | web | search=域名 pills；fetch=title summary + destination chip |
@@ -48,4 +48,4 @@
 - 场景 05 → `mcp__*`「已调用 MCP」；`web_fetch` 有 title
 - 场景 08 → Task 在 WP 步骤列表顶层，completed 有删除线
 - 场景 09 → ask_user `等待用户 · 2` + `0/2`；扁平「等待审批」；工具卡内审批条
-- 场景 12 → thinking 展开可见字面 `**` / `` ` `` / `#`
+- 场景 12 → thinking 展开可见渲染后的粗体 / 行内代码 / 标题

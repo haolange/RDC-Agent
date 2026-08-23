@@ -208,6 +208,13 @@ export async function sendComposerConversationTurn(options: {
       return;
     }
 
+    const stagedIds = sentAttachments
+      .map((attachment) => attachment.stagingId)
+      .filter((stagingId): stagingId is string => Boolean(stagingId));
+    if (stagedIds.length > 0) {
+      void electronAPI.conversation.releaseAttachments({ stagingIds: stagedIds });
+    }
+
     // Drop optimistic placeholders before applying authoritative turn messages.
     rollbackOptimistic();
 

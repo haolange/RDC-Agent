@@ -41,6 +41,7 @@ class BrowserAppBridgeClient implements RendererApiTransport {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-rdc-invoke-channel': channel,
       },
       credentials: 'include',
       body: JSON.stringify({ channel, args }),

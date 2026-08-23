@@ -63,6 +63,9 @@ export function createConversationApi(transport: RendererApiTransport): Conversa
     undoLastTurn: (sessionId) => transport.invoke(INVOKE.conversation.undoLastTurn, sessionId),
     compactHistory: (sessionId) => transport.invoke(INVOKE.conversation.compactHistory, sessionId),
     getToolImagePreview: (request) => transport.invoke(INVOKE.conversation.getToolImagePreview, request),
+    stageAttachments: (request) => transport.invoke(INVOKE.conversation.stageAttachments, request),
+    releaseAttachments: (request) => transport.invoke(INVOKE.conversation.releaseAttachments, request),
+    getAttachmentPreview: (request) => transport.invoke(INVOKE.conversation.getAttachmentPreview, request),
     onEvent: (callback): void => {
       transport.addListener(EVENT.conversation.event, callback as unknown as RendererEventCallback);
     },

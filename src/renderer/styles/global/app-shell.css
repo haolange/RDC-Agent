@@ -442,85 +442,6 @@ html[data-resolved-theme='light'] .app-main {
   opacity: 0.94;
 }
 
-.composer-attachments {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.composer-attachment-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 38px;
-  max-width: min(320px, 100%);
-  padding: 6px 10px;
-  border-radius: 14px;
-  border: 1px solid rgb(var(--color-border-secondary));
-  background: rgb(var(--color-bg-1) / 0.88);
-}
-
-.composer-attachment-chip-icon {
-  width: 28px;
-  height: 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9px;
-  background: rgb(var(--color-accent-500) / 0.15);
-  color: rgb(var(--color-accent-300));
-  font-size: 9px;
-  font-weight: var(--font-bold);
-  letter-spacing: 0.08em;
-  flex-shrink: 0;
-}
-
-.composer-attachment-chip.image .composer-attachment-chip-icon {
-  background: rgb(var(--color-primary-500) / 0.16);
-  color: rgb(var(--color-primary-200));
-}
-
-.composer-attachment-chip.skill .composer-attachment-chip-icon {
-  background: color-mix(in srgb, var(--token-context-skills) 18%, transparent);
-  color: var(--token-context-skills);
-}
-
-.composer-attachment-chip-copy {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.composer-attachment-chip-name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: rgb(var(--color-text-primary));
-  font-size: var(--text-sm);
-}
-
-.composer-attachment-chip-meta {
-  color: rgb(var(--color-text-tertiary));
-  font-size: var(--text-xs);
-}
-
-.composer-attachment-chip-remove {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: transparent;
-  color: rgb(var(--color-text-tertiary));
-  cursor: pointer;
-}
-
-.composer-attachment-chip-remove:hover {
-  background: rgb(var(--color-bg-3));
-  color: rgb(var(--color-text-primary));
-}
-
 .composer-input-row {
   position: relative;
   display: flex;
@@ -549,17 +470,17 @@ html[data-resolved-theme='light'] .app-main {
   justify-content: center;
   padding: 0;
   border-radius: var(--control-radius);
-  border: 1px solid rgb(var(--color-border-default));
-  background: rgb(var(--color-bg-1) / 0.82);
-  color: rgb(var(--color-text-secondary));
+  border: 1px solid var(--token-border-default);
+  background: var(--token-bg-panel);
+  color: var(--token-text-caption);
   cursor: pointer;
   flex: 0 0 auto;
   transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
 .composer-attach-button:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--composer-mode-accent) 8%, rgb(var(--color-bg-3)));
-  border-color: color-mix(in srgb, var(--composer-mode-accent) 22%, rgb(var(--color-border-default)));
+  background: var(--token-interactive-hover);
+  border-color: var(--token-border-strong);
   color: var(--composer-mode-accent);
 }
 

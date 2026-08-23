@@ -63,6 +63,7 @@ export function buildOptimisticConversationTurn(options: {
       sessionId: currentSession?.sessionId ?? '',
       projectId: currentProject?.projectId ?? '',
       kind: attachment.kind,
+      layer: attachment.layer,
       fileName: attachment.fileName,
       filePath: attachment.sourcePath,
       mimeType: attachment.mimeType || 'application/octet-stream',
@@ -112,12 +113,15 @@ export const removeOptimisticConversationMessages = (
 
 export const toConversationAttachmentInputs = (
   pendingAttachments: PendingAttachmentDraft[],
-): ConversationAttachmentInput[] => pendingAttachments.map((attachment) => ({
-  sourcePath: attachment.sourcePath,
-  fileName: attachment.fileName,
-  mimeType: attachment.mimeType,
-  size: attachment.size,
-}));
+): ConversationAttachmentInput[] => pendingAttachments
+  .filter((attachment) => !attachment.error && attachment.sourcePath)
+  .map((attachment) => ({
+    sourcePath: attachment.sourcePath,
+    fileName: attachment.fileName,
+    mimeType: attachment.mimeType,
+    size: attachment.size,
+    stagingId: attachment.stagingId,
+  }));
 
 /**
  * Turn 响应里的消息以“可见分支成员集”为准，但流事件（SSE/IPC）可能先于

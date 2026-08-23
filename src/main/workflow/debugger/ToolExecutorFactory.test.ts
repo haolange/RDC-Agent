@@ -55,6 +55,12 @@ vi.mock('../../runtime/AppPathService', () => ({
   },
 }));
 
+vi.mock('../../sessions/StorageAdapter', () => ({
+  storageAdapter: {
+    getSessionAttachmentsDir: () => 'D:/sessions/session-a/attachments',
+  },
+}));
+
 vi.mock('../../agent-runtime/permissions/AgentPermissionPolicy', () => ({
   agentPermissionPolicyService: {
     evaluate: () => ({ action: 'allow' }),

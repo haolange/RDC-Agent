@@ -121,7 +121,9 @@ assignDefaultCaptureRoles
 AssistantMessageDiagnostic
 AssistantMessageNode
 AttachmentKind
+AttachmentLayer
 AttachmentRef
+AttachmentRejectCode
 BaseTraceNode
 Blocker
 BLOCKER_CODES
@@ -185,6 +187,8 @@ compileProviderCatalog
 compileThemeChrome
 COMPOSE_ACCENT_FALLBACK
 ComposeAccentCssVars
+ComposerAttachmentDescriptor
+ComposerAttachmentError
 CONTEXT_COMPACTION_PERCENT_MAX
 CONTEXT_COMPACTION_PERCENT_MIN
 CONTEXT_COMPACTION_PERCENT_STEP
@@ -221,6 +225,9 @@ ConversationAskUserAnswer
 ConversationAskUserOption
 ConversationAskUserQuestion
 ConversationAttachmentInput
+ConversationAttachmentStageBytesItem
+ConversationAttachmentStageItem
+ConversationAttachmentStagePathItem
 ConversationBranch
 ConversationBranchState
 ConversationCancelActiveTurnRequest
@@ -231,6 +238,8 @@ ConversationDiagnosticSeverity
 ConversationErrorViewModel
 ConversationExecutionTransition
 ConversationFork
+ConversationGetAttachmentPreviewRequest
+ConversationGetAttachmentPreviewResult
 ConversationHistoryResult
 ConversationLoopContinuationState
 ConversationLoopOutputPhase
@@ -247,11 +256,15 @@ ConversationMessageStatus
 ConversationMode
 ConversationPreflightErrorCode
 ConversationReasoningState
+ConversationReleaseAttachmentsRequest
+ConversationReleaseAttachmentsResult
 ConversationRewriteFromMessageRequest
 ConversationRole
 ConversationRunLinkedEvent
 ConversationSendRequest
 ConversationSendResult
+ConversationStageAttachmentsRequest
+ConversationStageAttachmentsResult
 ConversationStreamEvent
 ConversationSwitchBranchRequest
 ConversationSwitchBranchResult
@@ -425,9 +438,9 @@ INVESTIGATOR_AGENTS
 isAgentIconPreset
 isAlphanumeric
 isEffectiveModelPickerSelectable
+isEligibleMaxContextTier
 isHexColor
 isLlmProviderProtocol
-isEligibleMaxContextTier
 isNamedReasoningLevel
 isReasoningSelection
 isRendererEventChannel

@@ -9,6 +9,7 @@ import type { AgentRole } from '@shared/types/agent';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
+import path from 'node:path';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { settingsService } from '../settings/SettingsService';
 import { agentOrchestrator } from '../workflow/debugger/AgentOrchestrator';
@@ -202,11 +203,64 @@ export async function startProfileTurn(
   // valid canonical-model -> internal-target plan.
   const pendingAttachmentDescriptors = await resolvePendingAttachmentDescriptors(pendingAttachments);
   throwIfPreparationCancelled();
+  const reservedSession = !context.session && context.projectId && pendingAttachmentDescriptors.length > 0
+    ? storageAdapter.allocateStagedConversationSession(
+      context.projectId,
+      rawMessage.slice(0, 80),
+      requestId,
+      turnId,
+    )
+    : null;
+  const plannedAttachmentRecords: SessionAttachmentRecord[] = pendingAttachmentDescriptors.length === 0
+    ? []
+    : context.session
+      ? storageAdapter.history.planAttachmentsForTurn(
+        context.session,
+        pendingAttachmentDescriptors.map((attachment) => attachment.filePath),
+        storageAdapter.sessions.getSessionAttachmentsDir(context.session.sessionId),
+        pendingAttachmentDescriptors.map((attachment) => ({
+          layer: attachment.layer,
+          mimeType: attachment.mimeType,
+          kind: attachment.kind,
+          fileName: attachment.fileName,
+          size: attachment.size,
+        })),
+      )
+      : reservedSession
+        ? storageAdapter.history.planAttachmentsForTurn(
+          reservedSession.session,
+          pendingAttachmentDescriptors.map((attachment) => attachment.filePath),
+          path.join(reservedSession.finalPath, 'attachments'),
+          pendingAttachmentDescriptors.map((attachment) => ({
+            layer: attachment.layer,
+            mimeType: attachment.mimeType,
+            kind: attachment.kind,
+            fileName: attachment.fileName,
+            size: attachment.size,
+          })),
+        )
+        : [];
+  if (pendingAttachmentDescriptors.length > 0 && plannedAttachmentRecords.length === 0) {
+    throw new Error('ATTACHMENT_SESSION_REQUIRED: select or create a project session before attaching files.');
+  }
+  const plannedInputAttachments = pendingAttachmentDescriptors.map((attachment, index) => {
+    const planned = plannedAttachmentRecords[index]!;
+    return {
+      attachmentId: planned.attachmentId,
+      kind: planned.kind,
+      layer: planned.layer ?? attachment.layer,
+      fileName: planned.fileName,
+      filePath: planned.filePath,
+      readPath: attachment.filePath,
+      mimeType: planned.mimeType,
+      size: planned.size,
+    };
+  });
   const preparedUserInput = await materializeAgentUserInput(
     effectiveMessage,
-    pendingAttachmentDescriptors,
+    plannedInputAttachments,
     plannedRouteCapability.visionInputMode,
-    false,
+    { includeImageData: false, contextBudgetTokens: planning.plan.contextBudgetTokens },
   );
   const preparedPrompt = host.prepareConversationPrompt({
     context,
@@ -231,6 +285,9 @@ export async function startProfileTurn(
     turnId,
     agentId: conversationAgentId,
     content: preparedUserInput.content,
+    frozenUserContent: preparedUserInput.content,
+    attachmentManifest: preparedUserInput.attachmentManifest,
+    inlineTokenBudget: preparedUserInput.inlineTokenBudget,
     imageTokenAdjustment: preparedUserInput.imageTokenAdjustment,
     providerId: routePreflight.providerId,
     selectedModelId: routePreflight.modelId,
@@ -265,7 +322,7 @@ export async function startProfileTurn(
   let assistantDraftMessage: ConversationMessage;
   let continuationNotice: ConversationMessage | null = null;
   try {
-    const attachmentPaths = pendingAttachments.map((entry) => entry.sourcePath);
+    const attachmentPaths = pendingAttachmentDescriptors.map((entry) => entry.filePath);
     if (!workingSession && context.projectId) {
       stagedSessionCommit = storageAdapter.beginStagedConversationSession(
         context.projectId,
@@ -273,6 +330,9 @@ export async function startProfileTurn(
         attachmentPaths,
         requestId,
         turnId,
+        reservedSession
+          ? { reserved: reservedSession, plannedAttachments: plannedAttachmentRecords }
+          : undefined,
       );
       workingSession = stagedSessionCommit.session;
       importedAttachments = stagedSessionCommit.attachments;
@@ -282,6 +342,7 @@ export async function startProfileTurn(
         attachmentPaths,
         requestId,
         turnId,
+        plannedAttachmentRecords,
       );
       importedAttachments = existingTurnCommit.attachments;
       persistedHistoryBeforeCommit = existingTurnCommit.beforeHistory;

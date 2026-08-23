@@ -5,7 +5,8 @@ import { generateShortId, nowMs } from '@shared/utils/id';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import { sanitizeStoredWorkTrace } from '../conversation/ConversationWorkTrace';
-import type { SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
+import type { SessionAttachmentKind, SessionAttachmentLayer, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
+import { classifyAttachmentBytes } from '../conversation/attachmentClassify';
 import type { SessionContextTurnEntry } from '../conversation/SessionContextJournal';
 import {
   CONVERSATION_COMPACTION_DELTA_THRESHOLD,
@@ -37,6 +38,7 @@ export class ConversationHistoryStore {
     sourceAttachmentPaths: string[],
     requestId: string,
     turnId: string,
+    plannedAttachments?: SessionAttachmentRecord[],
   ): ExistingConversationTurnCommit {
     if (this.host.turnCommitSessionIds.has(sessionId)) {
       throw new Error(`Conversation turn commit is already active for session ${sessionId}.`);
@@ -48,7 +50,7 @@ export class ConversationHistoryStore {
     const beforeBranch = this.readConversationBranchState(sessionId);
     const beforeAttachments = this.readSessionAttachments(sessionId);
     const attachmentsDir = this.host.sessions.getSessionAttachmentsDir(sessionId);
-    const attachments = this.planAttachmentsForTurn(session, sourceAttachmentPaths, attachmentsDir);
+    const attachments = plannedAttachments ?? this.planAttachmentsForTurn(session, sourceAttachmentPaths, attachmentsDir);
     const afterAttachments = beforeAttachments.concat(attachments);
     const journal: ConversationTurnCommitJournal = {
       schemaVersion: '1',
@@ -345,14 +347,17 @@ export class ConversationHistoryStore {
       const targetPath = this.resolveImportedFilePath(attachmentsDir, path.basename(sourcePath));
       fs.copyFileSync(sourcePath, targetPath);
       const stats = fs.statSync(targetPath);
+      const header = fs.readFileSync(targetPath).subarray(0, Math.min(stats.size, 64 * 1024));
+      const classified = this.classifySource(path.basename(targetPath), header);
       imported.push({
         attachmentId: `att_${generateShortId()}`,
         sessionId,
         projectId: session.projectId,
-        kind: this.inferAttachmentKind(targetPath),
+        kind: classified.kind,
+        layer: classified.layer,
         fileName: path.basename(targetPath),
         filePath: targetPath,
-        mimeType: this.inferMimeType(targetPath),
+        mimeType: classified.mimeType,
         size: stats.size,
         createdAt: stats.birthtimeMs || stats.ctimeMs || nowMs(),
       });
@@ -666,16 +671,26 @@ export class ConversationHistoryStore {
     session: SessionRecord,
     sourcePaths: string[],
     logicalAttachmentsDir: string,
+    classifications?: Array<{
+      layer: SessionAttachmentLayer;
+      mimeType: string;
+      kind: SessionAttachmentKind;
+      fileName?: string;
+      size?: number;
+    }>,
   ): SessionAttachmentRecord[] {
     const reserved = new Set<string>();
-    return sourcePaths.map((filePath) => {
+    return sourcePaths.map((filePath, index) => {
       const sourcePath = path.resolve(filePath);
       if (!fs.existsSync(sourcePath) || !fs.statSync(sourcePath).isFile()) {
         throw new Error(`Attachment is not a readable file: ${sourcePath}`);
       }
-      const extension = path.extname(sourcePath);
-      const baseName = path.basename(sourcePath, extension);
-      let fileName = path.basename(sourcePath);
+      const classification = classifications?.[index];
+      const stats = fs.statSync(sourcePath);
+      const sourceName = classification?.fileName || path.basename(sourcePath);
+      const extension = path.extname(sourceName);
+      const baseName = path.basename(sourceName, extension);
+      let fileName = path.basename(sourceName);
       let targetPath = path.join(logicalAttachmentsDir, fileName);
       let counter = 2;
       while (fs.existsSync(targetPath) || reserved.has(targetPath.toLowerCase())) {
@@ -684,16 +699,20 @@ export class ConversationHistoryStore {
         counter += 1;
       }
       reserved.add(targetPath.toLowerCase());
-      const stats = fs.statSync(sourcePath);
+      const classified = classification ?? this.classifySource(
+        fileName,
+        fs.readFileSync(sourcePath).subarray(0, Math.min(stats.size, 64 * 1024)),
+      );
       return {
         attachmentId: `att_${generateShortId()}`,
         sessionId: session.sessionId,
         projectId: session.projectId,
-        kind: this.inferAttachmentKind(sourcePath),
+        kind: classified.kind,
+        layer: classified.layer,
         fileName,
         filePath: targetPath,
-        mimeType: this.inferMimeType(sourcePath),
-        size: stats.size,
+        mimeType: classified.mimeType,
+        size: classification?.size ?? stats.size,
         createdAt: nowMs(),
       };
     });
@@ -755,28 +774,19 @@ export class ConversationHistoryStore {
     return candidate;
   }
 
-  private inferAttachmentKind(filePath: string): SessionAttachmentRecord['kind'] {
-    return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(filePath) ? 'image' : 'file';
-  }
-
-  private inferMimeType(filePath: string): string {
-    const extension = path.extname(filePath).toLowerCase();
-    const mimeByExtension: Record<string, string> = {
-      '.png': 'image/png',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.gif': 'image/gif',
-      '.webp': 'image/webp',
-      '.bmp': 'image/bmp',
-      '.svg': 'image/svg+xml',
-      '.pdf': 'application/pdf',
-      '.txt': 'text/plain',
-      '.md': 'text/markdown',
-      '.json': 'application/json',
-      '.zip': 'application/zip',
-      '.7z': 'application/x-7z-compressed',
-      '.log': 'text/plain',
+  private classifySource(fileName: string, header: Buffer): {
+    kind: SessionAttachmentKind;
+    layer: SessionAttachmentLayer;
+    mimeType: string;
+  } {
+    const classification = classifyAttachmentBytes(fileName, header);
+    if (classification.rejectCode) {
+      throw new Error(`${classification.rejectCode}: ${classification.rejectMessage ?? fileName}`);
+    }
+    return {
+      kind: classification.kind,
+      layer: classification.layer,
+      mimeType: classification.mimeType,
     };
-    return mimeByExtension[extension] || 'application/octet-stream';
   }
 }

@@ -15,6 +15,8 @@ Work Process 必须展示真实 `Requested approval` / `Approved` / `Denied` / `
 
 Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllowedPathRoots`。
 
+当前 session 的 `{sessionPath}/attachments` 作为 scoped readable root 注入 `AgentPermissionPolicy.sessionAttachmentsRoot`。仅 `READ_ONLY_FILE_TOOLS`（`read_file` / `read_image` / `glob` / `grep`）自动可读；写工具、`code_interpreter` 与跨 session 附件目录不继承。依据是用户亲手附加 = 显式意图；`.rdc`、可执行文件与 SVG 不得进入该目录。
+
 ## Electron Sandbox（Phase 6）
 
 - BrowserWindow：`sandbox: true`。

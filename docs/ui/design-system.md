@@ -70,6 +70,14 @@ Session 右侧栏四张卡（Progress / Outputs / Context / Capture）的空态�
 - 语义：Progress=上升台阶（蓝→青→绿→琥珀，最高块带进行中光点）；Outputs=虚线收集框+悬浮玻璃文件；Context=异色玻璃节点发光连线网；Capture=玻璃 capture 卡+播放徽标+REC 点。文案保持一句 honest copy，图形不承载文字。
 - gradient/filter 的 `id` 必须带场景前缀（`rr-eg-<scene>-*`），保证四卡同屏唯一；不引入 svgr/图片资产双轨。
 
+## Composer 附件卡
+
+- 待发附件走输入框上方托盘（`composer-attachment-tray` / `composer-attachment-card`），不用 chip 文本条。
+- 图片卡 72px 圆角真实缩略图；文件卡类型字形 + 文件名 + `TYPE · size`。
+- 移除叉仅 hover / `:focus-within` 显现；键盘聚焦时常驻。
+- 颜色、字号、间距只引用 `--token-*` / `--text-*` / `--space-*`；样式在 `composer-attachments.css`，禁止回到 `app-shell.css` 的 primitive token chip。
+- `<=480px` 卡片缩尺、托盘限高滚动，不得挤掉底栏控件。
+
 ## Transcript 卡壳
 
 审批卡、Work Process tool 卡、Asked 卡、Sub Agent 子行、Tasks 快照卡、图像缩略图与 Compact 摘要共用同一组变量（定义在 `design-system.css`）：`--transcript-card-radius` / `--transcript-card-padding` / `--transcript-card-border` / `--transcript-card-surface` / `--transcript-card-shadow`。禁止再为某一类卡另起一套 radius/padding/border/背景。缩略图经 `conversation:getToolImagePreview` 取 `data:` URL，禁止把大图 base64 写进 `resultPreview`。

@@ -18,7 +18,7 @@ export interface FrozenHandoffDefinition {
   model?: string;
 }
 
-export const EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION = 2 as const;
+export const EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION = 3 as const;
 
 export interface EffectiveRuntimePlan {
   schemaVersion: typeof EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION;
@@ -56,6 +56,7 @@ export interface EffectiveRuntimePlan {
   routeCapability: AgentRouteCapability;
   requestPlanFingerprint: string;
   promptPlanFingerprint: string;
+  attachmentManifestFingerprint: string | null;
   /** Frozen at plan build; Prompt 与 Executor 共用。 */
   createdAt: number;
 }
@@ -84,6 +85,7 @@ export interface BuildEffectiveRuntimePlanInput {
   mcpDescriptorHash?: string | null;
   /** User-level compaction percent before policy min-merge. */
   compactionThresholdPercent?: number;
+  attachmentManifestFingerprint?: string | null;
 }
 
 export function policyFingerprintOf(policy: CompiledPolicy): string {
@@ -158,6 +160,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
   const policyFingerprint = policyFingerprintOf(policy);
   const requestPlanFingerprint = input.requestPlan.executionIdentity.fingerprint;
   const promptPlanFingerprint = stableHash([input.promptPlan.systemPrompt]);
+  const attachmentManifestFingerprint = input.attachmentManifestFingerprint ?? null;
   const contextCompactionPercent = resolveEffectiveCompactionPercent(
     input.compactionThresholdPercent ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
     policy.contextCompactionPercent,
@@ -183,6 +186,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     input.routeCapability.toolCallingMode,
     requestPlanFingerprint,
     promptPlanFingerprint,
+    attachmentManifestFingerprint,
   ]);
   return {
     schemaVersion: EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION,
@@ -208,6 +212,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     routeCapability: input.routeCapability,
     requestPlanFingerprint,
     promptPlanFingerprint,
+    attachmentManifestFingerprint,
     createdAt: Date.now(),
   };
 }

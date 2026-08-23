@@ -437,6 +437,28 @@ export function createTurnFailedDiagnostic(
       technicalMessage: redactTechnicalMessage(error),
     });
   }
+  const technicalMessage = redactTechnicalMessage(error);
+  const matchedCode = technicalMessage.match(/^([A-Z][A-Z0-9_]+):/u)?.[1];
+  const attachmentCode = matchedCode === 'ATTACHMENT_LIMIT_EXCEEDED'
+    || matchedCode === 'ATTACHMENT_MEDIA_UNSUPPORTED'
+    || matchedCode === 'ATTACHMENT_NOT_FOUND'
+    || matchedCode === 'ATTACHMENT_INVALID'
+    || matchedCode === 'VISION_INPUT_UNSUPPORTED'
+    ? matchedCode
+    : null;
+  if (attachmentCode) {
+    return createConversationDiagnostic({
+      agentId: route.agentId,
+      code: attachmentCode,
+      severity: 'error',
+      userMessage: attachmentCode === 'VISION_INPUT_UNSUPPORTED'
+        ? `${label} 当前模型不接受图片附件。请更换支持视觉输入的模型后重试。`
+        : `附件未能用于本次请求（${attachmentCode}）。请移除无效附件后重试。`,
+      providerId: route.providerId,
+      modelId: route.modelId,
+      technicalMessage,
+    });
+  }
   return createConversationDiagnostic({
     agentId: route.agentId,
     code: 'CONVERSATION_LLM_REQUEST_FAILED',
@@ -444,6 +466,6 @@ export function createTurnFailedDiagnostic(
     userMessage: `模型请求失败：${label} 当前使用 ${route.providerId}/${route.modelId}，但服务商请求没有成功。请检查该账号、模型权限、额度或网络状态后重试。`,
     providerId: route.providerId,
     modelId: route.modelId,
-    technicalMessage: redactTechnicalMessage(error),
+    technicalMessage,
   });
 }

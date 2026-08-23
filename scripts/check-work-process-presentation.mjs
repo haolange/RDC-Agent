@@ -98,6 +98,10 @@ assert(
   normalizeWorkProcessText('  line one  \n\n\n\nline two  ') === 'line one\n\nline two',
   'work-process text should collapse excessive blank lines',
 );
+assert(
+  normalizeWorkProcessText('item\n  nested\n\tindented') === 'item\n  nested\n\tindented',
+  'work-process text should preserve inline indentation',
+);
 
 const normalizedMarkdown = normalizeAssistantMarkdown('Summary:\n\n- **Who:** Edit\n\n\n- **Use:** help');
 assert(normalizedMarkdown.includes('### Summary'), 'markdown normalizer should promote section headings');
@@ -1233,6 +1237,14 @@ assert(cssSource.includes('width: 6px'), 'loop rail marker should be 6px');
 assert(cssSource.includes('@media (prefers-reduced-motion: reduce)'), 'streaming motion should honor reduced motion');
 assert(cssSource.includes('.work-process-tool-approval'), 'tool approval styling should exist');
 assert(cssSource.includes('.work-process-disclosure:not([open]) > :not(summary)'), 'closed disclosure must not render expanded body content');
+assert(
+  componentSource.includes('<MessageMarkdown content={row.thinkingPreview} />'),
+  'thinking preview must render through MessageMarkdown',
+);
+assert(
+  cssSource.includes('.work-process-thinking-preview .markdown-body'),
+  'thinking preview must scope markdown-body styles',
+);
 assert(!cssSource.includes('.work-process-section-steps'), 'legacy tool-step disclosure CSS should be removed');
 assert(!cssSource.includes('.work-process-step-rail.is-section .work-process-rail-marker'), 'section markers must not use a hierarchy-only color override');
 assert(!cssSource.includes('.work-process-steps-toggle'), 'legacy tool-step toggle CSS should be removed');

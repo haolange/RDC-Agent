@@ -36,7 +36,7 @@ npx --yes serve test/work-process-cot
 | `scenarios/09-ask-user-approval.html` | ask_user Q/A + 审批行 |
 | `scenarios/10-opaque-answer-only.html` | opaque/answer-only：无 CoT 占位 |
 | `scenarios/11-error-recovery-absent.html` | 有意不出现 error_recovery 蓝字旁白 |
-| `scenarios/12-markdown-surfaces.html` | commentary/final Markdown vs thinking 纯文本 |
+| `scenarios/12-markdown-surfaces.html` | commentary / final / thinking 均走 Markdown |
 
 ## 与产品规格对照
 
@@ -44,7 +44,7 @@ npx --yes serve test/work-process-cot
 | --- | --- |
 | 运行中「工作中 / Working」+ Active Signal | index / 02 |
 | 完成后「工作过程 / Work process」+ duration · actions | index settle / 03 |
-| Thinking 纯文本；运行开 / 完成关 | index / 02 / 03 / 12 |
+| Thinking Markdown；运行开 / 完成关 | index / 02 / 03 / 12 |
 | Commentary MessageMarkdown，不进 thinking 槽 | index / 01 / 12 |
 | 统一单披露 tool 卡，结果优先 body | 05 |
 | web_search pills / web_fetch page chip | index / 05 |

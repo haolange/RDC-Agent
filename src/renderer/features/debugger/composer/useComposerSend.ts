@@ -83,14 +83,14 @@ export function useComposerSend(options: {
   const handlePromptSend = useCallback(async () => {
     const trimmed = promptValue.trim();
     const concurrentModelSwitch = isConcurrentModelSwitchCommand(trimmed);
-    if ((!trimmed && pendingAttachments.length === 0) || (isComposerBusy && !concurrentModelSwitch)) {
+    if ((!trimmed && !pendingAttachments.some((attachment) => !attachment.error))
+      || (isComposerBusy && !concurrentModelSwitch)) {
       return;
     }
 
     const electronAPI = window.electronAPI;
     if (!electronAPI) return;
 
-    // === 斜杠命令拦截 ===
     if (trimmed.startsWith('/')) {
       if (!concurrentModelSwitch) setIsPromptSending(true);
       try {

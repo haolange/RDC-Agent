@@ -79,13 +79,18 @@ export function ownsActiveTurn(
     && activeTurn.agentId === ownership.agentId;
 }
 
+function normalizeComposerSessionOwner(sessionId: string | null | undefined): string {
+  return sessionId && sessionId !== 'no-session' ? sessionId : 'no-session';
+}
+
 /** Restore draft only when lastSent owns the current session. */
 export function restoreLastSentIfCurrentSession(
   currentSessionId: string | null | undefined,
   apply: (lastSent: LastSentPrompt) => void,
 ): boolean {
   const lastSent = useComposerSessionContextStore.getState().lastSent;
-  if (!lastSent || !currentSessionId || lastSent.sessionId !== currentSessionId) {
+  if (!lastSent) return false;
+  if (normalizeComposerSessionOwner(currentSessionId) !== normalizeComposerSessionOwner(lastSent.sessionId)) {
     return false;
   }
   apply(lastSent);

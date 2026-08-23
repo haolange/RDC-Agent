@@ -18,10 +18,8 @@ export function buildComposerPresentation(input: {
       ? `向 ${input.currentModeLabel} 描述目标、异常或验证需求`
       : `Describe the goal, anomaly, or verification request for ${input.currentModeLabel}`);
   const attachButtonLabel = !input.hasProject
-    ? (zh
-      ? '选择项目后可附加图片、文件或 .rdc Capture'
-      : 'Select a project before attaching images, files, or .rdc captures')
-    : (zh ? '附加图片、文件或 .rdc Capture' : 'Attach images, files, or .rdc captures');
+    ? (zh ? '选择项目后可附加图片或文件' : 'Select a project before attaching images or files')
+    : (zh ? '附加图片或文件' : 'Attach images or files');
   const stopButtonLabel = input.hasActiveDebugRun
     ? (zh ? '停止当前调试' : 'Stop current debug run')
     : (zh ? '停止当前请求' : 'Stop current request');

@@ -117,7 +117,7 @@ export function useComposer(options: {
   });
 
   const hasMessageContent = Boolean(promptValue.trim());
-  const hasPendingAttachments = attachments.pendingAttachments.length > 0;
+  const hasPendingAttachments = attachments.pendingAttachments.some((attachment) => !attachment.error);
   const presentation = buildComposerPresentation({
     language,
     currentMode,
@@ -168,7 +168,11 @@ export function useComposer(options: {
     primaryButtonDescription: presentation.primaryButtonDescription,
     handlePrimaryStop: send.handlePrimaryStop,
     handleAttachmentSelect: attachments.handleAttachmentSelect,
+    handleFilesIngest: attachments.handleFilesIngest,
     handlePendingAttachmentRemove: attachments.handlePendingAttachmentRemove,
+    fileInputRef: attachments.fileInputRef,
+    isDropActive: attachments.isDropActive,
+    setIsDropActive: attachments.setIsDropActive,
     handlePromptSend: send.handlePromptSend,
     handlePromptKeyDown: send.handlePromptKeyDown,
     setPromptValueDirect: setPromptValue,

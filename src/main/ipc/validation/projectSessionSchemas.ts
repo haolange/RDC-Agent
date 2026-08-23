@@ -49,11 +49,6 @@ export const SessionSetModelOverrideArgsSchema = z.tuple([
 ]);
 
 
-export const SessionAttachmentsImportArgsSchema = z.tuple([
-  ipcId(128, 'sessionId'),
-  FilePathArraySchema,
-]);
-
 export const RunListArgsSchema = z.tuple([
   ipcId(128, 'sessionId'),
 ]);

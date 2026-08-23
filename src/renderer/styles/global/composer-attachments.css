@@ -1,0 +1,163 @@
+.composer-shell.is-drop-active {
+  border-color: var(--composer-mode-accent);
+  outline: 2px dashed color-mix(in srgb, var(--composer-mode-accent) 55%, transparent);
+  outline-offset: -4px;
+}
+
+.composer-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--token-bg-overlay) 88%, transparent);
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  pointer-events: none;
+}
+
+.composer-attachment-tray {
+  --composer-attachment-card-size: 72px;
+  --composer-attachment-card-size-narrow: 56px;
+  --composer-attachment-remove-size: 24px;
+  --composer-attachment-tray-max: 168px;
+  --composer-attachment-tray-max-narrow: 128px;
+  --composer-attachment-card-max: 280px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  max-height: var(--composer-attachment-tray-max);
+  overflow-y: auto;
+}
+
+.composer-attachment-card,
+.composer-skill-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--composer-attachment-card-size);
+  max-width: min(var(--composer-attachment-card-max), 100%);
+  padding: var(--space-2);
+  border-radius: var(--control-radius);
+  border: 1px solid var(--token-border-default);
+  background: var(--token-bg-raised);
+}
+
+.composer-attachment-card.is-error {
+  border-color: var(--token-status-error);
+}
+
+.composer-attachment-card.is-warning {
+  border-color: var(--token-status-warning);
+}
+
+.composer-attachment-card-preview,
+.composer-skill-chip-glyph {
+  width: var(--composer-attachment-card-size);
+  height: var(--composer-attachment-card-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--control-radius);
+  background: var(--token-bg-muted);
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+.composer-skill-chip {
+  min-height: var(--composer-attachment-card-size-narrow);
+}
+
+.composer-skill-chip-glyph {
+  width: 40px;
+  height: 40px;
+  color: var(--token-text-link);
+}
+
+.composer-attachment-card-thumb,
+.message-attachment-pill-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.composer-attachment-card-copy,
+.composer-skill-chip-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-right: var(--space-4);
+}
+
+.composer-attachment-card-name,
+.composer-skill-chip-name {
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-attachment-card-meta,
+.composer-skill-chip-meta {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+}
+
+.composer-attachment-card-remove,
+.composer-skill-chip-remove {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  width: var(--composer-attachment-remove-size);
+  height: var(--composer-attachment-remove-size);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--token-border-default);
+  background: var(--token-bg-overlay);
+  color: var(--token-text-heading);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.composer-attachment-card:hover .composer-attachment-card-remove,
+.composer-attachment-card:focus-within .composer-attachment-card-remove,
+.composer-skill-chip:hover .composer-skill-chip-remove,
+.composer-skill-chip:focus-within .composer-skill-chip-remove {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (max-width: 480px) {
+  .composer-attachment-tray {
+    max-height: var(--composer-attachment-tray-max-narrow);
+  }
+
+  .composer-attachment-card,
+  .composer-skill-chip {
+    min-height: var(--composer-attachment-card-size-narrow);
+    max-width: 100%;
+  }
+
+  .composer-attachment-card-preview {
+    width: var(--composer-attachment-card-size-narrow);
+    height: var(--composer-attachment-card-size-narrow);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-attachment-card-remove,
+  .composer-skill-chip-remove {
+    transition: none;
+  }
+}

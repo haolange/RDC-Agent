@@ -254,8 +254,10 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
     assert(contextJournal.includes(token), `Session context v2 continuation filtering must include ${token}.`);
   }
   const conversationIpc = read('src/main/ipc/conversationHandlers.ts');
+  const conversationRejection = read('src/main/conversation/conversationSendRejection.ts');
   assert(conversationIpc.includes("status: 'accepted'"), 'Main IPC must return a structured accepted send result after commit.');
-  assert(conversationIpc.includes("status: 'rejected'"), 'Main IPC must return a structured rejected preflight result without persistence.');
+  assert(conversationRejection.includes("status: 'rejected'"), 'Main IPC must return a structured rejected preflight result without persistence.');
+  assert(conversationIpc.includes('toRejectedSendResult'), 'Main IPC must map preflight failures through the structured rejection helper.');
   assert(!conversationIpc.includes('conversation:previewNextRequestContext'), 'Main IPC must not expose draft-time context preview.');
 
   const settingsService = read('src/main/settings/SettingsService.ts');

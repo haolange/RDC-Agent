@@ -146,6 +146,49 @@ describe('AgentPermissionPolicyService external reads', () => {
     expect(decision.action).toBe('allow');
     expect(decision.temporaryPathRoots).toContain(path.join(readableRoot, 'notes.txt'));
   });
+
+  it('allows default-mode reads inside the current session attachments directory', () => {
+    mockSettings.agentRuntime.permissions.mode = 'default';
+    const attachmentsRoot = path.join(fixtureRoot, 'session-a', 'attachments');
+    const decision = service.evaluate({
+      tool: readFileTool,
+      toolCall: makeReadFileToolCall(path.join(attachmentsRoot, 'notes.txt')),
+      projectRootPath: workspaceRoot,
+      sessionAttachmentsRoot: attachmentsRoot,
+    });
+    expect(decision.action).toBe('allow');
+    expect(decision.temporaryPathRoots).toContain(path.join(attachmentsRoot, 'notes.txt'));
+  });
+
+  it('does not grant write tools the session attachments root', () => {
+    mockSettings.agentRuntime.permissions.mode = 'default';
+    const attachmentsRoot = path.join(fixtureRoot, 'session-a', 'attachments');
+    const decision = service.evaluate({
+      tool: deleteFileTool,
+      toolCall: {
+        type: 'toolCall',
+        id: 'tc-del',
+        name: 'delete_file',
+        arguments: { path: path.join(attachmentsRoot, 'notes.txt') },
+      },
+      projectRootPath: workspaceRoot,
+      sessionAttachmentsRoot: attachmentsRoot,
+    });
+    expect(decision.action).toBe('ask_user');
+  });
+
+  it('does not allow reads from another session attachments directory', () => {
+    mockSettings.agentRuntime.permissions.mode = 'default';
+    const ownRoot = path.join(fixtureRoot, 'session-a', 'attachments');
+    const otherRoot = path.join(fixtureRoot, 'session-b', 'attachments');
+    const decision = service.evaluate({
+      tool: readFileTool,
+      toolCall: makeReadFileToolCall(path.join(otherRoot, 'notes.txt')),
+      projectRootPath: workspaceRoot,
+      sessionAttachmentsRoot: ownRoot,
+    });
+    expect(decision.action).toBe('ask_user');
+  });
 });
 
 describe('AgentPermissionPolicyService network tools', () => {

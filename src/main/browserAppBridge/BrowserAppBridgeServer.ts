@@ -70,6 +70,8 @@ let allowedOrigins = new Set<string>();
 let healthMetadata: BrowserHealthMetadata | null = null;
 
 const MAX_JSON_BODY_BYTES = 1 * 1024 * 1024;
+const STAGE_ATTACHMENTS_JSON_BODY_BYTES = 96 * 1024 * 1024;
+const INVOKE_CHANNEL_HEADER = 'x-rdc-invoke-channel';
 
 const contentTypes: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
@@ -117,7 +119,7 @@ function setCors(response: ServerResponse, requestOrigin: string | undefined): v
     response.setHeader('Vary', 'Origin');
     response.setHeader('Access-Control-Allow-Credentials', 'true');
   }
-  response.setHeader('Access-Control-Allow-Headers', 'content-type, authorization');
+  response.setHeader('Access-Control-Allow-Headers', `content-type, authorization, ${INVOKE_CHANNEL_HEADER}`);
   response.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
 }
 
@@ -207,15 +209,28 @@ async function checkDevRenderer(url: string): Promise<{ ok: boolean; url: string
   });
 }
 
-async function readJsonBody(request: IncomingMessage): Promise<unknown> {
+function resolveInvokeBodyLimit(request: IncomingMessage): number {
+  const declared = request.headers[INVOKE_CHANNEL_HEADER];
+  const channel = Array.isArray(declared) ? declared[0] : declared;
+  return channel === 'conversation:stageAttachments'
+    ? STAGE_ATTACHMENTS_JSON_BODY_BYTES
+    : MAX_JSON_BODY_BYTES;
+}
+
+async function readJsonBody(request: IncomingMessage, maxBytes = MAX_JSON_BODY_BYTES): Promise<unknown> {
+  const declaredLength = Number(request.headers['content-length'] ?? 0);
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    request.destroy();
+    throw new Error(`PAYLOAD_TOO_LARGE: bridge JSON body exceeds ${maxBytes} bytes.`);
+  }
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of request) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     total += buffer.byteLength;
-    if (total > MAX_JSON_BODY_BYTES) {
+    if (total > maxBytes) {
       request.destroy();
-      throw new Error('PAYLOAD_TOO_LARGE: bridge JSON body exceeds 1 MiB.');
+      throw new Error(`PAYLOAD_TOO_LARGE: bridge JSON body exceeds ${maxBytes} bytes.`);
     }
     chunks.push(buffer);
   }
@@ -340,11 +355,18 @@ async function handleRequest(options: BridgeOptions, request: IncomingMessage, r
   }
 
   if (url.pathname === '/invoke' && request.method === 'POST') {
-    void readJsonBody(request)
+    const invokeLimit = resolveInvokeBodyLimit(request);
+    void readJsonBody(request, invokeLimit)
       .then(async (body) => {
         const payload = body as { channel?: unknown; args?: unknown };
         if (typeof payload.channel !== 'string') {
           sendJson(response, 400, { success: false, error: 'channel must be a string' }, requestOrigin);
+          return;
+        }
+        const declaredChannel = request.headers[INVOKE_CHANNEL_HEADER];
+        const headerChannel = Array.isArray(declaredChannel) ? declaredChannel[0] : declaredChannel;
+        if (invokeLimit > MAX_JSON_BODY_BYTES && headerChannel !== payload.channel) {
+          sendJson(response, 400, { success: false, error: 'INVOKE_CHANNEL_MISMATCH' }, requestOrigin);
           return;
         }
         if (!isBridgeChannelAllowed(payload.channel)) {
