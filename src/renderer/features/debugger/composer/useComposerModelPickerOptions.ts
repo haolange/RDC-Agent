@@ -18,6 +18,27 @@ function pickerProviderKey(
     .join('|');
 }
 
+export async function loadComposerModelPickerOptions(
+  providers: readonly LlmProviderEntry[],
+  routeProviderId?: string,
+): Promise<ComposerModelPickerOption[]> {
+  const api = getElectronApi();
+  if (!api) return [];
+  const settings = await api.settings.get().catch(() => null);
+  const source = settings?.llm.providers?.length ? settings.llm.providers : providers;
+  const resolved = source.filter((provider) => (
+    provider.enabled !== false || provider.id === routeProviderId
+  ));
+  const rows = await Promise.allSettled(resolved.map(async (provider) => {
+    const catalog = await api.settings.getEffectiveCatalog(provider.id, provider.activeAccountId);
+    if (!catalog) return [] as ComposerModelPickerOption[];
+    return catalog.models
+      .filter(isComposerPickerModel)
+      .map((model) => toComposerPickerOption(provider.id, provider.label, model));
+  }));
+  return rows.flatMap((row) => (row.status === 'fulfilled' ? row.value : []));
+}
+
 export function useComposerModelPickerOptions(
   providers: readonly LlmProviderEntry[],
   routeProviderId?: string,
@@ -29,32 +50,13 @@ export function useComposerModelPickerOptions(
   const providerKey = pickerProviderKey(providers, routeProviderId);
 
   useEffect(() => {
-    const api = getElectronApi();
-    if (!api) {
-      setOptions([]);
-      setLoading(false);
-      return undefined;
-    }
-
     let cancelled = false;
     setLoading(true);
-    void (async () => {
-      const settings = await api.settings.get().catch(() => null);
-      const source = settings?.llm.providers?.length ? settings.llm.providers : providersRef.current;
-      const resolved = source.filter((provider) => (
-        provider.enabled !== false || provider.id === routeProviderId
-      ));
-      const rows = await Promise.allSettled(resolved.map(async (provider) => {
-        const catalog = await api.settings.getEffectiveCatalog(provider.id, provider.activeAccountId);
-        if (!catalog) return [] as ComposerModelPickerOption[];
-        return catalog.models
-          .filter(isComposerPickerModel)
-          .map((model) => toComposerPickerOption(provider.id, provider.label, model));
-      }));
+    void loadComposerModelPickerOptions(providersRef.current, routeProviderId).then((next) => {
       if (cancelled) return;
-      setOptions(rows.flatMap((row) => (row.status === 'fulfilled' ? row.value : [])));
+      setOptions(next);
       setLoading(false);
-    })();
+    });
     return () => {
       cancelled = true;
     };

@@ -45,6 +45,17 @@ export async function commitComposerModelChoice(
   return { ok: true };
 }
 
+export async function clearComposerModelChoice(
+  sessionId: string | null | undefined,
+  projectId: string | null | undefined,
+): Promise<{ ok: boolean; error?: string }> {
+  if (sessionId) {
+    return persistSessionModelOverride(sessionId, null);
+  }
+  clearComposerDraftModel(projectId);
+  return { ok: true };
+}
+
 export async function persistComposerDraftToSession(
   sessionId: string | null | undefined,
   projectId: string | null | undefined,

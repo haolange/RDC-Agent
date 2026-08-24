@@ -538,7 +538,7 @@ export const AGENT_WORKBENCH_COMMAND_CATALOG: AgentWorkbenchCommandDeclaration[]
   {
     command: '/model',
     label: 'Model',
-    description: 'Show the active model route for this profile.',
+    description: 'Show or switch the conversation model; use /model default to follow the Agent configuration.',
     relatedTools: [],
     permission: 'readonly',
   },

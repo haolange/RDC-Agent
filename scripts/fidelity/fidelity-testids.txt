@@ -38,6 +38,7 @@ composer-markdown-tab-preview
 composer-markdown-tab-write
 composer-markdown-toolbar
 composer-mode-pill
+composer-model-agent-default
 composer-model-item-${option.providerId}-${option.modelId}
 composer-model-pill
 composer-model-search

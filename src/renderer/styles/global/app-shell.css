@@ -1343,9 +1343,23 @@ html[data-resolved-theme='light'] .app-main {
   cursor: pointer;
 }
 
-.composer-model-item:hover {
+.composer-model-item.composer-model-default {
+  margin-top: var(--space-1);
+  background: transparent;
+}
+
+.composer-model-item.composer-model-default.is-selected {
+  background: color-mix(in srgb, var(--composer-mode-accent) 10%, transparent);
+}
+
+.composer-model-item:hover:not(:disabled) {
   background: var(--token-interactive-hover);
   color: var(--token-text-heading);
+}
+
+.composer-model-item:disabled {
+  cursor: default;
+  opacity: 0.55;
 }
 
 .composer-model-item.is-selected {

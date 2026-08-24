@@ -125,7 +125,7 @@ Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only
 
 Temporary 外部路径只经当前 `ToolExecutionContext.temporaryAllowedPathRoots`，不得全局泄漏。
 
-Slash 命令是 runtime 输入，不绕过 profile 权限。基线：`/help` `/compact` `/context` `/memory` `/agents` `/skills` `/mcp` `/status` `/model`。
+Slash 命令是 runtime 输入，不绕过 profile 权限。基线：`/help` `/compact` `/context` `/memory` `/agents` `/skills` `/mcp` `/status` `/model`。`/model` 参数为 `[provider:model|modelId|default]`；`default` 跟随当前 Agent 配置，与 Composer 底栏共用 EffectiveCatalog + `isAgentToolExecutableModel` 可选集。裸 `default` 先于模型 id 解析，真名叫 `default` 的模型用 canonical `provider:model`。
 
 权限模式：`Default` / `Auto-review` / `Full access` / `Custom(config.toml)`；主进程权威。即使 Full access：二进制/`.rdc` 拒绝进对话、realpath 约束、灾难性 shell 硬拒绝（按平台分集）、`web_*` SSRF fail-closed。agent `shell` 每次新进程，不提供 `run_in_background`。
 

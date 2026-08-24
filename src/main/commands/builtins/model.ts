@@ -3,7 +3,7 @@ import type { CommandDefinition } from '@shared/types/command';
 export const modelCommand: CommandDefinition = {
   id: 'model',
   name: 'model',
-  description: 'View or switch the current LLM model',
+  description: 'View or switch the current conversation model; use default to follow the Agent configuration',
   category: 'navigation',
 
   async execute(args, ctx) {
@@ -13,10 +13,18 @@ export const modelCommand: CommandDefinition = {
         message: `Current model: ${ctx.currentModelId ?? 'not configured'}`,
       };
     }
+    const token = args[0].trim();
+    if (token.toLowerCase() === 'default') {
+      return {
+        success: true,
+        message: 'Following the current Agent configuration',
+        uiAction: { type: 'switch-model', payload: { modelId: 'default' } },
+      };
+    }
     return {
       success: true,
-      message: `Switching model to: ${args[0]}`,
-      uiAction: { type: 'switch-model', payload: { modelId: args[0] } },
+      message: `Switching model to: ${token}`,
+      uiAction: { type: 'switch-model', payload: { modelId: token } },
     };
   },
 };

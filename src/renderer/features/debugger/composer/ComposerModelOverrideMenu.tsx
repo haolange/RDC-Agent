@@ -7,9 +7,26 @@ import {
   filterComposerPickerOptions,
   groupComposerPickerOptions,
 } from './composerModelPicker';
-import { commitComposerModelChoice } from './sessionModelOverride';
+import {
+  resolveComposerAgentDefaultState,
+  type ComposerAgentDefaultState,
+} from './composerAgentDefaultModel';
+import { clearComposerModelChoice, commitComposerModelChoice } from './sessionModelOverride';
 import { useComposerEffectiveModel } from './useComposerEffectiveModel';
 import { useComposerModelPickerOptions } from './useComposerModelPickerOptions';
+
+function formatAgentDefaultMeta(
+  state: ComposerAgentDefaultState,
+  agentName: string,
+  t: (key: 'composer.model.agentDefaultUnset' | 'composer.model.agentDefaultUnavailable') => string,
+): string {
+  if (state.kind === 'unset') return t('composer.model.agentDefaultUnset');
+  if (state.kind === 'unavailable') return t('composer.model.agentDefaultUnavailable');
+  if (state.kind === 'available') {
+    return `${agentName} · ${state.providerLabel} / ${state.modelLabel}`;
+  }
+  return `${agentName} · ${state.providerId} / ${state.modelId}`;
+}
 
 export const ComposerModelOverrideMenu: React.FC<{
   agentId: string;
@@ -24,8 +41,16 @@ export const ComposerModelOverrideMenu: React.FC<{
   const agentRoute = useAppSettingsStore((state) => (
     state.settings.llm.agentRoutes.find((route) => route.agentId === agentId)
   ));
+  const agentName = useAppSettingsStore((state) => (
+    state.settings.agents.definitions.find((entry) => entry.id === agentId)?.name || agentId
+  ));
   const { options, loading } = useComposerModelPickerOptions(providers, agentRoute?.providerId);
   const { effective, hasChoice, projectId } = useComposerEffectiveModel(agentId, currentSession);
+  const agentDefault = resolveComposerAgentDefaultState(agentRoute, options, !loading);
+  const agentDefaultMeta = formatAgentDefaultMeta(agentDefault, agentName, t);
+  const agentDefaultTitle = agentDefault.kind === 'unavailable' && agentDefault.providerId && agentDefault.modelId
+    ? `${agentDefault.providerId} / ${agentDefault.modelId}`
+    : t('composer.model.agentDefaultTitle', { name: agentName });
   const currentOption = options.find((option) => (
     option.providerId === effective?.providerId && option.modelId === effective?.modelId
   ));
@@ -58,6 +83,17 @@ export const ComposerModelOverrideMenu: React.FC<{
       currentSession?.sessionId,
       projectId,
     );
+    if (!result.ok) {
+      setSaveError(t('composer.model.saveFailed'));
+      return;
+    }
+    menu.close();
+  };
+
+  const selectAgentDefault = async () => {
+    if (!agentDefault.selectable) return;
+    setSaveError('');
+    const result = await clearComposerModelChoice(currentSession?.sessionId, projectId);
     if (!result.ok) {
       setSaveError(t('composer.model.saveFailed'));
       return;
@@ -131,6 +167,19 @@ export const ComposerModelOverrideMenu: React.FC<{
               aria-label={t('composer.model.searchPlaceholder')}
               onChange={(event) => setQuery(event.target.value)}
             />
+            <button
+              type="button"
+              className={`composer-model-item composer-model-default${hasChoice ? '' : ' is-selected'}`}
+              data-testid="composer-model-agent-default"
+              role="menuitemradio"
+              aria-checked={!hasChoice}
+              title={agentDefaultTitle}
+              disabled={!agentDefault.selectable}
+              onClick={() => void selectAgentDefault()}
+            >
+              <span className="composer-model-item-label">{t('composer.model.agentDefault')}</span>
+              <span className="composer-model-item-meta">{agentDefaultMeta}</span>
+            </button>
             {saveError ? <p className="composer-model-empty">{saveError}</p> : null}
             {loading && groups.length === 0 ? (
               <p className="composer-model-empty">{t('composer.model.loading')}</p>
