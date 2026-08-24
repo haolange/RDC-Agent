@@ -12,7 +12,7 @@ const BUILTIN_COMMANDS = [
   { name: '/status', description: 'Show system status' },
   { name: '/config', description: 'Open settings' },
   { name: '/mode', description: 'Switch agent mode' },
-  { name: '/model', description: 'Switch LLM model' },
+  { name: '/model', description: 'Switch conversation model, or use the Agent configuration' },
   { name: '/compact', description: 'Compact conversation context' },
   { name: '/undo', description: 'Undo last user message' },
 ];

@@ -161,6 +161,7 @@ composer-markdown-stage
 composer-markdown-tab
 composer-markdown-toolbar
 composer-model-badge
+composer-model-default
 composer-model-empty
 composer-model-group
 composer-model-group-label

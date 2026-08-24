@@ -26,6 +26,43 @@ if (!sessionHandler.includes('isAgentToolExecutableModel')) {
   fail('session:setModelOverride must use the shared Agent tool-eligibility gate');
 }
 
+const resolveOverride = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/features/debugger/composer/resolveComposerModelOverride.ts'),
+  'utf8',
+);
+if (resolveOverride.includes('AgentModelOption') || resolveOverride.includes('isComposerOverrideOption')) {
+  fail('/model resolver must use Composer picker options, not AgentModelOption');
+}
+if (!resolveOverride.includes('ComposerModelPickerOption')) {
+  fail('/model resolver must accept ComposerModelPickerOption');
+}
+
+const slash = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/features/debugger/composer/slashCommandExecutor.ts'),
+  'utf8',
+);
+if (slash.includes('modelOptions')) {
+  fail('/model must not read settings.agents.modelOptions');
+}
+if (
+  !slash.includes('loadComposerModelPickerOptions')
+  || !slash.includes('isComposerAgentDefaultToken')
+  || !slash.includes('clearComposerModelChoice')
+) {
+  fail('/model must share the picker catalog and Follow Agent clear path');
+}
+
+const loader = fs.readFileSync(
+  path.join(repoRoot, 'src/renderer/features/debugger/composer/useComposerModelPickerOptions.ts'),
+  'utf8',
+);
+if (
+  !loader.includes('export async function loadComposerModelPickerOptions')
+  || !loader.includes('isComposerPickerModel')
+) {
+  fail('Composer picker loader must stay the shared EffectiveCatalog path');
+}
+
 const vitest = path.join(repoRoot, 'node_modules/vitest/vitest.mjs');
 const result = spawnSync(process.execPath, [vitest, 'run',
   'src/shared/utils/agentToolCapability.test.ts',

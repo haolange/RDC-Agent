@@ -8,9 +8,14 @@ import { translate } from '../../../i18n';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
-import { commitComposerModelChoice } from './sessionModelOverride';
+import {
+  isComposerAgentDefaultToken,
+  resolveComposerAgentDefaultState,
+} from './composerAgentDefaultModel';
+import { clearComposerModelChoice, commitComposerModelChoice } from './sessionModelOverride';
 import { resolveComposerModelOverride } from './resolveComposerModelOverride';
 import { readComposerEffectiveModel } from './useComposerEffectiveModel';
+import { loadComposerModelPickerOptions } from './useComposerModelPickerOptions';
 
 interface SlashCommandContext {
   currentSession: SessionRecord | null;
@@ -79,11 +84,27 @@ async function loadSession(sessionId: string, context: SlashCommandContext): Pro
 }
 
 async function switchModel(modelId: string, context: SlashCommandContext): Promise<void> {
-  const language = useAppSettingsStore.getState().settings.appearance.language;
-  const override = resolveComposerModelOverride(
-    modelId,
-    useAppSettingsStore.getState().settings.agents.modelOptions,
-  );
+  const { settings } = useAppSettingsStore.getState();
+  const language = settings.appearance.language;
+  const route = settings.llm.agentRoutes.find((entry) => entry.agentId === context.selectedAgentId);
+  const options = await loadComposerModelPickerOptions(settings.llm.providers, route?.providerId);
+  if (isComposerAgentDefaultToken(modelId)) {
+    const state = resolveComposerAgentDefaultState(route, options, true);
+    if (!state.selectable) {
+      context.showNotice(translate(
+        language,
+        state.kind === 'unset' ? 'composer.model.agentDefaultUnset' : 'composer.model.agentDefaultUnavailable',
+      ));
+      return;
+    }
+    const cleared = await clearComposerModelChoice(
+      context.currentSession?.sessionId,
+      context.currentProject?.projectId,
+    );
+    if (!cleared.ok) context.showNotice(translate(language, 'composer.model.saveFailed'));
+    return;
+  }
+  const override = resolveComposerModelOverride(modelId, options);
   if (!override) {
     context.showNotice(translate(language, 'composer.model.invalidArg'));
     return;
@@ -93,9 +114,7 @@ async function switchModel(modelId: string, context: SlashCommandContext): Promi
     context.currentSession?.sessionId,
     context.currentProject?.projectId,
   );
-  if (!result.ok) {
-    context.showNotice(translate(language, 'composer.model.saveFailed'));
-  }
+  if (!result.ok) context.showNotice(translate(language, 'composer.model.saveFailed'));
 }
 
 async function handleUiAction(action: CommandUiAction, context: SlashCommandContext): Promise<void> {

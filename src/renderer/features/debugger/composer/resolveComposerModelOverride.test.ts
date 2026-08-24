@@ -1,40 +1,54 @@
 import { describe, expect, it } from 'vitest';
-import type { AgentModelOption } from '@shared/types/agentManifest';
+import type { ComposerModelPickerOption } from './composerModelPicker';
 import { resolveComposerModelOverride } from './resolveComposerModelOverride';
 
-function option(partial: Partial<AgentModelOption> & Pick<AgentModelOption, 'providerId' | 'modelId'>): AgentModelOption {
+function option(
+  partial: Pick<ComposerModelPickerOption, 'providerId' | 'modelId'> & Partial<ComposerModelPickerOption>,
+): ComposerModelPickerOption {
   return {
-    canonicalId: `${partial.providerId}:${partial.modelId}`,
     providerLabel: partial.providerId,
-    modelLabel: partial.modelId,
-    configured: true,
-    status: 'ready',
+    label: partial.modelId,
+    aliases: [],
+    contextWindowTokens: null,
+    contextWindowLabel: null,
+    hasReasoning: false,
     ...partial,
   };
 }
 
 describe('resolveComposerModelOverride', () => {
   const options = [
-    option({ providerId: 'chatgpt-account', modelId: 'gpt-5.6-sol', status: 'model-unverified' }),
-    option({ providerId: 'openai', modelId: 'gpt-5.6-sol', status: 'ready' }),
-    option({ providerId: 'kimi-coding-plan', modelId: 'kimi-for-coding', status: 'model-unverified' }),
-    option({ providerId: 'openai', modelId: 'hidden', status: 'model-unavailable' }),
+    option({ providerId: 'openai', modelId: 'gpt-5.6-sol', label: 'GPT-5.6 Sol' }),
+    option({ providerId: 'kimi-coding-plan', modelId: 'kimi-for-coding' }),
   ];
 
-  it('accepts only ready Agent-executable models', () => {
+  it('accepts canonical provider:model ids from the picker catalog', () => {
     expect(resolveComposerModelOverride('openai:gpt-5.6-sol', options)).toEqual({
       providerId: 'openai',
       modelId: 'gpt-5.6-sol',
     });
     expect(resolveComposerModelOverride('chatgpt-account:gpt-5.6-sol', options)).toBeNull();
-    expect(resolveComposerModelOverride('kimi-for-coding', options)).toBeNull();
   });
 
-  it('rejects denied models and ambiguous bare ids', () => {
-    expect(resolveComposerModelOverride('openai:hidden', options)).toBeNull();
+  it('accepts a unique bare model id and rejects ambiguous or unknown ids', () => {
     expect(resolveComposerModelOverride('gpt-5.6-sol', options)).toEqual({
       providerId: 'openai',
       modelId: 'gpt-5.6-sol',
+    });
+    expect(resolveComposerModelOverride('openai:hidden', options)).toBeNull();
+    expect(resolveComposerModelOverride('missing', options)).toBeNull();
+    expect(resolveComposerModelOverride('', options)).toBeNull();
+  });
+
+  it('keeps provider:model as the escape hatch for a model named default', () => {
+    const withDefault = [...options, option({ providerId: 'openai', modelId: 'default' })];
+    expect(resolveComposerModelOverride('openai:default', withDefault)).toEqual({
+      providerId: 'openai',
+      modelId: 'default',
+    });
+    expect(resolveComposerModelOverride('default', withDefault)).toEqual({
+      providerId: 'openai',
+      modelId: 'default',
     });
   });
 });
