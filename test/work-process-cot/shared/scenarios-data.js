@@ -268,8 +268,8 @@
       },
       '08': {
         note: en
-          ? 'Plan = plan_artifact tool card; TaskRows are standalone narrative rows (not inside section-list).'
-          : 'Plan = plan_artifact 工具卡；TaskRow 是叙事流 standalone 行（不在 section-list 内）。',
+          ? 'Plan = plan_artifact tool card; Tasks use one live snapshot card.'
+          : 'Plan = plan_artifact 工具卡；Tasks 用一张活的快照卡。',
         user: userPrompt('先出计划再执行。', 'Create a plan, then execute.'),
         wp: {
           status: 'complete',
@@ -286,19 +286,21 @@
             },
             prose: {
               html: en
-                ? '<p>Plan saved. Tasks below are standalone narrative rows (Progress rail shares TaskRegistry).</p>'
-                : '<p>计划已保存。下方任务是叙事流 standalone 行（与 Progress 轨同源 TaskRegistry）。</p>',
+                ? '<p>Plan saved. Tasks below are one live snapshot card (Progress rail shares taskProjection).</p>'
+                : '<p>计划已保存。下方是一张活的任务快照卡（与 Progress 轨共用 taskProjection）。</p>',
             },
             items: [
               { type: 'tool', tool: { name: 'plan_artifact', body: 'Plan artifact saved: artifacts/plan.md' } },
             ],
           }],
           extras: [
-            { type: 'task', task: { title: en ? 'Import .rdc into project' : '将 .rdc 导入项目', status: 'completed' } },
-            { type: 'task', task: { title: en ? 'Open capture in owner session' : '在归属 session 打开 capture', status: 'in_progress' } },
-            { type: 'task', task: { title: en ? 'Collect replay diagnostics' : '收集 replay 诊断', status: 'pending' } },
-            { type: 'task', task: { title: en ? 'Publish report via output_register' : '经 output_register 发布报告', status: 'blocked', reason: 'waiting for capture' } },
-            { type: 'task', task: { title: en ? 'Cancelled exploratory pass' : '已取消的探索轮', status: 'cancelled' } },
+            { type: 'taskSnapshot', snapshot: { items: [
+              { title: en ? 'Import .rdc into project' : '将 .rdc 导入项目', status: 'completed', order: 0 },
+              { title: en ? 'Open capture in owner session' : '在归属 session 打开 capture', status: 'in_progress', order: 1 },
+              { title: en ? 'Collect replay diagnostics' : '收集 replay 诊断', status: 'pending', order: 2 },
+              { title: en ? 'Publish report via output_register' : '经 output_register 发布报告', status: 'blocked', reason: 'waiting for capture', order: 3 },
+              { title: en ? 'Cancelled exploratory pass' : '已取消的探索轮', status: 'cancelled', order: 4 },
+            ] } },
           ],
         },
         final: en

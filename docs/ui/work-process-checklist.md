@@ -34,7 +34,7 @@
 - 或 ≥8 聚合摘要行。
 - 同 loop 连续 tool 外距 `--space-2`。
 - thinking/commentary → 首个 tool 与相邻 loop section 顶距均为 `--space-3`（只比 tool 宽一档；与是否有 commentary 无关）。
-- file/search/shell/git/web/memory/skill/mcp/runtime/interpreter/generic 族模板一致；Tasks 用快照卡（`N of M completed` + 划线 + `data-work-process-task-id`）；Compact 区分自动/手动并展示计数。
+- file/search/shell/git/web/memory/skill/mcp/runtime/interpreter/generic 族模板一致；Tasks 用一轮一张活快照卡（`N of M completed` + `TaskStatusMarker` + `statusReason` + `data-work-process-task-id`），顺序与 Right Rail Progress 共用 `taskProjection`；Compact 区分自动/手动并展示计数。
 - 每个 builtin tool 唯一 header glyph（`mcp__*`→`plug`）。
 - 安静 loop 级轨道点。
 

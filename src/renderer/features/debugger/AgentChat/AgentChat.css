@@ -819,7 +819,6 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 
 /* Asked / ask_user: same card chrome rhythm as unified tool cards */
 .work-process-summary-card,
-.work-process-task,
 .work-process-task-snapshot,
 .work-process-subagent,
 .work-process-approval {
@@ -991,8 +990,8 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 }
 
 .work-process-tool-card-icon {
-  width: 14px;
-  height: 14px;
+  width: var(--transcript-card-icon-size);
+  height: var(--transcript-card-icon-size);
   flex-shrink: 0;
   color: var(--token-text-muted);
 }
@@ -1476,6 +1475,11 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 .work-process-step.kind-section {
   /* Turn gap comes only from the next section's padding-top (space-3). */
   padding-bottom: 0;
+}
+
+.work-process-step.kind-task-snapshot {
+  grid-template-columns: minmax(0, 1fr);
+  padding: var(--space-2) 0 0;
 }
 
 .work-process-step.kind-section .work-process-step-content {

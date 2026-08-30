@@ -132,10 +132,13 @@
         },
       });
       base.extras = [{
-        type: 'task',
-        task: {
-          title: locale === 'en' ? 'Validate replay device path' : '校验 Replay Device 路径',
-          status: phase >= 11 ? 'completed' : 'in_progress',
+        type: 'taskSnapshot',
+        snapshot: {
+          items: [{
+            title: locale === 'en' ? 'Validate replay device path' : '校验 Replay Device 路径',
+            status: phase >= 11 ? 'completed' : 'in_progress',
+            order: 0,
+          }],
         },
       }];
     }

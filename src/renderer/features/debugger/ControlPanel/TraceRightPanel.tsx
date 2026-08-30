@@ -4,8 +4,8 @@ import { useWorkflowStore } from '../../../stores/workflowStore';
 import { CapturePanel } from './CapturePanel';
 import { RightRailContext } from './RightRailContext';
 import { RightRailEmptyState as EmptyState } from './RightRailEmptyState';
+import { TaskStatusMarker } from '../../../ui/TaskStatusMarker';
 import { TraceArtifactList } from './TraceArtifactList';
-import { TraceProgressMarker } from './TraceProgressMarker';
 
 const focusWorkProcessTask = (taskId: string): void => {
   const escaped = window.CSS?.escape ? window.CSS.escape(taskId) : taskId;
@@ -29,11 +29,11 @@ const RailSection: React.FC<{ id: 'progress' | 'outputs' | 'context' | 'capture'
 
 const ProgressList: React.FC<{ tasks: ProgressTask[] }> = ({ tasks }) => (
   <ol className="right-rail-progress">
-    {tasks.map((task, index) => (
+    {tasks.map((task) => (
       <li key={task.id} className={`right-rail-task-row status-${task.status}`}>
         <button type="button" onClick={() => focusWorkProcessTask(task.id)} title="Locate in Work Process">
-          <TraceProgressMarker status={task.status} index={index + 1} />
-          <span className="right-rail-task-copy"><strong>{task.status === 'running' && task.activeForm ? task.activeForm : task.title}</strong>{task.blockerSummary ? <small>{task.blockerSummary}</small> : null}</span>
+          <TaskStatusMarker status={task.status} order={task.order} />
+          <span className="right-rail-task-copy"><strong>{task.title}</strong>{task.blockerSummary ? <small>{task.blockerSummary}</small> : null}</span>
         </button>
       </li>
     ))}
@@ -43,11 +43,10 @@ const ProgressList: React.FC<{ tasks: ProgressTask[] }> = ({ tasks }) => (
 export const TraceRightPanel: React.FC = () => {
   const presentation = useWorkflowStore((state) => state.tracePresentation);
   const rightPanel = presentation?.rightPanel;
-  const progress = rightPanel?.progress ?? { current: [], history: [] };
+  const tasks = rightPanel?.progress ?? [];
   const outputs = rightPanel?.artifacts ?? { current: [], previous: [] };
   const taskContext: TaskContextPanelViewModel | undefined = rightPanel?.context?.task;
   const captureContext: RdxContextPanelViewModel | undefined = rightPanel?.context?.rdx;
-  const tasks = [...progress.current, ...progress.history];
   const hasOutputs = outputs.current.length + outputs.previous.length > 0;
   const hasTaskContext = Boolean(taskContext?.resources.length);
   const hasCapture = Boolean(taskContext && captureContext && (captureContext.capture || captureContext.availableCaptures.length || captureContext.diagnostics.length));

@@ -1,0 +1,64 @@
+.task-status-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-6);
+  height: var(--space-6);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  font-variant-numeric: tabular-nums;
+  flex: 0 0 auto;
+}
+
+.task-status-marker.is-pending {
+  color: var(--token-text-caption);
+  font-weight: var(--font-medium);
+}
+
+.task-status-marker.is-in-progress {
+  background: var(--token-accent-primary);
+  color: var(--token-text-inverse);
+  font-weight: var(--font-semibold);
+}
+
+.task-status-marker.is-completed {
+  color: var(--token-status-success);
+}
+
+.task-status-marker.is-blocked {
+  color: var(--token-status-warning);
+}
+
+.task-status-marker.is-cancelled {
+  color: var(--token-text-caption);
+}
+
+.task-status-marker svg {
+  width: var(--space-4);
+  height: var(--space-4);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.work-process-task-snapshot-item .task-status-marker {
+  width: var(--transcript-card-icon-size);
+  height: var(--transcript-card-icon-size);
+}
+
+.work-process-task-snapshot-item .task-status-marker svg {
+  width: var(--space-3);
+  height: var(--space-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-status-marker.is-in-progress {
+    animation: none;
+  }
+}

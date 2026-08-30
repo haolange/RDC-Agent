@@ -612,7 +612,6 @@ POLICY_UNLIMITED_COMPACTION_PERCENT
 PolicyApprovalFloor
 PreparedTurnContextSummary
 ProfileSettings
-ProgressPanelViewModel
 ProgressTask
 ProgressTaskStatus
 ProjectApi

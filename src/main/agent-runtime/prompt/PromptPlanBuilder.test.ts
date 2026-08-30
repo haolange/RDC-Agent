@@ -87,6 +87,7 @@ describe('PromptPlanBuilder', () => {
       timeZone: 'Asia/Shanghai',
     });
     expect(plan.systemPrompt).toContain('Tasks are writable in this turn.');
+    expect(plan.systemPrompt).toContain('Create the full multi-step list in one task_create call.');
     expect(plan.systemPrompt).not.toContain('Tasks are read-only in this turn.');
   });
 

@@ -4,13 +4,13 @@ import type {
   ArtifactsPanelViewModel,
   ContextPanelViewModel,
   ProgressTask,
-  ProgressTaskStatus,
   RdxContextDiagnostic,
   TaskContextResource,
   TraceArtifactRecord,
 } from '@shared/types/trace';
 import { nowIso } from '@shared/utils/id';
 import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
+import { projectTaskItems } from '../agent-runtime/tasks/taskProjection';
 import type { SessionArtifactSource } from '../sessions/SessionArtifactSource';
 import type { ContextSnapshot, OpenedCaptureState } from '@shared/types/session';
 import { agentProfileRegistry } from './manifests/AgentProfileRegistry';
@@ -23,39 +23,22 @@ export function mapRightRailProgress(
   records: TaskRecord[],
 ): ProgressTask[] {
   const byId = new Map(records.map((task) => [task.id, task] as const));
-  const completed = new Set(records.filter((task) => task.status === 'completed').map((task) => task.id));
-  return records
-    .slice()
-    .sort((left, right) => left.createdAt - right.createdAt || left.id.localeCompare(right.id))
-    .map((task, order) => {
-      const blockers = task.blockedBy.map((id) => byId.get(id)).filter(
-        (blocker): blocker is TaskRecord => blocker !== undefined && !completed.has(blocker.id),
-      );
-      const status: ProgressTaskStatus = task.status === 'completed'
-        ? 'completed'
-        : task.status === 'cancelled'
-          ? 'cancelled'
-          : task.status === 'blocked'
-            ? 'blocked'
-            : task.status === 'in_progress'
-              ? 'running'
-              : blockers.length > 0 ? 'blocked' : 'pending';
-      return {
-        id: task.id,
-        sessionId,
-        traceLaneId: sessionId,
-        branchId,
-        title: task.subject,
-        status,
-        order,
-        createdAt: toIso(task.createdAt),
-        updatedAt: toIso(task.updatedAt),
-        completedAt: task.status === 'completed' ? toIso(task.updatedAt) : undefined,
-        source: 'runtime',
-        activeForm: task.activeForm,
-        blockerSummary: task.statusReason ?? (blockers.length ? blockers.map((blocker) => blocker.subject).join(', ') : undefined),
-      };
-    });
+  return projectTaskItems(records).map((item) => {
+    const task = byId.get(item.taskId);
+    return {
+      id: item.taskId,
+      sessionId,
+      traceLaneId: sessionId,
+      branchId,
+      title: item.title,
+      status: item.status,
+      order: item.order,
+      createdAt: toIso(task?.createdAt),
+      updatedAt: toIso(task?.updatedAt),
+      completedAt: item.status === 'completed' ? toIso(task?.updatedAt) : undefined,
+      blockerSummary: item.statusReason,
+    };
+  });
 }
 
 const artifactType = (source: SessionArtifactSource): TraceArtifactRecord['type'] => {

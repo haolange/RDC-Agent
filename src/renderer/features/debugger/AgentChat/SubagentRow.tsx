@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import type { WorkProcessRow } from './workProcessPresentation';
 import { getRowStatusLabel } from './workProcessPresentation';
 import { ToolRow } from './WorkProcessRowParts';
-import { TaskRow } from './TaskRow';
 import { TaskSnapshotCard } from './TaskSnapshotCard';
 
 interface SubagentRowProps {
@@ -71,7 +70,6 @@ const renderChildRow = (row: WorkProcessRow): React.ReactNode => {
       </li>
     );
   }
-  if (row.type === 'task') return <TaskRow key={row.id} row={row} />;
   if (row.type === 'section') {
     // 子 agent 的简化扁平视图：把小节内步骤直接展开为子 row。
     return (

@@ -45,6 +45,7 @@ export interface ConversationTaskSnapshotItem {
   title: string;
   status: ConversationTaskStatus;
   statusReason?: string;
+  order: number;
 }
 
 export interface ConversationTaskSnapshot {
@@ -176,10 +177,7 @@ export interface ConversationWorkBlock {
   title: string;
   stage?: string;
   status: ConversationWorkBlockStatus;
-  /** Present only for TaskRegistry-backed work blocks; never synthesized by the renderer. */
-  taskStatus?: ConversationTaskStatus;
-  taskStatusReason?: string;
-  /** Adjacent task_* mutations merge into one snapshot; non-adjacent snapshots keep loop history. */
+  /** One live snapshot per turn; canonical order and derived status come from main-side projection. */
   taskSnapshot?: ConversationTaskSnapshot;
   compactionStats?: ConversationCompactionStats;
   /** Non-loop summary text; LLM turn output lives in result and never contains provider thinking text. */

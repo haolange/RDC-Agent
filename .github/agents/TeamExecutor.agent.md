@@ -94,13 +94,11 @@ agents: ['Explore']
 | `Description` | `description` | 任务描述（含验收标准） |
 | `Acceptance Criteria` | 合入 `description` | 与 Description 合并 |
 | `Dependencies` | `blockedBy` | 前置任务依赖 |
-| `activeForm`（缺失时） | 从 subject 自动推导 | 如 "Implement auth module" → "Implementing auth module" |
 
-### 每个 Task 的三要素
+### 每个 Task 的要素
 
 1. **subject**：祈使句标题（如 `Implement auth middleware`）
 2. **description**：包含验收标准、范围边界、相关文件路径
-3. **activeForm**：进行时描述（如 `Implementing auth middleware`）
 
 ### 依赖关系建模（适用于两种模式）
 

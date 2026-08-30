@@ -18,10 +18,9 @@ export interface RawAuditRef {
 
 export type ProgressTaskStatus =
   | 'pending'
-  | 'running'
+  | 'in_progress'
   | 'completed'
   | 'blocked'
-  | 'reopened'
   | 'cancelled';
 
 export interface ProgressTask {
@@ -35,11 +34,8 @@ export interface ProgressTask {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
-  source: 'plan' | 'runtime';
   linkedEventIds?: string[];
   blockerSummary?: string;
-  /** Verb phrase shown while a task is running, for example "Verifying". */
-  activeForm?: string;
 }
 
 export type TraceArtifactType =
@@ -132,11 +128,6 @@ export interface RequestBranchGroup {
   branches: RequestBranch[];
 }
 
-export interface ProgressPanelViewModel {
-  current: ProgressTask[];
-  history: ProgressTask[];
-}
-
 export interface ArtifactsPanelViewModel {
   current: TraceArtifactRecord[];
   previous: TraceArtifactRecord[];
@@ -227,7 +218,7 @@ export interface ContextPanelViewModel {
 }
 
 export interface RightPanelViewModel {
-  progress: ProgressPanelViewModel;
+  progress: ProgressTask[];
   artifacts: ArtifactsPanelViewModel;
   context: ContextPanelViewModel;
 }

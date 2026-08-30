@@ -116,8 +116,8 @@ const FIXTURES = {
     resultPreview: toolEnvelope('- Ship feature', { total: 1, tasks: [{ subject: 'Ship feature' }] }),
   },
   task_create: {
-    argsPreview: JSON.stringify({ subject: 'New task' }),
-    resultPreview: toolEnvelope('Created task-1: New task', { taskId: 'task-1', subject: 'New task' }),
+    argsPreview: JSON.stringify({ tasks: [{ subject: 'New task' }] }),
+    resultPreview: toolEnvelope('Created task-1: New task', { ids: ['task-1'] }),
   },
   task_update: {
     argsPreview: JSON.stringify({ taskId: 'task-1', status: 'done' }),

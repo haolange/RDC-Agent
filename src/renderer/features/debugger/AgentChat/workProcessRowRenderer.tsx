@@ -1,7 +1,6 @@
 import React from 'react';
 import type { WorkProcessRow } from './workProcessPresentation';
 import { SubagentRow } from './SubagentRow';
-import { TaskRow } from './TaskRow';
 import { TaskSnapshotCard } from './TaskSnapshotCard';
 import {
   ApprovalRow,
@@ -21,7 +20,6 @@ export function createWorkProcessRowRenderer() {
     if (row.type === 'approval') return <ApprovalRow key={row.id} row={row} />;
     if (row.type === 'diagnostic') return <DiagnosticRow key={row.id} row={row} />;
     if (row.type === 'subagent') return <SubagentRow key={row.id} row={row} />;
-    if (row.type === 'task') return <TaskRow key={row.id} row={row} />;
     if (row.type === 'taskSnapshot') return <TaskSnapshotCard key={row.id} row={row} />;
     if (row.type === 'section') {
       return (

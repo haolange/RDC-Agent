@@ -972,7 +972,6 @@ terminal-pill
 terminal-status-badge
 titlebar-panel-toggle
 tooltip
-trace-progress-marker
 ui-badge
 ui-badge--
 ui-skeleton
@@ -1051,16 +1050,12 @@ work-process-summary
 work-process-summary-card
 work-process-summary-duration
 work-process-summary-line
-work-process-task
-work-process-task-content
-work-process-task-icon
 work-process-task-snapshot
+work-process-task-snapshot-copy
 work-process-task-snapshot-item
 work-process-task-snapshot-list
-work-process-task-snapshot-mark
+work-process-task-snapshot-reason
 work-process-task-snapshot-title
-work-process-task-status
-work-process-task-title
 work-process-thinking-icon
 work-process-thinking-preview
 work-process-thinking-source

@@ -51,21 +51,28 @@ describe('buildWorkProcessPresentation', () => {
           result: { status: 'complete', outputPhase: 'commentary', toolCallIds: ['task-create'] },
           toolCalls: [{
             id: 'task-create', toolName: 'task_create', status: 'complete',
-            argsPreview: JSON.stringify({ subject: 'Inspect capture' }),
-            resultPreview: JSON.stringify({ taskId: 'task-1', subject: 'Inspect capture' }),
+            argsPreview: JSON.stringify({ tasks: [{ subject: 'Inspect capture' }] }),
+            resultPreview: JSON.stringify({ ids: ['task-1'] }),
             startedAt: now, completedAt: now + 10,
           }],
           startedAt: now, completedAt: now + 10,
         },
         {
-          id: 'task-1', kind: 'command', title: 'Inspect capture', summary: 'Inspect capture',
-          status: 'pending', toolCalls: [], startedAt: now + 10,
+          id: 'task-snapshot-turn-1', kind: 'task_snapshot', title: '0 of 1 completed', status: 'running',
+          taskSnapshot: {
+            completed: 0,
+            total: 1,
+            items: [{ taskId: 'task-1', title: 'Inspect capture', status: 'pending', order: 0 }],
+          },
+          toolCalls: [], startedAt: now + 10,
         },
       ],
     });
     const rows = flattenWorkRows(presentation.rows);
     expect(rows.filter((row) => row.type === 'tool' && row.toolName === 'task_create')).toHaveLength(0);
-    expect(rows.filter((row) => row.type === 'task')).toEqual([expect.objectContaining({ taskId: 'task-1', title: 'Inspect capture' })]);
+    expect(rows.filter((row) => row.type === 'taskSnapshot')).toEqual([
+      expect.objectContaining({ id: 'task-snapshot-turn-1', completed: 0, total: 1 }),
+    ]);
   });
 
   it('preserves the TaskRegistry lifecycle state and blocked reason in Work Process', () => {
@@ -73,15 +80,25 @@ describe('buildWorkProcessPresentation', () => {
       status: 'complete',
       updatedAt: now + 20,
       blocks: [{
-        id: 'task-1', kind: 'command', title: 'Wait for QA', summary: 'Wait for QA',
-        stage: 'task', status: 'error', taskStatus: 'blocked', taskStatusReason: 'QA waiting',
-        toolCalls: [], startedAt: now,
+        id: 'task-snapshot-1',
+        kind: 'task_snapshot',
+        title: '0 of 1 completed',
+        status: 'complete',
+        taskSnapshot: {
+          completed: 0,
+          total: 1,
+          items: [{ taskId: 'task-1', title: 'Wait for QA', status: 'blocked', statusReason: 'QA waiting', order: 0 }],
+        },
+        toolCalls: [],
+        startedAt: now,
       }],
     });
-    const row = flattenWorkRows(presentation.rows).find((entry) => entry.type === 'task');
-    expect(row).toEqual(expect.objectContaining({
-      taskId: 'task-1', taskStatus: 'blocked', taskStatusReason: 'QA waiting',
-    }));
+    const row = flattenWorkRows(presentation.rows).find((entry) => entry.type === 'taskSnapshot');
+    expect(row).toEqual(expect.objectContaining({ type: 'taskSnapshot', completed: 0, total: 1 }));
+    if (!row || row.type !== 'taskSnapshot') throw new Error('expected task snapshot');
+    expect(row.items).toEqual([expect.objectContaining({
+      taskId: 'task-1', title: 'Wait for QA', status: 'blocked', statusReason: 'QA waiting', order: 0,
+    })]);
   });
 
   it('withholds unclassified streaming prose before tools arrive', () => {
@@ -1163,9 +1180,9 @@ describe('buildWorkProcessPresentation', () => {
           completed: 2,
           total: 3,
           items: [
-            { taskId: 'task-a', title: 'Inspect capture', status: 'completed' },
-            { taskId: 'task-b', title: 'Write notes', status: 'completed' },
-            { taskId: 'task-c', title: 'Publish output', status: 'pending' },
+            { taskId: 'task-a', title: 'Inspect capture', status: 'completed', order: 0 },
+            { taskId: 'task-b', title: 'Write notes', status: 'completed', order: 1 },
+            { taskId: 'task-c', title: 'Publish output', status: 'pending', order: 2 },
           ],
         },
         toolCalls: [],
@@ -1183,15 +1200,15 @@ describe('buildWorkProcessPresentation', () => {
     expect(row.items.map((item) => item.taskId)).toEqual(['task-a', 'task-b', 'task-c']);
   });
 
-  it('keeps non-adjacent task snapshots as separate cards', () => {
+  it('keeps one live task snapshot card when later work arrives after the snapshot', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'complete',
       updatedAt: now + 80,
       blocks: [
         {
-          id: 'task-snapshot-1', kind: 'task_snapshot', title: '0 of 1 completed', status: 'complete',
-          taskSnapshot: { completed: 0, total: 1, items: [{ taskId: 'task-a', title: 'One', status: 'pending' }] },
-          toolCalls: [], startedAt: now, completedAt: now + 5,
+          id: 'task-snapshot-turn-1', kind: 'task_snapshot', title: '1 of 1 completed', status: 'complete',
+          taskSnapshot: { completed: 1, total: 1, items: [{ taskId: 'task-a', title: 'One', status: 'completed', order: 0 }] },
+          toolCalls: [], startedAt: now, completedAt: now + 35,
         },
         {
           id: 'loop-shell', kind: 'llm_turn', title: 'LLM turn', status: 'complete',
@@ -1204,16 +1221,11 @@ describe('buildWorkProcessPresentation', () => {
           }],
           startedAt: now + 10, completedAt: now + 20,
         },
-        {
-          id: 'task-snapshot-2', kind: 'task_snapshot', title: '1 of 1 completed', status: 'complete',
-          taskSnapshot: { completed: 1, total: 1, items: [{ taskId: 'task-a', title: 'One', status: 'completed' }] },
-          toolCalls: [], startedAt: now + 30, completedAt: now + 35,
-        },
       ],
     });
     const snapshots = flattenWorkRows(presentation.rows).filter((entry) => entry.type === 'taskSnapshot');
-    expect(snapshots).toHaveLength(2);
-    expect(snapshots.map((entry) => entry.id)).toEqual(['task-snapshot-1', 'task-snapshot-2']);
+    expect(snapshots).toHaveLength(1);
+    expect(snapshots[0]).toEqual(expect.objectContaining({ id: 'task-snapshot-turn-1', completed: 1, total: 1 }));
   });
 
   it('projects memory and interpreter families with chips and code body', () => {

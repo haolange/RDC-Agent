@@ -18,7 +18,6 @@ describe('TaskRegistry', () => {
     const registry = await createRegistry();
     const created = await registry.createTask('Implement login', {
       description: 'Wire auth endpoints',
-      activeForm: 'Implementing login',
     });
     expect(created.id).toMatch(/^task_/);
     expect(created.status).toBe('pending');
@@ -107,5 +106,21 @@ describe('TaskRegistry', () => {
   it('rejects empty subject', async () => {
     const registry = await createRegistry();
     await expect(registry.createTask('   ')).rejects.toThrow(/subject/);
+  });
+
+  it('creates a batch in one persist pass and emits one change event', async () => {
+    const registry = await createRegistry();
+    const events: string[] = [];
+    registry.onTaskChange = ({ type, task }) => {
+      events.push(`${type}:${task.subject}`);
+    };
+    const created = await registry.createTasks([
+      { subject: 'First' },
+      { subject: 'Second' },
+      { subject: 'Third' },
+    ]);
+    expect(created.map((task) => task.subject)).toEqual(['First', 'Second', 'Third']);
+    expect(events).toEqual(['created:Third']);
+    expect((await registry.listTasks()).map((task) => task.subject)).toEqual(['First', 'Second', 'Third']);
   });
 });

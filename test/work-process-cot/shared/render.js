@@ -1,5 +1,5 @@
 (function (global) {
-  const { icon, taskIcon } = global.CotIcons;
+  const { icon } = global.CotIcons;
   const { t, toolVerb, family, formatMeta, statusLabel, getLocale } = global.CotI18n;
 
   function esc(value) {
@@ -149,22 +149,25 @@
     return `<div class="work-process-prose${prose.streaming ? ' is-streaming' : ''}"><div class="markdown-body">${prose.html}</div></div>`;
   }
 
-  function renderTask(task) {
-    const statusLabelText = task.status === 'blocked'
-      ? (task.reason ? `Blocked · ${task.reason}` : 'Blocked')
-      : task.status === 'in_progress'
-        ? 'In progress'
-        : task.status === 'cancelled'
-          ? 'Cancelled'
-          : '';
-    return `
-      <li class="work-process-task status-complete task-${task.status}" data-testid="work-process-task">
-        <span class="work-process-task-icon task-${task.status}" aria-hidden="true">${taskIcon(task.status)}</span>
-        <span class="work-process-task-content">
-          <span class="work-process-task-title">${esc(task.title)}</span>
-          ${statusLabelText ? `<span class="work-process-task-status">${esc(statusLabelText)}</span>` : ''}
+  function renderTaskSnapshot(snapshot) {
+    const items = snapshot.items || [];
+    const completed = items.filter((item) => item.status === 'completed').length;
+    const rows = items.map((item, index) => `
+      <li class="work-process-task-snapshot-item task-${item.status}" data-work-process-task-id="${esc(item.taskId || `task-${index}`)}">
+        <span class="task-status-marker is-${item.status}" aria-hidden="true">${item.status === 'pending' || item.status === 'in_progress' ? (item.order ?? index) + 1 : ''}</span>
+        <span class="work-process-task-snapshot-copy">
+          <span class="work-process-task-snapshot-title">${esc(item.title)}</span>
+          ${item.reason ? `<small class="work-process-task-snapshot-reason">${esc(item.reason)}</small>` : ''}
         </span>
       </li>
+    `).join('');
+    return `
+      <div class="work-process-task-snapshot is-expanded" data-testid="work-process-task-snapshot">
+        <div class="work-process-tool-card-header">
+          <span class="work-process-tool-card-verb">${completed} of ${items.length} completed</span>
+        </div>
+        <ul class="work-process-task-snapshot-list">${rows}</ul>
+      </div>
     `;
   }
 
@@ -306,9 +309,8 @@
     (model.sections || []).forEach((section) => rows.push(renderSection(section)));
     (model.extras || []).forEach((item) => {
       if (item.type === 'summary') rows.push(wrapStep(renderSummary(item.text), { kind: 'summary' }));
-      if (item.type === 'task') {
-        // TaskRow is a top-level narrative <li.work-process-task> (no step rail wrapper)
-        rows.push(renderTask(item.task));
+      if (item.type === 'taskSnapshot') {
+        rows.push(wrapStep(renderTaskSnapshot(item.snapshot), { kind: 'task-snapshot' }));
       }
       if (item.type === 'diagnostic') {
         rows.push(wrapStep(
