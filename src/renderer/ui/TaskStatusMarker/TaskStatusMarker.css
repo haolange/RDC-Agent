@@ -48,13 +48,13 @@
 }
 
 .work-process-task-snapshot-item .task-status-marker {
-  width: var(--transcript-card-icon-size);
-  height: var(--transcript-card-icon-size);
+  width: var(--space-4);
+  height: var(--space-4);
 }
 
 .work-process-task-snapshot-item .task-status-marker svg {
-  width: var(--space-3);
-  height: var(--space-3);
+  width: var(--transcript-card-icon-size);
+  height: var(--transcript-card-icon-size);
 }
 
 @media (prefers-reduced-motion: reduce) {
