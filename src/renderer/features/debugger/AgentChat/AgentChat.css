@@ -1479,7 +1479,11 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 
 .work-process-step.kind-task-snapshot {
   grid-template-columns: minmax(0, 1fr);
-  padding: var(--space-2) 0 0;
+  /* Standalone snapshot supplies its own entrance/exit: sections adjacent to it
+   * cannot match .work-process-section + .work-process-section. */
+  padding: var(--space-3) 0;
+  /* Share the nested tool-card indent line (rail 8px + column-gap space-1). */
+  padding-left: calc(8px + var(--space-1));
 }
 
 .work-process-step.kind-section .work-process-step-content {
