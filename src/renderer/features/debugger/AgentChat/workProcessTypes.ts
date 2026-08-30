@@ -208,17 +208,6 @@ export type WorkProcessRow =
     children: WorkProcessRow[];
   }
   | {
-    type: 'task';
-    id: string;
-    /** 与进度泳道 ProgressTask.id 对齐的稳定任务锚点。 */
-    taskId: string;
-    status: WorkProcessRowStatus;
-    title: string;
-    taskStatus: import('@shared/types/conversation').ConversationTaskStatus;
-    taskStatusReason?: string;
-    duration: string;
-  }
-  | {
     type: 'section';
     id: string;
     status: WorkProcessRowStatus;

@@ -183,100 +183,6 @@
 }
 
 
-.work-process-task {
-  list-style: none;
-  display: grid;
-  grid-template-columns: var(--space-5) minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-2);
-  min-height: var(--space-6);
-  padding: var(--transcript-card-padding);
-  font-size: var(--text-base);
-  color: var(--token-text-body);
-}
-
-.work-process-task-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--space-5);
-  height: var(--space-5);
-}
-
-.work-process-task-icon svg {
-  width: var(--space-4);
-  height: var(--space-4);
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.5;
-}
-
-.work-process-task-icon.task-pending {
-  color: var(--token-text-caption);
-}
-
-.work-process-task-icon.task-in_progress {
-  color: var(--token-status-info);
-}
-
-.work-process-task-icon.task-blocked {
-  color: var(--token-status-warning);
-}
-
-.work-process-task-icon.task-completed {
-  color: var(--token-status-success);
-}
-
-.work-process-task-icon.task-cancelled {
-  color: var(--token-text-caption);
-}
-
-.work-process-task-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.work-process-task-content {
-  min-width: 0;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
-}
-
-.work-process-task.task-completed .work-process-task-title {
-  color: var(--token-text-caption);
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
-}
-
-.work-process-task.task-in_progress .work-process-task-title {
-  color: var(--token-text-strong);
-}
-
-.work-process-task:focus-visible {
-  outline: 1px solid var(--token-border-focus);
-  outline-offset: var(--space-1);
-}
-
-.work-process-task-status {
-  font-size: var(--text-sm);
-  color: var(--token-text-caption);
-  flex: 0 0 auto;
-}
-
-.work-process-task-status.status-error {
-  color: var(--token-status-error);
-}
-
-.work-process-task-status.status-running {
-  color: var(--token-status-info);
-}
-
 .work-process-tool-thumbs {
   display: flex;
   flex-wrap: wrap;
@@ -334,38 +240,62 @@
   border-radius: var(--transcript-card-radius);
   background: var(--transcript-card-surface);
   overflow: hidden;
+  font-size: var(--text-sm);
 }
 
 .work-process-task-snapshot-list {
   list-style: none;
   margin: 0;
-  padding: var(--space-2) var(--space-3) var(--space-3);
+  padding: var(--space-2) var(--space-3);
 }
 
 .work-process-task-snapshot-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) 0;
+  min-height: var(--space-6);
 }
 
-.work-process-task-snapshot-mark {
-  width: var(--space-3);
-  height: var(--space-3);
-  margin-top: var(--space-1);
-  border: 1px solid var(--token-border-muted);
-  border-radius: 50%;
-  flex: 0 0 auto;
+.work-process-task-snapshot-item .task-status-marker {
+  flex: 0 0 var(--transcript-card-icon-size);
 }
 
-.work-process-task-snapshot-item.task-completed .work-process-task-snapshot-mark {
-  background: var(--token-status-success);
-  border-color: var(--token-status-success);
+.work-process-task-snapshot-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.work-process-task-snapshot-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.45;
+}
+
+.work-process-task-snapshot-reason {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.45;
 }
 
 .work-process-task-snapshot-item.task-completed .work-process-task-snapshot-title {
-  color: var(--token-text-muted);
+  color: var(--token-text-caption);
   text-decoration: line-through;
+}
+
+.work-process-task-snapshot-item.task-cancelled .work-process-task-snapshot-title {
+  color: var(--token-text-caption);
+}
+
+.work-process-task-snapshot-item.task-in_progress .work-process-task-snapshot-title {
+  color: var(--token-text-heading);
+}
+
+.work-process-task-snapshot-item.task-blocked .work-process-task-snapshot-reason {
+  color: var(--token-status-warning);
 }
 
 .work-process-tool-chips {

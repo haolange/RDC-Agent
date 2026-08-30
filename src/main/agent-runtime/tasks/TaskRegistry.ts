@@ -12,7 +12,6 @@ export interface TaskRecord {
   owner?: string;
   blockedBy: string[];
   blocks: string[];
-  activeForm?: string;
   metadata?: Record<string, unknown>;
   createdAt: number;
   updatedAt: number;
@@ -22,7 +21,6 @@ export interface CreateTaskOptions {
   description?: string;
   blockedBy?: string[];
   owner?: string;
-  activeForm?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -31,7 +29,6 @@ export interface UpdateTaskOptions {
   statusReason?: string;
   subject?: string;
   description?: string;
-  activeForm?: string;
   owner?: string;
   addBlockedBy?: string[];
   addBlocks?: string[];
@@ -47,28 +44,39 @@ export class TaskRegistry {
   }
 
   async createTask(subject: string, options: CreateTaskOptions = {}): Promise<TaskRecord> {
-    if (!subject.trim()) throw new Error('Task subject is required.');
-    const now = Date.now();
-    const id = this.generateId();
-    const blockedBy = dedupe(options.blockedBy ?? []);
-    await this.assertNoDependencyCycle(id, blockedBy);
-    const task: TaskRecord = {
-      id,
-      subject: subject.trim(),
-      description: options.description ?? '',
-      status: 'pending',
-      owner: options.owner,
-      blockedBy,
-      blocks: [],
-      activeForm: options.activeForm,
-      metadata: options.metadata ? { ...options.metadata } : undefined,
-      createdAt: now,
-      updatedAt: now,
-    };
-    await this.saveTask(task);
-    for (const upstreamId of blockedBy) await this.linkBlocks(upstreamId, id);
-    this.onTaskChange?.({ type: 'created', task });
-    return task;
+    const [task] = await this.createTasks([{ subject, ...options }]);
+    return task!;
+  }
+
+  async createTasks(inputs: ReadonlyArray<{ subject: string } & CreateTaskOptions>): Promise<TaskRecord[]> {
+    if (inputs.length === 0) throw new Error('At least one task is required.');
+    const prepared: TaskRecord[] = [];
+    const base = Date.now();
+    for (const [index, input] of inputs.entries()) {
+      if (!input.subject.trim()) throw new Error('Task subject is required.');
+      const createdAt = base + index;
+      const id = this.generateId(createdAt);
+      const blockedBy = dedupe(input.blockedBy ?? []);
+      await this.assertNoDependencyCycle(id, blockedBy);
+      prepared.push({
+        id,
+        subject: input.subject.trim(),
+        description: input.description ?? '',
+        status: 'pending',
+        owner: input.owner,
+        blockedBy,
+        blocks: [],
+        metadata: input.metadata ? { ...input.metadata } : undefined,
+        createdAt,
+        updatedAt: createdAt,
+      });
+    }
+    for (const task of prepared) {
+      await this.saveTask(task);
+      for (const upstreamId of task.blockedBy) await this.linkBlocks(upstreamId, task.id);
+    }
+    this.onTaskChange?.({ type: 'created', task: prepared[prepared.length - 1]! });
+    return prepared;
   }
 
   async updateTask(taskId: string, updates: UpdateTaskOptions): Promise<TaskRecord> {
@@ -89,7 +97,6 @@ export class TaskRegistry {
     task.statusReason = nextReason;
     if (updates.subject !== undefined) task.subject = updates.subject;
     if (updates.description !== undefined) task.description = updates.description;
-    if (updates.activeForm !== undefined) task.activeForm = updates.activeForm;
     if (updates.owner !== undefined) task.owner = updates.owner;
     if (updates.metadata !== undefined) task.metadata = { ...(task.metadata ?? {}), ...updates.metadata };
 
@@ -176,7 +183,9 @@ export class TaskRegistry {
 
   private async saveTask(task: TaskRecord): Promise<void> { await this.store.saveTask(task); }
   private async loadTask(taskId: string): Promise<TaskRecord | null> { return this.store.loadTask(taskId); }
-  private generateId(): string { return `task_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`; }
+  private generateId(now = Date.now()): string {
+    return `task_${now}_${crypto.randomBytes(3).toString('hex')}`;
+  }
 }
 
 function dedupe(values: readonly string[]): string[] {

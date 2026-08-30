@@ -33,3 +33,11 @@ export {
   resolveSessionTasksDir,
   createSessionTaskStore,
 } from './sessionTaskStore';
+
+export {
+  createdAtFromTaskId,
+  orderTasks,
+  projectTaskItems,
+  type ProjectedTaskItem,
+  type ProjectedTaskStatus,
+} from './taskProjection';

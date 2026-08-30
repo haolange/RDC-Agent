@@ -551,10 +551,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
               };
               const items = normalizeTaskSnapshotItems(payload);
               const completed = items.filter((item) => item.status === 'completed').length;
-              const lastBlock = turnStreamState.assistantMessage.workTrace?.blocks.at(-1);
-              const snapshotId = lastBlock?.kind === 'task_snapshot'
-                ? lastBlock.id
-                : `task-snapshot-${event.id}`;
+              const snapshotId = `task-snapshot-${turnStreamState.assistantMessage.turnId}`;
               commitAssistantMessage('message_patched', {
                 workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, snapshotId, {
                   kind: 'task_snapshot',
@@ -780,11 +777,12 @@ function normalizeTaskSnapshotItems(payload: {
   snapshot?: ConversationTaskSnapshotItem[];
 }): ConversationTaskSnapshotItem[] {
   if (Array.isArray(payload.snapshot) && payload.snapshot.length > 0) {
-    return payload.snapshot.map((item) => ({
+    return payload.snapshot.map((item, index) => ({
       taskId: item.taskId,
       title: item.title,
       status: item.status,
       statusReason: item.statusReason,
+      order: typeof item.order === 'number' ? item.order : index,
     }));
   }
   const taskId = payload.taskId?.trim() || 'runtime-tasks';
@@ -796,5 +794,6 @@ function normalizeTaskSnapshotItems(payload: {
       ? payload.status
       : 'pending',
     statusReason: payload.statusReason,
+    order: 0,
   }];
 }

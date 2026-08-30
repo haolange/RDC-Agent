@@ -224,19 +224,28 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
   },
   {
     id: 'task_create',
-    label: 'Create Task',
+    label: 'Create Tasks',
     permission: 'mutation',
     inputSchema: {
       type: 'object',
-      required: ['subject'],
+      required: ['tasks'],
       properties: {
-        subject: { type: 'string' },
-        description: { type: 'string' },
-        activeForm: { type: 'string' },
-        blockedBy: { type: 'array', items: { type: 'string' } },
+        tasks: {
+          type: 'array',
+          minItems: 1,
+          items: {
+            type: 'object',
+            required: ['subject'],
+            properties: {
+              subject: { type: 'string' },
+              description: { type: 'string' },
+              blockedBy: { type: 'array', items: { type: 'string' } },
+            },
+          },
+        },
       },
     },
-    resultSummary: 'Creates a private agent task record in workspace user space.',
+    resultSummary: 'Creates the full private agent task list in one call.',
     icon: 'list-plus',
     approvalRequired: false,
   },

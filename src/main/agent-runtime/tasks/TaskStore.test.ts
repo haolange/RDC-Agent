@@ -27,4 +27,29 @@ describe('FileTaskStore', () => {
       status: 'cancelled',
     });
   });
+
+  it('derives missing createdAt from the task id and orders by that time', async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'rdx-task-store-'));
+    roots.push(dir);
+    await writeFile(path.join(dir, 'task_2000_bb.json'), JSON.stringify({
+      id: 'task_2000_bb',
+      subject: 'Later',
+      description: '',
+      status: 'pending',
+      blockedBy: [],
+      blocks: [],
+    }), 'utf8');
+    await writeFile(path.join(dir, 'task_1000_aa.json'), JSON.stringify({
+      id: 'task_1000_aa',
+      subject: 'Earlier',
+      description: '',
+      status: 'pending',
+      blockedBy: [],
+      blocks: [],
+    }), 'utf8');
+
+    const listed = await new FileTaskStore(dir).listTasks();
+    expect(listed.map((task) => task.id)).toEqual(['task_1000_aa', 'task_2000_bb']);
+    expect(listed[0]?.createdAt).toBe(1000);
+  });
 });

@@ -80,7 +80,7 @@ Session 右侧栏四张卡（Progress / Outputs / Context / Capture）的空态�
 
 ## Transcript 卡壳
 
-审批卡、Work Process tool 卡、Asked 卡、Sub Agent 子行、Tasks 快照卡、图像缩略图与 Compact 摘要共用同一组变量（定义在 `design-system.css`）：`--transcript-card-radius` / `--transcript-card-padding` / `--transcript-card-border` / `--transcript-card-surface` / `--transcript-card-shadow`。禁止再为某一类卡另起一套 radius/padding/border/背景。缩略图经 `conversation:getToolImagePreview` 取 `data:` URL，禁止把大图 base64 写进 `resultPreview`。
+审批卡、Work Process tool 卡、Asked 卡、Sub Agent 子行、Tasks 快照卡、图像缩略图与 Compact 摘要共用同一组变量（定义在 `design-system.css`）：`--transcript-card-radius` / `--transcript-card-padding` / `--transcript-card-border` / `--transcript-card-surface` / `--transcript-card-shadow` / `--transcript-card-icon-size`。禁止再为某一类卡另起一套 radius/padding/border/背景，也禁止 tool 卡图标硬编码 px。缩略图经 `conversation:getToolImagePreview` 取 `data:` URL，禁止把大图 base64 写进 `resultPreview`。
 
 ## 模态尺寸
 

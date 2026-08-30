@@ -178,7 +178,6 @@ work-process-block
 work-process-image-thumbs
 work-process-section
 work-process-source-pills
-work-process-task
 work-process-task-snapshot
 work-process-tool-aggregate
 work-process-tool-approval

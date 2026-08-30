@@ -202,31 +202,6 @@ export function buildPresentationUnits(
     }
 
     if (block.kind === 'command') {
-      const summaryText = deps.getMeaningfulBlockSummary(block);
-      if (summaryText) {
-        ctx.hasVisibleProcessEvidence = true;
-        const taskStatus = block.taskStatus ?? (block.status === 'error'
-          ? 'cancelled'
-          : block.status === 'running'
-            ? 'in_progress'
-            : block.status === 'pending'
-              ? 'pending'
-              : 'completed');
-        units.push({
-          kind: 'standalone',
-          rows: [{
-            type: 'task',
-            id: block.id,
-            taskId: block.id,
-            status: block.status,
-            title: summaryText,
-            taskStatus,
-            taskStatusReason: block.taskStatusReason,
-            duration: formatDurationMs(block.startedAt, block.completedAt),
-          }],
-          loopIds: [block.id],
-        });
-      }
       continue;
     }
 

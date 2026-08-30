@@ -831,6 +831,7 @@
   --transcript-card-border:    1px solid var(--token-border-muted);
   --transcript-card-surface:   var(--token-surface-sunken);
   --transcript-card-shadow:    var(--shadow-panel-hover);
+  --transcript-card-icon-size: 14px;
 
   --token-shadow-raised:       var(--shadow-sm);
   --token-shadow-card:         var(--shadow-md);

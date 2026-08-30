@@ -40,9 +40,9 @@ describe('right rail projection mappers', () => {
     const rows = mapRightRailProgress('session-a', 'branch-a', [
       task('done', 'completed', 1), task('active', 'in_progress', 2), task('blocked', 'blocked', 3, 'Waiting for device'), task('cancel', 'cancelled', 4),
     ]);
-    expect(rows.map((entry) => entry.status)).toEqual(['completed', 'running', 'blocked', 'cancelled']);
+    expect(rows.map((entry) => entry.status)).toEqual(['completed', 'in_progress', 'blocked', 'cancelled']);
+    expect(rows.map((entry) => entry.order)).toEqual([0, 1, 2, 3]);
     expect(rows.find((entry) => entry.id === 'blocked')?.blockerSummary).toBe('Waiting for device');
-    expect(rows.every((entry) => entry.source === 'runtime')).toBe(true);
   });
 
   it('projects explicit user-facing outputs without pinning plans or exposing internal producers', () => {

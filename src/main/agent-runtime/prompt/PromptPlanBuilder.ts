@@ -269,6 +269,9 @@ function buildEffectiveToolContent(agentId: string, tools: readonly string[]): s
       '',
       '## Tasks capability',
       'Tasks are writable in this turn. Create, update, inspect, list, or stop Tasks only through the effective task tools shown above.',
+      'Create the full multi-step list in one task_create call. Do not create Tasks one by one.',
+      'Before starting a step, mark exactly one task in_progress. When it is done, mark it completed immediately and only then start the next.',
+      'blocked requires a statusReason. Do not create Tasks for single-step or trivial work.',
     );
   } else if (readableTasks) {
     lines.push(

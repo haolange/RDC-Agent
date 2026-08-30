@@ -2,7 +2,7 @@
  * TaskTools — 把 TaskRegistry 暴露为 5 个 AgentTool。
  *
  * 工具列表：
- *  - `task_create`：创建任务；
+ *  - `task_create`：批量创建任务；
  *  - `task_update`：更新任务（状态 / 描述 / 依赖）；
  *  - `task_get`：读取单个任务详情；
  *  - `task_list`：列出全部任务；
@@ -50,69 +50,73 @@ export function createTaskTools(registry: TaskRegistry): AgentTool[] {
 
 // ── task_create ───────────────────────────────────────────────
 
-interface TaskCreateParams {
+interface TaskCreateItem {
   subject: string;
   description?: string;
-  activeForm?: string;
   blockedBy?: string[];
+}
+
+interface TaskCreateParams {
+  tasks: TaskCreateItem[];
 }
 
 /** 构造 `task_create` 工具。 */
 export function createTaskCreateTool(
   registry: TaskRegistry,
-): AgentTool<TaskCreateParams, { id: string }> {
+): AgentTool<TaskCreateParams, { ids: string[] }> {
   return {
     name: 'task_create',
-    label: 'Create Task',
-    description: 'Create a new task for tracking work progress',
+    label: 'Create Tasks',
+    description: 'Create the full task list for this turn in one call',
     parameters: {
       type: 'object',
       properties: {
-        subject: {
-          type: 'string',
-          description: 'Brief imperative title',
-        },
-        description: {
-          type: 'string',
-          description: 'Detailed description',
-        },
-        activeForm: {
-          type: 'string',
-          description: 'Present continuous form for spinner',
-        },
-        blockedBy: {
+        tasks: {
           type: 'array',
-          items: { type: 'string' },
-          description: 'Task IDs that block this',
+          minItems: 1,
+          items: {
+            type: 'object',
+            properties: {
+              subject: {
+                type: 'string',
+                description: 'Brief imperative title',
+              },
+              description: {
+                type: 'string',
+                description: 'Detailed description',
+              },
+              blockedBy: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Task IDs that block this',
+              },
+            },
+            required: ['subject'],
+          },
+          description: 'Complete list of tasks to create together',
         },
       },
-      required: ['subject'],
+      required: ['tasks'],
     },
     permissionHint: 'readonly',
 
     async execute(_toolCallId, params, signal) {
       throwIfAborted(signal);
-      const subject = readString(params, 'subject', true);
-      const description = readString(params, 'description', false);
-      const activeForm = readString(params, 'activeForm', false);
-      const blockedBy = readStringArray(params, 'blockedBy');
-
-      const task = await registry.createTask(subject, {
-        description,
-        activeForm,
-        blockedBy,
-      });
-
-      const depsText =
-        blockedBy && blockedBy.length > 0
-          ? ` (blockedBy: ${blockedBy.join(', ')})`
-          : '';
-      const text = `Created ${task.id}: ${task.subject}${depsText}`;
+      const items = readTaskItems(params);
+      const created = await registry.createTasks(items);
+      const text = created
+        .map((task) => {
+          const depsText = task.blockedBy.length > 0
+            ? ` (blockedBy: ${task.blockedBy.join(', ')})`
+            : '';
+          return `Created ${task.id}: ${task.subject}${depsText}`;
+        })
+        .join('\n');
 
       return {
         content: [{ type: 'text', text }],
-        details: { id: task.id },
-      } satisfies AgentToolResult<{ id: string }>;
+        details: { ids: created.map((task) => task.id) },
+      } satisfies AgentToolResult<{ ids: string[] }>;
     },
   };
 }
@@ -125,7 +129,6 @@ interface TaskUpdateParams {
   statusReason?: string;
   subject?: string;
   description?: string;
-  activeForm?: string;
   owner?: string;
   addBlockedBy?: string[];
   addBlocks?: string[];
@@ -157,7 +160,6 @@ export function createTaskUpdateTool(
         statusReason: { type: 'string' },
         subject: { type: 'string' },
         description: { type: 'string' },
-        activeForm: { type: 'string' },
         owner: { type: 'string' },
         addBlockedBy: { type: 'array', items: { type: 'string' } },
         addBlocks: { type: 'array', items: { type: 'string' } },
@@ -175,7 +177,6 @@ export function createTaskUpdateTool(
       const statusReason = readString(params, 'statusReason', false);
       const subject = readString(params, 'subject', false);
       const description = readString(params, 'description', false);
-      const activeForm = readString(params, 'activeForm', false);
       const owner = readString(params, 'owner', false);
       const addBlockedBy = readStringArray(params, 'addBlockedBy');
       const addBlocks = readStringArray(params, 'addBlocks');
@@ -189,7 +190,6 @@ export function createTaskUpdateTool(
         statusReason,
         subject,
         description,
-        activeForm,
         owner,
         addBlockedBy,
         addBlocks,
@@ -374,6 +374,26 @@ function readString(
     throw new Error(`参数 "${key}" 必须是字符串`);
   }
   return value;
+}
+
+/** 读取 task_create 的唯一批量入参。 */
+function readTaskItems(params: object): TaskCreateItem[] {
+  const value = (params as Record<string, unknown>).tasks;
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error('参数 "tasks" 必须是非空数组');
+  }
+  return value.map((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      throw new Error(`参数 "tasks[${index}]" 必须是对象`);
+    }
+    const record = item as Record<string, unknown>;
+    const subject = readString(record, 'subject', true);
+    return {
+      subject,
+      description: readString(record, 'description', false),
+      blockedBy: readStringArray(record, 'blockedBy'),
+    };
+  });
 }
 
 /** 从未知入参中读取字符串数组字段。 */

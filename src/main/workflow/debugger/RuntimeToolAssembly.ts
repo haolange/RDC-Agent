@@ -14,7 +14,7 @@ import type { ToolDefinition } from '../../agent-runtime/core/types';
 import { createToolSearchTool, getPrimitiveTools } from '../../agent-runtime/tools';
 import { handoffController } from '../../agent-runtime/agent/HandoffController';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
-import { createTaskTools, TaskRegistry, MemoryTaskStore, createSessionTaskStore } from '../../agent-runtime/tasks';
+import { createTaskTools, TaskRegistry, MemoryTaskStore, createSessionTaskStore, projectTaskItems } from '../../agent-runtime/tasks';
 import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
 import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
 import { storageAdapter } from '../../sessions/StorageAdapter';
@@ -102,12 +102,7 @@ export class RuntimeToolAssembly {
             title: task.subject,
             status: task.status,
             statusReason: task.statusReason,
-            snapshot: tasks.map((entry) => ({
-              taskId: entry.id,
-              title: entry.subject,
-              status: entry.status,
-              statusReason: entry.statusReason,
-            })),
+            snapshot: projectTaskItems(tasks),
           },
         });
       });

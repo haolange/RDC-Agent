@@ -17,7 +17,7 @@ import {
 } from './rightRailProjectionMappers';
 
 const emptyRightPanel = (sessionId: string): RightPanelViewModel => ({
-  progress: { current: [], history: [] },
+  progress: [],
   artifacts: { current: [], previous: [] },
   context: {
     task: {
@@ -81,10 +81,7 @@ export class RightRailProjectionService {
       })),
     });
     return {
-      progress: {
-        current: progress.filter((task) => ['running', 'blocked', 'pending', 'reopened'].includes(task.status)),
-        history: progress.filter((task) => ['completed', 'cancelled'].includes(task.status)),
-      },
+      progress,
       artifacts,
       context: { task, rdx },
     };

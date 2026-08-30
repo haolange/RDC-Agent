@@ -10,6 +10,7 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import type { TaskRecord, TaskStatus } from './TaskRegistry';
+import { createdAtFromTaskId, orderTasks } from './taskProjection';
 
 /** 任务存储接口。 */
 export interface TaskStore {
@@ -68,16 +69,14 @@ export class FileTaskStore implements TaskStore {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') return [];
       throw err;
     }
-    const files = entries
-      .filter((name) => name.startsWith('task_') && name.endsWith('.json'))
-      .sort();
+    const files = entries.filter((name) => name.startsWith('task_') && name.endsWith('.json'));
     const tasks: TaskRecord[] = [];
     for (const file of files) {
       const id = file.slice(0, -'.json'.length);
       const task = await this.loadTask(id);
       if (task) tasks.push(task);
     }
-    return tasks;
+    return orderTasks(tasks);
   }
 
   async deleteTask(taskId: string): Promise<void> {
@@ -102,7 +101,7 @@ export class MemoryTaskStore implements TaskStore {
   }
 
   async listTasks(): Promise<TaskRecord[]> {
-    return Array.from(this.store.values()).map((t) => ({ ...t }));
+    return orderTasks(Array.from(this.store.values()).map((t) => ({ ...t })));
   }
 
   async deleteTask(taskId: string): Promise<void> {
@@ -125,10 +124,9 @@ function normalizeTaskRecord(parsed: Partial<TaskRecord>): TaskRecord | null {
     owner: typeof parsed.owner === 'string' ? parsed.owner : undefined,
     blockedBy: Array.isArray(parsed.blockedBy) ? parsed.blockedBy.filter((x): x is string => typeof x === 'string') : [],
     blocks: Array.isArray(parsed.blocks) ? parsed.blocks.filter((x): x is string => typeof x === 'string') : [],
-    activeForm: typeof parsed.activeForm === 'string' ? parsed.activeForm : undefined,
     metadata: parsed.metadata && typeof parsed.metadata === 'object' ? parsed.metadata as Record<string, unknown> : undefined,
-    createdAt: typeof parsed.createdAt === 'number' ? parsed.createdAt : Date.now(),
-    updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : Date.now(),
+    createdAt: typeof parsed.createdAt === 'number' ? parsed.createdAt : createdAtFromTaskId(parsed.id),
+    updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : createdAtFromTaskId(parsed.id),
   };
 }
 

@@ -339,7 +339,6 @@ Rules:
 对每个 sub-task 创建任务节点：
 - **subject**：祈使句标题（如 "Implement auth module"）
 - **description**：任务描述 + 验收标准 + 精炼的知识库摘要
-- **activeForm**：进行时描述（自动推导）
 
 **Step 5d — 设置依赖关系**
 使用 task graph 为每个 task 设置 `blockedBy` 和 `blocks`，构建无环 DAG。
@@ -367,7 +366,6 @@ Rules:
 对每个 sub-task 创建任务节点：
 - **subject**：祈使句标题（如 "Implement auth module"）
 - **description**：任务描述 + 验收标准 + 精炼的知识库摘要
-- **activeForm**：进行时描述（自动推导）
 
 **Step 6d — 设置依赖关系**
 使用 task graph 为每个 task 设置 `blockedBy` 和 `blocks`，构建无环 DAG。

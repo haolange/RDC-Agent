@@ -210,7 +210,6 @@ describe('ConversationService work trace tool approvals', () => {
       title: 'Wait for QA',
       stage: 'task',
       status: 'pending',
-      taskStatus: 'pending',
       toolCalls: [],
     });
 
@@ -220,7 +219,6 @@ describe('ConversationService work trace tool approvals', () => {
       id: 'task-1',
       stage: 'task',
       status: 'pending',
-      taskStatus: 'pending',
     });
     expect(completed.blocks[0].completedAt).toBeUndefined();
   });
@@ -292,5 +290,41 @@ describe('ConversationService work trace tool approvals', () => {
         completedAt: 200,
       }),
     ]);
+  });
+
+  it('keeps a live task snapshot in place when later work blocks are inserted', () => {
+    let trace = upsertWorkBlock(undefined, 'task-snapshot-turn-1', {
+      kind: 'task_snapshot',
+      title: '0 of 1 completed',
+      stage: 'task',
+      status: 'complete',
+      taskSnapshot: {
+        completed: 0,
+        total: 1,
+        items: [{ taskId: 'task-a', title: 'One', status: 'pending', order: 0 }],
+      },
+      toolCalls: [],
+    });
+    trace = upsertWorkBlock(trace, 'loop-shell', {
+      kind: 'llm_turn',
+      title: 'LLM turn',
+      status: 'complete',
+      toolCalls: [],
+    });
+    trace = upsertWorkBlock(trace, 'task-snapshot-turn-1', {
+      kind: 'task_snapshot',
+      title: '1 of 1 completed',
+      stage: 'task',
+      status: 'complete',
+      taskSnapshot: {
+        completed: 1,
+        total: 1,
+        items: [{ taskId: 'task-a', title: 'One', status: 'completed', order: 0 }],
+      },
+      toolCalls: [],
+    });
+
+    expect(trace.blocks.map((block) => block.id)).toEqual(['task-snapshot-turn-1', 'loop-shell']);
+    expect(trace.blocks[0]?.taskSnapshot).toMatchObject({ completed: 1, total: 1 });
   });
 });

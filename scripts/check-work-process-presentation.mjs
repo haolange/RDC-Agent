@@ -30,7 +30,6 @@ const activeSignalRenderSource = [
   'src/renderer/features/debugger/AgentChat/ToolAggregateRow.tsx',
   'src/renderer/features/debugger/AgentChat/WorkProcessRows.tsx',
   'src/renderer/features/debugger/AgentChat/SubagentRow.tsx',
-  'src/renderer/features/debugger/AgentChat/TaskRow.tsx',
   'src/renderer/features/debugger/composer/UserInputRequestPanel.tsx',
   'src/renderer/features/debugger/composer/ToolApprovalRequestPanel.tsx',
 ].map(readSource).join('\n');

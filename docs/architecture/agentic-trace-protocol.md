@@ -27,10 +27,10 @@ Right-panel records use `traceLaneId`.
 
 The right-panel Progress lane (`RightPanelViewModel.progress`) is projected from the
 session-scoped agent task registry at `${userData}/state/tasks/{sessionId}` (`TaskRegistry` with the
-`task_create` / `task_update` / `task_list` tools), mapped to `ProgressTask` by
-`TraceService.mapSessionProgress`. It is session-scoped rather than per-run, so it stays populated
-under the conversation-driven projection path (`buildConversationPresentation`). `current` holds
-pending / running / blocked steps; `history` holds completed steps. Agent task changes emit
+`task_create` / `task_update` / `task_list` tools), mapped to `ProgressTask[]` by
+`mapRightRailProgress` via `taskProjection`. It is session-scoped rather than per-run, so it stays populated
+under the conversation-driven projection path (`buildConversationPresentation`). The list is a single
+creation-order array; completed items stay in place. Agent task changes emit
 `task.created` / `task.updated`, which republish `trace:projectionChanged` and refresh the lane in
 place. Subagents keep their tasks in an in-memory store and never write to the session lane. The
 harness `task-board.json` no longer feeds this lane.
@@ -58,7 +58,7 @@ Use `pnpm run check:fidelity` for `trace-*` anchors, `pnpm run typecheck` for sh
 
 ## Progress lane
 
-Progress is projected from session-scoped `TaskRegistry` records only. `RightRailProjectionService` does not synthesize tasks from UI stages, harness records, or plan text. Current tasks and history are different views over the same registry records; Work Process remains the event location target. Task work-trace blocks carry the same lifecycle status and blocked reason from `TaskRegistry`; ending a turn must not convert a pending or blocked task into a completed trace row.
+Progress is projected from session-scoped `TaskRegistry` records only. `RightRailProjectionService` does not synthesize tasks from UI stages, harness records, or plan text. Progress and the transcript live snapshot share one `taskProjection`; Work Process remains the event location target. Task work-trace blocks carry the same lifecycle status and blocked reason from `TaskRegistry`; ending a turn must not convert a pending or blocked task into a completed trace row.
 
 ## Outputs lane
 

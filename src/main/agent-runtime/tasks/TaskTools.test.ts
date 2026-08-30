@@ -30,11 +30,10 @@ describe('TaskTools', () => {
     const byName = Object.fromEntries(tools.map((tool) => [tool.name, tool]));
 
     const created = await byName.task_create!.execute('c1', {
-      subject: 'Ship feature',
-      description: 'End-to-end',
+      tasks: [{ subject: 'Ship feature', description: 'End-to-end' }],
     });
     expect(textOf(created)).toContain('Created');
-    const taskId = (created.details as { id: string }).id;
+    const taskId = (created.details as { ids: string[] }).ids[0]!;
 
     const listed = await byName.task_list!.execute('l1', {});
     expect(textOf(listed)).toContain(taskId);

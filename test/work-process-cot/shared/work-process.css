@@ -904,70 +904,61 @@ summary {
   margin-top: var(--space-2);
 }
 
-.work-process-task {
+.work-process-task-snapshot {
+  border: var(--transcript-card-border);
+  border-radius: var(--transcript-card-radius);
+  background: var(--transcript-card-surface);
+  overflow: hidden;
+  font-size: var(--text-sm);
+}
+
+.work-process-task-snapshot-list {
   list-style: none;
-  display: grid;
-  grid-template-columns: var(--space-5) minmax(0, 1fr);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+}
+
+.work-process-task-snapshot-item {
+  display: flex;
   align-items: center;
   gap: var(--space-2);
   min-height: var(--space-6);
-  padding: var(--space-2) 0;
-  font-size: var(--text-base);
-  color: var(--token-text-body);
 }
 
-.work-process-task-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: var(--space-5);
-  height: var(--space-5);
-  color: var(--token-text-caption);
-}
-
-.work-process-task-icon.task-completed { color: var(--token-status-success); }
-.work-process-task-icon.task-in_progress { color: var(--token-status-info); }
-.work-process-task-icon.task-blocked { color: var(--token-status-warning); }
-.work-process-task-icon.task-cancelled { color: var(--token-text-caption); }
-
-.work-process-task-icon svg {
-  display: block;
-  width: var(--space-4);
-  height: var(--space-4);
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.5;
-}
-
-.work-process-task-content {
+.work-process-task-snapshot-copy {
   min-width: 0;
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-2);
+  flex-direction: column;
 }
 
-.work-process-task-title {
+.work-process-task-snapshot-title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 1.45;
 }
 
-.work-process-task.task-completed .work-process-task-title {
+.work-process-task-snapshot-reason {
   color: var(--token-text-caption);
+  font-size: var(--text-xs);
+}
+
+.work-process-task-snapshot-item.task-completed .work-process-task-snapshot-title,
+.work-process-task-snapshot-item.task-cancelled .work-process-task-snapshot-title {
+  color: var(--token-text-muted);
   text-decoration: line-through;
-  text-decoration-thickness: 1px;
 }
 
-.work-process-task.task-in_progress .work-process-task-title {
-  color: var(--token-text-heading);
-}
-
-.work-process-task-status {
-  font-size: var(--text-sm);
-  color: var(--token-text-caption);
-  flex: 0 0 auto;
+.task-status-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--transcript-card-icon-size, 14px);
+  height: var(--transcript-card-icon-size, 14px);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
 }
 
 .work-process-user-input {
