@@ -10,7 +10,7 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 
 **不做** image/video 生成 runtime、media provider 目录面或 `MediaRuntimeService` 类骨架；discovery 对非 agent modality（含 image/video output）保持 fail-closed 剔除。用户附件 vision-input（读图）仍属 agent chat 能力，与生成 media 无关。
 
-产品不是固定模式向导。Ask、Plan、Edit、Debugger、Analyzer、Optimizer 是 agent profiles（指令、工具、审批策略、handoff、可见性不同）。仅 `user-invocable` 的 profile 出现在 composer orchestrator 菜单。Plan 不是硬编码 `AppMode`，而是可研究、提问、写 plan artifact、调用允许的 subagent 并 handoff 实现的 `.agent.md` profile。
+产品不是固定模式向导。**当前态**顶层 profile 仍是 Ask / Plan / Edit / Debugger / Analyzer / Optimizer，并由 `AgentManifestService.ensureSeedManifests` 写入 `~/.rdx/agents`。**目标态**只保留四个 builtin profile：`general` / `debugger` / `analyzer` / `optimizer`（`resources/agent-runtime/agents`，scope 优先级 `builtin < user < project`，不再写 user seed）。仅 `user-invocable` 的 profile 出现在 composer orchestrator 菜单。Plan 不是硬编码 `AppMode`，也不是目标拓扑的独立顶层身份；计划能力落在 Mission profile 的 Coordinator Skill、plan artifact 与 durable handoff。裁决与迁移门禁见下文「Current / Target / Migration Adjudications」。
 
 唯一运行时路径是 agent loop：解析 profile / model route / policy / tools → 调用 LLM → 执行已批准工具 → 回灌结果 → 产出 final answer。Renderer 不得伪造推理阶段；隐藏 CoT 永不作为 UI 内容展示或持久化。
 
@@ -35,6 +35,7 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 | 主题 | 权威位置 |
 | --- | --- |
 | 产品边界与本文件不变量 | 本文件 |
+| 当前态 / 目标态 / 迁移门禁（Profile、Right Rail、Embedding、Handoff、Investigation、并发、Knowledge、legacy） | 本文件「Current / Target / Migration Adjudications」 |
 | Runtime / Prompt / Provider / Tool / Session 契约 | [`docs/contracts/runtime-kernel.md`](docs/contracts/runtime-kernel.md) |
 | Session Projection（active UI / 后台 cache / Composer 恢复） | [`docs/contracts/session-projection.md`](docs/contracts/session-projection.md) |
 | Session `modelOverride`（所有权 / 冻结时机 / 不传子 agent） | 本文件 Architecture Principles §9；实现：`SessionRecord` + `resolveAgentRoutePreflight` |
@@ -42,6 +43,7 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 | Fail-closed 三分类与标注点 | [`docs/contracts/failure-model.md`](docs/contracts/failure-model.md) |
 | Orchestrator façade 行数 / 职责外提 | 本文件 Invariant + `pnpm run check:orchestrator-facade` |
 | Profiles / Skills / Hooks / Memory / RDX 产品规格 | [`docs/product/`](docs/product/) |
+| RenderDoc 垂直目标设计（非第二权威） | [`docs/product/renderdoc-agent-complete-design.md`](docs/product/renderdoc-agent-complete-design.md) |
 | Workbench / Transcript / Composer | [`docs/ui/workbench-and-transcript.md`](docs/ui/workbench-and-transcript.md) |
 | Design System（Token / 按钮 / 颜色 / 组件） | [`docs/ui/design-system.md`](docs/ui/design-system.md) |
 | Work Process UI 验收 checklist | [`docs/ui/work-process-checklist.md`](docs/ui/work-process-checklist.md) |
@@ -99,6 +101,7 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 
 - [`docs/product/scoped-runtime-resources.md`](docs/product/scoped-runtime-resources.md) — Scope、Profiles、Skills、Hooks、Memory、Project Instructions
 - [`docs/product/vertical-debugger-overview.md`](docs/product/vertical-debugger-overview.md)
+- [`docs/product/renderdoc-agent-complete-design.md`](docs/product/renderdoc-agent-complete-design.md) — 受本文件裁决的详细目标设计；目标态未全部实现
 - 其它：`docs/product/README.md`
 
 ### UI
@@ -125,6 +128,92 @@ UI/工作流用 `pnpm run start:agent-browser` 真实会话验收（先停旧进
 
 Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThemes` 为 RDC 默认（清理历史污染）。桌面窗口几何写入 `layout.window`（宽高/坐标/最大化），主进程在 resize/move/close 时持久化并在启动恢复；左右栏与 terminal 高度仍经 renderer `settings:set` 持久化。Browser 与 Desktop 走同一 Settings 持久化路径；Browser QA 默认使用经过校验并在退出清理的 disposable `os.tmpdir()/rdc-agent/qa-*` userData，只有显式 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 才共享 canonical userData，`instance.lock` 阻止并发占用。
 
+## Current / Target / Migration Adjudications
+
+本节是 Wave 0 原子裁决。凡写「当前态」即仓库现有实现；「目标态」即后续 Wave 必须收敛到的单一路径；「迁移门禁」是实现该目标时的数据/契约约束。目标态未实现前，不得把目标模块写成已完成，也不得为旧路径增加兼容双轨。详细字段与领域流程见 [`docs/product/renderdoc-agent-complete-design.md`](docs/product/renderdoc-agent-complete-design.md)；该文件受本裁决约束，不是第二产品权威。
+
+非侵入硬约束（当前态与目标态共同成立）：
+
+- 不新增平台级 InvestigationGraph、第二 TaskStore 或第二 Agent Runtime。
+- `TaskRecord.metadata`、`AgentProfile.metadata`、`ConversationMessage` 禁止领域字段；垂直记录只能引用 task id。
+- 不注册约 194 个 RDX 工具，不把 RDX 做成 MCP；RDX 仍是外部 CLI，经 `shell` 与 Settings action 调用。
+- Knowledge 持久写入仅 human review；`FullAccess` 不可绕过；无自动 Memory / Knowledge / Candidate / Promote。
+- 新结构替代旧结构时直接收敛；默认不保留 legacy / deprecated shim。
+
+### A. Builtin Profiles
+
+| | 裁决 |
+| --- | --- |
+| **当前态** | 顶层身份是 Ask / Plan / Edit / Debugger / Analyzer / Optimizer。`AgentManifestService.ensureSeedManifests` 在 `~/.rdx/agents` 缺文件时写入 user seed。`AgentCategory` 把三类 Mission 标成 `general` executable。 |
+| **目标态** | 四个 builtin profile：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件只存在于 `resources/agent-runtime/agents`，scope 为 builtin。生效优先级 **`builtin < user < project`**，整资源替换。运行时**不再写 user seed**。已有 user `general` 自然覆盖 builtin `general`。空 `handoffs` 禁止；空 `agents` 仅表示可委托自身。不新增 `mission` / `orchestratorType` / `investigationMode` 等 Profile 领域字段。 |
+| **迁移门禁** | 历史 S0–S8 官方 seed 以 **parse 后的语义 hash** 识别（instructions / tools / skills / agents / handoffs / **model / icon / accent** 任一变化都视为用户修改，保守不迁）。匹配历史官方语义的旧文件原子移至 `~/.rdx/agents/.migrated/<migration-id>/` 备份，**不物理删除**。用户修改版原样保留在 `~/.rdx/agents`。进度 marker 为 `~/.rdx/agents/.seed-migration.json`，经 `StorageIo` 原子写，幂等 / 可重入，并写诊断。禁止交互式「导出 / 保留 / 移除」选择面；禁止静默覆盖用户修改。Ask / Plan / Edit 不再作为目标拓扑身份，也不作为运行时 fallback。 |
+
+### B. Right Rail
+
+| | 裁决 |
+| --- | --- |
+| **当前态** | Project rail 只有 `Import .rdc` 与已导入列表。Session rail 是四张不可折叠卡：`Progress / Outputs / Context / Capture`。`RightRailProjectionService` 单轨投影；renderer 不重建。Outputs 只认 `output_register`。 |
+| **目标态** | Project rail **仍只有** `Import .rdc`，不读 session runtime。Session rail 目标五卡：`Progress / Artifacts / Outputs / Context / Capture`。Artifacts 是 main-owned Investigation Artifacts（垂直 Session Artifact 投影，不是 Working Directory 扫描，也不是 `output_register`）。Outputs 仍只展示 `output_register` 发布的用户输出文件。Capture 保留现有所有权与 Replay Device 面。Progress 仍消费 canonical `taskProjection`。五卡外壳在 empty / populated 之间不变。单轨投影与「renderer 不重建」不变。 |
+| **迁移门禁** | 不得再写目标三卡（`Progress / Artifacts / Context`）或把当前四卡写成最终契约。实现五卡前，四卡是 Wave 迁移事实；落地后直接收敛到五卡，删除四卡分支。门禁仍走 `pnpm run check:right-rail`，后续须覆盖 Artifacts 卡与跨卡所有权。 |
+
+### C. Independent Embedding Capability
+
+| | 裁决 |
+| --- | --- |
+| **当前态** | Discovery 对 embedding / embeddings 等非 agent modality fail-closed 剔除。不存在独立 Embedding catalog / execution / consent。Knowledge 尚无 semantic lane 实现。 |
+| **目标态** | Embedding 是**独立 capability**，不进入 Agent / Composer / subagent picker，也不并入 EffectiveCatalog 的 agent 可选集。路径：manifest `embeddings` → `EmbeddingCatalog` → `EmbeddingExecutionService`。使用独立 `embeddings` protocol / adapter。opaque credential 的 `operation=embed`。用户 consent **默认关**。semantic lane 在未配置、拒绝或构建失败时返回 `unavailable` / `stale` 并 fail-closed，其余 Knowledge lane 仍可工作，但不得宣称已做语义检索。索引绑定 identity / dimension / chunker / corpus hash；重建必须显式 rebuild。Discovery 的 agent modality 边界**不放松**。 |
+| **迁移门禁** | 禁止把 embedding 模型写进 Agent route、`isAgentToolExecutableModel` 或 Settings Agents 可选集。禁止静默上传 User / Project Knowledge。实现前不得把 `EmbeddingCatalog` 写成已存在模块。 |
+
+### D. Profile Handoff Durable State Machine
+
+| | 裁决 |
+| --- | --- |
+| **当前态** | `AgentHandoffDefinition`（`label` / `agent` / `prompt` / `send` / `showContinueOn` / `model`）只是 manifest 路由声明。`agent_handoff` 经 Conversation 应用控制权，但没有 durable 状态机、root 链上限或重启恢复合同。现有定义**不足以**表达目标语义。 |
+| **目标态** | 每个 handoff 实例是 session-owned durable 记录，状态为 `prepared` → `committed` → `consumed`，或任意未完成点进入 `cancelled`。必填字段：`handoffId` / `lifecycle` / `sourceTurnId` / `sourceRequestId` / `sourceAgentId` / `toAgentId` / `chainRoot` / `depth` / `prompt` / `label` / `declaredModel` / timestamps / `cancelReason`。`declaredModel` **字段必存在，值可为 `null`**。`prepared` 仅工具成功；`committed` 仅源 turn complete；`consumed` 仅目标消息 commit。`send:true` 在 committed 后自动续跑。每个用户 root 链最多 3 次 handoff。进程重启后未 consumed 的实例降级为手动继续，不自动续跑。Stop / Rewrite / branch / 手动切换 profile 取消未完成 handoff。审批不继承。同一 session 同时只允许一个活跃 handoff。非法 model fail-closed。模型优先级始终：**session `modelOverride` > 通过 `isAgentToolExecutableModel` 校验的 handoff `declaredModel` > target route**。空 `handoffs` 禁止；空 `agents` 仅自身。字段细则见详细目标设计。 |
+| **迁移门禁** | 实现必须新增 durable store（经 `StorageIo`），不得宣称「现有 `AgentHandoffDefinition` 已足够」。不得为旧无状态 handoff 增加永久双写。 |
+
+### E. Investigation Vertical Schema
+
+| | 裁决 |
+| --- | --- |
+| **当前态** | Session Artifact / Trace Artifact 是通用路径引用。不存在平台级 Investigation Graph，也没有字段级 `WorldState` / `EvidenceRecord` / `ClaimRecord` 等强 schema。 |
+| **目标态** | 混合 schema namespace `rdc.investigation.v1`，**只**存在于垂直 Session Artifact：`WorldState`、`EvidenceRecord`、`ClaimRecord`（Hypothesis 是 `claimKind`，Decision 内嵌）、`ExperimentRecord`、`ChallengeRecord`、`MissionCheckpoint`、`InvestigationArtifactManifest`。记录必有稳定 id（`claimId` / `experimentId` / `challengeId` / `artifactId`）；causal / counterfactual Claim 必须带可解引用 `experimentId`。系统不变量 `S-CTX-01` / `S-STATE-01` / `S-CLAIM-01` / `S-CAUSAL-01` / `S-KNOW-01` / `S-KNOW-02` / `S-RDC-01` 在该 schema 上做机器判定。认识论偏序 `unknown < inferred < derived < observed`；Confidence 与 Verification 分离。`ready` 必须结构化 `sourceRefs`（`{ artifactId, expectedHash }`）`>= 1`、各 `expectedHash` 与源当前 sha256 匹配、`contentHash` 等于 `contentRef` 正文字节 sha256、`kind` 经闭集 Registry 解析到 `recordType + schema` 且正文通过；旧版本标 `superseded`。compact / report / view 投影 Claim 必须带 `compactProvenance`，否则违反 `S-CLAIM-01`。`S-RDC-01`：mutate 必有 Experiment + exclusive world state + rollback / restored 验证，否则 `polluted` / `stale`。`S-CAUSAL-01`：causal / counterfactual Claim 必须引用**可解引用**的 `ExperimentRecord`，且该实验 `intervention.type != none`、`status ∈ {recorded, rolled_back}`、`rollback.executed === true`、`rollback.baselineRestored === true`、并存在 verify evidence（三者均须满足）。字段细则见详细目标设计。 |
+| **迁移门禁** | 禁止把上述字段写入 `TaskRecord` / `AgentProfile` / `ConversationMessage`。垂直记录只能引用 task id。禁止新建平台级 Graph Service。`pnpm run check:investigation-system` ratchet 已建立、目标债务未清零。 |
+
+### F. Concurrent Tools
+
+| | 裁决 |
+| --- | --- |
+| **当前态** | 工具 spec 已有 `isConcurrencySafe`，但执行缺省按不安全处理；不得假设现有 loop 已实现分组并发。 |
+| **目标态** | 并发缺省不安全：只有 `AgentTool.spec.isConcurrencySafe === true` 才安全，缺省 `false`。只并发**连续**安全组；unsafe 独占。`shell` / write / task mutation / RDX / MCP / ask / handoff / `output_register` 串行。`callIndex` 保持稳定顺序。dispatch 前原子扣减预算。abort 必须 `allSettled` join。部分失败不连坐同组其余已发出调用的结果记录，但不得继续开新组。offline subagent 必须 `requiresRdxLease=false`。 |
+| **迁移门禁** | 实现前不得把并发执行写成已完成能力。RDX lease / shader replace / replay 不得进入并发组。 |
+
+### G. Knowledge
+
+| | 裁决 |
+| --- | --- |
+| **当前态** | Knowledge Center 是 scoped Markdown 只读浏览。`KnowledgeBrowseService` 存在；五服务、七 lane、Candidate / Promote、ColdData import 均未实现。 |
+| **目标态** | 五个主进程服务：`KnowledgeQueryService` / `KnowledgeIndexService` / `KnowledgeCompileService` / `KnowledgeCandidateService` / `KnowledgeWriteService`。七 retrieval lane：Identity/Path、Scope/Metadata、Lexical、Structural、Semantic、Relation/Graph、Temporal/Version。持久写入仅 human review。ColdData Historical Debug Case 经 canonical case card normalization 进入 session staging / Draft，**绝不默认或自动进入 Candidate**；`fixed ≠ verified`。仅当用户显式点击 / 命令，或 Agent 在本轮得到明确用户意图后显式调用 `knowledge_candidate_create`，才创建 Session Candidate。持久 Promote 仍只能 human review。canonical 仍是 `~/.rdx/knowledge` 或 `<project-root>/.rdx/knowledge`。本机原数据不入仓库；CI 只用脱敏 fixture。 |
+| **迁移门禁** | 无自动抽取 / 自动 Candidate / 自动 Promote。`FullAccess` 不能绕过写入确认。旧 browse-only 路径在五服务落地后直接收敛，不保留第二套 resolver。`pnpm run check:knowledge-system` ratchet 已建立、目标债务未清零。 |
+
+### H. Legacy 清理目标
+
+实现目标拓扑时直接删除或改写，不得保留双轨：
+
+- Ask / Plan / Edit 作为目标顶层身份、user seed 写入、`AgentCategory` 把 Mission 标成 general executable。
+- 固定 Debugger harness stage、Classic Session Panel、`harnessTasks`、第二套 Hook（`AgentHooks` vs `HookEngine`）。
+- 把 RDX catalog 展开为模型工具、把 RDX 做成 MCP、向 `TaskRecord` 加 capture/evidence 字段。
+- 平台级 Investigation Graph、第二 TaskStore、Mailbox / Blackboard。
+- 交互式旧 Profile 导出选择面、把 `AgentHandoffDefinition` 当成 durable 状态、把 embedding 并入 agent catalog。
+- 目标三卡 Right Rail、把当前四卡写成最终契约、把未实现模块写成已完成。
+
 ## Right Rail Authority
 
-Right Rail has two target-specific surfaces. Selecting a Project renders only the project-scoped `Import .rdc` input surface and its imported capture list; it never reads session runtime state. Selecting a Session renders the fixed `Progress / Outputs / Context / Capture` inspector. Progress is a single canonical list (`RightPanelViewModel.progress: ProgressTask[]`) in creation order; completed items stay in place. The main-owned `RightRailProjectionService` still assembles `RightPanelViewModel` for an explicit `{ projectId, sessionId }`; renderer consumes that projection and does not rebuild session business state. Context is limited to concrete task resources proven by frozen Prompt segments or successful tool results; generic tool categories and configured-but-unused Skill/MCP entries are not resources. Capture is always visible in a session: it is either an honest `.rdc` empty state or the owner-session selection/open/preview surface. Runtime identifiers remain owner-scoped agent data. Outputs expose only user-facing output-file categories: an agent must explicitly publish a finished project file through `output_register`, which copies it into the owning run before projection; inputs and plans are rejected. Progress, Outputs, Context, and Capture always remain four separate, non-collapsible rounded cards with the same background, border, title treatment, padding, and spacing whether empty or populated. Empty content uses the quiet original wireframe illustration; populated content grows only its own card and uses internal hairlines between sibling rows. The dock remains available through compact desktop widths and becomes the shared overlay drawer only at or below `RIGHT_RAIL_DRAWER_BREAKPOINT` (920px), or when geometry cannot preserve the minimum work surface. Static enforcement: `pnpm run check:right-rail`.
+Right Rail 有两个按选择对象区分的表面。选中 Project 时**只**渲染项目级 `Import .rdc` 输入面与已导入 capture 列表，永不读取 session runtime。
+
+选中 Session 时：
+
+- **当前态（Wave 迁移事实）**：四张不可折叠圆角卡 `Progress / Outputs / Context / Capture`。这是现有实现与 `check:right-rail` 的当前合同，不是最终产品形态。
+- **目标态**：五张不可折叠圆角卡 `Progress / Artifacts / Outputs / Context / Capture`。Artifacts 只投影 main-owned Investigation Artifacts；Outputs 仍只接受 `output_register`；Capture 保留 scoped `.rdc` 选择、Replay Device、open / preview / refresh / copy / clear 与紧凑诊断。
+
+两条状态下，main-owned `RightRailProjectionService` 都为显式 `{ projectId, sessionId }` 组装 `RightPanelViewModel`；renderer 只消费投影，不从 action events、全局 capture、工作目录扫描或 tool catalog 重建 Progress / Artifacts / Outputs / Context / Capture。Progress 是单一规范列表（`RightPanelViewModel.progress: ProgressTask[]`），创建序，已完成项就地保留，并与 transcript `taskProjection` 同序同态。Context 只含被冻结 Prompt 段或成功 tool result 证明的具体任务资源。Capture 在 session 中始终可见：诚实空态或 owner-session 操作面。Outputs 拒绝 inputs 与 plan。卡外壳在 empty / populated 之间不变；空内容用安静线框插图，有内容只增高本卡并在兄弟行间使用内部 hairline。Dock 在紧凑桌面宽度仍可用，仅在 `RIGHT_RAIL_DRAWER_BREAKPOINT`（920px）及以下或无法保住最小工作面时变为共享 overlay drawer。静态门禁：`pnpm run check:right-rail`。落地五卡后该门禁必须改认五卡，不得同时断言三卡、四卡与五卡。
