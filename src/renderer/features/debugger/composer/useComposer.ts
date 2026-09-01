@@ -48,7 +48,7 @@ export function useComposer(options: {
 
   useEffect(() => {
     hydrateComposerAgentFromSession(currentSession);
-  }, [currentSession?.sessionId, currentSession?.agentId]);
+  }, [currentSession]);
   const agentDefinitions = useAppSettingsStore((state) => state.settings.agents.definitions);
   const userInvocableAgents = agentDefinitions.filter((agent) => agent.enabled && agent.userInvocable);
 
