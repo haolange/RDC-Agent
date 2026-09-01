@@ -20,6 +20,7 @@ import {
   INVESTIGATION_MISSIONS,
   INVESTIGATION_RECORD_TYPES,
   INVESTIGATION_SCHEMA_NAMESPACE,
+  REPORT_CANDIDATE_STATUSES,
   VERIFICATION_LEVELS,
   WORLD_STATE_KINDS,
   WORLD_STATE_VALIDITIES,
@@ -271,6 +272,14 @@ export const InvestigationReportSchema: ZodType<InvestigationReport> = z.object(
   claims: z.array(ClaimRecordShape),
   evidenceIds: z.array(nonEmpty),
   experimentIds: z.array(nonEmpty),
+  reportContract: z.object({
+    conclusion: nonEmpty,
+    evidence: nonEmpty,
+    verification: nonEmpty,
+    limitations: nonEmpty,
+    artifactIds: z.array(nonEmpty).min(1),
+    candidateStatus: z.enum(REPORT_CANDIDATE_STATUSES),
+  }).strict().optional(),
 }).strict();
 
 export const ArtifactSourceRefSchema: ZodType<ArtifactSourceRef> = z.object({

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('electron', () => ({
   app: {
@@ -16,15 +16,46 @@ vi.mock('../../sessions/RdxRuntimeContextRegistry', () => ({
   assertRdxContextLeaseOwnership: vi.fn(() => null),
 }));
 
-const { dispatchRuntimeHooks, prepareHandoff, computeNextChain, getActiveHandoff } = vi.hoisted(() => ({
-  dispatchRuntimeHooks: vi.fn(async () => true),
+const {
+  dispatchRuntimeHooks,
+  prepareHandoff,
+  computeNextChain,
+  getActiveHandoff,
+  listCheckpoints,
+  readCheckpoint,
+} = vi.hoisted(() => ({
+  dispatchRuntimeHooks: vi.fn<(
+    event: string,
+    context: { payload?: Record<string, unknown> },
+  ) => Promise<boolean>>(async () => true),
   prepareHandoff: vi.fn(() => ({ handoffId: 'handoff-1', send: true })),
   computeNextChain: vi.fn(() => ({ chainRoot: 'root', depth: 1 })),
   getActiveHandoff: vi.fn(() => null),
+  listCheckpoints: vi.fn<(
+    sessionId: string,
+    filter?: { kind?: string },
+  ) => Array<{
+    artifactId: string;
+    kind: string;
+    status: string;
+    recordKey: string;
+    createdAt: string;
+  }>>(() => []),
+  readCheckpoint: vi.fn<(
+    sessionId: string,
+    artifactId: string,
+  ) => { record: { checkpointId?: string }; manifest?: { mission?: string } }>(),
 }));
 
 vi.mock('../../hooks/runtimeHookDispatch', () => ({
   dispatchRuntimeHooks,
+}));
+
+vi.mock('../../investigation/InvestigationArtifactService', () => ({
+  investigationArtifactService: {
+    list: listCheckpoints,
+    readRecord: readCheckpoint,
+  },
 }));
 
 vi.mock('../../sessions/StorageAdapter', async (importOriginal) => {
@@ -68,6 +99,15 @@ function createAssembly(): RuntimeToolAssembly {
 }
 
 describe('RuntimeToolAssembly', () => {
+  beforeEach(() => {
+    dispatchRuntimeHooks.mockClear();
+    prepareHandoff.mockClear();
+    computeNextChain.mockReset().mockReturnValue({ chainRoot: 'root', depth: 1 });
+    getActiveHandoff.mockReset().mockReturnValue(null);
+    listCheckpoints.mockReset().mockReturnValue([]);
+    readCheckpoint.mockReset();
+  });
+
   it('createToolSignature sorts tool names', () => {
     const assembly = createAssembly();
     expect(assembly.createToolSignature([
@@ -167,11 +207,176 @@ describe('RuntimeToolAssembly', () => {
     expect(result.isError).not.toBe(true);
     expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
       'agent.before-handoff',
-      expect.objectContaining({ agentId: 'debugger', sessionId: 'session-a' }),
+      expect.objectContaining({
+        agentId: 'debugger',
+        sessionId: 'session-a',
+        payload: {
+          fromAgentId: 'debugger',
+          toAgentId: 'general',
+          label: 'Go',
+          prompt: 'continue',
+          depth: 1,
+          isBigLoop: false,
+        },
+      }),
     );
     expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
       'agent.after-handoff',
       expect.objectContaining({ agentId: 'debugger', sessionId: 'session-a' }),
     );
+  });
+
+  it('passes a dereferenceable MissionCheckpoint id on Big Loop handoff and omits fabricated fields', async () => {
+    computeNextChain.mockReturnValueOnce({ chainRoot: 'root', depth: 2 });
+    listCheckpoints.mockReturnValueOnce([{
+      artifactId: 'art-cp-1',
+      kind: 'checkpoint',
+      status: 'draft',
+      recordKey: 'cp-1',
+      createdAt: '2026-09-01T00:00:00.000Z',
+    }]);
+    readCheckpoint.mockReturnValueOnce({
+      record: { checkpointId: 'cp-1' },
+      manifest: { mission: 'debugger' },
+    });
+    const assembly = createAssembly();
+    const handle = new TurnHandle({ sessionKey: 'session-b', turnId: 'turn-b', runId: 'run-b', generation: 1 });
+    handle.eventSink = { sessionId: 'session-b', requestId: 'req-2' } as never;
+    handle.runtimePlan = {
+      projectRootPath: 'D:/project',
+      profileHandoffs: [{ agent: 'debugger', label: 'Replan', prompt: 'Replan the mission.' }],
+      enabledProfileIds: ['debugger', 'general'],
+    } as never;
+    const tool = assembly.createAgentHandoffTool('general', 'session-b', handle);
+    const result = await tool.execute('tc-replan', { agent: 'debugger', prompt: 'Replan the mission.', label: 'Replan' });
+    expect(result.isError).not.toBe(true);
+    expect(listCheckpoints).toHaveBeenCalledWith('session-b', { kind: 'checkpoint' });
+    expect(readCheckpoint).toHaveBeenCalledWith('session-b', 'art-cp-1');
+    expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
+      'agent.before-handoff',
+      expect.objectContaining({
+        agentId: 'general',
+        sessionId: 'session-b',
+        payload: {
+          fromAgentId: 'general',
+          toAgentId: 'debugger',
+          label: 'Replan',
+          prompt: 'Replan the mission.',
+          depth: 2,
+          isBigLoop: true,
+          checkpointId: 'cp-1',
+        },
+      }),
+    );
+    const beforeCall = dispatchRuntimeHooks.mock.calls.find((call) => call[0] === 'agent.before-handoff');
+    expect(beforeCall?.[1].payload).not.toHaveProperty('loop');
+    expect(beforeCall?.[1].payload).not.toHaveProperty('missionLoop');
+    expect(beforeCall?.[1].payload).not.toHaveProperty('reasonForReplan');
+  });
+
+  it('does not invent a checkpointId when no MissionCheckpoint is persisted', async () => {
+    computeNextChain.mockReturnValueOnce({ chainRoot: 'root', depth: 2 });
+    listCheckpoints.mockReturnValueOnce([]);
+    const assembly = createAssembly();
+    const handle = new TurnHandle({ sessionKey: 'session-c', turnId: 'turn-c', runId: 'run-c', generation: 1 });
+    handle.eventSink = { sessionId: 'session-c', requestId: 'req-3' } as never;
+    handle.runtimePlan = {
+      projectRootPath: 'D:/project',
+      profileHandoffs: [{ agent: 'debugger', label: 'Replan', prompt: 'Replan the mission.' }],
+      enabledProfileIds: ['debugger', 'general'],
+    } as never;
+    const tool = assembly.createAgentHandoffTool('general', 'session-c', handle);
+    await tool.execute('tc-missing', { agent: 'debugger', prompt: 'Replan the mission.', label: 'Replan' });
+    expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
+      'agent.before-handoff',
+      expect.objectContaining({
+        payload: {
+          fromAgentId: 'general',
+          toAgentId: 'debugger',
+          label: 'Replan',
+          prompt: 'Replan the mission.',
+          depth: 2,
+          isBigLoop: true,
+        },
+      }),
+    );
+    const beforeCall = dispatchRuntimeHooks.mock.calls.find((call) => call[0] === 'agent.before-handoff');
+    expect(beforeCall?.[1].payload).not.toHaveProperty('checkpointId');
+  });
+
+  it('filters MissionCheckpoint by target mission and ignores a newer Debugger checkpoint', async () => {
+    computeNextChain.mockReturnValueOnce({ chainRoot: 'root', depth: 2 });
+    listCheckpoints.mockReturnValueOnce([
+      {
+        artifactId: 'art-cp-debugger',
+        kind: 'checkpoint',
+        status: 'draft',
+        recordKey: 'cp-debugger',
+        createdAt: '2026-09-01T02:00:00.000Z',
+      },
+      {
+        artifactId: 'art-cp-analyzer',
+        kind: 'checkpoint',
+        status: 'draft',
+        recordKey: 'cp-analyzer',
+        createdAt: '2026-09-01T00:00:00.000Z',
+      },
+    ]);
+    readCheckpoint.mockImplementation((_sessionId, artifactId) => {
+      if (artifactId === 'art-cp-debugger') {
+        return { record: { checkpointId: 'cp-debugger' }, manifest: { mission: 'debugger' } };
+      }
+      return { record: { checkpointId: 'cp-analyzer' }, manifest: { mission: 'analyzer' } };
+    });
+    const assembly = createAssembly();
+    const handle = new TurnHandle({ sessionKey: 'session-d', turnId: 'turn-d', runId: 'run-d', generation: 1 });
+    handle.eventSink = { sessionId: 'session-d', requestId: 'req-4' } as never;
+    handle.runtimePlan = {
+      projectRootPath: 'D:/project',
+      profileHandoffs: [{ agent: 'analyzer', label: 'Replan', prompt: 'Replan architecture.' }],
+      enabledProfileIds: ['analyzer', 'general'],
+    } as never;
+    const tool = assembly.createAgentHandoffTool('general', 'session-d', handle);
+    const result = await tool.execute('tc-mixed', { agent: 'analyzer', prompt: 'Replan architecture.', label: 'Replan' });
+    expect(result.isError).not.toBe(true);
+    expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
+      'agent.before-handoff',
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          toAgentId: 'analyzer',
+          isBigLoop: true,
+          checkpointId: 'cp-analyzer',
+        }),
+      }),
+    );
+    const beforeCall = dispatchRuntimeHooks.mock.calls.find((call) => call[0] === 'agent.before-handoff');
+    expect(beforeCall?.[1].payload).not.toMatchObject({ checkpointId: 'cp-debugger' });
+  });
+
+  it('does not hand a Debugger checkpoint to Analyzer planning when no Analyzer checkpoint exists', async () => {
+    computeNextChain.mockReturnValueOnce({ chainRoot: 'root', depth: 2 });
+    listCheckpoints.mockReturnValueOnce([{
+      artifactId: 'art-cp-debugger-only',
+      kind: 'checkpoint',
+      status: 'draft',
+      recordKey: 'cp-debugger-only',
+      createdAt: '2026-09-01T03:00:00.000Z',
+    }]);
+    readCheckpoint.mockReturnValueOnce({
+      record: { checkpointId: 'cp-debugger-only' },
+      manifest: { mission: 'debugger' },
+    });
+    const assembly = createAssembly();
+    const handle = new TurnHandle({ sessionKey: 'session-e', turnId: 'turn-e', runId: 'run-e', generation: 1 });
+    handle.eventSink = { sessionId: 'session-e', requestId: 'req-5' } as never;
+    handle.runtimePlan = {
+      projectRootPath: 'D:/project',
+      profileHandoffs: [{ agent: 'analyzer', label: 'Replan', prompt: 'Replan architecture.' }],
+      enabledProfileIds: ['analyzer', 'general'],
+    } as never;
+    const tool = assembly.createAgentHandoffTool('general', 'session-e', handle);
+    await tool.execute('tc-no-analyzer-cp', { agent: 'analyzer', prompt: 'Replan architecture.', label: 'Replan' });
+    const beforeCall = dispatchRuntimeHooks.mock.calls.find((call) => call[0] === 'agent.before-handoff');
+    expect(beforeCall?.[1].payload).not.toHaveProperty('checkpointId');
   });
 });

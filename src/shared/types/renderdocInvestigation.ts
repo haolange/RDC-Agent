@@ -392,6 +392,18 @@ export interface MissionCheckpoint {
   unresolvedFrontier: string;
 }
 
+export const REPORT_CANDIDATE_STATUSES = ['none', 'session-created', 'not-requested'] as const;
+export type ReportCandidateStatus = (typeof REPORT_CANDIDATE_STATUSES)[number];
+
+export interface InvestigationReportContract {
+  conclusion: string;
+  evidence: string;
+  verification: string;
+  limitations: string;
+  artifactIds: string[];
+  candidateStatus: ReportCandidateStatus;
+}
+
 export interface InvestigationReport {
   title: string;
   mission: InvestigationMission;
@@ -399,6 +411,7 @@ export interface InvestigationReport {
   claims: ClaimRecord[];
   evidenceIds: string[];
   experimentIds: string[];
+  reportContract?: InvestigationReportContract;
 }
 
 export interface ArtifactSourceRef {
@@ -435,6 +448,23 @@ export type InvestigationRecord =
 
 export function isCausalOrCounterfactualClaim(claim: Pick<ClaimRecord, 'claimKind' | 'declaresCounterfactual'>): boolean {
   return claim.claimKind === 'causal_conclusion' || claim.declaresCounterfactual === true;
+}
+
+export const ANALYZER_EXPLANATION_LAYERS = ['observed', 'reconstructed', 'authoring'] as const;
+export type AnalyzerExplanationLayer = (typeof ANALYZER_EXPLANATION_LAYERS)[number];
+
+export const MISSION_PLANNING_AGENT_IDS = ['debugger', 'analyzer', 'optimizer'] as const;
+
+/** Observed / Reconstructed / Authoring. Non-architecture kinds return null. */
+export function analyzerExplanationLayer(claimKind: ClaimKind): AnalyzerExplanationLayer | null {
+  if (claimKind === 'observed_fact') return 'observed';
+  if (claimKind === 'derived_structure') return 'reconstructed';
+  if (claimKind === 'semantic_inference' || claimKind === 'hypothesis') return 'authoring';
+  return null;
+}
+
+export function isClosedExperimentStatus(status: ExperimentStatus): boolean {
+  return status === 'recorded' || status === 'rolled_back';
 }
 
 export function isWorldStateMutated(state: Pick<WorldState, 'shaderReplacement' | 'patchStack'>): boolean {

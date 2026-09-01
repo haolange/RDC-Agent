@@ -1,0 +1,35 @@
+{
+  "id": "optimizer-aba-sanitized",
+  "captureRef": "captures/fixture-timing.rdc",
+  "notes": "Deidentified Optimizer oracle. No host paths, original screenshots, or ColdData filenames. Local ColdData replay is a Wave 6 / manual step.",
+  "oracle": {
+    "closeLegal": {
+      "interventionType": "shader_replace",
+      "status": "recorded",
+      "executed": true,
+      "baselineRestored": true,
+      "verifyEvidenceIds": ["ev-verify"],
+      "protocol": "A-B-A"
+    },
+    "closeIllegal": [
+      {
+        "id": "mutate-without-rollback",
+        "interventionType": "shader_replace",
+        "status": "recorded",
+        "executed": false,
+        "baselineRestored": false,
+        "verifyEvidenceIds": [],
+        "reason": "mutate-without-rollback"
+      },
+      {
+        "id": "none-is-not-counterfactual",
+        "interventionType": "none",
+        "status": "recorded",
+        "executed": true,
+        "baselineRestored": true,
+        "verifyEvidenceIds": ["ev-verify"],
+        "reason": "none-is-not-counterfactual"
+      }
+    ]
+  }
+}

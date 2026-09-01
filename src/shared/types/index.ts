@@ -262,15 +262,21 @@ export type {
   InvestigationArtifactKind,
   InvestigationArtifactManifest,
   InvestigationReport,
+  InvestigationReportContract,
   MissionCheckpoint,
   WorldState,
 } from './renderdocInvestigation';
 export {
+  ANALYZER_EXPLANATION_LAYERS,
   EPISTEMIC_RANK,
   INVESTIGATION_ARTIFACT_KINDS,
   INVESTIGATION_KIND_REGISTRY,
   INVESTIGATION_SCHEMA_NAMESPACE,
+  MISSION_PLANNING_AGENT_IDS,
+  REPORT_CANDIDATE_STATUSES,
+  analyzerExplanationLayer,
   epistemicRank,
+  isClosedExperimentStatus,
   resolveInvestigationKind,
 } from './renderdocInvestigation';
 export {

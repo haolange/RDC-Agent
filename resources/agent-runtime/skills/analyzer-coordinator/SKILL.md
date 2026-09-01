@@ -5,13 +5,54 @@ description: Coordinate Analyzer planning so an unknown rendering system becomes
 
 # Analyzer Coordinator
 
-Plan first. The goal is to maximize explainability of the current rendering system.
+Plan first. The goal is to maximize explainability of the current rendering system. Do not invent a second runtime, TaskStore, or InvestigationGraph.
 
-1. State what must be explained and what evidence would make the explanation inspectable.
-2. Ask when the system boundary, capture, or expected audience is missing.
-3. Use only limited read, search, web, shell, interpreter, RDX context, tasks, memory, and questions.
-4. Separate observed structure from inferred behavior.
-5. Write a plan artifact, then hand off to General for execution.
-6. When the plan needs a method, cite an on-demand skill such as `$capture-facts`, `$pass-graph-analysis`, `$shader-ir-analysis`, `$resource-versioning`, `$cross-capture-alignment`, `$artifact-provenance`, or `$report-composition`. Do not preload them.
+## Planning
 
-Use `investigation_*` for session-owned `rdc.investigation.v1` records. Do not invent a second investigation schema. Report projections must not raise Claim rank (`S-CLAIM-01`). Do not write, edit, git-mutate, or manage files. Do not add unregistered tool tokens. Persistent Knowledge writes stay human-confirmed.
+1. State what must be explained, the capture or system boundary, and what evidence would make the explanation inspectable. Ask when any of those is missing.
+2. Use only limited read, search, web, shell, interpreter, RDX context, tasks, memory, and questions.
+3. Retrieve similar cases with `$knowledge-scout`. Persistent Knowledge writes stay human-confirmed. Do not create a Session Candidate unless the user asked.
+4. Separate Observed structure from Reconstructed topology and Authoring hypotheses. `claimKind` must not cross those layers.
+5. Write a versioned plan artifact that names: Capture Facts, Resource Versioning, Pass Reconstruction, Shader Fingerprint/Block, Traceability, Architecture Model comparison, Skeptic, and Report. Then durable-handoff to General (`send: true`).
+6. When the plan needs a method, cite an on-demand skill. Do not preload them:
+   `$capture-preflight`, `$capture-facts`, `$resource-versioning`, `$pass-graph-analysis`, `$shader-ir-analysis`, `$cross-capture-alignment`, `$analyzer-architecture-method`, `$artifact-provenance`, `$renderdoc-execution`, `$rdx-cli-shell`, `$skeptic-review`, `$report-composition`.
+
+Use `investigation_*` for session-owned `rdc.investigation.v1` Evidence / Claim / Experiment / Challenge / Checkpoint. Report and compact projections must not raise Claim rank (`S-CLAIM-01`).
+
+## Durable Handoff
+
+Handoff is the existing `ProfileHandoffState` machine (`prepared` → `committed` → `consumed`). `send: true` auto-continues after commit. Each user root chain allows at most 3 handoffs. A process restart does not auto-fire an unconsumed handoff. Stop / Rewrite / branch / manual switch cancels the active handoff. Approvals do not inherit. Do not treat `AgentHandoffDefinition` as the durable record.
+
+## Execution (General owns the tools)
+
+After handoff, General expands the plan into a Task graph and collects evidence through the Settings-configured RDX CLI. Execute in order: Capture Facts → Resource Versioning → Pass Reconstruction → Shader Fingerprint/Block → Traceability → incremental Architecture Model. Record shapes live in `$analyzer-architecture-method` and the cited method skills. Do not write those fields into Tasks, Profiles, or Messages. Tasks may only store a subject and a `taskRef` back from Evidence.
+
+## Small Loop
+
+Trigger: missing evidence, a live alternative, a confound, scope growth, or an Unknown Frontier that can be closed without replanning. Do not replan the Mission.
+
+1. Execution writes candidate Claims on their correct layers.
+2. Open an independent context and load `$skeptic-review`. Skeptic writes `ChallengeRecord`s; it does not rewrite the Generator narrative.
+3. For each `open` Challenge, General creates one follow-up Task with `task_create`. Subject quotes `challengeId` and `requiredFollowUp`. Do not add domain fields to `TaskRecord`.
+4. After the follow-up, update the Iteration Memory Artifact: a `claim_set` titled Iteration Memory whose items are the current accepted / active / rejected Claims, `sourceRefs` pointing at Evidence and Challenge artifacts, and a summary that names blockers, resolved `challengeId`s, and the delta. Supersede the previous Iteration Memory artifact.
+5. Retry only the follow-up path.
+
+Iteration Memory is a Session Artifact. `memory_write` still requires explicit user intent or approval.
+
+## Big Loop
+
+Trigger: collapsed structural assumption, missing capability, verifier repeating the same structural gap, changed user goal, or context nearly exhausted while the plan has drifted.
+
+1. Write a `MissionCheckpoint` (`kind: checkpoint`). Every listed `claimId` / `experimentId` / `challengeId` / `artifactId` / `currentWorldStateId` must resolve.
+2. Handoff back to Analyzer with `checkpointId` in the prompt (and payload when the tool allows). Consume one durable-handoff depth.
+3. Analyzer re-retrieves Knowledge, writes a new plan version, and hands off to General again.
+
+If the chain would exceed depth 3, stop and ask the user. After restart, wait for a manual continue.
+
+## Delegation Capsule
+
+When delegating a subagent, compile a capsule in the handoff / task prompt. This is not a new platform file type. Include: identity, Mission, Task, reason, accepted facts, competing hypotheses, related Challenges, current World State, input artifact ids, relevant Knowledge refs, falsified paths, experiments not to retry, output requirements, and recoverable Evidence refs (`artifactId` + hash). Offline subagents must set `requiresRdxLease: false`.
+
+## Bounds
+
+Do not write, edit, git-mutate, or manage files. Do not add unregistered tool tokens. Do not weaken `S-CLAIM-01` / `S-CAUSAL-01` / `S-RDC-01` / `ANALYZER-LAYER`. Embedding models stay out of the Agent picker. RDX runs only through the Settings-configured CLI. Debugger and Optimizer vertical slices are not this skill.

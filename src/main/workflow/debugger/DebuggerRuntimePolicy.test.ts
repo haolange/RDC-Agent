@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+import YAML from 'yaml';
 import { describe, expect, it } from 'vitest';
 import {
   combineActiveSkillAllowlists,
@@ -8,6 +11,33 @@ import {
   resolveAgentToolAllowlistFromDefinition,
 } from './DebuggerRuntimePolicy';
 import { CANONICAL_TOOL_TOKEN_EXPANSIONS, REJECTED_TOOL_TOKENS } from '@shared/constants/agentToolTokens';
+
+const DEBUGGER_LOOP_SKILLS = [
+  'renderdoc-execution',
+  'debugger-causal-method',
+  'skeptic-review',
+  'capture-facts',
+  'pixel-forensics',
+  'report-composition',
+  'capture-preflight',
+  'rdx-cli-shell',
+  'artifact-provenance',
+  'pass-graph-analysis',
+  'shader-ir-analysis',
+  'resource-versioning',
+  'cross-capture-alignment',
+  'optimization-experiment',
+] as const;
+
+function readSkillAllowedTools(skillId: string): string[] {
+  const sourcePath = path.resolve(__dirname, '../../../../resources/agent-runtime/skills', skillId, 'SKILL.md');
+  const raw = fs.readFileSync(sourcePath, 'utf8').replace(/^\uFEFF/u, '');
+  const match = /^---\r?\n([\s\S]*?)\r?\n---/u.exec(raw);
+  const frontmatter = match ? YAML.parse(match[1]) as Record<string, unknown> : {};
+  return Array.isArray(frontmatter['allowed-tools'])
+    ? frontmatter['allowed-tools'].filter((entry): entry is string => typeof entry === 'string')
+    : [];
+}
 
 describe('DebuggerRuntimePolicy tool tokens', () => {
   it('expands knowledge token to the five deferred Knowledge tools', () => {
@@ -106,5 +136,33 @@ describe('combineActiveSkillAllowlists', () => {
     ]);
     expect(combined).toContain('read_file');
     expect(combined).not.toContain('grep');
+  });
+
+  it('keeps Debugger closed-loop tools when method skills are armed together', () => {
+    const runtime = [
+      'shell',
+      'task_create',
+      'task_update',
+      'task_get',
+      'task_list',
+      'subagent',
+      'investigation_read',
+      'investigation_write',
+      'investigation_list',
+      'artifact_read',
+      'rdx_context',
+      'read_file',
+      'read_image',
+      'ask_user',
+      'knowledge_browse',
+      'knowledge_search',
+      'knowledge_read',
+      'skill_read',
+      'tool_search',
+    ];
+    const skillLists = DEBUGGER_LOOP_SKILLS.map((skillId) => readSkillAllowedTools(skillId));
+    expect(skillLists.every((list) => list.length > 0)).toBe(true);
+    const combined = combineActiveSkillAllowlists(runtime, skillLists);
+    expect(combined).toEqual(expect.arrayContaining(['subagent', 'task_create', 'shell']));
   });
 });

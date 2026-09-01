@@ -1,16 +1,37 @@
 import {
+  analyzerExplanationLayer,
   epistemicRank,
   isCausalOrCounterfactualClaim,
+  isClosedExperimentStatus,
   isWorldStateMutated,
+  type AnalyzerExplanationLayer,
   type ChallengeRecord,
   type ClaimRecord,
   type CompactProvenanceEntry,
   type EvidenceRecord,
   type ExperimentRecord,
+  type InvestigationMission,
   type InvestigationReport,
   type WorldState,
 } from '@shared/types/renderdocInvestigation';
 import { InvestigationError } from './investigationErrors';
+
+const ANALYZER_LAYER_RANK: Record<AnalyzerExplanationLayer, number> = {
+  authoring: 0,
+  reconstructed: 1,
+  observed: 2,
+};
+
+export function isOptimizerExperimentRecord(
+  experiment: ExperimentRecord,
+  mission?: InvestigationMission,
+): boolean {
+  if (mission === 'optimizer') return true;
+  if (experiment.actionClass != null) return true;
+  if (experiment.protocol.kind === 'ABABAB') return true;
+  if (experiment.visualValidation != null) return true;
+  return false;
+}
 
 export type InvestigationLookup = {
   getWorldState(worldStateId: string): WorldState | null;
@@ -129,10 +150,136 @@ export function worldStateMarksEvidenceStale(
   return verdict.staleEvidence || worldState.validity === 'polluted' || worldState.validity === 'stale';
 }
 
+export function assertAnalyzerClaimLayer(claim: ClaimRecord, lookup?: InvestigationLookup): void {
+  const layer = analyzerExplanationLayer(claim.claimKind);
+  if (!layer) return;
+  const crossed = layer === 'observed'
+    ? claim.epistemic !== 'observed' || claim.verification !== 'observed'
+    : layer === 'reconstructed'
+      ? claim.epistemic !== 'derived' || claim.verification !== 'reconstructed'
+      : claim.epistemic === 'observed' || claim.epistemic === 'derived' || claim.verification === 'observed';
+  if (crossed) {
+    throw new InvestigationError(
+      'INVESTIGATION_INVARIANT_VIOLATION',
+      `Analyzer claimKind ${claim.claimKind} must stay on the ${layer} layer`,
+      {
+        invariantId: 'ANALYZER-LAYER',
+        details: {
+          claimKind: claim.claimKind,
+          epistemic: claim.epistemic,
+          verification: claim.verification,
+          layer,
+          projectionKind: claim.projectionKind,
+        },
+      },
+    );
+  }
+  const provenance = claim.compactProvenance;
+  if (!lookup || !provenance || provenance.length === 0) return;
+  let minSourceRank = Number.POSITIVE_INFINITY;
+  for (const entry of provenance) {
+    const source = lookup.getClaim(entry.sourceClaimId);
+    if (!source) continue;
+    const sourceLayer = analyzerExplanationLayer(source.claimKind);
+    if (!sourceLayer) continue;
+    minSourceRank = Math.min(minSourceRank, ANALYZER_LAYER_RANK[sourceLayer]);
+  }
+  if (Number.isFinite(minSourceRank) && ANALYZER_LAYER_RANK[layer] > minSourceRank) {
+    throw new InvestigationError(
+      'INVESTIGATION_INVARIANT_VIOLATION',
+      `Analyzer projection must not raise claimKind layer above source (${layer})`,
+      {
+        invariantId: 'ANALYZER-LAYER',
+        details: {
+          claimKind: claim.claimKind,
+          layer,
+          maxLegalRank: minSourceRank,
+          projectionKind: claim.projectionKind,
+        },
+      },
+    );
+  }
+}
+
+export function assertOptimizerExperimentClose(
+  experiment: ExperimentRecord,
+  mission?: InvestigationMission,
+): void {
+  if (!isClosedExperimentStatus(experiment.status)) return;
+  if (experiment.intervention.type === 'none') {
+    throw new InvestigationError(
+      'INVESTIGATION_INVARIANT_VIOLATION',
+      'intervention.type == none cannot close a recorded or rolled_back experiment',
+      { invariantId: 'S-CAUSAL-01', details: { experimentId: experiment.experimentId } },
+    );
+  }
+  const rollback = experiment.rollback;
+  if (rollback.executed !== true || rollback.baselineRestored !== true || rollback.verifyEvidenceIds.length < 1) {
+    throw new InvestigationError(
+      'INVESTIGATION_INVARIANT_VIOLATION',
+      'recorded or rolled_back experiment cannot close without rollback verify',
+      {
+        invariantId: 'S-RDC-01',
+        details: { experimentId: experiment.experimentId, status: experiment.status, mission },
+      },
+    );
+  }
+}
+
+export function assertReportContractPresent(
+  report: InvestigationReport,
+  lookup: InvestigationLookup,
+  options?: { mission?: InvestigationMission },
+): void {
+  const contract = report.reportContract;
+  if (!contract) {
+    throw new InvestigationError(
+      'INVESTIGATION_INVARIANT_VIOLATION',
+      'ready Analyzer/Optimizer report requires reportContract',
+      { invariantId: 'S-CLAIM-01' },
+    );
+  }
+  const missing = [
+    contract.conclusion,
+    contract.evidence,
+    contract.verification,
+    contract.limitations,
+    contract.candidateStatus,
+  ].some((value) => typeof value !== 'string' || value.trim().length < 1);
+  if (missing || !Array.isArray(contract.artifactIds) || contract.artifactIds.length < 1) {
+    throw new InvestigationError(
+      'INVESTIGATION_INVARIANT_VIOLATION',
+      'reportContract requires conclusion, evidence, verification, limitations, artifactIds, and candidateStatus',
+      { invariantId: 'S-CLAIM-01' },
+    );
+  }
+  if (report.claims.length < 1) {
+    throw new InvestigationError(
+      'INVESTIGATION_INVARIANT_VIOLATION',
+      'ready report requires projected conclusion claims that satisfy S-CLAIM-01',
+      { invariantId: 'S-CLAIM-01' },
+    );
+  }
+  for (const artifactId of contract.artifactIds) {
+    if (typeof artifactId !== 'string' || artifactId.trim().length < 1 || !lookup.getArtifact?.(artifactId)) {
+      throw new InvestigationError(
+        'INVESTIGATION_REF_UNRESOLVED',
+        `reportContract artifact ${artifactId} is not resolvable`,
+        { invariantId: 'S-CLAIM-01', details: { artifactId } },
+      );
+    }
+  }
+  const mission = options?.mission ?? report.mission;
+  for (const claim of report.claims) {
+    assertSClaim01(claim, lookup, { treatAsProjected: true });
+    if (mission === 'analyzer') assertAnalyzerClaimLayer(claim, lookup);
+  }
+}
+
 export function assertClaimRecordRefs(
   claim: ClaimRecord,
   lookup: InvestigationLookup,
-  options?: { treatAsProjected?: boolean },
+  options?: { treatAsProjected?: boolean; mission?: InvestigationMission },
 ): void {
   if (!lookup.getWorldState(claim.worldStateId)) {
     throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', `worldState ${claim.worldStateId}`);
@@ -147,21 +294,38 @@ export function assertClaimRecordRefs(
   }
   assertSClaim01(claim, lookup, options);
   if (isCausalOrCounterfactualClaim(claim)) assertSCausal01(claim, lookup);
+  if (options?.mission === 'analyzer') assertAnalyzerClaimLayer(claim, lookup);
 }
 
-export function assertReportRecordRefs(report: InvestigationReport, lookup: InvestigationLookup): void {
+export function assertReportRecordRefs(
+  report: InvestigationReport,
+  lookup: InvestigationLookup,
+  options?: { mission?: InvestigationMission },
+): void {
+  const mission = options?.mission ?? report.mission;
   for (const evidenceId of report.evidenceIds) {
     if (!lookup.getEvidence(evidenceId)) {
       throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', `report evidence ${evidenceId}`);
     }
   }
   for (const experimentId of report.experimentIds) {
-    if (!lookup.getExperiment(experimentId)) {
+    const experiment = lookup.getExperiment(experimentId);
+    if (!experiment) {
       throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', `report experiment ${experimentId}`);
+    }
+    if (mission === 'optimizer' || isOptimizerExperimentRecord(experiment, mission)) {
+      if (!isClosedExperimentStatus(experiment.status)) {
+        throw new InvestigationError(
+          'INVESTIGATION_INVARIANT_VIOLATION',
+          `Optimizer report cannot cite experiment ${experimentId} that is not recorded or rolled_back`,
+          { invariantId: 'S-RDC-01', details: { experimentId, status: experiment.status } },
+        );
+      }
+      assertOptimizerExperimentClose(experiment, mission);
     }
   }
   for (const claim of report.claims) {
-    assertClaimRecordRefs(claim, lookup, { treatAsProjected: true });
+    assertClaimRecordRefs(claim, lookup, { treatAsProjected: true, mission });
   }
 }
 

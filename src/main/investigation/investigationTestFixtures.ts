@@ -4,11 +4,15 @@ import path from 'node:path';
 import {
   INVESTIGATION_SCHEMA_NAMESPACE,
   type ArtifactSourceRef,
+  type ChallengeRecord,
   type ClaimRecord,
   type EvidenceRecord,
   type ExperimentRecord,
   type InvestigationArtifactKind,
+  type InvestigationMission,
   type InvestigationReport,
+  type InvestigationReportContract,
+  type MissionCheckpoint,
   type WorldState,
 } from '@shared/types/renderdocInvestigation';
 import { formatSessionArtifactUri } from '@shared/types/sessionArtifact';
@@ -78,6 +82,17 @@ export function hypothesisClaim(worldStateId: string, claimId = 'claim-hyp'): Cl
   };
 }
 
+export function derivedStructureClaim(worldStateId: string, claimId = 'claim-derived'): ClaimRecord {
+  return {
+    ...hypothesisClaim(worldStateId, claimId),
+    claimKind: 'derived_structure',
+    statement: 'Pass P0 consumes RT0 written by event E2.',
+    epistemic: 'derived',
+    confidence: 'strong',
+    verification: 'reconstructed',
+  };
+}
+
 export function observedClaim(worldStateId: string, claimId = 'claim-obs'): ClaimRecord {
   return {
     ...hypothesisClaim(worldStateId, claimId),
@@ -121,6 +136,9 @@ export function recordedExperiment(input: {
   status?: ExperimentRecord['status'];
   executed?: boolean;
   baselineRestored?: boolean;
+  actionClass?: ExperimentRecord['actionClass'];
+  visualValidation?: ExperimentRecord['visualValidation'];
+  protocolKind?: ExperimentRecord['protocol']['kind'];
 }): ExperimentRecord {
   return {
     experimentId: input.experimentId ?? 'exp-1',
@@ -132,7 +150,7 @@ export function recordedExperiment(input: {
     controlledVariables: ['resolution', 'vsync'],
     changedVariables: ['pixel-shader'],
     metrics: [{ name: 'present-delta', kind: 'visual' }],
-    protocol: { kind: 'A-B-A', warmup: 3, noiseThreshold: 0.02 },
+    protocol: { kind: input.protocolKind ?? 'A-B-A', warmup: 3, noiseThreshold: 0.02 },
     result: { summary: 'delta confirmed', accepted: true },
     rollback: {
       executed: input.executed ?? true,
@@ -140,6 +158,64 @@ export function recordedExperiment(input: {
       verifyEvidenceIds: input.verifyEvidenceIds,
     },
     status: input.status ?? 'recorded',
+    ...(input.visualValidation ? { visualValidation: input.visualValidation } : {}),
+    ...(input.actionClass ? { actionClass: input.actionClass } : {}),
+  };
+}
+
+export function sampleChallenge(input: {
+  challengeId?: string;
+  targetType?: ChallengeRecord['targetRef']['type'];
+  targetId: string;
+  challengeKind?: ChallengeRecord['challengeKind'];
+  requiredFollowUp?: string;
+  status?: ChallengeRecord['status'];
+  resolutionClaimId?: string;
+}): ChallengeRecord {
+  return {
+    challengeId: input.challengeId ?? 'ch-1',
+    targetRef: { type: input.targetType ?? 'claim', id: input.targetId },
+    challengeKind: input.challengeKind ?? 'missing_evidence',
+    statement: 'The claim needs a distinguishing follow-up.',
+    requiredFollowUp: input.requiredFollowUp ?? 'Collect the first diverging event color.',
+    status: input.status ?? 'open',
+    resolutionClaimId: input.resolutionClaimId,
+  };
+}
+
+export function sampleCheckpoint(input: {
+  checkpointId?: string;
+  established?: string[];
+  rejected?: string[];
+  completedExperiments?: string[];
+  openChallenges?: string[];
+  currentWorldStateId: string;
+  criticalArtifactRefs?: string[];
+  reasonForReplan?: string;
+}): MissionCheckpoint {
+  return {
+    checkpointId: input.checkpointId ?? 'cp-1',
+    goal: 'Locate the first bad event and a qualifying counterfactual.',
+    planVersion: 'plan-v2',
+    established: input.established ?? [],
+    rejected: input.rejected ?? [],
+    completedExperiments: input.completedExperiments ?? [],
+    openChallenges: input.openChallenges ?? [],
+    reasonForReplan: input.reasonForReplan,
+    currentWorldStateId: input.currentWorldStateId,
+    criticalArtifactRefs: input.criticalArtifactRefs ?? [],
+    unresolvedFrontier: 'Need a distinguishing experiment.',
+  };
+}
+
+export function sampleReportContract(artifactIds: string[]): InvestigationReportContract {
+  return {
+    conclusion: 'Projected conclusion with explicit limitations.',
+    evidence: 'Linked evidence artifacts are dereferenceable.',
+    verification: 'Compact provenance is closed and not upgraded.',
+    limitations: 'Fixture report; no runtime counterfactual beyond cited experiments.',
+    artifactIds,
+    candidateStatus: 'none',
   };
 }
 
@@ -147,14 +223,17 @@ export function sampleReport(input: {
   claims: ClaimRecord[];
   evidenceIds?: string[];
   experimentIds?: string[];
+  mission?: InvestigationMission;
+  reportContract?: InvestigationReportContract;
 }): InvestigationReport {
   return {
     title: 'Investigation report',
-    mission: 'debugger',
+    mission: input.mission ?? 'debugger',
     summary: 'Projected report',
     claims: input.claims,
     evidenceIds: input.evidenceIds ?? [],
     experimentIds: input.experimentIds ?? [],
+    reportContract: input.reportContract,
   };
 }
 
@@ -170,11 +249,12 @@ export function writeDraft(
     supersedes: string;
     sourceRefs: ArtifactSourceRef[];
     status: 'draft' | 'ready';
+    mission: 'debugger' | 'analyzer' | 'optimizer';
   }> = {},
 ) {
   return service.writeRecord(SESSION_ID, {
     kind,
-    mission: 'debugger',
+    mission: extras.mission ?? 'debugger',
     title: extras.title ?? kind,
     summary: extras.summary ?? kind,
     record,

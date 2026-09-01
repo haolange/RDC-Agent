@@ -1,0 +1,56 @@
+{
+  "id": "analyzer-architecture-sanitized",
+  "captureRef": "captures/fixture-pass-graph.rdc",
+  "notes": "Deidentified Analyzer oracle. No host paths, original screenshots, or ColdData filenames.",
+  "oracle": {
+    "legal": [
+      {
+        "id": "obs-draw",
+        "claimKind": "observed_fact",
+        "epistemic": "observed",
+        "verification": "observed",
+        "layer": "observed",
+        "statement": "Event E12 is a draw that writes RT0."
+      },
+      {
+        "id": "rec-pass",
+        "claimKind": "derived_structure",
+        "epistemic": "derived",
+        "verification": "reconstructed",
+        "layer": "reconstructed",
+        "statement": "Pass P0 is the producer of resource RT0@v2."
+      },
+      {
+        "id": "auth-engine",
+        "claimKind": "semantic_inference",
+        "epistemic": "inferred",
+        "verification": "reconstructed",
+        "layer": "authoring",
+        "statement": "The pass order resembles a deferred lighting graph."
+      }
+    ],
+    "illegal": [
+      {
+        "id": "authoring-as-observed",
+        "claimKind": "observed_fact",
+        "epistemic": "inferred",
+        "verification": "reconstructed",
+        "reason": "authoring-as-observed"
+      },
+      {
+        "id": "authoring-as-reconstructed",
+        "claimKind": "derived_structure",
+        "epistemic": "inferred",
+        "verification": "reconstructed",
+        "reason": "authoring-as-reconstructed"
+      },
+      {
+        "id": "authoring-upgraded",
+        "claimKind": "semantic_inference",
+        "epistemic": "observed",
+        "verification": "observed",
+        "reason": "authoring-upgraded-to-observed"
+      }
+    ]
+  }
+}

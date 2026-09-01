@@ -102,9 +102,82 @@ describe('HookEngine', () => {
 
     const handoff = await engine.test('mission-plan-handoff-check', {
       event: 'agent.before-handoff',
-      payload: { toAgentId: 'general', prompt: 'Execute the approved plan.' },
+      agentId: 'debugger',
+      sessionId: 'session-a',
+      payload: {
+        fromAgentId: 'debugger',
+        toAgentId: 'general',
+        label: 'Execute with General',
+        prompt: 'Execute the approved plan.',
+        depth: 1,
+        isBigLoop: false,
+      },
     });
     expect(handoff).toMatchObject({ status: 'completed', allowed: true });
+
+    const initialMission = await engine.test('mission-plan-handoff-check', {
+      event: 'agent.before-handoff',
+      agentId: 'general',
+      sessionId: 'session-a',
+      payload: {
+        fromAgentId: 'general',
+        toAgentId: 'debugger',
+        label: 'Debug with Debugger',
+        prompt: 'Investigate the current failure.',
+        depth: 1,
+        isBigLoop: false,
+      },
+    });
+    expect(initialMission).toMatchObject({ status: 'completed', allowed: true });
+
+    const bigLoopMissing = await engine.test('mission-plan-handoff-check', {
+      event: 'agent.before-handoff',
+      agentId: 'general',
+      sessionId: 'session-a',
+      payload: {
+        fromAgentId: 'general',
+        toAgentId: 'debugger',
+        label: 'Replan with Debugger',
+        prompt: 'Replan the mission.',
+        depth: 2,
+        isBigLoop: true,
+      },
+    });
+    expect(bigLoopMissing.status).toBe('failed');
+    expect(bigLoopMissing.allowed).toBe(false);
+
+    const bigLoopOk = await engine.test('mission-plan-handoff-check', {
+      event: 'agent.before-handoff',
+      agentId: 'general',
+      sessionId: 'session-a',
+      payload: {
+        fromAgentId: 'general',
+        toAgentId: 'debugger',
+        label: 'Replan with Debugger',
+        prompt: 'Replan from the persisted MissionCheckpoint.',
+        depth: 2,
+        isBigLoop: true,
+        checkpointId: 'cp-1',
+      },
+    });
+    expect(bigLoopOk).toMatchObject({ status: 'completed', allowed: true });
+
+    const chainLimit = await engine.test('mission-plan-handoff-check', {
+      event: 'agent.before-handoff',
+      agentId: 'general',
+      sessionId: 'session-a',
+      payload: {
+        fromAgentId: 'general',
+        toAgentId: 'debugger',
+        label: 'Replan with Debugger',
+        prompt: 'Replan from the persisted MissionCheckpoint.',
+        depth: 4,
+        isBigLoop: true,
+        checkpointId: 'cp-1',
+      },
+    });
+    expect(chainLimit.status).toBe('failed');
+    expect(chainLimit.allowed).toBe(false);
 
     const readyDenied = await engine.test('artifact-integrity', {
       event: 'tool.before-call',

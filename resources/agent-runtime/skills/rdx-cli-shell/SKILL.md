@@ -1,7 +1,7 @@
 ---
 name: rdx-cli-shell
 description: Invoke RenderDoc or RDX only through the Settings-configured CLI shell action.
-allowed-tools: [shell, rdx_context]
+allowed-tools: [shell, rdx_context, task_create, subagent]
 ---
 
 # RDX CLI Shell
