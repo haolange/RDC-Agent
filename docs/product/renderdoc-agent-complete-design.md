@@ -2,7 +2,7 @@
 
 > **文档地位**：本文件是受根目录 [`DESIGN.md`](../../DESIGN.md) 裁决的详细目标设计，**不是第二产品权威**。若与 `DESIGN.md` / `AGENTS.md` 冲突，以 `DESIGN.md` 为准并回改本文。
 >
-> **实现状态**：文中模块、schema、服务以目标态叙述。Wave 3 已落地 Knowledge 五服务、七 lane、五个 deferred 工具与 Knowledge Center 三列 UI。Investigation schema 与五卡 Right Rail 仍未完成。`check:knowledge-system` browse-only channel 债务已清零；`check:investigation-system` ratchet 目标债务未清零。
+> **实现状态**：文中模块、schema、服务以目标态叙述。Wave 3 已落地 Knowledge 五服务、七 lane、五个 deferred 工具与 Knowledge Center 三列 UI。Wave 4 schema 已落地 `rdc.investigation.v1`、`InvestigationArtifactService` 与三个 deferred Investigation 工具；13 个垂直方法 Skill 与 4 个 builtin Hook 模板已落地。Session rail 五卡 `Progress / Artifacts / Outputs / Context / Capture` 已落地。三 Mission 纵切尚未落地。`check:knowledge-system` browse-only channel 债务已清零；`check:investigation-system` 已清零 schema/service/contract/五卡债务，其余只减不增。
 >
 > **读者**：实现后续 Wave 的 Codex / Agent。路径相对本仓库。中文为主，产品术语保留英文。
 
@@ -96,11 +96,10 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 ### 3.2 Right Rail
 
 - Project rail **仅** `Import .rdc` + 已导入列表，不读 session runtime。此合同当前已成立，目标不变。
-- Session **当前态（Wave 迁移事实）**：四卡 `Progress / Outputs / Context / Capture`。
-- Session **目标态**：五卡 `Progress / Artifacts / Outputs / Context / Capture`。
+- Session rail 只有五卡 `Progress / Artifacts / Outputs / Context / Capture`。
 - Artifacts = main-owned Investigation Artifact 投影，不是工作目录扫描，也不是 `output_register`。
 - Outputs 只认 `output_register`。Capture 保留 scoped `.rdc`、Replay Device 与现有所有权。
-- 禁止同时维持目标三卡 / 当前四卡 / 目标五卡三套文案。落地后直接收敛到五卡。
+- 只保留五卡一套文案，禁止再把三卡或四卡写成现行合同。
 
 ### 3.3 Embedding（独立 capability，目标态 / 迁移中）
 
@@ -116,7 +115,7 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 
 ### 3.6 Knowledge 与 Investigation 门禁
 
-门禁脚本：`pnpm run check:knowledge-system`、`pnpm run check:investigation-system`。**ratchet 已建立、目标债务未清零**。禁止用空壳测试、skip/todo 或只加类名绕过；债务只减不增，Wave 6 清零。
+门禁脚本：`pnpm run check:knowledge-system`、`pnpm run check:investigation-system`。**ratchet 已建立**；Investigation schema / Service / contract suite / 五卡已清零，三 Mission 纵切仍属后续 Wave。禁止用空壳测试、skip/todo 或只加类名绕过；债务只减不增，Wave 6 清零。
 
 ---
 
@@ -392,7 +391,7 @@ Right Rail **目标** Artifacts 卡只投影 main-owned 本清单及其记录，
 | `S-KNOW-02` | 冲突不可静默覆盖；必须保留 `contradicts` 或显式 `supersedes` 原因 |
 | `S-RDC-01` | mutate 必有 Experiment + exclusive World State + rollback / restored 验证；否则 World State `polluted`，相关 Evidence `stale` |
 
-`check:investigation-system` ratchet 已建立、目标债务未清零，应覆盖字段完整性（含 `claimId` / `experimentId` / `challengeId` / `artifactId`）、`ready` 三条件、偏序不可升级、精确 `S-CAUSAL-01`、引用可解、非侵入。未来 contract suite 一旦存在即硬执行。
+`check:investigation-system` ratchet 已建立；schema + `InvestigationArtifactService` + 三个 deferred 工具 + `investigationSystemContract.test.ts` 已落地并硬执行。应覆盖字段完整性（含 `claimId` / `experimentId` / `challengeId` / `artifactId`）、`ready` 三条件、偏序不可升级、精确 `S-CAUSAL-01`、引用可解、非侵入。13 Skill / 4 Hook 与 Session rail 五卡已落地。三 Mission 纵切尚未落地。禁止 skip/todo/无断言空壳。
 
 ---
 
@@ -678,7 +677,7 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 ColdDat
 - 交互式旧 Profile 导出选择面。
 - 宣称现有 `AgentHandoffDefinition` 已足够。
 - Embedding 进入 Agent / Composer / subagent picker。
-- 目标三卡 Right Rail；把当前四卡写成最终契约。
+- 把三卡或四卡 Right Rail 写成现行契约。
 - 把 `EmbeddingCatalog`、Knowledge 五服务、垂直 schema、并发组、durable handoff 写成已完成模块。
 - 用空壳测试、skip/todo 或只加类名绕过已建立的 `check:knowledge-system` / `check:investigation-system` ratchet。
 
@@ -686,4 +685,4 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 ColdDat
 
 ## 22. 与当前实现的差距（非实现清单）
 
-Wave 1 已落地四个 builtin profile、Coordinator Skills、seed 无损迁移、effective snapshot 与 Run v2（`kind` / `mission` / `profileId`，无 `mode`）。Wave 3 已落地独立 Embedding、Knowledge 五服务 / 七 lane / ColdData staging ingest、五个 deferred 工具与 Knowledge Center 三列 UI。尚未实现：durable handoff 状态机、`rdc.investigation.v1`、Session rail 五卡、连续安全工具并发组。后续 Wave 按 `DESIGN.md` 裁决落地，落地一项删除一项旧路径。
+Wave 1 已落地四个 builtin profile、Coordinator Skills、seed 无损迁移、effective snapshot 与 Run v2（`kind` / `mission` / `profileId`，无 `mode`）。Wave 3 已落地独立 Embedding、Knowledge 五服务 / 七 lane / ColdData staging ingest、五个 deferred 工具与 Knowledge Center 三列 UI。Wave 4 schema 已落地 `rdc.investigation.v1`、`InvestigationArtifactService` 与 `investigation_read` / `investigation_write` / `investigation_list`。13 个垂直方法 Skill、4 个 builtin Hook 模板与 Session rail 五卡已落地。尚未实现：durable handoff 状态机、三 Mission 纵切、连续安全工具并发组。后续 Wave 按 `DESIGN.md` 裁决落地，落地一项删除一项旧路径。

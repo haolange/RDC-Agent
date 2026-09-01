@@ -64,6 +64,9 @@ export const WORK_PROCESS_TOOL_DISPLAY_CATALOG: Record<string, WorkProcessToolDi
   knowledge_read: { icon: 'knowledgeRead', groupKind: 'runtime', category: '知识读取', groupTitle: '知识', groupUnit: '读取', completeVerb: '已读取知识', runningVerb: '正在读取知识' },
   knowledge_compile: { icon: 'knowledgeCompile', groupKind: 'runtime', category: '知识编译', groupTitle: '知识', groupUnit: '编译', completeVerb: '已编译知识', runningVerb: '正在编译知识' },
   knowledge_candidate_create: { icon: 'knowledgeCandidate', groupKind: 'runtime', category: '知识候选', groupTitle: '知识', groupUnit: '候选', completeVerb: '已创建知识候选', runningVerb: '正在创建知识候选', mutation: true },
+  investigation_read: { icon: 'investigationRead', groupKind: 'runtime', category: '调查读取', groupTitle: '调查', groupUnit: '读取', completeVerb: '已读取调查产物', runningVerb: '正在读取调查产物' },
+  investigation_write: { icon: 'investigationWrite', groupKind: 'runtime', category: '调查写入', groupTitle: '调查', groupUnit: '写入', completeVerb: '已写入调查产物', runningVerb: '正在写入调查产物', mutation: true },
+  investigation_list: { icon: 'investigationList', groupKind: 'runtime', category: '调查列表', groupTitle: '调查', groupUnit: '列表', completeVerb: '已列出调查产物', runningVerb: '正在列出调查产物' },
 };
 
 const GENERIC_TOOL_DISPLAY: WorkProcessToolDisplay = {
@@ -155,6 +158,7 @@ export const getToolFamily = (toolName: string): WorkProcessToolFamily => {
     || normalized === 'rdx_context'
     || normalized === 'agent_handoff'
     || normalized.startsWith('knowledge_')
+    || normalized.startsWith('investigation_')
   ) return 'runtime';
   return 'generic';
 };

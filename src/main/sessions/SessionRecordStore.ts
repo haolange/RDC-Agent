@@ -15,11 +15,9 @@ import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type {
   Blocker,
-  ReasoningSummary,
   WorkflowStage,
   WorkflowState,
 } from '@shared/types/workflow';
-import { normalizeWorkflowStage } from '@shared/constants/stages';
 import type {
   CaptureDescriptor,
   ProjectRecord,
@@ -29,12 +27,9 @@ import type {
 import { isMissionAgentId } from '@shared/types/agent';
 import { toPersistedRunV2 } from './runV2/runRecordSchema';
 import { appPathService } from '../runtime/AppPathService';
-import type {
-  PersistedRunRecord,
-  SessionEvidenceRecord,
-} from './storageTypes';
+import type { PersistedRunRecord } from './storageTypes';
 import type { ReservedStagedConversationSession, StagedConversationSessionCommit } from './storageCommitTypes';
-import { SessionRecordSchema, SESSION_EVIDENCE_MIGRATIONS, toSessionAttachmentManifest } from './storageSchema';
+import { SessionRecordSchema, toSessionAttachmentManifest } from './storageSchema';
 import { reconcileProjectSessionTitles } from './sessionRecordReconcile';
 import { readPersistedRun as loadPersistedRun, toRunSummary, writeRunFiles as persistRunFiles } from './sessionRunPersistence';
 
@@ -153,8 +148,6 @@ export class SessionRecordStore {
     if (!fs.existsSync(path.join(sessionPath, 'attachments.json'))) {
       this.host.io.writeJsonAtomic(path.join(sessionPath, 'attachments.json'), toSessionAttachmentManifest([]));
     }
-    this.syncSessionEvidence(session.sessionId, session.projectId);
-
     this.host.projects.touchProject(project.projectId, session.sessionId, timestamp);
     this.host.projects.setCurrentProjectId(projectId);
     this.host.projects.setCurrentSessionId(session.sessionId);
@@ -269,7 +262,6 @@ export class SessionRecordStore {
       this.host.io.writeJsonAtomic(path.join(commit.stagingPath, 'conversation-branches.json'), branchState);
     }
     fs.renameSync(commit.stagingPath, commit.finalPath);
-    this.syncSessionEvidence(commit.session.sessionId, commit.session.projectId);
     this.host.projects.touchProject(commit.session.projectId, commit.session.sessionId, commit.session.updatedAt);
     this.host.projects.setCurrentProjectId(commit.session.projectId);
     this.host.projects.setCurrentSessionId(commit.session.sessionId);
@@ -511,7 +503,6 @@ export class SessionRecordStore {
       goal: persistedRun.goal,
       lastRunId: runId,
     });
-    this.syncSessionEvidence(sessionId, session.projectId);
     this.host.projects.touchProject(session.projectId, sessionId);
     this.host.projects.setCurrentProjectId(session.projectId);
     this.host.projects.setCurrentSessionId(sessionId);
@@ -588,7 +579,6 @@ export class SessionRecordStore {
     this.updateSession(caseId, {
       lastRunId: runId,
     });
-    this.syncSessionEvidence(caseId, existing.projectId);
   }
 
   getActionChainPath(sessionId: string): string {
@@ -617,14 +607,6 @@ export class SessionRecordStore {
     return path.join(location.sessionPath, 'attachments.json');
   }
 
-  getSessionEvidencePath(sessionId: string): string {
-    const location = this.findSessionLocation(sessionId);
-    if (!location) {
-      throw new Error(`Session not found for session evidence: ${sessionId}`);
-    }
-    return path.join(location.sessionPath, 'session_evidence.yaml');
-  }
-
   writeSessionPlanArtifact(sessionId: string, content: string): string {
     const location = this.findSessionLocation(sessionId);
     if (!location) {
@@ -637,21 +619,9 @@ export class SessionRecordStore {
     return artifactPath;
   }
 
-  readSessionEvidence(sessionId: string): SessionEvidenceRecord | null {
-    const parsed = this.host.io.readYaml(
-      this.getSessionEvidencePath(sessionId),
-      SESSION_EVIDENCE_MIGRATIONS,
-    );
-    return parsed as SessionEvidenceRecord | null;
-  }
-
   async appendActionEvent(sessionId: string, event: ActionEvent): Promise<void> {
     appendJsonl(this.getActionChainPath(sessionId), event);
     this.updateSession(sessionId, {});
-    const session = this.readSession(sessionId);
-    if (session) {
-      this.syncSessionEvidence(sessionId, session.projectId);
-    }
   }
 
   async readActionChain(sessionId: string): Promise<ActionEvent[]> {
@@ -730,64 +700,6 @@ export class SessionRecordStore {
       board.hypothesis_board = hypothesisBoard;
       writeYaml(boardPath, board);
     }
-  }
-
-  syncSessionEvidence(sessionId: string, projectId: string): void {
-    const latestRun = this.getLatestRun(sessionId);
-    const actionChainPath = this.getActionChainPath(sessionId);
-    const actionEvents = fs.existsSync(actionChainPath)
-      ? (() => {
-        const result = readJsonl<ActionEvent>(actionChainPath);
-        assertNoJsonlDiagnostics(actionChainPath, result.diagnostics);
-        return result.records;
-      })()
-      : [];
-    const eventCounts = actionEvents.reduce<Record<string, number>>((acc, event) => {
-      acc[event.event_type] = (acc[event.event_type] || 0) + 1;
-      return acc;
-    }, {});
-    const activeBlockers = actionEvents
-      .filter((event) => event.event_type === 'blocker')
-      .map((event) => ({
-        code: String(event.payload.code || 'BLOCKER'),
-        reason: String(event.payload.reason || event.payload.message || 'Blocker'),
-        refs: Array.isArray(event.refs) ? event.refs : [],
-        detectedAt: new Date(event.ts_ms).toISOString(),
-      }));
-    const verificationSummary = actionEvents
-      .filter((event) => event.event_type === 'verification')
-      .slice(-5)
-      .map((event) => String(event.payload.summary || event.payload.verdict || event.payload.verification_kind || 'verification'));
-    const reasoningSummaries = actionEvents
-      .filter((event) => event.event_type === 'agent_summary')
-      .slice(-10)
-      .map((event, index) => ({
-        summaryId: `summary-${index}-${event.event_id}`,
-        stage: normalizeWorkflowStage(String(event.payload.stage || latestRun?.lastStage || 'investigate')),
-        agentId: String(event.agent_id) as ReasoningSummary['agentId'],
-        summary: String(event.payload.summary || event.payload.content || ''),
-        evidence: Array.isArray(event.payload.evidence) ? event.payload.evidence.map(String) : [],
-        nextStep: String(event.payload.next_step || event.payload.nextStep || ''),
-        confidence: typeof event.payload.confidence === 'number' ? event.payload.confidence : 0.5,
-        createdAt: new Date(event.ts_ms).toISOString(),
-      }));
-
-    const record: SessionEvidenceRecord = {
-      schema_version: '1',
-      session_id: sessionId,
-      project_id: projectId,
-      latest_run_id: latestRun?.runId || null,
-      latest_run_status: latestRun?.status || null,
-      latest_stage: latestRun?.lastStage || null,
-      updated_at: nowIso(),
-      event_counts: eventCounts,
-      active_blockers: activeBlockers,
-      verification_summary: verificationSummary,
-      reasoning_summaries: reasoningSummaries,
-      report_paths: latestRun?.reportPaths || null,
-    };
-
-    writeYaml(this.getSessionEvidencePath(sessionId), record);
   }
 
   writeRunFiles(run: PersistedRunRecord): void {

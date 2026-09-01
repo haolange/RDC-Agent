@@ -1,0 +1,8 @@
+id: mission-plan-handoff-check
+enabled: true
+event: agent.before-handoff
+command: node
+args:
+  - mission-plan-handoff-check.mjs
+timeoutMs: 8000
+failurePolicy: block

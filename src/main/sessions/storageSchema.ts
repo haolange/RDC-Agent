@@ -170,25 +170,6 @@ export const SessionRecordSchema: ZodType<SessionRecord> = z.object({
   agentId: z.string().min(1).optional(),
 }).passthrough() as ZodType<SessionRecord>;
 
-export const SessionEvidenceV1Schema = z.object({
-  schema_version: z.literal('1'),
-  session_id: z.string().min(1),
-  project_id: z.string().min(1),
-  latest_run_id: z.string().nullable(),
-  latest_run_status: z.string().nullable(),
-  latest_stage: z.string().nullable(),
-  updated_at: z.string(),
-  event_counts: z.record(z.string(), z.number()),
-  active_blockers: z.array(z.unknown()),
-  verification_summary: z.array(z.string()).optional(),
-  reasoning_summaries: z.array(z.unknown()).optional(),
-  report_paths: z.unknown().nullable().optional(),
-}).passthrough();
-
-export const SESSION_EVIDENCE_MIGRATIONS: StorageMigration<z.infer<typeof SessionEvidenceV1Schema>>[] = [
-  { schemaVersion: '1', schema: SessionEvidenceV1Schema },
-];
-
 export const ConversationTurnCommitV1Schema = z.object({
   schemaVersion: z.literal('1'),
   requestId: z.string().min(1),

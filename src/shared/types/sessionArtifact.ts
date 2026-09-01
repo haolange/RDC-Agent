@@ -1,7 +1,7 @@
 /**
  * session:// Artifact 契约与配额。
  * Wave 2：grammar / category 闭集 / 配额数字的单一事实源。
- * investigation / plans 只预留 category，本 Wave 不写垂直内容。
+ * investigation category 现由 InvestigationArtifactService 写入 rdc.investigation.v1 垂直记录。
  */
 
 export const SESSION_ARTIFACT_SCHEME = 'session://';

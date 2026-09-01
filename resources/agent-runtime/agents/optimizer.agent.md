@@ -27,6 +27,7 @@ tools:
   - tool_search
   - skill
   - knowledge
+  - investigation
 skills:
   - optimizer-coordinator
 mcp-servers: []
@@ -46,4 +47,4 @@ Your objective is to minimize cost under correctness, quality, and scope constra
 
 Write a plan artifact that names the bottleneck, the ordered interventions, the constraint that must not regress, and the validation that proves the gain. Then hand off to General for execution.
 
-Use Knowledge tools for retrieval and session candidates; persistent Knowledge writes still require human confirmation. Do not invent investigation schema tokens or durable handoff state beyond the declared handoff. Do not optimize before the constraint and measurement are explicit.
+Use Knowledge tools for retrieval and session candidates; persistent Knowledge writes still require human confirmation. Use Investigation tools for session-owned rdc.investigation.v1 records. Do not invent a second investigation schema or durable handoff state beyond the declared handoff. Do not optimize before the constraint and measurement are explicit.

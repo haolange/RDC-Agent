@@ -1,28 +1,6 @@
 {
   "schemaVersion": 1,
   "waveClearBy": 6,
-  "maxHits": 21,
-  "ids": [
-    "investigation.forbidden.context-service",
-    "investigation.forbidden.evidence-ledger",
-    "investigation.forbidden.harness-task",
-    "investigation.forbidden.harness-tasks-field",
-    "investigation.forbidden.report-bundle",
-    "investigation.forbidden.run-capsule",
-    "investigation.forbidden.session-evidence.schema",
-    "investigation.forbidden.session-evidence.write",
-    "investigation.forbidden.session.four-card",
-    "investigation.forbidden.task-board",
-    "investigation.missing.contract.suite",
-    "investigation.missing.dir.main",
-    "investigation.missing.schema.ChallengeRecord",
-    "investigation.missing.schema.ClaimRecord",
-    "investigation.missing.schema.EvidenceRecord",
-    "investigation.missing.schema.ExperimentRecord",
-    "investigation.missing.schema.InvestigationArtifactManifest",
-    "investigation.missing.schema.MissionCheckpoint",
-    "investigation.missing.schema.WorldState",
-    "investigation.missing.session.artifacts-card",
-    "investigation.missing.types.renderdocInvestigation"
-  ]
+  "maxHits": 0,
+  "ids": []
 }

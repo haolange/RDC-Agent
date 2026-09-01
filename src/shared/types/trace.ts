@@ -1,3 +1,10 @@
+import type {
+  InvestigationArtifactKind,
+  InvestigationArtifactStatus,
+  InvestigationMission,
+  InvestigationRecordType,
+} from './renderdocInvestigation';
+
 export type PlanStatus =
   | 'draft'
   | 'awaiting_approval'
@@ -128,9 +135,29 @@ export interface RequestBranchGroup {
   branches: RequestBranch[];
 }
 
-export interface ArtifactsPanelViewModel {
+export interface OutputsPanelViewModel {
   current: TraceArtifactRecord[];
   previous: TraceArtifactRecord[];
+}
+
+export interface InvestigationArtifactRow {
+  artifactId: string;
+  kind: InvestigationArtifactKind;
+  recordType: InvestigationRecordType;
+  status: InvestigationArtifactStatus;
+  mission: InvestigationMission;
+  title: string;
+  createdAt: string;
+  contentHashShort: string;
+  sourceRefCount: number;
+  worldStateId?: string;
+  degraded: boolean;
+}
+
+export interface InvestigationArtifactsPanelViewModel {
+  rows: InvestigationArtifactRow[];
+  supersededCount: number;
+  truncatedCount: number;
 }
 
 export type TaskContextResourceKind =
@@ -219,7 +246,8 @@ export interface ContextPanelViewModel {
 
 export interface RightPanelViewModel {
   progress: ProgressTask[];
-  artifacts: ArtifactsPanelViewModel;
+  artifacts: InvestigationArtifactsPanelViewModel;
+  outputs: OutputsPanelViewModel;
   context: ContextPanelViewModel;
 }
 

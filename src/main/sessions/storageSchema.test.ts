@@ -15,7 +15,6 @@ import {
   SESSION_RUN_MIGRATIONS,
   CONVERSATION_TURN_COMMIT_MIGRATIONS,
   CONVERSATION_TERMINAL_COMMIT_MIGRATIONS,
-  SESSION_EVIDENCE_MIGRATIONS,
   StorageSchemaError,
   type StorageMigration,
 } from './storageSchema';
@@ -416,21 +415,6 @@ const legalTerminalCommit = {
   afterContext: [],
 };
 
-const legalEvidence = {
-  schema_version: '1',
-  session_id: 'sess_1',
-  project_id: 'proj_1',
-  latest_run_id: null,
-  latest_run_status: null,
-  latest_stage: null,
-  updated_at: '2026-01-01T00:00:00.000Z',
-  event_counts: {},
-  active_blockers: [],
-  verification_summary: [],
-  reasoning_summaries: [],
-  report_paths: null,
-};
-
 const legalUsage = {
   runId: 'run_1',
   providerId: 'provider',
@@ -558,23 +542,6 @@ describe('storage schema store quartet', () => {
       read: (filePath: string) => io.readJson(filePath, SESSION_RUN_MIGRATIONS),
     },
     {
-      name: 'session evidence',
-      file: 'session_evidence.yaml',
-      legal: legalEvidence,
-      corrupt: 'schema_version: [\n',
-      missingOrLegacy: legalEvidence,
-      higher: { ...legalEvidence, schema_version: '99' },
-      read: (filePath: string) => io.readYaml(filePath, SESSION_EVIDENCE_MIGRATIONS),
-      write: (filePath: string, value: unknown) => {
-        fs.mkdirSync(path.dirname(filePath), { recursive: true });
-        fs.writeFileSync(
-          filePath,
-          typeof value === 'string' ? value : stringifyYaml(value),
-          'utf8',
-        );
-      },
-    },
-    {
       name: 'settings',
       file: 'config.json',
       legal: { schemaVersion: SETTINGS_SCHEMA_VERSION, appearance: { theme: 'dark' } },
@@ -605,7 +572,6 @@ describe('storage schema store quartet', () => {
       'turn-commit',
       'terminal-commit',
       'run',
-      'session evidence',
       'settings',
     ]);
   });
@@ -614,11 +580,7 @@ describe('storage schema store quartet', () => {
     describe(store.name, () => {
       it('accepts a legal current document', () => {
         const filePath = path.join(tempRoot(), store.file);
-        if ('write' in store && store.write) {
-          store.write(filePath, store.legal);
-        } else {
-          io.writeJsonAtomic(filePath, store.legal);
-        }
+        io.writeJsonAtomic(filePath, store.legal);
         const parsed = store.read(filePath);
         expect(parsed).toBeTruthy();
         if (store.name === 'attachments') {
@@ -636,33 +598,21 @@ describe('storage schema store quartet', () => {
 
       it('fail-closes a structurally damaged document', () => {
         const filePath = path.join(tempRoot(), store.file);
-        if ('write' in store && store.write) {
-          store.write(filePath, store.corrupt);
-        } else {
-          fs.mkdirSync(path.dirname(filePath), { recursive: true });
-          fs.writeFileSync(filePath, JSON.stringify(store.corrupt), 'utf8');
-        }
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        fs.writeFileSync(filePath, JSON.stringify(store.corrupt), 'utf8');
         expect(() => store.read(filePath)).toThrow(/STORAGE_CORRUPT|STORAGE_SCHEMA/);
       });
 
       it('accepts a current-shaped document without requiring a newer version', () => {
         const filePath = path.join(tempRoot(), store.file);
-        if ('write' in store && store.write) {
-          store.write(filePath, store.missingOrLegacy);
-        } else {
-          io.writeJsonAtomic(filePath, store.missingOrLegacy);
-        }
+        io.writeJsonAtomic(filePath, store.missingOrLegacy);
         expect(store.read(filePath)).toBeTruthy();
       });
 
       it('fail-closes an unknown higher schemaVersion without quarantine', () => {
         const filePath = path.join(tempRoot(), store.file);
-        if ('write' in store && store.write) {
-          store.write(filePath, store.higher);
-        } else {
-          fs.mkdirSync(path.dirname(filePath), { recursive: true });
-          fs.writeFileSync(filePath, JSON.stringify(store.higher), 'utf8');
-        }
+        fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        fs.writeFileSync(filePath, JSON.stringify(store.higher), 'utf8');
         expect(() => store.read(filePath)).toThrow(/STORAGE_SCHEMA_UNSUPPORTED/);
         expect(fs.existsSync(filePath)).toBe(true);
       });

@@ -6,7 +6,7 @@ import type { RightRailEmptyKind } from './RightRailEmptyState';
  * Gradient stops never carry hard-coded colors — they resolve through
  * `.rr-eg-{tone}-hi/lo` classes in RightRail.css, which reference design
  * tokens so the glass adapts to light/dark and custom chrome themes.
- * Filter/gradient ids are scene-prefixed to stay unique across the four
+ * Filter/gradient ids are scene-prefixed to stay unique across the five
  * simultaneously mounted cards.
  */
 
@@ -144,6 +144,36 @@ const ContextVisual: React.FC = () => {
   );
 };
 
+const ArtifactsVisual: React.FC = () => {
+  const blur = 'rr-eg-artifacts-blur';
+  return (
+    <svg className="right-rail-empty-visual artifacts-visual" viewBox="0 0 200 112" aria-hidden="true">
+      <defs>
+        {glassGradient('rr-eg-artifacts-purple', 'purple')}
+        {glassGradient('rr-eg-artifacts-sky', 'sky')}
+        {glassGradient('rr-eg-artifacts-amber', 'amber')}
+        <linearGradient id="rr-eg-artifacts-link" gradientUnits="userSpaceOnUse" x1={52} y1={70} x2={148} y2={46}>
+          <stop offset="0" className="rr-eg-purple-hi" />
+          <stop offset="1" className="rr-eg-amber-hi" />
+        </linearGradient>
+        {softBlur(blur)}
+      </defs>
+      <GroundShadow cx={70} cy={92} rx={24} ry={5} blurId={blur} />
+      <GroundShadow cx={118} cy={86} rx={20} ry={4.4} blurId={blur} />
+      <GroundShadow cx={148} cy={78} rx={16} ry={3.6} blurId={blur} />
+      <line className="rr-eg-link-glow" x1={70} y1={58} x2={118} y2={50} filter={`url(#${blur})`} />
+      <line className="rr-eg-link-glow" x1={118} y1={50} x2={148} y2={42} filter={`url(#${blur})`} />
+      <line className="rr-eg-link" x1={70} y1={58} x2={148} y2={42} stroke="url(#rr-eg-artifacts-link)" />
+      <IsoBox cx={70} cy={58} rx={20} h={22} fill="url(#rr-eg-artifacts-purple)" />
+      <IsoBox cx={118} cy={50} rx={16} h={18} fill="url(#rr-eg-artifacts-sky)" />
+      <IsoBox cx={148} cy={42} rx={13} h={14} fill="url(#rr-eg-artifacts-amber)" />
+      <circle className="rr-eg-node" cx={70} cy={58} r={2.8} />
+      <circle className="rr-eg-node" cx={118} cy={50} r={2.6} />
+      <circle className="rr-eg-node" cx={148} cy={42} r={2.4} />
+    </svg>
+  );
+};
+
 const CaptureVisual: React.FC = () => {
   const blur = 'rr-eg-capture-blur';
   return (
@@ -175,6 +205,7 @@ const CaptureVisual: React.FC = () => {
 
 export const RightRailEmptyVisual: React.FC<{ kind: RightRailEmptyKind }> = ({ kind }) => {
   if (kind === 'progress') return <ProgressVisual />;
+  if (kind === 'artifacts') return <ArtifactsVisual />;
   if (kind === 'outputs') return <OutputsVisual />;
   if (kind === 'context') return <ContextVisual />;
   return <CaptureVisual />;

@@ -1,11 +1,13 @@
 ﻿import React from 'react';
 import type { ProgressTask, RdxContextPanelViewModel, TaskContextPanelViewModel } from '@shared/types/trace';
+import { useI18n } from '../../../i18n';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { CapturePanel } from './CapturePanel';
+import { RightRailArtifactList } from './RightRailArtifactList';
 import { RightRailContext } from './RightRailContext';
 import { RightRailEmptyState as EmptyState } from './RightRailEmptyState';
+import { RightRailOutputList } from './RightRailOutputList';
 import { TaskStatusMarker } from '../../../ui/TaskStatusMarker';
-import { TraceArtifactList } from './TraceArtifactList';
 
 const focusWorkProcessTask = (taskId: string): void => {
   const escaped = window.CSS?.escape ? window.CSS.escape(taskId) : taskId;
@@ -20,7 +22,7 @@ const focusWorkProcessTask = (taskId: string): void => {
   window.setTimeout(() => target.classList.remove('is-trace-flash', 'is-trace-flash-static'), reduced ? 800 : 1600);
 };
 
-const RailSection: React.FC<{ id: 'progress' | 'outputs' | 'context' | 'capture'; title: string; children: React.ReactNode }> = ({ id, title, children }) => (
+const RailSection: React.FC<{ id: 'progress' | 'artifacts' | 'outputs' | 'context' | 'capture'; title: string; children: React.ReactNode }> = ({ id, title, children }) => (
   <section className="right-rail-section" data-testid={`right-rail-${id}`}>
     <h2 className="right-rail-section-heading">{title}</h2>
     <div className="right-rail-section-content">{children}</div>
@@ -41,22 +43,26 @@ const ProgressList: React.FC<{ tasks: ProgressTask[] }> = ({ tasks }) => (
 );
 
 export const TraceRightPanel: React.FC = () => {
+  const { t } = useI18n();
   const presentation = useWorkflowStore((state) => state.tracePresentation);
   const rightPanel = presentation?.rightPanel;
   const tasks = rightPanel?.progress ?? [];
-  const outputs = rightPanel?.artifacts ?? { current: [], previous: [] };
+  const artifacts = rightPanel?.artifacts ?? { rows: [], supersededCount: 0, truncatedCount: 0 };
+  const outputs = rightPanel?.outputs ?? { current: [], previous: [] };
   const taskContext: TaskContextPanelViewModel | undefined = rightPanel?.context?.task;
   const captureContext: RdxContextPanelViewModel | undefined = rightPanel?.context?.rdx;
+  const hasArtifacts = artifacts.rows.length + artifacts.supersededCount + artifacts.truncatedCount > 0;
   const hasOutputs = outputs.current.length + outputs.previous.length > 0;
   const hasTaskContext = Boolean(taskContext?.resources.length);
   const hasCapture = Boolean(taskContext && captureContext && (captureContext.capture || captureContext.availableCaptures.length || captureContext.diagnostics.length));
 
   return (
     <aside className="right-rail" aria-label="Session inspector">
-      <RailSection id="progress" title="Progress">{tasks.length ? <ProgressList tasks={tasks} /> : <EmptyState kind="progress" copy="Steps will show as the task unfolds." />}</RailSection>
-      <RailSection id="outputs" title="Outputs">{hasOutputs ? <TraceArtifactList current={outputs.current} previous={outputs.previous} /> : <EmptyState kind="outputs" copy="Outputs created during this task appear here." />}</RailSection>
-      <RailSection id="context" title="Context">{hasTaskContext && taskContext ? <RightRailContext task={taskContext} /> : <EmptyState kind="context" copy="Tools and referenced files used in this task appear here." />}</RailSection>
-      <RailSection id="capture" title="Capture">{hasCapture && taskContext && captureContext ? <CapturePanel task={taskContext} capture={captureContext} /> : <EmptyState kind="capture" copy="Import a .rdc file to this project to open and preview it here." />}</RailSection>
+      <RailSection id="progress" title={t('control.rightRail.progress.title')}>{tasks.length ? <ProgressList tasks={tasks} /> : <EmptyState kind="progress" copy={t('control.rightRail.progress.empty')} />}</RailSection>
+      <RailSection id="artifacts" title={t('control.rightRail.artifacts.title')}>{hasArtifacts ? <RightRailArtifactList artifacts={artifacts} /> : <EmptyState kind="artifacts" copy={t('control.rightRail.artifacts.empty')} />}</RailSection>
+      <RailSection id="outputs" title={t('control.rightRail.outputs.title')}>{hasOutputs ? <RightRailOutputList current={outputs.current} previous={outputs.previous} /> : <EmptyState kind="outputs" copy={t('control.rightRail.outputs.empty')} />}</RailSection>
+      <RailSection id="context" title={t('control.rightRail.context.title')}>{hasTaskContext && taskContext ? <RightRailContext task={taskContext} /> : <EmptyState kind="context" copy={t('control.rightRail.context.empty')} />}</RailSection>
+      <RailSection id="capture" title={t('control.rightRail.capture.title')}>{hasCapture && taskContext && captureContext ? <CapturePanel task={taskContext} capture={captureContext} /> : <EmptyState kind="capture" copy={t('control.rightRail.capture.empty')} />}</RailSection>
     </aside>
   );
 };

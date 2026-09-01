@@ -12,6 +12,16 @@
     "resources/agent-runtime/**/*",
     "resources/knowledge/**/*"
   ],
+  "asarUnpack": [
+    "resources/agent-runtime/hooks/**/*.mjs"
+  ],
+  "extraResources": [
+    {
+      "from": "resources/agent-runtime/hooks",
+      "to": "agent-runtime/hooks",
+      "filter": ["*.mjs"]
+    }
+  ],
   "forceCodeSigning": false,
   "electronDist": "node_modules/electron/dist",
   "win": {

@@ -1,8 +1,8 @@
 import path from 'path';
 import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type {
-  ArtifactsPanelViewModel,
   ContextPanelViewModel,
+  OutputsPanelViewModel,
   ProgressTask,
   RdxContextDiagnostic,
   TaskContextResource,
@@ -48,12 +48,12 @@ const artifactType = (source: SessionArtifactSource): TraceArtifactRecord['type'
   return 'other';
 };
 
-export function mapRightRailArtifacts(input: {
+export function mapRightRailOutputs(input: {
   sessionId: string;
   branchId: string;
   sources: SessionArtifactSource[];
   runs: RunSummary[];
-}): ArtifactsPanelViewModel {
+}): OutputsPanelViewModel {
   const latestRunId = input.runs
     .slice().sort((left, right) => (right.startedAt ?? 0) - (left.startedAt ?? 0))[0]?.runId;
   const all = input.sources

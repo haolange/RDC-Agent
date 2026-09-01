@@ -1,0 +1,11 @@
+id: report-contract
+enabled: true
+event: tool.before-call
+command: node
+args:
+  - report-contract.mjs
+timeoutMs: 8000
+failurePolicy: block
+matcher:
+  tools:
+    - investigation_write

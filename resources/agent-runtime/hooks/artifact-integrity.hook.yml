@@ -1,0 +1,11 @@
+id: artifact-integrity
+enabled: true
+event: tool.before-call
+command: node
+args:
+  - artifact-integrity.mjs
+timeoutMs: 8000
+failurePolicy: block
+matcher:
+  tools:
+    - investigation_write

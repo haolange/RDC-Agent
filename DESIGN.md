@@ -10,7 +10,7 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 
 **不做** image/video 生成 runtime、media provider 目录面或 `MediaRuntimeService` 类骨架；discovery 对非 agent modality（含 image/video output）保持 fail-closed 剔除。用户附件 vision-input（读图）仍属 agent chat 能力，与生成 media 无关。
 
-产品不是固定模式向导。**Wave 1 已落地**四个 builtin profile：`general` / `debugger` / `analyzer` / `optimizer`（`resources/agent-runtime/agents`，scope 优先级 `builtin < user < project`，不再写 user seed）。仅 `user-invocable` 的 profile 出现在 composer orchestrator 菜单。`/plan` 不再硬切 builtin plan。durable handoff runtime、五卡 Right Rail 与 Investigation schema **尚未实现**。Knowledge 五服务、七 lane、五个 deferred 工具与 Knowledge Center 三列 UI 已落地。裁决与迁移门禁见下文「Current / Target / Migration Adjudications」。
+产品不是固定模式向导。**Wave 1 已落地**四个 builtin profile：`general` / `debugger` / `analyzer` / `optimizer`（`resources/agent-runtime/agents`，scope 优先级 `builtin < user < project`，不再写 user seed）。仅 `user-invocable` 的 profile 出现在 composer orchestrator 菜单。`/plan` 不再硬切 builtin plan。Session rail 五卡 `Progress / Artifacts / Outputs / Context / Capture` 已落地。durable handoff runtime 与三 Mission 纵切尚未实现。Investigation 垂直 schema（`rdc.investigation.v1`）、`InvestigationArtifactService` 与三个 deferred 工具已落地；13 个垂直方法 Skill 与 4 个 builtin Hook 模板已落地。Knowledge 五服务、七 lane、五个 deferred 工具与 Knowledge Center 三列 UI 已落地。裁决与迁移门禁见下文「Current / Target / Migration Adjudications」。
 
 唯一运行时路径是 agent loop：解析 profile / model route / policy / tools → 调用 LLM → 执行已批准工具 → 回灌结果 → 产出 final answer。Renderer 不得伪造推理阶段；隐藏 CoT 永不作为 UI 内容展示或持久化。
 
@@ -76,7 +76,7 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 - **Capture 所有权**：`ownerSessionId` 不匹配则 fail-closed；不得跨 session 继承已打开 capture。
 - **唯一 Turn Preparation**：`sendMessage` / `sendProfileMessage` / Subagent 经 `ProfileTurnPreparation`（或 conversation `prepareTurn`）冻结 `preparedRuntime`；`AgentTurnRunner` 无 preparedRuntime 抛 `TURN_NOT_PREPARED`，禁止 fallback plan。
 - **AgentState 复合键**：`sessionId|ephemeralScope` + `agentId`；renderer `agentStore` 与 IPC bridge 无 sessionId 的事件丢弃。
-- **存储 fail-closed**：`StorageIo.readJson` / `readYaml` 区分 ENOENT(null)、损坏（quarantine + `STORAGE_CORRUPT`）与未知更高 `schemaVersion`/`schema_version`（`STORAGE_SCHEMA_UNSUPPORTED`，不 quarantine）。JSON store 经 zod runtime 校验；带版本的文档走 `schemaVersion → migration registry → 升级`。`session_evidence.yaml` 走 `SESSION_EVIDENCE_MIGRATIONS`；`attachments.json` 现写 `{ schemaVersion, attachments }`，已有纯数组仍按当前 Zod 形状校验；`usage.json` 现写 `{ schemaVersion: '2', usage }`；`context-view.json` 现写 `{ schemaVersion: '1', view }`，缺版本的裸 `DerivedContextView` 经 `SESSION_CONTEXT_VIEW_MIGRATIONS` 包一层；`session.json` / `attachments.json` / `run.json` / `run.yaml` 若带更高版本同样 fail-closed，缺版本仍按当前 Zod 形状校验。Settings 的 `rebuildPersistedSettings` 是该框架下的 settings 迁移实现，未知更高版本同样 fail-closed。写入走 atomic rename；`deepMerge` 拒绝 `__proto__`/`constructor`。Memory `.memory.lock` 与 Project `registry.json` 的 `.registry.lock` 共用 `directoryFileLock`：**活 pid 永不回收**，仅死 pid 或损坏锁文件可回收；Project registry 的 create/rename/remove/touch 读改写在同一把锁内。
+- **存储 fail-closed**：`StorageIo.readJson` / `readYaml` 区分 ENOENT(null)、损坏（quarantine + `STORAGE_CORRUPT`）与未知更高 `schemaVersion`/`schema_version`（`STORAGE_SCHEMA_UNSUPPORTED`，不 quarantine）。JSON store 经 zod runtime 校验；带版本的文档走 `schemaVersion → migration registry → 升级`。`attachments.json` 现写 `{ schemaVersion, attachments }`，已有纯数组仍按当前 Zod 形状校验；`usage.json` 现写 `{ schemaVersion: '2', usage }`；`context-view.json` 现写 `{ schemaVersion: '1', view }`，缺版本的裸 `DerivedContextView` 经 `SESSION_CONTEXT_VIEW_MIGRATIONS` 包一层；`session.json` / `attachments.json` / `run.json` / `run.yaml` 若带更高版本同样 fail-closed，缺版本仍按当前 Zod 形状校验。Settings 的 `rebuildPersistedSettings` 是该框架下的 settings 迁移实现，未知更高版本同样 fail-closed。写入走 atomic rename；`deepMerge` 拒绝 `__proto__`/`constructor`。Memory `.memory.lock` 与 Project `registry.json` 的 `.registry.lock` 共用 `directoryFileLock`：**活 pid 永不回收**，仅死 pid 或损坏锁文件可回收；Project registry 的 create/rename/remove/touch 读改写在同一把锁内。
 - **Reasoning 续接**：`session-context.jsonl` 是 canonical 中性历史；`ContinuationReplayPolicy` 只按 compiled execution identity 决定同绑定回放 / 跨绑定 drop。切模型只改下一轮 route，不自动 compact，也不引入迁移事务、portable work state、workspace checkpoint。provider/model/protocol 变化且存在将被丢弃的 continuation 制品时，普通 Send 与 rewrite 都插入同一条 continuation-drop 系统通知。DeepSeek 带 tools 的 thinking-mode 协议要求跨轮回传 reasoning，对应 route 的 `artifactScope` 为 `all-assistant-turns`；`requirement: required` 的制品不受 8 轮 retention 过期，只随 compaction 边界终止。
 - **结构化压缩**：manual `/compact` 与预算触发 auto-compact 共用 `PromptPlan → RequestEnvelope → adapter` 单轮、无工具的 model-generated `StructuredHandoff`（`derivation: 'model-generated'`）。LLM 失败显式报错（Availability recoverable），不静默回退确定性抽取。低于阈值或可见回合过短时返回 `status: 'noop'`，不写 `complete` 压缩工作块。
 - **MCP transport**：仅 `stdio` / `streamable-http`；`sse` 配置 fail-closed（`MCP_TRANSPORT_UNSUPPORTED`）。Pool identity：`realpath + projectId + descriptorHash`；失败缓存指数退避；orphan pool quarantine。
@@ -146,16 +146,16 @@ Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThem
 | | 裁决 |
 | --- | --- |
 | **当前态（Wave 1 已落地）** | 四个 builtin profile：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件只存在于 `resources/agent-runtime/agents`。生效优先级 **`builtin < user < project`**，整资源替换，builtin 属性由 scope 派生。运行时**不再写 user seed**。Settings / Composer / Conversation preflight 共用 project-aware effective snapshot。`handoffs` 可省略或显式空（合法=禁止 handoff）；任一畸形 entry 使整个 candidate invalid。空 `agents` 仅允许 self delegate。`AgentId` / `TOP_LEVEL_AGENT_IDS` 只含四 builtin；用户保留的 ask/plan/edit 仍可按 custom manifest 运行。Run v2 用 `kind: conversation\|mission` + `profileId`，新写无 `mode`。 |
-| **目标态** | 与 Wave 1 拓扑相同。durable handoff 状态机、Knowledge 工具、五卡 Right Rail、Investigation schema 仍属后续 Wave，不得写成已完成。不新增 `mission` / `orchestratorType` / `investigationMode` 等 Profile 领域字段。 |
+| **目标态** | 与 Wave 1 拓扑相同。durable handoff 状态机与三 Mission 纵切仍属后续 Wave，不得写成已完成。Investigation schema / Service / 工具、13 个垂直方法 Skill、4 个 builtin Hook 模板与 Session rail 五卡已落地。不新增 `mission` / `orchestratorType` / `investigationMode` 等 Profile 领域字段。 |
 | **迁移门禁** | 历史官方 seed 世代诚实编号为 S0–S9（从 git 历史抽出，不编造）。以 **parse 后的语义 hash** 识别（instructions / tools / skills / agents / handoffs / **model / icon / accent** 任一变化都视为用户修改；历史动态 model 无法证实时不匹配）。匹配历史官方语义的旧文件原子移至 `~/.rdx/agents/.migrated/<migration-id>/` 备份，**不物理删除**。用户修改版原样保留。marker `~/.rdx/agents/.seed-migration.json` `schemaVersion:'1'`，经 `StorageIo` 原子写，未知高版本 fail-closed，幂等 / 可重入并写诊断。`.migrated` 不枚举。Ask / Plan / Edit 不再作为目标拓扑身份，也不作为运行时 fallback。 |
 
 ### B. Right Rail
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | Project rail 只有 `Import .rdc` 与已导入列表。Session rail 是四张不可折叠卡：`Progress / Outputs / Context / Capture`。`RightRailProjectionService` 单轨投影；renderer 不重建。Outputs 只认 `output_register`。 |
-| **目标态** | Project rail **仍只有** `Import .rdc`，不读 session runtime。Session rail 目标五卡：`Progress / Artifacts / Outputs / Context / Capture`。Artifacts 是 main-owned Investigation Artifacts（垂直 Session Artifact 投影，不是 Working Directory 扫描，也不是 `output_register`）。Outputs 仍只展示 `output_register` 发布的用户输出文件。Capture 保留现有所有权与 Replay Device 面。Progress 仍消费 canonical `taskProjection`。五卡外壳在 empty / populated 之间不变。单轨投影与「renderer 不重建」不变。 |
-| **迁移门禁** | 不得再写目标三卡（`Progress / Artifacts / Context`）或把当前四卡写成最终契约。实现五卡前，四卡是 Wave 迁移事实；落地后直接收敛到五卡，删除四卡分支。门禁仍走 `pnpm run check:right-rail`，后续须覆盖 Artifacts 卡与跨卡所有权。 |
+| **当前态** | Project rail 只有 `Import .rdc` 与已导入列表。Session rail 是五张不可折叠卡：`Progress / Artifacts / Outputs / Context / Capture`。`RightRailProjectionService` 单轨投影；renderer 不重建。Artifacts 只投影 main-owned `rdc.investigation.v1`。Outputs 只认 `output_register`。 |
+| **目标态** | 与当前态相同。Project rail **仍只有** `Import .rdc`，不读 session runtime。Artifacts 是 main-owned Investigation Artifacts（垂直 Session Artifact 投影，不是 Working Directory 扫描，也不是 `output_register`）。Outputs 仍只展示 `output_register` 发布的用户输出文件。Capture 保留现有所有权与 Replay Device 面。Progress 仍消费 canonical `taskProjection`。五卡外壳在 empty / populated 之间不变。单轨投影与「renderer 不重建」不变。 |
+| **迁移门禁** | Session rail 只承认五卡一套契约，禁止再把三卡或四卡写成现行合同。门禁走 `pnpm run check:right-rail`，必须覆盖 Artifacts 卡与跨卡所有权。 |
 
 ### C. Independent Embedding Capability
 
@@ -177,9 +177,9 @@ Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThem
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | Session Artifact / Trace Artifact 是通用路径引用。不存在平台级 Investigation Graph，也没有字段级 `WorldState` / `EvidenceRecord` / `ClaimRecord` 等强 schema。 |
+| **当前态** | `rdc.investigation.v1` 垂直 Session Artifact 强 schema、Kind Registry、四大不变量机器判定、`InvestigationArtifactService` 与三个 deferred 工具（`investigation_read` / `investigation_write` / `investigation_list`）已落地。13 个垂直方法 Skill 与 4 个 builtin Hook 模板已落地（按需 `$skill`，不预装进 `.agent.md`）。记录只写 session-owned Session Artifact；不存在平台级 Investigation Graph。Session rail 五卡已落地，Artifacts 只投影该 namespace。 |
 | **目标态** | 混合 schema namespace `rdc.investigation.v1`，**只**存在于垂直 Session Artifact：`WorldState`、`EvidenceRecord`、`ClaimRecord`（Hypothesis 是 `claimKind`，Decision 内嵌）、`ExperimentRecord`、`ChallengeRecord`、`MissionCheckpoint`、`InvestigationArtifactManifest`。记录必有稳定 id（`claimId` / `experimentId` / `challengeId` / `artifactId`）；causal / counterfactual Claim 必须带可解引用 `experimentId`。系统不变量 `S-CTX-01` / `S-STATE-01` / `S-CLAIM-01` / `S-CAUSAL-01` / `S-KNOW-01` / `S-KNOW-02` / `S-RDC-01` 在该 schema 上做机器判定。认识论偏序 `unknown < inferred < derived < observed`；Confidence 与 Verification 分离。`ready` 必须结构化 `sourceRefs`（`{ artifactId, expectedHash }`）`>= 1`、各 `expectedHash` 与源当前 sha256 匹配、`contentHash` 等于 `contentRef` 正文字节 sha256、`kind` 经闭集 Registry 解析到 `recordType + schema` 且正文通过；旧版本标 `superseded`。compact / report / view 投影 Claim 必须带 `compactProvenance`，否则违反 `S-CLAIM-01`。`S-RDC-01`：mutate 必有 Experiment + exclusive world state + rollback / restored 验证，否则 `polluted` / `stale`。`S-CAUSAL-01`：causal / counterfactual Claim 必须引用**可解引用**的 `ExperimentRecord`，且该实验 `intervention.type != none`、`status ∈ {recorded, rolled_back}`、`rollback.executed === true`、`rollback.baselineRestored === true`、并存在 verify evidence（三者均须满足）。字段细则见详细目标设计。 |
-| **迁移门禁** | 禁止把上述字段写入 `TaskRecord` / `AgentProfile` / `ConversationMessage`。垂直记录只能引用 task id。禁止新建平台级 Graph Service。`pnpm run check:investigation-system` ratchet 已建立、目标债务未清零。 |
+| **迁移门禁** | 禁止把上述字段写入 `TaskRecord` / `AgentProfile` / `ConversationMessage`。垂直记录只能引用 task id。禁止新建平台级 Graph Service。`pnpm run check:investigation-system` ratchet 已建立；schema / Service / contract suite / 五卡已清零，13 Skill / 4 Hook 已落地，三 Mission 纵切仍属后续 Wave，债务只减不增。 |
 
 ### F. Concurrent Tools
 
@@ -202,19 +202,16 @@ Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThem
 实现目标拓扑时直接删除或改写，不得保留双轨：
 
 - Ask / Plan / Edit 作为目标顶层身份、user seed 写入、`AgentCategory` 把 Mission 标成 general executable。
-- 固定 Debugger harness stage、Classic Session Panel、`harnessTasks`、第二套 Hook（`AgentHooks` vs `HookEngine`）。
+- 固定 Debugger harness stage、Classic Session Panel、第二套 Hook（`AgentHooks` vs `HookEngine`）。
 - 把 RDX catalog 展开为模型工具、把 RDX 做成 MCP、向 `TaskRecord` 加 capture/evidence 字段。
 - 平台级 Investigation Graph、第二 TaskStore、Mailbox / Blackboard。
 - 交互式旧 Profile 导出选择面、把 `AgentHandoffDefinition` 当成 durable 状态、把 embedding 并入 agent catalog。
-- 目标三卡 Right Rail、把当前四卡写成最终契约、把未实现模块写成已完成。
+- 把三卡或四卡 Right Rail 写成现行契约、把未实现模块写成已完成。
 
 ## Right Rail Authority
 
 Right Rail 有两个按选择对象区分的表面。选中 Project 时**只**渲染项目级 `Import .rdc` 输入面与已导入 capture 列表，永不读取 session runtime。
 
-选中 Session 时：
+选中 Session 时渲染五张不可折叠圆角卡 `Progress / Artifacts / Outputs / Context / Capture`。Artifacts 只投影 main-owned Investigation Artifacts；Outputs 仍只接受 `output_register`；Capture 保留 scoped `.rdc` 选择、Replay Device、open / preview / refresh / copy / clear 与紧凑诊断。
 
-- **当前态（Wave 迁移事实）**：四张不可折叠圆角卡 `Progress / Outputs / Context / Capture`。这是现有实现与 `check:right-rail` 的当前合同，不是最终产品形态。
-- **目标态**：五张不可折叠圆角卡 `Progress / Artifacts / Outputs / Context / Capture`。Artifacts 只投影 main-owned Investigation Artifacts；Outputs 仍只接受 `output_register`；Capture 保留 scoped `.rdc` 选择、Replay Device、open / preview / refresh / copy / clear 与紧凑诊断。
-
-两条状态下，main-owned `RightRailProjectionService` 都为显式 `{ projectId, sessionId }` 组装 `RightPanelViewModel`；renderer 只消费投影，不从 action events、全局 capture、工作目录扫描或 tool catalog 重建 Progress / Artifacts / Outputs / Context / Capture。Progress 是单一规范列表（`RightPanelViewModel.progress: ProgressTask[]`），创建序，已完成项就地保留，并与 transcript `taskProjection` 同序同态。Context 只含被冻结 Prompt 段或成功 tool result 证明的具体任务资源。Capture 在 session 中始终可见：诚实空态或 owner-session 操作面。Outputs 拒绝 inputs 与 plan。卡外壳在 empty / populated 之间不变；空内容用安静线框插图，有内容只增高本卡并在兄弟行间使用内部 hairline。Dock 在紧凑桌面宽度仍可用，仅在 `RIGHT_RAIL_DRAWER_BREAKPOINT`（920px）及以下或无法保住最小工作面时变为共享 overlay drawer。静态门禁：`pnpm run check:right-rail`。落地五卡后该门禁必须改认五卡，不得同时断言三卡、四卡与五卡。
+main-owned `RightRailProjectionService` 为显式 `{ projectId, sessionId }` 组装 `RightPanelViewModel`；renderer 只消费投影，不从 action events、全局 capture、工作目录扫描或 tool catalog 重建 Progress / Artifacts / Outputs / Context / Capture。Progress 是单一规范列表（`RightPanelViewModel.progress: ProgressTask[]`），创建序，已完成项就地保留，并与 transcript `taskProjection` 同序同态。Context 只含被冻结 Prompt 段或成功 tool result 证明的具体任务资源。Capture 在 session 中始终可见：诚实空态或 owner-session 操作面。Outputs 拒绝 inputs 与 plan。Investigation Artifacts 不得混进 Outputs。卡外壳在 empty / populated 之间不变；空内容用安静线框插图，有内容只增高本卡并在兄弟行间使用内部 hairline。Dock 在紧凑桌面宽度仍可用，仅在 `RIGHT_RAIL_DRAWER_BREAKPOINT`（920px）及以下或无法保住最小工作面时变为共享 overlay drawer。静态门禁：`pnpm run check:right-rail`，只认五卡。

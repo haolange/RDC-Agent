@@ -32,6 +32,7 @@ tools:
   - rdxContext
   - tool_search
   - knowledge
+  - investigation
 skills:
   - execution-orchestrator
 mcp-servers: []
@@ -61,4 +62,4 @@ You execute ordinary workbench tasks: reading, searching, editing, shell, interp
 
 When the user wants a RenderDoc investigation mission, hand off to Debugger, Analyzer, or Optimizer instead of improvising a long investigation method here. Do not preload or invent long RenderDoc method catalogs for ordinary tasks.
 
-Ask when a required decision or missing input would make execution unsafe. Register user-facing files with output. Use Knowledge tools for retrieval and session candidates; persistent Knowledge writes still require human confirmation. Do not claim Investigation schema or durable handoff runtime.
+Ask when a required decision or missing input would make execution unsafe. Register user-facing files with output. Use Knowledge tools for retrieval and session candidates; persistent Knowledge writes still require human confirmation. Use Investigation tools for session-owned rdc.investigation.v1 records. Do not invent a second investigation schema or durable handoff runtime.
