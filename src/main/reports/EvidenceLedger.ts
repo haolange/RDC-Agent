@@ -1,12 +1,14 @@
 import { nowIso } from '@shared/utils/id';
 import type { EvidenceRecord, VerificationResult } from '@shared/types/harness';
 import { runScopedStore } from '../workflow/debugger/RunScopedStore';
+import { assertMissionRun } from '../sessions/runV2/runKindGuard';
 
 const EVIDENCE_PATH = 'evidence-ledger.jsonl';
 const VERIFICATION_PATH = 'verification_results.jsonl';
 
 export class EvidenceLedger {
   appendEvidence(sessionId: string, runId: string, record: EvidenceRecord): EvidenceRecord {
+    assertMissionRun(sessionId, runId);
     this.assertRunBinding(sessionId, runId, record);
     const nextRecord: EvidenceRecord = {
       ...record,
@@ -17,6 +19,7 @@ export class EvidenceLedger {
   }
 
   listEvidence(sessionId: string, runId: string): EvidenceRecord[] {
+    assertMissionRun(sessionId, runId);
     return runScopedStore.readJsonl<EvidenceRecord>(sessionId, runId, EVIDENCE_PATH);
   }
 
@@ -29,6 +32,7 @@ export class EvidenceLedger {
     runId: string,
     result: VerificationResult,
   ): VerificationResult {
+    assertMissionRun(sessionId, runId);
     this.assertRunBinding(sessionId, runId, result);
     const nextResult: VerificationResult = {
       ...result,
@@ -39,6 +43,7 @@ export class EvidenceLedger {
   }
 
   listVerificationResults(sessionId: string, runId: string): VerificationResult[] {
+    assertMissionRun(sessionId, runId);
     return runScopedStore.readJsonl<VerificationResult>(sessionId, runId, VERIFICATION_PATH);
   }
 

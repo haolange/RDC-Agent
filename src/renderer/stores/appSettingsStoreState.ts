@@ -30,7 +30,9 @@ export interface AppSettingsState {
   setSystemTheme: (systemTheme: ResolvedTheme) => void;
   patchSettings: (patch: AppSettingsPatch) => Promise<AppSettings>;
   saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
-  flushAgentDefinitionSaves: (agentId: string) => Promise<AgentDefinitionCommitSnapshot | null>;
+  flushAgentDefinitionSaves: (
+    query: import('@shared/types/agentManifest').AgentDefinitionCommitQuery,
+  ) => Promise<AgentDefinitionCommitSnapshot | null>;
   reloadSettings: () => Promise<AppSettings>;
   setTheme: (theme: AppTheme) => Promise<void>;
   setLanguage: (language: AppLanguage) => Promise<void>;

@@ -8,6 +8,8 @@ import type {
   AgentDefinitionSaveResult,
   AgentManifestDraft,
 } from '@shared/types/agentManifest';
+import { resolveAgentWriteTargetFromDraft, toAgentManifestEditorDraft } from '@shared/types/agentManifest';
+import { applyAgentDefinitionSaveResults, selectSubmittableAgentManifestDrafts } from './useAgentManifestAutosave';
 import type { useI18n } from '../../../i18n';
 import { nextAgentDefinitionClientRevision } from '../../../stores/appSettingsStore';
 import type { useProviderConnection } from './useProviderConnection';
@@ -24,7 +26,10 @@ interface SettingsModalActionsOptions {
   updateProfile: (profile: Partial<AppSettings['profile']>) => Promise<void>;
   patchSettings: (patch: AppSettingsPatch) => Promise<AppSettings>;
   saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
+  currentProjectId?: string | null;
   t: Translate;
+  blockSubmit?: (draft: AgentManifestDraft) => string | null;
+  blockProjectedSubmit?: (projectedDrafts: AgentManifestDraft[]) => string | null;
 }
 
 export interface AgentManifestSaveBatch {
@@ -38,7 +43,10 @@ export function createSettingsModalActions({
   updateProfile,
   patchSettings,
   saveAgentDefinition,
+  currentProjectId,
   t,
+  blockSubmit,
+  blockProjectedSubmit,
 }: SettingsModalActionsOptions) {
   const handleAvatarSelect = async () => {
     const avatarPath = await window.electronAPI?.appShell.selectAvatar();
@@ -101,14 +109,44 @@ export function createSettingsModalActions({
   const handleSaveAgentManifests = async (
     batch?: AgentManifestSaveBatch,
   ): Promise<AgentDefinitionSaveResult[] | null> => {
-    const request = batch ?? {
-      drafts: modalState.agentManifestDrafts,
-      clientRevision: nextAgentDefinitionClientRevision(),
+    let request = batch;
+    if (!request) {
+      const { drafts, blockedReason } = selectSubmittableAgentManifestDrafts(
+        modalState.agentManifestDrafts,
+        blockSubmit,
+        blockProjectedSubmit,
+        modalState.agentManifestDrafts,
+      );
+      if (blockedReason) {
+        modalState.setAgentManifestSaveBlocked(true);
+        modalState.setAgentManifestSaveState('error');
+        modalState.setAgentManifestSaveMessage(blockedReason);
+        return null;
+      }
+      modalState.setAgentManifestSaveBlocked(false);
+      if (drafts.length === 0) return [];
+      request = { drafts, clientRevision: nextAgentDefinitionClientRevision() };
+    }
+    const pending = request;
+    const saveBatch = async () => {
+      const results = await Promise.all(pending.drafts.map((draft) => {
+        const write = resolveAgentWriteTargetFromDraft(draft, currentProjectId);
+        return saveAgentDefinition({
+          draft,
+          clientRevision: pending.clientRevision,
+          scope: write.scope,
+          projectId: write.projectId,
+          sourceHash: draft.sourceHash,
+        });
+      }));
+      modalState.setAgentManifestDrafts((current) => applyAgentDefinitionSaveResults(
+        current,
+        pending.drafts,
+        results,
+        currentProjectId,
+      ));
+      return results;
     };
-    const saveBatch = () => Promise.all(request.drafts.map((draft) => saveAgentDefinition({
-      draft,
-      clientRevision: request.clientRevision,
-    })));
     if (batch) return saveBatch();
 
     modalState.setAgentManifestSaveState('saving');
@@ -137,7 +175,9 @@ export function createSettingsModalActions({
     modalState.setAgentManifestSaveMessage('');
     try {
       const nextSettings = await window.electronAPI.settings.importAgentManifest(filePath);
-      modalState.setAgentManifestDrafts(nextSettings.agents.definitions.map((definition) => ({ ...definition })));
+      modalState.setAgentManifestDrafts(nextSettings.agents.definitions.map((definition) => (
+        toAgentManifestEditorDraft(definition, currentProjectId)
+      )));
       modalState.setAgentRouteDrafts(nextSettings.llm.agentRoutes.map(cloneRoute));
       modalState.setAgentManifestSaveState('saved');
       modalState.setAgentManifestSaveMessage(t('settings.agentManifestImported'));

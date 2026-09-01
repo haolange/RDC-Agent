@@ -12,7 +12,7 @@ import {
   buildOptimisticConversationTurn,
   removeOptimisticConversationMessages,
   syncE2EConversationState,
-  toConversationMode,
+  resolveComposerProfileId,
   toConversationAttachmentInputs,
 } from './composerSendHelpers';
 import { useTurnControlsStore } from './useTurnControls';
@@ -162,6 +162,7 @@ export async function sendComposerConversationTurn(options: {
   try {
     const configuration = await buildConversationConfigurationCommit({
       selectedAgentId,
+      currentProjectId: currentProject?.projectId,
       getEffectiveCatalog: (providerId) => electronAPI.settings.getEffectiveCatalog(providerId),
       modelOverride: readComposerEffectiveModel(
         selectedAgentId,
@@ -169,7 +170,7 @@ export async function sendComposerConversationTurn(options: {
         currentProject?.projectId,
       ),
     });
-    const conversationMode = toConversationMode(currentMode);
+    const profileId = resolveComposerProfileId(currentMode, selectedAgentId);
     const turnControls = { ...useTurnControlsStore.getState().turnControls };
     const result = await electronAPI.conversation.sendMessage({
       requestId,
@@ -177,8 +178,8 @@ export async function sendComposerConversationTurn(options: {
       sessionId: currentSession?.sessionId ?? null,
       currentRunId: currentRun?.runId ?? null,
       replayDeviceId: selectedDeviceEntry?.id ?? null,
-      mode: conversationMode,
       agentId: selectedAgentId || null,
+      profileId,
       message: sentPrompt,
       attachments: toConversationAttachmentInputs(sentAttachments),
       preloadSkillIds: sentSkillIds,

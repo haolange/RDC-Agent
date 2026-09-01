@@ -12,7 +12,10 @@ import type { AgentTool } from '../../agent-runtime/agent/AgentTool';
 import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
 import type { ToolDefinition } from '../../agent-runtime/core/types';
 import { createToolSearchTool, getPrimitiveTools } from '../../agent-runtime/tools';
+import { HANDOFF_ERROR } from '@shared/types/profileHandoff';
 import { handoffController } from '../../agent-runtime/agent/HandoffController';
+import { isHandoffDeclaredModelValid } from '../../sessions/profileHandoffModel';
+import { settingsService } from '../../settings/SettingsService';
 import { MemoryStore } from '../../agent-runtime/memory/MemoryStore';
 import { createTaskTools, TaskRegistry, MemoryTaskStore, createSessionTaskStore, projectTaskItems } from '../../agent-runtime/tasks';
 import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
@@ -232,6 +235,13 @@ export class RuntimeToolAssembly {
       async execute(_toolCallId, args) {
         const toProfile = typeof args.agent === 'string' ? args.agent.trim() : '';
         const turn = capturedTurn ?? getActiveTurn(sessionId);
+        const resolvedSessionId = sessionId ?? turn?.eventSink?.sessionId ?? null;
+        const sourceRequestId = turn?.eventSink?.requestId?.trim() || '';
+        const sourceTurnId = turn?.turnId ?? '';
+        const store = storageAdapter.handoffs;
+        const nextChain = resolvedSessionId
+          ? store.computeNextChain(resolvedSessionId, agentId, sourceTurnId || undefined)
+          : { chainRoot: `handoff-root-${agentId}`, depth: 1 };
         const resolved = handoffController.resolve(
           agentId,
           toProfile,
@@ -241,6 +251,11 @@ export class RuntimeToolAssembly {
             ? {
                 sourceHandoffs: turn.runtimePlan.profileHandoffs,
                 enabledProfileIds: turn.runtimePlan.enabledProfileIds,
+                sessionId: resolvedSessionId ?? undefined,
+                hasActiveHandoff: resolvedSessionId ? Boolean(store.getActive(resolvedSessionId)) : false,
+                nextDepth: nextChain.depth,
+                chainRoot: nextChain.chainRoot,
+                isDeclaredModelValid: (canonical) => isHandoffDeclaredModelValid(canonical, settingsService.getAll()),
               }
             : undefined,
         );
@@ -248,32 +263,73 @@ export class RuntimeToolAssembly {
           return {
             content: [{
               type: 'text',
-              text: `Handoff rejected: ${resolved.reason ?? 'unknown reason'}`,
+              text: `${resolved.code ?? 'HANDOFF_REJECTED'}: ${resolved.reason ?? 'unknown reason'}`,
             }],
             isError: true,
-            details: { fromAgentId: agentId, toAgentId: toProfile, label: '', prompt: '', valid: false },
+            details: {
+              fromAgentId: agentId,
+              toAgentId: toProfile,
+              label: '',
+              prompt: '',
+              valid: false,
+              code: resolved.code,
+            },
           };
         }
-        const { toProfile: target, label, prompt } = resolved.request;
-        const handoff = {
-          turnId: turn?.turnId ?? '',
-          fromAgentId: agentId,
-          toProfile: target as AgentRole,
-          prompt,
-          label,
-          sessionId: sessionId ?? turn?.eventSink?.sessionId ?? null,
-        };
-        if (turn) {
-          turn.pendingHandoff = handoff;
+        const { toProfile: target, label, prompt, send, declaredModel, chainRoot, depth } = resolved.request;
+        if (!resolvedSessionId || !sourceTurnId || !sourceRequestId) {
+          return {
+            content: [{ type: 'text', text: `${HANDOFF_ERROR.STATE_CONFLICT}: handoff requires a session-owned turn.` }],
+            isError: true,
+            details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false },
+          };
         }
-        // 记录待处理 handoff，供 ConversationService turn 结束后 consume 实现 profile 切换。
-        return {
-          content: [{
-            type: 'text',
-            text: `Handoff prepared from ${agentId} to ${target}: ${label}\n${prompt}`,
-          }],
-          details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: true },
-        };
+        try {
+          const prepared = store.prepare(resolvedSessionId, {
+            sourceTurnId,
+            sourceRequestId,
+            sourceAgentId: agentId,
+            toAgentId: target,
+            prompt,
+            label,
+            declaredModel,
+            send,
+            chainRoot,
+            depth,
+          });
+          if (turn) {
+            turn.pendingHandoff = {
+              turnId: sourceTurnId,
+              fromAgentId: agentId,
+              toProfile: target as AgentRole,
+              prompt,
+              label,
+              sessionId: resolvedSessionId,
+            };
+          }
+          return {
+            content: [{
+              type: 'text',
+              text: `Handoff prepared from ${agentId} to ${target}: ${label}\n${prompt}`,
+            }],
+            details: {
+              fromAgentId: agentId,
+              toAgentId: target,
+              label,
+              prompt,
+              valid: true,
+              handoffId: prepared.handoffId,
+              send: prepared.send,
+            },
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            content: [{ type: 'text', text: message }],
+            isError: true,
+            details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false },
+          };
+        }
       },
     };
   }

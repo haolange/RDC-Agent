@@ -1,9 +1,7 @@
 import type { LlmProviderId } from './settings';
 
-export type AgentId = 'ask' | 'plan' | 'edit' | 'debugger' | 'analyzer' | 'optimizer';
+export type AgentId = 'general' | 'debugger' | 'analyzer' | 'optimizer';
 export type AgentRole = AgentId | (string & {});
-
-export type AgentCategory = 'orchestrator' | 'general';
 
 export type AgentStatus = 'idle' | 'thinking' | 'executing' | 'waiting' | 'complete' | 'error';
 
@@ -13,8 +11,6 @@ export interface AgentConfig {
   modelProvider: LlmProviderId;
   modelName: string;
   temperature?: number;
-  category: AgentCategory;
-  writeScope: WriteScope[];
 }
 
 export type WriteScope =
@@ -69,29 +65,26 @@ export interface AgentConversation {
   lastUpdated: string;
 }
 
-export const TOP_LEVEL_AGENT_IDS: AgentId[] = ['ask', 'plan', 'edit', 'debugger', 'analyzer', 'optimizer'];
+export const TOP_LEVEL_AGENT_IDS: AgentId[] = ['general', 'debugger', 'analyzer', 'optimizer'];
+export const MISSION_AGENT_IDS = ['debugger', 'analyzer', 'optimizer'] as const;
+export type MissionAgentId = (typeof MISSION_AGENT_IDS)[number];
 export const SAFE_AGENT_PROFILE_ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/u;
+export const DEFAULT_AGENT_ID: AgentId = 'general';
+export const LEGACY_UNKNOWN_PROFILE_ID = 'legacy:unknown';
 
 export const DEFAULT_MODEL_ROUTING: Record<AgentId, { provider: LlmProviderId; model: string }> = {
-  ask: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
-  plan: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
-  edit: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
+  general: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
   debugger: { provider: 'openrouter', model: 'anthropic/claude-3-opus' },
   analyzer: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
   optimizer: { provider: 'openrouter', model: 'anthropic/claude-3-sonnet' },
 };
 
-export const AGENT_CATEGORY_MAP: Record<AgentId, AgentCategory> = {
-  ask: 'orchestrator',
-  plan: 'orchestrator',
-  edit: 'orchestrator',
-  debugger: 'general',
-  analyzer: 'general',
-  optimizer: 'general',
-};
-
 export function isTopLevelAgentId(value: string): value is AgentId {
   return (TOP_LEVEL_AGENT_IDS as string[]).includes(value);
+}
+
+export function isMissionAgentId(value: string): value is MissionAgentId {
+  return (MISSION_AGENT_IDS as readonly string[]).includes(value);
 }
 
 export function isSafeAgentProfileId(value: string): boolean {

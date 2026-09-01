@@ -14,6 +14,7 @@ import {
 } from './composerAgentDefaultModel';
 import { clearComposerModelChoice, commitComposerModelChoice } from './sessionModelOverride';
 import { resolveComposerModelOverride } from './resolveComposerModelOverride';
+import { readCompiledComposerRoute } from './composerEffectiveModel';
 import { readComposerEffectiveModel } from './useComposerEffectiveModel';
 import { loadComposerModelPickerOptions } from './useComposerModelPickerOptions';
 
@@ -86,7 +87,7 @@ async function loadSession(sessionId: string, context: SlashCommandContext): Pro
 async function switchModel(modelId: string, context: SlashCommandContext): Promise<void> {
   const { settings } = useAppSettingsStore.getState();
   const language = settings.appearance.language;
-  const route = settings.llm.agentRoutes.find((entry) => entry.agentId === context.selectedAgentId);
+  const route = readCompiledComposerRoute(settings, context.selectedAgentId);
   const options = await loadComposerModelPickerOptions(settings.llm.providers, route?.providerId);
   if (isComposerAgentDefaultToken(modelId)) {
     const state = resolveComposerAgentDefaultState(route, options, true);
@@ -131,6 +132,7 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
       if (!agentId) return;
       context.setSelectedAgentId(agentId);
       context.setCurrentMode(agentId as AgentMode);
+      return;
       return;
     }
     case 'switch-model': {

@@ -1,6 +1,6 @@
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { RequestPlan } from '@shared/types/providerCapability';
-import type { AppMode, PreparedTurnContextSummary } from '@shared/types/session';
+import type { PreparedTurnContextSummary } from '@shared/types/session';
 import { createConversationMessage } from './ConversationRoutePreflight';
 
 export function shouldAnnounceContinuationDrop(
@@ -20,7 +20,7 @@ export function createContinuationDropNotice(options: {
   sessionId: string | null;
   projectId: string | null;
   runId?: string | null;
-  modeContext?: AppMode;
+  profileId?: string;
   branchId: string;
   forkId?: string;
   variantIndex?: number;
@@ -36,7 +36,7 @@ export function createContinuationDropNotice(options: {
       sessionId: options.sessionId,
       projectId: options.projectId,
       runId: options.runId,
-      modeContext: options.modeContext,
+      profileId: options.profileId,
       status: 'complete',
       branchId: options.branchId,
       forkId: options.forkId,

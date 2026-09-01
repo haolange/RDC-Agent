@@ -10,7 +10,7 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 
 **不做** image/video 生成 runtime、media provider 目录面或 `MediaRuntimeService` 类骨架；discovery 对非 agent modality（含 image/video output）保持 fail-closed 剔除。用户附件 vision-input（读图）仍属 agent chat 能力，与生成 media 无关。
 
-产品不是固定模式向导。**当前态**顶层 profile 仍是 Ask / Plan / Edit / Debugger / Analyzer / Optimizer，并由 `AgentManifestService.ensureSeedManifests` 写入 `~/.rdx/agents`。**目标态**只保留四个 builtin profile：`general` / `debugger` / `analyzer` / `optimizer`（`resources/agent-runtime/agents`，scope 优先级 `builtin < user < project`，不再写 user seed）。仅 `user-invocable` 的 profile 出现在 composer orchestrator 菜单。Plan 不是硬编码 `AppMode`，也不是目标拓扑的独立顶层身份；计划能力落在 Mission profile 的 Coordinator Skill、plan artifact 与 durable handoff。裁决与迁移门禁见下文「Current / Target / Migration Adjudications」。
+产品不是固定模式向导。**Wave 1 已落地**四个 builtin profile：`general` / `debugger` / `analyzer` / `optimizer`（`resources/agent-runtime/agents`，scope 优先级 `builtin < user < project`，不再写 user seed）。仅 `user-invocable` 的 profile 出现在 composer orchestrator 菜单。`/plan` 不再硬切 builtin plan。durable handoff runtime、Knowledge、五卡 Right Rail 与 Investigation schema **尚未实现**。裁决与迁移门禁见下文「Current / Target / Migration Adjudications」。
 
 唯一运行时路径是 agent loop：解析 profile / model route / policy / tools → 调用 LLM → 执行已批准工具 → 回灌结果 → 产出 final answer。Renderer 不得伪造推理阶段；隐藏 CoT 永不作为 UI 内容展示或持久化。
 
@@ -144,9 +144,9 @@ Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThem
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | 顶层身份是 Ask / Plan / Edit / Debugger / Analyzer / Optimizer。`AgentManifestService.ensureSeedManifests` 在 `~/.rdx/agents` 缺文件时写入 user seed。`AgentCategory` 把三类 Mission 标成 `general` executable。 |
-| **目标态** | 四个 builtin profile：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件只存在于 `resources/agent-runtime/agents`，scope 为 builtin。生效优先级 **`builtin < user < project`**，整资源替换。运行时**不再写 user seed**。已有 user `general` 自然覆盖 builtin `general`。空 `handoffs` 禁止；空 `agents` 仅表示可委托自身。不新增 `mission` / `orchestratorType` / `investigationMode` 等 Profile 领域字段。 |
-| **迁移门禁** | 历史 S0–S8 官方 seed 以 **parse 后的语义 hash** 识别（instructions / tools / skills / agents / handoffs / **model / icon / accent** 任一变化都视为用户修改，保守不迁）。匹配历史官方语义的旧文件原子移至 `~/.rdx/agents/.migrated/<migration-id>/` 备份，**不物理删除**。用户修改版原样保留在 `~/.rdx/agents`。进度 marker 为 `~/.rdx/agents/.seed-migration.json`，经 `StorageIo` 原子写，幂等 / 可重入，并写诊断。禁止交互式「导出 / 保留 / 移除」选择面；禁止静默覆盖用户修改。Ask / Plan / Edit 不再作为目标拓扑身份，也不作为运行时 fallback。 |
+| **当前态（Wave 1 已落地）** | 四个 builtin profile：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件只存在于 `resources/agent-runtime/agents`。生效优先级 **`builtin < user < project`**，整资源替换，builtin 属性由 scope 派生。运行时**不再写 user seed**。Settings / Composer / Conversation preflight 共用 project-aware effective snapshot。`handoffs` 可省略或显式空（合法=禁止 handoff）；任一畸形 entry 使整个 candidate invalid。空 `agents` 仅允许 self delegate。`AgentId` / `TOP_LEVEL_AGENT_IDS` 只含四 builtin；用户保留的 ask/plan/edit 仍可按 custom manifest 运行。Run v2 用 `kind: conversation\|mission` + `profileId`，新写无 `mode`。 |
+| **目标态** | 与 Wave 1 拓扑相同。durable handoff 状态机、Knowledge 工具、五卡 Right Rail、Investigation schema 仍属后续 Wave，不得写成已完成。不新增 `mission` / `orchestratorType` / `investigationMode` 等 Profile 领域字段。 |
+| **迁移门禁** | 历史官方 seed 世代诚实编号为 S0–S9（从 git 历史抽出，不编造）。以 **parse 后的语义 hash** 识别（instructions / tools / skills / agents / handoffs / **model / icon / accent** 任一变化都视为用户修改；历史动态 model 无法证实时不匹配）。匹配历史官方语义的旧文件原子移至 `~/.rdx/agents/.migrated/<migration-id>/` 备份，**不物理删除**。用户修改版原样保留。marker `~/.rdx/agents/.seed-migration.json` `schemaVersion:'1'`，经 `StorageIo` 原子写，未知高版本 fail-closed，幂等 / 可重入并写诊断。`.migrated` 不枚举。Ask / Plan / Edit 不再作为目标拓扑身份，也不作为运行时 fallback。 |
 
 ### B. Right Rail
 
@@ -168,7 +168,7 @@ Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThem
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | `AgentHandoffDefinition`（`label` / `agent` / `prompt` / `send` / `showContinueOn` / `model`）只是 manifest 路由声明。`agent_handoff` 经 Conversation 应用控制权，但没有 durable 状态机、root 链上限或重启恢复合同。现有定义**不足以**表达目标语义。 |
+| **当前态** | `AgentHandoffDefinition` 仍只是 manifest 路由声明。Durable 状态机已落地：`ProfileHandoffState`（`src/shared/types/profileHandoff.ts`）经 `HandoffStateStore` 写入 `<sessionPath>/handoff-state.json`。 |
 | **目标态** | 每个 handoff 实例是 session-owned durable 记录，状态为 `prepared` → `committed` → `consumed`，或任意未完成点进入 `cancelled`。必填字段：`handoffId` / `lifecycle` / `sourceTurnId` / `sourceRequestId` / `sourceAgentId` / `toAgentId` / `chainRoot` / `depth` / `prompt` / `label` / `declaredModel` / timestamps / `cancelReason`。`declaredModel` **字段必存在，值可为 `null`**。`prepared` 仅工具成功；`committed` 仅源 turn complete；`consumed` 仅目标消息 commit。`send:true` 在 committed 后自动续跑。每个用户 root 链最多 3 次 handoff。进程重启后未 consumed 的实例降级为手动继续，不自动续跑。Stop / Rewrite / branch / 手动切换 profile 取消未完成 handoff。审批不继承。同一 session 同时只允许一个活跃 handoff。非法 model fail-closed。模型优先级始终：**session `modelOverride` > 通过 `isAgentToolExecutableModel` 校验的 handoff `declaredModel` > target route**。空 `handoffs` 禁止；空 `agents` 仅自身。字段细则见详细目标设计。 |
 | **迁移门禁** | 实现必须新增 durable store（经 `StorageIo`），不得宣称「现有 `AgentHandoffDefinition` 已足够」。不得为旧无状态 handoff 增加永久双写。 |
 

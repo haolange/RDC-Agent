@@ -34,13 +34,31 @@ export interface AgentManifestDefinition {
   instructions: string;
   builtin: boolean;
   enabled: boolean;
+  compiledRoute?: {
+    agentId: string;
+    providerId: string;
+    modelId: string;
+  };
   /** 工具执行轮数上限；未设置时由 runtime 按 profile 默认值决定。 */
   maxTurns?: number;
   updatedAt?: string;
+  provenance?: AgentManifestProvenance;
 }
 
-export interface AgentManifestDraft extends Omit<AgentManifestDefinition, 'filePath' | 'builtin' | 'updatedAt'> {
+export interface AgentManifestProvenance {
+  scope: 'builtin' | 'user' | 'project';
+  sourcePath: string;
+  sourceHash: string;
+}
+
+export interface AgentManifestDraft extends Omit<
+  AgentManifestDefinition,
+  'filePath' | 'builtin' | 'updatedAt' | 'provenance' | 'compiledRoute'
+> {
   delete?: boolean;
+  writeScope?: AgentManifestWriteScope;
+  writeProjectId?: string;
+  sourceHash?: string;
 }
 
 export interface AgentModelOption {
@@ -63,11 +81,80 @@ export interface AgentManifestSettings {
   definitions: AgentManifestDefinition[];
   modelOptions: AgentModelOption[];
   globalInstructions: string;
+  diagnostics: string[];
+}
+
+export type AgentManifestWriteScope = 'user' | 'project';
+
+export interface AgentDefinitionCommitQuery {
+  agentId: string;
+  scope: AgentManifestWriteScope;
+  projectId?: string;
+}
+
+export function agentDefinitionLaneKey(
+  scope: AgentManifestWriteScope,
+  projectId: string | undefined,
+  agentId: string,
+): string {
+  return scope === 'project' ? `project:${projectId ?? ''}:${agentId}` : `user:${agentId}`;
+}
+
+export function resolveAgentWriteTarget(
+  definition: { provenance?: AgentManifestProvenance } | null | undefined,
+  currentProjectId?: string | null,
+): { scope: AgentManifestWriteScope; projectId?: string } {
+  if (definition?.provenance?.scope === 'project') {
+    const projectId = currentProjectId?.trim();
+    if (!projectId) {
+      throw new Error('AGENT_MANIFEST_PROJECT_ID_REQUIRED: project effective profile requires a current projectId.');
+    }
+    return { scope: 'project', projectId };
+  }
+  return { scope: 'user' };
+}
+
+export function resolveAgentWriteTargetFromDraft(
+  draft: Pick<AgentManifestDraft, 'writeScope' | 'writeProjectId'>,
+  currentProjectId?: string | null,
+): { scope: AgentManifestWriteScope; projectId?: string } {
+  if (draft.writeScope === 'project') {
+    const projectId = draft.writeProjectId?.trim() || currentProjectId?.trim();
+    if (!projectId) {
+      throw new Error('AGENT_MANIFEST_PROJECT_ID_REQUIRED: project-scoped editor draft requires a current projectId.');
+    }
+    return { scope: 'project', projectId };
+  }
+  return { scope: 'user' };
+}
+
+export function toAgentManifestEditorDraft(
+  definition: AgentManifestDefinition,
+  currentProjectId?: string | null,
+): AgentManifestDraft {
+  const {
+    filePath: _filePath,
+    builtin: _builtin,
+    updatedAt: _updatedAt,
+    provenance: _provenance,
+    compiledRoute: _compiledRoute,
+    ...rest
+  } = definition;
+  const write = resolveAgentWriteTarget(definition, currentProjectId);
+  return {
+    ...rest,
+    writeScope: write.scope,
+    writeProjectId: write.projectId,
+    sourceHash: definition.provenance?.sourceHash,
+  };
 }
 
 export interface AgentDefinitionSaveRequest {
   draft: AgentManifestDraft;
   clientRevision: number;
+  scope: AgentManifestWriteScope;
+  projectId?: string;
+  sourceHash?: string;
 }
 
 export type AgentDefinitionSaveStatus = 'committed' | 'superseded' | 'failed';

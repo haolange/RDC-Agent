@@ -12,6 +12,7 @@ import {
   type ComposerAgentDefaultState,
 } from './composerAgentDefaultModel';
 import { clearComposerModelChoice, commitComposerModelChoice } from './sessionModelOverride';
+import { readCompiledComposerRoute } from './composerEffectiveModel';
 import { useComposerEffectiveModel } from './useComposerEffectiveModel';
 import { useComposerModelPickerOptions } from './useComposerModelPickerOptions';
 
@@ -38,9 +39,7 @@ export const ComposerModelOverrideMenu: React.FC<{
   const [query, setQuery] = useState('');
   const [saveError, setSaveError] = useState('');
   const providers = useAppSettingsStore((state) => state.settings.llm.providers);
-  const agentRoute = useAppSettingsStore((state) => (
-    state.settings.llm.agentRoutes.find((route) => route.agentId === agentId)
-  ));
+  const agentRoute = useAppSettingsStore((state) => readCompiledComposerRoute(state.settings, agentId));
   const agentName = useAppSettingsStore((state) => (
     state.settings.agents.definitions.find((entry) => entry.id === agentId)?.name || agentId
   ));

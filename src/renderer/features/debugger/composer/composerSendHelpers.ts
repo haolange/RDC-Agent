@@ -1,7 +1,7 @@
 import type { ConversationAttachmentInput, ConversationMessage, ConversationTurnResult } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type { AgentMode } from '@shared/types/layout';
-import type { AppMode, ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
+import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type { AgentRunPresentation } from '@shared/types/agenticTrace';
 import type { PendingAttachmentDraft } from '../../../app/bootstrap/types';
 import { useConversationStore } from '../../../stores/conversationStore';
@@ -10,14 +10,8 @@ import { stopWorkTrace } from './stopWorkTrace';
 import { getActiveSessionId, isActiveSessionEvent } from '../../../app/bootstrap/sessionEventGate';
 import { useSessionProjectionStore } from '../../../stores/sessionProjectionStore';
 
-const EXECUTABLE_APP_MODES = new Set<string>(['edit', 'debugger', 'analyzer', 'optimizer']);
-
-export const toConversationMode = (mode: AgentMode): AppMode => {
-  if (mode === 'ask' || mode === 'plan') {
-    return 'ask';
-  }
-  return EXECUTABLE_APP_MODES.has(mode) ? mode as AppMode : 'edit';
-};
+export const resolveComposerProfileId = (_mode: AgentMode, selectedAgentId?: string): string =>
+  selectedAgentId?.trim() || 'general';
 
 export function buildOptimisticConversationTurn(options: {
   requestId: string;
@@ -41,7 +35,7 @@ export function buildOptimisticConversationTurn(options: {
   } = options;
   const turnId = `optimistic-turn-${requestId}`;
   const now = Date.now();
-  const conversationMode = toConversationMode(currentMode);
+  const profileId = resolveComposerProfileId(currentMode, selectedAgentId);
   const userId = `optimistic-user-${requestId}`;
   const assistantId = `optimistic-assistant-${requestId}`;
 
@@ -52,7 +46,7 @@ export function buildOptimisticConversationTurn(options: {
     sessionId: currentSession?.sessionId ?? null,
     projectId: currentProject?.projectId ?? null,
     runId: currentRun?.runId ?? null,
-    modeContext: conversationMode,
+    profileId,
     role: 'user',
     content: trimmed,
     status: 'complete',
@@ -80,7 +74,7 @@ export function buildOptimisticConversationTurn(options: {
     sessionId: currentSession?.sessionId ?? null,
     projectId: currentProject?.projectId ?? null,
     runId: currentRun?.runId ?? null,
-    modeContext: conversationMode,
+    profileId,
     role: 'assistant',
     agentId: selectedAgentId || currentMode,
     content: '',

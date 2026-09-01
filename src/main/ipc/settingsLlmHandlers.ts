@@ -12,6 +12,8 @@ import type {
 import type { AgentDefinitionSaveRequest } from '@shared/types/agentManifest';
 import { appPathService } from '../runtime/AppPathService';
 import { agentManifestService } from '../settings/AgentManifestService';
+import { resolveCompiledRouteForAgent } from '../settings/compiledAgentRoutes';
+import { tryCurrentProjectRoot } from '../settings/resolveRegisteredProjectRoot';
 import { providerConnectionService } from '../settings/ProviderConnectionService';
 import { settingsService } from '../settings/SettingsService';
 import { resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
@@ -38,6 +40,7 @@ import {
   LlmProviderAccountLoginStartArgsSchema,
   LlmProviderDraftArgsSchema,
   LlmProviderIdArgsSchema,
+  SettingsGetAgentDefinitionCommitArgsSchema,
   SettingsSaveAgentDefinitionArgsSchema,
   SettingsSaveProviderDefinitionArgsSchema,
   SettingsGetModelsOverrideArgsSchema,
@@ -214,7 +217,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
         maxBytes: 4 * 1024,
       });
       const settings = settingsService.getAll();
-      const route = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
+      const route = resolveCompiledRouteForAgent(agentId, settings, tryCurrentProjectRoot());
       if (!route?.providerId || !route.modelId) return null;
       await loadProviderSurface(route.providerId);
       return resolveEffectiveModel(route.providerId, route.modelId, settings);
@@ -275,11 +278,11 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
   });
 
   ipcMain.handle('settings:getAgentDefinitionCommit', async (_event, ...rawArgs: unknown[]) => {
-    const [agentId] = parseIpcArgs(SettingsAgentIdArgsSchema, rawArgs, {
+    const [query] = parseIpcArgs(SettingsGetAgentDefinitionCommitArgsSchema, rawArgs, {
       label: 'settings:getAgentDefinitionCommit',
       maxBytes: 4 * 1024,
     });
-    return settingsService.getAgentDefinitionCommit(agentId);
+    return settingsService.getAgentDefinitionCommit(query);
   });
 
   ipcMain.handle('settings:saveProviderDefinition', async (_event, ...rawArgs: unknown[]) => {

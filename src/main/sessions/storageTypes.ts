@@ -15,7 +15,7 @@ export interface SelectionState {
   sessionId: string | null;
 }
 
-export interface PersistedRunRecord extends RunRecord {
+export type PersistedRunRecord = RunRecord & {
   createdAt: number;
   updatedAt: number;
   runtime: {
@@ -26,7 +26,7 @@ export interface PersistedRunRecord extends RunRecord {
     session_id: string;
     workflow_stage: WorkflowStage;
   };
-}
+};
 
 export interface SessionEvidenceRecord {
   schema_version: '1';

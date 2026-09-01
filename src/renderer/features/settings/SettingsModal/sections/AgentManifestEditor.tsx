@@ -7,7 +7,8 @@ import { useDynStyle } from '../../../../lib/useDynStyle';
 import { ColorField } from '../../../../ui/ColorField';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { AutosizeTextarea } from '../AutosizeTextarea';
-import { AgentCapabilityPicker, type AgentCapabilityGroup } from './AgentCapabilityPicker';
+import { AgentCapabilityPicker, buildAgentCapabilityGroups } from './AgentCapabilityPicker';
+import { AgentHandoffEditor } from './AgentHandoffEditor';
 import { AgentIconPresetPicker } from './AgentIconPresetPicker';
 import { AgentModelCascadeSelect } from './AgentModelCascadeSelect';
 
@@ -22,78 +23,9 @@ interface AgentManifestEditorProps {
   onRetrySaveAgentManifests: () => void | Promise<unknown>;
   agentManifestSaveState: 'idle' | 'saving' | 'saved' | 'error';
   agentManifestSaveMessage: string;
+  agentManifestSaveBlocked?: boolean;
   t: Translate;
 }
-
-const BUILTIN_TOOL_OPTIONS = [
-  'read',
-  'search',
-  'web',
-  'git',
-  'shell',
-  'interpreter',
-  'write',
-  'edit',
-  'file-manage',
-  'askUser',
-  'agent',
-  'handoff',
-  'task',
-  'memory',
-  'memory-write',
-  'planArtifact',
-  'skill',
-  'mcp',
-  'tool_search',
-  'rdxContext',
-  'subagent',
-];
-
-const uniqueOptions = (...groups: string[][]): string[] =>
-  Array.from(new Set(groups.flat().map((value) => value.trim()).filter(Boolean)))
-    .sort((first, second) => first.localeCompare(second));
-
-const buildCapabilityGroups = (
-  settings: AppSettings,
-  selectedAgent: AgentManifestDraft,
-  onUpdateAgent: (patch: Partial<AgentManifestDraft>) => void,
-  t: Translate,
-): AgentCapabilityGroup[] => {
-  const allAgents = settings.agents.definitions;
-  return [
-    {
-      id: 'tools',
-      label: t('settings.tools'),
-      values: selectedAgent.tools,
-      options: uniqueOptions(BUILTIN_TOOL_OPTIONS, allAgents.flatMap((agent) => agent.tools), selectedAgent.tools),
-      onChange: (tools) => onUpdateAgent({ tools }),
-    },
-    {
-      id: 'agents',
-      label: t('settings.subAgents'),
-      values: selectedAgent.agents,
-      options: uniqueOptions(
-        allAgents.filter((agent) => agent.id !== selectedAgent.id).map((agent) => agent.id),
-        selectedAgent.agents,
-      ),
-      onChange: (agents) => onUpdateAgent({ agents }),
-    },
-    {
-      id: 'skills',
-      label: t('settings.skills'),
-      values: selectedAgent.skills,
-      options: uniqueOptions(allAgents.flatMap((agent) => agent.skills), selectedAgent.skills),
-      onChange: (skills) => onUpdateAgent({ skills }),
-    },
-    {
-      id: 'mcp',
-      label: t('settings.mcp'),
-      values: selectedAgent.mcpServers,
-      options: uniqueOptions(allAgents.flatMap((agent) => agent.mcpServers), selectedAgent.mcpServers),
-      onChange: (mcpServers) => onUpdateAgent({ mcpServers }),
-    },
-  ];
-};
 
 export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   settings,
@@ -104,10 +36,11 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
   onRetrySaveAgentManifests,
   agentManifestSaveState,
   agentManifestSaveMessage,
+  agentManifestSaveBlocked = false,
   t,
 }) => {
   const selectedModel = selectedAgent.models[0] ?? '';
-  const capabilityGroups = buildCapabilityGroups(settings, selectedAgent, onUpdateAgent, t);
+  const capabilityGroups = buildAgentCapabilityGroups(settings, selectedAgent, onUpdateAgent, t);
   const toolDiagnostics = diagnoseManifestToolTokens(selectedAgent.tools);
   const saveStatusMessage = agentManifestSaveState === 'saving'
     ? t('settings.saving')
@@ -258,6 +191,25 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
 
         <details className="settings-advanced-panel">
           <summary>
+            <span>{t('settings.handoffs')}</span>
+            <small>{t('settings.agentHandoffsHint')}</small>
+          </summary>
+          <div className="settings-advanced-content">
+            <AgentHandoffEditor
+              key={selectedAgent.id}
+              selfId={selectedAgent.id}
+              handoffs={selectedAgent.handoffs}
+              definitions={settings.agents.definitions}
+              modelOptions={settings.agents.modelOptions}
+              forceShowRequired={agentManifestSaveBlocked}
+              onChange={(handoffs) => onUpdateAgent({ handoffs })}
+              t={t}
+            />
+          </div>
+        </details>
+
+        <details className="settings-advanced-panel">
+          <summary>
             <span>{t('settings.agentAdvancedInstructions')}</span>
           </summary>
           <div className="settings-advanced-content">
@@ -276,7 +228,7 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
       {showSaveStatus ? (
         <div className={`settings-agent-autosave-status ${agentManifestSaveState}`}>
           <span>{saveStatusMessage}</span>
-          {agentManifestSaveState === 'error' ? (
+          {agentManifestSaveState === 'error' && !agentManifestSaveBlocked ? (
             <button type="button" className="button button-secondary" onClick={() => void onRetrySaveAgentManifests()}>
               {t('settings.retry')}
             </button>

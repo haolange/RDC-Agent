@@ -11,7 +11,7 @@ export interface AgentRunPresentation {
   projectId: string;
   sessionId: string;
   activeBranchId: string;
-  mode: import('../session').AppMode;
+  profileId: string;
   updatedAt: string;
   runs: AgentRunViewModel[];
   rightPanel: RightPanelViewModel;

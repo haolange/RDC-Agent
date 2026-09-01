@@ -13,7 +13,7 @@ import {
 import { useTurnControlsStore } from '../composer/useTurnControls';
 import { createConversationRequestId } from '../composer/composerSendFlow';
 import { buildConversationConfigurationCommit } from '../composer/composerConfigurationCommit';
-import { toConversationMode } from '../composer/composerSendHelpers';
+import { resolveComposerProfileId } from '../composer/composerSendHelpers';
 import { useComposerSessionContextStore } from '../composer/composerSessionContext';
 import { useLayoutStore } from '../../../stores/layoutStore';
 import { readComposerEffectiveModel } from '../composer/useComposerEffectiveModel';
@@ -48,7 +48,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
     const previousMessages = useConversationStore.getState().allConversationMessages;
     const previousBranchState = useConversationStore.getState().branchState;
     const requestId = createConversationRequestId();
-    const rewriteAgentId = useLayoutStore.getState().selectedAgentId || 'ask';
+    const rewriteAgentId = useLayoutStore.getState().selectedAgentId || 'general';
     const turnOwnership = {
       sessionId: message.sessionId ?? 'no-session',
       requestId,
@@ -75,6 +75,7 @@ export function useUserMessageRewrite(message: ConversationMessage) {
     try {
       const configuration = await buildConversationConfigurationCommit({
         selectedAgentId: rewriteAgentId,
+        currentProjectId: currentProject?.projectId,
         getEffectiveCatalog: (providerId) => electronAPI.settings.getEffectiveCatalog(providerId),
         modelOverride: readComposerEffectiveModel(
           rewriteAgentId,
@@ -89,8 +90,8 @@ export function useUserMessageRewrite(message: ConversationMessage) {
         sessionId: message.sessionId,
         currentRunId: message.runId ?? null,
         replayDeviceId: null,
-        mode: toConversationMode(useLayoutStore.getState().currentMode),
         agentId: rewriteAgentId,
+        profileId: resolveComposerProfileId(useLayoutStore.getState().currentMode, rewriteAgentId),
         message: nextContent,
         attachments: message.attachments?.map((attachment) => ({
           sourcePath: attachment.filePath,

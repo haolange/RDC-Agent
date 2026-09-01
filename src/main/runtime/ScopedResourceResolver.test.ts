@@ -20,6 +20,28 @@ describe('ScopedResourceResolver', () => {
     expect(catalog.resources[0].effectiveStatus).toBe('overridden');
   });
 
+  it('keeps a lower-scope winner when a higher-scope candidate is invalid', () => {
+    const resolver = new ScopedResourceResolver();
+    const catalog = resolver.resolve([
+      { id: 'general', kind: 'agent', scope: 'builtin', sourcePath: 'builtin/general.agent.md', value: { model: 'builtin' } },
+      {
+        id: 'general',
+        kind: 'agent',
+        scope: 'project',
+        sourcePath: 'project/general.agent.md',
+        value: { model: 'broken' },
+        invalid: true,
+        invalidReason: 'malformed frontmatter',
+      },
+    ]);
+    expect(catalog.resources).toHaveLength(1);
+    expect(catalog.resources[0].value).toEqual({ model: 'builtin' });
+    expect(catalog.resources[0].provenance.scope).toBe('builtin');
+    expect(catalog.diagnostics.some((entry) => (
+      entry.code === 'resource.invalid' && entry.sourcePath === 'project/general.agent.md'
+    ))).toBe(true);
+  });
+
   it('allows a project disabled override to shadow an inherited resource', () => {
     const resolver = new ScopedResourceResolver();
     const catalog = resolver.resolve([

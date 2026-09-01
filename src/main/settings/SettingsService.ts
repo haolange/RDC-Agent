@@ -31,6 +31,7 @@ import type {
   AgentDefinitionSaveResult,
 } from '@shared/types/agentManifest';
 import type { LLMConfig, LLMProviderConfig } from '@shared/types/llm';
+import { compiledRoutesFromDefinitions } from './compiledAgentRoutes';
 import { mergeUiPreferences, sanitizeUiPreferences } from '@shared/theme/uiPreferences';
 import {
   createLocalAccountId,
@@ -381,9 +382,11 @@ export class SettingsService {
     });
   }
 
-  async getAgentDefinitionCommit(agentIdDraft: string): Promise<AgentDefinitionCommitSnapshot | null> {
+  async getAgentDefinitionCommit(
+    query: import('@shared/types/agentManifest').AgentDefinitionCommitQuery,
+  ): Promise<AgentDefinitionCommitSnapshot | null> {
     this.ensureInitialized();
-    return this.agentOps.getAgentDefinitionCommit(agentIdDraft);
+    return this.agentOps.getAgentDefinitionCommit(query);
   }
 
   async saveAgentDefinition(request: AgentDefinitionSaveRequest): Promise<AgentDefinitionSaveResult> {
@@ -479,7 +482,7 @@ export class SettingsService {
 
     return {
       providers,
-      agentRoutes: settings.llm.agentRoutes,
+      agentRoutes: compiledRoutesFromDefinitions(settings.agents.definitions),
     };
   }
 

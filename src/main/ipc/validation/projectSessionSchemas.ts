@@ -48,6 +48,11 @@ export const SessionSetModelOverrideArgsSchema = z.tuple([
   }).nullable(),
 ]);
 
+export const SessionSetAgentIdArgsSchema = z.tuple([
+  ipcId(128, 'sessionId'),
+  ipcNonEmptyString(128, 'agentId'),
+]);
+
 
 export const RunListArgsSchema = z.tuple([
   ipcId(128, 'sessionId'),

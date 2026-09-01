@@ -28,6 +28,8 @@ export interface ScopedResourceCandidate<T> {
   sourcePath: string;
   value: T;
   enabled?: boolean;
+  invalid?: boolean;
+  invalidReason?: string;
 }
 
 export interface ResolvedResource<T> {
@@ -52,6 +54,11 @@ export interface ScopedResourceCatalog<T = unknown> {
 export interface EffectiveAgentProfile extends AgentManifestDefinition {
   effectiveStatus: EffectiveResourceStatus;
   provenance: ResourceProvenance;
+  compiledRoute: {
+    agentId: string;
+    providerId: string;
+    modelId: string;
+  };
 }
 
 export interface ScopedInstructionSource {

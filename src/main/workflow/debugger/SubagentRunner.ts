@@ -311,20 +311,29 @@ export class SubagentRunner {
     > = {
       name: 'subagent',
       label: 'Subagent',
-      description: 'Delegate a sub-task to an isolated sub-agent. The sub-agent runs to completion (serial, not parallel) and returns its final answer. Use profile to target a specific agent profile (defaults to "ask" read-only). Optional model is a canonical providerId:modelId and does not inherit the parent session override.',
+      description: 'Delegate a sub-task to an isolated sub-agent. The sub-agent runs to completion (serial, not parallel) and returns its final answer. Use profile to target a declared delegate. Defaults to the caller profile. Optional model is a canonical providerId:modelId and does not inherit the parent session override.',
       parameters: {
         type: 'object',
         required: ['task'],
         properties: {
           task: { type: 'string', description: 'The task description for the sub-agent.' },
-          profile: { type: 'string', description: 'Target profile id. Defaults to "ask" (read-only).' },
+          profile: { type: 'string', description: 'Target profile id. Defaults to the caller profile. Must be in the frozen profileDelegates set, or self when that set is empty.' },
           model: { type: 'string', description: 'Optional canonical providerId:modelId. Fail-closed if the model is not available.' },
         },
       },
       permissionHint: 'readonly',
       async execute(toolCallId, args, signal) {
-        const targetProfile = (typeof args.profile === 'string' && args.profile.trim() ? args.profile.trim() : 'ask') as AgentRole;
         const turn = capturedTurn ?? getActiveTurn(sessionId);
+        const targetProfile = (typeof args.profile === 'string' && args.profile.trim()
+          ? args.profile.trim()
+          : parentAgentId) as AgentRole;
+        const delegates = turn?.runtimePlan?.profileDelegates ?? [];
+        const authorized = delegates.length === 0
+          ? targetProfile === parentAgentId
+          : targetProfile === parentAgentId || delegates.includes(targetProfile);
+        if (!authorized) {
+          throw new Error(`SUBAGENT_DELEGATE_DENIED: ${targetProfile} is not in the frozen profileDelegates set.`);
+        }
         const result = await runSubagent({
           parentAgentId,
           parentToolCallId: toolCallId,

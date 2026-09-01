@@ -13,7 +13,6 @@ import type {
 } from '@shared/types/workflow';
 import type {
   CaptureDescriptor,
-  ExecutableAppMode,
   ProjectInputRecord,
   ProjectRecord,
   RunContextUsageSummary,
@@ -21,6 +20,7 @@ import type {
   SessionAttachmentRecord,
   SessionRecord,
 } from '@shared/types/session';
+import type { ProfileHandoffState } from '@shared/types/profileHandoff';
 import type { PersistedRunRecord, SessionEvidenceRecord } from './storageTypes';
 import type { SessionContextTurnEntry } from '../conversation/SessionContextJournal';
 import { StorageIo } from './StorageIo';
@@ -28,6 +28,7 @@ import { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
 import { SessionRecordStore } from './SessionRecordStore';
 import { ConversationHistoryStore } from './ConversationHistoryStore';
 import { SessionContextStore } from './SessionContextStore';
+import { HandoffStateStore } from './HandoffStateStore';
 import type {
   ConversationHistoryCacheEntry,
   ExistingConversationTurnCommit,
@@ -57,13 +58,22 @@ export class StorageAdapter implements StorageHost {
   sessions: SessionRecordStore;
   history: ConversationHistoryStore;
   context: SessionContextStore;
+  handoffs: HandoffStateStore;
+  private handoffHydrateListener: ((sessionId: string, result: ProfileHandoffState | null) => void) | null = null;
 
   constructor() {
     this.projects = new ProjectWorkspaceStore(this);
     this.sessions = new SessionRecordStore(this);
     this.history = new ConversationHistoryStore(this);
     this.context = new SessionContextStore(this);
+    this.handoffs = new HandoffStateStore(this);
     this.projects.syncRuntimePaths();
+  }
+
+  setHandoffHydrateListener(
+    listener: ((sessionId: string, result: ProfileHandoffState | null) => void) | null,
+  ): void {
+    this.handoffHydrateListener = listener;
   }
 
   getWorkspacePath(): string {
@@ -193,7 +203,12 @@ export class StorageAdapter implements StorageHost {
   }
 
   readSession(sessionId: string): SessionRecord | null {
-    return this.sessions.readSession(sessionId);
+    const session = this.sessions.readSession(sessionId);
+    if (session) {
+      const hydrated = this.handoffs.hydrate(sessionId);
+      this.handoffHydrateListener?.(sessionId, hydrated);
+    }
+    return session;
   }
 
   updateSession(sessionId: string, patch: Partial<SessionRecord>): SessionRecord | null {
@@ -214,6 +229,10 @@ export class StorageAdapter implements StorageHost {
 
   getRunPath(caseId: string, runId: string): string {
     return this.sessions.getRunPath(caseId, runId);
+  }
+
+  readPersistedRun(sessionId: string, runId: string) {
+    return this.sessions.readPersistedRun(sessionId, runId);
   }
 
   async createCase(input: {
@@ -239,7 +258,7 @@ export class StorageAdapter implements StorageHost {
     sessionId?: string;
     turnId?: string;
     capturePaths: string[];
-    mode?: ExecutableAppMode;
+    profileId: string;
     goal?: string;
     captures?: CaptureDescriptor[];
     backend?: 'local' | 'remote';

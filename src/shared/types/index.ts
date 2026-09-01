@@ -29,13 +29,16 @@ export type {
 export type { AgentConfig, AgentRole, AgentState, AgentStatus } from './agent';
 export type {
   AgentHandoffDefinition,
+  AgentDefinitionCommitQuery,
   AgentDefinitionCommitSnapshot,
   AgentDefinitionSaveRequest,
   AgentDefinitionSaveResult,
   AgentDefinitionSaveStatus,
   AgentManifestDefinition,
   AgentManifestDraft,
+  AgentManifestProvenance,
   AgentManifestSettings,
+  AgentManifestWriteScope,
   AgentModelOption,
 } from './agentManifest';
 export type {
@@ -68,6 +71,13 @@ export type {
   TraceStatus,
   VisibleReasoningPacket,
 } from './agenticTrace';
+export type {
+  HandoffErrorCode,
+  HandoffStateDocument,
+  ProfileHandoffCancelReason,
+  ProfileHandoffLifecycle,
+  ProfileHandoffState,
+} from './profileHandoff';
 export type { AgentEvent, AgentEventPayload, AgentEventType } from './agentRuntime';
 export type {
   AgentRuntimeCatalog,
@@ -219,7 +229,13 @@ export type {
   ProjectInputRecord,
   ProjectRecord,
   RunContextUsageSummary,
+  ConversationRunRecord,
+  MissionId,
+  MissionKind,
+  MissionRunRecord,
+  RunKind,
   RunRecord,
+  RunStatus,
   RunSummary,
   SessionAttachmentRecord,
   SessionModelOverride,

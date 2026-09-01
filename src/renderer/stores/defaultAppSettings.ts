@@ -83,7 +83,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     },
   },
   llm: { providers: [], agentRoutes: createEmptyAgentRoutes() },
-  agents: { directoryPath: '', definitions: [], modelOptions: [], globalInstructions: '' },
+  agents: { directoryPath: '', definitions: [], modelOptions: [], globalInstructions: '', diagnostics: [] },
   resourceCatalog: {
     availableSkills: [],
     availableMcpServers: [],

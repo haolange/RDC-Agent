@@ -20,7 +20,6 @@ export type {
   ToolTokenDiagnostic,
 } from './agentToolTokens';
 export {
-  AGENT_CATEGORIES,
   AGENT_SEED_ACCENTS,
   AGENT_DESCRIPTIONS,
   AGENT_DISPLAY_NAMES,
@@ -28,7 +27,6 @@ export {
   AGENT_MODES,
   AGENT_NOTE_FILES,
   AGENT_ROLES,
-  AGENT_WRITE_SCOPES,
   DEFAULT_MODEL_ROUTING,
   DEFAULT_TOKEN_TTL_SECONDS,
   getAgentModeConfig,

@@ -1,5 +1,5 @@
 import path from 'path';
-import type { AppMode, ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
+import type { ProjectRecord, RunSummary, SessionRecord } from '@shared/types/session';
 import type {
   ArtifactsPanelViewModel,
   ContextPanelViewModel,
@@ -99,11 +99,11 @@ export function buildTaskContext(input: {
   runs: RunSummary[];
   attachments: SessionArtifactSource[];
   resources: TaskContextResource[];
-  mode: AppMode;
+  profileId?: string;
   permissionMode: string;
 }): ContextPanelViewModel['task'] {
   const latest = input.runs.slice().sort((left, right) => (right.startedAt ?? 0) - (left.startedAt ?? 0))[0];
-  const mode = latest?.mode ?? input.mode;
+  const mode = latest?.profileId ?? input.profileId ?? 'general';
   const profile = agentProfileRegistry.getForMode(mode);
   const resources: TaskContextResource[] = input.attachments.filter((item) => item.kind === 'attachment').map((item) => ({
     id: `attachment:${item.id}`, kind: 'attachment', label: item.title, summary: item.filePath, path: item.filePath, state: 'active',

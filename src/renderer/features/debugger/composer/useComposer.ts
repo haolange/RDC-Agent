@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { ModeConfig } from '@shared/types/layout';
 import { AGENT_MODES, resolveAgentDisplay } from '@shared/constants/agents';
 import { COMPOSE_ACCENT_FALLBACK } from '@shared/theme/composeAccent';
@@ -17,6 +17,7 @@ import { buildComposerPresentation } from './composerPresentation';
 import { projectContextUsagePreview } from './projectContextUsagePreview';
 import { useSelectedContextProfile } from './useSelectedContextProfile';
 import { useComposerDomEffects } from './useComposerDomEffects';
+import { hydrateComposerAgentFromSession, persistSessionAgentId } from './sessionAgentId';
 
 export function useComposer(options: {
   showNotice: (message: string) => void;
@@ -42,10 +43,18 @@ export function useComposer(options: {
   const setCurrentMode = useLayoutStore((state) => state.setCurrentMode);
   const selectedAgentId = useLayoutStore((state) => state.selectedAgentId);
   const setSelectedAgentId = useCallback((agentId: string) => {
-    useLayoutStore.getState().setSelectedAgentId(agentId);
+    void persistSessionAgentId(useProjectStore.getState().currentSession?.sessionId, agentId);
   }, []);
+
+  useEffect(() => {
+    hydrateComposerAgentFromSession(currentSession);
+  }, [currentSession?.sessionId, currentSession?.agentId]);
   const agentDefinitions = useAppSettingsStore((state) => state.settings.agents.definitions);
   const userInvocableAgents = agentDefinitions.filter((agent) => agent.enabled && agent.userInvocable);
+
+  useEffect(() => {
+    void useAppSettingsStore.getState().reloadSettings().catch(() => undefined);
+  }, [currentProject?.projectId]);
 
   const devices = useDeviceStore((state) => state.devices);
   const selectedDevice = useDeviceStore((state) => state.selectedDevice);

@@ -51,11 +51,11 @@ describe('AgentDefinitionMutationCoordinator', () => {
   it('debounces A -> B -> C and flushes only the latest revision', async () => {
     const commit = vi.fn(async (request: AgentDefinitionSaveRequest) => committed(request));
     const coordinator = new AgentDefinitionMutationCoordinator(commit, 60_000);
-    const a = coordinator.enqueue({ draft: draft('provider:a'), clientRevision: 1 });
-    const b = coordinator.enqueue({ draft: draft('provider:b'), clientRevision: 2 });
-    const c = coordinator.enqueue({ draft: draft('provider:c'), clientRevision: 3 });
+    const a = coordinator.enqueue({ draft: draft('provider:a'), clientRevision: 1, scope: 'user' });
+    const b = coordinator.enqueue({ draft: draft('provider:b'), clientRevision: 2, scope: 'user' });
+    const c = coordinator.enqueue({ draft: draft('provider:c'), clientRevision: 3, scope: 'user' });
 
-    const barrier = await coordinator.flush('ask');
+    const barrier = await coordinator.flush({ scope: 'user', agentId: 'ask' });
     const results = await Promise.all([a, b, c]);
 
     expect(commit).toHaveBeenCalledTimes(1);
@@ -80,9 +80,26 @@ describe('AgentDefinitionMutationCoordinator', () => {
       error: 'disk full',
     };
     const coordinator = new AgentDefinitionMutationCoordinator(async () => failed, 60_000);
-    const pending = coordinator.enqueue({ draft: draft('provider:d'), clientRevision: 4 });
+    const pending = coordinator.enqueue({ draft: draft('provider:d'), clientRevision: 4, scope: 'user' });
 
-    await expect(coordinator.flush('ask')).rejects.toThrow('disk full');
+    await expect(coordinator.flush({ scope: 'user', agentId: 'ask' })).rejects.toThrow('disk full');
     await expect(pending).resolves.toMatchObject({ status: 'failed', error: 'disk full' });
+  });
+
+  it('isolates revision lanes by scope+projectId+agentId', async () => {
+    const commit = vi.fn(async (request: AgentDefinitionSaveRequest) => committed(request));
+    const coordinator = new AgentDefinitionMutationCoordinator(commit, 60_000);
+    const userSave = coordinator.enqueue({ draft: draft('provider:user'), clientRevision: 1, scope: 'user' });
+    const projectSave = coordinator.enqueue({
+      draft: draft('provider:project'),
+      clientRevision: 1,
+      scope: 'project',
+      projectId: 'proj_a',
+    });
+    await coordinator.flush({ scope: 'user', agentId: 'ask' });
+    await coordinator.flush({ scope: 'project', projectId: 'proj_a', agentId: 'ask' });
+    const results = await Promise.all([userSave, projectSave]);
+    expect(commit).toHaveBeenCalledTimes(2);
+    expect(results.map((result) => result.status)).toEqual(['committed', 'committed']);
   });
 });

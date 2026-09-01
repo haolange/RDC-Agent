@@ -17,7 +17,6 @@ import type {
   ConversationDiagnosticSeverity,
   ConversationLoopStopReason,
 } from './conversation';
-import type { AppMode, ExecutableAppMode } from './session';
 import type { LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
 import type { ToolCallResult } from './tool';
 import type { WorkflowPhase, WorkflowStage } from './workflow';
@@ -69,14 +68,16 @@ export type AgentEventType =
   | 'subagent.started'
   | 'subagent.delta'
   | 'subagent.completed'
-  | 'handoff.requested';
+  | 'handoff.requested'
+  | 'handoff.consumed'
+  | 'handoff.cancelled';
 
 export interface AgentEventBasePayload {
   [key: string]: unknown;
 }
 
 export interface AgentRunStartedPayload extends AgentEventBasePayload {
-  mode: AppMode;
+  profileId: string;
   providerId: string;
   modelId: string;
   toolAllowlist: string[];
@@ -215,10 +216,28 @@ export interface AgentHandoffRequestedPayload extends AgentEventBasePayload {
   fromAgentId: string;
   /** 目标 profile。 */
   toProfile: string;
+  toAgentId?: string;
+  handoffId?: string;
+  send?: boolean;
   /** 移交后注入的 prompt（缺省时从目标 profile handoffs 定义取）。 */
   prompt: string;
   /** handoff 标签。 */
   label?: string;
+}
+
+export interface AgentHandoffConsumedPayload extends AgentEventBasePayload {
+  handoffId: string;
+  fromAgentId: string;
+  toAgentId: string;
+  toProfile: string;
+}
+
+export interface AgentHandoffCancelledPayload extends AgentEventBasePayload {
+  handoffId: string;
+  fromAgentId: string;
+  toAgentId: string;
+  toProfile: string;
+  cancelReason: string;
 }
 
 export type AgentEventPayload =
@@ -236,7 +255,9 @@ export type AgentEventPayload =
   | AgentRunFinalPayload
   | AgentContextCompactedPayload
   | AgentSubagentEventPayload
-  | AgentHandoffRequestedPayload;
+  | AgentHandoffRequestedPayload
+  | AgentHandoffConsumedPayload
+  | AgentHandoffCancelledPayload;
 
 export interface AgentEvent {
   id: string;
@@ -330,7 +351,7 @@ export interface AgentRuntimeTaskDescriptor {
 export interface AgentRuntimeTaskGraphDescriptor {
   id: string;
   runId: string;
-  mode: ExecutableAppMode;
+  profileId: string;
   execution: 'serial';
   status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
   tasks: AgentRuntimeTaskDescriptor[];

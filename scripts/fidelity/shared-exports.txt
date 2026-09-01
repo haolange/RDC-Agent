@@ -1,6 +1,4 @@
 ActionEvent
-AGENT_CATEGORIES
-AGENT_CATEGORY_MAP
 AGENT_DESCRIPTIONS
 AGENT_DISPLAY_NAMES
 AGENT_ICON_PRESETS
@@ -11,13 +9,11 @@ AGENT_ROLES
 AGENT_SEED_ACCENTS
 AGENT_WORKBENCH_COMMAND_CATALOG
 AGENT_WORKBENCH_TOOL_CATALOG
-AGENT_WRITE_SCOPES
 AgentApi
 AgentApprovalEventPayload
 AgentAssistantCompletedPayload
 AgentAssistantDeltaPayload
 AgentAssistantThinkingPayload
-AgentCategory
 AgentConfig
 AgentContextCompactedPayload
 AgentConversation
@@ -94,7 +90,6 @@ appendJsonl
 AppLanguage
 applyContrastPair
 AppMetaApi
-AppMode
 ApprovalAction
 ApprovalNode
 ApprovalResolveRequest
@@ -139,7 +134,6 @@ buildToolResultPreview
 BUILTIN_AGENT_TOOL_ID_SET
 BUILTIN_AGENT_TOOL_IDS
 BUILTIN_AGENT_TOOL_TIERS
-BuiltinAgentMode
 BuiltinAgentToolId
 BuiltinAgentToolTier
 BuiltinLlmProviderId
@@ -371,8 +365,6 @@ EvidenceRecord
 EvidenceRef
 EvidenceRefKind
 EvidenceStrength
-ExecutableAgentMode
-ExecutableAppMode
 ExecutionBinding
 ExecutionBindingDefinition
 ExecutionBindingResolution

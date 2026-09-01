@@ -1,39 +1,53 @@
 import type { AppRuntimePaths } from '@shared/types/settings';
 import type {
+  AgentDefinitionCommitQuery,
   AgentDefinitionCommitSnapshot,
   AgentDefinitionSaveRequest,
   AgentDefinitionSaveResult,
   AgentManifestDraft,
 } from '@shared/types/agentManifest';
+import { agentDefinitionLaneKey } from '@shared/types/agentManifest';
 import { isSafeAgentProfileId } from '@shared/types/agent';
 import { appPathService } from '../runtime/AppPathService';
 import { agentManifestService } from './AgentManifestService';
+import { resolveRegisteredProjectRoot } from './resolveRegisteredProjectRoot';
 
 export class SettingsAgentOps {
   private readonly agentDefinitionRevisions = new Map<string, number>();
   private readonly agentDefinitionCommits = new Map<string, AgentDefinitionCommitSnapshot>();
   private readonly agentDefinitionWriteTails = new Map<string, Promise<void>>();
 
-  private async withAgentDefinitionWriteLock<T>(agentId: string, task: () => Promise<T>): Promise<T> {
-    const previous = this.agentDefinitionWriteTails.get(agentId) ?? Promise.resolve();
+  private laneKey(request: Pick<AgentDefinitionCommitQuery, 'scope' | 'projectId' | 'agentId'>): string {
+    return agentDefinitionLaneKey(request.scope, request.projectId, request.agentId);
+  }
+
+  private async withAgentDefinitionWriteLock<T>(laneKey: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.agentDefinitionWriteTails.get(laneKey) ?? Promise.resolve();
     let release: () => void = () => {};
     const gate = new Promise<void>((resolve) => { release = resolve; });
     const tail = previous.catch(() => undefined).then(() => gate);
-    this.agentDefinitionWriteTails.set(agentId, tail);
+    this.agentDefinitionWriteTails.set(laneKey, tail);
     await previous.catch(() => undefined);
     try {
       return await task();
     } finally {
       release();
-      if (this.agentDefinitionWriteTails.get(agentId) === tail) {
-        this.agentDefinitionWriteTails.delete(agentId);
+      if (this.agentDefinitionWriteTails.get(laneKey) === tail) {
+        this.agentDefinitionWriteTails.delete(laneKey);
       }
     }
   }
 
-  private async readAgentDefinitionCommit(agentId: string): Promise<AgentDefinitionCommitSnapshot | null> {
-    const cached = this.agentDefinitionCommits.get(agentId);
-    const definition = await agentManifestService.readDefinition(appPathService.getRuntimePaths(), agentId);
+  private async readAgentDefinitionCommit(
+    query: AgentDefinitionCommitQuery,
+  ): Promise<AgentDefinitionCommitSnapshot | null> {
+    const laneKey = this.laneKey(query);
+    const cached = this.agentDefinitionCommits.get(laneKey);
+    const projectRoot = query.scope === 'project' ? resolveRegisteredProjectRoot(query.projectId) : undefined;
+    const definition = await agentManifestService.readDefinition(appPathService.getRuntimePaths(), query.agentId, {
+      scope: query.scope,
+      projectRoot,
+    });
     if (!definition) {
       return cached?.definition === null ? cached : null;
     }
@@ -44,7 +58,7 @@ export class SettingsAgentOps {
         definition,
         route: agentManifestService.routeFromDefinition(definition),
       };
-      this.agentDefinitionCommits.set(agentId, refreshed);
+      this.agentDefinitionCommits.set(laneKey, refreshed);
       return refreshed;
     }
     const snapshot: AgentDefinitionCommitSnapshot = {
@@ -53,7 +67,7 @@ export class SettingsAgentOps {
       definition,
       route: agentManifestService.routeFromDefinition(definition),
     };
-    this.agentDefinitionCommits.set(agentId, snapshot);
+    this.agentDefinitionCommits.set(laneKey, snapshot);
     return snapshot;
   }
 
@@ -80,22 +94,36 @@ export class SettingsAgentOps {
     snapshot: AgentDefinitionCommitSnapshot | null,
   ): Promise<void> {
     if (!snapshot?.definition) {
-      await agentManifestService.saveDefinition(paths, { ...request.draft, delete: true });
+      await agentManifestService.saveDefinition(paths, { ...request.draft, delete: true }, {
+        scope: request.scope,
+        projectRoot: request.scope === 'project' ? resolveRegisteredProjectRoot(request.projectId) : undefined,
+        sourceHash: request.sourceHash,
+      });
       return;
     }
     const {
       filePath: _filePath,
       builtin: _builtin,
       updatedAt: _updatedAt,
+      provenance: _provenance,
+      compiledRoute: _compiledRoute,
       ...draft
     } = snapshot.definition;
-    await agentManifestService.saveDefinition(paths, draft as AgentManifestDraft);
+    await agentManifestService.saveDefinition(paths, draft as AgentManifestDraft, {
+      scope: request.scope,
+      projectRoot: request.scope === 'project' ? resolveRegisteredProjectRoot(request.projectId) : undefined,
+      sourceHash: request.sourceHash,
+    });
   }
 
-  async getAgentDefinitionCommit(agentIdDraft: string): Promise<AgentDefinitionCommitSnapshot | null> {
-    const agentId = agentIdDraft.trim();
+  async getAgentDefinitionCommit(query: AgentDefinitionCommitQuery): Promise<AgentDefinitionCommitSnapshot | null> {
+    const agentId = query.agentId.trim();
     if (!isSafeAgentProfileId(agentId)) return null;
-    return this.readAgentDefinitionCommit(agentId);
+    return this.readAgentDefinitionCommit({
+      agentId,
+      scope: query.scope,
+      projectId: query.projectId,
+    });
   }
 
   async saveAgentDefinition(request: AgentDefinitionSaveRequest): Promise<AgentDefinitionSaveResult> {
@@ -104,25 +132,42 @@ export class SettingsAgentOps {
       return this.saveResult(request, 'failed', null, `Invalid agent profile id: ${agentId || '<empty>'}`);
     }
     if (!Number.isSafeInteger(request.clientRevision) || request.clientRevision < 1) {
-      return this.saveResult(request, 'failed', await this.readAgentDefinitionCommit(agentId), 'clientRevision must be a positive safe integer.');
+      return this.saveResult(request, 'failed', await this.readAgentDefinitionCommit({
+        agentId,
+        scope: request.scope,
+        projectId: request.projectId,
+      }), 'clientRevision must be a positive safe integer.');
     }
 
-    const latestRevision = this.agentDefinitionRevisions.get(agentId) ?? 0;
+    const laneKey = this.laneKey({ agentId, scope: request.scope, projectId: request.projectId });
+    const latestRevision = this.agentDefinitionRevisions.get(laneKey) ?? 0;
     if (request.clientRevision <= latestRevision) {
-      return this.saveResult(request, 'superseded', await this.readAgentDefinitionCommit(agentId));
+      return this.saveResult(request, 'superseded', await this.readAgentDefinitionCommit({
+        agentId,
+        scope: request.scope,
+        projectId: request.projectId,
+      }));
     }
-    this.agentDefinitionRevisions.set(agentId, request.clientRevision);
+    this.agentDefinitionRevisions.set(laneKey, request.clientRevision);
     await Promise.resolve();
 
-    return this.withAgentDefinitionWriteLock(agentId, async () => {
-      const previous = await this.readAgentDefinitionCommit(agentId);
-      if (this.agentDefinitionRevisions.get(agentId) !== request.clientRevision) {
+    return this.withAgentDefinitionWriteLock(laneKey, async () => {
+      const previous = await this.readAgentDefinitionCommit({
+        agentId,
+        scope: request.scope,
+        projectId: request.projectId,
+      });
+      if (this.agentDefinitionRevisions.get(laneKey) !== request.clientRevision) {
         return this.saveResult(request, 'superseded', previous);
       }
       const paths = appPathService.getRuntimePaths();
       try {
-        const commit = await agentManifestService.saveDefinition(paths, request.draft);
-        if (this.agentDefinitionRevisions.get(agentId) !== request.clientRevision) {
+        const commit = await agentManifestService.saveDefinition(paths, request.draft, {
+          scope: request.scope,
+          projectRoot: request.scope === 'project' ? resolveRegisteredProjectRoot(request.projectId) : undefined,
+          sourceHash: request.sourceHash,
+        });
+        if (this.agentDefinitionRevisions.get(laneKey) !== request.clientRevision) {
           await this.restoreAgentDefinitionCommit(paths, request, previous);
           return this.saveResult(request, 'superseded', previous);
         }
@@ -130,13 +175,14 @@ export class SettingsAgentOps {
           clientRevision: request.clientRevision,
           commitHash: commit.commitHash,
           definition: commit.definition,
-          route: commit.definition ? agentManifestService.routeFromDefinition(commit.definition) : null,
+          route: commit.definition?.compiledRoute
+            ?? (commit.definition ? agentManifestService.routeFromDefinition(commit.definition) : null),
         };
-        this.agentDefinitionCommits.set(agentId, snapshot);
+        this.agentDefinitionCommits.set(laneKey, snapshot);
         return this.saveResult(request, 'committed', snapshot);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        return this.agentDefinitionRevisions.get(agentId) === request.clientRevision
+        return this.agentDefinitionRevisions.get(laneKey) === request.clientRevision
           ? this.saveResult(request, 'failed', previous, message)
           : this.saveResult(request, 'superseded', previous);
       }

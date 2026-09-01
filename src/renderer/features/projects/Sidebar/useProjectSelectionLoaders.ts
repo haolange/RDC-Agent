@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useCaptureStore } from '../../../stores/captureStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
@@ -80,6 +81,7 @@ export function useProjectSelectionLoaders({
     setRuns,
     setCaptures,
     getCurrentSession: () => useProjectStore.getState().currentSession,
+    reloadSettings: () => useAppSettingsStore.getState().reloadSettings(),
   }), [
     t,
     setSidebarError,

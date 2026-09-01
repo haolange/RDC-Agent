@@ -1,13 +1,18 @@
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { DerivedContextView } from '@shared/types/semanticContext';
-import type { AgentRole } from '@shared/types/agent';
+import { DEFAULT_AGENT_ID, type AgentRole } from '@shared/types/agent';
 import type { Message } from '../core/types';
 import { planEffectiveModelRequest, resolveEffectiveModel } from '../../settings/EffectiveModelResolver';
 import { settingsService } from '../../settings/SettingsService';
 import { resolveCompactionPercentForSettings } from '../../settings/compactionPercent';
+import { lookupProjectById } from '../../settings/projectRegistryLookup';
 import { loadProviderSurface } from '../../provider-catalog/ProviderCatalogRegistry';
-import { resolveAgentRoutePreflight } from '../../conversation/ConversationRoutePreflight';
+import {
+  findEffectiveAgentProfile,
+  resolveAgentRoutePreflight,
+} from '../../conversation/ConversationRoutePreflight';
 import { sessionContextJournal } from '../../conversation/SessionContextJournal';
+import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import { agentOrchestrator } from '../../workflow/debugger/AgentOrchestrator';
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import {
@@ -31,12 +36,84 @@ export function isWithinSessionCompactionLine(
   return occupiedTokens <= compactionThresholdTokens || visibleTurnCount <= keepRecentTurns;
 }
 
-function resolveCompactionAgentId(history: ConversationMessage[]): AgentRole {
+export type CompactionAgentFallbackReason = 'missing' | 'unknown' | 'disabled';
+
+export interface CompactionAgentResolution {
+  agentId: AgentRole;
+  source: 'history' | 'session' | 'default';
+  fallbackReason?: CompactionAgentFallbackReason;
+}
+
+function readMessageAgentId(message: ConversationMessage | undefined): string | null {
+  const candidate = message?.agentId?.trim() || message?.profileId?.trim();
+  return candidate || null;
+}
+
+function isEnabledInProjectSnapshot(agentId: string, projectRootPath: string): boolean {
+  return findEffectiveAgentProfile(agentId, projectRootPath).enabled;
+}
+
+export function resolveCompactionAgentId(
+  history: ConversationMessage[],
+  projectRootPath: string | null,
+): CompactionAgentResolution {
   const lastAssistant = [...history].reverse().find((message) => message.role === 'assistant');
-  return lastAssistant?.agentId === 'analyzer' || lastAssistant?.agentId === 'optimizer'
-    || lastAssistant?.agentId === 'debugger' || lastAssistant?.agentId === 'ask'
-    ? lastAssistant.agentId
-    : 'ask';
+  const lastUser = [...history].reverse().find((message) => message.role === 'user');
+  const historyAgentId = readMessageAgentId(lastAssistant);
+  const sessionAgentId = readMessageAgentId(lastUser);
+
+  // Without a project root, a user/builtin-only snapshot must not rewrite a custom id.
+  if (!projectRootPath) {
+    if (historyAgentId) {
+      return { agentId: historyAgentId, source: 'history' };
+    }
+    if (sessionAgentId) {
+      return { agentId: sessionAgentId, source: 'session', fallbackReason: 'missing' };
+    }
+    return { agentId: DEFAULT_AGENT_ID, source: 'default', fallbackReason: 'missing' };
+  }
+
+  if (historyAgentId) {
+    const historyProfile = findEffectiveAgentProfile(historyAgentId, projectRootPath);
+    if (historyProfile.enabled) {
+      return { agentId: historyAgentId, source: 'history' };
+    }
+    const fallbackReason: CompactionAgentFallbackReason = historyProfile.found ? 'disabled' : 'unknown';
+    if (sessionAgentId && isEnabledInProjectSnapshot(sessionAgentId, projectRootPath)) {
+      return { agentId: sessionAgentId, source: 'session', fallbackReason };
+    }
+    return { agentId: DEFAULT_AGENT_ID, source: 'default', fallbackReason };
+  }
+
+  if (sessionAgentId && isEnabledInProjectSnapshot(sessionAgentId, projectRootPath)) {
+    return { agentId: sessionAgentId, source: 'session', fallbackReason: 'missing' };
+  }
+  return { agentId: DEFAULT_AGENT_ID, source: 'default', fallbackReason: 'missing' };
+}
+
+function recordCompactionProfileFallback(
+  sessionId: string,
+  projectId: string,
+  requestedAgentId: string | null,
+  resolved: CompactionAgentResolution,
+): void {
+  if (!resolved.fallbackReason) return;
+  runtimeLogService.log({
+    scope: 'session',
+    namespace: 'context',
+    severity: 'warning',
+    title: 'COMPACTION_PROFILE_FALLBACK',
+    summary: `Compaction used ${resolved.agentId} after history profile ${requestedAgentId ?? '(missing)'} was ${resolved.fallbackReason}.`,
+    sessionId,
+    projectId,
+    raw: {
+      code: 'COMPACTION_PROFILE_FALLBACK',
+      requestedAgentId,
+      resolvedAgentId: resolved.agentId,
+      source: resolved.source,
+      reason: resolved.fallbackReason,
+    },
+  });
 }
 
 export async function generateSessionCompactionSections(input: {
@@ -46,9 +123,17 @@ export async function generateSessionCompactionSections(input: {
 }): Promise<ModelHandoffSections> {
   const session = storageAdapter.readSession(input.sessionId);
   if (!session) throw new Error('SESSION_NOT_FOUND: cannot compact a missing session.');
-  const agentId = resolveCompactionAgentId(input.history);
-  const projectRootPath = storageAdapter.getProjectById(session.projectId)?.rootPath ?? null;
-  const routePreflight = resolveAgentRoutePreflight(agentId, undefined, session.modelOverride);
+  const projectRootPath = lookupProjectById(session.projectId)?.rootPath ?? null;
+  const resolved = resolveCompactionAgentId(input.history, projectRootPath);
+  const lastAssistant = [...input.history].reverse().find((message) => message.role === 'assistant');
+  recordCompactionProfileFallback(
+    session.sessionId,
+    session.projectId,
+    readMessageAgentId(lastAssistant),
+    resolved,
+  );
+  const agentId = resolved.agentId;
+  const routePreflight = resolveAgentRoutePreflight(agentId, undefined, session.modelOverride, projectRootPath);
   if (!routePreflight.ok) {
     throw new Error(`COMPACTION_ROUTE_UNAVAILABLE: ${routePreflight.diagnostic.userMessage}`);
   }

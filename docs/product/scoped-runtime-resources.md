@@ -28,7 +28,7 @@ Settings scoped 编辑器（Skills / MCP / Hooks / Policy）与 Agents 同级导
 
 ## Profiles
 
-基线 profile：Ask（只读）、Plan（研究/提问/artifact/handoff）、Edit（实现）、Debugger、Analyzer、Optimizer。行为应落在指令、工具权限、审批与 handoff，而不是 mode 专用运行时分支。
+Wave 1 四个 builtin：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件在 `resources/agent-runtime/agents`，再与 `~/.rdx/agents` 和 `<project-root>/.rdx/agents` 合成 effective snapshot。行为应落在指令、工具权限、审批与 handoff，而不是 mode 专用运行时分支。用户保留的 ask/plan/edit 仍可按 custom manifest 运行。
 
 ## Project Instructions
 

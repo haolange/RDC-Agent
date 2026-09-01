@@ -24,6 +24,7 @@ import { useEvidenceStore } from '../../stores/evidenceStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
+import { useLayoutStore } from '../../stores/layoutStore';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { resetWorkbenchStores } from '../../stores/storesReset';
@@ -156,6 +157,30 @@ export function useIpcEventBridge(options: {
         return;
       }
       if (event.type === 'agent_event') {
+        if (
+          event.event.type === 'handoff.requested'
+          || event.event.type === 'handoff.consumed'
+          || event.event.type === 'handoff.cancelled'
+        ) {
+          const toAgentId = String(
+            event.event.payload.toAgentId
+            ?? event.event.payload.toProfile
+            ?? '',
+          ).trim();
+          if (
+            (event.event.type === 'handoff.requested' || event.event.type === 'handoff.consumed')
+            && toAgentId
+          ) {
+            useLayoutStore.getState().setSelectedAgentId(toAgentId);
+          }
+          if (
+            event.event.type === 'handoff.cancelled'
+            && event.event.payload.cancelReason === 'restart_degrade'
+          ) {
+            showNotice(t('chat.handoffRestartDegraded'));
+          }
+          return;
+        }
         if (event.event.type === 'diagnostic') {
           conversation.addTimelineEntry({
             id: event.event.id,

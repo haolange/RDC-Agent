@@ -27,6 +27,7 @@ export type AbortReason =
 export interface TurnEventSink {
   onEvent?: (event: SharedAgentEvent) => void;
   sessionId?: string | null;
+  requestId?: string | null;
   projectRootPath?: string | null;
   projectId?: string | null;
   agentId?: AgentRole;

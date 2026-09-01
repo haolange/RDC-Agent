@@ -97,7 +97,7 @@ describe('StorageAdapter.removeSession side-channel cleanup', () => {
       caseId: session.sessionId,
       sessionId: session.sessionId,
       capturePaths: [],
-      mode: 'debugger',
+      profileId: 'debugger',
     });
     const runId = run.runId;
 
@@ -234,6 +234,50 @@ describe('StorageAdapter.removeSession side-channel cleanup', () => {
     expect(storageAdapter.readConversationHistory(session.sessionId)).toEqual([]);
     expect(fs.existsSync(pending.attachments[0]!.filePath)).toBe(false);
     expect(fs.existsSync(path.join(session.sessionPath, 'turn-commit.json'))).toBe(false);
+  });
+
+  it('refuses to change kind, mission, or profileId after createRun', async () => {
+    const { storageAdapter } = await import('./StorageAdapter');
+    const projectRoot = path.join(tempRoot, 'immutable-run-root');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const project = await storageAdapter.createProject(projectRoot);
+    const session = storageAdapter.createSession(project.projectId, 'Immutable run');
+    const run = await storageAdapter.createRun({
+      caseId: session.sessionId,
+      sessionId: session.sessionId,
+      capturePaths: [],
+      profileId: 'debugger',
+    });
+    await storageAdapter.updateRun(session.sessionId, run.runId, {
+      kind: 'conversation',
+      mission: 'optimizer',
+      profileId: 'general',
+      status: 'completed',
+    });
+    const updated = await storageAdapter.readRun(session.sessionId, run.runId);
+    expect(updated?.kind).toBe('mission');
+    expect(updated?.profileId).toBe('debugger');
+    expect((updated as { mission?: string } | null)?.mission).toBe('debugger');
+    expect(updated?.status).toBe('completed');
+  });
+
+  it('rejects non-empty conversation captures on updateRun', async () => {
+    const { storageAdapter } = await import('./StorageAdapter');
+    const projectRoot = path.join(tempRoot, 'conversation-captures-root');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const project = await storageAdapter.createProject(projectRoot);
+    const session = storageAdapter.createSession(project.projectId, 'Conversation captures');
+    const run = await storageAdapter.createRun({
+      caseId: session.sessionId,
+      sessionId: session.sessionId,
+      capturePaths: [],
+      profileId: 'general',
+    });
+    await expect(storageAdapter.updateRun(session.sessionId, run.runId, {
+      captures: [{ id: 'cap', filePath: 'a.rdc', role: 'primary', backendHint: 'local', status: 'pending' }],
+    })).rejects.toThrow(/CONVERSATION_RUN_CAPTURES_FORBIDDEN/);
+    const persisted = await storageAdapter.readRun(session.sessionId, run.runId);
+    expect(persisted?.captures).toEqual([]);
   });
 });
 function makeTerminalContextEntry(): SessionContextTurnEntry {

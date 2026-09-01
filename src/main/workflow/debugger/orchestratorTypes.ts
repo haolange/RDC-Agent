@@ -52,6 +52,7 @@ export interface AgentTurnOptions {
   reasoning?: ResolvedReasoningSelection;
   turnControls?: ConversationTurnControls;
   requestPlan?: RequestPlan;
+  requestId?: string;
   userContent?: UserMessage['content'];
   preloadSkillIds?: string[];
   policyBudget?: PolicyBudgetState;
@@ -67,6 +68,7 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
   systemPrompt?: string;
   temperature?: number;
   turnId?: string;
+  requestId?: string;
   routeAgentId?: AgentRole;
   stage?: WorkflowStage | 'report';
   /** 当前激活项目根目录，透传到工具执行上下文。 */

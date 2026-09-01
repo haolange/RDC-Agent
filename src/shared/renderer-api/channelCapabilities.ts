@@ -119,6 +119,7 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'session:remove': 'mutation',
   'session:select': 'mutation',
   'session:setModelOverride': 'mutation',
+  'session:setAgentId': 'mutation',
   'run:list': 'read',
   'runtimeLog:list': 'read',
   'capture:list': 'read',

@@ -169,10 +169,20 @@ export class StorageIo {
     }
   }
 
-  writeUtf8Atomic(filePath: string, content: string): void {
+  writeUtf8Atomic(filePath: string, content: string, options?: { fsync?: boolean }): void {
     this.ensureDir(path.dirname(filePath));
     const temporaryPath = `${filePath}.${process.pid}.${generateShortId()}.tmp`;
-    fs.writeFileSync(temporaryPath, content, 'utf-8');
+    if (options?.fsync) {
+      const fd = fs.openSync(temporaryPath, 'w');
+      try {
+        fs.writeFileSync(fd, content, 'utf-8');
+        fs.fsyncSync(fd);
+      } finally {
+        fs.closeSync(fd);
+      }
+    } else {
+      fs.writeFileSync(temporaryPath, content, 'utf-8');
+    }
     try {
       fs.renameSync(temporaryPath, filePath);
     } catch (error) {
@@ -217,6 +227,10 @@ export class StorageIo {
         }
       }
     }
+  }
+
+  writeUtf8AtomicFsync(filePath: string, content: string): void {
+    this.writeUtf8Atomic(filePath, content, { fsync: true });
   }
 
   writeJsonAtomic(filePath: string, data: unknown): void {

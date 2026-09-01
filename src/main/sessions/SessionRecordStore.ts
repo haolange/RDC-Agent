@@ -22,11 +22,12 @@ import type {
 import { normalizeWorkflowStage } from '@shared/constants/stages';
 import type {
   CaptureDescriptor,
-  ExecutableAppMode,
   ProjectRecord,
   RunSummary,
   SessionRecord,
 } from '@shared/types/session';
+import { isMissionAgentId } from '@shared/types/agent';
+import { toPersistedRunV2 } from './runV2/runRecordSchema';
 import { appPathService } from '../runtime/AppPathService';
 import type {
   PersistedRunRecord,
@@ -418,7 +419,7 @@ export class SessionRecordStore {
     sessionId?: string;
     turnId?: string;
     capturePaths: string[];
-    mode?: ExecutableAppMode;
+    profileId: string;
     goal?: string;
     captures?: CaptureDescriptor[];
     backend?: 'local' | 'remote';
@@ -453,15 +454,15 @@ export class SessionRecordStore {
     const backend = input.backend
       || (captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local');
     const startedAt = nowMs();
-    const persistedRun: PersistedRunRecord = {
+    const persistedRun = toPersistedRunV2({
       runId,
       turnId: input.turnId,
       projectId: session.projectId,
       sessionId,
       caseId: sessionId,
-      mode: input.mode || 'debugger',
+      profileId: input.profileId,
       goal: input.goal || session.goal,
-      captures,
+      captures: isMissionAgentId(input.profileId) ? captures : [],
       startedAt,
       status: input.status || 'queued',
       lastStage: 'preflight',
@@ -476,33 +477,35 @@ export class SessionRecordStore {
         session_id: sessionId,
         workflow_stage: 'preflight',
       },
-    };
+    });
 
     persistRunFiles(this.host, runPath, persistedRun);
-    writeYaml(path.join(runPath, 'capture_refs.yaml'), {
-      captures: captures.map((capture, index) => ({
-        capture_id: capture.id || `cap-${index}`,
-        capture_role: capture.role,
-        source_path: capture.filePath,
-      })),
-    });
-    writeYaml(path.join(runPath, 'notes', 'hypothesis_board.yaml'), {
-      hypothesis_board: {
-        session_id: sessionId,
-        entry_skill: 'debugger',
-        user_goal: persistedRun.goal,
-        intake_state: 'handoff_ready',
-        current_phase: 'intake',
-        current_task: '',
-        active_owner: 'debugger',
-        pending_requirements: [],
-        blocking_issues: [],
-        progress_summary: ['accepted intake complete'],
-        next_actions: ['run dispatch_readiness before specialist dispatch'],
-        last_updated: nowIso(),
-        hypotheses: [],
-      },
-    });
+    if (persistedRun.kind === 'mission') {
+      writeYaml(path.join(runPath, 'capture_refs.yaml'), {
+        captures: persistedRun.captures.map((capture, index) => ({
+          capture_id: capture.id || `cap-${index}`,
+          capture_role: capture.role,
+          source_path: capture.filePath,
+        })),
+      });
+      writeYaml(path.join(runPath, 'notes', 'hypothesis_board.yaml'), {
+        hypothesis_board: {
+          session_id: sessionId,
+          entry_skill: persistedRun.mission,
+          user_goal: persistedRun.goal,
+          intake_state: 'handoff_ready',
+          current_phase: 'intake',
+          current_task: '',
+          active_owner: persistedRun.profileId,
+          pending_requirements: [],
+          blocking_issues: [],
+          progress_summary: ['accepted intake complete'],
+          next_actions: ['run dispatch_readiness before specialist dispatch'],
+          last_updated: nowIso(),
+          hypotheses: [],
+        },
+      });
+    }
 
     this.updateSession(sessionId, {
       goal: persistedRun.goal,
@@ -540,13 +543,20 @@ export class SessionRecordStore {
       'captures',
       'reportPaths',
       'backend',
-      'mode',
+      'diagnostics',
       'turnId',
     ]);
     const sanitizedPatch: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(data)) {
       if (!allowedTopLevel.has(key)) continue;
       sanitizedPatch[key] = value;
+    }
+
+    if (existing.kind === 'conversation' && 'captures' in sanitizedPatch) {
+      const nextCaptures = sanitizedPatch.captures;
+      if (!Array.isArray(nextCaptures) || nextCaptures.length > 0) {
+        throw new Error('CONVERSATION_RUN_CAPTURES_FORBIDDEN: conversation runs cannot persist captures.');
+      }
     }
 
     const merged = this.host.io.deepMerge(
@@ -559,6 +569,13 @@ export class SessionRecordStore {
       ...(merged.runtime || {}),
       workflow_stage: workflowStage,
     };
+    const identity = existing.kind === 'mission'
+      ? { kind: existing.kind, profileId: existing.profileId, mission: existing.mission }
+      : { kind: existing.kind, profileId: existing.profileId };
+    Object.assign(merged, identity);
+    if (existing.kind !== 'mission') {
+      delete (merged as { mission?: unknown }).mission;
+    }
     merged.lastStage = workflowStage;
     merged.updatedAt = nowMs();
 
@@ -796,7 +813,9 @@ export class SessionRecordStore {
   }
 
   readPersistedRun(sessionId: string, runId: string): PersistedRunRecord | null {
-    return loadPersistedRun(this.host, this.getRunPath(sessionId, runId), sessionId, runId);
+    const location = this.findSessionLocation(sessionId);
+    if (!location) return null;
+    return loadPersistedRun(this.host, this.getRunPath(sessionId, runId), sessionId, runId, location.sessionPath);
   }
 
   private normalizeSessionTitle(projectId: string, title?: string): string {

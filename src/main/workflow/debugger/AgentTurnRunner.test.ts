@@ -96,16 +96,19 @@ describe('AgentTurnRunner', () => {
     expect(() => runner.resolveMaxTurns('ask', 0, 12)).toThrow(/POLICY_MAX_TURNS_ZERO/);
   });
 
-  it('resolveMaxTurns uses role defaults for execution agents', () => {
+  it('resolveMaxTurns uses a single default when profile maxTurns is omitted', () => {
     const runner = createRunner();
-    expect(runner.resolveMaxTurns('debugger')).toBe(50);
-    expect(runner.resolveMaxTurns('edit', 80)).toBe(50);
-    expect(runner.resolveMaxTurns('optimizer' as never)).toBe(50);
+    expect(runner.resolveMaxTurns('edit', 80)).toBe(25);
+    expect(runner.resolveMaxTurns('custom-writer' as never, 80)).toBe(25);
+    expect(runner.resolveMaxTurns('debugger')).toBe(25);
+    expect(runner.resolveMaxTurns('optimizer' as never)).toBe(25);
   });
 
-  it('resolveMaxTurns falls back to 25 for other roles', () => {
+  it('resolveMaxTurns uses profile maxTurns for any id, including custom edit', () => {
     const runner = createRunner();
-    expect(runner.resolveMaxTurns('custom' as never)).toBe(25);
+    expect(runner.resolveMaxTurns('edit', 80, 40)).toBe(40);
+    expect(runner.resolveMaxTurns('custom-writer' as never, 80, 40)).toBe(40);
+    expect(runner.resolveMaxTurns('debugger', undefined, 50)).toBe(50);
   });
 
   it('getOrCreateAgentSlot requires PromptPlan', () => {
@@ -157,7 +160,7 @@ describe('AgentTurnRunner', () => {
       systemPrompt: 'system',
       providerId: 'test',
       modelId: 'model',
-      mode: 'ask',
+      profileId: 'general',
       toolAllowlist: [],
       contextTokenLimit: 800,
       sessionId: 's',
@@ -227,7 +230,7 @@ describe('AgentTurnRunner', () => {
       systemPrompt: 'system',
       providerId: 'test',
       modelId: 'model',
-      mode: 'ask',
+      profileId: 'general',
       toolAllowlist: [],
       contextTokenLimit: 800,
       sessionId: 'setup-session',
@@ -302,7 +305,7 @@ describe('AgentTurnRunner', () => {
       systemPrompt: 'system',
       providerId: 'test',
       modelId: 'model',
-      mode: 'ask',
+      profileId: 'general',
       toolAllowlist: [],
       contextTokenLimit: 800,
       sessionId,

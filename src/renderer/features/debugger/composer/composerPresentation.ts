@@ -10,13 +10,9 @@ export function buildComposerPresentation(input: {
   isComposerBusy: boolean;
 }) {
   const zh = input.language === 'zh-CN';
-  const promptPlaceholder = input.currentMode === 'ask'
-    ? (zh
-      ? '向 Ask 描述问题、目标或需要打开的 .rdc Capture'
-      : 'Ask about the issue, goal, or .rdc capture to open')
-    : (zh
-      ? `向 ${input.currentModeLabel} 描述目标、异常或验证需求`
-      : `Describe the goal, anomaly, or verification request for ${input.currentModeLabel}`);
+  const promptPlaceholder = zh
+    ? `向 ${input.currentModeLabel} 描述目标、异常或验证需求`
+    : `Describe the goal, anomaly, or verification request for ${input.currentModeLabel}`;
   const attachButtonLabel = !input.hasProject
     ? (zh ? '选择项目后可附加图片或文件' : 'Select a project before attaching images or files')
     : (zh ? '附加图片或文件' : 'Attach images or files');
@@ -25,7 +21,7 @@ export function buildComposerPresentation(input: {
     : (zh ? '停止当前请求' : 'Stop current request');
   const primaryButtonLabel = input.isComposerBusy
     ? stopButtonLabel
-    : input.currentMode === 'ask' || input.hasActiveDebugRun
+    : input.hasActiveDebugRun
       ? (zh ? '发送' : 'Send')
       : (zh ? '开始' : 'Start');
 

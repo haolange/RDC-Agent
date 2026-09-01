@@ -11,6 +11,7 @@ import { debuggerRuntime } from '../workflow/debugger/DebuggerRuntime';
 import { runExecutionService } from '../workflow/debugger/RunExecutionService';
 import { settingsService } from '../settings/SettingsService';
 import { storageAdapter } from '../sessions/StorageAdapter';
+import { projectSessionForClient } from '../sessions/projectSessionHandoff';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { rdxCliInvokerService } from '../tools/RdxCliInvokerService';
 import { sessionResumeService } from '../sessions/SessionResumeService';
@@ -176,7 +177,9 @@ async function selectCurrentProject(projectId: string | null): Promise<ProjectSe
 
   return {
     project,
-    currentSession: selectedSession?.projectId === projectId ? selectedSession : null,
+    currentSession: selectedSession?.projectId === projectId
+      ? projectSessionForClient(selectedSession)
+      : null,
     currentRun: state.currentSessionId ? storageAdapter.getLatestRun(state.currentSessionId) : null,
   };
 }

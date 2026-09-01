@@ -5,8 +5,9 @@
 import type { ConversationTurnControls } from './modelCapability';
 import type { ReplayDeviceEntry } from './device';
 
-export type ExecutableAppMode = 'debugger' | 'analyzer' | 'optimizer';
-export type AppMode = 'ask' | 'edit' | ExecutableAppMode;
+export type MissionId = 'debugger' | 'analyzer' | 'optimizer';
+export type MissionKind = MissionId;
+export type RunKind = 'conversation' | 'mission';
 
 export interface ProjectInputRecord {
   inputId: string;
@@ -49,6 +50,8 @@ export interface SessionRecord {
   lastRunId?: string;
   turnControls?: ConversationTurnControls;
   modelOverride?: SessionModelOverride | null;
+  /** Current conversation Agent id. Missing means Composer pill hydrates to general. */
+  agentId?: string;
 }
 
 /** Explicit project/session ownership for stateful RDX operations and events. */
@@ -132,41 +135,58 @@ export interface DebugSessionStartRequest {
   projectId: string;
   sessionId?: string;
   turnId?: string;
-  mode: ExecutableAppMode;
+  profileId: string;
+  kind?: RunKind;
+  mission?: MissionKind;
   goal: string;
   captures?: CaptureDescriptor[];
   primaryCaptureId?: string;
   replayDevice?: ReplayDeviceEntry | null;
 }
 
-export interface RunRecord {
+export type RunStatus =
+  | 'queued'
+  | 'planning'
+  | 'awaiting_input'
+  | 'awaiting_approval'
+  | 'running'
+  | 'stopping'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'interrupted';
+
+export interface RunRecordBase {
+  schemaVersion: '2';
   runId: string;
   turnId?: string;
   projectId: string;
   sessionId: string;
   caseId: string;
-  mode: ExecutableAppMode;
+  profileId: string;
   goal: string;
   captures: CaptureDescriptor[];
   startedAt: number;
   finishedAt?: number;
   stoppedAt?: number;
-  status:
-    | 'queued'
-    | 'planning'
-    | 'awaiting_input'
-    | 'awaiting_approval'
-    | 'running'
-    | 'stopping'
-    | 'completed'
-    | 'failed'
-    | 'cancelled'
-    | 'interrupted';
+  status: RunStatus;
   stopReason?: string;
   lastStage: string;
   backend: 'local' | 'remote';
   reportPaths?: RunReportPaths;
+  diagnostics?: string[];
 }
+
+export interface ConversationRunRecord extends RunRecordBase {
+  kind: 'conversation';
+}
+
+export interface MissionRunRecord extends RunRecordBase {
+  kind: 'mission';
+  mission: MissionKind;
+}
+
+export type RunRecord = ConversationRunRecord | MissionRunRecord;
 
 export type RunSummary = RunRecord;
 
@@ -314,6 +334,7 @@ export interface PreparedTurnContextSummary {
     reason: string;
   };
   preparedAt: number;
+  runtimeDiagnostics?: string[];
 }
 
 export interface HumanPreviewSnapshot {

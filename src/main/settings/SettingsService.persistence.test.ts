@@ -147,7 +147,7 @@ describe('SettingsService provider persistence', () => {
       schemaVersion: 2,
       llm: {
         providers: [],
-        agentRoutes: [{ agentId: 'ask', providerId: 'retired-provider', modelId: 'retired-model' }],
+        agentRoutes: [{ agentId: 'general', providerId: 'retired-provider', modelId: 'retired-model' }],
       },
     }), 'utf8');
     const { SettingsService } = await import('./SettingsService');
@@ -156,10 +156,10 @@ describe('SettingsService provider persistence', () => {
     const runtime = service.initialize();
     const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as { llm: Record<string, unknown> };
 
-    expect(runtime.llm.agentRoutes.find((route) => route.agentId === 'ask')).toMatchObject({
-      providerId: '',
-      modelId: '',
-    });
+    expect(runtime.llm.agentRoutes.some((route) => (
+      route.providerId === 'retired-provider' || route.modelId === 'retired-model'
+    ))).toBe(false);
+    expect(runtime.llm.agentRoutes.find((route) => route.agentId === 'general')).toBeDefined();
     expect(persisted.llm).not.toHaveProperty('agentRoutes');
   });
 
@@ -439,16 +439,17 @@ describe('SettingsService provider persistence', () => {
       { id: 'glm-4.7', label: 'GLM 4.7', enabled: true, availability: 'available' },
     ]);
 
-    const ask = initialized.agents.definitions.find((definition) => definition.id === 'ask');
-    expect(ask).toBeDefined();
-    const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
+    const general = initialized.agents.definitions.find((definition) => definition.id === 'general');
+    expect(general).toBeDefined();
+    const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = general!;
     await service.saveAgentDefinition({
       draft: { ...draft, models: ['volcengine-coding-plan:glm-5.2'] },
       clientRevision: 1,
+      scope: 'user',
     });
 
     expect(service.getAll().llm.agentRoutes).toContainEqual({
-      agentId: 'ask',
+      agentId: 'general',
       providerId: 'volcengine-coding-plan',
       modelId: 'glm-5.2',
     });
@@ -502,15 +503,16 @@ describe('SettingsService provider persistence', () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
     const initialized = service.initialize();
-    const ask = initialized.agents.definitions.find((definition) => definition.id === 'ask');
+    const ask = initialized.agents.definitions.find((definition) => definition.id === 'general');
     expect(ask).toBeDefined();
     const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
     await service.saveAgentDefinition({
       draft: { ...draft, models: ['missing-provider:missing-model'] },
       clientRevision: 1,
+      scope: 'user',
     });
     expect(service.getAll().llm.agentRoutes).toContainEqual({
-      agentId: 'ask', providerId: 'missing-provider', modelId: 'missing-model',
+      agentId: 'general', providerId: 'missing-provider', modelId: 'missing-model',
     });
   });
 
@@ -518,7 +520,7 @@ describe('SettingsService provider persistence', () => {
     const { SettingsService } = await import('./SettingsService');
     const service = new SettingsService();
     const initialized = service.initialize();
-    const ask = initialized.agents.definitions.find((definition) => definition.id === 'ask');
+    const ask = initialized.agents.definitions.find((definition) => definition.id === 'general');
     expect(ask).toBeDefined();
     const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
     const settingsBeforeSave = fs.readFileSync(initialized.paths.settingsPath, 'utf8');
@@ -526,14 +528,17 @@ describe('SettingsService provider persistence', () => {
     const first = service.saveAgentDefinition({
       draft: { ...draft, models: ['deepseek:model-a'] },
       clientRevision: 100,
+      scope: 'user',
     });
     const middle = service.saveAgentDefinition({
       draft: { ...draft, models: ['deepseek:model-b'] },
       clientRevision: 200,
+      scope: 'user',
     });
     const newest = service.saveAgentDefinition({
       draft: { ...draft, models: ['deepseek:model-c'] },
       clientRevision: 300,
+      scope: 'user',
     });
     const [firstResult, middleResult, newestResult] = await Promise.all([first, middle, newest]);
     expect(firstResult.status).toBe('superseded');
@@ -541,14 +546,14 @@ describe('SettingsService provider persistence', () => {
     expect(newestResult).toMatchObject({
       status: 'committed',
       clientRevision: 300,
-      route: { agentId: 'ask', providerId: 'deepseek', modelId: 'model-c' },
+      route: { agentId: 'general', providerId: 'deepseek', modelId: 'model-c' },
     });
     expect(newestResult.commitHash).toMatch(/^[a-f0-9]{64}$/);
     expect(newestResult.lastSuccessful?.commitHash).toBe(newestResult.commitHash);
     expect(service.getAll().llm.agentRoutes).toContainEqual({
-      agentId: 'ask', providerId: 'deepseek', modelId: 'model-c',
+      agentId: 'general', providerId: 'deepseek', modelId: 'model-c',
     });
-    const saved = service.getAll().agents.definitions.find((definition) => definition.id === 'ask');
+    const saved = service.getAll().agents.definitions.find((definition) => definition.id === 'general');
     expect(saved?.models).toEqual(['deepseek:model-c']);
     expect(fs.readdirSync(initialized.paths.agentsPath).some((entry) => entry.endsWith('.tmp'))).toBe(false);
     const persisted = JSON.parse(fs.readFileSync(initialized.paths.settingsPath, 'utf8')) as { llm: Record<string, unknown> };
@@ -561,12 +566,13 @@ describe('SettingsService provider persistence', () => {
     const { agentManifestService } = await import('./AgentManifestService');
     const service = new SettingsService();
     const initialized = service.initialize();
-    const ask = initialized.agents.definitions.find((definition) => definition.id === 'ask');
+    const ask = initialized.agents.definitions.find((definition) => definition.id === 'general');
     expect(ask).toBeDefined();
     const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
     const committed = await service.saveAgentDefinition({
       draft: { ...draft, models: ['deepseek:model-c'] },
       clientRevision: 300,
+      scope: 'user',
     });
     const saveSpy = vi.spyOn(agentManifestService, 'saveDefinition')
       .mockRejectedValueOnce(new Error('simulated atomic rename failure'));
@@ -574,16 +580,17 @@ describe('SettingsService provider persistence', () => {
     const failed = await service.saveAgentDefinition({
       draft: { ...draft, models: ['deepseek:model-d'] },
       clientRevision: 400,
+      scope: 'user',
     });
 
     expect(failed).toMatchObject({
       status: 'failed',
       error: 'simulated atomic rename failure',
       commitHash: committed.commitHash,
-      route: { agentId: 'ask', providerId: 'deepseek', modelId: 'model-c' },
+      route: { agentId: 'general', providerId: 'deepseek', modelId: 'model-c' },
     });
     expect(failed.lastSuccessful?.commitHash).toBe(committed.commitHash);
-    expect(service.getAll().agents.definitions.find((definition) => definition.id === 'ask')?.models)
+    expect(service.getAll().agents.definitions.find((definition) => definition.id === 'general')?.models)
       .toEqual(['deepseek:model-c']);
     saveSpy.mockRestore();
   });

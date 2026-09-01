@@ -20,7 +20,9 @@ vi.mock('../../settings/SettingsService', () => ({
 vi.mock('../../settings/AgentManifestService', () => ({
   agentManifestService: {
     getEffectiveProfiles: () => [
-      { id: 'ask', enabled: true, instructions: 'Ask profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [] },
+      { id: 'ask', enabled: true, instructions: 'Ask profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'] },
+      { id: 'debugger', enabled: true, instructions: 'Debugger profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['general'] },
+      { id: 'general', enabled: true, instructions: 'General profile instructions', tools: [], skills: [], mcpServers: [], handoffs: [], agents: ['debugger'] },
     ],
   },
 }));
@@ -228,7 +230,7 @@ describe('SubagentRunner', () => {
     expect(parentBudget.aggregateToolCalls).toBe(0);
   });
 
-  it('createSubagentTools executes delegated run', async () => {
+  it('createSubagentTools executes a self run when frozen delegates are empty', async () => {
     const runner = new SubagentRunner({
       sendProfileMessage: async () => 'child done',
       systemPromptForAgent: () => 'fallback',
@@ -236,9 +238,30 @@ describe('SubagentRunner', () => {
     });
     const [tool] = runner.createSubagentTools('debugger', 'sess-1');
     expect(tool.name).toBe('subagent');
-    const result = await tool.execute('tc-1', { task: 'do work', profile: 'ask' });
-    expect(result.details).toMatchObject({ profile: 'ask', status: 'complete' });
+    const result = await tool.execute('tc-1', { task: 'do work' });
+    expect(result.details).toMatchObject({ profile: 'debugger', status: 'complete' });
     expect(result.content[0]).toMatchObject({ type: 'text', text: 'child done' });
+  });
+
+  it('authorizes only frozen profileDelegates and denies others', async () => {
+    const runner = new SubagentRunner({
+      sendProfileMessage: async () => 'child done',
+      systemPromptForAgent: () => 'fallback',
+      getActiveTurn: () => ({
+        runtimePlan: { profileDelegates: ['general'] },
+        registerProducer: () => () => undefined,
+        subagentBudget: createSubagentBudgetState(),
+        signal: undefined,
+        generation: 1,
+        isLive: () => true,
+        eventSink: { sessionId: 'sess-1', onEvent: () => undefined },
+      } as unknown as TurnHandle),
+    });
+    const [tool] = runner.createSubagentTools('debugger', 'sess-1');
+    const allowed = await tool.execute('tc-allowed', { task: 'do work', profile: 'general' });
+    expect(allowed.details).toMatchObject({ profile: 'general', status: 'complete' });
+    await expect(tool.execute('tc-denied', { task: 'do work', profile: 'ask' }))
+      .rejects.toThrow(/SUBAGENT_DELEGATE_DENIED/);
   });
 
   it('rejects an invalid model without sending a child turn', async () => {

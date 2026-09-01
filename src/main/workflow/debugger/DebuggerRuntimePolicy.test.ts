@@ -4,7 +4,8 @@ import {
   diagnoseManifestToolTokens,
   expandCanonicalToolToken,
   intersectSkillAllowedTools,
-  isToolAllowedForAgent,
+  isToolAllowedByFrozenAllowlist,
+  resolveAgentToolAllowlistFromDefinition,
 } from './DebuggerRuntimePolicy';
 import { CANONICAL_TOOL_TOKEN_EXPANSIONS, REJECTED_TOOL_TOKENS } from '@shared/constants/agentToolTokens';
 
@@ -17,10 +18,14 @@ describe('DebuggerRuntimePolicy tool tokens', () => {
     );
   });
 
-  it('denies task_create for ask agent', () => {
-    expect(isToolAllowedForAgent('task_create', 'ask')).toBe(false);
-    expect(isToolAllowedForAgent('task_update', 'ask')).toBe(false);
-    expect(isToolAllowedForAgent('task_stop', 'ask')).toBe(false);
+  it('fail-closes an empty tools list and honors declared tokens only', () => {
+    expect(() => resolveAgentToolAllowlistFromDefinition('general', [])).toThrow(/AGENT_TOOLS_EMPTY/);
+    const general = resolveAgentToolAllowlistFromDefinition('general', ['task', 'write']);
+    expect(isToolAllowedByFrozenAllowlist('task_create', 'general', general)).toBe(true);
+    expect(isToolAllowedByFrozenAllowlist('write_file', 'general', general)).toBe(true);
+    const mission = resolveAgentToolAllowlistFromDefinition('debugger', ['read', 'task']);
+    expect(isToolAllowedByFrozenAllowlist('task_create', 'debugger', mission)).toBe(true);
+    expect(isToolAllowedByFrozenAllowlist('write_file', 'debugger', mission)).toBe(false);
   });
 
   it('diagnoses rejected todo and search_codebase tokens', () => {

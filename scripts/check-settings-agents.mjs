@@ -254,14 +254,20 @@ async function main() {
   assert(modeGlyph.includes('FALLBACK_MODE_CONFIG'), 'ModeGlyph should provide a safe fallback for custom Agent profiles.');
 
   const composerSendHelpers = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/debugger/composer/composerSendHelpers.ts'), 'utf8');
-  assert(composerSendHelpers.includes("return EXECUTABLE_APP_MODES.has(mode) ? mode as AppMode : 'edit';"), 'Composer send should not map custom profiles to Ask mode.');
+  assert(composerSendHelpers.includes('resolveComposerProfileId'), 'Composer send should freeze the selected profile id without Ask/Edit fallback.');
   const composerSendFlow = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/debugger/composer/composerSendFlow.ts'), 'utf8');
   assert(composerSendFlow.includes('agentId: selectedAgentId || null'), 'Conversation sends should freeze the selected Agent id.');
   assert(composerSendFlow.includes('setPromptValue(sentPrompt)') && composerSendFlow.includes('setPendingAttachments(sentAttachments)'), 'Local preflight failures should restore the Composer snapshot.');
   assert(!composerSendFlow.includes('setSelectedAgentId'), 'Local send failures must not rewrite the selected Agent id.');
 
-  const handoffActions = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/debugger/AgentChat/useAgentHandoffActions.ts'), 'utf8');
-  assert(handoffActions.includes(": 'edit';"), 'Handoff to a custom Agent should keep the custom agentId with a generic executable mode.');
+  assert(!fs.existsSync(path.join(repoRoot, 'src/renderer/features/debugger/AgentChat/useAgentHandoffActions.ts')), 'Dead renderer handoff actions must be deleted.');
+  const profileHandoff = fs.readFileSync(path.join(repoRoot, 'src/shared/types/profileHandoff.ts'), 'utf8');
+  assert(profileHandoff.includes('export interface ProfileHandoffState'), 'ProfileHandoffState must be the durable handoff record.');
+  const conversationService = fs.readFileSync(path.join(repoRoot, 'src/main/conversation/ConversationService.ts'), 'utf8');
+  assert(!conversationService.includes('pendingHandoffs'), 'ConversationService must not keep an in-memory pendingHandoffs map.');
+  assert(conversationService.includes('scheduleHandoffAutoSend'), 'send:true continuation must go through the durable handoff store.');
+  const sessionApi = fs.readFileSync(path.join(repoRoot, 'src/shared/renderer-api/workbench.ts'), 'utf8');
+  assert(sessionApi.includes('setAgentId'), 'Manual Agent switch must persist session.agentId through main.');
 
   const useSettingsModal = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/useSettingsModal.ts'), 'utf8');
   assert(!useSettingsModal.includes('AGENT_ROLES'), 'Settings route validation should derive agents from manifest drafts.');
@@ -311,11 +317,11 @@ async function main() {
     path.join(repoRoot, 'src/main/workflow/debugger/AgentSlotRegistry.ts'),
     'utf8',
   );
-  assert(agentSlotRegistrySource.includes("isTopLevelAgentId(agentId) ? agentId : 'edit'"), 'Custom Agent fallback config should use a generic profile default.');
+  assert(agentSlotRegistrySource.includes('DEFAULT_AGENT_ID'), 'Custom Agent fallback config should use general, not edit.');
 
   const runtimePolicySource = fs.readFileSync(path.join(repoRoot, 'src/main/workflow/debugger/DebuggerRuntimePolicy.ts'), 'utf8');
   assert(runtimePolicySource.includes('manifest.tools.flatMap'), 'Runtime tool policy should derive manifest tool allowlists directly.');
-  assert(runtimePolicySource.includes('isTopLevelAgentId(agentId)'), 'Runtime tool policy should only grant executable defaults to built-in Agents.');
+  assert(runtimePolicySource.includes('AGENT_TOOLS_EMPTY'), 'Runtime tool policy must fail-closed on empty tools.');
 
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-agent-settings-agents-'));
   try {
@@ -343,9 +349,22 @@ async function main() {
     }
 
     const savedAgentId = 'custom-saved-agent';
+    let mismatchRejected = false;
+    try {
+      await manifestService.saveDefinition({ agentsPath, instructionsPath }, agentDraft({
+        id: savedAgentId,
+        fileName: 'wrong-file-name.agent.md',
+        models: [canonicalAgentModelId('ollama', 'llama3')],
+      }));
+    } catch (error) {
+      mismatchRejected = String(error instanceof Error ? error.message : error).includes('AGENT_MANIFEST_FILENAME_MISMATCH');
+    }
+    assert(mismatchRejected, 'Saving a profile whose file stem does not equal id must be rejected.');
+    assert(!fs.existsSync(path.join(agentsPath, 'wrong-file-name.agent.md')), 'Rejected filename mismatch must not write the submitted file name.');
+    assert(!fs.existsSync(path.join(agentsPath, `${savedAgentId}.agent.md`)), 'Rejected filename mismatch must not write a different profile file.');
     await manifestService.saveDefinition({ agentsPath, instructionsPath }, agentDraft({
       id: savedAgentId,
-      fileName: 'wrong-file-name.agent.md',
+      fileName: `${savedAgentId}.agent.md`,
       models: [canonicalAgentModelId('ollama', 'llama3')],
     }));
     manifestService.saveGlobalInstructions({ instructionsPath }, 'global custom instructions');

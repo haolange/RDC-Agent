@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   LlmProviderDraftArgsSchema,
+  SettingsGetAgentDefinitionCommitArgsSchema,
   SettingsSaveAgentDefinitionArgsSchema,
   SettingsSaveProviderDefinitionArgsSchema,
 } from './settingsLlmSchemas';
@@ -13,6 +14,7 @@ describe('settingsLlmSchemas clientRevision / modelPreferences', () => {
     expect(SettingsSaveAgentDefinitionArgsSchema.safeParse([{
       draft: { id: 'debugger' },
       clientRevision: revision,
+      scope: 'user',
     }]).success).toBe(true);
 
     expect(SettingsSaveProviderDefinitionArgsSchema.safeParse([{
@@ -30,6 +32,35 @@ describe('settingsLlmSchemas clientRevision / modelPreferences', () => {
     expect(SettingsSaveAgentDefinitionArgsSchema.safeParse([{
       draft: { id: 'debugger' },
       clientRevision: Number.MAX_SAFE_INTEGER + 1,
+    }]).success).toBe(false);
+  });
+
+  it('rejects path-shaped projectId and missing projectId on project scope', () => {
+    expect(SettingsSaveAgentDefinitionArgsSchema.safeParse([{
+      draft: { id: 'general' },
+      clientRevision: 1,
+      scope: 'project',
+      projectId: 'D:/Projects/Demo',
+    }]).success).toBe(false);
+    expect(SettingsSaveAgentDefinitionArgsSchema.safeParse([{
+      draft: { id: 'general' },
+      clientRevision: 1,
+      scope: 'project',
+    }]).success).toBe(false);
+    expect(SettingsSaveAgentDefinitionArgsSchema.safeParse([{
+      draft: { id: 'general' },
+      clientRevision: 1,
+      scope: 'project',
+      projectId: 'proj_demo',
+    }]).success).toBe(true);
+    expect(SettingsGetAgentDefinitionCommitArgsSchema.safeParse([{
+      agentId: 'general',
+      scope: 'project',
+      projectId: 'proj_demo',
+    }]).success).toBe(true);
+    expect(SettingsGetAgentDefinitionCommitArgsSchema.safeParse([{
+      agentId: 'general',
+      scope: 'project',
     }]).success).toBe(false);
   });
 

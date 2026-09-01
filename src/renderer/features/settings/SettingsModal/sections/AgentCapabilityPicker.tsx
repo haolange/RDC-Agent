@@ -1,7 +1,79 @@
 import React, { useState } from 'react';
+import type { AgentManifestDraft } from '@shared/types/agentManifest';
+import type { AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
+
+const BUILTIN_TOOL_OPTIONS = [
+  'read',
+  'search',
+  'web',
+  'git',
+  'shell',
+  'interpreter',
+  'write',
+  'edit',
+  'file-manage',
+  'askUser',
+  'agent',
+  'handoff',
+  'task',
+  'memory',
+  'memory-write',
+  'planArtifact',
+  'skill',
+  'mcp',
+  'tool_search',
+  'rdxContext',
+  'subagent',
+];
+
+const uniqueOptions = (...groups: string[][]): string[] =>
+  Array.from(new Set(groups.flat().map((value) => value.trim()).filter(Boolean)))
+    .sort((first, second) => first.localeCompare(second));
+
+export const buildAgentCapabilityGroups = (
+  settings: AppSettings,
+  selectedAgent: AgentManifestDraft,
+  onUpdateAgent: (patch: Partial<AgentManifestDraft>) => void,
+  t: Translate,
+): AgentCapabilityGroup[] => {
+  const allAgents = settings.agents.definitions;
+  return [
+    {
+      id: 'tools',
+      label: t('settings.tools'),
+      values: selectedAgent.tools,
+      options: uniqueOptions(BUILTIN_TOOL_OPTIONS, allAgents.flatMap((agent) => agent.tools), selectedAgent.tools),
+      onChange: (tools) => onUpdateAgent({ tools }),
+    },
+    {
+      id: 'agents',
+      label: t('settings.subAgents'),
+      values: selectedAgent.agents,
+      options: uniqueOptions(
+        allAgents.filter((agent) => agent.id !== selectedAgent.id).map((agent) => agent.id),
+        selectedAgent.agents,
+      ),
+      onChange: (agents) => onUpdateAgent({ agents }),
+    },
+    {
+      id: 'skills',
+      label: t('settings.skills'),
+      values: selectedAgent.skills,
+      options: uniqueOptions(allAgents.flatMap((agent) => agent.skills), selectedAgent.skills),
+      onChange: (skills) => onUpdateAgent({ skills }),
+    },
+    {
+      id: 'mcp',
+      label: t('settings.mcp'),
+      values: selectedAgent.mcpServers,
+      options: uniqueOptions(allAgents.flatMap((agent) => agent.mcpServers), selectedAgent.mcpServers),
+      onChange: (mcpServers) => onUpdateAgent({ mcpServers }),
+    },
+  ];
+};
 
 export interface AgentCapabilityGroup {
   id: string;

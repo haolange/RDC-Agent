@@ -1,6 +1,7 @@
 import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
-import type { RunSummary, AppMode } from '@shared/types/session';
+import { DEFAULT_AGENT_ID } from '@shared/types/agent';
+import type { RunSummary } from '@shared/types/session';
 import type {
   AgentRun,
   AgentRunPresentation,
@@ -87,6 +88,18 @@ interface AskTurn {
   assistantMessages: ConversationMessage[];
 }
 
+export function resolveHistoryTurnProfileId(turn: {
+  userMessage?: Pick<ConversationMessage, 'profileId' | 'agentId'>;
+  assistantMessages: Array<Pick<ConversationMessage, 'profileId' | 'agentId'>>;
+}): string {
+  const raw = turn.userMessage?.profileId
+    ?? turn.assistantMessages.at(-1)?.profileId
+    ?? turn.assistantMessages.at(-1)?.agentId
+    ?? '';
+  const id = typeof raw === 'string' ? raw.trim() : '';
+  return id || DEFAULT_AGENT_ID;
+}
+
 export class TraceService {
   private traceRoot: string;
   private runStore: TraceRunStore;
@@ -155,13 +168,13 @@ export class TraceService {
       ref: `raw-${event.event_id}`,
     }));
 
-    let mode: AppMode = 'ask';
+    let profileId = 'general';
 
     for (const run of runs) {
       const runEvents = events.filter((e) => e.run_id === run.runId).sort((a, b) => a.ts_ms - b.ts_ms);
       const planStatus = mapRunPlanStatus(run);
-      const agentType = run.mode ?? 'debugger';
-      mode = agentType;
+      const agentType = run.profileId ?? 'general';
+      profileId = agentType;
       const profile = agentProfileRegistry.getForMode(agentType);
 
       const userPrompt = this.userPromptForRun(conversations, run.runId)
@@ -278,7 +291,7 @@ export class TraceService {
     for (const turn of this.groupAskTurns(conversations)) {
       if (turn.messages.some((m) => m.runId)) continue;
       const runId = `ask-${turn.turnId}`;
-      const userPrompt = turn.userMessage?.content.trim() || 'Ask';
+      const userPrompt = turn.userMessage?.content.trim() || 'Conversation';
       const assistant = turn.assistantMessages.slice(-1)[0];
       const status: TraceStatus = assistant?.status === 'error'
         ? 'failed'
@@ -288,9 +301,10 @@ export class TraceService {
             ? 'running'
             : 'succeeded';
 
+      const profileId = resolveHistoryTurnProfileId(turn);
       let agentRun = this.runStore.get(runId) ?? {
         runId,
-        agentType: 'ask',
+        agentType: profileId,
         userRequest: userPrompt,
         status,
         createdAt: toIso(turn.createdAt),
@@ -331,7 +345,7 @@ export class TraceService {
         this.emitter.emitFinalResponse(runId, assistant.content);
       }
 
-      const profile = agentProfileRegistry.get('ask');
+      const profile = agentProfileRegistry.get(profileId);
       const nodes = traceTreeBuilder.build(this.eventStore.getEvents(runId), profile);
       runViewModels.push({
         run: agentRun,
@@ -350,14 +364,14 @@ export class TraceService {
       branchId,
       runs,
       events,
-      mode,
+      profileId,
     });
 
     return {
       projectId,
       sessionId,
       activeBranchId: state.activeBranchId || 'branch-main',
-      mode,
+      profileId,
       runs: runViewModels.sort((a, b) => Date.parse(a.run.createdAt) - Date.parse(b.run.createdAt)),
       rightPanel,
       branchNavigator: null,

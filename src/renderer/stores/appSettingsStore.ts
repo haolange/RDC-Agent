@@ -64,7 +64,7 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
 
     try {
       const result = await agentDefinitionMutations.enqueue(request);
-      if (!isLatestAgentDefinitionRevision(agentId, request.clientRevision)) return result;
+      if (!isLatestAgentDefinitionRevision(request.scope, request.projectId, agentId, request.clientRevision)) return result;
       if (result.status === 'failed') {
         set((state) => ({
           settings: rollbackAgentDefinitionSave(state.settings, agentId, result.lastSuccessful),
@@ -90,8 +90,12 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
       }
       return result;
     } catch (error) {
-      if (isLatestAgentDefinitionRevision(agentId, request.clientRevision)) {
-        const lastSuccessful = await window.electronAPI.settings.getAgentDefinitionCommit(agentId).catch(() => null);
+      if (isLatestAgentDefinitionRevision(request.scope, request.projectId, agentId, request.clientRevision)) {
+        const lastSuccessful = await window.electronAPI.settings.getAgentDefinitionCommit({
+          agentId,
+          scope: request.scope,
+          projectId: request.projectId,
+        }).catch(() => null);
         set((state) => ({
           settings: rollbackAgentDefinitionSave(state.settings, agentId, lastSuccessful),
           agentRouteSyncById: withAgentRouteSyncState(state.agentRouteSyncById, agentId, routeChanged, {
@@ -105,13 +109,13 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
       throw error;
     }
   },
-  flushAgentDefinitionSaves: async (agentId) => {
-    await agentDefinitionMutations.flush(agentId);
-    return window.electronAPI.settings.getAgentDefinitionCommit(agentId);
+  flushAgentDefinitionSaves: async (query) => {
+    await agentDefinitionMutations.flush(query);
+    return window.electronAPI.settings.getAgentDefinitionCommit(query);
   },
   reloadSettings: async () => {
     const nextSettings = await window.electronAPI.settings.get();
-    set({ settings: nextSettings, hydrated: true });
+    set({ settings: nextSettings, hydrated: true, agentRouteSyncById: {} });
     return nextSettings;
   },
   ...createAppSettingsAppearanceActions(get),

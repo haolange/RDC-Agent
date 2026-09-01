@@ -1,6 +1,5 @@
 import type { ActionEvent } from '@shared/types/evidence';
 import type { RunSummary } from '@shared/types/session';
-import type { AppMode } from '@shared/types/session';
 import type { RightPanelViewModel } from '@shared/types/trace';
 import { createSessionTaskStore } from '../agent-runtime/tasks/sessionTaskStore';
 import { rdxSessionService } from '../sessions';
@@ -37,7 +36,7 @@ export class RightRailProjectionService {
     branchId: string;
     runs: RunSummary[];
     events: ActionEvent[];
-    mode: AppMode;
+    profileId?: string;
   }): Promise<RightPanelViewModel> {
     const session = storageAdapter.readSession(input.sessionId);
     if (!session) return emptyRightPanel(input.sessionId);
@@ -68,7 +67,7 @@ export class RightRailProjectionService {
       projectRoot: project?.rootPath,
     });
     const task = buildTaskContext({
-      session, project, runs: input.runs, mode: input.mode,
+      session, project, runs: input.runs, profileId: input.profileId,
       attachments: sources, resources: taskResources,
       permissionMode: settings.agentRuntime.permissions.mode,
     });

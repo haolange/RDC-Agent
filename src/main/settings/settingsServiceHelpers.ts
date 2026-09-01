@@ -21,6 +21,7 @@ import {
 import { appPathService } from '../runtime/AppPathService';
 import { agentManifestService } from './AgentManifestService';
 import { executionProfileService } from './ExecutionProfileService';
+import { tryCurrentProjectRoot } from './resolveRegisteredProjectRoot';
 import { secretStorageService } from './SecretStorageService';
 import { StorageSchemaError } from '../sessions/storageSchema';
 import {
@@ -165,6 +166,7 @@ export function createDefaultRuntimeSettings(): AppSettings {
       definitions: [],
       modelOptions: [],
       globalInstructions: '',
+      diagnostics: [],
     },
     resourceCatalog,
     paths: EMPTY_PATHS,
@@ -362,6 +364,8 @@ export function toRuntimeSettings(
     paths,
     hydratedProviders,
     createEmptyAgentRoutes(),
+    [],
+    tryCurrentProjectRoot(),
   );
   const agentRoutes = normalizeManifestRoutes(
     agentManifestService.routesFromDefinitions(createEmptyAgentRoutes(), baseAgentSettings.definitions),

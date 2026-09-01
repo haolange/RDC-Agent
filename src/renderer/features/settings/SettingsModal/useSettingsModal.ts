@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useAppSettingsStore } from '../../../stores/appSettingsStore';
+import { useProjectStore } from '../../../stores/projectStore';
 import { useI18n } from '../../../i18n';
+import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings, LlmProviderEntry } from '@shared/types/settings';
 import type { ProviderCatalogSnapshot } from './types';
 import { createSettingsModalActions } from './settingsModalActions';
+import { findProjectedHandoffTargetConflicts, validateAgentHandoffs } from './sections/agentHandoffValidation';
 import { rollbackAgentManifestDrafts, useAgentManifestAutosave } from './useAgentManifestAutosave';
 import { useProviderConnection } from './useProviderConnection';
 import { useSettingsModalState } from './useSettingsModalState';
@@ -41,8 +44,9 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
   const saveProvider = useAppSettingsStore((state) => state.saveProvider);
   const saveAgentDefinition = useAppSettingsStore((state) => state.saveAgentDefinition);
   const reloadSettings = useAppSettingsStore((state) => state.reloadSettings);
+  const currentProjectId = useProjectStore((state) => state.currentProject?.projectId ?? null);
 
-  const modalState = useSettingsModalState(open, settings);
+  const modalState = useSettingsModalState(open, settings, currentProjectId);
   const [providerCatalogSnapshot, setProviderCatalogSnapshot] = useState<ProviderCatalogSnapshot>(EMPTY_PROVIDER_CATALOG_SNAPSHOT);
 
   useEffect(() => {
@@ -110,18 +114,36 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     { id: 'policy', label: t('settings.policy') },
   ], [t]);
 
+  const blockSubmit = (draft: AgentManifestDraft) => {
+    const issues = validateAgentHandoffs(draft.handoffs, {
+      selfId: draft.id,
+      definitions: modalState.agentManifestDrafts.filter((entry) => !entry.delete),
+      modelOptions: settings.agents.modelOptions,
+    });
+    return issues.length === 0 ? null : t('settings.agentHandoffBlocked', { count: issues.length });
+  };
+  const blockProjectedSubmit = (projectedDrafts: AgentManifestDraft[]) => {
+    const conflict = findProjectedHandoffTargetConflicts(projectedDrafts)[0];
+    return conflict
+      ? t('settings.agentHandoffBlockedByOther', { source: conflict.sourceId, id: conflict.targetId })
+      : null;
+  };
   const actions = createSettingsModalActions({
     modalState,
     providerConnection,
     updateProfile,
     patchSettings,
     saveAgentDefinition,
+    currentProjectId,
     t,
+    blockSubmit,
+    blockProjectedSubmit,
   });
   useAgentManifestAutosave({
     open,
     settings,
     agentManifestDrafts: modalState.agentManifestDrafts,
+    currentProjectId,
     onSave: actions.handleSaveAgentManifests,
     onRollback: (failedDrafts, savedDrafts) => {
       modalState.setAgentManifestDrafts((current) => rollbackAgentManifestDrafts(
@@ -132,6 +154,9 @@ export const useSettingsModal = (open: boolean, settings: AppSettings) => {
     },
     onSaveStateChange: modalState.setAgentManifestSaveState,
     onSaveMessageChange: modalState.setAgentManifestSaveMessage,
+    onBlockedChange: modalState.setAgentManifestSaveBlocked,
+    blockSubmit,
+    blockProjectedSubmit,
     savedMessage: t('settings.agentManifestSaved'),
     failedMessage: t('settings.agentManifestSaveFailed'),
   });

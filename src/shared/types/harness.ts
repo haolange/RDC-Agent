@@ -1,5 +1,5 @@
 import type { AgentRole } from './agent';
-import type { CaptureDescriptor, ExecutableAppMode } from './session';
+import type { CaptureDescriptor, MissionId } from './session';
 import type { WorkflowStage } from './workflow';
 
 export type HarnessSchemaVersion = '1';
@@ -205,7 +205,8 @@ export interface PlanContract {
   planId: string;
   runId: string;
   sessionId: string;
-  mode: ExecutableAppMode;
+  profileId: string;
+  mission?: MissionId;
   goal: string;
   status: HarnessStatus;
   captures: CaptureDescriptor[];

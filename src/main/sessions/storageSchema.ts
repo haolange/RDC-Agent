@@ -1,6 +1,5 @@
 import { z, type ZodType } from 'zod';
 import type { RunContextUsageSummary, SessionAttachmentRecord, SessionRecord } from '@shared/types/session';
-import type { PersistedRunRecord } from './storageTypes';
 import type {
   ConversationTerminalCommitJournal,
   ConversationTurnCommitJournal,
@@ -168,6 +167,7 @@ export const SessionRecordSchema: ZodType<SessionRecord> = z.object({
     providerId: z.string().min(1),
     modelId: z.string().min(1),
   }).nullable().optional(),
+  agentId: z.string().min(1).optional(),
 }).passthrough() as ZodType<SessionRecord>;
 
 export const SessionEvidenceV1Schema = z.object({
@@ -264,45 +264,10 @@ export const SessionAttachmentManifestSchema = z
   .transform((raw) => unwrapAttachmentManifest(raw))
   .pipe(SessionAttachmentRecordsSchema) as unknown as ZodType<SessionAttachmentRecord[]>;
 
-export const PersistedRunRecordSchema: ZodType<PersistedRunRecord> = z.object({
-  runId: z.string().min(1),
-  turnId: z.string().optional(),
-  projectId: z.string().min(1),
-  sessionId: z.string().min(1),
-  caseId: z.string().min(1),
-  mode: z.enum(['debugger', 'analyzer', 'optimizer']),
-  goal: z.string(),
-  captures: z.array(z.unknown()),
-  startedAt: z.number(),
-  finishedAt: z.number().optional(),
-  stoppedAt: z.number().optional(),
-  status: z.enum([
-    'queued',
-    'planning',
-    'awaiting_input',
-    'awaiting_approval',
-    'running',
-    'stopping',
-    'completed',
-    'failed',
-    'cancelled',
-    'interrupted',
-  ]),
-  stopReason: z.string().optional(),
-  lastStage: z.string(),
-  backend: z.enum(['local', 'remote']),
-  reportPaths: z.unknown().optional(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-  runtime: z.object({
-    backend: z.enum(['local', 'remote']),
-    entry_mode: z.enum(['cli', 'mcp']),
-    context_id: z.string().nullable(),
-    runtime_owner: z.string().nullable(),
-    session_id: z.string().min(1),
-    workflow_stage: z.string(),
-  }).passthrough(),
-}).passthrough() as ZodType<PersistedRunRecord>;
+export {
+  PersistedRunRecordV2Schema as PersistedRunRecordSchema,
+  SESSION_RUN_MIGRATIONS,
+} from './runV2/runRecordSchema';
 
 const ContextUsageBreakdownEntrySchema = z.object({
   id: z.string().min(1),

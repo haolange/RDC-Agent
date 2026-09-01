@@ -10,7 +10,7 @@ type Translate = ReturnType<typeof useI18n>['t'];
 
 const AGENT_DESCRIPTION_KEYS: Partial<Record<string, TranslationKey>> = {
   analyzer: 'settings.agentDescription.analyzer',
-  ask: 'settings.agentDescription.ask',
+  general: 'settings.agentDescription.general',
   debugger: 'settings.agentDescription.debugger',
   optimizer: 'settings.agentDescription.optimizer',
 };
@@ -23,6 +23,7 @@ interface AgentsSettingsProps {
   onImportAgentManifest: () => void | Promise<void>;
   agentManifestSaveState: 'idle' | 'saving' | 'saved' | 'error';
   agentManifestSaveMessage: string;
+  agentManifestSaveBlocked?: boolean;
   t: Translate;
 }
 
@@ -77,6 +78,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   onImportAgentManifest,
   agentManifestSaveState,
   agentManifestSaveMessage,
+  agentManifestSaveBlocked = false,
   t,
 }) => {
   const activeDrafts = visibleDrafts(agentManifestDrafts);
@@ -145,6 +147,19 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
               </div>
             </div>
 
+            {(settings.agents.diagnostics ?? []).length > 0 ? (
+              <div
+                className="settings-agent-tool-diagnostics"
+                data-testid="settings-agent-manifest-diagnostics"
+              >
+                <ul className="settings-agent-tool-diagnostics-list">
+                  {(settings.agents.diagnostics ?? []).map((entry) => (
+                    <li key={entry}>{entry}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
             <div className="settings-manifest-list" aria-label={t('settings.agentManifestTitle')}>
               {activeDrafts.map((agent) => (
                 <button
@@ -175,6 +190,7 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
               onRetrySaveAgentManifests={onRetrySaveAgentManifests}
               agentManifestSaveState={agentManifestSaveState}
               agentManifestSaveMessage={agentManifestSaveMessage}
+              agentManifestSaveBlocked={agentManifestSaveBlocked}
               t={t}
             />
           )}

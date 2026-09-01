@@ -76,6 +76,28 @@ export class AppPathService {
     return normalizePath(process.env.RDC_AGENT_HOME?.trim() || path.join(os.homedir(), '.rdx'));
   }
 
+  /**
+   * Builtin agent-runtime root: packaged app path, repo `resources/agent-runtime`,
+   * then Electron `process.resourcesPath`. First existing candidate wins.
+   */
+  getBuiltinAgentRuntimeRoot(): string {
+    const candidates = [
+      path.join(app?.getAppPath?.() || process.cwd(), 'resources', 'agent-runtime'),
+      path.join(process.cwd(), 'resources', 'agent-runtime'),
+      path.join(process.resourcesPath ?? '', 'agent-runtime'),
+    ];
+    return candidates.map((candidate) => path.resolve(candidate)).find((candidate) => fs.existsSync(candidate))
+      ?? path.resolve(candidates[0]);
+  }
+
+  getBuiltinAgentsPath(): string {
+    return path.join(this.getBuiltinAgentRuntimeRoot(), 'agents');
+  }
+
+  getBuiltinSkillsPath(): string {
+    return path.join(this.getBuiltinAgentRuntimeRoot(), 'skills');
+  }
+
   getUserRdxPaths(): UserRdxPaths {
     const userRdxRoot = this.getUserRdxRoot();
     return {
