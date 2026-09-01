@@ -52,7 +52,6 @@ export class DebuggerRuntime {
       orchestrationMode: 'multi_agent',
       coordinationMode: 'staged_handoff',
       blockers: [],
-      harnessTasks: [],
       reasoningSummaries: [],
       lastUpdated: nowIso(),
     };

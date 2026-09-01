@@ -3,7 +3,7 @@
  * Single source of truth for seed manifests, allowlist expansion, and Settings diagnostics.
  */
 
-/** All builtin AgentTool ids after Knowledge tools (45). */
+/** All builtin AgentTool ids after Investigation tools (48). */
 export const BUILTIN_AGENT_TOOL_IDS = [
   'shell',
   'read_file',
@@ -50,6 +50,9 @@ export const BUILTIN_AGENT_TOOL_IDS = [
   'knowledge_read',
   'knowledge_compile',
   'knowledge_candidate_create',
+  'investigation_read',
+  'investigation_write',
+  'investigation_list',
 ] as const;
 
 export type BuiltinAgentToolId = (typeof BUILTIN_AGENT_TOOL_IDS)[number];
@@ -108,6 +111,9 @@ export const BUILTIN_AGENT_TOOL_TIERS: Record<BuiltinAgentToolId, BuiltinAgentTo
   knowledge_read: 'extended',
   knowledge_compile: 'extended',
   knowledge_candidate_create: 'extended',
+  investigation_read: 'extended',
+  investigation_write: 'extended',
+  investigation_list: 'extended',
 };
 
 export function getBuiltinToolTier(toolName: string): BuiltinAgentToolTier | null {
@@ -149,6 +155,7 @@ export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
   rdx: ['rdx_context'],
   subagent: ['subagent'],
   knowledge: ['knowledge_browse', 'knowledge_search', 'knowledge_read', 'knowledge_compile', 'knowledge_candidate_create'],
+  investigation: ['investigation_read', 'investigation_write', 'investigation_list'],
 };
 
 /** Tokens intentionally rejected (removed or renamed). No silent fallback. */

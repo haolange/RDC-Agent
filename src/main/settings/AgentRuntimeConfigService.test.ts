@@ -118,4 +118,39 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     expect(trusted?.needsRetrust).toBe(false);
     expect(() => mcpTrustService.assertConnectAllowed(trusted!, project)).not.toThrow();
   });
+
+  it('discovers the thirteen Wave 4 method skills from the builtin catalog', async () => {
+    const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
+    const service = new AgentRuntimeConfigService();
+    const ids = service.listSkillMetadata().map((skill) => skill.id);
+    expect(ids).toEqual(expect.arrayContaining([
+      'renderdoc-execution',
+      'rdx-cli-shell',
+      'capture-preflight',
+      'capture-facts',
+      'artifact-provenance',
+      'pass-graph-analysis',
+      'shader-ir-analysis',
+      'pixel-forensics',
+      'resource-versioning',
+      'cross-capture-alignment',
+      'optimization-experiment',
+      'skeptic-review',
+      'report-composition',
+      'execution-orchestrator',
+      'debugger-coordinator',
+      'analyzer-coordinator',
+      'optimizer-coordinator',
+      'knowledge-scout',
+      'knowledge-candidate',
+    ]));
+    const provenance = service.loadSkill('artifact-provenance');
+    expect(provenance?.allowedTools).toEqual(expect.arrayContaining([
+      'investigation_read',
+      'investigation_write',
+      'investigation_list',
+      'artifact_read',
+    ]));
+    expect(provenance?.instructions).toContain('sourceRefs.length >= 1');
+  });
 });

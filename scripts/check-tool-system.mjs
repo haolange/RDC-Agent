@@ -40,8 +40,8 @@ function main() {
   const { WORK_PROCESS_TOOL_DISPLAY_CATALOG } = require('../src/renderer/features/debugger/AgentChat/workProcessToolCatalog.ts');
 
   assert(
-    BUILTIN_AGENT_TOOL_IDS.length === 45,
-    `BUILTIN_AGENT_TOOL_IDS.length must be 45, got ${BUILTIN_AGENT_TOOL_IDS.length}`,
+    BUILTIN_AGENT_TOOL_IDS.length === 48,
+    `BUILTIN_AGENT_TOOL_IDS.length must be 48, got ${BUILTIN_AGENT_TOOL_IDS.length}`,
   );
 
   const builtinSet = new Set(BUILTIN_AGENT_TOOL_IDS);
@@ -167,6 +167,16 @@ function main() {
     'CANONICAL_TOOL_TOKEN_EXPANSIONS.knowledge must expand to the five Knowledge tools',
   );
   for (const id of knowledgeTools) {
+    assert(BUILTIN_AGENT_TOOL_IDS.includes(id), `BUILTIN_AGENT_TOOL_IDS must include ${id}`);
+    assert(BUILTIN_AGENT_TOOL_TIERS[id] === 'extended', `${id} must be extended/deferred`);
+  }
+  const investigationTools = ['investigation_read', 'investigation_write', 'investigation_list'];
+  assert(
+    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS.investigation)
+      && investigationTools.every((id) => CANONICAL_TOOL_TOKEN_EXPANSIONS.investigation.includes(id)),
+    'CANONICAL_TOOL_TOKEN_EXPANSIONS.investigation must expand to the Investigation tools',
+  );
+  for (const id of investigationTools) {
     assert(BUILTIN_AGENT_TOOL_IDS.includes(id), `BUILTIN_AGENT_TOOL_IDS must include ${id}`);
     assert(BUILTIN_AGENT_TOOL_TIERS[id] === 'extended', `${id} must be extended/deferred`);
   }

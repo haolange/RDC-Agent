@@ -24,6 +24,7 @@ import { storageAdapter } from '../../sessions/StorageAdapter';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
 import { createKnowledgeTools } from '../../knowledge/KnowledgeTools';
+import { createInvestigationTools } from '../../investigation/InvestigationTools';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import {
   expandCanonicalToolToken,
@@ -664,6 +665,7 @@ export class RuntimeToolAssembly {
       this.createSkillReadTool(agentId),
       this.createMcpCatalogTool(),
       ...createKnowledgeTools(sessionId),
+      ...createInvestigationTools(sessionId),
       ...this.deps.createSubagentTools(agentId, sessionId, turnHandle),
     ];
   }

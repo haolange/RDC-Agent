@@ -7,17 +7,19 @@ import { listSessionArtifactSources } from '../sessions/SessionArtifactSource';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { settingsService } from '../settings/SettingsService';
 import { requestSnapshotStore } from '../agent-runtime/prompt';
+import { mapRightRailInvestigationArtifacts } from './rightRailInvestigationArtifacts';
 import { collectSessionTaskContextResources } from './rightRailTaskContextResources';
 import {
   buildRdxContext,
   buildTaskContext,
-  mapRightRailArtifacts,
+  mapRightRailOutputs,
   mapRightRailProgress,
 } from './rightRailProjectionMappers';
 
 const emptyRightPanel = (sessionId: string): RightPanelViewModel => ({
   progress: [],
-  artifacts: { current: [], previous: [] },
+  artifacts: { rows: [], supersededCount: 0, truncatedCount: 0 },
+  outputs: { current: [], previous: [] },
   context: {
     task: {
       projectId: '', projectName: '', sessionId, sessionTitle: '', workingDirectory: '',
@@ -41,11 +43,12 @@ export class RightRailProjectionService {
     const session = storageAdapter.readSession(input.sessionId);
     if (!session) return emptyRightPanel(input.sessionId);
 
-    const [sources, taskRecords, conversations, requestSnapshots] = await Promise.all([
+    const [sources, taskRecords, conversations, requestSnapshots, artifacts] = await Promise.all([
       listSessionArtifactSources(input.sessionId),
       createSessionTaskStore(input.sessionId).listTasks().catch(() => []),
       Promise.resolve(storageAdapter.readConversationHistory(input.sessionId)),
       Promise.resolve().then(() => requestSnapshotStore.list(input.sessionId)).catch(() => []),
+      Promise.resolve().then(() => mapRightRailInvestigationArtifacts(input.sessionId)),
     ]);
     const project = storageAdapter.getProjectById(session.projectId);
     const openedCapture = rdxSessionService.snapshotOpenedCaptureForSession({
@@ -57,7 +60,7 @@ export class RightRailProjectionService {
       sessionId: input.sessionId,
     });
     const progress = mapRightRailProgress(input.sessionId, input.branchId, taskRecords);
-    const artifacts = mapRightRailArtifacts({
+    const outputs = mapRightRailOutputs({
       sessionId: input.sessionId, branchId: input.branchId, sources, runs: input.runs,
     });
     const settings = settingsService.getAll();
@@ -82,6 +85,7 @@ export class RightRailProjectionService {
     return {
       progress,
       artifacts,
+      outputs,
       context: { task, rdx },
     };
   }

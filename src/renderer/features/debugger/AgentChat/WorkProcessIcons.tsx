@@ -1,14 +1,14 @@
 import type { FC, ReactElement } from 'react';
 import type { WorkProcessIconKey } from './workProcessPresentation';
 import { renderKnowledgeIconPath } from './WorkProcessKnowledgeIcons';
+import { renderInvestigationIconPath } from './WorkProcessInvestigationIcons';
 interface WorkProcessIconProps {
   icon: WorkProcessIconKey;
   className?: string;
 }
-
 const renderIconPath = (icon: WorkProcessIconKey): ReactElement => {
-  const knowledgeIcon = renderKnowledgeIconPath(icon);
-  if (knowledgeIcon) return knowledgeIcon;
+  const extracted = renderKnowledgeIconPath(icon) ?? renderInvestigationIconPath(icon);
+  if (extracted) return extracted;
   switch (icon) {
     case 'fileRead':
       return (

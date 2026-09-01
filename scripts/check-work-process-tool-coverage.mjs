@@ -252,6 +252,25 @@ const FIXTURES = {
       persisted: false,
     }),
   },
+  investigation_read: {
+    argsPreview: JSON.stringify({ artifactId: 'invart-1' }),
+    resultPreview: toolEnvelope('world_state\tdraft\tBaseline\n{"worldStateId":"ws-1"}', {
+      artifactId: 'invart-1',
+      contentHash: 'sha256:abc',
+    }),
+  },
+  investigation_write: {
+    argsPreview: JSON.stringify({ kind: 'world_state', mission: 'debugger', title: 'Baseline', summary: 'ws', record: { worldStateId: 'ws-1' } }),
+    resultPreview: toolEnvelope('invart-1\tworld_state\tdraft\tsha256:abc', {
+      artifactId: 'invart-1',
+      kind: 'world_state',
+      status: 'draft',
+    }),
+  },
+  investigation_list: {
+    argsPreview: JSON.stringify({ kind: 'claim' }),
+    resultPreview: toolEnvelope('artifacts\t1\ninvart-1\tclaim\tdraft\tclaim-1', { count: 1 }),
+  },
 };
 
 const workbenchToolIds = AGENT_WORKBENCH_TOOL_CATALOG.map((tool) => tool.id);

@@ -783,6 +783,8 @@
 
   /* ── Accent ── */
   --token-accent-primary:      rgb(var(--color-accent-400));
+  /* Right-rail empty-visual illustration accent; not a chrome/UI surface color. */
+  --token-illustration-purple: rgb(var(--color-purple));
 
   /* ── Muted/dim surfaces ── */
   --token-bg-muted:            color-mix(in srgb, var(--token-bg-raised) 60%, transparent);

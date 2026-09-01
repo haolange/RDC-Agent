@@ -22,6 +22,7 @@ const ALWAYS_SERIAL_TOOL_NAMES = new Set([
   'ask_user',
   'agent_handoff',
   'output_register',
+  'investigation_write',
 ]);
 
 export function isAlwaysSerialToolName(toolName: string): boolean {

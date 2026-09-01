@@ -28,12 +28,15 @@ const lineCount = (relativePath) => read(relativePath).split(/\r?\n/).length;
 const requiredFiles = [
   'src/main/agent-trace/RightRailProjectionService.ts',
   'src/main/agent-trace/rightRailProjectionMappers.ts',
+  'src/main/agent-trace/rightRailInvestigationArtifacts.ts',
   'src/main/agent-trace/rightRailTaskContextResources.ts',
   'src/main/reports/OutputRegistrationTool.ts',
   'src/main/sessions/SessionArtifactSource.ts',
   'src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx',
   'src/renderer/features/debugger/ControlPanel/ProjectCaptureImportPanel.tsx',
-  'src/renderer/features/debugger/ControlPanel/TraceArtifactList.tsx',
+  'src/renderer/features/debugger/ControlPanel/RightRailArtifactList.tsx',
+  'src/renderer/features/debugger/ControlPanel/RightRailArtifactGlyphs.tsx',
+  'src/renderer/features/debugger/ControlPanel/RightRailOutputList.tsx',
   'src/renderer/features/debugger/ControlPanel/RightRailContext.tsx',
   'src/renderer/features/debugger/ControlPanel/CapturePanel.tsx',
   'src/renderer/features/debugger/ControlPanel/RightRail.css',
@@ -57,6 +60,7 @@ const retiredFiles = [
   'src/renderer/features/debugger/ControlPanel/SessionControlPanel.tsx',
   'src/renderer/features/debugger/ControlPanel/SessionProgressPanel.tsx',
   'src/renderer/features/debugger/ControlPanel/SessionWorkingFolderPanel.tsx',
+  'src/renderer/features/debugger/ControlPanel/TraceArtifactList.tsx',
 ];
 for (const relativePath of retiredFiles) {
   if (fs.existsSync(path.join(root, relativePath))) fail(`retired path must remain deleted: ${relativePath}`);
@@ -64,18 +68,42 @@ for (const relativePath of retiredFiles) {
 
 for (const component of [
   'src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx',
-  'src/renderer/features/debugger/ControlPanel/TraceArtifactList.tsx',
+  'src/renderer/features/debugger/ControlPanel/RightRailArtifactList.tsx',
+  'src/renderer/features/debugger/ControlPanel/RightRailArtifactGlyphs.tsx',
+  'src/renderer/features/debugger/ControlPanel/RightRailOutputList.tsx',
   'src/renderer/features/debugger/ControlPanel/RightRailContext.tsx',
   'src/renderer/features/debugger/ControlPanel/CapturePanel.tsx',
 ]) {
-  if (lineCount(component) > 300) fail(`component must stay under 300 lines: ${component}`);
+  const limit = component.endsWith('RightRailArtifactList.tsx') || component.endsWith('RightRailArtifactGlyphs.tsx') ? 200 : 300;
+  if (lineCount(component) > limit) fail(`component must stay under ${limit} lines: ${component}`);
+}
+if (lineCount('src/main/agent-trace/rightRailInvestigationArtifacts.ts') > 150) {
+  fail('rightRailInvestigationArtifacts.ts must stay under 150 lines');
 }
 
 const tracePanel = read('src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx');
-for (const requiredSection of ['id="progress"', 'id="outputs"', 'id="context"', 'id="capture"', 'Progress', 'Outputs', 'Context', 'Capture']) {
+for (const requiredSection of ['id="progress"', 'id="artifacts"', 'id="outputs"', 'id="context"', 'id="capture"', 'Progress', 'Artifacts', 'Outputs', 'Context', 'Capture']) {
   requireText(tracePanel, requiredSection, `TraceRightPanel must render ${requiredSection}`);
 }
-for (const required of ['EmptyState', 'Steps will show as the task unfolds.', 'Outputs created during this task appear here.', 'Tools and referenced files used in this task appear here.', 'Import a .rdc file to this project to open and preview it here.', 'CapturePanel']) {
+if (!/id="progress"[\s\S]*id="artifacts"[\s\S]*id="outputs"[\s\S]*id="context"[\s\S]*id="capture"/.test(tracePanel)) {
+  fail('TraceRightPanel must render five cards in Progress / Artifacts / Outputs / Context / Capture order');
+}
+for (const required of [
+  'EmptyState',
+  'RightRailArtifactList',
+  'RightRailOutputList',
+  "t('control.rightRail.progress.title')",
+  "t('control.rightRail.artifacts.title')",
+  "t('control.rightRail.outputs.title')",
+  "t('control.rightRail.context.title')",
+  "t('control.rightRail.capture.title')",
+  "t('control.rightRail.progress.empty')",
+  "t('control.rightRail.artifacts.empty')",
+  "t('control.rightRail.outputs.empty')",
+  "t('control.rightRail.context.empty')",
+  "t('control.rightRail.capture.empty')",
+  'CapturePanel',
+]) {
   requireText(tracePanel, required, `TraceRightPanel must retain ${required}`);
 }
 for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail', 'harnessTasks', 'RequestInspector', 'No tasks', 'aria-expanded', 'useState']) {
@@ -91,12 +119,25 @@ for (const forbidden of ['useCaptureStore', 'openedCapture', 'TraceRightPanel', 
   forbidText(projectCaptureImport, forbidden, `ProjectCaptureImportPanel must not retain ${forbidden}`);
 }
 
-const artifactList = read('src/renderer/features/debugger/ControlPanel/TraceArtifactList.tsx');
-for (const required of ['OutputFileGlyph', "artifact.status === 'failed'", "'Missing'", "'Open'"]) {
-  requireText(artifactList, required, `TraceArtifactList must retain ${required}`);
+const artifactList = read('src/renderer/features/debugger/ControlPanel/RightRailArtifactList.tsx');
+for (const required of ['RightRailArtifactGlyph', 'control.rightRail.artifacts.copyId', 'appShell.copyText']) {
+  requireText(artifactList, required, `RightRailArtifactList must retain ${required}`);
+}
+for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:', 'Open', 'Preview', 'Delete', 'Refresh']) {
+  forbidText(artifactList, forbidden, `RightRailArtifactList must not retain ${forbidden}`);
+}
+
+const artifactGlyphs = read('src/renderer/features/debugger/ControlPanel/RightRailArtifactGlyphs.tsx');
+for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:']) {
+  forbidText(artifactGlyphs, forbidden, `RightRailArtifactGlyphs must not retain ${forbidden}`);
+}
+
+const outputList = read('src/renderer/features/debugger/ControlPanel/RightRailOutputList.tsx');
+for (const required of ['OutputFileGlyph', "artifact.status === 'failed'", 'control.rightRail.outputs.missing', 'control.rightRail.outputs.open']) {
+  requireText(outputList, required, `RightRailOutputList must retain ${required}`);
 }
 for (const forbidden of ['PlanArtifactPreview', 'isPlanArtifact', "artifact.type === 'plan'", 'previewMarkdown', 'plan.md', 'session_plan', 'artifact_store', 'run_report', 'action_output']) {
-  forbidText(artifactList, forbidden, `TraceArtifactList must not retain ${forbidden}`);
+  forbidText(outputList, forbidden, `RightRailOutputList must not retain ${forbidden}`);
 }
 
 const context = read('src/renderer/features/debugger/ControlPanel/RightRailContext.tsx');
@@ -117,7 +158,7 @@ for (const required of ['RdxContextPanelViewModel', "'Open'", "'Preview'", "'Ref
 forbidText(capturePanel, 'right-rail-capture-summary', 'CapturePanel must not duplicate the selected capture above its picker');
 
 const rightRailCss = read('src/renderer/features/debugger/ControlPanel/RightRail.css');
-for (const required of ['.right-rail-empty-state', '.right-rail-empty-visual', 'grid-template-rows:', 'flex: 0 0 auto', 'font-size: var(--text-md)', 'font-size: var(--text-xl)', '.right-rail-capture-panel', '.right-rail-capture-open-row', '.project-capture-import-section', '.project-capture-input-list', '.output-visual', '.context-visual', '.capture-visual']) {
+for (const required of ['.right-rail-empty-state', '.right-rail-empty-visual', 'grid-template-rows:', 'flex: 0 0 auto', 'font-size: var(--text-md)', 'font-size: var(--text-xl)', '.right-rail-capture-panel', '.right-rail-capture-open-row', '.project-capture-import-section', '.project-capture-input-list', '.output-visual', '.artifacts-visual', '.context-visual', '.capture-visual', '.right-rail-investigation-list', '.right-rail-investigation-row']) {
   requireText(rightRailCss, required, `RightRail.css must retain ${required}`);
 }
 for (const forbidden of ['.control-panel', '.cp-section', '.capture-library', '.panel-action-btn', 'trace-plan-preview', 'is-plan', '.right-rail-details', '.right-rail-context-area-heading', '.right-rail-rdx-context', '.right-rail-section:not(.is-empty)', '.right-rail-section.is-empty', '.right-rail-capture-summary']) {
@@ -135,7 +176,19 @@ requireText(layoutConstants, 'RIGHT_RAIL_DRAWER_BREAKPOINT = 920', 'right rail d
 requireText(workbenchLayout, 'useNarrowViewport(RIGHT_RAIL_DRAWER_BREAKPOINT)', 'workbench layout must use the shared right rail drawer breakpoint');
 
 const traceTypes = read('src/shared/types/trace.ts');
-for (const requiredContract of ['task: TaskContextPanelViewModel;', 'rdx: RdxContextPanelViewModel;', "export type TraceArtifactSource = 'report' | 'evidence' | 'image' | 'document' | 'data' | 'other';", 'contextId?: string;', 'replaySessionId?: string;', 'remoteId?: string;']) {
+for (const requiredContract of [
+  'task: TaskContextPanelViewModel;',
+  'rdx: RdxContextPanelViewModel;',
+  "export type TraceArtifactSource = 'report' | 'evidence' | 'image' | 'document' | 'data' | 'other';",
+  'contextId?: string;',
+  'replaySessionId?: string;',
+  'remoteId?: string;',
+  'export interface InvestigationArtifactRow',
+  'export interface InvestigationArtifactsPanelViewModel',
+  'export interface OutputsPanelViewModel',
+  'artifacts: InvestigationArtifactsPanelViewModel;',
+  'outputs: OutputsPanelViewModel;',
+]) {
   requireText(traceTypes, requiredContract, `trace contract must retain ${requiredContract}`);
 }
 for (const forbidden of ['groups:', 'session:outputs:list', 'previewMarkdown', 'session_plan', 'artifact_store', 'run_report', 'action_output', 'cliSummary', 'toolCount']) {
@@ -152,6 +205,16 @@ for (const forbidden of ['argsPreview', 'resultPreview', 'configuredTools', 'set
 const projection = read('src/main/agent-trace/rightRailProjectionMappers.ts');
 for (const forbidden of ['ToolRuntimeSummary', 'cliSummary', 'toolCount', 'session_plan', 'run_report', 'action_output', 'previewMarkdown']) {
   forbidText(projection, forbidden, `right rail projection must not retain ${forbidden}`);
+}
+requireText(projection, 'export function mapRightRailOutputs', 'outputs mapper must be named mapRightRailOutputs');
+forbidText(projection, 'mapRightRailArtifacts', 'outputs mapper must not keep the artifacts name');
+
+const investigationProjection = read('src/main/agent-trace/rightRailInvestigationArtifacts.ts');
+for (const required of ['mapRightRailInvestigationArtifacts', 'investigationArtifactService', 'listForProjection', 'listManifests']) {
+  requireText(investigationProjection, required, `investigation rail mapper must retain ${required}`);
+}
+for (const forbidden of ['artifactStore', 'readdirSync', 'SessionArtifactSource', 'listSessionArtifactSources']) {
+  forbidText(investigationProjection, forbidden, `investigation rail mapper must not retain ${forbidden}`);
 }
 
 for (const forbidden of ['usedToolNames', "kind: 'tool'", 'settings.agents.definitions']) {
@@ -182,6 +245,7 @@ for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail
   forbidText(controlPanel, forbidden, `ControlPanel must not retain ${forbidden}`);
 }
 forbidText(channels, 'session:outputs:list', 'IPC channel registry must not retain session:outputs:list');
+forbidText(channels, 'session:investigation:', 'IPC channel registry must not add investigation channels in this wave');
 
 const docs = {
   design: read('DESIGN.md'),
@@ -202,7 +266,19 @@ for (const [source, requiredTextValue, label] of [
 ]) {
   requireText(source, requiredTextValue, `missing ${label}`);
 }
-for (const forbiddenDocText of ['keeps `plan.md` first', '`plan.md` fixed', 'CLI summary, and deduplicated diagnostics', 'source: \'session_plan\'', 'Context has only Task Context and RDX Context', 'exactly three top-level sections: `Progress / Artifacts / Context`']) {
+for (const [name, source] of Object.entries(docs)) {
+  requireText(source, 'Progress / Artifacts / Outputs / Context / Capture', `${name} must describe the five-card Session rail`);
+}
+for (const forbiddenDocText of [
+  'keeps `plan.md` first',
+  '`plan.md` fixed',
+  'CLI summary, and deduplicated diagnostics',
+  "source: 'session_plan'",
+  'Context has only Task Context and RDX Context',
+  'exactly three top-level sections: `Progress / Artifacts / Context`',
+  '目标三卡',
+  '当前四卡',
+]) {
   for (const [name, source] of Object.entries(docs)) forbidText(source, forbiddenDocText, `${name} must not retain ${forbiddenDocText}`);
 }
 

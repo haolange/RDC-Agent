@@ -3,7 +3,7 @@ import type { ContextSnapshot, OpenedCaptureState, RunSummary } from '@shared/ty
 import type { TraceArtifactRecord } from '@shared/types/trace';
 import type { TaskRecord } from '../agent-runtime/tasks/TaskRegistry';
 import { dedupeSessionArtifactSources, type SessionArtifactSource } from '../sessions/SessionArtifactSource';
-import { buildRdxContext, buildTaskContext, mapRightRailArtifacts, mapRightRailProgress } from './rightRailProjectionMappers';
+import { buildRdxContext, buildTaskContext, mapRightRailOutputs, mapRightRailProgress } from './rightRailProjectionMappers';
 
 const task = (id: string, status: TaskRecord['status'], createdAt: number, statusReason?: string): TaskRecord => ({
   id, subject: id, description: '', status, statusReason, blockedBy: [], blocks: [], createdAt, updatedAt: createdAt,
@@ -46,7 +46,7 @@ describe('right rail projection mappers', () => {
   });
 
   it('projects explicit user-facing outputs without pinning plans or exposing internal producers', () => {
-    const result = mapRightRailArtifacts({
+    const result = mapRightRailOutputs({
       sessionId: 'session-a', branchId: 'branch-a', runs: [run('run-old', 1), run('run-current', 2)],
       sources: [
         source('current', 'output', 'run-current', true, 'report'),

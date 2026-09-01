@@ -33,10 +33,10 @@ const FORBIDDEN_TOOL_TOKENS = ['todo', 'bash', 'search_codebase'];
 const MISSION_FORBIDDEN_TOOLS = ['write', 'edit', 'git', 'file-manage'];
 const GENERAL_REQUIRED_TOOLS = [
   'read', 'search', 'web', 'shell', 'write', 'edit', 'git', 'file-manage',
-  'handoff', 'task', 'output', 'subagent', 'tool_search', 'knowledge',
+  'handoff', 'task', 'output', 'subagent', 'tool_search', 'knowledge', 'investigation',
 ];
 const MISSION_REQUIRED_TOOLS = [
-  'read', 'search', 'web', 'shell', 'askUser', 'handoff', 'task', 'planArtifact', 'tool_search', 'knowledge',
+  'read', 'search', 'web', 'shell', 'askUser', 'handoff', 'task', 'planArtifact', 'tool_search', 'knowledge', 'investigation',
 ];
 
 function assert(condition, message) {

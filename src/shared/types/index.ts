@@ -117,7 +117,7 @@ export type {
 } from './conversation';
 export type { ReplayDeviceEntry, ReplayDeviceStatusChangedPayload } from './device';
 export type { ActionEvent, EventStatus, EventType } from './evidence';
-export type { ArtifactRecord, HarnessTask, RunCapsule, VerificationResult } from './harness';
+export type { ArtifactRecord } from './harness';
 export type { LLMConfig, LLMStreamEvent, ToolCall } from './llm';
 export type {
   ConversationTurnControls,
@@ -251,6 +251,28 @@ export type {
   KnowledgeSpaceKind,
   SessionKnowledgeCandidate,
 } from './knowledge';
+export type {
+  ArtifactSourceRef,
+  ChallengeRecord,
+  ClaimRecord,
+  CompactProvenanceEntry,
+  EpistemicStatus,
+  EvidenceRecord,
+  ExperimentRecord,
+  InvestigationArtifactKind,
+  InvestigationArtifactManifest,
+  InvestigationReport,
+  MissionCheckpoint,
+  WorldState,
+} from './renderdocInvestigation';
+export {
+  EPISTEMIC_RANK,
+  INVESTIGATION_ARTIFACT_KINDS,
+  INVESTIGATION_KIND_REGISTRY,
+  INVESTIGATION_SCHEMA_NAMESPACE,
+  epistemicRank,
+  resolveInvestigationKind,
+} from './renderdocInvestigation';
 export {
   KNOWLEDGE_CARD_TYPES,
   KNOWLEDGE_CASE_CHAPTERS,
@@ -375,6 +397,9 @@ export type {
   ProgressTask,
   RequestBranch,
   RequestBranchGroup,
+  InvestigationArtifactRow,
+  InvestigationArtifactsPanelViewModel,
+  OutputsPanelViewModel,
   RightPanelViewModel,
   TraceBranchSwitchResult,
   TraceRevisionResult,

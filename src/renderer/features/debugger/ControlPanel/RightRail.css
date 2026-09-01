@@ -115,11 +115,11 @@
   stroke-dasharray: 3 4;
   opacity: 0.4;
 }
-.progress-visual .rr-eg-active-glow { fill: rgb(var(--color-warning)); opacity: 0.55; }
+.progress-visual .rr-eg-active-glow { fill: var(--token-status-warning); opacity: 0.55; }
 .progress-visual .rr-eg-active-core {
-  fill: rgb(255 255 255);
+  fill: var(--token-text-inverse);
   fill-opacity: 0.95;
-  stroke: rgb(var(--color-warning));
+  stroke: var(--token-status-warning);
   stroke-width: 1.5;
   stroke-opacity: 0.85;
 }
@@ -131,24 +131,29 @@
   stroke-dasharray: 5 5;
 }
 .output-visual .rr-eg-doc-back { opacity: 0.55; }
-.output-visual .rr-eg-doc-fold { fill: rgb(255 255 255); fill-opacity: 0.45; }
-.output-visual .rr-eg-doc-mark { fill: rgb(255 255 255); fill-opacity: 0.6; }
+.output-visual .rr-eg-doc-fold { fill: var(--token-text-inverse); fill-opacity: 0.45; }
+.output-visual .rr-eg-doc-mark { fill: var(--token-text-inverse); fill-opacity: 0.6; }
 
-.context-visual .rr-eg-link-glow { stroke: rgb(var(--color-accent-400)); stroke-opacity: 0.45; stroke-width: 5; }
+.artifacts-visual .rr-eg-link-glow { stroke: var(--token-illustration-purple); stroke-opacity: 0.4; stroke-width: 5; }
+.artifacts-visual .rr-eg-link { stroke-width: 1.75; }
+.artifacts-visual .rr-eg-node { fill: var(--token-text-inverse); fill-opacity: 0.9; }
+
+.context-visual .rr-eg-link-glow { stroke: var(--token-accent-primary); stroke-opacity: 0.45; stroke-width: 5; }
 .context-visual .rr-eg-link { stroke-width: 1.75; }
-.context-visual .rr-eg-node { fill: rgb(255 255 255); fill-opacity: 0.9; }
+.context-visual .rr-eg-node { fill: var(--token-text-inverse); fill-opacity: 0.9; }
 
-.capture-visual .rr-eg-rec-glow { fill: rgb(var(--color-error)); opacity: 0.5; }
+.capture-visual .rr-eg-rec-glow { fill: var(--token-status-error); opacity: 0.5; }
 .capture-visual .rr-eg-rec {
-  fill: rgb(var(--color-error));
-  stroke: rgb(255 255 255);
+  fill: var(--token-status-error);
+  stroke: var(--token-text-inverse);
   stroke-opacity: 0.6;
   stroke-width: 1;
 }
-.capture-visual .rr-eg-play { fill: rgb(var(--color-primary-600)); }
+.capture-visual .rr-eg-play { fill: var(--token-accent-primary); }
 
 .right-rail-progress,
 .right-rail-artifact-list,
+.right-rail-investigation-list,
 .right-rail-context,
 .right-rail-resource-list,
 .right-rail-capture-panel {
@@ -295,6 +300,102 @@
 }
 
 .right-rail-artifact-row.status-failed .right-rail-artifact-icon { color: var(--token-status-error); }
+
+.right-rail-investigation-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  min-width: 0;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+}
+
+.right-rail-investigation-row + .right-rail-investigation-row {
+  border-top: 1px solid var(--token-border-subtle);
+}
+
+.right-rail-investigation-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--space-6);
+  height: var(--space-6);
+  margin-top: var(--space-1);
+  color: var(--token-text-body);
+}
+
+.right-rail-investigation-icon svg {
+  width: var(--space-5);
+  height: var(--space-5);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.35;
+}
+
+.right-rail-investigation-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.right-rail-investigation-title,
+.right-rail-investigation-copy strong {
+  overflow: hidden;
+  color: var(--token-text-body);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.right-rail-investigation-meta,
+.right-rail-investigation-copy small {
+  min-width: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.right-rail-investigation-row.status-draft .right-rail-investigation-copy strong,
+.right-rail-investigation-row.status-draft .right-rail-investigation-icon {
+  color: var(--token-text-secondary);
+}
+
+.right-rail-investigation-row.status-stale .right-rail-investigation-copy small,
+.right-rail-investigation-row.status-stale .right-rail-investigation-icon {
+  color: var(--token-status-warning);
+}
+
+.right-rail-investigation-row.status-failed .right-rail-investigation-copy small,
+.right-rail-investigation-row.status-failed .right-rail-investigation-icon,
+.right-rail-investigation-row.is-degraded .right-rail-investigation-copy small,
+.right-rail-investigation-row.is-degraded .right-rail-investigation-icon {
+  color: var(--token-status-error);
+}
+
+.right-rail-investigation-actions {
+  display: inline-flex;
+  align-items: center;
+}
+
+.right-rail-investigation-footer {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--token-border-subtle);
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+}
+
+.right-rail-investigation-footer p {
+  margin: 0;
+}
 .right-rail-output-actions {
   display: inline-flex;
   grid-column: 2;
@@ -542,6 +643,7 @@
 
 .right-rail-inline-actions .button,
 .right-rail-artifact-row .button,
+.right-rail-investigation-row .button,
 .right-rail-resource-row .button {
   min-height: auto;
   padding: var(--space-1) var(--space-2);
@@ -554,6 +656,8 @@
 .right-rail-inline-actions .button:focus-visible,
 .right-rail-artifact-row .button:hover,
 .right-rail-artifact-row .button:focus-visible,
+.right-rail-investigation-row .button:hover,
+.right-rail-investigation-row .button:focus-visible,
 .right-rail-resource-row .button:hover,
 .right-rail-resource-row .button:focus-visible {
   background: var(--token-bg-muted);
@@ -766,6 +870,8 @@
   .right-rail-capture-open-row { grid-template-columns: minmax(0, 1fr); }
   .right-rail-capture-open-button { width: 100%; }
   .project-capture-input-row { grid-template-columns: var(--control-height-sm) minmax(0, 1fr) auto; }
+  .right-rail-investigation-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .right-rail-investigation-row .button { min-width: var(--space-8); min-height: var(--space-8); }
 }
 
 /* The dock can be narrow while the app window is wide.  Capture must respond

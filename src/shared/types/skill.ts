@@ -11,21 +11,6 @@ export interface SkillParameter {
   default?: unknown;
 }
 
-/** Skill 定义 */
-export interface SkillDefinition {
-  name: string;
-  displayName: string;
-  description: string;
-  version: string;
-  parameters: SkillParameter[];
-  /** 来源：内置 / 插件 */
-  source: 'builtin' | 'plugin' | 'workspace';
-  /** Skill 文件路径（plugin 类型时） */
-  filePath?: string;
-  /** 标签 */
-  tags: string[];
-}
-
 /** Skill 执行上下文 */
 export interface SkillExecutionContext {
   caseId: string;

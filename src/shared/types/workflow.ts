@@ -1,5 +1,4 @@
 import type { AgentRole } from './agent';
-import type { HarnessTask } from './harness';
 
 export type WorkflowStage =
   | 'preflight'
@@ -61,7 +60,6 @@ export interface WorkflowState {
   orchestrationMode: 'multi_agent';
   coordinationMode: 'staged_handoff';
   blockers: Blocker[];
-  harnessTasks?: HarnessTask[];
   reasoningSummaries?: ReasoningSummary[];
   recoveryState?: RunRecoveryState | null;
   lastUpdated: string;

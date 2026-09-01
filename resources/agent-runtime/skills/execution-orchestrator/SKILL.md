@@ -12,5 +12,6 @@ Use this skill for ordinary workbench execution, not for inventing a long Render
 3. Execute the smallest complete path with the tools already granted to General.
 4. Verify the result against the request before claiming done.
 5. If the user wants root-cause debugging, system explanation, or cost optimization, hand off to Debugger, Analyzer, or Optimizer.
+6. For RenderDoc capture work, load only the needed method skill (`$renderdoc-execution`, `$rdx-cli-shell`, `$capture-preflight`, `$capture-facts`, `$artifact-provenance`, `$pass-graph-analysis`, `$shader-ir-analysis`, `$pixel-forensics`, `$resource-versioning`, `$cross-capture-alignment`, `$optimization-experiment`, `$skeptic-review`, `$report-composition`). Do not preload all thirteen.
 
-Do not preload long RenderDoc method catalogs. Knowledge retrieval is available through the knowledge token; persistent Knowledge writes still require human confirmation. Do not claim investigation schema or durable handoff runtime that is not available. Empty or omitted skill allowed-tools must never be treated as a reason to block the main execution path.
+Investigation records live in session-owned `rdc.investigation.v1` via `investigation_read` / `investigation_write` / `investigation_list`. Do not write those fields into Tasks, Profiles, or Messages. Knowledge writes stay human-confirmed. Embedding models stay out of the Agent picker. RDX runs only through the Settings-configured CLI / `ShellInvocationService`. Empty or omitted skill allowed-tools must never block the main execution path.

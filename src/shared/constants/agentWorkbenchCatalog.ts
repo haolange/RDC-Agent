@@ -600,6 +600,59 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     icon: 'library-plus',
     approvalRequired: false,
   },
+  {
+    id: 'investigation_read',
+    label: 'Read Investigation Artifact',
+    permission: 'readonly',
+    inputSchema: {
+      type: 'object',
+      required: ['artifactId'],
+      properties: {
+        artifactId: { type: 'string' },
+        expectedHash: { type: 'string' },
+      },
+    },
+    resultSummary: 'Reads one session-owned rdc.investigation.v1 artifact by id.',
+    icon: 'file-search',
+    approvalRequired: false,
+  },
+  {
+    id: 'investigation_write',
+    label: 'Write Investigation Artifact',
+    permission: 'mutation',
+    inputSchema: {
+      type: 'object',
+      required: ['kind', 'mission', 'title', 'summary', 'record'],
+      properties: {
+        kind: { type: 'string' },
+        mission: { type: 'string' },
+        title: { type: 'string' },
+        summary: { type: 'string' },
+        record: { type: 'object' },
+        sourceRefs: { type: 'array' },
+        supersedes: { type: 'string' },
+        status: { type: 'string' },
+      },
+    },
+    resultSummary: 'Writes a session-owned rdc.investigation.v1 record through schema and invariant gates.',
+    icon: 'file-plus',
+    approvalRequired: false,
+  },
+  {
+    id: 'investigation_list',
+    label: 'List Investigation Artifacts',
+    permission: 'readonly',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        kind: { type: 'string' },
+        status: { type: 'string' },
+      },
+    },
+    resultSummary: 'Lists session-owned rdc.investigation.v1 manifests.',
+    icon: 'list',
+    approvalRequired: false,
+  },
 ];
 
 export const AGENT_WORKBENCH_COMMAND_CATALOG: AgentWorkbenchCommandDeclaration[] = [

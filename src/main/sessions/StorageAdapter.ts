@@ -21,7 +21,7 @@ import type {
   SessionRecord,
 } from '@shared/types/session';
 import type { ProfileHandoffState } from '@shared/types/profileHandoff';
-import type { PersistedRunRecord, SessionEvidenceRecord } from './storageTypes';
+import type { PersistedRunRecord } from './storageTypes';
 import type { SessionContextTurnEntry } from '../conversation/SessionContextJournal';
 import { StorageIo } from './StorageIo';
 import { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
@@ -310,10 +310,6 @@ export class StorageAdapter implements StorageHost {
     return this.sessions.getSessionAttachmentsManifestPath(sessionId);
   }
 
-  getSessionEvidencePath(sessionId: string): string {
-    return this.sessions.getSessionEvidencePath(sessionId);
-  }
-
   writeSessionPlanArtifact(sessionId: string, content: string): string {
     return this.sessions.writeSessionPlanArtifact(sessionId, content);
   }
@@ -428,10 +424,6 @@ export class StorageAdapter implements StorageHost {
     attachments: SessionAttachmentRecord[],
   ): void {
     return this.history.rollbackImportedSessionAttachments(sessionId, attachments);
-  }
-
-  readSessionEvidence(sessionId: string): SessionEvidenceRecord | null {
-    return this.sessions.readSessionEvidence(sessionId);
   }
 
   async appendActionEvent(sessionId: string, event: ActionEvent): Promise<void> {

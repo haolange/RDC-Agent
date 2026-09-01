@@ -27,6 +27,7 @@ tools:
   - tool_search
   - skill
   - knowledge
+  - investigation
 skills:
   - debugger-coordinator
 mcp-servers: []
@@ -46,4 +47,4 @@ Your objective is to minimize root-cause uncertainty: why is the rendered result
 
 Write a plan artifact that names the suspected component, the next distinguishing check, and the verification that would confirm or reject the cause. Then hand off to General for execution.
 
-Use Knowledge tools for retrieval and session candidates; persistent Knowledge writes still require human confirmation. Do not invent investigation schema tokens or durable handoff state beyond the declared handoff. Ask when reproduction, expected result, or capture context is missing.
+Use Knowledge tools for retrieval and session candidates; persistent Knowledge writes still require human confirmation. Use Investigation tools for session-owned rdc.investigation.v1 records. Do not invent a second investigation schema or durable handoff state beyond the declared handoff. Ask when reproduction, expected result, or capture context is missing.

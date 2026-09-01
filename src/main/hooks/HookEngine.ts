@@ -55,6 +55,79 @@ const parseHookFile = (sourcePath: string): HookDefinition => {
   };
 };
 
+const isNodeCommand = (command: string): boolean => /^node(\.exe)?$/i.test(command);
+
+const isInsideRoot = (candidate: string, root: string): boolean => {
+  const relative = path.relative(path.resolve(root), path.resolve(candidate));
+  return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+};
+
+const officialBuiltinScriptRoots = (sourcePath: string): string[] => {
+  const roots = [path.dirname(sourcePath), appPathService.getBuiltinHooksPath()];
+  if (process.resourcesPath) roots.push(path.join(process.resourcesPath, 'agent-runtime', 'hooks'));
+  return [...new Set(roots.map((root) => path.resolve(root)))];
+};
+
+const resolveBuiltinScriptArg = (arg: string, sourcePath: string): string | null => {
+  if (!arg || arg.startsWith('-') || path.isAbsolute(arg)) return arg;
+  const names = arg === path.basename(arg) ? [arg] : [arg, path.basename(arg)];
+  for (const root of officialBuiltinScriptRoots(sourcePath)) {
+    for (const name of names) {
+      const candidate = path.resolve(root, name);
+      if (isInsideRoot(candidate, root) && fs.existsSync(candidate)) return candidate;
+    }
+  }
+  return null;
+};
+
+const resolveExistingRelativePath = (arg: string, sourcePath: string, cwd: string): string => {
+  if (!arg || arg.startsWith('-') || path.isAbsolute(arg)) return arg;
+  const seen = new Set<string>();
+  for (const start of [path.dirname(sourcePath), cwd]) {
+    let dir = path.resolve(start);
+    for (let depth = 0; depth < 8; depth += 1) {
+      if (seen.has(dir)) break;
+      seen.add(dir);
+      const candidate = path.resolve(dir, arg);
+      if (fs.existsSync(candidate)) return candidate;
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  }
+  return arg;
+};
+
+const resolveHookCommand = (command: string): { command: string; electronAsNode: boolean } => {
+  if (!isNodeCommand(command)) return { command, electronAsNode: false };
+  return {
+    command: process.execPath,
+    electronAsNode: !isNodeCommand(path.basename(process.execPath)),
+  };
+};
+
+const resolveHookSpawn = (
+  hook: LoadedHook,
+  cwd: string,
+): { command: string; args: string[]; electronAsNode: boolean } | { unresolvedArg: string } => {
+  const runtime = resolveHookCommand(hook.definition.command);
+  const args: string[] = [];
+  for (const arg of hook.definition.args) {
+    if (hook.scope === 'builtin') {
+      const resolved = resolveBuiltinScriptArg(arg, hook.sourcePath);
+      if (resolved === null) return { unresolvedArg: arg };
+      args.push(resolved);
+      continue;
+    }
+    args.push(resolveExistingRelativePath(arg, hook.sourcePath, cwd));
+  }
+  return {
+    command: runtime.command,
+    args,
+    electronAsNode: runtime.electronAsNode,
+  };
+};
+
 export class HookEngine {
   private loaded: LoadedHook[] = [];
 
@@ -159,9 +232,22 @@ export class HookEngine {
     const definition = hook.definition;
     const env = { ...process.env } as Record<string, string | undefined>;
     for (const [targetName, sourceName] of Object.entries(definition.env ?? {})) env[targetName] = process.env[sourceName];
-    const supervised = processSupervisor.spawn('hook', definition.command, definition.args, {
+    const cwd = definition.cwd ? path.resolve(context.projectRoot ?? process.cwd(), definition.cwd) : context.projectRoot ?? process.cwd();
+    const spawnSpec = resolveHookSpawn(hook, cwd);
+    if ('unresolvedArg' in spawnSpec) {
+      return {
+        hookId: definition.id,
+        allowed: false,
+        status: 'failed',
+        stdout: '',
+        stderr: '',
+        reason: `Builtin hook script was not found in the official hook directory: ${spawnSpec.unresolvedArg}`,
+      };
+    }
+    if (spawnSpec.electronAsNode) env.ELECTRON_RUN_AS_NODE = '1';
+    const supervised = processSupervisor.spawn('hook', spawnSpec.command, spawnSpec.args, {
       shell: false,
-      cwd: definition.cwd ? path.resolve(context.projectRoot ?? process.cwd(), definition.cwd) : context.projectRoot ?? process.cwd(),
+      cwd,
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
