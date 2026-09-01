@@ -13,4 +13,4 @@ Use this skill for ordinary workbench execution, not for inventing a long Render
 4. Verify the result against the request before claiming done.
 5. If the user wants root-cause debugging, system explanation, or cost optimization, hand off to Debugger, Analyzer, or Optimizer.
 
-Do not preload long RenderDoc method catalogs. Do not claim knowledge, investigation schema, or durable handoff runtime that is not available. Empty or omitted skill allowed-tools must never be treated as a reason to block the main execution path.
+Do not preload long RenderDoc method catalogs. Knowledge retrieval is available through the knowledge token; persistent Knowledge writes still require human confirmation. Do not claim investigation schema or durable handoff runtime that is not available. Empty or omitted skill allowed-tools must never be treated as a reason to block the main execution path.

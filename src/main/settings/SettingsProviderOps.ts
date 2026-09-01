@@ -128,7 +128,10 @@ export class SettingsProviderOps {
   await writeSettingsAsync({
     ...currentPersisted,
     schemaVersion: SETTINGS_SCHEMA_VERSION,
-    llm: { providers: nextProviders.map((entry) => ({ ...entry, apiKey: '' })) },
+    llm: {
+      ...currentPersisted.llm,
+      providers: nextProviders.map((entry) => ({ ...entry, apiKey: '' })),
+    },
   });
   const committed = this.host.getAll().llm.providers.find((entry) => entry.id === provider.id);
   if (!committed) throw new Error(`Provider ${provider.id} disappeared after commit.`);

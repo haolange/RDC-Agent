@@ -713,6 +713,45 @@ describe('Provider Catalog compiler', () => {
     expect(() => compileProviderCatalog(invalidResolution)).toThrow(/must select one of its fact sources/u);
   });
 
+  it('compiles an independent EmbeddingCatalog that never enters Agent picker surfaces', () => {
+    const catalog = compileProviderCatalog(input());
+    expect(catalog.embeddings.models.length).toBeGreaterThan(0);
+    expect(catalog.index.embeddings).toEqual(catalog.embeddings);
+    const embeddingIds = new Set(
+      catalog.embeddings.models.map((model) => `${model.providerId}:${model.modelId}`),
+    );
+    expect(embeddingIds.has('openai:text-embedding-3-small')).toBe(true);
+    for (const summary of catalog.index.surfaces) {
+      expect(summary).not.toHaveProperty('embeddings');
+      for (const model of summary.models) {
+        expect(embeddingIds.has(`${summary.id}:${model.modelId}`)).toBe(false);
+      }
+    }
+    for (const compiled of catalog.surfaces.values()) {
+      for (const model of compiled.surface.models) {
+        expect(embeddingIds.has(`${compiled.surface.id}:${model.modelId}`)).toBe(false);
+      }
+    }
+  });
+
+  it('fails closed on illegal embeddings catalog facts', () => {
+    const unknownField = clone(input());
+    mutableSurface(unknownField, 'openai').embeddings.unexpected = true;
+    expect(() => compileProviderCatalog(unknownField)).toThrow();
+
+    const missingAdapter = clone(input());
+    mutableSurface(missingAdapter, 'openai').embeddings.adapterId = 'not-registered';
+    expect(() => compileProviderCatalog(missingAdapter)).toThrow(/no registered embedding adapter/u);
+
+    const leakedModel = clone(input());
+    mutableSurface(leakedModel, 'openai').embeddings.models[0].modelId = 'gpt-5.4';
+    expect(() => compileProviderCatalog(leakedModel)).toThrow(/must not also appear in Agent models/u);
+
+    const missingFact = clone(input());
+    mutableSurface(missingFact, 'openai').embeddings.models[0].factSourceId = 'missing-fact-source';
+    expect(() => compileProviderCatalog(missingFact)).toThrow(/unknown fact source/u);
+  });
+
   it('contains no hard unavailable or TODO placeholder in the stable compiled catalog', () => {
     const catalog = compileProviderCatalog(input());
     for (const { surface } of catalog.surfaces.values()) {

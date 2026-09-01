@@ -51,6 +51,11 @@ export type WorkProcessIconKey =
   | 'taskStop'
   | 'imageRead'
   | 'interpreter'
+  | 'knowledgeBrowse'
+  | 'knowledgeSearch'
+  | 'knowledgeRead'
+  | 'knowledgeCompile'
+  | 'knowledgeCandidate'
   | 'spark'
   | 'tool';
 

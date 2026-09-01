@@ -21,7 +21,7 @@ import {
 } from './projectSessionSchemas';
 import { CaptureOpenProjectInputArgsSchema } from './captureDeviceSchemas';
 import { CommandExecuteArgsSchema } from './commandSchemas';
-import { KnowledgeGetCardArgsSchema } from './knowledgeSchemas';
+import { KnowledgeCardArgsSchema, KnowledgeCandidateCreateArgsSchema } from './knowledgeSchemas';
 import { RdxRuntimeTrustMcpArgsSchema } from './rdxRuntimeSchemas';
 import { TraceGetEventsArgsSchema } from './traceSchemas';
 import { WebResolveFaviconArgsSchema } from './webSchemas';
@@ -157,10 +157,28 @@ describe('parseIpcArgs', () => {
     })).toThrow(IpcValidationError);
   });
 
-  it('rejects knowledge getCard with empty relativePath', () => {
-    expect(() => parseIpcArgs(KnowledgeGetCardArgsSchema, ['user', ''], {
-      label: 'knowledge:getCard',
+  it('rejects knowledge card with empty relativePath', () => {
+    expect(() => parseIpcArgs(KnowledgeCardArgsSchema, ['user', ''], {
+      label: 'knowledge:card',
     })).toThrow(IpcValidationError);
+  });
+
+  it('rejects knowledge candidateCreate without explicit user intent', () => {
+    expect(() => parseIpcArgs(KnowledgeCandidateCreateArgsSchema, [{
+      sessionId: 'session_a',
+      card: {
+        cardId: 'user:facts/sample.md',
+        spaceId: 'user',
+        relativePath: 'facts/sample.md',
+        type: 'fact',
+        lifecycle: 'draft',
+        title: 'Sample',
+        scope: {},
+        relations: [],
+        body: 'Body',
+      },
+      explicitUserIntent: false,
+    }], { label: 'knowledge:candidateCreate' })).toThrow(IpcValidationError);
   });
 
   it('rejects rdx-runtime trustMcp with empty descriptorId', () => {

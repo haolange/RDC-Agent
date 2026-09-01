@@ -1,11 +1,15 @@
 import type { LlmProviderId } from '@shared/types/settings';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { providerAccountAuthService } from './ProviderAccountAuthService';
-import { providerRuntimeCredentialService } from './ProviderRuntimeCredentialService';
+import {
+  providerRuntimeCredentialService,
+  type ProviderRuntimeCredentialOperation,
+} from './ProviderRuntimeCredentialService';
 import { settingsService } from './SettingsService';
 
 export interface FrozenProviderRuntimeCredentialLease {
   handle: string;
+  operation: ProviderRuntimeCredentialOperation;
   accountCredentialsRefreshed: boolean;
 }
 
@@ -15,6 +19,7 @@ export interface FrozenProviderRuntimeCredentialLease {
  */
 export async function freezeProviderRuntimeCredentials(
   providerId: LlmProviderId,
+  operation: ProviderRuntimeCredentialOperation = 'chat',
 ): Promise<FrozenProviderRuntimeCredentialLease> {
   const surface = await loadProviderSurface(providerId);
   if (!surface) throw new Error(`Provider Catalog surface ${providerId} is unavailable.`);
@@ -26,7 +31,8 @@ export async function freezeProviderRuntimeCredentials(
   }
 
   return {
-    handle: await providerRuntimeCredentialService.freeze(providerId),
+    handle: await providerRuntimeCredentialService.freeze(providerId, operation),
+    operation,
     accountCredentialsRefreshed,
   };
 }

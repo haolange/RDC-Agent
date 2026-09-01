@@ -98,9 +98,17 @@ export function createAgentApi(transport: RendererApiTransport): AgentApi {
 
 export function createKnowledgeApi(transport: RendererApiTransport): KnowledgeApi {
   return {
-    listSpaces: () => transport.invoke(INVOKE.knowledge.listSpaces),
-    listCards: (spaceId) => transport.invoke(INVOKE.knowledge.listCards, spaceId),
-    getCard: (spaceId, relativePath) => transport.invoke(INVOKE.knowledge.getCard, spaceId, relativePath),
+    overview: () => transport.invoke(INVOKE.knowledge.overview),
+    query: (request) => transport.invoke(INVOKE.knowledge.query, request),
+    card: (spaceId, relativePath) => transport.invoke(INVOKE.knowledge.card, spaceId, relativePath),
+    compile: (request) => transport.invoke(INVOKE.knowledge.compile, request),
+    indexRebuild: () => transport.invoke(INVOKE.knowledge.indexRebuild),
+    candidates: (sessionId) => transport.invoke(INVOKE.knowledge.candidates, sessionId),
+    candidateCreate: (request) => transport.invoke(INVOKE.knowledge.candidateCreate, request),
+    coldDataImport: (request) => transport.invoke(INVOKE.knowledge.coldDataImport, request),
+    issueApprovalToken: (request) => transport.invoke(INVOKE.knowledge.issueApprovalToken, request),
+    write: (request) => transport.invoke(INVOKE.knowledge.write, request),
+    promote: (request) => transport.invoke(INVOKE.knowledge.promote, request),
   };
 }
 

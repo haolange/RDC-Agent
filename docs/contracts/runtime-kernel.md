@@ -113,7 +113,7 @@ Agent loop 终止与 Provider 失败互斥：`AGENT_NO_PROGRESS` → `CONVERSATI
 
 ## Tools 与 Permission（执行侧）
 
-Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（40 ids，含 `shell` / `read_image` / `code_interpreter` / `artifact_read`）。Manifest token 经 `CANONICAL_TOOL_TOKEN_EXPANSIONS` 展开（`read` 含 `read_file`+`read_image`+`artifact_read`，`interpreter`/`image`/`shell` 为专用 token）；`REJECTED_TOOL_TOKENS` 拒绝无静默 fallback（含旧 token `bash`）。
+Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（45 ids，含 `shell` / `read_image` / `code_interpreter` / `artifact_read` 与五个 deferred `knowledge_*`）。Manifest token 经 `CANONICAL_TOOL_TOKEN_EXPANSIONS` 展开（`read` 含 `read_file`+`read_image`+`artifact_read`，`knowledge` 含五个 Knowledge 工具，`interpreter`/`image`/`shell` 为专用 token）；`REJECTED_TOOL_TOKENS` 拒绝无静默 fallback（含旧 token `bash`）。
 
 `read_image` 在 `visionInputMode !== 'native'` 时 `VISION_INPUT_UNSUPPORTED`。tool-result 图像由 `ContextManager.convertToLlm` 剥出并桥成紧随的 user image part；UI 缩略图只走 session `image-previews` + `conversation:getToolImagePreview`，禁止把大 base64 写入 `resultPreview`。`code_interpreter` 执行 Settings 配置的外部解释器，未启用 fail-closed。
 

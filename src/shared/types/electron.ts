@@ -34,6 +34,7 @@ import type { EffectiveCatalogSnapshot, EffectiveModel } from './providerCapabil
 import type { ModelsOverride } from '../provider-catalog/modelsOverrideSchema';
 import type { RuntimeLogEntry, RuntimeLogScope } from './runtimeLog';
 import type {
+  AgentPermissionMode,
   AppSettings,
   AppSettingsPatch,
   ResolvedShellSnapshot,
@@ -75,7 +76,20 @@ import type {
   TraceSessionResult,
 } from './trace';
 import type { HookEvent, RdxRuntimeOverview, RequestEnvelopeSnapshot, ScopedResourceImportRequest, ScopedResourceKind, ScopedResourceWriteRequest } from './rdxRuntime';
-import type { KnowledgeCardDetail, KnowledgeCardSummary, KnowledgeSpace } from './knowledge';
+import type {
+  ColdDataIngestResult,
+  KnowledgeCandidatesResult,
+  KnowledgeCardDetail,
+  KnowledgeCardRecord,
+  KnowledgeHumanConfirmation,
+  KnowledgeIndexOverview,
+  KnowledgeLifecycle,
+  KnowledgeOverviewResult,
+  KnowledgePack,
+  KnowledgeQueryRequest,
+  KnowledgeQueryResult,
+  SessionKnowledgeCandidate,
+} from './knowledge';
 
 /** Memory 面板列表项摘要（对应 MemoryRecord 的精简视图）。 */
 export interface MemorySummary {
@@ -244,9 +258,43 @@ export interface ElectronAPI {
   };
 
   knowledge: {
-    listSpaces: () => Promise<{ spaces: KnowledgeSpace[] }>;
-    listCards: (spaceId: string) => Promise<{ cards: KnowledgeCardSummary[] }>;
-    getCard: (spaceId: string, relativePath: string) => Promise<{ card: KnowledgeCardDetail | null }>;
+    overview: () => Promise<KnowledgeOverviewResult>;
+    query: (request: KnowledgeQueryRequest) => Promise<KnowledgeQueryResult>;
+    card: (spaceId: string, relativePath: string) => Promise<{ card: KnowledgeCardDetail | null }>;
+    compile: (request: KnowledgeQueryRequest & { limit?: number }) => Promise<KnowledgePack>;
+    indexRebuild: () => Promise<Pick<KnowledgeIndexOverview, 'revision' | 'builtAt' | 'cardCount'>>;
+    candidates: (sessionId: string) => Promise<KnowledgeCandidatesResult>;
+    candidateCreate: (request: {
+      sessionId: string;
+      card: KnowledgeCardRecord;
+      explicitUserIntent: true;
+    }) => Promise<SessionKnowledgeCandidate>;
+    coldDataImport: (request: {
+      sessionId: string;
+      spaceId?: string;
+      source?: string;
+      filePath?: string;
+    }) => Promise<ColdDataIngestResult>;
+    issueApprovalToken: (request: {
+      action: 'knowledge.write' | 'knowledge.promote';
+      spaceId: string;
+      relativePath: string;
+    }) => Promise<{ token?: string; error?: string }>;
+    write: (request: {
+      spaceId: string;
+      card: KnowledgeCardRecord;
+      permissionMode: AgentPermissionMode;
+      confirmation: KnowledgeHumanConfirmation;
+      approvalToken: string;
+    }) => Promise<{ card: KnowledgeCardRecord }>;
+    promote: (request: {
+      spaceId: string;
+      card: KnowledgeCardRecord;
+      to: Extract<KnowledgeLifecycle, 'verified' | 'promoted' | 'deprecated'>;
+      permissionMode: AgentPermissionMode;
+      confirmation: KnowledgeHumanConfirmation;
+      approvalToken: string;
+    }) => Promise<{ card: KnowledgeCardRecord }>;
   };
 
   rdxRuntime: {
@@ -318,6 +366,9 @@ export interface ElectronAPI {
     getModelsOverride: () => Promise<ModelsOverride>;
     setModelsOverride: (overrides: ModelsOverride) => Promise<ModelsOverride>;
     getResolvedShell: (executable: string) => Promise<ResolvedShellSnapshot>;
+    getEmbeddingCatalog: () => Promise<import('./embedding').EmbeddingCatalog>;
+    getSemanticLaneStatus: () => Promise<import('./embedding').SemanticLaneStatus>;
+    rebuildSemanticIndex: () => Promise<import('./embedding').SemanticLaneStatus>;
     set: (settings: AppSettingsPatch) => Promise<AppSettings>;
   };
 

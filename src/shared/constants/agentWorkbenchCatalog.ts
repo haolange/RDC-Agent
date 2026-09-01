@@ -518,6 +518,88 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     icon: 'terminal-square',
     approvalRequired: true,
   },
+  {
+    id: 'knowledge_browse',
+    label: 'Browse Knowledge',
+    permission: 'readonly',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        spaceId: { type: 'string' },
+      },
+    },
+    resultSummary: 'Lists Knowledge spaces or cards in one declared space.',
+    icon: 'library',
+    approvalRequired: false,
+  },
+  {
+    id: 'knowledge_search',
+    label: 'Search Knowledge',
+    permission: 'readonly',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        spaceIds: { type: 'array', items: { type: 'string' } },
+        lanes: { type: 'array', items: { type: 'string' } },
+      },
+    },
+    resultSummary: 'Searches Knowledge cards across retrieval lanes and reports semantic availability.',
+    icon: 'library-search',
+    approvalRequired: false,
+  },
+  {
+    id: 'knowledge_read',
+    label: 'Read Knowledge',
+    permission: 'readonly',
+    inputSchema: {
+      type: 'object',
+      required: ['spaceId', 'relativePath'],
+      properties: {
+        spaceId: { type: 'string' },
+        relativePath: { type: 'string' },
+      },
+    },
+    resultSummary: 'Reads one Knowledge card by space and relative path.',
+    icon: 'library-book',
+    approvalRequired: false,
+  },
+  {
+    id: 'knowledge_compile',
+    label: 'Compile Knowledge',
+    permission: 'readonly',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        spaceIds: { type: 'array', items: { type: 'string' } },
+        limit: { type: 'integer' },
+      },
+    },
+    resultSummary: 'Compiles a sourced Knowledge Pack from a query without writing canonical cards.',
+    icon: 'library-stack',
+    approvalRequired: false,
+  },
+  {
+    id: 'knowledge_candidate_create',
+    label: 'Create Knowledge Candidate',
+    permission: 'mutation',
+    inputSchema: {
+      type: 'object',
+      required: ['title', 'type', 'body', 'explicitUserIntent'],
+      properties: {
+        title: { type: 'string' },
+        type: { type: 'string' },
+        body: { type: 'string' },
+        relativePath: { type: 'string' },
+        spaceId: { type: 'string' },
+        explicitUserIntent: { type: 'boolean' },
+      },
+    },
+    resultSummary: 'Creates a session Knowledge Candidate after explicit user intent. Does not persist verified or promoted cards.',
+    icon: 'library-plus',
+    approvalRequired: false,
+  },
 ];
 
 export const AGENT_WORKBENCH_COMMAND_CATALOG: AgentWorkbenchCommandDeclaration[] = [

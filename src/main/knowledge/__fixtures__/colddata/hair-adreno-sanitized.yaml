@@ -1,0 +1,42 @@
+case_id: fixture-hair-adreno-740
+title: Adreno 740 hair darkening / KajiyaDiffuse
+meta:
+  status: fixed
+  severity: high
+environment:
+  platform: Android
+  api: Vulkan
+  gpu_vendor: Qualcomm
+  gpu_arch: Adreno
+  device: fixture-device
+  driver: sanitized
+repro:
+  steps: Replay the hair pass and compare against the reference still.
+assets:
+  images:
+    - { file: "symptom-compare-a1b2c3d4.png", role: "symptom_compare" }
+symptoms:
+  visual: Hair appears darker than the reference still.
+evidence:
+  - kind: screenshot
+    asset: symptom-compare-a1b2c3d4.png
+investigation:
+  action_chain:
+    - Compared hair shading on the fixture GPU
+root_cause:
+  phenomenon: Hair darkened
+  first_bad_event: KajiyaDiffuse eval
+  mechanism: unknown
+  responsible_layer: shader
+  why_here: unknown
+  why_not_elsewhere: unknown
+  counterfactual: unknown
+fix:
+  summary: Adjust KajiyaDiffuse energy
+verification_plan:
+  - Replay the hair pass
+generalization:
+  note: Do not lift scope to all Adreno
+  do_not_retry: Do not retry the same energy fold on Adreno 650 without a new capture.
+notes:
+  derived_feature: KajiyaDiffuse energy

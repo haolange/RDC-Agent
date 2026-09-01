@@ -12,6 +12,7 @@ const titles: Record<string, string> = {
   'settings.workspace': 'Workspace',
   'settings.workspaceRuntimeRoot': 'RDX runtime root',
   'settings.models': 'Models',
+  'settings.embeddingTitle': 'Embedding',
   'settings.agentManifestTitle': 'Agents',
   'settings.skills': 'Skills',
   'settings.toolsAndExtensions': 'Tools',
@@ -39,5 +40,7 @@ describe('settingsSearchIndex', () => {
     expect(matchSettingsSearchEntries('环境变量', titleOf).map((entry) => entry.id)).toContain('code-interpreter');
     expect(matchSettingsSearchEntries('env', titleOf).map((entry) => entry.id)).toContain('code-interpreter');
     expect(matchSettingsSearchEntries('agents', titleOf).map((entry) => entry.section)).toContain('agents');
+    expect(matchSettingsSearchEntries('embedding', titleOf).map((entry) => entry.id)).toContain('embedding');
+    expect(matchSettingsSearchEntries('嵌入', titleOf).map((entry) => entry.id)).toContain('embedding');
   });
 });

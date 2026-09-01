@@ -29,14 +29,14 @@ const MISSION_NAMES = {
   optimizer: 'Optimizer',
 };
 
-const FORBIDDEN_TOOL_TOKENS = ['todo', 'knowledge', 'bash', 'search_codebase'];
+const FORBIDDEN_TOOL_TOKENS = ['todo', 'bash', 'search_codebase'];
 const MISSION_FORBIDDEN_TOOLS = ['write', 'edit', 'git', 'file-manage'];
 const GENERAL_REQUIRED_TOOLS = [
   'read', 'search', 'web', 'shell', 'write', 'edit', 'git', 'file-manage',
-  'handoff', 'task', 'output', 'subagent', 'tool_search',
+  'handoff', 'task', 'output', 'subagent', 'tool_search', 'knowledge',
 ];
 const MISSION_REQUIRED_TOOLS = [
-  'read', 'search', 'web', 'shell', 'askUser', 'handoff', 'task', 'planArtifact', 'tool_search',
+  'read', 'search', 'web', 'shell', 'askUser', 'handoff', 'task', 'planArtifact', 'tool_search', 'knowledge',
 ];
 
 function assert(condition, message) {

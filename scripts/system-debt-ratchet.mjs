@@ -839,16 +839,10 @@ export function runContractSuite(rule, repoRoot) {
   }
 
   const reportPath = path.join(os.tmpdir(), `rdc-system-debt-${randomBytes(8).toString('hex')}.json`);
-  const command = process.platform === 'win32' ? 'corepack.cmd' : 'corepack';
   try {
-    const spawned = spawnSync(
-      command,
-      ['pnpm', 'exec', 'vitest', 'run', toPosix(rule.file), '--reporter=json', `--outputFile=${reportPath}`],
-      {
-        cwd: repoRoot,
-        encoding: 'utf8',
-        windowsHide: true,
-      },
+    const spawned = spawnVitest(
+      ['run', toPosix(rule.file), '--reporter=json', `--outputFile=${reportPath}`],
+      { cwd: repoRoot },
     );
     if (spawned.status !== 0 && !existsSync(reportPath)) {
       return [`${rule.id}: vitest hard fail (exit ${spawned.status}): ${(spawned.stderr || spawned.stdout || '').trim()}`];
@@ -876,15 +870,40 @@ export function runContractSuite(rule, repoRoot) {
   }
 }
 
+function resolveVitestEntry(cwd) {
+  const candidates = [
+    path.join(cwd, 'node_modules', 'vitest', 'vitest.mjs'),
+    path.join(cwd, 'node_modules', 'vitest', 'dist', 'cli.js'),
+  ];
+  return candidates.find((candidate) => existsSync(candidate)) || null;
+}
+
+export function spawnVitest(args, { cwd } = {}) {
+  const root = cwd || defaultRepoRoot();
+  const entry = resolveVitestEntry(root);
+  if (entry) {
+    return spawnSync(process.execPath, [entry, ...args], {
+      cwd: root,
+      encoding: 'utf8',
+      windowsHide: true,
+    });
+  }
+  return spawnSync(
+    process.platform === 'win32' ? 'corepack.cmd' : 'corepack',
+    ['pnpm', 'exec', 'vitest', ...args],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      windowsHide: true,
+      shell: process.platform === 'win32',
+    },
+  );
+}
+
 export function spawnVitestOnFile(suitePath, { cwd, reportPath } = {}) {
-  const command = process.platform === 'win32' ? 'corepack.cmd' : 'corepack';
-  const args = ['pnpm', 'exec', 'vitest', 'run', suitePath, '--reporter=json', '--no-config'];
+  const args = ['run', suitePath, '--reporter=json', '--no-config'];
   if (reportPath) args.push(`--outputFile=${reportPath}`);
-  return spawnSync(command, args, {
-    cwd: cwd || defaultRepoRoot(),
-    encoding: 'utf8',
-    windowsHide: true,
-  });
+  return spawnVitest(args, { cwd: cwd || defaultRepoRoot() });
 }
 
 export function runSystemDebtCheck(options) {

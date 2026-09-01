@@ -4,7 +4,7 @@
  */
 import { randomBytes } from 'crypto';
 
-export type IpcApprovalAction = 'memory.write' | 'memory.delete';
+export type IpcApprovalAction = 'memory.write' | 'memory.delete' | 'knowledge.write' | 'knowledge.promote';
 
 export interface IpcApprovalTokenIssueRequest {
   action: IpcApprovalAction;

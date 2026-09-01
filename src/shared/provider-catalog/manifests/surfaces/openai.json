@@ -1205,5 +1205,26 @@
     "gpt-5.3-codex",
     "gpt-4.1"
   ],
-  "docsUrl": "https://platform.openai.com/api-keys"
+  "docsUrl": "https://platform.openai.com/api-keys",
+  "embeddings": {
+    "protocol": "OpenAICompatibleEmbeddings",
+    "adapterId": "openai-compatible-embeddings",
+    "baseUrl": "https://api.openai.com/v1",
+    "models": [
+      {
+        "modelId": "text-embedding-3-small",
+        "label": "text-embedding-3-small",
+        "dimensions": 1536,
+        "maxInputTokens": 8191,
+        "factSourceId": "rdc-agent:openai:0"
+      },
+      {
+        "modelId": "text-embedding-3-large",
+        "label": "text-embedding-3-large",
+        "dimensions": 3072,
+        "maxInputTokens": 8191,
+        "factSourceId": "rdc-agent:openai:0"
+      }
+    ]
+  }
 }

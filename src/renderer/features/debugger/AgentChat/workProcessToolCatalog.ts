@@ -59,6 +59,11 @@ export const WORK_PROCESS_TOOL_DISPLAY_CATALOG: Record<string, WorkProcessToolDi
   task_get: { icon: 'taskGet', groupKind: 'task', category: '任务读取', groupTitle: '任务', groupUnit: '读取', completeVerb: '已读取任务', runningVerb: '正在读取任务' },
   task_list: { icon: 'taskList', groupKind: 'task', category: '任务列表', groupTitle: '任务', groupUnit: '列表', completeVerb: '已列出任务', runningVerb: '正在列出任务' },
   task_stop: { icon: 'taskStop', groupKind: 'task', category: '任务停止', groupTitle: '任务', groupUnit: '停止', completeVerb: '已停止任务', runningVerb: '正在停止任务', mutation: true, errorAccent: true },
+  knowledge_browse: { icon: 'knowledgeBrowse', groupKind: 'runtime', category: '知识浏览', groupTitle: '知识', groupUnit: '浏览', completeVerb: '已浏览知识', runningVerb: '正在浏览知识' },
+  knowledge_search: { icon: 'knowledgeSearch', groupKind: 'runtime', category: '知识搜索', groupTitle: '知识', groupUnit: '搜索', completeVerb: '已搜索知识', runningVerb: '正在搜索知识' },
+  knowledge_read: { icon: 'knowledgeRead', groupKind: 'runtime', category: '知识读取', groupTitle: '知识', groupUnit: '读取', completeVerb: '已读取知识', runningVerb: '正在读取知识' },
+  knowledge_compile: { icon: 'knowledgeCompile', groupKind: 'runtime', category: '知识编译', groupTitle: '知识', groupUnit: '编译', completeVerb: '已编译知识', runningVerb: '正在编译知识' },
+  knowledge_candidate_create: { icon: 'knowledgeCandidate', groupKind: 'runtime', category: '知识候选', groupTitle: '知识', groupUnit: '候选', completeVerb: '已创建知识候选', runningVerb: '正在创建知识候选', mutation: true },
 };
 
 const GENERIC_TOOL_DISPLAY: WorkProcessToolDisplay = {
@@ -149,6 +154,7 @@ export const getToolFamily = (toolName: string): WorkProcessToolFamily => {
     || normalized === 'output_register'
     || normalized === 'rdx_context'
     || normalized === 'agent_handoff'
+    || normalized.startsWith('knowledge_')
   ) return 'runtime';
   return 'generic';
 };

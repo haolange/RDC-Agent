@@ -225,6 +225,33 @@ const FIXTURES = {
     argsPreview: JSON.stringify({ code: 'print(1)' }),
     resultPreview: toolEnvelope('1', { command: 'python', language: 'python', exitCode: 0 }),
   },
+  knowledge_browse: {
+    argsPreview: JSON.stringify({ spaceId: 'user' }),
+    resultPreview: toolEnvelope('cards\t1\nuser:facts/sample.md\tfact\tdraft\tSample', { spaceId: 'user', count: 1 }),
+  },
+  knowledge_search: {
+    argsPreview: JSON.stringify({ query: 'vulkan' }),
+    resultPreview: toolEnvelope('1 hits · semantic: unavailable (consent-denied)\n1. Sample · fact · draft · Lexical · user:facts/sample.md', {
+      count: 1,
+      cardIds: ['user:facts/sample.md'],
+    }),
+  },
+  knowledge_read: {
+    argsPreview: JSON.stringify({ spaceId: 'user', relativePath: 'facts/sample.md' }),
+    resultPreview: toolEnvelope('# Sample\n\nA fact.', { spaceId: 'user', relativePath: 'facts/sample.md', title: 'Sample' }),
+  },
+  knowledge_compile: {
+    argsPreview: JSON.stringify({ query: 'vulkan', limit: 8 }),
+    resultPreview: toolEnvelope('pack pack:abcd · 1 hits · semanticClaimed: false', { packId: 'pack:abcd', count: 1 }),
+  },
+  knowledge_candidate_create: {
+    argsPreview: JSON.stringify({ title: 'New fact', type: 'fact', body: 'A fact.', explicitUserIntent: true }),
+    resultPreview: toolEnvelope('Session candidate cand_1 created as lifecycle=candidate.', {
+      candidateId: 'cand_1',
+      lifecycle: 'candidate',
+      persisted: false,
+    }),
+  },
 };
 
 const workbenchToolIds = AGENT_WORKBENCH_TOOL_CATALOG.map((tool) => tool.id);

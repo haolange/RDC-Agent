@@ -20,13 +20,54 @@ describe('ProviderRuntimeCredentialService', () => {
     });
     const handle = await service.freeze('openai');
     expect(handle).toBe('handle-1');
-    expect(service.get(handle, 'openai')).toMatchObject({
+    expect(service.get(handle, 'openai', 'chat')).toMatchObject({
       provider: { apiKey: 'secret-a' },
       connectionValues: { tenant: 'a' },
       connectionHeaders: { 'x-tenant': 'a' },
+      operation: 'chat',
     });
     service.release(handle);
-    expect(() => service.get(handle, 'openai')).toThrow('invalid');
+    expect(() => service.get(handle, 'openai', 'chat')).toThrow('invalid');
+  });
+
+  it('rejects mismatched lease operations in both directions', async () => {
+    const service = new ProviderRuntimeCredentialService({
+      getProvider: () => ({
+        id: 'openai',
+        protocol: 'OpenAIResponses',
+        label: 'OpenAI',
+        enabled: true,
+        apiKey: 'secret-embed',
+      }),
+      getConnectionValues: () => ({}),
+      getConnectionHeaders: () => ({}),
+      resolveGoogleVertex: vi.fn(),
+      resolveAwsBedrock: vi.fn(),
+      now: () => 10,
+      createHandle: () => 'handle-embed',
+    });
+    const embedHandle = await service.freeze('openai', 'embed');
+    expect(service.get(embedHandle, 'openai', 'embed')?.operation).toBe('embed');
+    expect(() => service.get(embedHandle, 'openai', 'chat')).toThrow('not issued for chat');
+
+    const chatService = new ProviderRuntimeCredentialService({
+      getProvider: () => ({
+        id: 'openai',
+        protocol: 'OpenAIResponses',
+        label: 'OpenAI',
+        enabled: true,
+        apiKey: 'secret-chat',
+      }),
+      getConnectionValues: () => ({}),
+      getConnectionHeaders: () => ({}),
+      resolveGoogleVertex: vi.fn(),
+      resolveAwsBedrock: vi.fn(),
+      now: () => 10,
+      createHandle: () => 'handle-chat',
+    });
+    const chatHandle = await chatService.freeze('openai', 'chat');
+    expect(chatService.get(chatHandle, 'openai', 'chat')?.operation).toBe('chat');
+    expect(() => chatService.get(chatHandle, 'openai', 'embed')).toThrow('not issued for embed');
   });
 
   it('resolves cloud credentials once during the freeze barrier', async () => {
@@ -48,7 +89,7 @@ describe('ProviderRuntimeCredentialService', () => {
     });
     const handle = await service.freeze('google-vertex');
     expect(resolveGoogleVertex).toHaveBeenCalledWith('adc.json');
-    expect(service.get(handle, 'google-vertex')?.provider.apiKey).toBe('frozen-access-token');
+    expect(service.get(handle, 'google-vertex', 'chat')?.provider.apiKey).toBe('frozen-access-token');
   });
 
   it('refreshes only credential material behind the same handle and preserves the frozen route', async () => {
@@ -76,7 +117,7 @@ describe('ProviderRuntimeCredentialService', () => {
     baseUrl = 'https://changed.example/v1';
     await service.refresh(handle, 'chatgpt-account');
 
-    expect(service.get(handle, 'chatgpt-account')?.provider).toMatchObject({
+    expect(service.get(handle, 'chatgpt-account', 'chat')?.provider).toMatchObject({
       apiKey: 'token-b',
       baseUrl: 'https://frozen.example/v1',
     });

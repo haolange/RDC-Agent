@@ -23,6 +23,7 @@ import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContext
 import { storageAdapter } from '../../sessions/StorageAdapter';
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
+import { createKnowledgeTools } from '../../knowledge/KnowledgeTools';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import {
   expandCanonicalToolToken,
@@ -662,6 +663,7 @@ export class RuntimeToolAssembly {
       this.createSkillsCatalogTool(),
       this.createSkillReadTool(agentId),
       this.createMcpCatalogTool(),
+      ...createKnowledgeTools(sessionId),
       ...this.deps.createSubagentTools(agentId, sessionId, turnHandle),
     ];
   }

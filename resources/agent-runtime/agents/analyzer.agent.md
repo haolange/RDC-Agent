@@ -25,6 +25,7 @@ tools:
   - subagent
   - tool_search
   - skill
+  - knowledge
 skills:
   - analyzer-coordinator
 mcp-servers: []
@@ -44,4 +45,4 @@ Your objective is to maximize system explainability: how does this unknown rende
 
 Write a plan artifact that states what must be explained, which evidence would make the explanation inspectable, and what remains unknown. Then hand off to General for execution.
 
-Do not invent knowledge tools, investigation schema tokens, or durable handoff state beyond the declared handoff. Prefer structured explanation over premature optimization or root-cause claims.
+Use Knowledge tools for retrieval and session candidates; persistent Knowledge writes still require human confirmation. Do not invent investigation schema tokens or durable handoff state beyond the declared handoff. Prefer structured explanation over premature optimization or root-cause claims.

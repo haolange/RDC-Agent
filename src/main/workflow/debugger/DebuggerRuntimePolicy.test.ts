@@ -10,6 +10,17 @@ import {
 import { CANONICAL_TOOL_TOKEN_EXPANSIONS, REJECTED_TOOL_TOKENS } from '@shared/constants/agentToolTokens';
 
 describe('DebuggerRuntimePolicy tool tokens', () => {
+  it('expands knowledge token to the five deferred Knowledge tools', () => {
+    expect(expandCanonicalToolToken('knowledge')).toEqual([
+      'knowledge_browse',
+      'knowledge_search',
+      'knowledge_read',
+      'knowledge_compile',
+      'knowledge_candidate_create',
+    ]);
+    expect(CANONICAL_TOOL_TOKEN_EXPANSIONS.knowledge).toHaveLength(5);
+  });
+
   it('expands task token to include task_stop', () => {
     const expanded = expandCanonicalToolToken('task');
     expect(expanded).toContain('task_stop');

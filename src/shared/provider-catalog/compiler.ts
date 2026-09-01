@@ -25,6 +25,8 @@ import {
 import { contextTierWindowTokens, isEligibleMaxContextTier } from '../utils/contextTiers';
 import { hasImplementedStructuredToolAdapter } from '../utils/agentToolCapability';
 import { createFailClosedProviderContracts } from './providerContracts';
+import { compileEmbeddingCatalog, validateSurfaceEmbeddings } from './embeddingCatalog';
+import type { EmbeddingCatalog } from '../types/embedding';
 
 export function dedicatedToolCallingFactSourceIds(
   surface: Pick<ProviderSurfaceManifest, 'factSources'>,
@@ -65,6 +67,7 @@ export type ProviderSurfaceSummary = Omit<ProviderSurfaceManifest,
   | 'factConflicts'
   | 'discoveredModelProjection'
   | 'models'
+  | 'embeddings'
   | 'protocolOverrides'
 > & {
   discoveryAuthority: ProviderSurfaceManifest['discovery']['authority'];
@@ -79,6 +82,7 @@ export interface CompiledProviderCatalogIndex {
   surfaceCount: number;
   modelCount: number;
   surfaces: ProviderSurfaceSummary[];
+  embeddings: EmbeddingCatalog;
 }
 
 export interface CompiledProviderSurface {
@@ -92,6 +96,7 @@ export interface CompiledProviderCatalog {
   identities: ProviderIdentityManifest[];
   profiles: ProviderProfileManifest[];
   surfaces: Map<string, CompiledProviderSurface>;
+  embeddings: EmbeddingCatalog;
 }
 
 function stableJson(value: unknown): string {
@@ -617,6 +622,7 @@ function validateSurface(
       errors.push(`${surface.id} recommends missing model ${modelId}`);
     }
   }
+  validateSurfaceEmbeddings(surface, factSourceIds, errors);
 }
 
 export function compileProviderCatalog(input: ProviderCatalogCompileInput): CompiledProviderCatalog {
@@ -655,6 +661,7 @@ export function compileProviderCatalog(input: ProviderCatalogCompileInput): Comp
 
   const canonicalInput = { identities, profiles, surfaces };
   const catalogRevision = createHash('sha256').update(stableJson(canonicalInput), 'utf8').digest('hex');
+  const embeddings = compileEmbeddingCatalog(surfaces, catalogRevision);
   const compiledSurfaces = new Map(surfaces.map((surface) => [surface.id, {
     schemaVersion: PROVIDER_CATALOG_SCHEMA_VERSION,
     catalogRevision,
@@ -707,9 +714,11 @@ export function compileProviderCatalog(input: ProviderCatalogCompileInput): Comp
       surfaceCount: surfaces.length,
       modelCount: surfaces.reduce((count, surface) => count + surface.models.filter((model) => model.selection.pickerVisibility !== 'internal').length, 0),
       surfaces: summaries,
+      embeddings,
     },
     identities,
     profiles,
     surfaces: compiledSurfaces,
+    embeddings,
   };
 }
