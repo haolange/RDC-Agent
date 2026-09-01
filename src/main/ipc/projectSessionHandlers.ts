@@ -29,6 +29,7 @@ import {
   SessionSetAgentIdArgsSchema,
   SessionSetModelOverrideArgsSchema,
 } from './validation/projectSessionSchemas';
+import { createSessionWithHooks, removeSessionWithHooks } from '../hooks/sessionLifecycle';
 import { conversationService } from '../conversation/ConversationService';
 import { projectSessionForClient } from '../sessions/projectSessionHandoff';
 import { resolveEnabledAgentDefinition } from '../conversation/ConversationRoutePreflight';
@@ -213,7 +214,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         maxBytes: 4 * 1024,
         padTo: 2,
       });
-      const session = storageAdapter.createSession(projectId, title);
+      const session = await createSessionWithHooks(projectId, title);
       state.currentProjectId = session.projectId;
       state.currentSessionId = session.sessionId;
       state.currentRunId = null;
@@ -274,7 +275,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         });
       }
 
-      storageAdapter.removeSession(id);
+      await removeSessionWithHooks(id);
       attachmentStagingService.releaseBySessionId(id);
       agentOrchestrator.syncSessionSlots(id);
       const remainingSessions = storageAdapter.listSessions(session.projectId);

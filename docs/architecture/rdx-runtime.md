@@ -30,7 +30,8 @@ RDX Runtime 是 RDC-Agent 的资源解析、Prompt 构建与运行期可观测�
 - Skill 使用 `<skill-id>/SKILL.md` 与可选的 `scripts/`、`references/`、`assets/`。
 - Progressive Skill：非空 metadata catalog 一律注入短索引（`SkillCatalogBudget`）；`.agent.md` `skills`、composer `$skill-id`、以及 session-scoped `/skills` 武装在首次 LLM 调用前全文 preload（缺失 fail-closed）；其余 Skill 经 core `skills` / `skill_read` 渐进加载。禁止 lean/standard harness 档位。
 - MCP 由 scoped `.mcp.json` 与 exact effective Agent profile 决定；pool 按 `projectRoot + descriptorHash` 隔离，以 ref-counted lease 保证 Project 切换不关闭在用连接。 The leased pool key is passed through tool assembly and execution.
-- Hook 使用 `.hook.yml`、结构化 command/args、`shell: false`、timeout 与 `block | warn` failure policy。
+- Hook 使用 `.hook.yml`、结构化 command/args、`shell: false`、timeout 与 `block | warn` failure policy。分发根为 `resources/agent-runtime/hooks`（builtin）+ `~/.rdx/hooks` + `<project>/.rdx/hooks`，顺序 `builtin < user < project`。
+- 运行时接线：`session.*`、`turn.*`、`tool.*`、`context.*`、`agent.*`、`permission.denied`。唯一引擎是 `HookEngine`。
 - Project Hook 按 `project + content hash` 授信，内容变化或资源删除自动撤销授信。
 
 ## Prompt 与请求管线

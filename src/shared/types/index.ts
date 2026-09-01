@@ -202,6 +202,15 @@ export type {
   SkillMetadata,
 } from './rdxRuntime';
 export type {
+  DelegationCapsule,
+  DelegationCapsuleBudget,
+} from './delegationCapsule';
+export {
+  DELEGATION_CAPSULE_ERROR,
+  DELEGATION_CAPSULE_JSON_SCHEMA,
+  parseDelegationCapsule,
+} from './delegationCapsule';
+export type {
   CompiledPromptCache,
   DerivedContextView,
   PromptStablePrefix,
@@ -218,6 +227,33 @@ export type {
   KnowledgeSpace,
   KnowledgeSpaceKind,
 } from './knowledge';
+export type {
+  ParsedSessionArtifactUri,
+  SessionArtifactCategory,
+  SessionArtifactErrorCode,
+  SessionArtifactMimeType,
+  SessionArtifactRefDetails,
+} from './sessionArtifact';
+export {
+  ARTIFACT_READ_MAX_OUTPUT_BYTES,
+  ARTIFACT_READ_MAX_OUTPUT_LINES,
+  SESSION_ARTIFACT_ALLOWED_MIME_TYPES,
+  SESSION_ARTIFACT_CATEGORIES,
+  SESSION_ARTIFACT_ERROR_CODES,
+  SESSION_ARTIFACT_MAX_FILE_BYTES,
+  SESSION_ARTIFACT_MAX_SESSION_BYTES,
+  SESSION_ARTIFACT_MAX_TOOL_OUTPUT_FILES,
+  SESSION_ARTIFACT_ROOT_DIR,
+  SESSION_ARTIFACT_SCHEME,
+  SessionArtifactError,
+  TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES,
+  extractSessionArtifactUris,
+  formatSessionArtifactUri,
+  isSessionArtifactCategory,
+  isSessionArtifactUri,
+  parseSessionArtifactUri,
+  shortArtifactHash,
+} from './sessionArtifact';
 export type {
   CaptureDescriptor,
   ContextSnapshot,

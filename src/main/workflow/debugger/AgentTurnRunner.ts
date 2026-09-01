@@ -37,6 +37,7 @@ import {
   translateCoreToSharedAgentEvent,
   type AgentEventBridgeContext,
 } from '../../agent-runtime/AgentEventBridge';
+import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { agentUserInputRequestService } from '../../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentToolApprovalRequestService } from '../../agent-runtime/permissions/AgentToolApprovalRequestService';
 import type {
@@ -354,6 +355,16 @@ export class AgentTurnRunner {
       throw error;
     }
     const sessionKey = this.deps.sessionTurnKey(executionScopeId);
+    const turnHooksAllowed = await dispatchRuntimeHooks('turn.before-start', {
+      agentId: input.agentId,
+      sessionId: executionScopeId,
+      projectRoot: input.projectRootPath ?? undefined,
+      payload: { turnId: input.turnId, runId: input.runId },
+    });
+    if (!turnHooksAllowed) {
+      await mcpLease?.release({ discardIfIdle: true });
+      throw new Error('HOOK_DENIED: turn.before-start');
+    }
     let turnHandle;
     try {
       turnHandle = await turnCoordinator.beginTurn({
@@ -799,6 +810,12 @@ export class AgentTurnRunner {
       await mcpLease?.release({ discardIfIdle: turnHandle.isOrphaned });
       turnCoordinator.endTurn(turnHandle);
       turnEnded = true;
+      await dispatchRuntimeHooks('turn.after-end', {
+        agentId: input.agentId,
+        sessionId: executionScopeId,
+        projectRoot: input.projectRootPath ?? undefined,
+        payload: { turnId: turnHandle.turnId },
+      });
       setupCleanupComplete = true;
     }
     } catch (error) {
@@ -830,6 +847,12 @@ export class AgentTurnRunner {
         if (!turnEnded) {
           turnCoordinator.endTurn(turnHandle);
           turnEnded = true;
+          await dispatchRuntimeHooks('turn.after-end', {
+            agentId: input.agentId,
+            sessionId: executionScopeId,
+            projectRoot: input.projectRootPath ?? undefined,
+            payload: { turnId: turnHandle.turnId },
+          });
         }
         setupCleanupComplete = true;
       }

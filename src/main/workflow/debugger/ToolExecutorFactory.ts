@@ -30,9 +30,11 @@ import {
 } from './DebuggerRuntimePolicy';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
-import type { TurnHandle } from './TurnCoordinator';
+import { reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
+import { countSubagentCalls, isAgentToolCallConcurrencySafe } from '../../agent-runtime/agent/toolConcurrency';
 import type { ResolvedRuntimeTools, ToolExecutorRuntimeContext } from './orchestratorTypes';
 import { storageAdapter } from '../../sessions/StorageAdapter';
+import { artifactizeToolResult } from '../../agent-runtime/tools/ToolResultArtifactizer';
 
 export interface ToolExecutorFactoryDeps {
   slots: AgentSlotRegistry;
@@ -125,26 +127,49 @@ export class ToolExecutorFactory {
     const permissionSettings = plan?.permissionSettings;
     const compiledPolicy = plan?.policy;
     const planActivatedDeferredTools = new Set(plan?.activatedDeferredTools ?? []);
+    const reservedCallIds = new Set<string>();
     return {
+      isConcurrencySafe: (toolCall: ToolCall) => {
+        const normalizedName = normalizeToolName(toolCall.name);
+        return isAgentToolCallConcurrencySafe(tools.get(normalizedName), {
+          ...toolCall,
+          name: normalizedName,
+        });
+      },
+      reserveDispatchBudget: (toolCalls: ToolCall[]) => {
+        const cost = {
+          toolCalls: toolCalls.length,
+          subagents: countSubagentCalls(toolCalls.map((call) => ({ name: normalizeToolName(call.name) }))),
+        };
+        const reserved = reserveDispatchBudget(runtimeContext?.policyBudget, cost);
+        if (reserved.ok) {
+          for (const call of toolCalls) {
+            reservedCallIds.add(call.id);
+          }
+        }
+        return reserved;
+      },
       execute: async (toolCall: ToolCall, signal?: AbortSignal, onUpdate?: (partialResult: unknown) => void) => {
+        const denyTool = (reason?: string) => this.createPolicyDeniedToolResult(
+          toolCall,
+          agentId,
+          reason,
+          runtimeContext,
+        );
         const normalizedName = normalizeToolName(toolCall.name);
         if (!this.deps.isAllowedForRuntime(agentId, toolCall.name, stage, effectiveToolAllowlist) || !tools.has(normalizedName)) {
-          return this.createPolicyDeniedToolResult(toolCall, agentId);
+          return denyTool();
         }
         if (
           activeSkillAllowlist !== null
           && !this.deps.matchesToolAllowlist(normalizedName, Array.from(activeSkillAllowlist))
         ) {
-          return this.createPolicyDeniedToolResult(
-            toolCall,
-            agentId,
+          return denyTool(
             `Tool "${toolCall.name}" is outside the allowed-tools set declared by the active skill.`,
           );
         }
         if (compiledPolicy && isToolDeniedByPolicy(compiledPolicy, normalizedName)) {
-          return this.createPolicyDeniedToolResult(
-            toolCall,
-            agentId,
+          return denyTool(
             `POLICY_DENIED: tool "${toolCall.name}" is in deniedTools.`,
           );
         }
@@ -166,17 +191,15 @@ export class ToolExecutorFactory {
         }
         const tool = tools.get(normalizedName);
         if (!tool) {
-          return this.createPolicyDeniedToolResult(toolCall, agentId);
+          return denyTool();
         }
         const policyBudget = runtimeContext?.policyBudget;
-        if (policyBudget) {
-          if (Date.now() - policyBudget.wallStartedAt >= policyBudget.maxWallTimeMs) {
-            return this.createPolicyLimitToolResult(toolCall, agentId, 'maxWallTimeMs');
+        const alreadyReserved = reservedCallIds.delete(toolCall.id);
+        if (policyBudget && !alreadyReserved) {
+          const reserved = reserveDispatchBudget(policyBudget, { toolCalls: 1, subagents: 0 });
+          if (!reserved.ok) {
+            return this.createPolicyLimitToolResult(toolCall, agentId, reserved.limit);
           }
-          if (policyBudget.toolCalls >= policyBudget.maxToolCalls) {
-            return this.createPolicyLimitToolResult(toolCall, agentId, 'maxToolCalls');
-          }
-          policyBudget.toolCalls += 1;
         }
         let validatedArgs: Record<string, unknown>;
         try {
@@ -216,7 +239,7 @@ export class ToolExecutorFactory {
           ...(sessionAttachmentsRoot ? { sessionAttachmentsRoot } : {}),
         });
         if (permissionDecision.action === 'deny') {
-          return this.createPolicyDeniedToolResult(toolCall, agentId, permissionDecision.reason);
+          return denyTool(permissionDecision.reason);
         }
         if (permissionDecision.action === 'ask_user') {
           if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
@@ -235,12 +258,12 @@ export class ToolExecutorFactory {
             signal,
           });
           if (!approved) {
-            return this.createPolicyDeniedToolResult(toolCall, agentId, 'User denied this tool call.');
+            return denyTool('User denied this tool call.');
           }
         }
         if (permissionDecision.action === 'auto_review') {
           if (!runtimeContext?.eventContext || !runtimeContext.turnId) {
-            return this.createPolicyDeniedToolResult(toolCall, agentId, 'Auto-review requires an active conversation turn.');
+            return denyTool('Auto-review requires an active conversation turn.');
           }
           const approved = agentToolApprovalRequestService.autoReview({
             agentId,
@@ -255,7 +278,7 @@ export class ToolExecutorFactory {
             signal,
           });
           if (!approved) {
-            return this.createPolicyDeniedToolResult(toolCall, agentId, 'Auto-review denied this tool call.');
+            return denyTool('Auto-review denied this tool call.');
           }
         }
         try {
@@ -266,7 +289,7 @@ export class ToolExecutorFactory {
             arguments: validatedArgs,
           });
           if (!beforeHooksAllowed) {
-            return this.createPolicyDeniedToolResult(toolCall, agentId, 'A blocking lifecycle hook denied this tool call.');
+            return denyTool('A blocking lifecycle hook denied this tool call.');
           }
           const toolContext: ToolExecutionContext = {
             workspaceRoot: projectRootPath ?? getWorkspaceRoot(),
@@ -308,7 +331,15 @@ export class ToolExecutorFactory {
               applySkillNarrowing(skill.allowedTools);
             }
           }
-          return this.agentToolResultToMessage(toolCall, result);
+          const finalized = result.isError === true
+            ? result
+            : artifactizeToolResult({
+                sessionId: runtimeContext?.sessionId ?? sessionId,
+                toolCallId: toolCall.id,
+                toolName: toolCall.name,
+                result,
+              });
+          return this.agentToolResultToMessage(toolCall, finalized);
         } catch (error) {
           await this.triggerRuntimeHooks('tool.on-error', agentId, runtimeContext, {
             toolName: toolCall.name,
@@ -421,14 +452,25 @@ export class ToolExecutorFactory {
     };
   }
 
-  createPolicyDeniedToolResult(toolCall: ToolCall, agentId: AgentRole, reason?: string): ToolResultMessage {
+  async createPolicyDeniedToolResult(
+    toolCall: ToolCall,
+    agentId: AgentRole,
+    reason?: string,
+    runtimeContext?: ToolExecutorRuntimeContext,
+  ): Promise<ToolResultMessage> {
+    const message = reason || `Policy denied tool "${toolCall.name}" for ${agentId}.`;
+    await this.triggerRuntimeHooks('permission.denied', agentId, runtimeContext, {
+      toolName: toolCall.name,
+      toolCallId: toolCall.id,
+      reason: message,
+    });
     return {
       role: 'toolResult',
       toolCallId: toolCall.id,
       toolName: toolCall.name,
       content: [{
         type: 'text',
-        text: reason || `Policy denied tool "${toolCall.name}" for ${agentId}.`,
+        text: message,
       }],
       isError: true,
       timestamp: Date.now(),

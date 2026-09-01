@@ -38,6 +38,16 @@ const FIXTURES = {
     argsPreview: JSON.stringify({ path: 'src/main/index.ts' }),
     resultPreview: toolEnvelope('     1→export {}\n     2→', { path: 'src/main/index.ts', totalLines: 12, offset: 1, limit: 2000, truncated: false }),
   },
+  artifact_read: {
+    argsPreview: JSON.stringify({ uri: 'session://tool-outputs/call-1.json' }),
+    resultPreview: toolEnvelope('Offloaded tool result', {
+      artifactized: true,
+      ref: 'session://tool-outputs/call-1.json',
+      hash: 'aabbccddeeff00112233445566778899',
+      summary: 'Offloaded tool result',
+      uri: 'session://tool-outputs/call-1.json',
+    }),
+  },
   glob: {
     argsPreview: JSON.stringify({ pattern: '**/package.json' }),
     resultPreview: toolEnvelope('package.json\ntools/package.json', { pattern: '**/package.json', cwd: '.', matched: 2, truncated: false }),
@@ -310,6 +320,11 @@ for (const toolName of allTools) {
     assert(row.bodyText && row.bodyText.includes('src/main/index.ts'), 'read_file body should keep the path');
     assert(row.bodyText.includes('12 lines'), `read_file body should include totalLines, got "${row.bodyText}"`);
     assert(row.previewLines.some((line) => line.includes('export')), 'read_file preview should include file content');
+  }
+
+  if (toolName === 'artifact_read') {
+    assert(row.pathChip === 'session://tool-outputs/call-1.json', `artifact_read should expose session:// pathChip, got "${row.pathChip}"`);
+    assert(Array.isArray(row.chips) && row.chips.includes('aabbccdd'), `artifact_read should expose short hash chip, got ${JSON.stringify(row.chips)}`);
   }
 
   if (toolName === 'web_search') {

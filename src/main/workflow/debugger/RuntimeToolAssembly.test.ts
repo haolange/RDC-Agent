@@ -16,6 +16,39 @@ vi.mock('../../sessions/RdxRuntimeContextRegistry', () => ({
   assertRdxContextLeaseOwnership: vi.fn(() => null),
 }));
 
+const { dispatchRuntimeHooks, prepareHandoff, computeNextChain, getActiveHandoff } = vi.hoisted(() => ({
+  dispatchRuntimeHooks: vi.fn(async () => true),
+  prepareHandoff: vi.fn(() => ({ handoffId: 'handoff-1', send: true })),
+  computeNextChain: vi.fn(() => ({ chainRoot: 'root', depth: 1 })),
+  getActiveHandoff: vi.fn(() => null),
+}));
+
+vi.mock('../../hooks/runtimeHookDispatch', () => ({
+  dispatchRuntimeHooks,
+}));
+
+vi.mock('../../sessions/StorageAdapter', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../sessions/StorageAdapter')>();
+  return {
+    ...actual,
+    storageAdapter: {
+      ...actual.storageAdapter,
+      handoffs: {
+        ...actual.storageAdapter.handoffs,
+        computeNextChain,
+        getActive: getActiveHandoff,
+        prepare: prepareHandoff,
+      },
+    },
+  };
+});
+
+vi.mock('../../settings/SettingsService', () => ({
+  settingsService: {
+    getAll: () => ({ llm: { providers: [] } }),
+  },
+}));
+
 import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
 import { RuntimeToolAssembly } from './RuntimeToolAssembly';
 import { TurnHandle } from './TurnCoordinator';
@@ -118,5 +151,27 @@ describe('RuntimeToolAssembly', () => {
     const tools = assembly.resolveRuntimeTools('debugger', ['task'], undefined, 'session-a', handle, 'project-a');
 
     expect(tools.toolMap.has('output_register')).toBe(true);
+  });
+
+  it('fires agent.before-handoff and agent.after-handoff on a valid handoff', async () => {
+    const assembly = createAssembly();
+    const handle = new TurnHandle({ sessionKey: 'session-a', turnId: 'turn-a', runId: 'run-a', generation: 1 });
+    handle.eventSink = { sessionId: 'session-a', requestId: 'req-1' } as never;
+    handle.runtimePlan = {
+      projectRootPath: 'D:/project',
+      profileHandoffs: [{ agent: 'general', label: 'Go', prompt: 'continue' }],
+      enabledProfileIds: ['debugger', 'general'],
+    } as never;
+    const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
+    const result = await tool.execute('tc-handoff', { agent: 'general', prompt: 'continue', label: 'Go' });
+    expect(result.isError).not.toBe(true);
+    expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
+      'agent.before-handoff',
+      expect.objectContaining({ agentId: 'debugger', sessionId: 'session-a' }),
+    );
+    expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
+      'agent.after-handoff',
+      expect.objectContaining({ agentId: 'debugger', sessionId: 'session-a' }),
+    );
   });
 });

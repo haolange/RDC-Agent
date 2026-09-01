@@ -141,7 +141,8 @@ export type PromptSegmentKind =
   | 'preloaded-skill'
   | 'skill-catalog'
   | 'tool-capability'
-  | 'runtime-fact';
+  | 'runtime-fact'
+  | 'delegation-capsule';
 
 export interface PromptSegment {
   id: string;
@@ -221,7 +222,7 @@ export interface RdxRuntimeOverview {
   resources: ScopedResourceDocument[];
   hooks: Array<{
     id: string;
-    scope: 'user' | 'project';
+    scope: 'builtin' | 'user' | 'project';
     sourcePath: string;
     sourceHash: string;
     enabled: boolean;

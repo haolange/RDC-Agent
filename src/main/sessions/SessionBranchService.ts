@@ -3,6 +3,7 @@
  *
  * 允许在当前位置分叉对话，创建独立的对话分支。
  */
+import { createSessionWithHooks } from '../hooks/sessionLifecycle';
 import { storageAdapter } from './StorageAdapter';
 import type { SessionRecord } from '@shared/types/session';
 
@@ -20,7 +21,7 @@ export class SessionBranchService {
     if (!source) return null;
 
     const title = branchName ?? `${source.title ?? 'session'} (branch)`;
-    const branched = storageAdapter.createSession(source.projectId, title);
+    const branched = await createSessionWithHooks(source.projectId, title);
 
     // 复制源会话的消息到分支
     const sourceMessages = storageAdapter.readConversationHistory(sourceSessionId);

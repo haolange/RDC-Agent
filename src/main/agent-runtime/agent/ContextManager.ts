@@ -23,10 +23,8 @@ import type {
   ToolResultMessage,
   UserMessage,
 } from '../core/types';
-import type { DerivedContextView } from '@shared/types/semanticContext';
 import { charsToTokens } from '@shared/utils/tokens';
 import { TokenizerService } from '../core/TokenizerService';
-import { createStructuredHandoffMessage } from '../context/StructuredHandoffBuilder';
 import { ToolResultSummarizer } from '../tools/ToolResultSummarizer';
 
 /** 上下文压缩配置。 */
@@ -43,11 +41,6 @@ export interface ContextManagerConfig {
   tokenizer?: TokenizerService;
   /** 当前模型 ID（用于选择正确的编码器）。 */
   modelId?: string;
-  /** Session/test-provided model-generated handoff assembler. */
-  createDerivedView?: (
-    source: AgentMessage[],
-    options: { createdAt: number; maxFactsPerGroup: number; maxResourceRefs: number },
-  ) => DerivedContextView | null;
 }
 
 const DEFAULT_TOOL_RESULT_BUDGET = 200 * 1024;
@@ -57,6 +50,7 @@ const DEFAULT_KEEP_RECENT_TOOL_RESULTS = 3;
 const SNIP_HEAD = 3;
 const TOOL_RESULT_TRUNCATE_HEAD = 2000;
 const TOOL_RESULT_COMPACTION_TEXT = '[Earlier tool result compacted]';
+const CONVERSATION_COMPACTION_TEXT = '[Earlier conversation compacted]';
 
 export const estimateImageTokensFromBase64Length = (base64Length: number): number => {
   const byteLength = Math.max(0, Math.floor(base64Length * 0.75));
@@ -72,8 +66,6 @@ export interface CompressResult {
   messages: AgentMessage[];
   /** 实际发生压缩时的人类可读摘要；no-op 时为 undefined。 */
   summary?: string;
-  /** Provenance-bearing derived view created by the last semantic compaction stage. */
-  derivedContextView?: DerivedContextView;
 }
 
 /** 上下文管理器。 */
@@ -118,26 +110,13 @@ export class ContextManager {
     const beforeCount = messages.length;
     const beforeTokens = this.estimateTokens(messages);
     const stages: string[] = [];
-    let derivedContextView: DerivedContextView | undefined;
 
     let result = this.toolResultBudget(messages);
     if (!messagesEqual(result, messages)) stages.push('toolResultBudget');
 
     const afterBudget = result;
-    const snipped = this.snipCompact(result);
-    result = snipped.messages;
-    derivedContextView = snipped.view;
+    result = this.snipCompact(result);
     if (!messagesEqual(result, afterBudget)) stages.push('snip');
-
-    if (this.estimateTokens(result) > tokenLimit && derivedContextView) {
-      // Do not derive a second handoff from a rendered handoff. If count-based
-      // snipping did not satisfy the token budget, restart semantic compaction
-      // from the post-tool-budget source and let full compaction own provenance.
-      result = afterBudget;
-      derivedContextView = undefined;
-      const snipStage = stages.lastIndexOf('snip');
-      if (snipStage >= 0) stages.splice(snipStage, 1);
-    }
 
     if (this.estimateTokens(result) > tokenLimit) {
       const beforeMicro = result;
@@ -150,9 +129,7 @@ export class ContextManager {
         throw new DOMException('The operation was aborted', 'AbortError');
       }
       const beforeFull = result;
-      const compacted = await this.fullCompact(result);
-      result = compacted.messages;
-      derivedContextView = compacted.view ?? derivedContextView;
+      result = this.fullCompact(result);
       if (!messagesEqual(result, beforeFull)) stages.push('full');
     }
 
@@ -163,7 +140,6 @@ export class ContextManager {
       result = degraded.messages;
       if (degraded.stages.length > 0) {
         stages.push(...degraded.stages);
-        derivedContextView = degraded.view ?? derivedContextView;
       }
     }
 
@@ -187,7 +163,6 @@ export class ContextManager {
     return {
       messages: result,
       summary,
-      ...(derivedContextView ? { derivedContextView } : {}),
     };
   }
 
@@ -283,31 +258,24 @@ export class ContextManager {
    * 如果切口左侧的 assistant 消息含 toolCall，
    * 则把切口往右推一格直到对应的 toolResult 之后。
    */
-  private snipCompact(
-    messages: AgentMessage[],
-  ): { messages: AgentMessage[]; view?: DerivedContextView } {
+  private snipCompact(messages: AgentMessage[]): AgentMessage[] {
     const max = this.config.maxMessages ?? DEFAULT_MAX_MESSAGES;
-    if (messages.length <= max) return { messages: [...messages] };
+    if (messages.length <= max) return [...messages];
 
     const tailCount = max - SNIP_HEAD - 1;
-    if (tailCount <= 0) return { messages: [...messages] };
+    if (tailCount <= 0) return [...messages];
 
     const snipStart = this.adjustSnipStart(messages, SNIP_HEAD);
     const snipEnd = this.adjustSnipEnd(messages, messages.length - tailCount);
-    if (snipStart >= snipEnd) return { messages: [...messages] };
+    if (snipStart >= snipEnd) return [...messages];
 
     const source = messages.slice(snipStart, snipEnd);
-    if (source.length === 0) return { messages: [...messages] };
-    const compacted = this.buildCompactionView(source);
-    if (!compacted) return { messages: [...messages] };
-    return {
-      messages: [
-        ...messages.slice(0, snipStart),
-        compacted.message,
-        ...messages.slice(snipEnd),
-      ],
-      view: compacted.view,
-    };
+    if (source.length === 0) return [...messages];
+    return [
+      ...messages.slice(0, snipStart),
+      this.compactionPlaceholder(),
+      ...messages.slice(snipEnd),
+    ];
   }
 
   /** Compact early tool results while preserving tool-call/result pairing. */
@@ -358,20 +326,13 @@ export class ContextManager {
     return result;
   }
 
-  /** Level 4: Full 压缩（生成摘要替换全部）。 */
-  private async fullCompact(
-    messages: AgentMessage[],
-  ): Promise<{ messages: AgentMessage[]; view?: DerivedContextView }> {
+  /** Level 4: Full 压缩（占位符替换头部，保留尾部）。 */
+  private fullCompact(messages: AgentMessage[]): AgentMessage[] {
     const tailStart = this.adjustSnipEnd(messages, Math.max(0, messages.length - 5));
     const tail = messages.slice(tailStart);
     const source = messages.slice(0, tailStart);
-    if (source.length === 0) return { messages: [...tail] };
-    const compacted = this.buildCompactionView(source);
-    if (!compacted) return { messages: [...messages] };
-    return {
-      messages: [compacted.message, ...tail],
-      view: compacted.view,
-    };
+    if (source.length === 0) return [...tail];
+    return [this.compactionPlaceholder(), ...tail];
   }
 
   /**
@@ -381,7 +342,7 @@ export class ContextManager {
   private degradeToFit(
     messages: AgentMessage[],
     tokenLimit: number,
-  ): { messages: AgentMessage[]; stages: string[]; view?: DerivedContextView } {
+  ): { messages: AgentMessage[]; stages: string[] } {
     if (messages.length === 0) return { messages: [], stages: [] };
     let lastUserIndex = -1;
     for (let i = messages.length - 1; i >= 0; i -= 1) {
@@ -393,15 +354,6 @@ export class ContextManager {
     const keepFrom = lastUserIndex >= 0 ? lastUserIndex : Math.max(0, messages.length - 1);
     const tail = messages.slice(keepFrom);
     if (this.estimateTokens(tail) <= tokenLimit) {
-      const source = messages.slice(0, keepFrom);
-      const compacted = source.length > 0 ? this.buildCompactionView(source) : null;
-      if (compacted && this.estimateTokens([compacted.message, ...tail]) <= tokenLimit) {
-        return {
-          messages: [compacted.message, ...tail],
-          stages: ['degrade'],
-          view: compacted.view,
-        };
-      }
       return { messages: tail, stages: ['degrade'] };
     }
     // Strip images from the surviving user message as a final degrade step.
@@ -419,24 +371,12 @@ export class ContextManager {
     return { messages: stripped, stages: ['degrade'] };
   }
 
-  private buildCompactionView(
-    source: AgentMessage[],
-  ): { view: DerivedContextView; message: UserMessage } | null {
-    const sourceTokens = this.estimateTokens(source);
-    if (sourceTokens <= 0) return null;
-    const createdAt = Date.now();
-    for (const candidate of [
-      { maxFactsPerGroup: 4, maxResourceRefs: 8 },
-      { maxFactsPerGroup: 2, maxResourceRefs: 4 },
-      { maxFactsPerGroup: 1, maxResourceRefs: 2 },
-      { maxFactsPerGroup: 0, maxResourceRefs: 0 },
-    ]) {
-      const view = this.config.createDerivedView?.(source, { createdAt, ...candidate }) ?? null;
-      if (!view) continue;
-      const message = createStructuredHandoffMessage(view);
-      if (this.estimateTokens([message]) < sourceTokens) return { view, message };
-    }
-    return null;
+  private compactionPlaceholder(): UserMessage {
+    return {
+      role: 'user',
+      content: CONVERSATION_COMPACTION_TEXT,
+      timestamp: Date.now(),
+    };
   }
 
   // =====================================================================

@@ -57,6 +57,8 @@ const ROW_STATUS_LABEL: Record<WorkProcessRowStatus, string> = {
 };
 
 const TARGET_KEYS = [
+  'uri',
+  'ref',
   'path',
   'title',
   'file',
@@ -670,7 +672,7 @@ export type UnwrappedToolContent = {
   chips?: string[];
 };
 
-const FILE_TOOL_NAMES = /^(?:read_file|write_file|edit_file|delete_file|move_file|copy_file|read)$/;
+const FILE_TOOL_NAMES = /^(?:read_file|artifact_read|write_file|edit_file|delete_file|move_file|copy_file|read)$/;
 
 /**
  * Strip transport envelopes (`ok` / `data` / `trace_id` / `duration_ms`) and project
@@ -687,6 +689,25 @@ export const unwrapToolContentLayer = (
   const details = getDetailsRecord(record);
   const argsRecord = toRecord(parsePreview(argsPreview));
   const contentText = sanitizeContentText(extractContentLayerText(parsed, raw));
+
+  const artifactized = details?.artifactized === true
+    || (typeof details?.ref === 'string' && details.ref.startsWith('session://'))
+    || (typeof details?.uri === 'string' && details.uri.startsWith('session://'));
+  if (artifactized) {
+    const ref = sanitizeContentText(stringifyPreview(
+      details?.ref ?? details?.uri ?? argsRecord?.uri,
+    ));
+    const hash = sanitizeContentText(stringifyPreview(details?.hash));
+    const summary = sanitizeContentText(stringifyPreview(details?.summary)) || contentText;
+    const shortHash = hash ? hash.slice(0, 8) : '';
+    return {
+      previewKind: 'file',
+      pathChip: ref || undefined,
+      chips: shortHash ? [shortHash] : undefined,
+      bodyText: [ref, shortHash].filter(Boolean).join(' · ') || summary || undefined,
+      previewLines: summary ? filterEnvelopeLines(createDetailLines(summary, 4)) : [],
+    };
+  }
 
   if (normalized === 'shell' || normalized.includes('shell')) {
     const commandText = sanitizeContentText(
@@ -884,13 +905,17 @@ export const unwrapToolContentLayer = (
   if (FILE_TOOL_NAMES.test(normalized)) {
     const pathChip = sanitizeContentText(
       stringifyPreview(
-        argsRecord?.path
+        argsRecord?.uri
+        ?? argsRecord?.ref
+        ?? argsRecord?.path
         ?? argsRecord?.file
         ?? argsRecord?.filePath
         ?? argsRecord?.filepath
         ?? argsRecord?.destination
         ?? argsRecord?.dest
         ?? argsRecord?.source
+        ?? details?.uri
+        ?? details?.ref
         ?? details?.path
         ?? record?.path,
       ),

@@ -56,6 +56,8 @@ export interface PolicyBudgetState {
   maxSubagents: number;
   maxChildDepth: number;
   maxWallTimeMs: number;
+  /** Slots reserved by the concurrent dispatcher; consumed by SubagentRunner. */
+  reservedSubagentSlots?: number;
 }
 
 export function assertPolicyWallTimeAllowed(maxWallTimeMs: number): void {
@@ -84,7 +86,36 @@ export function createPolicyBudgetState(
     maxSubagents: policy?.maxSubagents ?? Number.MAX_SAFE_INTEGER,
     maxChildDepth: policy?.maxChildDepth ?? Number.MAX_SAFE_INTEGER,
     maxWallTimeMs,
+    reservedSubagentSlots: 0,
   };
+}
+
+export function reserveDispatchBudget(
+  policy: PolicyBudgetState | undefined,
+  cost: { toolCalls: number; subagents: number },
+): { ok: true } | { ok: false; limit: string } {
+  if (!policy) return { ok: true };
+  if (Date.now() - policy.wallStartedAt >= policy.maxWallTimeMs) {
+    return { ok: false, limit: 'maxWallTimeMs' };
+  }
+  if (policy.toolCalls + cost.toolCalls > policy.maxToolCalls) {
+    return { ok: false, limit: 'maxToolCalls' };
+  }
+  if (policy.subagents + cost.subagents > policy.maxSubagents) {
+    return { ok: false, limit: 'maxSubagents' };
+  }
+  policy.toolCalls += cost.toolCalls;
+  policy.subagents += cost.subagents;
+  policy.reservedSubagentSlots = (policy.reservedSubagentSlots ?? 0) + cost.subagents;
+  return { ok: true };
+}
+
+export function consumeReservedSubagentSlot(policy?: PolicyBudgetState): boolean {
+  if (!policy || (policy.reservedSubagentSlots ?? 0) <= 0) {
+    return false;
+  }
+  policy.reservedSubagentSlots = (policy.reservedSubagentSlots ?? 1) - 1;
+  return true;
 }
 
 export interface SubagentBudget {

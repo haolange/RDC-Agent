@@ -35,6 +35,53 @@ describe('HookEngine', () => {
     expect(engine.load(path.join(root, 'user-hooks'), project)[0].trust.trusted).toBe(false);
   });
 
+  it('resolves builtin < user < project with the same ScopedResourceResolver order', async () => {
+    const root = makeRoot();
+    const builtin = path.join(root, 'builtin');
+    const userHooks = path.join(root, 'user');
+    const project = path.join(root, 'project');
+    const projectHooks = path.join(project, '.rdx', 'hooks');
+    fs.mkdirSync(builtin, { recursive: true });
+    fs.mkdirSync(userHooks, { recursive: true });
+    fs.mkdirSync(projectHooks, { recursive: true });
+    const writeHook = (dir: string, commandArg: string) => {
+      fs.writeFileSync(path.join(dir, 'audit.hook.yml'), YAML.stringify({
+        id: 'audit',
+        enabled: true,
+        event: 'session.before-start',
+        command: process.execPath,
+        args: ['-e', `console.log(${JSON.stringify(commandArg)})`],
+        timeoutMs: 2000,
+        failurePolicy: 'warn',
+      }));
+    };
+    writeHook(builtin, 'builtin');
+    writeHook(userHooks, 'user');
+    const engine = new HookEngine(path.join(root, 'trust.json'));
+    const builtinWinner = engine.load(userHooks, undefined, builtin);
+    expect(builtinWinner).toHaveLength(1);
+    expect(builtinWinner[0].scope).toBe('user');
+    expect(builtinWinner[0].trust.trusted).toBe(true);
+    writeHook(projectHooks, 'project');
+    const projectLoaded = engine.load(userHooks, project, builtin);
+    expect(projectLoaded[0].scope).toBe('project');
+    expect(projectLoaded[0].trust.trusted).toBe(false);
+    engine.trustProjectHook(project, 'audit');
+    const result = await engine.trigger('session.before-start', {
+      event: 'session.before-start',
+      projectRoot: project,
+    });
+    expect(result[0]).toMatchObject({ status: 'completed', allowed: true });
+    expect(result[0].stdout.trim()).toBe('project');
+  });
+
+  it('does not keep AgentHooks or BackgroundTaskRunner as a second surface', () => {
+    const repoRoot = path.resolve(__dirname, '../../..');
+    expect(fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/agent/AgentHooks.ts'))).toBe(false);
+    expect(fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/agent/HookCallbacks.ts'))).toBe(false);
+    expect(fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/scheduler/BackgroundTaskRunner.ts'))).toBe(false);
+  });
+
   it('applies explicit warn or block timeout policy without shell execution', async () => {
     const root = makeRoot();
     const userHooks = path.join(root, 'hooks');

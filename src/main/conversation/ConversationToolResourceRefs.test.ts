@@ -67,4 +67,19 @@ describe('ConversationToolResourceRefs', () => {
     expect(extractConversationToolResourceRefs('task_list', success({ count: 3 }))).toEqual([]);
     expect(extractConversationToolResourceRefs('rdx_context', success({ contextId: 'internal' }))).toEqual([]);
   });
+
+  it('extracts session:// refs as file kind with the URI as path', () => {
+    expect(extractConversationToolResourceRefs('grep', success({
+      artifactized: true,
+      ref: 'session://tool-outputs/call-9.json',
+      hash: 'aabbccdd',
+      summary: 'offloaded',
+    }))).toEqual([
+      expect.objectContaining({
+        kind: 'file',
+        path: 'session://tool-outputs/call-9.json',
+        label: 'call-9.json',
+      }),
+    ]);
+  });
 });

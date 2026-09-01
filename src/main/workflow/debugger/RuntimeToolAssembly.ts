@@ -21,6 +21,7 @@ import { createTaskTools, TaskRegistry, MemoryTaskStore, createSessionTaskStore,
 import { traceProjectionRefreshService } from '../../agent-trace/TraceProjectionRefreshService';
 import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
 import { storageAdapter } from '../../sessions/StorageAdapter';
+import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import {
@@ -124,6 +125,7 @@ export class RuntimeToolAssembly {
         properties: {},
       },
       permissionHint: 'readonly',
+      spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'system', requiresApproval: false },
       async execute() {
         const lease = assertRdxContextLeaseOwnership({
           sessionId,
@@ -192,6 +194,7 @@ export class RuntimeToolAssembly {
         },
       },
       permissionHint: 'readonly',
+      spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'comm', requiresApproval: false },
       async execute(_toolCallId, args) {
         const questions = normalizeAskUserQuestions(args);
         return {
@@ -232,6 +235,7 @@ export class RuntimeToolAssembly {
         },
       },
       permissionHint: 'readonly',
+      spec: { isReadOnly: true, isConcurrencySafe: false, isDestructive: false, sideEffect: 'session', category: 'comm', requiresApproval: false },
       async execute(_toolCallId, args) {
         const toProfile = typeof args.agent === 'string' ? args.agent.trim() : '';
         const turn = capturedTurn ?? getActiveTurn(sessionId);
@@ -284,6 +288,20 @@ export class RuntimeToolAssembly {
             details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false },
           };
         }
+        const projectRoot = turn?.runtimePlan?.projectRootPath ?? undefined;
+        const handoffAllowed = await dispatchRuntimeHooks('agent.before-handoff', {
+          agentId,
+          sessionId: resolvedSessionId,
+          projectRoot,
+          payload: { toAgentId: target, label, prompt },
+        });
+        if (!handoffAllowed) {
+          return {
+            content: [{ type: 'text', text: 'HOOK_DENIED: agent.before-handoff' }],
+            isError: true,
+            details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false },
+          };
+        }
         try {
           const prepared = store.prepare(resolvedSessionId, {
             sourceTurnId,
@@ -296,6 +314,12 @@ export class RuntimeToolAssembly {
             send,
             chainRoot,
             depth,
+          });
+          await dispatchRuntimeHooks('agent.after-handoff', {
+            agentId,
+            sessionId: resolvedSessionId,
+            projectRoot,
+            payload: { toAgentId: target, handoffId: prepared.handoffId, label },
           });
           if (turn) {
             turn.pendingHandoff = {

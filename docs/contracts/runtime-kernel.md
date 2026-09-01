@@ -113,7 +113,7 @@ Agent loop 终止与 Provider 失败互斥：`AGENT_NO_PROGRESS` → `CONVERSATI
 
 ## Tools 与 Permission（执行侧）
 
-Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（39 ids，含 `shell` / `read_image` / `code_interpreter`）。Manifest token 经 `CANONICAL_TOOL_TOKEN_EXPANSIONS` 展开（`read` 含 `read_file`+`read_image`，`interpreter`/`image`/`shell` 为专用 token）；`REJECTED_TOOL_TOKENS` 拒绝无静默 fallback（含旧 token `bash`）。
+Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（40 ids，含 `shell` / `read_image` / `code_interpreter` / `artifact_read`）。Manifest token 经 `CANONICAL_TOOL_TOKEN_EXPANSIONS` 展开（`read` 含 `read_file`+`read_image`+`artifact_read`，`interpreter`/`image`/`shell` 为专用 token）；`REJECTED_TOOL_TOKENS` 拒绝无静默 fallback（含旧 token `bash`）。
 
 `read_image` 在 `visionInputMode !== 'native'` 时 `VISION_INPUT_UNSUPPORTED`。tool-result 图像由 `ContextManager.convertToLlm` 剥出并桥成紧随的 user image part；UI 缩略图只走 session `image-previews` + `conversation:getToolImagePreview`，禁止把大 base64 写入 `resultPreview`。`code_interpreter` 执行 Settings 配置的外部解释器，未启用 fail-closed。
 
@@ -124,6 +124,10 @@ Run 持久化是 v2 discriminated union：`kind: conversation|mission` + `profil
 Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only route 的有效工具集为空，不得列出或模仿工具调用。`tool_search` 无结果时返回 `NO_MATCH_IN_EFFECTIVE_TOOL_SET`、`authoritative: true` 与工具集 fingerprint；fingerprint 未变化时重复同一搜索属于无进展。
 
 执行前：`toolValidator.validate`；失败 → `TOOL_SCHEMA_VIOLATION`。`CompiledPolicy.deniedTools` 进入 Permission + Executor。非法 policy → fail-closed。
+
+同轮工具并发：只有 `AgentTool.spec.isConcurrencySafe === true` 才安全，缺省 `false`。`ConcurrentToolScheduler` 只并发**连续**安全组；`shell` / write / task mutation / RDX / MCP / ask / handoff / `output_register` 与需要 RDX lease 的 `subagent` 一律串行。offline `subagent` 必须 `requiresRdxLease=false`。`callIndex` 稳定回填。`reserveDispatchBudget` 在 dispatch 前原子扣减 `maxToolCalls` / `maxSubagents` / wall clock；失败整组不开。组内部分失败不连坐已发出调用，但不得继续开新组。abort 必须 `Promise.allSettled` join。
+
+`subagent` 只接受 Delegation Capsule（`mission` / `task` / `acceptedFacts` / `forbiddenPaths` / `inputArtifactRefs` / `outputRequirements` / `budget` / `requiresRdxLease`）。缺字段 fail-closed。capsule 编译器产出 `delegation-capsule` PromptPlan 分段并注入子 Prompt。
 
 Temporary 外部路径只经当前 `ToolExecutionContext.temporaryAllowedPathRoots`，不得全局泄漏。
 
@@ -140,6 +144,10 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 ```
 
 空 `allowed-tools` 不收窄。实现：`intersectSkillAllowedTools` + `combineActiveSkillAllowlists`（`DebuggerRuntimePolicy`）。
+
+## Hooks
+
+唯一引擎是 `HookEngine`。分发根：`resources/agent-runtime/hooks`（builtin）< `~/.rdx/hooks` < `<project>/.rdx/hooks`，与 `ScopedResourceResolver` 同序。Project hook 按内容 hash 授信。接线事件：`session.before-start` / `session.after-end`、`turn.before-start` / `turn.after-end`、`tool.before-call` / `tool.after-call` / `tool.on-error`、`context.before-compact` / `context.after-compact`、`agent.before-handoff` / `agent.after-handoff`、`permission.denied`。禁止第二套 `AgentHooks`。
 
 ## RDX / Capture
 

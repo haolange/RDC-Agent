@@ -34,10 +34,13 @@ vi.mock('../../agent-runtime/core/ToolValidator', () => ({
   },
 }));
 
+const { hookTrigger } = vi.hoisted(() => ({
+  hookTrigger: vi.fn(async () => [] as Array<{ allowed: boolean; status: string }>),
+}));
 vi.mock('../../hooks/HookEngine', () => ({
   hookEngine: {
     load: vi.fn(),
-    trigger: async () => [],
+    trigger: hookTrigger,
     run: async () => ({ continue: true }),
   },
 }));
@@ -189,6 +192,14 @@ describe('ToolExecutorFactory', () => {
     });
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result)).toMatch(/POLICY_DENIED|denied/i);
+    expect(hookTrigger).toHaveBeenCalledWith(
+      'permission.denied',
+      expect.objectContaining({
+        event: 'permission.denied',
+        agentId: 'ask',
+        toolName: 'shell',
+      }),
+    );
   });
 
   it('createToolExecutor denies tools outside skill intersection', async () => {
@@ -392,5 +403,68 @@ describe('ToolExecutorFactory', () => {
     });
     expect(execute).toHaveBeenCalled();
     expect(result.isError).not.toBe(true);
+  });
+
+  it('classifies concurrency and reserves a group atomically so none start on failure', () => {
+    const read = {
+      name: 'read_file',
+      description: 'read',
+      parameters: { type: 'object', properties: {} },
+      spec: { isReadOnly: true, isConcurrencySafe: true, isDestructive: false, sideEffect: 'none' as const, category: 'file' as const, requiresApproval: false },
+      execute: vi.fn(async () => ({ content: [{ type: 'text' as const, text: 'ok' }] })),
+    };
+    const shell = {
+      name: 'shell',
+      description: 'shell',
+      parameters: { type: 'object', properties: {} },
+      spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: true, sideEffect: 'process' as const, category: 'system' as const, requiresApproval: true },
+      execute: vi.fn(async () => ({ content: [{ type: 'text' as const, text: 'ok' }] })),
+    };
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+      getActiveTurn: () => null,
+      resolveRuntimeTools: () => ({
+        toolMap: new Map([['read_file', read], ['shell', shell]] as never),
+        definitions: [],
+        deferredDefinitions: [],
+      }),
+      isAllowedForRuntime: () => true,
+      matchesToolAllowlist: () => true,
+    });
+    const budget = {
+      toolCalls: 0,
+      subagents: 0,
+      childDepth: 0,
+      wallStartedAt: Date.now(),
+      maxToolCalls: 1,
+      maxSubagents: 3,
+      maxChildDepth: 3,
+      maxWallTimeMs: 60_000,
+    };
+    const executor = factory.createToolExecutor('ask', ['read_file', 'shell'], undefined, null, {
+      effectivePlan: { toolAllowlist: ['read_file', 'shell'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
+      policyBudget: budget,
+    });
+    expect(executor.isConcurrencySafe?.({ type: 'toolCall', id: 'r1', name: 'read_file', arguments: {} })).toBe(true);
+    expect(executor.isConcurrencySafe?.({ type: 'toolCall', id: 's1', name: 'shell', arguments: { command: 'echo' } })).toBe(false);
+    expect(executor.isConcurrencySafe?.({
+      type: 'toolCall',
+      id: 'off',
+      name: 'subagent',
+      arguments: { requiresRdxLease: false },
+    })).toBe(true);
+    expect(executor.isConcurrencySafe?.({
+      type: 'toolCall',
+      id: 'live',
+      name: 'subagent',
+      arguments: { requiresRdxLease: true },
+    })).toBe(false);
+    expect(executor.reserveDispatchBudget?.([
+      { type: 'toolCall', id: 'g1', name: 'read_file', arguments: {} },
+      { type: 'toolCall', id: 'g2', name: 'read_file', arguments: {} },
+    ])).toEqual({ ok: false, limit: 'maxToolCalls' });
+    expect(budget.toolCalls).toBe(0);
+    expect(read.execute).not.toHaveBeenCalled();
   });
 });

@@ -249,7 +249,7 @@ export class TurnPreparationService {
     const uncompactedInputTokens = fixedTokens + beforeConversationTokens;
     const preparedInputTokens = fixedTokens + afterConversationTokens;
     const compactionApplied = computation.compactionApplied;
-    const effectiveContextView = computation.derivedContextView ?? materialized.derivedContextView;
+    const effectiveContextView = materialized.derivedContextView;
     const promptCache = promptCacheCompiler.compile({
       promptPlan: input.promptPlan,
       requestPlan: input.requestPlan,

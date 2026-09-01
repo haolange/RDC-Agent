@@ -20,6 +20,7 @@ export interface WorkProcessToolDisplay {
 
 export const WORK_PROCESS_TOOL_DISPLAY_CATALOG: Record<string, WorkProcessToolDisplay> = {
   read_file: { icon: 'fileRead', groupKind: 'explore', category: '文件读取', groupTitle: '探索', groupUnit: '文件', completeVerb: '已读取', runningVerb: '正在读取' },
+  artifact_read: { icon: 'artifactRead', groupKind: 'explore', category: '产物读取', groupTitle: '探索', groupUnit: '产物', completeVerb: '已读取产物', runningVerb: '正在读取产物' },
   read_image: { icon: 'imageRead', groupKind: 'explore', category: '图片查看', groupTitle: '探索', groupUnit: '图片', completeVerb: '已查看图片', runningVerb: '正在查看图片' },
   glob: { icon: 'fileGlob', groupKind: 'explore', category: '文件列举', groupTitle: '探索', groupUnit: '文件', completeVerb: '已列出', runningVerb: '正在列出' },
   grep: { icon: 'codeSearch', groupKind: 'search', category: '代码搜索', groupTitle: '搜索', groupUnit: '查询', completeVerb: '已搜索代码', runningVerb: '正在搜索代码' },
@@ -109,6 +110,7 @@ export const formatMcpTarget = (toolName: string): string => {
 
 const FILE_FAMILY_TOOLS = new Set([
   'read_file',
+  'artifact_read',
   'write_file',
   'edit_file',
   'delete_file',

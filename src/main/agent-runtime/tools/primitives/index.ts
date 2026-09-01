@@ -3,6 +3,7 @@
  */
 export { shellTool } from './ShellTool';
 export { readFileTool } from './ReadFileTool';
+export { artifactReadTool } from './ArtifactReadTool';
 export { readImageTool } from './ReadImageTool';
 export { codeInterpreterTool } from './CodeInterpreterTool';
 export { writeFileTool } from './WriteFileTool';
@@ -18,6 +19,7 @@ export * from './toolLimits';
 import type { AgentTool } from '../../agent/AgentTool';
 import { shellTool } from './ShellTool';
 import { readFileTool } from './ReadFileTool';
+import { artifactReadTool } from './ArtifactReadTool';
 import { readImageTool } from './ReadImageTool';
 import { codeInterpreterTool } from './CodeInterpreterTool';
 import { writeFileTool } from './WriteFileTool';
@@ -34,6 +36,7 @@ export function getPrimitiveTools(): AgentTool[] {
   return [
     shellTool as unknown as AgentTool,
     readFileTool as unknown as AgentTool,
+    artifactReadTool as unknown as AgentTool,
     readImageTool as unknown as AgentTool,
     writeFileTool as unknown as AgentTool,
     editFileTool as unknown as AgentTool,

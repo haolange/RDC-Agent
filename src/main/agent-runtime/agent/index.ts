@@ -4,7 +4,6 @@
 export * from './AgentLoop';
 export * from './Agent';
 export * from './AgentTool';
-export * from './AgentHooks';
 export * from './MCPManager';
 export * from './ContextManager';
 export * from './ErrorRecovery';

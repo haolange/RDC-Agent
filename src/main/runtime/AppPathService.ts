@@ -98,6 +98,10 @@ export class AppPathService {
     return path.join(this.getBuiltinAgentRuntimeRoot(), 'skills');
   }
 
+  getBuiltinHooksPath(): string {
+    return path.join(this.getBuiltinAgentRuntimeRoot(), 'hooks');
+  }
+
   getUserRdxPaths(): UserRdxPaths {
     const userRdxRoot = this.getUserRdxRoot();
     return {

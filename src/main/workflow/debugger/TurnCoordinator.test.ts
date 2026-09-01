@@ -7,6 +7,7 @@ import {
   DEFAULT_SUBAGENT_BUDGET,
   createPolicyBudgetState,
   assertPolicyWallTimeAllowed,
+  reserveDispatchBudget,
 } from './TurnCoordinator';
 import type { AgentEvent } from '@shared/types/agentRuntime';
 
@@ -202,5 +203,28 @@ describe('SubagentBudget', () => {
         maxWallTimeMs: 0,
       },
     })).toThrow(/POLICY_MAX_WALL_TIME_ZERO/);
+  });
+
+  it('reserveDispatchBudget deducts atomically and fails the whole group without partial increment', () => {
+    const budget = createPolicyBudgetState({
+      maxToolCalls: 2,
+      maxSubagents: 1,
+      maxChildDepth: 1,
+      maxWallTimeMs: 60_000,
+    });
+    expect(reserveDispatchBudget(budget, { toolCalls: 2, subagents: 1 })).toEqual({ ok: true });
+    expect(budget.toolCalls).toBe(2);
+    expect(budget.subagents).toBe(1);
+    expect(budget.reservedSubagentSlots).toBe(1);
+    expect(reserveDispatchBudget(budget, { toolCalls: 1, subagents: 0 })).toEqual({
+      ok: false,
+      limit: 'maxToolCalls',
+    });
+    expect(budget.toolCalls).toBe(2);
+    expect(reserveDispatchBudget(budget, { toolCalls: 0, subagents: 1 })).toEqual({
+      ok: false,
+      limit: 'maxSubagents',
+    });
+    expect(budget.subagents).toBe(1);
   });
 });

@@ -55,6 +55,7 @@ export function createOutputRegistrationTool(context: OutputRegistrationContext)
       },
     },
     permissionHint: 'session_mutation',
+    spec: { isReadOnly: false, isConcurrencySafe: false, isDestructive: false, sideEffect: 'filesystem', category: 'file', requiresApproval: false },
     async execute(_toolCallId, params, signal) {
       if (signal?.aborted) throw new Error('Output publication cancelled.');
       const sessionId = context.sessionId;

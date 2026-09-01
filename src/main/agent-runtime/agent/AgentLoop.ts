@@ -40,6 +40,7 @@ import {
   LoopProgressGuard,
   RUNTIME_NO_PROGRESS_INSTRUCTION,
 } from './LoopProgressGuard';
+import { executeConcurrentToolGroups } from './ConcurrentToolScheduler';
 
 export type TransformContextResult = AgentMessage[] | CompressResult;
 
@@ -135,6 +136,10 @@ export interface ToolExecutor {
     signal?: AbortSignal,
     onUpdate?: (partialResult: unknown) => void,
   ): Promise<ToolResultMessage>;
+  /** Missing implementation defaults to unsafe (serial). */
+  isConcurrencySafe?(toolCall: ToolCall): boolean;
+  /** Atomically reserve shared budget for a dispatch group. Failure means the group does not start. */
+  reserveDispatchBudget?(toolCalls: ToolCall[]): { ok: true } | { ok: false; limit: string };
 }
 
 /** 内层循环工具执行结果。 */
@@ -752,24 +757,39 @@ async function streamAssistantResponse(
 // 工具执行
 // =====================================================================
 
+function createToolCallFailure(
+  toolCall: ToolCall,
+  text: string,
+  details?: Record<string, unknown>,
+): ToolResultMessage {
+  return {
+    role: 'toolResult',
+    toolCallId: toolCall.id,
+    toolName: toolCall.name,
+    content: [{ type: 'text', text }],
+    isError: true,
+    ...(details ? { details } : {}),
+    timestamp: Date.now(),
+  };
+}
+
 /**
- * 执行助手消息中的工具调用（支持并发）。
+ * 执行助手消息中的工具调用。
+ * 只并发连续 isConcurrencySafe 组；缺省与 unsafe 一律串行。
+ * maxToolConcurrency 不再决定分组，仅保留配置位。
  */
 async function executeToolCalls(
   assistantMessage: AssistantMessage,
   toolExecutor: ToolExecutor | undefined,
   stream: EventStream<AgentEvent, Message[]>,
-  maxConcurrency?: number,
+  _maxConcurrency?: number,
 ): Promise<ExecuteToolCallsResult> {
   const toolCalls = assistantMessage.content.filter(
     (c): c is ToolCall => c.type === 'toolCall',
   );
-  const results: ToolResultMessage[] = new Array(toolCalls.length);
-  const concurrency = maxConcurrency && maxConcurrency > 1 ? maxConcurrency : 1;
 
-  // 单个工具调用执行逻辑
-  const executeOne = async (index: number): Promise<void> => {
-    const toolCall = toolCalls[index];
+  const executeOne = async (toolCall: ToolCall, index: number): Promise<ToolResultMessage> => {
+    void index;
     const startTime = Date.now();
 
     stream.push({
@@ -796,26 +816,13 @@ async function executeToolCalls(
         );
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        result = {
-          role: 'toolResult',
-          toolCallId: toolCall.id,
-          toolName: toolCall.name,
-          content: [{ type: 'text', text: `Error: ${message}` }],
-          isError: true,
-          timestamp: Date.now(),
-        };
+        result = createToolCallFailure(toolCall, `Error: ${message}`);
       }
     } else {
-      result = {
-        role: 'toolResult',
-        toolCallId: toolCall.id,
-        toolName: toolCall.name,
-        content: [
-          { type: 'text', text: `Tool "${toolCall.name}" not available (no executor configured)` },
-        ],
-        isError: true,
-        timestamp: Date.now(),
-      };
+      result = createToolCallFailure(
+        toolCall,
+        `Tool "${toolCall.name}" not available (no executor configured)`,
+      );
     }
 
     stream.push({
@@ -825,19 +832,29 @@ async function executeToolCalls(
       result,
       durationMs: Date.now() - startTime,
     });
-    results[index] = result;
+    return result;
   };
 
-  // 并发执行
-  for (let i = 0; i < toolCalls.length; i += concurrency) {
-    const batch = [];
-    for (let j = i; j < Math.min(i + concurrency, toolCalls.length); j++) {
-      batch.push(executeOne(j));
-    }
-    await Promise.all(batch);
-  }
+  const results = await executeConcurrentToolGroups({
+    calls: toolCalls,
+    isSafe: (toolCall) => toolExecutor?.isConcurrencySafe?.(toolCall) === true,
+    reserve: (group) => toolExecutor?.reserveDispatchBudget?.([...group]) ?? { ok: true },
+    executeOne,
+    createBudgetFailure: (toolCall, _index, limit) => createToolCallFailure(
+      toolCall,
+      `POLICY_LIMIT_EXCEEDED: ${limit}; tool execution was not started.`,
+      { code: 'POLICY_LIMIT_EXCEEDED', limit },
+    ),
+    createNotStarted: (toolCall, _index, reason) => createToolCallFailure(
+      toolCall,
+      `TOOL_GROUP_NOT_STARTED: ${reason}`,
+      { code: 'TOOL_GROUP_NOT_STARTED', reason },
+    ),
+    isErrorResult: (result) => result.isError === true,
+    signal: stream.signal,
+  });
 
-  return { results: results.filter(Boolean) as ToolResultMessage[] };
+  return { results };
 }
 
 async function applyTransformContext(

@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -59,5 +59,23 @@ describe('ReadFileTool', () => {
 
     await expect(readFileTool.execute('r3', { path: 'WhiteHair.rdc' }, undefined, undefined, context))
       .rejects.toThrow(/RenderDoc|\.rdc|binary/i);
+  });
+
+  it('still refuses session-artifacts even with an absolute path', async () => {
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-read-ws-'));
+    const sessionRoot = await mkdtemp(path.join(os.tmpdir(), 'rdx-read-session-'));
+    roots.push(workspace, sessionRoot);
+    const artifact = path.join(sessionRoot, 'session-artifacts', 'tool-outputs', 'offload.json');
+    await mkdir(path.dirname(artifact), { recursive: true });
+    await writeFile(artifact, '{"secret":true}', 'utf8');
+    const context: ToolExecutionContext = {
+      workspaceRoot: workspace,
+      projectRootPath: workspace,
+      projectId: null,
+      sessionId: 'sess-1',
+    };
+
+    await expect(readFileTool.execute('r4', { path: artifact }, undefined, undefined, context))
+      .rejects.toThrow(/超出 workspace|workspace/);
   });
 });

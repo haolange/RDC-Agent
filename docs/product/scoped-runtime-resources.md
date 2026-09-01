@@ -63,7 +63,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 ## Hooks
 
-`.hook.yml` 生命周期命令；结构化 `command`+`args`；禁止 `shell: true`。Project hooks 需按项目身份与内容 hash trust；变更撤销 trust。
+官方 builtin 目录：`resources/agent-runtime/hooks`。解析顺序与 ScopedResourceResolver 相同：`builtin < user < project`。`.hook.yml` 生命周期命令；结构化 `command`+`args`；禁止 `shell: true`。Project hooks 需按项目身份与内容 hash trust；变更撤销 trust。运行时事件：`session.before-start` / `session.after-end`、`turn.before-start` / `turn.after-end`、`tool.before-call` / `tool.after-call` / `tool.on-error`、`context.before-compact` / `context.after-compact`、`agent.before-handoff` / `agent.after-handoff`、`permission.denied`。
 
 ## Memory 与 Knowledge
 

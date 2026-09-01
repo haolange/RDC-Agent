@@ -20,7 +20,7 @@ export interface HookContext {
 
 export interface LoadedHook {
   definition: HookDefinition;
-  scope: 'user' | 'project';
+  scope: 'builtin' | 'user' | 'project';
   sourcePath: string;
   sourceHash: string;
   trust: HookTrustState;
@@ -60,9 +60,13 @@ export class HookEngine {
 
   constructor(private readonly trustStorePath = path.join(appPathService.getAppStatePaths().appStateRoot, 'hook-trust.json')) {}
 
-  load(userHooksPath: string, projectRoot?: string): LoadedHook[] {
+  load(
+    userHooksPath: string,
+    projectRoot?: string,
+    builtinHooksPath = appPathService.getBuiltinHooksPath(),
+  ): LoadedHook[] {
     const candidates: Array<ScopedResourceCandidate<HookDefinition>> = [];
-    const addDirectory = (root: string, scope: 'user' | 'project') => {
+    const addDirectory = (root: string, scope: 'builtin' | 'user' | 'project') => {
       if (!fs.existsSync(root)) return;
       fs.readdirSync(root)
         .filter((entry) => entry.endsWith('.hook.yml'))
@@ -73,14 +77,15 @@ export class HookEngine {
           candidates.push({ id: value.id, kind: 'hook', scope, sourcePath, value, enabled: value.enabled });
         });
     };
+    addDirectory(builtinHooksPath, 'builtin');
     addDirectory(userHooksPath, 'user');
     if (projectRoot) addDirectory(appPathService.getProjectRdxPaths(projectRoot).hooksPath, 'project');
 
     const trustStore = this.readTrustStore();
     this.loaded = scopedResourceResolver.resolve(candidates).resources.map((resource) => {
-      const scope = resource.provenance.scope === 'project' ? 'project' : 'user';
+      const scope = resource.provenance.scope;
       const trustKey = scope === 'project' && projectRoot ? this.trustKey(projectRoot, resource.id) : '';
-      const trusted = scope === 'user' || trustStore[trustKey]?.sourceHash === resource.provenance.sourceHash;
+      const trusted = scope !== 'project' || trustStore[trustKey]?.sourceHash === resource.provenance.sourceHash;
       return {
         definition: resource.value,
         scope,

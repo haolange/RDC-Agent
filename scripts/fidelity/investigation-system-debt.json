@@ -1,10 +1,8 @@
 {
   "schemaVersion": 1,
   "waveClearBy": 6,
-  "maxHits": 23,
+  "maxHits": 21,
   "ids": [
-    "investigation.forbidden.agent-hooks",
-    "investigation.forbidden.background-task-runner",
     "investigation.forbidden.context-service",
     "investigation.forbidden.evidence-ledger",
     "investigation.forbidden.harness-task",
