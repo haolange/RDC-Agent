@@ -60,45 +60,26 @@ import {
 import {
   InvestigationArtifactManifestSchema,
   InvestigationIndexDocumentSchema,
-  assertNoOpaqueProviderPayload,
   parseInvestigationRecord,
 } from './investigationRecordSchemas';
+import {
+  rejectOpaqueWriteInput,
+  requireCanonicalWriteMission,
+  worldStateBindError,
+  worldStateResolvable,
+  type InvestigationArtifactServiceDeps,
+  type InvestigationReadResult,
+  type InvestigationWriteInput,
+  type InvestigationWriteResult,
+} from './investigationArtifactWrite';
 
 export type { InvestigationIndexDocument, InvestigationIndexEntry } from './investigationRecordKeys';
-
-export interface InvestigationWriteInput {
-  kind: string;
-  mission: InvestigationMission;
-  title: string;
-  summary: string;
-  record: unknown;
-  sourceRefs?: ArtifactSourceRef[];
-  worldStateId?: string;
-  supersedes?: string;
-  status?: 'draft' | 'ready';
-  artifactId?: string;
-  createdAt?: string;
-}
-
-export interface InvestigationWriteResult {
-  manifest: InvestigationArtifactManifest;
-  contentUri: string;
-  contentHash: string;
-  record: InvestigationRecord;
-  supersededArtifactId?: string;
-}
-
-export interface InvestigationReadResult {
-  manifest: InvestigationArtifactManifest;
-  record: InvestigationRecord;
-  contentUri: string;
-  contentHash: string;
-}
-
-export interface InvestigationArtifactServiceDeps {
-  resolver?: SessionArtifactResolver;
-  now?: () => Date;
-}
+export type {
+  InvestigationArtifactServiceDeps,
+  InvestigationReadResult,
+  InvestigationWriteInput,
+  InvestigationWriteResult,
+} from './investigationArtifactWrite';
 
 export class InvestigationArtifactService {
   private readonly resolver: SessionArtifactResolver;
@@ -111,7 +92,7 @@ export class InvestigationArtifactService {
 
   writeRecord(sessionId: string | null | undefined, input: InvestigationWriteInput): InvestigationWriteResult {
     this.assertSession(sessionId);
-    this.rejectOpaque(input);
+    rejectOpaqueWriteInput(input);
     const kindEntry = requireInvestigationKind(input.kind);
     let parsed: InvestigationRecord;
     try {
@@ -124,7 +105,7 @@ export class InvestigationArtifactService {
     }
     this.materializeIndexIfAbsent(sessionId);
     const lookup = this.createRawLookup(sessionId);
-    const mission = this.requireCanonicalWriteMission(kindEntry.kind, input.mission, parsed);
+    const mission = requireCanonicalWriteMission(kindEntry.kind, input.mission, parsed);
     this.assertRecordInvariants(sessionId, kindEntry.kind, parsed, lookup, mission);
     const artifactId = input.artifactId?.trim() || generateEventId('invart');
     const supersedes = input.supersedes?.trim() || undefined;
@@ -296,7 +277,7 @@ export class InvestigationArtifactService {
     }
     this.resolveBoundWorldStateId(kindEntry.kind, record, manifest.worldStateId, lookup, true);
     if (kindEntry.kind === 'report') {
-      const mission = this.requireCanonicalWriteMission(kindEntry.kind, manifest.mission, record);
+      const mission = requireCanonicalWriteMission(kindEntry.kind, manifest.mission, record);
       if (mission === 'analyzer' || mission === 'optimizer') {
         assertReportContractPresent(record as InvestigationReport, lookup, { mission });
       }
@@ -559,36 +540,22 @@ export class InvestigationArtifactService {
     const inferred = inferWorldStateId(kind, record);
     const provided = inputWorldStateId?.trim() || undefined;
     if (provided && inferred && provided !== inferred) {
-      throw this.worldStateBindError(ready, `worldStateId ${provided} does not match record body ${inferred}`);
+      throw worldStateBindError(ready, `worldStateId ${provided} does not match record body ${inferred}`);
     }
     const bound = inferred ?? provided;
     if (isWorldStateBoundKind(kind)) {
       if (!bound) {
-        throw this.worldStateBindError(ready, 'bound record requires worldStateId');
+        throw worldStateBindError(ready, 'bound record requires worldStateId');
       }
-      if (!this.worldStateResolvable(kind, record, bound, lookup)) {
-        throw this.worldStateBindError(ready, `worldState ${bound} is not resolvable`);
+      if (!worldStateResolvable(kind, record, bound, lookup)) {
+        throw worldStateBindError(ready, `worldState ${bound} is not resolvable`);
       }
       return bound;
     }
-    if (provided && !this.worldStateResolvable(kind, record, provided, lookup)) {
-      throw this.worldStateBindError(ready, `worldState ${provided} is not resolvable`);
+    if (provided && !worldStateResolvable(kind, record, provided, lookup)) {
+      throw worldStateBindError(ready, `worldState ${provided} is not resolvable`);
     }
     return bound;
-  }
-
-  private worldStateResolvable(
-    kind: InvestigationArtifactKind,
-    record: InvestigationRecord,
-    worldStateId: string,
-    lookup: InvestigationLookup,
-  ): boolean {
-    if (kind === 'world_state' && (record as WorldState).worldStateId === worldStateId) return true;
-    return lookup.getWorldState(worldStateId) != null;
-  }
-
-  private worldStateBindError(ready: boolean, message: string): InvestigationError {
-    return new InvestigationError(ready ? 'INVESTIGATION_READY_DENIED' : 'INVESTIGATION_REF_UNRESOLVED', message);
   }
 
   private findExperimentForWorldState(sessionId: string, worldStateId: string): ExperimentRecord | null {
@@ -888,35 +855,6 @@ export class InvestigationArtifactService {
       return this.resolver.write(sessionId, uri, text, { mimeType: 'application/json' });
     } catch (error) {
       throw toInvestigationError(error);
-    }
-  }
-
-  private requireCanonicalWriteMission(
-    kind: InvestigationArtifactKind,
-    inputMission: InvestigationMission,
-    record: InvestigationRecord,
-  ): InvestigationMission {
-    if (kind !== 'report') return inputMission;
-    const reportMission = (record as InvestigationReport).mission;
-    if (reportMission !== inputMission) {
-      throw new InvestigationError(
-        'INVESTIGATION_INVARIANT_VIOLATION',
-        `input.mission ${inputMission} does not match report.mission ${reportMission}`,
-        { details: { inputMission, reportMission } },
-      );
-    }
-    return reportMission;
-  }
-
-  private rejectOpaque(input: InvestigationWriteInput): void {
-    try {
-      assertNoOpaqueProviderPayload(input);
-      assertNoOpaqueProviderPayload(input.record);
-    } catch (error) {
-      throw new InvestigationError(
-        'INVESTIGATION_OPAQUE_PAYLOAD_DENIED',
-        error instanceof Error ? error.message : String(error),
-      );
     }
   }
 

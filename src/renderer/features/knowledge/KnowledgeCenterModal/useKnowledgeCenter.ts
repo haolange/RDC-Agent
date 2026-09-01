@@ -6,7 +6,6 @@ import type {
   KnowledgeIndexOverview,
   KnowledgeLaneHit,
   KnowledgePack,
-  KnowledgeQueryRequest,
   KnowledgeSpace,
 } from '@shared/types/knowledge';
 import { KNOWLEDGE_RETRIEVAL_LANES, type KnowledgeRetrievalLane } from '@shared/types/knowledge';
@@ -22,19 +21,12 @@ import {
   type KnowledgeNarrowPane,
   type KnowledgeViewMode,
 } from './knowledgeCenterModel';
-
-const SEARCH_DEBOUNCE_MS = 300;
-
-export function assignKnowledgeCenterList(
-  viewMode: KnowledgeViewMode,
-  queryHits: KnowledgeLaneHit[],
-  compiled: KnowledgePack,
-): { hits: KnowledgeLaneHit[]; pack: KnowledgePack } {
-  if (viewMode === 'conflicts') {
-    return { hits: compiled.hits, pack: compiled };
-  }
-  return { hits: queryHits, pack: compiled };
-}
+import {
+  buildKnowledgeCenterQueryRequest,
+  nextSelectedSpaceIds,
+  runKnowledgeCenterQuery,
+  SEARCH_DEBOUNCE_MS,
+} from './knowledgeCenterQuery';
 
 export function useKnowledgeCenter(open: boolean) {
   const sessionId = useProjectStore((state) => state.currentSession?.sessionId ?? null);
@@ -86,11 +78,7 @@ export function useKnowledgeCenter(open: boolean) {
       setSpaces(result.spaces);
       setIndex(result.index);
       setSemantic(result.semantic);
-      setSelectedSpaceIds((current) => (
-        current.length === 0 ? result.spaces.map((space) => space.spaceId) : current.filter((id) => (
-          result.spaces.some((space) => space.spaceId === id)
-        ))
-      ));
+      setSelectedSpaceIds((current) => nextSelectedSpaceIds(current, result.spaces));
       if (result.semantic.availability !== 'ready') {
         setLanes((current) => current.filter((lane) => lane !== 'Semantic'));
       }
@@ -101,33 +89,28 @@ export function useKnowledgeCenter(open: boolean) {
     }
   }, []);
 
-  const queryRequest = useMemo<KnowledgeQueryRequest>(() => ({
+  const queryRequest = useMemo(() => buildKnowledgeCenterQueryRequest({
     spaceIds: selectedSpaceIds,
-    text: debouncedSearch.trim() || undefined,
+    text: debouncedSearch,
     type: types,
     lifecycle: lifecycles,
-    lanes: lanes.filter((lane) => lane !== 'Semantic' || semanticReady),
+    lanes,
+    semanticReady,
   }), [debouncedSearch, lanes, lifecycles, selectedSpaceIds, semanticReady, types]);
 
   const refreshQuery = useCallback(async () => {
     const seq = querySeq.current.next();
     setLoadingQuery(true);
     try {
-      if (viewMode === 'conflicts') {
-        const compiled = await window.electronAPI.knowledge.compile({ ...queryRequest, limit: 50 });
-        if (!querySeq.current.isCurrent(seq)) return;
-        const next = assignKnowledgeCenterList(viewMode, compiled.hits, compiled);
-        setPack(next.pack);
-        setPackQueryKey(knowledgeQueryKey(queryRequest));
-        setHits(next.hits);
-        return;
-      }
-      const result = await window.electronAPI.knowledge.query(queryRequest);
-      if (!querySeq.current.isCurrent(seq)) return;
-      if (result.semantic) setSemantic(result.semantic);
-      const compiled = await window.electronAPI.knowledge.compile({ ...queryRequest, limit: 50 });
-      if (!querySeq.current.isCurrent(seq)) return;
-      const next = assignKnowledgeCenterList(viewMode, result.hits, compiled);
+      const next = await runKnowledgeCenterQuery({
+        viewMode,
+        queryRequest,
+        query: (request) => window.electronAPI.knowledge.query(request),
+        compile: (request) => window.electronAPI.knowledge.compile(request),
+        isCurrent: () => querySeq.current.isCurrent(seq),
+      });
+      if (!next || !querySeq.current.isCurrent(seq)) return;
+      if (next.semantic) setSemantic(next.semantic);
       setHits(next.hits);
       setPack(next.pack);
       setPackQueryKey(knowledgeQueryKey(queryRequest));

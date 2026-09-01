@@ -133,7 +133,6 @@ async function handleUiAction(action: CommandUiAction, context: SlashCommandCont
       context.setSelectedAgentId(agentId);
       context.setCurrentMode(agentId as AgentMode);
       return;
-      return;
     }
     case 'switch-model': {
       const modelId = getPayloadString(action, 'modelId');

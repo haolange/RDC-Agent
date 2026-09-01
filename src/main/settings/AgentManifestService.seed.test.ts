@@ -38,7 +38,7 @@ describe('AgentManifestService effective builtin snapshot', () => {
     for (const definition of settings.definitions) {
       expect(definition.tools).not.toContain('todo');
       expect(definition.tools).not.toContain('search_codebase');
-      expect(definition.tools).not.toContain('knowledge');
+      expect(definition.tools).toContain('knowledge');
       expect(definition.tools).toContain('tool_search');
     }
     const byId = new Map(settings.definitions.map((definition) => [definition.id, definition]));
