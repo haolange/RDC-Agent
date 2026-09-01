@@ -1,5 +1,4 @@
 import type { AgentMessage, Message } from '../agent-runtime/core/types';
-import type { DerivedContextView } from '@shared/types/semanticContext';
 import { ContextManager } from '../agent-runtime/agent/ContextManager';
 import { TokenizerService } from '../agent-runtime/core/TokenizerService';
 
@@ -19,7 +18,6 @@ export interface TurnPreparationComputationResult {
   beforeConversationTokens: number;
   afterConversationTokens: number;
   compactionApplied: boolean;
-  derivedContextView?: DerivedContextView;
   classification: {
     summaryTokens: number;
     conversationTokens: number;
@@ -49,7 +47,6 @@ export async function computeTurnPreparation(
     afterConversationTokens,
     compactionApplied: Boolean(compacted.summary)
       || JSON.stringify(compacted.messages) !== JSON.stringify(input.messages),
-    ...(compacted.derivedContextView ? { derivedContextView: compacted.derivedContextView } : {}),
     classification: contextManager.classifyMessages(compacted.messages),
   };
 }

@@ -8,12 +8,16 @@ const {
   lookupProjectById,
   readSession,
   log,
+  dispatchRuntimeHooks,
+  createDerivedView,
 } = vi.hoisted(() => ({
   findEffectiveAgentProfile: vi.fn(),
   resolveAgentRoutePreflight: vi.fn(),
   lookupProjectById: vi.fn(),
   readSession: vi.fn(),
   log: vi.fn(),
+  dispatchRuntimeHooks: vi.fn(async () => true),
+  createDerivedView: vi.fn(() => ({ viewId: 'view-1' })),
 }));
 
 vi.mock('../../conversation/ConversationRoutePreflight', async (importOriginal) => {
@@ -44,9 +48,21 @@ vi.mock('../../runtime/RuntimeLogService', () => ({
   runtimeLogService: { log },
 }));
 
+vi.mock('../../hooks/runtimeHookDispatch', () => ({
+  dispatchRuntimeHooks,
+}));
+
+vi.mock('../../conversation/SessionContextJournal', () => ({
+  sessionContextJournal: {
+    createDerivedView,
+    readEntries: vi.fn(() => []),
+  },
+}));
+
 import {
   generateSessionCompactionSections,
   isWithinSessionCompactionLine,
+  persistGeneratedSessionCompaction,
   resolveCompactionAgentId,
 } from './CompactionHandoffService';
 
@@ -220,5 +236,58 @@ describe('generateSessionCompactionSections route binding', () => {
         reason: 'unknown',
       }),
     }));
+  });
+});
+
+describe('persistGeneratedSessionCompaction hooks', () => {
+  afterEach(() => {
+    dispatchRuntimeHooks.mockReset().mockResolvedValue(true);
+    createDerivedView.mockReset().mockReturnValue({ viewId: 'view-1' });
+    lookupProjectById.mockReset();
+    readSession.mockReset();
+  });
+
+  it('fires context.before-compact and context.after-compact', async () => {
+    readSession.mockReturnValue(session());
+    lookupProjectById.mockReturnValue({ projectId: 'project-1', rootPath: 'D:/Project' });
+    dispatchRuntimeHooks.mockResolvedValue(true);
+    createDerivedView.mockReturnValue({ viewId: 'view-1' });
+
+    const view = await persistGeneratedSessionCompaction({
+      sessionId: 'session-1',
+      history: [message('user')],
+      visibleTurnIds: ['t1', 't2', 't3'],
+      branchId: 'root',
+      occupiedTokens: 10,
+      compactionThresholdTokens: 100,
+    });
+
+    expect(view).toEqual({ viewId: 'view-1' });
+    expect(dispatchRuntimeHooks).toHaveBeenNthCalledWith(
+      1,
+      'context.before-compact',
+      expect.objectContaining({ sessionId: 'session-1', projectRoot: 'D:/Project' }),
+    );
+    expect(dispatchRuntimeHooks).toHaveBeenNthCalledWith(
+      2,
+      'context.after-compact',
+      expect.objectContaining({ sessionId: 'session-1', projectRoot: 'D:/Project' }),
+    );
+  });
+
+  it('skips compaction when context.before-compact is denied', async () => {
+    readSession.mockReturnValue(session());
+    lookupProjectById.mockReturnValue({ projectId: 'project-1', rootPath: 'D:/Project' });
+    dispatchRuntimeHooks.mockResolvedValueOnce(false);
+
+    await expect(persistGeneratedSessionCompaction({
+      sessionId: 'session-1',
+      history: [message('user')],
+      visibleTurnIds: ['t1', 't2', 't3'],
+      branchId: 'root',
+      occupiedTokens: 10,
+      compactionThresholdTokens: 100,
+    })).resolves.toBeNull();
+    expect(createDerivedView).not.toHaveBeenCalled();
   });
 });

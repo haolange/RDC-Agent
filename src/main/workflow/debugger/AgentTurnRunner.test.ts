@@ -7,6 +7,10 @@ vi.mock('electron', () => ({
   },
 }));
 
+vi.mock('../../hooks/runtimeHookDispatch', () => ({
+  dispatchRuntimeHooks: vi.fn(async () => true),
+}));
+
 vi.mock('../../settings/SettingsService', () => ({
   settingsService: {
     getAll: () => ({
@@ -21,6 +25,7 @@ vi.mock('../../settings/SettingsService', () => ({
   },
 }));
 
+import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { AgentTurnRunner, hasActualProviderUsage } from './AgentTurnRunner';
 import { resolveExecutionScopeId } from './executionScope';
 import { TokenizerService } from '../../agent-runtime/core/TokenizerService';
@@ -243,6 +248,14 @@ describe('AgentTurnRunner', () => {
 
     expect(release).toHaveBeenCalledWith({ discardIfIdle: false });
     expect(turnCoordinator.getActive('setup-session')).toBeNull();
+    expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
+      'turn.before-start',
+      expect.objectContaining({ sessionId: 'setup-session', agentId: 'ask' }),
+    );
+    expect(dispatchRuntimeHooks).toHaveBeenCalledWith(
+      'turn.after-end',
+      expect.objectContaining({ sessionId: 'setup-session', agentId: 'ask' }),
+    );
   });
 
   it.each([null, '', '   ', '\t'] as const)(

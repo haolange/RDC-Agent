@@ -56,7 +56,6 @@ export default defineConfig({
         'src/main/agent-runtime/core/ProviderRegistry.ts',
         'src/main/agent-runtime/agent/MCPOAuth.ts',
         'src/main/agent-runtime/providers/ProviderAuth.ts',
-        'src/main/agent-runtime/scheduler/BackgroundTaskRunner.ts',
         'src/main/workflow/debugger/DebuggerRuntime.ts',
         'src/main/daemon/**',
         'src/main/sdk/**',

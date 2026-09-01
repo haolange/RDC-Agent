@@ -15,6 +15,7 @@ import { sessionContextJournal } from '../../conversation/SessionContextJournal'
 import { runtimeLogService } from '../../runtime/RuntimeLogService';
 import { agentOrchestrator } from '../../workflow/debugger/AgentOrchestrator';
 import { storageAdapter } from '../../sessions/StorageAdapter';
+import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import {
   assistantMessageText,
   executeCompactionHandoff,
@@ -188,36 +189,54 @@ export async function persistGeneratedSessionCompaction(input: {
     occupiedTokens: input.occupiedTokens,
     compactionThresholdTokens: input.compactionThresholdTokens,
   };
+  const session = storageAdapter.readSession(input.sessionId);
+  const projectRoot = session ? lookupProjectById(session.projectId)?.rootPath : undefined;
+  const compactAllowed = await dispatchRuntimeHooks('context.before-compact', {
+    sessionId: input.sessionId,
+    projectRoot,
+    payload: occupancy,
+  });
+  if (!compactAllowed) {
+    return null;
+  }
+  let view: DerivedContextView | null;
   if (isWithinSessionCompactionLine(
     input.occupiedTokens,
     input.compactionThresholdTokens,
     input.visibleTurnIds.length,
     keepRecentTurns,
   )) {
-    return sessionContextJournal.createDerivedView(
+    view = sessionContextJournal.createDerivedView(
       input.sessionId,
       input.visibleTurnIds,
       input.branchId,
       occupancy,
       keepRecentTurns,
     );
+  } else {
+    const entries = sessionContextJournal.readEntries(input.sessionId);
+    const entryByTurn = new Map(entries.map((entry) => [entry.turnId, entry]));
+    const sourceMessages = input.visibleTurnIds
+      .slice(0, -keepRecentTurns)
+      .flatMap((turnId) => entryByTurn.get(turnId)?.messages ?? []);
+    const sections = await generateSessionCompactionSections({
+      sessionId: input.sessionId,
+      history: input.history,
+      sourceMessages,
+    });
+    view = sessionContextJournal.createDerivedView(
+      input.sessionId,
+      input.visibleTurnIds,
+      input.branchId,
+      occupancy,
+      keepRecentTurns,
+      sections,
+    );
   }
-  const entries = sessionContextJournal.readEntries(input.sessionId);
-  const entryByTurn = new Map(entries.map((entry) => [entry.turnId, entry]));
-  const sourceMessages = input.visibleTurnIds
-    .slice(0, -keepRecentTurns)
-    .flatMap((turnId) => entryByTurn.get(turnId)?.messages ?? []);
-  const sections = await generateSessionCompactionSections({
+  await dispatchRuntimeHooks('context.after-compact', {
     sessionId: input.sessionId,
-    history: input.history,
-    sourceMessages,
+    projectRoot,
+    payload: { ...occupancy, applied: Boolean(view) },
   });
-  return sessionContextJournal.createDerivedView(
-    input.sessionId,
-    input.visibleTurnIds,
-    input.branchId,
-    occupancy,
-    keepRecentTurns,
-    sections,
-  );
+  return view;
 }

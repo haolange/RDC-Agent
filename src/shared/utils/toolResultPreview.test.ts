@@ -41,6 +41,27 @@ describe('buildToolResultPreview', () => {
     expect(preview.data.details.results).toHaveLength(2);
   });
 
+  it('preserves artifactized ref, hash, and summary', () => {
+    const preview = JSON.parse(buildToolResultPreview({
+      ok: true,
+      data: {
+        content: [{ type: 'text', text: 'stored' }],
+        details: {
+          artifactized: true,
+          ref: 'session://tool-outputs/call-1.json',
+          hash: 'abcdef0123456789',
+          summary: 'Offloaded grep matches',
+        },
+      },
+    }));
+    expect(preview.data.details).toMatchObject({
+      artifactized: true,
+      ref: 'session://tool-outputs/call-1.json',
+      hash: 'abcdef0123456789',
+      summary: 'Offloaded grep matches',
+    });
+  });
+
   it('truncates very long preview JSON', () => {
     const huge = 'x'.repeat(20_000);
     const encoded = buildToolResultPreview({

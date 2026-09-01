@@ -44,6 +44,21 @@ vi.mock('../../settings/EffectiveModelResolver', () => ({
 
 import { SubagentRunner } from './SubagentRunner';
 import { createSubagentBudgetState, type TurnHandle } from './TurnCoordinator';
+import type { DelegationCapsule } from '@shared/types/delegationCapsule';
+
+function testCapsule(overrides: Partial<DelegationCapsule> = {}): DelegationCapsule {
+  return {
+    mission: 'Inspect the capture',
+    task: 'inspect',
+    acceptedFacts: ['Frame presents a triangle'],
+    forbiddenPaths: ['Do not mutate shaders'],
+    inputArtifactRefs: [],
+    outputRequirements: 'Return a short evidence summary',
+    budget: { maxToolCalls: 8, maxWallTimeMs: 60_000 },
+    requiresRdxLease: false,
+    ...overrides,
+  };
+}
 
 describe('SubagentRunner', () => {
   it('runSubagent completes and forwards tool/assistant events', async () => {
@@ -97,7 +112,7 @@ describe('SubagentRunner', () => {
       parentAgentId: 'debugger',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
-      task: 'inspect',
+      capsule: testCapsule(),
       parentSessionId: 'parent',
       parentOnEvent: (event) => parentEvents.push({ type: event.type }),
       parentTurn,
@@ -122,7 +137,7 @@ describe('SubagentRunner', () => {
       parentAgentId: 'debugger',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
-      task: 'inspect',
+      capsule: testCapsule(),
       signal: controller.signal,
     });
     expect(result.status).toBe('cancelled');
@@ -140,7 +155,7 @@ describe('SubagentRunner', () => {
       parentAgentId: 'debugger',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
-      task: 'inspect',
+      capsule: testCapsule(),
     });
     expect(result.status).toBe('failed');
     expect(result.text).toBe('boom');
@@ -183,7 +198,7 @@ describe('SubagentRunner', () => {
       parentAgentId: 'debugger',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
-      task: 'inspect',
+      capsule: testCapsule(),
       parentSessionId: 'parent',
       parentTurn,
     });
@@ -223,7 +238,7 @@ describe('SubagentRunner', () => {
       parentAgentId: 'debugger',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
-      task: 'inspect',
+      capsule: testCapsule(),
       parentSessionId: 'parent',
       parentTurn,
     });
@@ -238,9 +253,23 @@ describe('SubagentRunner', () => {
     });
     const [tool] = runner.createSubagentTools('debugger', 'sess-1');
     expect(tool.name).toBe('subagent');
-    const result = await tool.execute('tc-1', { task: 'do work' });
+    const result = await tool.execute('tc-1', testCapsule({ task: 'do work' }) as unknown as Record<string, unknown>);
     expect(result.details).toMatchObject({ profile: 'debugger', status: 'complete' });
     expect(result.content[0]).toMatchObject({ type: 'text', text: 'child done' });
+  });
+
+  it('fails closed when the capsule is missing required fields', async () => {
+    const sendProfileMessage = vi.fn(async () => 'should-not-run');
+    const runner = new SubagentRunner({
+      sendProfileMessage,
+      systemPromptForAgent: () => 'fallback',
+      getActiveTurn: () => null,
+    });
+    const [tool] = runner.createSubagentTools('debugger', 'sess-1');
+    const result = await tool.execute('tc-missing', { task: 'do work' } as never);
+    expect(result.isError).toBe(true);
+    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringContaining('DELEGATION_CAPSULE_INVALID') });
+    expect(sendProfileMessage).not.toHaveBeenCalled();
   });
 
   it('authorizes only frozen profileDelegates and denies others', async () => {
@@ -258,9 +287,9 @@ describe('SubagentRunner', () => {
       } as unknown as TurnHandle),
     });
     const [tool] = runner.createSubagentTools('debugger', 'sess-1');
-    const allowed = await tool.execute('tc-allowed', { task: 'do work', profile: 'general' });
+    const allowed = await tool.execute('tc-allowed', testCapsule({ task: 'do work', profile: 'general' }) as unknown as Record<string, unknown>);
     expect(allowed.details).toMatchObject({ profile: 'general', status: 'complete' });
-    await expect(tool.execute('tc-denied', { task: 'do work', profile: 'ask' }))
+    await expect(tool.execute('tc-denied', testCapsule({ task: 'do work', profile: 'ask' }) as unknown as Record<string, unknown>))
       .rejects.toThrow(/SUBAGENT_DELEGATE_DENIED/);
   });
 
@@ -275,7 +304,7 @@ describe('SubagentRunner', () => {
       parentAgentId: 'debugger',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
-      task: 'inspect',
+      capsule: testCapsule(),
       model: 'not-canonical',
     });
     expect(result.status).toBe('failed');
@@ -294,7 +323,7 @@ describe('SubagentRunner', () => {
       parentAgentId: 'debugger',
       parentToolCallId: 'parent-tool',
       targetProfile: 'ask',
-      task: 'inspect',
+      capsule: testCapsule(),
       parentSessionId: 'parent',
       model: 'openai:gpt-5.6-sol',
     });
@@ -304,6 +333,9 @@ describe('SubagentRunner', () => {
       expect.objectContaining({
         modelOverride: { providerId: 'openai', modelId: 'gpt-5.6-sol' },
         sessionId: expect.stringContaining('::subagent::'),
+        extraPromptSegments: expect.arrayContaining([
+          expect.objectContaining({ kind: 'delegation-capsule', id: 'delegation:task' }),
+        ]),
       }),
     );
   });

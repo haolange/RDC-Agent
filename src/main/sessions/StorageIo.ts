@@ -233,6 +233,65 @@ export class StorageIo {
     this.writeUtf8Atomic(filePath, content, { fsync: true });
   }
 
+  writeBytesAtomic(filePath: string, content: Buffer, options?: { fsync?: boolean }): void {
+    this.ensureDir(path.dirname(filePath));
+    const temporaryPath = `${filePath}.${process.pid}.${generateShortId()}.tmp`;
+    if (options?.fsync) {
+      const fd = fs.openSync(temporaryPath, 'w');
+      try {
+        fs.writeFileSync(fd, content);
+        fs.fsyncSync(fd);
+      } finally {
+        fs.closeSync(fd);
+      }
+    } else {
+      fs.writeFileSync(temporaryPath, content);
+    }
+    try {
+      fs.renameSync(temporaryPath, filePath);
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'EEXIST' && code !== 'EPERM') {
+        if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+        throw error;
+      }
+
+      const bakTmpPath = `${filePath}.bak.tmp.${process.pid}.${generateShortId()}`;
+      try {
+        fs.renameSync(filePath, bakTmpPath);
+      } catch (bakError) {
+        if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+        throw bakError;
+      }
+
+      try {
+        fs.renameSync(temporaryPath, filePath);
+      } catch (finalError) {
+        try {
+          fs.renameSync(bakTmpPath, filePath);
+        } catch {
+          // Leave bakTmp in place for manual recovery.
+        }
+        if (fs.existsSync(temporaryPath)) fs.rmSync(temporaryPath, { force: true });
+        throw finalError;
+      }
+
+      const durableBakPath = `${filePath}.bak`;
+      try {
+        if (fs.existsSync(durableBakPath)) {
+          fs.rmSync(durableBakPath, { force: true });
+        }
+        fs.renameSync(bakTmpPath, durableBakPath);
+      } catch {
+        try {
+          fs.rmSync(bakTmpPath, { force: true });
+        } catch {
+          // Best-effort bak cleanup.
+        }
+      }
+    }
+  }
+
   writeJsonAtomic(filePath: string, data: unknown): void {
     this.writeUtf8Atomic(filePath, JSON.stringify(data, null, 2));
   }

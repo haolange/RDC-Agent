@@ -80,6 +80,20 @@ const compactDetails = (
   }
   if (Object.keys(base).length === 0) return details == null ? null : { value: details };
 
+  const artifactized = base.artifactized === true
+    || typeof base.ref === 'string'
+    || typeof base.hash === 'string'
+    || typeof base.summary === 'string';
+  if (artifactized) {
+    return {
+      ...base,
+      artifactized: base.artifactized === true,
+      ref: base.ref,
+      hash: base.hash,
+      summary: typeof base.summary === 'string' ? truncateText(String(base.summary), 800, 12) : base.summary,
+    };
+  }
+
   if (Array.isArray(base.results)) {
     const originalLength = base.results.length;
     base.results = compactWebResults(base.results);

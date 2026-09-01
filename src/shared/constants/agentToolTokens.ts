@@ -3,10 +3,11 @@
  * Single source of truth for seed manifests, allowlist expansion, and Settings diagnostics.
  */
 
-/** All builtin AgentTool ids after search_codebase removal (39). */
+/** All builtin AgentTool ids after search_codebase removal (40). */
 export const BUILTIN_AGENT_TOOL_IDS = [
   'shell',
   'read_file',
+  'artifact_read',
   'read_image',
   'write_file',
   'edit_file',
@@ -59,6 +60,7 @@ export type BuiltinAgentToolTier = 'core' | 'extended';
 export const BUILTIN_AGENT_TOOL_TIERS: Record<BuiltinAgentToolId, BuiltinAgentToolTier> = {
   shell: 'core',
   read_file: 'core',
+  artifact_read: 'core',
   read_image: 'core',
   write_file: 'core',
   edit_file: 'core',
@@ -106,7 +108,7 @@ export function getBuiltinToolTier(toolName: string): BuiltinAgentToolTier | nul
 
 /** Manifest-facing canonical tokens → concrete tool ids. */
 export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
-  read: ['read_file', 'read_image'],
+  read: ['read_file', 'read_image', 'artifact_read'],
   image: ['read_image'],
   interpreter: ['code_interpreter'],
   code_interpreter: ['code_interpreter'],

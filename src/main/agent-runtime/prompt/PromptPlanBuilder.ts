@@ -39,6 +39,8 @@ export interface PromptPlanInput {
   currentDate: string;
   timeZone: string;
   contextWindowTokens?: number;
+  /** Volatile extra segments (e.g. Delegation Capsule). Appended after runtime-fact. */
+  extraSegments?: PromptSegment[];
 }
 
 function resolveProfileProvenance(profile: PromptPlanInput['profile']): {
@@ -188,6 +190,18 @@ export class PromptPlanBuilder {
       stability: 'volatile',
       content: runtimeFactsContent,
     });
+
+    for (const extra of input.extraSegments ?? []) {
+      const content = extra.content.trim();
+      if (!content) continue;
+      segments.push({
+        ...extra,
+        content,
+        stability: 'volatile',
+        precedence: segments.length,
+        tokenEstimate: extra.tokenEstimate || charsToTokens(content.length),
+      });
+    }
 
     const systemPrompt = segments.map((segment) => segment.content).join('\n\n');
     const stableSegments = segments.filter((segment) => segment.stability === 'stable');

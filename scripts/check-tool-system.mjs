@@ -40,8 +40,8 @@ function main() {
   const { WORK_PROCESS_TOOL_DISPLAY_CATALOG } = require('../src/renderer/features/debugger/AgentChat/workProcessToolCatalog.ts');
 
   assert(
-    BUILTIN_AGENT_TOOL_IDS.length === 39,
-    `BUILTIN_AGENT_TOOL_IDS.length must be 39, got ${BUILTIN_AGENT_TOOL_IDS.length}`,
+    BUILTIN_AGENT_TOOL_IDS.length === 40,
+    `BUILTIN_AGENT_TOOL_IDS.length must be 40, got ${BUILTIN_AGENT_TOOL_IDS.length}`,
   );
 
   const builtinSet = new Set(BUILTIN_AGENT_TOOL_IDS);
@@ -124,6 +124,14 @@ function main() {
   assert(BUILTIN_AGENT_TOOL_TIERS.skills === 'core', 'skills must stay core (Progressive Skill discovery)');
   assert(BUILTIN_AGENT_TOOL_TIERS.skill_read === 'core', 'skill_read must stay core (Progressive Skill load)');
   assert(BUILTIN_AGENT_TOOL_TIERS.read_file === 'core', 'read_file must stay core');
+  assert(BUILTIN_AGENT_TOOL_TIERS.artifact_read === 'core', 'artifact_read must stay core');
+  assert(
+    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS.read)
+      && CANONICAL_TOOL_TOKEN_EXPANSIONS.read.includes('artifact_read')
+      && CANONICAL_TOOL_TOKEN_EXPANSIONS.read.includes('read_file')
+      && CANONICAL_TOOL_TOKEN_EXPANSIONS.read.includes('read_image'),
+    'CANONICAL_TOOL_TOKEN_EXPANSIONS.read must include read_file, read_image, artifact_read',
+  );
   for (const orphan of ['delete_file', 'move_file', 'copy_file', 'notebook_edit', 'memory_write', 'memory_delete']) {
     assert(
       BUILTIN_AGENT_TOOL_TIERS[orphan] === 'extended',
@@ -247,6 +255,7 @@ function main() {
     'utf8',
   );
   assert(readFileTool.includes('assertTextReadable'), 'read_file must gate binary/.rdc via assertTextReadable');
+  assert(!readFileTool.includes('session-artifacts'), 'read_file must not gain a session-artifacts allow path');
 
   const webTools = fs.readFileSync(
     path.join(repoRoot, 'src/main/agent-runtime/tools/primitives/WebTools.ts'),
@@ -267,6 +276,10 @@ function main() {
   const permissionPolicy = fs.readFileSync(
     path.join(repoRoot, 'src/main/agent-runtime/permissions/AgentPermissionPolicy.ts'),
     'utf8',
+  );
+  assert(
+    /READ_ONLY_FILE_TOOLS\s*=\s*new Set\(\['read_file', 'read_image', 'glob', 'grep'\]\)/.test(permissionPolicy),
+    'artifact_read must not join READ_ONLY_FILE_TOOLS / attachments auto-auth',
   );
   assert(
     permissionPolicy.includes('matchShellHardDeny'),

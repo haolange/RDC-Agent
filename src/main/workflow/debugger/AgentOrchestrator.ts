@@ -65,6 +65,7 @@ import {
   type PreparedAgentTurnContext,
   type TurnHandle,
 } from './AgentOrchestrator.deps';
+import { applyDelegationCapsuleToPromptPlan } from '../../agent-runtime/prompt/DelegationCapsuleCompiler';
 
 export type { PreparedAgentTurnContext } from './AgentOrchestrator.deps';
 export class AgentOrchestrator {
@@ -485,7 +486,7 @@ export class AgentOrchestrator {
         ?? resolveEffectiveModel(routeProviderId, routeModelId, settings);
       if (!capability) throw new Error(`MODEL_UNAVAILABLE: ${routeProviderId}/${routeModelId}`);
       const activeContextWindow = planning.plan.contextWindowTokens;
-      const promptPlan = options?.promptPlan ?? this.promptPlan.buildPromptPlanForAgentTurn({
+      let promptPlan = options?.promptPlan ?? this.promptPlan.buildPromptPlanForAgentTurn({
         agentId,
         sessionId: options?.sessionId ?? null,
         projectRootPath: options?.projectRootPath ?? null,
@@ -498,8 +499,12 @@ export class AgentOrchestrator {
         messageText: typeof content === 'string' ? content : '',
         preloadSkillIds: options?.preloadSkillIds,
         effectiveProfile,
+        extraSegments: options?.extraPromptSegments,
       });
       if (!promptPlan) throw new Error(`PROMPT_PLAN_UNAVAILABLE: ${agentId}`);
+      if (options?.promptPlan && options.extraPromptSegments?.length) {
+        promptPlan = applyDelegationCapsuleToPromptPlan(promptPlan, options.extraPromptSegments);
+      }
 
       const isSubagentSession = Boolean(options?.sessionId?.includes('::subagent::'));
       if (!preparedTurn) {

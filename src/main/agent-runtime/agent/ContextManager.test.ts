@@ -4,7 +4,6 @@
 import { describe, it, expect } from 'vitest';
 import { ContextManager, estimateImageTokensFromBase64Length } from './ContextManager';
 import { TokenizerService } from '../core/TokenizerService';
-import { assembleDerivedContextView, testHandoffSections } from '../context/StructuredHandoffBuilder';
 import type {
   AgentMessage,
   AssistantMessage,
@@ -45,17 +44,6 @@ function createContextManager(
 ): ContextManager {
   return new ContextManager({
     contextTokenLimit: 64_000,
-    createDerivedView: (source, options) => assembleDerivedContextView(source, {
-      scope: 'ephemeral',
-      createdAt: options.createdAt,
-      maxFactsPerGroup: options.maxFactsPerGroup,
-      maxResourceRefs: options.maxResourceRefs,
-      sections: testHandoffSections(
-        source.find((message) => message.role === 'user')
-          ? String((source.find((message) => message.role === 'user') as UserMessage).content)
-          : 'Compacted context',
-      ),
-    }),
     ...config,
   });
 }
@@ -267,13 +255,10 @@ describe('ContextManager', () => {
       const result = await cm.compress(msgs);
       // 保留头 3 + 占位符 + 尾 (5 - 3 - 1 = 1) = 5
       expect(result.messages.length).toBeLessThan(msgs.length);
-      const handoff = result.messages.find(
-        (message) => message.role === 'user' && Boolean((message as UserMessage).derivedContext),
-      ) as UserMessage | undefined;
-      expect(handoff?.derivedContext).toMatchObject({
-        viewId: result.derivedContextView?.viewId,
-        sourceHash: result.derivedContextView?.sourceHash,
-      });
+      expect(result.messages.some((message) => (
+        message.role === 'user'
+        && (message as UserMessage).content === '[Earlier conversation compacted]'
+      ))).toBe(true);
     });
 
     it('消息数未超 maxMessages 时不应 snip', async () => {
@@ -356,14 +341,7 @@ describe('ContextManager', () => {
         msgs.push(user(`message number ${i} with some content`));
       }
       const result = await cm.compress(msgs);
-      // 应包含摘要或 derived handoff（degrade 可能只保留尾部）
-      const handoff = result.messages.find(
-        (message) => message.role === 'user' && Boolean((message as UserMessage).derivedContext),
-      ) as UserMessage | undefined;
-      expect(Boolean(result.summary) || Boolean(handoff) || result.messages.length < msgs.length).toBe(true);
-      if (handoff && result.derivedContextView) {
-        expect(handoff.derivedContext?.handoffId).toBe(result.derivedContextView.handoff.handoffId);
-      }
+      expect(Boolean(result.summary) || result.messages.length < msgs.length).toBe(true);
     });
 
     it('throws CONTEXT_CANNOT_FIT when even degrade exceeds budget', async () => {

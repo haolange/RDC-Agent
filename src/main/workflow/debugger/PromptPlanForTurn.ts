@@ -45,6 +45,7 @@ export class PromptPlanForTurn {
     systemPrompt?: string;
     messageText?: string;
     preloadSkillIds?: string[];
+    extraSegments?: import('@shared/types/rdxRuntime').PromptSegment[];
     /** Exact effective profile snapshot resolved by the caller. */
     effectiveProfile?: AgentManifestDefinition | null;
     /**
@@ -116,6 +117,7 @@ export class PromptPlanForTurn {
       currentDate: promptClock.currentDate,
       timeZone: promptClock.timeZone,
       contextWindowTokens: input.contextWindowTokens,
+      extraSegments: input.extraSegments,
     });
   }
 }

@@ -76,6 +76,8 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
   /** 当前激活项目 id。 */
   projectId?: string | null;
   promptPlan?: PromptPlan;
+  /** Volatile Delegation Capsule segments appended to the child PromptPlan. */
+  extraPromptSegments?: import('@shared/types/rdxRuntime').PromptSegment[];
   /** Exact profile snapshot used to build this child turn. */
   effectiveProfile?: EffectiveAgentProfile | null;
   /** Enabled profile ids from the same resolution snapshot. */

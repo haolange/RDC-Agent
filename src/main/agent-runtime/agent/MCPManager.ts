@@ -136,6 +136,14 @@ class MCPAgentTool implements AgentTool {
   readonly description: string;
   readonly parameters: JsonSchema;
   readonly permissionHint = 'mutation' as const;
+  readonly spec = {
+    isReadOnly: false,
+    isConcurrencySafe: false,
+    isDestructive: false,
+    sideEffect: 'network' as const,
+    category: 'web' as const,
+    requiresApproval: true,
+  };
 
   constructor(
     private readonly manager: MCPManager,

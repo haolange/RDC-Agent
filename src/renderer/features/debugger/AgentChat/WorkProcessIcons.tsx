@@ -15,6 +15,15 @@ const renderIconPath = (icon: WorkProcessIconKey): ReactElement => {
           <path d="M10 11h6M10 14h4" />
         </>
       );
+    case 'artifactRead':
+      return (
+        <>
+          <path d="M7 3.5h7l3 3V20H7V3.5Zm7 0v3h3" />
+          <path d="M10 12h4" />
+          <circle cx="16.5" cy="16.5" r="2.2" />
+          <path d="m18 18 2 2" />
+        </>
+      );
     case 'fileWrite':
       return (
         <>

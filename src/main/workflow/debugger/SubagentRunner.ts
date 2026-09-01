@@ -1,5 +1,7 @@
 /**
- * SubagentRunner — serial isolated sub-agent turns and subagent tool.
+ * SubagentRunner — isolated sub-agent turns and the subagent tool.
+ * Capsule fields are required. Offline children (requiresRdxLease=false) may
+ * join a consecutive concurrency-safe group; lease-holding children are serial.
  */
 
 import type { AgentRole } from '@shared/types/agent';
@@ -14,6 +16,7 @@ import { settingsService } from '../../settings/SettingsService';
 import { agentManifestService } from '../../settings/AgentManifestService';
 import {
   assertSubagentBudgetAllowsChild,
+  consumeReservedSubagentSlot,
   createSubagentBudgetState,
   type SubagentResultStatus,
   type TurnHandle,
@@ -21,6 +24,12 @@ import {
 import type { AgentProfileTurnOptions } from './orchestratorTypes';
 import { createEphemeralScopeId } from './executionScope';
 import { resolveSubagentModelOverride } from './subagentModelArg';
+import {
+  DELEGATION_CAPSULE_JSON_SCHEMA,
+  parseDelegationCapsule,
+  type DelegationCapsule,
+} from '@shared/types/delegationCapsule';
+import { compileDelegationCapsule } from '../../agent-runtime/prompt/DelegationCapsuleCompiler';
 
 export interface SubagentRunnerDeps {
   sendProfileMessage: (
@@ -39,7 +48,7 @@ export class SubagentRunner {
     parentAgentId: AgentRole;
     parentToolCallId: string;
     targetProfile: AgentRole;
-    task: string;
+    capsule: DelegationCapsule;
     parentSessionId?: string | null;
     parentOnEvent?: (event: SharedAgentEvent) => void;
     projectRootPath?: string | null;
@@ -48,6 +57,8 @@ export class SubagentRunner {
     signal?: AbortSignal | null;
     model?: string;
   }): Promise<{ text: string; status: SubagentResultStatus; subagentId: string }> {
+    const capsule = input.capsule;
+    const task = capsule.task;
     // Resolve and authorize the exact project profile before mutating parent budgets or emitting a child event.
     const childSettings = settingsService.getAll();
     const effectiveProfiles = childSettings.paths
@@ -78,7 +89,8 @@ export class SubagentRunner {
     const parentBudget = input.parentTurn?.subagentBudget ?? createSubagentBudgetState();
     assertSubagentBudgetAllowsChild(parentBudget);
     const policyBudget = input.parentTurn?.policyBudget;
-    if (policyBudget) {
+    const prepaid = consumeReservedSubagentSlot(policyBudget);
+    if (policyBudget && !prepaid) {
       if (Date.now() - policyBudget.wallStartedAt >= policyBudget.maxWallTimeMs) {
         throw new Error(`POLICY_LIMIT_EXCEEDED: maxWallTimeMs ${policyBudget.maxWallTimeMs}.`);
       }
@@ -123,7 +135,7 @@ export class SubagentRunner {
         subagentId,
         profile: input.targetProfile,
         parentToolCallId: input.parentToolCallId,
-        text: input.task,
+        text: task,
       } satisfies AgentSubagentEventPayload,
     });
 
@@ -153,9 +165,10 @@ export class SubagentRunner {
       if (childAbort.signal.aborted) {
         throw new DOMException('Aborted', 'AbortError');
       }
+      const capsuleSegments = compileDelegationCapsule(capsule);
       childPromise = this.deps.sendProfileMessage(
         input.targetProfile,
-        input.task,
+        task,
         {
           sessionId: subagentSessionId,
           stage: 'investigate',
@@ -168,6 +181,7 @@ export class SubagentRunner {
           policyBudget,
           subagentBudget: childBudget,
           modelOverride: modelOverride ?? null,
+          extraPromptSegments: capsuleSegments,
           onEvent: (event: SharedAgentEvent) => {
             if (input.parentTurn && !input.parentTurn.isLive(input.parentTurn.generation)) {
               return;
@@ -306,27 +320,36 @@ export class SubagentRunner {
     const runSubagent = this.runSubagent.bind(this);
     const capturedTurn = turnHandle ?? getActiveTurn(sessionId);
     const runSubagentTool: AgentTool<
-      { task: string; profile?: string; model?: string },
+      Record<string, unknown>,
       { subagentId: string; profile: string; status: string }
     > = {
       name: 'subagent',
       label: 'Subagent',
-      description: 'Delegate a sub-task to an isolated sub-agent. The sub-agent runs to completion (serial, not parallel) and returns its final answer. Use profile to target a declared delegate. Defaults to the caller profile. Optional model is a canonical providerId:modelId and does not inherit the parent session override.',
-      parameters: {
-        type: 'object',
-        required: ['task'],
-        properties: {
-          task: { type: 'string', description: 'The task description for the sub-agent.' },
-          profile: { type: 'string', description: 'Target profile id. Defaults to the caller profile. Must be in the frozen profileDelegates set, or self when that set is empty.' },
-          model: { type: 'string', description: 'Optional canonical providerId:modelId. Fail-closed if the model is not available.' },
-        },
-      },
+      description: 'Delegate a structured Delegation Capsule to an isolated sub-agent. Required fields: mission, task, acceptedFacts, forbiddenPaths, inputArtifactRefs, outputRequirements, budget, requiresRdxLease. Offline children set requiresRdxLease=false and may join a concurrent group; lease-holding children are serial. Optional model is a canonical providerId:modelId and does not inherit the parent session override.',
+      parameters: DELEGATION_CAPSULE_JSON_SCHEMA as unknown as AgentTool['parameters'],
       permissionHint: 'readonly',
+      spec: {
+        isReadOnly: true,
+        isConcurrencySafe: false,
+        isDestructive: false,
+        sideEffect: 'session',
+        category: 'task',
+        requiresApproval: false,
+      },
       async execute(toolCallId, args, signal) {
+        let capsule: DelegationCapsule;
+        try {
+          capsule = parseDelegationCapsule(args);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return {
+            content: [{ type: 'text', text: message }],
+            isError: true,
+            details: { subagentId: '', errorCode: 'DELEGATION_CAPSULE_INVALID', profile: parentAgentId, status: 'failed' },
+          };
+        }
         const turn = capturedTurn ?? getActiveTurn(sessionId);
-        const targetProfile = (typeof args.profile === 'string' && args.profile.trim()
-          ? args.profile.trim()
-          : parentAgentId) as AgentRole;
+        const targetProfile = (capsule.profile?.trim() || parentAgentId) as AgentRole;
         const delegates = turn?.runtimePlan?.profileDelegates ?? [];
         const authorized = delegates.length === 0
           ? targetProfile === parentAgentId
@@ -338,8 +361,8 @@ export class SubagentRunner {
           parentAgentId,
           parentToolCallId: toolCallId,
           targetProfile,
-          task: args.task,
-          model: typeof args.model === 'string' ? args.model : undefined,
+          capsule,
+          model: capsule.model,
           parentSessionId: sessionId ?? null,
           parentOnEvent: turn?.eventSink?.onEvent,
           projectRootPath: turn?.eventSink?.projectRootPath ?? null,

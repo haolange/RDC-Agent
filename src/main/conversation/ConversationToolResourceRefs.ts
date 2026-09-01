@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import type { ConversationToolResourceRef } from '@shared/types/conversation';
 import type { ToolCallResult } from '@shared/types/tool';
+import { extractSessionArtifactUris, isSessionArtifactUri } from '@shared/types/sessionArtifact';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => (
   Boolean(value) && typeof value === 'object' && !Array.isArray(value)
@@ -121,6 +122,28 @@ export const extractConversationToolResourceRefs = (
   if (normalizedName === 'web_fetch' || normalizedName === 'web_search') {
     const ref = webRef(details);
     if (ref) refs.push(ref);
+  }
+
+  const sessionUris = new Set<string>();
+  for (const key of ['ref', 'uri', 'path']) {
+    const value = stringValue(details, key);
+    if (value && isSessionArtifactUri(value)) sessionUris.add(value);
+  }
+  const contentText = typeof result.data?.content === 'string'
+    ? result.data.content
+    : Array.isArray(result.data?.content)
+      ? result.data.content
+        .map((item) => (isRecord(item) && typeof item.text === 'string' ? item.text : ''))
+        .join('\n')
+      : '';
+  for (const uri of extractSessionArtifactUris(contentText)) sessionUris.add(uri);
+  for (const uri of sessionUris) {
+    refs.push({
+      id: 'file:' + normalizePathIdentity(uri),
+      kind: 'file',
+      label: uri.split('/').pop() || uri,
+      path: uri,
+    });
   }
   return dedupe(refs);
 };

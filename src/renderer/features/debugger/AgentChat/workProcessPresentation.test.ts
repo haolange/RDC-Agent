@@ -1167,6 +1167,47 @@ describe('buildWorkProcessPresentation', () => {
     expect(readRow.pathChip).toBe('DESIGN.md');
   });
 
+  it('shows a session:// chip and short hash for artifactized tool results', () => {
+    const presentation = buildWorkProcessPresentation({
+      status: 'complete',
+      updatedAt: now,
+      blocks: [{
+        id: 'loop-artifact',
+        kind: 'llm_turn',
+        title: 'LLM turn',
+        status: 'complete',
+        toolCalls: [{
+          id: 'tool-artifact',
+          toolName: 'grep',
+          status: 'complete',
+          argsPreview: JSON.stringify({ pattern: 'foo' }),
+          resultPreview: JSON.stringify({
+            ok: true,
+            data: {
+              content: [{ type: 'text', text: 'Offloaded grep matches' }],
+              details: {
+                artifactized: true,
+                ref: 'session://tool-outputs/call-9.json',
+                hash: 'abcdef0123456789ffff',
+                summary: 'Offloaded grep matches',
+              },
+            },
+          }),
+          startedAt: now,
+          completedAt: now + 8,
+        }],
+        startedAt: now,
+        completedAt: now + 8,
+      }],
+    });
+    const row = flattenWorkRows(presentation.rows).find(
+      (entry) => entry.type === 'tool' && entry.toolName === 'grep',
+    );
+    if (!row || row.type !== 'tool') throw new Error('expected artifactized tool row');
+    expect(row.pathChip).toBe('session://tool-outputs/call-9.json');
+    expect(row.chips).toEqual(['abcdef01']);
+  });
+
   it('projects adjacent task snapshots with N of M counts and task anchors', () => {
     const presentation = buildWorkProcessPresentation({
       status: 'complete',

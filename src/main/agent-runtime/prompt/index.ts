@@ -1,5 +1,10 @@
 export { PromptPlanBuilder, promptPlanBuilder } from './PromptPlanBuilder';
 export type { PromptPlanInput } from './PromptPlanBuilder';
+export {
+  applyDelegationCapsuleToPromptPlan,
+  compileDelegationCapsule,
+  renderDelegationCapsulePrompt,
+} from './DelegationCapsuleCompiler';
 export { RequestEnvelopeBuilder, requestEnvelopeBuilder } from './RequestEnvelopeBuilder';
 export type { RequestEnvelopeInput } from './RequestEnvelopeBuilder';
 export { RequestSnapshotStore, requestSnapshotStore } from './RequestSnapshotStore';

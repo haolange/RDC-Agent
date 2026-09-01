@@ -12,6 +12,7 @@ export type WorkProcessRowStatus = 'pending' | 'running' | 'complete' | 'error' 
 /** Per-builtin Work Process header glyph. Each catalog tool maps to a unique key. */
 export type WorkProcessIconKey =
   | 'fileRead'
+  | 'artifactRead'
   | 'fileWrite'
   | 'fileEdit'
   | 'fileDelete'
