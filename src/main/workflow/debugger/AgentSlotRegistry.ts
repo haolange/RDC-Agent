@@ -7,21 +7,17 @@
  */
 
 import type {
-  AgentCategory,
   AgentConfig,
   AgentId,
   AgentRole,
   AgentState,
-  WriteScope,
 } from '@shared/types/agent';
-import { isTopLevelAgentId } from '@shared/types/agent';
+import { DEFAULT_AGENT_ID, isTopLevelAgentId } from '@shared/types/agent';
 import {
-  AGENT_CATEGORIES,
   AGENT_ROLES,
-  AGENT_WRITE_SCOPES,
   DEFAULT_MODEL_ROUTING,
 } from '@shared/constants/agents';
-import type { LLMConfig } from '@shared/types/llm';
+import type { LLMAgentRouteConfig } from '@shared/types/llm';
 import { nowIso } from '@shared/utils/id';
 import type { Agent } from '../../agent-runtime/agent/Agent';
 import type { ContextManager } from '../../agent-runtime/agent/ContextManager';
@@ -115,7 +111,7 @@ export class AgentSlotRegistry {
   }
 
   createDefaultAgentConfig(agentId: AgentRole): AgentConfig {
-    const fallbackAgentId: AgentId = isTopLevelAgentId(agentId) ? agentId : 'edit';
+    const fallbackAgentId: AgentId = isTopLevelAgentId(agentId) ? agentId : DEFAULT_AGENT_ID;
     const defaultRouting = DEFAULT_MODEL_ROUTING[fallbackAgentId];
     return {
       agentId,
@@ -123,8 +119,6 @@ export class AgentSlotRegistry {
       modelProvider: defaultRouting.provider,
       modelName: defaultRouting.model,
       temperature: 0.7,
-      category: this.getAgentCategory(agentId),
-      writeScope: this.getAgentWriteScopes(agentId),
     };
   }
 
@@ -145,16 +139,14 @@ export class AgentSlotRegistry {
     return this.agentConfigs.get(agentId) ?? null;
   }
 
-  applyLlmConfig(config: LLMConfig): void {
-    const routeMap = new Map(config.agentRoutes.map((route) => [route.agentId, route]));
+  applyLlmConfig(compiledRoutes: LLMAgentRouteConfig[]): void {
+    const routeMap = new Map(compiledRoutes.map((route) => [route.agentId, route]));
     for (const [agentId, agentConfig] of this.agentConfigs.entries()) {
-      const fallbackAgentId: AgentId = isTopLevelAgentId(agentId) ? agentId : 'edit';
-      const fallback = DEFAULT_MODEL_ROUTING[fallbackAgentId];
       const route = routeMap.get(agentId);
       this.agentConfigs.set(agentId, {
         ...agentConfig,
-        modelProvider: route?.providerId ?? fallback.provider,
-        modelName: route?.modelId ?? fallback.model,
+        modelProvider: route?.providerId ?? '',
+        modelName: route?.modelId ?? '',
       });
     }
   }
@@ -226,11 +218,4 @@ export class AgentSlotRegistry {
     this.purgeAgentStatesForScope(sessionId);
   }
 
-  private getAgentCategory(role: AgentRole): AgentCategory {
-    return isTopLevelAgentId(role) ? AGENT_CATEGORIES[role] : 'general';
-  }
-
-  private getAgentWriteScopes(role: AgentRole): WriteScope[] {
-    return isTopLevelAgentId(role) ? AGENT_WRITE_SCOPES[role] : ['workspace_notes'];
-  }
 }

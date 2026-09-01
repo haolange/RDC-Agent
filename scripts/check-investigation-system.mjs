@@ -1,10 +1,13 @@
 #!/usr/bin/env node
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   defaultRepoRoot,
   isDirectInvocation,
   printCheckResult,
   runSystemDebtCheck,
 } from './system-debt-ratchet.mjs';
+import { assertBuiltinProfileContracts } from './builtin-profile-contracts.mjs';
 
 const INVESTIGATION_RECORDS = [
   'WorldState',
@@ -75,7 +78,7 @@ export const INVESTIGATION_RULE_REGISTRY = [
     id: `investigation.missing.builtin.${profile}`,
     kind: 'missing',
     file: `resources/agent-runtime/agents/${profile}.agent.md`,
-    pattern: `id:\\s*${profile}|^name:\\s*${profile}\\b`,
+    pattern: 'target:\\s*rdc-agent',
     probe: 'source-pattern',
     note: `four builtin profiles include ${profile} (general + three Missions)`,
   })),
@@ -262,9 +265,13 @@ export const INVESTIGATION_RULE_REGISTRY = [
 ];
 
 export function runInvestigationSystemCheck(overrides = {}) {
+  const repoRoot = overrides.repoRoot || defaultRepoRoot();
+  if (fs.existsSync(path.join(repoRoot, 'resources', 'agent-runtime', 'agents'))) {
+    assertBuiltinProfileContracts(repoRoot);
+  }
   return runSystemDebtCheck({
     name: 'investigation-system',
-    repoRoot: overrides.repoRoot || defaultRepoRoot(),
+    repoRoot,
     registry: INVESTIGATION_RULE_REGISTRY,
     debtRelativePath: 'scripts/fidelity/investigation-system-debt.json',
     argv: overrides.argv || process.argv.slice(2),

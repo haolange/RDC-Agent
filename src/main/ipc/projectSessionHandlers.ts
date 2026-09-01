@@ -26,8 +26,12 @@ import {
   SessionIdOnlyArgsSchema,
   SessionListArgsSchema,
   SessionRenameArgsSchema,
+  SessionSetAgentIdArgsSchema,
   SessionSetModelOverrideArgsSchema,
 } from './validation/projectSessionSchemas';
+import { conversationService } from '../conversation/ConversationService';
+import { projectSessionForClient } from '../sessions/projectSessionHandoff';
+import { resolveEnabledAgentDefinition } from '../conversation/ConversationRoutePreflight';
 import { classifyAgentToolEligibility, describeAgentToolIneligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
 import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { resolveEffectiveModel } from '../settings/EffectiveModelResolver';
@@ -93,7 +97,9 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       return {
         success: true,
         project: selection.project,
-        currentSession: selection.currentSession,
+        currentSession: selection.currentSession
+          ? projectSessionForClient(selection.currentSession)
+          : null,
         currentRun: selection.currentRun,
       };
     } catch (err) {
@@ -197,7 +203,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
     if (!resolvedProjectId) {
       return { sessions: [] as SessionRecord[] };
     }
-    return { sessions: storageAdapter.listSessions(resolvedProjectId) };
+    return { sessions: storageAdapter.listSessions(resolvedProjectId).map(projectSessionForClient) };
   });
 
   ipcMain.handle('session:create', async (_event, ...rawArgs: unknown[]) => {
@@ -251,6 +257,9 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         return { success: false, error: `Session not found: ${id}` };
       }
 
+      conversationService.cancelUnfinishedHandoff(id, 'session_close');
+      await conversationService.cancelActiveTurn({ sessionId: id });
+
       const runs = storageAdapter.listRuns(id);
       const activeRun = runs.find((run) => ['queued', 'running', 'stopping'].includes(run.status));
       if (activeRun) {
@@ -269,7 +278,9 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       attachmentStagingService.releaseBySessionId(id);
       agentOrchestrator.syncSessionSlots(id);
       const remainingSessions = storageAdapter.listSessions(session.projectId);
-      const nextSession = remainingSessions[0] || null;
+      const nextSession = remainingSessions[0]
+        ? projectSessionForClient(remainingSessions[0])
+        : null;
       let nextRun: RunSummary | null = null;
       if (state.currentSessionId === id) {
         state.currentSessionId = nextSession?.sessionId || null;
@@ -308,7 +319,7 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
       await storageAdapter.setCurrentSessionId(id);
       return {
         success: true,
-        session,
+        session: projectSessionForClient(session),
         currentRun,
       };
     } catch (err) {
@@ -347,6 +358,29 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         }
       }
       const updated = storageAdapter.updateSession(id, { modelOverride });
+      return { success: true, session: updated };
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
+  ipcMain.handle('session:setAgentId', async (_event, ...rawArgs: unknown[]) => {
+    try {
+      const [id, agentId] = parseIpcArgs(SessionSetAgentIdArgsSchema, rawArgs, {
+        label: 'session:setAgentId',
+        maxBytes: 4 * 1024,
+      });
+      const session = storageAdapter.readSession(id);
+      if (!session) {
+        return { success: false, error: `Session not found: ${id}` };
+      }
+      const projectRoot = storageAdapter.getProjectById(session.projectId)?.rootPath ?? null;
+      const definition = resolveEnabledAgentDefinition(agentId, projectRoot);
+      if (!definition) {
+        return { success: false, error: `CONVERSATION_AGENT_UNAVAILABLE: requested profile \`${agentId}\` is not enabled.` };
+      }
+      conversationService.cancelUnfinishedHandoff(id, 'manual_switch');
+      const updated = storageAdapter.updateSession(id, { agentId });
       return { success: true, session: updated };
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) };

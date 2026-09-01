@@ -77,6 +77,7 @@ describe('app settings Agent route sync state', () => {
     const pending = useAppSettingsStore.getState().saveAgentDefinition({
       draft: draft(original, 'provider:model-b'),
       clientRevision: 501,
+      scope: 'user',
     });
     expect(useAppSettingsStore.getState().agentRouteSyncById[agentId]).toMatchObject({
       status: 'saving',
@@ -122,6 +123,7 @@ describe('app settings Agent route sync state', () => {
     const pending = useAppSettingsStore.getState().saveAgentDefinition({
       draft: draft(original, 'provider:model-b'),
       clientRevision: 601,
+      scope: 'user',
     });
     const rejection = expect(pending).rejects.toThrow('write rejected');
     await vi.advanceTimersByTimeAsync(120);
@@ -137,5 +139,20 @@ describe('app settings Agent route sync state', () => {
       commitHash: 'commit-model-a',
       error: 'write rejected',
     });
+  });
+
+  it('clears inherited route-saving state when reloadSettings hydrates a new project snapshot', async () => {
+    const settings = structuredClone(DEFAULT_SETTINGS);
+    vi.stubGlobal('window', {
+      electronAPI: { settings: { get: vi.fn(async () => settings) } },
+    });
+    useAppSettingsStore.getState().hydrate(settings, 'dark');
+    useAppSettingsStore.setState({
+      agentRouteSyncById: {
+        general: { status: 'saving', clientRevision: 9, commitHash: null },
+      },
+    });
+    await useAppSettingsStore.getState().reloadSettings();
+    expect(useAppSettingsStore.getState().agentRouteSyncById).toEqual({});
   });
 });

@@ -22,6 +22,28 @@ function mockSlot(): AgentSlot {
   } as unknown as AgentSlot;
 }
 
+describe('AgentSlotRegistry compiledRoute apply', () => {
+  it('applies compiledRoute and does not use leftover agentRoutes or DEFAULT_MODEL_ROUTING', () => {
+    const registry = new AgentSlotRegistry();
+    registry.initializeDefaults();
+    expect(registry.getAgentConfig('general')?.modelProvider).toBe('openrouter');
+
+    registry.applyLlmConfig([
+      { agentId: 'general', providerId: 'real', modelId: 'real-model' },
+    ]);
+    expect(registry.getAgentConfig('general')).toMatchObject({
+      modelProvider: 'real',
+      modelName: 'real-model',
+    });
+
+    registry.applyLlmConfig([]);
+    expect(registry.getAgentConfig('general')).toMatchObject({
+      modelProvider: '',
+      modelName: '',
+    });
+  });
+});
+
 describe('AgentSlotRegistry agent state lifecycle', () => {
   it('does not accumulate ephemeral scopes after purge', () => {
     const registry = new AgentSlotRegistry();

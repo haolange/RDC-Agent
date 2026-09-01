@@ -3,12 +3,14 @@ import { buildConversationConfigurationCommit } from './composerConfigurationCom
 
 const flushAgentDefinitionSaves = vi.fn();
 const flushProviderSaves = vi.fn();
+const definitions: Array<{ id: string; provenance?: { scope: 'builtin' | 'user' | 'project'; sourcePath: string; sourceHash: string } }> = [];
 
 vi.mock('../../../stores/appSettingsStore', () => ({
   useAppSettingsStore: {
     getState: () => ({
       flushAgentDefinitionSaves,
       flushProviderSaves,
+      settings: { agents: { definitions } },
     }),
   },
 }));
@@ -17,6 +19,7 @@ describe('buildConversationConfigurationCommit', () => {
   beforeEach(() => {
     flushAgentDefinitionSaves.mockReset();
     flushProviderSaves.mockReset();
+    definitions.splice(0);
   });
 
   it('flushes agent and provider and freezes the selected model revision', async () => {
@@ -38,7 +41,7 @@ describe('buildConversationConfigurationCommit', () => {
       getEffectiveCatalog,
     });
 
-    expect(flushAgentDefinitionSaves).toHaveBeenCalledWith('edit');
+    expect(flushAgentDefinitionSaves).toHaveBeenCalledWith({ agentId: 'edit', scope: 'user' });
     expect(flushProviderSaves).toHaveBeenCalledWith('openai');
     expect(result).toEqual({
       agentId: 'edit',
@@ -53,6 +56,31 @@ describe('buildConversationConfigurationCommit', () => {
         providerCatalogRevision: 'catalog-live',
         routeRevision: 'route-sol',
       },
+    });
+  });
+
+  it('flushes the project lane when the effective profile is project-scoped', async () => {
+    definitions.push({
+      id: 'project-only',
+      provenance: { scope: 'project', sourcePath: 'p.agent.md', sourceHash: 'h' },
+    });
+    flushAgentDefinitionSaves.mockResolvedValue({
+      commitHash: 'project-hash',
+      route: { providerId: 'openai', modelId: 'gpt-5.6-sol' },
+    });
+    flushProviderSaves.mockResolvedValue({ commitHash: 'provider-hash' });
+    await buildConversationConfigurationCommit({
+      selectedAgentId: 'project-only',
+      currentProjectId: 'proj_b',
+      getEffectiveCatalog: vi.fn().mockResolvedValue({
+        catalogRevision: 'catalog-live',
+        models: [{ modelId: 'gpt-5.6-sol', routeRevision: 'route-sol' }],
+      }),
+    });
+    expect(flushAgentDefinitionSaves).toHaveBeenCalledWith({
+      agentId: 'project-only',
+      scope: 'project',
+      projectId: 'proj_b',
     });
   });
 

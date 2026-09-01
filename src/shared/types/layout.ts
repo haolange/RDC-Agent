@@ -2,12 +2,10 @@
  * Layout Types - Layout and mode-related type definitions
  */
 
-import type { ExecutableAppMode } from './session';
+import type { MissionKind } from './session';
 
-// UI work modes. Ask is UI/conversation-only and must not be persisted as a run mode.
-export type ExecutableAgentMode = ExecutableAppMode;
-export type BuiltinAgentMode = 'ask' | 'plan' | 'edit' | ExecutableAgentMode;
-export type AgentMode = BuiltinAgentMode | (string & {});
+/** Composer / workbench profile-id selector. Not an AppMode. */
+export type AgentMode = 'general' | MissionKind | (string & {});
 
 export type ModeIconKey =
   | 'message-orbit'

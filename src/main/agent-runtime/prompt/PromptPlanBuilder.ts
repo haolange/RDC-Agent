@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { app } from 'electron';
+import { appPathService } from '../../runtime/AppPathService';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { EffectiveModel } from '@shared/types/providerCapability';
@@ -62,12 +62,7 @@ function resolveProfileProvenance(profile: PromptPlanInput['profile']): {
 
 export class PromptPlanBuilder {
   private coreRoot(): string {
-    const candidates = [
-      path.join(app.getAppPath(), 'resources', 'agent-runtime', 'prompts'),
-      path.join(process.cwd(), 'resources', 'agent-runtime', 'prompts'),
-      path.join(process.resourcesPath ?? '', 'agent-runtime', 'prompts'),
-    ];
-    return candidates.map((candidate) => path.resolve(candidate)).find((candidate) => fs.existsSync(candidate)) ?? path.resolve(candidates[0]);
+    return path.join(appPathService.getBuiltinAgentRuntimeRoot(), 'prompts');
   }
 
   build(input: PromptPlanInput): PromptPlan {
@@ -152,7 +147,7 @@ export class PromptPlanBuilder {
     const effectiveTools = input.routeCapability.toolCallingMode === 'native-structured'
       ? input.tools
       : [];
-    const effectiveToolContent = buildEffectiveToolContent(input.profile.id, effectiveTools);
+    const effectiveToolContent = buildEffectiveToolContent(effectiveTools);
     push({
       id: 'runtime:tools',
       kind: 'tool-capability',
@@ -250,7 +245,7 @@ function resolvePromptShellCwd(sessionId: string | null | undefined, workDir: st
 
 export const promptPlanBuilder = new PromptPlanBuilder();
 
-function buildEffectiveToolContent(agentId: string, tools: readonly string[]): string {
+function buildEffectiveToolContent(tools: readonly string[]): string {
   const lines = tools.length
     ? ['# Effective Tools', ...tools.map((tool) => `- ${tool}`)]
     : [
@@ -278,9 +273,7 @@ function buildEffectiveToolContent(agentId: string, tools: readonly string[]): s
       '',
       '## Tasks capability',
       'Tasks are read-only in this turn. You may inspect Tasks with task_list/task_get, but you cannot create, update, or stop them.',
-      agentId === 'ask'
-        ? 'Ask is intentionally read-only. Use Plan or Edit for work that must create or change Tasks.'
-        : 'Use a Plan or Edit turn whose effective tools include task mutations when Tasks must change.',
+      'Use a profile whose effective tools include task mutations when Tasks must change.',
     );
   } else {
     lines.push('', '## Tasks capability', 'No Tasks tools are available in this turn.');

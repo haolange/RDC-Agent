@@ -1,6 +1,7 @@
 import { generateEventId, nowIso } from '@shared/utils/id';
 import type { HarnessTask, TaskMutation } from '@shared/types/harness';
 import { runScopedStore } from './RunScopedStore';
+import { assertMissionRun } from '../../sessions/runV2/runKindGuard';
 
 export interface TaskBoardSnapshot {
   schemaVersion: '1';
@@ -15,6 +16,7 @@ const BOARD_PATH = 'task-board.json';
 
 export class TaskBoard {
   read(sessionId: string, runId: string): TaskBoardSnapshot {
+    assertMissionRun(sessionId, runId);
     return runScopedStore.readJson<TaskBoardSnapshot>(
       sessionId,
       runId,
@@ -107,6 +109,7 @@ export class TaskBoard {
   }
 
   write(snapshot: TaskBoardSnapshot): void {
+    assertMissionRun(snapshot.sessionId, snapshot.runId);
     runScopedStore.writeJson(snapshot.sessionId, snapshot.runId, BOARD_PATH, snapshot);
   }
 

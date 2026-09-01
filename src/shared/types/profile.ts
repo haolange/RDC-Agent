@@ -1,4 +1,4 @@
-import type { AgentRole, WriteScope } from './agent';
+import type { AgentRole } from './agent';
 import type { LlmProviderId } from './settings';
 import type { WorkflowPhase, WorkflowStage } from './workflow';
 
@@ -35,8 +35,6 @@ export interface EffectiveAgentRuntimeConfig {
   providerId: LlmProviderId;
   modelId: string;
   temperature?: number;
-  category?: string;
-  writeScope?: WriteScope[];
   stage: WorkflowStage;
   phase: WorkflowPhase;
   toolAllowlist: string[];

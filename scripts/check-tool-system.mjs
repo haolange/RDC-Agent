@@ -91,11 +91,12 @@ function main() {
     path.join(repoRoot, 'src/main/settings/AgentManifestService.ts'),
     'utf8',
   );
-  const seedDefinition = /const createSeedDefinition[\s\S]*?\n\};/m.exec(agentManifestService)?.[0];
-  assert(seedDefinition, 'AgentManifestService must keep createSeedDefinition');
-  assert(seedDefinition.includes("'task'"), 'AgentManifestService seed must include task');
-  assert(!seedDefinition.includes("'todo'"), 'AgentManifestService seed must not include todo');
-  assert(!seedDefinition.includes("'search_codebase'"), 'AgentManifestService seed must not include search_codebase');
+  assert(!agentManifestService.includes('createSeedDefinition'), 'AgentManifestService must not write user seeds');
+  const generalManifest = fs.readFileSync(path.join(repoRoot, 'resources/agent-runtime/agents/general.agent.md'), 'utf8');
+  assert(generalManifest.includes('task'), 'General builtin must include task');
+  assert(!generalManifest.includes('todo'), 'General builtin must not include todo');
+  assert(!generalManifest.includes('search_codebase'), 'General builtin must not include search_codebase');
+  assert(!generalManifest.includes('knowledge'), 'Wave 1 must not register knowledge tokens');
 
   assert(
     Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS.task)

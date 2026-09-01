@@ -13,6 +13,7 @@ import type {
   PreparedConversationPrompt,
   ResolvedConversationContext,
 } from './ConversationRoutePreflight';
+import { resolveEffectiveAgentSnapshot } from './ConversationRoutePreflight';
 
 export interface PrepareConversationPromptInput {
   context: ResolvedConversationContext;
@@ -99,6 +100,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     ));
   }
 
+  const overlayDiagnostics = resolveEffectiveAgentSnapshot(input.agentId, projectRootPath).overlayDiagnostics;
   return {
     projectRootPath,
     effectiveProfile: definition,
@@ -109,5 +111,6 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     allowedToolNames,
     promptPlan,
     visibleTurnIds,
+    ...(overlayDiagnostics.length > 0 ? { overlayDiagnostics } : {}),
   };
 }

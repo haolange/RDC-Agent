@@ -12,7 +12,7 @@ import {
   toSessionUsageManifest,
   toSessionShellStateManifest,
   toSessionContextViewManifest,
-  PersistedRunRecordSchema,
+  SESSION_RUN_MIGRATIONS,
   CONVERSATION_TURN_COMMIT_MIGRATIONS,
   CONVERSATION_TERMINAL_COMMIT_MIGRATIONS,
   SESSION_EVIDENCE_MIGRATIONS,
@@ -365,11 +365,14 @@ const legalAttachment = {
 };
 
 const legalRun = {
+  schemaVersion: '2' as const,
+  kind: 'mission' as const,
+  mission: 'debugger' as const,
+  profileId: 'debugger',
   runId: 'run_1',
   projectId: 'proj_1',
   sessionId: 'sess_1',
   caseId: 'sess_1',
-  mode: 'debugger' as const,
   goal: 'g',
   captures: [],
   startedAt: 1,
@@ -552,7 +555,7 @@ describe('storage schema store quartet', () => {
       corrupt: { runId: 1 },
       missingOrLegacy: legalRun,
       higher: { ...legalRun, schemaVersion: '99' },
-      read: (filePath: string) => io.readJson(filePath, PersistedRunRecordSchema),
+      read: (filePath: string) => io.readJson(filePath, SESSION_RUN_MIGRATIONS),
     },
     {
       name: 'session evidence',

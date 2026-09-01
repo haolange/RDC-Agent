@@ -6,14 +6,14 @@ import type { ModeCapabilities } from '../types/workflow';
 import type { CaptureRole } from '../types/session';
 
 export const MODE_CAPABILITIES: Record<string, ModeCapabilities> = {
-  ask: {
-    mode: 'ask',
+  general: {
+    profileId: 'general',
     availableStages: [],
     requiresLLM: true,
     isFullyImplemented: true,
   },
   debugger: {
-    mode: 'debugger',
+    profileId: 'debugger',
     availableStages: [
       'preflight',
       'entry_gate',
@@ -29,14 +29,14 @@ export const MODE_CAPABILITIES: Record<string, ModeCapabilities> = {
     isFullyImplemented: true,
   },
   analyzer: {
-    mode: 'analyzer',
+    profileId: 'analyzer',
     availableStages: [],
     requiresLLM: false,
     isFullyImplemented: false,
     disabledReason: 'Analyzer is not implemented yet.',
   },
   optimizer: {
-    mode: 'optimizer',
+    profileId: 'optimizer',
     availableStages: [],
     requiresLLM: false,
     isFullyImplemented: false,

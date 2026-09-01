@@ -3,6 +3,8 @@ import type { ConversationMessage, ConversationTurnResult } from '@shared/types/
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import {
   applyConversationTurnResult,
+  buildOptimisticConversationTurn,
+  resolveComposerProfileId,
   syncE2EConversationState,
 } from './composerSendHelpers';
 import { useConversationStore } from '../../../stores/conversationStore';
@@ -89,6 +91,23 @@ const makeElectronApi = () => ({
 }) as unknown as NonNullable<Window['electronAPI']>;
 
 describe('composerSendHelpers', () => {
+  it('defaults an empty composer identity to general instead of ask', () => {
+    expect(resolveComposerProfileId('general', undefined)).toBe('general');
+    expect(resolveComposerProfileId('general', '')).toBe('general');
+    const optimistic = buildOptimisticConversationTurn({
+      requestId: 'req-1',
+      trimmed: 'hello',
+      currentMode: 'general',
+      currentProject: null,
+      currentSession: null,
+      currentRun: null,
+      pendingAttachments: [],
+    });
+    expect(optimistic.userMessage.profileId).toBe('general');
+    expect(optimistic.assistantDraftMessage.agentId).toBe('general');
+    expect(optimistic.assistantDraftMessage.agentId).not.toBe('ask');
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     useConversationStore.getState().reset();

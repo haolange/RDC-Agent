@@ -3089,6 +3089,117 @@
   margin-top: 0;
 }
 
+.settings-handoff-editor {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.settings-handoff-list {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.settings-handoff-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-raised) 30%, transparent);
+}
+
+.settings-handoff-card[data-invalid='true'] {
+  border-color: var(--token-status-error);
+}
+
+.settings-handoff-card-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.settings-handoff-card-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--token-text-heading);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-handoff-card-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-handoff-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.settings-handoff-prompt {
+  grid-column: 1 / -1;
+}
+
+.settings-handoff-model {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.settings-handoff-model-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-2);
+}
+
+.settings-handoff-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.settings-handoff-flag {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.settings-handoff-error {
+  color: var(--token-status-error);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.settings-handoff-target-select[aria-invalid='true'] {
+  border-color: var(--token-status-error);
+}
+
+.settings-handoff-add {
+  display: flex;
+  justify-content: flex-start;
+}
+
+@media (max-width: 880px) {
+  .settings-handoff-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .settings-provider-row-actions--configured {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr);

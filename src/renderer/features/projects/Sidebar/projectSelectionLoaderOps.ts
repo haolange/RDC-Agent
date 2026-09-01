@@ -4,6 +4,7 @@ import { useProjectStore } from '../../../stores/projectStore';
 import { useSessionStore } from '../../../stores/sessionStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import { applySessionSwitchHygiene } from '../../../app/bootstrap/sessionSwitchHygiene';
+import { hydrateComposerAgentFromSession } from '../../debugger/composer/sessionAgentId';
 import type { TranslationKey } from '../../../i18n';
 import type { ProjectRecord, SessionRecord } from '@shared/types/session';
 import type {
@@ -32,6 +33,7 @@ export interface ProjectSelectionLoaderOpsContext {
   setRuns: ReturnType<typeof useSessionStore.getState>['setRuns'];
   setCaptures: ReturnType<typeof useCaptureStore.getState>['setCaptures'];
   getCurrentSession: () => ReturnType<typeof useProjectStore.getState>['currentSession'];
+  reloadSettings: () => Promise<unknown>;
 }
 
 export async function loadRunsForSession(sessionId: string) {
@@ -110,6 +112,7 @@ export async function selectSessionOp(
     });
   }
   ctx.setCurrentSession(result.session);
+  hydrateComposerAgentFromSession(result.session);
   const history = await window.electronAPI.conversation.getHistory(result.session.sessionId).catch(() => null);
   if (history && ctx.isLatestSelectionRequest(options.requestId)) {
     useConversationStore.getState().setConversationSnapshot(history.messages ?? [], history.branchState ?? null);
@@ -157,6 +160,10 @@ export async function loadSessionsOp(
   }
 
   ctx.setSessions(nextSessions);
+  await ctx.reloadSettings();
+  if (!ctx.isLatestSelectionRequest(options.requestId)) {
+    return;
+  }
   ctx.setCurrentProject(selectedProject);
   ctx.updateProjectInputs(selectedProject.projectId, selectedProject.inputs ?? []);
   ctx.ensureProjectExpanded(selectedProject.projectId);
@@ -233,6 +240,7 @@ export async function loadProjectsOp(
     ctx.setCaptures([]);
     ctx.setSessions([]);
     ctx.setRuns([]);
+    await ctx.reloadSettings();
     return;
   }
 

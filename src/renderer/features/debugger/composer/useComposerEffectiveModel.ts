@@ -3,6 +3,7 @@ import { useAppSettingsStore } from '../../../stores/appSettingsStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import {
   hasComposerModelChoice,
+  readCompiledComposerRoute,
   resolveComposerEffectiveModel,
 } from './composerEffectiveModel';
 import {
@@ -16,9 +17,7 @@ export function readComposerEffectiveModel(
   currentSession: SessionRecord | null,
   projectId?: string | null,
 ): ReturnType<typeof resolveComposerEffectiveModel> {
-  const route = useAppSettingsStore.getState().settings.llm.agentRoutes.find((entry) => (
-    entry.agentId === agentId
-  ));
+  const route = readCompiledComposerRoute(useAppSettingsStore.getState().settings, agentId);
   return resolveComposerEffectiveModel(
     currentSession?.modelOverride,
     currentSession ? null : readComposerDraftModel(projectId ?? useProjectStore.getState().currentProject?.projectId),
@@ -28,9 +27,7 @@ export function readComposerEffectiveModel(
 
 export function useComposerEffectiveModel(agentId: string, currentSession: SessionRecord | null) {
   const projectId = useProjectStore((state) => state.currentProject?.projectId ?? null);
-  const agentRoute = useAppSettingsStore((state) => (
-    state.settings.llm.agentRoutes.find((route) => route.agentId === agentId)
-  ));
+  const agentRoute = useAppSettingsStore((state) => readCompiledComposerRoute(state.settings, agentId));
   const draftScope = composerNoSessionScopeKey(projectId);
   const draftModel = useComposerModelDraftStore((state) => (
     currentSession ? null : (state.draftByScope[draftScope] ?? null)

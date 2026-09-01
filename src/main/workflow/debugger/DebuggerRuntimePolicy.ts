@@ -1,5 +1,4 @@
 import type { AgentRole } from '@shared/types/agent';
-import { isTopLevelAgentId } from '@shared/types/agent';
 import type { WorkflowStage } from '@shared/types/workflow';
 import {
   BUILTIN_AGENT_TOOL_ID_SET,
@@ -11,22 +10,6 @@ import { executionProfileService } from '../../settings/ExecutionProfileService'
 import { settingsService } from '../../settings/SettingsService';
 
 export { diagnoseManifestToolTokens, expandCanonicalToolToken };
-
-export const ASK_READONLY_TOOL_ALLOWLIST = [
-  'read_file',
-  'glob',
-  'grep',
-  'task_list',
-  'task_get',
-  'web_fetch',
-  'web_search',
-  'git_status',
-  'git_diff',
-  'git_log',
-  'tool_search',
-  'memory_search',
-  'memory_read',
-];
 
 const RUNTIME_TOOL_ALIASES: Record<string, string> = {
   read: 'read_file',
@@ -87,67 +70,6 @@ const RUNTIME_TOOL_ALIASES: Record<string, string> = {
   notebook_edit: 'notebook_edit',
 };
 
-const ASK_DENIED_TOOL_PREFIXES = ['rd.', 'mcp.', 'mcp__'];
-const ASK_DENIED_TOOLS = new Set([
-  'shell',
-  'write',
-  'write_file',
-  'edit',
-  'edit_file',
-  'remove',
-  'delete',
-  'delete_file',
-  'move_file',
-  'copy_file',
-  'notebook_edit',
-  'git_add',
-  'git_unstage',
-  'git_commit',
-  'task_create',
-  'task_update',
-  'task_stop',
-  'rdx_context',
-  'subagent',
-  'memory_write',
-  'memory_delete',
-  'plan_artifact',
-  'output_register',
-]);
-
-const EXECUTABLE_AGENT_TOOL_ALLOWLIST = [
-  ...ASK_READONLY_TOOL_ALLOWLIST,
-  'shell',
-  'write_file',
-  'edit_file',
-  'ask_user',
-  'agent_handoff',
-  'subagent',
-  'task_create',
-  'task_update',
-  'task_get',
-  'task_list',
-  'task_stop',
-  'memory_read',
-  'memory_search',
-  'memory_write',
-  'memory_delete',
-  'plan_artifact',
-  'output_register',
-  'skills',
-  'skill_read',
-  'mcp',
-  'mcp__*',
-  'rdx_context',
-  'git_add',
-  'git_unstage',
-  'git_commit',
-  'delete_file',
-  'move_file',
-  'copy_file',
-  'notebook_edit',
-  'tool_search',
-];
-
 const SHADER_EDIT_TOOLS = ['rd.shader.edit_and_replace', 'rd.macro.shader_hotfix_validate'];
 
 function expandToken(toolName: string): string[] {
@@ -161,10 +83,10 @@ export function resolveAgentToolAllowlistFromDefinition(
   definitionTools: readonly string[],
 ): string[] {
   const profileTools = definitionTools.flatMap(expandToken);
-  const filtered = agentId === 'ask'
-    ? profileTools.filter((toolName) => !isDeniedAskTool(toolName, normalizeToolName(toolName)))
-    : profileTools;
-  return Array.from(new Set(filtered));
+  if (profileTools.length === 0) {
+    throw new Error(`AGENT_TOOLS_EMPTY: profile ${agentId} has an empty tools list and cannot execute.`);
+  }
+  return Array.from(new Set(profileTools));
 }
 
 export function resolveAgentToolAllowlist(agentId: AgentRole, stage?: WorkflowStage): string[] {
@@ -175,27 +97,19 @@ export function resolveAgentToolAllowlist(agentId: AgentRole, stage?: WorkflowSt
     ? manifest.tools.flatMap(expandToken)
     : runtimeProfile.toolAllowlist?.length
       ? runtimeProfile.toolAllowlist.flatMap(expandToken)
-      : agentId === 'ask'
-        ? ASK_READONLY_TOOL_ALLOWLIST
-        : isTopLevelAgentId(agentId)
-          ? EXECUTABLE_AGENT_TOOL_ALLOWLIST
-          : [];
+      : [];
 
-  if (agentId === 'ask') {
-    return Array.from(new Set(profileTools.filter((toolName) => !isDeniedAskTool(toolName, normalizeToolName(toolName)))));
+  if (profileTools.length === 0) {
+    throw new Error(`AGENT_TOOLS_EMPTY: profile ${agentId} has an empty tools list and cannot execute.`);
   }
   return Array.from(new Set(profileTools));
 }
 
-export function isBuiltinToolAllowedForAgent(toolName: string, agentId: AgentRole): boolean {
+export function isBuiltinToolAllowedForAgent(toolName: string, _agentId: AgentRole): boolean {
   const normalizedToolName = normalizeToolName(toolName);
   if (SHADER_EDIT_TOOLS.includes(normalizedToolName)) {
     return false;
   }
-  if (agentId === 'ask' && isDeniedAskTool(toolName, normalizedToolName)) {
-    return false;
-  }
-
   return true;
 }
 
@@ -305,13 +219,6 @@ export function combineActiveSkillAllowlists(
     active = new Set([...active].filter((name) => narrowed.includes(name)));
   }
   return active ? Array.from(active) : null;
-}
-
-function isDeniedAskTool(originalToolName: string, normalizedToolName: string): boolean {
-  if (ASK_DENIED_TOOLS.has(originalToolName) || ASK_DENIED_TOOLS.has(normalizedToolName)) {
-    return true;
-  }
-  return ASK_DENIED_TOOL_PREFIXES.some((prefix) => originalToolName.startsWith(prefix) || normalizedToolName.startsWith(prefix));
 }
 
 export function isBuiltinAgentToolId(toolName: string): boolean {

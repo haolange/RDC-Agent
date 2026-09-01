@@ -11,13 +11,13 @@ import type { AgentRouteCapability, AgentEvent } from '@shared/types/agentRuntim
 import type { PromptPlan, EffectiveAgentProfile } from '@shared/types/rdxRuntime';
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type {
-  AppMode,
   OpenedCaptureState,
   ProjectInputRecord,
   RunSummary,
   SessionAttachmentRecord,
   SessionRecord,
 } from '@shared/types/session';
+import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import {
@@ -115,6 +115,7 @@ export interface PreparedConversationPrompt {
   allowedToolNames: string[];
   promptPlan: PromptPlan;
   visibleTurnIds: string[];
+  overlayDiagnostics?: string[];
 }
 
 export interface ActiveConversationTurn {
@@ -128,14 +129,31 @@ export interface ActiveConversationTurn {
   stopped: Promise<void>;
 }
 
-export function resolveConversationAgentId(requestedMode: AppMode, requestedAgentId?: string | null): AgentRole {
-  if (requestedAgentId && resolveEnabledAgentDefinition(requestedAgentId)) {
-    return requestedAgentId as AgentRole;
+function throwUnavailableConversationAgent(agentId: string, projectRootPath?: string | null): never {
+  const lookup = findEffectiveAgentProfile(agentId, projectRootPath);
+  const code = lookup.found ? 'CONVERSATION_PROFILE_DISABLED' : 'CONVERSATION_PROFILE_UNKNOWN';
+  const reason = lookup.found ? 'disabled' : 'not in the project-aware snapshot';
+  throw new Error(`${code}: requested profile \`${agentId}\` is ${reason}.`);
+}
+
+export function resolveConversationAgentId(
+  requestedAgentId?: string | null,
+  requestedProfileId?: string | null,
+  projectRootPath?: string | null,
+): AgentRole {
+  const candidate = requestedAgentId?.trim() || requestedProfileId?.trim();
+  if (candidate) {
+    if (findEffectiveAgentProfile(candidate, projectRootPath).enabled) {
+      return candidate as AgentRole;
+    }
+    throwUnavailableConversationAgent(candidate, projectRootPath);
   }
-  if (requestedMode !== 'ask' && resolveEnabledAgentDefinition(requestedMode)) {
-    return requestedMode as AgentRole;
+  if (findEffectiveAgentProfile(DEFAULT_AGENT_ID, projectRootPath).enabled) {
+    return DEFAULT_AGENT_ID;
   }
-  return 'ask';
+  throw new Error(
+    `CONVERSATION_AGENT_UNAVAILABLE: default profile \`${DEFAULT_AGENT_ID}\` is not enabled.`,
+  );
 }
 
 const ACTIVE_RUN_STATUSES: Array<RunSummary['status']> = [
@@ -182,7 +200,7 @@ export function createConversationMessage(
     sessionId?: string | null;
     projectId?: string | null;
     runId?: string | null;
-    modeContext?: AppMode;
+    profileId?: string;
     agentId?: ConversationMessage['agentId'];
     attachments?: SessionAttachmentRecord[];
     status?: ConversationMessage['status'];
@@ -203,7 +221,7 @@ export function createConversationMessage(
     sessionId: options.sessionId ?? null,
     projectId: options.projectId ?? null,
     runId: options.runId ?? null,
-    modeContext: options.modeContext,
+    profileId: options.profileId ?? options.agentId,
     role,
     agentId: options.agentId,
     content,
@@ -220,17 +238,48 @@ export function createConversationMessage(
   };
 }
 
-export function resolveEnabledAgentDefinition(agentId: string, projectRootPath?: string | null) {
+function isOverlayDiagnosticForProfile(entry: string, agentId: string): boolean {
+  return entry.includes(`${agentId}.agent.md`)
+    || ((entry.includes('PROJECT_AGENT_MANIFEST_INVALID') || entry.includes('USER_AGENT_MANIFEST_INVALID'))
+      && entry.includes(agentId));
+}
+
+export function findEffectiveAgentProfile(agentId: string, projectRootPath?: string | null) {
   const settings = settingsService.getAll();
-  if (!settings.paths) return null;
-  const providers = settings.llm?.providers ?? [];
-  const agentRoutes = settings.llm?.agentRoutes ?? [];
-  return agentManifestService.getEffectiveProfiles(
+  if (!settings.paths) {
+    return { found: false as const, enabled: false as const, profile: null };
+  }
+  const snapshot = agentManifestService.resolveEffectiveSnapshot(
     settings.paths,
-    providers,
-    agentRoutes,
     projectRootPath ?? undefined,
-  ).find((entry) => entry.id === agentId && entry.enabled) ?? null;
+  );
+  const profile = snapshot.profiles.find((entry) => entry.id === agentId) ?? null;
+  return {
+    found: Boolean(profile),
+    enabled: Boolean(profile?.enabled),
+    profile,
+  };
+}
+
+export function resolveEffectiveAgentSnapshot(agentId: string, projectRootPath?: string | null) {
+  const settings = settingsService.getAll();
+  if (!settings.paths) {
+    return { profile: null, overlayDiagnostics: [] as string[], diagnostics: [] as string[] };
+  }
+  const snapshot = agentManifestService.resolveEffectiveSnapshot(
+    settings.paths,
+    projectRootPath ?? undefined,
+  );
+  const profile = snapshot.profiles.find((entry) => entry.id === agentId && entry.enabled) ?? null;
+  return {
+    profile,
+    overlayDiagnostics: snapshot.diagnostics.filter((entry) => isOverlayDiagnosticForProfile(entry, agentId)),
+    diagnostics: snapshot.diagnostics,
+  };
+}
+
+export function resolveEnabledAgentDefinition(agentId: string, projectRootPath?: string | null) {
+  return resolveEffectiveAgentSnapshot(agentId, projectRootPath).profile;
 }
 
 export function getAgentLabel(agentId: AgentRole): string {
@@ -245,12 +294,14 @@ export interface AgentRoutePreflightOk {
   providerId: string;
   modelId: string;
   routeCapability: AgentRouteCapability;
+  overlayDiagnostics?: string[];
   aliasRemap?: { from: string; to: string };
 }
 
 export interface AgentRoutePreflightBlocked {
   ok: false;
   diagnostic: ConversationMessageDiagnostic;
+  overlayDiagnostics?: string[];
 }
 
 export type AgentRoutePreflight = AgentRoutePreflightOk | AgentRoutePreflightBlocked;
@@ -291,19 +342,27 @@ export function resolveAgentRoutePreflight(
   agentId: AgentRole,
   fallbackAgentId?: AgentRole,
   modelOverride?: { providerId: string; modelId: string } | null,
+  projectRootPath?: string | null,
 ): AgentRoutePreflight {
   const settings = settingsService.getAll();
-  const primaryRoute = settings.llm.agentRoutes.find((entry) => entry.agentId === agentId);
-  const fallbackRoute = fallbackAgentId
-    ? settings.llm.agentRoutes.find((entry) => entry.agentId === fallbackAgentId)
-    : undefined;
-  const route = primaryRoute?.providerId && primaryRoute.modelId ? primaryRoute : fallbackRoute;
-  const routeAgentId = route?.agentId ?? agentId;
+  const snapshot = resolveEffectiveAgentSnapshot(agentId, projectRootPath);
+  const effectiveProfile = snapshot.profile;
+  const compiled = effectiveProfile?.compiledRoute;
+  const fallbackProfile = fallbackAgentId ? resolveEnabledAgentDefinition(fallbackAgentId, projectRootPath) : null;
+  const route = compiled?.providerId && compiled.modelId
+    ? compiled
+    : fallbackProfile?.compiledRoute;
+  const routeAgentId = (route?.agentId ?? agentId) as AgentRole;
   const label = getAgentLabel(agentId);
   const providerId = modelOverride?.providerId || route?.providerId;
   const modelId = modelOverride?.modelId || route?.modelId;
+  const withOverlay = <T extends AgentRoutePreflight>(result: T): T => (
+    snapshot.overlayDiagnostics.length > 0
+      ? { ...result, overlayDiagnostics: snapshot.overlayDiagnostics }
+      : result
+  );
   if (!providerId || !modelId) {
-    return {
+    return withOverlay({
       ok: false,
       diagnostic: createConversationDiagnostic({
         agentId,
@@ -311,12 +370,12 @@ export function resolveAgentRoutePreflight(
         severity: 'warning',
         userMessage: `当前 ${label} 链路还没绑定可用模型。请在 Settings 中为 \`${agentId}\` 选择 provider 和 model route。`,
       }),
-    };
+    });
   }
 
   const provider = settings.llm.providers.find((entry) => entry.id === providerId);
   if (!provider || !provider.enabled || !provider.isConfigured) {
-    return {
+    return withOverlay({
       ok: false,
       diagnostic: createConversationDiagnostic({
         agentId,
@@ -327,11 +386,11 @@ export function resolveAgentRoutePreflight(
         modelId,
         technicalMessage: provider?.lastError ?? provider?.unavailableReason,
       }),
-    };
+    });
   }
 
   if (provider.status !== 'verified') {
-    return {
+    return withOverlay({
       ok: false,
       diagnostic: createConversationDiagnostic({
         agentId,
@@ -342,14 +401,14 @@ export function resolveAgentRoutePreflight(
         modelId,
         technicalMessage: provider.lastError ?? provider.unavailableReason,
       }),
-    };
+    });
   }
 
   const selection = resolveEffectiveModelSelection(providerId, modelId, settings);
   const effectiveModel = selection.model;
   if (!effectiveModel) {
     const recommendationText = selection.recommendations.map((entry) => entry.modelId).join(', ');
-    return {
+    return withOverlay({
       ok: false,
       diagnostic: createConversationDiagnostic({
         agentId,
@@ -361,7 +420,7 @@ export function resolveAgentRoutePreflight(
         technicalMessage: `MODEL_UNAVAILABLE: ${providerId}/${modelId} is absent, disabled, or unavailable in the effective catalog.${recommendationText ? ` Recommendations: ${recommendationText}.` : ''}`,
         recommendations: selection.recommendations,
       }),
-    };
+    });
   }
   const effectiveModelId = effectiveModel.modelId;
   if (!isAgentToolExecutableModel(effectiveModel)) {
@@ -374,7 +433,7 @@ export function resolveAgentRoutePreflight(
         }
       : describeAgentToolIneligibility(eligibility, providerId, effectiveModelId);
     const recommendationText = selection.recommendations.map((entry) => entry.modelId).join(', ');
-    return {
+    return withOverlay({
       ok: false,
       diagnostic: createConversationDiagnostic({
         agentId,
@@ -388,10 +447,10 @@ export function resolveAgentRoutePreflight(
         technicalMessage: `${detail.technicalMessage}${recommendationText ? ` Recommendations: ${recommendationText}.` : ''}`,
         recommendations: selection.recommendations,
       }),
-    };
+    });
   }
 
-  return {
+  return withOverlay({
     ok: true,
     agentId,
     routeAgentId,
@@ -405,7 +464,27 @@ export function resolveAgentRoutePreflight(
     ...(selection.remappedFrom
       ? { aliasRemap: { from: selection.remappedFrom, to: effectiveModelId } }
       : {}),
-  };
+  });
+}
+
+export function recordOverlayProfileDiagnostics(
+  context: ResolvedConversationContext,
+  agentId: AgentRole,
+  overlayDiagnostics: string[] | undefined,
+  continuedWithLowerScope: boolean,
+): void {
+  if (!overlayDiagnostics?.length) return;
+  for (const entry of overlayDiagnostics) {
+    recordLlmDiagnostic(context, createConversationDiagnostic({
+      agentId,
+      code: 'CONVERSATION_PROFILE_OVERLAY_INVALID',
+      severity: 'warning',
+      userMessage: continuedWithLowerScope
+        ? `当前项目的 profile 覆盖无效，已继续使用较低 scope 的有效 profile。${entry}`
+        : `当前项目的 profile 覆盖无效，且当前没有可用的较低 scope 路由。${entry}`,
+      technicalMessage: entry,
+    }));
+  }
 }
 
 export function recordLlmDiagnostic(

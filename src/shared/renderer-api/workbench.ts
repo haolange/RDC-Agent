@@ -50,6 +50,7 @@ export function createSessionApi(transport: RendererApiTransport): SessionApi {
     setModelOverride: (id, modelOverride) => (
       transport.invoke(INVOKE.session.setModelOverride, id, modelOverride)
     ),
+    setAgentId: (id, agentId) => transport.invoke(INVOKE.session.setAgentId, id, agentId),
   };
 }
 

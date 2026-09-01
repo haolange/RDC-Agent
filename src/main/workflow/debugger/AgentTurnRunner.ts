@@ -4,7 +4,7 @@
 
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
-import type { AppMode, ContextUsageBreakdownEntry } from '@shared/types/session';
+import type { ContextUsageBreakdownEntry } from '@shared/types/session';
 import type { WorkflowStage } from '@shared/types/workflow';
 import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdxRuntime';
 import type { EffectiveModel } from '@shared/types/providerCapability';
@@ -110,11 +110,10 @@ export interface AgentTurnRunnerDeps {
 export class AgentTurnRunner {
   constructor(private readonly deps: AgentTurnRunnerDeps) {}
 
-  resolveMaxTurns(agentId: AgentRole, policyMaxTurns?: number, profileMaxTurns?: number | null): number {
-    const defaultMax = agentId === 'edit' || agentId === 'debugger' || agentId === 'optimizer' ? 50 : 25;
+  resolveMaxTurns(_agentId: AgentRole, policyMaxTurns?: number, profileMaxTurns?: number | null): number {
     const profileMax = typeof profileMaxTurns === 'number' && profileMaxTurns > 0
       ? profileMaxTurns
-      : defaultMax;
+      : 25;
     if (typeof policyMaxTurns === 'number' && Number.isFinite(policyMaxTurns)) {
       if (policyMaxTurns === 0) {
         throw new Error('POLICY_MAX_TURNS_ZERO: maxTurns must be greater than zero for an executable turn.');
@@ -308,7 +307,7 @@ export class AgentTurnRunner {
     providerId: string;
     modelId: string;
     temperature?: number;
-    mode: AppMode;
+    profileId: string;
     stage?: WorkflowStage | 'report';
     runId?: string;
     sessionId?: string | null;
@@ -394,6 +393,7 @@ export class AgentTurnRunner {
         input.options?.onEvent?.(event);
       },
       sessionId: executionScopeId,
+      requestId: input.options?.requestId ?? null,
       projectRootPath: input.projectRootPath ?? null,
       projectId: input.projectId ?? null,
       agentId: input.agentId,
@@ -433,7 +433,7 @@ export class AgentTurnRunner {
       turnId: input.turnId,
       sessionId: executionScopeId,
       stage: input.stage,
-      mode: input.mode,
+      profileId: input.profileId,
       providerId: input.providerId,
       modelId: input.modelId,
       toolAllowlist: activeToolAllowlist,

@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import type { Report } from '@shared/types/workflow';
 import type { RunLlmExecutionSummary } from '../settings/DebuggerLlmService';
+import { assertMissionRun } from '../sessions/runV2/runKindGuard';
 
 export interface ReportBundleInput {
   projectRoot: string;
@@ -32,6 +33,7 @@ const escapeHtml = (value: string): string => value
 
 export class ReportBundleService {
   publish(input: ReportBundleInput): ReportBundleResult {
+    assertMissionRun(input.sessionId, input.runId);
     const reportsDir = path.join(
       input.projectRoot,
       'sessions',

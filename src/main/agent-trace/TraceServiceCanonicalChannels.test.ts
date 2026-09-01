@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { ConversationMessage, ConversationWorkBlock } from '@shared/types/conversation';
-import { findCanonicalFinalAnswer } from './TraceService';
+import { DEFAULT_AGENT_ID } from '@shared/types/agent';
+import { agentProfileRegistry } from './manifests/AgentProfileRegistry';
+import { findCanonicalFinalAnswer, resolveHistoryTurnProfileId } from './TraceService';
 
 function block(id: string, text: string, outputPhase: 'commentary' | 'final_answer'): ConversationWorkBlock {
   return {
@@ -56,5 +58,40 @@ describe('TraceService canonical channel reload', () => {
         block('loop-2', 'Same bytes', 'final_answer'),
       ]),
     ], 'run-1')).toBe('Same bytes');
+  });
+});
+
+describe('TraceService history-turn profile projection', () => {
+  it('projects a no-runId general turn with its own profileId, not ask or debugger', () => {
+    const profileId = resolveHistoryTurnProfileId({
+      assistantMessages: [{ profileId: 'general', agentId: 'general' }],
+    });
+    const profile = agentProfileRegistry.get(profileId);
+    expect(profileId).toBe('general');
+    expect(profile.agentType).toBe('general');
+    expect(profile.displayName).toBe('General');
+    expect(profile.agentType).not.toBe('ask');
+  });
+
+  it('projects a no-runId custom ask turn as ask instead of debugger', () => {
+    const profileId = resolveHistoryTurnProfileId({
+      userMessage: { profileId: 'ask' },
+      assistantMessages: [{ agentId: 'ask' }],
+    });
+    const profile = agentProfileRegistry.get(profileId);
+    expect(profileId).toBe('ask');
+    expect(profile.agentType).toBe('ask');
+    expect(profile.displayName).toBe('ask');
+    expect(profile.agentType).not.toBe('debugger');
+    expect(profile.displayName).not.toBe('Debugger');
+  });
+
+  it('uses DEFAULT_AGENT_ID=general when a history turn has no profileId', () => {
+    const profileId = resolveHistoryTurnProfileId({ assistantMessages: [{}] });
+    const profile = agentProfileRegistry.get(profileId);
+    expect(profileId).toBe(DEFAULT_AGENT_ID);
+    expect(profile.agentType).toBe('general');
+    expect(profile.agentType).not.toBe('ask');
+    expect(profile.agentType).not.toBe('debugger');
   });
 });

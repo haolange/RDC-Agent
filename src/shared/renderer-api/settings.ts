@@ -72,7 +72,7 @@ export function createSettingsApi(transport: RendererApiTransport): SettingsApi 
     hasProviderSecret: (providerId) => transport.invoke(INVOKE.settings.hasProviderSecret, providerId),
     importAgentManifest: (filePath) => transport.invoke(INVOKE.settings.importAgentManifest, filePath),
     saveAgentDefinition: (request) => transport.invoke(INVOKE.settings.saveAgentDefinition, request),
-    getAgentDefinitionCommit: (agentId) => transport.invoke(INVOKE.settings.getAgentDefinitionCommit, agentId),
+    getAgentDefinitionCommit: (query) => transport.invoke(INVOKE.settings.getAgentDefinitionCommit, query),
     saveProviderDefinition: (request) => transport.invoke(INVOKE.settings.saveProviderDefinition, request),
     getProviderDefinitionCommit: (providerId) => (
       transport.invoke(INVOKE.settings.getProviderDefinitionCommit, providerId)

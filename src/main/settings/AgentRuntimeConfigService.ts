@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { app } from 'electron';
 import YAML from 'yaml';
 import type {
   AgentRuntimeMcpDescriptor,
@@ -60,12 +59,7 @@ const parseSkill = (skillDir: string, scope: 'builtin' | 'user' | 'project'): Sk
 
 export class AgentRuntimeConfigService {
   private templateRoot(): string {
-    const candidates = [
-      path.join(app.getAppPath(), 'resources', 'agent-runtime'),
-      path.join(process.cwd(), 'resources', 'agent-runtime'),
-      path.join(process.resourcesPath ?? '', 'agent-runtime'),
-    ];
-    return candidates.map((candidate) => path.resolve(candidate)).find((candidate) => fs.existsSync(candidate)) ?? path.resolve(candidates[0]);
+    return appPathService.getBuiltinAgentRuntimeRoot();
   }
 
   ensureScaffold(): void {

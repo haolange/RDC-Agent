@@ -42,6 +42,16 @@ export class ScopedResourceResolver {
         });
         continue;
       }
+      if (candidate.invalid) {
+        diagnostics.push({
+          code: 'resource.invalid',
+          severity: 'error',
+          message: candidate.invalidReason
+            ?? `Resource ${id} at ${candidate.sourcePath} is invalid and will not override a lower-scope resource.`,
+          sourcePath: candidate.sourcePath,
+        });
+        continue;
+      }
       const groupKey = `${candidate.kind}:${id}`;
       const group = grouped.get(groupKey) ?? [];
       group.push({ ...candidate, id });

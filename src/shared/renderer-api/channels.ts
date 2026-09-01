@@ -136,6 +136,7 @@ export const RENDERER_INVOKE_CHANNEL = {
     remove: 'session:remove',
     select: 'session:select',
     setModelOverride: 'session:setModelOverride',
+    setAgentId: 'session:setAgentId',
   },
   run: {
     list: 'run:list',

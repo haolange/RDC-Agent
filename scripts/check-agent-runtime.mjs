@@ -2,6 +2,7 @@ import { createRequire } from 'module';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { assertBuiltinProfileContracts } from './builtin-profile-contracts.mjs';
 
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
@@ -71,24 +72,6 @@ function extractStringLiterals(source) {
   return Array.from(source.matchAll(/'([^']+)'/g), (match) => match[1]);
 }
 
-function extractPlanTools(agentManifestServiceSource) {
-  const match = /agentId === 'plan'\s*\?\s*\[([\s\S]*?)\]\s*:\s*agentId === 'edit'/m.exec(agentManifestServiceSource);
-  assert(match, 'AgentManifestService must keep Plan seed tools split from Edit and executable agents.');
-  return extractStringLiterals(match[1]);
-}
-
-function assertIncludesAll(values, required, label) {
-  for (const value of required) {
-    assert(values.includes(value), `${label} must include ${value}.`);
-  }
-}
-
-function assertIncludesNone(values, forbidden, label) {
-  for (const value of forbidden) {
-    assert(!values.includes(value), `${label} must not include ${value}.`);
-  }
-}
-
 async function main() {
   const { loadProviderSurface } = require('../src/main/provider-catalog/ProviderCatalogRegistry.ts');
   await Promise.all(['kimi-coding-plan', 'grok-account', 'openrouter'].map((id) => loadProviderSurface(id)));
@@ -141,35 +124,40 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   }
 
   const agentTypes = read('src/shared/types/agent.ts');
-  assert(agentTypes.includes("export type AgentId = 'ask' | 'plan' | 'edit'"), 'Plan must remain a first-class top-level agent id.');
-  assert(agentTypes.includes("TOP_LEVEL_AGENT_IDS: AgentId[] = ['ask', 'plan', 'edit'"), 'Plan must stay split in TOP_LEVEL_AGENT_IDS.');
+  assert(agentTypes.includes("export type AgentId = 'general' | 'debugger' | 'analyzer' | 'optimizer'"), 'Top-level AgentId must be the four builtin profiles.');
+  assert(agentTypes.includes("TOP_LEVEL_AGENT_IDS: AgentId[] = ['general', 'debugger', 'analyzer', 'optimizer']"), 'TOP_LEVEL_AGENT_IDS must list the four builtin profiles.');
+  assert(agentTypes.includes("DEFAULT_AGENT_ID: AgentId = 'general'"), 'Default profile must be general.');
 
   const layoutTypes = read('src/shared/types/layout.ts');
-  assert(layoutTypes.includes("BuiltinAgentMode = 'ask' | 'plan' | 'edit'"), 'Plan must be a built-in agent mode, split from executable app modes.');
+  assert(layoutTypes.includes("export type AgentMode = 'general' | MissionKind | (string & {})"), 'AgentMode is the Composer profile-id selector.');
+  assert(!layoutTypes.includes('BuiltinAgentMode'), 'BuiltinAgentMode must be removed.');
+  assert(!layoutTypes.includes('ExecutableAgentMode'), 'ExecutableAgentMode must be removed.');
+
+  const sessionTypes = read('src/shared/types/session.ts');
+  assert(sessionTypes.includes("export type MissionId = 'debugger' | 'analyzer' | 'optimizer'"), 'MissionId is the independent mission identity.');
+  assert(!sessionTypes.includes('ExecutableAppMode'), 'ExecutableAppMode must be removed.');
+  assert(!sessionTypes.includes("export type AppMode"), 'AppMode must not return.');
+
+  const harnessTypes = read('src/shared/types/harness.ts');
+  assert(harnessTypes.includes('profileId: string'), 'PlanContract identity is profileId.');
+  assert(!harnessTypes.includes('mode: ExecutableAppMode'), 'PlanContract must not use ExecutableAppMode.');
+  assert(harnessTypes.includes('mission?: MissionId'), 'PlanContract mission uses MissionId.');
 
   const agentConstants = read('src/shared/constants/agents.ts');
-  assert(agentConstants.includes("plan: 'Planning agent"), 'Plan must keep its own agent description.');
-  assert(agentConstants.includes('without direct changes'), 'Plan description must state that it does not directly change files.');
-  assert(agentConstants.includes("plan: ['workspace_notes']"), 'Plan write scope must stay limited to workspace notes.');
+  assert(agentConstants.includes('Execution Orchestrator'), 'General must be described as Execution Orchestrator.');
+  assert(agentConstants.includes('Planning Orchestrator'), 'Mission profiles must be described as Planning Orchestrator.');
+  assert(!agentConstants.includes('AGENT_CATEGORIES'), 'AGENT_CATEGORIES must be deleted.');
+  assert(!agentConstants.includes('AGENT_WRITE_SCOPES'), 'AGENT_WRITE_SCOPES must be deleted.');
 
   const agentManifestService = read('src/main/settings/AgentManifestService.ts');
-  const planTools = extractPlanTools(agentManifestService);
-  assertIncludesAll(
-    planTools,
-    ['read', 'search', 'web', 'askUser', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search'],
-    'Plan seed tools',
-  );
-  assertIncludesNone(
-    planTools,
-    // 'agent' 是宽泛 token；Plan 通过 handoff/subagent 精确协作，不需要它。
-    ['bash', 'shell', 'write', 'edit', 'rdxContext', 'agent'],
-    'Plan seed tools',
-  );
-  assert(agentManifestService.includes("handoffs: agentId === 'plan'"), 'Plan must own a dedicated handoff entry.');
-  assert(agentManifestService.includes("agent: 'edit'"), 'Plan handoff must target Edit for implementation.');
-  assert(agentManifestService.includes("providerId: ''") && agentManifestService.includes("modelId: ''"), 'Invalid or missing Plan routes must persist as empty fail-closed routes.');
+  assert(!agentManifestService.includes('createSeedDefinition'), 'AgentManifestService must not write user seeds.');
+  assert(!agentManifestService.includes('ensureSeedManifests'), 'AgentManifestService must not ensure user seeds.');
+  assert(agentManifestService.includes('resolveEffectiveSnapshot'), 'AgentManifestService must resolve builtin/user/project snapshots.');
+  assert(agentManifestService.includes("providerId: ''") && agentManifestService.includes("modelId: ''"), 'Missing routes must persist as empty fail-closed routes.');
   assert(!agentManifestService.includes('provider.models.some'), 'AgentManifestService must not validate routes against the static settings model list.');
   assert(agentManifestService.includes('EffectiveCatalog is the only'), 'AgentManifestService must preserve explicit routes for EffectiveCatalog validation.');
+
+  assertBuiltinProfileContracts(repoRoot);
 
   const orchestrator = [
     'src/main/workflow/debugger/AgentOrchestrator.ts',

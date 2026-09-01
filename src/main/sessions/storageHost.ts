@@ -3,6 +3,7 @@ import type { ProjectWorkspaceStore } from './ProjectWorkspaceStore';
 import type { SessionRecordStore } from './SessionRecordStore';
 import type { ConversationHistoryStore } from './ConversationHistoryStore';
 import type { SessionContextStore } from './SessionContextStore';
+import type { HandoffStateStore } from './HandoffStateStore';
 import type { ConversationHistoryCacheEntry } from './storageCommitTypes';
 
 export interface StorageHost {
@@ -20,4 +21,5 @@ export interface StorageHost {
   sessions: SessionRecordStore;
   history: ConversationHistoryStore;
   context: SessionContextStore;
+  handoffs: HandoffStateStore;
 }

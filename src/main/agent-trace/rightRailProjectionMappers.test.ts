@@ -91,7 +91,7 @@ describe('right rail projection mappers', () => {
         { id: 'file:duplicate', kind: 'file', label: 'DESIGN.md', path: 'D:/project/DESIGN.md', state: 'used' },
         { id: 'mcp:renderdoc:inspect', kind: 'mcp', label: 'inspect', summary: 'renderdoc', state: 'used' },
       ],
-      mode: 'debugger',
+      profileId: 'debugger',
       permissionMode: 'default',
     });
     expect(result.resources.map((resource) => resource.label)).toEqual(['DESIGN.md', 'inspect']);

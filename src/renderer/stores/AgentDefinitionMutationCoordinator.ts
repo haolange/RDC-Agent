@@ -1,8 +1,10 @@
 import type {
+  AgentDefinitionCommitQuery,
   AgentDefinitionCommitSnapshot,
   AgentDefinitionSaveRequest,
   AgentDefinitionSaveResult,
 } from '@shared/types/agentManifest';
+import { agentDefinitionLaneKey } from '@shared/types/agentManifest';
 
 type CommitAgentDefinition = (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
 
@@ -45,8 +47,8 @@ export class AgentDefinitionMutationCoordinator {
   ) {}
 
   enqueue(request: AgentDefinitionSaveRequest): Promise<AgentDefinitionSaveResult> {
-    const agentId = request.draft.id;
-    const lane = this.getLane(agentId);
+    const laneKey = agentDefinitionLaneKey(request.scope, request.projectId, request.draft.id);
+    const lane = this.getLane(laneKey);
     if (request.clientRevision < lane.latestRevision) {
       return Promise.resolve(supersededResult(request, lane.lastSuccessful));
     }
@@ -60,22 +62,23 @@ export class AgentDefinitionMutationCoordinator {
     if (lane.timer) clearTimeout(lane.timer);
     lane.timer = setTimeout(() => {
       lane.timer = null;
-      void this.runLane(agentId);
+      void this.runLane(laneKey);
     }, this.debounceMs);
     return new Promise<AgentDefinitionSaveResult>((resolve, reject) => {
       lane.waiters.push({ request, resolve, reject });
     });
   }
 
-  async flush(agentId: string): Promise<AgentDefinitionCommitSnapshot | null> {
-    const lane = this.lanes.get(agentId);
+  async flush(query: AgentDefinitionCommitQuery): Promise<AgentDefinitionCommitSnapshot | null> {
+    const laneKey = agentDefinitionLaneKey(query.scope, query.projectId, query.agentId);
+    const lane = this.lanes.get(laneKey);
     if (!lane) return null;
     if (lane.timer) {
       clearTimeout(lane.timer);
       lane.timer = null;
     }
     while (lane.pending || lane.running) {
-      await this.runLane(agentId);
+      await this.runLane(laneKey);
     }
     if (lane.lastResult?.status === 'failed') {
       throw new Error(lane.lastResult.error ?? 'Agent definition save failed.');
@@ -84,8 +87,8 @@ export class AgentDefinitionMutationCoordinator {
     return lane.lastSuccessful;
   }
 
-  private getLane(agentId: string): MutationLane {
-    const current = this.lanes.get(agentId);
+  private getLane(laneKey: string): MutationLane {
+    const current = this.lanes.get(laneKey);
     if (current) return current;
     const lane: MutationLane = {
       pending: null,
@@ -98,12 +101,12 @@ export class AgentDefinitionMutationCoordinator {
       latestRevision: 0,
       runningRevision: null,
     };
-    this.lanes.set(agentId, lane);
+    this.lanes.set(laneKey, lane);
     return lane;
   }
 
-  private async runLane(agentId: string): Promise<void> {
-    const lane = this.getLane(agentId);
+  private async runLane(laneKey: string): Promise<void> {
+    const lane = this.getLane(laneKey);
     if (lane.running) {
       await lane.running;
       return;
@@ -140,6 +143,6 @@ export class AgentDefinitionMutationCoordinator {
         lane.runningRevision = null;
       });
     await lane.running;
-    if (lane.pending) await this.runLane(agentId);
+    if (lane.pending) await this.runLane(laneKey);
   }
 }

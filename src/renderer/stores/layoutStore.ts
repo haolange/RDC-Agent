@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { AppSettings } from '@shared/types/settings';
+import { DEFAULT_AGENT_ID } from '@shared/types/agent';
 import type { AgentMode } from '@shared/types/layout';
 import {
   LEFT_SIDEBAR_COLLAPSED_WIDTH,
@@ -74,8 +75,8 @@ const persistLayout = async (state: Pick<
 };
 
 export const useLayoutStore = create<LayoutState>((set, get) => ({
-  currentMode: 'ask',
-  selectedAgentId: 'ask',
+  currentMode: DEFAULT_AGENT_ID,
+  selectedAgentId: DEFAULT_AGENT_ID,
   leftSidebarCollapsed: false,
   rightPanelCollapsed: false,
   leftSidebarWidth: LEFT_SIDEBAR_DEFAULT_WIDTH,

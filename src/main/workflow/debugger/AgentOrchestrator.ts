@@ -15,7 +15,6 @@ import type {
 } from '@shared/types/agent';
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import type { LLMConfig } from '@shared/types/llm';
-import type { AppMode } from '@shared/types/session';
 import type { LlmProviderId } from '@shared/types/settings';
 import type { WorkflowStage } from '@shared/types/workflow';
 import {
@@ -44,6 +43,7 @@ import {
   runtimeLogService,
   appPathService,
   agentManifestService,
+  compiledRoutesFromDefinitions,
   settingsService,
   storageAdapter,
   streamTestModeStub,
@@ -148,8 +148,10 @@ export class AgentOrchestrator {
     return this.slots.getAgentConfig(agentId);
   }
 
-  applyLlmConfig(config: LLMConfig): void {
-    this.slots.applyLlmConfig(config);
+  applyLlmConfig(_config: LLMConfig): void {
+    this.slots.applyLlmConfig(
+      compiledRoutesFromDefinitions(settingsService.getAll().agents.definitions),
+    );
   }
 
   getToolsForRole(agentId: AgentRole): string[] {
@@ -304,7 +306,7 @@ export class AgentOrchestrator {
         providerId: config.modelProvider,
         modelId: config.modelName,
         temperature: planning.plan.temperature,
-        mode: this.modeForAgent(agentId),
+        profileId: agentId,
         stage: context?.stageId,
         runId: context?.runId,
         sessionId: executionScopeId,
@@ -384,11 +386,26 @@ export class AgentOrchestrator {
     try {
       let preparedTurn = options?.preparedTurn;
       let settings = settingsService.getAll();
-      let routeMap = new Map(settings.llm.agentRoutes.map((route) => [route.agentId, route]));
       const routeAgentId = options?.routeAgentId ?? agentId;
-      let route = routeMap.get(routeAgentId);
       const modelOverride = options?.modelOverride ?? null;
       const frozenRequestPlan = options?.requestPlan;
+      const effectiveProfiles = options?.effectiveProfile
+        ? [options.effectiveProfile]
+        : agentManifestService.getEffectiveProfiles(
+            settings.paths,
+            settings.llm.providers,
+            [],
+            options?.projectRootPath ?? undefined,
+          );
+      const effectiveProfile = options?.effectiveProfile
+        ?? effectiveProfiles.find((definition) => definition.id === agentId && definition.enabled)
+        ?? null;
+      const compiledRoute = (
+        routeAgentId === agentId
+          ? effectiveProfile?.compiledRoute
+          : effectiveProfiles.find((definition) => definition.id === routeAgentId && definition.enabled)?.compiledRoute
+      );
+      let route = compiledRoute?.providerId && compiledRoute.modelId ? compiledRoute : undefined;
       const credentialProviderId = frozenRequestPlan?.providerId
         ?? preparedTurn?.summary.route.providerId
         ?? modelOverride?.providerId
@@ -396,20 +413,11 @@ export class AgentOrchestrator {
       if (credentialProviderId && !preparedTurn && process.env.RDC_AGENT_TEST_MODE !== '1') {
         ownedCredentialHandle = await this.refreshProviderRuntimeCredentials(credentialProviderId);
         settings = settingsService.getAll();
-        routeMap = new Map(settings.llm.agentRoutes.map((entry) => [entry.agentId, entry]));
-        route = routeMap.get(routeAgentId);
+        const refreshed = this.resolveEffectiveAgentProfileSnapshot(agentId, options?.projectRootPath);
+        route = refreshed.profile?.compiledRoute?.providerId
+          ? refreshed.profile.compiledRoute
+          : route;
       }
-      const effectiveProfiles = options?.effectiveProfile
-        ? [options.effectiveProfile]
-        : agentManifestService.getEffectiveProfiles(
-            settings.paths,
-            settings.llm.providers,
-            settings.llm.agentRoutes,
-            options?.projectRootPath ?? undefined,
-          );
-      const effectiveProfile = options?.effectiveProfile
-        ?? effectiveProfiles.find((definition) => definition.id === agentId && definition.enabled)
-        ?? null;
       const effectiveProfileIds = options?.effectiveProfileIds?.length
         ? options.effectiveProfileIds
         : effectiveProfiles.filter((definition) => definition.enabled).map((definition) => definition.id);
@@ -537,7 +545,7 @@ export class AgentOrchestrator {
         providerId: routeProviderId,
         modelId: routeModelId,
         temperature: planning.plan.temperature,
-        mode: this.modeForAgent(agentId),
+        profileId: agentId,
         stage: options?.stage ?? 'investigate',
         runId: options?.runId,
         sessionId: executionScopeId,
@@ -672,7 +680,7 @@ export class AgentOrchestrator {
     const profiles = agentManifestService.getEffectiveProfiles(
       settings.paths,
       settings.llm.providers,
-      settings.llm.agentRoutes,
+      [],
       projectRootPath ?? undefined,
     );
     return {
@@ -684,13 +692,6 @@ export class AgentOrchestrator {
   private resolveRuntimeProfile(agentId: AgentRole, stage?: WorkflowStage) {
     const settings = settingsService.getAll();
     return executionProfileService.resolveAgentRuntimeProfile(settings, stage || 'investigate', agentId);
-  }
-
-  private modeForAgent(agentId: AgentRole): AppMode {
-    if (agentId === 'plan') {
-      return 'ask';
-    }
-    return isTopLevelAgentId(agentId) ? agentId as AppMode : 'edit';
   }
 
   private getAgentDisplayName(agentId: AgentRole): string {

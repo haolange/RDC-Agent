@@ -49,11 +49,44 @@ export const LlmProviderAccountLoginFinishArgsSchema = z.tuple([
   }).strict(),
 ]);
 
+const projectScopeIdRefine = (
+  value: { scope: 'user' | 'project'; projectId?: string },
+  ctx: z.RefinementCtx,
+): void => {
+  if (value.scope !== 'project') return;
+  if (!value.projectId?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'project scope requires a registered projectId.',
+      path: ['projectId'],
+    });
+    return;
+  }
+  if (/[\\/]|^[A-Za-z]:|\.\./.test(value.projectId)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'projectId is a registry id, not a filesystem path.',
+      path: ['projectId'],
+    });
+  }
+};
+
+export const SettingsGetAgentDefinitionCommitArgsSchema = z.tuple([
+  z.object({
+    agentId: z.string().min(1).max(200),
+    scope: z.enum(['user', 'project']),
+    projectId: z.string().max(200).optional(),
+  }).strict().superRefine(projectScopeIdRefine),
+]);
+
 export const SettingsSaveAgentDefinitionArgsSchema = z.tuple([
   z.object({
     draft: z.record(z.string().max(200), z.unknown()),
     clientRevision: ClientRevisionSchema,
-  }).strict(),
+    scope: z.enum(['user', 'project']),
+    projectId: z.string().max(200).optional(),
+    sourceHash: z.string().max(128).optional(),
+  }).strict().superRefine(projectScopeIdRefine),
 ]);
 
 export const SettingsSaveProviderDefinitionArgsSchema = z.tuple([

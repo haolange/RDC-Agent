@@ -22,6 +22,19 @@ export function resolveComposerEffectiveModel(
   return null;
 }
 
+export function readCompiledComposerRoute(
+  settings: {
+    agents?: {
+      definitions?: Array<{ id: string; compiledRoute?: ComposerModelRouteSeed }>;
+    };
+  },
+  agentId: string,
+): ComposerModelRouteSeed | null {
+  const compiled = settings.agents?.definitions?.find((entry) => entry.id === agentId)?.compiledRoute;
+  if (!compiled?.providerId || !compiled.modelId) return null;
+  return compiled;
+}
+
 export function hasComposerModelChoice(
   sessionOverride: SessionModelOverride | null | undefined,
   draftModel: SessionModelOverride | null | undefined,

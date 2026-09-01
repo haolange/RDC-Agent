@@ -35,6 +35,8 @@ export interface EffectiveRuntimePlan {
   profileHandoffs: readonly FrozenHandoffDefinition[];
   /** Enabled profile ids from the same resolution snapshot. */
   enabledProfileIds: readonly string[];
+  /** Frozen effective profile `agents` delegates for subagent authorization. */
+  profileDelegates: readonly string[];
   toolAllowlist: readonly string[];
   /**
    * Frozen `∩(skill_i.allowedTools) ∩ toolAllowlist` at prepareTurn.
@@ -66,8 +68,12 @@ export interface BuildEffectiveRuntimePlanInput {
   projectRootPath: string | null;
   projectId?: string | null;
   profileProvenance?: ResourceProvenance | null;
-  profile?: Pick<AgentManifestDefinition, 'skills' | 'maxTurns'> & { handoffs?: AgentManifestDefinition['handoffs'] } | null;
+  profile?: Pick<AgentManifestDefinition, 'skills' | 'maxTurns'> & {
+    agents?: AgentManifestDefinition['agents'];
+    handoffs?: AgentManifestDefinition['handoffs'];
+  } | null;
   enabledProfileIds?: readonly string[];
+  profileDelegates?: readonly string[];
   toolAllowlist: readonly string[];
   permissionSettings: AgentPermissionSettings;
   routeCapability: AgentRouteCapability;
@@ -150,6 +156,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     ...(handoff.model !== undefined ? { model: handoff.model } : {}),
   })));
   const enabledProfileIds = freezeStringList(input.enabledProfileIds);
+  const profileDelegates = freezeStringList(input.profileDelegates ?? input.profile?.agents ?? []);
   const toolAllowlist = freezeStringList(input.toolAllowlist);
   const skillIntersection = input.skillIntersection === undefined || input.skillIntersection === null
     ? null
@@ -175,6 +182,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     profileMaxTurns,
     profileHandoffs,
     enabledProfileIds,
+    profileDelegates,
     toolAllowlist,
     skillIntersection,
     visibleToolNames,
@@ -200,6 +208,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     profileMaxTurns,
     profileHandoffs,
     enabledProfileIds,
+    profileDelegates,
     toolAllowlist,
     skillIntersection,
     visibleToolNames,

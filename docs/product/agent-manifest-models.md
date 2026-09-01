@@ -4,18 +4,13 @@ RDC-Agent 以 `.agent.md` 作为 agent 行为配置的唯一产品入口。Setti
 
 ## Manifest 位置
 
-Agent manifests 位于当前 workspace：
+Agent manifests 按 scope 解析，优先级 `builtin < user < project`，整资源替换：
 
-`profiles/agents/*.agent.md`
+- builtin：`resources/agent-runtime/agents/{general,debugger,analyzer,optimizer}.agent.md`
+- user：`~/.rdx/agents/*.agent.md`
+- project：`<project-root>/.rdx/agents/*.agent.md`
 
-当前 baseline seed 六个顶层 profile：
-
-- `ask.agent.md`
-- `plan.agent.md`
-- `edit.agent.md`
-- `debugger.agent.md`
-- `analyzer.agent.md`
-- `optimizer.agent.md`
+Wave 1 四个 builtin profile：`general` / `debugger` / `analyzer` / `optimizer`。用户保留的 ask/plan/edit 仍可按 custom manifest 运行。运行时不再写 user seed。
 
 Agent ID 来自文件名 stem，不再从 frontmatter 读取 `id`。
 

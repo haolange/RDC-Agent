@@ -12,7 +12,6 @@ import type {
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type { ConversationLoopStopReason } from '@shared/types/conversation';
 import type { AgentRole } from '@shared/types/agent';
-import type { AppMode } from '@shared/types/session';
 import type { WorkflowPhase, WorkflowStage } from '@shared/types/workflow';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import type {
@@ -34,7 +33,7 @@ export interface AgentEventBridgeContext {
   sessionId?: string | null;
   stage?: WorkflowStage | 'report';
   phase?: WorkflowPhase;
-  mode?: AppMode;
+  profileId?: string;
   providerId?: string;
   modelId?: string;
   toolAllowlist?: string[];
@@ -95,7 +94,7 @@ export function translateCoreToSharedAgentEvent(
       return buildSharedAgentEvent(
         'run.started',
         {
-          mode: context.mode ?? 'debugger',
+          profileId: context.profileId ?? context.agentId ?? 'legacy:unknown',
           providerId: context.providerId ?? '',
           modelId: context.modelId ?? '',
           toolAllowlist: context.toolAllowlist ?? [],

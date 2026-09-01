@@ -1,56 +1,47 @@
 /**
- * HandoffController — orchestrator 层 profile 移交控制。
+ * HandoffController — orchestrator 层 profile 移交预检。
  *
- * 职责：
- *  - 解析目标 profile 的 `.agent.md` handoffs frontmatter；
- *  - 校验 handoff 合法性（目标 profile 存在且在源 profile 声明的 handoffs 列表内）；
- *  - 生成 handoff 描述（label/prompt），缺省 prompt 从目标 profile handoffs 定义取。
- *
- * Handoff 是 session 级控制权转移（DESIGN.md：渲染为 next-action，非 tool card），
- * 不是工具返回值。本控制器只产出 handoff 描述，实际 profile 切换由 ConversationService
- * 消费 handoff 请求后执行。
- *
- * 设计参考 claude-code coordinator 的 task-notification 协议，但本库为单进程串行，
- * handoff 不走 mailbox，直接通过 tool_result details 上抛到 ConversationService。
+ * 只解析 frozen 白名单、算出 send / declaredModel / depth，并预检
+ * 单活跃 / 链上限 / model。不写盘。落盘由 HandoffStateStore 在工具成功后完成。
  */
 
-import type { AgentHandoffDefinition } from '@shared/types/agentManifest';
+import { HANDOFF_CHAIN_LIMIT, HANDOFF_ERROR } from '@shared/types/profileHandoff';
 import type { FrozenHandoffDefinition } from '../EffectiveRuntimePlan';
 
 export interface HandoffRequest {
-  /** 源 profile。 */
   fromAgentId: string;
-  /** 目标 profile id。 */
   toProfile: string;
-  /** 移交后注入的 prompt。 */
   prompt: string;
-  /** handoff 标签。 */
   label: string;
+  send: boolean;
+  declaredModel: string | null;
+  chainRoot: string;
+  depth: number;
 }
 
 export interface FrozenHandoffContext {
   sourceHandoffs: readonly FrozenHandoffDefinition[];
   enabledProfileIds: readonly string[];
+  /** When omitted, depth/active/model preflight is skipped (frozen-authority unit tests). */
+  sessionId?: string;
+  hasActiveHandoff?: boolean;
+  nextDepth?: number;
+  chainRoot?: string;
+  isDeclaredModelValid?: (canonical: string) => boolean;
 }
 
 export interface HandoffResolveResult {
-  /** 是否合法。 */
   valid: boolean;
-  /** 解析后的 handoff 请求（合法时）。 */
   request?: HandoffRequest;
-  /** 不合法时的原因。 */
   reason?: string;
+  code?: string;
+}
+
+function fail(code: string, reason: string): HandoffResolveResult {
+  return { valid: false, code, reason };
 }
 
 export class HandoffController {
-  /**
-   * 解析并校验 handoff 请求。
-   *
-   * @param fromAgentId 源 profile（当前活跃 agent）
-   * @param toProfile 目标 profile id（agent_handoff 工具的 agent 参数）
-   * @param promptOverride 调用方提供的 prompt（缺省时从目标 profile handoffs 定义取）
-   * @param labelOverride 调用方提供的 label
-   */
   resolve(
     fromAgentId: string,
     toProfile: string,
@@ -60,34 +51,66 @@ export class HandoffController {
   ): HandoffResolveResult {
     const target = toProfile.trim();
     if (!target) {
-      return { valid: false, reason: 'Handoff target profile is empty.' };
+      return fail(HANDOFF_ERROR.NOT_DECLARED, 'Handoff target profile is empty.');
     }
 
-    // 校验目标 profile 存在且启用
-    // Handoff authorization is turn-scoped. Re-reading mutable settings here
-    // would let a later settings change diverge from the prompt/executor plan.
     if (!frozen) {
-      return { valid: false, reason: 'Handoff requires a frozen turn runtime plan.' };
+      return fail(HANDOFF_ERROR.REQUIRES_FROZEN_PLAN, 'Handoff requires a frozen turn runtime plan.');
     }
     const targetEnabled = frozen.enabledProfileIds.includes(target);
     if (!targetEnabled) {
-      return { valid: false, reason: 'Target profile "' + target + '" is not enabled or does not exist.' };
+      return fail(
+        HANDOFF_ERROR.TARGET_DISABLED,
+        'Target profile "' + target + '" is not enabled or does not exist.',
+      );
     }
-    const sourceHandoffs = frozen.sourceHandoffs;
-    if (sourceHandoffs.length > 0 && !sourceHandoffs.some((handoff) => handoff.agent === target)) {
-      return {
-        valid: false,
-        reason: `Profile "${fromAgentId}" does not declare a handoff to "${target}".`,
-      };
+    const sourceHandoffs = frozen.sourceHandoffs ?? [];
+    if (sourceHandoffs.length === 0 || !sourceHandoffs.some((handoff) => handoff.agent === target)) {
+      return fail(
+        HANDOFF_ERROR.NOT_DECLARED,
+        sourceHandoffs.length === 0
+          ? `Profile "${fromAgentId}" declares no handoffs.`
+          : `Profile "${fromAgentId}" does not declare a handoff to "${target}".`,
+      );
     }
 
-    const declared: AgentHandoffDefinition | FrozenHandoffDefinition | undefined = sourceHandoffs.find((handoff) => handoff.agent === target);
+    const declared = sourceHandoffs.find((handoff) => handoff.agent === target);
     const prompt = (promptOverride?.trim() || declared?.prompt || `Continue from ${fromAgentId} as ${target}.`).trim();
     const label = (labelOverride?.trim() || declared?.label || `Hand off to ${target}`).trim();
+    const send = declared?.send === true;
+    const declaredModel = typeof declared?.model === 'string' && declared.model.trim()
+      ? declared.model.trim()
+      : null;
+
+    if (frozen.hasActiveHandoff) {
+      return fail(HANDOFF_ERROR.ALREADY_ACTIVE, 'Session already has an unfinished handoff.');
+    }
+
+    const depth = frozen.nextDepth ?? 1;
+    const chainRoot = frozen.chainRoot?.trim() || `handoff-root-${fromAgentId}`;
+    if (depth > HANDOFF_CHAIN_LIMIT) {
+      return fail(
+        HANDOFF_ERROR.CHAIN_LIMIT,
+        `Handoff chain exceeds the limit of ${HANDOFF_CHAIN_LIMIT}.`,
+      );
+    }
+
+    if (declaredModel && frozen.isDeclaredModelValid && !frozen.isDeclaredModelValid(declaredModel)) {
+      return fail(HANDOFF_ERROR.MODEL_INVALID, `Handoff declaredModel "${declaredModel}" is not executable.`);
+    }
 
     return {
       valid: true,
-      request: { fromAgentId, toProfile: target, prompt, label },
+      request: {
+        fromAgentId,
+        toProfile: target,
+        prompt,
+        label,
+        send,
+        declaredModel,
+        chainRoot,
+        depth,
+      },
     };
   }
 }

@@ -4,8 +4,8 @@ import type {
   ConversationSendRequest,
   ConversationTurnResult,
 } from '@shared/types/conversation';
-import type { AppMode, ExecutableAppMode, SessionAttachmentRecord } from '@shared/types/session';
-import type { AgentRole } from '@shared/types/agent';
+import type { SessionAttachmentRecord } from '@shared/types/session';
+import { isConsumableHandoff, type ProfileHandoffState } from '@shared/types/profileHandoff';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import { ROOT_BRANCH_ID } from '@shared/types/conversationBranch';
@@ -27,9 +27,14 @@ import type {
   PreparedConversationPrompt,
   ResolvedConversationContext,
 } from './ConversationRoutePreflight';
+import { resolveAgentWriteTarget } from '@shared/types/agentManifest';
+import { resolveHandoffTurnModelOverride } from '../sessions/profileHandoffModel';
+import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
+import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import {
   createConversationMessage,
   isActiveRun,
+  recordOverlayProfileDiagnostics,
   redactTechnicalMessage,
   resolveAgentRoutePreflight,
   resolveConversationAgentId,
@@ -55,21 +60,15 @@ export interface ConversationTurnStarterHost {
   persistConversationSnapshot(sessionId: string | null | undefined, message: ConversationMessage): Error | null;
   publishConversationTrace(traceSessionId: string, messages: ConversationMessage[], persistedSessionId?: string | null): void;
   ephemeralTraceSessionId(turnId: string): string;
-  getPendingHandoff(sessionId: string): { toProfile: AgentRole; prompt: string } | undefined;
-  deletePendingHandoff(sessionId: string): void;
-}
-
-function executableRunMode(agentId: AgentRole): ExecutableAppMode {
-  if (agentId === 'analyzer') return 'analyzer';
-  if (agentId === 'optimizer') return 'optimizer';
-  return 'debugger';
+  getCommittedHandoff(sessionId: string): ProfileHandoffState | null;
+  consumeCommittedHandoff(sessionId: string, handoff: ProfileHandoffState, continuationTurnId?: string): void;
 }
 
 export async function startProfileTurn(
   host: ConversationTurnStarterHost,
   onCompleteProfileTurn: (input: CompleteProfileTurnInput) => Promise<void>,
   context: ResolvedConversationContext,
-  requestedMode: AppMode,
+  requestedProfileId: string | null,
   requestedAgentId: string | null,
   rawMessage: string,
   pendingAttachments: ConversationAttachmentInput[],
@@ -86,16 +85,16 @@ export async function startProfileTurn(
     ? storageAdapter.getProjectById(context.projectId)?.rootPath ?? null
     : null;
   const pendingHandoff = context.session
-    ? host.getPendingHandoff(context.session.sessionId)
-    : undefined;
-  const handoffProfile = pendingHandoff && resolveEnabledAgentDefinition(pendingHandoff.toProfile, pendingProjectRootPath)
-    ? pendingHandoff.toProfile
+    ? host.getCommittedHandoff(context.session.sessionId)
     : null;
   const effectiveMessage = pendingHandoff
-    ? `${pendingHandoff.prompt}\n\n---\nUser message: ${rawMessage}`
+    ? (rawMessage.trim()
+      ? `${pendingHandoff.prompt}\n\n---\nUser message: ${rawMessage}`
+      : pendingHandoff.prompt)
     : rawMessage;
-  const conversationAgentId = handoffProfile
-    ?? resolveConversationAgentId(requestedMode, requestedAgentId);
+  const conversationAgentId = pendingHandoff
+    ? resolveConversationAgentId(pendingHandoff.toAgentId, null, pendingProjectRootPath)
+    : resolveConversationAgentId(requestedAgentId, requestedProfileId, pendingProjectRootPath);
   const turnId = generateEventId('turn');
   const throwIfPreparationCancelled = () => {
     if (preparationController.signal.aborted) {
@@ -104,22 +103,42 @@ export async function startProfileTurn(
   };
 
   throwIfPreparationCancelled();
-  if (configurationCommit?.agentId && configurationCommit.agentId !== conversationAgentId) {
+  if (
+    !pendingHandoff
+    && configurationCommit?.agentId
+    && configurationCommit.agentId !== conversationAgentId
+  ) {
     throw new Error('AGENT_COMMIT_NOT_FOUND: the committed Agent does not match the selected route.');
   }
-  if (configurationCommit?.agentCommitHash) {
-    const latestCommit = await settingsService.getAgentDefinitionCommit(conversationAgentId);
+  const effectiveSnapshot = resolveEnabledAgentDefinition(conversationAgentId, pendingProjectRootPath);
+  if (!effectiveSnapshot) {
+    throw new Error(
+      `CONVERSATION_AGENT_UNAVAILABLE: requested profile \`${conversationAgentId}\` is not enabled.`,
+    );
+  }
+  if (!pendingHandoff && configurationCommit?.agentCommitHash) {
+    const writeTarget = resolveAgentWriteTarget(effectiveSnapshot, context.projectId);
+    const latestCommit = await settingsService.getAgentDefinitionCommit({
+      agentId: conversationAgentId,
+      ...writeTarget,
+    });
     if (!latestCommit || latestCommit.commitHash !== configurationCommit.agentCommitHash) {
       throw new Error('AGENT_COMMIT_NOT_FOUND: the selected Agent definition changed before preflight.');
     }
   }
   throwIfPreparationCancelled();
 
-  const modelOverride = context.session?.modelOverride
-    ?? (configurationCommit?.providerId && configurationCommit.modelId
-      ? { providerId: configurationCommit.providerId, modelId: configurationCommit.modelId }
-      : null);
-  const configuredRoute = settingsService.getAll().llm.agentRoutes.find((entry) => entry.agentId === conversationAgentId);
+  const modelOverride = pendingHandoff
+    ? resolveHandoffTurnModelOverride({
+        sessionOverride: context.session?.modelOverride ?? null,
+        declaredModel: pendingHandoff.declaredModel,
+        settings: settingsService.getAll(),
+      })
+    : context.session?.modelOverride
+      ?? (configurationCommit?.providerId && configurationCommit.modelId
+        ? { providerId: configurationCommit.providerId, modelId: configurationCommit.modelId }
+        : null);
+  const configuredRoute = effectiveSnapshot?.compiledRoute;
   const surfaceProviderId = modelOverride?.providerId ?? configuredRoute?.providerId;
   if (surfaceProviderId) {
     const surface = await loadProviderSurface(surfaceProviderId);
@@ -127,12 +146,14 @@ export async function startProfileTurn(
   }
   throwIfPreparationCancelled();
 
-  let routePreflight = resolveAgentRoutePreflight(conversationAgentId, undefined, modelOverride);
+  let routePreflight = resolveAgentRoutePreflight(conversationAgentId, undefined, modelOverride, pendingProjectRootPath);
   if (!routePreflight.ok) {
+    recordOverlayProfileDiagnostics(context, conversationAgentId, routePreflight.overlayDiagnostics, false);
+    const overlay = routePreflight.overlayDiagnostics?.join(' ') ?? '';
     const code = routePreflight.diagnostic.code === 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
       ? 'PROVIDER_UNAVAILABLE'
       : 'MODEL_UNAVAILABLE';
-    throw new Error(`${code}: ${routePreflight.diagnostic.userMessage}`);
+    throw new Error(`${code}: ${routePreflight.diagnostic.userMessage}${overlay ? ` ${overlay}` : ''}`);
   }
   if (configurationCommit?.providerId && configurationCommit.providerId !== routePreflight.providerId) {
     throw new Error('PROVIDER_UNAVAILABLE: the committed Provider does not match the selected Agent route.');
@@ -147,12 +168,14 @@ export async function startProfileTurn(
   const credentialRequestState = host.getPreparingRequestByRequestId(requestId);
   if (credentialRequestState) credentialRequestState.credentialHandle = credentialHandle;
   throwIfPreparationCancelled();
-  routePreflight = resolveAgentRoutePreflight(conversationAgentId, undefined, modelOverride);
+  routePreflight = resolveAgentRoutePreflight(conversationAgentId, undefined, modelOverride, pendingProjectRootPath);
   if (!routePreflight.ok) {
+    recordOverlayProfileDiagnostics(context, conversationAgentId, routePreflight.overlayDiagnostics, false);
+    const overlay = routePreflight.overlayDiagnostics?.join(' ') ?? '';
     const code = routePreflight.diagnostic.code === 'CONVERSATION_LLM_PROVIDER_UNAVAILABLE'
       ? 'PROVIDER_UNAVAILABLE'
       : 'MODEL_UNAVAILABLE';
-    throw new Error(`${code}: ${routePreflight.diagnostic.userMessage}`);
+    throw new Error(`${code}: ${routePreflight.diagnostic.userMessage}${overlay ? ` ${overlay}` : ''}`);
   }
 
   const settings = settingsService.getAll();
@@ -306,6 +329,10 @@ export async function startProfileTurn(
     activeBranchId: preparedBranchId,
     signal: preparationController.signal,
   });
+  if (routePreflight.overlayDiagnostics?.length) {
+    preparedTurn.summary.runtimeDiagnostics = [...routePreflight.overlayDiagnostics];
+    recordOverlayProfileDiagnostics(context, conversationAgentId, routePreflight.overlayDiagnostics, true);
+  }
   throwIfPreparationCancelled();
   const requestState = host.getPreparingRequestByRequestId(requestId);
   if (requestState) requestState.phase = 'committing';
@@ -365,7 +392,7 @@ export async function startProfileTurn(
       sessionId: sessionIdForBranch,
       projectId: context.projectId,
       runId: isActiveRun(context.currentRun) ? context.currentRun.runId : null,
-      modeContext: requestedMode,
+      profileId: conversationAgentId,
       attachments: importedAttachments,
       status: 'complete',
       branchId,
@@ -379,7 +406,7 @@ export async function startProfileTurn(
       sessionId: sessionIdForBranch,
       projectId: context.projectId,
       runId: isActiveRun(context.currentRun) ? context.currentRun.runId : null,
-      modeContext: requestedMode,
+      profileId: conversationAgentId,
       agentId: conversationAgentId,
       status: 'streaming',
       workTrace: createDraftWorkTrace(),
@@ -401,7 +428,7 @@ export async function startProfileTurn(
           turnId,
           sessionId: sessionIdForBranch,
           projectId: context.projectId,
-          modeContext: requestedMode,
+          profileId: conversationAgentId,
           branchId,
           forkId: branchContext?.forkId,
           variantIndex: branchContext?.variantIndex,
@@ -453,7 +480,7 @@ export async function startProfileTurn(
         sessionId: workingSession.sessionId,
         turnId,
         capturePaths: [],
-        mode: executableRunMode(conversationAgentId),
+        profileId: conversationAgentId,
         goal: effectiveMessage,
         status: 'running',
       });
@@ -479,8 +506,22 @@ export async function startProfileTurn(
     await preparedTurn.runtime.mcpLease?.release({ discardIfIdle: true });
     throw new Error(`TURN_COMMIT_FAILED: ${redactTechnicalMessage(error)}`);
   }
+  const cancelAfterCommit = host.getPreparingRequestByRequestId(requestId)?.cancelAfterCommit === true;
+  const preparationAborted = preparationController.signal.aborted;
   if (pendingHandoff && context.session) {
-    host.deletePendingHandoff(context.session.sessionId);
+    const latest = host.getCommittedHandoff(context.session.sessionId);
+    if (
+      !cancelAfterCommit
+      && !preparationAborted
+      && isConsumableHandoff(pendingHandoff, latest)
+    ) {
+      agentToolApprovalRequestService.cancelTurn(pendingHandoff.sourceTurnId);
+      agentUserInputRequestService.cancelTurn(pendingHandoff.sourceTurnId);
+      host.consumeCommittedHandoff(context.session.sessionId, latest, turnId);
+    }
+  } else if (workingSession && conversationAgentId) {
+    storageAdapter.updateSession(workingSession.sessionId, { agentId: conversationAgentId });
+    workingSession = storageAdapter.readSession(workingSession.sessionId) ?? workingSession;
   }
   let visibleMessages = workingSession?.sessionId && branchState
     ? resolveVisibleConversationMessages(
@@ -493,7 +534,6 @@ export async function startProfileTurn(
     traceSessionId,
     [userMessage, assistantDraftMessage],
   );
-  const cancelAfterCommit = host.getPreparingRequestByRequestId(requestId)?.cancelAfterCommit === true;
   if (cancelAfterCommit) {
     assistantDraftMessage.status = 'stopped';
     assistantDraftMessage.updatedAt = nowMs();
@@ -536,7 +576,7 @@ export async function startProfileTurn(
           ? storageAdapter.listRuns(workingSession.sessionId).find((run) => run.runId === turnRunId) ?? null
           : context.currentRun,
       },
-      requestedMode,
+      requestedProfileId: requestedProfileId ?? conversationAgentId,
       requestedAgentId: conversationAgentId,
       rawMessage: effectiveMessage,
       importedAttachments,

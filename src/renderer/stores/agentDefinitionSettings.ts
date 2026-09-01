@@ -4,6 +4,7 @@ import type {
   AgentDefinitionSaveResult,
   AgentManifestDefinition,
 } from '@shared/types/agentManifest';
+import { agentDefinitionLaneKey } from '@shared/types/agentManifest';
 import type { AppSettings, LlmAgentRoute } from '@shared/types/settings';
 import { splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
 
@@ -21,8 +22,13 @@ export const nextAgentDefinitionClientRevision = (): number => {
   return lastClientRevision;
 };
 
-export const isLatestAgentDefinitionRevision = (agentId: string, clientRevision: number): boolean => (
-  latestRevisions.get(agentId) === clientRevision
+export const isLatestAgentDefinitionRevision = (
+  scope: AgentDefinitionSaveRequest['scope'],
+  projectId: string | undefined,
+  agentId: string,
+  clientRevision: number,
+): boolean => (
+  latestRevisions.get(agentDefinitionLaneKey(scope, projectId, agentId)) === clientRevision
 );
 
 const replaceDefinition = (
@@ -72,7 +78,7 @@ export function beginAgentDefinitionSave(settings: AppSettings, request: AgentDe
   const optimisticDefinition = request.draft.delete || !existing
     ? null
     : { ...existing, ...request.draft } as AgentManifestDefinition;
-  latestRevisions.set(agentId, request.clientRevision);
+  latestRevisions.set(agentDefinitionLaneKey(request.scope, request.projectId, agentId), request.clientRevision);
   return {
     settings: request.draft.delete
       ? projectSettings(settings, agentId, null, null)

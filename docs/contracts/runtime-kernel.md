@@ -22,7 +22,7 @@ Work Process 的工具摘要只由 runtime tool result 计算 `succeeded / faile
 
 | 模块 | 职责 |
 | --- | --- |
-| `EffectiveRuntimePlan` | `schemaVersion: 3`；one exact User/Project profile snapshot (provenance, skills, handoffs, enabled ids), tools/skill intersection, deferred/MCP lease, permission/policy/route/request+prompt fingerprints, attachment manifest fingerprint；Prompt and Executor share it |
+| `EffectiveRuntimePlan` | `schemaVersion: 3`；project-aware effective profile snapshot（definition + scope/provenance/sourceHash + compiled route）+ 冻结 `profileDelegates`（effective `agents`）；tools/skill intersection, deferred/MCP lease, permission/policy/route/request+prompt fingerprints, attachment manifest fingerprint；Prompt and Executor share it。`settings.llm.agentRoutes` 只是 `compiledRoute` 的 Settings 派生镜像；`getEffectiveModel` / `applyLlmConfig` / preflight 只读 snapshot 的 `compiledRoute`。 |
 | `AgentOrchestrator` | façade（少于 800 行）；`ProfileTurnPreparation` 为 sendMessage/sendProfileMessage/subagent 唯一 prepare 入口；无 `preparedRuntime` → `TURN_NOT_PREPARED` |
 | `TurnCoordinator` / `TurnHandle` | Session ownership Active→Aborting→Orphaned→Settled；Orphaned 时 `beginTurn` → `TURN_ORPHANED`；`abortAndJoin` 等 stream + producerCompletion；late producer join |
 | `ProcessSupervisor` | spawn/joinAll；POSIX pgid；Windows `taskkill /T`；close-observed registry；timeout yields `unconfirmed_orphan` |
@@ -117,7 +117,9 @@ Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（39 ids，含 `shell` / `read
 
 `read_image` 在 `visionInputMode !== 'native'` 时 `VISION_INPUT_UNSUPPORTED`。tool-result 图像由 `ContextManager.convertToLlm` 剥出并桥成紧随的 user image part；UI 缩略图只走 session `image-previews` + `conversation:getToolImagePreview`，禁止把大 base64 写入 `resultPreview`。`code_interpreter` 执行 Settings 配置的外部解释器，未启用 fail-closed。
 
-`native-structured` 路由：core schema 常驻；extended / `mcp__*` deferred，经 `tool_search` 等契约路径激活。未激活调用 → `TOOL_NOT_ACTIVATED`。Tasks 工具按 Agent 角色过滤后预激活：Ask 仅 `task_list` / `task_get`，Plan/Edit 等具备 mutation 权限的 profile 才可获得 `task_create` / `task_update` / `task_stop`。
+`native-structured` 路由：core schema 常驻；extended / `mcp__*` deferred，经 `tool_search` 等契约路径激活。未激活调用 → `TOOL_NOT_ACTIVATED`。Tasks 工具只在冻结 allowlist 含对应 token 时预激活，不再按 Ask/Plan/Edit 角色硬编码。
+
+Run 持久化是 v2 discriminated union：`kind: conversation|mission` + `profileId`，新写无 `mode`。只有精确三 Mission profile 才是 `kind: mission`；conversation 的 `captures=[]` 且不消费 investigation sidecar。旧 run 先原子归档再迁移；归档不是 active fallback。
 
 Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only route 的有效工具集为空，不得列出或模仿工具调用。`tool_search` 无结果时返回 `NO_MATCH_IN_EFFECTIVE_TOOL_SET`、`authoritative: true` 与工具集 fingerprint；fingerprint 未变化时重复同一搜索属于无进展。
 

@@ -52,6 +52,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     setConnectionDraft,
     agentManifestSaveState,
     agentManifestSaveMessage,
+    agentManifestSaveBlocked,
     accountProviders,
     providerCatalog,
     providerCatalogCategories,
@@ -211,6 +212,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
                   onImportAgentManifest={handleImportAgentManifest}
                   agentManifestSaveState={agentManifestSaveState}
                   agentManifestSaveMessage={agentManifestSaveMessage}
+                  agentManifestSaveBlocked={agentManifestSaveBlocked}
                   t={t}
                 /></section>
               )}

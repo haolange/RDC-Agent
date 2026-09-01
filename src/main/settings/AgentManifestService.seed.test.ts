@@ -1,7 +1,15 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import fs from 'node:fs';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('electron', () => ({
+  app: {
+    getPath: () => os.tmpdir(),
+    getAppPath: () => process.cwd(),
+  },
+}));
 import { agentManifestService } from './AgentManifestService';
 import type { AgentManifestSettings } from '@shared/types/agentManifest';
 import type { EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
@@ -10,8 +18,8 @@ import type { LlmProviderEntry } from '@shared/types/settings';
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
 
-describe('AgentManifestService seed manifests', () => {
-  it('writes seeds with task token and without todo', async () => {
+describe('AgentManifestService effective builtin snapshot', () => {
+  it('loads four builtins without writing user seeds', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-agent-seeds-'));
     roots.push(root);
     const agentsPath = path.join(root, 'agents');
@@ -23,20 +31,20 @@ describe('AgentManifestService seed manifests', () => {
       [],
     );
 
-    expect(settings.definitions.length).toBeGreaterThan(0);
+    expect(settings.definitions.map((definition) => definition.id).sort()).toEqual(
+      ['analyzer', 'debugger', 'general', 'optimizer'],
+    );
+    expect(settings.definitions.every((definition) => definition.builtin)).toBe(true);
     for (const definition of settings.definitions) {
       expect(definition.tools).not.toContain('todo');
       expect(definition.tools).not.toContain('search_codebase');
-      // 所有 seed 都保留 tool_search 发现入口。
+      expect(definition.tools).not.toContain('knowledge');
       expect(definition.tools).toContain('tool_search');
     }
-    // Tier 收窄：ask 是纯问答面（无 task），plan/edit 保留 task。
     const byId = new Map(settings.definitions.map((definition) => [definition.id, definition]));
-    expect(byId.get('ask')?.tools).not.toContain('task');
-    expect(byId.get('plan')?.tools).toContain('task');
-    expect(byId.get('edit')?.tools).toContain('task');
-    expect(byId.get('edit')?.tools).toContain('file-manage');
-    expect(byId.get('edit')?.tools).toContain('memory-write');
+    expect(byId.get('general')?.tools).toContain('file-manage');
+    expect(byId.get('debugger')?.tools).not.toContain('write');
+    expect(byId.get('debugger')?.tools).toContain('planArtifact');
   });
 
   it('projects app-managed choices from EffectiveCatalog and retains only referenced tombstones', () => {
@@ -57,7 +65,7 @@ describe('AgentManifestService seed manifests', () => {
       id: 'edit', models: ['github-copilot/claude-sonnet-5'],
     }] as AgentManifestSettings['definitions'];
     const settings = {
-      directoryPath: '', definitions, modelOptions: [], globalInstructions: '',
+      directoryPath: '', definitions, modelOptions: [], globalInstructions: '', diagnostics: [],
     } satisfies AgentManifestSettings;
     const baseModel = {
       providerId: 'github-copilot', aliases: [], enabled: true,
@@ -241,5 +249,62 @@ describe('AgentManifestService seed manifests', () => {
       [{ ...copilot, isConfigured: false }, unusedDisconnected],
       [],
     )).toEqual([]);
+  });
+
+  it('rejects saving general into debugger.agent.md and does not delete debugger', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-agent-filename-'));
+    roots.push(root);
+    const agentsPath = path.join(root, 'agents');
+    const instructionsPath = path.join(root, 'RDX.md');
+    await mkdir(agentsPath, { recursive: true });
+    const debuggerPath = path.join(agentsPath, 'debugger.agent.md');
+    await writeFile(debuggerPath, '---\nname: Debugger\n---\nuser copy\n', 'utf8');
+    await expect(agentManifestService.saveDefinition(
+      { agentsPath, instructionsPath },
+      {
+        id: 'general',
+        fileName: 'debugger.agent.md',
+        name: 'General',
+        description: 'x',
+        argumentHint: '',
+        target: 'rdc-agent',
+        models: [],
+        icon: 'nodes',
+        accent: '#33d1ff',
+        disableModelInvocation: false,
+        userInvocable: true,
+        tools: ['read'],
+        skills: [],
+        mcpServers: [],
+        agents: [],
+        handoffs: [],
+        metadata: {},
+        instructions: 'general',
+        enabled: true,
+      },
+      { scope: 'user' },
+    )).rejects.toThrow(/AGENT_MANIFEST_FILENAME_MISMATCH/);
+    expect(await readFile(debuggerPath, 'utf8')).toContain('user copy');
+    expect(fs.existsSync(path.join(agentsPath, 'general.agent.md'))).toBe(false);
+  });
+
+  it('surfaces project invalid candidates as Settings diagnostics without overriding builtin', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-agent-invalid-'));
+    roots.push(root);
+    const projectRoot = path.join(root, 'project');
+    const projectAgents = path.join(projectRoot, '.rdx', 'agents');
+    await mkdir(projectAgents, { recursive: true });
+    await writeFile(path.join(projectAgents, 'general.agent.md'), 'not a valid manifest\n', 'utf8');
+    const settings = agentManifestService.getSettings(
+      { agentsPath: path.join(root, 'user-agents'), instructionsPath: path.join(root, 'RDX.md') },
+      [],
+      [],
+      [],
+      projectRoot,
+    );
+    const general = settings.definitions.find((definition) => definition.id === 'general');
+    expect(general?.builtin).toBe(true);
+    expect(general?.tools).toContain('write');
+    expect(settings.diagnostics.some((entry) => entry.includes('PROJECT_AGENT_MANIFEST_INVALID'))).toBe(true);
   });
 });

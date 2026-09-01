@@ -1,35 +1,25 @@
 import fs from 'fs';
 import path from 'path';
 import { createHash, randomUUID } from 'crypto';
-import YAML from 'yaml';
-import type { AgentId } from '@shared/types/agent';
 import { isSafeAgentProfileId } from '@shared/types/agent';
 import type {
-  AgentHandoffDefinition,
   AgentManifestDefinition,
   AgentManifestDraft,
   AgentManifestSettings,
+  AgentManifestWriteScope,
   AgentModelOption,
 } from '@shared/types/agentManifest';
 import type { AppRuntimePaths, LlmAgentRoute, LlmProviderEntry } from '@shared/types/settings';
 import type { EffectiveCatalogSnapshot, EffectiveModel } from '@shared/types/providerCapability';
 import type { EffectiveAgentProfile, ScopedResourceCandidate } from '@shared/types/rdxRuntime';
-import {
-  AGENT_DESCRIPTIONS,
-  AGENT_DISPLAY_NAMES,
-  AGENT_MODE_MAP,
-  AGENT_ROLES,
-  AGENT_SEED_ACCENTS,
-  isAgentIconPreset,
-} from '@shared/constants/agents';
-import { COMPOSE_ACCENT_FALLBACK, normalizeAgentAccent } from '@shared/theme/composeAccent';
+import { AGENT_ROLES } from '@shared/constants/agents';
 import { canonicalAgentModelId, splitCanonicalAgentModelId } from '@shared/utils/agentModelRoute';
 import { classifyAgentToolEligibility, isAgentToolExecutableModel } from '@shared/utils/agentToolCapability';
-
-const normalizeManifestAccent = (value: unknown, fallback: string): string =>
-  normalizeAgentAccent(value, fallback);
 import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
+import { parseAgentMarkdownStrict, serializeAgentMarkdown } from './agentManifestParse';
+import { agentSeedMigrationService } from './seed-migration/AgentSeedMigrationService';
+import { extractSeedSemanticManifest, hashSeedSemanticManifest } from './seed-migration/semanticHash';
 
 const toSlug = (value: string): string => {
   const slug = value
@@ -50,196 +40,119 @@ const safeFileNameForDraft = (draft: Pick<AgentManifestDraft, 'id' | 'name' | 'f
   if (!isSafeAgentProfileId(agentId)) {
     throw new Error(`Invalid agent profile id: ${agentId}`);
   }
-  const candidate = draft.fileName && draft.fileName.endsWith('.agent.md')
-    ? path.basename(draft.fileName)
-    : fileNameForId(agentId);
-  const candidateId = idFromFileName(candidate);
-  return candidateId === agentId && isSafeAgentProfileId(candidateId) ? candidate : fileNameForId(agentId);
-};
-
-const readStringArray = (value: unknown): string[] => {
-  if (Array.isArray(value)) {
-    return value.filter((entry): entry is string => typeof entry === 'string').map((entry) => entry.trim()).filter(Boolean);
+  const expected = fileNameForId(agentId);
+  if (draft.fileName) {
+    const candidate = path.basename(draft.fileName);
+    if (idFromFileName(candidate) !== agentId) {
+      throw new Error(`AGENT_MANIFEST_FILENAME_MISMATCH: file stem must equal id ${agentId}.`);
+    }
   }
-  if (typeof value === 'string' && value.trim()) {
-    return [value.trim()];
-  }
-  return [];
-};
-
-const readBoolean = (value: unknown, fallback: boolean): boolean =>
-  typeof value === 'boolean' ? value : fallback;
-
-const readHandoffs = (value: unknown): AgentHandoffDefinition[] => {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  const handoffs: AgentHandoffDefinition[] = [];
-  for (const entry of value) {
-      if (!entry || typeof entry !== 'object') {
-        continue;
-      }
-      const candidate = entry as Record<string, unknown>;
-      const label = typeof candidate.label === 'string' ? candidate.label.trim() : '';
-      const agent = typeof candidate.agent === 'string' ? candidate.agent.trim() : '';
-      const prompt = typeof candidate.prompt === 'string' ? candidate.prompt.trim() : '';
-      if (!label || !agent || !prompt) {
-        continue;
-      }
-      const handoff: AgentHandoffDefinition = {
-        label,
-        agent,
-        prompt,
-      };
-      if (typeof candidate.send === 'boolean') {
-        handoff.send = candidate.send;
-      }
-      if (typeof candidate.showContinueOn === 'boolean') {
-        handoff.showContinueOn = candidate.showContinueOn;
-      }
-      if (typeof candidate.model === 'string' && candidate.model.trim()) {
-        handoff.model = candidate.model.trim();
-      }
-      handoffs.push(handoff);
-  }
-  return handoffs;
-};
-
-const parseAgentMarkdownContent = (
-  rawContent: string,
-  filePath: string,
-  fallbackId: string,
-  updatedAt: string,
-): AgentManifestDefinition => {
-  const raw = rawContent.replace(/^\uFEFF/u, '');
-  const match = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/u.exec(raw);
-  const frontmatter = match ? YAML.parse(match[1]) as Record<string, unknown> : {};
-  const instructions = match ? match[2].trim() : raw.trim();
-  const name = typeof frontmatter.name === 'string' && frontmatter.name.trim()
-    ? frontmatter.name.trim()
-    : fallbackId;
-  return {
-    id: fallbackId,
-    fileName: path.basename(filePath),
-    filePath,
-    name,
-    description: typeof frontmatter.description === 'string' ? frontmatter.description.trim() : '',
-    argumentHint: typeof frontmatter['argument-hint'] === 'string' ? frontmatter['argument-hint'].trim() : '',
-    target: typeof frontmatter.target === 'string' ? frontmatter.target.trim() : 'rdc-agent',
-    models: readStringArray(frontmatter.model),
-    icon: isAgentIconPreset(frontmatter.icon) ? frontmatter.icon : AGENT_MODE_MAP[fallbackId]?.icon ?? 'message-orbit',
-    accent: normalizeManifestAccent(
-      frontmatter.accent,
-      AGENT_SEED_ACCENTS[fallbackId as AgentId] ?? COMPOSE_ACCENT_FALLBACK,
-    ),
-    disableModelInvocation: readBoolean(frontmatter['disable-model-invocation'], false),
-    userInvocable: readBoolean(frontmatter['user-invocable'], true),
-    tools: readStringArray(frontmatter.tools),
-    skills: readStringArray(frontmatter.skills),
-    mcpServers: readStringArray(frontmatter['mcp-servers']),
-    agents: readStringArray(frontmatter.agents),
-    handoffs: readHandoffs(frontmatter.handoffs),
-    metadata: frontmatter.metadata && typeof frontmatter.metadata === 'object'
-      ? frontmatter.metadata as Record<string, unknown>
-      : {},
-    instructions,
-    builtin: false,
-    enabled: readBoolean(frontmatter.enabled, true),
-    maxTurns: typeof frontmatter['max-turns'] === 'number' && frontmatter['max-turns'] > 0
-      ? frontmatter['max-turns']
-      : undefined,
-    updatedAt,
-  };
-};
-
-const parseAgentMarkdown = (filePath: string, fallbackId: string): AgentManifestDefinition => (
-  parseAgentMarkdownContent(
-    fs.readFileSync(filePath, 'utf8'),
-    filePath,
-    fallbackId,
-    fs.statSync(filePath).mtime.toISOString(),
-  )
-);
-
-const serializeAgentMarkdown = (definition: AgentManifestDraft): string => {
-  const frontmatter: Record<string, unknown> = {
-    name: definition.name,
-    description: definition.description,
-    'argument-hint': definition.argumentHint,
-    target: definition.target || 'rdc-agent',
-    model: definition.models,
-    icon: isAgentIconPreset(definition.icon) ? definition.icon : 'message-orbit',
-    accent: normalizeManifestAccent(definition.accent, COMPOSE_ACCENT_FALLBACK),
-    'disable-model-invocation': definition.disableModelInvocation,
-    'user-invocable': definition.userInvocable,
-    enabled: definition.enabled,
-    ...(definition.maxTurns ? { 'max-turns': definition.maxTurns } : {}),
-    tools: definition.tools,
-    skills: definition.skills,
-    'mcp-servers': definition.mcpServers,
-    agents: definition.agents,
-    handoffs: definition.handoffs,
-    metadata: definition.metadata,
-  };
-  return `---\n${YAML.stringify(frontmatter).trim()}\n---\n\n${definition.instructions.trim()}\n`;
+  return expected;
 };
 
 const hashManifestContent = (content: string): string => (
   createHash('sha256').update(content, 'utf8').digest('hex')
 );
 
+const hashManifestFile = (filePath: string, id: string): string =>
+  hashSeedSemanticManifest(extractSeedSemanticManifest(fs.readFileSync(filePath, 'utf8'), id));
+
 export interface AgentManifestCommit {
   definition: AgentManifestDefinition | null;
   commitHash: string;
 }
 
-const createSeedDefinition = (
-  agentId: AgentId,
-  routes: LlmAgentRoute[],
-): AgentManifestDraft => {
-  const route = routes.find((entry) => entry.agentId === agentId);
-  const model = canonicalAgentModelId(route?.providerId ?? '', route?.modelId ?? '');
-  const name = AGENT_DISPLAY_NAMES[agentId];
-  // 窄核心 seed：core tier 常驻注入；extended token 只授予权限，
-  // schema 经 tool_search 发现或直接调用激活后再注入。
-  const tools = agentId === 'ask'
-    ? ['read', 'search', 'web', 'askUser', 'tool_search']
-    : agentId === 'plan'
-      ? ['read', 'search', 'web', 'askUser', 'task', 'memory', 'planArtifact', 'handoff', 'subagent', 'tool_search']
-      : agentId === 'edit'
-        ? ['read', 'search', 'web', 'shell', 'interpreter', 'write', 'edit', 'git', 'file-manage', 'askUser', 'handoff', 'task', 'output', 'memory', 'memory-write', 'skill', 'mcp', 'subagent', 'tool_search']
-        : ['read', 'search', 'web', 'shell', 'interpreter', 'askUser', 'handoff', 'task', 'output', 'memory', 'rdxContext', 'subagent', 'tool_search'];
-  return {
-    id: agentId,
-    fileName: fileNameForId(agentId),
-    name,
-    description: AGENT_DESCRIPTIONS[agentId],
-    argumentHint: agentId === 'ask'
-      ? 'Ask about the current project, capture, or workflow'
-      : 'Describe the RenderDoc/RDC investigation goal',
-    target: 'rdc-agent',
-    models: model ? [model] : [],
-    icon: AGENT_MODE_MAP[agentId]?.icon ?? 'message-orbit',
-    accent: AGENT_SEED_ACCENTS[agentId] ?? COMPOSE_ACCENT_FALLBACK,
-    disableModelInvocation: false,
-    userInvocable: true,
-    tools,
-    skills: [],
-    mcpServers: [],
-    agents: agentId === 'ask' ? [] : AGENT_ROLES.filter((role) => role !== agentId),
-    handoffs: agentId === 'plan'
-      ? [
-          {
-            label: 'Start Implementation',
-            agent: 'edit',
-            prompt: 'Start implementing the approved plan.',
+export interface AgentManifestSaveOptions {
+  scope: AgentManifestWriteScope;
+  projectRoot?: string;
+  sourceHash?: string;
+}
+
+interface ParsedManifestCandidate {
+  candidate: ScopedResourceCandidate<AgentManifestDefinition>;
+  builtinInvalid?: string;
+}
+
+const listAgentManifestFiles = (directory: string): string[] => {
+  if (!fs.existsSync(directory)) return [];
+  return fs.readdirSync(directory).filter((entry) => (
+    entry.endsWith('.agent.md')
+    && !entry.startsWith('.')
+    && isSafeAgentProfileId(idFromFileName(entry))
+  ));
+};
+
+const loadManifestCandidates = (
+  directory: string,
+  scope: ScopedResourceCandidate<AgentManifestDefinition>['scope'],
+  failClosedOnInvalid: boolean,
+): ParsedManifestCandidate[] => {
+  const results: ParsedManifestCandidate[] = [];
+  for (const entry of listAgentManifestFiles(directory)) {
+    const filePath = path.join(directory, entry);
+    const fallbackId = idFromFileName(entry);
+    const parsed = parseAgentMarkdownStrict(
+      fs.readFileSync(filePath, 'utf8'),
+      filePath,
+      fallbackId,
+      fs.statSync(filePath).mtime.toISOString(),
+      scope === 'builtin',
+    );
+    if (!parsed.ok) {
+      if (failClosedOnInvalid) {
+        throw new Error(`BUILTIN_AGENT_MANIFEST_INVALID: ${filePath}: ${parsed.reason}`);
+      }
+      results.push({
+        candidate: {
+          id: fallbackId,
+          kind: 'agent',
+          scope,
+          sourcePath: filePath,
+          value: {
+            id: fallbackId,
+            fileName: entry,
+            filePath,
+            name: fallbackId,
+            description: '',
+            argumentHint: '',
+            target: 'rdc-agent',
+            models: [],
+            icon: 'message-orbit',
+            accent: '#33d1ff',
+            disableModelInvocation: false,
+            userInvocable: false,
+            tools: [],
+            skills: [],
+            mcpServers: [],
+            agents: [],
+            handoffs: [],
+            metadata: {},
+            instructions: '',
+            builtin: scope === 'builtin',
+            enabled: false,
           },
-        ]
-      : [],
-    metadata: {},
-    instructions: `You are ${name}. ${AGENT_DESCRIPTIONS[agentId]}.`,
-    enabled: true,
-  };
+          enabled: false,
+          invalid: true,
+          invalidReason: parsed.reason,
+        },
+      });
+      continue;
+    }
+    results.push({
+      candidate: {
+        id: parsed.definition.id,
+        kind: 'agent',
+        scope,
+        sourcePath: filePath,
+        value: {
+          ...parsed.definition,
+          builtin: scope === 'builtin',
+        },
+        enabled: parsed.definition.enabled,
+      },
+    });
+  }
+  return results;
 };
 
 export class AgentManifestService {
@@ -251,16 +164,52 @@ export class AgentManifestService {
     return paths.instructionsPath;
   }
 
-  ensureSeedManifests(paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>, routes: LlmAgentRoute[]): void {
-    const directory = this.getAgentsDirectory(paths);
-    fs.mkdirSync(directory, { recursive: true });
-    const existing = new Set(fs.readdirSync(directory));
-    for (const agentId of AGENT_ROLES) {
-      const seed = createSeedDefinition(agentId, routes);
-      if (!existing.has(seed.fileName)) {
-        fs.writeFileSync(path.join(directory, seed.fileName), serializeAgentMarkdown(seed), 'utf8');
+  resolveEffectiveSnapshot(
+    paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
+    projectRoot?: string,
+  ): { profiles: EffectiveAgentProfile[]; diagnostics: string[] } {
+    agentSeedMigrationService.migrateUserAgents(this.getAgentsDirectory(paths));
+    const candidates: Array<ScopedResourceCandidate<AgentManifestDefinition>> = [];
+    const diagnostics: string[] = [];
+
+    const builtinPath = appPathService.getBuiltinAgentsPath();
+    if (!fs.existsSync(builtinPath)) {
+      throw new Error(`BUILTIN_AGENT_MANIFESTS_MISSING: ${builtinPath}`);
+    }
+    for (const loaded of loadManifestCandidates(builtinPath, 'builtin', true)) {
+      candidates.push(loaded.candidate);
+    }
+
+    for (const loaded of loadManifestCandidates(this.getAgentsDirectory(paths), 'user', false)) {
+      if (loaded.candidate.invalid) {
+        diagnostics.push(`USER_AGENT_MANIFEST_INVALID: ${loaded.candidate.sourcePath}: ${loaded.candidate.invalidReason}`);
+      }
+      candidates.push(loaded.candidate);
+    }
+
+    if (projectRoot) {
+      const projectAgentsPath = appPathService.getProjectRdxPaths(projectRoot).agentsPath;
+      for (const loaded of loadManifestCandidates(projectAgentsPath, 'project', false)) {
+        if (loaded.candidate.invalid) {
+          diagnostics.push(`PROJECT_AGENT_MANIFEST_INVALID: ${loaded.candidate.sourcePath}: ${loaded.candidate.invalidReason}`);
+        }
+        candidates.push(loaded.candidate);
       }
     }
+
+    const resolved = scopedResourceResolver.resolve(candidates);
+    diagnostics.push(...resolved.diagnostics.map((entry) => `${entry.code}: ${entry.message}`));
+    const profiles = resolved.resources.map((resource) => ({
+      ...resource.value,
+      builtin: resource.provenance.scope === 'builtin',
+      effectiveStatus: resource.effectiveStatus,
+      provenance: {
+        ...resource.provenance,
+        sourceHash: hashManifestFile(resource.provenance.sourcePath, resource.id),
+      },
+      compiledRoute: this.routeFromDefinition(resource.value),
+    }));
+    return { profiles, diagnostics };
   }
 
   getSettings(
@@ -268,69 +217,28 @@ export class AgentManifestService {
     providers: LlmProviderEntry[],
     routes: LlmAgentRoute[],
     catalogs: EffectiveCatalogSnapshot[] = [],
+    projectRoot?: string,
   ): AgentManifestSettings {
-    this.ensureSeedManifests(paths, routes);
-    const directoryPath = this.getAgentsDirectory(paths);
-    const definitions = fs.readdirSync(directoryPath)
-      .filter((entry) => entry.endsWith('.agent.md'))
-      .filter((entry) => isSafeAgentProfileId(idFromFileName(entry)))
-      .map((entry) => {
-        const fullPath = path.join(directoryPath, entry);
-        const fallbackId = idFromFileName(entry);
-        return parseAgentMarkdown(fullPath, fallbackId);
-      })
+    const { profiles, diagnostics } = this.resolveEffectiveSnapshot(paths, projectRoot);
+    const definitions = profiles
+      .slice()
       .sort((left, right) => Number(right.userInvocable) - Number(left.userInvocable) || left.name.localeCompare(right.name));
-
     return {
-      directoryPath,
+      directoryPath: this.getAgentsDirectory(paths),
       definitions,
       modelOptions: this.getModelOptions(providers, definitions, routes, catalogs),
       globalInstructions: this.readGlobalInstructions(paths),
+      diagnostics,
     };
   }
 
   getEffectiveProfiles(
     paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
-    providers: LlmProviderEntry[],
-    routes: LlmAgentRoute[],
+    _providers: LlmProviderEntry[],
+    _routes: LlmAgentRoute[],
     projectRoot?: string,
   ): EffectiveAgentProfile[] {
-    const userSettings = this.getSettings(paths, providers, routes);
-    const candidates: Array<ScopedResourceCandidate<AgentManifestDefinition>> = userSettings.definitions.map((definition) => ({
-      id: definition.id,
-      kind: 'agent',
-      scope: 'user',
-      sourcePath: definition.filePath,
-      value: definition,
-      enabled: definition.enabled,
-    }));
-
-    if (projectRoot) {
-      const projectAgentsPath = appPathService.getProjectRdxPaths(projectRoot).agentsPath;
-      if (fs.existsSync(projectAgentsPath)) {
-        fs.readdirSync(projectAgentsPath)
-          .filter((entry) => entry.endsWith('.agent.md'))
-          .filter((entry) => isSafeAgentProfileId(idFromFileName(entry)))
-          .forEach((entry) => {
-            const filePath = path.join(projectAgentsPath, entry);
-            const definition = parseAgentMarkdown(filePath, idFromFileName(entry));
-            candidates.push({
-              id: definition.id,
-              kind: 'agent',
-              scope: 'project',
-              sourcePath: filePath,
-              value: definition,
-              enabled: definition.enabled,
-            });
-          });
-      }
-    }
-
-    return scopedResourceResolver.resolve(candidates).resources.map((resource) => ({
-      ...resource.value,
-      effectiveStatus: resource.effectiveStatus,
-      provenance: resource.provenance,
-    }));
+    return this.resolveEffectiveSnapshot(paths, projectRoot).profiles;
   }
 
   saveGlobalInstructions(
@@ -343,23 +251,56 @@ export class AgentManifestService {
   async saveDefinition(
     paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
     draft: AgentManifestDraft,
+    options: AgentManifestSaveOptions = { scope: 'user' },
   ): Promise<AgentManifestCommit> {
-    const directory = this.getAgentsDirectory(paths);
-    await fs.promises.mkdir(directory, { recursive: true });
+    if (options.scope !== 'user' && options.scope !== 'project') {
+      throw new Error('AGENT_MANIFEST_SCOPE_REQUIRED: save/delete must specify user or project.');
+    }
     const agentId = draft.id || toSlug(draft.name);
     if (!isSafeAgentProfileId(agentId)) {
       throw new Error(`Invalid agent profile id: ${agentId}`);
     }
+    const directory = options.scope === 'project'
+      ? this.resolveProjectAgentsPath(options.projectRoot)
+      : this.getAgentsDirectory(paths);
+    if (options.scope === 'user' && path.resolve(directory) === path.resolve(appPathService.getBuiltinAgentsPath())) {
+      throw new Error('BUILTIN_AGENT_MANIFEST_READONLY: edit requires an explicit user copy-on-write.');
+    }
+    await fs.promises.mkdir(directory, { recursive: true });
     const fileName = safeFileNameForDraft(draft);
     const filePath = path.join(directory, fileName);
+    const current = this.resolveEffectiveSnapshot(
+      paths,
+      options.scope === 'project' ? options.projectRoot : undefined,
+    ).profiles.find((profile) => profile.id === agentId);
+    if (options.sourceHash && current && current.provenance.sourceHash !== options.sourceHash) {
+      throw new Error('AGENT_MANIFEST_SOURCE_HASH_CONFLICT: the effective profile changed since the editor loaded.');
+    }
+    if (current?.provenance.scope === 'builtin' && options.scope === 'project' && !draft.delete) {
+      // copy-on-write to project is allowed
+    }
+    const resolutionRoot = options.scope === 'project' ? options.projectRoot : undefined;
     if (draft.delete) {
+      if (current?.provenance.scope === 'builtin' && options.scope === 'user') {
+        throw new Error('BUILTIN_AGENT_MANIFEST_READONLY: deleting a builtin profile is not allowed.');
+      }
       await fs.promises.rm(filePath, { force: true });
       return {
-        definition: null,
+        definition: this.resolveEffectiveDefinition(paths, agentId, resolutionRoot),
         commitHash: hashManifestContent(`deleted:${agentId}`),
       };
     }
 
+    const parsed = parseAgentMarkdownStrict(
+      serializeAgentMarkdown({ ...draft, id: agentId, fileName }),
+      filePath,
+      agentId,
+      new Date().toISOString(),
+      false,
+    );
+    if (!parsed.ok) {
+      throw new Error(`AGENT_MANIFEST_INVALID: ${parsed.reason}`);
+    }
     const content = serializeAgentMarkdown({
       ...draft,
       id: agentId,
@@ -373,17 +314,29 @@ export class AgentManifestService {
       await fs.promises.rm(temporaryPath, { force: true });
     }
 
-    const previousFileName = draft.fileName?.endsWith('.agent.md')
-      ? path.basename(draft.fileName)
-      : fileName;
-    const previousPath = path.join(directory, previousFileName);
-    if (previousPath !== filePath) {
-      await fs.promises.rm(previousPath, { force: true });
+    const ownedFileName = fileNameForId(agentId);
+    if (path.basename(filePath) !== ownedFileName) {
+      throw new Error(`AGENT_MANIFEST_FILENAME_MISMATCH: write path must be ${ownedFileName}.`);
     }
     return {
-      definition: parseAgentMarkdownContent(content, filePath, agentId, new Date().toISOString()),
+      definition: this.resolveEffectiveDefinition(paths, agentId, resolutionRoot),
       commitHash: hashManifestContent(content),
     };
+  }
+
+  private resolveEffectiveDefinition(
+    paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
+    agentId: string,
+    projectRoot?: string,
+  ): AgentManifestDefinition | null {
+    return this.resolveEffectiveSnapshot(paths, projectRoot).profiles.find((profile) => profile.id === agentId) ?? null;
+  }
+
+  private resolveProjectAgentsPath(projectRoot?: string): string {
+    if (!projectRoot?.trim()) {
+      throw new Error('AGENT_MANIFEST_PROJECT_ROOT_REQUIRED: project-scoped save needs a project root.');
+    }
+    return appPathService.getProjectRdxPaths(projectRoot).agentsPath;
   }
 
   async readCommitHash(filePath: string): Promise<string> {
@@ -393,8 +346,11 @@ export class AgentManifestService {
   async readDefinition(
     paths: Pick<AppRuntimePaths, 'agentsPath'>,
     agentId: string,
+    options?: { scope?: 'user' | 'project'; projectRoot?: string },
   ): Promise<AgentManifestDefinition | null> {
-    const directory = this.getAgentsDirectory(paths);
+    const directory = options?.scope === 'project'
+      ? this.resolveProjectAgentsPath(options.projectRoot)
+      : this.getAgentsDirectory(paths);
     const entries = await fs.promises.readdir(directory).catch(() => [] as string[]);
     const fileName = entries.find((entry) => (
       entry.endsWith('.agent.md') && idFromFileName(entry) === agentId
@@ -405,7 +361,8 @@ export class AgentManifestService {
       fs.promises.readFile(filePath, 'utf8'),
       fs.promises.stat(filePath),
     ]);
-    return parseAgentMarkdownContent(content, filePath, agentId, stat.mtime.toISOString());
+    const parsed = parseAgentMarkdownStrict(content, filePath, agentId, stat.mtime.toISOString(), false);
+    return parsed.ok ? parsed.definition : null;
   }
 
   routeFromDefinition(definition: Pick<AgentManifestDraft, 'id' | 'models'>): LlmAgentRoute {
@@ -427,20 +384,24 @@ export class AgentManifestService {
       throw new Error(`Agent manifest not found: ${sourcePath}`);
     }
     const sourceContent = await fs.promises.readFile(sourcePath, 'utf8');
-    const imported = parseAgentMarkdownContent(
+    const imported = parseAgentMarkdownStrict(
       sourceContent,
       sourcePath,
       path.basename(sourcePath, '.agent.md'),
       sourceStat.mtime.toISOString(),
+      false,
     );
-    if (!isSafeAgentProfileId(imported.id)) {
-      throw new Error(`Invalid agent profile id: ${imported.id}`);
+    if (!imported.ok) {
+      throw new Error(`Imported agent manifest is invalid: ${imported.reason}`);
     }
-    const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = imported;
+    if (!isSafeAgentProfileId(imported.definition.id)) {
+      throw new Error(`Invalid agent profile id: ${imported.definition.id}`);
+    }
+    const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = imported.definition;
     const commit = await this.saveDefinition(paths, {
       ...draft,
-      fileName: fileNameForId(imported.id || imported.name),
-    });
+      fileName: fileNameForId(imported.definition.id || imported.definition.name),
+    }, { scope: 'user' });
     if (!commit.definition) throw new Error('Imported agent manifest was not committed.');
     return commit.definition;
   }

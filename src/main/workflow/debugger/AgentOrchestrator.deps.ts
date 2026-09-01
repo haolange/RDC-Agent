@@ -16,6 +16,7 @@ export { storageAdapter } from '../../sessions/StorageAdapter';
 export { executionProfileService } from '../../settings/ExecutionProfileService';
 export { settingsService } from '../../settings/SettingsService';
 export { agentManifestService } from '../../settings/AgentManifestService';
+export { compiledRoutesFromDefinitions } from '../../settings/compiledAgentRoutes';
 export { providerRuntimeCredentialService } from '../../settings/ProviderRuntimeCredentialService';
 export { freezeProviderRuntimeCredentials } from '../../settings/ProviderRuntimeCredentialLease';
 export {

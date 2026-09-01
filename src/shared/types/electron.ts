@@ -312,7 +312,7 @@ export interface ElectronAPI {
     hasProviderSecret: (providerId: string) => Promise<{ hasSecret: boolean; maskedPreview?: string }>;
     importAgentManifest: (filePath: string) => Promise<AppSettings>;
     saveAgentDefinition: (request: AgentDefinitionSaveRequest) => Promise<AgentDefinitionSaveResult>;
-    getAgentDefinitionCommit: (agentId: string) => Promise<AgentDefinitionCommitSnapshot | null>;
+    getAgentDefinitionCommit: (query: import('./agentManifest').AgentDefinitionCommitQuery) => Promise<AgentDefinitionCommitSnapshot | null>;
     saveProviderDefinition: (request: ProviderDefinitionSaveRequest) => Promise<ProviderDefinitionSaveResult>;
     getProviderDefinitionCommit: (providerId: string) => Promise<ProviderDefinitionCommitSnapshot | null>;
     getModelsOverride: () => Promise<ModelsOverride>;
@@ -396,6 +396,14 @@ export interface ElectronAPI {
     setModelOverride: (
       id: string,
       modelOverride: SessionRecord['modelOverride'],
+    ) => Promise<{
+      success: boolean;
+      session?: SessionRecord;
+      error?: string;
+    }>;
+    setAgentId: (
+      id: string,
+      agentId: string,
     ) => Promise<{
       success: boolean;
       session?: SessionRecord;

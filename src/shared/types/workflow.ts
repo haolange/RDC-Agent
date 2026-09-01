@@ -101,7 +101,7 @@ export interface Report {
 }
 
 export interface ModeCapabilities {
-  mode: import('./session').AppMode;
+  profileId: string;
   availableStages: WorkflowStage[];
   requiresLLM: boolean;
   isFullyImplemented: boolean;

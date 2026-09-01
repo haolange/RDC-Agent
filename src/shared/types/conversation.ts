@@ -4,7 +4,6 @@ import type { AgentEvent } from './agentRuntime';
 import type { ConversationBranchState } from './conversationBranch';
 import type { ProviderOutputRef, ThinkingArtifact } from './reasoning';
 import type {
-  AppMode,
   PreparedTurnContextSummary,
   RunSummary,
   SessionAttachmentLayer,
@@ -111,6 +110,7 @@ export type ConversationMessageDiagnosticCode =
   | 'CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION'
   | 'CONVERSATION_AGENT_LOOP_STALLED'
   | 'CONVERSATION_AGENT_TURN_LIMIT_EXCEEDED'
+  | 'CONVERSATION_PROFILE_OVERLAY_INVALID'
   | 'MODEL_CONTINUATION_DROPPED'
   | 'ATTACHMENT_LIMIT_EXCEEDED'
   | 'ATTACHMENT_MEDIA_UNSUPPORTED'
@@ -221,7 +221,7 @@ export interface ConversationMessage {
   sessionId: string | null;
   projectId: string | null;
   runId?: string | null;
-  modeContext?: AppMode;
+  profileId?: string;
   role: ConversationRole;
   agentId?: AgentRole;
   content: string;
@@ -343,8 +343,8 @@ export interface ConversationSendRequest {
   sessionId?: string | null;
   currentRunId?: string | null;
   replayDeviceId?: string | null;
-  mode: AppMode;
   agentId?: string | null;
+  profileId?: string | null;
   message: string;
   attachments?: ConversationAttachmentInput[];
   /** Composer `/skills` 武装的当轮预载 skill id（与 `$skill` / profile.skills 合并）。 */

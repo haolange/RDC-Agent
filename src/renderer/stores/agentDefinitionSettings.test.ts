@@ -43,13 +43,13 @@ describe('agent definition optimistic settings projection', () => {
     base.agents.definitions = [definition('provider:a')];
     base.llm.agentRoutes = [{ agentId: 'ask', providerId: 'provider', modelId: 'a' }];
 
-    const a = beginAgentDefinitionSave(base, { draft: draft('provider:a'), clientRevision: 101 });
-    const b = beginAgentDefinitionSave(a.settings, { draft: draft('provider:b'), clientRevision: 102 });
-    const c = beginAgentDefinitionSave(b.settings, { draft: draft('provider:c'), clientRevision: 103 });
+    const a = beginAgentDefinitionSave(base, { draft: draft('provider:a'), clientRevision: 101, scope: 'user' });
+    const b = beginAgentDefinitionSave(a.settings, { draft: draft('provider:b'), clientRevision: 102, scope: 'user' });
+    const c = beginAgentDefinitionSave(b.settings, { draft: draft('provider:c'), clientRevision: 103, scope: 'user' });
 
-    expect(isLatestAgentDefinitionRevision('ask', 101)).toBe(false);
-    expect(isLatestAgentDefinitionRevision('ask', 102)).toBe(false);
-    expect(isLatestAgentDefinitionRevision('ask', 103)).toBe(true);
+    expect(isLatestAgentDefinitionRevision('user', undefined, 'ask', 101)).toBe(false);
+    expect(isLatestAgentDefinitionRevision('user', undefined, 'ask', 102)).toBe(false);
+    expect(isLatestAgentDefinitionRevision('user', undefined, 'ask', 103)).toBe(true);
     expect(c.settings.llm.agentRoutes).toContainEqual({ agentId: 'ask', providerId: 'provider', modelId: 'c' });
   });
 
@@ -57,7 +57,7 @@ describe('agent definition optimistic settings projection', () => {
     const base = structuredClone(DEFAULT_SETTINGS);
     base.agents.definitions = [definition('provider:a')];
     base.llm.agentRoutes = [{ agentId: 'ask', providerId: 'provider', modelId: 'a' }];
-    const pending = beginAgentDefinitionSave(base, { draft: draft('provider:b'), clientRevision: 201 });
+    const pending = beginAgentDefinitionSave(base, { draft: draft('provider:b'), clientRevision: 201, scope: 'user' });
     const settled = settleAgentDefinitionSave(pending.settings, 'ask', {
       clientRevision: 201,
       status: 'committed',
@@ -80,6 +80,48 @@ describe('agent definition optimistic settings projection', () => {
     })).toMatchObject({
       agents: { definitions: [{ models: ['provider:a'] }] },
       llm: { agentRoutes: [{ agentId: 'ask', providerId: 'provider', modelId: 'a' }] },
+    });
+  });
+
+  it('upserts a restored builtin general after deleting a project override', () => {
+    const projectOverride: AgentManifestDefinition = {
+      ...definition('openai:project'),
+      id: 'general',
+      fileName: 'general.agent.md',
+      builtin: false,
+      provenance: { scope: 'project', sourcePath: 'project/general.agent.md', sourceHash: 'project-hash' },
+      compiledRoute: { agentId: 'general', providerId: 'openai', modelId: 'project' },
+    };
+    const restoredBuiltin: AgentManifestDefinition = {
+      ...definition(''),
+      id: 'general',
+      fileName: 'general.agent.md',
+      models: [],
+      builtin: true,
+      provenance: { scope: 'builtin', sourcePath: 'builtin/general.agent.md', sourceHash: 'builtin-hash' },
+      compiledRoute: { agentId: 'general', providerId: '', modelId: '' },
+    };
+    restoredBuiltin.compiledRoute = { agentId: 'general', providerId: 'openrouter', modelId: 'anthropic/claude-3-sonnet' };
+    const base = structuredClone(DEFAULT_SETTINGS);
+    base.agents.definitions = [projectOverride];
+    const settled = settleAgentDefinitionSave(base, 'general', {
+      clientRevision: 301,
+      status: 'committed',
+      commitHash: 'deleted-project',
+      definition: restoredBuiltin,
+      route: restoredBuiltin.compiledRoute,
+      lastSuccessful: {
+        clientRevision: 301,
+        commitHash: 'deleted-project',
+        definition: restoredBuiltin,
+        route: restoredBuiltin.compiledRoute,
+      },
+    });
+    const general = settled.agents.definitions.find((entry) => entry.id === 'general');
+    expect(general).toMatchObject({
+      builtin: true,
+      compiledRoute: { agentId: 'general', providerId: 'openrouter', modelId: 'anthropic/claude-3-sonnet' },
+      provenance: { scope: 'builtin', sourceHash: 'builtin-hash' },
     });
   });
 });

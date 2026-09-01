@@ -12,8 +12,8 @@ import type { AgentRole } from '@shared/types/agent';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import type { ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
 import type { ProviderOutputRef, ThinkingArtifact } from '@shared/types/reasoning';
-import type { AppMode, SessionAttachmentRecord } from '@shared/types/session';
-import { generateEventId, nowMs } from '@shared/utils/id';
+import type { SessionAttachmentRecord } from '@shared/types/session';
+import { nowMs } from '@shared/utils/id';
 import { agentOrchestrator, type PreparedAgentTurnContext } from '../workflow/debugger/AgentOrchestrator';
 import { agentUserInputRequestService } from '../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentToolApprovalRequestService } from '../agent-runtime/permissions/AgentToolApprovalRequestService';
@@ -29,6 +29,8 @@ import { beginAssistantContentLoopIfPending } from './ConversationLoopRuntimeSta
 import { EMPTY_CANONICAL_ASSISTANT_OUTPUT, requireCanonicalFinalAnswer } from './CanonicalAssistantOutput';
 import { hydrateFrozenUserContent } from './ConversationAttachmentMaterializer';
 import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
+import { buildHandoffAgentEvent } from './profileHandoffEvents';
+import type { PendingHandoff } from '../workflow/debugger/TurnCoordinator';
 import type {
   ActiveConversationTurn,
   AgentRoutePreflightOk,
@@ -44,7 +46,7 @@ import {
 
 export interface CompleteProfileTurnInput {
     context: ResolvedConversationContext;
-    requestedMode: AppMode;
+    requestedProfileId: string;
     requestedAgentId: AgentRole;
     rawMessage: string;
     importedAttachments: SessionAttachmentRecord[];
@@ -76,7 +78,44 @@ export interface ConversationTurnRunnerHost {
     branchId: string,
   ): void;
   ephemeralTraceSessionId(turnId: string): string;
-  setPendingHandoff(sessionId: string, handoff: { toProfile: AgentRole; prompt: string }): void;
+  commitPreparedHandoff(sessionId: string, sourceTurnId: string): import('@shared/types/profileHandoff').ProfileHandoffState | null;
+  cancelUnfinishedHandoff(sessionId: string, reason: import('@shared/types/profileHandoff').ProfileHandoffCancelReason): void;
+  scheduleHandoffAutoSend(sessionId: string): void;
+}
+
+export function settleSourceHandoffAfterTerminal(
+  host: ConversationTurnRunnerHost,
+  input: {
+    terminalCommitted: boolean;
+    assistantStatus: ConversationMessage['status'];
+    sessionId: string | null;
+    sourceTurnId: string;
+    pendingHandoff: PendingHandoff | null;
+  },
+): void {
+  const { terminalCommitted, assistantStatus, sessionId, sourceTurnId, pendingHandoff } = input;
+  if (!sessionId) return;
+
+  if (!terminalCommitted || assistantStatus === 'error' || assistantStatus === 'stopped') {
+    host.cancelUnfinishedHandoff(
+      sessionId,
+      assistantStatus === 'stopped' ? 'user_stop' : 'superseded',
+    );
+    return;
+  }
+  if (!pendingHandoff || pendingHandoff.turnId !== sourceTurnId || pendingHandoff.sessionId !== sessionId) {
+    return;
+  }
+
+  const committed = host.commitPreparedHandoff(sessionId, sourceTurnId);
+  if (!committed) {
+    host.cancelUnfinishedHandoff(sessionId, 'superseded');
+    return;
+  }
+  host.emitConversationEvent(buildHandoffAgentEvent('handoff.requested', sessionId, committed));
+  if (committed.send) {
+    host.scheduleHandoffAutoSend(sessionId);
+  }
 }
 
 export async function completeProfileTurn(
@@ -103,6 +142,21 @@ export async function completeProfileTurn(
 
   let streamScheduler: ConversationStreamPatchScheduler | null = null;
   let conversationPersistenceError: Error | null = null;
+  let sourceHandoffSettled = false;
+  const settleSourceHandoff = (
+    terminalCommitted: boolean,
+    assistantStatus: ConversationMessage['status'],
+  ): void => {
+    if (sourceHandoffSettled || !sessionId) return;
+    sourceHandoffSettled = true;
+    settleSourceHandoffAfterTerminal(host, {
+      terminalCommitted,
+      assistantStatus,
+      sessionId,
+      sourceTurnId: assistantMessage.turnId,
+      pendingHandoff: terminalHandoff,
+    });
+  };
   let deferredTerminalEventType: ConversationStreamEvent['type'] | null = null;
   let lastTracePublishedAt = 0;
   const TRACE_PUBLISH_MIN_INTERVAL_MS = 160;
@@ -111,7 +165,7 @@ export async function completeProfileTurn(
     executionIdentity: ExecutionIdentity;
     status: 'complete' | 'stopped' | 'error';
   } | null } = { value: null };
-  let terminalHandoff: import('../workflow/debugger/TurnCoordinator').PendingHandoff | null = null;
+  let terminalHandoff: PendingHandoff | null = null;
 
   const applyAssistantMessagePatch = (
     type: ConversationStreamEvent['type'],
@@ -149,6 +203,7 @@ export async function completeProfileTurn(
           message: assistantMessage,
         });
         host.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
+        settleSourceHandoff(false, 'error');
         return;
       }
     }
@@ -200,6 +255,7 @@ export async function completeProfileTurn(
   const commitStoppedMessage = () => {
     agentUserInputRequestService.cancelTurn(assistantMessage.turnId);
     agentToolApprovalRequestService.cancelTurn(assistantMessage.turnId);
+    if (sessionId) host.cancelUnfinishedHandoff(sessionId, 'user_stop');
     commitTerminalAssistantMessage('message_completed', {
       status: 'stopped',
       content: assistantMessage.content || '当前请求已停止。',
@@ -419,6 +475,7 @@ export async function completeProfileTurn(
           sessionId: input.context.session?.sessionId,
           runId: isActiveRun(input.context.currentRun) ? input.context.currentRun.runId : undefined,
           turnId: assistantMessage.turnId,
+          requestId: input.requestId,
           stage: 'investigate',
           projectRootPath: prepared.projectRootPath,
           projectId: input.context.projectId,
@@ -521,42 +578,6 @@ export async function completeProfileTurn(
       terminalSummary,
     )),
   });
-  const handoff = terminalHandoff as import('../workflow/debugger/TurnCoordinator').PendingHandoff | null;
-  const frozenPlan = input.preparedTurn.runtime.effectivePlan;
-  const handoffTargetAllowed = (target: string): boolean => frozenPlan.enabledProfileIds.includes(target)
-    && (frozenPlan.profileHandoffs.length === 0 || frozenPlan.profileHandoffs.some((declared) => declared.agent === target));
-  if (
-    finalStatus !== 'error'
-    && input.context.session
-    && handoff
-    && handoff.turnId === assistantMessage.turnId
-    && handoff.sessionId === input.context.session.sessionId
-    && handoff.toProfile
-    && handoffTargetAllowed(handoff.toProfile)
-  ) {
-    host.setPendingHandoff(input.context.session.sessionId, {
-      toProfile: handoff.toProfile,
-      prompt: handoff.prompt,
-    });
-    host.emitConversationEvent({
-      type: 'agent_event',
-      sessionId: input.context.session.sessionId,
-      turnId: assistantMessage.turnId,
-      event: {
-        id: generateEventId('agent-event'),
-        type: 'handoff.requested',
-        timestamp: nowMs(),
-        sessionId: input.context.session.sessionId,
-        agentId: handoff.fromAgentId,
-        payload: {
-          fromAgentId: handoff.fromAgentId,
-          toProfile: handoff.toProfile,
-          prompt: handoff.prompt,
-          label: handoff.label,
-        },
-      },
-    });
-  }
 
   } finally {
     if (abortController.signal.aborted && !conversationPersistenceError && assistantMessage.status === 'streaming') {
@@ -630,6 +651,7 @@ export async function completeProfileTurn(
           message: assistantMessage,
         } as ConversationStreamEvent);
         host.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
+        settleSourceHandoff(true, assistantMessage.status);
       } catch (error) {
         console.error(`[ConversationService] Terminal transaction failed for ${assistantMessage.turnId}:`, error);
         assistantMessage = {
@@ -643,6 +665,7 @@ export async function completeProfileTurn(
           },
           updatedAt: nowMs(),
         };
+        settleSourceHandoff(false, 'error');
         host.emitConversationEvent({
           type: 'message_errored',
           sessionId,
@@ -650,6 +673,18 @@ export async function completeProfileTurn(
           message: assistantMessage,
         });
         host.publishConversationTrace(traceSessionId, [input.userMessage, assistantMessage], sessionId);
+      }
+    }
+    if (!sourceHandoffSettled && sessionId) {
+      const turnFailed = Boolean(conversationPersistenceError)
+        || abortController.signal.aborted
+        || assistantMessage.status === 'error'
+        || assistantMessage.status === 'stopped';
+      if (turnFailed) {
+        settleSourceHandoff(
+          false,
+          assistantMessage.status === 'stopped' ? 'stopped' : 'error',
+        );
       }
     }
     host.clearActiveTurn(assistantMessage.turnId, abortController);

@@ -64,7 +64,9 @@ describe('PromptPlanBuilder', () => {
       timeZone: 'Asia/Shanghai',
     });
     expect(plan.systemPrompt).toContain('Tasks are read-only in this turn.');
-    expect(plan.systemPrompt).toContain('Use Plan or Edit');
+    expect(plan.systemPrompt).toContain('effective tools include task mutations');
+    expect(plan.systemPrompt).not.toContain('Ask is intentionally read-only');
+    expect(plan.systemPrompt).not.toContain('Use Plan or Edit');
     expect(plan.systemPrompt).toContain('cannot reveal or activate tools denied');
     expect(plan.systemPrompt).toContain('must not be repeated');
   });

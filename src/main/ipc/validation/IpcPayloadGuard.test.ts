@@ -124,14 +124,14 @@ describe('parseIpcArgs', () => {
   it('rejects conversation send with self-asserted approved field', () => {
     expect(() => parseIpcArgs(ConversationSendMessageArgsSchema, [{
       requestId: 'request-1',
-      mode: 'debugger',
+      profileId: 'debugger',
       message: 'hi',
       turnControls: { reasoningLevel: 'medium', maxContextMode: false, fastModel: false },
       approved: true,
     }], { label: 'conversation:sendMessage' })).toThrow(/schema violation|unrecognized|strict/i);
   });
 
-  it('rejects conversation send with invalid mode', () => {
+  it('rejects conversation send with unrecognized identity field', () => {
     expect(() => parseIpcArgs(ConversationSendMessageArgsSchema, [{
       requestId: 'request-1',
       mode: 'hacker',

@@ -13,8 +13,6 @@ const ReasoningSelectionSchema = z.enum([
   'max',
 ]);
 
-const AppModeSchema = z.enum(['ask', 'edit', 'debugger', 'analyzer', 'optimizer']);
-
 const ConversationTurnControlsSchema = z.object({
   reasoningLevel: ReasoningSelectionSchema,
   maxContextMode: z.boolean(),
@@ -82,8 +80,8 @@ export const ConversationSendRequestSchema = z.object({
   sessionId: NullableId.optional(),
   currentRunId: NullableId.optional(),
   replayDeviceId: NullableId.optional(),
-  mode: AppModeSchema,
   agentId: z.union([ipcNonEmptyString(200, 'agentId'), z.null()]).optional(),
+  profileId: z.union([ipcNonEmptyString(200, 'profileId'), z.null()]).optional(),
   message: ipcString(200_000, 'message'),
   attachments: z.array(ConversationAttachmentInputSchema).max(32).optional(),
   preloadSkillIds: ipcStringArray(64, 200, 'preloadSkillIds').optional(),

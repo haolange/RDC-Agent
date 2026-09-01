@@ -686,4 +686,4 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 ColdDat
 
 ## 22. 与当前实现的差距（非实现清单）
 
-当前顶层仍是 Ask / Plan / Edit + 三类 Mission 的 user seed；无 builtin `general`；无 durable handoff 状态机；无 `rdc.investigation.v1`；无五服务 / 七 lane / ColdData ingest；无独立 Embedding；Session rail 仍是四卡；并发缺省按不安全串行，尚未实现连续安全组。后续 Wave 按 `DESIGN.md` 裁决落地，落地一项删除一项旧路径。
+Wave 1 已落地四个 builtin profile、Coordinator Skills、seed 无损迁移、effective snapshot 与 Run v2（`kind` / `mission` / `profileId`，无 `mode`）。尚未实现：durable handoff 状态机、`rdc.investigation.v1`、Knowledge 五服务 / 七 lane / ColdData ingest、独立 Embedding、Session rail 五卡、连续安全工具并发组。后续 Wave 按 `DESIGN.md` 裁决落地，落地一项删除一项旧路径。

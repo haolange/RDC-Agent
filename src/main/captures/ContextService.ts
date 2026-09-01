@@ -9,6 +9,7 @@ import { artifactStore } from '../reports/ArtifactStore';
 import { evidenceLedger } from '../reports/EvidenceLedger';
 import { taskBoard } from '../workflow/debugger/TaskBoard';
 import { runScopedStore } from '../workflow/debugger/RunScopedStore';
+import { assertMissionRun } from '../sessions/runV2/runKindGuard';
 
 const PLAN_PATH = 'plan_contract.json';
 const CONTEXT_PACKETS_PATH = 'context_packets.jsonl';
@@ -17,10 +18,12 @@ const CAPSULE_PATH = 'run_capsule.json';
 
 export class ContextService {
   readPlanContract(sessionId: string, runId: string): PlanContract | null {
+    assertMissionRun(sessionId, runId);
     return runScopedStore.readJson<PlanContract | null>(sessionId, runId, PLAN_PATH, null);
   }
 
   writePlanContract(sessionId: string, runId: string, contract: PlanContract): PlanContract {
+    assertMissionRun(sessionId, runId);
     this.assertRunBinding(sessionId, runId, contract);
     const nextContract: PlanContract = {
       ...contract,
@@ -31,6 +34,7 @@ export class ContextService {
   }
 
   appendContextPacket(sessionId: string, runId: string, packet: ContextPacket): ContextPacket {
+    assertMissionRun(sessionId, runId);
     this.assertRunBinding(sessionId, runId, packet);
     const nextPacket: ContextPacket = {
       ...packet,
@@ -42,10 +46,12 @@ export class ContextService {
   }
 
   listContextPackets(sessionId: string, runId: string): ContextPacket[] {
+    assertMissionRun(sessionId, runId);
     return runScopedStore.readJsonl<ContextPacket>(sessionId, runId, CONTEXT_PACKETS_PATH);
   }
 
   appendAgentResultCard(sessionId: string, runId: string, card: AgentResultCard): AgentResultCard {
+    assertMissionRun(sessionId, runId);
     this.assertRunBinding(sessionId, runId, card);
     const now = nowIso();
     const nextCard: AgentResultCard = {
@@ -59,10 +65,12 @@ export class ContextService {
   }
 
   listAgentResultCards(sessionId: string, runId: string): AgentResultCard[] {
+    assertMissionRun(sessionId, runId);
     return runScopedStore.readJsonl<AgentResultCard>(sessionId, runId, RESULT_CARDS_PATH);
   }
 
   buildRunCapsule(sessionId: string, runId: string): RunCapsule {
+    assertMissionRun(sessionId, runId);
     const now = nowIso();
     return {
       schemaVersion: '1',
@@ -82,6 +90,7 @@ export class ContextService {
   }
 
   writeRunCapsule(sessionId: string, runId: string): RunCapsule {
+    assertMissionRun(sessionId, runId);
     const capsule = this.buildRunCapsule(sessionId, runId);
     runScopedStore.writeJson(sessionId, runId, CAPSULE_PATH, capsule);
     return capsule;
