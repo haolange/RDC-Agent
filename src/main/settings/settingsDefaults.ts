@@ -1,3 +1,5 @@
+import type { EmbeddingSettings } from '@shared/types/embedding';
+import { DEFAULT_EMBEDDING_SETTINGS } from '@shared/types/embedding';
 import type {
   AppRuntimePaths,
   AgentPermissionMode,
@@ -30,6 +32,8 @@ import {
   TERMINAL_DEFAULT_HEIGHT,
 } from '@shared/constants/layout';
 
+export { DEFAULT_EMBEDDING_SETTINGS } from '@shared/types/embedding';
+
 export const SETTINGS_SCHEMA_VERSION = 6;
 
 export type PersistedLlmProviderEntry = Partial<LlmProviderEntry>;
@@ -41,6 +45,7 @@ export interface PersistedSettingsPayload {
   profile?: Partial<ProfileSettings>;
   llm?: {
     providers?: PersistedLlmProviderEntry[];
+    embedding?: Partial<EmbeddingSettings>;
   };
   tooling?: {
     rdxCli?: Partial<RdxCliInvokerSettings>;
@@ -187,6 +192,7 @@ export function createDefaultPersistedSettings(): PersistedSettingsPayload {
     agentRuntime: DEFAULT_AGENT_RUNTIME,
     llm: {
       providers: [],
+      embedding: { ...DEFAULT_EMBEDDING_SETTINGS },
     },
   };
 }

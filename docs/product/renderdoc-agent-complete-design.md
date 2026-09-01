@@ -2,7 +2,7 @@
 
 > **文档地位**：本文件是受根目录 [`DESIGN.md`](../../DESIGN.md) 裁决的详细目标设计，**不是第二产品权威**。若与 `DESIGN.md` / `AGENTS.md` 冲突，以 `DESIGN.md` 为准并回改本文。
 >
-> **实现状态**：文中模块、schema、服务均为**目标态**，当前仓库尚未全部实现，不得把目标写成已落地。`check:knowledge-system` / `check:investigation-system` ratchet 已建立、目标债务未清零；清零前不得宣称五服务或垂直 schema 已完成。
+> **实现状态**：文中模块、schema、服务以目标态叙述。Wave 3 已落地 Knowledge 五服务、七 lane、五个 deferred 工具与 Knowledge Center 三列 UI。Investigation schema 与五卡 Right Rail 仍未完成。`check:knowledge-system` browse-only channel 债务已清零；`check:investigation-system` ratchet 目标债务未清零。
 >
 > **读者**：实现后续 Wave 的 Codex / Agent。路径相对本仓库。中文为主，产品术语保留英文。
 
@@ -104,7 +104,7 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 
 ### 3.3 Embedding（独立 capability，目标态 / 迁移中）
 
-路径：manifest `embeddings` → `EmbeddingCatalog` → `EmbeddingExecutionService`。独立 `embeddings` protocol / adapter。opaque credential `operation=embed`。consent **默认关**。索引绑定 identity / dimension / chunker / corpus hash；重建必须显式 rebuild。semantic lane 未配置、拒绝或失败时返回 `unavailable` / `stale` 并 fail-closed，其余 lane 仍可工作，但不得宣称已做语义检索。**严禁**进入 Agent / Composer / subagent picker 或 EffectiveCatalog 的 agent 可选集。Discovery 的 agent modality 边界不放松。实现前不得把这些模块写成已存在。
+路径：manifest `embeddings` → `EmbeddingCatalog` → `EmbeddingExecutionService`。独立 `embeddings` protocol / adapter。opaque credential `operation=embed`。consent **默认关**。索引绑定 identity / dimension / chunker / corpus hash；重建必须显式 rebuild。semantic lane 未配置、拒绝或失败时返回 `unavailable` / `stale` 并 fail-closed，其余 lane 仍可工作，但不得宣称已做语义检索。**严禁**进入 Agent / Composer / subagent picker 或 EffectiveCatalog 的 agent 可选集。Discovery 的 agent modality 边界不放松。Embedding capability 本身已落地；Knowledge 五服务已落地，完整 semantic 检索仍依赖 consent 与显式 rebuild。
 
 ### 3.4 Durable Handoff（目标态 / 迁移中）
 
@@ -501,7 +501,7 @@ Planning：Triage & Taxonomy → Capture Report → Knowledge Retrieval → plan
 
 ## 13. Knowledge Engine（目标态 / 迁移中）
 
-当前只有 `KnowledgeBrowseService` 只读浏览。目标五个主进程服务：`KnowledgeQueryService` / `KnowledgeIndexService` / `KnowledgeCompileService` / `KnowledgeCandidateService` / `KnowledgeWriteService`。七 lane：Identity/Path、Scope/Metadata、Lexical、Structural、Semantic、Relation/Graph、Temporal/Version。
+五个主进程服务已落地：`KnowledgeQueryService` / `KnowledgeIndexService` / `KnowledgeCompileService` / `KnowledgeCandidateService` / `KnowledgeWriteService`。七 lane：Identity/Path、Scope/Metadata、Lexical、Structural、Semantic、Relation/Graph、Temporal/Version。五个 deferred 工具与 `$knowledge-scout` / `$knowledge-candidate` 已落地。Knowledge Center 三列 UI（Spaces / List / Detail）、Candidate Inbox 与 ColdData Import 已落地；browse-only IPC 已删除。
 
 三个逻辑平面：Evidence（不可变事实，不是 Knowledge）→ Knowledge（结构化、带 Scope 与验证）→ Compiled Context（即时 Pack）。Card 是 Projection，不是存储本体。
 
@@ -686,4 +686,4 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 ColdDat
 
 ## 22. 与当前实现的差距（非实现清单）
 
-Wave 1 已落地四个 builtin profile、Coordinator Skills、seed 无损迁移、effective snapshot 与 Run v2（`kind` / `mission` / `profileId`，无 `mode`）。尚未实现：durable handoff 状态机、`rdc.investigation.v1`、Knowledge 五服务 / 七 lane / ColdData ingest、独立 Embedding、Session rail 五卡、连续安全工具并发组。后续 Wave 按 `DESIGN.md` 裁决落地，落地一项删除一项旧路径。
+Wave 1 已落地四个 builtin profile、Coordinator Skills、seed 无损迁移、effective snapshot 与 Run v2（`kind` / `mission` / `profileId`，无 `mode`）。Wave 3 已落地独立 Embedding、Knowledge 五服务 / 七 lane / ColdData staging ingest、五个 deferred 工具与 Knowledge Center 三列 UI。尚未实现：durable handoff 状态机、`rdc.investigation.v1`、Session rail 五卡、连续安全工具并发组。后续 Wave 按 `DESIGN.md` 裁决落地，落地一项删除一项旧路径。

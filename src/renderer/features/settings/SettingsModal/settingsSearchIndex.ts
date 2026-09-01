@@ -74,6 +74,13 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     target: 'models',
   },
   {
+    id: 'embedding',
+    section: 'models',
+    titleKey: 'settings.embeddingTitle',
+    keywords: ['embedding', 'embeddings', 'semantic', 'consent', '向量', '嵌入', '语义', '上传'],
+    target: 'embedding',
+  },
+  {
     id: 'agents',
     section: 'agents',
     titleKey: 'settings.agentManifestTitle',

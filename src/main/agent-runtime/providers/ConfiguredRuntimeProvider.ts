@@ -271,7 +271,7 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
     }
     let credentialLease: ReturnType<typeof providerRuntimeCredentialService.get>;
     try {
-      credentialLease = providerRuntimeCredentialService.get(options.credentialHandle, decoded.providerId);
+      credentialLease = providerRuntimeCredentialService.get(options.credentialHandle, decoded.providerId, 'chat');
     } catch (error) {
       return missingProviderStream(error instanceof Error ? error : new Error(String(error)));
     }
@@ -294,7 +294,7 @@ export class ConfiguredRuntimeProvider implements ProviderStrategy {
     const createAttempt = (): EventStream<AssistantMessageEvent, AssistantMessage> => {
       let activeLease;
       try {
-        activeLease = providerRuntimeCredentialService.get(options.credentialHandle, decoded.providerId);
+        activeLease = providerRuntimeCredentialService.get(options.credentialHandle, decoded.providerId, 'chat');
       } catch (error) {
         return missingProviderStream(error instanceof Error ? error : new Error(String(error)));
       }

@@ -104,6 +104,25 @@ describe('Agent tool-calling catalog audit', () => {
     expect(missing).toEqual([]);
   });
 
+  it('never treats embedding catalog models as Agent-executable picker models', () => {
+    const embeddingIds = new Set(
+      catalog.embeddings.models.map((model) => `${model.providerId}:${model.modelId}`),
+    );
+    expect(embeddingIds.size).toBeGreaterThan(0);
+    for (const compiled of catalog.surfaces.values()) {
+      for (const model of compiled.surface.models) {
+        expect(embeddingIds.has(`${compiled.surface.id}:${model.modelId}`)).toBe(false);
+        expect(isAgentToolExecutableModel({
+          enabled: model.enabled !== false,
+          availability: model.availability === 'unavailable' ? 'unavailable' : 'available',
+          selection: model.selection,
+          toolCalling: model.toolCalling,
+          route: model.route,
+        }) && model.modelId.includes('embedding')).toBe(false);
+      }
+    }
+  });
+
   it('covers every registered adapter protocol in the wire-fixture matrix', () => {
     for (const adapter of Object.values(PROVIDER_ADAPTER_IMPLEMENTATIONS)) {
       for (const protocol of adapter.protocols) {

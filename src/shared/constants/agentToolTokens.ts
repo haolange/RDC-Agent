@@ -3,7 +3,7 @@
  * Single source of truth for seed manifests, allowlist expansion, and Settings diagnostics.
  */
 
-/** All builtin AgentTool ids after search_codebase removal (40). */
+/** All builtin AgentTool ids after Knowledge tools (45). */
 export const BUILTIN_AGENT_TOOL_IDS = [
   'shell',
   'read_file',
@@ -45,6 +45,11 @@ export const BUILTIN_AGENT_TOOL_IDS = [
   'rdx_context',
   'tool_search',
   'code_interpreter',
+  'knowledge_browse',
+  'knowledge_search',
+  'knowledge_read',
+  'knowledge_compile',
+  'knowledge_candidate_create',
 ] as const;
 
 export type BuiltinAgentToolId = (typeof BUILTIN_AGENT_TOOL_IDS)[number];
@@ -98,6 +103,11 @@ export const BUILTIN_AGENT_TOOL_TIERS: Record<BuiltinAgentToolId, BuiltinAgentTo
   rdx_context: 'core',
   tool_search: 'core',
   code_interpreter: 'extended',
+  knowledge_browse: 'extended',
+  knowledge_search: 'extended',
+  knowledge_read: 'extended',
+  knowledge_compile: 'extended',
+  knowledge_candidate_create: 'extended',
 };
 
 export function getBuiltinToolTier(toolName: string): BuiltinAgentToolTier | null {
@@ -138,6 +148,7 @@ export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
   rdxContext: ['rdx_context'],
   rdx: ['rdx_context'],
   subagent: ['subagent'],
+  knowledge: ['knowledge_browse', 'knowledge_search', 'knowledge_read', 'knowledge_compile', 'knowledge_candidate_create'],
 };
 
 /** Tokens intentionally rejected (removed or renamed). No silent fallback. */

@@ -10,7 +10,7 @@ RDC-Agent 是通用 agent workbench，并一等公民支持 RDC/RDX 与 RenderDo
 
 **不做** image/video 生成 runtime、media provider 目录面或 `MediaRuntimeService` 类骨架；discovery 对非 agent modality（含 image/video output）保持 fail-closed 剔除。用户附件 vision-input（读图）仍属 agent chat 能力，与生成 media 无关。
 
-产品不是固定模式向导。**Wave 1 已落地**四个 builtin profile：`general` / `debugger` / `analyzer` / `optimizer`（`resources/agent-runtime/agents`，scope 优先级 `builtin < user < project`，不再写 user seed）。仅 `user-invocable` 的 profile 出现在 composer orchestrator 菜单。`/plan` 不再硬切 builtin plan。durable handoff runtime、Knowledge、五卡 Right Rail 与 Investigation schema **尚未实现**。裁决与迁移门禁见下文「Current / Target / Migration Adjudications」。
+产品不是固定模式向导。**Wave 1 已落地**四个 builtin profile：`general` / `debugger` / `analyzer` / `optimizer`（`resources/agent-runtime/agents`，scope 优先级 `builtin < user < project`，不再写 user seed）。仅 `user-invocable` 的 profile 出现在 composer orchestrator 菜单。`/plan` 不再硬切 builtin plan。durable handoff runtime、五卡 Right Rail 与 Investigation schema **尚未实现**。Knowledge 五服务、七 lane、五个 deferred 工具与 Knowledge Center 三列 UI 已落地。裁决与迁移门禁见下文「Current / Target / Migration Adjudications」。
 
 唯一运行时路径是 agent loop：解析 profile / model route / policy / tools → 调用 LLM → 执行已批准工具 → 回灌结果 → 产出 final answer。Renderer 不得伪造推理阶段；隐藏 CoT 永不作为 UI 内容展示或持久化。
 
@@ -161,9 +161,9 @@ Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThem
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | Discovery 对 embedding / embeddings 等非 agent modality fail-closed 剔除。不存在独立 Embedding catalog / execution / consent。Knowledge 尚无 semantic lane 实现。 |
+| **当前态（Wave 3 Embedding 已落地）** | Discovery 对 embedding / embeddings 等非 agent modality fail-closed 剔除（边界不放松）。独立路径已落地：manifest 可选 `embeddings` → `EmbeddingCatalog` → `EmbeddingExecutionService`（OpenAI 兼容 embeddings、opaque credential `operation=embed`、批量+限流）。Settings > Models 有 Embedding 子区（选模型 + 数据上传 consent，默认关）。未配置/未同意 → semantic lane `unavailable`；切换模型或维度 → `stale`，需显式 Rebuild。Embedding 模型不进入 Agent / Composer / subagent picker，也不并入 EffectiveCatalog 的 agent 可选集。Knowledge 五服务已落地；完整 semantic 检索仍依赖 consent 与显式 rebuild。 |
 | **目标态** | Embedding 是**独立 capability**，不进入 Agent / Composer / subagent picker，也不并入 EffectiveCatalog 的 agent 可选集。路径：manifest `embeddings` → `EmbeddingCatalog` → `EmbeddingExecutionService`。使用独立 `embeddings` protocol / adapter。opaque credential 的 `operation=embed`。用户 consent **默认关**。semantic lane 在未配置、拒绝或构建失败时返回 `unavailable` / `stale` 并 fail-closed，其余 Knowledge lane 仍可工作，但不得宣称已做语义检索。索引绑定 identity / dimension / chunker / corpus hash；重建必须显式 rebuild。Discovery 的 agent modality 边界**不放松**。 |
-| **迁移门禁** | 禁止把 embedding 模型写进 Agent route、`isAgentToolExecutableModel` 或 Settings Agents 可选集。禁止静默上传 User / Project Knowledge。实现前不得把 `EmbeddingCatalog` 写成已存在模块。 |
+| **迁移门禁** | 禁止把 embedding 模型写进 Agent route、`isAgentToolExecutableModel` 或 Settings Agents 可选集。禁止静默上传 User / Project Knowledge。Embedding catalog / execution 已作为独立 capability 存在，不得并回 EffectiveCatalog 的 agent 可选集。 |
 
 ### D. Profile Handoff Durable State Machine
 
@@ -193,9 +193,9 @@ Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThem
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | Knowledge Center 是 scoped Markdown 只读浏览。`KnowledgeBrowseService` 存在；五服务、七 lane、Candidate / Promote、ColdData import 均未实现。 |
+| **当前态** | 五服务与七 lane 已落地于 `src/main/knowledge/`。五个 deferred 工具 `knowledge_browse/search/read/compile/candidate_create` 与 canonical `knowledge` token 已注册；`$knowledge-scout` / `$knowledge-candidate` 已作为 builtin Skill。Knowledge Center 三列 UI（Spaces / List / Detail）已落地，IPC 只映射五服务，browse-only channel 已删除。semantic lane 显式降级到 `EmbeddingExecutionService`（未配置/未 consent → `unavailable`；模型/维度变 → `stale`），Center 不得在未 ready 时点亮 Semantic。 |
 | **目标态** | 五个主进程服务：`KnowledgeQueryService` / `KnowledgeIndexService` / `KnowledgeCompileService` / `KnowledgeCandidateService` / `KnowledgeWriteService`。七 retrieval lane：Identity/Path、Scope/Metadata、Lexical、Structural、Semantic、Relation/Graph、Temporal/Version。持久写入仅 human review。ColdData Historical Debug Case 经 canonical case card normalization 进入 session staging / Draft，**绝不默认或自动进入 Candidate**；`fixed ≠ verified`。仅当用户显式点击 / 命令，或 Agent 在本轮得到明确用户意图后显式调用 `knowledge_candidate_create`，才创建 Session Candidate。持久 Promote 仍只能 human review。canonical 仍是 `~/.rdx/knowledge` 或 `<project-root>/.rdx/knowledge`。本机原数据不入仓库；CI 只用脱敏 fixture。 |
-| **迁移门禁** | 无自动抽取 / 自动 Candidate / 自动 Promote。`FullAccess` 不能绕过写入确认。旧 browse-only 路径在五服务落地后直接收敛，不保留第二套 resolver。`pnpm run check:knowledge-system` ratchet 已建立、目标债务未清零。 |
+| **迁移门禁** | 无自动抽取 / 自动 Candidate / 自动 Promote。`FullAccess` 不能绕过写入确认。旧 browse-only 路径已删除，不保留第二套 resolver。`pnpm run check:knowledge-system` ratchet 已清零 browse-only channel 债务，其余目标债务只减不增。 |
 
 ### H. Legacy 清理目标
 

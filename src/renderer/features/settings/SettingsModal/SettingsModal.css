@@ -3624,14 +3624,16 @@
 }
 
 .settings-page-skills .settings-browser-block,
-.settings-page-policy .settings-browser-block {
+.settings-page-policy .settings-browser-block,
+.settings-page-models .settings-browser-block {
   margin-bottom: 0;
   padding: var(--space-5);
   border-radius: var(--radius-lg);
 }
 
 .settings-page-skills .settings-browser-section-head,
-.settings-page-policy .settings-browser-section-head {
+.settings-page-policy .settings-browser-section-head,
+.settings-page-models .settings-browser-section-head {
   min-height: var(--space-12);
   align-items: center;
 }

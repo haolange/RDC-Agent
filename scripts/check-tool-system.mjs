@@ -40,8 +40,8 @@ function main() {
   const { WORK_PROCESS_TOOL_DISPLAY_CATALOG } = require('../src/renderer/features/debugger/AgentChat/workProcessToolCatalog.ts');
 
   assert(
-    BUILTIN_AGENT_TOOL_IDS.length === 40,
-    `BUILTIN_AGENT_TOOL_IDS.length must be 40, got ${BUILTIN_AGENT_TOOL_IDS.length}`,
+    BUILTIN_AGENT_TOOL_IDS.length === 45,
+    `BUILTIN_AGENT_TOOL_IDS.length must be 45, got ${BUILTIN_AGENT_TOOL_IDS.length}`,
   );
 
   const builtinSet = new Set(BUILTIN_AGENT_TOOL_IDS);
@@ -96,7 +96,11 @@ function main() {
   assert(generalManifest.includes('task'), 'General builtin must include task');
   assert(!generalManifest.includes('todo'), 'General builtin must not include todo');
   assert(!generalManifest.includes('search_codebase'), 'General builtin must not include search_codebase');
-  assert(!generalManifest.includes('knowledge'), 'Wave 1 must not register knowledge tokens');
+  assert(/\n  - knowledge\n/.test(generalManifest), 'General builtin must grant canonical knowledge token');
+  assert(
+    !/\bknowledge_(?:browse|search|read|compile|candidate_create)\b/.test(generalManifest),
+    'General builtin must expose Knowledge via token expansion, not individual knowledge_* ids',
+  );
 
   assert(
     Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS.task)
@@ -149,6 +153,27 @@ function main() {
       && ['memory_write', 'memory_delete']
         .every((id) => CANONICAL_TOOL_TOKEN_EXPANSIONS['memory-write'].includes(id)),
     'CANONICAL_TOOL_TOKEN_EXPANSIONS.memory-write must cover memory_write/memory_delete',
+  );
+  const knowledgeTools = [
+    'knowledge_browse',
+    'knowledge_search',
+    'knowledge_read',
+    'knowledge_compile',
+    'knowledge_candidate_create',
+  ];
+  assert(
+    Array.isArray(CANONICAL_TOOL_TOKEN_EXPANSIONS.knowledge)
+      && knowledgeTools.every((id) => CANONICAL_TOOL_TOKEN_EXPANSIONS.knowledge.includes(id)),
+    'CANONICAL_TOOL_TOKEN_EXPANSIONS.knowledge must expand to the five Knowledge tools',
+  );
+  for (const id of knowledgeTools) {
+    assert(BUILTIN_AGENT_TOOL_IDS.includes(id), `BUILTIN_AGENT_TOOL_IDS must include ${id}`);
+    assert(BUILTIN_AGENT_TOOL_TIERS[id] === 'extended', `${id} must be extended/deferred`);
+  }
+  assert(
+    !['knowledge_write', 'knowledge_promote', 'knowledge_update', 'knowledge_deprecate']
+      .some((id) => BUILTIN_AGENT_TOOL_IDS.includes(id)),
+    'persistent Knowledge write tools must not be registered as agent tools',
   );
 
   // Context Window Phase 2：MCP deferred loading 计量 id 与前缀规则。

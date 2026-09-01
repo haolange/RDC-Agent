@@ -15,6 +15,7 @@ import {
   PROVIDER_DISCOVERY_POLICY_IDS,
   type ProviderAdapterId,
 } from './implementationRegistry';
+import { SurfaceEmbeddingsManifestSchema } from './embeddingManifestSchema';
 
 const ProviderAdapterIdSchema = z.custom<ProviderAdapterId>(
   (value) => typeof value === 'string' && Boolean(getProviderAdapterImplementation(value)),
@@ -225,6 +226,7 @@ export const ProviderSurfaceManifestSchema = z.object({
     factSourceId: z.string().min(1),
   }).strict().optional(),
   models: z.array(ModelManifestSchema),
+  embeddings: SurfaceEmbeddingsManifestSchema.optional(),
   protocolOverrides: z.array(z.object({
     modelId: z.string().min(1),
     protocol: ProviderProtocolSchema.optional(),

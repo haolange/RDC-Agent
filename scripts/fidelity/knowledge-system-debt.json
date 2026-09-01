@@ -1,28 +1,6 @@
 {
   "schemaVersion": 1,
   "waveClearBy": 6,
-  "maxHits": 21,
-  "ids": [
-    "knowledge.forbidden.browse.channels",
-    "knowledge.forbidden.browse.coverage-exclusion",
-    "knowledge.forbidden.browse.dto",
-    "knowledge.forbidden.browse.ipc",
-    "knowledge.forbidden.browse.service",
-    "knowledge.forbidden.browse.ui-doc",
-    "knowledge.missing.builtin.five-ids",
-    "knowledge.missing.contract.suite",
-    "knowledge.missing.lanes.seven",
-    "knowledge.missing.profile.ceiling.analyzer",
-    "knowledge.missing.profile.ceiling.debugger",
-    "knowledge.missing.profile.ceiling.general",
-    "knowledge.missing.profile.ceiling.optimizer",
-    "knowledge.missing.service.candidate",
-    "knowledge.missing.service.compile",
-    "knowledge.missing.service.index",
-    "knowledge.missing.service.query",
-    "knowledge.missing.service.write",
-    "knowledge.missing.tiers.extended",
-    "knowledge.missing.token.five-tools",
-    "knowledge.missing.workbench.catalog"
-  ]
+  "maxHits": 0,
+  "ids": []
 }

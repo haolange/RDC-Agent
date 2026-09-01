@@ -10,9 +10,12 @@ import {
   type AwsBedrockCredentials,
 } from './AwsBedrockCredentials';
 
+export type ProviderRuntimeCredentialOperation = 'chat' | 'embed';
+
 export interface FrozenProviderRuntimeCredential {
   handle: string;
   providerId: LlmProviderId;
+  operation: ProviderRuntimeCredentialOperation;
   provider: LLMProviderConfig;
   connectionValues: Readonly<Record<string, string>>;
   connectionHeaders: Readonly<Record<string, string>>;
@@ -52,10 +55,13 @@ export class ProviderRuntimeCredentialService {
     private readonly dependencies: ProviderRuntimeCredentialDependencies = defaultDependencies,
   ) {}
 
-  async freeze(providerId: LlmProviderId): Promise<string> {
+  async freeze(
+    providerId: LlmProviderId,
+    operation: ProviderRuntimeCredentialOperation = 'chat',
+  ): Promise<string> {
     this.purgeExpired();
     const handle = this.dependencies.createHandle();
-    this.leases.set(handle, await this.materializeLease(providerId, handle));
+    this.leases.set(handle, await this.materializeLease(providerId, handle, operation));
     return handle;
   }
 
@@ -65,7 +71,7 @@ export class ProviderRuntimeCredentialService {
     if (!current || current.providerId !== providerId) {
       throw new Error(`Runtime credential handle is invalid for ${providerId}.`);
     }
-    const refreshed = await this.materializeLease(providerId, handle);
+    const refreshed = await this.materializeLease(providerId, handle, current.operation);
     this.leases.set(handle, {
       ...refreshed,
       provider: Object.freeze({
@@ -79,6 +85,7 @@ export class ProviderRuntimeCredentialService {
   private async materializeLease(
     providerId: LlmProviderId,
     handle: string,
+    operation: ProviderRuntimeCredentialOperation,
   ): Promise<FrozenProviderRuntimeCredential> {
     const configured = this.dependencies.getProvider(providerId);
     if (!configured) {
@@ -98,6 +105,7 @@ export class ProviderRuntimeCredentialService {
     return {
       handle,
       providerId,
+      operation,
       provider: Object.freeze({ ...configured, apiKey }),
       connectionValues: Object.freeze(connectionValues),
       connectionHeaders: Object.freeze(connectionHeaders),
@@ -106,11 +114,18 @@ export class ProviderRuntimeCredentialService {
     };
   }
 
-  get(handle: string | undefined, providerId: LlmProviderId): FrozenProviderRuntimeCredential | null {
+  get(
+    handle: string | undefined,
+    providerId: LlmProviderId,
+    expectedOperation: ProviderRuntimeCredentialOperation,
+  ): FrozenProviderRuntimeCredential | null {
     if (!handle) return null;
     const lease = this.leases.get(handle);
     if (!lease || lease.providerId !== providerId) {
       throw new Error(`Runtime credential handle is invalid for ${providerId}.`);
+    }
+    if (lease.operation !== expectedOperation) {
+      throw new Error(`Runtime credential handle is not issued for ${expectedOperation}.`);
     }
     return lease;
   }

@@ -1,12 +1,101 @@
 import { z } from 'zod';
-import { ipcNonEmptyString } from './IpcPayloadGuard';
+import {
+  KNOWLEDGE_CARD_TYPES,
+  KNOWLEDGE_LIFECYCLES,
+  KNOWLEDGE_RETRIEVAL_LANES,
+} from '@shared/types/knowledge';
+import { KnowledgeCardRecordSchema } from '../../knowledge/knowledgeCardSchema';
+import { ipcId, ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
 
-/** spaceId may be `user` or `project:<projectId>`. */
-export const KnowledgeListCardsArgsSchema = z.tuple([
-  ipcNonEmptyString(200, 'spaceId'),
+const KnowledgeSpaceIdSchema = ipcNonEmptyString(200, 'spaceId');
+const KnowledgePermissionModeSchema = z.enum(['default', 'auto-review', 'full-access', 'custom']);
+const KnowledgeConfirmationSchema = z.object({
+  explicitHumanConfirmation: z.literal(true),
+}).strict();
+
+export const KnowledgeOverviewArgsSchema = z.tuple([]);
+
+export const KnowledgeQueryArgsSchema = z.tuple([
+  z.object({
+    spaceIds: z.array(KnowledgeSpaceIdSchema).max(64).optional(),
+    text: ipcString(4000, 'text').optional(),
+    cardId: ipcString(400, 'cardId').optional(),
+    relativePath: ipcString(1024, 'relativePath').optional(),
+    type: z.array(z.enum(KNOWLEDGE_CARD_TYPES)).max(KNOWLEDGE_CARD_TYPES.length).optional(),
+    lifecycle: z.array(z.enum(KNOWLEDGE_LIFECYCLES)).max(KNOWLEDGE_LIFECYCLES.length).optional(),
+    relationTargetCardId: ipcString(400, 'relationTargetCardId').optional(),
+    asOf: z.number().int().nonnegative().optional(),
+    lanes: z.array(z.enum(KNOWLEDGE_RETRIEVAL_LANES)).max(KNOWLEDGE_RETRIEVAL_LANES.length).optional(),
+  }).strict(),
 ]);
 
-export const KnowledgeGetCardArgsSchema = z.tuple([
-  ipcNonEmptyString(200, 'spaceId'),
+export const KnowledgeCardArgsSchema = z.tuple([
+  KnowledgeSpaceIdSchema,
   ipcNonEmptyString(1024, 'relativePath'),
+]);
+
+export const KnowledgeCompileArgsSchema = z.tuple([
+  z.object({
+    spaceIds: z.array(KnowledgeSpaceIdSchema).max(64).optional(),
+    text: ipcString(4000, 'text').optional(),
+    type: z.array(z.enum(KNOWLEDGE_CARD_TYPES)).max(KNOWLEDGE_CARD_TYPES.length).optional(),
+    lifecycle: z.array(z.enum(KNOWLEDGE_LIFECYCLES)).max(KNOWLEDGE_LIFECYCLES.length).optional(),
+    lanes: z.array(z.enum(KNOWLEDGE_RETRIEVAL_LANES)).max(KNOWLEDGE_RETRIEVAL_LANES.length).optional(),
+    limit: z.number().int().min(1).max(50).optional(),
+  }).strict(),
+]);
+
+export const KnowledgeIndexRebuildArgsSchema = z.tuple([]);
+
+export const KnowledgeCandidatesArgsSchema = z.tuple([
+  ipcId(128, 'sessionId'),
+]);
+
+export const KnowledgeCandidateCreateArgsSchema = z.tuple([
+  z.object({
+    sessionId: ipcId(128, 'sessionId'),
+    card: KnowledgeCardRecordSchema,
+    explicitUserIntent: z.literal(true),
+  }).strict(),
+]);
+
+export const KnowledgeColdDataImportArgsSchema = z.tuple([
+  z.object({
+    sessionId: ipcId(128, 'sessionId'),
+    spaceId: KnowledgeSpaceIdSchema.optional(),
+    source: ipcString(512 * 1024, 'source').optional(),
+    filePath: ipcNonEmptyString(4096, 'filePath').optional(),
+  }).strict().refine(
+    (value) => Boolean(value.source?.trim() || value.filePath?.trim()),
+    { message: 'source or filePath is required' },
+  ),
+]);
+
+export const KnowledgeIssueApprovalTokenArgsSchema = z.tuple([
+  z.object({
+    action: z.enum(['knowledge.write', 'knowledge.promote']),
+    spaceId: KnowledgeSpaceIdSchema,
+    relativePath: ipcNonEmptyString(1024, 'relativePath'),
+  }).strict(),
+]);
+
+export const KnowledgeWriteArgsSchema = z.tuple([
+  z.object({
+    spaceId: KnowledgeSpaceIdSchema,
+    card: KnowledgeCardRecordSchema,
+    permissionMode: KnowledgePermissionModeSchema,
+    confirmation: KnowledgeConfirmationSchema,
+    approvalToken: ipcNonEmptyString(128, 'approvalToken'),
+  }).strict(),
+]);
+
+export const KnowledgePromoteArgsSchema = z.tuple([
+  z.object({
+    spaceId: KnowledgeSpaceIdSchema,
+    card: KnowledgeCardRecordSchema,
+    to: z.enum(['verified', 'promoted', 'deprecated']),
+    permissionMode: KnowledgePermissionModeSchema,
+    confirmation: KnowledgeConfirmationSchema,
+    approvalToken: ipcNonEmptyString(128, 'approvalToken'),
+  }).strict(),
 ]);
