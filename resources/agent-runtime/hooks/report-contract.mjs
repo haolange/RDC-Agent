@@ -42,5 +42,25 @@ walkClaims(record, (claim) => {
   }
 });
 
+const isInvestigationReport = Array.isArray(record.claims);
+if (isInvestigationReport) {
+  const contract = record.reportContract && typeof record.reportContract === 'object'
+    ? record.reportContract
+    : null;
+  const fields = ['conclusion', 'evidence', 'verification', 'limitations', 'candidateStatus'];
+  if (!contract) {
+    violations.push('report missing reportContract (conclusion/evidence/verification/limitations/artifactIds/candidateStatus)');
+  } else {
+    for (const field of fields) {
+      if (typeof contract[field] !== 'string' || contract[field].trim().length < 1) {
+        violations.push(`reportContract.${field} is required`);
+      }
+    }
+    if (!Array.isArray(contract.artifactIds) || contract.artifactIds.length < 1) {
+      violations.push('reportContract.artifactIds must be a non-empty artifact link list');
+    }
+  }
+}
+
 if (violations.length > 0) fail(`report-contract: ${violations.join('; ')}`);
 pass('report-contract: ok');

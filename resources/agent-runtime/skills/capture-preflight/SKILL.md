@@ -1,7 +1,7 @@
 ---
 name: capture-preflight
 description: Check capture, CLI, and replay readiness before opening or mutating a .rdc.
-allowed-tools: [rdx_context, read_file, investigation_list, ask_user]
+allowed-tools: [rdx_context, read_file, investigation_list, ask_user, shell, task_create, subagent]
 ---
 
 # Capture Preflight

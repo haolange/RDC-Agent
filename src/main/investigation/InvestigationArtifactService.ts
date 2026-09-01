@@ -25,6 +25,8 @@ import {
   assertChallengeRecordRefs,
   assertCheckpointRecordRefs,
   assertClaimRecordRefs,
+  assertOptimizerExperimentClose,
+  assertReportContractPresent,
   assertReportRecordRefs,
   assertSCausal01,
   assertSClaim01,
@@ -122,7 +124,8 @@ export class InvestigationArtifactService {
     }
     this.materializeIndexIfAbsent(sessionId);
     const lookup = this.createRawLookup(sessionId);
-    this.assertRecordInvariants(sessionId, kindEntry.kind, parsed, lookup);
+    const mission = this.requireCanonicalWriteMission(kindEntry.kind, input.mission, parsed);
+    this.assertRecordInvariants(sessionId, kindEntry.kind, parsed, lookup, mission);
     const artifactId = input.artifactId?.trim() || generateEventId('invart');
     const supersedes = input.supersedes?.trim() || undefined;
     this.assertUniqueIds(sessionId, {
@@ -137,6 +140,13 @@ export class InvestigationArtifactService {
     const contentText = serializeInvestigationJson(parsed);
     const contentHash = sha256Prefixed(contentText);
     const requestedReady = input.status === 'ready';
+    if (
+      kindEntry.kind === 'report'
+      && requestedReady
+      && (mission === 'analyzer' || mission === 'optimizer')
+    ) {
+      assertReportContractPresent(parsed as InvestigationReport, lookup, { mission });
+    }
     const sourceRefs = input.sourceRefs ?? [];
     const worldStateId = this.resolveBoundWorldStateId(
       kindEntry.kind,
@@ -147,7 +157,7 @@ export class InvestigationArtifactService {
     );
     const manifest: InvestigationArtifactManifest = {
       artifactId,
-      mission: input.mission,
+      mission,
       kind: kindEntry.kind,
       status: requestedReady ? 'ready' : 'draft',
       title: input.title.trim(),
@@ -285,6 +295,12 @@ export class InvestigationArtifactService {
       );
     }
     this.resolveBoundWorldStateId(kindEntry.kind, record, manifest.worldStateId, lookup, true);
+    if (kindEntry.kind === 'report') {
+      const mission = this.requireCanonicalWriteMission(kindEntry.kind, manifest.mission, record);
+      if (mission === 'analyzer' || mission === 'optimizer') {
+        assertReportContractPresent(record as InvestigationReport, lookup, { mission });
+      }
+    }
     this.parseManifest(manifest);
   }
 
@@ -344,6 +360,7 @@ export class InvestigationArtifactService {
     kind: InvestigationArtifactKind,
     record: InvestigationRecord,
     lookup: InvestigationLookup,
+    mission?: InvestigationMission,
   ): void {
     if (kind === 'evidence') {
       this.assertEvidenceInvariants(sessionId, record as EvidenceRecord, lookup);
@@ -354,11 +371,11 @@ export class InvestigationArtifactService {
       }
     }
     if (kind === 'claim') {
-      assertClaimRecordRefs(record as ClaimRecord, lookup);
+      assertClaimRecordRefs(record as ClaimRecord, lookup, { mission });
     }
     if (kind === 'claim_set') {
       for (const claim of (record as ClaimSet).items) {
-        assertClaimRecordRefs(claim, lookup);
+        assertClaimRecordRefs(claim, lookup, { mission });
       }
     }
     if (kind === 'experiment') {
@@ -382,6 +399,7 @@ export class InvestigationArtifactService {
           });
         }
       }
+      assertOptimizerExperimentClose(experiment, mission);
     }
     if (kind === 'challenge') {
       assertChallengeRecordRefs(record as ChallengeRecord, lookup);
@@ -397,7 +415,7 @@ export class InvestigationArtifactService {
       }, lookup);
     }
     if (kind === 'report') {
-      assertReportRecordRefs(record as InvestigationReport, lookup);
+      assertReportRecordRefs(record as InvestigationReport, lookup, { mission });
     }
     if (kind !== 'report') {
       for (const claim of collectProjectedClaims(record)) {
@@ -871,6 +889,23 @@ export class InvestigationArtifactService {
     } catch (error) {
       throw toInvestigationError(error);
     }
+  }
+
+  private requireCanonicalWriteMission(
+    kind: InvestigationArtifactKind,
+    inputMission: InvestigationMission,
+    record: InvestigationRecord,
+  ): InvestigationMission {
+    if (kind !== 'report') return inputMission;
+    const reportMission = (record as InvestigationReport).mission;
+    if (reportMission !== inputMission) {
+      throw new InvestigationError(
+        'INVESTIGATION_INVARIANT_VIOLATION',
+        `input.mission ${inputMission} does not match report.mission ${reportMission}`,
+        { details: { inputMission, reportMission } },
+      );
+    }
+    return reportMission;
   }
 
   private rejectOpaque(input: InvestigationWriteInput): void {

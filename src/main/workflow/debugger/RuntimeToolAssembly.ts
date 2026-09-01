@@ -25,6 +25,7 @@ import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
 import { createOutputRegistrationTool } from '../../reports/OutputRegistrationTool';
 import { createKnowledgeTools } from '../../knowledge/KnowledgeTools';
 import { createInvestigationTools } from '../../investigation/InvestigationTools';
+import { investigationArtifactService } from '../../investigation/InvestigationArtifactService';
 import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import {
   expandCanonicalToolToken,
@@ -41,6 +42,62 @@ export interface RuntimeToolAssemblyDeps {
   getMemoryStore: (scope: 'user' | 'project', projectRootPath?: string | null) => MemoryStore;
   createSubagentTools: (parentAgentId: AgentRole, sessionId?: string | null, turnHandle?: TurnHandle | null) => AgentTool[];
   getMcpServerStatusSummary: (projectRootPath?: string | null, query?: string) => MCPServerStatusSummary[];
+}
+
+const MISSION_PLANNING_AGENT_IDS = new Set(['debugger', 'analyzer', 'optimizer']);
+
+function isBigLoopReplan(fromAgentId: string, toAgentId: string, depth: number): boolean {
+  return fromAgentId === 'general'
+    && MISSION_PLANNING_AGENT_IDS.has(toAgentId)
+    && Number.isFinite(depth)
+    && depth >= 2;
+}
+
+function resolvePersistedMissionCheckpointId(sessionId: string, toAgentId: string): string | undefined {
+  if (!MISSION_PLANNING_AGENT_IDS.has(toAgentId)) return undefined;
+  try {
+    const live = investigationArtifactService.list(sessionId, { kind: 'checkpoint' })
+      .filter((entry) => entry.status !== 'superseded' && entry.recordKey.trim());
+    const matching: Array<{ createdAt: string; checkpointId: string }> = [];
+    for (const entry of live) {
+      const result = investigationArtifactService.readRecord(sessionId, entry.artifactId);
+      const mission = result.manifest && typeof result.manifest === 'object'
+        ? (result.manifest as { mission?: unknown }).mission
+        : undefined;
+      if (mission !== toAgentId) continue;
+      const checkpointId = typeof (result.record as { checkpointId?: unknown })?.checkpointId === 'string'
+        ? (result.record as { checkpointId: string }).checkpointId.trim()
+        : '';
+      if (!checkpointId) continue;
+      matching.push({ createdAt: entry.createdAt, checkpointId });
+    }
+    if (matching.length === 0) return undefined;
+    return matching.reduce((best, entry) => (entry.createdAt > best.createdAt ? entry : best)).checkpointId;
+  } catch {
+    return undefined;
+  }
+}
+
+function buildBeforeHandoffPayload(input: {
+  fromAgentId: string;
+  toAgentId: string;
+  label: string;
+  prompt: string;
+  depth: number;
+  sessionId: string;
+}): Record<string, unknown> {
+  const isBigLoop = isBigLoopReplan(input.fromAgentId, input.toAgentId, input.depth);
+  const payload: Record<string, unknown> = {
+    fromAgentId: input.fromAgentId,
+    toAgentId: input.toAgentId,
+    label: input.label,
+    prompt: input.prompt,
+    depth: input.depth,
+    isBigLoop,
+  };
+  const checkpointId = resolvePersistedMissionCheckpointId(input.sessionId, input.toAgentId);
+  if (checkpointId) payload.checkpointId = checkpointId;
+  return payload;
 }
 
 export class RuntimeToolAssembly {
@@ -295,7 +352,14 @@ export class RuntimeToolAssembly {
           agentId,
           sessionId: resolvedSessionId,
           projectRoot,
-          payload: { toAgentId: target, label, prompt },
+          payload: buildBeforeHandoffPayload({
+            fromAgentId: agentId,
+            toAgentId: target,
+            label,
+            prompt,
+            depth,
+            sessionId: resolvedSessionId,
+          }),
         });
         if (!handoffAllowed) {
           return {

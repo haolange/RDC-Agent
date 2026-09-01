@@ -25,9 +25,14 @@ export const INVESTIGATION_CONTRACT_CASES = [
   { title: 'investigation.contract.epistemic.order', minAssertions: 1 },
   { title: 'investigation.contract.s-claim.positive-negative', minAssertions: 1 },
   { title: 'investigation.contract.s-causal.positive-negative', minAssertions: 1 },
+  { title: 'investigation.contract.s-causal.ready-denied-without-experiment', minAssertions: 1 },
+  { title: 'investigation.contract.skeptic.challenge-shape', minAssertions: 1 },
+  { title: 'investigation.contract.checkpoint.ids-resolvable', minAssertions: 1 },
   { title: 'investigation.contract.s-rdc.positive-negative', minAssertions: 1 },
   { title: 'investigation.contract.non-invasion', minAssertions: 1 },
   { title: 'investigation.contract.rail.five-cards', minAssertions: 1 },
+  { title: 'investigation.contract.analyzer.claimkind-layer', minAssertions: 1 },
+  { title: 'investigation.contract.optimizer.rollback-close', minAssertions: 1 },
 ];
 export const INVESTIGATION_CONTRACT_CASE_IDS = INVESTIGATION_CONTRACT_CASES.map((entry) => entry.title);
 
@@ -88,7 +93,7 @@ export const INVESTIGATION_RULE_REGISTRY = [
     file: 'src/main/testing/investigationSystemContract.test.ts',
     pattern: INVESTIGATION_CONTRACT_CASE_IDS.join('|'),
     probe: 'contract-suite',
-    note: 'executable Investigation contract suite: schema, ready, epistemic, S-CLAIM/S-CAUSAL/S-RDC, non-invasion, five cards',
+    note: 'executable Investigation contract suite: schema, ready, epistemic, S-CLAIM/S-CAUSAL/S-RDC, skeptic challenge, checkpoint refs, non-invasion, five cards, analyzer claimKind layer, optimizer rollback close',
     requiredCases: INVESTIGATION_CONTRACT_CASES,
     minTests: INVESTIGATION_CONTRACT_CASES.length,
     minAssertions: INVESTIGATION_CONTRACT_CASES.length,

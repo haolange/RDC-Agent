@@ -194,6 +194,27 @@ describe('InvestigationArtifactService', () => {
     expect(evidence.manifest.kind).toBe('evidence');
   });
 
+  it('rejects report write when input.mission does not match InvestigationReport.mission', () => {
+    const { service } = createInvestigationHarness();
+    let thrown: unknown;
+    try {
+      service.writeRecord(SESSION_ID, {
+        kind: 'report',
+        mission: 'debugger',
+        title: 'mission mismatch',
+        summary: 'input debugger vs body analyzer',
+        record: sampleReport({
+          mission: 'analyzer',
+          claims: [],
+        }),
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(InvestigationError);
+    expect((thrown as InvestigationError).code).toBe('INVESTIGATION_INVARIANT_VIOLATION');
+  });
+
   it('P1-4 syncs manifest hash when evidence becomes stale and fail-closes on drift', () => {
     const { resolver, service } = createInvestigationHarness();
     const note = seedNote(resolver);
@@ -784,7 +805,6 @@ describe('InvestigationArtifactService', () => {
       variantWorldStateId: 'ws-b',
       restoredWorldStateId: 'ws-c',
       verifyEvidenceIds: ['ev-verify'],
-      interventionType: 'none',
     }));
     overwriteInvestigationRecordBody(resolver, experiment.manifest.artifactId, recordedExperiment({
       experimentId: 'exp-tamper',
@@ -793,7 +813,7 @@ describe('InvestigationArtifactService', () => {
       variantWorldStateId: 'ws-b',
       restoredWorldStateId: 'ws-c',
       verifyEvidenceIds: ['ev-verify'],
-      interventionType: 'shader_replace',
+      interventionType: 'none',
     }));
     expect(() => service.list(SESSION_ID)).toThrow(/INVESTIGATION_HASH_MISMATCH|INVESTIGATION_INDEX_CORRUPT/);
     expect(() => service.readRecord(SESSION_ID, experiment.manifest.artifactId))

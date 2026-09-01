@@ -119,7 +119,7 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     expect(() => mcpTrustService.assertConnectAllowed(trusted!, project)).not.toThrow();
   });
 
-  it('discovers the thirteen Wave 4 method skills from the builtin catalog', async () => {
+  it('discovers the Wave 4 method skills and Debugger causal method from the builtin catalog', async () => {
     const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
     const service = new AgentRuntimeConfigService();
     const ids = service.listSkillMetadata().map((skill) => skill.id);
@@ -135,6 +135,8 @@ describe('AgentRuntimeConfigService scoped resources', () => {
       'resource-versioning',
       'cross-capture-alignment',
       'optimization-experiment',
+      'debugger-causal-method',
+      'analyzer-architecture-method',
       'skeptic-review',
       'report-composition',
       'execution-orchestrator',
@@ -152,5 +154,11 @@ describe('AgentRuntimeConfigService scoped resources', () => {
       'artifact_read',
     ]));
     expect(provenance?.instructions).toContain('sourceRefs.length >= 1');
+    const execution = service.loadSkill('renderdoc-execution');
+    const causal = service.loadSkill('debugger-causal-method');
+    const architecture = service.loadSkill('analyzer-architecture-method');
+    for (const skill of [execution, causal, architecture]) {
+      expect(skill?.allowedTools).toEqual(expect.arrayContaining(['subagent', 'task_create', 'shell']));
+    }
   });
 });

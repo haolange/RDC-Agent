@@ -1,7 +1,7 @@
 ---
 name: artifact-provenance
 description: Enforce ready provenance and cite investigation artifacts only by id and hash.
-allowed-tools: [investigation_read, investigation_write, investigation_list, artifact_read]
+allowed-tools: [investigation_read, investigation_write, investigation_list, artifact_read, shell, task_create, subagent]
 ---
 
 # Artifact Provenance

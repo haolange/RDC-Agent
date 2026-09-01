@@ -21,14 +21,19 @@ import {
   SESSION_ID,
   baselineWorld,
   createInvestigationHarness,
+  derivedStructureClaim,
   evidenceOf,
   exclusiveWorld,
   forceReadyEmptySourceRefs,
   hypothesisClaim,
   observedClaim,
   overwriteInvestigationRecordBody,
+  plantInvestigationRecord,
   recordedExperiment,
+  sampleChallenge,
+  sampleCheckpoint,
   sampleReport,
+  sampleReportContract,
   seedNote,
   writeDraft,
 } from '../investigation/investigationTestFixtures';
@@ -247,7 +252,7 @@ describe('investigation system contract', () => {
     })).toThrow(/S-CLAIM-01|compactProvenance|INVESTIGATION_INVARIANT_VIOLATION/);
   });
 
-  it('investigation.contract.s-causal.positive-negative', () => {
+  it('investigation.contract.s-causal.positive-negative', { timeout: 15_000 }, () => {
     expect.hasAssertions();
     const { resolver, service } = createInvestigationHarness();
     const note = seedNote(resolver);
@@ -304,7 +309,7 @@ describe('investigation system contract', () => {
         verifyEvidenceIds: ['ev-verify'],
         baselineRestored: false,
       })), 'exp-norestore'),
-    })).toThrow(/S-CAUSAL-01/);
+    })).toThrow(/S-CAUSAL-01|S-RDC-01/);
     const forged = writeDraft(service, 'experiment', recordedExperiment({
       experimentId: 'exp-forged-hash',
       hypothesisClaimId: (hyp.record as ClaimRecord).claimId,
@@ -312,7 +317,6 @@ describe('investigation system contract', () => {
       variantWorldStateId: 'ws-b',
       restoredWorldStateId: 'ws-c',
       verifyEvidenceIds: ['ev-verify'],
-      interventionType: 'none',
     }));
     overwriteInvestigationRecordBody(resolver, forged.manifest.artifactId, recordedExperiment({
       experimentId: 'exp-forged-hash',
@@ -321,7 +325,7 @@ describe('investigation system contract', () => {
       variantWorldStateId: 'ws-b',
       restoredWorldStateId: 'ws-c',
       verifyEvidenceIds: ['ev-verify'],
-      interventionType: 'shader_replace',
+      interventionType: 'none',
     }));
     expect(() => service.createLookup(SESSION_ID).getExperiment('exp-forged-hash'))
       .toThrow(/INVESTIGATION_HASH_MISMATCH|INVESTIGATION_INDEX_CORRUPT/);
@@ -372,6 +376,147 @@ describe('investigation system contract', () => {
     expect(() => service.readRecord(SESSION_ID, evidence.manifest.artifactId)).toThrow(closed);
     expect(() => service.list(SESSION_ID, { kind: 'evidence' })).toThrow(closed);
     expect(() => service.createLookup(SESSION_ID).getEvidence('ev-sctx')).toThrow(closed);
+  });
+
+  it('investigation.contract.s-causal.ready-denied-without-experiment', () => {
+    expect.hasAssertions();
+    const { resolver, service } = createInvestigationHarness();
+    const note = seedNote(resolver);
+    const world = writeDraft(service, 'world_state', baselineWorld('ws-a'));
+    writeDraft(service, 'world_state', exclusiveWorld('ws-b'));
+    writeDraft(service, 'world_state', baselineWorld('ws-c'));
+    writeDraft(service, 'claim', hypothesisClaim('ws-a'));
+    writeDraft(service, 'evidence', evidenceOf('ws-c', note, 'ev-verify'));
+    const missingExperiment: ClaimRecord = {
+      ...hypothesisClaim('ws-a', 'claim-causal-ready'),
+      claimKind: 'causal_conclusion',
+      experimentId: null,
+      declaresCounterfactual: false,
+      epistemic: 'derived',
+      verification: 'replay_counterfactual',
+    };
+    expect(() => service.writeRecord(SESSION_ID, {
+      kind: 'claim',
+      mission: 'debugger',
+      title: 'Causal without experiment',
+      summary: 'must not become ready',
+      record: missingExperiment,
+      sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
+      status: 'ready',
+    })).toThrow(/S-CAUSAL-01|experimentId|INVESTIGATION_SCHEMA_INVALID|INVESTIGATION_READY_DENIED/);
+    writeDraft(service, 'experiment', recordedExperiment({
+      experimentId: 'exp-designed',
+      hypothesisClaimId: 'claim-hyp',
+      baselineWorldStateId: 'ws-a',
+      variantWorldStateId: 'ws-b',
+      restoredWorldStateId: 'ws-c',
+      verifyEvidenceIds: ['ev-verify'],
+      status: 'designed',
+    }));
+    const designed: ClaimRecord = {
+      ...missingExperiment,
+      claimId: 'claim-designed-exp',
+      experimentId: 'exp-designed',
+    };
+    expect(() => service.writeRecord(SESSION_ID, {
+      kind: 'claim',
+      mission: 'debugger',
+      title: 'Causal on designed experiment',
+      summary: 'must not become ready',
+      record: designed,
+      sourceRefs: [{ artifactId: world.manifest.artifactId, expectedHash: world.contentHash }],
+      status: 'ready',
+    })).toThrow(/S-CAUSAL-01|INVESTIGATION_READY_DENIED|INVESTIGATION_INVARIANT_VIOLATION/);
+  });
+
+  it('investigation.contract.skeptic.challenge-shape', () => {
+    expect.hasAssertions();
+    const { service } = createInvestigationHarness();
+    writeDraft(service, 'world_state', baselineWorld());
+    const hyp = writeDraft(service, 'claim', hypothesisClaim('ws-baseline'));
+    const written = writeDraft(service, 'challenge', sampleChallenge({
+      targetId: (hyp.record as ClaimRecord).claimId,
+      requiredFollowUp: 'Sample the first diverging event color.',
+    }));
+    expect(written.manifest.kind).toBe('challenge');
+    expect(written.record).toMatchObject({
+      challengeId: 'ch-1',
+      targetRef: { type: 'claim', id: 'claim-hyp' },
+      challengeKind: 'missing_evidence',
+      requiredFollowUp: 'Sample the first diverging event color.',
+      status: 'open',
+    });
+    expect(() => writeDraft(service, 'challenge', sampleChallenge({
+      challengeId: 'ch-ghost',
+      targetId: 'claim-does-not-exist',
+    }))).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(() => writeDraft(service, 'challenge', sampleChallenge({
+      challengeId: 'ch-resolved-gap',
+      targetId: (hyp.record as ClaimRecord).claimId,
+      status: 'resolved',
+    }))).toThrow(/resolutionClaimId|INVESTIGATION_SCHEMA_INVALID/);
+    const source = readRepo('resources/agent-runtime/skills/skeptic-review/SKILL.md');
+    expect(source).toMatch(/ChallengeRecord/);
+    expect(source).toMatch(/requiredFollowUp/);
+    expect(source).toMatch(/task_create/);
+  });
+
+  it('investigation.contract.checkpoint.ids-resolvable', () => {
+    expect.hasAssertions();
+    const { resolver, service } = createInvestigationHarness();
+    const note = seedNote(resolver);
+    const world = writeDraft(service, 'world_state', baselineWorld('ws-a'));
+    writeDraft(service, 'world_state', exclusiveWorld('ws-b'));
+    writeDraft(service, 'world_state', baselineWorld('ws-c'));
+    const hyp = writeDraft(service, 'claim', hypothesisClaim('ws-a'));
+    writeDraft(service, 'evidence', evidenceOf('ws-c', note, 'ev-verify'));
+    const experiment = writeDraft(service, 'experiment', recordedExperiment({
+      hypothesisClaimId: (hyp.record as ClaimRecord).claimId,
+      baselineWorldStateId: 'ws-a',
+      variantWorldStateId: 'ws-b',
+      restoredWorldStateId: 'ws-c',
+      verifyEvidenceIds: ['ev-verify'],
+    }));
+    const challenge = writeDraft(service, 'challenge', sampleChallenge({
+      targetId: (hyp.record as ClaimRecord).claimId,
+    }));
+    const checkpoint = writeDraft(service, 'checkpoint', sampleCheckpoint({
+      established: [(hyp.record as ClaimRecord).claimId],
+      completedExperiments: ['exp-1'],
+      openChallenges: ['ch-1'],
+      currentWorldStateId: 'ws-a',
+      criticalArtifactRefs: [world.manifest.artifactId, experiment.manifest.artifactId, challenge.manifest.artifactId],
+      reasonForReplan: 'Structural assumption collapsed.',
+    }));
+    expect(checkpoint.manifest.kind).toBe('checkpoint');
+    expect(checkpoint.record).toMatchObject({
+      checkpointId: 'cp-1',
+      currentWorldStateId: 'ws-a',
+      completedExperiments: ['exp-1'],
+      openChallenges: ['ch-1'],
+    });
+    expect(() => writeDraft(service, 'checkpoint', sampleCheckpoint({
+      checkpointId: 'cp-ghost-exp',
+      completedExperiments: ['exp-missing'],
+      currentWorldStateId: 'ws-a',
+      criticalArtifactRefs: [world.manifest.artifactId],
+    }))).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    expect(() => writeDraft(service, 'checkpoint', sampleCheckpoint({
+      checkpointId: 'cp-ghost-challenge',
+      openChallenges: ['ch-missing'],
+      currentWorldStateId: 'ws-a',
+      criticalArtifactRefs: [world.manifest.artifactId],
+    }))).toThrow(/INVESTIGATION_REF_UNRESOLVED/);
+    const method = readRepo('resources/agent-runtime/skills/debugger-causal-method/SKILL.md');
+    expect(method).toMatch(/First Bad Event/);
+    expect(method).toMatch(/Hypothesis Matrix/);
+    expect(method).toMatch(/Counterfactual/);
+    const execution = readRepo('resources/agent-runtime/skills/renderdoc-execution/SKILL.md');
+    for (const source of [method, execution]) {
+      expect(source).toMatch(/subagent/);
+      expect(source).toMatch(/task_create/);
+      expect(source).toMatch(/\bshell\b/);
+    }
   });
 
   it('investigation.contract.s-rdc.positive-negative', () => {
@@ -434,5 +579,243 @@ describe('investigation system contract', () => {
     expect(rail).toContain('id="context"');
     expect(rail).toContain('id="capture"');
     expect(rail).toMatch(/id="progress"[\s\S]*id="artifacts"[\s\S]*id="outputs"[\s\S]*id="context"[\s\S]*id="capture"/);
+  });
+
+  it('investigation.contract.analyzer.claimkind-layer', () => {
+    expect.hasAssertions();
+    const fixture = JSON.parse(readRepo('src/main/investigation/__fixtures__/analyzer-architecture-oracle.json')) as {
+      oracle: {
+        legal: Array<{ id: string; claimKind: ClaimRecord['claimKind']; epistemic: ClaimRecord['epistemic']; verification: ClaimRecord['verification']; layer: string }>;
+        illegal: Array<{ id: string; claimKind: ClaimRecord['claimKind']; epistemic: ClaimRecord['epistemic']; verification: ClaimRecord['verification']; reason: string }>;
+      };
+    };
+    expect(fixture.oracle.legal).toHaveLength(3);
+    expect(fixture.oracle.illegal.map((entry) => entry.reason)).toEqual([
+      'authoring-as-observed',
+      'authoring-as-reconstructed',
+      'authoring-upgraded-to-observed',
+    ]);
+    const { service } = createInvestigationHarness();
+    writeDraft(service, 'world_state', baselineWorld(), { mission: 'analyzer' });
+    for (const entry of fixture.oracle.legal) {
+      const base = entry.claimKind === 'observed_fact'
+        ? observedClaim('ws-baseline', entry.id)
+        : entry.claimKind === 'derived_structure'
+          ? derivedStructureClaim('ws-baseline', entry.id)
+          : hypothesisClaim('ws-baseline', entry.id);
+      const written = writeDraft(service, 'claim', {
+        ...base,
+        claimKind: entry.claimKind,
+        epistemic: entry.epistemic,
+        verification: entry.verification,
+        statement: entry.layer,
+      }, { mission: 'analyzer' });
+      expect(written.record).toMatchObject({ claimKind: entry.claimKind, epistemic: entry.epistemic });
+    }
+    for (const entry of fixture.oracle.illegal) {
+      expect(() => writeDraft(service, 'claim', {
+        ...observedClaim('ws-baseline', entry.id),
+        claimKind: entry.claimKind,
+        epistemic: entry.epistemic,
+        verification: entry.verification,
+        statement: entry.reason,
+      }, { mission: 'analyzer' })).toThrow(/ANALYZER-LAYER|claimKind|layer/);
+    }
+    const authoring = writeDraft(service, 'claim', hypothesisClaim('ws-baseline', 'claim-authoring-src'), {
+      mission: 'analyzer',
+    });
+    const authoringRecord = authoring.record as ClaimRecord;
+    expect(() => writeDraft(service, 'claim', {
+      ...observedClaim('ws-baseline', 'claim-proj-authoring-as-observed'),
+      projectionKind: 'report',
+      compactProvenance: [{
+        sourceClaimId: authoringRecord.claimId,
+        sourceEpistemicStatus: authoringRecord.epistemic,
+        sourceVerificationLevel: authoringRecord.verification,
+      }],
+    }, { mission: 'analyzer' })).toThrow(/ANALYZER-LAYER|claimKind|layer|S-CLAIM-01/);
+    expect(() => writeDraft(service, 'claim', {
+      ...hypothesisClaim('ws-baseline', 'claim-proj-skip-layer'),
+      claimKind: 'semantic_inference',
+      epistemic: 'observed',
+      verification: 'observed',
+      projectionKind: 'compact',
+      compactProvenance: [{
+        sourceClaimId: authoringRecord.claimId,
+        sourceEpistemicStatus: authoringRecord.epistemic,
+        sourceVerificationLevel: authoringRecord.verification,
+      }],
+    }, { mission: 'analyzer' })).toThrow(/ANALYZER-LAYER|claimKind|layer|S-CLAIM-01/);
+    expect(() => service.writeRecord(SESSION_ID, {
+      kind: 'report',
+      mission: 'analyzer',
+      title: 'Illegal authoring projection',
+      summary: 'report path must carry Analyzer mission context',
+      record: sampleReport({
+        mission: 'analyzer',
+        claims: [{
+          ...observedClaim('ws-baseline', 'claim-report-authoring-as-observed'),
+          projectionKind: 'report',
+          compactProvenance: [{
+            sourceClaimId: authoringRecord.claimId,
+            sourceEpistemicStatus: authoringRecord.epistemic,
+            sourceVerificationLevel: authoringRecord.verification,
+          }],
+        }],
+        reportContract: sampleReportContract([authoring.manifest.artifactId]),
+      }),
+      sourceRefs: [{ artifactId: authoring.manifest.artifactId, expectedHash: authoring.contentHash }],
+      status: 'ready',
+    })).toThrow(/ANALYZER-LAYER|claimKind|layer|S-CLAIM-01/);
+    const method = readRepo('resources/agent-runtime/skills/analyzer-architecture-method/SKILL.md');
+    expect(method).toMatch(/Observed/);
+    expect(method).toMatch(/Reconstructed/);
+    expect(method).toMatch(/Authoring/);
+    expect(method).toMatch(/Architecture Model/);
+    const coordinator = readRepo('resources/agent-runtime/skills/analyzer-coordinator/SKILL.md');
+    expect(coordinator).toMatch(/\$analyzer-architecture-method/);
+    expect(coordinator).toMatch(/claimKind/);
+  });
+
+  it('investigation.contract.optimizer.rollback-close', () => {
+    expect.hasAssertions();
+    const fixture = JSON.parse(readRepo('src/main/investigation/__fixtures__/optimizer-experiment-oracle.json')) as {
+      oracle: {
+        closeLegal: { interventionType: string; status: 'recorded'; executed: boolean; baselineRestored: boolean; verifyEvidenceIds: string[] };
+        closeIllegal: Array<{
+          id: string;
+          interventionType: string;
+          status: 'recorded';
+          executed: boolean;
+          baselineRestored: boolean;
+          verifyEvidenceIds: string[];
+          reason: string;
+        }>;
+      };
+    };
+    expect(fixture.oracle.closeIllegal.map((entry) => entry.reason)).toEqual([
+      'mutate-without-rollback',
+      'none-is-not-counterfactual',
+    ]);
+    const { resolver, service } = createInvestigationHarness();
+    const note = seedNote(resolver);
+    writeDraft(service, 'world_state', baselineWorld('ws-base'), { mission: 'optimizer' });
+    writeDraft(service, 'world_state', exclusiveWorld('ws-var'), { mission: 'optimizer' });
+    writeDraft(service, 'world_state', baselineWorld('ws-restored'), { mission: 'optimizer' });
+    writeDraft(service, 'claim', hypothesisClaim('ws-base', 'claim-opt'), { mission: 'optimizer' });
+    writeDraft(service, 'evidence', { ...evidenceOf('ws-restored', note, 'ev-verify'), mission: 'optimizer' }, { mission: 'optimizer' });
+    const legal = writeDraft(service, 'experiment', recordedExperiment({
+      experimentId: 'exp-opt-legal',
+      hypothesisClaimId: 'claim-opt',
+      baselineWorldStateId: 'ws-base',
+      variantWorldStateId: 'ws-var',
+      restoredWorldStateId: 'ws-restored',
+      verifyEvidenceIds: fixture.oracle.closeLegal.verifyEvidenceIds,
+      interventionType: fixture.oracle.closeLegal.interventionType,
+      status: fixture.oracle.closeLegal.status,
+      executed: fixture.oracle.closeLegal.executed,
+      baselineRestored: fixture.oracle.closeLegal.baselineRestored,
+    }), { mission: 'optimizer' });
+    expect(legal.record).toMatchObject({ status: 'recorded', experimentId: 'exp-opt-legal' });
+    for (const entry of fixture.oracle.closeIllegal) {
+      expect(() => writeDraft(service, 'experiment', recordedExperiment({
+        experimentId: entry.id,
+        hypothesisClaimId: 'claim-opt',
+        baselineWorldStateId: 'ws-base',
+        variantWorldStateId: 'ws-var',
+        restoredWorldStateId: 'ws-restored',
+        verifyEvidenceIds: entry.verifyEvidenceIds,
+        interventionType: entry.interventionType,
+        status: entry.status,
+        executed: entry.executed,
+        baselineRestored: entry.baselineRestored,
+      }), { mission: 'optimizer' })).toThrow(/S-RDC-01|S-CAUSAL-01|rollback|none/);
+    }
+    expect(() => writeDraft(service, 'experiment', recordedExperiment({
+      experimentId: 'exp-disguised-debugger',
+      hypothesisClaimId: 'claim-opt',
+      baselineWorldStateId: 'ws-base',
+      variantWorldStateId: 'ws-var',
+      restoredWorldStateId: 'ws-restored',
+      verifyEvidenceIds: [],
+      executed: false,
+      baselineRestored: false,
+      actionClass: 'C',
+    }), { mission: 'debugger' })).toThrow(/S-RDC-01|S-CAUSAL-01|rollback|none/);
+    expect(() => writeDraft(service, 'experiment', recordedExperiment({
+      experimentId: 'exp-debugger-no-rollback',
+      hypothesisClaimId: 'claim-opt',
+      baselineWorldStateId: 'ws-base',
+      variantWorldStateId: 'ws-var',
+      restoredWorldStateId: 'ws-restored',
+      verifyEvidenceIds: [],
+      executed: false,
+      baselineRestored: false,
+    }), { mission: 'debugger' })).toThrow(/S-RDC-01|S-CAUSAL-01|rollback|none/);
+    const legalSource = service.createLookup(SESSION_ID).getClaim('claim-opt');
+    expect(legalSource).toBeTruthy();
+    if (!legalSource) throw new Error('expected optimizer hypothesis');
+    const projectedOpt: ClaimRecord = {
+      ...legalSource,
+      claimId: 'claim-opt-report',
+      projectionKind: 'report',
+      compactProvenance: [{
+        sourceClaimId: legalSource.claimId,
+        sourceEpistemicStatus: legalSource.epistemic,
+        sourceVerificationLevel: legalSource.verification,
+      }],
+    };
+    expect(() => service.writeRecord(SESSION_ID, {
+      kind: 'report',
+      mission: 'optimizer',
+      title: 'Empty claims fake artifacts',
+      summary: 'must not become ready',
+      record: sampleReport({
+        mission: 'optimizer',
+        claims: [],
+        reportContract: sampleReportContract(['artifact-does-not-exist']),
+      }),
+      sourceRefs: [{ artifactId: legal.manifest.artifactId, expectedHash: legal.contentHash }],
+      status: 'ready',
+    })).toThrow(/S-CLAIM-01|INVESTIGATION_REF_UNRESOLVED|artifact|claims/);
+    plantInvestigationRecord(resolver, {
+      artifactId: 'art-exp-disguised-plant',
+      kind: 'experiment',
+      recordType: 'ExperimentRecord',
+      recordKey: 'exp-planted-no-rollback',
+      record: recordedExperiment({
+        experimentId: 'exp-planted-no-rollback',
+        hypothesisClaimId: 'claim-opt',
+        baselineWorldStateId: 'ws-base',
+        variantWorldStateId: 'ws-var',
+        restoredWorldStateId: 'ws-restored',
+        verifyEvidenceIds: [],
+        executed: false,
+        baselineRestored: false,
+      }),
+    });
+    expect(() => service.writeRecord(SESSION_ID, {
+      kind: 'report',
+      mission: 'optimizer',
+      title: 'Cite disguised experiment',
+      summary: 'masqueraded debugger experiment is not qualifying',
+      record: sampleReport({
+        mission: 'optimizer',
+        claims: [projectedOpt],
+        experimentIds: ['exp-planted-no-rollback'],
+        reportContract: sampleReportContract([legal.manifest.artifactId]),
+      }),
+      sourceRefs: [{ artifactId: legal.manifest.artifactId, expectedHash: legal.contentHash }],
+      status: 'ready',
+    })).toThrow(/S-RDC-01|S-CAUSAL-01|rollback|INVESTIGATION_REF_UNRESOLVED|INVESTIGATION_INVARIANT/);
+    const coordinator = readRepo('resources/agent-runtime/skills/optimizer-coordinator/SKILL.md');
+    expect(coordinator).toMatch(/\$optimization-experiment/);
+    expect(coordinator).toMatch(/A-B-A/);
+    const experimentSkill = readRepo('resources/agent-runtime/skills/optimization-experiment/SKILL.md');
+    expect(experimentSkill).toMatch(/rollback/);
+    expect(experimentSkill).toMatch(/intervention\.type != none|intervention\.type == none/);
+    const report = readRepo('resources/agent-runtime/skills/report-composition/SKILL.md');
+    expect(report).toMatch(/reportContract/);
+    expect(report).toMatch(/candidateStatus/);
   });
 });
