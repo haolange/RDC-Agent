@@ -25,6 +25,8 @@ export interface PrepareHandoffInput {
   send: boolean;
   chainRoot: string;
   depth: number;
+  /** When set, persist reuses the memory-draft id instead of minting another. */
+  handoffId?: string;
 }
 
 function handoffConflict(detail: string): Error {
@@ -37,6 +39,8 @@ export class HandoffStateStore {
    * durable prepared/committed ids missing from this set as restart_degrade.
    */
   private readonly liveHandoffIds = new Set<string>();
+  /** In-memory drafts reserved after bind and before persist. */
+  private readonly draftReservations = new Map<string, string>();
 
   constructor(private readonly host: StorageHost) {}
 
@@ -96,15 +100,52 @@ export class HandoffStateStore {
     return this.cancel(sessionId, 'restart_degrade');
   }
 
+  /**
+   * Memory-only prepare. Reserves the session so a second draft is ALREADY_ACTIVE.
+   * Does not write durable state or mark the id live.
+   */
+  createPreparedDraft(sessionId: string, input: PrepareHandoffInput): ProfileHandoffState {
+    this.assertCanPrepare(sessionId, input);
+    const prepared = this.buildPreparedState(input);
+    this.draftReservations.set(sessionId, prepared.handoffId);
+    return prepared;
+  }
+
+  abandonDraft(sessionId: string, handoffId: string): void {
+    if (this.draftReservations.get(sessionId) === handoffId) {
+      this.draftReservations.delete(sessionId);
+    }
+  }
+
   prepare(sessionId: string, input: PrepareHandoffInput): ProfileHandoffState {
+    this.assertCanPrepare(sessionId, input);
+    const reserved = this.draftReservations.get(sessionId);
+    if (reserved && input.handoffId && reserved !== input.handoffId) {
+      throw new Error(`${HANDOFF_ERROR.ALREADY_ACTIVE}: session already has an unfinished handoff.`);
+    }
+    const prepared = this.buildPreparedState(input);
+    this.writeDocument(sessionId, prepared, this.readDocument(sessionId)?.history ?? []);
+    this.liveHandoffIds.add(prepared.handoffId);
+    this.draftReservations.delete(sessionId);
+    return prepared;
+  }
+
+  private assertCanPrepare(sessionId: string, input: PrepareHandoffInput): void {
     if (this.getActive(sessionId)) {
+      throw new Error(`${HANDOFF_ERROR.ALREADY_ACTIVE}: session already has an unfinished handoff.`);
+    }
+    const reserved = this.draftReservations.get(sessionId);
+    if (reserved && reserved !== input.handoffId) {
       throw new Error(`${HANDOFF_ERROR.ALREADY_ACTIVE}: session already has an unfinished handoff.`);
     }
     if (input.depth > HANDOFF_CHAIN_LIMIT) {
       throw new Error(`${HANDOFF_ERROR.CHAIN_LIMIT}: handoff chain exceeds ${HANDOFF_CHAIN_LIMIT}.`);
     }
-    const prepared: ProfileHandoffState = {
-      handoffId: generateEventId('handoff'),
+  }
+
+  private buildPreparedState(input: PrepareHandoffInput): ProfileHandoffState {
+    return {
+      handoffId: input.handoffId ?? generateEventId('handoff'),
       lifecycle: 'prepared',
       sourceTurnId: input.sourceTurnId,
       sourceRequestId: input.sourceRequestId,
@@ -118,9 +159,6 @@ export class HandoffStateStore {
       send: input.send,
       preparedAt: nowMs(),
     };
-    this.writeDocument(sessionId, prepared, this.readDocument(sessionId)?.history ?? []);
-    this.liveHandoffIds.add(prepared.handoffId);
-    return prepared;
   }
 
   commit(sessionId: string, sourceTurnId: string): ProfileHandoffState {

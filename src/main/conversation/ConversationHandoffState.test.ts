@@ -82,9 +82,11 @@ vi.mock('../captures/ReplayDeviceService', () => ({
   },
 }));
 
+import { HANDOFF_AUTO_SEND_MAX_IDLE_OBSERVATIONS } from '@shared/types/profileHandoff';
 import { conversationService } from './ConversationService';
 import { settleSourceHandoffAfterTerminal } from './ConversationTurnRunner';
 import { projectSessionForClient } from '../sessions/projectSessionHandoff';
+import type { ActiveConversationTurn } from './ConversationRoutePreflight';
 
 const committed: ProfileHandoffState = {
   handoffId: 'handoff-1',
@@ -125,16 +127,21 @@ describe('ConversationService durable handoff wiring', () => {
     });
     handoffs.isLiveThisProcess.mockReturnValue(true);
     const service = conversationService as unknown as {
-      autoSendHandoffSessions: Set<string>;
       preparingRequests: Map<string, unknown>;
       activeSendScopes: Map<string, string>;
+      activeTurns: Map<string, ActiveConversationTurn>;
       startProfileTurn: typeof startProfileTurn;
-      startHandoffAutoSend: (sessionId: string) => Promise<void>;
       scheduleHandoffAutoSend: (sessionId: string) => void;
+      notifySessionTurnIdle: (sessionId: string) => void;
+      handoffs: {
+        startHandoffAutoSend: (sessionId: string) => Promise<void>;
+        resetAutoSendScheduler: () => void;
+      };
     };
-    service.autoSendHandoffSessions.clear();
+    service.handoffs.resetAutoSendScheduler();
     service.preparingRequests.clear();
     service.activeSendScopes.clear();
+    service.activeTurns.clear();
     service.startProfileTurn = startProfileTurn;
   });
 
@@ -142,10 +149,10 @@ describe('ConversationService durable handoff wiring', () => {
     handoffs.isLiveThisProcess.mockReturnValue(false);
     const service = conversationService as unknown as {
       scheduleHandoffAutoSend: (sessionId: string) => void;
-      startHandoffAutoSend: (sessionId: string) => Promise<void>;
+      handoffs: { startHandoffAutoSend: (sessionId: string) => Promise<void> };
     };
     service.scheduleHandoffAutoSend('sess_1');
-    await service.startHandoffAutoSend('sess_1');
+    await service.handoffs.startHandoffAutoSend('sess_1');
     expect(startProfileTurn).not.toHaveBeenCalled();
   });
 
@@ -347,11 +354,11 @@ describe('ConversationService durable handoff wiring', () => {
   it('cancels committed send:true when auto-send preflight fails on an unavailable route', async () => {
     startProfileTurn.mockRejectedValueOnce(new Error('PROVIDER_UNAVAILABLE: target route is not available.'));
     const service = conversationService as unknown as {
-      autoSendHandoffSessions: Set<string>;
-      startHandoffAutoSend: (sessionId: string) => Promise<void>;
+      scheduleHandoffAutoSend: (sessionId: string) => void;
+      handoffs: { startHandoffAutoSend: (sessionId: string) => Promise<void> };
     };
-    service.autoSendHandoffSessions.add('sess_1');
-    await service.startHandoffAutoSend('sess_1');
+    service.scheduleHandoffAutoSend('sess_1');
+    await service.handoffs.startHandoffAutoSend('sess_1');
     expect(startProfileTurn).toHaveBeenCalled();
     expect(handoffs.consume).not.toHaveBeenCalled();
     expect(handoffs.cancel).toHaveBeenCalledWith('sess_1', 'invalid_model');
@@ -360,16 +367,16 @@ describe('ConversationService durable handoff wiring', () => {
 
   it('does not cancel after successful auto-send consume', async () => {
     const service = conversationService as unknown as {
-      autoSendHandoffSessions: Set<string>;
-      startHandoffAutoSend: (sessionId: string) => Promise<void>;
+      scheduleHandoffAutoSend: (sessionId: string) => void;
+      handoffs: { startHandoffAutoSend: (sessionId: string) => Promise<void> };
       consumeCommittedHandoff: (sessionId: string, handoff: ProfileHandoffState) => void;
     };
     startProfileTurn.mockImplementationOnce(async () => {
       service.consumeCommittedHandoff('sess_1', committed);
       return { requestId: 'auto' };
     });
-    service.autoSendHandoffSessions.add('sess_1');
-    await service.startHandoffAutoSend('sess_1');
+    service.scheduleHandoffAutoSend('sess_1');
+    await service.handoffs.startHandoffAutoSend('sess_1');
     expect(handoffs.consume).toHaveBeenCalledWith('sess_1', 'handoff-1', undefined);
     expect(handoffs.cancel).not.toHaveBeenCalled();
   });
@@ -402,8 +409,8 @@ describe('ConversationService durable handoff wiring', () => {
   it('registers auto-send on the shared preparing path so Stop can abort it', async () => {
     const service = conversationService as unknown as {
       preparingRequests: Map<string, { controller: AbortController; scopeKey: string }>;
-      autoSendHandoffSessions: Set<string>;
-      startHandoffAutoSend: (sessionId: string) => Promise<void>;
+      scheduleHandoffAutoSend: (sessionId: string) => void;
+      handoffs: { startHandoffAutoSend: (sessionId: string) => Promise<void> };
     };
     let sawPreparing = false;
     startProfileTurn.mockImplementation(async (...args: unknown[]) => {
@@ -419,8 +426,8 @@ describe('ConversationService durable handoff wiring', () => {
       });
       return { requestId: 'auto' };
     });
-    service.autoSendHandoffSessions.add('sess_1');
-    const pending = service.startHandoffAutoSend('sess_1');
+    service.scheduleHandoffAutoSend('sess_1');
+    const pending = service.handoffs.startHandoffAutoSend('sess_1');
     await vi.waitFor(() => {
       expect(startProfileTurn).toHaveBeenCalled();
     });
@@ -430,6 +437,126 @@ describe('ConversationService durable handoff wiring', () => {
     expect(result).toMatchObject({ success: true, phase: 'preparing' });
     expect(handoffs.cancel).toHaveBeenCalledWith('sess_1', 'user_stop');
     await pending;
+  });
+
+  function occupySessionSlot(): void {
+    const service = conversationService as unknown as {
+      activeTurns: Map<string, ActiveConversationTurn>;
+    };
+    service.activeTurns.set('turn-src', {
+      requestId: 'req-src',
+      turnId: 'turn-src',
+      sessionId: 'sess_1',
+      startedAt: 1,
+      abortController: new AbortController(),
+      stop: vi.fn(),
+      stopped: Promise.resolve(),
+    });
+  }
+
+  it('does not start a target turn when Stop lands after schedule', async () => {
+    occupySessionSlot();
+    const service = conversationService as unknown as {
+      scheduleHandoffAutoSend: (sessionId: string) => void;
+      notifySessionTurnIdle: (sessionId: string) => void;
+      activeTurns: Map<string, ActiveConversationTurn>;
+    };
+    service.scheduleHandoffAutoSend('sess_1');
+    conversationService.cancelUnfinishedHandoff('sess_1', 'user_stop');
+    service.activeTurns.clear();
+    service.notifySessionTurnIdle('sess_1');
+    await Promise.resolve();
+    expect(startProfileTurn).not.toHaveBeenCalled();
+    expect(handoffs.cancel).toHaveBeenCalledWith('sess_1', 'user_stop');
+  });
+
+  it('does not start a target turn when Rewrite lands after schedule', async () => {
+    occupySessionSlot();
+    const service = conversationService as unknown as {
+      scheduleHandoffAutoSend: (sessionId: string) => void;
+      notifySessionTurnIdle: (sessionId: string) => void;
+      activeTurns: Map<string, ActiveConversationTurn>;
+    };
+    service.scheduleHandoffAutoSend('sess_1');
+    conversationService.cancelUnfinishedHandoff('sess_1', 'rewrite');
+    service.activeTurns.clear();
+    service.notifySessionTurnIdle('sess_1');
+    await Promise.resolve();
+    expect(startProfileTurn).not.toHaveBeenCalled();
+    expect(handoffs.cancel).toHaveBeenCalledWith('sess_1', 'rewrite');
+  });
+
+  it('starts at most one continuation when two send:true schedules race', async () => {
+    occupySessionSlot();
+    const service = conversationService as unknown as {
+      scheduleHandoffAutoSend: (sessionId: string) => void;
+      notifySessionTurnIdle: (sessionId: string) => void;
+      activeTurns: Map<string, ActiveConversationTurn>;
+    };
+    service.scheduleHandoffAutoSend('sess_1');
+    service.scheduleHandoffAutoSend('sess_1');
+    expect(startProfileTurn).not.toHaveBeenCalled();
+    service.activeTurns.clear();
+    service.notifySessionTurnIdle('sess_1');
+    service.notifySessionTurnIdle('sess_1');
+    await vi.waitFor(() => {
+      expect(startProfileTurn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('waits for turn-idle instead of busy-looping while the source turn occupies the slot', async () => {
+    occupySessionSlot();
+    const service = conversationService as unknown as {
+      scheduleHandoffAutoSend: (sessionId: string) => void;
+      notifySessionTurnIdle: (sessionId: string) => void;
+      handoffs: { startHandoffAutoSend: (sessionId: string) => Promise<void> };
+      activeTurns: Map<string, ActiveConversationTurn>;
+    };
+    service.scheduleHandoffAutoSend('sess_1');
+    await service.handoffs.startHandoffAutoSend('sess_1');
+    expect(startProfileTurn).not.toHaveBeenCalled();
+    service.notifySessionTurnIdle('sess_1');
+    expect(startProfileTurn).not.toHaveBeenCalled();
+    expect(handoffs.cancel).not.toHaveBeenCalled();
+    service.activeTurns.clear();
+    service.notifySessionTurnIdle('sess_1');
+    await vi.waitFor(() => {
+      expect(startProfileTurn).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('cancels superseded after bounded turn-idle observations while the slot stays occupied', () => {
+    occupySessionSlot();
+    const service = conversationService as unknown as {
+      scheduleHandoffAutoSend: (sessionId: string) => void;
+      notifySessionTurnIdle: (sessionId: string) => void;
+    };
+    service.scheduleHandoffAutoSend('sess_1');
+    for (let i = 0; i < HANDOFF_AUTO_SEND_MAX_IDLE_OBSERVATIONS; i += 1) {
+      service.notifySessionTurnIdle('sess_1');
+    }
+    expect(startProfileTurn).not.toHaveBeenCalled();
+    expect(handoffs.cancel).toHaveBeenCalledWith('sess_1', 'superseded');
+    service.notifySessionTurnIdle('sess_1');
+    expect(startProfileTurn).not.toHaveBeenCalled();
+  });
+
+  it('does not auto-send after forgetLiveHandoffs plus hydrate restart_degrade', async () => {
+    handoffs.isLiveThisProcess.mockReturnValue(false);
+    const service = conversationService as unknown as {
+      scheduleHandoffAutoSend: (sessionId: string) => void;
+      notifySessionTurnIdle: (sessionId: string) => void;
+      handoffs: { startHandoffAutoSend: (sessionId: string) => Promise<void> };
+    };
+    conversationService.notifyHydratedHandoff('sess_1', {
+      ...committed,
+      lifecycle: 'cancelled',
+      cancelReason: 'restart_degrade',
+    });
+    service.scheduleHandoffAutoSend('sess_1');
+    service.notifySessionTurnIdle('sess_1');
+    await service.handoffs.startHandoffAutoSend('sess_1');
+    expect(startProfileTurn).not.toHaveBeenCalled();
   });
 
   it('projects toAgentId for select/hydrate while committed handoff is unconsumed', () => {

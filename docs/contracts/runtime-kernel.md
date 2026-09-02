@@ -149,6 +149,14 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 唯一引擎是 `HookEngine`。分发根：`resources/agent-runtime/hooks`（builtin）< `~/.rdx/hooks` < `<project>/.rdx/hooks`，与 `ScopedResourceResolver` 同序。Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity；任一变化 → `needsRetrust`。builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。旧仅-YAML-hash trust 在首次加载时失效并要求 retrust（不静默沿用）。接线事件（12 canonical）：`session.before-start` / `session.after-end`、`turn.before-start` / `turn.after-end`、`tool.before-call` / `tool.after-call` / `tool.on-error`、`context.before-compact` / `context.after-compact`、`agent.before-handoff` / `agent.after-handoff`、`permission.denied`。禁止第二套 `AgentHooks`。
 
+## Profile Handoff
+
+`ProfileHandoffState` 是 session-owned durable 状态机（`prepared` → `committed` → `consumed`，或未完成点 `cancelled`），由 `HandoffStateStore` 写入 `<sessionPath>/handoff-state.json`。`AgentHandoffDefinition` 只是 manifest 路由声明，不是该记录。
+
+事务顺序：`before-handoff` → 内存草稿 prepare → 绑定 `turn.pendingHandoff` → `after-hook` → 持久化 `HandoffStateStore.prepare`。`before-handoff` denied 则不 draft、不 bind、不 persist。Hook / 持久化 / 绑定失败必须 cancel/rollback，不得遗留 active prepared，并清掉 `pendingHandoff`。
+
+`send:true` 续跑由源 turn complete / 会话 turn-idle 事件触发一次；同一 `handoffId` 只有一次 generation token，迟到/重复事件丢弃。仅对「源 turn 仍占槽」做有界 idle 观察（`HANDOFF_AUTO_SEND_MAX_IDLE_OBSERVATIONS`），超过则 `cancel(superseded)`。Stop / cancel / preflight / `invalid_model` 永不重试。禁止 `queueMicrotask` 自递归续跑。重启 hydrate 将本进程未 live 的 durable prepared/committed 降为 `restart_degrade`，永不 auto-send。
+
 ## RDX / Capture
 
 无内置 RDX toolchain。**General** 与 UI 的 Open capture / remote / preview / close 以及 Live RDC mutate 走 Settings shell action / `shell` → `ShellInvocationService`，且必须持有 exclusive lease。**Mission planner** 禁止 `shell` 与 `code_interpreter`；只通过受控只读 `rdx_probe` + `rdx_context` 访问 RDX（见 `DESIGN.md` 裁决 J）。`rdx_probe` 唯一执行路径是 Settings `tooling.rdxCli` 已配置的只读 shell action；仓库不得硬编码 CLI 路径。已打开 `.rdc` 由 `ownerSessionId` 拥有；不匹配 fail-closed。Local + Android-origin capture 不得静默 fallback remote。

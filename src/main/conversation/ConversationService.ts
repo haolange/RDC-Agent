@@ -109,9 +109,7 @@ export class ConversationService {
   private readonly sendRequests = new Map<string, Promise<ConversationTurnResult>>();
   private readonly sendRequestFingerprints = new Map<string, string>();
   private readonly activeSendScopes = new Map<string, string>();
-  private readonly autoSendHandoffSessions = new Set<string>();
   private readonly handoffs = new ConversationHandoffOps({
-    autoSendHandoffSessions: this.autoSendHandoffSessions,
     hasActiveTurnForSession: (sessionId) => Array.from(this.activeTurns.values()).some((turn) => turn.sessionId === sessionId),
     runIdempotentTurn: (input, operation) => this.runIdempotentTurn(input, operation),
     resolveContext: (input) => this.resolveContext(input),
@@ -119,7 +117,6 @@ export class ConversationService {
       input.context, input.agentId, input.agentId, '', [], [], undefined,
       input.turnControls, input.requestId, input.controller, undefined, input.requestFingerprint,
     ),
-    startHandoffAutoSend: (sessionId) => this.startHandoffAutoSend(sessionId),
   });
 
   stopAcceptingTurns(): void {
@@ -247,8 +244,14 @@ export class ConversationService {
   private clearActiveTurn(turnId: string, controller: AbortController): void {
     const active = this.activeTurns.get(turnId);
     if (active?.abortController === controller) {
+      const sessionId = active.sessionId;
       this.activeTurns.delete(turnId);
+      if (sessionId) this.notifySessionTurnIdle(sessionId);
     }
+  }
+
+  private notifySessionTurnIdle(sessionId: string): void {
+    this.handoffs.notifySessionTurnIdle(sessionId);
   }
 
   private getPreparingRequestByRequestId(requestId: string) {
@@ -827,10 +830,6 @@ export class ConversationService {
 
   private scheduleHandoffAutoSend(sessionId: string): void {
     this.handoffs.scheduleHandoffAutoSend(sessionId);
-  }
-
-  private startHandoffAutoSend(sessionId: string): Promise<void> {
-    return this.handoffs.startHandoffAutoSend(sessionId);
   }
 
   private async startProfileTurn(

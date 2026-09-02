@@ -21,6 +21,9 @@ vi.mock('../../sessions/RdxRuntimeContextRegistry', () => ({
 const {
   dispatchRuntimeHooks,
   prepareHandoff,
+  createPreparedDraft,
+  abandonDraft,
+  cancelHandoff,
   computeNextChain,
   getActiveHandoff,
   listCheckpoints,
@@ -30,9 +33,18 @@ const {
     event: string,
     context: { payload?: Record<string, unknown> },
   ) => Promise<boolean>>(async () => true),
-  prepareHandoff: vi.fn(() => ({ handoffId: 'handoff-1', send: true })),
+  prepareHandoff: vi.fn((
+    _sessionId: string,
+    input: { handoffId?: string; send?: boolean },
+  ) => ({ handoffId: input.handoffId ?? 'handoff-1', send: input.send ?? true })),
+  createPreparedDraft: vi.fn((
+    _sessionId: string,
+    input: { send?: boolean },
+  ) => ({ handoffId: 'handoff-1', send: input.send ?? true, lifecycle: 'prepared' })),
+  abandonDraft: vi.fn(),
+  cancelHandoff: vi.fn(),
   computeNextChain: vi.fn(() => ({ chainRoot: 'root', depth: 1 })),
-  getActiveHandoff: vi.fn(() => null),
+  getActiveHandoff: vi.fn((_sessionId?: string) => null as { handoffId: string; lifecycle: string } | null),
   listCheckpoints: vi.fn<(
     sessionId: string,
     filter?: { kind?: string },
@@ -71,6 +83,9 @@ vi.mock('../../sessions/StorageAdapter', async (importOriginal) => {
         computeNextChain,
         getActive: getActiveHandoff,
         prepare: prepareHandoff,
+        createPreparedDraft,
+        abandonDraft,
+        cancel: cancelHandoff,
       },
     },
   };
@@ -103,8 +118,12 @@ function createAssembly(): RuntimeToolAssembly {
 
 describe('RuntimeToolAssembly', () => {
   beforeEach(() => {
-    dispatchRuntimeHooks.mockClear();
+    dispatchRuntimeHooks.mockReset();
+    dispatchRuntimeHooks.mockImplementation(async () => true);
     prepareHandoff.mockClear();
+    createPreparedDraft.mockClear();
+    abandonDraft.mockClear();
+    cancelHandoff.mockClear();
     computeNextChain.mockReset().mockReturnValue({ chainRoot: 'root', depth: 1 });
     getActiveHandoff.mockReset().mockReturnValue(null);
     listCheckpoints.mockReset().mockReturnValue([]);
@@ -384,5 +403,152 @@ describe('RuntimeToolAssembly', () => {
     await tool.execute('tc-no-analyzer-cp', { agent: 'analyzer', prompt: 'Replan architecture.', label: 'Replan' });
     const beforeCall = dispatchRuntimeHooks.mock.calls.find((call) => call[0] === 'agent.before-handoff');
     expect(beforeCall?.[1].payload).not.toHaveProperty('checkpointId');
+  });
+
+  it('rolls back after-handoff deny without persisting or leaving pendingHandoff', async () => {
+    dispatchRuntimeHooks.mockImplementation(async (event) => event !== 'agent.after-handoff');
+    const assembly = createAssembly();
+    const handle = new TurnHandle({ sessionKey: 'session-a', turnId: 'turn-a', runId: 'run-a', generation: 1 });
+    handle.eventSink = { sessionId: 'session-a', requestId: 'req-1' } as never;
+    handle.runtimePlan = {
+      projectRootPath: 'D:/project',
+      profileHandoffs: [{ agent: 'general', label: 'Go', prompt: 'continue' }],
+      enabledProfileIds: ['debugger', 'general'],
+    } as never;
+    const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
+    const result = await tool.execute('tc-after-denied', { agent: 'general', prompt: 'continue', label: 'Go' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]).toMatchObject({ type: 'text', text: 'HOOK_DENIED: agent.after-handoff' });
+    expect(createPreparedDraft).toHaveBeenCalled();
+    expect(prepareHandoff).not.toHaveBeenCalled();
+    expect(handle.pendingHandoff).toBeNull();
+    expect(getActiveHandoff('session-a')).toBeNull();
+    expect(abandonDraft).toHaveBeenCalledWith('session-a', 'handoff-1');
+    expect(cancelHandoff).not.toHaveBeenCalled();
+  });
+
+  it('rolls back after-handoff throw without a durable prepared or pendingHandoff', async () => {
+    dispatchRuntimeHooks.mockImplementation(async (event) => {
+      if (event === 'agent.after-handoff') throw new Error('after-handoff failed');
+      return true;
+    });
+    const assembly = createAssembly();
+    const handle = new TurnHandle({ sessionKey: 'session-a', turnId: 'turn-a', runId: 'run-a', generation: 1 });
+    handle.eventSink = { sessionId: 'session-a', requestId: 'req-1' } as never;
+    handle.runtimePlan = {
+      projectRootPath: 'D:/project',
+      profileHandoffs: [{ agent: 'general', label: 'Go', prompt: 'continue' }],
+      enabledProfileIds: ['debugger', 'general'],
+    } as never;
+    const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
+    const result = await tool.execute('tc-hook-throw', { agent: 'general', prompt: 'continue', label: 'Go' });
+    expect(result.isError).toBe(true);
+    expect(createPreparedDraft).toHaveBeenCalled();
+    expect(prepareHandoff).not.toHaveBeenCalled();
+    expect(handle.pendingHandoff).toBeNull();
+    expect(getActiveHandoff('session-a')).toBeNull();
+    expect(abandonDraft).toHaveBeenCalledWith('session-a', 'handoff-1');
+    expect(cancelHandoff).not.toHaveBeenCalled();
+  });
+
+  it('rolls back pendingHandoff when persist fails and leaves no active handoff', async () => {
+    prepareHandoff.mockImplementationOnce(() => {
+      throw new Error('HANDOFF_STATE_CONFLICT: disk full');
+    });
+    const assembly = createAssembly();
+    const handle = new TurnHandle({ sessionKey: 'session-a', turnId: 'turn-a', runId: 'run-a', generation: 1 });
+    handle.eventSink = { sessionId: 'session-a', requestId: 'req-1' } as never;
+    handle.runtimePlan = {
+      projectRootPath: 'D:/project',
+      profileHandoffs: [{ agent: 'general', label: 'Go', prompt: 'continue' }],
+      enabledProfileIds: ['debugger', 'general'],
+    } as never;
+    const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
+    const result = await tool.execute('tc-persist-fail', { agent: 'general', prompt: 'continue', label: 'Go' });
+    expect(result.isError).toBe(true);
+    expect(createPreparedDraft).toHaveBeenCalled();
+    expect(prepareHandoff).toHaveBeenCalled();
+    expect(handle.pendingHandoff).toBeNull();
+    expect(getActiveHandoff('session-a')).toBeNull();
+    expect(abandonDraft).toHaveBeenCalledWith('session-a', 'handoff-1');
+  });
+
+  it('does not draft, bind, or persist when before-handoff is denied', async () => {
+    dispatchRuntimeHooks.mockImplementation(async (event) => event !== 'agent.before-handoff');
+    const assembly = createAssembly();
+    const handle = new TurnHandle({ sessionKey: 'session-a', turnId: 'turn-a', runId: 'run-a', generation: 1 });
+    handle.eventSink = { sessionId: 'session-a', requestId: 'req-1' } as never;
+    handle.runtimePlan = {
+      projectRootPath: 'D:/project',
+      profileHandoffs: [{ agent: 'general', label: 'Go', prompt: 'continue' }],
+      enabledProfileIds: ['debugger', 'general'],
+    } as never;
+    const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
+    const result = await tool.execute('tc-denied', { agent: 'general', prompt: 'continue', label: 'Go' });
+    expect(result.isError).toBe(true);
+    expect(createPreparedDraft).not.toHaveBeenCalled();
+    expect(prepareHandoff).not.toHaveBeenCalled();
+    expect(handle.pendingHandoff).toBeNull();
+  });
+
+  it('rejects a second in-session prepare as ALREADY_ACTIVE without binding', async () => {
+    getActiveHandoff.mockReturnValue({ handoffId: 'existing', lifecycle: 'prepared' });
+    const assembly = createAssembly();
+    const handle = new TurnHandle({ sessionKey: 'session-a', turnId: 'turn-a', runId: 'run-a', generation: 1 });
+    handle.eventSink = { sessionId: 'session-a', requestId: 'req-1' } as never;
+    handle.runtimePlan = {
+      projectRootPath: 'D:/project',
+      profileHandoffs: [{ agent: 'general', label: 'Go', prompt: 'continue' }],
+      enabledProfileIds: ['debugger', 'general'],
+    } as never;
+    const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
+    const result = await tool.execute('tc-second', { agent: 'general', prompt: 'continue', label: 'Go' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringMatching(/HANDOFF_ALREADY_ACTIVE/) });
+    expect(createPreparedDraft).not.toHaveBeenCalled();
+    expect(prepareHandoff).not.toHaveBeenCalled();
+    expect(handle.pendingHandoff).toBeNull();
+  });
+
+  it('rejects depth 4 before drafting or persisting', async () => {
+    computeNextChain.mockReturnValueOnce({ chainRoot: 'root', depth: 4 });
+    const assembly = createAssembly();
+    const handle = new TurnHandle({ sessionKey: 'session-a', turnId: 'turn-a', runId: 'run-a', generation: 1 });
+    handle.eventSink = { sessionId: 'session-a', requestId: 'req-1' } as never;
+    handle.runtimePlan = {
+      projectRootPath: 'D:/project',
+      profileHandoffs: [{ agent: 'general', label: 'Go', prompt: 'continue' }],
+      enabledProfileIds: ['debugger', 'general'],
+    } as never;
+    const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
+    const result = await tool.execute('tc-depth', { agent: 'general', prompt: 'continue', label: 'Go' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringMatching(/HANDOFF_CHAIN_LIMIT/) });
+    expect(createPreparedDraft).not.toHaveBeenCalled();
+    expect(prepareHandoff).not.toHaveBeenCalled();
+    expect(handle.pendingHandoff).toBeNull();
+  });
+
+  it('fails closed on an illegal declaredModel without drafting', async () => {
+    const assembly = createAssembly();
+    const handle = new TurnHandle({ sessionKey: 'session-a', turnId: 'turn-a', runId: 'run-a', generation: 1 });
+    handle.eventSink = { sessionId: 'session-a', requestId: 'req-1' } as never;
+    handle.runtimePlan = {
+      projectRootPath: 'D:/project',
+      profileHandoffs: [{
+        agent: 'general',
+        label: 'Go',
+        prompt: 'continue',
+        model: 'internal-provider:hidden',
+      }],
+      enabledProfileIds: ['debugger', 'general'],
+    } as never;
+    const tool = assembly.createAgentHandoffTool('debugger', 'session-a', handle);
+    const result = await tool.execute('tc-model', { agent: 'general', prompt: 'continue', label: 'Go' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0]).toMatchObject({ type: 'text', text: expect.stringMatching(/HANDOFF_MODEL_INVALID/) });
+    expect(createPreparedDraft).not.toHaveBeenCalled();
+    expect(prepareHandoff).not.toHaveBeenCalled();
+    expect(handle.pendingHandoff).toBeNull();
   });
 });

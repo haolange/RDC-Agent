@@ -2,7 +2,12 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { HANDOFF_CHAIN_LIMIT, HANDOFF_ERROR, isConsumableHandoff } from '@shared/types/profileHandoff';
+import {
+  HANDOFF_CHAIN_LIMIT,
+  HANDOFF_ERROR,
+  isConsumableHandoff,
+  type ProfileHandoffCancelReason,
+} from '@shared/types/profileHandoff';
 import { StorageIo } from './StorageIo';
 import { HandoffStateStore } from './HandoffStateStore';
 import { HANDOFF_STATE_MIGRATIONS } from './handoffStateSchema';
@@ -47,6 +52,93 @@ afterEach(() => {
 });
 
 describe('HandoffStateStore durable lifecycle', () => {
+  it('walks prepared → committed → consumed and records each cancel reason', () => {
+    const { store } = createStore();
+    const prepared = prepare(store);
+    expect(prepared.lifecycle).toBe('prepared');
+    const committed = store.commit('sess_1', 'turn-1');
+    expect(committed.lifecycle).toBe('committed');
+    const consumed = store.consume('sess_1', committed.handoffId, 'turn-continue');
+    expect(consumed).toMatchObject({
+      lifecycle: 'consumed',
+      continuationTurnId: 'turn-continue',
+    });
+    expect(store.getActive('sess_1')).toBeNull();
+
+    const reasons: ProfileHandoffCancelReason[] = [
+      'user_stop',
+      'rewrite',
+      'branch',
+      'manual_switch',
+      'session_close',
+      'restart_degrade',
+      'invalid_model',
+      'depth_exceeded',
+      'superseded',
+    ];
+    for (const reason of reasons) {
+      const next = prepare(store, {
+        sourceTurnId: `turn-${reason}`,
+        sourceRequestId: `req-${reason}`,
+        chainRoot: `root-${reason}`,
+      });
+      expect(store.cancel('sess_1', reason)).toMatchObject({
+        handoffId: next.handoffId,
+        lifecycle: 'cancelled',
+        cancelReason: reason,
+      });
+      expect(store.getActive('sess_1')).toBeNull();
+    }
+  });
+
+  it('keeps createPreparedDraft in memory until persist, and abandons without writing', () => {
+    const { store, sessionPath } = createStore();
+    const draft = store.createPreparedDraft('sess_1', {
+      sourceTurnId: 'turn-1',
+      sourceRequestId: 'req-1',
+      sourceAgentId: 'plan',
+      toAgentId: 'edit',
+      prompt: 'Continue as edit.',
+      label: 'Implement',
+      declaredModel: null,
+      send: true,
+      chainRoot: 'root-1',
+      depth: 1,
+    });
+    expect(draft.lifecycle).toBe('prepared');
+    expect(store.getActive('sess_1')).toBeNull();
+    expect(fs.existsSync(path.join(sessionPath, 'handoff-state.json'))).toBe(false);
+    expect(() => store.createPreparedDraft('sess_1', {
+      sourceTurnId: 'turn-2',
+      sourceRequestId: 'req-2',
+      sourceAgentId: 'plan',
+      toAgentId: 'edit',
+      prompt: 'Other.',
+      label: 'Other',
+      declaredModel: null,
+      send: false,
+      chainRoot: 'root-2',
+      depth: 1,
+    })).toThrow(/HANDOFF_ALREADY_ACTIVE/);
+    store.abandonDraft('sess_1', draft.handoffId);
+    expect(store.getActive('sess_1')).toBeNull();
+    const persisted = store.prepare('sess_1', {
+      sourceTurnId: 'turn-1',
+      sourceRequestId: 'req-1',
+      sourceAgentId: 'plan',
+      toAgentId: 'edit',
+      prompt: 'Continue as edit.',
+      label: 'Implement',
+      declaredModel: null,
+      send: true,
+      chainRoot: 'root-1',
+      depth: 1,
+      handoffId: draft.handoffId,
+    });
+    expect(persisted.handoffId).toBe(draft.handoffId);
+    expect(store.getActive('sess_1')?.handoffId).toBe(draft.handoffId);
+  });
+
   it('writes prepared then commits, and rejects a second active handoff', () => {
     const { store } = createStore();
     const prepared = prepare(store);

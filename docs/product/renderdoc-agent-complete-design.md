@@ -107,7 +107,7 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 
 ### 3.4 Durable Handoff（已落地）
 
-`ProfileHandoffState` 经 `HandoffStateStore` 写入 `<sessionPath>/handoff-state.json`。现有 `AgentHandoffDefinition` 仍只是 manifest 路由声明，不是该状态机。Debugger Big Loop 走同一套机器（链上限 3，重启不自动开火）。目标态：durable `prepare` 后必须立即绑定当前 turn，再执行 after-hook；Hook / 持久化 / 后续绑定失败必须显式 cancel/rollback，不得遗留 active prepared；`send:true` 必须公平、可取消、事件驱动或有界调度，禁止 microtask 自递归续跑。**当前态诚实缺口**：prepare 在 after-hook 前、pendingHandoff 在后；续跑为 queueMicrotask 自调度。见 §5。**产品级 Browser QA 与本机 ColdData 真实验收尚未跑。**
+`ProfileHandoffState` 经 `HandoffStateStore` 写入 `<sessionPath>/handoff-state.json`。现有 `AgentHandoffDefinition` 仍只是 manifest 路由声明，不是该状态机。Debugger Big Loop 走同一套机器（链上限 3，重启不自动开火）。事务顺序：内存草稿 prepare → 绑定 `turn.pendingHandoff` → after-hook → 持久化；Hook 拒绝/抛错或持久化失败必须 cancel/rollback，不得遗留 active prepared。`send:true` 由源 turn complete / turn-idle 事件驱动，同一 `handoffId` 一次 generation，有界 idle 观察，禁止 microtask 自递归。**源码与定向测试已落地。**产品级自动续跑 / pill 闭环仍须在有 session 的 Browser QA 中验收。
 
 ### 3.5 并发（目标态 / 迁移中）
 
