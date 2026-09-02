@@ -7,15 +7,12 @@ import type {
   RunContextUsageRequest,
   RunContextUsageSummary,
 } from '@shared/types/session';
-import type { WorkflowStage } from '@shared/types/workflow';
 import { cacheHitRatePercent } from '../agent-runtime/providers/internal/normalizeCacheUsage';
 import { workflowProjectionPublisher } from '../workflow/debugger/WorkflowProjectionPublisher';
 import { storageAdapter } from '../sessions/StorageAdapter';
 import { planEffectiveModelRequest } from './EffectiveModelResolver';
 import { settingsService } from './SettingsService';
 import { resolveCompactionPercentForSession } from './compactionPercent';
-
-export type LlmAuditStage = WorkflowStage | 'plan' | 'report';
 
 /** 一次 LLM call 的成本明细（美元）。 */
 export interface LlmUsageCost {
@@ -51,7 +48,6 @@ export interface RunLlmExecutionSummary {
   lastSnapshotAt?: number | null;
   routesUsed: Array<{
     agentId: AgentRole;
-    stage: LlmAuditStage;
     providerId: string;
     modelId: string;
     requestId?: string;

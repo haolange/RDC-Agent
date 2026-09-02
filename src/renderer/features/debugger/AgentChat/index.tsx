@@ -5,7 +5,6 @@ import {
   selectLatestMessageActivityAt,
   useConversationStore,
 } from '../../../stores/conversationStore';
-import { useWorkflowStore } from '../../../stores/workflowStore';
 import { ConversationThread } from './ConversationThread';
 import './AgentChat.css';
 import './AgentChat.markdown.css';
@@ -17,7 +16,6 @@ const STICKY_SCROLL_THRESHOLD = 96;
 export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
   const messageCount = useConversationStore(selectConversationMessageCount);
   const latestMessageActivityAt = useConversationStore(selectLatestMessageActivityAt);
-  const workflowState = useWorkflowStore((state) => state.workflowState);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const shouldStickToBottomRef = useRef(true);
   const isEmpty = messageCount === 0;
@@ -37,7 +35,6 @@ export const AgentChat: React.FC<{ mode: AgentMode }> = ({ mode }) => {
   }, [
     messageCount,
     latestMessageActivityAt,
-    workflowState?.currentStage,
   ]);
 
   const handleScroll = () => {

@@ -27,7 +27,7 @@ export function recoverRunProfileId(
   const diagnostics: string[] = [];
   if (legacyMode !== undefined) {
     diagnostics.push(
-      `RUN_V2_LEGACY_MODE_IGNORED: old mode ${JSON.stringify(legacyMode)} is diagnostic-only and never infers profile or mission.`,
+      `RUN_V3_LEGACY_MODE_IGNORED: old mode ${JSON.stringify(legacyMode)} is diagnostic-only and never infers profile or mission.`,
     );
   }
 
@@ -53,14 +53,14 @@ export function recoverRunProfileId(
   if (assistantIds.length === 1) {
     if (assistantIds[0] !== userIds[0] && userIds.length > 0) {
       diagnostics.push(
-        `RUN_V2_PROFILE_ASSISTANT_PRIORITY: terminal assistant ${assistantIds[0]} preferred over user ${userIds.join(',')}.`,
+        `RUN_V3_PROFILE_ASSISTANT_PRIORITY: terminal assistant ${assistantIds[0]} preferred over user ${userIds.join(',')}.`,
       );
     }
     return { profileId: assistantIds[0]!, diagnostics };
   }
   if (assistantIds.length > 1) {
     diagnostics.push(
-      `RUN_V2_PROFILE_ASSISTANT_CONFLICT: conflicting terminal assistant ids ${assistantIds.join(',')}; using first.`,
+      `RUN_V3_PROFILE_ASSISTANT_CONFLICT: conflicting terminal assistant ids ${assistantIds.join(',')}; using first.`,
     );
     return { profileId: assistantIds[0]!, diagnostics };
   }
@@ -72,10 +72,10 @@ export function recoverRunProfileId(
   }
   if (actionIds.length > 1) {
     diagnostics.push(
-      `RUN_V2_PROFILE_ACTION_CONFLICT: conflicting action agent_id ${actionIds.join(',')}; leaving unknown.`,
+      `RUN_V3_PROFILE_ACTION_CONFLICT: conflicting action agent_id ${actionIds.join(',')}; leaving unknown.`,
     );
   }
-  diagnostics.push('RUN_V2_PROFILE_UNKNOWN: no unique conversation or action-event identity.');
+  diagnostics.push('RUN_V3_PROFILE_UNKNOWN: no unique conversation or action-event identity.');
   return { profileId: LEGACY_UNKNOWN_PROFILE_ID, diagnostics };
 }
 

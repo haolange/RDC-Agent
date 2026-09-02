@@ -171,7 +171,6 @@ export class SubagentRunner {
         task,
         {
           sessionId: subagentSessionId,
-          stage: 'investigate',
           projectRootPath: input.projectRootPath,
           projectId: input.projectId,
           systemPrompt,

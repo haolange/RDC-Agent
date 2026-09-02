@@ -7,11 +7,6 @@ import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type {
-  Blocker,
-  WorkflowStage,
-  WorkflowState,
-} from '@shared/types/workflow';
-import type {
   CaptureDescriptor,
   ProjectInputRecord,
   ProjectRecord,
@@ -445,14 +440,6 @@ export class StorageAdapter implements StorageHost {
     refs?: string[];
   }): ActionEvent {
     return this.sessions.createActionEvent(input);
-  }
-
-  async getWorkflowState(caseId: string, runId: string): Promise<WorkflowState | null> {
-    return this.sessions.getWorkflowState(caseId, runId);
-  }
-
-  async updateWorkflowStage(caseId: string, runId: string, stage: WorkflowStage, blockers: Blocker[] = []): Promise<void> {
-    return this.sessions.updateWorkflowStage(caseId, runId, stage, blockers);
   }
 
   getCurrentProjectId(): string | null {

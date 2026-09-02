@@ -1,4 +1,3 @@
-import type { WorkflowStage } from '@shared/types/workflow';
 import type { ProjectRecord, RunRecord, SessionRecord } from '@shared/types/session';
 
 export interface ProjectRegistry {
@@ -20,7 +19,6 @@ export type PersistedRunRecord = RunRecord & {
     context_id: string | null;
     runtime_owner: string | null;
     session_id: string;
-    workflow_stage: WorkflowStage;
   };
 };
 

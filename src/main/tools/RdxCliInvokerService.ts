@@ -38,16 +38,6 @@ const EMPTY_CATALOG: ToolCatalog = {
   namespaces: EMPTY_NAMESPACES,
 };
 
-const RECOMMENDED_SPECIALISTS = [
-  'triage_agent',
-  'capture_repro_agent',
-  'pass_graph_pipeline_agent',
-  'pixel_forensics_agent',
-  'shader_ir_agent',
-  'skeptic_agent',
-  'curator_agent',
-];
-
 export class RdxCliInvokerService {
   private catalog: ToolCatalog | null = null;
   private catalogPath: string | null = null;
@@ -146,7 +136,6 @@ export class RdxCliInvokerService {
         unavailableReason,
       },
       namespaces,
-      recommendedSpecialists: RECOMMENDED_SPECIALISTS,
     };
   }
 

@@ -16,9 +16,6 @@ export function createEventSubscriptionApi(transport: RendererApiTransport): Eve
     onWorkflowStateChanged: (callback) => (
       transport.subscribe(EVENT.workflow.stateChanged, (state) => callback(state as Parameters<typeof callback>[0]))
     ),
-    onWorkflowStageChanged: (callback) => (
-      transport.subscribe(EVENT.workflow.stageChanged, (data) => callback(data as Parameters<typeof callback>[0]))
-    ),
     onRunStatusChanged: (callback) => (
       transport.subscribe(EVENT.workflow.runStatusChanged, (data) => callback(data as Parameters<typeof callback>[0]))
     ),

@@ -268,7 +268,6 @@ export function registerProjectSessionHandlers(context: WorkbenchIpcContext): vo
         rdxCliInvokerService.abortRun(activeRun.runId);
         await context.setRunLifecycleState(id, activeRun.runId, {
           status: 'cancelled',
-          lastStage: activeRun.lastStage,
           stopReason: 'Session removed',
           stoppedAt: Date.now(),
           finishedAt: Date.now(),

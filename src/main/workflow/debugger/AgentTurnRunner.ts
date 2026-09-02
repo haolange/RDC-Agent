@@ -5,7 +5,6 @@
 import type { AgentRole } from '@shared/types/agent';
 import type { AgentRouteCapability } from '@shared/types/agentRuntime';
 import type { ContextUsageBreakdownEntry } from '@shared/types/session';
-import type { WorkflowStage } from '@shared/types/workflow';
 import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdxRuntime';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import { generateEventId, nowMs } from '@shared/utils/id';
@@ -91,7 +90,6 @@ export interface AgentTurnRunnerDeps {
   resolveRuntimeTools: (
     agentId: AgentRole,
     toolAllowlist: string[],
-    stage?: WorkflowStage | 'report',
     sessionId?: string | null,
     turnHandle?: import('./TurnCoordinator').TurnHandle | null,
     projectId?: string | null,
@@ -102,7 +100,6 @@ export interface AgentTurnRunnerDeps {
   createToolExecutor: (
     agentId: AgentRole,
     toolAllowlist: string[],
-    stage?: WorkflowStage | 'report',
     sessionId?: string | null,
     runtimeContext?: ToolExecutorRuntimeContext,
   ) => ToolExecutor;
@@ -309,7 +306,6 @@ export class AgentTurnRunner {
     modelId: string;
     temperature?: number;
     profileId: string;
-    stage?: WorkflowStage | 'report';
     runId?: string;
     sessionId?: string | null;
     turnId?: string;
@@ -414,7 +410,6 @@ export class AgentTurnRunner {
     const liveRuntimeTools = this.deps.resolveRuntimeTools(
       input.agentId,
       frozenToolAllowlist,
-      input.stage,
       executionScopeId,
       turnHandle,
       input.projectId,
@@ -443,7 +438,6 @@ export class AgentTurnRunner {
       runId: input.runId,
       turnId: input.turnId,
       sessionId: executionScopeId,
-      stage: input.stage,
       profileId: input.profileId,
       providerId: input.providerId,
       modelId: input.modelId,
@@ -461,7 +455,7 @@ export class AgentTurnRunner {
     const executorAllowlist = routeCapability.toolCallingMode === 'native-structured'
       ? [...effectivePlan.toolAllowlist]
       : activeToolAllowlist;
-    const toolExecutor = this.deps.createToolExecutor(input.agentId, executorAllowlist, input.stage, executionScopeId, {
+    const toolExecutor = this.deps.createToolExecutor(input.agentId, executorAllowlist, executionScopeId, {
       sessionId: executionScopeId,
       runId: input.runId,
       turnId: input.turnId,

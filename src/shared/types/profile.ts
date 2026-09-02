@@ -1,6 +1,5 @@
 import type { AgentRole } from './agent';
 import type { LlmProviderId } from './settings';
-import type { WorkflowPhase, WorkflowStage } from './workflow';
 
 export interface AgentToolPolicy {
   allowTools?: string[];
@@ -35,8 +34,6 @@ export interface EffectiveAgentRuntimeConfig {
   providerId: LlmProviderId;
   modelId: string;
   temperature?: number;
-  stage: WorkflowStage;
-  phase: WorkflowPhase;
   toolAllowlist: string[];
   skillIds: string[];
   mcpServerIds: string[];

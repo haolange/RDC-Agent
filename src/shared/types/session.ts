@@ -157,7 +157,7 @@ export type RunStatus =
   | 'interrupted';
 
 export interface RunRecordBase {
-  schemaVersion: '2';
+  schemaVersion: '3';
   runId: string;
   turnId?: string;
   projectId: string;
@@ -171,7 +171,6 @@ export interface RunRecordBase {
   stoppedAt?: number;
   status: RunStatus;
   stopReason?: string;
-  lastStage: string;
   backend: 'local' | 'remote';
   reportPaths?: RunReportPaths;
   diagnostics?: string[];

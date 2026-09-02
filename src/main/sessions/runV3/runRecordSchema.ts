@@ -36,11 +36,10 @@ const RuntimeSchema = z.object({
   context_id: z.string().nullable(),
   runtime_owner: z.string().nullable(),
   session_id: z.string().min(1),
-  workflow_stage: z.string(),
-}).passthrough();
+}).strict();
 
 const RunRecordBaseFields = {
-  schemaVersion: z.literal('2'),
+  schemaVersion: z.literal('3'),
   runId: z.string().min(1),
   turnId: z.string().optional(),
   projectId: z.string().min(1),
@@ -54,7 +53,6 @@ const RunRecordBaseFields = {
   stoppedAt: z.number().optional(),
   status: RunStatusSchema,
   stopReason: z.string().optional(),
-  lastStage: z.string(),
   backend: z.enum(['local', 'remote']),
   reportPaths: z.unknown().optional(),
   diagnostics: z.array(z.string()).optional(),
@@ -63,32 +61,63 @@ const RunRecordBaseFields = {
   runtime: RuntimeSchema,
 };
 
+const RUN_V3_STAGE_ERA_KEYS = [
+  'lastStage',
+  'last_stage',
+  'workflow_stage',
+  'recommendedSpecialists',
+  'availableStages',
+  'currentStage',
+  'mode',
+] as const;
+
+function collectRunV3StageFields(record: Record<string, unknown>): string[] {
+  const leftovers: string[] = [];
+  for (const key of RUN_V3_STAGE_ERA_KEYS) {
+    if (key in record) leftovers.push(key);
+  }
+  const runtime = record.runtime;
+  if (runtime && typeof runtime === 'object' && !Array.isArray(runtime)) {
+    const runtimeRecord = runtime as Record<string, unknown>;
+    for (const key of RUN_V3_STAGE_ERA_KEYS) {
+      if (key in runtimeRecord) leftovers.push(`runtime.${key}`);
+    }
+  }
+  return leftovers;
+}
+
+export function assertNoRunV3StageFields(record: Record<string, unknown>, source: string): void {
+  const leftovers = collectRunV3StageFields(record);
+  if (leftovers.length === 0) return;
+  throw new Error(
+    `STORAGE: RUN_V3_STAGE_FIELD: ${source} must not carry ${leftovers.join(', ')}`,
+  );
+}
+
 export const ConversationPersistedRunSchema = z.object({
   ...RunRecordBaseFields,
   kind: z.literal('conversation'),
   captures: z.array(CaptureDescriptorSchema).max(0),
-}).passthrough().superRefine((value, ctx) => {
-  if ('mission' in value) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'ConversationRun must not carry mission.' });
-  }
-  if ('mode' in value) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Run v2 must not carry mode.' });
-  }
-  if (isMissionAgentId(String(value.profileId))) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: 'ConversationRun profileId cannot be a Mission identity.',
-    });
-  }
-}) as unknown as ZodType<PersistedRunRecord>;
+}).strict();
 
 export const MissionPersistedRunSchema = z.object({
   ...RunRecordBaseFields,
   kind: z.literal('mission'),
   mission: z.enum(['debugger', 'analyzer', 'optimizer']),
-}).passthrough().superRefine((value, ctx) => {
-  if ('mode' in value) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Run v2 must not carry mode.' });
+}).strict();
+
+export const PersistedRunRecordV3Schema: ZodType<PersistedRunRecord> = z.discriminatedUnion('kind', [
+  ConversationPersistedRunSchema,
+  MissionPersistedRunSchema,
+]).superRefine((value, ctx) => {
+  if (value.kind === 'conversation') {
+    if (isMissionAgentId(String(value.profileId))) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'ConversationRun profileId cannot be a Mission identity.',
+      });
+    }
+    return;
   }
   if (!isMissionAgentId(String(value.profileId))) {
     ctx.addIssue({
@@ -104,11 +133,6 @@ export const MissionPersistedRunSchema = z.object({
   }
 }) as unknown as ZodType<PersistedRunRecord>;
 
-export const PersistedRunRecordV2Schema: ZodType<PersistedRunRecord> = z.discriminatedUnion('kind', [
-  ConversationPersistedRunSchema as unknown as z.ZodObject<z.ZodRawShape>,
-  MissionPersistedRunSchema as unknown as z.ZodObject<z.ZodRawShape>,
-]) as unknown as ZodType<PersistedRunRecord>;
-
 export interface RunProfileRecovery {
   profileId: string;
   diagnostics: string[];
@@ -121,7 +145,7 @@ export function classifyRunKind(profileId: string): { kind: RunRecord['kind']; m
   return { kind: 'conversation' };
 }
 
-export function toPersistedRunV2(
+export function toPersistedRunV3(
   base: Omit<PersistedRunRecord, 'schemaVersion' | 'kind' | 'mission' | 'profileId' | 'diagnostics'> & {
     profileId: string;
     diagnostics?: string[];
@@ -129,8 +153,10 @@ export function toPersistedRunV2(
   },
 ): PersistedRunRecord {
   const classified = classifyRunKind(base.profileId);
+  const runtime = { ...base.runtime };
+  assertNoRunV3StageFields({ ...(base as Record<string, unknown>), runtime }, 'toPersistedRunV3');
   const shared = {
-    schemaVersion: '2' as const,
+    schemaVersion: '3' as const,
     runId: base.runId,
     turnId: base.turnId,
     projectId: base.projectId,
@@ -144,13 +170,12 @@ export function toPersistedRunV2(
     stoppedAt: base.stoppedAt,
     status: base.status,
     stopReason: base.stopReason,
-    lastStage: base.lastStage,
     backend: base.backend,
     reportPaths: base.reportPaths,
     diagnostics: base.diagnostics,
     createdAt: base.createdAt,
     updatedAt: base.updatedAt,
-    runtime: base.runtime,
+    runtime,
   };
   if (classified.kind === 'mission') {
     return { ...shared, kind: 'mission', mission: classified.mission! };
@@ -159,6 +184,24 @@ export function toPersistedRunV2(
 }
 
 export const LEGACY_RUN_PROFILE_ID = LEGACY_UNKNOWN_PROFILE_ID;
+
+function stampLegacyRun(raw: unknown, fromVersion: '0' | '1' | '2'): unknown {
+  const record = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? { ...(raw as Record<string, unknown>) }
+    : {};
+  delete record.lastStage;
+  delete record.last_stage;
+  if (record.runtime && typeof record.runtime === 'object' && !Array.isArray(record.runtime)) {
+    const runtime = { ...(record.runtime as Record<string, unknown>) };
+    delete runtime.workflow_stage;
+    record.runtime = runtime;
+  }
+  return {
+    ...record,
+    schemaVersion: '3',
+    _legacyRunMigration: fromVersion,
+  };
+}
 
 export const SESSION_RUN_MIGRATIONS: StorageMigration<PersistedRunRecord>[] = [
   {
@@ -173,17 +216,11 @@ export const SESSION_RUN_MIGRATIONS: StorageMigration<PersistedRunRecord>[] = [
   },
   {
     schemaVersion: '2',
-    schema: PersistedRunRecordV2Schema,
+    schema: z.object({}).passthrough() as unknown as ZodType<PersistedRunRecord>,
+    migrate: (raw) => stampLegacyRun(raw, '2'),
+  },
+  {
+    schemaVersion: '3',
+    schema: PersistedRunRecordV3Schema,
   },
 ];
-
-function stampLegacyRun(raw: unknown, fromVersion: '0' | '1'): unknown {
-  const record = raw && typeof raw === 'object' && !Array.isArray(raw)
-    ? { ...(raw as Record<string, unknown>) }
-    : {};
-  return {
-    ...record,
-    schemaVersion: '2',
-    _legacyRunMigration: fromVersion,
-  };
-}

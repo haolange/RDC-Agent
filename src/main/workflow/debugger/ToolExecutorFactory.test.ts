@@ -168,7 +168,7 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true,
       matchesToolAllowlist: () => true,
     });
-    const executor = factory.createToolExecutor('ask', ['shell'], undefined, null, {
+    const executor = factory.createToolExecutor('ask', ['shell'], null, {
       effectivePlan: {
         toolAllowlist: ['shell'],
         skillIntersection: null,
@@ -219,7 +219,7 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true,
       matchesToolAllowlist: () => false,
     });
-    const executor = factory.createToolExecutor('ask', ['shell'], undefined, null, {
+    const executor = factory.createToolExecutor('ask', ['shell'], null, {
       effectivePlan: {
         toolAllowlist: ['shell'],
         skillIntersection: ['read_file'],
@@ -297,7 +297,7 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true,
       matchesToolAllowlist: () => true,
     });
-    const executor = factory.createToolExecutor('plan', ['task_create'], undefined, 'session-1', {
+    const executor = factory.createToolExecutor('plan', ['task_create'], 'session-1', {
       effectivePlan: {
         toolAllowlist: ['task_create'],
         activatedDeferredTools: ['task_create'],
@@ -338,7 +338,7 @@ describe('ToolExecutorFactory', () => {
       matchesToolAllowlist: () => true,
     });
     const budget = { toolCalls: 0, subagents: 0, childDepth: 0, wallStartedAt: Date.now(), maxToolCalls: 1, maxSubagents: 3, maxChildDepth: 3, maxWallTimeMs: 60_000 };
-    const executor = factory.createToolExecutor('ask', ['read_file'], undefined, null, {
+    const executor = factory.createToolExecutor('ask', ['read_file'], null, {
       effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
       policyBudget: budget,
     });
@@ -349,7 +349,7 @@ describe('ToolExecutorFactory', () => {
     expect(execute).toHaveBeenCalledOnce();
 
     const expired = { ...budget, toolCalls: 0, wallStartedAt: Date.now() - 100, maxWallTimeMs: 1 };
-    const expiredExecutor = factory.createToolExecutor('ask', ['read_file'], undefined, null, {
+    const expiredExecutor = factory.createToolExecutor('ask', ['read_file'], null, {
       effectivePlan: { toolAllowlist: ['read_file'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
       policyBudget: expired,
     });
@@ -379,7 +379,7 @@ describe('ToolExecutorFactory', () => {
       isAllowedForRuntime: () => true,
       matchesToolAllowlist: () => true,
     });
-    const executor = factory.createToolExecutor('ask', ['read_file'], undefined, null, {
+    const executor = factory.createToolExecutor('ask', ['read_file'], null, {
       effectivePlan: {
         toolAllowlist: ['read_file'],
         skillIntersection: ['read_file'],
@@ -442,7 +442,7 @@ describe('ToolExecutorFactory', () => {
       maxChildDepth: 3,
       maxWallTimeMs: 60_000,
     };
-    const executor = factory.createToolExecutor('ask', ['read_file', 'shell'], undefined, null, {
+    const executor = factory.createToolExecutor('ask', ['read_file', 'shell'], null, {
       effectivePlan: { toolAllowlist: ['read_file', 'shell'], skillIntersection: null, projectId: null, projectRootPath: null } as never,
       policyBudget: budget,
     });

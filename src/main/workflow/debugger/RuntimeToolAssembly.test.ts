@@ -128,17 +128,16 @@ describe('RuntimeToolAssembly', () => {
   it('uses the turn-frozen allowlist for runtime checks and tool assembly', () => {
     const assembly = createAssembly();
     const frozen = ['read_file'];
-    expect(assembly.isAllowedForRuntime('ask', 'read_file', 'investigate', frozen)).toBe(true);
-    expect(assembly.isAllowedForRuntime('ask', 'write_file', 'investigate', frozen)).toBe(false);
+    expect(assembly.isAllowedForRuntime('ask', 'read_file', frozen)).toBe(true);
+    expect(assembly.isAllowedForRuntime('ask', 'write_file', frozen)).toBe(false);
     frozen[0] = 'write_file';
-    expect(assembly.isAllowedForRuntime('ask', 'read_file', 'investigate', ['read_file'])).toBe(true);
+    expect(assembly.isAllowedForRuntime('ask', 'read_file', ['read_file'])).toBe(true);
   });
 
-  it('isAllowedForRuntime maps report stage to undefined workflow stage', () => {
+  it('isAllowedForRuntime denies tools outside the frozen allowlist', () => {
     const assembly = createAssembly();
-    // ask profile allows readonly tools in policy tables
-    expect(assembly.isAllowedForRuntime('ask', 'read_file', 'report', ['read_file'])).toBe(true);
-    expect(assembly.isAllowedForRuntime('ask', 'read_file', 'investigate', [])).toBe(false);
+    expect(assembly.isAllowedForRuntime('ask', 'read_file', ['read_file'])).toBe(true);
+    expect(assembly.isAllowedForRuntime('ask', 'read_file', [])).toBe(false);
   });
 
   it('createAskUserTool rejects empty questions', async () => {
@@ -188,7 +187,7 @@ describe('RuntimeToolAssembly', () => {
   it('grants explicit output publication with the canonical task capability', () => {
     const assembly = createAssembly();
     const handle = new TurnHandle({ sessionKey: 'session-a', turnId: 'turn-a', runId: 'run-a', generation: 1 });
-    const tools = assembly.resolveRuntimeTools('debugger', ['task'], undefined, 'session-a', handle, 'project-a');
+    const tools = assembly.resolveRuntimeTools('debugger', ['task'], 'session-a', handle, 'project-a');
 
     expect(tools.toolMap.has('output_register')).toBe(true);
   });

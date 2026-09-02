@@ -11,7 +11,6 @@ export interface RunStatusProjection {
   sessionId: string;
   runId: string;
   status: RunSummary['status'];
-  lastStage?: string;
   stopReason?: string;
 }
 
@@ -27,10 +26,6 @@ export class WorkflowProjectionPublisher {
 
   publishWorkflowState(state: WorkflowState): void {
     this.publish('workflow:stateChanged', state);
-    this.publish('workflow:stageChanged', {
-      stage: state.currentStage,
-      blockers: state.blockers,
-    });
   }
 
   publishRunStatus(payload: RunStatusProjection): void {

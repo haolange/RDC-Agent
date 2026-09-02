@@ -60,16 +60,6 @@ export {
 } from './llm';
 export { MODE_CAPABILITIES, assignDefaultCaptureRoles } from './modes';
 export {
-  ALL_STAGES,
-  MAIN_STAGES,
-  SIMPLIFIED_STAGES,
-  SPECIAL_STAGES,
-  STAGE_DISPLAY_NAMES,
-  STAGE_GROUPS,
-  STAGE_PHASES,
-  normalizeWorkflowStage,
-} from './stages';
-export {
   CONTEXT_COMPACTION_PERCENT_MAX,
   CONTEXT_COMPACTION_PERCENT_MIN,
   CONTEXT_COMPACTION_PERCENT_STEP,

@@ -1,25 +1,7 @@
 import type { AgentRole } from './agent';
 
-export type WorkflowStage =
-  | 'preflight'
-  | 'entry_gate'
-  | 'speclist'
-  | 'dispatch'
-  | 'investigate'
-  | 'fix_verify'
-  | 'skepti'
-  | 'curate'
-  | 'finalize'
-  | 'blocked';
-
-export type WorkflowPhase =
-  | 'planner'
-  | 'generator'
-  | 'evaluator';
-
 export interface ReasoningSummary {
   summaryId: string;
-  stage: WorkflowStage;
   agentId: AgentRole;
   summary: string;
   evidence: string[];
@@ -53,8 +35,6 @@ export interface WorkflowState {
   caseId: string;
   runId: string;
   sessionId: string;
-  currentStage: WorkflowStage;
-  previousStages: WorkflowStage[];
   entryMode: 'cli' | 'mcp';
   backend: 'local' | 'remote';
   orchestrationMode: 'multi_agent';
@@ -73,9 +53,7 @@ export interface Blocker {
   resolvedAt?: string;
 }
 
-export type WorkflowStateView =
-  | (WorkflowState & { currentStage: 'blocked'; blockers: [Blocker, ...Blocker[]] })
-  | WorkflowState;
+export type WorkflowStateView = WorkflowState;
 
 export interface GateResult {
   stage: string;
@@ -100,7 +78,6 @@ export interface Report {
 
 export interface ModeCapabilities {
   profileId: string;
-  availableStages: WorkflowStage[];
   requiresLLM: boolean;
   isFullyImplemented: boolean;
   disabledReason?: string;

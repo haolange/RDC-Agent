@@ -70,7 +70,6 @@ function emitProfileTestEvent(
     timestamp: nowMs(),
     turnId: options.turnId,
     sessionId: options.sessionId ?? null,
-    stage: options.stage,
     payload,
   });
 }

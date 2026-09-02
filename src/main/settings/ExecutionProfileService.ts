@@ -2,8 +2,6 @@ import type { AgentRole } from '@shared/types/agent';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
 import type { AppSettings, RuntimeResourceCatalog, LlmAgentRoute, SettingsDiagnostic } from '@shared/types/settings';
 import type { EffectiveAgentRuntimeConfig } from '@shared/types/profile';
-import type { WorkflowStage } from '@shared/types/workflow';
-import { STAGE_PHASES } from '@shared/constants/stages';
 import { agentRuntimeConfigService } from './AgentRuntimeConfigService';
 import { resolveEffectiveModel } from './EffectiveModelResolver';
 
@@ -26,7 +24,6 @@ export class ExecutionProfileService {
 
   resolveAgentRuntimeProfile(
     settings: AppSettings,
-    stage: WorkflowStage,
     agentId: AgentRole,
   ): EffectiveAgentRuntimeConfig {
     const profile = profileForAgent(settings, agentId);
@@ -37,8 +34,6 @@ export class ExecutionProfileService {
       providerId: route?.providerId ?? '',
       modelId: route?.modelId ?? '',
       temperature: 0.3,
-      stage,
-      phase: STAGE_PHASES[stage],
       toolAllowlist: profile?.tools ?? [],
       skillIds: profile?.skills ?? [],
       mcpServerIds: profile?.mcpServers ?? [],

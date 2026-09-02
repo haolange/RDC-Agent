@@ -16,7 +16,6 @@ import type {
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
 import type { LLMConfig } from '@shared/types/llm';
 import type { LlmProviderId } from '@shared/types/settings';
-import type { WorkflowStage } from '@shared/types/workflow';
 import {
   AGENT_DISPLAY_NAMES,
   AgentSlotRegistry,
@@ -196,13 +195,13 @@ export class AgentOrchestrator {
 
     try {
       const stub = createTestModeStub(agentId, content, this.getAgentDisplayName(agentId));
-      let runtimeProfile = this.resolveRuntimeProfile(agentId, context?.stageId);
+      let runtimeProfile = this.resolveRuntimeProfile(agentId);
       let effectiveSnapshot = this.resolveEffectiveAgentProfileSnapshot(agentId, context?.projectRootPath);
       let effectiveProfile = effectiveSnapshot.profile;
       if (!stub) {
         const credentialProviderId = runtimeProfile.providerId;
         ownedCredentialHandle = await this.refreshProviderRuntimeCredentials(credentialProviderId);
-        runtimeProfile = this.resolveRuntimeProfile(agentId, context?.stageId);
+        runtimeProfile = this.resolveRuntimeProfile(agentId);
         effectiveSnapshot = this.resolveEffectiveAgentProfileSnapshot(agentId, context?.projectRootPath);
         effectiveProfile = effectiveSnapshot.profile;
         if (runtimeProfile.providerId !== credentialProviderId) {
@@ -308,7 +307,6 @@ export class AgentOrchestrator {
         modelId: config.modelName,
         temperature: planning.plan.temperature,
         profileId: agentId,
-        stage: context?.stageId,
         runId: context?.runId,
         sessionId: executionScopeId,
         turnId: context?.turnId ?? preparedBundle.prepared.summary.turnId,
@@ -551,7 +549,6 @@ export class AgentOrchestrator {
         modelId: routeModelId,
         temperature: planning.plan.temperature,
         profileId: agentId,
-        stage: options?.stage ?? 'investigate',
         runId: options?.runId,
         sessionId: executionScopeId,
         turnId: options?.turnId ?? preparedTurn.summary.turnId,
@@ -694,9 +691,9 @@ export class AgentOrchestrator {
     };
   }
 
-  private resolveRuntimeProfile(agentId: AgentRole, stage?: WorkflowStage) {
+  private resolveRuntimeProfile(agentId: AgentRole) {
     const settings = settingsService.getAll();
-    return executionProfileService.resolveAgentRuntimeProfile(settings, stage || 'investigate', agentId);
+    return executionProfileService.resolveAgentRuntimeProfile(settings, agentId);
   }
 
   private getAgentDisplayName(agentId: AgentRole): string {

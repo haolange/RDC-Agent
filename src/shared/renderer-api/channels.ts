@@ -189,7 +189,6 @@ export const RENDERER_EVENT_CHANNEL = {
   },
   workflow: {
     stateChanged: 'workflow:stateChanged',
-    stageChanged: 'workflow:stageChanged',
     runStatusChanged: 'workflow:runStatusChanged',
     runUsageChanged: 'workflow:runUsageChanged',
     blocked: 'workflow:blocked',

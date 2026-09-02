@@ -3,7 +3,6 @@
  */
 
 import type { AgentRole } from '@shared/types/agent';
-import type { WorkflowStage } from '@shared/types/workflow';
 import type { HookEvent } from '@shared/types/rdxRuntime';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
 import type { AgentToolResult, ToolExecutionContext } from '../../agent-runtime/agent/AgentTool';
@@ -43,7 +42,6 @@ export interface ToolExecutorFactoryDeps {
   resolveRuntimeTools: (
     agentId: AgentRole,
     toolAllowlist: string[],
-    stage?: WorkflowStage | 'report',
     sessionId?: string | null,
     turnHandle?: TurnHandle | null,
     projectId?: string | null,
@@ -53,7 +51,6 @@ export interface ToolExecutorFactoryDeps {
   isAllowedForRuntime: (
     agentId: AgentRole,
     toolName: string,
-    stage?: WorkflowStage | 'report',
     frozenToolAllowlist?: readonly string[],
   ) => boolean;
   matchesToolAllowlist: (toolName: string, toolAllowlist: string[]) => boolean;
@@ -87,7 +84,6 @@ export class ToolExecutorFactory {
   createToolExecutor(
     agentId: AgentRole,
     toolAllowlist: string[],
-    stage?: WorkflowStage | 'report',
     sessionId?: string | null,
     runtimeContext?: ToolExecutorRuntimeContext,
   ): ToolExecutor {
@@ -99,7 +95,6 @@ export class ToolExecutorFactory {
     const tools = this.deps.resolveRuntimeTools(
       agentId,
       [...effectiveToolAllowlist],
-      stage,
       sessionId,
       this.deps.getActiveTurn(sessionId),
       runtimeContext?.projectId ?? plan?.projectId,
@@ -157,7 +152,7 @@ export class ToolExecutorFactory {
           runtimeContext,
         );
         const normalizedName = normalizeToolName(toolCall.name);
-        if (!this.deps.isAllowedForRuntime(agentId, toolCall.name, stage, effectiveToolAllowlist) || !tools.has(normalizedName)) {
+        if (!this.deps.isAllowedForRuntime(agentId, toolCall.name, effectiveToolAllowlist) || !tools.has(normalizedName)) {
           return denyTool();
         }
         if (

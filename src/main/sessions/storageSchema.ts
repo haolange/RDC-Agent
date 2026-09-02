@@ -246,9 +246,9 @@ export const SessionAttachmentManifestSchema = z
   .pipe(SessionAttachmentRecordsSchema) as unknown as ZodType<SessionAttachmentRecord[]>;
 
 export {
-  PersistedRunRecordV2Schema as PersistedRunRecordSchema,
+  PersistedRunRecordV3Schema as PersistedRunRecordSchema,
   SESSION_RUN_MIGRATIONS,
-} from './runV2/runRecordSchema';
+} from './runV3/runRecordSchema';
 
 const ContextUsageBreakdownEntrySchema = z.object({
   id: z.string().min(1),

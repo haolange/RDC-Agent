@@ -89,7 +89,6 @@ function broadcastRunStatusChanged(payload: {
   runId: string;
   sessionId: string;
   status: string;
-  lastStage?: string;
   stopReason?: string;
 }): void {
   broadcastToRenderer('workflow:runStatusChanged', payload);
@@ -114,12 +113,6 @@ async function setRunLifecycleState(
     status: patch.status,
   };
 
-  if (patch.lastStage) {
-    updatePayload.lastStage = patch.lastStage;
-    updatePayload.runtime = {
-      workflow_stage: patch.lastStage,
-    };
-  }
   if (patch.stopReason) {
     updatePayload.stopReason = patch.stopReason;
   }
@@ -135,7 +128,6 @@ async function setRunLifecycleState(
     runId,
     sessionId,
     status: patch.status,
-    lastStage: patch.lastStage,
     stopReason: patch.stopReason,
   });
 }
