@@ -62,6 +62,7 @@ const RUNTIME_TOOL_ALIASES: Record<string, string> = {
   rdxContext: 'rdx_context',
   rdx: 'rdx_context',
   rdx_context: 'rdx_context',
+  rdx_probe: 'rdx_probe',
   tool_search: 'tool_search',
   delete_file: 'delete_file',
   move_file: 'move_file',

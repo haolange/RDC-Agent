@@ -74,11 +74,11 @@ export function compileDelegationCapsule(capsule: DelegationCapsule): PromptSegm
     'delegation:lease',
     `# RDX Lease\n\nrequiresRdxLease: ${capsule.requiresRdxLease ? 'true' : 'false'}\n${
       capsule.requiresRdxLease
-        ? 'This child may use the parent RDX / Live Capture lease. Do not run in a concurrent tool group.'
+        ? 'This child may use a delegated parent RDX / Live Capture lease. Do not run in a concurrent tool group.'
         : 'This child is offline. Do not request or assume an RDX lease.'
     }`,
   );
-  return segments;
+  return Object.freeze(segments.map((segment) => Object.freeze(segment))) as PromptSegment[];
 }
 
 /** Join capsule segments the same way PromptPlan joins system-prompt segments. */

@@ -20,6 +20,11 @@ export type {
   ToolTokenDiagnostic,
 } from './agentToolTokens';
 export {
+  RDX_LEASE_TOOL_IDS,
+  isRdxLeaseToolName,
+  stripRdxLeaseToolsFromAllowlist,
+} from './rdxLeaseTools';
+export {
   AGENT_SEED_ACCENTS,
   AGENT_DESCRIPTIONS,
   AGENT_DISPLAY_NAMES,

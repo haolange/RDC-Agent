@@ -208,6 +208,7 @@ export type {
 export {
   DELEGATION_CAPSULE_ERROR,
   DELEGATION_CAPSULE_JSON_SCHEMA,
+  freezeDelegationCapsule,
   parseDelegationCapsule,
 } from './delegationCapsule';
 export type {

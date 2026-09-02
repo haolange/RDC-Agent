@@ -31,6 +31,7 @@ import {
   isToolAllowedByFrozenAllowlist,
   normalizeToolName,
 } from './DebuggerRuntimePolicy';
+import { isRdxLeaseToolName } from '@shared/constants/rdxLeaseTools';
 import type { TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
@@ -127,7 +128,11 @@ export class RuntimeToolAssembly {
     agentId: AgentRole,
     toolName: string,
     frozenToolAllowlist?: readonly string[],
+    excludeRdxLeaseTools?: boolean,
   ): boolean {
+    if (excludeRdxLeaseTools && isRdxLeaseToolName(toolName)) {
+      return false;
+    }
     return isToolAllowedByFrozenAllowlist(toolName, agentId, frozenToolAllowlist ?? []);
   }
 
@@ -739,7 +744,10 @@ export class RuntimeToolAssembly {
     projectId?: string | null,
     projectRootPath?: string | null,
     mcpPoolKey?: string | null,
+    options?: { excludeRdxLeaseTools?: boolean },
   ): ResolvedRuntimeTools {
+    const excludeRdxLeaseTools = options?.excludeRdxLeaseTools === true
+      || turnHandle?.runtimePlan?.excludeRdxLeaseTools === true;
     const availableTools = new Map<string, AgentTool>();
     for (const tool of getPrimitiveTools()) {
       availableTools.set(normalizeToolName(tool.name), tool);
@@ -747,8 +755,10 @@ export class RuntimeToolAssembly {
     for (const tool of this.createTaskRuntimeTools(sessionId, turnHandle)) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
-    const rdxContextTool = this.createRdxContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);
-    availableTools.set(rdxContextTool.name, rdxContextTool);
+    if (!excludeRdxLeaseTools) {
+      const rdxContextTool = this.createRdxContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);
+      availableTools.set(rdxContextTool.name, rdxContextTool);
+    }
     for (const tool of this.createWorkbenchTools(agentId, sessionId, turnHandle)) {
       availableTools.set(normalizeToolName(tool.name), tool);
     }
@@ -763,7 +773,7 @@ export class RuntimeToolAssembly {
     const toolSearchTool = createToolSearchTool(() =>
       Array.from(availableTools.values()).filter((tool) =>
         this.matchesToolAllowlist(tool.name, toolAllowlist)
-        && this.isAllowedForRuntime(agentId, tool.name, toolAllowlist),
+        && this.isAllowedForRuntime(agentId, tool.name, toolAllowlist, excludeRdxLeaseTools),
       ),
     );
     availableTools.set(normalizeToolName(toolSearchTool.name), toolSearchTool);
@@ -772,7 +782,7 @@ export class RuntimeToolAssembly {
     const toolMap = new Map<string, AgentTool>();
     for (const tool of availableTools.values()) {
       if (!this.matchesToolAllowlist(tool.name, toolAllowlist)) continue;
-      if (!this.isAllowedForRuntime(agentId, tool.name, toolAllowlist)) continue;
+      if (!this.isAllowedForRuntime(agentId, tool.name, toolAllowlist, excludeRdxLeaseTools)) continue;
       const normalized = normalizeToolName(tool.name);
       if (!toolMap.has(normalized)) {
         toolMap.set(normalized, tool);

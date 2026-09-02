@@ -95,6 +95,7 @@ export interface TurnPreparationServiceDeps {
     projectId?: string | null,
     projectRootPath?: string | null,
     mcpPoolKey?: string | null,
+    options?: { excludeRdxLeaseTools?: boolean },
   ) => ResolvedRuntimeTools;
   createToolSignature: (tools: ToolDefinition[]) => string;
 }
@@ -128,6 +129,8 @@ export class TurnPreparationService {
     visibleTurnIds: string[];
     activeBranchId?: string | null;
     signal?: AbortSignal;
+    excludeRdxLeaseTools?: boolean;
+    frozenDelegationCapsule?: import('@shared/types/delegationCapsule').DelegationCapsule;
   }): Promise<PreparedAgentTurnContext> {
     const throwIfCancelled = () => {
       if (input.signal?.aborted) throw new Error('REQUEST_CANCELLED: request preparation was cancelled.');
@@ -174,6 +177,7 @@ export class TurnPreparationService {
     const mcpLease = acquiredMcp.lease;
     try {
       throwIfCancelled();
+    const excludeRdxLeaseTools = input.excludeRdxLeaseTools === true;
     const runtimeTools = this.deps.resolveRuntimeTools(
       input.agentId,
       input.toolAllowlist,
@@ -182,6 +186,7 @@ export class TurnPreparationService {
       input.projectId,
       input.projectRootPath,
       mcpLease?.poolKey ?? null,
+      { excludeRdxLeaseTools },
     );
     const slotKey = agentSlotKey(resolveExecutionScopeId(input.sessionId), input.agentId);
     const toolSignature = this.deps.createToolSignature(runtimeTools.definitions);
@@ -344,6 +349,8 @@ export class TurnPreparationService {
       mcpDescriptorHash: aggregateMcpDescriptorHash(profile, input.projectRootPath),
       compactionThresholdPercent: turnSettings.agentRuntime.context.compactionThresholdPercent
         ?? DEFAULT_CONTEXT_COMPACTION_PERCENT,
+      excludeRdxLeaseTools,
+      delegationCapsule: input.frozenDelegationCapsule ?? null,
     });
     const summary: PreparedTurnContextSummary = {
       requestId: input.requestId,
@@ -404,7 +411,7 @@ export class TurnPreparationService {
       summary,
       selectedModelId: input.selectedModelId,
       effectiveModel: input.effectiveModel,
-      toolAllowlist: [...input.toolAllowlist],
+      toolAllowlist: [...effectivePlan.toolAllowlist],
       frozenUserContent: input.frozenUserContent ?? input.content,
       attachmentManifest: input.attachmentManifest ?? [],
       inlineTokenBudget: input.inlineTokenBudget ?? 0,
