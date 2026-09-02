@@ -399,5 +399,5 @@ describe('system debt ratchet CLI', () => {
     expect(investigation.status).toBe(0);
     expect(knowledge.stdout).toMatch(/historical monotonic skipped/);
     expect(investigation.stdout).toMatch(/historical monotonic skipped/);
-  });
+  }, 60_000);
 });

@@ -46,6 +46,7 @@ jobs:
       - run: pnpm run check:appearance
       - run: pnpm run check:session-projection
       - run: pnpm run check:right-rail
+      - run: pnpm run check:browser-capability
       - name: Check knowledge system
         env:
           RDC_SYSTEM_DEBT_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -64,6 +65,7 @@ jobs:
       - run: pnpm run check:hooks
       - run: pnpm run check:memory-policy
       - run: pnpm run check:contracts
+      - run: pnpm run check:release-config
       - run: pnpm run build
 
   macos-shell:

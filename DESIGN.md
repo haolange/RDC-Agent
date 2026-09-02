@@ -123,7 +123,7 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 
 **宣称完成必须以门禁与浏览器证据为准**，不得仅靠 commit message。
 
-本地 / CI（`.github/workflows/ci.yml`）必跑：`check:repository-hygiene` → `typecheck` → `lint` → `test` → `test:coverage` → `check:coverage-ratchet`（只升不降；基线 `scripts/fidelity/coverage-ratchet.json`）→ `check:architecture`（含 Orchestrator &lt;800 与 main 单文件 ≤900）→ 全套关键 `check:*`（含 `check:browser-capability` / `check:release-config`）→ `check:contracts` → `build`。并行：`browser-smoke`（xvfb + smoke:agent-browser 双 FULL_ACCESS 矩阵）、`desktop-smoke`、三 OS `launcher-fresh-checkout`/`pack`（Linux 上 SBOM/checksum）。
+本地 / CI（`.github/workflows/ci.yml`）必跑：`check:repository-hygiene` → `typecheck` → `lint` → `test` → `test:coverage` → `check:coverage-ratchet`（只升不降；基线 `scripts/fidelity/coverage-ratchet.json`）→ `check:architecture`（含 Orchestrator &lt;800 与 main 单文件 ≤900）→ 全套关键 `check:*`（含 `check:browser-capability` / `check:release-config`）→ `check:contracts` → `build`。并行：`browser-smoke`（Windows + smoke:agent-browser，矩阵 `RDC_AGENT_BROWSER_QA_FULL_ACCESS` 0/1）、`desktop-smoke`、双 OS（ubuntu/windows）`launcher-fresh-checkout`/`pack`（Linux 上 SBOM/checksum）。
 
 UI/工作流用 `pnpm run start:agent-browser` 真实会话验收（先停旧进程、删光 QA project 全部 session、再新建隔离 session）。完整清单见 `AGENTS.md`。
 

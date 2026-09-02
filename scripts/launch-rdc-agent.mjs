@@ -18,9 +18,9 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { REQUIRED_PNPM, resolvePnpm as resolvePnpmCandidate } from './pnpm-resolver.mjs';
 
 const REQUIRED_NODE = [22, 13, 0];
-const REQUIRED_PNPM = '11.7.0';
 const STATE_SCHEMA_VERSION = 1;
 const VALID_MODES = new Set(['desktop', 'desktop-dev', 'browser', 'browser-dev', 'prepare-only']);
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -99,57 +99,8 @@ function runSync(command, args, options = {}) {
   };
 }
 
-function executableCandidate(command, prefix, label) {
-  return { command, prefix, shell: false, label };
-}
-
-function pathPnpmCandidate() {
-  if (process.platform !== 'win32') return executableCandidate('pnpm', [], 'pnpm');
-  const commandInterpreter = process.env.ComSpec || 'cmd.exe';
-  return executableCandidate(commandInterpreter, ['/d', '/s', '/c', 'pnpm.cmd'], 'pnpm.cmd');
-}
-
-function pnpmCandidates() {
-  const candidates = [];
-  const runtimeRoot = path.resolve(path.dirname(process.execPath), '..');
-  const adjacentPnpm = path.join(runtimeRoot, 'node_modules', 'pnpm', 'bin', 'pnpm.mjs');
-  if (existsSync(adjacentPnpm)) {
-    candidates.push(executableCandidate(process.execPath, [adjacentPnpm], adjacentPnpm));
-  }
-
-  candidates.push(pathPnpmCandidate());
-
-  const cacheRoots = [path.join(os.homedir(), '.cache'), path.join(os.homedir(), 'Library', 'Caches')];
-  for (const cacheRoot of cacheRoots) {
-    const bundledPnpm = path.join(
-      cacheRoot,
-      'codex-runtimes',
-      'codex-primary-runtime',
-      'dependencies',
-      'node',
-      'node_modules',
-      'pnpm',
-      'bin',
-      'pnpm.mjs',
-    );
-    if (existsSync(bundledPnpm) && bundledPnpm !== adjacentPnpm) {
-      candidates.push(executableCandidate(process.execPath, [bundledPnpm], bundledPnpm));
-    }
-  }
-  return candidates;
-}
-
 function resolvePnpm() {
-  const observed = [];
-  for (const candidate of pnpmCandidates()) {
-    const result = runSync(candidate.command, [...candidate.prefix, '--version'], { capture: true });
-    if (result.status === 0) {
-      const version = result.output.split(/\s+/).find((value) => /^\d+\.\d+\.\d+$/.test(value));
-      observed.push(`${candidate.label}=${version ?? 'unknown'}`);
-      if (version === REQUIRED_PNPM) return candidate;
-    }
-  }
-  fail(`pnpm ${REQUIRED_PNPM} is required. Checked: ${observed.join(', ') || 'no pnpm runtime found'}.`);
+  return resolvePnpmCandidate({ runSync, fail });
 }
 
 function runPnpm(pnpm, args, options = {}) {

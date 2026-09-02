@@ -136,12 +136,16 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   const sessionTypes = read('src/shared/types/session.ts');
   assert(sessionTypes.includes("export type MissionId = 'debugger' | 'analyzer' | 'optimizer'"), 'MissionId is the independent mission identity.');
   assert(!sessionTypes.includes('ExecutableAppMode'), 'ExecutableAppMode must be removed.');
+  assert(!sessionTypes.includes('mode: ExecutableAppMode'), 'session PlanContract must not use ExecutableAppMode.');
   assert(!sessionTypes.includes("export type AppMode"), 'AppMode must not return.');
+  assert(sessionTypes.includes("kind: 'mission'"), "MissionRunRecord has kind: 'mission'.");
+  assert(sessionTypes.includes('mission: MissionKind'), 'MissionRunRecord has mission: MissionKind.');
+  assert(sessionTypes.includes('profileId: string'), 'DebugSessionStartRequest has profileId: string.');
+  assert(sessionTypes.includes('mission?: MissionKind'), 'DebugSessionStartRequest has optional mission?: MissionKind.');
 
   const harnessTypes = read('src/shared/types/harness.ts');
-  assert(harnessTypes.includes('profileId: string'), 'PlanContract identity is profileId.');
-  assert(!harnessTypes.includes('mode: ExecutableAppMode'), 'PlanContract must not use ExecutableAppMode.');
-  assert(harnessTypes.includes('mission?: MissionId'), 'PlanContract mission uses MissionId.');
+  assert(!harnessTypes.includes('ExecutableAppMode'), 'harness leftover types must not use ExecutableAppMode.');
+  assert(!harnessTypes.includes('mode: ExecutableAppMode'), 'harness leftover types must not use ExecutableAppMode.');
 
   const agentConstants = read('src/shared/constants/agents.ts');
   assert(agentConstants.includes('Execution Orchestrator'), 'General must be described as Execution Orchestrator.');
