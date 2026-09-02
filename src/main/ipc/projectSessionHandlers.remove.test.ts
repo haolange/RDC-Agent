@@ -9,6 +9,7 @@ const { handlers, syncSessionSlots, storage, conversation } = vi.hoisted(() => (
   },
   storage: {
     readSession: vi.fn(),
+    getProjectById: vi.fn(),
     listRuns: vi.fn(() => []),
     removeSession: vi.fn(),
     listSessions: vi.fn(() => []),
@@ -45,6 +46,19 @@ vi.mock('../conversation/ConversationRoutePreflight', () => ({
   resolveEnabledAgentDefinition: vi.fn(() => ({ id: 'general' })),
 }));
 
+vi.mock('../hooks/sessionLifecycle', () => ({
+  createSessionWithHooks: vi.fn(),
+  removeSessionWithHooks: vi.fn(async (sessionId: string) => {
+    storage.removeSession(sessionId);
+  }),
+}));
+
+vi.mock('../conversation/AttachmentStagingService', () => ({
+  attachmentStagingService: {
+    releaseBySessionId: vi.fn(),
+  },
+}));
+
 vi.mock('../workflow/debugger/RunExecutionService', () => ({
   runExecutionService: {
     stopRun: vi.fn(),
@@ -64,11 +78,13 @@ describe('session:remove slot sync', () => {
     handlers.clear();
     syncSessionSlots.mockReset();
     storage.readSession.mockReset();
+    storage.getProjectById.mockReset();
     storage.listRuns.mockReset();
     storage.removeSession.mockReset();
     storage.listSessions.mockReset();
     storage.listRuns.mockReturnValue([]);
     storage.listSessions.mockReturnValue([]);
+    storage.getProjectById.mockReturnValue({ projectId: 'proj_1', rootPath: 'D:/proj_1' });
     storage.handoffs.getActive.mockReset();
     storage.handoffs.getActive.mockReturnValue(null);
   });
@@ -96,7 +112,13 @@ describe('session:remove slot sync', () => {
     const handler = handlers.get('session:remove');
     expect(handler).toBeTypeOf('function');
     const result = await handler!({}, 'sess_1');
-    expect(result).toMatchObject({ success: true });
+    // Diagnosed 2026-09-03: ipcId allows underscore (`sess_1` matches
+    // /^[A-Za-z0-9][A-Za-z0-9._:@+-]*$/). The real payload was
+    // {"success":false,"error":"__vite_ssr_import_0__.storageAdapter.getProjectById is not a function"}
+    // because unmocked removeSessionWithHooks called storageAdapter.getProjectById,
+    // which the hoisted storage stub omitted. attachmentStagingService is also
+    // imported by the handler and is mocked so this test does not load AppPathService/HookEngine.
+    expect(result, `session:remove payload=${JSON.stringify(result)}`).toMatchObject({ success: true });
     expect(conversation.cancelUnfinishedHandoff).toHaveBeenCalledWith('sess_1', 'session_close');
     expect(conversation.cancelActiveTurn).toHaveBeenCalledWith({ sessionId: 'sess_1' });
     expect(storage.removeSession).toHaveBeenCalledWith('sess_1');

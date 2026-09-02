@@ -6,6 +6,10 @@ import { hashAttachmentContents } from './ConversationAttachmentHashing';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-att-tx-'));
 
+vi.mock('electron', () => ({
+  app: { getPath: () => process.cwd() },
+}));
+
 vi.mock('../runtime/AppPathService', () => {
   const appStateRoot = path.join(tempRoot, 'state');
   const paths = {

@@ -6,6 +6,10 @@ import type { ConversationMessage } from '@shared/types/conversation';
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-conversation-io-'));
 
+vi.mock('electron', () => ({
+  app: { getPath: () => process.cwd() },
+}));
+
 vi.mock('../runtime/AppPathService', () => {
   const appStateRoot = path.join(tempRoot, 'state');
   const paths = {
