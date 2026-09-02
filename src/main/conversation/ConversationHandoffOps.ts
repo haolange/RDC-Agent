@@ -1,6 +1,6 @@
 /**
  * Durable Profile Handoff operations owned by ConversationService.
- * Cancel / commit / consume / auto-send live here; the service only delegates.
+ * Cancel / commit / consume / event-driven auto-send live here; the service only delegates.
  */
 import type {
   ConversationAttachmentInput,
@@ -9,6 +9,7 @@ import type {
 } from '@shared/types/conversation';
 import type { ConversationTurnControls } from '@shared/types/modelCapability';
 import {
+  HANDOFF_AUTO_SEND_MAX_IDLE_OBSERVATIONS,
   isActiveHandoffLifecycle,
   isConsumableHandoff,
   type ProfileHandoffCancelReason,
@@ -30,7 +31,6 @@ export interface ConversationHandoffAutoSendInput extends ConversationSendReques
 }
 
 export interface ConversationHandoffOpsHost {
-  readonly autoSendHandoffSessions: Set<string>;
   hasActiveTurnForSession(sessionId: string): boolean;
   runIdempotentTurn(
     input: ConversationHandoffAutoSendInput,
@@ -50,7 +50,13 @@ export interface ConversationHandoffOpsHost {
     controller: AbortController;
     requestFingerprint: string;
   }): Promise<ConversationTurnResult>;
-  startHandoffAutoSend(sessionId: string): Promise<void>;
+}
+
+interface HandoffAutoSendLease {
+  sessionId: string;
+  handoffId: string;
+  generation: number;
+  idleObservations: number;
 }
 
 function cancelReasonForAutoSendFailure(error: unknown): ProfileHandoffCancelReason {
@@ -65,11 +71,26 @@ function cancelReasonForAutoSendFailure(error: unknown): ProfileHandoffCancelRea
 }
 
 export class ConversationHandoffOps {
+  private generationClock = 0;
+  private readonly leases = new Map<string, HandoffAutoSendLease>();
+  private readonly generationByHandoffId = new Map<string, number>();
+  private readonly consumedHandoffIds = new Set<string>();
+  private readonly inFlightStarts = new Map<string, Promise<void>>();
+
   constructor(private readonly host: ConversationHandoffOpsHost) {}
+
+  /** Drops in-process auto-send leases. Used by tests between cases; never arms a send. */
+  resetAutoSendScheduler(): void {
+    this.generationClock = 0;
+    this.leases.clear();
+    this.generationByHandoffId.clear();
+    this.consumedHandoffIds.clear();
+    this.inFlightStarts.clear();
+  }
 
   cancelUnfinishedHandoff(sessionId: string | null | undefined, reason: ProfileHandoffCancelReason): void {
     if (!sessionId) return;
-    this.host.autoSendHandoffSessions.delete(sessionId);
+    this.dropAutoSend(sessionId);
     const cancelled = storageAdapter.handoffs.cancel(sessionId, reason);
     if (cancelled) {
       this.emitCancelledHandoff(sessionId, cancelled);
@@ -78,7 +99,8 @@ export class ConversationHandoffOps {
 
   notifyHydratedHandoff(sessionId: string, result: ProfileHandoffState | null): void {
     if (result?.lifecycle !== 'cancelled' || result.cancelReason !== 'restart_degrade') return;
-    this.host.autoSendHandoffSessions.delete(sessionId);
+    this.dropAutoSend(sessionId);
+    this.consumedHandoffIds.add(result.handoffId);
     this.emitCancelledHandoff(sessionId, result);
   }
 
@@ -103,7 +125,8 @@ export class ConversationHandoffOps {
   ): void {
     const latest = this.getCommittedHandoff(sessionId);
     if (!isConsumableHandoff(handoff, latest)) return;
-    this.host.autoSendHandoffSessions.delete(sessionId);
+    this.dropAutoSend(sessionId);
+    this.consumedHandoffIds.add(latest.handoffId);
     agentToolApprovalRequestService.cancelTurn(handoff.sourceTurnId);
     agentUserInputRequestService.cancelTurn(handoff.sourceTurnId);
     const consumed = storageAdapter.handoffs.consume(sessionId, latest.handoffId, continuationTurnId);
@@ -111,31 +134,68 @@ export class ConversationHandoffOps {
     emitConversationEvent(buildHandoffAgentEvent('handoff.consumed', sessionId, consumed));
   }
 
+  /**
+   * Arm one auto-send generation for the committed handoff.
+   * Starts immediately when the session has no active turn; otherwise waits for turn-idle.
+   */
   scheduleHandoffAutoSend(sessionId: string): void {
-    const committed = this.getCommittedHandoff(sessionId);
-    if (!committed?.send || !storageAdapter.handoffs.isLiveThisProcess(committed.handoffId)) {
-      return;
+    const lease = this.armAutoSendLease(sessionId);
+    if (!lease) return;
+    if (!this.host.hasActiveTurnForSession(sessionId)) {
+      void this.startHandoffAutoSend(sessionId, lease.generation);
     }
-    this.host.autoSendHandoffSessions.add(sessionId);
-    queueMicrotask(() => {
-      void this.host.startHandoffAutoSend(sessionId);
-    });
   }
 
-  async startHandoffAutoSend(sessionId: string): Promise<void> {
-    if (!this.host.autoSendHandoffSessions.has(sessionId)) return;
-    const committed = this.getCommittedHandoff(sessionId);
-    if (!committed?.send || !storageAdapter.handoffs.isLiveThisProcess(committed.handoffId)) {
-      this.host.autoSendHandoffSessions.delete(sessionId);
-      return;
-    }
+  /**
+   * Source turn complete / session slot freed. One observation per event.
+   * Late or duplicate generations are discarded. Occupied-slot waits are bounded.
+   */
+  notifySessionTurnIdle(sessionId: string): void {
+    const lease = this.leases.get(sessionId);
+    if (!this.isCurrentLease(lease)) return;
     if (this.host.hasActiveTurnForSession(sessionId)) {
-      queueMicrotask(() => {
-        void this.startHandoffAutoSend(sessionId);
-      });
+      lease.idleObservations += 1;
+      if (lease.idleObservations >= HANDOFF_AUTO_SEND_MAX_IDLE_OBSERVATIONS) {
+        this.cancelUnfinishedHandoff(sessionId, 'superseded');
+      }
       return;
     }
-    this.host.autoSendHandoffSessions.delete(sessionId);
+    void this.startHandoffAutoSend(sessionId, lease.generation);
+  }
+
+  async startHandoffAutoSend(sessionId: string, expectedGeneration?: number): Promise<void> {
+    const inFlight = this.inFlightStarts.get(sessionId);
+    if (inFlight) return inFlight;
+    const run = this.runHandoffAutoSend(sessionId, expectedGeneration);
+    this.inFlightStarts.set(sessionId, run);
+    try {
+      await run;
+    } finally {
+      this.inFlightStarts.delete(sessionId);
+    }
+  }
+
+  private async runHandoffAutoSend(sessionId: string, expectedGeneration?: number): Promise<void> {
+    const lease = this.leases.get(sessionId);
+    if (!this.isCurrentLease(lease)) return;
+    if (expectedGeneration !== undefined && expectedGeneration !== lease.generation) return;
+    if (this.host.hasActiveTurnForSession(sessionId)) {
+      return;
+    }
+
+    const committed = this.getCommittedHandoff(sessionId);
+    if (
+      !committed?.send
+      || committed.handoffId !== lease.handoffId
+      || !storageAdapter.handoffs.isLiveThisProcess(committed.handoffId)
+    ) {
+      this.dropAutoSend(sessionId);
+      return;
+    }
+
+    this.consumedHandoffIds.add(lease.handoffId);
+    this.leases.delete(sessionId);
+
     const session = storageAdapter.readSession(sessionId);
     if (!session) {
       this.cancelLeftoverAutoSendHandoff(sessionId, 'superseded');
@@ -179,12 +239,56 @@ export class ConversationHandoffOps {
       );
     } catch (error) {
       autoSendError = error;
-      // Stop / cancel / preflight failure — never retry auto-send.
+      // Stop / cancel / preflight / invalid_model — never retry auto-send.
     }
     this.cancelLeftoverAutoSendHandoff(
       sessionId,
       cancelReasonForAutoSendFailure(autoSendError),
     );
+  }
+
+  private armAutoSendLease(sessionId: string): HandoffAutoSendLease | null {
+    const committed = this.getCommittedHandoff(sessionId);
+    if (!committed?.send || !storageAdapter.handoffs.isLiveThisProcess(committed.handoffId)) {
+      return null;
+    }
+    if (this.consumedHandoffIds.has(committed.handoffId)) {
+      return null;
+    }
+    const existingGeneration = this.generationByHandoffId.get(committed.handoffId);
+    const existingLease = this.leases.get(sessionId);
+    if (existingLease && existingGeneration === existingLease.generation) {
+      return existingLease;
+    }
+    if (existingGeneration !== undefined) {
+      return null;
+    }
+    const generation = this.generationClock + 1;
+    this.generationClock = generation;
+    const lease: HandoffAutoSendLease = {
+      sessionId,
+      handoffId: committed.handoffId,
+      generation,
+      idleObservations: 0,
+    };
+    this.generationByHandoffId.set(committed.handoffId, generation);
+    this.leases.set(sessionId, lease);
+    return lease;
+  }
+
+  private isCurrentLease(lease: HandoffAutoSendLease | null | undefined): lease is HandoffAutoSendLease {
+    if (!lease) return false;
+    if (this.consumedHandoffIds.has(lease.handoffId)) return false;
+    return this.generationByHandoffId.get(lease.handoffId) === lease.generation
+      && this.leases.get(lease.sessionId) === lease;
+  }
+
+  private dropAutoSend(sessionId: string): void {
+    const lease = this.leases.get(sessionId);
+    if (lease) {
+      this.consumedHandoffIds.add(lease.handoffId);
+      this.leases.delete(sessionId);
+    }
   }
 
   private emitCancelledHandoff(sessionId: string, cancelled: ProfileHandoffState): void {

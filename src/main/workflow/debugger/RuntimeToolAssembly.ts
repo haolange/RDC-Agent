@@ -371,25 +371,22 @@ export class RuntimeToolAssembly {
             details: { fromAgentId: agentId, toAgentId: target, label, prompt, valid: false },
           };
         }
+        const prepareInput = {
+          sourceTurnId,
+          sourceRequestId,
+          sourceAgentId: agentId,
+          toAgentId: target,
+          prompt,
+          label,
+          declaredModel,
+          send,
+          chainRoot,
+          depth,
+        };
+        let draftHandoffId: string | null = null;
         try {
-          const prepared = store.prepare(resolvedSessionId, {
-            sourceTurnId,
-            sourceRequestId,
-            sourceAgentId: agentId,
-            toAgentId: target,
-            prompt,
-            label,
-            declaredModel,
-            send,
-            chainRoot,
-            depth,
-          });
-          await dispatchRuntimeHooks('agent.after-handoff', {
-            agentId,
-            sessionId: resolvedSessionId,
-            projectRoot,
-            payload: { toAgentId: target, handoffId: prepared.handoffId, label },
-          });
+          const draft = store.createPreparedDraft(resolvedSessionId, prepareInput);
+          draftHandoffId = draft.handoffId;
           if (turn) {
             turn.pendingHandoff = {
               turnId: sourceTurnId,
@@ -400,6 +397,19 @@ export class RuntimeToolAssembly {
               sessionId: resolvedSessionId,
             };
           }
+          const afterAllowed = await dispatchRuntimeHooks('agent.after-handoff', {
+            agentId,
+            sessionId: resolvedSessionId,
+            projectRoot,
+            payload: { toAgentId: target, handoffId: draft.handoffId, label },
+          });
+          if (!afterAllowed) {
+            throw new Error('HOOK_DENIED: agent.after-handoff');
+          }
+          const prepared = store.prepare(resolvedSessionId, {
+            ...prepareInput,
+            handoffId: draft.handoffId,
+          });
           return {
             content: [{
               type: 'text',
@@ -416,6 +426,16 @@ export class RuntimeToolAssembly {
             },
           };
         } catch (error) {
+          if (turn) {
+            turn.pendingHandoff = null;
+          }
+          if (draftHandoffId) {
+            store.abandonDraft(resolvedSessionId, draftHandoffId);
+            const leaked = store.getActive(resolvedSessionId);
+            if (leaked?.handoffId === draftHandoffId) {
+              store.cancel(resolvedSessionId, 'superseded');
+            }
+          }
           const message = error instanceof Error ? error.message : String(error);
           return {
             content: [{ type: 'text', text: message }],

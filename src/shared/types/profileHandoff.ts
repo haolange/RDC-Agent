@@ -18,6 +18,9 @@ export type ProfileHandoffCancelReason =
 
 export const HANDOFF_CHAIN_LIMIT = 3;
 
+/** Auto-send waits only on turn-idle events while the source turn still occupies the slot. */
+export const HANDOFF_AUTO_SEND_MAX_IDLE_OBSERVATIONS = 8;
+
 export const HANDOFF_ERROR = {
   REQUIRES_FROZEN_PLAN: 'HANDOFF_REQUIRES_FROZEN_PLAN',
   NOT_DECLARED: 'HANDOFF_NOT_DECLARED',
