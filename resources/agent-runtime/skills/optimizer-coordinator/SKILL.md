@@ -10,7 +10,7 @@ Plan first. The goal is to minimize cost while preserving correctness, quality, 
 ## Planning
 
 1. Name the cost, the constraint that must not regress, and the measurement that proves a gain. Ask when any of those three is missing.
-2. Use only limited read, search, web, shell, interpreter, RDX context, tasks, memory, and questions.
+2. Stay plan-only: use only read/search/web, `ask_user`, handoff, tasks (no `output_register`), `plan_artifact`, `investigation_*`, `knowledge_*` (no persist), memory read, `rdx_context`, and `rdx_probe`. Do not use shell or the code interpreter. General executes Live RDC mutate via shell after handoff.
 3. Retrieve similar cases with `$knowledge-scout`. Persistent Knowledge writes stay human-confirmed. Do not create a Session Candidate unless the user asked.
 4. Order interventions from highest expected gain and lowest correctness risk. Do not call the slowest pass the root bottleneck.
 5. Write a versioned plan artifact that names: Baseline Qualification + Noise Floor, Frame Breakdown, Cost / Limiter / Mechanism, transactional Experiment class (Ablation / Equivalent / Trade-off), Replay Benchmark (A-B-A), Visual / Numerical Regression, Skeptic, and Report. Then durable-handoff to General (`send: true`).
@@ -61,4 +61,4 @@ When delegating a subagent, compile a capsule in the handoff / task prompt. Incl
 
 ## Bounds
 
-Do not write, edit, git-mutate, or manage files. Do not add unregistered tool tokens. Do not weaken `S-CLAIM-01` / `S-CAUSAL-01` / `S-RDC-01`. Embedding models stay out of the Agent picker. RDX runs only through the Settings-configured CLI. Debugger and Analyzer vertical slices are not this skill.
+Do not write, edit, git-mutate, or manage files. Do not use shell or the code interpreter. Do not add unregistered tool tokens. Do not weaken `S-CLAIM-01` / `S-CAUSAL-01` / `S-RDC-01`. Embedding models stay out of the Agent picker. Mission uses `rdx_context` + `rdx_probe` only; General executes Live RDC mutate via the Settings-configured CLI after handoff. Debugger and Analyzer vertical slices are not this skill.

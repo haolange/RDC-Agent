@@ -14,6 +14,8 @@ vi.mock('electron', () => ({
 
 vi.mock('../../sessions/RdxRuntimeContextRegistry', () => ({
   assertRdxContextLeaseOwnership: vi.fn(() => null),
+  getRdxContextLease: vi.fn(() => null),
+  setRdxRuntimeContextForSession: vi.fn(() => null),
 }));
 
 const {
@@ -81,6 +83,7 @@ vi.mock('../../settings/SettingsService', () => ({
 }));
 
 import { assertRdxContextLeaseOwnership } from '../../sessions/RdxRuntimeContextRegistry';
+import { resolveAgentToolAllowlistFromDefinition } from './DebuggerRuntimePolicy';
 import { RuntimeToolAssembly } from './RuntimeToolAssembly';
 import { TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
@@ -184,12 +187,16 @@ describe('RuntimeToolAssembly', () => {
     expect(tools.some((tool) => tool.name.includes('task') || tool.name === 'task_create' || tool.name.length > 0)).toBe(true);
   });
 
-  it('grants explicit output publication with the canonical task capability', () => {
+  it('keeps output publication on General task tokens and drops it for Mission', () => {
     const assembly = createAssembly();
     const handle = new TurnHandle({ sessionKey: 'session-a', turnId: 'turn-a', runId: 'run-a', generation: 1 });
-    const tools = assembly.resolveRuntimeTools('debugger', ['task'], 'session-a', handle, 'project-a');
+    const general = assembly.resolveRuntimeTools('general', ['task'], 'session-a', handle, 'project-a');
+    expect(general.toolMap.has('output_register')).toBe(true);
 
-    expect(tools.toolMap.has('output_register')).toBe(true);
+    const missionAllowlist = resolveAgentToolAllowlistFromDefinition('debugger', ['task']);
+    const mission = assembly.resolveRuntimeTools('debugger', missionAllowlist, 'session-a', handle, 'project-a');
+    expect(mission.toolMap.has('output_register')).toBe(false);
+    expect(mission.toolMap.has('task_create')).toBe(true);
   });
 
   it('fires agent.before-handoff and agent.after-handoff on a valid handoff', async () => {

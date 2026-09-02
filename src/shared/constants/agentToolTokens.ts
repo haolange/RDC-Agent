@@ -3,7 +3,7 @@
  * Single source of truth for seed manifests, allowlist expansion, and Settings diagnostics.
  */
 
-/** All builtin AgentTool ids after Investigation tools (48). */
+/** All builtin AgentTool ids after Investigation tools (49). */
 export const BUILTIN_AGENT_TOOL_IDS = [
   'shell',
   'read_file',
@@ -43,6 +43,7 @@ export const BUILTIN_AGENT_TOOL_IDS = [
   'mcp',
   'subagent',
   'rdx_context',
+  'rdx_probe',
   'tool_search',
   'code_interpreter',
   'knowledge_browse',
@@ -104,6 +105,7 @@ export const BUILTIN_AGENT_TOOL_TIERS: Record<BuiltinAgentToolId, BuiltinAgentTo
   mcp: 'extended',
   subagent: 'extended',
   rdx_context: 'core',
+  rdx_probe: 'core',
   tool_search: 'core',
   code_interpreter: 'extended',
   knowledge_browse: 'extended',
@@ -153,6 +155,8 @@ export const CANONICAL_TOOL_TOKEN_EXPANSIONS: Record<string, string[]> = {
   tool_search: ['tool_search'],
   rdxContext: ['rdx_context'],
   rdx: ['rdx_context'],
+  rdxProbe: ['rdx_probe'],
+  rdx_probe: ['rdx_probe'],
   subagent: ['subagent'],
   knowledge: ['knowledge_browse', 'knowledge_search', 'knowledge_read', 'knowledge_compile', 'knowledge_candidate_create'],
   investigation: ['investigation_read', 'investigation_write', 'investigation_list'],

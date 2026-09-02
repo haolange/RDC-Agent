@@ -16,6 +16,7 @@ import {
   isToolDeniedByPolicy,
   resolvePolicyApprovalFloor,
 } from './PolicyCompiler';
+import { isMissionForbiddenToolId, isMissionProfileId } from '@shared/constants/missionPlanOnly';
 
 /**
  * Agent permission risk classifier for tool / shell calls.
@@ -36,6 +37,8 @@ export interface AgentPermissionDecision {
 export interface AgentPermissionDecisionInput {
   tool: AgentTool;
   toolCall: ToolCall;
+  /** Mission plan-only hard deny uses this; Full access cannot bypass. */
+  agentId?: string | null;
   /** 当前激活项目根目录；权限边界以它为准，回退固定 User Scope。 */
   projectRootPath?: string | null;
   /** Turn 冻结的权限快照；缺省时才读 settingsService（兼容旧调用）。 */
@@ -328,6 +331,13 @@ export class AgentPermissionPolicyService {
       || settings?.paths.userRdxRoot
       || process.cwd(),
     );
+
+    if (input.agentId && isMissionProfileId(input.agentId) && isMissionForbiddenToolId(toolName)) {
+      return denied(
+        `MISSION_PLAN_ONLY_DENIED: tool "${input.toolCall.name}" is forbidden for ${input.agentId}. Full access cannot bypass.`,
+        'high',
+      );
+    }
 
     if (input.compiledPolicy && isToolDeniedByPolicy(input.compiledPolicy, toolName)) {
       return denied(`Policy deniedTools blocked tool "${input.toolCall.name}".`, 'high');

@@ -82,7 +82,7 @@ function serializeOfficialSeedFixture(
 }
 
 describe('AgentSeedMigrationService', () => {
-  it('moves matching official seeds and retains user-modified files', async () => {
+  it('permanently purges unmodified official seeds and retains user-modified files', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-mig-'));
     roots.push(root);
     const s9Ask = OFFICIAL_SEED_GENERATIONS.find((entry) => entry.id === 's9')!.manifests.find((entry) => entry.id === 'ask')!;
@@ -106,28 +106,53 @@ describe('AgentSeedMigrationService', () => {
     const service = new AgentSeedMigrationService();
     const first = service.migrateUserAgents(root);
     expect(first.alreadyComplete).toBe(false);
-    expect(first.marker.moved.some((entry) => entry.id === 'ask' && entry.generationId === 's9')).toBe(true);
+    expect(first.marker.purged.some((entry) => entry.id === 'ask' && entry.generationId === 's9')).toBe(true);
     expect(first.marker.retained.some((entry) => entry.id === 'my-custom')).toBe(true);
     expect(first.marker.retained.some((entry) => entry.id === 'edit' && entry.reason === 'user-modified')).toBe(true);
+    expect(fs.existsSync(path.join(root, 'ask.agent.md'))).toBe(false);
+    expect(fs.existsSync(path.join(root, '.migrated'))).toBe(false);
+    await expect(readFile(path.join(root, 'my-custom.agent.md'), 'utf8')).resolves.toContain('user owned');
+    await expect(readFile(path.join(root, 'edit.agent.md'), 'utf8')).resolves.toContain('openrouter/x');
 
     const second = service.migrateUserAgents(root);
     expect(second.alreadyComplete).toBe(true);
-    await expect(readFile(path.join(root, '.migrated', 's9', 'ask.agent.md'), 'utf8')).resolves.toContain('Ask');
+    expect(fs.existsSync(path.join(root, '.migrated'))).toBe(false);
+    expect(fs.existsSync(path.join(root, 'ask.agent.md'))).toBe(false);
   });
 
-  it('fail-closes when an archive target has a different hash', async () => {
-    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-conflict-'));
+  it('does not delete user files whose hash does not match an official seed', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-keep-'));
     roots.push(root);
     const s9Ask = OFFICIAL_SEED_GENERATIONS.find((entry) => entry.id === 's9')!.manifests.find((entry) => entry.id === 'ask')!;
-    await mkdir(path.join(root, '.migrated', 's9'), { recursive: true });
-    await writeFile(path.join(root, '.migrated', 's9', 'ask.agent.md'), '---\nname: other\n---\nchanged\n', 'utf8');
-    await writeFile(path.join(root, 'ask.agent.md'), serializeAgentMarkdown(toDraft(s9Ask)), 'utf8');
+    await writeFile(
+      path.join(root, 'ask.agent.md'),
+      serializeAgentMarkdown({
+        ...toDraft(s9Ask),
+        instructions: 'I changed the official Ask seed on purpose',
+      }),
+      'utf8',
+    );
     const result = new AgentSeedMigrationService().migrateUserAgents(root);
-    expect(result.marker.retained.some((entry) => entry.reason === 'target-hash-conflict')).toBe(true);
-    await expect(readFile(path.join(root, 'ask.agent.md'), 'utf8')).resolves.toContain('Ask');
+    expect(result.marker.purged).toEqual([]);
+    expect(result.marker.retained.some((entry) => entry.id === 'ask' && entry.reason === 'user-modified')).toBe(true);
+    expect(fs.existsSync(path.join(root, 'ask.agent.md'))).toBe(true);
+    expect(fs.existsSync(path.join(root, '.migrated'))).toBe(false);
   });
 
-  it('retains the source when it changes between hash and move', async () => {
+  it('restores isolated files when builtin verification fails', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-verify-'));
+    roots.push(root);
+    const missingBuiltins = path.join(root, 'missing-builtins');
+    await mkdir(missingBuiltins, { recursive: true });
+    const s9Ask = OFFICIAL_SEED_GENERATIONS.find((entry) => entry.id === 's9')!.manifests.find((entry) => entry.id === 'ask')!;
+    await writeFile(path.join(root, 'ask.agent.md'), serializeAgentMarkdown(toDraft(s9Ask)), 'utf8');
+    expect(() => new AgentSeedMigrationService(new StorageIo(), { builtinAgentsPath: missingBuiltins }).migrateUserAgents(root))
+      .toThrow(/SEED_MIGRATION_VERIFY_FAILED/);
+    expect(fs.existsSync(path.join(root, 'ask.agent.md'))).toBe(true);
+    expect(fs.existsSync(path.join(root, '.migrated'))).toBe(false);
+  });
+
+  it('retains the source when it changes between hash and isolate', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-changed-'));
     roots.push(root);
     const s9Ask = OFFICIAL_SEED_GENERATIONS.find((entry) => entry.id === 's9')!.manifests.find((entry) => entry.id === 'ask')!;
@@ -153,7 +178,7 @@ describe('AgentSeedMigrationService', () => {
       expect(result.marker.retained.some((entry) => entry.id === 'ask' && entry.reason === 'user-modified')).toBe(true);
       expect(result.marker.diagnostics.some((entry) => entry.includes('SEED_MIGRATION_SOURCE_CHANGED'))).toBe(true);
       expect(fs.existsSync(sourcePath)).toBe(true);
-      expect(fs.existsSync(path.join(root, '.migrated', 's9', 'ask.agent.md'))).toBe(false);
+      expect(fs.existsSync(path.join(root, '.migrated'))).toBe(false);
     } finally {
       spy.mockRestore();
     }
@@ -174,7 +199,7 @@ describe('AgentSeedMigrationService', () => {
     await expect(readFile(sourcePath, 'utf8')).resolves.toContain('Ask');
   });
 
-  it('moves hyphen-filename S0 seeds whose frontmatter id matches the official underscore id', async () => {
+  it('purges hyphen-filename S0 seeds whose frontmatter id matches the official underscore id', async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-s0-hyphen-'));
     roots.push(root);
     const s0Ask = OFFICIAL_SEED_GENERATIONS.find((entry) => entry.id === 's0')!.manifests
@@ -182,17 +207,15 @@ describe('AgentSeedMigrationService', () => {
     const raw = serializeOfficialSeedFixture(s0Ask, 'ask_agent');
     expect(hashSeedSemanticManifest(extractSeedSemanticManifest(raw, 'ask_agent')))
       .toBe(hashSeedSemanticManifest(s0Ask));
-    expect(hashSeedSemanticManifest(extractSeedSemanticManifest(raw, 'ask-agent')))
-      .not.toBe(hashSeedSemanticManifest(s0Ask));
     await writeFile(path.join(root, 'ask-agent.agent.md'), raw, 'utf8');
 
     const result = new AgentSeedMigrationService().migrateUserAgents(root);
-    expect(result.marker.moved.some((entry) => (
+    expect(result.marker.purged.some((entry) => (
       entry.id === 'ask_agent' && entry.generationId === 's0'
     ))).toBe(true);
     expect(result.marker.retained.some((entry) => entry.id === 'ask-agent' || entry.id === 'ask_agent')).toBe(false);
     expect(fs.existsSync(path.join(root, 'ask-agent.agent.md'))).toBe(false);
-    await expect(readFile(path.join(root, '.migrated', 's0', 'ask-agent.agent.md'), 'utf8')).resolves.toContain('id: ask_agent');
+    expect(fs.existsSync(path.join(root, '.migrated'))).toBe(false);
   });
 
   it('retains a hyphen-filename S0 seed after the user changes model, icon, or accent', async () => {
@@ -211,10 +234,22 @@ describe('AgentSeedMigrationService', () => {
       'utf8',
     );
     const result = new AgentSeedMigrationService().migrateUserAgents(root);
-    expect(result.marker.moved).toEqual([]);
+    expect(result.marker.purged).toEqual([]);
     expect(result.marker.retained.some((entry) => (
       (entry.id === 'ask_agent' || entry.id === 'ask-agent') && entry.reason === 'user-modified'
     ))).toBe(true);
     expect(fs.existsSync(path.join(root, 'ask-agent.agent.md'))).toBe(true);
+  });
+
+  it('removes a leftover .migrated directory after a successful purge', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-seed-leftover-'));
+    roots.push(root);
+    const s9Ask = OFFICIAL_SEED_GENERATIONS.find((entry) => entry.id === 's9')!.manifests.find((entry) => entry.id === 'ask')!;
+    await mkdir(path.join(root, '.migrated', 's9'), { recursive: true });
+    await writeFile(path.join(root, '.migrated', 's9', 'ask.agent.md'), 'stale archive\n', 'utf8');
+    await writeFile(path.join(root, 'ask.agent.md'), serializeAgentMarkdown(toDraft(s9Ask)), 'utf8');
+    const result = new AgentSeedMigrationService().migrateUserAgents(root);
+    expect(result.marker.purged.some((entry) => entry.id === 'ask')).toBe(true);
+    expect(fs.existsSync(path.join(root, '.migrated'))).toBe(false);
   });
 });

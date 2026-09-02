@@ -221,7 +221,7 @@ Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThem
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | Mission profile 仍声明 `shell` / `interpreter`；enforcement 主要靠 manifest 列表与 gate。`rdx_probe` **尚未实现**。**产品级 Browser QA 与本机 ColdData 真实验收尚未跑。** |
+| **当前态** | 三 Mission profile 已为严格 plan-only：token 展开剔除 `shell` / `code_interpreter` / `output_register`，四层 enforcement（profile 解析、冻结 EffectiveRuntimePlan、AgentPermissionPolicy hard deny、tool activation）已落地，Full access 不能绕过。`rdx_probe` 已实现（Settings `tooling.rdxCli` 只读 closed allowlist；lease 仅当前 session；raw `.rdc` bytes 不进模型）。**产品级 Browser QA 与本机 ColdData 真实验收尚未跑。** |
 | **目标态** | Mission profiles（`debugger` / `analyzer` / `optimizer`）runtime allowlist **仅允许**下列工具。**General** 通过 Settings 配置的 shell action / `shell` 执行需要 lease 的 Live RDC 操作。 |
 | **迁移门禁** | T00 定稿契约；T03 落地四层 enforcement；T06 落地 delegated lease 与 `rdx_probe` 执行。不得只靠 prompt 文案。Full access 不能绕过。 |
 

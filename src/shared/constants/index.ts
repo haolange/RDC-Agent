@@ -25,6 +25,23 @@ export {
   stripRdxLeaseToolsFromAllowlist,
 } from './rdxLeaseTools';
 export {
+  MISSION_FORBIDDEN_TOOL_IDS,
+  MISSION_PLAN_ONLY_TOOL_IDS,
+  expandMissionPlanOnlyTokens,
+  filterMissionPlanOnlyAllowlist,
+  isMissionForbiddenToolId,
+  isMissionPlanOnlyToolId,
+  isMissionProfileId,
+} from './missionPlanOnly';
+export {
+  RDX_PROBE_ACTIONS,
+  RDX_PROBE_READONLY_CLI_ACTIONS,
+  RdxProbeInputSchema,
+  assertRdxProbeArgsReadOnly,
+  isRdxProbeMutateActionName,
+  resolveRdxProbeCliAction,
+} from './rdxProbe';
+export {
   AGENT_SEED_ACCENTS,
   AGENT_DESCRIPTIONS,
   AGENT_DISPLAY_NAMES,

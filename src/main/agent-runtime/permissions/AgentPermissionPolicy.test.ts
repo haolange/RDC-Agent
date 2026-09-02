@@ -511,6 +511,23 @@ describe('AgentPermissionPolicyService shell risk classifier', () => {
     expect(decision.risk).toBe('high');
   });
 
+  it('hard-denies shell for debugger even in full-access', () => {
+    mockSettings.agentRuntime.permissions.mode = 'full-access';
+    const decision = service.evaluate({
+      tool: shellTool,
+      toolCall: {
+        type: 'toolCall',
+        id: 'tc-shell',
+        name: 'shell',
+        arguments: { command: 'echo ok' },
+      },
+      agentId: 'debugger',
+      projectRootPath: workspaceRoot,
+    });
+    expect(decision.action).toBe('deny');
+    expect(decision.reason).toMatch(/MISSION_PLAN_ONLY_DENIED/);
+  });
+
   it('hard-denies mkfs via shellHardDeny even in full-access', () => {
     mockSettings.agentRuntime.permissions.mode = 'full-access';
     const decision = service.evaluate({

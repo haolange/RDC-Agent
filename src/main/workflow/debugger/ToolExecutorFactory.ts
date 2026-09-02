@@ -241,6 +241,7 @@ export class ToolExecutorFactory {
         const permissionDecision = agentPermissionPolicyService.evaluate({
           tool,
           toolCall: validatedToolCall,
+          agentId,
           projectRootPath: runtimeContext?.projectRootPath ?? plan?.projectRootPath ?? null,
           ...(permissionSettings ? { permissionSettings } : {}),
           ...(compiledPolicy ? { compiledPolicy } : {}),

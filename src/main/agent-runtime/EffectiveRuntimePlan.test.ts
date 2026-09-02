@@ -266,6 +266,30 @@ describe('EffectiveRuntimePlan', () => {
     expect(policyFingerprintOf(tightened)).not.toBe(policyFingerprintOf(unlimited));
   });
 
+  it('strips Mission-forbidden tools from a frozen debugger plan even if the input allowlist is dirty', () => {
+    const policy = compilePolicyFromRestrictive({ deniedTools: [], limits: { maxTurns: 3 } });
+    const plan = buildEffectiveRuntimePlan({
+      agentId: 'debugger',
+      projectRootPath: 'D:/Project',
+      profile: { skills: [] },
+      toolAllowlist: ['read_file', 'shell', 'code_interpreter', 'output_register', 'rdx_probe', 'task_create'],
+      permissionSettings: basePermission,
+      routeCapability,
+      requestPlan: { executionIdentity: { fingerprint: 'mission' } },
+      promptPlan: { systemPrompt: 'system' },
+      policy,
+      skillIntersection: ['read_file', 'shell', 'rdx_probe'],
+      visibleToolNames: ['read_file', 'shell', 'output_register', 'rdx_probe'],
+      activatedDeferredTools: [],
+      mcpDescriptorHash: null,
+    });
+    expect(plan.toolAllowlist).toEqual(['read_file', 'rdx_probe', 'task_create']);
+    expect(plan.skillIntersection).toEqual(['read_file', 'rdx_probe']);
+    expect(plan.visibleToolNames).toEqual(['read_file', 'rdx_probe']);
+    expect(plan.toolAllowlist).not.toContain('shell');
+    expect(plan.toolAllowlist).not.toContain('output_register');
+  });
+
   it('strips RDX lease tools from an offline child plan', () => {
     const policy = compilePolicyFromRestrictive({ deniedTools: [], limits: { maxTurns: 3 } });
     const plan = buildEffectiveRuntimePlan({

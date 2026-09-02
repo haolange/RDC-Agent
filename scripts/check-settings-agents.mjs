@@ -320,7 +320,11 @@ async function main() {
   assert(agentSlotRegistrySource.includes('DEFAULT_AGENT_ID'), 'Custom Agent fallback config should use general, not edit.');
 
   const runtimePolicySource = fs.readFileSync(path.join(repoRoot, 'src/main/workflow/debugger/DebuggerRuntimePolicy.ts'), 'utf8');
-  assert(runtimePolicySource.includes('manifest.tools.flatMap'), 'Runtime tool policy should derive manifest tool allowlists directly.');
+  assert(
+    runtimePolicySource.includes('finalizeAllowlist')
+    && (runtimePolicySource.includes('manifest.tools') || runtimePolicySource.includes('expandMissionPlanOnlyTokens')),
+    'Runtime tool policy should derive manifest tool allowlists directly.',
+  );
   assert(runtimePolicySource.includes('AGENT_TOOLS_EMPTY'), 'Runtime tool policy must fail-closed on empty tools.');
 
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdc-agent-settings-agents-'));

@@ -32,6 +32,7 @@ import {
   normalizeToolName,
 } from './DebuggerRuntimePolicy';
 import { isRdxLeaseToolName } from '@shared/constants/rdxLeaseTools';
+import { createRdxProbeTool } from './RdxProbeTool';
 import type { TurnHandle } from './TurnCoordinator';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { ResolvedRuntimeTools } from './orchestratorTypes';
@@ -758,6 +759,11 @@ export class RuntimeToolAssembly {
     if (!excludeRdxLeaseTools) {
       const rdxContextTool = this.createRdxContextTool(sessionId, projectId ?? turnHandle?.eventSink?.projectId ?? null);
       availableTools.set(rdxContextTool.name, rdxContextTool);
+      const rdxProbeTool = createRdxProbeTool(
+        sessionId,
+        projectId ?? turnHandle?.eventSink?.projectId ?? null,
+      );
+      availableTools.set(rdxProbeTool.name, rdxProbeTool as unknown as AgentTool);
     }
     for (const tool of this.createWorkbenchTools(agentId, sessionId, turnHandle)) {
       availableTools.set(normalizeToolName(tool.name), tool);

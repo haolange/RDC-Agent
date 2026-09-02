@@ -12,6 +12,7 @@ const RDX_LEASE_TOKEN_ALIASES = new Set([
   ...RDX_LEASE_TOOL_IDS,
   'rdx',
   'rdxContext',
+  'rdxProbe',
 ]);
 
 export function isRdxLeaseToolName(toolName: string): boolean {

@@ -10,7 +10,7 @@ Plan first. The goal is to minimize root-cause uncertainty for an incorrect resu
 ## Planning
 
 1. Capture the expected result, the observed result, and the reproduction condition. Ask when any of those three is missing.
-2. Use only limited read, search, web, shell, interpreter, RDX context, tasks, memory, and questions.
+2. Stay plan-only: use only read/search/web, `ask_user`, handoff, tasks (no `output_register`), `plan_artifact`, `investigation_*`, `knowledge_*` (no persist), memory read, `rdx_context`, and `rdx_probe`. Do not use shell or the code interpreter. General executes Live RDC mutate via shell after handoff.
 3. Retrieve similar cases with `$knowledge-scout`. Persistent Knowledge writes stay human-confirmed. Do not create a Session Candidate unless the user asked.
 4. Name the smallest distinguishing check that would confirm or reject the current cause.
 5. Write a versioned plan artifact that names: suspected component, First Bad Event check, Hypothesis Matrix rows, the qualifying Experiment, Skeptic, and Report. Then durable-handoff to General (`send: true`).
@@ -55,4 +55,4 @@ When delegating a subagent, compile a capsule in the handoff / task prompt. This
 
 ## Bounds
 
-Do not write, edit, git-mutate, or manage files. Do not add unregistered tool tokens. Do not weaken `S-CLAIM-01` / `S-CAUSAL-01` / `S-RDC-01`. Embedding models stay out of the Agent picker. RDX runs only through the Settings-configured CLI. Analyzer and Optimizer vertical slices are not this skill.
+Do not write, edit, git-mutate, or manage files. Do not use shell or the code interpreter. Do not add unregistered tool tokens. Do not weaken `S-CLAIM-01` / `S-CAUSAL-01` / `S-RDC-01`. Embedding models stay out of the Agent picker. Mission uses `rdx_context` + `rdx_probe` only; General executes Live RDC mutate via the Settings-configured CLI after handoff. Analyzer and Optimizer vertical slices are not this skill.
