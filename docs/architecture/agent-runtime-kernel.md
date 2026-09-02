@@ -10,7 +10,7 @@ The agent runtime owns agent turns, tool mediation policy, deterministic events,
 - Agent route capability gates tool registration before each turn. Only `native-structured` routes receive tool schemas and enter the tool execution loop.
 - Prompt composition lives in `src/main/agent-runtime/prompt`. Conversation code collects context, but does not hand-code provider/tool prompt fragments.
 - Tool capability comes only from the effective profile manifest ∩ active skill ∩ policy ∩ runtime prerequisites. Empty tools fail-closed (`AGENT_TOOLS_EMPTY`). There is no Ask-readonly / Plan→Edit / custom→Edit hardcoded fallback. General is the Execution Orchestrator; Debugger / Analyzer / Optimizer are Planning Orchestrators. User-retained ask/plan/edit manifests remain custom profiles.
-- Mission profiles may use limited shell through their declared tools. RDX-specific app entries are mediated by Settings shell actions and `ShellInvocationService`.
+- Mission profiles (`debugger` / `analyzer` / `optimizer`) are plan-only: they must not receive `shell` or `code_interpreter`. They access RDX only through controlled read-only `rdx_probe` plus `rdx_context` (current session lease status). General executes lease-holding Live RDC operations through Settings-configured shell actions and `shell`. RDX-specific app entries are mediated by Settings shell actions and `ShellInvocationService`. See `DESIGN.md` adjudication J.
 - No RDC-specific bridge, MCP server, or skill registry is injected as a hidden default tool path.
 - Assistant text is never parsed as an executable tool call. Textual tool-call shaped output produces a diagnostic event only.
 
@@ -19,7 +19,8 @@ The agent runtime owns agent turns, tool mediation policy, deterministic events,
 The execution path for RDX work is:
 
 ```text
-AgentRuntime or UI -> shell or Settings shell action -> ShellInvocationService -> system-installed RDX CLI -> RdxRuntimeContext
+Mission planner -> rdx_probe / rdx_context (read-only Settings actions) -> ShellInvocationService -> system-installed RDX CLI
+General or UI -> shell or Settings shell action (lease-holding Live RDC) -> ShellInvocationService -> system-installed RDX CLI -> RdxRuntimeContext
 ```
 
 `ToolRegistry` continues to mediate runtime tool requests, but RDX CLI command configuration is not stored in the registry. Catalog/runtime summary configuration is stored in `settings.tooling.rdxCli`; openCapture / openRemoteCapture / connect / preview / close command recipes are stored in `settings.tooling.rdxActions`.
