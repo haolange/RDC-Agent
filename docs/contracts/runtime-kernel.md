@@ -119,13 +119,13 @@ Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（48 ids，含 `shell` / `read
 
 `native-structured` 路由：core schema 常驻；extended / `mcp__*` deferred，经 `tool_search` 等契约路径激活。未激活调用 → `TOOL_NOT_ACTIVATED`。Tasks 工具只在冻结 allowlist 含对应 token 时预激活，不再按 Ask/Plan/Edit 角色硬编码。
 
-Run 持久化是 v2 discriminated union：`kind: conversation|mission` + `profileId`，新写无 `mode`。只有精确三 Mission profile 才是 `kind: mission`；conversation 的 `captures=[]` 且不消费 investigation sidecar。旧 run 先原子归档再迁移；归档不是 active fallback。
+Run **当前实现**最高 `schemaVersion` 为 `'2'`（`src/main/sessions/runV2/`）：discriminated union `kind: conversation|mission` + `profileId`，新写无 `mode`；仍含 `lastStage`、`runtime.workflow_stage`、`WorkflowStage` / `WorkflowPhase`、`stages.ts`、`recommendedSpecialists`。目标唯一活跃 schema 为 `'3'`，见 `DESIGN.md` 裁决 I；实现时 archive-and-rewrite，**不得**对 v2/v3 双读。只有精确三 Mission profile 才是 `kind: mission`；conversation 的 `captures=[]` 且不消费 investigation sidecar。无法分类的历史 run 只能成为带迁移诊断的 `kind: conversation`，**绝不从旧 stage 推断 Mission**。归档不是 active fallback，不进入 Run 枚举、IPC、UI 或 Right Rail。
 
 Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only route 的有效工具集为空，不得列出或模仿工具调用。`tool_search` 无结果时返回 `NO_MATCH_IN_EFFECTIVE_TOOL_SET`、`authoritative: true` 与工具集 fingerprint；fingerprint 未变化时重复同一搜索属于无进展。
 
 执行前：`toolValidator.validate`；失败 → `TOOL_SCHEMA_VIOLATION`。`CompiledPolicy.deniedTools` 进入 Permission + Executor。非法 policy → fail-closed。
 
-同轮工具并发：只有 `AgentTool.spec.isConcurrencySafe === true` 才安全，缺省 `false`。`ConcurrentToolScheduler` 只并发**连续**安全组；`shell` / write / task mutation / RDX / MCP / ask / handoff / `output_register` 与需要 RDX lease 的 `subagent` 一律串行。offline `subagent` 必须 `requiresRdxLease=false`。`callIndex` 稳定回填。`reserveDispatchBudget` 在 dispatch 前原子扣减 `maxToolCalls` / `maxSubagents` / wall clock；失败整组不开。组内部分失败不连坐已发出调用，但不得继续开新组。abort 必须 `Promise.allSettled` join。
+同轮工具并发：只有 `AgentTool.spec.isConcurrencySafe === true` 才安全，缺省 `false`。`ConcurrentToolScheduler` 只并发**连续**安全组；`shell` / write / task mutation / RDX（含 `rdx_probe`） / MCP / ask / handoff / `output_register` 与需要 RDX lease 的 `subagent` 一律串行。offline `subagent` 必须 `requiresRdxLease=false`，且 **在 allowlist 层**就不能拿到 `rdx_context` / `rdx_probe` / `shell` 中的 RDX 路径。`requiresRdxLease=true` 的 child 必须经显式、受限、生命周期绑定的 delegated lease 取得 parent 上下文并串行。禁止并发 RDX 双 owner。`callIndex` 稳定回填。`reserveDispatchBudget` 在 dispatch 前原子扣减 `maxToolCalls` / `maxSubagents` / wall clock；失败整组不开。组内部分失败不连坐已发出调用，但不得继续开新组。abort 必须 `Promise.allSettled` join。
 
 `subagent` 只接受 Delegation Capsule（`mission` / `task` / `acceptedFacts` / `forbiddenPaths` / `inputArtifactRefs` / `outputRequirements` / `budget` / `requiresRdxLease`）。缺字段 fail-closed。capsule 编译器产出 `delegation-capsule` PromptPlan 分段并注入子 Prompt。
 
@@ -147,13 +147,13 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 ## Hooks
 
-唯一引擎是 `HookEngine`。分发根：`resources/agent-runtime/hooks`（builtin）< `~/.rdx/hooks` < `<project>/.rdx/hooks`，与 `ScopedResourceResolver` 同序。Project hook 按内容 hash 授信。接线事件：`session.before-start` / `session.after-end`、`turn.before-start` / `turn.after-end`、`tool.before-call` / `tool.after-call` / `tool.on-error`、`context.before-compact` / `context.after-compact`、`agent.before-handoff` / `agent.after-handoff`、`permission.denied`。禁止第二套 `AgentHooks`。
+唯一引擎是 `HookEngine`。分发根：`resources/agent-runtime/hooks`（builtin）< `~/.rdx/hooks` < `<project>/.rdx/hooks`，与 `ScopedResourceResolver` 同序。Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity；任一变化 → `needsRetrust`。builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。旧仅-YAML-hash trust 在首次加载时失效并要求 retrust（不静默沿用）。接线事件（12 canonical）：`session.before-start` / `session.after-end`、`turn.before-start` / `turn.after-end`、`tool.before-call` / `tool.after-call` / `tool.on-error`、`context.before-compact` / `context.after-compact`、`agent.before-handoff` / `agent.after-handoff`、`permission.denied`。禁止第二套 `AgentHooks`。
 
 ## RDX / Capture
 
-无内置 RDX toolchain。Open capture / remote / preview / close 只走 Settings shell action → `ShellInvocationService`。已打开 `.rdc` 由 `ownerSessionId` 拥有；不匹配 fail-closed。Local + Android-origin capture 不得静默 fallback remote。
+无内置 RDX toolchain。**General** 与 UI 的 Open capture / remote / preview / close 以及 Live RDC mutate 走 Settings shell action / `shell` → `ShellInvocationService`，且必须持有 exclusive lease。**Mission planner** 禁止 `shell` 与 `code_interpreter`；只通过受控只读 `rdx_probe` + `rdx_context` 访问 RDX（见 `DESIGN.md` 裁决 J）。`rdx_probe` 唯一执行路径是 Settings `tooling.rdxCli` 已配置的只读 shell action；仓库不得硬编码 CLI 路径。已打开 `.rdc` 由 `ownerSessionId` 拥有；不匹配 fail-closed。Local + Android-origin capture 不得静默 fallback remote。
 
-RDX runtime context 仅绑定 per-session lease（`RdxRuntimeContextRegistry`）。禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext` 全局 API；工具路径经 `assertRdxContextLeaseOwnership`。
+RDX runtime context 仅绑定 per-session lease（`RdxRuntimeContextRegistry`）。禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext` 全局 API；工具路径经 `assertRdxContextLeaseOwnership`。parent 可授予 child 一条 scoped、生命周期绑定的 delegated lease（完整实现 T06）；`requiresRdxLease=false` 的 child 在 allowlist 层不得看到 RDX 工具。
 
 ## Model Capability（摘要）
 

@@ -26,7 +26,7 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 
 ## IPC Schema（Zod）
 
-**全量** IPC handler 经 `parseIpcArgs`（含 settings / terminal / workflow / memory / conversation / project / capture / shell / rdx-runtime / trace / web 等）。非法 payload fail-closed。`approvalToken` 单次消费（`IpcApprovalTokenService`）。契约测试：`IpcPayloadGuard.test.ts`。
+**全量** IPC handler 经 `parseIpcArgs`（含 settings / terminal / workflow / memory / conversation / project / capture / shell / rdx-runtime / trace / web 等）。非法 payload fail-closed。`approvalToken` 单次消费（`IpcApprovalTokenService`）。契约测试：`IpcPayloadGuard.test.ts`。Renderer 读取 Investigation 正文的唯一通道是目标态 IPC `investigation:read({ sessionId, artifactId, expectedHash })`：分类 `read`；active project/session owner gate；内部唯一调用 `InvestigationArtifactService.readRecord`；只返回既有 max-bytes 内完整 record，超限 fail-closed；不接受 URI / 绝对路径 / generic artifact。**当前态无此 IPC**；见 `DESIGN.md` 裁决 B / E。
 
 ## Browser Bridge（QA-only / debug-only）
 - /qa is a QA bootstrap surface: the launcher logs a one-time qaBootstrap, which is consumed before minting the bridge cookie. It isolates browser origins; it is not authentication against a malicious local process.
@@ -56,6 +56,14 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 - **禁止** RDX global mirror、`legacyGlobalMirror`、`getRdxRuntimeContext` 全局 API。
 - 工具读上下文前必须校验 lease 所有权；空 `sessionId` fail-closed（不写任何全局镜像）。
 - UI 无 session 摘要可经 `getMostRecentRdxContextLease`；工具路径仍须显式 `sessionId` + ownership assert。
+- **Delegated lease（目标态，完整实现 T06）**：parent 可授予 child 一条 scoped、生命周期绑定的 delegated lease，使 `requiresRdxLease=true` 的 child 取得 parent RDX context 并串行；child 完成/取消立即撤销。`requiresRdxLease=false` 的 child **在 allowlist 层**就不能拿到 `rdx_context` / `rdx_probe` / `shell` 中的 RDX 路径（不是运行时再报错）。禁止并发 RDX 双 owner。Mission 只读面走 `rdx_probe`，不得获得 generic shell。
+
+## Hook Trust
+
+- Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity。任一变化 → `needsRetrust`。
+- builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。
+- 旧仅-YAML-hash trust 在首次加载时失效并要求 retrust（不静默沿用）。
+- 12 canonical events 保持单一 `HookEngine` 路径。见 `DESIGN.md` 裁决 K。
 
 ## MCP Trust
 

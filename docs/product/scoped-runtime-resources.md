@@ -28,7 +28,7 @@ Settings scoped 编辑器（Skills / MCP / Hooks / Policy）与 Agents 同级导
 
 ## Profiles
 
-Wave 1 四个 builtin：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件在 `resources/agent-runtime/agents`，再与 `~/.rdx/agents` 和 `<project-root>/.rdx/agents` 合成 effective snapshot。行为应落在指令、工具权限、审批与 handoff，而不是 mode 专用运行时分支。用户保留的 ask/plan/edit 仍可按 custom manifest 运行。
+Wave 1 四个 builtin：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件在 `resources/agent-runtime/agents`，再与 `~/.rdx/agents` 和 `<project-root>/.rdx/agents` 合成 effective snapshot。行为应落在指令、工具权限、审批与 handoff，而不是 mode 专用运行时分支。官方未改的历史 Ask/Plan/Edit（及历史官方 debugger/analyzer/optimizer/general seed）按 `DESIGN.md` 裁决 A 在校验后永久清除，不留 `.migrated` 备份。仅用户修改过的 ask/plan/edit 原样保留，并按 custom manifest 运行；它们不是目标拓扑身份，也不是运行时 fallback。Mission planner 工具面见裁决 J（plan-only + `rdx_probe`）。
 
 ## Project Instructions
 
@@ -63,13 +63,13 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 ## Hooks
 
-官方 builtin 目录：`resources/agent-runtime/hooks`。解析顺序与 ScopedResourceResolver 相同：`builtin < user < project`。`.hook.yml` 生命周期命令；结构化 `command`+`args`；禁止 `shell: true`。Project hooks 需按项目身份与内容 hash trust；变更撤销 trust。运行时事件：`session.before-start` / `session.after-end`、`turn.before-start` / `turn.after-end`、`tool.before-call` / `tool.after-call` / `tool.on-error`、`context.before-compact` / `context.after-compact`、`agent.before-handoff` / `agent.after-handoff`、`permission.denied`。
+官方 builtin 目录：`resources/agent-runtime/hooks`。解析顺序与 ScopedResourceResolver 相同：`builtin < user < project`。`.hook.yml` 生命周期命令；结构化 `command`+`args`；禁止 `shell: true`。Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity；任一变化 → `needsRetrust`。builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。旧仅-YAML-hash trust 在首次加载时失效并要求 retrust（不静默沿用）。运行时事件（12 canonical，单一 `HookEngine`）：`session.before-start` / `session.after-end`、`turn.before-start` / `turn.after-end`、`tool.before-call` / `tool.after-call` / `tool.on-error`、`context.before-compact` / `context.after-compact`、`agent.before-handoff` / `agent.after-handoff`、`permission.denied`。
 
 ## Memory 与 Knowledge
 
 Memory：显式 search/read/write/delete；写入需用户意图或交互审批；删除需确认；禁止轮次自动抽取/consolidation/全索引注入。
 
-Knowledge Center 是三列 UI（Spaces / List / Detail），只消费 Query / Index / Compile / Candidate / Write；独立 `knowledge` IPC。持久写入须显式人类确认；ColdData 摄入为 staging / Draft，不自动 Candidate。不生成、不自动注入 prompt。
+Knowledge Center 是三列 UI（Spaces / List / Detail），只消费 Query / Index / Compile / Candidate / Write；独立 `knowledge` IPC。持久写入须显式人类确认；ColdData 摄入为 staging / Draft，不自动 Candidate。不生成、不自动注入 prompt。**当前态**：Candidate/Draft 为进程内 Map，写路径无 realpath、非原子；ColdData 不记录源 hash/mtime/size；Semantic rebuild 只写 snapshot，属假 ready。目标态见 `DESIGN.md` 裁决 C / G。**产品级 Browser QA 与本机 ColdData 真实验收尚未跑。**
 
 ## Provider Account（产品）
 
