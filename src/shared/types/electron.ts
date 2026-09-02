@@ -303,8 +303,8 @@ export interface ElectronAPI {
     importResource: (request: ScopedResourceImportRequest) => Promise<{ overview: RdxRuntimeOverview; id: string }>;
     deleteResource: (kind: ScopedResourceKind, scope: 'user' | 'project', id: string, projectRoot?: string) => Promise<RdxRuntimeOverview>;
     revealResource: (sourcePath: string) => Promise<{ success: boolean; error?: string }>;
-    trustHook: (projectRoot: string, hookId: string) => Promise<RdxRuntimeOverview>;
-    revokeHook: (projectRoot: string, hookId: string) => Promise<RdxRuntimeOverview>;
+    trustHook: (projectRoot: string | undefined | null, hookId: string) => Promise<RdxRuntimeOverview>;
+    revokeHook: (projectRoot: string | undefined | null, hookId: string) => Promise<RdxRuntimeOverview>;
     trustMcp: (projectRoot: string, descriptorId: string) => Promise<RdxRuntimeOverview>;
     revokeMcp: (projectRoot: string, descriptorId: string) => Promise<RdxRuntimeOverview>;
     testHook: (event: HookEvent, projectRoot?: string, hookId?: string) => Promise<unknown>;

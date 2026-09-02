@@ -75,7 +75,10 @@ describe('RdxRuntimeService', () => {
       hooks.load(path.join(home, '.rdx', 'hooks'), project);
       hooks.trustProjectHook(project, 'verify');
       hookService.delete('hook', 'project', 'verify', project);
-      expect(JSON.parse(fs.readFileSync(trustPath, 'utf8'))).toEqual({});
+      expect(JSON.parse(fs.readFileSync(trustPath, 'utf8'))).toEqual({
+        schemaVersion: '2',
+        records: {},
+      });
     } finally { fs.rmSync(project, { recursive: true, force: true }); }
   });
 });

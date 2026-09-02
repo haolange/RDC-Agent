@@ -67,7 +67,10 @@ describe('HookEngine', () => {
     const builtinWinner = engine.load(userHooks, undefined, builtin);
     expect(builtinWinner).toHaveLength(1);
     expect(builtinWinner[0].scope).toBe('user');
-    expect(builtinWinner[0].trust.trusted).toBe(true);
+    expect(builtinWinner[0].trust.trusted).toBe(false);
+    expect(builtinWinner[0].trust.needsRetrust).toBe(true);
+    engine.trustUserHook('audit');
+    expect(engine.list()[0].trust.trusted).toBe(true);
     writeHook(projectHooks, 'project');
     const projectLoaded = engine.load(userHooks, project, builtin);
     expect(projectLoaded[0].scope).toBe('project');
@@ -79,6 +82,31 @@ describe('HookEngine', () => {
     });
     expect(result[0]).toMatchObject({ status: 'completed', allowed: true });
     expect(result[0].stdout.trim()).toBe('project');
+  });
+
+  it('keeps the user trust record when revokeHook receives a projectRoot', () => {
+    const root = makeRoot();
+    const userHooks = path.join(root, 'user');
+    const project = path.join(root, 'project');
+    fs.mkdirSync(userHooks, { recursive: true });
+    fs.writeFileSync(path.join(userHooks, 'audit.hook.yml'), YAML.stringify({
+      id: 'audit',
+      enabled: true,
+      event: 'session.before-start',
+      command: process.execPath,
+      args: ['-e', 'console.log("user")'],
+      timeoutMs: 2000,
+      failurePolicy: 'warn',
+    }));
+    const engine = new HookEngine(path.join(root, 'trust.json'));
+    const builtin = emptyBuiltin();
+    engine.load(userHooks, undefined, builtin);
+    engine.trustUserHook('audit');
+    expect(engine.list()[0].trust.trusted).toBe(true);
+    engine.revokeHook('audit', project);
+    expect(engine.load(userHooks, undefined, builtin)[0].trust.trusted).toBe(true);
+    engine.revokeHook('audit');
+    expect(engine.load(userHooks, undefined, builtin)[0].trust.trusted).toBe(false);
   });
 
   it('parses and runs the four builtin Wave 4 hook templates', async () => {
@@ -310,6 +338,7 @@ describe('HookEngine', () => {
     }));
     const engine = new HookEngine(path.join(root, 'trust.json'));
     engine.load(userHooks, undefined, emptyBuiltin());
+    engine.trustUserHook('timeout');
     expect((await engine.trigger('turn.before-start', { event: 'turn.before-start' }))[0]).toMatchObject({ status: 'timed-out', allowed: true });
   });
 });

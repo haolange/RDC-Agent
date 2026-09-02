@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CANONICAL_HOOK_EVENTS } from '@shared/types/rdxRuntime';
 import { ipcId, ipcNonEmptyString, ipcString } from './IpcPayloadGuard';
 
 const ResourceScopeMutableSchema = z.enum(['user', 'project']);
@@ -13,20 +14,7 @@ const ScopedResourceKindSchema = z.enum([
   'memory',
 ]);
 
-const HookEventSchema = z.enum([
-  'session.before-start',
-  'session.after-end',
-  'turn.before-start',
-  'turn.after-end',
-  'tool.before-call',
-  'tool.after-call',
-  'tool.on-error',
-  'context.before-compact',
-  'context.after-compact',
-  'agent.before-handoff',
-  'agent.after-handoff',
-  'permission.denied',
-]);
+const HookEventSchema = z.enum(CANONICAL_HOOK_EVENTS);
 
 export const RdxRuntimeOverviewArgsSchema = z.tuple([
   ipcString(4096, 'projectRoot').optional(),
@@ -63,7 +51,8 @@ export const RdxRuntimeRevealArgsSchema = z.tuple([
 ]);
 
 export const RdxRuntimeTrustHookArgsSchema = z.tuple([
-  ipcNonEmptyString(4096, 'projectRoot'),
+  // Omitted / null projectRoot is user-scope; a path is project-scope only.
+  ipcString(4096, 'projectRoot').nullish(),
   ipcNonEmptyString(200, 'hookId'),
 ]);
 
