@@ -10,8 +10,10 @@ import {
   ARTIFACT_READ_MAX_OUTPUT_BYTES,
   ARTIFACT_READ_MAX_OUTPUT_LINES,
   formatSessionArtifactUri,
+  isSessionArtifactizedEnvelope,
   parseSessionArtifactUri,
   SESSION_ARTIFACT_ALLOWED_MIME_SET,
+  SESSION_ARTIFACT_CATEGORIES,
   SESSION_ARTIFACT_MAX_FILE_BYTES,
   SESSION_ARTIFACT_MAX_SESSION_BYTES,
   SESSION_ARTIFACT_MAX_TOOL_OUTPUT_FILES,
@@ -19,9 +21,21 @@ import {
   SessionArtifactError,
   type ParsedSessionArtifactUri,
   type SessionArtifactCategory,
+  type SessionArtifactSourceRef,
 } from '@shared/types/sessionArtifact';
+import { generateShortId } from '@shared/utils/id';
 import { StorageIo } from './StorageIo';
 import { storageAdapter } from './StorageAdapter';
+import {
+  commitSessionArtifactReservation,
+  getSessionArtifactQuotaSnapshot,
+  isSessionArtifactQuotaBookkeeping,
+  replaceSessionArtifactQuotaFromDisk,
+  reserveSessionArtifactQuota,
+  rollbackSessionArtifactReservation,
+  type SessionArtifactQuotaSnapshot,
+  type SessionArtifactReservation,
+} from './SessionArtifactQuota';
 
 const EXECUTABLE_EXTENSIONS = new Set([
   '.exe', '.dll', '.so', '.dylib', '.bin', '.com', '.msi', '.bat', '.cmd',
@@ -74,6 +88,8 @@ export interface SessionArtifactReadResult {
   offset: number;
   limit: number;
   totalLines?: number;
+  owner?: string;
+  source?: SessionArtifactSourceRef;
 }
 
 export interface SessionArtifactWriteResult {
@@ -214,11 +230,14 @@ function sha256Hex(bytes: Buffer): string {
 }
 
 function walkFiles(root: string, visitor: (filePath: string, stat: fs.Stats) => void): void {
-  if (!fs.existsSync(root)) return;
+  if (!fs.existsSync(root)) {
+    return;
+  }
   assertNoSymlinkPath(root);
   const stack = [root];
   while (stack.length > 0) {
     const current = stack.pop()!;
+    if (!fs.existsSync(current)) continue;
     const stat = fs.lstatSync(current);
     if (stat.isSymbolicLink()) {
       throw new SessionArtifactError('ARTIFACT_SYMLINK_REJECTED', current);
@@ -233,12 +252,40 @@ function walkFiles(root: string, visitor: (filePath: string, stat: fs.Stats) => 
   }
 }
 
+function extractEnvelopeMeta(
+  bytes: Buffer,
+  mimeType: string,
+): {
+  owner?: string;
+  source?: SessionArtifactSourceRef;
+  hash?: string;
+  bytes?: number;
+  mimeType?: string;
+} {
+  if (mimeType !== 'application/json') return {};
+  try {
+    const parsed: unknown = JSON.parse(bytes.toString('utf8'));
+    if (!isSessionArtifactizedEnvelope(parsed)) return {};
+    return {
+      owner: parsed.owner,
+      source: parsed.source,
+      hash: parsed.hash.toLowerCase(),
+      bytes: parsed.size,
+      mimeType: parsed.mime,
+    };
+  } catch {
+    return {};
+  }
+}
+
 export class SessionArtifactResolver {
   private readonly resolveSessionPath: (sessionId: string) => string | null;
   private readonly io: StorageIo;
   private readonly maxFileBytes: number;
   private readonly maxSessionBytes: number;
   private readonly maxToolOutputFiles: number;
+  private readonly reconciledSessionIds = new Set<string>();
+  private readonly reconcilingSessionIds = new Set<string>();
 
   constructor(deps: SessionArtifactResolverDeps = {}) {
     this.resolveSessionPath = deps.resolveSessionPath ?? defaultResolveSessionPath;
@@ -246,6 +293,35 @@ export class SessionArtifactResolver {
     this.maxFileBytes = deps.maxFileBytes ?? SESSION_ARTIFACT_MAX_FILE_BYTES;
     this.maxSessionBytes = deps.maxSessionBytes ?? SESSION_ARTIFACT_MAX_SESSION_BYTES;
     this.maxToolOutputFiles = deps.maxToolOutputFiles ?? SESSION_ARTIFACT_MAX_TOOL_OUTPUT_FILES;
+  }
+
+  /**
+   * Process-local first-touch reconcile. Sweeps leftover `*.tmp` and replaces
+   * leaked reservations with disk truth. Idempotent per session on this instance.
+   */
+  ensureReconciled(sessionId: string | null | undefined): void {
+    if (!sessionId?.trim()) {
+      throw new SessionArtifactError('ARTIFACT_SESSION_DENIED', 'an owning session is required.');
+    }
+    const owningSessionId = sessionId.trim();
+    if (this.reconciledSessionIds.has(owningSessionId) || this.reconcilingSessionIds.has(owningSessionId)) {
+      return;
+    }
+    this.reconcilingSessionIds.add(owningSessionId);
+    try {
+      const artifactsRoot = this.artifactsRootFor(owningSessionId);
+      if (fs.existsSync(artifactsRoot)) {
+        this.reconcileUsage(owningSessionId);
+      }
+      this.reconciledSessionIds.add(owningSessionId);
+    } finally {
+      this.reconcilingSessionIds.delete(owningSessionId);
+    }
+  }
+
+  resetReconcileState(): void {
+    this.reconciledSessionIds.clear();
+    this.reconcilingSessionIds.clear();
   }
 
   parse(uri: string): ParsedSessionArtifactUri {
@@ -261,6 +337,7 @@ export class SessionArtifactResolver {
     if (!sessionPath) {
       throw new SessionArtifactError('ARTIFACT_SESSION_DENIED', `session not found: ${owningSessionId}`);
     }
+    this.ensureReconciled(owningSessionId);
     const parsed = parseSessionArtifactUri(uri);
     const resolvedSession = path.resolve(sessionPath);
     if (!fs.existsSync(resolvedSession)) {
@@ -317,10 +394,17 @@ export class SessionArtifactResolver {
       );
     }
     const bytes = fs.readFileSync(resolved.absolutePath);
-    const mimeType = this.assertAllowedBytes(resolved.relativePath, bytes);
-    const hash = sha256Hex(bytes);
-    if (options?.expectedHash && options.expectedHash.toLowerCase() !== hash) {
-      throw new SessionArtifactError('ARTIFACT_HASH_MISMATCH', 'sha256 does not match expectedHash.');
+    const fileMimeType = this.assertAllowedBytes(resolved.relativePath, bytes);
+    const fileHash = sha256Hex(bytes);
+    const record = extractEnvelopeMeta(bytes, fileMimeType);
+    const hash = record.hash ?? fileHash;
+    const mimeType = record.mimeType ?? fileMimeType;
+    const byteLength = record.bytes ?? bytes.length;
+    if (options?.expectedHash) {
+      const expected = options.expectedHash.toLowerCase();
+      if (expected !== hash && expected !== fileHash) {
+        throw new SessionArtifactError('ARTIFACT_HASH_MISMATCH', 'sha256 does not match expectedHash.');
+      }
     }
     const offset = Math.max(1, Math.floor(options?.offset ?? 1));
     const limit = Math.max(
@@ -334,10 +418,12 @@ export class SessionArtifactResolver {
         relativePath: resolved.relativePath,
         mimeType,
         hash,
-        bytes: bytes.length,
+        bytes: byteLength,
         truncated: false,
         offset: 1,
         limit,
+        owner: record.owner,
+        source: record.source,
       };
     }
     const text = bytes.toString('utf8');
@@ -355,12 +441,14 @@ export class SessionArtifactResolver {
       relativePath: resolved.relativePath,
       mimeType,
       hash,
-      bytes: bytes.length,
+      bytes: byteLength,
       text: rendered,
       truncated,
       offset,
       limit,
       totalLines: lines.length,
+      owner: record.owner,
+      source: record.source,
     };
   }
 
@@ -368,11 +456,17 @@ export class SessionArtifactResolver {
     sessionId: string | null | undefined,
     uri: string,
     content: Buffer | string,
-    options?: { mimeType?: string },
+    options?: { mimeType?: string; signal?: AbortSignal; onAfterReserve?: () => void },
   ): SessionArtifactWriteResult {
     const bytes = Buffer.isBuffer(content) ? content : Buffer.from(content, 'utf8');
+    let reservation: SessionArtifactReservation | null = null;
+    let tempPath: string | null = null;
+    let resolved: SessionArtifactResolved | null = null;
     try {
-      const resolved = this.resolve(sessionId, uri);
+      if (options?.signal?.aborted) {
+        throw new SessionArtifactError('ARTIFACT_WRITE_FAILED', 'write aborted before reserve.');
+      }
+      resolved = this.resolve(sessionId, uri);
       if (bytes.length > this.maxFileBytes) {
         throw new SessionArtifactError(
           'ARTIFACT_TOO_LARGE',
@@ -380,26 +474,65 @@ export class SessionArtifactResolver {
         );
       }
       const mimeType = this.assertAllowedBytes(resolved.relativePath, bytes, options?.mimeType);
-      this.assertQuota(resolved, bytes.length);
       this.io.ensureDir(path.dirname(resolved.absolutePath));
       assertNoSymlinkPath(path.dirname(resolved.absolutePath));
       if (fs.existsSync(resolved.absolutePath)) {
         assertNoSymlinkPath(resolved.absolutePath);
         assertNoHardlinkFile(resolved.absolutePath);
       }
-      this.io.writeBytesAtomic(resolved.absolutePath, bytes);
+      const existingBytes = this.existingRegularFileBytes(resolved.absolutePath);
+      const disk = this.measureDiskUsage(resolved.artifactsRoot, resolved.categoryRoot);
+      const extraFiles = resolved.category === 'tool-outputs' && existingBytes === 0 ? 1 : 0;
+      reservation = reserveSessionArtifactQuota({
+        artifactsRoot: resolved.artifactsRoot,
+        diskBytes: disk.bytes,
+        diskToolOutputFiles: disk.toolOutputFiles,
+        incomingBytes: bytes.length,
+        existingBytes,
+        extraFiles,
+        maxSessionBytes: this.maxSessionBytes,
+        maxToolOutputFiles: this.maxToolOutputFiles,
+      });
+      if (options?.signal?.aborted) {
+        throw new SessionArtifactError('ARTIFACT_WRITE_FAILED', 'write aborted after reserve.');
+      }
+      options?.onAfterReserve?.();
+      if (options?.signal?.aborted) {
+        throw new SessionArtifactError('ARTIFACT_WRITE_FAILED', 'write aborted after reserve.');
+      }
+      tempPath = this.writeTempSibling(resolved.absolutePath, bytes);
+      const staged = fs.readFileSync(tempPath);
+      if (!staged.equals(bytes)) {
+        throw new SessionArtifactError('ARTIFACT_WRITE_FAILED', 'temp bytes drifted before commit.');
+      }
+      const hash = sha256Hex(staged);
+      this.atomicRename(tempPath, resolved.absolutePath);
+      tempPath = null;
       assertNoSymlinkPath(resolved.absolutePath);
       assertNoHardlinkFile(resolved.absolutePath);
       const written = fs.readFileSync(resolved.absolutePath);
+      commitSessionArtifactReservation(reservation, this.measureDiskUsage(resolved.artifactsRoot, resolved.categoryRoot));
+      reservation = null;
       return {
         uri: resolved.uri,
         category: resolved.category,
         relativePath: resolved.relativePath,
         mimeType,
-        hash: sha256Hex(written),
+        hash,
         bytes: written.length,
       };
     } catch (error) {
+      if (tempPath && fs.existsSync(tempPath)) {
+        try { fs.rmSync(tempPath, { force: true }); } catch { /* best-effort temp cleanup */ }
+      }
+      if (reservation && resolved) {
+        try {
+          rollbackSessionArtifactReservation(
+            reservation,
+            this.measureDiskUsage(resolved.artifactsRoot, resolved.categoryRoot),
+          );
+        } catch { /* rollback must not hide the original failure */ }
+      }
       if (error instanceof SessionArtifactError) throw error;
       throw new SessionArtifactError(
         'ARTIFACT_WRITE_FAILED',
@@ -408,10 +541,52 @@ export class SessionArtifactResolver {
     }
   }
 
+  reconcileUsage(sessionId: string | null | undefined): SessionArtifactQuotaSnapshot {
+    const artifactsRoot = this.artifactsRootFor(sessionId);
+    this.sweepTempLeftovers(artifactsRoot);
+    const categoryRoot = path.join(artifactsRoot, 'tool-outputs');
+    const disk = this.measureDiskUsage(artifactsRoot, categoryRoot);
+    const snapshot = replaceSessionArtifactQuotaFromDisk(artifactsRoot, disk);
+    if (sessionId?.trim()) {
+      this.reconciledSessionIds.add(sessionId.trim());
+    }
+    return snapshot;
+  }
+
+  getQuotaUsage(sessionId: string | null | undefined): SessionArtifactQuotaSnapshot {
+    this.ensureReconciled(sessionId);
+    const artifactsRoot = this.artifactsRootFor(sessionId);
+    const categoryRoot = path.join(artifactsRoot, 'tool-outputs');
+    return getSessionArtifactQuotaSnapshot(
+      artifactsRoot,
+      this.measureDiskUsage(artifactsRoot, categoryRoot),
+    );
+  }
+
+  list(sessionId: string | null | undefined, category?: SessionArtifactCategory): string[] {
+    this.ensureReconciled(sessionId);
+    const artifactsRoot = this.artifactsRootFor(sessionId);
+    if (!fs.existsSync(artifactsRoot)) return [];
+    const categories: SessionArtifactCategory[] = category
+      ? [category]
+      : [...SESSION_ARTIFACT_CATEGORIES];
+    const uris: string[] = [];
+    for (const current of categories) {
+      const categoryRoot = path.join(artifactsRoot, current);
+      walkFiles(categoryRoot, (filePath) => {
+        if (isSessionArtifactQuotaBookkeeping(filePath)) return;
+        const relativePath = path.relative(categoryRoot, filePath).replace(/\\/g, '/');
+        uris.push(formatSessionArtifactUri(current, relativePath));
+      });
+    }
+    return uris.sort();
+  }
+
   sweepToolOutputs(sessionId: string | null | undefined): void {
     if (!sessionId?.trim()) {
       throw new SessionArtifactError('ARTIFACT_SESSION_DENIED', 'an owning session is required.');
     }
+    this.ensureReconciled(sessionId.trim());
     const sessionPath = this.resolveSessionPath(sessionId.trim());
     if (!sessionPath) {
       throw new SessionArtifactError('ARTIFACT_SESSION_DENIED', `session not found: ${sessionId}`);
@@ -455,35 +630,83 @@ export class SessionArtifactResolver {
     return mime;
   }
 
-  private assertQuota(resolved: SessionArtifactResolved, incomingBytes: number): void {
-    let totalBytes = 0;
+  private artifactsRootFor(sessionId: string | null | undefined): string {
+    if (!sessionId?.trim()) {
+      throw new SessionArtifactError('ARTIFACT_SESSION_DENIED', 'an owning session is required.');
+    }
+    const sessionPath = this.resolveSessionPath(sessionId.trim());
+    if (!sessionPath) {
+      throw new SessionArtifactError('ARTIFACT_SESSION_DENIED', `session not found: ${sessionId}`);
+    }
+    const resolvedSession = path.resolve(sessionPath);
+    if (!fs.existsSync(resolvedSession)) {
+      throw new SessionArtifactError('ARTIFACT_SESSION_DENIED', `session path missing: ${sessionId}`);
+    }
+    assertNoSymlinkPath(resolvedSession);
+    const realSession = fs.realpathSync.native
+      ? fs.realpathSync.native(resolvedSession)
+      : fs.realpathSync(resolvedSession);
+    return path.join(realSession, SESSION_ARTIFACT_ROOT_DIR);
+  }
+
+  private existingRegularFileBytes(absolutePath: string): number {
+    if (!fs.existsSync(absolutePath)) return 0;
+    const stat = fs.lstatSync(absolutePath);
+    if (stat.isSymbolicLink()) {
+      throw new SessionArtifactError('ARTIFACT_SYMLINK_REJECTED', absolutePath);
+    }
+    if (!stat.isFile()) return 0;
+    assertNoHardlinkFile(absolutePath, stat);
+    return stat.size;
+  }
+
+  private measureDiskUsage(artifactsRoot: string, toolOutputsRoot: string): { bytes: number; toolOutputFiles: number } {
+    let bytes = 0;
     let toolOutputFiles = 0;
-    let existingBytes = 0;
-    walkFiles(resolved.artifactsRoot, (filePath, stat) => {
-      totalBytes += stat.size;
-      if (isWithinRoot(filePath, resolved.categoryRoot) && resolved.category === 'tool-outputs') {
+    walkFiles(artifactsRoot, (filePath, stat) => {
+      if (isSessionArtifactQuotaBookkeeping(filePath)) return;
+      bytes += stat.size;
+      if (isWithinRoot(filePath, toolOutputsRoot)) {
         toolOutputFiles += 1;
       }
-      if (path.resolve(filePath) === resolved.absolutePath) {
-        existingBytes = stat.size;
-      }
     });
-    const nextTotal = totalBytes - existingBytes + incomingBytes;
-    if (nextTotal > this.maxSessionBytes) {
-      throw new SessionArtifactError(
-        'ARTIFACT_QUOTA_EXCEEDED',
-        `session artifacts would be ${nextTotal} bytes (cap ${this.maxSessionBytes}).`,
-      );
+    return { bytes, toolOutputFiles };
+  }
+
+  private sweepTempLeftovers(artifactsRoot: string): void {
+    walkFiles(artifactsRoot, (filePath, stat) => {
+      if (!filePath.toLowerCase().endsWith('.tmp')) return;
+      if (stat.isSymbolicLink() || !stat.isFile()) return;
+      fs.rmSync(filePath, { force: true });
+    });
+  }
+
+  private writeTempSibling(absolutePath: string, bytes: Buffer): string {
+    const tempPath = `${absolutePath}.${process.pid}.${generateShortId()}.tmp`;
+    if (isSessionArtifactQuotaBookkeeping(absolutePath)) {
+      throw new SessionArtifactError('ARTIFACT_WRITE_FAILED', 'bookkeeping paths cannot be written as artifacts.');
     }
-    if (resolved.category === 'tool-outputs') {
-      const nextCount = toolOutputFiles + (existingBytes > 0 ? 0 : 1);
-      if (nextCount > this.maxToolOutputFiles) {
-        throw new SessionArtifactError(
-          'ARTIFACT_QUOTA_EXCEEDED',
-          `tool-outputs would have ${nextCount} files (cap ${this.maxToolOutputFiles}).`,
-        );
-      }
+    fs.writeFileSync(tempPath, bytes);
+    return tempPath;
+  }
+
+  private atomicRename(from: string, to: string): void {
+    try {
+      fs.renameSync(from, to);
+      return;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'EEXIST' && code !== 'EPERM') throw error;
     }
+    const bakPath = `${to}.${process.pid}.${generateShortId()}.swap.tmp`;
+    fs.renameSync(to, bakPath);
+    try {
+      fs.renameSync(from, to);
+    } catch (finalError) {
+      try { fs.renameSync(bakPath, to); } catch { /* leave bak for reconcile */ }
+      throw finalError;
+    }
+    try { fs.rmSync(bakPath, { force: true }); } catch { /* leftover tmp is reconciled */ }
   }
 
   private sliceUtf8(text: string, maxBytes: number): string {

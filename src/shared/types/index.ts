@@ -312,7 +312,9 @@ export type {
   SessionArtifactCategory,
   SessionArtifactErrorCode,
   SessionArtifactMimeType,
+  SessionArtifactizedEnvelope,
   SessionArtifactRefDetails,
+  SessionArtifactSourceRef,
 } from './sessionArtifact';
 export {
   ARTIFACT_READ_MAX_OUTPUT_BYTES,
@@ -330,6 +332,8 @@ export {
   extractSessionArtifactUris,
   formatSessionArtifactUri,
   isSessionArtifactCategory,
+  isSessionArtifactizedEnvelope,
+  isSessionArtifactSourceRef,
   isSessionArtifactUri,
   parseSessionArtifactUri,
   shortArtifactHash,

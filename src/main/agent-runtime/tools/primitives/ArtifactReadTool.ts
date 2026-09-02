@@ -22,6 +22,8 @@ interface ArtifactReadDetails {
   offset: number;
   limit: number;
   totalLines?: number;
+  owner?: string;
+  source?: { toolName: string; toolCallId: string };
 }
 
 export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails> = {
@@ -90,6 +92,8 @@ export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails
         result.mimeType,
         `${result.bytes} bytes`,
         `sha256=${result.hash}`,
+        result.owner ? `owner=${result.owner}` : null,
+        result.source ? `source=${result.source.toolName}/${result.source.toolCallId}` : null,
         result.truncated ? 'truncated=true' : null,
       ].filter(Boolean).join(' · ');
       const body = result.mimeType.startsWith('image/')
@@ -106,6 +110,8 @@ export const artifactReadTool: AgentTool<ArtifactReadParams, ArtifactReadDetails
           offset: result.offset,
           limit: result.limit,
           totalLines: result.totalLines,
+          owner: result.owner,
+          source: result.source,
         },
       };
     } catch (error) {
