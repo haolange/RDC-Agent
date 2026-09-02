@@ -364,7 +364,7 @@ const legalAttachment = {
 };
 
 const legalRun = {
-  schemaVersion: '2' as const,
+  schemaVersion: '3' as const,
   kind: 'mission' as const,
   mission: 'debugger' as const,
   profileId: 'debugger',
@@ -376,7 +376,6 @@ const legalRun = {
   captures: [],
   startedAt: 1,
   status: 'running' as const,
-  lastStage: 'investigate',
   backend: 'local' as const,
   createdAt: 1,
   updatedAt: 1,
@@ -386,7 +385,6 @@ const legalRun = {
     context_id: null,
     runtime_owner: null,
     session_id: 'sess_1',
-    workflow_stage: 'investigate',
   },
 };
 

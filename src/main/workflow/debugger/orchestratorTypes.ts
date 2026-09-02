@@ -10,7 +10,6 @@ import type {
 } from '@shared/types/modelCapability';
 import type { EffectiveModel, ExecutionIdentity, RequestPlan } from '@shared/types/providerCapability';
 import type { PreparedTurnContextSummary } from '@shared/types/session';
-import type { WorkflowStage } from '@shared/types/workflow';
 import type { EffectiveAgentProfile, PromptPlan } from '@shared/types/rdxRuntime';
 import type { CompiledPromptCache } from '@shared/types/semanticContext';
 import type { EffectiveRuntimePlan } from '../../agent-runtime/EffectiveRuntimePlan';
@@ -39,7 +38,6 @@ export interface FrozenAttachmentManifestEntry {
 export interface AgentTurnContext {
   runId?: string;
   sessionId?: string;
-  stageId?: WorkflowStage;
   turnId?: string;
   projectRootPath?: string | null;
   projectId?: string | null;
@@ -70,7 +68,6 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
   turnId?: string;
   requestId?: string;
   routeAgentId?: AgentRole;
-  stage?: WorkflowStage | 'report';
   /** 当前激活项目根目录，透传到工具执行上下文。 */
   projectRootPath?: string | null;
   /** 当前激活项目 id。 */

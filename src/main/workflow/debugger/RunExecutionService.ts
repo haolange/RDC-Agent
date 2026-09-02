@@ -6,7 +6,6 @@ export interface RunExecutionContext {
 
 export interface ActiveRunSnapshot extends RunExecutionContext {
   startedAt: number;
-  stage?: string;
 }
 
 interface ActiveRunController extends ActiveRunSnapshot {
@@ -50,20 +49,11 @@ export class RunExecutionService {
       sessionId: run.sessionId,
       projectId: run.projectId,
       startedAt: run.startedAt,
-      stage: run.stage,
     }));
   }
 
   getAbortSignal(runId: string): AbortSignal | null {
     return this.activeRuns.get(runId)?.abortController.signal ?? null;
-  }
-
-  updateStage(runId: string, stage: string): void {
-    const active = this.activeRuns.get(runId);
-    if (!active) {
-      return;
-    }
-    active.stage = stage;
   }
 
   isAbortRequested(runId: string): boolean {

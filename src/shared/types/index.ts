@@ -393,7 +393,6 @@ export type {
 export type { ToolCallResult, ToolCatalog, ToolRuntimeSummary, ToolTraceEntry } from './tool';
 export type {
   IntakeContext,
-  WorkflowStage,
   WorkflowState,
   WorkflowStateView,
 } from './workflow';

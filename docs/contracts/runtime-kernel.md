@@ -119,7 +119,7 @@ Builtin 目录以 `BUILTIN_AGENT_TOOL_IDS` 为准（48 ids，含 `shell` / `read
 
 `native-structured` 路由：core schema 常驻；extended / `mcp__*` deferred，经 `tool_search` 等契约路径激活。未激活调用 → `TOOL_NOT_ACTIVATED`。Tasks 工具只在冻结 allowlist 含对应 token 时预激活，不再按 Ask/Plan/Edit 角色硬编码。
 
-Run **当前实现**最高 `schemaVersion` 为 `'2'`（`src/main/sessions/runV2/`）：discriminated union `kind: conversation|mission` + `profileId`，新写无 `mode`；仍含 `lastStage`、`runtime.workflow_stage`、`WorkflowStage` / `WorkflowPhase`、`stages.ts`、`recommendedSpecialists`。目标唯一活跃 schema 为 `'3'`，见 `DESIGN.md` 裁决 I；实现时 archive-and-rewrite，**不得**对 v2/v3 双读。只有精确三 Mission profile 才是 `kind: mission`；conversation 的 `captures=[]` 且不消费 investigation sidecar。无法分类的历史 run 只能成为带迁移诊断的 `kind: conversation`，**绝不从旧 stage 推断 Mission**。归档不是 active fallback，不进入 Run 枚举、IPC、UI 或 Right Rail。
+Run **当前实现**唯一活跃 `schemaVersion` 为 `'3'`（`src/main/sessions/runV3/`）：discriminated union `kind: conversation|mission` + `profileId`，新写无 `mode` / `lastStage` / `runtime.workflow_stage`。v0–v2 在 session-scoped `.run-v3-migration.lock` 内 archive-and-rewrite 到 `migration-backups/run-v3/<runId>/<sha256>.<json|yaml>`，**不得**对 v2/v3 双读。只有精确三 Mission profile 才是 `kind: mission`；conversation 的 `captures=[]` 且不消费 investigation sidecar。无法分类的历史 run 只能成为带迁移诊断的 `kind: conversation`，**绝不从旧 stage 推断 Mission**。归档不是 active fallback，不进入 Run 枚举、IPC、UI 或 Right Rail。见 `DESIGN.md` 裁决 I。
 
 Prompt 仅依据 route 最终实际注入的工具生成能力说明。text-only route 的有效工具集为空，不得列出或模仿工具调用。`tool_search` 无结果时返回 `NO_MATCH_IN_EFFECTIVE_TOOL_SET`、`authoritative: true` 与工具集 fingerprint；fingerprint 未变化时重复同一搜索属于无进展。
 

@@ -12,7 +12,6 @@ import type {
 import type { ThinkingArtifact } from '@shared/types/reasoning';
 import type { ConversationLoopStopReason } from '@shared/types/conversation';
 import type { AgentRole } from '@shared/types/agent';
-import type { WorkflowPhase, WorkflowStage } from '@shared/types/workflow';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import type {
   AgentEvent as CoreAgentEvent,
@@ -31,8 +30,6 @@ export interface AgentEventBridgeContext {
   runId?: string;
   turnId?: string;
   sessionId?: string | null;
-  stage?: WorkflowStage | 'report';
-  phase?: WorkflowPhase;
   profileId?: string;
   providerId?: string;
   modelId?: string;
@@ -54,8 +51,6 @@ export function buildSharedAgentEvent(
     turnId: context.turnId,
     sessionId: context.sessionId ?? null,
     agentId: context.agentId,
-    stage: context.stage,
-    phase: context.phase,
     payload,
   };
 }

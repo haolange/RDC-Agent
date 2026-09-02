@@ -371,7 +371,6 @@ export function useIpcEventBridge(options: {
         runId: string;
         sessionId: string;
         status: RunSummary['status'];
-        lastStage?: string;
         stopReason?: string;
       };
       if (!isActiveSessionEvent(payload.sessionId)) {
@@ -383,7 +382,6 @@ export function useIpcEventBridge(options: {
         session.setCurrentRun({
           ...current,
           status: payload.status,
-          lastStage: payload.lastStage || current.lastStage,
           stopReason: payload.stopReason || current.stopReason,
           stoppedAt: ['cancelled', 'interrupted'].includes(payload.status) ? Date.now() : current.stoppedAt,
         });

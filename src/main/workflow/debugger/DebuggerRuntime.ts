@@ -1,5 +1,5 @@
 import type { AgentRole } from '@shared/types/agent';
-import type { WorkflowStage, WorkflowState } from '@shared/types/workflow';
+import type { WorkflowState } from '@shared/types/workflow';
 import type {
   TraceSessionResult,
   TraceBranchSwitchResult,
@@ -40,13 +40,10 @@ export class DebuggerRuntime {
       return null;
     }
 
-    const activeRun = runExecutionService.listActiveRuns().find((entry) => entry.runId === run.runId);
     return {
       caseId: run.caseId,
       runId: run.runId,
       sessionId: run.sessionId,
-      currentStage: (activeRun?.stage as WorkflowStage | undefined) ?? (run.lastStage as WorkflowStage | undefined) ?? 'investigate',
-      previousStages: [],
       entryMode: 'cli',
       backend: 'local',
       orchestrationMode: 'multi_agent',
@@ -57,12 +54,12 @@ export class DebuggerRuntime {
     };
   }
 
-  resolveAgentToolAllowlist(agentId: AgentRole, stage?: WorkflowStage): string[] {
-    return resolveAgentToolAllowlist(agentId, stage);
+  resolveAgentToolAllowlist(agentId: AgentRole): string[] {
+    return resolveAgentToolAllowlist(agentId);
   }
 
-  isToolAllowedForAgent(toolName: string, agentId: AgentRole, stage?: WorkflowStage): boolean {
-    return isToolAllowedForAgent(toolName, agentId, stage);
+  isToolAllowedForAgent(toolName: string, agentId: AgentRole): boolean {
+    return isToolAllowedForAgent(toolName, agentId);
   }
 }
 

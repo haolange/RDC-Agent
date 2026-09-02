@@ -131,7 +131,6 @@ export interface ToolRuntimeSummary {
     toolCount: number;
     available: boolean;
   }>;
-  recommendedSpecialists: string[];
 }
 
 export interface CLIResult {

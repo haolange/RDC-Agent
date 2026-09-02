@@ -12,7 +12,6 @@ export interface WorkbenchIpcState {
 
 export interface RunLifecyclePatch {
   status: RunSummary['status'];
-  lastStage?: string;
   stopReason?: string;
   stoppedAt?: number;
   finishedAt?: number;
@@ -31,7 +30,6 @@ export interface WorkbenchIpcContext {
     runId: string;
     sessionId: string;
     status: string;
-    lastStage?: string;
     stopReason?: string;
   }): void;
   applyCurrentLlmConfig(): void;

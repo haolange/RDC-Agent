@@ -19,7 +19,6 @@ import type {
 } from './conversation';
 import type { LlmProviderAuthMode, LlmProviderId, LlmProviderProtocol } from './settings';
 import type { ToolCallResult } from './tool';
-import type { WorkflowPhase, WorkflowStage } from './workflow';
 
 export type ToolCallingMode = 'native-structured' | 'text-only' | 'disabled';
 
@@ -267,18 +266,7 @@ export interface AgentEvent {
   turnId?: string;
   sessionId?: string | null;
   agentId?: AgentRole;
-  stage?: WorkflowStage | 'report';
-  phase?: WorkflowPhase;
   payload: AgentEventPayload;
-}
-
-export interface AgentRuntimeStageDescriptor {
-  id: string;
-  label: string;
-  stage: WorkflowStage;
-  phase: WorkflowPhase;
-  requiresApproval?: boolean;
-  verifierAgents?: AgentRole[];
 }
 
 export interface AgentRuntimeSkillDescriptor {
@@ -343,8 +331,6 @@ export interface AgentRuntimeTaskDescriptor {
   title: string;
   status: 'pending' | 'running' | 'blocked' | 'completed' | 'failed' | 'cancelled';
   ownerAgentId: AgentRole;
-  stage?: WorkflowStage | 'report';
-  phase?: WorkflowPhase;
   dependsOn?: string[];
 }
 

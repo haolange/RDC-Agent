@@ -9,7 +9,6 @@ const eventContext = {
   turnId: 'turn-cancel-test',
   sessionId: 'session-cancel-test',
   agentId: 'debugger' as const,
-  stage: 'investigate' as const,
 };
 
 describe('cancel turn stability', () => {

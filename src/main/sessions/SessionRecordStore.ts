@@ -1,12 +1,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { appendJsonl, assertNoJsonlDiagnostics, readJsonl } from '@shared/utils/jsonl';
-import { readYaml, writeYaml } from '@shared/utils/yaml';
 import {
   generateEventId,
   generateRunId,
   generateShortId,
-  nowIso,
   nowMs,
   sanitizeToken,
 } from '@shared/utils/id';
@@ -14,18 +12,13 @@ import type { ActionEvent } from '@shared/types/evidence';
 import type { ConversationMessage } from '@shared/types/conversation';
 import type { ConversationBranchState } from '@shared/types/conversationBranch';
 import type {
-  Blocker,
-  WorkflowStage,
-  WorkflowState,
-} from '@shared/types/workflow';
-import type {
   CaptureDescriptor,
   ProjectRecord,
   RunSummary,
   SessionRecord,
 } from '@shared/types/session';
 import { isMissionAgentId } from '@shared/types/agent';
-import { toPersistedRunV2 } from './runV2/runRecordSchema';
+import { assertNoRunV3StageFields, toPersistedRunV3 } from './runV3/runRecordSchema';
 import { appPathService } from '../runtime/AppPathService';
 import type { PersistedRunRecord } from './storageTypes';
 import type { ReservedStagedConversationSession, StagedConversationSessionCommit } from './storageCommitTypes';
@@ -446,7 +439,7 @@ export class SessionRecordStore {
     const backend = input.backend
       || (captures.some((capture) => capture.backendHint === 'remote') ? 'remote' : 'local');
     const startedAt = nowMs();
-    const persistedRun = toPersistedRunV2({
+    const persistedRun = toPersistedRunV3({
       runId,
       turnId: input.turnId,
       projectId: session.projectId,
@@ -457,7 +450,6 @@ export class SessionRecordStore {
       captures: isMissionAgentId(input.profileId) ? captures : [],
       startedAt,
       status: input.status || 'queued',
-      lastStage: 'preflight',
       backend,
       createdAt: startedAt,
       updatedAt: startedAt,
@@ -467,37 +459,10 @@ export class SessionRecordStore {
         context_id: null,
         runtime_owner: null,
         session_id: sessionId,
-        workflow_stage: 'preflight',
       },
     });
 
     persistRunFiles(this.host, runPath, persistedRun);
-    if (persistedRun.kind === 'mission') {
-      writeYaml(path.join(runPath, 'capture_refs.yaml'), {
-        captures: persistedRun.captures.map((capture, index) => ({
-          capture_id: capture.id || `cap-${index}`,
-          capture_role: capture.role,
-          source_path: capture.filePath,
-        })),
-      });
-      writeYaml(path.join(runPath, 'notes', 'hypothesis_board.yaml'), {
-        hypothesis_board: {
-          session_id: sessionId,
-          entry_skill: persistedRun.mission,
-          user_goal: persistedRun.goal,
-          intake_state: 'handoff_ready',
-          current_phase: 'intake',
-          current_task: '',
-          active_owner: persistedRun.profileId,
-          pending_requirements: [],
-          blocking_issues: [],
-          progress_summary: ['accepted intake complete'],
-          next_actions: ['run dispatch_readiness before specialist dispatch'],
-          last_updated: nowIso(),
-          hypotheses: [],
-        },
-      });
-    }
 
     this.updateSession(sessionId, {
       goal: persistedRun.goal,
@@ -521,6 +486,9 @@ export class SessionRecordStore {
       return;
     }
 
+    assertNoRunV3StageFields(data, 'run patch');
+    assertNoRunV3StageFields(existing as unknown as Record<string, unknown>, 'persisted run');
+
     const allowedTopLevel = new Set([
       'status',
       'stopReason',
@@ -529,7 +497,6 @@ export class SessionRecordStore {
       'updatedAt',
       'finishedAt',
       'stoppedAt',
-      'lastStage',
       'goal',
       'captures',
       'reportPaths',
@@ -554,11 +521,12 @@ export class SessionRecordStore {
       existing as unknown as Record<string, unknown>,
       sanitizedPatch,
     ) as unknown as PersistedRunRecord;
-    const workflowStage = merged.runtime?.workflow_stage || existing.runtime.workflow_stage;
+    const runtimePatch = merged.runtime && typeof merged.runtime === 'object'
+      ? { ...merged.runtime }
+      : {};
     merged.runtime = {
       ...existing.runtime,
-      ...(merged.runtime || {}),
-      workflow_stage: workflowStage,
+      ...runtimePatch,
     };
     const identity = existing.kind === 'mission'
       ? { kind: existing.kind, profileId: existing.profileId, mission: existing.mission }
@@ -567,13 +535,8 @@ export class SessionRecordStore {
     if (existing.kind !== 'mission') {
       delete (merged as { mission?: unknown }).mission;
     }
-    merged.lastStage = workflowStage;
+    assertNoRunV3StageFields(merged as unknown as Record<string, unknown>, 'merged run');
     merged.updatedAt = nowMs();
-
-    if (workflowStage === 'finalize' && merged.status === 'running') {
-      merged.status = 'completed';
-      merged.finishedAt = merged.finishedAt || merged.updatedAt;
-    }
 
     persistRunFiles(this.host, this.getRunPath(merged.sessionId, merged.runId), merged);
     this.updateSession(caseId, {
@@ -655,51 +618,6 @@ export class SessionRecordStore {
       refs: input.refs || [],
       payload: input.payload,
     };
-  }
-
-  async getWorkflowState(caseId: string, runId: string): Promise<WorkflowState | null> {
-    const run = this.readPersistedRun(caseId, runId);
-    if (!run) return null;
-
-    return {
-      caseId,
-      runId,
-      sessionId: run.sessionId,
-      currentStage: run.runtime.workflow_stage,
-      previousStages: [],
-      entryMode: run.runtime.entry_mode,
-      backend: run.runtime.backend,
-      orchestrationMode: 'multi_agent',
-      coordinationMode: 'staged_handoff',
-      blockers: [],
-      lastUpdated: new Date(run.updatedAt).toISOString(),
-    };
-  }
-
-  async updateWorkflowStage(caseId: string, runId: string, stage: WorkflowStage, blockers: Blocker[] = []): Promise<void> {
-    const run = this.readPersistedRun(caseId, runId);
-    if (!run) return;
-
-    run.runtime.workflow_stage = stage;
-    run.lastStage = stage;
-    run.updatedAt = nowMs();
-
-    if (stage === 'finalize') {
-      run.status = 'completed';
-      run.finishedAt = run.finishedAt || run.updatedAt;
-    }
-
-    persistRunFiles(this.host, this.getRunPath(run.sessionId, run.runId), run);
-
-    if (blockers.length > 0) {
-      const boardPath = path.join(this.getRunPath(caseId, runId), 'notes', 'hypothesis_board.yaml');
-      const board = readYaml<Record<string, unknown>>(boardPath) || {};
-      const hypothesisBoard = (board.hypothesis_board as Record<string, unknown>) || {};
-      hypothesisBoard.blocking_issues = blockers;
-      hypothesisBoard.last_updated = nowIso();
-      board.hypothesis_board = hypothesisBoard;
-      writeYaml(boardPath, board);
-    }
   }
 
   writeRunFiles(run: PersistedRunRecord): void {

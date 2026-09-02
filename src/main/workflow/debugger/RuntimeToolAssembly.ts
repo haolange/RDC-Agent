@@ -4,7 +4,6 @@
 
 import type { AgentRole } from '@shared/types/agent';
 import type { MCPServerStatusSummary } from '@shared/types/mcp';
-import type { WorkflowStage } from '@shared/types/workflow';
 import type { ConversationAskUserQuestion } from '@shared/types/conversation';
 import { generateEventId, nowMs } from '@shared/utils/id';
 import { normalizeAskUserQuestions } from '@shared/utils/askUser';
@@ -127,10 +126,8 @@ export class RuntimeToolAssembly {
   isAllowedForRuntime(
     agentId: AgentRole,
     toolName: string,
-    stage?: WorkflowStage | 'report',
     frozenToolAllowlist?: readonly string[],
   ): boolean {
-    void stage;
     return isToolAllowedByFrozenAllowlist(toolName, agentId, frozenToolAllowlist ?? []);
   }
 
@@ -737,7 +734,6 @@ export class RuntimeToolAssembly {
   resolveRuntimeTools(
     agentId: AgentRole,
     toolAllowlist: string[],
-    stage?: WorkflowStage | 'report',
     sessionId?: string | null,
     turnHandle?: TurnHandle | null,
     projectId?: string | null,
@@ -767,7 +763,7 @@ export class RuntimeToolAssembly {
     const toolSearchTool = createToolSearchTool(() =>
       Array.from(availableTools.values()).filter((tool) =>
         this.matchesToolAllowlist(tool.name, toolAllowlist)
-        && this.isAllowedForRuntime(agentId, tool.name, stage, toolAllowlist),
+        && this.isAllowedForRuntime(agentId, tool.name, toolAllowlist),
       ),
     );
     availableTools.set(normalizeToolName(toolSearchTool.name), toolSearchTool);
@@ -776,7 +772,7 @@ export class RuntimeToolAssembly {
     const toolMap = new Map<string, AgentTool>();
     for (const tool of availableTools.values()) {
       if (!this.matchesToolAllowlist(tool.name, toolAllowlist)) continue;
-      if (!this.isAllowedForRuntime(agentId, tool.name, stage, toolAllowlist)) continue;
+      if (!this.isAllowedForRuntime(agentId, tool.name, toolAllowlist)) continue;
       const normalized = normalizeToolName(tool.name);
       if (!toolMap.has(normalized)) {
         toolMap.set(normalized, tool);

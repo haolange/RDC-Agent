@@ -476,7 +476,6 @@ export async function completeProfileTurn(
           runId: isActiveRun(input.context.currentRun) ? input.context.currentRun.runId : undefined,
           turnId: assistantMessage.turnId,
           requestId: input.requestId,
-          stage: 'investigate',
           projectRootPath: prepared.projectRootPath,
           projectId: input.context.projectId,
           systemPrompt: prepared.promptPlan.systemPrompt,
@@ -699,8 +698,6 @@ export async function completeProfileTurn(
         await storageAdapter.updateRun(sessionId, ownedRun.runId, {
           status: terminalRunStatus,
           finishedAt: nowMs(),
-          lastStage: 'finalize',
-          runtime: { workflow_stage: 'finalize' },
         });
       } catch (error) {
         console.error(`[ConversationService] Failed to finalize run ${ownedRun.runId}:`, error);

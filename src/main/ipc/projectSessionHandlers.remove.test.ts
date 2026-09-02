@@ -10,7 +10,7 @@ const { handlers, syncSessionSlots, storage, conversation } = vi.hoisted(() => (
   storage: {
     readSession: vi.fn(),
     getProjectById: vi.fn(),
-    listRuns: vi.fn(() => []),
+    listRuns: vi.fn((): Array<{ runId: string; status: string }> => []),
     removeSession: vi.fn(),
     listSessions: vi.fn(() => []),
     setCurrentSessionId: vi.fn(async () => undefined),
@@ -157,5 +157,47 @@ describe('session:remove slot sync', () => {
       success: true,
       session: expect.objectContaining({ sessionId: 'sess_1', agentId: 'edit' }),
     });
+  });
+
+  it('cancels an active run without writing lastStage', async () => {
+    storage.readSession.mockReturnValue({
+      sessionId: 'sess_1',
+      projectId: 'proj_1',
+      title: 't',
+      goal: '',
+      sessionPath: 'D:/sess_1',
+      createdAt: 1,
+      updatedAt: 1,
+    });
+    storage.listRuns.mockReturnValue([
+      { runId: 'run_1', status: 'running' },
+    ]);
+    const setRunLifecycleState = vi.fn(async (
+      _sessionId: string,
+      _runId: string,
+      _patch: Record<string, unknown>,
+    ) => undefined);
+    registerProjectSessionHandlers({
+      state: { currentSessionId: 'sess_1', currentProjectId: 'proj_1', currentRunId: 'run_1' },
+      broadcastToRenderer: vi.fn(),
+      broadcastRunStatusChanged: vi.fn(),
+      applyCurrentLlmConfig: vi.fn(),
+      setRunLifecycleState,
+      selectCurrentProject: vi.fn(async () => ({ project: null, currentSession: null, currentRun: null })),
+      initializeIpcState: vi.fn(async () => undefined),
+    } as unknown as WorkbenchIpcContext);
+
+    const handler = handlers.get('session:remove');
+    const result = await handler!({}, 'sess_1');
+    expect(result).toMatchObject({ success: true });
+    expect(setRunLifecycleState).toHaveBeenCalledWith('sess_1', 'run_1', {
+      status: 'cancelled',
+      stopReason: 'Session removed',
+      stoppedAt: expect.any(Number),
+      finishedAt: expect.any(Number),
+    });
+    const patch = setRunLifecycleState.mock.calls[0]?.[2] as Record<string, unknown>;
+    expect(patch).not.toHaveProperty('lastStage');
+    expect(JSON.stringify(patch)).not.toContain('lastStage');
   });
 });

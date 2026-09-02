@@ -4,6 +4,8 @@ import path from 'path';
 import type { StorageIo } from '../StorageIo';
 
 export const RUN_V2_BACKUP_DIR = 'migration-backups/run-v2';
+export const RUN_V3_BACKUP_DIR = 'migration-backups/run-v3';
+export const RUN_V3_MIGRATION_LOCK = '.run-v3-migration.lock';
 
 export interface RunArchiveResult {
   archivePath: string;
@@ -23,7 +25,7 @@ export function archiveRunOriginalBytes(
   bytes: string,
 ): RunArchiveResult {
   const sha256 = hashUtf8(bytes);
-  const archiveDir = path.join(sessionPath, RUN_V2_BACKUP_DIR, runId);
+  const archiveDir = path.join(sessionPath, RUN_V3_BACKUP_DIR, runId);
   const archivePath = path.join(archiveDir, `${sha256}.${sourceExt}`);
   io.ensureDir(archiveDir);
   if (fs.existsSync(archivePath)) {
@@ -33,17 +35,25 @@ export function archiveRunOriginalBytes(
       return { archivePath, sha256, idempotent: true };
     }
     throw new Error(
-      `RUN_V2_ARCHIVE_CONFLICT: ${archivePath} already exists with a different hash.`,
+      `RUN_V3_ARCHIVE_CONFLICT: ${archivePath} already exists with a different hash.`,
     );
   }
   io.writeUtf8AtomicFsync(archivePath, bytes);
   const archived = fs.readFileSync(archivePath, 'utf8');
   if (hashUtf8(archived) !== sha256) {
-    throw new Error(`RUN_V2_ARCHIVE_MISMATCH: archived bytes for ${runId} failed hash verification.`);
+    throw new Error(`RUN_V3_ARCHIVE_MISMATCH: archived bytes for ${runId} failed hash verification.`);
   }
   return { archivePath, sha256, idempotent: false };
 }
 
 export function isRunV2BackupPath(filePath: string): boolean {
   return filePath.replace(/\\/g, '/').includes(`/${RUN_V2_BACKUP_DIR}/`);
+}
+
+export function isRunV3BackupPath(filePath: string): boolean {
+  return filePath.replace(/\\/g, '/').includes(`/${RUN_V3_BACKUP_DIR}/`);
+}
+
+export function isRunMigrationBackupPath(filePath: string): boolean {
+  return isRunV2BackupPath(filePath) || isRunV3BackupPath(filePath);
 }

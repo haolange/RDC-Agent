@@ -8,7 +8,6 @@ const eventContext = {
   turnId: 'turn-ask-user-test',
   sessionId: 'session-ask-user-test',
   agentId: 'debugger' as const,
-  stage: 'investigate' as const,
 };
 
 const questions: ConversationAskUserQuestion[] = [

@@ -1,5 +1,4 @@
 import type { AgentRole } from '@shared/types/agent';
-import type { WorkflowStage } from '@shared/types/workflow';
 import {
   BUILTIN_AGENT_TOOL_ID_SET,
   CANONICAL_TOOL_TOKEN_EXPANSIONS,
@@ -89,9 +88,9 @@ export function resolveAgentToolAllowlistFromDefinition(
   return Array.from(new Set(profileTools));
 }
 
-export function resolveAgentToolAllowlist(agentId: AgentRole, stage?: WorkflowStage): string[] {
+export function resolveAgentToolAllowlist(agentId: AgentRole): string[] {
   const settings = settingsService.getAll();
-  const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, stage || 'investigate', agentId);
+  const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, agentId);
   const manifest = settings.agents.definitions.find((definition) => definition.id === agentId && definition.enabled);
   const profileTools = manifest
     ? manifest.tools.flatMap(expandToken)
@@ -124,9 +123,9 @@ export function isToolAllowedByFrozenAllowlist(
   return matchesAllowlistPattern(normalizedToolName, expandedAllowlist);
 }
 
-export function isToolAllowedForAgent(toolName: string, agentId: AgentRole, stage?: WorkflowStage): boolean {
+export function isToolAllowedForAgent(toolName: string, agentId: AgentRole): boolean {
   if (!isBuiltinToolAllowedForAgent(toolName, agentId)) return false;
-  return isToolAllowedByFrozenAllowlist(toolName, agentId, resolveAgentToolAllowlist(agentId, stage));
+  return isToolAllowedByFrozenAllowlist(toolName, agentId, resolveAgentToolAllowlist(agentId));
 }
 
 export function normalizeToolName(toolName: string): string {

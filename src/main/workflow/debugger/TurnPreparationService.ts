@@ -47,7 +47,6 @@ import {
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import type { McpConnectionCoordinator } from './McpConnectionCoordinator';
 import type { TurnHandle } from './TurnCoordinator';
-import type { WorkflowStage } from '@shared/types/workflow';
 import type { UserMessage, ToolDefinition } from '../../agent-runtime/core/types';
 import {
   countContinuationDecisions,
@@ -91,7 +90,6 @@ export interface TurnPreparationServiceDeps {
   resolveRuntimeTools: (
     agentId: AgentRole,
     toolAllowlist: string[],
-    stage?: WorkflowStage | 'report',
     sessionId?: string | null,
     turnHandle?: TurnHandle | null,
     projectId?: string | null,
@@ -179,7 +177,6 @@ export class TurnPreparationService {
     const runtimeTools = this.deps.resolveRuntimeTools(
       input.agentId,
       input.toolAllowlist,
-      'investigate',
       input.sessionId,
       undefined,
       input.projectId,

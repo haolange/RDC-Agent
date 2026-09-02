@@ -61,7 +61,6 @@ AgentRuntimeMcpDescriptor
 AgentRuntimeProfileDescriptor
 AgentRuntimeSettings
 AgentRuntimeSkillDescriptor
-AgentRuntimeStageDescriptor
 AgentRuntimeTaskDescriptor
 AgentRuntimeTaskGraphDescriptor
 AgentRunViewModel
@@ -85,7 +84,6 @@ AgentToolStartedPayload
 AgentWorkbenchCommandDeclaration
 AgentWorkbenchToolDeclaration
 AgentWorkbenchToolPermission
-ALL_STAGES
 AndroidBootstrapMetadata
 AnthropicWireEffort
 APP_DEFAULT_WINDOW_HEIGHT
@@ -661,7 +659,6 @@ LLMStreamEvent
 LLMToolCallDelta
 loadProviderCatalogManifestInput
 LogPreview
-MAIN_STAGES
 McpApi
 MCPConnectionInfo
 MCPConnectionStatus
@@ -731,7 +728,6 @@ normalizeAskUserQuestions
 normalizeBranchId
 NormalizedToolResult
 normalizeHexColor
-normalizeWorkflowStage
 nowIso
 nowMs
 ObservationFact
@@ -1008,18 +1004,13 @@ SettingsDiagnostic
 shortArtifactHash
 shouldShowForkNavigatorForMessage
 SidebarLayoutPreference
-SIMPLIFIED_STAGES
 SkillExecutionContext
 SkillExecutionResult
 SkillLoadResult
 SkillMetadata
 SkillParameter
-SPECIAL_STAGES
 SpecialistToken
 splitCanonicalAgentModelId
-STAGE_DISPLAY_NAMES
-STAGE_GROUPS
-STAGE_PHASES
 StatePlan
 StreamingPlan
 stringifyYaml
@@ -1130,8 +1121,6 @@ WindowControlsApi
 WindowLayoutPreference
 WORKBENCH_CHAT_RAIL_MAX_WIDTH
 WorkflowApi
-WorkflowPhase
-WorkflowStage
 WorkflowState
 WorkflowStateView
 WORLD_STATE_KINDS

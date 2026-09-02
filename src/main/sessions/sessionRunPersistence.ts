@@ -1,11 +1,10 @@
 import * as path from 'path';
-import { writeYaml } from '@shared/utils/yaml';
-import { normalizeWorkflowStage } from '@shared/constants/stages';
+import { stringifyYaml } from '@shared/utils/yaml';
 import type { RunSummary } from '@shared/types/session';
 import type { PersistedRunRecord } from './storageTypes';
 import type { StorageHost } from './storageHost';
-import { readOrMigratePersistedRun } from './runV2/runMigration';
-import { PersistedRunRecordV2Schema } from './runV2/runRecordSchema';
+import { readOrMigratePersistedRun } from './runV3/runMigration';
+import { PersistedRunRecordV3Schema } from './runV3/runRecordSchema';
 
 export function toRunSummary(run: PersistedRunRecord): RunSummary {
   const { createdAt: _createdAt, updatedAt: _updatedAt, runtime: _runtime, ...summary } = run;
@@ -13,13 +12,13 @@ export function toRunSummary(run: PersistedRunRecord): RunSummary {
 }
 
 export function writeRunFiles(host: StorageHost, runPath: string, run: PersistedRunRecord): void {
-  const parsed = PersistedRunRecordV2Schema.safeParse(run);
+  const parsed = PersistedRunRecordV3Schema.safeParse(run);
   if (!parsed.success) {
-    throw new Error(`STORAGE_SCHEMA: refused to write invalid Run v2: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`);
+    throw new Error(`STORAGE_SCHEMA: refused to write invalid Run v3: ${parsed.error.issues.map((issue) => issue.message).join('; ')}`);
   }
   host.io.ensureDir(runPath);
-  host.io.writeJsonAtomic(path.join(runPath, 'run.json'), parsed.data);
-  writeYaml(path.join(runPath, 'run.yaml'), parsed.data);
+  host.io.writeUtf8AtomicFsync(path.join(runPath, 'run.json'), `${JSON.stringify(parsed.data, null, 2)}\n`);
+  host.io.writeUtf8AtomicFsync(path.join(runPath, 'run.yaml'), stringifyYaml(parsed.data));
 }
 
 export function readPersistedRun(
@@ -30,9 +29,5 @@ export function readPersistedRun(
   sessionPath?: string,
 ): PersistedRunRecord | null {
   const resolvedSessionPath = sessionPath ?? path.dirname(path.dirname(runPath));
-  const run = readOrMigratePersistedRun(host, runPath, resolvedSessionPath, sessionId, runId);
-  if (!run) return null;
-  run.lastStage = normalizeWorkflowStage(run.lastStage);
-  run.runtime.workflow_stage = normalizeWorkflowStage(run.runtime.workflow_stage);
-  return run;
+  return readOrMigratePersistedRun(host, runPath, resolvedSessionPath, sessionId, runId);
 }

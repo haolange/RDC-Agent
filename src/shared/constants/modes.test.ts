@@ -5,7 +5,8 @@ describe('modes', () => {
   it('exposes capability tables for product modes', () => {
     expect(MODE_CAPABILITIES.ask).toBeUndefined();
     expect(MODE_CAPABILITIES.general.profileId).toBe('general');
-    expect(MODE_CAPABILITIES.debugger.availableStages.length).toBeGreaterThan(0);
+    expect(MODE_CAPABILITIES.debugger.profileId).toBe('debugger');
+    expect(MODE_CAPABILITIES.debugger.isFullyImplemented).toBe(true);
     expect(MODE_CAPABILITIES.analyzer.isFullyImplemented).toBe(false);
     expect(MODE_CAPABILITIES.optimizer.disabledReason).toMatch(/not implemented/i);
   });

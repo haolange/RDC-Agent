@@ -1,5 +1,4 @@
 import type {
-  WorkflowStage,
   WorkflowState,
 } from './workflow';
 import type { AgentConfig, AgentRole, AgentState } from './agent';
@@ -233,7 +232,7 @@ export interface ElectronAPI {
      */
     getRunUsage: (request: RunContextUsageRequest) => Promise<RunContextUsageReadResult>;
     listRuns: () => Promise<{ runs: RunSummary[] }>;
-    listActiveRuns: () => Promise<{ runs: Array<{ runId: string; sessionId: string; projectId: string; startedAt: number; stage?: string }> }>;
+    listActiveRuns: () => Promise<{ runs: Array<{ runId: string; sessionId: string; projectId: string; startedAt: number }> }>;
   };
 
   agent: {
@@ -518,8 +517,7 @@ export interface ElectronAPI {
 
   events: {
     onWorkflowStateChanged: (callback: (state: WorkflowState) => void) => () => void;
-    onWorkflowStageChanged: (callback: (data: { stage: WorkflowStage; blockers: unknown[] }) => void) => () => void;
-    onRunStatusChanged: (callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; lastStage?: string; stopReason?: string }) => void) => () => void;
+    onRunStatusChanged: (callback: (data: { runId: string; sessionId: string; status: RunSummary['status']; stopReason?: string }) => void) => () => void;
     onRunUsageChanged: (
       callback: (summary: SessionScopedPayload<RunContextUsageSummary>) => void
     ) => () => void;
