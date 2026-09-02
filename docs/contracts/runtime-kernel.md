@@ -153,7 +153,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 无内置 RDX toolchain。**General** 与 UI 的 Open capture / remote / preview / close 以及 Live RDC mutate 走 Settings shell action / `shell` → `ShellInvocationService`，且必须持有 exclusive lease。**Mission planner** 禁止 `shell` 与 `code_interpreter`；只通过受控只读 `rdx_probe` + `rdx_context` 访问 RDX（见 `DESIGN.md` 裁决 J）。`rdx_probe` 唯一执行路径是 Settings `tooling.rdxCli` 已配置的只读 shell action；仓库不得硬编码 CLI 路径。已打开 `.rdc` 由 `ownerSessionId` 拥有；不匹配 fail-closed。Local + Android-origin capture 不得静默 fallback remote。
 
-RDX runtime context 仅绑定 per-session lease（`RdxRuntimeContextRegistry`）。禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext` 全局 API；工具路径经 `assertRdxContextLeaseOwnership`。parent 可授予 child 一条 scoped、生命周期绑定的 delegated lease（完整实现 T06）；`requiresRdxLease=false` 的 child 在 allowlist 层不得看到 RDX 工具。
+RDX runtime context 仅绑定 per-session lease（`RdxRuntimeContextRegistry`）。禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext` 全局 API；工具路径经 `assertRdxContextLeaseOwnership`，不得回退 parent。parent 经 `grantDelegatedLease` 授予 child 一条 scoped、生命周期绑定的 delegated lease；child 结束立即 `revokeDelegatedLease`。`requiresRdxLease=false` 的 child 在 allowlist 编译期不得看到 `rdx_context` / `rdx_probe`。
 
 ## Model Capability（摘要）
 

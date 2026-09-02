@@ -36,6 +36,12 @@ describe('DelegationCapsule', () => {
     expect(prompt).toContain('inspect the color target');
     expect(prompt).toContain('session://tool-outputs/notes/a.md');
     expect(prompt).toContain('requiresRdxLease: false');
+    expect(Object.isFrozen(capsule)).toBe(true);
+    expect(Object.isFrozen(capsule.budget)).toBe(true);
+    expect(Object.isFrozen(segments)).toBe(true);
+    expect(() => {
+      (capsule as { task: string }).task = 'mutated';
+    }).toThrow();
   });
 
   it('fails closed when required fields are missing or empty', () => {

@@ -43,6 +43,8 @@ export interface ProfileTurnPreparationInput {
   signal?: AbortSignal;
   /** When true, skip journal materialization (isolated child turns). */
   isolateContext?: boolean;
+  excludeRdxLeaseTools?: boolean;
+  frozenDelegationCapsule?: import('@shared/types/delegationCapsule').DelegationCapsule;
 }
 
 export class ProfileTurnPreparation {
@@ -119,6 +121,8 @@ export class ProfileTurnPreparation {
       visibleTurnIds: input.isolateContext ? [] : (input.visibleTurnIds ?? []),
       activeBranchId: input.activeBranchId ?? null,
       signal: input.signal,
+      excludeRdxLeaseTools: input.excludeRdxLeaseTools,
+      frozenDelegationCapsule: input.frozenDelegationCapsule,
     });
     return {
       prepared,

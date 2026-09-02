@@ -26,10 +26,15 @@ import { createEphemeralScopeId } from './executionScope';
 import { resolveSubagentModelOverride } from './subagentModelArg';
 import {
   DELEGATION_CAPSULE_JSON_SCHEMA,
+  freezeDelegationCapsule,
   parseDelegationCapsule,
   type DelegationCapsule,
 } from '@shared/types/delegationCapsule';
 import { compileDelegationCapsule } from '../../agent-runtime/prompt/DelegationCapsuleCompiler';
+import {
+  grantDelegatedLease,
+  revokeDelegatedLease,
+} from '../../sessions/RdxRuntimeContextRegistry';
 
 export interface SubagentRunnerDeps {
   sendProfileMessage: (
@@ -165,7 +170,23 @@ export class SubagentRunner {
       if (childAbort.signal.aborted) {
         throw new DOMException('Aborted', 'AbortError');
       }
-      const capsuleSegments = compileDelegationCapsule(capsule);
+      const frozenCapsule = freezeDelegationCapsule(capsule);
+      const capsuleSegments = compileDelegationCapsule(frozenCapsule);
+      if (frozenCapsule.requiresRdxLease) {
+        if (!input.parentSessionId?.trim()) {
+          throw new Error('RDX_LEASE_DELEGATE_DENIED: requiresRdxLease=true but no parent session.');
+        }
+        const ownerTurnId = input.parentTurn?.turnId?.trim() ?? '';
+        if (!ownerTurnId) {
+          throw new Error('RDX_LEASE_DELEGATE_DENIED: requiresRdxLease=true but parent turn id is missing.');
+        }
+        grantDelegatedLease({
+          parentSessionId: input.parentSessionId,
+          childSessionId: subagentSessionId,
+          ...(input.projectId ? { projectId: input.projectId } : {}),
+          ownerTurnId,
+        });
+      }
       childPromise = this.deps.sendProfileMessage(
         input.targetProfile,
         task,
@@ -181,6 +202,8 @@ export class SubagentRunner {
           subagentBudget: childBudget,
           modelOverride: modelOverride ?? null,
           extraPromptSegments: capsuleSegments,
+          frozenDelegationCapsule: frozenCapsule,
+          excludeRdxLeaseTools: !frozenCapsule.requiresRdxLease,
           onEvent: (event: SharedAgentEvent) => {
             if (input.parentTurn && !input.parentTurn.isLive(input.parentTurn.generation)) {
               return;
@@ -284,6 +307,7 @@ export class SubagentRunner {
       resultStatus = aborted ? 'cancelled' : 'failed';
       resultText = error instanceof Error ? error.message : String(error);
     } finally {
+      revokeDelegatedLease(subagentSessionId);
       unregisterProducer?.();
       if (parentSignal) {
         parentSignal.removeEventListener('abort', onParentAbort);

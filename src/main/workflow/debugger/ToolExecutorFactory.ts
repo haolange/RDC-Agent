@@ -27,6 +27,7 @@ import {
   intersectSkillAllowedTools,
   normalizeToolName,
 } from './DebuggerRuntimePolicy';
+import { isRdxLeaseToolName } from '@shared/constants/rdxLeaseTools';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
 import { reserveDispatchBudget, type TurnHandle } from './TurnCoordinator';
@@ -47,11 +48,13 @@ export interface ToolExecutorFactoryDeps {
     projectId?: string | null,
     projectRootPath?: string | null,
     mcpPoolKey?: string | null,
+    options?: { excludeRdxLeaseTools?: boolean },
   ) => ResolvedRuntimeTools;
   isAllowedForRuntime: (
     agentId: AgentRole,
     toolName: string,
     frozenToolAllowlist?: readonly string[],
+    excludeRdxLeaseTools?: boolean,
   ) => boolean;
   matchesToolAllowlist: (toolName: string, toolAllowlist: string[]) => boolean;
 }
@@ -100,6 +103,7 @@ export class ToolExecutorFactory {
       runtimeContext?.projectId ?? plan?.projectId,
       runtimeContext?.projectRootPath ?? plan?.projectRootPath,
       runtimeContext?.mcpPoolKey ?? null,
+      { excludeRdxLeaseTools: plan?.excludeRdxLeaseTools === true },
     ).toolMap;
     // Skill allowed-tools 收窄集（DESIGN Skills 条款：只收窄、不扩展）。
     // 多 skill：allowedTools = ∩(skill_i) ∩ runtimeAllowlist（空声明不参与）。
@@ -152,7 +156,16 @@ export class ToolExecutorFactory {
           runtimeContext,
         );
         const normalizedName = normalizeToolName(toolCall.name);
-        if (!this.deps.isAllowedForRuntime(agentId, toolCall.name, effectiveToolAllowlist) || !tools.has(normalizedName)) {
+        if (
+          (plan?.excludeRdxLeaseTools && isRdxLeaseToolName(toolCall.name))
+          || !this.deps.isAllowedForRuntime(
+            agentId,
+            toolCall.name,
+            effectiveToolAllowlist,
+            plan?.excludeRdxLeaseTools === true,
+          )
+          || !tools.has(normalizedName)
+        ) {
           return denyTool();
         }
         if (

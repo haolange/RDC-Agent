@@ -8,6 +8,9 @@ import { DEFAULT_CONTEXT_COMPACTION_PERCENT } from '@shared/types/modelCapabilit
 import { resolveEffectiveCompactionPercent } from '@shared/utils/contextBudget';
 import type { ToolDefinition } from './core/types';
 import { compileEffectivePolicy, emptyCompiledPolicy } from './permissions/PolicyCompiler';
+import type { DelegationCapsule } from '@shared/types/delegationCapsule';
+import { freezeDelegationCapsule } from '@shared/types/delegationCapsule';
+import { isRdxLeaseToolName, stripRdxLeaseToolsFromAllowlist } from '@shared/constants/rdxLeaseTools';
 
 export interface FrozenHandoffDefinition {
   agent: string;
@@ -59,6 +62,13 @@ export interface EffectiveRuntimePlan {
   requestPlanFingerprint: string;
   promptPlanFingerprint: string;
   attachmentManifestFingerprint: string | null;
+  /**
+   * Offline child plans strip RDX lease tools at compile time.
+   * Executor / tool_search must keep denying those ids even if a wildcard remains.
+   */
+  excludeRdxLeaseTools: boolean;
+  /** Frozen Delegation Capsule when this plan was prepared for a subagent child. */
+  delegationCapsule: DelegationCapsule | null;
   /** Frozen at plan build; Prompt 与 Executor 共用。 */
   createdAt: number;
 }
@@ -92,6 +102,10 @@ export interface BuildEffectiveRuntimePlanInput {
   /** User-level compaction percent before policy min-merge. */
   compactionThresholdPercent?: number;
   attachmentManifestFingerprint?: string | null;
+  /** When true, strip rdx_context / rdx_probe from frozen allowlists. */
+  excludeRdxLeaseTools?: boolean;
+  /** Structured clone stored on the child plan after capsule freeze. */
+  delegationCapsule?: DelegationCapsule | null;
 }
 
 export function policyFingerprintOf(policy: CompiledPolicy): string {
@@ -157,11 +171,26 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
   })));
   const enabledProfileIds = freezeStringList(input.enabledProfileIds);
   const profileDelegates = freezeStringList(input.profileDelegates ?? input.profile?.agents ?? []);
-  const toolAllowlist = freezeStringList(input.toolAllowlist);
+  const excludeRdxLeaseTools = input.excludeRdxLeaseTools === true;
+  const rawAllowlist = excludeRdxLeaseTools
+    ? stripRdxLeaseToolsFromAllowlist(input.toolAllowlist)
+    : input.toolAllowlist;
+  const toolAllowlist = freezeStringList(rawAllowlist);
   const skillIntersection = input.skillIntersection === undefined || input.skillIntersection === null
     ? null
-    : freezeStringList(input.skillIntersection);
-  const visibleToolNames = freezeStringList(input.visibleToolNames);
+    : freezeStringList(
+      excludeRdxLeaseTools
+        ? stripRdxLeaseToolsFromAllowlist(input.skillIntersection)
+        : input.skillIntersection,
+    );
+  const visibleToolNames = freezeStringList(
+    excludeRdxLeaseTools
+      ? stripRdxLeaseToolsFromAllowlist(input.visibleToolNames ?? [])
+      : input.visibleToolNames,
+  );
+  const delegationCapsule = input.delegationCapsule
+    ? freezeDelegationCapsule(structuredClone(input.delegationCapsule))
+    : null;
   const activatedDeferredTools = serializeActivatedDeferred(input.activatedDeferredTools);
   const mcpDescriptorHash = input.mcpDescriptorHash ?? null;
   const policyFingerprint = policyFingerprintOf(policy);
@@ -195,6 +224,8 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     requestPlanFingerprint,
     promptPlanFingerprint,
     attachmentManifestFingerprint,
+    excludeRdxLeaseTools,
+    delegationCapsule,
   ]);
   return {
     schemaVersion: EFFECTIVE_RUNTIME_PLAN_SCHEMA_VERSION,
@@ -222,6 +253,8 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     requestPlanFingerprint,
     promptPlanFingerprint,
     attachmentManifestFingerprint,
+    excludeRdxLeaseTools,
+    delegationCapsule,
     createdAt: Date.now(),
   };
 }
@@ -233,5 +266,10 @@ export function activeToolNamesForPlan(
   const allow = new Set(plan.toolAllowlist.map((name) => name.trim().toLowerCase()));
   return definitions
     .map((definition) => definition.name)
-    .filter((name) => allow.size === 0 || allow.has(name.trim().toLowerCase()));
+    .filter((name) => {
+      if (plan.excludeRdxLeaseTools && isRdxLeaseToolName(name)) {
+        return false;
+      }
+      return allow.size === 0 || allow.has(name.trim().toLowerCase());
+    });
 }

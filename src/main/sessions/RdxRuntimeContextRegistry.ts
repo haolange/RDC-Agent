@@ -1,9 +1,13 @@
 /**
  * Per-session RDX context leases. Tools must verify ownership before reading.
+ * Parent sessions may grant one scoped, lifecycle-bound delegated lease to a child.
  */
 
 import { createHash } from 'crypto';
 import type { RdxRuntimeContext } from '@shared/types/session';
+
+export const RDX_LEASE_DELEGATE_DENIED = 'RDX_LEASE_DELEGATE_DENIED';
+export const RDX_LEASE_DUAL_OWNER = 'RDX_LEASE_DUAL_OWNER';
 
 export interface RdxContextLease {
   contextId: string;
@@ -13,9 +17,22 @@ export interface RdxContextLease {
   captureHash: string | null;
   runtimeContext: RdxRuntimeContext;
   updatedAt: number;
+  /** Parent session id when this lease is a delegated copy. Independent leases omit it. */
+  delegatedFrom?: string;
+  /** Parent turn that owns the delegated grant. */
+  ownerTurnId?: string;
+}
+
+export interface GrantDelegatedLeaseInput {
+  parentSessionId: string;
+  childSessionId: string;
+  projectId?: string | null;
+  ownerTurnId: string;
 }
 
 const leasesBySession = new Map<string, RdxContextLease>();
+/** At most one live delegated child per parent. */
+const delegatedChildByParent = new Map<string, string>();
 let versionSeq = 0;
 
 function computeCaptureHash(runtimeContext: RdxRuntimeContext): string | null {
@@ -49,7 +66,19 @@ export function setRdxRuntimeContextForSession(
     return null;
   }
   if (!runtimeContext) {
+    const existing = leasesBySession.get(trimmed);
+    const delegatedChild = delegatedChildByParent.get(trimmed);
+    if (delegatedChild) {
+      revokeDelegatedLease(delegatedChild);
+    }
+    if (existing?.delegatedFrom && delegatedChildByParent.get(existing.delegatedFrom) === trimmed) {
+      delegatedChildByParent.delete(existing.delegatedFrom);
+    }
     leasesBySession.delete(trimmed);
+    return null;
+  }
+  const existing = leasesBySession.get(trimmed);
+  if (existing?.delegatedFrom) {
     return null;
   }
   versionSeq += 1;
@@ -95,6 +124,7 @@ export function getMostRecentRdxContextLease(): RdxContextLease | null {
 /**
  * Verify that the calling session owns the lease for the requested context.
  * Fail-closed: missing session or mismatched ownership returns null.
+ * Does not fall back to a parent session.
  */
 export function assertRdxContextLeaseOwnership(input: {
   sessionId?: string | null;
@@ -113,8 +143,100 @@ export function assertRdxContextLeaseOwnership(input: {
   return getRdxContextLease(sessionId);
 }
 
+function failDelegatedLease(code: string, detail: string): never {
+  throw new Error(`${code}: ${detail}`);
+}
+
+/**
+ * Copy the parent session's RDX context onto the child as a delegated lease.
+ * Child leases are not transferable. Only one live delegated child per parent.
+ */
+export function grantDelegatedLease(input: GrantDelegatedLeaseInput): RdxContextLease {
+  const parentSessionId = input.parentSessionId.trim();
+  const childSessionId = input.childSessionId.trim();
+  const ownerTurnId = input.ownerTurnId.trim();
+  if (!parentSessionId) {
+    failDelegatedLease(RDX_LEASE_DELEGATE_DENIED, 'parent session id is required.');
+  }
+  if (!childSessionId) {
+    failDelegatedLease(RDX_LEASE_DELEGATE_DENIED, 'child session id is required.');
+  }
+  if (!ownerTurnId) {
+    failDelegatedLease(RDX_LEASE_DELEGATE_DENIED, 'ownerTurnId is required.');
+  }
+  if (parentSessionId === childSessionId) {
+    failDelegatedLease(RDX_LEASE_DELEGATE_DENIED, 'child session must be distinct from parent.');
+  }
+
+  const parentLease = leasesBySession.get(parentSessionId);
+  if (!parentLease) {
+    failDelegatedLease(RDX_LEASE_DELEGATE_DENIED, 'parent session has no RDX runtime context lease.');
+  }
+  if (parentLease.delegatedFrom) {
+    failDelegatedLease(RDX_LEASE_DELEGATE_DENIED, 'child lease is not independently transferable.');
+  }
+  if (input.projectId != null && parentLease.ownerProjectId !== input.projectId) {
+    failDelegatedLease(RDX_LEASE_DELEGATE_DENIED, 'projectId does not match the parent RDX lease.');
+  }
+
+  const existingChild = delegatedChildByParent.get(parentSessionId);
+  if (existingChild && existingChild !== childSessionId && leasesBySession.has(existingChild)) {
+    failDelegatedLease(RDX_LEASE_DUAL_OWNER, 'parent already has a live delegated RDX lease.');
+  }
+
+  const existingLease = leasesBySession.get(childSessionId);
+  if (existingLease && !existingLease.delegatedFrom) {
+    failDelegatedLease(RDX_LEASE_DELEGATE_DENIED, 'child session already holds an independent RDX lease.');
+  }
+  if (existingLease?.delegatedFrom && existingLease.delegatedFrom !== parentSessionId) {
+    failDelegatedLease(RDX_LEASE_DELEGATE_DENIED, 'child session already holds a delegated RDX lease.');
+  }
+
+  versionSeq += 1;
+  const lease: RdxContextLease = {
+    contextId: parentLease.contextId,
+    version: versionSeq,
+    ownerSessionId: childSessionId,
+    ownerProjectId: parentLease.ownerProjectId,
+    captureHash: parentLease.captureHash,
+    runtimeContext: cloneRuntimeContext(parentLease.runtimeContext),
+    updatedAt: Date.now(),
+    delegatedFrom: parentSessionId,
+    ownerTurnId,
+  };
+  leasesBySession.set(childSessionId, lease);
+  delegatedChildByParent.set(parentSessionId, childSessionId);
+  return getRdxContextLease(childSessionId)!;
+}
+
+/** Remove a child's delegated binding. Parent lease is unchanged. */
+export function revokeDelegatedLease(childSessionId: string): boolean {
+  const trimmed = childSessionId.trim();
+  if (!trimmed) return false;
+  const lease = leasesBySession.get(trimmed);
+  for (const [parent, child] of delegatedChildByParent) {
+    if (child === trimmed) {
+      delegatedChildByParent.delete(parent);
+    }
+  }
+  if (!lease?.delegatedFrom) {
+    return false;
+  }
+  leasesBySession.delete(trimmed);
+  return true;
+}
+
+export function getDelegatedChildSessionId(parentSessionId: string): string | null {
+  const trimmed = parentSessionId.trim();
+  if (!trimmed) return null;
+  const child = delegatedChildByParent.get(trimmed);
+  if (!child || !leasesBySession.has(child)) return null;
+  return child;
+}
+
 export function clearRdxContextLeases(): void {
   leasesBySession.clear();
+  delegatedChildByParent.clear();
   versionSeq = 0;
 }
 

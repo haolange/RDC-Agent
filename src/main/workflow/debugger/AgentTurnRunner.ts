@@ -95,6 +95,7 @@ export interface AgentTurnRunnerDeps {
     projectId?: string | null,
     projectRootPath?: string | null,
     mcpPoolKey?: string | null,
+    options?: { excludeRdxLeaseTools?: boolean },
   ) => ResolvedRuntimeTools;
   createToolSignature: (tools: ToolDefinition[]) => string;
   createToolExecutor: (
@@ -415,6 +416,7 @@ export class AgentTurnRunner {
       input.projectId,
       input.projectRootPath,
       mcpLease?.poolKey ?? null,
+      { excludeRdxLeaseTools: preparedRuntime.effectivePlan.excludeRdxLeaseTools === true },
     );
     // Preparation freezes the schemas sent to the provider before a staged
     // conversation session has a durable run. Rebuild tool instances here so

@@ -265,4 +265,32 @@ describe('EffectiveRuntimePlan', () => {
     expect(plan.fingerprint).not.toBe(unlimitedPlan.fingerprint);
     expect(policyFingerprintOf(tightened)).not.toBe(policyFingerprintOf(unlimited));
   });
+
+  it('strips RDX lease tools from an offline child plan', () => {
+    const policy = compilePolicyFromRestrictive({ deniedTools: [], limits: { maxTurns: 3 } });
+    const plan = buildEffectiveRuntimePlan({
+      agentId: 'general',
+      projectRootPath: 'D:/Project',
+      profile: { skills: [] },
+      toolAllowlist: ['read_file', 'rdx_context', 'rdx_probe', 'rdx', 'shell'],
+      permissionSettings: basePermission,
+      routeCapability,
+      requestPlan: { executionIdentity: { fingerprint: 'offline' } },
+      promptPlan: { systemPrompt: 'system' },
+      policy,
+      skillIntersection: ['read_file', 'rdx_context'],
+      visibleToolNames: ['read_file', 'rdx_context', 'shell'],
+      activatedDeferredTools: [],
+      mcpDescriptorHash: null,
+      excludeRdxLeaseTools: true,
+    });
+    expect(plan.excludeRdxLeaseTools).toBe(true);
+    expect(plan.toolAllowlist).toEqual(['read_file', 'shell']);
+    expect(plan.skillIntersection).toEqual(['read_file']);
+    expect(plan.visibleToolNames).toEqual(['read_file', 'shell']);
+    expect(activeToolNamesForPlan([
+      { name: 'rdx_context', description: '', parameters: { type: 'object', properties: {} } },
+      { name: 'shell', description: '', parameters: { type: 'object', properties: {} } },
+    ], plan)).toEqual(['shell']);
+  });
 });

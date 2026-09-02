@@ -6,6 +6,11 @@ import {
   clearRdxContextLeases,
   getMostRecentRdxContextLease,
   listRdxContextLeaseSessionIds,
+  grantDelegatedLease,
+  revokeDelegatedLease,
+  getDelegatedChildSessionId,
+  RDX_LEASE_DELEGATE_DENIED,
+  RDX_LEASE_DUAL_OWNER,
 } from './RdxRuntimeContextRegistry';
 import type { RdxRuntimeContext } from '@shared/types/session';
 
@@ -65,5 +70,117 @@ describe('RdxRuntimeContextRegistry leases', () => {
     setRdxRuntimeContextForSession('s2', ctx('c2'));
     expect(getMostRecentRdxContextLease()?.contextId).toBe('c2');
     expect(listRdxContextLeaseSessionIds().sort()).toEqual(['s1', 's2']);
+  });
+});
+
+describe('RdxRuntimeContextRegistry delegated leases', () => {
+  beforeEach(() => {
+    clearRdxContextLeases();
+  });
+
+  it('grants a child copy with delegatedFrom and leaves the parent unchanged', () => {
+    setRdxRuntimeContextForSession('parent', ctx('c1', { captureId: 'cap-live' }), { projectId: 'p1' });
+    const child = grantDelegatedLease({
+      parentSessionId: 'parent',
+      childSessionId: 'parent::subagent::child-1',
+      projectId: 'p1',
+      ownerTurnId: 'turn-1',
+    });
+    expect(child.delegatedFrom).toBe('parent');
+    expect(child.ownerSessionId).toBe('parent::subagent::child-1');
+    expect(child.ownerTurnId).toBe('turn-1');
+    expect(child.runtimeContext.captureId).toBe('cap-live');
+    expect(assertRdxContextLeaseOwnership({
+      sessionId: 'parent::subagent::child-1',
+      projectId: 'p1',
+    })?.contextId).toBe('c1');
+    expect(getRdxContextLease('parent')?.delegatedFrom).toBeUndefined();
+    expect(getRdxContextLease('parent')?.ownerSessionId).toBe('parent');
+  });
+
+  it('fail-closes grant without a parent lease', () => {
+    expect(() => grantDelegatedLease({
+      parentSessionId: 'missing',
+      childSessionId: 'child',
+      ownerTurnId: 'turn-1',
+    })).toThrow(new RegExp(RDX_LEASE_DELEGATE_DENIED));
+    expect(getRdxContextLease('child')).toBeNull();
+  });
+
+  it('rejects a second live delegated child for the same parent', () => {
+    setRdxRuntimeContextForSession('parent', ctx('c1'), { projectId: 'p1' });
+    grantDelegatedLease({
+      parentSessionId: 'parent',
+      childSessionId: 'child-a',
+      projectId: 'p1',
+      ownerTurnId: 'turn-1',
+    });
+    expect(() => grantDelegatedLease({
+      parentSessionId: 'parent',
+      childSessionId: 'child-b',
+      projectId: 'p1',
+      ownerTurnId: 'turn-1',
+    })).toThrow(new RegExp(RDX_LEASE_DUAL_OWNER));
+    expect(getDelegatedChildSessionId('parent')).toBe('child-a');
+    expect(getRdxContextLease('child-b')).toBeNull();
+  });
+
+  it('does not let a delegated child grant a grandchild', () => {
+    setRdxRuntimeContextForSession('parent', ctx('c1'), { projectId: 'p1' });
+    grantDelegatedLease({
+      parentSessionId: 'parent',
+      childSessionId: 'child',
+      projectId: 'p1',
+      ownerTurnId: 'turn-1',
+    });
+    expect(() => grantDelegatedLease({
+      parentSessionId: 'child',
+      childSessionId: 'grandchild',
+      projectId: 'p1',
+      ownerTurnId: 'turn-2',
+    })).toThrow(/not independently transferable/);
+    expect(getRdxContextLease('grandchild')).toBeNull();
+  });
+
+  it('revokes only the child lease', () => {
+    setRdxRuntimeContextForSession('parent', ctx('c1'), { projectId: 'p1' });
+    grantDelegatedLease({
+      parentSessionId: 'parent',
+      childSessionId: 'child',
+      projectId: 'p1',
+      ownerTurnId: 'turn-1',
+    });
+    expect(revokeDelegatedLease('child')).toBe(true);
+    expect(getRdxContextLease('child')).toBeNull();
+    expect(assertRdxContextLeaseOwnership({ sessionId: 'child', projectId: 'p1' })).toBeNull();
+    expect(getRdxContextLease('parent')?.contextId).toBe('c1');
+    expect(getDelegatedChildSessionId('parent')).toBeNull();
+  });
+
+  it('allows a later grant after revoke', () => {
+    setRdxRuntimeContextForSession('parent', ctx('c1'), { projectId: 'p1' });
+    grantDelegatedLease({
+      parentSessionId: 'parent',
+      childSessionId: 'child-a',
+      projectId: 'p1',
+      ownerTurnId: 'turn-1',
+    });
+    revokeDelegatedLease('child-a');
+    const next = grantDelegatedLease({
+      parentSessionId: 'parent',
+      childSessionId: 'child-b',
+      projectId: 'p1',
+      ownerTurnId: 'turn-2',
+    });
+    expect(next.ownerSessionId).toBe('child-b');
+    expect(getDelegatedChildSessionId('parent')).toBe('child-b');
+  });
+
+  it('does not fall back to the parent when asserting a child without a grant', () => {
+    setRdxRuntimeContextForSession('parent', ctx('c1'), { projectId: 'p1' });
+    expect(assertRdxContextLeaseOwnership({
+      sessionId: 'parent::subagent::offline',
+      projectId: 'p1',
+    })).toBeNull();
   });
 });

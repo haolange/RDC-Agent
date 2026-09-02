@@ -75,6 +75,10 @@ export interface AgentProfileTurnOptions extends AgentTurnOptions {
   promptPlan?: PromptPlan;
   /** Volatile Delegation Capsule segments appended to the child PromptPlan. */
   extraPromptSegments?: import('@shared/types/rdxRuntime').PromptSegment[];
+  /** Frozen capsule stored on the child EffectiveRuntimePlan. */
+  frozenDelegationCapsule?: import('@shared/types/delegationCapsule').DelegationCapsule;
+  /** Offline children strip rdx_context / rdx_probe at allowlist compile time. */
+  excludeRdxLeaseTools?: boolean;
   /** Exact profile snapshot used to build this child turn. */
   effectiveProfile?: EffectiveAgentProfile | null;
   /** Enabled profile ids from the same resolution snapshot. */

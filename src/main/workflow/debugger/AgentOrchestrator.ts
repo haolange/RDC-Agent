@@ -65,6 +65,7 @@ import {
   type TurnHandle,
 } from './AgentOrchestrator.deps';
 import { applyDelegationCapsuleToPromptPlan } from '../../agent-runtime/prompt/DelegationCapsuleCompiler';
+import { stripRdxLeaseToolsFromAllowlist } from '@shared/constants/rdxLeaseTools';
 
 export type { PreparedAgentTurnContext } from './AgentOrchestrator.deps';
 export class AgentOrchestrator {
@@ -442,8 +443,11 @@ export class AgentOrchestrator {
         throw new Error(`AGENT_PROFILE_UNAVAILABLE: ${agentId}`);
       }
 
-      const toolAllowlist = preparedTurn?.toolAllowlist
+      const resolvedAllowlist = preparedTurn?.toolAllowlist
         ?? resolveAgentToolAllowlistFromDefinition(agentId, effectiveProfile.tools);
+      const toolAllowlist = options?.excludeRdxLeaseTools
+        ? stripRdxLeaseToolsFromAllowlist(resolvedAllowlist)
+        : resolvedAllowlist;
       const routeProviderId = config.modelProvider;
       const routeModelId = config.modelName;
       const sessionControls = options?.sessionId
@@ -533,6 +537,8 @@ export class AgentOrchestrator {
           activeBranchId: options?.activeBranchId,
           signal: options?.signal,
           isolateContext: isSubagentSession || !options?.sessionId,
+          excludeRdxLeaseTools: options?.excludeRdxLeaseTools,
+          frozenDelegationCapsule: options?.frozenDelegationCapsule,
         });
         preparedTurn = preparedBundle.prepared;
         ownsPreparedRuntime = true;

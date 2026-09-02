@@ -143,7 +143,32 @@ export function parseDelegationCapsule(input: unknown): DelegationCapsule {
   if (typeof record.model === 'string' && record.model.trim()) {
     capsule.model = record.model.trim();
   }
-  return capsule;
+  return freezeDelegationCapsule(capsule);
+}
+
+/** Deep-freeze a compiled capsule. Already-frozen input is returned as-is. */
+export function freezeDelegationCapsule(capsule: DelegationCapsule): DelegationCapsule {
+  if (
+    Object.isFrozen(capsule)
+    && Object.isFrozen(capsule.budget)
+    && Object.isFrozen(capsule.acceptedFacts)
+    && Object.isFrozen(capsule.forbiddenPaths)
+    && Object.isFrozen(capsule.inputArtifactRefs)
+  ) {
+    return capsule;
+  }
+  return Object.freeze({
+    mission: capsule.mission,
+    task: capsule.task,
+    acceptedFacts: Object.freeze([...capsule.acceptedFacts]),
+    forbiddenPaths: Object.freeze([...capsule.forbiddenPaths]),
+    inputArtifactRefs: Object.freeze([...capsule.inputArtifactRefs]),
+    outputRequirements: capsule.outputRequirements,
+    budget: Object.freeze({ ...capsule.budget }),
+    requiresRdxLease: capsule.requiresRdxLease,
+    ...(capsule.profile ? { profile: capsule.profile } : {}),
+    ...(capsule.model ? { model: capsule.model } : {}),
+  }) as DelegationCapsule;
 }
 
 export const DELEGATION_CAPSULE_JSON_SCHEMA = {
