@@ -80,7 +80,12 @@ export class StorageAdapter implements StorageHost {
   }
 
   async initializeWorkspace(): Promise<void> {
-    return this.projects.initializeWorkspace();
+    await this.projects.initializeWorkspace();
+    for (const project of this.listProjects()) {
+      for (const session of this.listSessions(project.projectId)) {
+        notifySessionArtifactsOpened(session.sessionId);
+      }
+    }
   }
 
   listProjects(): ProjectRecord[] {
@@ -202,6 +207,7 @@ export class StorageAdapter implements StorageHost {
     if (session) {
       const hydrated = this.handoffs.hydrate(sessionId);
       this.handoffHydrateListener?.(sessionId, hydrated);
+      notifySessionArtifactsOpened(session.sessionId);
     }
     return session;
   }
@@ -455,7 +461,19 @@ export class StorageAdapter implements StorageHost {
   }
 
   async setCurrentSessionId(sessionId: string | null): Promise<void> {
-    return this.projects.setCurrentSessionId(sessionId);
+    await this.projects.setCurrentSessionId(sessionId);
+    if (sessionId) {
+      notifySessionArtifactsOpened(sessionId);
+    }
+  }
+}
+
+function notifySessionArtifactsOpened(sessionId: string): void {
+  try {
+    const { sessionArtifactResolver } = require('./SessionArtifactResolver') as typeof import('./SessionArtifactResolver');
+    sessionArtifactResolver.ensureReconciled(sessionId);
+  } catch {
+    // Session open/load must stay available; resolver first-touch still fail-closes.
   }
 }
 

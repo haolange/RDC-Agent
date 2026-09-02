@@ -39,6 +39,8 @@ describe('ArtifactReadTool', () => {
       offset: 1,
       limit: 2000,
       totalLines: 1,
+      owner: 'sess-1',
+      source: { toolName: 'grep', toolCallId: 'tc-big' },
     });
     const result = await artifactReadTool.execute(
       'c2',
@@ -56,6 +58,10 @@ describe('ArtifactReadTool', () => {
     expect(result.details).toMatchObject({
       uri: 'session://tool-outputs/a.json',
       hash: 'abc123',
+      bytes: 11,
+      mimeType: 'application/json',
+      owner: 'sess-1',
+      source: { toolName: 'grep', toolCallId: 'tc-big' },
     });
   });
 

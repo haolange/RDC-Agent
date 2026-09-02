@@ -78,6 +78,11 @@ export interface ParsedSessionArtifactUri {
   relativePath: string;
 }
 
+export interface SessionArtifactSourceRef {
+  toolName: string;
+  toolCallId: string;
+}
+
 export interface SessionArtifactRefDetails {
   artifactized: true;
   ref: string;
@@ -85,6 +90,38 @@ export interface SessionArtifactRefDetails {
   summary: string;
   bytes?: number;
   mimeType?: string;
+  owner: string;
+  source: SessionArtifactSourceRef;
+}
+
+/** Canonical JSON envelope written for auto-artifactized tool outputs. */
+export interface SessionArtifactizedEnvelope {
+  owner: string;
+  source: SessionArtifactSourceRef;
+  hash: string;
+  size: number;
+  mime: string;
+  content: unknown;
+  details: unknown;
+}
+
+export function isSessionArtifactSourceRef(value: unknown): value is SessionArtifactSourceRef {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.toolName === 'string' && record.toolName.length > 0
+    && typeof record.toolCallId === 'string' && record.toolCallId.length > 0;
+}
+
+export function isSessionArtifactizedEnvelope(value: unknown): value is SessionArtifactizedEnvelope {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.owner === 'string' && record.owner.length > 0
+    && isSessionArtifactSourceRef(record.source)
+    && typeof record.hash === 'string' && /^[a-f0-9]{64}$/i.test(record.hash)
+    && typeof record.size === 'number' && Number.isFinite(record.size) && record.size >= 0
+    && typeof record.mime === 'string' && record.mime.length > 0
+    && 'content' in record
+    && 'details' in record;
 }
 
 const CATEGORY_SET = new Set<string>(SESSION_ARTIFACT_CATEGORIES);

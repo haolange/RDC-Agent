@@ -1,8 +1,10 @@
+import * as crypto from 'crypto';
 import type { AgentToolResult } from '../agent/AgentTool';
 import {
   SessionArtifactError,
   TOOL_RESULT_ARTIFACTIZE_THRESHOLD_BYTES,
   formatSessionArtifactUri,
+  type SessionArtifactizedEnvelope,
 } from '@shared/types/sessionArtifact';
 import { sessionArtifactResolver, type SessionArtifactResolver } from '../../sessions/SessionArtifactResolver';
 import { ToolResultSummarizer } from './ToolResultSummarizer';
@@ -25,6 +27,31 @@ function serializeResult(result: AgentToolResult): string {
     content: result.content,
     details: result.details ?? null,
   });
+}
+
+function sha256Hex(bytes: Buffer): string {
+  return crypto.createHash('sha256').update(bytes).digest('hex');
+}
+
+function serializeEnvelope(
+  sessionId: string,
+  toolName: string,
+  toolCallId: string,
+  result: AgentToolResult,
+): { envelope: string; record: SessionArtifactizedEnvelope } {
+  const payload = serializeResult(result);
+  const payloadBytes = Buffer.from(payload, 'utf8');
+  const parsed = JSON.parse(payload) as { content: unknown; details: unknown };
+  const record: SessionArtifactizedEnvelope = {
+    owner: sessionId,
+    source: { toolName, toolCallId },
+    hash: sha256Hex(payloadBytes),
+    size: payloadBytes.length,
+    mime: 'application/json',
+    content: parsed.content,
+    details: parsed.details,
+  };
+  return { envelope: JSON.stringify(record), record };
 }
 
 function failClosed(code: string, message: string): AgentToolResult {
@@ -66,23 +93,26 @@ export function artifactizeToolResult(input: ArtifactizeToolResultInput): AgentT
   const uri = formatSessionArtifactUri('tool-outputs', relativePath);
   const resolver = input.resolver ?? sessionArtifactResolver;
   const mimeType = 'application/json';
+  const { envelope, record } = serializeEnvelope(sessionId, input.toolName, input.toolCallId || toolCallId, result);
 
   try {
-    const written = resolver.write(sessionId, uri, Buffer.from(serialized, 'utf8'), { mimeType });
+    const written = resolver.write(sessionId, uri, Buffer.from(envelope, 'utf8'), { mimeType });
     const summary = summarizer.trySummarize(input.toolName, result, 400)
-      ?? `[${input.toolName}] ${written.bytes} bytes stored`;
+      ?? `[${input.toolName}] ${record.size} bytes stored`;
     return {
       content: [{
         type: 'text',
-        text: `${summary}\nref: ${written.uri}\nhash: ${written.hash}`,
+        text: `${summary}\nref: ${written.uri}\nhash: ${record.hash}`,
       }],
       details: {
         artifactized: true,
         ref: written.uri,
-        hash: written.hash,
+        hash: record.hash,
         summary,
-        bytes: written.bytes,
-        mimeType: written.mimeType,
+        bytes: record.size,
+        mimeType: record.mime,
+        owner: record.owner,
+        source: record.source,
       },
     };
   } catch (error) {

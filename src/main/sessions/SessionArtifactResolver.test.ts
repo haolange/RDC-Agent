@@ -4,11 +4,13 @@ import * as path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { SessionArtifactResolver } from './SessionArtifactResolver';
+import { SESSION_ARTIFACT_QUOTA_FILENAME, resetSessionArtifactQuotaLedger } from './SessionArtifactQuota';
 import { StorageIo } from './StorageIo';
 
 const roots: string[] = [];
 
 afterEach(() => {
+  resetSessionArtifactQuotaLedger();
   for (const root of roots.splice(0)) {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -172,4 +174,255 @@ describe('SessionArtifactResolver', () => {
     expect(resolver.parse('session://investigation/world.json').category).toBe('investigation');
     expect(() => resolver.read(a.sessionId, 'session://plans/future.md')).toThrow(/ARTIFACT_NOT_FOUND/);
   });
+
+  it('lets at most one of two concurrent 60% writes commit', async () => {
+    for (let round = 0; round < 3; round += 1) {
+      resetSessionArtifactQuotaLedger();
+      const a = makeSession(`race-${round}`);
+      const cap = 200;
+      const resolver = createResolver({ [a.sessionId]: a.sessionPath }, {
+        maxFileBytes: cap,
+        maxSessionBytes: cap,
+        maxToolOutputFiles: 16,
+      });
+      const chunk = jsonPad(Math.floor(cap * 0.6));
+      expect(Buffer.byteLength(chunk, 'utf8')).toBeLessThan(cap);
+      expect(Buffer.byteLength(chunk, 'utf8') * 2).toBeGreaterThan(cap);
+
+      let nestedError: unknown;
+      resolver.write(a.sessionId, 'session://tool-outputs/first.json', chunk, {
+        mimeType: 'application/json',
+        onAfterReserve: () => {
+          try {
+            resolver.write(a.sessionId, 'session://tool-outputs/second.json', chunk, {
+              mimeType: 'application/json',
+            });
+          } catch (error) {
+            nestedError = error;
+          }
+        },
+      });
+      expect(nestedError).toBeInstanceOf(SessionArtifactError);
+      expect(String(nestedError)).toMatch(/ARTIFACT_QUOTA_EXCEEDED/);
+
+      const settled = await Promise.allSettled([
+        Promise.resolve().then(() => resolver.write(
+          a.sessionId,
+          'session://tool-outputs/third.json',
+          chunk,
+          { mimeType: 'application/json' },
+        )),
+        Promise.resolve().then(() => resolver.write(
+          a.sessionId,
+          'session://tool-outputs/fourth.json',
+          chunk,
+          { mimeType: 'application/json' },
+        )),
+      ]);
+      const fulfilled = settled.filter((item) => item.status === 'fulfilled');
+      const rejected = settled.filter((item) => item.status === 'rejected');
+      expect(fulfilled.length).toBe(0);
+      expect(rejected.length).toBe(2);
+
+      const usage = resolver.getQuotaUsage(a.sessionId);
+      expect(usage.liveBytes).toBeLessThanOrEqual(cap);
+      expect(usage.reservedBytes).toBe(0);
+      expect(usage.diskBytes).toBeLessThanOrEqual(cap);
+      const files = listCommitted(a.sessionPath);
+      expect(files).toHaveLength(1);
+      expect(files[0]).toBe('first.json');
+    }
+  });
+
+  it('reserves only the overwrite delta', () => {
+    const a = makeSession('delta');
+    const resolver = createResolver({ [a.sessionId]: a.sessionPath }, {
+      maxFileBytes: 200,
+      maxSessionBytes: 100,
+      maxToolOutputFiles: 8,
+    });
+    const first = jsonPad(70);
+    const smaller = jsonPad(40);
+    const sibling = jsonPad(50);
+    resolver.write(a.sessionId, 'session://tool-outputs/slot.json', first, { mimeType: 'application/json' });
+    expect(resolver.getQuotaUsage(a.sessionId).diskBytes).toBe(Buffer.byteLength(first, 'utf8'));
+    resolver.write(a.sessionId, 'session://tool-outputs/slot.json', smaller, { mimeType: 'application/json' });
+    expect(resolver.getQuotaUsage(a.sessionId).diskBytes).toBe(Buffer.byteLength(smaller, 'utf8'));
+    resolver.write(a.sessionId, 'session://tool-outputs/extra.json', sibling, { mimeType: 'application/json' });
+    expect(resolver.getQuotaUsage(a.sessionId).diskBytes).toBe(
+      Buffer.byteLength(smaller, 'utf8') + Buffer.byteLength(sibling, 'utf8'),
+    );
+    expect(() => resolver.write(a.sessionId, 'session://tool-outputs/overflow.json', jsonPad(20), {
+      mimeType: 'application/json',
+    })).toThrow(/ARTIFACT_QUOTA_EXCEEDED/);
+  });
+
+  it('releases reservation when the after-reserve hook throws or aborts', () => {
+    const a = makeSession('abort');
+    const resolver = createResolver({ [a.sessionId]: a.sessionPath }, {
+      maxFileBytes: 200,
+      maxSessionBytes: 80,
+      maxToolOutputFiles: 8,
+    });
+    const payload = jsonPad(50);
+    expect(() => resolver.write(a.sessionId, 'session://tool-outputs/boom.json', payload, {
+      mimeType: 'application/json',
+      onAfterReserve: () => {
+        throw new Error('simulated mid-write failure');
+      },
+    })).toThrow(/ARTIFACT_WRITE_FAILED|simulated mid-write failure/);
+    expect(resolver.getQuotaUsage(a.sessionId).reservedBytes).toBe(0);
+    expect(listCommitted(a.sessionPath)).toEqual([]);
+
+    const controller = new AbortController();
+    expect(() => resolver.write(a.sessionId, 'session://tool-outputs/aborted.json', payload, {
+      mimeType: 'application/json',
+      signal: controller.signal,
+      onAfterReserve: () => controller.abort(),
+    })).toThrow(/ARTIFACT_WRITE_FAILED/);
+    expect(resolver.getQuotaUsage(a.sessionId).reservedBytes).toBe(0);
+    expect(listCommitted(a.sessionPath)).toEqual([]);
+    expect(listTemps(a.sessionPath)).toEqual([]);
+
+    resolver.write(a.sessionId, 'session://tool-outputs/ok.json', payload, { mimeType: 'application/json' });
+    expect(resolver.getQuotaUsage(a.sessionId).diskBytes).toBeLessThanOrEqual(80);
+  });
+
+  it('reconciles crashed reservations and leftover tmp to disk truth', () => {
+    const a = makeSession('crash');
+    const resolver = createResolver({ [a.sessionId]: a.sessionPath }, {
+      maxFileBytes: 200,
+      maxSessionBytes: 120,
+      maxToolOutputFiles: 8,
+    });
+    const committed = jsonPad(30);
+    resolver.write(a.sessionId, 'session://tool-outputs/kept.json', committed, { mimeType: 'application/json' });
+    const artifactsRoot = path.join(a.sessionPath, 'session-artifacts');
+    const toolOutputs = path.join(artifactsRoot, 'tool-outputs');
+    fs.writeFileSync(path.join(toolOutputs, 'kept.json.1234.deadbeefabcd.tmp'), '{"partial":true}', 'utf8');
+    fs.writeFileSync(path.join(artifactsRoot, SESSION_ARTIFACT_QUOTA_FILENAME), `${JSON.stringify({
+      schemaVersion: '1',
+      committedBytes: 0,
+      committedToolOutputFiles: 0,
+      reservations: [{
+        id: 'leak-1',
+        incomingBytes: 999_999,
+        existingBytes: 0,
+        deltaBytes: 999_999,
+        extraFiles: 1,
+      }],
+    })}\n`, 'utf8');
+    resetSessionArtifactQuotaLedger();
+    const recovered = resolver.reconcileUsage(a.sessionId);
+    expect(recovered.reservedBytes).toBe(0);
+    expect(recovered.diskBytes).toBe(Buffer.byteLength(committed, 'utf8'));
+    expect(recovered.liveBytes).toBe(recovered.diskBytes);
+    expect(listTemps(a.sessionPath)).toEqual([]);
+    expect(listCommitted(a.sessionPath)).toEqual(['kept.json']);
+    resolver.write(a.sessionId, 'session://tool-outputs/after-crash.json', jsonPad(40), {
+      mimeType: 'application/json',
+    });
+    expect(resolver.getQuotaUsage(a.sessionId).liveBytes).toBeLessThanOrEqual(120);
+  });
+
+  it('new resolver first touch sweeps leftover tmp and stale quota json', () => {
+    const a = makeSession('restart');
+    const writer = createResolver({ [a.sessionId]: a.sessionPath }, {
+      maxFileBytes: 200,
+      maxSessionBytes: 120,
+      maxToolOutputFiles: 8,
+    });
+    const committed = jsonPad(30);
+    writer.write(a.sessionId, 'session://tool-outputs/kept.json', committed, { mimeType: 'application/json' });
+    const artifactsRoot = path.join(a.sessionPath, 'session-artifacts');
+    const toolOutputs = path.join(artifactsRoot, 'tool-outputs');
+    fs.writeFileSync(path.join(toolOutputs, 'kept.json.9999.leftovertmp.tmp'), '{"partial":true}', 'utf8');
+    fs.writeFileSync(path.join(artifactsRoot, SESSION_ARTIFACT_QUOTA_FILENAME), `${JSON.stringify({
+      schemaVersion: '1',
+      committedBytes: 0,
+      committedToolOutputFiles: 0,
+      reservations: [{
+        id: 'stale-res',
+        incomingBytes: 888_888,
+        existingBytes: 0,
+        deltaBytes: 888_888,
+        extraFiles: 1,
+      }],
+    })}\n`, 'utf8');
+    resetSessionArtifactQuotaLedger();
+    expect(listTemps(a.sessionPath).length).toBeGreaterThan(0);
+
+    const restarted = createResolver({ [a.sessionId]: a.sessionPath }, {
+      maxFileBytes: 200,
+      maxSessionBytes: 120,
+      maxToolOutputFiles: 8,
+    });
+    const listed = restarted.list(a.sessionId);
+    const usage = restarted.getQuotaUsage(a.sessionId);
+    expect(listed).toEqual(['session://tool-outputs/kept.json']);
+    expect(listTemps(a.sessionPath)).toEqual([]);
+    expect(usage.reservedBytes).toBe(0);
+    expect(usage.diskBytes).toBe(Buffer.byteLength(committed, 'utf8'));
+    expect(usage.liveBytes).toBe(usage.diskBytes);
+    const quota = JSON.parse(
+      fs.readFileSync(path.join(artifactsRoot, SESSION_ARTIFACT_QUOTA_FILENAME), 'utf8'),
+    ) as { reservations: unknown[]; committedBytes: number };
+    expect(quota.reservations).toEqual([]);
+    expect(quota.committedBytes).toBe(usage.diskBytes);
+  });
+
+  it('rejects a directory junction planted under tool-outputs', () => {
+    const a = makeSession('junc-a');
+    const b = makeSession('junc-b');
+    const resolver = createResolver({ [a.sessionId]: a.sessionPath, [b.sessionId]: b.sessionPath });
+    resolver.write(b.sessionId, 'session://tool-outputs/secret.json', '{"from":"b"}');
+    const outside = path.join(b.sessionPath, 'session-artifacts', 'tool-outputs');
+    const categoryRoot = path.join(a.sessionPath, 'session-artifacts', 'tool-outputs');
+    fs.mkdirSync(categoryRoot, { recursive: true });
+    const link = path.join(categoryRoot, 'escaped');
+    try {
+      fs.symlinkSync(outside, link, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch {
+      return;
+    }
+    expect(() => resolver.read(a.sessionId, 'session://tool-outputs/escaped/secret.json'))
+      .toThrow(/ARTIFACT_SYMLINK_REJECTED|ARTIFACT_PATH_ESCAPE/);
+    expect(() => resolver.write(a.sessionId, 'session://tool-outputs/escaped/planted.json', '{"x":1}'))
+      .toThrow(/ARTIFACT_SYMLINK_REJECTED|ARTIFACT_PATH_ESCAPE/);
+  });
 });
+
+function jsonPad(bytes: number): string {
+  const prefix = '{"pad":"';
+  const suffix = '"}';
+  const fill = Math.max(0, bytes - prefix.length - suffix.length);
+  return `${prefix}${'p'.repeat(fill)}${suffix}`;
+}
+
+function listCommitted(sessionPath: string): string[] {
+  const dir = path.join(sessionPath, 'session-artifacts', 'tool-outputs');
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir)
+    .filter((name) => !name.toLowerCase().endsWith('.tmp'))
+    .sort();
+}
+
+function listTemps(sessionPath: string): string[] {
+  const root = path.join(sessionPath, 'session-artifacts');
+  if (!fs.existsSync(root)) return [];
+  const found: string[] = [];
+  const stack = [root];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    for (const entry of fs.readdirSync(current)) {
+      const full = path.join(current, entry);
+      const stat = fs.lstatSync(full);
+      if (stat.isDirectory()) {
+        stack.push(full);
+        continue;
+      }
+      if (entry.toLowerCase().endsWith('.tmp')) found.push(entry);
+    }
+  }
+  return found;
+}
