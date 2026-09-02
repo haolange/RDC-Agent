@@ -503,6 +503,27 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
     approvalRequired: false,
   },
   {
+    id: 'rdx_probe',
+    label: 'RDX Probe',
+    permission: 'readonly',
+    inputSchema: {
+      type: 'object',
+      required: ['action'],
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['enumerate', 'doctor', 'version', 'probe', 'lease_open', 'lease_close', 'preview_status'],
+        },
+        capturePath: { type: 'string' },
+        contextId: { type: 'string' },
+        args: { type: 'object', additionalProperties: { type: 'string' } },
+      },
+    },
+    resultSummary: 'Runs a Settings-configured read-only RDX CLI probe and returns a structured summary.',
+    icon: 'radar',
+    approvalRequired: false,
+  },
+  {
     id: 'code_interpreter',
     label: 'Code Interpreter',
     permission: 'approval',

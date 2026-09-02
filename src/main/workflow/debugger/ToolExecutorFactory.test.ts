@@ -467,4 +467,36 @@ describe('ToolExecutorFactory', () => {
     expect(budget.toolCalls).toBe(0);
     expect(read.execute).not.toHaveBeenCalled();
   });
+
+  it('fail-closes a direct shell invoke for debugger even when the tool map still has shell', async () => {
+    const execute = vi.fn(async () => ({ content: [{ type: 'text', text: 'ran' }] }));
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+      getActiveTurn: () => null,
+      resolveRuntimeTools: () => ({
+        toolMap: new Map([
+          ['shell', {
+            name: 'shell',
+            description: 'shell',
+            parameters: { type: 'object', properties: { command: { type: 'string' } } },
+            execute,
+          } as never],
+        ]),
+        definitions: [],
+        deferredDefinitions: [],
+      }),
+      isAllowedForRuntime: (agentId, toolName) => agentId !== 'debugger' || toolName !== 'shell',
+      matchesToolAllowlist: () => true,
+    });
+    const executor = factory.createToolExecutor('debugger', ['shell']);
+    const result = await executor.execute({
+      type: 'toolCall',
+      id: 'tc-mission-shell',
+      name: 'shell',
+      arguments: { command: 'echo bypass' },
+    });
+    expect(result.isError).toBe(true);
+    expect(execute).not.toHaveBeenCalled();
+  });
 });

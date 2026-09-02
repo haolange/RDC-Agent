@@ -199,6 +199,14 @@ const FIXTURES = {
     argsPreview: '{}',
     resultPreview: toolEnvelope('capture: demo.rdc', { capturePath: 'demo.rdc' }),
   },
+  rdx_probe: {
+    argsPreview: JSON.stringify({ action: 'doctor' }),
+    resultPreview: toolEnvelope('{"action":"doctor","exitCode":0}', {
+      action: 'doctor',
+      exitCode: 0,
+      truncated: false,
+    }),
+  },
   ask_user: {
     argsPreview: '1 question',
     userInputQuestions: [{

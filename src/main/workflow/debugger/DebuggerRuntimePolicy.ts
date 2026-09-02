@@ -1,10 +1,15 @@
 import type { AgentRole } from '@shared/types/agent';
+import { isMissionAgentId } from '@shared/types/agent';
 import {
   BUILTIN_AGENT_TOOL_ID_SET,
   CANONICAL_TOOL_TOKEN_EXPANSIONS,
   diagnoseManifestToolTokens,
   expandCanonicalToolToken,
 } from '@shared/constants/agentToolTokens';
+import {
+  expandMissionPlanOnlyTokens,
+  isMissionForbiddenToolId,
+} from '@shared/constants/missionPlanOnly';
 import { executionProfileService } from '../../settings/ExecutionProfileService';
 import { settingsService } from '../../settings/SettingsService';
 
@@ -62,6 +67,7 @@ const RUNTIME_TOOL_ALIASES: Record<string, string> = {
   rdxContext: 'rdx_context',
   rdx: 'rdx_context',
   rdx_context: 'rdx_context',
+  rdxProbe: 'rdx_probe',
   rdx_probe: 'rdx_probe',
   tool_search: 'tool_search',
   delete_file: 'delete_file',
@@ -78,15 +84,21 @@ function expandToken(toolName: string): string[] {
   return [normalizeToolName(toolName)];
 }
 
+function finalizeAllowlist(agentId: AgentRole, profileTools: readonly string[]): string[] {
+  const unique = isMissionAgentId(String(agentId))
+    ? expandMissionPlanOnlyTokens(profileTools)
+    : Array.from(new Set(profileTools.flatMap(expandToken)));
+  if (unique.length === 0) {
+    throw new Error(`AGENT_TOOLS_EMPTY: profile ${agentId} has an empty tools list and cannot execute.`);
+  }
+  return unique;
+}
+
 export function resolveAgentToolAllowlistFromDefinition(
   agentId: AgentRole,
   definitionTools: readonly string[],
 ): string[] {
-  const profileTools = definitionTools.flatMap(expandToken);
-  if (profileTools.length === 0) {
-    throw new Error(`AGENT_TOOLS_EMPTY: profile ${agentId} has an empty tools list and cannot execute.`);
-  }
-  return Array.from(new Set(profileTools));
+  return finalizeAllowlist(agentId, definitionTools);
 }
 
 export function resolveAgentToolAllowlist(agentId: AgentRole): string[] {
@@ -94,20 +106,19 @@ export function resolveAgentToolAllowlist(agentId: AgentRole): string[] {
   const runtimeProfile = executionProfileService.resolveAgentRuntimeProfile(settings, agentId);
   const manifest = settings.agents.definitions.find((definition) => definition.id === agentId && definition.enabled);
   const profileTools = manifest
-    ? manifest.tools.flatMap(expandToken)
+    ? manifest.tools
     : runtimeProfile.toolAllowlist?.length
-      ? runtimeProfile.toolAllowlist.flatMap(expandToken)
+      ? runtimeProfile.toolAllowlist
       : [];
-
-  if (profileTools.length === 0) {
-    throw new Error(`AGENT_TOOLS_EMPTY: profile ${agentId} has an empty tools list and cannot execute.`);
-  }
-  return Array.from(new Set(profileTools));
+  return finalizeAllowlist(agentId, profileTools);
 }
 
-export function isBuiltinToolAllowedForAgent(toolName: string, _agentId: AgentRole): boolean {
+export function isBuiltinToolAllowedForAgent(toolName: string, agentId: AgentRole): boolean {
   const normalizedToolName = normalizeToolName(toolName);
   if (SHADER_EDIT_TOOLS.includes(normalizedToolName)) {
+    return false;
+  }
+  if (isMissionAgentId(String(agentId)) && isMissionForbiddenToolId(normalizedToolName)) {
     return false;
   }
   return true;

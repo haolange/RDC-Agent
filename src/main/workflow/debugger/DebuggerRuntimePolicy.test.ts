@@ -64,9 +64,37 @@ describe('DebuggerRuntimePolicy tool tokens', () => {
     const general = resolveAgentToolAllowlistFromDefinition('general', ['task', 'write']);
     expect(isToolAllowedByFrozenAllowlist('task_create', 'general', general)).toBe(true);
     expect(isToolAllowedByFrozenAllowlist('write_file', 'general', general)).toBe(true);
+    expect(isToolAllowedByFrozenAllowlist('output_register', 'general', general)).toBe(true);
     const mission = resolveAgentToolAllowlistFromDefinition('debugger', ['read', 'task']);
     expect(isToolAllowedByFrozenAllowlist('task_create', 'debugger', mission)).toBe(true);
     expect(isToolAllowedByFrozenAllowlist('write_file', 'debugger', mission)).toBe(false);
+    expect(isToolAllowedByFrozenAllowlist('output_register', 'debugger', mission)).toBe(false);
+  });
+
+  it('expands Mission allowlists without shell, interpreter, or output_register', () => {
+    const expanded = resolveAgentToolAllowlistFromDefinition('debugger', [
+      'read',
+      'search',
+      'web',
+      'shell',
+      'interpreter',
+      'task',
+      'output',
+      'rdxContext',
+      'rdx_probe',
+    ]);
+    expect(expanded).toEqual(expect.arrayContaining([
+      'read_file',
+      'task_create',
+      'task_stop',
+      'rdx_context',
+      'rdx_probe',
+    ]));
+    expect(expanded).not.toContain('shell');
+    expect(expanded).not.toContain('code_interpreter');
+    expect(expanded).not.toContain('output_register');
+    expect(isToolAllowedByFrozenAllowlist('shell', 'debugger', expanded)).toBe(false);
+    expect(isToolAllowedByFrozenAllowlist('code_interpreter', 'optimizer', expanded)).toBe(false);
   });
 
   it('diagnoses rejected todo and search_codebase tokens', () => {
@@ -140,7 +168,6 @@ describe('combineActiveSkillAllowlists', () => {
 
   it('keeps Debugger closed-loop tools when method skills are armed together', () => {
     const runtime = [
-      'shell',
       'task_create',
       'task_update',
       'task_get',
@@ -151,6 +178,7 @@ describe('combineActiveSkillAllowlists', () => {
       'investigation_list',
       'artifact_read',
       'rdx_context',
+      'rdx_probe',
       'read_file',
       'read_image',
       'ask_user',
@@ -163,6 +191,7 @@ describe('combineActiveSkillAllowlists', () => {
     const skillLists = DEBUGGER_LOOP_SKILLS.map((skillId) => readSkillAllowedTools(skillId));
     expect(skillLists.every((list) => list.length > 0)).toBe(true);
     const combined = combineActiveSkillAllowlists(runtime, skillLists);
-    expect(combined).toEqual(expect.arrayContaining(['subagent', 'task_create', 'shell']));
+    expect(combined).toEqual(expect.arrayContaining(['subagent', 'task_create']));
+    expect(combined).not.toContain('shell');
   });
 });

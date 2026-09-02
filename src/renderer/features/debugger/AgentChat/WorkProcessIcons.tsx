@@ -221,6 +221,14 @@ const renderIconPath = (icon: WorkProcessIconKey): ReactElement => {
       return <path d="M9 7V3m6 4V3M7 7h10v4a5 5 0 0 1-10 0V7Zm5 9v5" />;
     case 'monitor':
       return <path d="M4 5h16v10H4V5Zm5 15h6m-3-5v5" />;
+    case 'rdxProbe':
+      return (
+        <>
+          <path d="M4 5h16v10H4V5Zm5 15h6m-3-5v5" />
+          <circle cx="12" cy="10" r="2.2" />
+          <path d="M13.6 11.6 17 15" />
+        </>
+      );
     case 'brain':
       return <path d="M8 5a3 3 0 0 0-3 3v1.5A3.5 3.5 0 0 0 5.5 16 3 3 0 0 0 11 17V7.5A2.5 2.5 0 0 0 8 5Zm8 0a3 3 0 0 1 3 3v1.5a3.5 3.5 0 0 1-.5 6.5A3 3 0 0 1 13 17V7.5A2.5 2.5 0 0 1 16 5Z" />;
     case 'taskCreate':

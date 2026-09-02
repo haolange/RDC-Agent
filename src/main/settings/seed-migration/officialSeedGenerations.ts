@@ -343,6 +343,19 @@ export function expandOfficialS0IdAliases(id: string): string[] {
   return [...new Set([official, official.replace(/_/g, '-'), official.replace(/-/g, '_')])];
 }
 
+export function officialSeedIdentitySet(): Set<string> {
+  const ids = new Set<string>();
+  for (const generation of OFFICIAL_SEED_GENERATIONS) {
+    for (const manifest of generation.manifests) {
+      ids.add(manifest.id);
+      for (const alias of expandOfficialS0IdAliases(manifest.id)) {
+        ids.add(alias);
+      }
+    }
+  }
+  return ids;
+}
+
 export function officialSeedHashIndex(): Map<string, { generationId: string; manifest: SeedSemanticManifest }> {
   const index = new Map<string, { generationId: string; manifest: SeedSemanticManifest }>();
   for (const generation of OFFICIAL_SEED_GENERATIONS) {

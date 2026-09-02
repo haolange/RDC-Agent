@@ -11,6 +11,7 @@ import { compileEffectivePolicy, emptyCompiledPolicy } from './permissions/Polic
 import type { DelegationCapsule } from '@shared/types/delegationCapsule';
 import { freezeDelegationCapsule } from '@shared/types/delegationCapsule';
 import { isRdxLeaseToolName, stripRdxLeaseToolsFromAllowlist } from '@shared/constants/rdxLeaseTools';
+import { filterMissionPlanOnlyAllowlist, isMissionProfileId } from '@shared/constants/missionPlanOnly';
 
 export interface FrozenHandoffDefinition {
   agent: string;
@@ -172,22 +173,25 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
   const enabledProfileIds = freezeStringList(input.enabledProfileIds);
   const profileDelegates = freezeStringList(input.profileDelegates ?? input.profile?.agents ?? []);
   const excludeRdxLeaseTools = input.excludeRdxLeaseTools === true;
+  const applyMissionFilter = (values: readonly string[]): readonly string[] => (
+    isMissionProfileId(input.agentId) ? filterMissionPlanOnlyAllowlist(values) : [...values]
+  );
   const rawAllowlist = excludeRdxLeaseTools
     ? stripRdxLeaseToolsFromAllowlist(input.toolAllowlist)
     : input.toolAllowlist;
-  const toolAllowlist = freezeStringList(rawAllowlist);
+  const toolAllowlist = freezeStringList(applyMissionFilter(rawAllowlist));
   const skillIntersection = input.skillIntersection === undefined || input.skillIntersection === null
     ? null
-    : freezeStringList(
+    : freezeStringList(applyMissionFilter(
       excludeRdxLeaseTools
         ? stripRdxLeaseToolsFromAllowlist(input.skillIntersection)
         : input.skillIntersection,
-    );
-  const visibleToolNames = freezeStringList(
+    ));
+  const visibleToolNames = freezeStringList(applyMissionFilter(
     excludeRdxLeaseTools
       ? stripRdxLeaseToolsFromAllowlist(input.visibleToolNames ?? [])
-      : input.visibleToolNames,
-  );
+      : input.visibleToolNames ?? [],
+  ));
   const delegationCapsule = input.delegationCapsule
     ? freezeDelegationCapsule(structuredClone(input.delegationCapsule))
     : null;
