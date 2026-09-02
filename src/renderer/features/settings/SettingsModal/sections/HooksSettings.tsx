@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { RdxRuntimeOverview } from '@shared/types/rdxRuntime';
 import { useI18n } from '../../../../i18n';
+import { resolveHookTrustProjectRoot } from './hookTrustProjectRoot';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
 
 export const HooksSettings: React.FC<{
@@ -20,12 +21,21 @@ export const HooksSettings: React.FC<{
     setBusyId(hookId);
     setMessage('');
     try {
-      if (action === 'trust' && overview?.projectRoot) {
-        onChanged(await window.electronAPI.rdxRuntime.trustHook(overview.projectRoot, hookId));
-      } else if (action === 'revoke' && overview?.projectRoot) {
-        onChanged(await window.electronAPI.rdxRuntime.revokeHook(overview.projectRoot, hookId));
+      const hook = hooks.find((entry) => entry.id === hookId);
+      const trustProjectRoot = resolveHookTrustProjectRoot({
+        scope: hook?.scope ?? scope,
+        projectRoot: overview?.projectRoot,
+      });
+      if (action === 'trust' || action === 'revoke') {
+        const next = action === 'trust'
+          ? await window.electronAPI.rdxRuntime.trustHook(trustProjectRoot, hookId)
+          : await window.electronAPI.rdxRuntime.revokeHook(trustProjectRoot, hookId);
+        onChanged(
+          trustProjectRoot == null && overview?.projectRoot
+            ? await window.electronAPI.rdxRuntime.getOverview(overview.projectRoot)
+            : next,
+        );
       } else {
-        const hook = hooks.find((entry) => entry.id === hookId);
         const result = await window.electronAPI.rdxRuntime.testHook(
           hook?.event ?? 'tool.before-call',
           overview?.projectRoot,
@@ -64,7 +74,7 @@ export const HooksSettings: React.FC<{
               <code>{hook.sourcePath}</code>
             </div>
             <div className="settings-runtime-actions">
-              {hook.scope === 'project' && (hook.trusted
+              {hook.scope !== 'builtin' && (hook.trusted
                 ? (
                   <button
                     type="button"
@@ -88,7 +98,7 @@ export const HooksSettings: React.FC<{
               <button
                 type="button"
                 className="button button-secondary"
-                disabled={busyId === hook.id || (hook.scope === 'project' && !hook.trusted)}
+                disabled={busyId === hook.id || (hook.scope !== 'builtin' && !hook.trusted)}
                 onClick={() => void run(hook.id, 'test')}
               >
                 {t('settings.hookTest')}

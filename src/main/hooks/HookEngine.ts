@@ -5,6 +5,14 @@ import type { HookDefinition, HookEvent, HookTrustState, ScopedResourceCandidate
 import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
 import { processSupervisor } from '../runtime/ProcessSupervisor';
+import { resolveHookCwd, resolveHookSpawn } from './hookResolve';
+import { canonicalRealpath, computeHookTrustFingerprint } from './hookTrustFingerprint';
+import {
+  hookTrustKey,
+  readHookTrustStore,
+  writeHookTrustStore,
+  type HookTrustStoreV2,
+} from './hookTrustStore';
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 const MAX_OUTPUT_BYTES = 64 * 1024;
@@ -23,6 +31,7 @@ export interface LoadedHook {
   scope: 'builtin' | 'user' | 'project';
   sourcePath: string;
   sourceHash: string;
+  trustFingerprint: string;
   trust: HookTrustState;
 }
 
@@ -55,83 +64,14 @@ const parseHookFile = (sourcePath: string): HookDefinition => {
   };
 };
 
-const isNodeCommand = (command: string): boolean => /^node(\.exe)?$/i.test(command);
-
-const isInsideRoot = (candidate: string, root: string): boolean => {
-  const relative = path.relative(path.resolve(root), path.resolve(candidate));
-  return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
-};
-
-const officialBuiltinScriptRoots = (sourcePath: string): string[] => {
-  const roots = [path.dirname(sourcePath), appPathService.getBuiltinHooksPath()];
-  if (process.resourcesPath) roots.push(path.join(process.resourcesPath, 'agent-runtime', 'hooks'));
-  return [...new Set(roots.map((root) => path.resolve(root)))];
-};
-
-const resolveBuiltinScriptArg = (arg: string, sourcePath: string): string | null => {
-  if (!arg || arg.startsWith('-') || path.isAbsolute(arg)) return arg;
-  const names = arg === path.basename(arg) ? [arg] : [arg, path.basename(arg)];
-  for (const root of officialBuiltinScriptRoots(sourcePath)) {
-    for (const name of names) {
-      const candidate = path.resolve(root, name);
-      if (isInsideRoot(candidate, root) && fs.existsSync(candidate)) return candidate;
-    }
-  }
-  return null;
-};
-
-const resolveExistingRelativePath = (arg: string, sourcePath: string, cwd: string): string => {
-  if (!arg || arg.startsWith('-') || path.isAbsolute(arg)) return arg;
-  const seen = new Set<string>();
-  for (const start of [path.dirname(sourcePath), cwd]) {
-    let dir = path.resolve(start);
-    for (let depth = 0; depth < 8; depth += 1) {
-      if (seen.has(dir)) break;
-      seen.add(dir);
-      const candidate = path.resolve(dir, arg);
-      if (fs.existsSync(candidate)) return candidate;
-      const parent = path.dirname(dir);
-      if (parent === dir) break;
-      dir = parent;
-    }
-  }
-  return arg;
-};
-
-const resolveHookCommand = (command: string): { command: string; electronAsNode: boolean } => {
-  if (!isNodeCommand(command)) return { command, electronAsNode: false };
-  return {
-    command: process.execPath,
-    electronAsNode: !isNodeCommand(path.basename(process.execPath)),
-  };
-};
-
-const resolveHookSpawn = (
-  hook: LoadedHook,
-  cwd: string,
-): { command: string; args: string[]; electronAsNode: boolean } | { unresolvedArg: string } => {
-  const runtime = resolveHookCommand(hook.definition.command);
-  const args: string[] = [];
-  for (const arg of hook.definition.args) {
-    if (hook.scope === 'builtin') {
-      const resolved = resolveBuiltinScriptArg(arg, hook.sourcePath);
-      if (resolved === null) return { unresolvedArg: arg };
-      args.push(resolved);
-      continue;
-    }
-    args.push(resolveExistingRelativePath(arg, hook.sourcePath, cwd));
-  }
-  return {
-    command: runtime.command,
-    args,
-    electronAsNode: runtime.electronAsNode,
-  };
-};
+const untrustedReason = (scope: 'user' | 'project'): string => (
+  `${scope === 'project' ? 'Project' : 'User'} hook requires explicit trust for its current trust fingerprint.`
+);
 
 export class HookEngine {
-  private loaded: LoadedHook[] = [];
-
   constructor(private readonly trustStorePath = path.join(appPathService.getAppStatePaths().appStateRoot, 'hook-trust.json')) {}
+
+  private loaded: LoadedHook[] = [];
 
   load(
     userHooksPath: string,
@@ -157,18 +97,31 @@ export class HookEngine {
     const trustStore = this.readTrustStore();
     this.loaded = scopedResourceResolver.resolve(candidates).resources.map((resource) => {
       const scope = resource.provenance.scope;
-      const trustKey = scope === 'project' && projectRoot ? this.trustKey(projectRoot, resource.id) : '';
-      const trusted = scope !== 'project' || trustStore[trustKey]?.sourceHash === resource.provenance.sourceHash;
+      const trustFingerprint = computeHookTrustFingerprint({
+        definition: resource.value,
+        scope,
+        sourcePath: resource.provenance.sourcePath,
+        projectRoot,
+      });
+      const ownerRoot = scope === 'project' && projectRoot
+        ? canonicalRealpath(projectRoot)
+        : canonicalRealpath(path.dirname(resource.provenance.sourcePath));
+      const trustKey = scope === 'builtin' ? '' : hookTrustKey(scope, ownerRoot, resource.id);
+      const record = trustKey ? trustStore.records[trustKey] : undefined;
+      const trusted = scope === 'builtin' || record?.trustFingerprint === trustFingerprint;
       return {
         definition: resource.value,
         scope,
         sourcePath: resource.provenance.sourcePath,
         sourceHash: resource.provenance.sourceHash,
+        trustFingerprint,
         trust: {
           trusted,
+          needsRetrust: scope !== 'builtin' && !trusted,
           ...(scope === 'project' && projectRoot ? { projectRoot: path.resolve(projectRoot) } : {}),
           sourceHash: resource.provenance.sourceHash,
-          ...(trusted && trustStore[trustKey]?.trustedAt ? { trustedAt: trustStore[trustKey].trustedAt } : {}),
+          trustFingerprint,
+          ...(trusted && record?.trustedAt ? { trustedAt: record.trustedAt } : {}),
         },
       };
     });
@@ -176,37 +129,116 @@ export class HookEngine {
   }
 
   list(): LoadedHook[] {
-    return this.loaded.map((hook) => ({ ...hook, definition: { ...hook.definition } }));
+    return this.loaded.map((hook) => ({
+      ...hook,
+      definition: { ...hook.definition },
+      trust: { ...hook.trust },
+    }));
   }
 
   trustProjectHook(projectRoot: string, hookId: string): HookTrustState {
-    const hook = this.loaded.find((entry) => entry.scope === 'project' && entry.definition.id === hookId && path.resolve(entry.trust.projectRoot ?? '') === path.resolve(projectRoot));
-    if (!hook) throw new Error(`Project hook not loaded: ${hookId}`);
-    const store = this.readTrustStore();
+    return this.trustHook(hookId, projectRoot);
+  }
+
+  trustUserHook(hookId: string): HookTrustState {
+    return this.trustHook(hookId);
+  }
+
+  trustHook(hookId: string, projectRoot?: string): HookTrustState {
+    const hook = this.requireMutableHook(hookId, projectRoot);
+    if (hook.scope === 'builtin') {
+      throw new Error('Builtin hooks are trusted by default and cannot be stored in the trust store.');
+    }
+    const ownerRoot = hook.scope === 'project'
+      ? canonicalRealpath(projectRoot ?? hook.trust.projectRoot ?? '')
+      : canonicalRealpath(path.dirname(hook.sourcePath));
     const trustedAt = new Date().toISOString();
-    store[this.trustKey(projectRoot, hookId)] = { sourceHash: hook.sourceHash, trustedAt };
+    const store = this.readTrustStore();
+    store.records[hookTrustKey(hook.scope, ownerRoot, hookId)] = {
+      trustFingerprint: hook.trustFingerprint,
+      trustedAt,
+      scope: hook.scope,
+      hookId,
+      ownerRoot,
+    };
     this.writeTrustStore(store);
-    hook.trust = { trusted: true, projectRoot: path.resolve(projectRoot), sourceHash: hook.sourceHash, trustedAt };
-    return hook.trust;
+    hook.trust = {
+      trusted: true,
+      needsRetrust: false,
+      ...(hook.scope === 'project' ? { projectRoot: path.resolve(projectRoot ?? ownerRoot) } : {}),
+      sourceHash: hook.sourceHash,
+      trustFingerprint: hook.trustFingerprint,
+      trustedAt,
+    };
+    return { ...hook.trust };
   }
 
   revokeProjectHook(projectRoot: string, hookId: string): void {
+    this.revokeHook(hookId, projectRoot);
+  }
+
+  revokeUserHook(hookId: string): void {
+    this.revokeHook(hookId);
+  }
+
+  revokeHook(hookId: string, projectRoot?: string): void {
     const store = this.readTrustStore();
-    delete store[this.trustKey(projectRoot, hookId)];
+    const requestedOwnerRoot = projectRoot ? canonicalRealpath(projectRoot) : undefined;
+    if (requestedOwnerRoot) {
+      delete store.records[hookTrustKey('project', requestedOwnerRoot, hookId)];
+    } else {
+      for (const [key, record] of Object.entries(store.records)) {
+        if (record.hookId === hookId && record.scope === 'user') delete store.records[key];
+      }
+    }
     this.writeTrustStore(store);
-    const hook = this.loaded.find((entry) => entry.scope === 'project' && entry.definition.id === hookId);
-    if (hook) hook.trust = { trusted: false, projectRoot: path.resolve(projectRoot), sourceHash: hook.sourceHash };
+    const hook = this.loaded.find((entry) => (
+      entry.definition.id === hookId
+      && (requestedOwnerRoot
+        ? entry.scope === 'project'
+          && hookTrustKey('project', canonicalRealpath(entry.trust.projectRoot ?? ''), hookId)
+            === hookTrustKey('project', requestedOwnerRoot, hookId)
+        : entry.scope === 'user')
+    ));
+    if (hook && hook.scope !== 'builtin') {
+      hook.trust = {
+        trusted: false,
+        needsRetrust: true,
+        ...(hook.scope === 'project' ? { projectRoot: path.resolve(projectRoot ?? hook.trust.projectRoot ?? '') } : {}),
+        sourceHash: hook.sourceHash,
+        trustFingerprint: hook.trustFingerprint,
+      };
+    }
   }
 
   async trigger(event: HookEvent, context: HookContext): Promise<HookExecutionResult[]> {
     const results: HookExecutionResult[] = [];
     for (const hook of this.loaded.filter((entry) => entry.definition.enabled && entry.definition.event === event && this.matches(entry.definition, context))) {
-      if (hook.scope === 'project' && !hook.trust.trusted) {
-        results.push({ hookId: hook.definition.id, allowed: false, status: 'untrusted', stdout: '', stderr: '', reason: 'Project hook requires trust for its current content hash.' });
+      if (hook.scope !== 'builtin' && !hook.trust.trusted) {
+        results.push({
+          hookId: hook.definition.id,
+          allowed: false,
+          status: 'untrusted',
+          stdout: '',
+          stderr: '',
+          reason: untrustedReason(hook.scope),
+        });
         if (hook.definition.failurePolicy === 'block') break;
         continue;
       }
-      const result = await this.run(hook, context);
+      let result: HookExecutionResult;
+      try {
+        result = await this.run(hook, context);
+      } catch (error) {
+        result = {
+          hookId: hook.definition.id,
+          allowed: hook.definition.failurePolicy === 'warn',
+          status: 'failed',
+          stdout: '',
+          stderr: '',
+          reason: error instanceof Error ? error.message : String(error),
+        };
+      }
       results.push(result);
       if (!result.allowed) break;
     }
@@ -216,10 +248,40 @@ export class HookEngine {
   async test(hookId: string, context: HookContext): Promise<HookExecutionResult> {
     const hook = this.loaded.find((entry) => entry.definition.id === hookId);
     if (!hook) throw new Error(`Hook not loaded: ${hookId}`);
-    if (hook.scope === 'project' && !hook.trust.trusted) {
-      return { hookId, allowed: false, status: 'untrusted', stdout: '', stderr: '', reason: 'Project hook requires trust for its current content hash.' };
+    if (hook.scope !== 'builtin' && !hook.trust.trusted) {
+      return {
+        hookId,
+        allowed: false,
+        status: 'untrusted',
+        stdout: '',
+        stderr: '',
+        reason: untrustedReason(hook.scope),
+      };
     }
-    return this.run(hook, { ...context, event: hook.definition.event });
+    try {
+      return await this.run(hook, { ...context, event: hook.definition.event });
+    } catch (error) {
+      return {
+        hookId,
+        allowed: hook.definition.failurePolicy === 'warn',
+        status: 'failed',
+        stdout: '',
+        stderr: '',
+        reason: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
+  private requireMutableHook(hookId: string, projectRoot?: string): LoadedHook {
+    const hook = this.loaded.find((entry) => entry.definition.id === hookId);
+    if (!hook) throw new Error(`Hook not loaded: ${hookId}`);
+    if (hook.scope === 'project') {
+      if (!projectRoot) throw new Error(`Project hook requires a project root: ${hookId}`);
+      if (path.resolve(hook.trust.projectRoot ?? '') !== path.resolve(projectRoot)) {
+        throw new Error(`Project hook not loaded: ${hookId}`);
+      }
+    }
+    return hook;
   }
 
   private matches(hook: HookDefinition, context: HookContext): boolean {
@@ -232,8 +294,8 @@ export class HookEngine {
     const definition = hook.definition;
     const env = { ...process.env } as Record<string, string | undefined>;
     for (const [targetName, sourceName] of Object.entries(definition.env ?? {})) env[targetName] = process.env[sourceName];
-    const cwd = definition.cwd ? path.resolve(context.projectRoot ?? process.cwd(), definition.cwd) : context.projectRoot ?? process.cwd();
-    const spawnSpec = resolveHookSpawn(hook, cwd);
+    const cwd = resolveHookCwd(definition, context.projectRoot);
+    const spawnSpec = resolveHookSpawn(definition, hook.scope, hook.sourcePath, cwd);
     if ('unresolvedArg' in spawnSpec) {
       return {
         hookId: definition.id,
@@ -306,21 +368,12 @@ export class HookEngine {
     };
   }
 
-  private trustKey(projectRoot: string, hookId: string): string {
-    return `${path.resolve(projectRoot).toLowerCase()}::${hookId}`;
+  private readTrustStore(): HookTrustStoreV2 {
+    return readHookTrustStore(this.trustStorePath);
   }
 
-  private readTrustStore(): Record<string, { sourceHash: string; trustedAt: string }> {
-    try {
-      return fs.existsSync(this.trustStorePath) ? JSON.parse(fs.readFileSync(this.trustStorePath, 'utf8')) as Record<string, { sourceHash: string; trustedAt: string }> : {};
-    } catch {
-      return {};
-    }
-  }
-
-  private writeTrustStore(store: Record<string, { sourceHash: string; trustedAt: string }>): void {
-    fs.mkdirSync(path.dirname(this.trustStorePath), { recursive: true });
-    fs.writeFileSync(this.trustStorePath, `${JSON.stringify(store, null, 2)}\n`, 'utf8');
+  private writeTrustStore(store: HookTrustStoreV2): void {
+    writeHookTrustStore(this.trustStorePath, store);
   }
 }
 

@@ -201,6 +201,7 @@ export type {
   SkillLoadResult,
   SkillMetadata,
 } from './rdxRuntime';
+export { CANONICAL_HOOK_EVENTS } from './rdxRuntime';
 export type {
   DelegationCapsule,
   DelegationCapsuleBudget,

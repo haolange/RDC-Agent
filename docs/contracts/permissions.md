@@ -64,6 +64,7 @@ Temporary 外部路径许可仅绑定当前 `ToolExecutionContext.temporaryAllow
 - builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。
 - 旧仅-YAML-hash trust 在首次加载时失效并要求 retrust（不静默沿用）。
 - 12 canonical events 保持单一 `HookEngine` 路径。见 `DESIGN.md` 裁决 K。
+- **当前态**：上述条款已由 `HookEngine` + `hook-trust.json` schemaVersion 2 落地；信任匹配只认 `trustFingerprint`，不再接受 YAML-only `sourceHash`。
 
 ## MCP Trust
 

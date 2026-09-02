@@ -100,19 +100,22 @@ export interface SkillLoadResult extends SkillMetadata {
   assetsPath?: string;
 }
 
-export type HookEvent =
-  | 'session.before-start'
-  | 'session.after-end'
-  | 'turn.before-start'
-  | 'turn.after-end'
-  | 'tool.before-call'
-  | 'tool.after-call'
-  | 'tool.on-error'
-  | 'context.before-compact'
-  | 'context.after-compact'
-  | 'agent.before-handoff'
-  | 'agent.after-handoff'
-  | 'permission.denied';
+export const CANONICAL_HOOK_EVENTS = [
+  'session.before-start',
+  'session.after-end',
+  'turn.before-start',
+  'turn.after-end',
+  'tool.before-call',
+  'tool.after-call',
+  'tool.on-error',
+  'context.before-compact',
+  'context.after-compact',
+  'agent.before-handoff',
+  'agent.after-handoff',
+  'permission.denied',
+] as const;
+
+export type HookEvent = typeof CANONICAL_HOOK_EVENTS[number];
 
 export interface HookDefinition {
   id: string;
@@ -129,8 +132,10 @@ export interface HookDefinition {
 
 export interface HookTrustState {
   trusted: boolean;
+  needsRetrust: boolean;
   projectRoot?: string;
   sourceHash: string;
+  trustFingerprint: string;
   trustedAt?: string;
 }
 
@@ -228,6 +233,8 @@ export interface RdxRuntimeOverview {
     enabled: boolean;
     event: HookEvent;
     trusted: boolean;
+    needsRetrust: boolean;
+    trustFingerprint: string;
     failurePolicy: 'block' | 'warn';
   }>;
   mcpServers: Array<{

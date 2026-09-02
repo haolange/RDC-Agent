@@ -94,7 +94,18 @@ export class RdxRuntimeService {
     if (projectRoot) appPathService.initializeProjectRdx(projectRoot);
     const user = appPathService.getUserRdxPaths();
     const project = projectRoot ? appPathService.getProjectRdxPaths(projectRoot) : undefined;
-    const hooks = this.hooks.load(user.hooksPath, projectRoot).map((hook) => ({ id: hook.definition.id, scope: hook.scope, sourcePath: hook.sourcePath, sourceHash: hook.sourceHash, enabled: hook.definition.enabled, event: hook.definition.event, trusted: hook.trust.trusted, failurePolicy: hook.definition.failurePolicy }));
+    const hooks = this.hooks.load(user.hooksPath, projectRoot).map((hook) => ({
+      id: hook.definition.id,
+      scope: hook.scope,
+      sourcePath: hook.sourcePath,
+      sourceHash: hook.sourceHash,
+      enabled: hook.definition.enabled,
+      event: hook.definition.event,
+      trusted: hook.trust.trusted,
+      needsRetrust: hook.trust.needsRetrust,
+      trustFingerprint: hook.trustFingerprint,
+      failurePolicy: hook.definition.failurePolicy,
+    }));
     const mcpServers = agentRuntimeConfigService.listMcpServers(projectRoot).map((server) => ({
       id: server.id,
       name: server.name,
@@ -116,8 +127,8 @@ export class RdxRuntimeService {
       }
     }
     for (const hook of hooks) {
-      if (hook.scope === 'project' && !hook.trusted) {
-        diagnostics.push(`hook/project/${hook.id}: project hook is not trusted`);
+      if (hook.scope !== 'builtin' && !hook.trusted) {
+        diagnostics.push(`hook/${hook.scope}/${hook.id}: ${hook.scope} hook is not trusted`);
       }
     }
     for (const server of mcpServers) {
@@ -238,6 +249,7 @@ export class RdxRuntimeService {
   delete(kind: ScopedResourceKind, scope: 'user' | 'project', idValue: string, projectRoot?: string): void {
     const id = safeId(idValue);
     if (kind === 'hook' && scope === 'project') this.hooks.revokeProjectHook(this.requireProject(projectRoot), id);
+    if (kind === 'hook' && scope === 'user') this.hooks.revokeUserHook(id);
     const root = this.rootFor(kind, scope, projectRoot);
     const target = kind === 'skill' ? path.join(root, id) : path.join(root, `${id}${EXTENSIONS[kind]}`);
     assertInside(root, target);

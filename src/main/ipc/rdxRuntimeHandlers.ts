@@ -19,6 +19,20 @@ import {
   ScopedResourceWriteArgsSchema,
 } from './validation/rdxRuntimeSchemas';
 
+function mutateHookTrust(
+  projectRoot: string | undefined | null,
+  hookId: string,
+  mutate: (hookId: string, trustRoot?: string) => void,
+) {
+  const overviewRoot = projectRoot || undefined;
+  hookEngine.load(rdxRuntimeService.overview(overviewRoot).userPaths.hooksPath, overviewRoot);
+  const hook = hookEngine.list().find((entry) => entry.definition.id === hookId);
+  // Same rule as renderer resolveHookTrustProjectRoot: only project-scope mutations receive a root.
+  const trustRoot = hook?.scope === 'project' ? overviewRoot : undefined;
+  mutate(hookId, trustRoot);
+  return rdxRuntimeService.overview(overviewRoot);
+}
+
 export function registerRdxRuntimeHandlers(): void {
   ipcMain.handle('rdx-runtime:overview', (_event, ...rawArgs: unknown[]) => {
     const [projectRoot] = parseIpcArgs(RdxRuntimeOverviewArgsSchema, rawArgs, {
@@ -83,19 +97,22 @@ export function registerRdxRuntimeHandlers(): void {
     const [projectRoot, hookId] = parseIpcArgs(RdxRuntimeTrustHookArgsSchema, rawArgs, {
       label: 'rdx-runtime:trustHook',
       maxBytes: 8 * 1024,
+      padTo: 2,
     });
-    hookEngine.load(rdxRuntimeService.overview(projectRoot).userPaths.hooksPath, projectRoot);
-    hookEngine.trustProjectHook(projectRoot, hookId);
-    return rdxRuntimeService.overview(projectRoot);
+    return mutateHookTrust(projectRoot, hookId, (id, trustRoot) => {
+      hookEngine.trustHook(id, trustRoot);
+    });
   });
 
   ipcMain.handle('rdx-runtime:revokeHook', (_event, ...rawArgs: unknown[]) => {
     const [projectRoot, hookId] = parseIpcArgs(RdxRuntimeRevokeHookArgsSchema, rawArgs, {
       label: 'rdx-runtime:revokeHook',
       maxBytes: 8 * 1024,
+      padTo: 2,
     });
-    hookEngine.revokeProjectHook(projectRoot, hookId);
-    return rdxRuntimeService.overview(projectRoot);
+    return mutateHookTrust(projectRoot, hookId, (id, trustRoot) => {
+      hookEngine.revokeHook(id, trustRoot);
+    });
   });
 
   ipcMain.handle('rdx-runtime:trustMcp', (_event, ...rawArgs: unknown[]) => {

@@ -207,7 +207,7 @@ Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThem
 - 平台级 Investigation Graph、第二 TaskStore、Mailbox / Blackboard。
 - 交互式旧 Profile 导出选择面、把 `AgentHandoffDefinition` 当成 durable 状态、把 embedding 并入 agent catalog。
 - 把三卡或四卡 Right Rail 写成现行契约、把未实现模块写成已完成。
-- 官方未改 seed 的 `.migrated` 备份、Ask/Plan/Edit 作为运行时 fallback、Run v2 双读、Mission generic `shell`、仅 YAML-hash Hook trust、只写 embedding snapshot 就标 Semantic `ready`。
+- 官方未改 seed 的 `.migrated` 备份、Ask/Plan/Edit 作为运行时 fallback、Run v2 双读、Mission generic `shell`、只写 embedding snapshot 就标 Semantic `ready`。
 
 ### I. Run Schema v3
 
@@ -257,7 +257,7 @@ Enforcement 必须同时发生在：(1) profile allowlist 解析（token 展开�
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | Hook trust 只 hash YAML 定义。12 canonical events 已走单一 `HookEngine` 路径。**产品级 Browser QA 与本机 ColdData 真实验收尚未跑。** |
+| **当前态** | Hook trust fingerprint 已覆盖 parsed definition + resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH executable identity（`hook-trust.json` schemaVersion 2）。旧 YAML-only 记录首次加载失效并要求 retrust，不静默沿用。user/project 必须显式 trust；builtin 默认信任。12 canonical events 走单一 `HookEngine` 路径。**产品级 Browser QA 与本机 ColdData 真实验收尚未跑。** |
 | **目标态** | Hook trust fingerprint = parsed definition + 所有 resolved 脚本/参数文件 bytes + canonical realpath + scope/provenance + PATH 解析后的 executable identity。任一变化 → `needsRetrust`。builtin 默认信任且内容变化必须随仓库发布；user/project 必须显式 trust。12 canonical events 保持单一 HookEngine 路径。 |
 | **迁移门禁** | 旧仅-YAML-hash trust 在首次加载时失效并要求 retrust（不静默沿用）。不得保留 YAML-only 与全指纹双轨。 |
 
