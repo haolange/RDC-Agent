@@ -47,9 +47,9 @@ if (isInvestigationReport) {
   const contract = record.reportContract && typeof record.reportContract === 'object'
     ? record.reportContract
     : null;
-  const fields = ['conclusion', 'evidence', 'verification', 'limitations', 'candidateStatus'];
+  const fields = ['conclusion', 'evidence', 'verification', 'limitations', 'status', 'links', 'candidateStatus'];
   if (!contract) {
-    violations.push('report missing reportContract (conclusion/evidence/verification/limitations/artifactIds/candidateStatus)');
+    violations.push('report missing reportContract (conclusion/evidence/verification/limitations/status/links/artifactIds/candidateStatus)');
   } else {
     for (const field of fields) {
       if (typeof contract[field] !== 'string' || contract[field].trim().length < 1) {

@@ -1,10 +1,12 @@
 ---
 name: rdx-cli-shell
-description: Invoke RenderDoc or RDX only through the Settings-configured CLI shell action.
+description: Invoke RenderDoc or RDX only through the Settings-configured CLI shell action. General-only; conflicts with Mission plan-only.
 allowed-tools: [shell, rdx_context, task_create, subagent]
 ---
 
 # RDX CLI Shell
+
+This skill is General-only. Mission profiles stay plan-only (`rdx_probe` / `rdx_context`) and must not arm it.
 
 Use this skill when a planned step needs a RenderDoc or RDX capability that already exists as a configured CLI action.
 

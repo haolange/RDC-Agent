@@ -243,14 +243,20 @@ export function sampleCheckpoint(input: {
   };
 }
 
-export function sampleReportContract(artifactIds: string[]): InvestigationReportContract {
+export function sampleReportContract(
+  artifactIds: string[],
+  extras: Partial<InvestigationReportContract> = {},
+): InvestigationReportContract {
   return {
     conclusion: 'Projected conclusion with explicit limitations.',
     evidence: 'Linked evidence artifacts are dereferenceable.',
     verification: 'Compact provenance is closed and not upgraded.',
     limitations: 'Fixture report; no runtime counterfactual beyond cited experiments.',
+    status: 'Complete',
+    links: `Linked investigation artifacts: ${artifactIds.join(', ')}.`,
     artifactIds,
     candidateStatus: 'none',
+    ...extras,
   };
 }
 
@@ -400,4 +406,46 @@ export function forceReadyEmptySourceRefs(
       entry.artifactId === artifactId ? { ...entry, status: 'ready' } : entry
     )),
   }), { mimeType: 'application/json' });
+}
+
+export function projectClaim(source: ClaimRecord, claimId: string): ClaimRecord {
+  return {
+    ...source,
+    claimId,
+    projectionKind: 'report',
+    compactProvenance: [{
+      sourceClaimId: source.claimId,
+      sourceEpistemicStatus: source.epistemic,
+      sourceVerificationLevel: source.verification,
+    }],
+  };
+}
+
+export function writeReadyReport(
+  service: InvestigationArtifactService,
+  input: {
+    mission: InvestigationMission;
+    source: { manifest: { artifactId: string }; contentHash: string };
+    claims: ClaimRecord[];
+    evidenceIds?: string[];
+    experimentIds?: string[];
+    reportContract?: InvestigationReportContract;
+  },
+) {
+  const sourceId = input.source.manifest.artifactId;
+  return service.writeRecord(SESSION_ID, {
+    kind: 'report',
+    mission: input.mission,
+    title: `${input.mission} report`,
+    summary: 'Ready completion report',
+    record: sampleReport({
+      mission: input.mission,
+      claims: input.claims,
+      evidenceIds: input.evidenceIds,
+      experimentIds: input.experimentIds,
+      reportContract: input.reportContract ?? sampleReportContract([sourceId]),
+    }),
+    sourceRefs: [{ artifactId: sourceId, expectedHash: input.source.contentHash }],
+    status: 'ready',
+  });
 }

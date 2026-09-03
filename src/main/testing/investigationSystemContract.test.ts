@@ -29,6 +29,7 @@ import {
   observedClaim,
   overwriteInvestigationRecordBody,
   plantInvestigationRecord,
+  projectClaim,
   recordedExperiment,
   reopenInvestigationHarness,
   sampleChallenge,
@@ -37,8 +38,21 @@ import {
   sampleReportContract,
   seedNote,
   writeDraft,
+  writeReadyReport,
 } from '../investigation/investigationTestFixtures';
 import { INVESTIGATION_TXN_COMMIT, INVESTIGATION_TXN_DIR, INVESTIGATION_TXN_JOURNAL } from '../investigation/investigationTxn';
+import {
+  assertMissionTurnCompletion,
+  enforceMissionTurnCompletion,
+  isAllowedMissionCompletionStatus,
+  MissionCompletionError,
+} from '../investigation/missionCompletionContract';
+import {
+  CANONICAL_SKILL_IDS,
+  GENERAL_SKILL_IDS,
+  isSkillVisibleToProfile,
+  MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS,
+} from '@shared/constants/canonicalSkills';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -906,5 +920,67 @@ describe('investigation system contract', () => {
     for (const source of [task, profile, message]) {
       expect(source).not.toMatch(/INVESTIGATION_DEGRADED|rdc\.investigation\.v1/);
     }
+  });
+
+  it('investigation.contract.mission.completion', () => {
+    expect.hasAssertions();
+    expect(MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS).toHaveLength(21);
+    expect(GENERAL_SKILL_IDS).toHaveLength(6);
+    expect(CANONICAL_SKILL_IDS).toHaveLength(27);
+    const runner = readRepo('src/main/workflow/debugger/AgentTurnRunner.ts');
+    const conversation = readRepo('src/main/conversation/ConversationTurnRunner.ts');
+    expect(runner).toMatch(/enforceMissionTurnCompletion/);
+    expect(conversation).toMatch(/enforceMissionTurnCompletion/);
+    expect(runner).toMatch(/pendingHandoff/);
+    expect(enforceMissionTurnCompletion({
+      profileId: 'general',
+      sessionId: SESSION_ID,
+      finalAnswerText: 'done',
+    })).toBeUndefined();
+    for (const mission of ['debugger', 'analyzer', 'optimizer'] as const) {
+      const { service } = createInvestigationHarness();
+      writeDraft(service, 'world_state', baselineWorld(), { mission });
+      writeDraft(service, 'checkpoint', sampleCheckpoint({
+        checkpointId: `cp-${mission}-contract`,
+        currentWorldStateId: 'ws-baseline',
+      }), { mission });
+      expect(() => assertMissionTurnCompletion({
+        profileId: mission,
+        sessionId: SESSION_ID,
+        finalAnswerText: 'output_register report.md',
+        service,
+      })).toThrow(MissionCompletionError);
+      const empty = createInvestigationHarness();
+      writeDraft(empty.service, 'world_state', baselineWorld(), { mission });
+      expect(() => assertMissionTurnCompletion({
+        profileId: mission,
+        sessionId: SESSION_ID,
+        finalAnswerText: 'final without checkpoint',
+        service: empty.service,
+      })).toThrow(/missing_checkpoint|missing_report|MISSION_COMPLETION_DENIED/);
+    }
+    expect(isAllowedMissionCompletionStatus('verified')).toBe(true);
+    expect(isAllowedMissionCompletionStatus('Pending')).toBe(false);
+    expect(isAllowedMissionCompletionStatus('Partially')).toBe(false);
+    const { service } = createInvestigationHarness();
+    writeDraft(service, 'world_state', baselineWorld(), { mission: 'analyzer' });
+    writeDraft(service, 'checkpoint', sampleCheckpoint({
+      checkpointId: 'cp-analyzer-one-layer',
+      currentWorldStateId: 'ws-baseline',
+    }), { mission: 'analyzer' });
+    const observed = writeDraft(service, 'claim', observedClaim('ws-baseline', 'claim-one-layer'), { mission: 'analyzer' });
+    const report = writeReadyReport(service, {
+      mission: 'analyzer',
+      source: observed,
+      claims: [projectClaim(observed.record as never, 'claim-one-layer-proj')],
+    });
+    expect(() => assertMissionTurnCompletion({
+      profileId: 'analyzer',
+      sessionId: SESSION_ID,
+      finalAnswerText: `${report.manifest.artifactId} ${report.contentHash}`,
+      service,
+    })).toThrow(/mission_method|MISSION_COMPLETION_DENIED/);
+    expect(isSkillVisibleToProfile('debugger', 'rdx-cli-shell')).toBe(false);
+    expect(isSkillVisibleToProfile('general', 'rdx-cli-shell')).toBe(true);
   });
 });

@@ -37,6 +37,7 @@ import {
   isProviderStreamProtocolError,
 } from '../agent-runtime/agent/ErrorRecovery';
 import { AgentLoopTerminationError } from '../agent-runtime/agent/LoopProgressGuard';
+import { isMissionCompletionError } from '../investigation/missionCompletionContract';
 
 export interface ConversationBranchTurnContext {
   branchId: string;
@@ -516,6 +517,17 @@ export function createTurnFailedDiagnostic(
   error: unknown,
 ): ConversationMessageDiagnostic {
   const label = getAgentLabel(route.agentId);
+  if (isMissionCompletionError(error)) {
+    return createConversationDiagnostic({
+      agentId: route.agentId,
+      code: 'MISSION_COMPLETION_DENIED',
+      severity: 'error',
+      userMessage: `${label} 不能把本次 Mission 标为已完成：缺少可解引用的 Checkpoint、ready 报告，或 final_answer 未引用该报告。Partial / Inconclusive / Blocked 不得伪装完成。`,
+      providerId: route.providerId,
+      modelId: route.modelId,
+      technicalMessage: redactTechnicalMessage(error),
+    });
+  }
   if (error instanceof AgentLoopTerminationError) {
     const isNoProgress = error.code === 'AGENT_NO_PROGRESS';
     return createConversationDiagnostic({

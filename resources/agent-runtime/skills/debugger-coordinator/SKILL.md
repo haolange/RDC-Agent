@@ -15,7 +15,7 @@ Plan first. The goal is to minimize root-cause uncertainty for an incorrect resu
 4. Name the smallest distinguishing check that would confirm or reject the current cause.
 5. Write a versioned plan artifact that names: suspected component, First Bad Event check, Hypothesis Matrix rows, the qualifying Experiment, Skeptic, and Report. Then durable-handoff to General (`send: true`).
 6. When the plan needs a method, cite an on-demand skill. Do not preload them:
-   `$capture-preflight`, `$capture-facts`, `$debugger-causal-method`, `$pass-graph-analysis`, `$shader-ir-analysis`, `$pixel-forensics`, `$artifact-provenance`, `$optimization-experiment`, `$renderdoc-execution`, `$rdx-cli-shell`, `$skeptic-review`, `$report-composition`.
+   `$capture-preflight`, `$capture-facts`, `$debugger-causal-method`, `$pass-graph-analysis`, `$shader-ir-analysis`, `$pixel-forensics`, `$artifact-provenance`, `$optimization-experiment`, `$renderdoc-execution`, `$skeptic-review`, `$report-composition`. Live RDC CLI stays on General via `$rdx-cli-shell`.
 
 Use `investigation_*` for session-owned `rdc.investigation.v1` Evidence / Claim / Experiment / Challenge / Checkpoint. Causal claims need a qualifying Experiment (`S-CAUSAL-01`). Report and compact projections must not raise Claim rank (`S-CLAIM-01`).
 

@@ -15,7 +15,7 @@ Plan first. The goal is to maximize explainability of the current rendering syst
 4. Separate Observed structure from Reconstructed topology and Authoring hypotheses. `claimKind` must not cross those layers.
 5. Write a versioned plan artifact that names: Capture Facts, Resource Versioning, Pass Reconstruction, Shader Fingerprint/Block, Traceability, Architecture Model comparison, Skeptic, and Report. Then durable-handoff to General (`send: true`).
 6. When the plan needs a method, cite an on-demand skill. Do not preload them:
-   `$capture-preflight`, `$capture-facts`, `$resource-versioning`, `$pass-graph-analysis`, `$shader-ir-analysis`, `$cross-capture-alignment`, `$analyzer-architecture-method`, `$artifact-provenance`, `$renderdoc-execution`, `$rdx-cli-shell`, `$skeptic-review`, `$report-composition`.
+   `$capture-preflight`, `$capture-facts`, `$resource-versioning`, `$pass-graph-analysis`, `$shader-ir-analysis`, `$cross-capture-alignment`, `$analyzer-architecture-method`, `$artifact-provenance`, `$renderdoc-execution`, `$skeptic-review`, `$report-composition`. Live RDC CLI stays on General via `$rdx-cli-shell`.
 
 Use `investigation_*` for session-owned `rdc.investigation.v1` Evidence / Claim / Experiment / Challenge / Checkpoint. Report and compact projections must not raise Claim rank (`S-CLAIM-01`).
 

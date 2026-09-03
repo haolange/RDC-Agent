@@ -76,6 +76,7 @@ import type {
   ResolvedRuntimeTools,
   ToolExecutorRuntimeContext,
 } from './orchestratorTypes';
+import { enforceMissionTurnCompletion } from '../../investigation/missionCompletionContract';
 
 export function hasActualProviderUsage(message: AssistantMessage): boolean {
   return message.stopReason !== 'error';
@@ -749,6 +750,12 @@ export class AgentTurnRunner {
       // Agent.prompt 内部跑完整循环；返回值是新增的全部消息，
       // 我们只在订阅里收集助手文本，最后返回 `responseText`。
       await activeSlot.agent.prompt(userMessage);
+      enforceMissionTurnCompletion({
+        profileId: input.agentId,
+        sessionId: executionScopeId,
+        finalAnswerText: responseText,
+        pendingHandoff: Boolean(turnHandle.pendingHandoff),
+      });
       return responseText;
     } catch (error) {
       terminalStatus = input.options?.signal?.aborted || turnHandle.isAborted ? 'stopped' : 'error';

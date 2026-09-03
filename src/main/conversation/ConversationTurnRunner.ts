@@ -29,6 +29,7 @@ import { beginAssistantContentLoopIfPending } from './ConversationLoopRuntimeSta
 import { EMPTY_CANONICAL_ASSISTANT_OUTPUT, requireCanonicalFinalAnswer } from './CanonicalAssistantOutput';
 import { hydrateFrozenUserContent } from './ConversationAttachmentMaterializer';
 import { createAgentEventHandler } from './ConversationTurnAgentEventHandler';
+import { enforceMissionTurnCompletion } from '../investigation/missionCompletionContract';
 import { buildHandoffAgentEvent } from './profileHandoffEvents';
 import type { PendingHandoff } from '../workflow/debugger/TurnCoordinator';
 import type {
@@ -508,6 +509,12 @@ export async function completeProfileTurn(
       );
 
       requireCanonicalFinalAnswer(canonicalOutput);
+      enforceMissionTurnCompletion({
+        profileId: conversationAgentId,
+        sessionId,
+        finalAnswerText: canonicalOutput.finalAnswerText,
+        pendingHandoff: Boolean(terminalHandoff),
+      });
     } catch (error) {
       llmDiagnostic = createTurnFailedDiagnostic(routePreflight, error);
       errorViewModel = {
@@ -549,6 +556,8 @@ export async function completeProfileTurn(
           ? 'Agent loop stopped at the configured turn limit.'
           : llmDiagnostic.code === 'CONVERSATION_PROVIDER_STREAM_PROTOCOL_VIOLATION'
             ? 'Provider stream protocol integrity check failed.'
+            : llmDiagnostic.code === 'MISSION_COMPLETION_DENIED'
+              ? 'Mission completion contract was not satisfied.'
             : 'Model request failed; diagnostic recorded.'
     : 'Final answer generated.';
 

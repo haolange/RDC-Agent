@@ -400,6 +400,8 @@ export interface InvestigationReportContract {
   evidence: string;
   verification: string;
   limitations: string;
+  status: string;
+  links: string;
   artifactIds: string[];
   candidateStatus: ReportCandidateStatus;
 }

@@ -93,7 +93,7 @@ export class PromptPlanForTurn {
     });
     const preloadedSkills = [];
     for (const skillId of preloadSkillIds) {
-      const skill = agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined);
+      const skill = agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined, input.agentId);
       if (!skill) {
         throw new Error(`SKILL_UNAVAILABLE: skill is not configured: ${skillId}`);
       }
@@ -107,7 +107,7 @@ export class PromptPlanForTurn {
       profile: activeDefinition,
       scopedInstructions,
       preloadedSkills,
-      skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? undefined),
+      skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? undefined, input.agentId),
       tools,
       workDir: projectRootPath ?? '',
       sessionId: input.sessionId ?? null,

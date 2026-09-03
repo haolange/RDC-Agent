@@ -35,6 +35,7 @@ export const INVESTIGATION_CONTRACT_CASES = [
   { title: 'investigation.contract.optimizer.rollback-close', minAssertions: 1 },
   { title: 'investigation.contract.txn.atomic-recover', minAssertions: 1 },
   { title: 'investigation.contract.txn.degraded-not-empty', minAssertions: 1 },
+  { title: 'investigation.contract.mission.completion', minAssertions: 1 },
 ];
 export const INVESTIGATION_CONTRACT_CASE_IDS = INVESTIGATION_CONTRACT_CASES.map((entry) => entry.title);
 
@@ -95,7 +96,7 @@ export const INVESTIGATION_RULE_REGISTRY = [
     file: 'src/main/testing/investigationSystemContract.test.ts',
     pattern: INVESTIGATION_CONTRACT_CASE_IDS.join('|'),
     probe: 'contract-suite',
-    note: 'executable Investigation contract suite: schema, ready, epistemic, S-CLAIM/S-CAUSAL/S-RDC, skeptic challenge, checkpoint refs, non-invasion, five cards, analyzer claimKind layer, optimizer rollback close, transactional write recover, degraded-not-empty',
+    note: 'executable Investigation contract suite: schema, ready, epistemic, S-CLAIM/S-CAUSAL/S-RDC, skeptic challenge, checkpoint refs, non-invasion, five cards, analyzer claimKind layer, optimizer rollback close, transactional write recover, degraded-not-empty, mission completion',
     requiredCases: INVESTIGATION_CONTRACT_CASES,
     minTests: INVESTIGATION_CONTRACT_CASES.length,
     minAssertions: INVESTIGATION_CONTRACT_CASES.length,

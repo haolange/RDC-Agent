@@ -25,6 +25,23 @@ export {
   stripRdxLeaseToolsFromAllowlist,
 } from './rdxLeaseTools';
 export {
+  CANONICAL_SKILL_IDS,
+  FORBIDDEN_SKILL_NAMES,
+  GENERAL_SKILL_IDS,
+  MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS,
+  PLAN_ONLY_CONFLICT_SKILL_IDS,
+  SKILL_ARMED_BY_PROFILE,
+  isPlanOnlyConflictSkill,
+  isSkillVisibleToProfile,
+  skillCallEntry,
+  skillLane,
+} from './canonicalSkills';
+export type {
+  CanonicalSkillId,
+  CanonicalSkillLane,
+  SkillCallEntry,
+} from './canonicalSkills';
+export {
   MISSION_FORBIDDEN_TOOL_IDS,
   MISSION_PLAN_ONLY_TOOL_IDS,
   expandMissionPlanOnlyTokens,

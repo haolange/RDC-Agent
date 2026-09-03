@@ -142,11 +142,7 @@ export class InvestigationArtifactService {
     const contentText = serializeInvestigationJson(parsed);
     const contentHash = sha256Prefixed(contentText);
     const requestedReady = input.status === 'ready';
-    if (
-      kindEntry.kind === 'report'
-      && requestedReady
-      && (mission === 'analyzer' || mission === 'optimizer')
-    ) {
+    if (kindEntry.kind === 'report' && requestedReady) {
       assertReportContractPresent(parsed as InvestigationReport, lookup, { mission });
     }
     const sourceRefs = input.sourceRefs ?? [];
@@ -334,9 +330,7 @@ export class InvestigationArtifactService {
     this.resolveBoundWorldStateId(kindEntry.kind, record, manifest.worldStateId, lookup, true);
     if (kindEntry.kind === 'report') {
       const mission = requireCanonicalWriteMission(kindEntry.kind, manifest.mission, record);
-      if (mission === 'analyzer' || mission === 'optimizer') {
-        assertReportContractPresent(record as InvestigationReport, lookup, { mission });
-      }
+      assertReportContractPresent(record as InvestigationReport, lookup, { mission });
     }
     this.parseManifest(manifest);
   }

@@ -12,13 +12,17 @@ A report is a View over Investigation State, not a new source of truth. It is bo
 2. Project statements with non-empty `compactProvenance`. Source `claimId`, `epistemic`, and `verification` must match verbatim.
 3. Epistemic rank of each projected statement must be `<= min(source ranks)`.
 4. Visual edits may change Layout, Typography, Diagram, or Narrative only.
-5. Write `InvestigationReport.reportContract` with all six fields. The hook refuses a report that omits them:
+5. Write `InvestigationReport.reportContract` with all required chapters. The hook and turn completion gate refuse a report that omits them:
    - `conclusion`
    - `evidence`
    - `verification`
    - `limitations`
+   - `status` (exactly `verified` / `conclusive` / `complete`, case-insensitive; any other token cannot complete)
+   - `links` (narrative Artifact links)
    - `artifactIds` (non-empty Artifact links)
    - `candidateStatus` (`none` / `session-created` / `not-requested`)
+
+   Canonical `outputPhase=final_answer` must cite the ready report `artifactId` and `contentHash`. Hook text, model prose, or `output_register` alone cannot complete a Mission.
 
 Generic sections stay Goal, Input, Environment, Capability, Plan, Task Timeline, Evidence, Claims, Experiments, Challenges, Limitations, Artifact Index. Mention a Session Candidate only if this turn created one.
 
