@@ -39,9 +39,11 @@ assert(activeSignalHelper.includes("status === 'running' || status === 'pending'
 assert(activeSignalHelper.includes("thinkingStatus === 'streaming'"), 'active signal must recognize streaming thinking lifecycle');
 assert(activeSignalStyles.includes('.active-signal-text.is-active'), 'active signal text CSS class is missing');
 assert(activeSignalStyles.includes('background-clip: text'), 'active signal must use clipped-gradient energy shimmer');
-assert(activeSignalStyles.includes('--active-signal-base'), 'active signal sheen must keep an opaque base color');
-assert(activeSignalStyles.includes('--active-signal-sheen'), 'active signal sheen highlight token is missing');
-assert(activeSignalStyles.includes('background-size: 300% 100%'), 'active signal sheen must travel across a 300% gradient');
+assert(activeSignalStyles.includes('background-size: 220% 100%'), 'active signal must use the original 220% energy wash');
+assert(activeSignalStyles.includes('1.6s linear infinite'), 'active signal must keep the original 1.6s continuous sweep');
+assert(activeSignalStyles.includes('color-mix(in srgb, var(--active-signal-highlight) 36%, transparent)'), 'active signal must keep the original 36% wash gradient');
+assert(!activeSignalStyles.includes('--active-signal-base'), 'narrow sheen base token must stay removed');
+assert(!activeSignalStyles.includes('--active-signal-sheen'), 'narrow sheen highlight token must stay removed');
 assert(activeSignalStyles.includes('@keyframes active-signal-shimmer'), 'active signal shimmer keyframe is missing');
 assert(!activeSignalStyles.includes('active-signal-pulse'), 'legacy active-signal pulse must be removed');
 assert(activeSignalStyles.includes('@media (prefers-reduced-motion: reduce)'), 'active signal must honor reduced-motion preferences');
