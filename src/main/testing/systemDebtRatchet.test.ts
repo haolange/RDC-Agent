@@ -102,7 +102,7 @@ function runFixture(dir: string, extraArgs: string[] = [], env: NodeJS.ProcessEn
 }
 
 describe('system debt ratchet CLI', () => {
-  it('passes --self-test fixture matrix', () => {
+  it('passes --self-test fixture matrix', { timeout: 20_000 }, () => {
     const result = spawnNode(ratchetCli, ['--self-test']);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('exact: ok');

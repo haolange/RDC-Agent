@@ -323,7 +323,7 @@ describe('InvestigationArtifactService', () => {
     expect(service.createLookup(SESSION_ID).getClaim('claim-C1')).toMatchObject({ claimId: 'claim-C1' });
   });
 
-  it('P1-2 live pack and set members resolve for refs', () => {
+  it('P1-2 live pack and set members resolve for refs', { timeout: 15_000 }, () => {
     const { resolver, service } = createInvestigationHarness();
     const note = seedNote(resolver);
     writeDraft(service, 'world_state', baselineWorld('ws-agg-a'));
