@@ -48,7 +48,6 @@ AgentPhaseDefinition
 AgentProfile
 AgentProfileUi
 AgentPromptProfile
-AgentResultCard
 AgentRole
 AgentRouteCapability
 AgentRun
@@ -118,9 +117,6 @@ ArtifactRefKind
 ArtifactRendererManifest
 ArtifactSourceRef
 ArtifactStatus
-AskUserQuestionAnswer
-AskUserQuestionOption
-AskUserQuestionRequest
 assertChannelCapabilityCoverage
 assertHexOrNull
 assertNoJsonlDiagnostics
@@ -154,7 +150,6 @@ CanonicalAgentModelId
 canonicalFromHalReasoningLevel
 CapabilityEvidence
 CapabilityEvidenceSource
-CapabilityProfile
 CapabilityState
 CapabilityStateSchema
 CaptureApi
@@ -227,8 +222,6 @@ CONTEXT_COMPACTION_PERCENT_STEP
 ContextApi
 ContextImportance
 ContextKind
-ContextPacket
-ContextPacketKind
 ContextPanelViewModel
 ContextSnapshot
 ContextTier
@@ -430,7 +423,6 @@ EVIDENCE_STRENGTHS
 EvidenceApi
 EvidenceChain
 EvidenceGap
-EvidenceKind
 EvidenceObservationKind
 EvidencePack
 EvidenceRecord
@@ -509,8 +501,6 @@ HANDOFF_CHAIN_LIMIT
 HANDOFF_ERROR
 HandoffErrorCode
 HandoffStateDocument
-HarnessSchemaVersion
-HarnessStatus
 hasBridgeChannelCapability
 hasImplementedStructuredToolAdapter
 hexToRgb
@@ -1109,11 +1099,7 @@ UserRequest
 UserRequestRevision
 validateSurfaceEmbeddings
 VERIFICATION_LEVELS
-VerificationContract
 VerificationLevel
-VerificationMethod
-VerificationRoute
-VerificationStatus
 VERIFIER_AGENTS
 VisibleReasoningMode
 VisibleReasoningPacket
