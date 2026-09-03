@@ -577,7 +577,8 @@ export class SessionRecordStore {
     }
     const artifactsDir = path.join(location.sessionPath, 'artifacts');
     this.host.io.ensureDir(artifactsDir);
-    const artifactPath = path.join(artifactsDir, 'plan.md');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '');
+    const artifactPath = path.join(artifactsDir, `plan-${stamp}.md`);
     fs.writeFileSync(artifactPath, content, 'utf8');
     return artifactPath;
   }

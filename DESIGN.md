@@ -209,6 +209,19 @@ Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThem
 - 把三卡或四卡 Right Rail 写成现行契约、把未实现模块写成已完成。
 - 官方未改 seed 的 `.migrated` 备份、Ask/Plan/Edit 作为运行时 fallback、Run v2 双读、Mission generic `shell`、只写 embedding snapshot 就标 Semantic `ready`。
 
+T19 逐项裁决（删除 / 保留理由 / 调用方）：
+
+| 项 | 裁决 | 理由 / 调用方 |
+| --- | --- | --- |
+| `src/main/reports/ArtifactStore.ts` + `artifact_store.json` | **保留** | `output_register` / `SessionArtifactSource` 的 Outputs 索引，不是 Investigation。禁止混进 Artifacts 卡。 |
+| `writeSessionPlanArtifact` 钉死 `artifacts/plan.md` | **删除钉死** | `plan_artifact` 仍写 session artifacts，文件名改为 `plan-<ISO>.md`，禁止覆盖单一 `plan.md`。 |
+| `src/shared/types/harness.ts` | **保留** | 仅服务 Outputs `ArtifactRecord` 类型，不是 Debugger stage harness。禁止恢复固定 stage。 |
+| `RdxCliInvokerService` `tool_count` | **保留诊断、禁止 UI** | CLI 内部 invoker 诊断可用；Right Rail / 模型工具面不得展示 catalog summary。 |
+| stage / `WorkflowStage` / `recommendedSpecialists` | **已删** | 见裁决 I；不得双读 v2。 |
+| Classic Session Panel / ArtifactViewer | **已不在 renderer 入口** | 禁止恢复。 |
+| `Classic` / `legacy` / `deprecated` / `compat` 文案 | **按语义保留** | provider `deprecated`、Knowledge lifecycle `deprecated`、OpenAI-compatible 协议名为合法词，禁止借清理误删。 |
+| `ErrorRecovery` 等 recoverable fallback | **保留** | Availability 分类，不是 legacy 双轨。 |
+
 ### I. Run Schema v3
 
 | | 裁决 |
