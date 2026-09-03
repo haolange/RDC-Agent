@@ -69,6 +69,9 @@ export const KnowledgeCardRecordSchema = z.object({
   sourceStatus: optionalString,
   caseId: optionalString,
   chapters: KnowledgeCaseChaptersSchema.optional(),
+  sourceHash: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+  sourceMtimeMs: z.number().int().nonnegative().optional(),
+  sourceSize: z.number().int().nonnegative().optional(),
 }).strict();
 
 export function splitFrontmatter(source: string): { rawMeta: string | null; body: string } {
@@ -191,6 +194,12 @@ export function parseKnowledgeFrontmatter(source: string, options: {
     sourceStatus: readString(meta.sourceStatus) || readString(asRecord(meta.meta).status),
     caseId: readString(meta.caseId) || readString(meta.case_id),
   };
+  const sourceHash = readString(meta.sourceHash);
+  if (sourceHash && /^[a-f0-9]{64}$/.test(sourceHash)) record.sourceHash = sourceHash;
+  const sourceMtimeMs = Number(meta.sourceMtimeMs);
+  if (Number.isInteger(sourceMtimeMs) && sourceMtimeMs >= 0) record.sourceMtimeMs = sourceMtimeMs;
+  const sourceSize = Number(meta.sourceSize);
+  if (Number.isInteger(sourceSize) && sourceSize >= 0) record.sourceSize = sourceSize;
   if (typeParsed.success) record.type = typeParsed.data;
   if (lifecycleParsed.success) record.lifecycle = lifecycleParsed.data;
   if (record.type === 'case') record.chapters = parseChapters(meta.chapters, body);
@@ -219,6 +228,9 @@ export function serializeKnowledgeCard(record: KnowledgeCardRecord): string {
   ];
   if (record.sourceStatus) yamlLines.push(`sourceStatus: ${JSON.stringify(record.sourceStatus)}`);
   if (record.caseId) yamlLines.push(`caseId: ${JSON.stringify(record.caseId)}`);
+  if (record.sourceHash) yamlLines.push(`sourceHash: ${JSON.stringify(record.sourceHash)}`);
+  if (record.sourceMtimeMs != null) yamlLines.push(`sourceMtimeMs: ${record.sourceMtimeMs}`);
+  if (record.sourceSize != null) yamlLines.push(`sourceSize: ${record.sourceSize}`);
   if (record.chapters) yamlLines.push(`chapters: ${JSON.stringify(record.chapters)}`);
   return `---\n${yamlLines.join('\n')}\n---\n\n${record.body.trim()}\n`;
 }
@@ -230,4 +242,9 @@ export function normalizeLifecycle(value: unknown, fallback: KnowledgeLifecycle 
 
 export function isStructuredCard(record: ParsedKnowledgeSource['record']): record is KnowledgeCardRecord {
   return Boolean(record.type && record.lifecycle && record.cardId && record.spaceId && record.relativePath && record.title);
+}
+
+/** `sourceStatus=fixed` is historical provenance, never verification. */
+export function sourceStatusImpliesVerified(sourceStatus: string | undefined): boolean {
+  return sourceStatus != null && sourceStatus !== 'fixed' && sourceStatus === 'verified';
 }

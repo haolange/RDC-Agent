@@ -1,10 +1,16 @@
+import { createHash } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { KnowledgeCardRecord, KnowledgeHumanConfirmation, KnowledgeLifecycle, KnowledgeSpace } from '@shared/types/knowledge';
 import type { AgentPermissionMode } from '@shared/types/settings';
 import { missingCaseChapters, serializeKnowledgeCard } from './knowledgeCardSchema';
-import { KnowledgeHumanConfirmationRequiredError, KnowledgeLifecycleError } from './knowledgeErrors';
-import { isPathInside, toPosixRelative } from './knowledgeFs';
+import {
+  KnowledgeApprovalTokenInvalidError,
+  KnowledgeHumanConfirmationRequiredError,
+  KnowledgeLifecycleError,
+  KnowledgeWriteIntegrityError,
+} from './knowledgeErrors';
+import { assertSafeKnowledgeWriteTarget, writeKnowledgeCardAtomic } from './knowledgeFs';
 import { knowledgeIndexService, KnowledgeIndexService } from './KnowledgeIndexService';
 import { knowledgeQueryService } from './KnowledgeQueryService';
 
@@ -13,6 +19,8 @@ export interface KnowledgeWriteInput {
   card: KnowledgeCardRecord;
   permissionMode: AgentPermissionMode;
   confirmation: KnowledgeHumanConfirmation;
+  approvalToken?: string;
+  approvalAlreadyConsumed?: boolean;
 }
 
 export interface KnowledgePromoteInput {
@@ -21,14 +29,16 @@ export interface KnowledgePromoteInput {
   to: Extract<KnowledgeLifecycle, 'verified' | 'promoted' | 'deprecated'>;
   permissionMode: AgentPermissionMode;
   confirmation: KnowledgeHumanConfirmation;
+  approvalToken?: string;
 }
 
 export interface KnowledgeWriteDependencies {
   listSpaces(): KnowledgeSpace[];
-  writeFile(filePath: string, contents: string): Promise<void>;
-  mkdir(dirPath: string): Promise<void>;
+  writeFile?(filePath: string, contents: string): Promise<void>;
+  mkdir?(dirPath: string): Promise<void>;
   index?: KnowledgeIndexService;
   now(): Date;
+  consumeApprovalToken?(token: string, action: 'knowledge.write' | 'knowledge.promote'): boolean;
 }
 
 function assertHumanConfirmation(
@@ -46,16 +56,11 @@ function resolveSpace(spaces: KnowledgeSpace[], spaceId: string): KnowledgeSpace
   return space;
 }
 
-function resolveWritePath(space: KnowledgeSpace, relativePath: string): string {
-  const normalized = toPosixRelative(relativePath).replace(/^\/+/, '');
-  if (!normalized || normalized.includes('\0') || normalized.split('/').includes('..')) {
-    throw new Error('Invalid knowledge card path.');
+function assertFixedIsNotVerified(card: KnowledgeCardRecord, to?: KnowledgeLifecycle): void {
+  const becomingVerified = card.lifecycle === 'verified' || to === 'verified';
+  if (becomingVerified && card.sourceStatus === 'fixed') {
+    throw new KnowledgeLifecycleError('KNOWLEDGE_LIFECYCLE_INVALID: sourceStatus=fixed is not verified.');
   }
-  const absolute = path.resolve(space.rootPath, ...normalized.split('/'));
-  if (!isPathInside(space.rootPath, absolute)) {
-    throw new Error('Knowledge card path escaped its space root.');
-  }
-  return absolute;
 }
 
 export class KnowledgeWriteService {
@@ -63,9 +68,13 @@ export class KnowledgeWriteService {
 
   async write(input: KnowledgeWriteInput): Promise<KnowledgeCardRecord> {
     assertHumanConfirmation(input.confirmation, input.permissionMode);
+    if (!input.approvalAlreadyConsumed) {
+      this.consumeToken(input.approvalToken, 'knowledge.write');
+    }
     if (input.card.lifecycle === 'candidate') {
       throw new KnowledgeLifecycleError('KNOWLEDGE_LIFECYCLE_INVALID: persist Candidate via KnowledgeCandidateService, not Write.');
     }
+    assertFixedIsNotVerified(input.card);
     if (input.card.lifecycle === 'verified' && input.card.type === 'case') {
       const missing = missingCaseChapters(input.card.chapters);
       if (missing.length > 0) {
@@ -73,20 +82,35 @@ export class KnowledgeWriteService {
       }
     }
     const space = resolveSpace(this.overrides.listSpaces(), input.spaceId);
-    const absolute = resolveWritePath(space, input.card.relativePath);
+    const absolute = await assertSafeKnowledgeWriteTarget(space.rootPath, input.card.relativePath);
     const record: KnowledgeCardRecord = {
       ...input.card,
       spaceId: space.spaceId,
       updatedAt: this.overrides.now().getTime(),
     };
-    await this.overrides.mkdir(path.dirname(absolute));
-    await this.overrides.writeFile(absolute, serializeKnowledgeCard(record));
+    const serialized = serializeKnowledgeCard(record);
+    const parent = path.dirname(absolute);
+    if (this.overrides.mkdir) await this.overrides.mkdir(parent);
+    else await fs.mkdir(parent, { recursive: true });
+    if (this.overrides.writeFile) {
+      await this.overrides.writeFile(absolute, serialized);
+      const written = await fs.readFile(absolute, 'utf8');
+      const expected = createHash('sha256').update(serialized, 'utf8').digest('hex');
+      const actual = createHash('sha256').update(written, 'utf8').digest('hex');
+      if (expected !== actual) {
+        throw new KnowledgeWriteIntegrityError(`post-write hash mismatch for ${absolute}.`);
+      }
+    } else {
+      await writeKnowledgeCardAtomic(absolute, serialized);
+    }
     await this.overrides.index?.rebuild();
     return record;
   }
 
   async promote(input: KnowledgePromoteInput): Promise<KnowledgeCardRecord> {
     assertHumanConfirmation(input.confirmation, input.permissionMode);
+    this.consumeToken(input.approvalToken, 'knowledge.promote');
+    assertFixedIsNotVerified(input.card, input.to);
     const current = input.card.lifecycle;
     if (current === 'draft') {
       throw new KnowledgeLifecycleError('KNOWLEDGE_LIFECYCLE_INVALID: Draft cannot promote; create a Candidate first.');
@@ -108,17 +132,23 @@ export class KnowledgeWriteService {
       card: { ...input.card, lifecycle: input.to },
       permissionMode: input.permissionMode,
       confirmation: input.confirmation,
+      approvalAlreadyConsumed: true,
     });
+  }
+
+  private consumeToken(
+    token: string | undefined,
+    action: 'knowledge.write' | 'knowledge.promote',
+  ): void {
+    if (!this.overrides.consumeApprovalToken) return;
+    if (!token || this.overrides.consumeApprovalToken(token, action) !== true) {
+      throw new KnowledgeApprovalTokenInvalidError();
+    }
   }
 }
 
 export const knowledgeWriteService = new KnowledgeWriteService({
   listSpaces: () => knowledgeQueryService.listSpaces(),
-  writeFile: (filePath, contents) => fs.writeFile(filePath, contents, 'utf8'),
-  mkdir: async (dirPath) => {
-    await fs.mkdir(dirPath, { recursive: true });
-  },
   index: knowledgeIndexService,
   now: () => new Date(),
 });
-

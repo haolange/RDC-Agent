@@ -31,6 +31,7 @@ export interface KnowledgeIndexEntry {
   headings: string[];
   lexical: string;
   updatedAt: number;
+  contentHash: string;
   sourceStatus?: string;
   caseId?: string;
 }

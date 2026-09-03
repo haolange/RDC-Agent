@@ -1,6 +1,6 @@
-import { promises as fs } from 'node:fs';
 import { BrowserWindow, dialog, ipcMain } from 'electron';
 import type { KnowledgeIndexOverview, KnowledgeQueryRequest, KnowledgeSpace } from '@shared/types/knowledge';
+import { COLD_DATA_MAX_BYTES } from '../knowledge/coldDataIngest';
 import { knowledgeCandidateService } from '../knowledge/KnowledgeCandidateService';
 import { knowledgeCompileService } from '../knowledge/KnowledgeCompileService';
 import { knowledgeIndexService } from '../knowledge/KnowledgeIndexService';
@@ -24,8 +24,6 @@ import {
   KnowledgeQueryArgsSchema,
   KnowledgeWriteArgsSchema,
 } from './validation/knowledgeSchemas';
-
-const IMPORT_MAX_BYTES = 512 * 1024;
 
 function assertKnownSpaces(spaceIds: string[] | undefined): void {
   if (!spaceIds?.length) return;
@@ -245,8 +243,8 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
       maxBytes: 4 * 1024,
     });
     return {
-      candidates: knowledgeCandidateService.listCandidates(sessionId),
-      drafts: knowledgeCandidateService.listStagedDrafts(sessionId),
+      candidates: await knowledgeCandidateService.listCandidates(sessionId),
+      drafts: await knowledgeCandidateService.listStagedDrafts(sessionId),
     };
   });
 
@@ -257,7 +255,7 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
     });
     try {
       if (input.card.spaceId) assertKnownSpaces([input.card.spaceId]);
-      return knowledgeCandidateService.createCandidate({
+      return await knowledgeCandidateService.createCandidate({
         sessionId: input.sessionId,
         card: input.card,
         explicitUserIntent: true,
@@ -270,21 +268,17 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
   ipcMain.handle('knowledge:coldDataImport', async (_event, ...rawArgs: unknown[]) => {
     const [input] = parseIpcArgs(KnowledgeColdDataImportArgsSchema, rawArgs, {
       label: 'knowledge:coldDataImport',
-      maxBytes: IMPORT_MAX_BYTES + 8 * 1024,
+      maxBytes: COLD_DATA_MAX_BYTES + 8 * 1024,
     });
     try {
       if (input.spaceId) assertKnownSpaces([input.spaceId]);
-      let source = input.source ?? '';
       if (input.filePath) {
-        const stat = await fs.stat(input.filePath);
-        if (stat.size > IMPORT_MAX_BYTES) {
-          const error = new Error('KNOWLEDGE_IMPORT_TOO_LARGE');
-          (error as Error & { code: string }).code = 'KNOWLEDGE_IMPORT_TOO_LARGE';
-          throw error;
-        }
-        source = await fs.readFile(input.filePath, 'utf8');
+        return await knowledgeCandidateService.ingestColdDataPathToStaging(input.filePath, {
+          sessionId: input.sessionId,
+          ...(input.spaceId ? { spaceId: input.spaceId } : {}),
+        });
       }
-      return knowledgeCandidateService.ingestColdDataToStaging(source, {
+      return await knowledgeCandidateService.ingestColdDataToStaging(input.source ?? '', {
         sessionId: input.sessionId,
         ...(input.spaceId ? { spaceId: input.spaceId } : {}),
       });

@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 import type { SemanticLaneStatus } from '@shared/types/embedding';
 import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledge';
 import { StorageIo } from '../sessions/StorageIo';
-import { KnowledgeCandidateService } from './KnowledgeCandidateService';
+import { createDisposableCandidateService } from './KnowledgeCandidateService';
 import { KnowledgeCompileService } from './KnowledgeCompileService';
 import { KnowledgeIndexService } from './KnowledgeIndexService';
 import { KnowledgeQueryService } from './KnowledgeQueryService';
@@ -140,22 +140,22 @@ describe('Knowledge five services', () => {
     })).rejects.toBeInstanceOf(KnowledgeLifecycleError);
   });
 
-  it('creates a candidate only with explicit user intent', () => {
-    const candidates = new KnowledgeCandidateService({
+  it('creates a candidate only with explicit user intent', async () => {
+    const candidates = createDisposableCandidateService(tempDir(), {
       now: () => new Date('2026-09-01T00:00:00.000Z'),
       createId: () => 'fixed',
     });
-    expect(() => candidates.createCandidate({
+    await expect(candidates.createCandidate({
       sessionId: 's1',
       card: draftCard(),
       explicitUserIntent: false,
-    })).toThrow(/KNOWLEDGE_CANDIDATE_REQUIRES_INTENT/);
-    const created = candidates.createCandidate({
+    })).rejects.toThrow(/KNOWLEDGE_CANDIDATE_REQUIRES_INTENT/);
+    const created = await candidates.createCandidate({
       sessionId: 's1',
       card: draftCard(),
       explicitUserIntent: true,
     });
     expect(created.card.lifecycle).toBe('candidate');
-    expect(candidates.listCandidates('s1')).toHaveLength(1);
+    expect(await candidates.listCandidates('s1')).toHaveLength(1);
   });
 });

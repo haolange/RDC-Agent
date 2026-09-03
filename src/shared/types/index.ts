@@ -244,6 +244,7 @@ export type {
   KnowledgePackConflict,
   KnowledgeQueryRequest,
   KnowledgeQueryResult,
+  KnowledgeReviewRecord,
   KnowledgeRelation,
   KnowledgeRelationKind,
   KnowledgeRetrievalLane,

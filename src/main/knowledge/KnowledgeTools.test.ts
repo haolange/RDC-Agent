@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledge';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { createKnowledgeTools } from './KnowledgeTools';
-import { KnowledgeCandidateService } from './KnowledgeCandidateService';
+import { createDisposableCandidateService, KnowledgeCandidateService } from './KnowledgeCandidateService';
 import { KnowledgeCompileService } from './KnowledgeCompileService';
 import { KnowledgeQueryService } from './KnowledgeQueryService';
 import type { KnowledgeQueryResult } from './knowledgeLanes';
@@ -35,7 +38,9 @@ const queryResult: KnowledgeQueryResult = {
   semantic: { availability: 'unavailable', reason: 'consent-denied', selectedIdentity: null, selectedDimensions: 1536, snapshot: null },
 };
 
-function createTools(candidates = new KnowledgeCandidateService()) {
+function createTools(candidates: KnowledgeCandidateService = createDisposableCandidateService(
+  mkdtempSync(path.join(tmpdir(), 'rdc-knowledge-tools-')),
+)) {
   const query = {
     listSpaces: vi.fn(() => spaces),
     listCards: vi.fn(async () => [{ cardId: card.cardId, spaceId: card.spaceId, relativePath: card.relativePath, title: card.title }]),
@@ -88,7 +93,7 @@ describe('KnowledgeTools', () => {
   });
 
   it('creates a session candidate only after explicit intent and never as verified/promoted', async () => {
-    const candidates = new KnowledgeCandidateService();
+    const candidates = createDisposableCandidateService(mkdtempSync(path.join(tmpdir(), 'rdc-knowledge-tools-')));
     const writeSpy = vi.fn();
     const { byName } = createTools(candidates);
     const denied = await byName.knowledge_candidate_create.execute('c6', {
@@ -98,7 +103,7 @@ describe('KnowledgeTools', () => {
       explicitUserIntent: false,
     });
     expect(denied.isError).toBe(true);
-    expect(candidates.listCandidates('session-tools')).toHaveLength(0);
+    expect(await candidates.listCandidates('session-tools')).toHaveLength(0);
 
     const created = await byName.knowledge_candidate_create.execute(
       'c7',
@@ -114,7 +119,7 @@ describe('KnowledgeTools', () => {
       verified: false,
       promoted: false,
     });
-    const stored = candidates.listCandidates('session-tools');
+    const stored = await candidates.listCandidates('session-tools');
     expect(stored).toHaveLength(1);
     expect(stored[0]?.card.lifecycle).toBe('candidate');
     expect(writeSpy).not.toHaveBeenCalled();

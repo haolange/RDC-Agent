@@ -69,7 +69,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 Memory：显式 search/read/write/delete；写入需用户意图或交互审批；删除需确认；禁止轮次自动抽取/consolidation/全索引注入。
 
-Knowledge Center 是三列 UI（Spaces / List / Detail），只消费 Query / Index / Compile / Candidate / Write；独立 `knowledge` IPC。持久写入须显式人类确认；ColdData 摄入为 staging / Draft，不自动 Candidate。不生成、不自动注入 prompt。**当前态**：Candidate/Draft 为进程内 Map，写路径无 realpath、非原子；ColdData 不记录源 hash/mtime/size；Semantic rebuild 只写 snapshot，属假 ready。目标态见 `DESIGN.md` 裁决 C / G。**产品级 Browser QA 与本机 ColdData 真实验收尚未跑。**
+Knowledge Center 是三列 UI（Spaces / List / Detail），只消费 Query / Index / Compile / Candidate / Write；独立 `knowledge` IPC。持久写入须显式人类确认；ColdData 摄入为 staging / Draft，不自动 Candidate。不生成、不自动注入 prompt。**当前态**：Candidate/Draft/review 已落到 session durable store；ColdData 记录并复核源 hash/mtime/size；写路径 realpath + 原子替换。Semantic rebuild 只写 snapshot，属假 ready。目标态见 `DESIGN.md` 裁决 C / G。**产品级 Browser QA 与本机 ColdData 真实验收尚未跑。**
 
 ## Provider Account（产品）
 
