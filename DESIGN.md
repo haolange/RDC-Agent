@@ -218,7 +218,7 @@ T19 逐项裁决（删除 / 保留理由 / 调用方）：
 | `src/shared/types/harness.ts` | **收敛保留** | 只留 Outputs `ArtifactKind` / `ArtifactRecord`。删除未用的 `HarnessStatus` / `EvidenceRecord` / `ContextPacket` 等旧 Debugger harness 类型。Investigation `EvidenceRecord` 仍以 `renderdocInvestigation.ts` 为准。禁止恢复固定 stage。 |
 | `RdxCliInvokerService` `tool_count` | **保留诊断、禁止 UI** | CLI 内部 invoker 诊断可用；Right Rail / 模型工具面不得展示 catalog summary。 |
 | stage / `WorkflowStage` / `recommendedSpecialists` | **已删** | 见裁决 I；不得双读 v2。 |
-| agent-trace `phases`（understand/work/summarize） | **保留** | Work Process / Trace UI 展示相位，不是 Run `WorkflowStage`，不得当 stage 双轨删除。 |
+| agent-trace `phases`（understand/work/summarize） | **保留并对齐** | Work Process / Trace UI 展示相位，不是 Run `WorkflowStage`。重建时间线只发这三相位，不再发旧 `plan`/`execute` phase id。`PhaseKind` 里的 `plan`/`execute` 是 trace node 词汇，不是 Run stage。 |
 | Classic Session Panel / ArtifactViewer | **已不在 renderer 入口** | 禁止恢复。 |
 | `Classic` / `legacy` / `deprecated` / `compat` 文案 | **按语义保留** | provider `deprecated`、Knowledge lifecycle `deprecated`、OpenAI-compatible 协议名为合法词，禁止借清理误删。 |
 | `ErrorRecovery` 等 recoverable fallback | **保留** | Availability 分类，不是 legacy 双轨。 |

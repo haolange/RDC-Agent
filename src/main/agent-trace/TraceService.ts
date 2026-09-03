@@ -253,18 +253,15 @@ export class TraceService {
         if (existingNodeIds.has(event.event_id)) continue;
         if (event.event_type === 'tool_execution') {
           completePhase('understand');
-          completePhase('plan');
-          startPhase('execute');
+          startPhase('work');
           this.emitter.emitToolFromActionEvent(runId, event);
         } else if (event.event_type === 'dispatch') {
           completePhase('understand');
-          completePhase('plan');
-          startPhase('execute');
+          startPhase('work');
           this.emitter.emitSubAgent(runId, event);
         } else if (event.event_type === 'agent_summary') {
           completePhase('understand');
-          completePhase('plan');
-          startPhase('execute');
+          startPhase('work');
           // Agent summaries are workflow metadata, not provider thinking artifacts.
         }
         existingNodeIds.add(event.event_id);
@@ -272,8 +269,7 @@ export class TraceService {
       const finalContent = this.finalContentForRun(run, runEvents, conversations, runId);
       if (finalContent && !existingNodeIds.has(`__final__:${runId}`)) {
         completePhase('understand');
-        completePhase('plan');
-        completePhase('execute');
+        completePhase('work');
         startPhase('summarize');
         this.emitter.emitFinalResponse(runId, finalContent);
         completePhase('summarize');
