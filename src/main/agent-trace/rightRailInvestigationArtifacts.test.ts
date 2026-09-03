@@ -11,7 +11,11 @@ import {
   overwriteInvestigationManifest,
   writeDraft,
 } from '../investigation/investigationTestFixtures';
-import { mapRightRailInvestigationArtifacts, type InvestigationArtifactsSource } from './rightRailInvestigationArtifacts';
+import {
+  mapRightRailInvestigationArtifacts,
+  type InvestigationArtifactsSource,
+  type InvestigationListSnapshot,
+} from './rightRailInvestigationArtifacts';
 import { mapRightRailOutputs } from './rightRailProjectionMappers';
 
 const entry = (
@@ -53,9 +57,9 @@ const manifestOf = (
 const sourceOf = (
   entries: InvestigationIndexEntry[],
   manifests: Array<[string, InvestigationArtifactManifest | null]> = [],
-  listImpl?: () => InvestigationIndexEntry[],
+  listImpl?: () => InvestigationListSnapshot,
 ): InvestigationArtifactsSource => ({
-  listForProjection: listImpl ?? (() => entries),
+  listForProjection: listImpl ?? (() => ({ artifacts: entries, storeDegraded: false })),
   listManifests: () => new Map(manifests),
 });
 
@@ -141,6 +145,7 @@ describe('mapRightRailInvestigationArtifacts', () => {
       rows: [],
       supersededCount: 0,
       truncatedCount: 0,
+      storeDegraded: true,
     });
   });
 
@@ -148,7 +153,7 @@ describe('mapRightRailInvestigationArtifacts', () => {
     const result = mapRightRailInvestigationArtifacts('session-a', sourceOf([], [], () => {
       throw new Error('INVESTIGATION_INDEX_CORRUPT');
     }));
-    expect(result).toEqual({ rows: [], supersededCount: 0, truncatedCount: 0 });
+    expect(result).toEqual({ rows: [], supersededCount: 0, truncatedCount: 0, storeDegraded: true });
   });
 
   it('does not mix output_register files into investigation rows', () => {

@@ -15,6 +15,7 @@ export const INVESTIGATION_ERROR_CODES = [
   'INVESTIGATION_INDEX_MISSING',
   'INVESTIGATION_DUPLICATE_ID',
   'INVESTIGATION_STORAGE_FAILED',
+  'INVESTIGATION_DEGRADED',
 ] as const;
 
 export type InvestigationErrorCode = (typeof INVESTIGATION_ERROR_CODES)[number];
@@ -52,4 +53,11 @@ export function toInvestigationError(error: unknown): InvestigationError {
     'INVESTIGATION_STORAGE_FAILED',
     error instanceof Error ? error.message : String(error),
   );
+}
+
+export function isInvestigationStoreDegraded(error: unknown): boolean {
+  if (!(error instanceof InvestigationError)) return false;
+  return error.code === 'INVESTIGATION_DEGRADED'
+    || error.code === 'INVESTIGATION_INDEX_CORRUPT'
+    || error.code === 'INVESTIGATION_INDEX_MISSING';
 }

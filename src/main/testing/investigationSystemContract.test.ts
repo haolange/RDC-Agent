@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -30,6 +30,7 @@ import {
   overwriteInvestigationRecordBody,
   plantInvestigationRecord,
   recordedExperiment,
+  reopenInvestigationHarness,
   sampleChallenge,
   sampleCheckpoint,
   sampleReport,
@@ -37,6 +38,7 @@ import {
   seedNote,
   writeDraft,
 } from '../investigation/investigationTestFixtures';
+import { INVESTIGATION_TXN_COMMIT, INVESTIGATION_TXN_DIR, INVESTIGATION_TXN_JOURNAL } from '../investigation/investigationTxn';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -817,5 +819,92 @@ describe('investigation system contract', () => {
     const report = readRepo('resources/agent-runtime/skills/report-composition/SKILL.md');
     expect(report).toMatch(/reportContract/);
     expect(report).toMatch(/candidateStatus/);
+  });
+
+  it('investigation.contract.txn.atomic-recover', () => {
+    expect.hasAssertions();
+    const { sessionPath } = createInvestigationHarness();
+    const world = writeDraft(
+      reopenInvestigationHarness(sessionPath).service,
+      'world_state',
+      baselineWorld('ws-txn-contract'),
+    );
+    const crashing = reopenInvestigationHarness(sessionPath, {
+      onPersistBoundary: (boundary) => {
+        if (boundary === 'temp:content') throw new Error('fault:temp-content');
+      },
+    });
+    expect(() => crashing.service.writeRecord(SESSION_ID, {
+      kind: 'world_state',
+      mission: 'debugger',
+      title: 'v2',
+      summary: 'must roll back',
+      record: baselineWorld('ws-txn-contract'),
+      supersedes: world.manifest.artifactId,
+    })).toThrow(/fault:temp-content|INVESTIGATION_/);
+    const afterRollback = reopenInvestigationHarness(sessionPath);
+    expect(afterRollback.service.list(SESSION_ID)).toHaveLength(1);
+    expect(afterRollback.service.readRecord(SESSION_ID, world.manifest.artifactId).manifest.status).toBe('draft');
+    const committed = reopenInvestigationHarness(sessionPath, {
+      onPersistBoundary: (boundary) => {
+        if (boundary === 'replace:index') throw new Error('fault:replace-index');
+      },
+    });
+    expect(() => committed.service.writeRecord(SESSION_ID, {
+      kind: 'world_state',
+      mission: 'debugger',
+      title: 'v2',
+      summary: 'must roll forward',
+      record: baselineWorld('ws-txn-contract'),
+      supersedes: world.manifest.artifactId,
+    })).toThrow(/fault:replace-index|INVESTIGATION_/);
+    const afterForward = reopenInvestigationHarness(sessionPath);
+    expect(afterForward.service.readRecord(SESSION_ID, world.manifest.artifactId).manifest.status).toBe('superseded');
+    expect(afterForward.service.list(SESSION_ID)).toHaveLength(2);
+    const serviceSource = readRepo('src/main/investigation/InvestigationArtifactService.ts');
+    expect(serviceSource).toMatch(/commitInvestigationTxn/);
+    expect(serviceSource).toMatch(/recoverInvestigationTxn/);
+    expect(serviceSource).not.toMatch(/this\.writeArtifact\(/);
+    const txnSource = readRepo('src/main/investigation/investigationTxn.ts');
+    expect(txnSource).toMatch(/INVESTIGATION_TXN_COMMIT/);
+    expect(txnSource).toMatch(/commitInvestigationTxn/);
+    expect(txnSource).toMatch(/recoverInvestigationTxn/);
+  });
+
+  it('investigation.contract.txn.degraded-not-empty', () => {
+    expect.hasAssertions();
+    const { sessionPath, service } = createInvestigationHarness();
+    writeDraft(service, 'world_state', baselineWorld('ws-deg-contract'));
+    expect(service.list(SESSION_ID)).not.toEqual([]);
+    const root = path.join(sessionPath, INVESTIGATION_TXN_DIR);
+    mkdirSync(root, { recursive: true });
+    writeFileSync(path.join(root, INVESTIGATION_TXN_COMMIT), '{not-json', 'utf8');
+    writeFileSync(path.join(root, INVESTIGATION_TXN_JOURNAL), '{also-bad', 'utf8');
+    const restarted = reopenInvestigationHarness(sessionPath);
+    expect(() => restarted.service.list(SESSION_ID)).toThrow(/INVESTIGATION_DEGRADED/);
+    expect(restarted.service.listForProjection(SESSION_ID)).toEqual({ artifacts: [], storeDegraded: true });
+    unlinkSync(path.join(root, INVESTIGATION_TXN_COMMIT));
+    writeFileSync(path.join(root, INVESTIGATION_TXN_JOURNAL), '{not-json', 'utf8');
+    const journalOnly = reopenInvestigationHarness(sessionPath);
+    expect(() => journalOnly.service.list(SESSION_ID)).toThrow(/INVESTIGATION_DEGRADED/);
+    expect(journalOnly.service.listForProjection(SESSION_ID).storeDegraded).toBe(true);
+    expect(journalOnly.service.listForProjection(SESSION_ID).artifacts).toEqual([]);
+    const rail = readRepo('src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx');
+    expect(rail).toMatch(/storeDegraded \? 'control\.rightRail\.artifacts\.storeDegraded'/);
+    expect(rail).toMatch(/control\.rightRail\.artifacts\.empty/);
+    let listed: unknown = 'empty-disguise';
+    try {
+      listed = journalOnly.service.list(SESSION_ID);
+    } catch (error) {
+      expect(error).toBeInstanceOf(InvestigationError);
+      expect((error as InvestigationError).code).toBe('INVESTIGATION_DEGRADED');
+    }
+    expect(listed).toBe('empty-disguise');
+    const task = readRepo('src/main/agent-runtime/tasks/TaskRegistry.ts');
+    const profile = readRepo('src/shared/types/profile.ts');
+    const message = readRepo('src/shared/types/conversation.ts');
+    for (const source of [task, profile, message]) {
+      expect(source).not.toMatch(/INVESTIGATION_DEGRADED|rdc\.investigation\.v1/);
+    }
   });
 });

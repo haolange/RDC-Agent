@@ -158,6 +158,7 @@ export interface InvestigationArtifactsPanelViewModel {
   rows: InvestigationArtifactRow[];
   supersededCount: number;
   truncatedCount: number;
+  storeDegraded: boolean;
 }
 
 export type TaskContextResourceKind =

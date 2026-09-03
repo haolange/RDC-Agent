@@ -11,6 +11,7 @@ import type { SessionArtifactResolver } from '../sessions/SessionArtifactResolve
 import { InvestigationError } from './investigationErrors';
 import type { InvestigationLookup } from './investigationInvariants';
 import { assertNoOpaqueProviderPayload } from './investigationRecordSchemas';
+import type { InvestigationPersistBoundary, InvestigationTxnRole } from './investigationTxn';
 
 export interface InvestigationWriteInput {
   kind: string;
@@ -44,6 +45,12 @@ export interface InvestigationReadResult {
 export interface InvestigationArtifactServiceDeps {
   resolver?: SessionArtifactResolver;
   now?: () => Date;
+  onPersistBoundary?: (boundary: InvestigationPersistBoundary, info: {
+    txnId: string;
+    uri?: string;
+    role?: InvestigationTxnRole;
+  }) => void;
+  lockMaxAttempts?: number;
 }
 
 export function requireCanonicalWriteMission(

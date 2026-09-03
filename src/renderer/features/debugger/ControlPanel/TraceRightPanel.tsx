@@ -47,7 +47,7 @@ export const TraceRightPanel: React.FC = () => {
   const presentation = useWorkflowStore((state) => state.tracePresentation);
   const rightPanel = presentation?.rightPanel;
   const tasks = rightPanel?.progress ?? [];
-  const artifacts = rightPanel?.artifacts ?? { rows: [], supersededCount: 0, truncatedCount: 0 };
+  const artifacts = rightPanel?.artifacts ?? { rows: [], supersededCount: 0, truncatedCount: 0, storeDegraded: false };
   const outputs = rightPanel?.outputs ?? { current: [], previous: [] };
   const taskContext: TaskContextPanelViewModel | undefined = rightPanel?.context?.task;
   const captureContext: RdxContextPanelViewModel | undefined = rightPanel?.context?.rdx;
@@ -59,7 +59,7 @@ export const TraceRightPanel: React.FC = () => {
   return (
     <aside className="right-rail" aria-label="Session inspector">
       <RailSection id="progress" title={t('control.rightRail.progress.title')}>{tasks.length ? <ProgressList tasks={tasks} /> : <EmptyState kind="progress" copy={t('control.rightRail.progress.empty')} />}</RailSection>
-      <RailSection id="artifacts" title={t('control.rightRail.artifacts.title')}>{hasArtifacts ? <RightRailArtifactList artifacts={artifacts} /> : <EmptyState kind="artifacts" copy={t('control.rightRail.artifacts.empty')} />}</RailSection>
+      <RailSection id="artifacts" title={t('control.rightRail.artifacts.title')}>{hasArtifacts ? <RightRailArtifactList artifacts={artifacts} /> : <EmptyState kind="artifacts" copy={t(artifacts.storeDegraded ? 'control.rightRail.artifacts.storeDegraded' : 'control.rightRail.artifacts.empty')} />}</RailSection>
       <RailSection id="outputs" title={t('control.rightRail.outputs.title')}>{hasOutputs ? <RightRailOutputList current={outputs.current} previous={outputs.previous} /> : <EmptyState kind="outputs" copy={t('control.rightRail.outputs.empty')} />}</RailSection>
       <RailSection id="context" title={t('control.rightRail.context.title')}>{hasTaskContext && taskContext ? <RightRailContext task={taskContext} /> : <EmptyState kind="context" copy={t('control.rightRail.context.empty')} />}</RailSection>
       <RailSection id="capture" title={t('control.rightRail.capture.title')}>{hasCapture && taskContext && captureContext ? <CapturePanel task={taskContext} capture={captureContext} /> : <EmptyState kind="capture" copy={t('control.rightRail.capture.empty')} />}</RailSection>

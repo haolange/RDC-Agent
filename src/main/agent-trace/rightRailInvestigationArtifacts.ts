@@ -1,5 +1,6 @@
 import { bareInvestigationHash, type InvestigationArtifactManifest, type InvestigationRecordType } from '@shared/types/renderdocInvestigation';
 import type { InvestigationArtifactRow, InvestigationArtifactsPanelViewModel } from '@shared/types/trace';
+import { isInvestigationStoreDegraded } from '../investigation/investigationErrors';
 import { hashesEqual } from '../investigation/investigationHash';
 import { investigationArtifactService } from '../investigation/InvestigationArtifactService';
 import { collectSupersedeChain, type InvestigationIndexEntry } from '../investigation/investigationRecordKeys';
@@ -7,15 +8,21 @@ import { collectSupersedeChain, type InvestigationIndexEntry } from '../investig
 const ROW_LIMIT = 50;
 const FALLBACK_MISSION = 'debugger' as const;
 
+export interface InvestigationListSnapshot {
+  artifacts: InvestigationIndexEntry[];
+  storeDegraded: boolean;
+}
+
 export interface InvestigationArtifactsSource {
-  listForProjection(sessionId: string): InvestigationIndexEntry[];
+  listForProjection(sessionId: string): InvestigationListSnapshot;
   listManifests(sessionId: string): Map<string, InvestigationArtifactManifest | null>;
 }
 
-const emptyArtifacts = (): InvestigationArtifactsPanelViewModel => ({
+const emptyArtifacts = (storeDegraded = false): InvestigationArtifactsPanelViewModel => ({
   rows: [],
   supersededCount: 0,
   truncatedCount: 0,
+  storeDegraded,
 });
 
 const hashShort = (value: string): string => {
@@ -59,7 +66,11 @@ export function mapRightRailInvestigationArtifacts(
   source: InvestigationArtifactsSource = investigationArtifactService,
 ): InvestigationArtifactsPanelViewModel {
   try {
-    const entries = source.listForProjection(sessionId).slice().sort((left, right) => {
+    const listed = source.listForProjection(sessionId);
+    if (listed.storeDegraded) {
+      return emptyArtifacts(true);
+    }
+    const entries = listed.artifacts.slice().sort((left, right) => {
       const time = left.createdAt.localeCompare(right.createdAt);
       return time !== 0 ? time : left.artifactId.localeCompare(right.artifactId);
     });
@@ -71,8 +82,9 @@ export function mapRightRailInvestigationArtifacts(
       rows: visible.slice(-ROW_LIMIT).map((entry) => toRow(entry, manifests.get(entry.artifactId) ?? null)),
       supersededCount: superseded.size,
       truncatedCount,
+      storeDegraded: false,
     };
-  } catch {
-    return emptyArtifacts();
+  } catch (error) {
+    return emptyArtifacts(isInvestigationStoreDegraded(error) || /INVESTIGATION_INDEX_CORRUPT|INVESTIGATION_INDEX_MISSING|INVESTIGATION_DEGRADED/.test(String(error)));
   }
 }
