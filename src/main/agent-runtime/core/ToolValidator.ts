@@ -456,6 +456,13 @@ export class ToolValidator {
         toolName,
       );
     }
+    // Omit `properties` = opaque bag (same as arrays without `items`).
+    // Kind-specific bodies such as investigation_write.record are enforced
+    // by the tool's own Zod schema, not by inventing a second field list here.
+    // An explicit empty `properties: {}` still rejects every key.
+    if (schema.properties === undefined) {
+      return { ...input };
+    }
     const output: Record<string, unknown> = {};
 
     if (schema.required && Array.isArray(schema.required)) {
