@@ -39,7 +39,13 @@ assert(activeSignalHelper.includes("status === 'running' || status === 'pending'
 assert(activeSignalHelper.includes("thinkingStatus === 'streaming'"), 'active signal must recognize streaming thinking lifecycle');
 assert(activeSignalStyles.includes('.active-signal-text.is-active'), 'active signal text CSS class is missing');
 assert(activeSignalStyles.includes('background-clip: text'), 'active signal must use clipped-gradient energy shimmer');
-assert(activeSignalStyles.includes('background-size: 220% 100%'), 'active signal must use the original 220% energy wash');
+assert(activeSignalStyles.includes('background-size: 200% 100%'), 'active signal must tile a 200% energy wash so the loop is one period');
+assert(activeSignalStyles.includes('background-repeat: repeat-x'), 'active signal must repeat-x so the loop seam can tile');
+assert(
+  /@keyframes active-signal-shimmer \{\s*0% \{ background-position: 100% 0; \}\s*100% \{ background-position: -100% 0; \}\s*\}/.test(activeSignalStyles),
+  'active signal keyframes must be a continuous 100% to -100% sweep with no hold',
+);
+assert(!activeSignalStyles.includes('78% { background-position'), 'active signal must not pause mid-cycle');
 assert(activeSignalStyles.includes('1.6s linear infinite'), 'active signal must keep the original 1.6s continuous sweep');
 assert(activeSignalStyles.includes('color-mix(in srgb, var(--active-signal-highlight) 36%, transparent)'), 'active signal must keep the original 36% wash gradient');
 assert(!activeSignalStyles.includes('--active-signal-base'), 'narrow sheen base token must stay removed');

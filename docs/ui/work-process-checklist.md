@@ -4,7 +4,7 @@
 
 ## 运行态
 
-- 顶层标题「工作中 / Working」+ Active Signal clipped-gradient 能量扫光（`active-signal-shimmer`，1.6s / 220% / 36% wash）。
+- 顶层标题「工作中 / Working」+ Active Signal clipped-gradient 能量扫光（`active-signal-shimmer`，1.6s / 200% / 36% wash，循环整格平铺）。
 - loop thinking 运行态默认展开（summary/raw/unknown 与 final-answer/收束 thinking 同一生命周期）。
 - Active Signal「正在思考 / Thinking」。
 - `.work-process-label.status-running` **不得**设置 `color`（仅 `--active-signal-highlight`）；运行标签 shimmer 依赖 `color: transparent` + `background-clip: text`，任何后续规则覆盖 `color` 都会冻结为透明。
@@ -43,7 +43,7 @@
 
 ## Active Signal / reduceMotion
 
-- 动画名 `active-signal-shimmer`；`.active-signal-text.is-active` 为 clipped-gradient 能量扫光（`1.6s linear`、`background-size: 220%`、36% wash 渐变，无关键帧停顿）。
+- 动画名 `active-signal-shimmer`；`.active-signal-text.is-active` 为 clipped-gradient 能量扫光（`1.6s linear`、`background-size: 200%`、`repeat-x`、36% wash 两端对齐，无关键帧停顿）。
 - Settings `html[data-reduce-motion='on']` 与 OS `prefers-reduced-motion: reduce` 均回退静态 `--active-signal-highlight`（移除透明 gradient）；全局 `animation-duration: 0` 仍生效，fallback 负责去掉冻结透明字。
 - 门禁：`ActiveSignalText.test.ts` + `check:work-process` 扫描 `.work-process-label.status-running` 不得含 `color:`。
 
