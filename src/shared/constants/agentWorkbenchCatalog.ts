@@ -516,7 +516,14 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
         },
         capturePath: { type: 'string' },
         contextId: { type: 'string' },
-        args: { type: 'object', additionalProperties: { type: 'string' } },
+        args: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            action: { type: 'string' },
+            name: { type: 'string' },
+          },
+        },
       },
     },
     resultSummary: 'Runs a Settings-configured read-only RDX CLI probe and returns a structured summary.',

@@ -149,8 +149,12 @@ export function createRdxProbeTool(
         contextId: { type: 'string', description: 'Optional daemon context id injected into the configured CLI action.' },
         args: {
           type: 'object',
-          additionalProperties: true,
-          description: 'Optional string arguments. Mutate action names and arbitrary argv are rejected.',
+          additionalProperties: false,
+          properties: {
+            action: { type: 'string', description: 'Read-only probe sub-action when action is probe.' },
+            name: { type: 'string', description: 'Alias for probe sub-action name.' },
+          },
+          description: 'Optional closed string arguments. Mutate action names and arbitrary argv are rejected.',
         },
       },
     },
