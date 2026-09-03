@@ -257,16 +257,12 @@ describe('knowledge system contract', () => {
     expect.hasAssertions();
     const scoutTools = skillAllowedTools('knowledge-scout');
     const candidateTools = skillAllowedTools('knowledge-candidate');
-    expect(scoutTools).toEqual(expect.arrayContaining([
+    expect(scoutTools).toEqual([
       'knowledge_browse',
       'knowledge_search',
       'knowledge_read',
       'knowledge_compile',
-      'rdx_probe',
-      'plan_artifact',
-      'investigation_write',
-      'agent_handoff',
-    ]));
+    ]);
     expect(candidateTools).toEqual(['knowledge_candidate_create']);
     expect(readRepo('resources/agent-runtime/skills/knowledge-scout/SKILL.md')).not.toMatch(/knowledge_write|knowledge_promote/);
     expect(readRepo('resources/agent-runtime/skills/knowledge-candidate/SKILL.md')).not.toMatch(/knowledge_write|knowledge_promote/);
