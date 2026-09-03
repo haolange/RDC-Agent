@@ -385,7 +385,7 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       label: 'settings:getSemanticLaneStatus',
       maxBytes: 1024,
     });
-    return embeddingExecutionService.resolveSemanticLaneStatus();
+    return await embeddingExecutionService.resolveSemanticLaneStatus();
   });
 
   ipcMain.handle('settings:rebuildSemanticIndex', async (_event, ...rawArgs: unknown[]) => {

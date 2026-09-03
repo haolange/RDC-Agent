@@ -174,7 +174,7 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
     return {
       spaces: knowledgeQueryService.listSpaces(),
       index: toIndexOverview(),
-      semantic: embeddingExecutionService.resolveSemanticLaneStatus(),
+      semantic: await embeddingExecutionService.resolveSemanticLaneStatus(),
     };
   });
 

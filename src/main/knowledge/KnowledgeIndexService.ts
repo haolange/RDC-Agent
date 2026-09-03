@@ -7,8 +7,10 @@ import { parseKnowledgeFrontmatter } from './knowledgeCardSchema';
 import { KNOWLEDGE_INDEX_MIGRATIONS } from './knowledgeIndexSchema';
 import {
   KNOWLEDGE_INDEX_SCHEMA_VERSION,
+  knowledgeCorpusHash,
   type KnowledgeIndexEntry,
   type KnowledgeIndexSnapshot,
+  type SemanticCorpusDocument,
 } from './knowledgeLanes';
 import { toPosixRelative, walkMarkdownFiles } from './knowledgeFs';
 
@@ -53,12 +55,6 @@ const defaultDependencies = (): KnowledgeIndexDependencies => {
 
 function contentHashOf(source: string): string {
   return createHash('sha256').update(source, 'utf8').digest('hex');
-}
-
-function revisionOf(cards: readonly KnowledgeIndexEntry[]): string {
-  return createHash('sha256')
-    .update(cards.map((card) => `${card.cardId}:${card.contentHash}`).join('|'), 'utf8')
-    .digest('hex');
 }
 
 function toEntry(
@@ -124,7 +120,7 @@ export class KnowledgeIndexService {
     cards.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
     const snapshot: KnowledgeIndexSnapshot = {
       schemaVersion: KNOWLEDGE_INDEX_SCHEMA_VERSION,
-      revision: revisionOf(cards),
+      revision: knowledgeCorpusHash(cards),
       builtAt: this.dependencies.now().toISOString(),
       cards,
     };
@@ -158,7 +154,39 @@ export class KnowledgeIndexService {
       }
     }
     cards.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
-    return revisionOf(cards);
+    return knowledgeCorpusHash(cards);
+  }
+
+  async listCorpusDocuments(): Promise<SemanticCorpusDocument[]> {
+    const snapshot = await this.getOrRebuild();
+    const spaces = this.dependencies.listSpaces();
+    const documents: SemanticCorpusDocument[] = [];
+    for (const card of snapshot.cards) {
+      const space = spaces.find((entry) => entry.spaceId === card.spaceId);
+      if (!space) continue;
+      try {
+        const absolutePath = path.join(space.rootPath, card.relativePath);
+        const source = await this.dependencies.readFile(absolutePath);
+        const parsed = parseKnowledgeFrontmatter(source, {
+          spaceId: card.spaceId,
+          relativePath: card.relativePath,
+        });
+        documents.push({
+          cardId: card.cardId,
+          spaceId: card.spaceId,
+          relativePath: card.relativePath,
+          title: card.title,
+          type: card.type,
+          lifecycle: card.lifecycle,
+          body: parsed.body,
+          contentHash: card.contentHash,
+        });
+      } catch {
+        // skip unreadable files
+      }
+    }
+    documents.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+    return documents;
   }
 
   async isSnapshotStale(snapshot: KnowledgeIndexSnapshot | null = this.getSnapshot()): Promise<boolean> {
