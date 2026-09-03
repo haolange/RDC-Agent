@@ -35,3 +35,35 @@ export class KnowledgeLifecycleError extends Error {
     this.name = 'KnowledgeLifecycleError';
   }
 }
+
+export class KnowledgeRevisionConflictError extends Error {
+  readonly code = 'KNOWLEDGE_REVISION_CONFLICT';
+  constructor(detail: string) {
+    super(`KNOWLEDGE_REVISION_CONFLICT: ${detail}`);
+    this.name = 'KnowledgeRevisionConflictError';
+  }
+}
+
+export class KnowledgeWritePathError extends Error {
+  readonly code = 'KNOWLEDGE_WRITE_PATH_REJECTED';
+  constructor(detail: string) {
+    super(`KNOWLEDGE_WRITE_PATH_REJECTED: ${detail}`);
+    this.name = 'KnowledgeWritePathError';
+  }
+}
+
+export class KnowledgeWriteIntegrityError extends Error {
+  readonly code = 'KNOWLEDGE_WRITE_INTEGRITY';
+  constructor(detail: string) {
+    super(`KNOWLEDGE_WRITE_INTEGRITY: ${detail}`);
+    this.name = 'KnowledgeWriteIntegrityError';
+  }
+}
+
+export class KnowledgeApprovalTokenInvalidError extends Error {
+  readonly code = 'KNOWLEDGE_APPROVAL_TOKEN_INVALID';
+  constructor() {
+    super('KNOWLEDGE_APPROVAL_TOKEN_INVALID: approvalToken is missing, already consumed, or does not match.');
+    this.name = 'KnowledgeApprovalTokenInvalidError';
+  }
+}

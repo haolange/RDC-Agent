@@ -116,6 +116,10 @@ export interface KnowledgeCardRecord {
   sourceStatus?: string;
   caseId?: string;
   chapters?: KnowledgeCaseChapters;
+  /** ColdData path ingest provenance. Never an absolute path or original filename. */
+  sourceHash?: string;
+  sourceMtimeMs?: number;
+  sourceSize?: number;
 }
 
 export type KnowledgeSpaceKind = 'user' | 'project';
@@ -151,6 +155,16 @@ export interface KnowledgeCardDetail extends KnowledgeCardSummary {
 
 export interface KnowledgeHumanConfirmation {
   explicitHumanConfirmation: true;
+}
+
+export interface KnowledgeReviewRecord {
+  reviewId: string;
+  sessionId: string;
+  kind: 'write' | 'promote';
+  cardId: string;
+  createdAt: string;
+  revision: number;
+  contentHash: string;
 }
 
 /** Seven retrieval lanes. Order is the walk-pattern contract. */
@@ -258,4 +272,7 @@ export interface ColdDataIngestResult {
   missingAssets: string[];
   reason?: string;
   existingCaseId?: string;
+  sourceHash?: string;
+  sourceMtimeMs?: number;
+  sourceSize?: number;
 }

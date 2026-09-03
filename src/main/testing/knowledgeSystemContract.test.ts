@@ -14,7 +14,7 @@ import { createKnowledgeTools } from '../knowledge/KnowledgeTools';
 import type { SemanticLaneStatus } from '@shared/types/embedding';
 import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledge';
 import { StorageIo } from '../sessions/StorageIo';
-import { KnowledgeCandidateService } from '../knowledge/KnowledgeCandidateService';
+import { createDisposableCandidateService } from '../knowledge/KnowledgeCandidateService';
 import { KnowledgeCompileService } from '../knowledge/KnowledgeCompileService';
 import { KnowledgeIndexService } from '../knowledge/KnowledgeIndexService';
 import { KnowledgeQueryService } from '../knowledge/KnowledgeQueryService';
@@ -167,15 +167,15 @@ describe('knowledge system contract', () => {
       confirmation: { explicitHumanConfirmation: true },
     });
     expect(saved.lifecycle).toBe('draft');
-    const candidates = new KnowledgeCandidateService();
-    expect(candidates.listCandidates('session-1')).toHaveLength(0);
+    const candidates = createDisposableCandidateService(mkdtempSync(path.join(tmpdir(), 'rdc-know-cand-')));
+    expect(await candidates.listCandidates('session-1')).toHaveLength(0);
   });
 
-  it('knowledge.contract.colddata.sanitized-import', () => {
+  it('knowledge.contract.colddata.sanitized-import', async () => {
     expect.hasAssertions();
     const yaml = readFileSync(fixturePath, 'utf8');
-    const candidates = new KnowledgeCandidateService();
-    const result = candidates.ingestColdDataToStaging(yaml, {
+    const candidates = createDisposableCandidateService(mkdtempSync(path.join(tmpdir(), 'rdc-know-cold-')));
+    const result = await candidates.ingestColdDataToStaging(yaml, {
       sessionId: 'session-cold',
       availableAssetNames: ['symptom-compare-a1b2c3d4.png'],
     });
@@ -186,7 +186,7 @@ describe('knowledge system contract', () => {
     expect(result.sourceStatus).toBe('fixed');
     expect(result.record?.lifecycle).toBe('draft');
     expect(yaml).not.toMatch(/[A-Za-z]:\\/);
-    expect(candidates.listCandidates('session-cold')).toHaveLength(0);
-    expect(candidates.listStagedDrafts('session-cold')).toHaveLength(1);
+    expect(await candidates.listCandidates('session-cold')).toHaveLength(0);
+    expect(await candidates.listStagedDrafts('session-cold')).toHaveLength(1);
   });
 });

@@ -344,7 +344,7 @@ function createKnowledgeCandidateCreateTool(
         body,
       };
       try {
-        const created = deps.candidates.createCandidate({
+        const created = await deps.candidates.createCandidate({
           sessionId: resolvedSessionId,
           card,
           explicitUserIntent: true,
