@@ -11,6 +11,12 @@ const snapshot = {
 } satisfies ContextSnapshot;
 
 describe('session capture ownership', () => {
+  it('fails closed when no capture is open', () => {
+    expect(isOpenedCaptureOwnedBySession(null, 'project-a', 'session-a')).toBe(false);
+    expect(isOpenedCaptureOwnedBySession(undefined, 'project-a', 'session-a')).toBe(false);
+    expect(isContextSnapshotOwnedBySession(null, 'session-a')).toBe(false);
+  });
+
   it('accepts only the current app session owner', () => {
     expect(isOpenedCaptureOwnedBySession(openedCapture, 'project-a', 'session-a')).toBe(true);
     expect(isOpenedCaptureOwnedBySession(openedCapture, 'project-a', 'session-b')).toBe(false);
