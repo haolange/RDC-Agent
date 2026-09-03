@@ -729,7 +729,7 @@ export function createAgentEventHandler(deps: AgentEventHandlerDeps) {
             }
             if (event.type === 'run.failed') {
               commitAssistantMessage('message_patched', {
-                workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, `runtime-${event.type}`, {
+                workTrace: upsertWorkBlock(turnStreamState.assistantMessage.workTrace, 'runtime-run', {
                   kind: 'diagnostic',
                   title: 'Agent Loop failed',
                   stage: 'respond',

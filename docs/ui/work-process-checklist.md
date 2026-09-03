@@ -4,9 +4,10 @@
 
 ## 运行态
 
-- 顶层标题「工作中 / Working」+ Active Signal 文本能量扫光。
+- 顶层标题「工作中 / Working」+ Active Signal 文本能量扫光（`active-signal-shimmer` clipped-gradient）。
 - loop thinking 运行态默认展开（summary/raw/unknown 与 final-answer/收束 thinking 同一生命周期）。
 - Active Signal「正在思考 / Thinking」。
+- `.work-process-label.status-running` **不得**设置 `color`（仅 `--active-signal-highlight`）；运行标签 shimmer 依赖 `color: transparent` + `background-clip: text`，任何后续规则覆盖 `color` 都会冻结为透明。
 
 ## 完成态
 
@@ -37,6 +38,14 @@
 - file/search/shell/git/web/memory/skill/mcp/runtime/interpreter/generic 族模板一致；Tasks 用一轮一张活快照卡（`N of M completed` + `TaskStatusMarker` + `statusReason` + `data-work-process-task-id`），顺序与 Right Rail Progress 共用 `taskProjection`；Compact 区分自动/手动并展示计数。
 - 每个 builtin tool 唯一 header glyph（`mcp__*`→`plug`）。
 - 安静 loop 级轨道点。
+- Rail marker 首行垂直居中：`margin-top: calc((var(--text-sm) * 1.65 - 6px) / 2)`；caption 行（`.first-line-caption`）用 `--text-xs * 1.45`。
+- 失败 summary → diagnostic 列表间距 `--space-2`（`.work-process-summary { margin: 0 0 var(--space-2) }`）。
+
+## Active Signal / reduceMotion
+
+- 动画名 `active-signal-shimmer`；`.active-signal-text.is-active` 为 clipped-gradient 扫光。
+- Settings `html[data-reduce-motion='on']` 与 OS `prefers-reduced-motion: reduce` 均回退静态 `--active-signal-highlight`（移除透明 gradient）；全局 `animation-duration: 0` 仍生效，fallback 负责去掉冻结透明字。
+- 门禁：`ActiveSignalText.test.ts` + `check:work-process` 扫描 `.work-process-label.status-running` 不得含 `color:`。
 
 ## Web 族
 
@@ -48,6 +57,7 @@
 - 无 Reply 边界行（收束 thinking 归入普通折叠）。
 - opaque/hidden 永不渲染 CoT 占位句（仅保留真实 tools/commentary/可见 thinking；answer-only 静默）。
 - `error_recovery_*` 自动恢复遥测不进 Work Process 叙事（仅 Agent Activity / runtime log；禁止蓝字「错误恢复成功…」旁白）。
+- Provider turn 最终失败：**一条** diagnostic（`CONVERSATION_LLM_REQUEST_FAILED` + 分类 userMessage + `technicalMessage`：`provider HTTP <status|n/a> · attempts <n>/<max> · <snippet>`）；`stopReason === 'error'` 时不 emit `empty_response_without_tool_call`。
 - Request Inspector 不出现在消息流也不在右侧默认会话/Trace 面板。
 - 真实事件驱动的逐条出现与短 CSS 入场（禁止假 stagger）。
 

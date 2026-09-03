@@ -63,6 +63,51 @@ export class ProviderHttpError extends Error {
   }
 }
 
+export const PROVIDER_EMPTY_STREAM_MESSAGE =
+  'Provider stream ended without assistant output or structured tool call.';
+
+export class ProviderEmptyStreamError extends Error {
+  readonly code = 'PROVIDER_STREAM_EMPTY' as const;
+  readonly providerApi: string;
+
+  constructor(providerApi: string, message = PROVIDER_EMPTY_STREAM_MESSAGE) {
+    super(message);
+    this.name = 'ProviderEmptyStreamError';
+    this.providerApi = providerApi;
+  }
+}
+
+export class ProviderWireFailureError extends Error {
+  readonly providerApi: string;
+  readonly wireCode?: string;
+  readonly bodyText?: string;
+
+  constructor(
+    providerApi: string,
+    message: string,
+    options?: { code?: string; bodyText?: string },
+  ) {
+    super(`[${providerApi}] ${message}`);
+    this.name = 'ProviderWireFailureError';
+    this.providerApi = providerApi;
+    this.wireCode = options?.code;
+    this.bodyText = options?.bodyText;
+  }
+}
+
+export function isProviderWireFailureError(error: unknown): error is ProviderWireFailureError {
+  return error instanceof ProviderWireFailureError;
+}
+
+export function isProviderEmptyStreamError(error: unknown): error is ProviderEmptyStreamError {
+  if (error instanceof ProviderEmptyStreamError) {
+    return true;
+  }
+  return error instanceof Error
+    && error.name === 'ProviderEmptyStreamError'
+    && (error as { code?: unknown }).code === 'PROVIDER_STREAM_EMPTY';
+}
+
 export interface ComposedSignal {
   signal: AbortSignal;
   dispose: () => void;
@@ -271,6 +316,63 @@ export function composeAbortSignals(
 export function normalizeError(err: unknown): Error {
   if (err instanceof Error) return err;
   return new Error(String(err));
+}
+
+function readWireRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function readWireString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function readHttpLikeStatus(record: Record<string, unknown> | null): number | undefined {
+  if (!record) {
+    return undefined;
+  }
+  for (const key of ['status', 'status_code'] as const) {
+    const value = record[key];
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 400 && value <= 599) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function serializeWireErrorBody(record: Record<string, unknown> | null): string | undefined {
+  if (!record) {
+    return undefined;
+  }
+  try {
+    return JSON.stringify(record).slice(0, 500);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Responses SSE `error` / `response.failed` — preserve provider message; only synthesize HTTP when status is explicit. */
+export function createResponsesStreamFailure(
+  providerApi: string,
+  params: {
+    error?: Record<string, unknown> | null;
+    event?: Record<string, unknown> | null;
+    fallbackMessage: string;
+  },
+): ProviderHttpError | ProviderWireFailureError {
+  const errorRecord = readWireRecord(params.error);
+  const eventRecord = readWireRecord(params.event);
+  const source = errorRecord ?? eventRecord;
+  const message = readWireString(source?.message) || params.fallbackMessage;
+  const status = readHttpLikeStatus(errorRecord) ?? readHttpLikeStatus(eventRecord);
+  const wireCode = readWireString(source?.code) || undefined;
+  const bodyText = serializeWireErrorBody(source);
+
+  if (status !== undefined) {
+    return new ProviderHttpError(providerApi, status, message, bodyText);
+  }
+  return new ProviderWireFailureError(providerApi, message, { code: wireCode, bodyText });
 }
 
 async function readWithTimeout(

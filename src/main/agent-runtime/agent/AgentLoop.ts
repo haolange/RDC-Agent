@@ -31,7 +31,6 @@ import type { ProviderStrategy } from '../core/ProviderRegistry';
 import {
   AgentRecoveryAbortError,
   ErrorRecovery,
-  isProviderStreamProtocolError,
   type RecoveryAction,
 } from './ErrorRecovery';
 import type { CompressResult } from './ContextManager';
@@ -501,7 +500,7 @@ async function streamAssistantResponseWithRecovery(
             continue;
           }
           case 'abort': {
-            throw new Error(`[Recovery abort] ${lengthAction.reason}`);
+            throw createRecoveryAbortError(new Error(lengthAction.reason), lengthAction.reason, recovery);
           }
           default: {
             completePendingRecovery();
@@ -557,21 +556,19 @@ async function streamAssistantResponseWithRecovery(
           continue;
         }
         case 'abort': {
-          throw createRecoveryAbortError(error, action.reason);
+          throw createRecoveryAbortError(error, action.reason, recovery);
         }
       }
     }
   }
 }
 
-function createRecoveryAbortError(original: Error, reason: string): Error {
-  if (isProviderStreamProtocolError(original) || original instanceof AgentRecoveryAbortError) {
-    const streamCode = original instanceof AgentRecoveryAbortError
-      ? original.streamCode
-      : typeof original.code === 'string' ? original.code : undefined;
-    return new AgentRecoveryAbortError(`[Recovery abort] ${reason}`, streamCode);
-  }
-  return new Error(`[Recovery abort] ${reason}`);
+function createRecoveryAbortError(
+  original: Error,
+  reason: string,
+  recovery: ErrorRecovery,
+): AgentRecoveryAbortError {
+  return recovery.createAbortError(original, reason);
 }
 
 function createAbortError(): Error {
@@ -717,15 +714,12 @@ async function streamAssistantResponse(
         break;
       }
       case 'error': {
-        finalMessage = event.message;
         if (partialIndex >= 0) {
-          context.messages[partialIndex] = finalMessage;
+          context.messages[partialIndex] = event.message;
         } else {
-          context.messages.push(finalMessage);
-          partialIndex = context.messages.length - 1;
+          context.messages.push(event.message);
         }
-        stream.push({ type: 'message_end', message: finalMessage });
-        break;
+        throw event.error;
       }
       default: {
         // 其它事件透传给 UI

@@ -454,6 +454,14 @@
   }
 }
 
+html[data-reduce-motion='on'] .active-signal-text.is-active {
+  animation: none;
+  background-image: none;
+  background-clip: border-box;
+  -webkit-background-clip: border-box;
+  color: var(--active-signal-highlight);
+}
+
 /* Stagger delays */
 .stagger-1 { animation-delay: 50ms; }
 .stagger-2 { animation-delay: 100ms; }

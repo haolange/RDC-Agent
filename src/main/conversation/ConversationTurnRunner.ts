@@ -249,7 +249,9 @@ export async function completeProfileTurn(
     streamScheduler?.commitTerminal(
       type,
       patch,
-      sessionId ? { persist: false, publishTrace: false, emit: false } : undefined,
+      // Emit terminal UI immediately so Browser QA / renderer do not stay on Working
+      // if the deferred finally SSE event is dropped. Disk atomicity remains in finally.
+      sessionId ? { persist: false, publishTrace: true, emit: true } : undefined,
     );
   };
 
@@ -525,6 +527,17 @@ export async function completeProfileTurn(
       visibleResponse = llmDiagnostic.userMessage;
       currentLoopText = llmDiagnostic.userMessage;
       recordLlmDiagnostic(input.context, llmDiagnostic);
+      assistantMessage = {
+        ...assistantMessage,
+        workTrace: upsertWorkBlock(assistantMessage.workTrace, 'llm-request-failed', {
+          kind: 'diagnostic',
+          status: llmDiagnostic.severity === 'warning' ? 'complete' : 'error',
+          diagnosticSeverity: llmDiagnostic.severity === 'warning' ? 'warning' : 'error',
+          title: llmDiagnostic.code,
+          summary: llmDiagnostic.userMessage,
+          completedAt: nowMs(),
+        }),
+      };
       commitVisibleAssistantText();
     }
 

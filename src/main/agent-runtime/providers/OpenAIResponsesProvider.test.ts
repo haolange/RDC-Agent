@@ -6,6 +6,7 @@ import type { RequestPlan } from '@shared/types/providerCapability';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
 import type { Context, Model } from '../core/types';
 import { OpenAIResponsesProvider, __testing } from './OpenAIResponsesProvider';
+import { ProviderEmptyStreamError, ProviderHttpError, ProviderWireFailureError } from './internal/http';
 
 const reasoningControl = {
   kind: 'levels',
@@ -235,5 +236,83 @@ describe('OpenAIResponsesProvider DeepSeek dialect', () => {
       expect.objectContaining({ type: 'function_call', call_id: 'call_1' }),
       expect.objectContaining({ type: 'function_call_output', call_id: 'call_1', output: 'result' }),
     ]);
+  });
+});
+
+describe('OpenAIResponsesProvider empty stream', () => {
+  it('throws ProviderEmptyStreamError instead of a synthetic HTTP 502', async () => {
+    vi.stubGlobal('fetch', async () => new Response([
+      'data: {"type":"response.completed","response":{"id":"resp_empty","status":"completed","output":[]}}',
+      '',
+    ].join('\n'), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+
+    const context: Context = {
+      systemPrompt: 'Answer.',
+      messages: [{ role: 'user', content: 'Hello', timestamp: 1 }],
+    };
+    const error = await new OpenAIResponsesProvider({ apiKey: 'secret' }).stream(model, context, {
+      requestPlan: deepSeekPlan(),
+    }).result().then(
+      () => {
+        throw new Error('expected empty stream to reject');
+      },
+      (caught: unknown) => caught,
+    );
+    expect(error).toBeInstanceOf(ProviderEmptyStreamError);
+    expect(error).toMatchObject({
+      name: 'ProviderEmptyStreamError',
+      code: 'PROVIDER_STREAM_EMPTY',
+      message: 'Provider stream ended without assistant output or structured tool call.',
+    });
+    expect(error).not.toMatchObject({ status: 502 });
+  });
+});
+
+describe('OpenAIResponsesProvider SSE stream failures', () => {
+  it('throws ProviderWireFailureError for error events without HTTP status', async () => {
+    vi.stubGlobal('fetch', async () => new Response([
+      'data: {"type":"error","message":"Account suspended by provider"}',
+      '',
+    ].join('\n'), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+
+    const context: Context = {
+      systemPrompt: 'Answer.',
+      messages: [{ role: 'user', content: 'Hello', timestamp: 1 }],
+    };
+    const error = await new OpenAIResponsesProvider({ apiKey: 'secret' }).stream(model, context, {
+      requestPlan: deepSeekPlan(),
+    }).result().then(
+      () => {
+        throw new Error('expected stream error to reject');
+      },
+      (caught: unknown) => caught,
+    );
+    expect(error).toBeInstanceOf(ProviderWireFailureError);
+    expect(error).not.toBeInstanceOf(ProviderHttpError);
+    expect((error as ProviderWireFailureError).message).toContain('Account suspended by provider');
+    expect((error as ProviderWireFailureError).message).not.toContain('HTTP 502');
+  });
+
+  it('throws ProviderHttpError 401 for response.failed with explicit status', async () => {
+    vi.stubGlobal('fetch', async () => new Response([
+      'data: {"type":"response.failed","response":{"error":{"message":"invalid api key","status":401}}}',
+      '',
+    ].join('\n'), { status: 200, headers: { 'Content-Type': 'text/event-stream' } }));
+
+    const context: Context = {
+      systemPrompt: 'Answer.',
+      messages: [{ role: 'user', content: 'Hello', timestamp: 1 }],
+    };
+    const error = await new OpenAIResponsesProvider({ apiKey: 'secret' }).stream(model, context, {
+      requestPlan: deepSeekPlan(),
+    }).result().then(
+      () => {
+        throw new Error('expected auth failure to reject');
+      },
+      (caught: unknown) => caught,
+    );
+    expect(error).toBeInstanceOf(ProviderHttpError);
+    expect((error as ProviderHttpError).status).toBe(401);
+    expect((error as ProviderHttpError).message).toContain('invalid api key');
   });
 });

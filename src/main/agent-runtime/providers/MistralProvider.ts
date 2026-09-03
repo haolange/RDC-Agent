@@ -31,7 +31,7 @@ import {
   StreamChannelRefs,
   closeSwitchedChannel,
 } from './internal/streamChannelRefs';
-import { composeAbortSignals, ensureOk, normalizeError, parseSSE, ProviderHttpError } from './internal/http';
+import { composeAbortSignals, ensureOk, normalizeError, parseSSE, ProviderEmptyStreamError, ProviderHttpError } from './internal/http';
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import { applyOpenAiCompatibleReasoning } from './reasoningWire';
 import { reasoningProjectionSource } from './reasoningProjection';
@@ -261,7 +261,7 @@ export class MistralProvider implements ProviderStrategy {
       }
 
       if (!sawOutput) {
-        throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+        throw new ProviderEmptyStreamError(PROVIDER_API);
       }
       builder.done(mapFinishReason(finishReason));
     } catch (err) {

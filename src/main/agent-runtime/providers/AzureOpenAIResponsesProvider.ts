@@ -32,7 +32,9 @@ import {
   ensureOk,
   normalizeError,
   parseSSE,
+  ProviderEmptyStreamError,
   ProviderHttpError,
+  createResponsesStreamFailure,
 } from './internal/http';
 import { finalizeProviderUsage } from './internal/normalizeCacheUsage';
 import { buildOpenAiResponsesReasoning } from './reasoningWire';
@@ -291,7 +293,7 @@ export class AzureOpenAIResponsesProvider implements ProviderStrategy {
               finishReason = completed.status === 'incomplete' ? 'length' : sawToolCall ? 'toolUse' : 'stop';
             }
             if (!sawOutput) {
-              throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+              throw new ProviderEmptyStreamError(PROVIDER_API);
             }
             providerTerminalSeen = true;
             break;
@@ -300,7 +302,7 @@ export class AzureOpenAIResponsesProvider implements ProviderStrategy {
             items.closeRemaining();
             finishReason = 'length';
             if (!sawOutput) {
-              throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+              throw new ProviderEmptyStreamError(PROVIDER_API);
             }
             providerTerminalSeen = true;
             break;
@@ -308,21 +310,26 @@ export class AzureOpenAIResponsesProvider implements ProviderStrategy {
           case 'response.failed': {
             const failed = readRecord(event.response);
             const error = readRecord(failed?.error);
-            throw new ProviderHttpError(
-              PROVIDER_API,
-              502,
-              readString(error?.message) || 'Azure OpenAI Responses request failed',
-            );
+            throw createResponsesStreamFailure(PROVIDER_API, {
+              error,
+              event,
+              fallbackMessage: 'Azure OpenAI Responses request failed',
+            });
           }
-          case 'error':
-            throw new ProviderHttpError(PROVIDER_API, 502, readString(event.message) || 'Azure OpenAI Responses stream error');
+          case 'error': {
+            throw createResponsesStreamFailure(PROVIDER_API, {
+              error: readRecord(event.error) ?? event,
+              event,
+              fallbackMessage: 'Azure OpenAI Responses stream error',
+            });
+          }
           default:
             break;
         }
       }
 
       if (!sawOutput) {
-        throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+        throw new ProviderEmptyStreamError(PROVIDER_API);
       }
       items.closeRemaining();
       builder.done(finishReason);

@@ -32,6 +32,7 @@ import {
   composeAbortSignals,
   ensureOk,
   normalizeError,
+  ProviderEmptyStreamError,
   ProviderHttpError,
   type ProviderStreamReadOptions,
   resolveProviderTimeouts,
@@ -338,7 +339,7 @@ export class BedrockConverseProvider implements ProviderStrategy {
       }
 
       if (!sawOutput) {
-        throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+        throw new ProviderEmptyStreamError(PROVIDER_API);
       }
       builder.done(finishReason);
     } catch (err) {

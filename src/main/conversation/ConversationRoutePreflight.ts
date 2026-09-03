@@ -34,8 +34,16 @@ import { resolveEffectiveModelSelection } from '../settings/EffectiveModelResolv
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import {
   AgentRecoveryAbortError,
+  findProviderHttpError,
   isProviderStreamProtocolError,
+  redactRecoverySnippet,
+  type ErrorCategory,
 } from '../agent-runtime/agent/ErrorRecovery';
+import {
+  isProviderEmptyStreamError,
+  isProviderWireFailureError,
+  ProviderTimeoutError,
+} from '../agent-runtime/providers/internal/http';
 import { AgentLoopTerminationError } from '../agent-runtime/agent/LoopProgressGuard';
 import { isMissionCompletionError } from '../investigation/missionCompletionContract';
 
@@ -544,10 +552,12 @@ export function createTurnFailedDiagnostic(
       technicalMessage: redactTechnicalMessage(error),
     });
   }
-  if (error instanceof AgentRecoveryAbortError || isProviderStreamProtocolError(error)) {
+  if (isStreamProtocolTurnFailure(error)) {
     const streamCode = error instanceof AgentRecoveryAbortError
       ? error.streamCode
-      : typeof error.code === 'string' ? error.code : undefined;
+      : typeof (error as { code?: unknown }).code === 'string'
+        ? (error as { code: string }).code
+        : undefined;
     const streamLabel = streamCode ? `（${streamCode}）` : '';
     return createConversationDiagnostic({
       agentId: route.agentId,
@@ -581,13 +591,183 @@ export function createTurnFailedDiagnostic(
       technicalMessage,
     });
   }
+  const failure = classifyLlmRequestFailure(error);
   return createConversationDiagnostic({
     agentId: route.agentId,
     code: 'CONVERSATION_LLM_REQUEST_FAILED',
     severity: 'error',
-    userMessage: `模型请求失败：${label} 当前使用 ${route.providerId}/${route.modelId}，但服务商请求没有成功。请检查该账号、模型权限、额度或网络状态后重试。`,
+    userMessage: llmRequestFailureUserMessage(label, route.providerId, route.modelId, failure),
     providerId: route.providerId,
     modelId: route.modelId,
-    technicalMessage,
+    technicalMessage: formatLlmFailureTechnicalMessage(failure),
   });
+}
+
+function isStreamProtocolTurnFailure(error: unknown): boolean {
+  if (isProviderStreamProtocolError(error)) {
+    return true;
+  }
+  return error instanceof AgentRecoveryAbortError && error.category === 'stream_protocol';
+}
+
+type LlmFailureClass = 'auth' | 'quota' | 'overloaded' | 'server' | 'empty_stream' | 'network' | 'generic';
+
+interface LlmRequestFailure {
+  kind: LlmFailureClass;
+  status?: number;
+  attempts: number;
+  maxAttempts: number;
+  snippet: string;
+}
+
+function classifyLlmRequestFailure(error: unknown): LlmRequestFailure {
+  const abort = error instanceof AgentRecoveryAbortError ? error : undefined;
+  const http = findProviderHttpError(error);
+  const status = abort?.lastStatus ?? http?.status ?? extractStatusFromMessage(error);
+  const attempts = abort?.attempts ?? 1;
+  const maxAttempts = abort?.maxAttempts ?? 1;
+  const snippetSource = abort?.bodySnippet
+    ?? http?.bodyText
+    ?? causeSnippet(error);
+  const snippet = redactTechnicalMessage(snippetSource);
+  const category = abort?.category ?? inferLlmFailureCategory(error, status);
+  const kind = llmFailureKind(category, status, error);
+  return { kind, status, attempts, maxAttempts, snippet };
+}
+
+function causeSnippet(error: unknown): string {
+  if (isProviderEmptyStreamError(error)) {
+    return error.message;
+  }
+  if (isProviderWireFailureError(error)) {
+    return error.bodyText ?? error.message;
+  }
+  if (error instanceof Error && error.cause instanceof Error) {
+    if (isProviderEmptyStreamError(error.cause)) {
+      return error.cause.message;
+    }
+    if (isProviderWireFailureError(error.cause)) {
+      return error.cause.bodyText ?? error.cause.message;
+    }
+    return error.cause.message;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
+function inferLlmFailureCategory(error: unknown, status: number | undefined): ErrorCategory | undefined {
+  if (isProviderEmptyStreamError(error)) {
+    return 'empty_stream';
+  }
+  if (error instanceof ProviderTimeoutError) {
+    return 'network_error';
+  }
+  if (status === 401 || status === 403) {
+    return 'auth_error';
+  }
+  if (status === 429 || status === 402) {
+    return 'rate_limit';
+  }
+  if (status === 529 || status === 503) {
+    return 'overloaded';
+  }
+  if (typeof status === 'number' && status >= 500) {
+    return 'server_error';
+  }
+  const wire = isProviderWireFailureError(error) ? error : undefined;
+  const raw = `${error instanceof Error ? `${error.message} ${error.name}` : String(error)} ${wire?.bodyText ?? ''}`.toLowerCase();
+  if (raw.includes('quota') || raw.includes('rate_limit') || (raw.includes('rate') && raw.includes('limit'))) {
+    return 'rate_limit';
+  }
+  if (
+    raw.includes('overloaded')
+    || raw.includes('service unavailable')
+    || raw.includes('at capacity')
+    || raw.includes('high demand')
+  ) {
+    return 'overloaded';
+  }
+  if (
+    raw.includes('econnrefused')
+    || raw.includes('econnreset')
+    || raw.includes('etimedout')
+    || raw.includes('enotfound')
+    || raw.includes('timeout')
+    || raw.includes('socket')
+    || raw.includes('network')
+  ) {
+    return 'network_error';
+  }
+  return undefined;
+}
+
+function llmFailureKind(
+  category: ErrorCategory | undefined,
+  status: number | undefined,
+  error: unknown,
+): LlmFailureClass {
+  if (category === 'empty_stream' || isProviderEmptyStreamError(error)) {
+    return 'empty_stream';
+  }
+  if (category === 'auth_error' || status === 401 || status === 403) {
+    return 'auth';
+  }
+  if (category === 'rate_limit' || status === 429 || status === 402) {
+    return 'quota';
+  }
+  if (category === 'overloaded') {
+    return 'overloaded';
+  }
+  if (category === 'server_error') {
+    return 'server';
+  }
+  if (status === 529 || status === 503) {
+    return 'overloaded';
+  }
+  if (typeof status === 'number' && status >= 500) {
+    return 'server';
+  }
+  if (category === 'network_error') {
+    return 'network';
+  }
+  return 'generic';
+}
+
+function extractStatusFromMessage(error: unknown): number | undefined {
+  const raw = error instanceof Error ? error.message : String(error);
+  const match = raw.match(/\b(4\d{2}|5\d{2})\b/);
+  if (!match) {
+    return undefined;
+  }
+  const code = Number(match[1]);
+  return Number.isNaN(code) ? undefined : code;
+}
+
+function llmRequestFailureUserMessage(
+  label: string,
+  providerId: string,
+  modelId: string,
+  failure: LlmRequestFailure,
+): string {
+  const route = `${providerId}/${modelId}`;
+  switch (failure.kind) {
+    case 'auth':
+      return `${label} 当前使用 ${route} 时认证或权限失败。请检查该账号的 API Key、登录状态或模型访问权限后重试。`;
+    case 'quota':
+      return `${label} 当前使用 ${route} 时额度不足或触发了限流。请检查该账号额度、账单或稍后重试。`;
+    case 'overloaded':
+      return `${label} 当前使用 ${route} 时服务商过载或容量不足。请稍后重试；若持续出现，可改用更高服务等级或更换模型。`;
+    case 'server':
+      return `${label} 当前使用 ${route} 时服务商返回了服务端错误${failure.status ? `（HTTP ${failure.status}）` : ''}。请稍后重试。`;
+    case 'empty_stream':
+      return `${label} 当前使用 ${route} 时，服务商没有返回助手正文或结构化工具调用。请稍后重试；若持续出现，请检查该模型或更换模型。`;
+    case 'network':
+      return `${label} 当前使用 ${route} 时网络连接失败。请检查网络、代理或服务商可达性后重试。`;
+    default:
+      return `模型请求失败：${label} 当前使用 ${route}，但服务商请求没有成功。请检查该账号、模型权限、额度或网络状态后重试。`;
+  }
+}
+
+function formatLlmFailureTechnicalMessage(failure: LlmRequestFailure): string {
+  const snippet = redactRecoverySnippet(failure.snippet);
+  return `provider HTTP ${failure.status ?? 'n/a'} · attempts ${failure.attempts}/${failure.maxAttempts} · ${snippet}`;
 }
