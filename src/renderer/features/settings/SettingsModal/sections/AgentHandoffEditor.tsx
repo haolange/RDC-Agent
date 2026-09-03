@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import type { AgentHandoffDefinition, AgentManifestDefinition, AgentModelOption } from '@shared/types/agentManifest';
 import type { useI18n } from '../../../../i18n';
+import { Button } from '../../../../ui/Button';
 import { AgentHandoffCard } from './AgentHandoffCard';
 import { persistAgentHandoff, validateAgentHandoffs } from './agentHandoffValidation';
 
@@ -129,9 +130,9 @@ export const AgentHandoffEditor: React.FC<AgentHandoffEditorProps> = ({
         </div>
       )}
       <div className="settings-handoff-add">
-        <button ref={addRef} type="button" className="button button-secondary" onClick={addHandoff}>
+        <Button ref={addRef} variant="secondary" onClick={addHandoff}>
           {t('settings.agentHandoffAdd')}
-        </button>
+        </Button>
       </div>
     </div>
   );

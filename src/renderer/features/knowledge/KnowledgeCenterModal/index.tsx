@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '../../../ui/Button';
+import { useModalFocus } from '../../../hooks/useModalFocus';
 import { useI18n } from '../../../i18n';
 import { SpacesColumn } from './columns/SpacesColumn';
 import { ListColumn } from './columns/ListColumn';
@@ -40,25 +41,33 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
       await importer.refreshInbox();
     },
   });
-  const bodyRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      if (write.open) {
-        write.close();
-        return;
-      }
-      if (importer.open) {
-        importer.close();
-        return;
-      }
-      onClose();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [importer, onClose, open, write]);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const importRef = useRef<HTMLDivElement>(null);
+  const writeRef = useRef<HTMLDivElement>(null);
+  const writeOpen = write.open;
+  const closeWrite = write.close;
+  const importOpen = importer.open;
+  const closeImport = importer.close;
+  const closeSurface = useCallback(() => {
+    if (writeOpen) {
+      closeWrite();
+      return;
+    }
+    if (importOpen) {
+      closeImport();
+      return;
+    }
+    onClose();
+  }, [closeImport, closeWrite, importOpen, onClose, writeOpen]);
+  const busy = state.loadingOverview || state.loadingQuery || importer.busy || write.busy;
+  useModalFocus({
+    open,
+    containerRef: dialogRef,
+    onClose: closeSurface,
+    busy,
+    trapRootRef: write.open ? writeRef : importer.open ? importRef : undefined,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -74,11 +83,14 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
   return createPortal(
     <div className="knowledge-center-backdrop" onClick={onClose} data-testid="knowledge-center-backdrop">
       <div
+        ref={dialogRef}
         className={`knowledge-center ${state.narrow ? 'is-narrow' : ''}`}
         data-testid="knowledge-center-modal"
         role="dialog"
+        tabIndex={-1}
         aria-modal="true"
         aria-labelledby="knowledge-center-title"
+        aria-busy={busy || undefined}
         onClick={(event) => event.stopPropagation()}
       >
         {state.narrow && (
@@ -108,8 +120,8 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
               }}
             />
           )}
-          {importer.open && <ImportPanel importer={importer} spaces={state.spaces} />}
-          {write.open && <WriteConfirmPanel write={write} />}
+          {importer.open && <ImportPanel importer={importer} spaces={state.spaces} panelRef={importRef} />}
+          {write.open && <WriteConfirmPanel write={write} panelRef={writeRef} />}
         </div>
       </div>
     </div>,

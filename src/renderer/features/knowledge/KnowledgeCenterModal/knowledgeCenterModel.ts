@@ -20,12 +20,7 @@ export const ALL_CARD_TYPES: KnowledgeCardType[] = [...KNOWLEDGE_CARD_TYPES];
 export const ALL_LIFECYCLES: KnowledgeLifecycle[] = [...KNOWLEDGE_LIFECYCLES];
 export const ALL_LANES: KnowledgeRetrievalLane[] = [...KNOWLEDGE_RETRIEVAL_LANES];
 
-export function knowledgeErrorMessage(error: unknown): string {
-  if (error && typeof error === 'object' && 'code' in error && typeof (error as { code: unknown }).code === 'string') {
-    return (error as { code: string }).code;
-  }
-  return error instanceof Error ? error.message : String(error);
-}
+export { serviceErrorMessage as knowledgeErrorMessage } from '../../../lib/serviceErrorMessage';
 
 export function createRequestSeq(): { next(): number; isCurrent(value: number): boolean } {
   let seq = 0;

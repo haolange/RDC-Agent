@@ -39,8 +39,8 @@ export function DetailColumn({ state, write, onClose, onCreateCandidate }: Detai
             <div className="knowledge-center-header-path" title={card.relativePath}>{card.relativePath}</div>
           )}
         </div>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           className="knowledge-center-close"
           onClick={onClose}
           aria-label={t('knowledgeCenter.close')}
@@ -50,7 +50,7 @@ export function DetailColumn({ state, write, onClose, onCreateCandidate }: Detai
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
-        </button>
+        </Button>
       </div>
 
       <div className="knowledge-center-body" data-testid="knowledge-center-body">

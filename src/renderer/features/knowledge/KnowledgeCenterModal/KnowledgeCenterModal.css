@@ -205,19 +205,24 @@
 }
 
 .knowledge-center-card-button,
+.knowledge-center-card-button.button,
 .knowledge-center-inbox-row,
+.knowledge-center-inbox-row.button,
 .knowledge-center-conflict-row {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  justify-content: flex-start;
   gap: var(--space-1);
   width: 100%;
+  min-height: 0;
   padding: var(--space-2) var(--space-3);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--token-text-body);
   text-align: left;
+  white-space: normal;
 }
 
 .knowledge-center-card-button {
@@ -315,12 +320,15 @@
   white-space: nowrap;
 }
 
-.knowledge-center-close {
+.knowledge-center-close,
+.knowledge-center-close.button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 32px;
+  min-height: 0;
+  padding: 0;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
@@ -418,10 +426,13 @@
 }
 
 .knowledge-center-conflict-id {
+  min-height: 0;
+  padding: 0;
   border: 0;
   background: transparent;
   color: var(--token-text-heading);
   cursor: pointer;
+  white-space: normal;
 }
 
 .knowledge-center-conflict-swap {

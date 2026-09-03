@@ -2,6 +2,9 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import type { SemanticLaneStatus, SemanticSearchHit } from '@shared/types/embedding';
 import type { KnowledgeCardDetail, KnowledgeCardSummary, KnowledgeSpace } from '@shared/types/knowledge';
+import { appPathService } from '../runtime/AppPathService';
+import { embeddingExecutionService } from '../settings/EmbeddingExecutionService';
+import { storageAdapter } from '../sessions/StorageAdapter';
 import { parseKnowledgeFrontmatter } from './knowledgeCardSchema';
 import { KnowledgeSemanticLaneClosedError } from './knowledgeErrors';
 import {
@@ -33,8 +36,6 @@ export interface KnowledgeQueryDependencies {
 }
 
 function defaultDependencies(): KnowledgeQueryDependencies {
-  const { appPathService } = require('../runtime/AppPathService') as typeof import('../runtime/AppPathService');
-  const { storageAdapter } = require('../sessions/StorageAdapter') as typeof import('../sessions/StorageAdapter');
   return {
     listSpaces: () => {
       const spaces: KnowledgeSpace[] = [{
@@ -54,14 +55,8 @@ function defaultDependencies(): KnowledgeQueryDependencies {
       }
       return spaces;
     },
-    resolveSemanticLaneStatus: async () => {
-      const { embeddingExecutionService } = require('../settings/EmbeddingExecutionService') as typeof import('../settings/EmbeddingExecutionService');
-      return embeddingExecutionService.resolveSemanticLaneStatus();
-    },
-    searchSemantic: (queryText) => {
-      const { embeddingExecutionService } = require('../settings/EmbeddingExecutionService') as typeof import('../settings/EmbeddingExecutionService');
-      return embeddingExecutionService.searchSemantic(queryText);
-    },
+    resolveSemanticLaneStatus: async () => embeddingExecutionService.resolveSemanticLaneStatus(),
+    searchSemantic: (queryText) => embeddingExecutionService.searchSemantic(queryText),
     index: new KnowledgeIndexService(),
     readFile: (filePath) => fs.readFile(filePath, 'utf8'),
     statMtime: async (filePath) => Math.trunc((await fs.stat(filePath)).mtimeMs),

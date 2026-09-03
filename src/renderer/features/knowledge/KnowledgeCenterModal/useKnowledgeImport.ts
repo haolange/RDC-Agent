@@ -57,7 +57,7 @@ export function useKnowledgeImport(options: {
 
   const importSource = useCallback(async () => {
     if (!options.sessionId) {
-      setError('KNOWLEDGE_SESSION_REQUIRED');
+      setError('KNOWLEDGE_SESSION_REQUIRED: Open a session before importing ColdData.');
       return;
     }
     setBusy(true);
@@ -80,7 +80,7 @@ export function useKnowledgeImport(options: {
 
   const createCandidate = useCallback(async (card: KnowledgeCardRecord) => {
     if (!options.sessionId) {
-      setError('KNOWLEDGE_SESSION_REQUIRED');
+      setError('KNOWLEDGE_SESSION_REQUIRED: Open a session before creating a Candidate.');
       return;
     }
     setBusy(true);

@@ -39,10 +39,16 @@ export function LaneStatusList({ lanes, enabled, semantic, semanticReady, onTogg
       })}
       <div className="knowledge-center-semantic-status" data-testid="knowledge-center-semantic-status">
         {!semantic && t('knowledgeCenter.semanticUnavailable')}
-        {semantic?.availability === 'ready' && t('knowledgeCenter.semanticReady')}
-        {semantic?.availability === 'unavailable' && t('knowledgeCenter.semanticUnavailable')}
-        {semantic?.availability === 'stale' && t('knowledgeCenter.semanticStale')}
-        {semantic && semantic.availability !== 'ready' && (
+        {semanticReady && t('knowledgeCenter.semanticReady')}
+        {!semanticReady && semantic?.availability === 'stale' && t('knowledgeCenter.semanticStale')}
+        {!semanticReady && semantic && semantic.availability !== 'stale' && t('knowledgeCenter.semanticUnavailable')}
+        {semantic?.selectedIdentity && (
+          <span> · {t('settings.embeddingIdentity', {
+            identity: semantic.selectedIdentity,
+            dimensions: semantic.selectedDimensions ?? '—',
+          })}</span>
+        )}
+        {semantic && !semanticReady && (
           <>
             <span> · {t(semanticReasonKey(semantic))}</span>
             <span> · {t('knowledgeCenter.semanticSettingsHint')}</span>

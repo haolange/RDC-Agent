@@ -1,4 +1,5 @@
 import type { KnowledgeCandidatesResult, KnowledgeLaneHit } from '@shared/types/knowledge';
+import { Button } from '../../../../ui/Button';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { CardBadges } from '../parts/CardBadges';
 import { ConflictRow } from '../parts/ConflictRow';
@@ -43,8 +44,8 @@ function HitButton({
 }) {
   const chips = card.lanes.filter((lane) => lane !== 'Semantic' || showSemantic);
   return (
-    <button
-      type="button"
+    <Button
+      variant="ghost"
       className={`knowledge-center-card-button ${active ? 'is-active' : ''}`}
       onClick={onSelect}
       data-testid={`knowledge-card-${card.cardId}`}
@@ -52,7 +53,7 @@ function HitButton({
       <span className="knowledge-center-card-title">{card.title}</span>
       <CardBadges type={card.type} lifecycle={card.lifecycle} />
       <span className="knowledge-center-card-preview">{chips.join(' · ')}</span>
-    </button>
+    </Button>
   );
 }
 
@@ -96,28 +97,28 @@ export function ListColumn({ state, inbox }: ListColumnProps) {
           <>
             <div className="knowledge-center-section-title">{t('knowledgeCenter.candidatesSection')}</div>
             {inbox.candidates.map((entry) => (
-              <button
+              <Button
                 key={entry.candidateId}
-                type="button"
+                variant="ghost"
                 className="knowledge-center-inbox-row"
                 onClick={() => state.selectRecord(entry.card)}
               >
                 <span className="knowledge-center-card-title">{entry.card.title}</span>
                 <CardBadges type={entry.card.type} lifecycle={entry.card.lifecycle} sourceStatus={entry.card.sourceStatus} />
-              </button>
+              </Button>
             ))}
             <div className="knowledge-center-section-title">{t('knowledgeCenter.draftsSection')}</div>
             {inbox.drafts.map((draft) => (
-              <button
+              <Button
                 key={draft.cardId}
-                type="button"
+                variant="ghost"
                 className="knowledge-center-inbox-row"
                 onClick={() => state.selectRecord(draft)}
               >
                 <span className="knowledge-center-card-title">{draft.title}</span>
                 <span className="knowledge-center-badge">{t('knowledgeCenter.draftNotCandidate')}</span>
                 <CardBadges type={draft.type} lifecycle={draft.lifecycle} sourceStatus={draft.sourceStatus} />
-              </button>
+              </Button>
             ))}
           </>
         )}

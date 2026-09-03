@@ -26,6 +26,7 @@ import {
   inspectSemanticIndexVectors,
   parseSemanticIndexSnapshot,
 } from '../knowledge/semanticIndexSchema';
+import { knowledgeIndexService } from '../knowledge/KnowledgeIndexService';
 import { appPathService } from '../runtime/AppPathService';
 import { StorageIo } from '../sessions/StorageIo';
 import {
@@ -96,14 +97,8 @@ const defaultDependencies = (): EmbeddingExecutionDependencies => ({
   batchSize: DEFAULT_BATCH_SIZE,
   interBatchDelayMs: 50,
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-  listCorpusDocuments: async () => {
-    const { knowledgeIndexService } = require('../knowledge/KnowledgeIndexService') as typeof import('../knowledge/KnowledgeIndexService');
-    return knowledgeIndexService.listCorpusDocuments();
-  },
-  getCorpusHash: async () => {
-    const { knowledgeIndexService } = require('../knowledge/KnowledgeIndexService') as typeof import('../knowledge/KnowledgeIndexService');
-    return knowledgeIndexService.computeLiveRevision();
-  },
+  listCorpusDocuments: async () => knowledgeIndexService.listCorpusDocuments(),
+  getCorpusHash: async () => knowledgeIndexService.computeLiveRevision(),
 });
 
 function resolveSelectedModel(

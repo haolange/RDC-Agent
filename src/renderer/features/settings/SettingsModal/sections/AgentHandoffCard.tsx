@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { AgentHandoffDefinition, AgentManifestDefinition, AgentModelOption } from '@shared/types/agentManifest';
 import type { TranslationKey, useI18n } from '../../../../i18n';
+import { Button } from '../../../../ui/Button';
 import { AutosizeTextarea } from '../AutosizeTextarea';
 import { AgentModelCascadeSelect } from './AgentModelCascadeSelect';
 import {
@@ -80,9 +81,9 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
           {handoff.label.trim() || t('settings.agentHandoffUntitled')}
         </strong>
         <div className="settings-handoff-card-actions">
-          <button type="button" className="button button-ghost" aria-label={t('settings.agentHandoffMoveUp')} disabled={isFirst} onClick={onMoveUp}>↑</button>
-          <button type="button" className="button button-ghost" aria-label={t('settings.agentHandoffMoveDown')} disabled={isLast} onClick={onMoveDown}>↓</button>
-          <button type="button" className="button button-danger" ref={deleteRef} onClick={onDelete}>{t('settings.delete')}</button>
+          <Button variant="ghost" aria-label={t('settings.agentHandoffMoveUp')} disabled={isFirst} onClick={onMoveUp}>↑</Button>
+          <Button variant="ghost" aria-label={t('settings.agentHandoffMoveDown')} disabled={isLast} onClick={onMoveDown}>↓</Button>
+          <Button variant="danger" ref={deleteRef} onClick={onDelete}>{t('settings.delete')}</Button>
         </div>
       </div>
 
@@ -156,14 +157,13 @@ export const AgentHandoffCard: React.FC<AgentHandoffCardProps> = ({
             onChange={(model) => patch({ model })}
             t={t}
           />
-          <button
-            type="button"
-            className="button button-ghost"
+          <Button
+            variant="ghost"
             disabled={!handoff.model}
             onClick={() => patch({ model: undefined })}
           >
             {t('settings.agentHandoffModelInherit')}
-          </button>
+          </Button>
         </div>
         {visible('model').map((issue) => (
           <small key={issue.code} id={errorId('model')} className="settings-handoff-error" role="alert">{errorText(issue)}</small>

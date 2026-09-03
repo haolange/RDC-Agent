@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { useModalFocus } from '../../../../hooks/useModalFocus';
+import { Button } from '../../../../ui/Button';
 import type { ProviderConnectionDraft } from '../types';
 import { getProviderCategoryTranslation } from '../utils';
 import { ProviderAccountOAuthPanel } from './ProviderAccountOAuthPanel';
@@ -54,6 +56,12 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
   );
   const modelListSize = catalogModelCount >= 24 ? 'long' : catalogModelCount >= 8 ? 'medium' : 'short';
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useModalFocus({
+    open: true,
+    containerRef: dialogRef,
+    onClose,
+  });
   const handleToggleModelCapability = (modelId: string) => {
     setExpandedModelId((current) => (current === modelId ? null : modelId));
   };
@@ -67,10 +75,12 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
     }}
   >
     <div
+      ref={dialogRef}
       className="settings-provider-connect-dialog"
       data-model-list-size={modelListSize}
       data-testid="settings-provider-connect-dialog"
       role="dialog"
+      tabIndex={-1}
       aria-modal="true"
       aria-labelledby="settings-provider-connect-title"
       onClick={(event) => event.stopPropagation()}
@@ -82,7 +92,8 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             {getResolvedProviderLabel(connectionProvider)}
           </div>
         </div>
-        <button type="button"
+        <Button
+          variant="ghost"
           className="settings-modal-close"
           onClick={onClose}
           aria-label={t('settings.close')}
@@ -91,7 +102,7 @@ export const ProviderConnectDialog: React.FC<ProviderConnectDialogProps> = ({
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
-        </button>
+        </Button>
       </div>
 
       <div className="settings-provider-connect-body" data-testid="settings-provider-connect-body">
