@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { KnowledgeCardRecord, KnowledgeScope } from '@shared/types/knowledge';
 
 /** Seven retrieval lanes. Order is the walk-pattern contract. */
@@ -43,4 +44,24 @@ export interface KnowledgeIndexSnapshot {
   revision: string;
   builtAt: string;
   cards: KnowledgeIndexEntry[];
+}
+
+export interface SemanticCorpusDocument {
+  cardId: string;
+  spaceId: string;
+  relativePath: string;
+  title: string;
+  type?: KnowledgeCardRecord['type'];
+  lifecycle?: KnowledgeCardRecord['lifecycle'];
+  body: string;
+  contentHash: string;
+}
+
+export function knowledgeCorpusHash(
+  cards: readonly Pick<KnowledgeIndexEntry, 'cardId' | 'contentHash' | 'relativePath'>[],
+): string {
+  const ordered = [...cards].sort((left, right) => left.relativePath.localeCompare(right.relativePath));
+  return createHash('sha256')
+    .update(ordered.map((card) => `${card.cardId}:${card.contentHash}`).join('|'), 'utf8')
+    .digest('hex');
 }

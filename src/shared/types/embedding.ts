@@ -1,7 +1,7 @@
 import type { EmbeddingAdapterId, EmbeddingProtocol } from '../provider-catalog/embeddingImplementationRegistry';
 
 export const EMBEDDING_CATALOG_SCHEMA_VERSION = 1 as const;
-export const SEMANTIC_INDEX_SNAPSHOT_SCHEMA_VERSION = 1 as const;
+export const SEMANTIC_INDEX_SNAPSHOT_SCHEMA_VERSION = 2 as const;
 export const DEFAULT_EMBEDDING_CHUNKER = 'plain-v1';
 
 export interface EmbeddingCatalogModel {
@@ -47,7 +47,23 @@ export type SemanticLaneStaleReason =
   | 'missing-snapshot'
   | 'identity-mismatch'
   | 'dimension-mismatch'
+  | 'chunker-mismatch'
+  | 'corpus-hash-mismatch'
+  | 'catalog-revision-mismatch'
+  | 'incomplete-vectors'
+  | 'invalid-vectors'
   | 'rebuild-required';
+
+export interface SemanticIndexChunk {
+  cardId: string;
+  spaceId: string;
+  relativePath: string;
+  title: string;
+  type?: string;
+  lifecycle?: string;
+  chunkIndex: number;
+  text: string;
+}
 
 export interface SemanticIndexSnapshot {
   schemaVersion: typeof SEMANTIC_INDEX_SNAPSHOT_SCHEMA_VERSION;
@@ -57,6 +73,21 @@ export interface SemanticIndexSnapshot {
   corpusHash: string;
   catalogRevision: string;
   builtAt: string;
+  chunkCount: number;
+  chunks: SemanticIndexChunk[];
+  vectors: number[][];
+}
+
+export interface SemanticSearchHit {
+  cardId: string;
+  spaceId: string;
+  relativePath: string;
+  title: string;
+  type?: string;
+  lifecycle?: string;
+  chunkIndex: number;
+  score: number;
+  text: string;
 }
 
 export interface SemanticLaneStatus {

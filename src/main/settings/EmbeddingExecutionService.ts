@@ -1,8 +1,5 @@
-import { createHash } from 'node:crypto';
 import path from 'node:path';
-import { z } from 'zod';
 import {
-  DEFAULT_EMBEDDING_CHUNKER,
   embeddingIdentity,
   sanitizeEmbeddingSettings,
   SEMANTIC_INDEX_SNAPSHOT_SCHEMA_VERSION,
@@ -13,8 +10,22 @@ import {
   type EmbeddingVector,
   type SemanticIndexSnapshot,
   type SemanticLaneStatus,
+  type SemanticSearchHit,
 } from '@shared/types/embedding';
 import { getEmbeddingCatalog } from '../provider-catalog/ProviderCatalogRegistry';
+import { knowledgeCorpusHash, type SemanticCorpusDocument } from '../knowledge/knowledgeLanes';
+import {
+  compareSemanticHits,
+  cosineSimilarity,
+  draftSemanticChunks,
+  SEMANTIC_CHUNKER_ID,
+} from '../knowledge/semanticChunker';
+import {
+  assertValidEmbeddingBatch,
+  EmbeddingIndexValidationError,
+  inspectSemanticIndexVectors,
+  parseSemanticIndexSnapshot,
+} from '../knowledge/semanticIndexSchema';
 import { appPathService } from '../runtime/AppPathService';
 import { StorageIo } from '../sessions/StorageIo';
 import {
@@ -26,17 +37,6 @@ import { settingsService } from './SettingsService';
 
 const SNAPSHOT_FILE = 'semantic-index.json';
 const DEFAULT_BATCH_SIZE = 64;
-const EMPTY_CORPUS_HASH = createHash('sha256').update('', 'utf8').digest('hex');
-
-const SemanticIndexSnapshotSchema = z.object({
-  schemaVersion: z.literal(SEMANTIC_INDEX_SNAPSHOT_SCHEMA_VERSION),
-  identity: z.string().min(1),
-  dimensions: z.number().int().positive(),
-  chunker: z.string().min(1),
-  corpusHash: z.string().min(1),
-  catalogRevision: z.string().min(1),
-  builtAt: z.string().min(1),
-}).strict();
 
 export class EmbeddingConsentDeniedError extends Error {
   readonly code = 'EMBEDDING_CONSENT_DENIED';
@@ -54,6 +54,8 @@ export class EmbeddingUnconfiguredError extends Error {
   }
 }
 
+export { EmbeddingIndexValidationError };
+
 export interface EmbeddingExecutionDependencies {
   getCatalog(): EmbeddingCatalog;
   getSettings(): EmbeddingSettings;
@@ -68,6 +70,9 @@ export interface EmbeddingExecutionDependencies {
   batchSize: number;
   interBatchDelayMs: number;
   sleep(ms: number): Promise<void>;
+  listCorpusDocuments(): Promise<SemanticCorpusDocument[]>;
+  getCorpusHash(): Promise<string>;
+  embedTexts?: (input: { texts: string[]; model: EmbeddingCatalogModel }) => Promise<EmbeddingBatchResult>;
 }
 
 const defaultDependencies = (): EmbeddingExecutionDependencies => ({
@@ -91,6 +96,14 @@ const defaultDependencies = (): EmbeddingExecutionDependencies => ({
   batchSize: DEFAULT_BATCH_SIZE,
   interBatchDelayMs: 50,
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  listCorpusDocuments: async () => {
+    const { knowledgeIndexService } = require('../knowledge/KnowledgeIndexService') as typeof import('../knowledge/KnowledgeIndexService');
+    return knowledgeIndexService.listCorpusDocuments();
+  },
+  getCorpusHash: async () => {
+    const { knowledgeIndexService } = require('../knowledge/KnowledgeIndexService') as typeof import('../knowledge/KnowledgeIndexService');
+    return knowledgeIndexService.computeLiveRevision();
+  },
 });
 
 function resolveSelectedModel(
@@ -114,9 +127,10 @@ export class EmbeddingExecutionService {
     this.dependencies = { ...defaultDependencies(), ...dependencies };
   }
 
-  resolveSemanticLaneStatus(): SemanticLaneStatus {
+  async resolveSemanticLaneStatus(): Promise<SemanticLaneStatus> {
     const settings = this.dependencies.getSettings();
-    const selected = resolveSelectedModel(this.dependencies.getCatalog(), settings);
+    const catalog = this.dependencies.getCatalog();
+    const selected = resolveSelectedModel(catalog, settings);
     const selectedIdentity = selected
       ? embeddingIdentity(selected.providerId, selected.modelId)
       : null;
@@ -136,7 +150,14 @@ export class EmbeddingExecutionService {
       return this.status('unavailable', 'provider-unconfigured', selectedIdentity, selectedDimensions, snapshot);
     }
     if (!snapshot) {
-      return this.status('stale', 'missing-snapshot', selectedIdentity, selectedDimensions, snapshot);
+      const raw = this.readRawSnapshot();
+      return this.status(
+        'stale',
+        raw == null ? 'missing-snapshot' : 'invalid-vectors',
+        selectedIdentity,
+        selectedDimensions,
+        null,
+      );
     }
     if (snapshot.identity !== selectedIdentity) {
       return this.status('stale', 'identity-mismatch', selectedIdentity, selectedDimensions, snapshot);
@@ -144,17 +165,37 @@ export class EmbeddingExecutionService {
     if (snapshot.dimensions !== selected.dimensions) {
       return this.status('stale', 'dimension-mismatch', selectedIdentity, selectedDimensions, snapshot);
     }
+    if (snapshot.chunker !== SEMANTIC_CHUNKER_ID) {
+      return this.status('stale', 'chunker-mismatch', selectedIdentity, selectedDimensions, snapshot);
+    }
+    if (snapshot.catalogRevision !== catalog.catalogRevision) {
+      return this.status('stale', 'catalog-revision-mismatch', selectedIdentity, selectedDimensions, snapshot);
+    }
+    if (snapshot.corpusHash !== await this.dependencies.getCorpusHash()) {
+      return this.status('stale', 'corpus-hash-mismatch', selectedIdentity, selectedDimensions, snapshot);
+    }
+    const integrity = inspectSemanticIndexVectors(snapshot, selected.dimensions);
+    if (integrity) {
+      return this.status('stale', integrity, selectedIdentity, selectedDimensions, snapshot);
+    }
     return this.status('ready', 'ready', selectedIdentity, selectedDimensions, snapshot);
   }
 
   async embed(texts: string[]): Promise<EmbeddingBatchResult> {
     const selected = this.requireExecutableModel();
+    if (texts.length === 0) {
+      return { modelId: selected.modelId, dimensions: selected.dimensions, vectors: [] };
+    }
+    if (this.dependencies.embedTexts) {
+      const result = await this.dependencies.embedTexts({ texts, model: selected });
+      assertValidEmbeddingBatch(texts, result, selected.dimensions);
+      return { modelId: selected.modelId, dimensions: selected.dimensions, vectors: alignVectors(result) };
+    }
     const lease = await this.dependencies.freeze(selected.providerId);
     try {
       const credential = this.dependencies.readLease(lease.handle, selected.providerId);
       const batches = this.chunk(texts, this.dependencies.batchSize);
       const vectors: EmbeddingVector[] = [];
-      let dimensions = selected.dimensions;
       for (let index = 0; index < batches.length; index += 1) {
         if (index > 0 && this.dependencies.interBatchDelayMs > 0) {
           await this.dependencies.sleep(this.dependencies.interBatchDelayMs);
@@ -162,32 +203,88 @@ export class EmbeddingExecutionService {
         const batch = batches[index];
         const offset = index * this.dependencies.batchSize;
         const result = await this.requestEmbeddings(selected, credential, batch, offset);
-        if (result.dimensions !== selected.dimensions) {
-          dimensions = result.dimensions;
-        }
+        assertValidEmbeddingBatch(batch, {
+          ...result,
+          vectors: result.vectors.map((row, rowIndex) => ({
+            index: rowIndex,
+            embedding: row.embedding,
+          })),
+        }, selected.dimensions);
         vectors.push(...result.vectors);
       }
-      return { modelId: selected.modelId, dimensions, vectors };
+      const assembled = { modelId: selected.modelId, dimensions: selected.dimensions, vectors };
+      assertValidEmbeddingBatch(texts, assembled, selected.dimensions);
+      return assembled;
     } finally {
       this.dependencies.release(lease.handle);
     }
   }
 
-  async rebuildSemanticIndex(input: { corpusHash?: string; chunker?: string } = {}): Promise<SemanticLaneStatus> {
+  async rebuildSemanticIndex(): Promise<SemanticLaneStatus> {
     const selected = this.requireExecutableModel();
+    const documents = await this.dependencies.listCorpusDocuments();
+    const drafts = draftSemanticChunks(documents);
+    const texts = drafts.map((draft) => draft.text);
+    const embedded = await this.embed(texts);
+    assertValidEmbeddingBatch(texts, embedded, selected.dimensions);
+    const vectors = alignVectors(embedded).map((row) => row.embedding);
     const snapshot: SemanticIndexSnapshot = {
       schemaVersion: SEMANTIC_INDEX_SNAPSHOT_SCHEMA_VERSION,
       identity: embeddingIdentity(selected.providerId, selected.modelId),
       dimensions: selected.dimensions,
-      chunker: input.chunker?.trim() || DEFAULT_EMBEDDING_CHUNKER,
-      corpusHash: input.corpusHash?.trim() || EMPTY_CORPUS_HASH,
+      chunker: SEMANTIC_CHUNKER_ID,
+      corpusHash: knowledgeCorpusHash(documents),
       catalogRevision: this.dependencies.getCatalog().catalogRevision,
       builtAt: this.dependencies.now().toISOString(),
+      chunkCount: drafts.length,
+      chunks: drafts,
+      vectors,
     };
+    const integrity = inspectSemanticIndexVectors(snapshot, selected.dimensions);
+    if (integrity) {
+      throw new EmbeddingIndexValidationError(integrity);
+    }
     const filePath = this.dependencies.snapshotPath();
     this.dependencies.storage.ensureDir(path.dirname(filePath));
-    this.dependencies.storage.writeJsonAtomic(filePath, snapshot);
+    this.dependencies.storage.writeUtf8Atomic(filePath, JSON.stringify(snapshot), { fsync: true });
     return this.resolveSemanticLaneStatus();
+  }
+
+  async searchSemantic(queryText: string): Promise<SemanticSearchHit[]> {
+    const status = await this.resolveSemanticLaneStatus();
+    const snapshot = status.snapshot;
+    if (status.availability !== 'ready' || !snapshot) return [];
+    const text = queryText.trim();
+    if (!text) return [];
+    let queryVector: number[];
+    try {
+      const embedded = await this.embed([text]);
+      queryVector = embedded.vectors[0]?.embedding ?? [];
+      if (queryVector.length !== snapshot.dimensions) return [];
+    } catch {
+      return [];
+    }
+    const hits: SemanticSearchHit[] = [];
+    for (let index = 0; index < snapshot.chunks.length; index += 1) {
+      const chunk = snapshot.chunks[index];
+      const vector = snapshot.vectors[index];
+      if (!vector) continue;
+      const score = cosineSimilarity(queryVector, vector);
+      if (score <= 0) continue;
+      hits.push({
+        cardId: chunk.cardId,
+        spaceId: chunk.spaceId,
+        relativePath: chunk.relativePath,
+        title: chunk.title,
+        type: chunk.type,
+        lifecycle: chunk.lifecycle,
+        chunkIndex: chunk.chunkIndex,
+        score,
+        text: chunk.text,
+      });
+    }
+    hits.sort(compareSemanticHits);
+    return hits;
   }
 
   private requireExecutableModel(): EmbeddingCatalogModel {
@@ -209,10 +306,18 @@ export class EmbeddingExecutionService {
     return selected;
   }
 
+  private readRawSnapshot(): unknown {
+    try {
+      return this.dependencies.storage.readJson<unknown>(this.dependencies.snapshotPath());
+    } catch {
+      return undefined;
+    }
+  }
+
   private readSnapshot(): SemanticIndexSnapshot | null {
-    const raw = this.dependencies.storage.readJson<unknown>(this.dependencies.snapshotPath());
+    const raw = this.readRawSnapshot();
     if (raw == null) return null;
-    return SemanticIndexSnapshotSchema.parse(raw);
+    return parseSemanticIndexSnapshot(raw);
   }
 
   private status(
@@ -262,9 +367,14 @@ export class EmbeddingExecutionService {
       index: offset + (typeof row.index === 'number' ? row.index : index),
       embedding: Array.isArray(row.embedding) ? row.embedding : [],
     }));
-    const dimensions = vectors[0]?.embedding.length ?? model.dimensions;
-    return { modelId: model.modelId, dimensions, vectors };
+    return { modelId: model.modelId, dimensions: model.dimensions, vectors };
   }
+}
+
+function alignVectors(result: EmbeddingBatchResult): EmbeddingVector[] {
+  return [...result.vectors]
+    .sort((left, right) => left.index - right.index)
+    .map((row, index) => ({ index, embedding: row.embedding }));
 }
 
 export const embeddingExecutionService = new EmbeddingExecutionService();

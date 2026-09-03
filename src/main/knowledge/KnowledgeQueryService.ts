@@ -1,6 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import type { SemanticLaneStatus } from '@shared/types/embedding';
+import type { SemanticLaneStatus, SemanticSearchHit } from '@shared/types/embedding';
 import type { KnowledgeCardDetail, KnowledgeCardSummary, KnowledgeSpace } from '@shared/types/knowledge';
 import { parseKnowledgeFrontmatter } from './knowledgeCardSchema';
 import { KnowledgeSemanticLaneClosedError } from './knowledgeErrors';
@@ -25,7 +25,8 @@ import {
 
 export interface KnowledgeQueryDependencies {
   listSpaces(): KnowledgeSpace[];
-  resolveSemanticLaneStatus(): SemanticLaneStatus;
+  resolveSemanticLaneStatus(): Promise<SemanticLaneStatus> | SemanticLaneStatus;
+  searchSemantic(queryText: string): Promise<SemanticSearchHit[]>;
   index: KnowledgeIndexService;
   readFile(filePath: string): Promise<string>;
   statMtime(filePath: string): Promise<number>;
@@ -53,9 +54,13 @@ function defaultDependencies(): KnowledgeQueryDependencies {
       }
       return spaces;
     },
-    resolveSemanticLaneStatus: () => {
+    resolveSemanticLaneStatus: async () => {
       const { embeddingExecutionService } = require('../settings/EmbeddingExecutionService') as typeof import('../settings/EmbeddingExecutionService');
       return embeddingExecutionService.resolveSemanticLaneStatus();
+    },
+    searchSemantic: (queryText) => {
+      const { embeddingExecutionService } = require('../settings/EmbeddingExecutionService') as typeof import('../settings/EmbeddingExecutionService');
+      return embeddingExecutionService.searchSemantic(queryText);
     },
     index: new KnowledgeIndexService(),
     readFile: (filePath) => fs.readFile(filePath, 'utf8'),
@@ -65,7 +70,10 @@ function defaultDependencies(): KnowledgeQueryDependencies {
 
 function resolveDeps(overrides: Partial<KnowledgeQueryDependencies>): KnowledgeQueryDependencies {
   if (overrides.listSpaces && overrides.resolveSemanticLaneStatus && overrides.index && overrides.readFile && overrides.statMtime) {
-    return overrides as KnowledgeQueryDependencies;
+    return {
+      ...overrides,
+      searchSemantic: overrides.searchSemantic ?? (async () => []),
+    } as KnowledgeQueryDependencies;
   }
   return { ...defaultDependencies(), ...overrides };
 }
@@ -174,8 +182,40 @@ export class KnowledgeQueryService {
 
     for (const lane of lanes) {
       if (lane === 'Semantic') {
-        semantic = this.deps.resolveSemanticLaneStatus();
-        laneResults.push({ lane, hits: [], semantic });
+        semantic = await this.deps.resolveSemanticLaneStatus();
+        const hits: KnowledgeLaneHit[] = [];
+        if (semantic.availability === 'ready' && request.text?.trim()) {
+          const allowed = new Set(universe.map((entry) => entry.cardId));
+          const ranked = await this.deps.searchSemantic(request.text);
+          for (const hit of ranked) {
+            if (!allowed.has(hit.cardId)) continue;
+            hits.push({
+              cardId: hit.cardId,
+              spaceId: hit.spaceId,
+              relativePath: hit.relativePath,
+              title: hit.title,
+              type: hit.type as KnowledgeLaneHit['type'],
+              lifecycle: hit.lifecycle as KnowledgeLaneHit['lifecycle'],
+              score: hit.score,
+              lanes: ['Semantic'],
+              chunkIndex: hit.chunkIndex,
+            });
+          }
+        }
+        laneResults.push({ lane, hits, semantic });
+        const bestByCard = new Set<string>();
+        for (const hit of hits) {
+          if (bestByCard.has(hit.cardId)) continue;
+          bestByCard.add(hit.cardId);
+          const existing = merged.get(hit.cardId);
+          if (!existing) {
+            merged.set(hit.cardId, { ...hit });
+            continue;
+          }
+          existing.score += hit.score;
+          if (existing.chunkIndex == null) existing.chunkIndex = hit.chunkIndex;
+          if (!existing.lanes.includes(lane)) existing.lanes.push(lane);
+        }
         continue;
       }
       const hits: KnowledgeLaneHit[] = [];
@@ -204,8 +244,8 @@ export class KnowledgeQueryService {
     };
   }
 
-  requireSemanticReady(): SemanticLaneStatus {
-    const status = this.deps.resolveSemanticLaneStatus();
+  async requireSemanticReady(): Promise<SemanticLaneStatus> {
+    const status = await this.deps.resolveSemanticLaneStatus();
     if (status.availability === 'unavailable' || status.availability === 'stale') {
       throw new KnowledgeSemanticLaneClosedError(status.availability, status.reason);
     }

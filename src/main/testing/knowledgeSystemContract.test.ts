@@ -134,7 +134,7 @@ describe('knowledge system contract', () => {
     expect(closed.semantic?.availability).toBe('unavailable');
     expect(closed.lanes.find((lane) => lane.lane === 'Semantic')?.hits).toEqual([]);
     expect(closed.hits.length).toBeGreaterThan(0);
-    expect(() => unavailable.requireSemanticReady()).toThrow(KnowledgeSemanticLaneClosedError);
+    await expect(unavailable.requireSemanticReady()).rejects.toBeInstanceOf(KnowledgeSemanticLaneClosedError);
     const staleResult = await stale.query({ lanes: ['Semantic'] });
     expect(staleResult.semantic?.availability).toBe('stale');
     expect(new KnowledgeCompileService().compile(staleResult).semanticClaimed).toBe(false);

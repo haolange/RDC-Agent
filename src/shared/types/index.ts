@@ -296,11 +296,13 @@ export type {
   EmbeddingCatalogModel,
   EmbeddingSettings,
   EmbeddingVector,
+  SemanticIndexChunk,
   SemanticIndexSnapshot,
   SemanticLaneAvailability,
   SemanticLaneStatus,
   SemanticLaneStaleReason,
   SemanticLaneUnavailableReason,
+  SemanticSearchHit,
 } from './embedding';
 export {
   DEFAULT_EMBEDDING_CHUNKER,

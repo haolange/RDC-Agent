@@ -189,6 +189,7 @@ export interface KnowledgeLaneHit {
   lifecycle?: KnowledgeLifecycle;
   score: number;
   lanes: KnowledgeRetrievalLane[];
+  chunkIndex?: number;
 }
 
 export interface KnowledgeLaneResult {
