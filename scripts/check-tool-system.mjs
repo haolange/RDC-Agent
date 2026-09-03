@@ -248,6 +248,10 @@ function main() {
     path.join(repoRoot, 'src/main/workflow/debugger/ToolExecutorFactory.ts'),
     'utf8',
   );
+  const runtimePolicy = fs.readFileSync(
+    path.join(repoRoot, 'src/main/workflow/debugger/DebuggerRuntimePolicy.ts'),
+    'utf8',
+  );
   assert(
     orchestrator.includes('new RuntimeToolAssembly'),
     'AgentOrchestrator must own the RuntimeToolAssembly collaboration boundary',
@@ -269,10 +273,21 @@ function main() {
     /createToolSearchTool\(\(\)\s*=>\s*\n?\s*Array\.from\(availableTools\.values\(\)\)\.filter/.test(runtimeToolAssembly),
     'RuntimeToolAssembly tool_search closure must filter available tools by allowlist and runtime policy',
   );
-  // Skill allowed-tools narrowing must be wired into the executor, not the façade.
+  // Skill ∩ is frozen on prepareTurn (`skillIntersection`); executor consumes the
+  // frozen set and must not re-narrow from skill_read mid-turn.
   assert(
-    toolExecutorFactory.includes('intersectSkillAllowedTools'),
-    'ToolExecutorFactory must intersect skill allowed-tools with the runtime allowlist',
+    turnPreparationService.includes('resolveSkillIntersection')
+      && turnPreparationService.includes('skillIntersection'),
+    'TurnPreparationService must freeze ∩(skill_i) ∩ runtimeAllowlist as skillIntersection',
+  );
+  assert(
+    runtimePolicy.includes('export function intersectSkillAllowedTools'),
+    'DebuggerRuntimePolicy must export intersectSkillAllowedTools for prepareTurn',
+  );
+  assert(
+    toolExecutorFactory.includes('plan?.skillIntersection')
+      && toolExecutorFactory.includes('skill_read does not re-narrow mid-turn'),
+    'ToolExecutorFactory must consume frozen skillIntersection and not re-narrow mid-turn',
   );
 
   // Primitive tool convergence contracts.
