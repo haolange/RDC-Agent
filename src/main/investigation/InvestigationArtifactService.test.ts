@@ -22,6 +22,8 @@ import {
   seedNote,
   writeDraft,
 } from './investigationTestFixtures';
+import { toolToDefinition } from '../agent-runtime/agent/AgentTool';
+import { toolValidator } from '../agent-runtime/core/ToolValidator';
 import { createInvestigationTools } from './InvestigationTools';
 
 function indexPath(sessionPath: string): string {
@@ -92,6 +94,42 @@ describe('InvestigationArtifactService', () => {
       /INVESTIGATION_REF_UNRESOLVED|INVESTIGATION_READY_DENIED/,
     );
     expect(formatInvestigationContentHash(written.contentHash.replace(/^sha256:/, ''))).toBe(written.contentHash);
+  });
+
+  it('lets investigation_write record bodies pass ToolValidator as an opaque object', () => {
+    const { resolver, service } = createInvestigationHarness();
+    const note = seedNote(resolver);
+    writeDraft(service, 'world_state', baselineWorld());
+    const tools = createInvestigationTools(SESSION_ID, { service });
+    const writeTool = tools.find((tool) => tool.name === 'investigation_write');
+    expect(writeTool).toBeDefined();
+    const args = toolValidator.validate(toolToDefinition(writeTool!), {
+      kind: 'evidence',
+      mission: 'debugger',
+      title: 'observed compare',
+      summary: 'Before/after color mismatch',
+      record: evidenceOf('ws-baseline', note),
+    });
+    expect(args.record).toMatchObject({ evidenceId: 'ev-1', worldStateId: 'ws-baseline' });
+  });
+
+  it('lets a report cite an existing claimId without superseding the source claim', () => {
+    const { service } = createInvestigationHarness();
+    writeDraft(service, 'world_state', baselineWorld());
+    writeDraft(service, 'claim', observedClaim('ws-baseline', 'cl-cite'));
+    const report = writeDraft(service, 'report', sampleReport({
+      claims: [{
+        ...observedClaim('ws-baseline', 'cl-cite'),
+        projectionKind: 'report',
+        compactProvenance: [{
+          sourceClaimId: 'cl-cite',
+          sourceEpistemicStatus: 'observed',
+          sourceVerificationLevel: 'observed',
+        }],
+      }],
+    }), { title: 'cite', summary: 'cite' });
+    expect(report.manifest.supersedes).toBeUndefined();
+    expect(service.createLookup(SESSION_ID).getClaim('cl-cite')).toMatchObject({ claimId: 'cl-cite' });
   });
 
   it('P1-1 treats unresolvable verifyEvidence as isolation failure', () => {
@@ -469,10 +507,12 @@ describe('InvestigationArtifactService', () => {
         sourceVerificationLevel: (claim.record as ClaimRecord).verification,
       }],
     });
-    expect(() => writeDraft(service, 'report', sampleReport({
+    const cited = writeDraft(service, 'report', sampleReport({
       claims: [projected('claim-owned')],
       evidenceIds: ['ev-owned'],
-    }))).toThrow(/INVESTIGATION_DUPLICATE_ID/);
+    }));
+    expect(cited.manifest.supersedes).toBeUndefined();
+    expect(service.createLookup(SESSION_ID).getClaim('claim-owned')).toMatchObject({ claimId: 'claim-owned' });
     const report = writeDraft(service, 'report', sampleReport({
       claims: [projected('claim-report-1')],
       evidenceIds: ['ev-owned'],

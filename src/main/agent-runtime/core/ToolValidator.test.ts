@@ -94,6 +94,36 @@ describe('ToolValidator', () => {
     )).toThrow(/未声明字段/);
   });
 
+  it('passes through opaque objects when properties is omitted', () => {
+    const result = validator.validate(
+      def({
+        type: 'object',
+        required: ['kind', 'record'],
+        properties: {
+          kind: { type: 'string' },
+          record: { type: 'object' },
+        },
+      }),
+      { kind: 'evidence', record: { evidenceId: 'ev-1', summary: 'observed' } },
+    );
+    expect(result).toEqual({
+      kind: 'evidence',
+      record: { evidenceId: 'ev-1', summary: 'observed' },
+    });
+  });
+
+  it('still rejects every key when properties is an empty object', () => {
+    expect(() => validator.validate(
+      def({
+        type: 'object',
+        properties: {
+          record: { type: 'object', properties: {} },
+        },
+      }),
+      { record: { evidenceId: 'ev-1' } },
+    )).toThrow(/未声明字段/);
+  });
+
   it('rejects unsupported schema keywords at compile time', () => {
     expect(() => validator.validate(
       def({

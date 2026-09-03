@@ -10,7 +10,6 @@ import {
   type InvestigationArtifactKind,
   type InvestigationArtifactStatus,
   type InvestigationRecord,
-  type InvestigationReport,
   type WorldState,
 } from '@shared/types/renderdocInvestigation';
 import { formatSessionArtifactUri } from '@shared/types/sessionArtifact';
@@ -87,7 +86,9 @@ export function collectRecordKeys(
   if (kind === 'challenge') return [{ space: 'challenge', id: (record as ChallengeRecord).challengeId }];
   if (kind === 'checkpoint') return [{ space: 'checkpoint', id: (record as { checkpointId: string }).checkpointId }];
   if (kind === 'report') {
-    return (record as InvestigationReport).claims.map((claim) => ({ space: 'claim' as const, id: claim.claimId }));
+    // Reports cite claims; they do not own claim ids. Treating cited claimId as a
+    // write-key forces supersede of the source Claim and breaks S-CLAIM-01 lookup.
+    return [];
   }
   return [];
 }
