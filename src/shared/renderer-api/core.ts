@@ -6,6 +6,7 @@ import type {
   ConversationApi,
   DialogApi,
   EvidenceApi,
+  InvestigationApi,
   KnowledgeApi,
   McpApi,
   ToolApi,
@@ -93,6 +94,12 @@ export function createAgentApi(transport: RendererApiTransport): AgentApi {
     getState: (agentId, sessionId) => transport.invoke(INVOKE.agent.getState, agentId, sessionId),
     getAllStates: () => transport.invoke(INVOKE.agent.getAllStates),
     configure: (agentId, config) => transport.invoke(INVOKE.agent.configure, agentId, config),
+  };
+}
+
+export function createInvestigationApi(transport: RendererApiTransport): InvestigationApi {
+  return {
+    read: (request) => transport.invoke(INVOKE.investigation.read, request),
   };
 }
 

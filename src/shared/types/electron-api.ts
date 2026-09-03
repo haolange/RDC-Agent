@@ -12,6 +12,7 @@ export type {
   EventSubscriptionApi,
   EvidenceApi,
   LlmApi,
+  InvestigationApi,
   KnowledgeApi,
   MemoryApi,
   McpApi,

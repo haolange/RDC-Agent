@@ -74,6 +74,8 @@ describe('mapRightRailInvestigationArtifacts', () => {
     ));
     expect(result.rows.map((row) => row.artifactId)).toEqual(['a-early', 'b-early', 'b-late']);
     expect(result.rows.every((row) => !row.degraded)).toBe(true);
+    expect(result.rows.every((row) => row.contentHash.startsWith('sha256:') && row.contentHash.length === 71)).toBe(true);
+    expect(result.rows.every((row) => row.contentHashShort === 'sha256:aaaaaaaaaaaa')).toBe(true);
   });
 
   it('counts superseded ids and keeps them out of rows', () => {
@@ -112,8 +114,21 @@ describe('mapRightRailInvestigationArtifacts', () => {
       [[drifted.artifactId, manifestOf('drifted', { contentHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' })]],
     ));
     expect(result.rows).toHaveLength(2);
-    expect(result.rows[0]).toMatchObject({ artifactId: 'missing', degraded: true, title: '' });
-    expect(result.rows[1]).toMatchObject({ artifactId: 'drifted', degraded: true, title: '' });
+    expect(result.rows[0]).toMatchObject({
+      artifactId: 'missing',
+      degraded: true,
+      title: '',
+      mission: 'unknown',
+      contentHash: missing.contentHash,
+    });
+    expect(result.rows[1]).toMatchObject({
+      artifactId: 'drifted',
+      degraded: true,
+      title: '',
+      mission: 'debugger',
+      contentHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    });
+    expect(result.rows[0]?.contentHashShort).toBe('sha256:aaaaaaaaaaaa');
   });
 
   it('keeps a valid row when a sibling manifest is drifted', () => {
@@ -154,6 +169,17 @@ describe('mapRightRailInvestigationArtifacts', () => {
       throw new Error('INVESTIGATION_INDEX_CORRUPT');
     }));
     expect(result).toEqual({ rows: [], supersededCount: 0, truncatedCount: 0, storeDegraded: true });
+  });
+
+  it('does not invent a debugger mission when the manifest is missing', () => {
+    const orphan = entry('orphan', '2026-01-01T00:00:00.000Z');
+    const result = mapRightRailInvestigationArtifacts('session-a', sourceOf([orphan], []));
+    expect(result.rows[0]).toMatchObject({
+      artifactId: 'orphan',
+      mission: 'unknown',
+      degraded: true,
+      contentHash: orphan.contentHash,
+    });
   });
 
   it('does not mix output_register files into investigation rows', () => {

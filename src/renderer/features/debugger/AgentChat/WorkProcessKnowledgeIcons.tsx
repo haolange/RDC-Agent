@@ -41,6 +41,16 @@ export function renderKnowledgeIconPath(icon: WorkProcessIconKey): ReactElement 
           <path d="M15 15h5" />
         </>
       );
+    case 'interpreter':
+      return (
+        <>
+          <path d="M6 5h12v14H6V5Z" />
+          <path d="M9 9h6M9 12h4" />
+          <path d="M9 16h2" />
+        </>
+      );
+    case 'spark':
+      return <path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7L12 3Zm6 11 .8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8L18 14Z" />;
     default:
       return null;
   }

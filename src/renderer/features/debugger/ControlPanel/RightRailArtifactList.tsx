@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { InvestigationArtifactKind, InvestigationArtifactStatus, InvestigationMission } from '@shared/types/renderdocInvestigation';
 import type { InvestigationArtifactRow, InvestigationArtifactsPanelViewModel } from '@shared/types/trace';
 import { useI18n, type TranslationKey } from '../../../i18n';
 import { getElectronApi } from '../../../platform/getElectronApi';
+import { useProjectStore } from '../../../stores/projectStore';
 import { Button } from '../../../ui/Button';
 import { RightRailArtifactGlyph } from './RightRailArtifactGlyphs';
+import { RightRailInvestigationPreview } from './RightRailInvestigationPreview';
 
 const kindKey = (kind: InvestigationArtifactKind): TranslationKey => `control.rightRail.artifacts.kind.${kind}` as TranslationKey;
 const statusKey = (status: InvestigationArtifactStatus): TranslationKey => `control.rightRail.artifacts.status.${status}` as TranslationKey;
-const missionKey = (mission: InvestigationMission): TranslationKey => `control.rightRail.artifacts.mission.${mission}` as TranslationKey;
+const missionKey = (mission: InvestigationMission | 'unknown'): TranslationKey => `control.rightRail.artifacts.mission.${mission}` as TranslationKey;
 
 const formatRelativeTime = (iso: string, language: string): string => {
   const deltaMs = Date.parse(iso) - Date.now();
@@ -40,6 +42,8 @@ const rowClass = (row: InvestigationArtifactRow): string => {
 
 export const RightRailArtifactList: React.FC<{ artifacts: InvestigationArtifactsPanelViewModel }> = ({ artifacts }) => {
   const { t, language } = useI18n();
+  const sessionId = useProjectStore((state) => state.currentSession?.sessionId ?? '');
+  const [previewRow, setPreviewRow] = useState<InvestigationArtifactRow | null>(null);
   return (
     <div className="right-rail-investigation-list">
       {artifacts.rows.map((row) => {
@@ -70,10 +74,24 @@ export const RightRailArtifactList: React.FC<{ artifacts: InvestigationArtifacts
               >
                 {t('control.rightRail.artifacts.copyId')}
               </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPreviewRow(row)}
+              >
+                {t('control.rightRail.artifacts.preview')}
+              </Button>
             </span>
           </article>
         );
       })}
+      {previewRow && sessionId ? (
+        <RightRailInvestigationPreview
+          sessionId={sessionId}
+          row={previewRow}
+          onClose={() => setPreviewRow(null)}
+        />
+      ) : null}
       {artifacts.supersededCount > 0 || artifacts.truncatedCount > 0 ? (
         <footer className="right-rail-investigation-footer">
           {artifacts.supersededCount > 0 ? (

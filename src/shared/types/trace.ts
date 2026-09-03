@@ -145,9 +145,10 @@ export interface InvestigationArtifactRow {
   kind: InvestigationArtifactKind;
   recordType: InvestigationRecordType;
   status: InvestigationArtifactStatus;
-  mission: InvestigationMission;
+  mission: InvestigationMission | 'unknown';
   title: string;
   createdAt: string;
+  contentHash: string;
   contentHashShort: string;
   sourceRefCount: number;
   worldStateId?: string;

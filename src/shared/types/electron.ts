@@ -89,6 +89,10 @@ import type {
   KnowledgeQueryResult,
   SessionKnowledgeCandidate,
 } from './knowledge';
+import type {
+  InvestigationReadIpcResult,
+  InvestigationReadRequest,
+} from './renderdocInvestigation';
 
 /** Memory 面板列表项摘要（对应 MemoryRecord 的精简视图）。 */
 export interface MemorySummary {
@@ -254,6 +258,10 @@ export interface ElectronAPI {
     get: (scope: 'user' | 'project', name: string, projectRoot?: string) => Promise<{ memory: MemoryDetail | null }>;
     write: (request: MemoryWriteRequest) => Promise<{ success: boolean; name: string; error?: string }>;
     delete: (scope: 'user' | 'project', name: string, approvalToken: string, projectRoot?: string) => Promise<{ success: boolean; error?: string }>;
+  };
+
+  investigation: {
+    read: (request: InvestigationReadRequest) => Promise<InvestigationReadIpcResult>;
   };
 
   knowledge: {

@@ -380,6 +380,9 @@
 .right-rail-investigation-actions {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
 }
 
 .right-rail-investigation-footer {
