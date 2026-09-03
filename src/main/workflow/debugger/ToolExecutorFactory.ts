@@ -334,7 +334,7 @@ export class ToolExecutorFactory {
           if (normalizedName === 'skill_read' && result.isError !== true) {
             const skillId = (result.details as { skillId?: string } | undefined)?.skillId;
             const skill = skillId
-              ? agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined)
+              ? agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined, agentId)
               : null;
             if (skill?.allowedTools?.length) {
               applySkillNarrowing(skill.allowedTools);

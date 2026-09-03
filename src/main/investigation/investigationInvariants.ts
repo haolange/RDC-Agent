@@ -235,7 +235,7 @@ export function assertReportContractPresent(
   if (!contract) {
     throw new InvestigationError(
       'INVESTIGATION_INVARIANT_VIOLATION',
-      'ready Analyzer/Optimizer report requires reportContract',
+      'ready report requires reportContract',
       { invariantId: 'S-CLAIM-01' },
     );
   }
@@ -244,12 +244,14 @@ export function assertReportContractPresent(
     contract.evidence,
     contract.verification,
     contract.limitations,
+    contract.status,
+    contract.links,
     contract.candidateStatus,
   ].some((value) => typeof value !== 'string' || value.trim().length < 1);
   if (missing || !Array.isArray(contract.artifactIds) || contract.artifactIds.length < 1) {
     throw new InvestigationError(
       'INVESTIGATION_INVARIANT_VIOLATION',
-      'reportContract requires conclusion, evidence, verification, limitations, artifactIds, and candidateStatus',
+      'reportContract requires conclusion, evidence, verification, limitations, status, links, artifactIds, and candidateStatus',
       { invariantId: 'S-CLAIM-01' },
     );
   }

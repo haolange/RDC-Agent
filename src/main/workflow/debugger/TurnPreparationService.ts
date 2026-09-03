@@ -73,10 +73,11 @@ function resolveSkillIntersection(
   profileSkills: readonly string[],
   toolAllowlist: readonly string[],
   projectRootPath: string | null,
+  agentId: AgentRole,
 ): string[] | null {
   const skillAllowedLists: string[][] = [];
   for (const skillId of profileSkills) {
-    const skill = agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined);
+    const skill = agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined, agentId);
     if (skill?.allowedTools?.length) {
       skillAllowedLists.push([...skill.allowedTools]);
     }
@@ -326,6 +327,7 @@ export class TurnPreparationService {
       profileSkills,
       input.toolAllowlist,
       input.projectRootPath,
+      input.agentId,
     );
     const effectivePlan = buildEffectiveRuntimePlan({
       agentId: input.agentId,

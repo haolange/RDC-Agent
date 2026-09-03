@@ -277,6 +277,8 @@ export const InvestigationReportSchema: ZodType<InvestigationReport> = z.object(
     evidence: nonEmpty,
     verification: nonEmpty,
     limitations: nonEmpty,
+    status: nonEmpty,
+    links: nonEmpty,
     artifactIds: z.array(nonEmpty).min(1),
     candidateStatus: z.enum(REPORT_CANDIDATE_STATUSES),
   }).strict().optional(),

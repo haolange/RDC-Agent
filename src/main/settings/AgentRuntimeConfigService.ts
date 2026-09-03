@@ -14,6 +14,7 @@ import {
   mcpTrustService,
   projectOverridesUserExecutable,
 } from './McpTrustService';
+import { isSkillVisibleToProfile } from '@shared/constants/canonicalSkills';
 
 const MCP_TRANSPORTS = new Set<MCPTransport>(['stdio', 'streamable-http']);
 
@@ -66,8 +67,8 @@ export class AgentRuntimeConfigService {
     appPathService.initializeRuntime();
   }
 
-  listSkills(projectRoot?: string): AgentRuntimeSkillDescriptor[] {
-    return this.resolveSkills(projectRoot).map((skill) => ({
+  listSkills(projectRoot?: string, viewerAgentId?: string): AgentRuntimeSkillDescriptor[] {
+    return this.resolveSkills(projectRoot, viewerAgentId).map((skill) => ({
       id: skill.id,
       name: skill.name,
       label: skill.name,
@@ -83,15 +84,15 @@ export class AgentRuntimeConfigService {
     }));
   }
 
-  listSkillMetadata(projectRoot?: string): SkillMetadata[] {
-    return this.resolveSkills(projectRoot).map(({ instructions: _instructions, referencesPath: _references, scriptsPath: _scripts, assetsPath: _assets, ...metadata }) => metadata);
+  listSkillMetadata(projectRoot?: string, viewerAgentId?: string): SkillMetadata[] {
+    return this.resolveSkills(projectRoot, viewerAgentId).map(({ instructions: _instructions, referencesPath: _references, scriptsPath: _scripts, assetsPath: _assets, ...metadata }) => metadata);
   }
 
-  loadSkill(id: string, projectRoot?: string): SkillLoadResult | null {
-    return this.resolveSkills(projectRoot).find((skill) => skill.id === toRuntimeId(id, 'skill')) ?? null;
+  loadSkill(id: string, projectRoot?: string, viewerAgentId?: string): SkillLoadResult | null {
+    return this.resolveSkills(projectRoot, viewerAgentId).find((skill) => skill.id === toRuntimeId(id, 'skill')) ?? null;
   }
 
-  private resolveSkills(projectRoot?: string): SkillLoadResult[] {
+  private resolveSkills(projectRoot?: string, viewerAgentId?: string): SkillLoadResult[] {
     this.ensureScaffold();
     const user = appPathService.getUserRdxPaths();
     const candidates: Array<ScopedResourceCandidate<SkillLoadResult>> = [];
@@ -105,13 +106,15 @@ export class AgentRuntimeConfigService {
     addDirectory(path.join(this.templateRoot(), 'skills'), 'builtin');
     addDirectory(user.skillsPath, 'user');
     if (projectRoot) addDirectory(appPathService.getProjectRdxPaths(projectRoot).skillsPath, 'project');
-    return scopedResourceResolver.resolve(candidates).resources.filter((resource) => resource.enabled).map((resource) => ({
+    const resolved = scopedResourceResolver.resolve(candidates).resources.filter((resource) => resource.enabled).map((resource) => ({
       ...resource.value,
       scope: resource.provenance.scope,
       sourcePath: resource.provenance.sourcePath,
       sourceHash: resource.provenance.sourceHash,
       effectiveStatus: resource.effectiveStatus,
     }));
+    if (!viewerAgentId) return resolved;
+    return resolved.filter((skill) => isSkillVisibleToProfile(viewerAgentId, skill.id));
   }
 
   listMcpServers(projectRoot?: string): AgentRuntimeMcpDescriptor[] {

@@ -8,6 +8,7 @@ vi.mock('../settings/SettingsService', () => ({
 import { AgentRecoveryAbortError } from '../agent-runtime/agent/ErrorRecovery';
 import { AgentLoopTerminationError } from '../agent-runtime/agent/LoopProgressGuard';
 import { createTurnFailedDiagnostic } from './ConversationRoutePreflight';
+import { MissionCompletionError } from '../investigation/missionCompletionContract';
 
 const ROUTE = {
   agentId: 'plan' as const,
@@ -72,6 +73,16 @@ describe('conversation turn failure classification', () => {
       new Error('VISION_INPUT_UNSUPPORTED: the selected model route does not accept image attachments.'),
     );
     expect(diagnostic.code).toBe('VISION_INPUT_UNSUPPORTED');
+    expect(diagnostic.userMessage).not.toContain('额度或网络');
+  });
+
+  it('classifies Mission completion denial independently from provider failures', () => {
+    const diagnostic = createTurnFailedDiagnostic(
+      { agentId: 'debugger', providerId: 'anthropic', modelId: 'claude-opus-5' },
+      new MissionCompletionError('missing_report', 'debugger cannot complete without a ready report'),
+    );
+    expect(diagnostic.code).toBe('MISSION_COMPLETION_DENIED');
+    expect(diagnostic.userMessage).toContain('不能把本次 Mission 标为已完成');
     expect(diagnostic.userMessage).not.toContain('额度或网络');
   });
 

@@ -614,7 +614,7 @@ export class RuntimeToolAssembly {
     };
   }
 
-  createSkillsCatalogTool(): AgentTool<
+  createSkillsCatalogTool(agentId: AgentRole): AgentTool<
     { query?: string },
     { count: number }
   > {
@@ -631,7 +631,7 @@ export class RuntimeToolAssembly {
       permissionHint: 'readonly',
       async execute(_toolCallId, args, _signal, _onUpdate, context) {
         const query = typeof args.query === 'string' ? args.query.trim().toLowerCase() : '';
-        const skills = agentRuntimeConfigService.listSkills(context?.projectRootPath ?? undefined)
+        const skills = agentRuntimeConfigService.listSkills(context?.projectRootPath ?? undefined, agentId)
           .filter((skill) => !query || `${skill.id} ${skill.name} ${skill.label} ${skill.description}`.toLowerCase().includes(query));
         const lines = skills.map((skill) => (
           `${skill.id}: ${skill.label || skill.name} (${skill.source})`
@@ -670,7 +670,7 @@ export class RuntimeToolAssembly {
           };
         }
 
-        const skill = agentRuntimeConfigService.loadSkill(skillKey, context?.projectRootPath ?? undefined);
+        const skill = agentRuntimeConfigService.loadSkill(skillKey, context?.projectRootPath ?? undefined, agentId);
         if (!skill) {
           return {
             content: [{ type: 'text', text: `Skill is not configured: ${skillKey}` }],
@@ -748,7 +748,7 @@ export class RuntimeToolAssembly {
         runId: turnHandle?.runId,
         projectRootPath: turnHandle?.eventSink?.projectRootPath,
       }) as unknown as AgentTool,
-      this.createSkillsCatalogTool(),
+      this.createSkillsCatalogTool(agentId),
       this.createSkillReadTool(agentId),
       this.createMcpCatalogTool(),
       ...createKnowledgeTools(sessionId),

@@ -64,7 +64,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
   });
   const preloadedSkills = [];
   for (const skillId of preloadSkillIds) {
-    const skill = agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined);
+    const skill = agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined, input.agentId);
     if (!skill) {
       throw new Error(`SKILL_UNAVAILABLE: skill is not configured: ${skillId}`);
     }
@@ -75,7 +75,7 @@ export function prepareConversationPrompt(input: PrepareConversationPromptInput)
     profile: definition,
     scopedInstructions,
     preloadedSkills,
-    skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? undefined),
+    skillCatalog: agentRuntimeConfigService.listSkillMetadata(projectRootPath ?? undefined, input.agentId),
     tools: allowedToolNames,
     workDir: projectRootPath ?? '',
     sessionId: input.context.session?.sessionId ?? null,

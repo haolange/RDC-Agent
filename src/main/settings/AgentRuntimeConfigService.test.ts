@@ -121,31 +121,53 @@ describe('AgentRuntimeConfigService scoped resources', () => {
 
   it('discovers the Wave 4 method skills and Debugger causal method from the builtin catalog', async () => {
     const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
+    const {
+      CANONICAL_SKILL_IDS,
+      FORBIDDEN_SKILL_NAMES,
+      GENERAL_SKILL_IDS,
+      MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS,
+      PLAN_ONLY_CONFLICT_SKILL_IDS,
+      SKILL_ARMED_BY_PROFILE,
+      isPlanOnlyConflictSkill,
+      skillCallEntry,
+      skillLane,
+    } = await import('@shared/constants/canonicalSkills');
+    const { MISSION_FORBIDDEN_TOOL_IDS } = await import('@shared/constants/missionPlanOnly');
     const service = new AgentRuntimeConfigService();
-    const ids = service.listSkillMetadata().map((skill) => skill.id);
-    expect(ids).toEqual(expect.arrayContaining([
-      'renderdoc-execution',
-      'rdx-cli-shell',
-      'capture-preflight',
-      'capture-facts',
-      'artifact-provenance',
-      'pass-graph-analysis',
-      'shader-ir-analysis',
-      'pixel-forensics',
-      'resource-versioning',
-      'cross-capture-alignment',
-      'optimization-experiment',
-      'debugger-causal-method',
-      'analyzer-architecture-method',
-      'skeptic-review',
-      'report-composition',
-      'execution-orchestrator',
-      'debugger-coordinator',
-      'analyzer-coordinator',
-      'optimizer-coordinator',
-      'knowledge-scout',
-      'knowledge-candidate',
-    ]));
+    const metadata = service.listSkillMetadata();
+    const ids = metadata.map((skill) => skill.id).sort();
+    expect(MISSION_KNOWLEDGE_COORDINATOR_SKILL_IDS).toHaveLength(21);
+    expect(GENERAL_SKILL_IDS).toHaveLength(6);
+    expect([...CANONICAL_SKILL_IDS].sort()).toEqual(ids);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const forbidden of FORBIDDEN_SKILL_NAMES) {
+      expect(ids).not.toContain(forbidden);
+    }
+    for (const skill of metadata) {
+      expect(skill.scope).toBe('builtin');
+      expect(skillLane(skill.id)).toBeTruthy();
+      expect(skillCallEntry(skill.id)).toMatch(/agent\.md-skills|composer-\$skill/);
+      const loaded = service.loadSkill(skill.id);
+      expect(loaded?.id).toBe(skill.id);
+      expect(loaded?.instructions.length).toBeGreaterThan(0);
+    }
+    for (const id of PLAN_ONLY_CONFLICT_SKILL_IDS) {
+      expect(skillLane(id)).toBe('general');
+      expect(isPlanOnlyConflictSkill(id)).toBe(true);
+      expect(service.loadSkill(id)?.allowedTools).toEqual(expect.arrayContaining(['shell']));
+    }
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    for (const [profile, armed] of Object.entries(SKILL_ARMED_BY_PROFILE)) {
+      const source = readFileSync(join(process.cwd(), 'resources/agent-runtime/agents', `${profile}.agent.md`), 'utf8');
+      for (const skillId of armed) {
+        expect(source).toMatch(new RegExp(`^  - ${skillId}$`, 'm'));
+        expect(skillCallEntry(skillId)).toBe('agent.md-skills');
+      }
+      if (profile !== 'general') {
+        expect(source).not.toMatch(/rdx-cli-shell/);
+      }
+    }
     const provenance = service.loadSkill('artifact-provenance');
     expect(provenance?.allowedTools).toEqual(expect.arrayContaining([
       'investigation_read',
@@ -160,5 +182,25 @@ describe('AgentRuntimeConfigService scoped resources', () => {
     for (const skill of [execution, causal, architecture]) {
       expect(skill?.allowedTools).toEqual(expect.arrayContaining(['subagent', 'task_create', 'shell']));
     }
+    const coordinator = service.loadSkill('debugger-coordinator');
+    expect(coordinator?.allowedTools.some((tool) => (
+      (MISSION_FORBIDDEN_TOOL_IDS as readonly string[]).includes(tool)
+    ))).toBe(false);
+  });
+
+  it('hides rdx-cli-shell from Mission catalog and skill_read viewers', async () => {
+    const { AgentRuntimeConfigService } = await import('./AgentRuntimeConfigService');
+    const { isSkillVisibleToProfile } = await import('@shared/constants/canonicalSkills');
+    const service = new AgentRuntimeConfigService();
+    for (const mission of ['debugger', 'analyzer', 'optimizer'] as const) {
+      expect(isSkillVisibleToProfile(mission, 'rdx-cli-shell')).toBe(false);
+      expect(service.listSkills(undefined, mission).map((skill) => skill.id)).not.toContain('rdx-cli-shell');
+      expect(service.listSkillMetadata(undefined, mission).map((skill) => skill.id)).not.toContain('rdx-cli-shell');
+      expect(service.loadSkill('rdx-cli-shell', undefined, mission)).toBeNull();
+    }
+    expect(isSkillVisibleToProfile('general', 'rdx-cli-shell')).toBe(true);
+    expect(service.listSkills(undefined, 'general').map((skill) => skill.id)).toContain('rdx-cli-shell');
+    expect(service.loadSkill('rdx-cli-shell', undefined, 'general')?.id).toBe('rdx-cli-shell');
+    expect(service.loadSkill('rdx-cli-shell')?.id).toBe('rdx-cli-shell');
   });
 });

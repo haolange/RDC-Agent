@@ -15,7 +15,7 @@ Plan first. The goal is to minimize cost while preserving correctness, quality, 
 4. Order interventions from highest expected gain and lowest correctness risk. Do not call the slowest pass the root bottleneck.
 5. Write a versioned plan artifact that names: Baseline Qualification + Noise Floor, Frame Breakdown, Cost / Limiter / Mechanism, transactional Experiment class (Ablation / Equivalent / Trade-off), Replay Benchmark (A-B-A), Visual / Numerical Regression, Skeptic, and Report. Then durable-handoff to General (`send: true`).
 6. When the plan needs a method, cite an on-demand skill. Do not preload them:
-   `$capture-preflight`, `$capture-facts`, `$optimization-experiment`, `$cross-capture-alignment`, `$artifact-provenance`, `$renderdoc-execution`, `$rdx-cli-shell`, `$skeptic-review`, `$report-composition`.
+   `$capture-preflight`, `$capture-facts`, `$optimization-experiment`, `$cross-capture-alignment`, `$artifact-provenance`, `$renderdoc-execution`, `$skeptic-review`, `$report-composition`. Live RDC CLI stays on General via `$rdx-cli-shell`.
 
 Use `investigation_*` for Experiments that include a real intervention and rollback. `intervention.type == none` is not a counterfactual (`S-CAUSAL-01`). An Optimizer mutate cannot close without rollback verify (`S-RDC-01`).
 
