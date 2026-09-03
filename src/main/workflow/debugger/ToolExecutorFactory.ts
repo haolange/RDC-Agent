@@ -18,15 +18,11 @@ import { isToolDeniedByPolicy } from '../../agent-runtime/permissions/PolicyComp
 import { ToolValidationError, toolValidator } from '../../agent-runtime/core/ToolValidator';
 import { hookEngine } from '../../hooks/HookEngine';
 import { appPathService } from '../../runtime/AppPathService';
-import { agentRuntimeConfigService } from '../../settings/AgentRuntimeConfigService';
 import {
   extractDeferredToolNamesFromToolSearchDetails,
   isDeferredToolName,
 } from './deferredTools';
-import {
-  intersectSkillAllowedTools,
-  normalizeToolName,
-} from './DebuggerRuntimePolicy';
+import { normalizeToolName } from './DebuggerRuntimePolicy';
 import { isRdxLeaseToolName } from '@shared/constants/rdxLeaseTools';
 import type { AgentSlotRegistry } from './AgentSlotRegistry';
 import type { DeferredToolActivationTracker } from './DeferredToolActivationTracker';
@@ -107,21 +103,10 @@ export class ToolExecutorFactory {
     ).toolMap;
     // Skill allowed-tools 收窄集（DESIGN Skills 条款：只收窄、不扩展）。
     // 多 skill：allowedTools = ∩(skill_i) ∩ runtimeAllowlist（空声明不参与）。
+    // Frozen on prepareTurn. skill_read does not re-narrow mid-turn.
     let activeSkillAllowlist: Set<string> | null = plan?.skillIntersection
       ? new Set(plan.skillIntersection)
       : null;
-    const applySkillNarrowing = (skillAllowedTools: string[]): void => {
-      if (skillAllowedTools.length === 0) return;
-      const narrowed = intersectSkillAllowedTools(effectiveToolAllowlist, skillAllowedTools);
-      if (activeSkillAllowlist === null) {
-        activeSkillAllowlist = new Set(narrowed);
-        return;
-      }
-      // failure-class: security — intersect skills; do not union.
-      activeSkillAllowlist = new Set(
-        [...activeSkillAllowlist].filter((name) => narrowed.includes(name)),
-      );
-    };
     // 无 plan 时才从 settings 解析 preloaded skills；有 plan 则用冻结的 skillIntersection。
     const permissionSettings = plan?.permissionSettings;
     const compiledPolicy = plan?.policy;
@@ -330,16 +315,8 @@ export class ToolExecutorFactory {
               runtimeContext?.sessionId,
             );
           }
-          // Skill 激活：skill_read 成功后按其 allowed-tools 收窄本 turn 工具面。
-          if (normalizedName === 'skill_read' && result.isError !== true) {
-            const skillId = (result.details as { skillId?: string } | undefined)?.skillId;
-            const skill = skillId
-              ? agentRuntimeConfigService.loadSkill(skillId, projectRootPath ?? undefined, agentId)
-              : null;
-            if (skill?.allowedTools?.length) {
-              applySkillNarrowing(skill.allowedTools);
-            }
-          }
+          // skill_read is discovery only. Armed-skill ∩ is frozen on prepareTurn
+          // from profile.skills / composer $skill / /skills — not from a read.
           const finalized = result.isError === true
             ? result
             : artifactizeToolResult({
