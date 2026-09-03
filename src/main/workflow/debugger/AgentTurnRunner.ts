@@ -82,6 +82,10 @@ export function hasActualProviderUsage(message: AssistantMessage): boolean {
   return message.stopReason !== 'error';
 }
 
+export function shouldWarnEmptyAssistantCompletion(message: AssistantMessage): boolean {
+  return message.stopReason !== 'error';
+}
+
 export interface AgentTurnRunnerDeps {
   slots: AgentSlotRegistry;
   mcp: McpConnectionCoordinator;
@@ -697,13 +701,13 @@ export class AgentTurnRunner {
             precomputedBreakdown,
           });
         }
-        if (!sawStructuredToolCall && !responseText.trim()) {
+        if (shouldWarnEmptyAssistantCompletion(event.message) && !sawStructuredToolCall && !responseText.trim()) {
           input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
             code: 'empty_response_without_tool_call',
             severity: 'warning',
             message: 'Provider returned an empty assistant message without a structured tool call.',
           }));
-        } else if (!sawStructuredToolCall && mentionsTextualToolCall(responseText)) {
+        } else if (shouldWarnEmptyAssistantCompletion(event.message) && !sawStructuredToolCall && mentionsTextualToolCall(responseText)) {
           input.options?.onEvent?.(buildDiagnosticAgentEvent(sharedEventContext, {
             code: 'textual_tool_call_not_executed',
             severity: 'warning',

@@ -2,7 +2,8 @@
  * ErrorRecovery 单元测试。
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ErrorRecovery } from './ErrorRecovery';
+import { AgentRecoveryAbortError, ErrorRecovery } from './ErrorRecovery';
+import { ProviderEmptyStreamError, ProviderHttpError, ProviderWireFailureError } from '../providers/internal/http';
 import type { Model } from '../core/types';
 
 const PRIMARY: Model = {
@@ -61,6 +62,21 @@ describe('ErrorRecovery', () => {
       expect(recovery.classifyError(makeErr('server overloaded'))).toBe('overloaded');
     });
 
+    it('应识别 at capacity / high demand 为 overloaded', () => {
+      expect(recovery.classifyError(makeErr(
+        'The model is currently at capacity due to high demand. Please try again in a few minutes',
+      ))).toBe('overloaded');
+    });
+
+    it('ProviderWireFailureError 容量不足应分类为 overloaded', () => {
+      const error = new ProviderWireFailureError(
+        'openai-responses',
+        'The model is currently at capacity due to high demand. Please try again in a few minutes',
+        { bodyText: '{"type":"error","message":"The model is currently at capacity due to high demand."}' },
+      );
+      expect(recovery.classifyError(error)).toBe('overloaded');
+    });
+
     it('应识别 401 为 auth_error', () => {
       expect(recovery.classifyError(makeErr('Unauthorized', 401))).toBe('auth_error');
     });
@@ -87,6 +103,20 @@ describe('ErrorRecovery', () => {
 
     it('应识别 500+ 为 server_error', () => {
       expect(recovery.classifyError(makeErr('Internal Error', 500))).toBe('server_error');
+    });
+
+    it('真实 HTTP 5xx ProviderHttpError 应分类为 server_error', () => {
+      expect(recovery.classifyError(new ProviderHttpError('openai-responses', 500, 'upstream exploded'))).toBe('server_error');
+    });
+
+    it('ProviderEmptyStreamError 应分类为 empty_stream 而不是 server_error', () => {
+      expect(recovery.classifyError(new ProviderEmptyStreamError('openai-responses'))).toBe('empty_stream');
+    });
+
+    it('PROVIDER_STREAM_EMPTY code 应分类为 empty_stream', () => {
+      const error = makeErr('Provider stream ended without assistant output or structured tool call.');
+      (error as { code?: string }).code = 'PROVIDER_STREAM_EMPTY';
+      expect(recovery.classifyError(error)).toBe('empty_stream');
     });
 
     it('应识别 internal server 文本为 server_error', () => {
@@ -206,9 +236,91 @@ describe('ErrorRecovery', () => {
       expect(action.type).toBe('retry');
     });
 
+    it('真实 5xx 应走 server_error 并重试 3 次后 abort', () => {
+      const error = new ProviderHttpError('openai-responses', 500, 'internal server error', '{"error":"boom"}');
+      expect(recovery.decide(error).type).toBe('retry');
+      recovery.noteRetryAttempt();
+      expect(recovery.decide(error).type).toBe('retry');
+      recovery.noteRetryAttempt();
+      expect(recovery.decide(error).type).toBe('retry');
+      recovery.noteRetryAttempt();
+      expect(recovery.decide(error)).toEqual({
+        type: 'abort',
+        reason: 'server_error retries exhausted',
+      });
+    });
+
+    it('empty_stream 只重试一次然后 abort', () => {
+      const error = new ProviderEmptyStreamError('openai-responses');
+      expect(recovery.decide(error).type).toBe('retry');
+      recovery.noteRetryAttempt();
+      expect(recovery.decide(error)).toEqual({
+        type: 'abort',
+        reason: 'empty_stream retries exhausted',
+      });
+    });
+
+    it('401 应立即 abort 且不进入 server_error 重试', () => {
+      const error = new ProviderHttpError('openai-responses', 401, 'unauthorized');
+      expect(recovery.decide(error)).toEqual({
+        type: 'abort',
+        reason: 'authentication failed; check API key',
+      });
+    });
+
+    it('abort 错误应保留原始 cause 与 HTTP 字段', () => {
+      const original = new ProviderHttpError('openai-responses', 500, 'upstream exploded', '{"error":"boom"}');
+      recovery.noteRetryAttempt();
+      recovery.noteRetryAttempt();
+      recovery.noteRetryAttempt();
+      const action = recovery.decide(original);
+      expect(action.type).toBe('abort');
+      if (action.type !== 'abort') {
+        throw new Error('expected abort');
+      }
+      const abortError = recovery.createAbortError(original, action.reason);
+      expect(abortError).toBeInstanceOf(AgentRecoveryAbortError);
+      expect(abortError.cause).toBe(original);
+      expect(abortError.category).toBe('server_error');
+      expect(abortError.lastStatus).toBe(500);
+      expect(abortError.bodySnippet).toContain('boom');
+      expect(abortError.attempts).toBe(4);
+      expect(abortError.maxAttempts).toBe(4);
+    });
+
     it('unknown error 应 abort', () => {
       const action = recovery.decide(makeErr('???'));
       expect(action.type).toBe('abort');
+    });
+
+    it('ProviderWireFailureError 应分类为 unknown 并立即 abort', () => {
+      const original = new ProviderWireFailureError(
+        'openai-responses',
+        'Account suspended by provider',
+        { code: 'account_suspended', bodyText: '{"code":"account_suspended"}' },
+      );
+      expect(recovery.classifyError(original)).toBe('unknown');
+      expect(recovery.decide(original)).toEqual({
+        type: 'abort',
+        reason: 'unrecoverable error: [openai-responses] Account suspended by provider',
+      });
+      const abortError = recovery.createAbortError(original, 'unrecoverable error');
+      expect(abortError.cause).toBe(original);
+      expect(abortError.category).toBe('unknown');
+      expect(abortError.bodySnippet).toContain('account_suspended');
+    });
+
+    it('AgentRecoveryAbortError 构造时 bodySnippet 应截断至 300 字符', () => {
+      const longSnippet = 'x'.repeat(1000);
+      const abort = new AgentRecoveryAbortError('[Recovery abort] test', {
+        cause: new Error('boom'),
+        category: 'unknown',
+        attempts: 1,
+        maxAttempts: 1,
+        bodySnippet: longSnippet,
+      });
+      expect(abort.bodySnippet).toBeDefined();
+      expect(abort.bodySnippet!.length).toBeLessThanOrEqual(300);
     });
 
     it('stream_protocol 应 abort 且不重试', () => {

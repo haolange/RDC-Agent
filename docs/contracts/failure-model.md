@@ -67,7 +67,44 @@
 | ProcessSupervisor timeout/abort | Availability | terminate process tree; settle only after observed close/error; retain `unconfirmed_orphan` in registry for diagnostics |
 | ShutdownCoordinator 限时 shutdown | Availability | 尽量排空后退出 |
 | Provider 网络/配额类错误 | Availability | 按 ErrorRecovery 契约；不发明 entitlement；429 与明确 `quota_exceeded` 的 402 只记录短期 quota |
+| Provider 空流 / wire 失败 / 恢复 abort | Availability | 见下文「provider 失败诊断保真」；空流不得合成 HTTP 502；最终 Work Process 只展示一条诊断 |
 | Headless instance.lock 冲突 | Security + Availability | 冲突 fail-closed 避免串 userData |
+
+## provider 失败诊断保真
+
+Provider 请求失败须保留 cause 链与用户可区分诊断，不得把空流冒充真实 5xx，也不得把 Agent loop 停滞误报为 Provider failure。
+
+### 错误类型（`providers/internal/http.ts`）
+
+| 类型 | code / 形态 | 语义 |
+| --- | --- | --- |
+| `ProviderEmptyStreamError` | `PROVIDER_STREAM_EMPTY` | 流结束但无 assistant 正文或 structured tool call；**禁止**合成 HTTP 502 |
+| `ProviderWireFailureError` | wire failure | OpenAI/Azure Responses SSE `error` / `response.failed` 无 400–599 status 时；有 status 则 `ProviderHttpError` |
+| `ProviderHttpError` | HTTP status | 真实 4xx/5xx；`createResponsesStreamFailure` 仅在 wire 带明确 status 时使用 |
+
+### ErrorRecovery 分类与重试
+
+| category | 行为 |
+| --- | --- |
+| `empty_stream` | 最多重试 **1** 次后 abort；**不**归入 `server_error` |
+| `server_error` | 真实 HTTP 5xx；最多 **3** 次重试 |
+| `overloaded` | HTTP **503/529**，或文案含 `at capacity` / `high demand` / `overloaded` / `service unavailable`；现有 `switch_model` 路径 |
+| `auth_error` | **401/403**；立即 abort |
+| `stream_protocol` | `PROVIDER_STREAM_*` 协议违规；不重试 |
+
+`AgentRecoveryAbortError` 必须经 `createAbortError` 构造，始终携带 `cause` + `category` / `attempts` / `maxAttempts` / `lastStatus?` / `bodySnippet`（脱敏 ≤300）；禁止裸 `new Error('[Recovery abort]')`。
+
+### Turn 失败诊断（`createTurnFailedDiagnostic`）
+
+- 对外 code 仍为 `CONVERSATION_LLM_REQUEST_FAILED`。
+- `userMessage` 按 cause 分类：**auth** / **quota-rate** / **overloaded** / **real 5xx** / **empty_stream** / **network**。
+- `technicalMessage` 固定：`provider HTTP <status\|n/a> · attempts <n>/<max> · <snippet>`（经 `redactTechnicalMessage` / `redactRecoverySnippet`）。
+
+### Agent loop 与 Work Process 投影
+
+- `AgentLoop` 不得把 provider `error` 事件 remap 为 `message_end`。
+- `AgentTurnRunner` 在 `stopReason === 'error'` 时跳过 `empty_response_without_tool_call`。
+- `error_recovery_*` 不进 Work Process；最终失败为 **一条** diagnostic（含 `technicalMessage`）。
 
 ## 过度 fail-closed 的纠正原则
 
@@ -83,6 +120,7 @@
 
 ## 相关测试
 
+- Provider 失败保真：`ErrorRecovery.test.ts`、`ConversationTurnDiagnostic.test.ts`、`providers/internal/http.test.ts`、`OpenAIResponsesProvider.test.ts`、`AgentLoop.recoveryDiagnostic.test.ts`
 - Integrity 存储：`src/shared/utils/jsonl.test.ts`、`src/main/testing/contracts/storageFaultContract.test.ts`
 - Availability 取消：`TurnCoordinator.test.ts`、`ProcessSupervisor.test.ts`、`cancellationContract.test.ts`
 - Security 矩阵：`securityContract.test.ts`

@@ -35,7 +35,7 @@ import {
   ensureOk,
   normalizeError,
   parseJsonLines,
-  ProviderHttpError,
+  ProviderEmptyStreamError,
 } from './internal/http';
 import { createContinuationArtifact } from '../reasoning/ContinuationArtifacts';
 import { decideContinuationReplay } from '../reasoning/ContinuationReplayPolicy';
@@ -225,7 +225,7 @@ export class OllamaProvider implements ProviderStrategy {
       }
 
       if (!sawOutput) {
-        throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+        throw new ProviderEmptyStreamError(PROVIDER_API);
       }
       builder.done(mapDoneReason(doneReason, toolCallCounter > 0));
     } catch (err) {

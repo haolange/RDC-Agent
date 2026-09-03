@@ -31,7 +31,7 @@ Commentary：markdown 散文，不进 thinking 槽。Tool / Asked / Sub Agent / 
 
 `error_recovery_*` 仅 Agent Activity / runtime log，不进 Work Process 叙事。Request Inspector 不出现在消息流或右侧默认 Session/Trace。入场动画由真实事件驱动，禁止假 stagger。
 
-Active Signal：tokenized clipped-gradient 能量扫光；仅用于权威 running/pending/streaming 主短语；`prefers-reduced-motion` 回退静态高亮。
+Active Signal：`active-signal-shimmer` clipped-gradient 能量扫光；仅用于权威 running/pending/streaming 主短语。`.work-process-label.status-running` 只设 `--active-signal-highlight`，**禁止**再设 `color`（否则 shimmer 字体会冻在透明）。减少动效：`prefers-reduced-motion: reduce` 与 Settings `html[data-reduce-motion='on']` 均回退静态 `--active-signal-highlight`（移除透明 gradient）；全局 animation-duration kill 仍生效，fallback 负责可见高亮字。
 
 ## Human-in-the-loop
 

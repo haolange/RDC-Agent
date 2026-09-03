@@ -3,10 +3,22 @@ import {
   composeAbortSignals,
   ensureOk,
   parseSSE,
+  ProviderEmptyStreamError,
+  ProviderHttpError,
   ProviderTimeoutError,
 } from './http';
 
 describe('provider http stream helpers', () => {
+  it('distinguishes empty-stream from a real HTTP 502', () => {
+    const empty = new ProviderEmptyStreamError('openai-responses');
+    const http = new ProviderHttpError('openai-responses', 502, 'Bad Gateway');
+    expect(empty).toBeInstanceOf(ProviderEmptyStreamError);
+    expect(empty).not.toBeInstanceOf(ProviderHttpError);
+    expect(empty.code).toBe('PROVIDER_STREAM_EMPTY');
+    expect(http.status).toBe(502);
+    expect(empty).not.toHaveProperty('status');
+  });
+
   it('summarizes an HTML gateway error without leaking markup into product diagnostics', async () => {
     const response = new Response('<!DOCTYPE html><html><head><title>opencode.ai | 502: Bad gateway</title></head><body>proxy</body></html>', {
       status: 502,

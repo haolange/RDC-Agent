@@ -42,6 +42,14 @@ assert(activeSignalStyles.includes('background-clip: text'), 'active signal must
 assert(activeSignalStyles.includes('@keyframes active-signal-shimmer'), 'active signal shimmer keyframe is missing');
 assert(!activeSignalStyles.includes('active-signal-pulse'), 'legacy active-signal pulse must be removed');
 assert(activeSignalStyles.includes('@media (prefers-reduced-motion: reduce)'), 'active signal must honor reduced-motion preferences');
+assert(
+  activeSignalStyles.includes("html[data-reduce-motion='on'] .active-signal-text.is-active"),
+  'Settings reduceMotion=on must use the static Active Signal highlight fallback',
+);
+assert(
+  !/html\[data-reduce-motion='on'\][\s\S]{0,180}\.active-signal-text\.is-active[\s\S]{0,180}!important/.test(activeSignalStyles),
+  'Active Signal reduce-motion fallback must not use !important',
+);
 assert(activeSignalRenderSource.includes('ActiveSignalText active={active}') || activeSignalRenderSource.includes('ActiveSignalText active '), 'Work Process rows should use shared ActiveSignalText for active labels');
 assert(activeSignalRenderSource.includes('tone="interaction"'), 'ask_user interaction surfaces should use the interaction active signal tone');
 assert(!activeSignalRenderSource.includes("row.status === 'complete' &&"), 'complete rows must not be a trigger for active signal text');
@@ -1233,6 +1241,22 @@ assert(cssSource.includes('.work-process-prose.is-streaming'), 'prose streaming 
 assert(cssSource.includes('.work-process-tool-aggregate'), 'tool aggregate styling should exist');
 assert(cssSource.includes('.work-process-section-list .work-process-step-rail'), 'nested tool rails must be suppressed under section lists');
 assert(cssSource.includes('width: 6px'), 'loop rail marker should be 6px');
+assert(
+  /margin-top:\s*calc\(\(var\(--text-sm\)\s*\*\s*1\.65\s*-\s*6px\)\s*\/\s*2\)/.test(cssSource),
+  'rail marker must center on the first text-sm line instead of a fixed space-3 drop',
+);
+assert(
+  !/\.work-process-rail-marker\s*\{[^}]*margin-top:\s*var\(--space-3\)/.test(cssSource),
+  'rail marker must not keep the legacy space-3 top offset',
+);
+assert(
+  /\.work-process-summary\s*\{[^}]*margin:\s*0\s+0\s+var\(--space-2\)/.test(cssSource),
+  'failure summary must use space-2 gap before diagnostic rows',
+);
+assert(
+  !/\.work-process-label\.status-running\s*\{[^}]*\bcolor:/.test(cssSource),
+  'running Work Process label must not set color that overrides Active Signal shimmer',
+);
 assert(cssSource.includes('@media (prefers-reduced-motion: reduce)'), 'streaming motion should honor reduced motion');
 assert(cssSource.includes('.work-process-tool-approval'), 'tool approval styling should exist');
 assert(cssSource.includes('.work-process-disclosure:not([open]) > :not(summary)'), 'closed disclosure must not render expanded body content');

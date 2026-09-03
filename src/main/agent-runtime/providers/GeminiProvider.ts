@@ -36,6 +36,7 @@ import {
   ensureOk,
   normalizeError,
   parseSSE,
+  ProviderEmptyStreamError,
   ProviderHttpError,
 } from './internal/http';
 import { applyGeminiReasoning } from './reasoningWire';
@@ -271,7 +272,7 @@ export class GeminiProvider implements ProviderStrategy {
       }
 
       if (!sawOutput) {
-        throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+        throw new ProviderEmptyStreamError(PROVIDER_API);
       }
       builder.done(mapFinishReason(finishReason, toolCallCounter > 0));
     } catch (err) {

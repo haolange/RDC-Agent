@@ -127,6 +127,8 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 
 UI/工作流用 `pnpm run start:agent-browser` 真实会话验收（先停旧进程、删光 QA project 全部 session、再新建隔离 session）。完整清单见 `AGENTS.md`。
 
+**Provider 失败诊断保真**（契约见 [`docs/contracts/failure-model.md`](docs/contracts/failure-model.md)「provider 失败诊断保真」）：`ProviderEmptyStreamError`（`PROVIDER_STREAM_EMPTY`）不得合成 HTTP 502；`ErrorRecovery` 的 `empty_stream` 最多 1 次重试，真实 5xx 仍为 `server_error`（3 次），503 仍为 `overloaded`，401 立即 abort；`AgentRecoveryAbortError` 必带 cause 与结构化字段；`createTurnFailedDiagnostic` 保留 `CONVERSATION_LLM_REQUEST_FAILED` 并按 auth / quota-rate / 5xx / empty_stream / network 分类文案。自动化：`ErrorRecovery.test.ts`、`ConversationTurnDiagnostic.test.ts`、`providers/internal/http.test.ts`、`OpenAIResponsesProvider.test.ts`、`AgentLoop.recoveryDiagnostic.test.ts`；Work Process Active Signal 与诊断行对齐见 `check:work-process` + [`docs/ui/work-process-checklist.md`](docs/ui/work-process-checklist.md)。
+
 Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThemes` 为 RDC 默认（清理历史污染）。桌面窗口几何写入 `layout.window`（宽高/坐标/最大化），主进程在 resize/move/close 时持久化并在启动恢复；左右栏与 terminal 高度仍经 renderer `settings:set` 持久化。Browser 与 Desktop 走同一 Settings 持久化路径；Browser QA 默认使用经过校验并在退出清理的 disposable `os.tmpdir()/rdc-agent/qa-*` userData，只有显式 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 才共享 canonical userData，`instance.lock` 阻止并发占用。
 
 ## Current / Target / Migration Adjudications

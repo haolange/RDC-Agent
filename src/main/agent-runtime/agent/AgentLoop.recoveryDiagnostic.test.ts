@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { EventStream } from '../core/EventStream';
 import type { ProviderStrategy } from '../core/ProviderRegistry';
 import { agentLoop, type AgentContext } from './AgentLoop';
-import { ErrorRecovery } from './ErrorRecovery';
+import { AgentRecoveryAbortError, ErrorRecovery } from './ErrorRecovery';
+import { ProviderEmptyStreamError, ProviderHttpError } from '../providers/internal/http';
 import type {
   AgentEvent,
   AssistantMessage,
@@ -209,5 +210,111 @@ describe('AgentLoop recovery diagnostics', () => {
     })()).rejects.toMatchObject({ name: 'AbortError' });
     await producerCompletion;
     expect(attempts).toBeGreaterThanOrEqual(1);
+  });
+
+  it('retains the original ProviderHttpError as cause when server_error retries abort', async () => {
+    const original = new ProviderHttpError('openai-responses', 500, 'upstream exploded', '{"error":"boom"}');
+    const recovery = new ErrorRecovery({ primaryModel: TEST_MODEL, maxRetries: 3 });
+    vi.spyOn(recovery, 'getRetryDelay').mockReturnValue(0);
+    let attempts = 0;
+    const provider: ProviderStrategy = {
+      api: 'openai-completions',
+      stream: () => {
+        attempts += 1;
+        const stream = new EventStream<AssistantMessageEvent, AssistantMessage>();
+        void Promise.resolve().then(() => {
+          stream.error(original);
+        });
+        return stream;
+      },
+    };
+    const { stream, producerCompletion } = agentLoop([], {
+      messages: [{
+        role: 'user',
+        content: [{ type: 'text', text: 'hello' }],
+        timestamp: Date.now(),
+      }],
+    }, {
+      model: TEST_MODEL,
+      convertToLlm: (messages) => messages as Message[],
+      errorRecovery: recovery,
+      maxTurns: 1,
+      streamOptions: { maxTokens: 256, requestPlan: TEST_REQUEST_PLAN } satisfies StreamOptions,
+    }, provider);
+
+    const rejected = await (async () => {
+      try {
+        for await (const _event of stream) {
+          // drain
+        }
+        return undefined;
+      } catch (error) {
+        return error;
+      }
+    })();
+    await producerCompletion;
+
+    expect(attempts).toBe(4);
+    expect(rejected).toBeInstanceOf(AgentRecoveryAbortError);
+    expect(rejected).toMatchObject({
+      category: 'server_error',
+      lastStatus: 500,
+      attempts: 4,
+      maxAttempts: 4,
+    });
+    expect((rejected as AgentRecoveryAbortError).cause).toBe(original);
+  });
+
+  it('retries empty_stream once then aborts with the original cause', async () => {
+    const original = new ProviderEmptyStreamError('openai-responses');
+    const recovery = new ErrorRecovery({ primaryModel: TEST_MODEL, maxRetries: 3 });
+    vi.spyOn(recovery, 'getRetryDelay').mockReturnValue(0);
+    let attempts = 0;
+    const provider: ProviderStrategy = {
+      api: 'openai-completions',
+      stream: () => {
+        attempts += 1;
+        const stream = new EventStream<AssistantMessageEvent, AssistantMessage>();
+        void Promise.resolve().then(() => {
+          stream.error(original);
+        });
+        return stream;
+      },
+    };
+    const { stream, producerCompletion } = agentLoop([], {
+      messages: [{
+        role: 'user',
+        content: [{ type: 'text', text: 'hello' }],
+        timestamp: Date.now(),
+      }],
+    }, {
+      model: TEST_MODEL,
+      convertToLlm: (messages) => messages as Message[],
+      errorRecovery: recovery,
+      maxTurns: 1,
+      streamOptions: { maxTokens: 256, requestPlan: TEST_REQUEST_PLAN } satisfies StreamOptions,
+    }, provider);
+
+    const rejected = await (async () => {
+      try {
+        for await (const _event of stream) {
+          // drain
+        }
+        return undefined;
+      } catch (error) {
+        return error;
+      }
+    })();
+    await producerCompletion;
+
+    expect(attempts).toBe(2);
+    expect(rejected).toBeInstanceOf(AgentRecoveryAbortError);
+    expect(rejected).toMatchObject({
+      category: 'empty_stream',
+      attempts: 2,
+      maxAttempts: 2,
+    });
+    expect((rejected as AgentRecoveryAbortError).cause).toBe(original);
+    expect(rejected).not.toMatchObject({ lastStatus: 502 });
   });
 });

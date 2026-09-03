@@ -15,6 +15,7 @@ import {
   ensureOk,
   normalizeError,
   parseSSE,
+  ProviderEmptyStreamError,
   ProviderHttpError,
 } from './internal/http';
 import {
@@ -122,7 +123,7 @@ export class GoogleInteractionsProvider implements ProviderStrategy {
         throw new ProviderHttpError(PROVIDER_API, 502, 'Google Interactions stream ended without a terminal event.');
       }
       if (!outcome.sawOutput) {
-        throw new ProviderHttpError(PROVIDER_API, 502, 'Google Interactions stream ended without assistant output.');
+        throw new ProviderEmptyStreamError(PROVIDER_API);
       }
       builder.done(outcome.finishReason);
     } catch (cause) {

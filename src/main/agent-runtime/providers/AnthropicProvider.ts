@@ -25,6 +25,7 @@ import {
   ensureOk,
   normalizeError,
   parseSSE,
+  ProviderEmptyStreamError,
   ProviderHttpError,
 } from './internal/http';
 import { applyReasoningToAnthropicLikeBody } from './reasoningWire';
@@ -369,7 +370,7 @@ export class AnthropicProvider implements ProviderStrategy {
       }
 
       if (!sawOutput) {
-        throw new ProviderHttpError(PROVIDER_API, 502, 'Provider stream ended without assistant output or structured tool call.');
+        throw new ProviderEmptyStreamError(PROVIDER_API);
       }
       builder.done(mapStopReason(stopReason));
     } catch (err) {

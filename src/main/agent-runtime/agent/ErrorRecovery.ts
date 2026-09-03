@@ -10,6 +10,11 @@
  */
 
 import type { Model } from '../core/types';
+import {
+  isProviderEmptyStreamError,
+  ProviderHttpError,
+  ProviderWireFailureError,
+} from '../providers/internal/http';
 
 // =====================================================================
 // 类型
@@ -44,18 +49,48 @@ export type ErrorCategory =
   | 'auth_error'
   | 'network_error'
   | 'server_error'
+  | 'empty_stream'
   | 'stream_protocol'
   | 'unknown';
 
-/** Recovery abort that preserves Integrity stream-protocol identity. */
-export class AgentRecoveryAbortError extends Error {
-  readonly code = 'PROVIDER_STREAM_PROTOCOL_VIOLATION';
-  readonly streamCode?: string;
+const RECOVERY_ABORT_SNIPPET_MAX = 300;
 
-  constructor(message: string, streamCode?: string) {
-    super(message);
+export interface AgentRecoveryAbortFields {
+  cause: Error;
+  category: ErrorCategory;
+  attempts: number;
+  maxAttempts: number;
+  lastStatus?: number;
+  bodySnippet?: string;
+  streamCode?: string;
+}
+
+/** Recovery abort：保留 cause 链与结构化诊断字段。 */
+export class AgentRecoveryAbortError extends Error {
+  readonly code: string;
+  readonly streamCode?: string;
+  readonly category: ErrorCategory;
+  readonly attempts: number;
+  readonly maxAttempts: number;
+  readonly lastStatus?: number;
+  readonly bodySnippet?: string;
+
+  constructor(message: string, fields: AgentRecoveryAbortFields) {
+    super(message, { cause: fields.cause });
     this.name = 'AgentRecoveryAbortError';
-    this.streamCode = streamCode;
+    this.category = fields.category;
+    this.attempts = fields.attempts;
+    this.maxAttempts = fields.maxAttempts;
+    this.lastStatus = fields.lastStatus;
+    this.bodySnippet = fields.bodySnippet !== undefined
+      ? redactRecoverySnippet(fields.bodySnippet)
+      : undefined;
+    this.streamCode = fields.streamCode;
+    this.code = fields.category === 'stream_protocol'
+      ? 'PROVIDER_STREAM_PROTOCOL_VIOLATION'
+      : fields.category === 'empty_stream'
+        ? 'PROVIDER_STREAM_EMPTY'
+        : 'AGENT_RECOVERY_ABORTED';
   }
 }
 
@@ -73,6 +108,7 @@ function readProviderStreamCode(error: Error): string | undefined {
 // =====================================================================
 
 const DEFAULT_MAX_RETRIES = 3;
+const EMPTY_STREAM_MAX_RETRIES = 1;
 const DEFAULT_MAX_RECOVERY_RETRIES = 2;
 const OVERLOAD_SWITCH_THRESHOLD = 3;
 const RETRY_BASE_MS = 1000;
@@ -108,10 +144,17 @@ export class ErrorRecovery {
 
   /** 分类错误。 */
   classifyError(error: Error): ErrorCategory {
-    if (isProviderStreamProtocolError(error) || error instanceof AgentRecoveryAbortError) {
+    if (isProviderEmptyStreamError(error) || readErrorCode(error) === 'PROVIDER_STREAM_EMPTY') {
+      return 'empty_stream';
+    }
+    if (error instanceof AgentRecoveryAbortError) {
+      return error.category;
+    }
+    if (isProviderStreamProtocolError(error)) {
       return 'stream_protocol';
     }
-    const raw = `${error.message ?? ''} ${error.name ?? ''}`.toLowerCase();
+    const wire = findProviderWireFailureError(error);
+    const raw = `${error.message ?? ''} ${error.name ?? ''} ${wire?.bodyText ?? ''}`.toLowerCase();
     const status = this.extractStatusCode(error);
 
     // prompt too long / context length
@@ -136,6 +179,8 @@ export class ErrorRecovery {
       status === 503 ||
       raw.includes('overloaded') ||
       raw.includes('service unavailable')
+      || raw.includes('at capacity')
+      || raw.includes('high demand')
     ) {
       return 'overloaded';
     }
@@ -255,6 +300,19 @@ export class ErrorRecovery {
         };
       }
 
+      case 'empty_stream': {
+        if (this.state.recoveryCount >= EMPTY_STREAM_MAX_RETRIES) {
+          return {
+            type: 'abort',
+            reason: 'empty_stream retries exhausted',
+          };
+        }
+        return {
+          type: 'retry',
+          delayMs: this.getRetryDelay(this.state.recoveryCount),
+        };
+      }
+
       case 'network_error':
       case 'server_error': {
         if (this.state.recoveryCount >= this.maxRetries) {
@@ -325,6 +383,35 @@ export class ErrorRecovery {
     return { ...this.state };
   }
 
+  /** 该分类允许的总尝试次数（含首次调用）。 */
+  getMaxAttempts(category: ErrorCategory): number {
+    if (category === 'empty_stream') {
+      return EMPTY_STREAM_MAX_RETRIES + 1;
+    }
+    if (category === 'network_error' || category === 'server_error' || category === 'rate_limit') {
+      return this.maxRetries + 1;
+    }
+    return 1;
+  }
+
+  createAbortError(original: Error, reason: string): AgentRecoveryAbortError {
+    const category = this.classifyError(original);
+    const http = findProviderHttpError(original);
+    const wire = findProviderWireFailureError(original);
+    return new AgentRecoveryAbortError(`[Recovery abort] ${reason}`, {
+      cause: original,
+      category,
+      attempts: this.state.recoveryCount + 1,
+      maxAttempts: this.getMaxAttempts(category),
+      lastStatus: http?.status,
+      bodySnippet: http?.bodyText ?? wire?.bodyText ?? wire?.message ?? original.message,
+      streamCode: category === 'stream_protocol'
+        ? readProviderStreamCode(original)
+          ?? (original instanceof AgentRecoveryAbortError ? original.streamCode : undefined)
+        : undefined,
+    });
+  }
+
   private decideOutputLimit(): RecoveryAction {
     if (!this.state.hasAttemptedReactiveCompact) {
       return { type: 'reactive_compact' };
@@ -359,4 +446,42 @@ export class ErrorRecovery {
     }
     return undefined;
   }
+}
+
+function readErrorCode(error: Error): string | undefined {
+  const code = (error as { code?: unknown }).code;
+  return typeof code === 'string' ? code : undefined;
+}
+
+export function findProviderHttpError(error: unknown): ProviderHttpError | undefined {
+  let current: unknown = error;
+  const seen = new Set<unknown>();
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    if (current instanceof ProviderHttpError) {
+      return current;
+    }
+    current = current.cause;
+  }
+  return undefined;
+}
+
+export function findProviderWireFailureError(error: unknown): ProviderWireFailureError | undefined {
+  let current: unknown = error;
+  const seen = new Set<unknown>();
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    if (current instanceof ProviderWireFailureError) {
+      return current;
+    }
+    current = current.cause;
+  }
+  return undefined;
+}
+
+export function redactRecoverySnippet(raw: string): string {
+  return raw
+    .replace(/(Bearer\s+)[^\s"'`,;)}]+/gi, '$1[redacted]')
+    .replace(/((?:api[_-]?key|access[_-]?token|refresh[_-]?token|secret)["'\s:=]+)[^"',;\s)}]+/gi, '$1[redacted]')
+    .slice(0, RECOVERY_ABORT_SNIPPET_MAX);
 }

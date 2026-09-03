@@ -26,7 +26,7 @@ vi.mock('../../settings/SettingsService', () => ({
 }));
 
 import { dispatchRuntimeHooks } from '../../hooks/runtimeHookDispatch';
-import { AgentTurnRunner, hasActualProviderUsage } from './AgentTurnRunner';
+import { AgentTurnRunner, hasActualProviderUsage, shouldWarnEmptyAssistantCompletion } from './AgentTurnRunner';
 import { resolveExecutionScopeId } from './executionScope';
 import { TokenizerService } from '../../agent-runtime/core/TokenizerService';
 import type { AssistantMessage, ToolResultMessage } from '../../agent-runtime/core/types';
@@ -83,6 +83,21 @@ describe('AgentTurnRunner', () => {
 
     expect(hasActualProviderUsage(errorMessage)).toBe(false);
     expect(hasActualProviderUsage(completedMessage)).toBe(true);
+    expect(shouldWarnEmptyAssistantCompletion(errorMessage)).toBe(false);
+    expect(shouldWarnEmptyAssistantCompletion(completedMessage)).toBe(true);
+  });
+
+  it('does not emit empty_response_without_tool_call when stopReason is error', () => {
+    const errorMessage: AssistantMessage = {
+      role: 'assistant',
+      content: [],
+      model: 'grok-4.6',
+      provider: 'grok-account',
+      usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+      stopReason: 'error',
+      timestamp: 0,
+    };
+    expect(shouldWarnEmptyAssistantCompletion(errorMessage)).toBe(false);
   });
 
   it('resolveMaxTurns prefers finite policy capped by profile', () => {

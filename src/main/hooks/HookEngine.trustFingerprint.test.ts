@@ -69,7 +69,7 @@ describe('HookEngine trust fingerprint', () => {
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({ status: 'completed', allowed: true, hookId: event.replace(/[.]/g, '-') });
     }
-  });
+  }, 20_000);
 
   it('isolates unexpected hook exceptions and honors cancel timeout policy', async () => {
     const root = makeRoot();

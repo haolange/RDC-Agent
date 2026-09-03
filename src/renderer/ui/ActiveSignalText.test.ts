@@ -27,6 +27,16 @@ describe('ActiveSignalText', () => {
     expect(css).toContain('@keyframes active-signal-shimmer');
     expect(css).not.toContain('active-signal-pulse');
     expect(activeBlock).not.toContain('::after');
+    expect(css).toContain("html[data-reduce-motion='on'] .active-signal-text.is-active");
+  });
+
+  it('does not let Work Process running labels override active shimmer color', () => {
+    const cssPath = path.resolve(process.cwd(), 'src/renderer/features/debugger/AgentChat/AgentChat.css');
+    const css = fs.readFileSync(cssPath, 'utf8');
+    const runningBlock = css.match(/\.work-process-label\.status-running\s*\{[\s\S]*?\}/)?.[0] ?? '';
+
+    expect(runningBlock).toContain('--active-signal-highlight');
+    expect(runningBlock).not.toMatch(/\bcolor:/);
   });
 
   it('keeps inactive text static', () => {
