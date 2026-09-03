@@ -93,7 +93,7 @@ export function SpacesColumn({ state, onImport }: SpacesColumnProps) {
         {t('knowledgeCenter.importColdData')}
       </Button>
       {state.error && (
-        <div className="knowledge-center-error" data-severity="error" data-testid="knowledge-center-error">
+        <div className="knowledge-center-error" data-severity="error" data-testid="knowledge-center-error" role="alert">
           {state.error}
         </div>
       )}

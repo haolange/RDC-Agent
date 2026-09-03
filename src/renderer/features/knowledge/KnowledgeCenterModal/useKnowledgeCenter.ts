@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SemanticLaneStatus } from '@shared/types/embedding';
+import { isSemanticLaneReady } from '../../embedding/semanticLaneCopy';
 import type {
   KnowledgeCardDetail,
   KnowledgeCardRecord,
@@ -55,7 +56,7 @@ export function useKnowledgeCenter(open: boolean) {
   const [rebuilding, setRebuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const semanticReady = semantic?.availability === 'ready';
+  const semanticReady = isSemanticLaneReady(semantic);
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 640px)');
@@ -79,7 +80,7 @@ export function useKnowledgeCenter(open: boolean) {
       setIndex(result.index);
       setSemantic(result.semantic);
       setSelectedSpaceIds((current) => nextSelectedSpaceIds(current, result.spaces));
-      if (result.semantic.availability !== 'ready') {
+      if (!isSemanticLaneReady(result.semantic)) {
         setLanes((current) => current.filter((lane) => lane !== 'Semantic'));
       }
     } catch (err) {

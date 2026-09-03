@@ -5,6 +5,7 @@ import type {
   KnowledgeReviewRecord,
   SessionKnowledgeCandidate,
 } from '@shared/types/knowledge';
+import { storageAdapter } from '../sessions/StorageAdapter';
 import { StorageIo } from '../sessions/StorageIo';
 import { withDirectoryFileLock } from '../sessions/directoryFileLock';
 import { KnowledgeRevisionConflictError } from './knowledgeErrors';
@@ -55,7 +56,6 @@ export function createSessionScopedKnowledgeStore(rootPath: string): KnowledgeDu
 }
 
 function defaultSessionStatePath(sessionId: string): string {
-  const { storageAdapter } = require('../sessions/StorageAdapter') as typeof import('../sessions/StorageAdapter');
   const location = storageAdapter.sessions.findSessionLocation(sessionId);
   if (!location) {
     throw new Error(`KNOWLEDGE_SESSION_UNKNOWN: no durable session path for ${sessionId}.`);

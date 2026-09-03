@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { AppSettings } from '@shared/types/settings';
+import { useModalFocus } from '../../../hooks/useModalFocus';
 import { useSettingsModal } from './useSettingsModal';
 import { GeneralSettings } from './sections/GeneralSettings';
 import { AppearanceSettings } from './sections/AppearanceSettings';
@@ -26,7 +27,8 @@ interface SettingsModalProps {
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, onClose }) => {
   const modal = useSettingsModal(open, settings);
-  const panelRef = useRef<HTMLDivElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const runtime = useRdxRuntimeOverview(open);
   const [resourceScope, setResourceScope] = useState<'user' | 'project'>('user');
   const {
@@ -86,14 +88,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     handleStartAccountLogin,
   } = modal;
 
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !document.querySelector('[data-confirmation-dialog]')) onClose();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [open, onClose]);
+  const closeSurface = useCallback(() => {
+    if (connectionDraft) {
+      setConnectionDraft(null);
+      return;
+    }
+    onClose();
+  }, [connectionDraft, onClose, setConnectionDraft]);
+  useModalFocus({
+    open,
+    containerRef: dialogRef,
+    onClose: closeSurface,
+    trap: !connectionDraft,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -106,9 +113,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
     <>
       <div className="settings-modal-backdrop" onClick={onClose}>
         <div
+          ref={dialogRef}
           className="settings-modal settings-center"
           data-testid="settings-modal"
           role="dialog"
+          tabIndex={-1}
           aria-modal="true"
           aria-labelledby="settings-modal-title"
           onClick={(event) => event.stopPropagation()}
