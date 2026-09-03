@@ -18,7 +18,7 @@ import {
 
 const emptyRightPanel = (sessionId: string): RightPanelViewModel => ({
   progress: [],
-  artifacts: { rows: [], supersededCount: 0, truncatedCount: 0 },
+  artifacts: { rows: [], supersededCount: 0, truncatedCount: 0, storeDegraded: false },
   outputs: { current: [], previous: [] },
   context: {
     task: {

@@ -20,19 +20,54 @@ import { SessionArtifactResolver } from '../sessions/SessionArtifactResolver';
 import { formatInvestigationContentHash } from '@shared/types/renderdocInvestigation';
 import { serializeInvestigationJson } from './investigationHash';
 import { InvestigationArtifactService } from './InvestigationArtifactService';
+import type { InvestigationArtifactServiceDeps } from './investigationArtifactWrite';
 
 export const SESSION_ID = 'inv-session';
+export const SESSION_B_ID = 'inv-session-b';
 
-export function createInvestigationHarness(prefix = 'rdc-inv-') {
+export function createInvestigationHarness(
+  prefix = 'rdc-inv-',
+  extras: Partial<InvestigationArtifactServiceDeps> & { sessionId?: string } = {},
+) {
+  const sessionId = extras.sessionId ?? SESSION_ID;
   const sessionPath = mkdtempSync(path.join(tmpdir(), prefix));
   const resolver = new SessionArtifactResolver({
-    resolveSessionPath: (id) => (id === SESSION_ID ? sessionPath : null),
+    resolveSessionPath: (id) => (id === sessionId ? sessionPath : null),
+  });
+  const service = new InvestigationArtifactService({
+    resolver,
+    now: () => new Date('2026-09-01T00:00:00.000Z'),
+    ...extras,
+  });
+  return { sessionPath, resolver, service, sessionId };
+}
+
+export function reopenInvestigationHarness(
+  sessionPath: string,
+  extras: Partial<InvestigationArtifactServiceDeps> & { sessionId?: string } = {},
+) {
+  const sessionId = extras.sessionId ?? SESSION_ID;
+  const resolver = new SessionArtifactResolver({
+    resolveSessionPath: (id) => (id === sessionId ? sessionPath : null),
+  });
+  const service = new InvestigationArtifactService({
+    resolver,
+    now: () => new Date('2026-09-01T00:00:00.000Z'),
+    ...extras,
+  });
+  return { sessionPath, resolver, service, sessionId };
+}
+
+export function createMultiSessionInvestigationHarness(ids: string[] = [SESSION_ID, SESSION_B_ID]) {
+  const paths = Object.fromEntries(ids.map((id) => [id, mkdtempSync(path.join(tmpdir(), `rdc-inv-${id}-`))]));
+  const resolver = new SessionArtifactResolver({
+    resolveSessionPath: (id) => paths[id] ?? null,
   });
   const service = new InvestigationArtifactService({
     resolver,
     now: () => new Date('2026-09-01T00:00:00.000Z'),
   });
-  return { sessionPath, resolver, service };
+  return { paths, resolver, service };
 }
 
 export function seedNote(resolver: SessionArtifactResolver, text = '{"note":true}') {

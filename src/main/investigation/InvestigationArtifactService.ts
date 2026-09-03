@@ -19,7 +19,20 @@ import {
 } from '@shared/types/renderdocInvestigation';
 import { SessionArtifactError } from '@shared/types/sessionArtifact';
 import { SessionArtifactResolver, sessionArtifactResolver } from '../sessions/SessionArtifactResolver';
-import { InvestigationError, toInvestigationError } from './investigationErrors';
+import { InvestigationError, isInvestigationStoreDegraded, toInvestigationError } from './investigationErrors';
+import {
+  collectStalePropagation,
+  collectSupersede,
+  upsertIndexEntry,
+} from './investigationArtifactMutations';
+import {
+  commitInvestigationTxn,
+  hasInvestigationTxnResidue,
+  recoverInvestigationTxn,
+  withInvestigationTxnLock,
+  type InvestigationTxnIo,
+  type InvestigationTxnMutation,
+} from './investigationTxn';
 import { hashesEqual, serializeInvestigationJson, sha256Prefixed } from './investigationHash';
 import {
   assertChallengeRecordRefs,
@@ -84,14 +97,23 @@ export type {
 export class InvestigationArtifactService {
   private readonly resolver: SessionArtifactResolver;
   private readonly now: () => Date;
+  private readonly onPersistBoundary?: InvestigationArtifactServiceDeps['onPersistBoundary'];
+  private readonly lockMaxAttempts?: number;
+  private readonly lockedSessions = new Set<string>();
 
   constructor(deps: InvestigationArtifactServiceDeps = {}) {
     this.resolver = deps.resolver ?? sessionArtifactResolver;
     this.now = deps.now ?? (() => new Date());
+    this.onPersistBoundary = deps.onPersistBoundary;
+    this.lockMaxAttempts = deps.lockMaxAttempts;
   }
 
   writeRecord(sessionId: string | null | undefined, input: InvestigationWriteInput): InvestigationWriteResult {
     this.assertSession(sessionId);
+    return this.withSessionLock(sessionId, () => this.writeRecordLocked(sessionId, input));
+  }
+
+  private writeRecordLocked(sessionId: string, input: InvestigationWriteInput): InvestigationWriteResult {
     rejectOpaqueWriteInput(input);
     const kindEntry = requireInvestigationKind(input.kind);
     let parsed: InvestigationRecord;
@@ -103,7 +125,6 @@ export class InvestigationArtifactService {
         error instanceof Error ? error.message : String(error),
       );
     }
-    this.materializeIndexIfAbsent(sessionId);
     const lookup = this.createRawLookup(sessionId);
     const mission = requireCanonicalWriteMission(kindEntry.kind, input.mission, parsed);
     this.assertRecordInvariants(sessionId, kindEntry.kind, parsed, lookup, mission);
@@ -156,19 +177,27 @@ export class InvestigationArtifactService {
     } else {
       this.parseManifest(manifest);
     }
+    const mutations: InvestigationTxnMutation[] = [];
+    let workingIndex = this.readIndexSnapshot(sessionId);
     if (isolation.markEvidenceStaleFor) {
-      this.markRelatedEvidenceStale(sessionId, isolation.markEvidenceStaleFor);
-    }
-    const written = this.writeArtifact(sessionId, contentUri, contentText);
-    if (!hashesEqual(contentHash, written.hash)) {
-      throw new InvestigationError('INVESTIGATION_HASH_MISMATCH', 'written content hash drifted');
+      const stale = collectStalePropagation(this.mutationReader(sessionId), isolation.markEvidenceStaleFor, workingIndex);
+      mutations.push(...stale.mutations);
+      workingIndex = stale.index;
     }
     let supersededArtifactId: string | undefined;
     if (manifest.supersedes) {
-      supersededArtifactId = this.markSuperseded(sessionId, manifest.supersedes);
+      const superseded = collectSupersede(this.mutationReader(sessionId), manifest.supersedes, workingIndex);
+      mutations.push(...superseded.mutations);
+      workingIndex = superseded.index;
+      supersededArtifactId = superseded.artifactId;
     }
-    this.writeArtifact(sessionId, manifestUriFor(artifactId), serializeInvestigationJson(manifest));
-    this.upsertIndex(sessionId, {
+    mutations.push({ uri: contentUri, text: contentText, role: 'content' });
+    mutations.push({
+      uri: manifestUriFor(artifactId),
+      text: serializeInvestigationJson(manifest),
+      role: 'manifest',
+    });
+    workingIndex = upsertIndexEntry(workingIndex, {
       artifactId,
       kind: kindEntry.kind,
       recordType: kindEntry.recordType,
@@ -180,11 +209,21 @@ export class InvestigationArtifactService {
       supersedes: manifest.supersedes,
       recordKey: recordKeyOf(kindEntry.kind, parsed),
     });
+    mutations.push({
+      uri: INDEX_URI,
+      text: serializeInvestigationJson(workingIndex),
+      role: 'index',
+    });
+    this.commitMutations(sessionId, mutations);
     return { manifest, contentUri, contentHash: manifest.contentHash, record: parsed, supersededArtifactId };
   }
 
   readRecord(sessionId: string | null | undefined, artifactId: string, expectedHash?: string): InvestigationReadResult {
     this.assertSession(sessionId);
+    return this.withSessionLock(sessionId, () => this.readRecordLocked(sessionId, artifactId, expectedHash));
+  }
+
+  private readRecordLocked(sessionId: string, artifactId: string, expectedHash?: string): InvestigationReadResult {
     const entry = this.findIndexEntry(sessionId, artifactId);
     if (!entry) {
       throw new InvestigationError('INVESTIGATION_NOT_FOUND', artifactId);
@@ -221,6 +260,7 @@ export class InvestigationArtifactService {
 
   list(sessionId: string | null | undefined, filter?: { kind?: string; status?: string }): InvestigationIndexEntry[] {
     this.assertSession(sessionId);
+    return this.withSessionLock(sessionId, () => {
     const entries = this.readIndex(sessionId).artifacts.filter((entry) => (
       (!filter?.kind || entry.kind === filter.kind) && (!filter?.status || entry.status === filter.status)
     ));
@@ -230,21 +270,37 @@ export class InvestigationArtifactService {
       this.assertRecordInvariants(sessionId, entry.kind, this.readRecordBody<InvestigationRecord>(sessionId, entry), lookup);
     }
     return entries;
+    });
   }
 
-  listForProjection(sessionId: string | null | undefined): InvestigationIndexEntry[] {
+  listForProjection(sessionId: string | null | undefined): {
+    artifacts: InvestigationIndexEntry[];
+    storeDegraded: boolean;
+  } {
     this.assertSession(sessionId);
-    return this.readIndexSnapshot(sessionId).artifacts;
+    try {
+      return this.withSessionLock(sessionId, () => ({
+        artifacts: this.readIndexSnapshot(sessionId).artifacts,
+        storeDegraded: false,
+      }));
+    } catch (error) {
+      if (isInvestigationStoreDegraded(error)) {
+        return { artifacts: [], storeDegraded: true };
+      }
+      throw error;
+    }
   }
 
   listManifests(sessionId: string | null | undefined): Map<string, InvestigationArtifactManifest | null> {
     this.assertSession(sessionId);
+    return this.withSessionLock(sessionId, () => {
     const manifests = new Map<string, InvestigationArtifactManifest | null>();
     for (const entry of this.readIndexSnapshot(sessionId).artifacts) {
       try { manifests.set(entry.artifactId, this.parseManifest(this.readJson(sessionId, entry.manifestUri))); }
       catch { manifests.set(entry.artifactId, null); }
     }
     return manifests;
+    });
   }
 
   assertReady(
@@ -286,7 +342,7 @@ export class InvestigationArtifactService {
   }
 
   createLookup(sessionId: string): InvestigationLookup {
-    return this.buildLookup(sessionId, true);
+    return this.withSessionLock(sessionId, () => this.buildLookup(sessionId, true));
   }
 
   private createRawLookup(sessionId: string): InvestigationLookup {
@@ -573,66 +629,12 @@ export class InvestigationArtifactService {
     return null;
   }
 
-  private markRelatedEvidenceStale(sessionId: string, worldStateId: string): void {
-    const live = this.readIndex(sessionId).artifacts.filter((entry) => entry.status !== 'superseded');
-    for (const entry of live) {
-      if (entry.kind === 'evidence') {
-        const evidence = this.readRecordBody<EvidenceRecord>(sessionId, entry);
-        if (evidence.worldStateId !== worldStateId || evidence.stale) continue;
-        this.rewriteStaleArtifact(sessionId, entry, { ...evidence, stale: true });
-        continue;
-      }
-      if (entry.kind !== 'evidence_pack') continue;
-      const pack = this.readRecordBody<EvidencePack>(sessionId, entry);
-      let changed = false;
-      const items = pack.items.map((evidence) => {
-        if (evidence.worldStateId !== worldStateId || evidence.stale) return evidence;
-        changed = true;
-        return { ...evidence, stale: true };
-      });
-      if (!changed) continue;
-      this.rewriteStaleArtifact(sessionId, entry, { items });
-    }
-  }
-
-  private rewriteStaleArtifact(
-    sessionId: string,
-    entry: InvestigationIndexEntry,
-    record: InvestigationRecord,
-  ): void {
-    const contentText = serializeInvestigationJson(record);
-    const written = this.writeArtifact(sessionId, entry.contentUri, contentText);
-    const contentHash = formatInvestigationContentHash(written.hash);
-    const manifest = this.parseManifest(this.readJson<InvestigationArtifactManifest>(sessionId, entry.manifestUri));
-    manifest.contentHash = contentHash;
-    manifest.status = 'stale';
-    this.writeArtifact(sessionId, entry.manifestUri, serializeInvestigationJson(manifest));
-    this.upsertIndex(sessionId, {
-      ...entry,
-      contentHash,
-      status: 'stale',
-    });
-    this.markReadyDependentsStale(sessionId, entry.artifactId);
-  }
-
-  private markReadyDependentsStale(sessionId: string, sourceArtifactId: string): void {
-    const snapshot = this.readIndexSnapshot(sessionId);
-    const source = snapshot.artifacts.find((entry) => entry.artifactId === sourceArtifactId);
-    const currentHash = source?.contentHash;
-    const dependents = snapshot.artifacts.filter((entry) => entry.artifactId !== sourceArtifactId);
-    for (const entry of dependents) {
-      if (entry.status !== 'ready') continue;
-      const manifest = this.parseManifest(this.readJson<InvestigationArtifactManifest>(sessionId, entry.manifestUri));
-      if (manifest.status !== 'ready') continue;
-      const drifted = manifest.sourceRefs.some((ref) => (
-        ref.artifactId === sourceArtifactId
-        && (!currentHash || !hashesEqual(ref.expectedHash, currentHash))
-      ));
-      if (!drifted) continue;
-      manifest.status = 'stale';
-      this.writeArtifact(sessionId, entry.manifestUri, serializeInvestigationJson(manifest));
-      this.upsertIndex(sessionId, { ...entry, status: 'stale' });
-    }
+  private mutationReader(sessionId: string) {
+    return {
+      readRecordBody: <T>(entry: InvestigationIndexEntry) => this.readRecordBody<T>(sessionId, entry),
+      readJson: <T>(uri: string) => this.readJson<T>(sessionId, uri),
+      parseManifest: (value: unknown) => this.parseManifest(value),
+    };
   }
 
   private refreshReadyOnRead(
@@ -647,22 +649,13 @@ export class InvestigationArtifactService {
     } catch (error) {
       if (!isReadySourceDriftError(error)) throw error;
       const next = { ...manifest, status: 'stale' as const };
-      this.writeArtifact(sessionId, entry.manifestUri, serializeInvestigationJson(next));
-      this.upsertIndex(sessionId, { ...entry, status: 'stale' });
+      const index = upsertIndexEntry(this.readIndexSnapshot(sessionId), { ...entry, status: 'stale' });
+      this.commitMutations(sessionId, [
+        { uri: entry.manifestUri, text: serializeInvestigationJson(next), role: 'stale' },
+        { uri: INDEX_URI, text: serializeInvestigationJson(index), role: 'index' },
+      ]);
       return this.parseManifest(next);
     }
-  }
-
-  private markSuperseded(sessionId: string, artifactId: string): string {
-    const entry = this.findIndexEntry(sessionId, artifactId);
-    if (!entry) {
-      throw new InvestigationError('INVESTIGATION_REF_UNRESOLVED', `supersedes ${artifactId}`);
-    }
-    const manifest = this.readJson<InvestigationArtifactManifest>(sessionId, entry.manifestUri);
-    manifest.status = 'superseded';
-    this.writeArtifact(sessionId, entry.manifestUri, serializeInvestigationJson(manifest));
-    this.upsertIndex(sessionId, { ...entry, status: 'superseded' });
-    return artifactId;
   }
 
   private findRecord<T>(sessionId: string, kind: InvestigationArtifactKind, recordKey: string): T | null {
@@ -734,6 +727,9 @@ export class InvestigationArtifactService {
         if (this.hasSiblingInvestigationFiles(sessionId)) {
           throw new InvestigationError('INVESTIGATION_INDEX_MISSING', 'investigation index is missing');
         }
+        if (this.hasTxnResidue(sessionId)) {
+          throw new InvestigationError('INVESTIGATION_DEGRADED', 'partial investigation transaction is visible');
+        }
         return emptyIndex();
       }
       throw new InvestigationError(
@@ -743,26 +739,19 @@ export class InvestigationArtifactService {
     }
   }
 
-  private materializeIndexIfAbsent(sessionId: string): void {
-    try {
-      this.readArtifact(sessionId, INDEX_URI);
-    } catch (error) {
-      if (error instanceof SessionArtifactError && error.code === 'ARTIFACT_NOT_FOUND') {
-        if (this.hasSiblingInvestigationFiles(sessionId)) {
-          throw new InvestigationError('INVESTIGATION_INDEX_MISSING', 'investigation index is missing');
-        }
-        this.writeArtifact(sessionId, INDEX_URI, serializeInvestigationJson(emptyIndex()));
-        return;
-      }
-      throw error instanceof InvestigationError ? error : toInvestigationError(error);
-    }
-  }
-
   private hasSiblingInvestigationFiles(sessionId: string): boolean {
     try {
       const resolved = this.resolver.resolve(sessionId, INDEX_URI);
       const root = path.dirname(resolved.absolutePath);
       return directoryHasJson(path.join(root, 'records')) || directoryHasJson(path.join(root, 'manifests'));
+    } catch {
+      return false;
+    }
+  }
+
+  private hasTxnResidue(sessionId: string): boolean {
+    try {
+      return hasInvestigationTxnResidue(this.resolver.resolve(sessionId, INDEX_URI).sessionPath);
     } catch {
       return false;
     }
@@ -810,14 +799,39 @@ export class InvestigationArtifactService {
     }
   }
 
-  private upsertIndex(sessionId: string, entry: InvestigationIndexEntry): void {
-    const index = this.readIndexSnapshot(sessionId);
-    const next = index.artifacts.filter((item) => item.artifactId !== entry.artifactId);
-    next.push(entry);
-    this.writeArtifact(sessionId, INDEX_URI, serializeInvestigationJson({
-      schemaVersion: index.schemaVersion,
-      artifacts: next,
-    }));
+  private commitMutations(sessionId: string, mutations: InvestigationTxnMutation[]): void {
+    try {
+      commitInvestigationTxn(sessionId, mutations, this.txnIo(), {
+        onPersistBoundary: this.onPersistBoundary,
+      });
+    } catch (error) {
+      throw error instanceof InvestigationError ? error : toInvestigationError(error);
+    }
+  }
+
+  private recoverStore(sessionId: string): void {
+    recoverInvestigationTxn(sessionId, this.txnIo());
+  }
+
+  private txnIo(): InvestigationTxnIo {
+    return {
+      resolve: (id, uri) => this.resolver.resolve(id, uri),
+      write: (id, uri, text) => this.resolver.write(id, uri, text, { mimeType: 'application/json' }),
+    };
+  }
+
+  private withSessionLock<T>(sessionId: string, operation: () => T): T {
+    if (this.lockedSessions.has(sessionId)) return operation();
+    const sessionPath = this.resolver.resolve(sessionId, INDEX_URI).sessionPath;
+    return withInvestigationTxnLock(sessionPath, () => {
+      this.lockedSessions.add(sessionId);
+      try {
+        this.recoverStore(sessionId);
+        return operation();
+      } finally {
+        this.lockedSessions.delete(sessionId);
+      }
+    }, { maxAttempts: this.lockMaxAttempts });
   }
 
   private parseManifest(value: unknown): InvestigationArtifactManifest {
@@ -846,14 +860,6 @@ export class InvestigationArtifactService {
       return this.resolver.read(sessionId, uri, options);
     } catch (error) {
       if (error instanceof SessionArtifactError) throw error;
-      throw toInvestigationError(error);
-    }
-  }
-
-  private writeArtifact(sessionId: string, uri: string, text: string) {
-    try {
-      return this.resolver.write(sessionId, uri, text, { mimeType: 'application/json' });
-    } catch (error) {
       throw toInvestigationError(error);
     }
   }
