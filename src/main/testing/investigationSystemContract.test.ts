@@ -904,7 +904,7 @@ describe('investigation system contract', () => {
     expect(journalOnly.service.listForProjection(SESSION_ID).storeDegraded).toBe(true);
     expect(journalOnly.service.listForProjection(SESSION_ID).artifacts).toEqual([]);
     const rail = readRepo('src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx');
-    expect(rail).toMatch(/storeDegraded \? 'control\.rightRail\.artifacts\.storeDegraded'/);
+    expect(rail).toMatch(/storeDegraded \? t\('control\.rightRail\.artifacts\.storeDegraded'\)/);
     expect(rail).toMatch(/control\.rightRail\.artifacts\.empty/);
     let listed: unknown = 'empty-disguise';
     try {

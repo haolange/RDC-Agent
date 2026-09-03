@@ -52,6 +52,7 @@ export const CHANNEL_CAPABILITY: Record<RendererInvokeChannel, BridgeChannelCapa
   'memory:get': 'read',
   'memory:write': 'mutation',
   'memory:delete': 'mutation',
+  'investigation:read': 'read',
   'knowledge:overview': 'read',
   'knowledge:query': 'read',
   'knowledge:card': 'read',

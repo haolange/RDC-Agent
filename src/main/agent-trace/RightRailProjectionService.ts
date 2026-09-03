@@ -23,7 +23,7 @@ const emptyRightPanel = (sessionId: string): RightPanelViewModel => ({
   context: {
     task: {
       projectId: '', projectName: '', sessionId, sessionTitle: '', workingDirectory: '',
-      configurationPhase: 'next_turn', agentProfile: 'Ask', permission: 'default', resources: [],
+      configurationPhase: 'next_turn', agentProfile: '', permission: 'default', resources: [],
     },
     rdx: {
       capture: null, availableCaptures: [],

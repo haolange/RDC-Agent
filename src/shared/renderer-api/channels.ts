@@ -52,6 +52,9 @@ export const RENDERER_INVOKE_CHANNEL = {
     write: 'memory:write',
     delete: 'memory:delete',
   },
+  investigation: {
+    read: 'investigation:read',
+  },
   knowledge: {
     overview: 'knowledge:overview',
     query: 'knowledge:query',

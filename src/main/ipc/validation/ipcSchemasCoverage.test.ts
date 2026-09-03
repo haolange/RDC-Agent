@@ -10,6 +10,7 @@ import {
   LlmProviderIdArgsSchema,
 } from './settingsLlmSchemas';
 import { EvidenceGetEventsArgsSchema } from './toolEvidenceSchemas';
+import { InvestigationReadArgsSchema } from './investigationSchemas';
 
 const HANDLERS_DIR = path.join(__dirname, '..');
 const HANDLER_FILES = readdirSync(HANDLERS_DIR)
@@ -68,6 +69,38 @@ describe('IPC schema coverage', () => {
       modelId: 'gpt',
       mode: 'nope',
     }])).toThrow();
+  });
+
+  it('accepts investigation:read ids and rejects URI or path payloads', () => {
+    const hash = `sha256:${'a'.repeat(64)}`;
+    expect(parseIpcArgs(InvestigationReadArgsSchema, [{
+      sessionId: 'session-1',
+      artifactId: 'invart-1',
+      expectedHash: hash,
+    }])).toEqual([{ sessionId: 'session-1', artifactId: 'invart-1', expectedHash: hash }]);
+    expect(() => parseIpcArgs(InvestigationReadArgsSchema, [{
+      sessionId: 'session-1',
+      artifactId: 'session://investigation/a.json',
+      expectedHash: hash,
+    }])).toThrow();
+    expect(() => parseIpcArgs(InvestigationReadArgsSchema, [{
+      sessionId: 'session-1',
+      artifactId: 'invart-1',
+      expectedHash: hash,
+      uri: 'D:/escape.json',
+    }])).toThrow();
+    for (const schemeId of ['file:record', 'http:record', 'D:record']) {
+      expect(() => parseIpcArgs(InvestigationReadArgsSchema, [{
+        sessionId: 'session-1',
+        artifactId: schemeId,
+        expectedHash: hash,
+      }])).toThrow();
+      expect(() => parseIpcArgs(InvestigationReadArgsSchema, [{
+        sessionId: schemeId,
+        artifactId: 'invart-1',
+        expectedHash: hash,
+      }])).toThrow();
+    }
   });
 
   it('accepts optional evidence filter', () => {

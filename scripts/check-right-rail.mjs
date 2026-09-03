@@ -35,6 +35,7 @@ const requiredFiles = [
   'src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx',
   'src/renderer/features/debugger/ControlPanel/ProjectCaptureImportPanel.tsx',
   'src/renderer/features/debugger/ControlPanel/RightRailArtifactList.tsx',
+  'src/renderer/features/debugger/ControlPanel/RightRailInvestigationPreview.tsx',
   'src/renderer/features/debugger/ControlPanel/RightRailArtifactGlyphs.tsx',
   'src/renderer/features/debugger/ControlPanel/RightRailOutputList.tsx',
   'src/renderer/features/debugger/ControlPanel/RightRailContext.tsx',
@@ -61,6 +62,12 @@ const retiredFiles = [
   'src/renderer/features/debugger/ControlPanel/SessionProgressPanel.tsx',
   'src/renderer/features/debugger/ControlPanel/SessionWorkingFolderPanel.tsx',
   'src/renderer/features/debugger/ControlPanel/TraceArtifactList.tsx',
+  'src/renderer/features/debugger/ArtifactViewer/index.tsx',
+  'src/renderer/features/debugger/ArtifactViewer/ArtifactViewerLayout.tsx',
+  'src/renderer/features/debugger/ArtifactViewer/useArtifactViewer.ts',
+  'src/renderer/features/debugger/ArtifactViewer/artifactViewerModel.ts',
+  'src/renderer/features/debugger/ArtifactViewer/artifactViewerIcons.tsx',
+  'src/renderer/features/debugger/ArtifactViewer/ArtifactViewer.css',
 ];
 for (const relativePath of retiredFiles) {
   if (fs.existsSync(path.join(root, relativePath))) fail(`retired path must remain deleted: ${relativePath}`);
@@ -69,6 +76,7 @@ for (const relativePath of retiredFiles) {
 for (const component of [
   'src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx',
   'src/renderer/features/debugger/ControlPanel/RightRailArtifactList.tsx',
+  'src/renderer/features/debugger/ControlPanel/RightRailInvestigationPreview.tsx',
   'src/renderer/features/debugger/ControlPanel/RightRailArtifactGlyphs.tsx',
   'src/renderer/features/debugger/ControlPanel/RightRailOutputList.tsx',
   'src/renderer/features/debugger/ControlPanel/RightRailContext.tsx',
@@ -120,11 +128,19 @@ for (const forbidden of ['useCaptureStore', 'openedCapture', 'TraceRightPanel', 
 }
 
 const artifactList = read('src/renderer/features/debugger/ControlPanel/RightRailArtifactList.tsx');
-for (const required of ['RightRailArtifactGlyph', 'control.rightRail.artifacts.copyId', 'appShell.copyText']) {
+for (const required of ['RightRailArtifactGlyph', 'control.rightRail.artifacts.copyId', 'control.rightRail.artifacts.preview', 'RightRailInvestigationPreview', 'appShell.copyText']) {
   requireText(artifactList, required, `RightRailArtifactList must retain ${required}`);
 }
-for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:', 'Open', 'Preview', 'Delete', 'Refresh']) {
+for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:', 'Open', 'Delete', 'Refresh']) {
   forbidText(artifactList, forbidden, `RightRailArtifactList must not retain ${forbidden}`);
+}
+
+const artifactPreview = read('src/renderer/features/debugger/ControlPanel/RightRailInvestigationPreview.tsx');
+for (const required of ['investigation.read', 'expectedHash', "role=\"dialog\"", "event.key === 'Escape'", 'hash-mismatch']) {
+  requireText(artifactPreview, required, `RightRailInvestigationPreview must retain ${required}`);
+}
+for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:', 'ArtifactViewer', 'title={hash}', 'title={row.contentHash}']) {
+  forbidText(artifactPreview, forbidden, `RightRailInvestigationPreview must not retain ${forbidden}`);
 }
 
 const artifactGlyphs = read('src/renderer/features/debugger/ControlPanel/RightRailArtifactGlyphs.tsx');
@@ -184,6 +200,7 @@ for (const requiredContract of [
   'replaySessionId?: string;',
   'remoteId?: string;',
   'export interface InvestigationArtifactRow',
+  'contentHash: string;',
   'export interface InvestigationArtifactsPanelViewModel',
   'export interface OutputsPanelViewModel',
   'artifacts: InvestigationArtifactsPanelViewModel;',
@@ -210,12 +227,16 @@ requireText(projection, 'export function mapRightRailOutputs', 'outputs mapper m
 forbidText(projection, 'mapRightRailArtifacts', 'outputs mapper must not keep the artifacts name');
 
 const investigationProjection = read('src/main/agent-trace/rightRailInvestigationArtifacts.ts');
-for (const required of ['mapRightRailInvestigationArtifacts', 'investigationArtifactService', 'listForProjection', 'listManifests']) {
+for (const required of ['mapRightRailInvestigationArtifacts', 'investigationArtifactService', 'listForProjection', 'listManifests', "mission === 'unknown'", 'contentHash']) {
   requireText(investigationProjection, required, `investigation rail mapper must retain ${required}`);
 }
-for (const forbidden of ['artifactStore', 'readdirSync', 'SessionArtifactSource', 'listSessionArtifactSources']) {
+for (const forbidden of ['artifactStore', 'readdirSync', 'SessionArtifactSource', 'listSessionArtifactSources', 'FALLBACK_MISSION', "?? 'debugger'"]) {
   forbidText(investigationProjection, forbidden, `investigation rail mapper must not retain ${forbidden}`);
 }
+
+const projectionService = read('src/main/agent-trace/RightRailProjectionService.ts');
+forbidText(projectionService, "agentProfile: 'Ask'", 'RightRailProjectionService must not use Ask as a profile fallback');
+requireText(projectionService, "agentProfile: ''", 'empty right-rail panel must leave agentProfile empty');
 
 for (const forbidden of ['usedToolNames', "kind: 'tool'", 'settings.agents.definitions']) {
   forbidText(projection, forbidden, 'right rail projection must not retain generic resource path ' + forbidden);
@@ -245,7 +266,9 @@ for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail
   forbidText(controlPanel, forbidden, `ControlPanel must not retain ${forbidden}`);
 }
 forbidText(channels, 'session:outputs:list', 'IPC channel registry must not retain session:outputs:list');
-forbidText(channels, 'session:investigation:', 'IPC channel registry must not add investigation channels in this wave');
+forbidText(channels, 'session:investigation:', 'IPC channel registry must not add session:investigation channels');
+requireText(channels, "read: 'investigation:read'", 'IPC channel registry must expose investigation:read');
+requireText(read('src/shared/renderer-api/channelCapabilities.ts'), "'investigation:read': 'read'", 'investigation:read must be classified as read');
 
 const docs = {
   design: read('DESIGN.md'),

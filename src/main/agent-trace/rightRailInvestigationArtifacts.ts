@@ -1,4 +1,11 @@
-import { bareInvestigationHash, type InvestigationArtifactManifest, type InvestigationRecordType } from '@shared/types/renderdocInvestigation';
+import {
+  INVESTIGATION_MISSIONS,
+  bareInvestigationHash,
+  formatInvestigationContentHash,
+  type InvestigationArtifactManifest,
+  type InvestigationMission,
+  type InvestigationRecordType,
+} from '@shared/types/renderdocInvestigation';
 import type { InvestigationArtifactRow, InvestigationArtifactsPanelViewModel } from '@shared/types/trace';
 import { isInvestigationStoreDegraded } from '../investigation/investigationErrors';
 import { hashesEqual } from '../investigation/investigationHash';
@@ -6,7 +13,12 @@ import { investigationArtifactService } from '../investigation/InvestigationArti
 import { collectSupersedeChain, type InvestigationIndexEntry } from '../investigation/investigationRecordKeys';
 
 const ROW_LIMIT = 50;
-const FALLBACK_MISSION = 'debugger' as const;
+
+const knownMission = (value: string | undefined): InvestigationMission | 'unknown' => (
+  value && (INVESTIGATION_MISSIONS as readonly string[]).includes(value)
+    ? value as InvestigationMission
+    : 'unknown'
+);
 
 export interface InvestigationListSnapshot {
   artifacts: InvestigationIndexEntry[];
@@ -45,16 +57,19 @@ const toRow = (
   entry: InvestigationIndexEntry,
   manifest: InvestigationArtifactManifest | null,
 ): InvestigationArtifactRow => {
-  const degraded = !manifest || !hashesEqual(manifest.contentHash, entry.contentHash);
+  const mission = knownMission(manifest?.mission);
+  const contentHash = formatInvestigationContentHash(manifest?.contentHash || entry.contentHash);
+  const degraded = !manifest || mission === 'unknown' || !hashesEqual(manifest.contentHash, entry.contentHash);
   return {
     artifactId: entry.artifactId,
     kind: entry.kind,
     recordType: (manifest?.recordType ?? entry.recordType) as InvestigationRecordType,
     status: entry.status,
-    mission: manifest?.mission ?? FALLBACK_MISSION,
+    mission,
     title: degraded ? '' : manifest.title,
     createdAt: entry.createdAt,
-    contentHashShort: hashShort(manifest?.contentHash || entry.contentHash),
+    contentHash,
+    contentHashShort: hashShort(contentHash),
     sourceRefCount: manifest?.sourceRefs.length ?? 0,
     worldStateId: manifest?.worldStateId,
     degraded,

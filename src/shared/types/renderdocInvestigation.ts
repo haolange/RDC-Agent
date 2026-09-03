@@ -481,3 +481,22 @@ export function formatInvestigationContentHash(hex: string): string {
 export function bareInvestigationHash(value: string): string {
   return value.trim().toLowerCase().replace(/^sha256:/, '');
 }
+
+export const INVESTIGATION_READ_IPC_STATUSES = ['ready', 'degraded', 'error', 'hash-mismatch'] as const;
+export type InvestigationReadIpcStatus = (typeof INVESTIGATION_READ_IPC_STATUSES)[number];
+
+export interface InvestigationReadRequest {
+  sessionId: string;
+  artifactId: string;
+  expectedHash: string;
+}
+
+export interface InvestigationReadIpcResult {
+  ok: boolean;
+  status: InvestigationReadIpcStatus;
+  error?: string;
+  errorCode?: string;
+  manifest?: InvestigationArtifactManifest;
+  record?: InvestigationRecord;
+  contentHash?: string;
+}
