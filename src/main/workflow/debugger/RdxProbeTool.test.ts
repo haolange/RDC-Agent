@@ -14,6 +14,7 @@ vi.mock('electron', () => ({
 
 import { createRdxProbeTool } from './RdxProbeTool';
 import { setRdxRuntimeContextForSession } from '../../sessions/RdxRuntimeContextRegistry';
+import { toolValidator } from '../../agent-runtime/core/ToolValidator';
 
 describe('createRdxProbeTool', () => {
   it('fail-closes when Settings rdxCli is not configured', async () => {
@@ -130,5 +131,19 @@ describe('createRdxProbeTool', () => {
     const closed = await tool.execute('tc-close', { action: 'lease_close' });
     expect(closed.isError).not.toBe(true);
     expect(setLease).toHaveBeenCalledWith('session-a', null);
+  });
+
+  it('accepts version without args under the closed ToolValidator schema', () => {
+    const tool = createRdxProbeTool('session-a', 'project-a');
+    expect(() => toolValidator.validate({
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+    }, { action: 'version' })).not.toThrow();
+    expect(() => toolValidator.validate({
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.parameters,
+    }, { action: 'probe', args: { action: 'doctor' } })).not.toThrow();
   });
 });
