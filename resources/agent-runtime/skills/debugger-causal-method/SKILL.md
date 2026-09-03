@@ -1,7 +1,7 @@
 ---
 name: debugger-causal-method
 description: Write Debugger First Bad Event, Hypothesis Matrix, and Counterfactual records on existing rdc.investigation.v1 kinds.
-allowed-tools: [investigation_read, investigation_write, investigation_list, artifact_read, rdx_context, shell, task_create, subagent]
+allowed-tools: [investigation_read, investigation_write, investigation_list, artifact_read, rdx_context, rdx_probe, plan_artifact, agent_handoff, shell, task_create, subagent]
 ---
 
 # Debugger Causal Method
