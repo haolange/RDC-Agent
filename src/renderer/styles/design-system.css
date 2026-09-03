@@ -391,6 +391,7 @@
 
 @keyframes active-signal-shimmer {
   0% { background-position: 100% 0; }
+  78% { background-position: -100% 0; }
   100% { background-position: -100% 0; }
 }
 
@@ -410,9 +411,11 @@
 .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
 .animate-spin { animation: spin 1s linear infinite; }
 .animate-float { animation: float 3s ease-in-out infinite; }
-/* Active runtime signal text — left-to-right energy shimmer on live phrases */
+/* Active runtime signal text — opaque base plus a narrow left-to-right sheen */
 .active-signal-text {
   --active-signal-highlight: var(--token-text-heading);
+  --active-signal-base: var(--active-signal-highlight);
+  --active-signal-sheen: color-mix(in srgb, var(--active-signal-base) 42%, white);
   color: inherit;
 }
 
@@ -430,18 +433,23 @@
 
 .active-signal-text.is-active {
   display: inline;
+  --active-signal-base: var(--active-signal-highlight);
+  --active-signal-sheen: color-mix(in srgb, var(--active-signal-base) 42%, white);
   background-image: linear-gradient(
-    90deg,
-    color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 0%,
-    var(--active-signal-highlight) 46%,
-    color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 92%
+    100deg,
+    var(--active-signal-base) 0%,
+    var(--active-signal-base) 46%,
+    var(--active-signal-sheen) 48%,
+    var(--active-signal-sheen) 52%,
+    var(--active-signal-base) 54%,
+    var(--active-signal-base) 100%
   );
-  background-size: 220% 100%;
+  background-size: 300% 100%;
   background-position: 100% 0;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: active-signal-shimmer 1.6s linear infinite;
+  animation: active-signal-shimmer 1.2s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
