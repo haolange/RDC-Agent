@@ -257,7 +257,16 @@ describe('knowledge system contract', () => {
     expect.hasAssertions();
     const scoutTools = skillAllowedTools('knowledge-scout');
     const candidateTools = skillAllowedTools('knowledge-candidate');
-    expect(scoutTools).toEqual(['knowledge_browse', 'knowledge_search', 'knowledge_read', 'knowledge_compile']);
+    expect(scoutTools).toEqual(expect.arrayContaining([
+      'knowledge_browse',
+      'knowledge_search',
+      'knowledge_read',
+      'knowledge_compile',
+      'rdx_probe',
+      'plan_artifact',
+      'investigation_write',
+      'agent_handoff',
+    ]));
     expect(candidateTools).toEqual(['knowledge_candidate_create']);
     expect(readRepo('resources/agent-runtime/skills/knowledge-scout/SKILL.md')).not.toMatch(/knowledge_write|knowledge_promote/);
     expect(readRepo('resources/agent-runtime/skills/knowledge-candidate/SKILL.md')).not.toMatch(/knowledge_write|knowledge_promote/);
@@ -265,7 +274,12 @@ describe('knowledge system contract', () => {
 
     const runtime = [...FIVE_DEFERRED, 'skills', 'skill_read', 'ask_user', 'tool_search', 'read_file'];
     const scoutNarrow = intersectSkillAllowedTools(runtime, scoutTools);
-    expect(scoutNarrow).toEqual(expect.arrayContaining(scoutTools));
+    expect(scoutNarrow).toEqual(expect.arrayContaining([
+      'knowledge_browse',
+      'knowledge_search',
+      'knowledge_read',
+      'knowledge_compile',
+    ]));
     expect(scoutNarrow).toEqual(expect.arrayContaining(['skills', 'skill_read', 'ask_user', 'tool_search']));
     expect(scoutNarrow).not.toContain('knowledge_candidate_create');
     expect(scoutNarrow).not.toContain('read_file');

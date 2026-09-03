@@ -1,7 +1,7 @@
 ---
 name: knowledge-scout
 description: Search, read, and compile scoped Knowledge into a sourced Brief or Pack without writing or promoting cards.
-allowed-tools: [knowledge_browse, knowledge_search, knowledge_read, knowledge_compile]
+allowed-tools: [knowledge_browse, knowledge_search, knowledge_read, knowledge_compile, rdx_probe, rdx_context, plan_artifact, investigation_read, investigation_write, investigation_list, agent_handoff, ask_user, task_create, task_update]
 ---
 
 # Knowledge Scout
