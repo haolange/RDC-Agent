@@ -434,9 +434,10 @@
     90deg,
     color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 0%,
     var(--active-signal-highlight) 46%,
-    color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 92%
+    color-mix(in srgb, var(--active-signal-highlight) 36%, transparent) 100%
   );
-  background-size: 220% 100%;
+  background-size: 200% 100%;
+  background-repeat: repeat-x;
   background-position: 100% 0;
   -webkit-background-clip: text;
   background-clip: text;

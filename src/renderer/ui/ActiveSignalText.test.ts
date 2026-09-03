@@ -24,9 +24,12 @@ describe('ActiveSignalText', () => {
 
     expect(activeBlock).toContain('background-clip: text');
     expect(activeBlock).toContain('color: transparent');
-    expect(activeBlock).toContain('background-size: 220% 100%');
+    expect(activeBlock).toContain('background-size: 200% 100%');
+    expect(activeBlock).toContain('background-repeat: repeat-x');
     expect(activeBlock).toContain('1.6s linear infinite');
     expect(activeBlock).toContain('color-mix(in srgb, var(--active-signal-highlight) 36%, transparent)');
+    expect(css).toMatch(/@keyframes active-signal-shimmer \{\s*0% \{ background-position: 100% 0; \}\s*100% \{ background-position: -100% 0; \}\s*\}/);
+    expect(css).not.toContain('78% { background-position');
     expect(activeBlock).not.toContain('--active-signal-base');
     expect(activeBlock).not.toContain('--active-signal-sheen');
     expect(css).toContain('@keyframes active-signal-shimmer');
