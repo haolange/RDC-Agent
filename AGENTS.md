@@ -31,6 +31,10 @@
 - 只修改完成当前目标必需的文件和代码，每一处 diff 都应能对应到本次请求、验证失败或本文件已有约定。
 - 新路径替代旧路径时，应同步删除旧入口、旧文案、旧默认路径或无意义兼容分支，避免留下 legacy / deprecated 双轨。
 - 临时兼容只能在用户明确要求、外部不可控依赖强制需要，或无法一次性安全迁移时使用；采用前必须说明原因、边界、移除条件和验证方式。默认实现不得保留旧字段/新字段双写、旧入口/新入口双轨或 deprecated 分支。
+- **桌面启动权**：人类入口 `scripts/start-rdc-agent.cmd` / `pnpm run start:human` / `start:human:dev` 与任何 Electron 实例互斥占用 canonical `%APPDATA%/rdc-agent/instance.lock`。活 pid **永不回收**；headless Browser QA 占着这把锁时，桌面启动会立刻 `userData is already in use` 并 exit 1。这不是应用坏了。
+- Browser QA **默认** disposable `os.tmpdir()/rdc-agent/qa-*`。只有用户本轮明确要求真实账号、canonical 会话或 T15–T18 真实验收时，才允许 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 或 `RDC_AGENT_USER_DATA`。
+- 本轮只要启动过 Browser QA / Electron，**结束前必须停掉**对应 `start:agent-browser` 及其 electron/node 子进程，确认 `instance.lock` 不存在或 owner pid 已死，并在交付说明写「桌面启动权已交还」。禁止把 headless 整晚挂在 canonical userData 上，也不得把「桌面起不来」留给用户。
+- 改过 launcher、主进程入口、窗口、userData 或跑过 Browser QA 后，宣称可交付前必须确认桌面入口不再因占锁失败。不得只跑 headless 就结束。
 
 ## 代码与文档边界
 
@@ -118,7 +122,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 
 ## 浏览器真实会话边界
 
-- agent 日常 UI/功能验证默认使用 headless Browser QA：`pnpm run start:agent-browser`（`RDC_AGENT_HEADLESS=1` + `RDC_AGENT_BROWSER_QA=1`），每次默认使用经过校验的 disposable `os.tmpdir()/rdc-agent/qa-*` userData；只有显式 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 才进入真实共享数据。再用主进程日志输出的 **one-time `http://127.0.0.1:<port>/qa?qaBootstrap=...`** 打开同一套 renderer（`/qa` Set-Cookie 后进干净同源 `/app`）。**优先 `/qa`**；桥接鉴权不接受任何 URL token；`browser-dev` 下 Vite 由 bridge 同源反代（含 HMR），不得直开 Vite 端口、无跨端口 challenge；`high-impact` channel（含 `command:execute`、`settings:set`、MCP trust/revoke 等）在无 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时必须 fail-closed；`desktop-only` 永拒。门禁：`pnpm run check:browser-capability`。
+- agent 日常 UI/功能验证默认使用 headless Browser QA：`pnpm run start:agent-browser`（`RDC_AGENT_HEADLESS=1` + `RDC_AGENT_BROWSER_QA=1`），每次默认使用经过校验的 disposable `os.tmpdir()/rdc-agent/qa-*` userData；只有显式 `RDC_AGENT_USER_DATA` 或 `RDC_AGENT_USE_CANONICAL_USERDATA=1` 才进入真实共享数据。再用主进程日志输出的 **one-time `http://127.0.0.1:<port>/qa?qaBootstrap=...`** 打开同一套 renderer（`/qa` Set-Cookie 后进干净同源 `/app`）。**优先 `/qa`**；桥接鉴权不接受任何 URL token；`browser-dev` 下 Vite 由 bridge 同源反代（含 HMR），不得直开 Vite 端口、无跨端口 challenge；`high-impact` channel（含 `command:execute`、`settings:set`、MCP trust/revoke 等）在无 `RDC_AGENT_BROWSER_QA_FULL_ACCESS=1` 时必须 fail-closed；`desktop-only` 永拒。门禁：`pnpm run check:browser-capability`。**canonical 与桌面互斥**：QA 结束后必须停进程并交还 `instance.lock`，见「执行纪律 / 桌面启动权」。
 - 浏览器真实会话通过 localhost bridge 连接真实 `main process`、workspace、settings、LLM runtime、事件流和已配置的 RDX CLI invoker；不得新增渲染层本地样本或演示场景作为验收入口。
 - Bridge 为 **debug-only** 安全边界（`bridgeSecurity`）：非 `RDC_AGENT_BROWSER_QA=1` 不得启动，且**不进 release 默认路径**。Browser 与 Desktop 必须共用 `src/shared/renderer-api` 的唯一 `ElectronAPI` 工厂、channel manifest 与 main handler registry；所有 preload 公开产品能力均保持 parity，未知/内部/未注册 channel 及不存在的明文 secret 读取 fail-closed。矩阵见 `docs/architecture/browser-qa-surface.md`。
 - Electron 窗口通过 `preload -> IPC transport` 进入主进程；浏览器真实会话通过 `localhost HTTP/SSE transport -> IPC handler registry` 进入主进程。除 transport 与原生窗口容器外，两条路径的 API、状态、持久化与审批语义必须一致，禁止恢复手写 Browser API、拒绝桩或第二套 channel 规则。
@@ -175,6 +179,7 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - 是否把运行期 / 构建期产物错误地带回仓库结构。
 - 是否让现有 UI/UX 的布局、交互或视觉效果发生非预期退化。
 - 是否需要同步更新 `README.md`、`docs/` 或注释中的说明。
+- 本轮是否还占着 canonical `instance.lock`；人类 `start-rdc-agent.cmd` 现在能否启动。
 
 ## 验证建议
 
@@ -203,8 +208,8 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - **[AUTO]** 安全 / 并发 / 取消 / 存储故障 / provider wire 契约改动后执行：`vitest run src/main/testing/contracts`（及被触及的既有单测，如 `bridgeSecurity`、`jsonl`、`TurnCoordinator`、`ProcessSupervisor`、`DebuggerRuntimePolicy`）。
 - **[AUTO]** 入口、构建或窗口逻辑改动后，再补 `pnpm run build` 或等价打包检查。
 - **[MANUAL]** 发布配置改动后执行 `pnpm run pack`，并确认 unpacked 产物不包含开发期包管理器、lockfile、launcher 和缓存状态。
-- **[BROWSER-QA]** 浏览器真实会话使用 `pnpm run start:agent-browser`（或 `scripts/run-rdc-launcher.* --mode browser`），然后用 Codex 内置浏览器打开主进程输出的 **complete bootstrap `/qa?qaBootstrap=...`**（勿截断 token URL）。Work Process / tool 卡片 UI 验收前必须先停旧进程再重启以加载最新前后端，并删除该 QA project 下全部 session 后新建隔离 session，避免跨 session/project 串台与脏数据。涉及 Send/Stop/Edit-and-resend 或流式卡顿时额外验收：Preparing Stop 干净撤销、Running Stop 单调落停、Rewrite 提交即时切分支、流式期间窗口拖拽/滚动无明显整应用卡顿。
-- **[MANUAL]** 人类开发入口使用 `pnpm run start:human:dev`，源码构建入口使用 `pnpm run start:human`；平台包装器只转发到共享 launcher，依赖与 build 由指纹条件式准备，发布模式直接双击 exe / app 包。
+- **[BROWSER-QA]** 浏览器真实会话使用 `pnpm run start:agent-browser`（或 `scripts/run-rdc-launcher.* --mode browser`），然后用 Codex 内置浏览器打开主进程输出的 **complete bootstrap `/qa?qaBootstrap=...`**（勿截断 token URL）。Work Process / tool 卡片 UI 验收前必须先停旧进程再重启以加载最新前后端，并删除该 QA project 下全部 session 后新建隔离 session，避免跨 session/project 串台与脏数据。涉及 Send/Stop/Edit-and-resend 或流式卡顿时额外验收：Preparing Stop 干净撤销、Running Stop 单调落停、Rewrite 提交即时切分支、流式期间窗口拖拽/滚动无明显整应用卡顿。**本轮结束后必须停进程并交还桌面启动权**；默认 disposable userData，禁止无必要占用 canonical。
+- **[MANUAL]** 人类开发入口使用 `pnpm run start:human:dev`，源码构建入口使用 `pnpm run start:human` / `scripts/start-rdc-agent.cmd`；平台包装器只转发到共享 launcher，依赖与 build 由指纹条件式准备，发布模式直接双击 exe / app 包。Agent 结束本轮时不得留下活的 headless 占锁。
 - **[AUTO]** Provider 体系契约验证使用 `pnpm run check:provider-system`。
 - **[AUTO]** Provider Catalog strict manifest 与编译语义验证使用 `pnpm run check:provider-catalog`。Catalog schema、manifest 字段、identity 覆盖或 route/binding 改动后必须执行。Composer `/model` 与底栏 picker 必须共用 `isAgentToolExecutableModel` 可选集，禁止回读 `settings.agents.modelOptions`；该断言由内含的 `check:agent-tool-capability` 强制。
 - **[AUTO] [BROWSER-QA]** Agent Loop / Tasks 改动必须覆盖相同指纹第二轮纠偏、第三轮终止、revision/result/args 变化复位、max-turn typed error、Ask Tasks 只读、Plan/Edit Tasks 可写、text-only route 不宣称工具、`tool_search` authoritative no-match；Browser 真实会话至少命中一次三轮无进展终止并确认没有 `CONVERSATION_LLM_REQUEST_FAILED`。
