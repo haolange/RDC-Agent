@@ -27,15 +27,15 @@ Verdict 枚举：`planned` / `verified` / `failed` / `waived-by-user`。`verifie
 | U02-six-lanes-code | Knowledge 源码与门禁收敛为六 lane；不再把 Semantic hits 当现行门禁 | U02 `check:knowledge-system` `lanes.six` | build `3bff8172`；QA `proj_a99a24c68de3`；1440 desktop Dark；Knowledge Center LANES 恰 6（Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version）；Rebuild 文案 six retrieval lanes；无 Semantic；截图 `u02-knowledge-center-six-lanes.png` | verified | 3bff8172 | 2026-09-05 |
 | U02-read-roots-code | `knowledgeReadRoots` 冻结并仅注入四只读文件工具；写工具双层拒绝 | U02 permissions / EffectiveRuntimePlan 测试 | build `3bff8172`；QA `proj_a99a24c68de3` / `sess_e2b23442e230`；Debugger + grok-4.6；`grep ~/.rdx/knowledge` 无审批命中 `AIRD-20260207-0001`（`cardId: user:cases/AIRD-20260207-0001.md`）；`glob/read_file ~/.rdx/memory/*` 审批 pending 后拒绝；Context 卡普通 file `AIRD-20260207-0001.md` + directory `knowledge`；IPC `conversation:answerToolApproval` deny `success:true`；截图 `u02-read-roots-context.png` | verified | 3bff8172 | 2026-09-05 |
 | U02-settings-7 | Settings schema 6→7 一次性删除 `llm.embedding`；>7 fail-closed | U02 settings 迁移 fixture | build `3bff8172`；Settings 搜索 “Embedding” 无命中；Provider 页无 Embedding 区；截图 `u02-settings-search-embedding.png` | verified | 3bff8172 | 2026-09-05 |
-| U03-mcp-legacy | `MCPManager` legacy sanitized fallback：删除或证明 in-flight 必需并补 TTL/测试 | U03 `check:legacy-residue` | — | planned | — | — |
-| U03-modes | `modes.ts` `MODE_CAPABILITIES`：只被测试用则删，否则改为真值 | `modes.test.ts`；U03 `check:legacy-residue` | — | planned | — | — |
-| U03-dead-types | 删除 dead `WriteScope` / `IntakeContext` / `GateResult` | U03 `check:legacy-residue` | — | planned | — | — |
-| U03-timeline-type | `AgentTimelineEntry.type` 收窄到实际发出的值 | U03 `check:legacy-residue` | — | planned | — | — |
-| U03-coordination-mode | `coordinationMode` → `turn_handoff`（shared/main/renderer/测试同步） | U03 `check:legacy-residue` | — | planned | — | — |
-| U03-plan-phases | `check-investigation-system` 过时 `PLAN_PHASES` 改为当前 phase 合同 | `pnpm run check:investigation-system` | — | planned | — | — |
-| U03-rdx-leak | 删除 `rdx-runtime-leak.json` 写入；改 runtimeLog + `ProcessSupervisor unconfirmed_orphan` | U03 `check:legacy-residue` | — | planned | — | — |
-| U03-harness | `harness.ts` **不改名**，只确认只剩 `ArtifactKind` / `ArtifactRecord` | U03 `check:legacy-residue` | — | planned | — | — |
-| U03-legacy-residue | `check:legacy-residue` 零命中（合法词精确上下文白名单） | U03 落地 `pnpm run check:legacy-residue` | — | planned | — | — |
+| U03-mcp-legacy | `MCPManager` name-segment 仅保留 encode/decode fail-closed；无 legacy sanitized 兼容读路径 | `MCPManager.test.ts`；`check:legacy-residue` | — | verified | 60ed27dc | 2026-09-05 |
+| U03-modes | `MODE_CAPABILITIES` 已删除；保留 `assignDefaultCaptureRoles` | `modes.test.ts`；`check:legacy-residue` | — | verified | 60ed27dc | 2026-09-05 |
+| U03-dead-types | 删除 dead `WriteScope` / `IntakeContext` / `GateResult` | `check:legacy-residue`；`check:shared-exports` | — | verified | 60ed27dc | 2026-09-05 |
+| U03-timeline-type | `AgentTimelineEntry.type` 收窄为 `user` / `agent` / `system` / `tool_call` | `src/shared/types/agent.timeline.test.ts`；`check:legacy-residue` | — | verified | 60ed27dc | 2026-09-05 |
+| U03-coordination-mode | `coordinationMode` → `turn_handoff`（shared/main/renderer/测试同步） | `src/shared/types/workflow.test.ts`；`check:legacy-residue` | — | verified | 60ed27dc | 2026-09-05 |
+| U03-plan-phases | `check-investigation-system` 改为 understand/work/summarize phase 合同 | `pnpm run check:investigation-system` | — | verified | 60ed27dc | 2026-09-05 |
+| U03-rdx-leak | 删除 `rdx-runtime-leak.json` 写入；改 runtimeLog + `ProcessSupervisor unconfirmed_orphan` | `RdxSessionService.test.ts`；`check:legacy-residue` | — | verified | 60ed27dc | 2026-09-05 |
+| U03-harness | `harness.ts` **不改名**，只确认只剩 `ArtifactKind` / `ArtifactRecord` | `check:legacy-residue` | — | verified | 60ed27dc | 2026-09-05 |
+| U03-legacy-residue | `check:legacy-residue` 零命中（合法词精确上下文白名单）；已接入 `check:gates` | `pnpm run check:legacy-residue` | — | verified | 60ed27dc | 2026-09-05 |
 | U04-gates | CI build job 改为 `pnpm run check:gates` 聚合 | `.github/workflows/ci.yml`；本地 `check:gates` | — | planned | — | — |
 | U04-diff-check | CI 增加 `git diff --check`（有效 base 解析） | U04 脚本 + 首提交测试 | — | planned | — | — |
 | U04-ledger-gate | `check:acceptance-ledger` schema + verified SHA ∈ `git rev-list HEAD`；文档 required/forbidden 短语断言 | `pnpm run check:acceptance-ledger` | — | planned | — | — |
