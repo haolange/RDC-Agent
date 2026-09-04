@@ -13,13 +13,6 @@ export interface AgentConfig {
   temperature?: number;
 }
 
-export type WriteScope =
-  | 'workspace_control'
-  | 'workspace_notes'
-  | 'session_signoff'
-  | 'workspace_reports'
-  | 'session_artifacts';
-
 export interface AgentState {
   agentId: AgentRole;
   /** Session or ephemeral execution scope that owns this status projection. */
@@ -97,18 +90,7 @@ import type { ReasoningSummary } from './workflow';
 
 export interface AgentTimelineEntry {
   id: string;
-  type:
-    | 'user'
-    | 'agent'
-    | 'tool_call'
-    | 'blocker'
-    | 'system'
-    | 'plan'
-    | 'stage'
-    | 'dispatch'
-    | 'verification'
-    | 'report'
-    | 'reasoning';
+  type: 'user' | 'agent' | 'system' | 'tool_call';
   agentRole?: AgentRole;
   content: string;
   title?: string;

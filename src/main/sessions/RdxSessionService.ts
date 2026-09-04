@@ -27,6 +27,7 @@ import {
   rdxShellActionService,
   type RdxShellActionResult,
 } from '../tools/RdxShellActionService';
+import { processSupervisor } from '../runtime/ProcessSupervisor';
 import { setRdxRuntimeContextForSession, clearRdxContextLeases } from './RdxRuntimeContextRegistry';
 
 interface PreviewLoadResult {
@@ -676,8 +677,6 @@ export class RdxSessionService {
 
   private async teardownRuntime(): Promise<void> {
     const previousContext = this.runtimeContext;
-    const { appPathService } = await import('../runtime/AppPathService');
-    const leakMarkerPath = path.join(appPathService.getUserRdxPaths().userRdxRoot, 'rdx-runtime-leak.json');
 
     let closeOk = true;
 
@@ -728,46 +727,21 @@ export class RdxSessionService {
       });
     }
 
-    // Stage 4: leak marker when graceful close failed (diagnostics / later GC)
+    const remaining = processSupervisor.list();
     if (!closeOk && previousContext) {
-      try {
-        fs.mkdirSync(path.dirname(leakMarkerPath), { recursive: true });
-        fs.writeFileSync(
-          leakMarkerPath,
-          JSON.stringify({
-            markedAt: new Date().toISOString(),
-            contextId: previousContext.contextId,
-            runtimeOwner: previousContext.runtimeOwner,
-            ownerLeaseId: previousContext.ownerLeaseId,
-            stage: 'force-after-wait',
-          }, null, 2),
-          'utf8',
-        );
-        runtimeLogService.log({
-          scope: 'app',
-          namespace: 'context',
-          severity: 'warning',
-          title: 'RDX runtime leak marker written',
-          summary: `Context ${previousContext.contextId} close failed; leak marker persisted.`,
-          raw: { leakMarkerPath },
-        });
-      } catch (error) {
-        runtimeLogService.log({
-          scope: 'app',
-          namespace: 'context',
-          severity: 'warning',
-          title: 'RDX leak marker write failed',
-          summary: error instanceof Error ? error.message : String(error),
-        });
-      }
-    } else {
-      try {
-        if (fs.existsSync(leakMarkerPath)) {
-          fs.unlinkSync(leakMarkerPath);
-        }
-      } catch {
-        // ignore cleanup failures
-      }
+      runtimeLogService.log({
+        scope: 'app',
+        namespace: 'context',
+        severity: 'warning',
+        title: 'RDX runtime close failed',
+        summary: `Context ${previousContext.contextId} close failed; ProcessSupervisor retains any unconfirmed_orphan children.`,
+        raw: {
+          contextId: previousContext.contextId,
+          runtimeOwner: previousContext.runtimeOwner,
+          ownerLeaseId: previousContext.ownerLeaseId,
+          supervised: remaining,
+        },
+      });
     }
   }
 

@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReplayDeviceEntry } from '@shared/types/device';
 import type { OpenProjectInputRequest, SessionScope } from '@shared/types/session';
@@ -32,6 +33,14 @@ vi.mock('../runtime/RuntimeLogService', () => ({
   runtimeLogService: { log: vi.fn() },
 }));
 
+vi.mock('../runtime/ProcessSupervisor', () => ({
+  processSupervisor: { list: () => [] },
+}));
+
+vi.mock('../tools/ShellInvocationService', () => ({
+  shellInvocationService: { terminateAll: vi.fn() },
+}));
+
 vi.mock('../captures/ReplayDeviceService', () => ({
   replayDeviceService: {
     peekPreparedRemote: () => null,
@@ -40,6 +49,7 @@ vi.mock('../captures/ReplayDeviceService', () => ({
   },
 }));
 
+import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { RdxSessionService } from './RdxSessionService';
 
 const ownerScope: SessionScope = { projectId: 'project-a', sessionId: 'session-a' };
@@ -119,5 +129,44 @@ describe('RdxSessionService capture ownership fail-closed', () => {
     expect(await service.closeHumanPreviewWindow(wrongProject)).toBeNull();
     expect(service.snapshotOpenedCaptureForSession(ownerScope)?.inputId).toBe('input-a');
     expect(runAction).not.toHaveBeenCalled();
+  });
+
+  it('logs close failure through runtimeLog and ProcessSupervisor without writing a leak file', async () => {
+    vi.useFakeTimers();
+    const writeSpy = vi.spyOn(fs, 'writeFileSync');
+    const mkdirSpy = vi.spyOn(fs, 'mkdirSync');
+    const unlinkSpy = vi.spyOn(fs, 'unlinkSync');
+    try {
+      const service = new RdxSessionService();
+      await openOwnedCapture(service);
+      runAction.mockImplementation(async (actionId: string) => ({
+        ok: actionId !== 'closeRuntime',
+        actionId,
+        error: actionId === 'closeRuntime' ? 'close failed' : undefined,
+        data: {},
+        stdout: '',
+        stderr: actionId === 'closeRuntime' ? 'boom' : '',
+        exitCode: actionId === 'closeRuntime' ? 1 : 0,
+      }));
+
+      const clearPromise = service.clearOpenedCaptureForSession(ownerScope);
+      await vi.advanceTimersByTimeAsync(1_500);
+      await clearPromise;
+
+      const leakMarkerName = ['rdx-runtime-leak', '.json'].join('');
+      const leakWrites = [...writeSpy.mock.calls, ...mkdirSpy.mock.calls, ...unlinkSpy.mock.calls]
+        .map((args) => String(args[0] ?? ''))
+        .filter((filePath) => filePath.includes(leakMarkerName));
+      expect(leakWrites).toEqual([]);
+      expect(runtimeLogService.log).toHaveBeenCalledWith(expect.objectContaining({
+        title: 'RDX runtime close failed',
+        summary: expect.stringContaining('unconfirmed_orphan'),
+      }));
+    } finally {
+      writeSpy.mockRestore();
+      mkdirSpy.mockRestore();
+      unlinkSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 });

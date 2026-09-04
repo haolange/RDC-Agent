@@ -230,12 +230,12 @@ export const INVESTIGATION_RULE_REGISTRY = [
     note: 'ReportBundleService is current debt',
   },
   {
-    id: 'investigation.forbidden.fixed-stages',
-    kind: 'forbidden',
+    id: 'investigation.missing.trace-phases',
+    kind: 'missing',
     file: 'src/main/agent-trace/manifests/profileManifest.ts',
-    pattern: 'const BASELINE_PHASES[\\s\\S]*const PLAN_PHASES',
+    pattern: "phaseId: 'understand'[\\s\\S]*phaseId: 'work'[\\s\\S]*phaseId: 'summarize'",
     probe: 'source-pattern',
-    note: 'fixed Debugger/Plan harness stages are current debt',
+    note: 'trace phases are understand/work/summarize; not Run WorkflowStage',
   },
   {
     id: 'investigation.forbidden.session-evidence.schema',

@@ -397,4 +397,5 @@ for (const toolName of allTools) {
   }
 }
 
-console.log(`[work-process-tool-coverage] OK (${allTools.length} tools)`);
+// Coverage set is BUILTIN_AGENT_TOOL_IDS (currently 49) plus one MCP fixture.
+console.log(`[work-process-tool-coverage] OK (${builtinIds.length} builtin + 1 MCP fixture)`);

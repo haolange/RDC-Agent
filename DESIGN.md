@@ -214,7 +214,7 @@ Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThem
 - 交互式旧 Profile 导出选择面、把 `AgentHandoffDefinition` 当成 durable 状态、把 embedding 并入 agent catalog。
 - 把三卡或四卡 Right Rail 写成现行契约、把未实现模块写成已完成。
 - 官方未改 seed 的 `.migrated` 备份、Ask/Plan/Edit 作为运行时 fallback、恢复 ask/plan/edit 运行通道或 custom manifest fallback、Run v2 双读、Mission generic `shell`。
-- 恢复 Embedding capability / Semantic lane / `settings.llm.embedding` / `EmbeddingCatalog` / `EmbeddingExecutionService`。
+- 禁止恢复 Embedding capability / Semantic lane / `settings.llm.embedding` / `EmbeddingCatalog` / `EmbeddingExecutionService`。
 
 T19 逐项裁决（删除 / 保留理由 / 调用方）：
 
@@ -222,21 +222,21 @@ T19 逐项裁决（删除 / 保留理由 / 调用方）：
 | --- | --- | --- | --- |
 | `src/main/reports/ArtifactStore.ts` + `artifact_store.json` | **保留** | `output_register` / `SessionArtifactSource` 的 Outputs 索引，不是 Investigation。禁止混进 Artifacts 卡。 | `OutputRegistrationTool.test.ts`；`pnpm run check:right-rail` |
 | `writeSessionPlanArtifact` 钉死 `artifacts/plan.md` | **删除钉死** | `plan_artifact` 仍写 session artifacts，文件名改为 `plan-<ISO>.md`，禁止覆盖单一 `plan.md`。 | `sessionPlanArtifact.test.ts` |
-| `src/shared/types/harness.ts` | **收敛保留** | 只留 Outputs `ArtifactKind` / `ArtifactRecord`。**不改名**。删除未用的 `HarnessStatus` / `EvidenceRecord` / `ContextPacket` 等旧 Debugger harness 类型。Investigation `EvidenceRecord` 仍以 `renderdocInvestigation.ts` 为准。禁止恢复固定 stage。 | 当前只剩 `ArtifactKind` / `ArtifactRecord`；U03 将补 `check:legacy-residue` 确认不改名、无旧 harness 类型 |
+| `src/shared/types/harness.ts` | **收敛保留** | 只留 Outputs `ArtifactKind` / `ArtifactRecord`。**不改名**。删除未用的旧 Debugger harness 类型。Investigation `EvidenceRecord` 仍以 `renderdocInvestigation.ts` 为准。禁止恢复固定 stage。 | `pnpm run check:legacy-residue`（断言该路径仍存在且无旧 harness 类型） |
 | `RdxCliInvokerService` `tool_count` | **保留诊断、禁止 UI** | CLI 内部 invoker 诊断可用；Right Rail / 模型工具面不得展示 catalog summary。 | `pnpm run check:right-rail` |
 | stage / `WorkflowStage` / `recommendedSpecialists` | **已删** | 见裁决 I；不得双读 v2。 | `pnpm run check:investigation-system`；Run v3 合同见裁决 I |
 | agent-trace `phases`（understand/work/summarize） | **保留并对齐** | Work Process / Trace UI 展示相位，不是 Run `WorkflowStage`。重建时间线只发这三相位，不再发旧 `plan`/`execute` phase id。`PhaseKind` 里的 `plan`/`execute` 是 trace node 词汇，不是 Run stage。 | `pnpm run check:work-process` |
 | Classic Session Panel / ArtifactViewer | **已不在 renderer 入口** | 禁止恢复。 | `pnpm run check:right-rail` |
-| `Classic` / `legacy` / `deprecated` / `compat` 文案 | **按语义保留** | provider `deprecated`、Knowledge lifecycle `deprecated`、OpenAI-compatible 协议名为合法词，禁止借清理误删。 | U03 将补 `check:legacy-residue`（精确上下文白名单） |
+| `Classic` / `legacy` / `deprecated` / `compat` 文案 | **按语义保留** | provider `deprecated`、Knowledge lifecycle `deprecated`、OpenAI-compatible 协议名为合法词，禁止借清理误删。 | `pnpm run check:legacy-residue`（精确上下文白名单） |
 | `ErrorRecovery` 等 recoverable fallback | **保留** | Availability 分类，不是 legacy 双轨。 | `ErrorRecovery.test.ts`；`ConversationTurnDiagnostic.test.ts` |
-| `MCPManager` legacy sanitized fallback | **U03 删除或证伪** | 无 TTL/移除条件则删；若 in-flight 协议必需须补测试与移除条件。 | U03 将补 `check:legacy-residue` |
-| `modes.ts` `MODE_CAPABILITIES` | **U03 删除或改为真值** | 现被 `modes.test.ts` 使用，且把 analyzer/optimizer 标未实现。只被测试用则删；否则改为真实值。 | `modes.test.ts`；U03 将补 `check:legacy-residue` |
-| dead `WriteScope` / `IntakeContext` / `GateResult` | **U03 删除** | 死类型，不是现行合同。`AgentManifestWriteScope` 是 Settings 作用域，不是本项。 | U03 将补 `check:legacy-residue` |
-| `AgentTimelineEntry.type` 收窄 | **U03 收窄** | 只保留实际发出的值。 | U03 将补 `check:legacy-residue` |
-| `coordinationMode: 'staged_handoff'` | **U03 改为 `turn_handoff`** | shared / main / renderer / 测试同步；中性命名，不是 stage 双轨。 | U03 将补 `check:legacy-residue` |
-| `check-investigation-system` 过时 `PLAN_PHASES` | **U03 改写** | 改为当前 understand/work/summarize phase 合同，禁止再扫旧 PLAN_PHASES。 | `pnpm run check:investigation-system`；U03 将重写该规则 |
-| `rdx-runtime-leak.json` | **U03 删除写入** | 只写不读。改 runtimeLog 诊断 + 现有 `ProcessSupervisor unconfirmed_orphan`；`~/.rdx` 不再有无读者文件。 | U03 将补 `check:legacy-residue` |
-| `check:legacy-residue` 零命中 | **U03 新建门禁** | 每项一条 forbidden pattern/path/导出/动态 import/mock 扫描；合法词用精确上下文白名单。 | U03 落地 `pnpm run check:legacy-residue`（U04 接入 `check:gates`） |
+| `MCPManager` name-segment fail-closed | **保留 fail-closed** | in-flight encode/decode 协议必需；`encode(decode(x)) !== x` → null；不是 compat 读路径。 | `MCPManager.test.ts`；`pnpm run check:legacy-residue` |
+| `modes.ts` capability table | **已删除** | 只被测试使用且把 analyzer/optimizer 标未实现；保留 `assignDefaultCaptureRoles`。 | `modes.test.ts`；`pnpm run check:legacy-residue` |
+| dead workspace write / intake / gate types | **已删除** | 死类型，不是现行合同。`AgentManifestWriteScope` 是 Settings 作用域，不是本项。 | `pnpm run check:legacy-residue`；`pnpm run check:shared-exports` |
+| `AgentTimelineEntry.type` 收窄 | **已收窄** | 只保留实际发出的 `user` / `agent` / `system` / `tool_call`。 | `src/shared/types/agent.timeline.test.ts`；`pnpm run check:legacy-residue` |
+| `coordinationMode` | **已改为 `turn_handoff`** | shared / main / renderer / 测试同步；中性命名，不是 stage 双轨。 | `src/shared/types/workflow.test.ts`；`pnpm run check:legacy-residue` |
+| `check-investigation-system` phase 合同 | **已改写** | 现行 understand/work/summarize phase 合同；禁止再扫旧固定 Plan 相位表。 | `pnpm run check:investigation-system` |
+| unread RDX runtime leak marker | **已删除写入** | 只写不读。改 runtimeLog 诊断 + 现有 `ProcessSupervisor unconfirmed_orphan`；`~/.rdx` 不再有无读者文件。 | `RdxSessionService.test.ts`；`pnpm run check:legacy-residue` |
+| `check:legacy-residue` 零命中 | **已落地** | 每项一条 forbidden pattern/path/导出/动态 import/mock 扫描；合法词用精确上下文白名单。已接入 `check:gates`。U04 才接 `check:acceptance-ledger` / CI。 | `pnpm run check:legacy-residue` |
 
 ### I. Run Schema v3
 

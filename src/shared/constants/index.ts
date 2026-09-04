@@ -97,7 +97,7 @@ export {
   SUPER_GROK_OAUTH_REDIRECT_URI,
   isLlmProviderProtocol,
 } from './llm';
-export { MODE_CAPABILITIES, assignDefaultCaptureRoles } from './modes';
+export { assignDefaultCaptureRoles } from './modes';
 export {
   CONTEXT_COMPACTION_PERCENT_MAX,
   CONTEXT_COMPACTION_PERCENT_MIN,
