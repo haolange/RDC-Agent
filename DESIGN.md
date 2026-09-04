@@ -167,7 +167,7 @@ Settings `schemaVersion` **6**：升级时不可逆重置 `appearance.chromeThem
 
 | | 裁决 |
 | --- | --- |
-| **当前态** | Embedding capability 与 Semantic lane **已删除**。Knowledge 走 markdown-first 六 lane（见裁决 G）。Settings schema 7 不再持久化 embedding 选择。Discovery 对 embedding / embeddings 等非 agent modality **继续** fail-closed 剔除。Embedding 模型不进入 Agent / Composer / subagent picker。T18 未跑真实 OpenAI embed；**不再补跑**。 |
+| **当前态** | Embedding capability 与 Semantic lane **已删除**。Knowledge 走 markdown-first 六 lane（见裁决 G）。Settings schema 7 不再持久化 embedding 选择。Discovery 对 embedding / embeddings 等非 agent modality **继续** fail-closed 剔除。Embedding 模型不进入 Agent / Composer / subagent picker。真实 OpenAI embed **不再补跑**（U02 已删除 Embedding）。 |
 | **目标态** | 保持删除。禁止恢复 Embedding capability / Semantic lane / `settings.llm.embedding` / `EmbeddingCatalog` / `EmbeddingExecutionService`。Discovery 对 embedding/embeddings modality 继续 fail-closed 剔除。 |
 | **迁移门禁（U02 落地）** | `check:knowledge-system` 为六 lane + `forbidden.embedding-runtime` 零命中。Settings schema 7 一次性删除 embedding 选择；`>7` fail-closed。不得把「未跑真实 OpenAI embed」写成仍待验收的产品缺口。 |
 
@@ -236,7 +236,7 @@ T19 逐项裁决（删除 / 保留理由 / 调用方）：
 | `coordinationMode` | **已改为 `turn_handoff`** | shared / main / renderer / 测试同步；中性命名，不是 stage 双轨。 | `src/shared/types/workflow.test.ts`；`pnpm run check:legacy-residue` |
 | `check-investigation-system` phase 合同 | **已改写** | 现行 understand/work/summarize phase 合同；禁止再扫旧固定 Plan 相位表。 | `pnpm run check:investigation-system` |
 | unread RDX runtime leak marker | **已删除写入** | 只写不读。改 runtimeLog 诊断 + 现有 `ProcessSupervisor unconfirmed_orphan`；`~/.rdx` 不再有无读者文件。 | `RdxSessionService.test.ts`；`pnpm run check:legacy-residue` |
-| `check:legacy-residue` 零命中 | **已落地** | 每项一条 forbidden pattern/path/导出/动态 import/mock 扫描；合法词用精确上下文白名单。已接入 `check:gates`。U04 才接 `check:acceptance-ledger` / CI。 | `pnpm run check:legacy-residue` |
+| `check:legacy-residue` 零命中 | **已落地** | 每项一条 forbidden pattern/path/导出/动态 import/mock 扫描；合法词用精确上下文白名单。已接入 `check:gates`。`check:acceptance-ledger` 已由 U04 接入 CI / `check:gates`。 | `pnpm run check:legacy-residue`；`pnpm run check:acceptance-ledger` |
 
 ### I. Run Schema v3
 
@@ -321,12 +321,11 @@ main-owned `RightRailProjectionService` 为显式 `{ projectId, sessionId }` 组
 | `T18-t15-debugger-neg` | T15 Debugger 负路径 | 已证 | 无 capture：`sess_df6be27d58a5` → `MISSION_COMPLETION_DENIED`（`debugger cannot complete without a dereferenceable MissionCheckpoint`），未伪装 completed。Settings RDX CLI 已配置；未配置 fail-closed 单测在 `adafa804`。WhiteHair 正路径被 `LOCAL_REPLAY_UNSUPPORTED` 挡住（正路径见硬件阻塞组 `T18-whitehair-open`） |
 | `T18-t16-analyzer-blocked` | T16 Analyzer 闭环 | Blocked 诚实收口 | `sess_5be2b0c52a58` / `proj_a99a24c68de3`；`rdx_probe version` ok（schema 3.0.0）；`preview_status` exit 2；`investigation_write` 写出 world/evidence/claim/checkpoint + ready report `invart-55a27b669134-1788459010567`（`sha256:3fc09696feae39145fd4c94c66c9260dda460f1da610e0d618789328aba4c5e3`）；source claim `cl_t16` 仍为 draft 未被 supersede；`reportContract.status=Blocked` → turn `MISSION_COMPLETION_DENIED`（`Blocked cannot complete`），未伪装 completed。伴随修复：`ToolValidator` 省略 `properties` 的 object 作 opaque bag；`report` 不再占用 cited `claimId`（`a37c107e`） |
 | `T18-t17-optimizer-blocked` | T17 Optimizer 闭环 | Blocked 诚实收口 | `sess_a73c57d0d2a5` / `proj_a99a24c68de3`；plan-only；`rdx_probe version` ok；`preview_status` exit 2；未写 Experiment / 未 mutate 工程；ready world `invart-9c0432fc5f8d-1788459329316`、claim `cl_t17` `invart-654177b47a50-1788459452297`（仍 ready，未被 report supersede）、checkpoint `cp_t17` `invart-85907a5d7764-1788459462807`、ready report `invart-71244190ba45-1788459648111`（`sha256:335d77de70a9a196f150330f7ae703366dd240b6723c9714e57eb6bc4ab10bbd`，`reportContract.status=Blocked`）→ `MISSION_COMPLETION_DENIED`（`Blocked cannot complete`） |
+| `T18-semantic` | Semantic / 真实 OpenAI embed | 已关闭 | 真实 OpenAI embed **不再补跑**（U02 已删除 Embedding capability / Semantic lane）。 |
 
 ### 未证
 
-| Ledger | 项 | 状态 | 证据 |
-| --- | --- | --- | --- |
-| `T18-semantic` | Semantic / 真实 OpenAI embed | 未证 → 将由 U02 删除 | `openai` `hasSecret: false`；lane `unavailable/unconfigured`；未伪装 ready。**不再补跑**真实 OpenAI embed 验收；U02 删除 Embedding capability / Semantic lane 后关闭本行。 |
+无剩余未证项。`T18-semantic` 已关闭，见上表。硬件阻塞见下一组。
 
 ### 硬件阻塞
 
