@@ -28,7 +28,7 @@ Settings scoped 编辑器（Skills / MCP / Hooks / Policy）与 Agents 同级导
 
 ## Profiles
 
-Wave 1 四个 builtin：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件在 `resources/agent-runtime/agents`，再与 `~/.rdx/agents` 和 `<project-root>/.rdx/agents` 合成 effective snapshot。行为应落在指令、工具权限、审批与 handoff，而不是 mode 专用运行时分支。官方未改的历史 Ask/Plan/Edit（及历史官方 debugger/analyzer/optimizer/general seed）按 `DESIGN.md` 裁决 A 在校验后永久清除，不留 `.migrated` 备份。仅用户修改过的 ask/plan/edit 原样保留，并按 custom manifest 运行；它们不是目标拓扑身份，也不是运行时 fallback。Mission planner 工具面见裁决 J（plan-only + `rdx_probe`）。
+四个 builtin：`general`（Execution Orchestrator）、`debugger` / `analyzer` / `optimizer`（Planning Orchestrator）。官方文件在 `resources/agent-runtime/agents`，再与 `~/.rdx/agents` 和 `<project-root>/.rdx/agents` 合成 effective snapshot。user/project 只能覆盖这四个 id，或新增无关自定义 id。行为应落在指令、工具权限、审批与 handoff，而不是 mode 专用运行时分支。ask/plan/edit 及 S0 specialist id 为历史非法 id：剔出 effective snapshot + 诊断 `AGENT_ID_RESERVED_HISTORICAL`；**无运行通道**（U01 落地 v2 迁移：shadow purge，真正改过正文/工具的 builtin-id 副本 `retained-override`）。代码仍是 v1 marker（U01 修）。Mission planner 工具面见裁决 J（plan-only + `rdx_probe`）。
 
 ## Project Instructions
 
@@ -69,7 +69,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 Memory：显式 search/read/write/delete；写入需用户意图或交互审批；删除需确认；禁止轮次自动抽取/consolidation/全索引注入。
 
-Knowledge Center 是三列 UI（Spaces / List / Detail），只消费 Query / Index / Compile / Candidate / Write；独立 `knowledge` IPC。持久写入须显式人类确认；ColdData 摄入为 staging / Draft，不自动 Candidate。不生成、不自动注入 prompt。**当前态**：Candidate/Draft/review 已落到 session durable store；ColdData 记录并复核源 hash/mtime/size；写路径 realpath + 原子替换。Semantic 真实向量索引已落地。目标态见 `DESIGN.md` 裁决 C / G。**产品级真实 OpenAI 调用与 Browser QA 尚未跑（T18）。**
+Knowledge Center 是三列 UI（Spaces / List / Detail），只消费 Query / Index / Compile / Candidate / Write；独立 `knowledge` IPC。目标拓扑 **六 lane** markdown-first；canonical 读根对 `read_file` / `read_image` / `glob` / `grep` 免审批（U02 落地）。持久写入须显式人类确认；ColdData 摄入为 staging / Draft，不自动 Candidate。不生成、不自动注入 prompt。**当前态**：Candidate/Draft/review 已落到 session durable store；ColdData 记录并复核源 hash/mtime/size；写路径 realpath + 原子替换。源码仍含 Semantic / Embedding，由 U02 删除。**T18 ColdData 已证**。产品级 Browser QA 全矩阵见 U05。目标态见 `DESIGN.md` 裁决 C / G。
 
 ## Provider Account（产品）
 

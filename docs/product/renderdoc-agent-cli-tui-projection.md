@@ -354,7 +354,7 @@ Search 列表必须显示 match reason，而不是只有不透明 score：
 
 - Browse/Search 默认 12 条、server hard cap 50，通过 cursor 分页；
 - Show/Read 按 token budget 返回，截断必须显示 continuation；
-- Semantic unavailable/stale/failed 必须如实显示，不得标成已完成“智能搜索”；
+- 六 lane 无语义检索轴；不得把不可用的语义检索标成已完成“智能搜索”；
 - 结果过长写 Session Artifact，屏幕只保留摘要、引用和诊断；
 - `/knowledge` 命令不得把结果自动写进 Prompt 或复制到所有后续 turn；
 - 人类直接 Compile 与 Agent Compile 共享预算、Pack 格式和 Usage Trace；
@@ -508,7 +508,7 @@ TUI 不根据文本关键词猜测事件类型。
 7. 小型 Knowledge lookup 直接 Tool，不产生无意义 Scout。
 8. 重 Knowledge Retrieval 派发 Scout，父级只收到 Brief/Pack refs。
 9. Browse/Search/Show/Compile/Status 与 Agent Tool 返回相同 stable refs/index revision/provenance。
-10. Lexical/Structural/Semantic/Relation lane 状态、match reason、stale 和分页/截断。
+10. Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version 六 lane 状态、match reason、stale 和分页/截断。无语义检索轴。
 11. Candidate Create 只写 Session Artifact。
 12. Candidate 明确 Promote/Reject，FullAccess 不绕过，未回答不自动选择。
 13. Session Resume 后 Pack/Candidate freshness 和 RDX Context 重新校验。

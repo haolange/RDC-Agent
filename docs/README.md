@@ -5,7 +5,7 @@
 ## 分类
 
 - `contracts/`：跨层稳定契约（runtime kernel、permissions、failure model）。
-- `product/`：产品定位、scoped resources、垂直能力。
+- `product/`：产品定位、scoped resources、垂直能力、[`acceptance-ledger.md`](product/acceptance-ledger.md)。
 - `architecture/`：模块地图、数据流、实现向架构说明（指向 contracts，避免双轨权威）。
 - `workflows/`：Debugger 主链与流程说明。
 - `ui/`：Workbench、Design System、Knowledge Center。
