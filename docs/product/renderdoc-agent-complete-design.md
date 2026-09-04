@@ -2,7 +2,7 @@
 
 > **文档地位**：本文件是受根目录 [`DESIGN.md`](../../DESIGN.md) 裁决的详细目标设计，**不是第二产品权威**。若与 `DESIGN.md` / `AGENTS.md` 冲突，以 `DESIGN.md` 为准并回改本文。
 >
-> **实现状态**：文中模块、schema、服务以目标态叙述。Knowledge 目标拓扑是五服务 + **六 lane** markdown-first + 五个 deferred 工具与 Knowledge Center 三列 UI（源码仍含 Semantic / Embedding，由 U02 删除）。Wave 4 schema 已落地 `rdc.investigation.v1`、`InvestigationArtifactService` 与三个 deferred Investigation 工具；IPC `investigation:read` 已落地；4 个 builtin Hook 模板与 Session rail 五卡已落地。Wave 5：三条 Mission 方法面已接到 Skill / Hook / Capsule（Debugger `$debugger-causal-method`，Analyzer `$analyzer-architecture-method`，Optimizer `$optimization-experiment`；现 15 个垂直方法 Skill）。**T18 ColdData 真实验收已证**（见 `DESIGN.md` T18 已证组与 [`acceptance-ledger.md`](acceptance-ledger.md) `T18-colddata-*`）。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06；均不得写成已验收。durable handoff 状态机已落地。Run 当前为 v3。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。
+> **实现状态**：文中模块、schema、服务以目标态叙述。Knowledge 目标拓扑是五服务 + **六 lane** markdown-first + 五个 deferred 工具与 Knowledge Center 三列 UI（Embedding / Semantic lane 已由 U02 删除）。Wave 4 schema 已落地 `rdc.investigation.v1`、`InvestigationArtifactService` 与三个 deferred Investigation 工具；IPC `investigation:read` 已落地；4 个 builtin Hook 模板与 Session rail 五卡已落地。Wave 5：三条 Mission 方法面已接到 Skill / Hook / Capsule（Debugger `$debugger-causal-method`，Analyzer `$analyzer-architecture-method`，Optimizer `$optimization-experiment`；现 15 个垂直方法 Skill）。**T18 ColdData 真实验收已证**（见 `DESIGN.md` T18 已证组与 [`acceptance-ledger.md`](acceptance-ledger.md) `T18-colddata-*`）。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06。durable handoff 状态机已落地。Run 当前为 v3。`check:knowledge-system` / `check:investigation-system` 债务 allowlist 已空（hits=0）。
 >
 > **读者**：实现后续 Wave 的 Codex / Agent。路径相对本仓库。中文为主，产品术语保留英文。
 
@@ -695,7 +695,7 @@ Benchmark 四类：Synthetic Ground Truth、Historical Cases（含脱敏 ColdDat
 - 宣称现有 `AgentHandoffDefinition` 已足够。
 - 恢复 Embedding capability / Semantic lane / `settings.llm.embedding`。
 - 把三卡或四卡 Right Rail 写成现行契约。
-- 把未实现的并发组写成已完成模块。Knowledge 五服务 / 垂直 schema / durable handoff / 三条 Mission 方法面（Skill/Hook/Capsule）/ Run v3 / `investigation:read` 已落地，不得再写成「尚未实现」。不得把产品级 Browser QA 全矩阵或三条 Mission 正常 `completed` 写成已跑（U05 / U06）。不得把 T18 ColdData 已证写成尚未跑。不得把 Embedding 写成已落地现行能力。
+- 把未实现的并发组写成已完成模块。Knowledge 五服务 / 垂直 schema / durable handoff / 三条 Mission 方法面（Skill/Hook/Capsule）/ Run v3 / `investigation:read` 已落地，不得再写成「尚未实现」。产品级 Browser QA 全矩阵见 U05；三条 Mission 正常 `completed` 见 U06；均不得再写成尚未跑。不得把 T18 ColdData 已证写成尚未跑。不得把 Embedding 写成已落地现行能力。
 - 用空壳测试、skip/todo 或只加类名绕过已建立的 `check:knowledge-system` / `check:investigation-system` ratchet。
 
 ---

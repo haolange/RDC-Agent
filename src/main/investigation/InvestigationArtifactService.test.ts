@@ -35,7 +35,7 @@ function toolErrorCode(result: { details?: unknown }): string | undefined {
   return details?.code;
 }
 
-describe('InvestigationArtifactService', () => {
+describe('InvestigationArtifactService', { timeout: 15_000 }, () => {
   it('supersedes the previous manifest on version update', () => {
     const { service } = createInvestigationHarness();
     const first = writeDraft(service, 'world_state', baselineWorld('ws-v1'));

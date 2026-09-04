@@ -69,7 +69,7 @@ allowedTools = ∩(skill_i) ∩ runtimeAllowlist
 
 Memory：显式 search/read/write/delete；写入需用户意图或交互审批；删除需确认；禁止轮次自动抽取/consolidation/全索引注入。
 
-Knowledge Center 是三列 UI（Spaces / List / Detail），只消费 Query / Index / Compile / Candidate / Write；独立 `knowledge` IPC。目标拓扑 **六 lane** markdown-first；canonical 读根对 `read_file` / `read_image` / `glob` / `grep` 免审批（U02 落地）。持久写入须显式人类确认；ColdData 摄入为 staging / Draft，不自动 Candidate。不生成、不自动注入 prompt。**当前态**：Candidate/Draft/review 已落到 session durable store；ColdData 记录并复核源 hash/mtime/size；写路径 realpath + 原子替换。源码仍含 Semantic / Embedding，由 U02 删除。**T18 ColdData 已证**。产品级 Browser QA 全矩阵见 U05。目标态见 `DESIGN.md` 裁决 C / G。
+Knowledge Center 是三列 UI（Spaces / List / Detail），只消费 Query / Index / Compile / Candidate / Write；独立 `knowledge` IPC。目标拓扑 **六 lane** markdown-first；canonical 读根对 `read_file` / `read_image` / `glob` / `grep` 免审批（U02 落地）。持久写入须显式人类确认；ColdData 摄入为 staging / Draft，不自动 Candidate。不生成、不自动注入 prompt。**当前态**：Candidate/Draft/review 已落到 session durable store；ColdData 记录并复核源 hash/mtime/size；写路径 realpath + 原子替换。Embedding capability / Semantic lane **已由 U02 删除**，禁止恢复。**T18 ColdData 已证**。产品级 Browser QA 全矩阵见 U05。目标态见 `DESIGN.md` 裁决 C / G。
 
 ## Provider Account（产品）
 

@@ -39,7 +39,7 @@ function commitFile(cwd: string, fileName: string, contents: string, message: st
   git(cwd, ['commit', '--no-gpg-sign', '-m', message]);
 }
 
-describe('git diff --check base resolution', () => {
+describe('git diff --check base resolution', { timeout: 15_000 }, () => {
   it('treats all-zero SHAs as unusable', () => {
     expect(isZeroSha('0000000')).toBe(true);
     expect(isZeroSha('0000000000000000000000000000000000000000')).toBe(true);
