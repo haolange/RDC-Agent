@@ -87,7 +87,6 @@ knowledge-center-modal
 knowledge-center-narrow-tabs
 knowledge-center-rebuild
 knowledge-center-search
-knowledge-center-semantic-status
 knowledge-center-space-list
 knowledge-center-spaces
 knowledge-center-tree

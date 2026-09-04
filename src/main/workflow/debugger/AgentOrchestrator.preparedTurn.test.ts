@@ -1,8 +1,48 @@
-import { describe, expect, it, vi } from 'vitest';
+import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { EffectiveModel } from '@shared/types/providerCapability';
 import type { EffectiveAgentProfile } from '@shared/types/rdxRuntime';
 import { createNoneReasoningContract } from '@shared/provider-catalog/providerContracts';
 import { createTestRequestPlan } from '../../testing/createTestRequestPlan';
+import { pathIdentityKey } from '../../agent-runtime/knowledgeReadRoots';
+
+const { knowledgeFixture } = vi.hoisted(() => ({
+  knowledgeFixture: {
+    userKnowledgePath: '',
+    projectKnowledgePath: '',
+  },
+}));
+
+vi.mock('../../runtime/AppPathService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../runtime/AppPathService')>();
+  return {
+    ...actual,
+    appPathService: new Proxy(actual.appPathService, {
+      get(target, prop, receiver) {
+        if (prop === 'getUserRdxPaths') {
+          return () => {
+            const paths = target.getUserRdxPaths();
+            return knowledgeFixture.userKnowledgePath
+              ? { ...paths, knowledgePath: knowledgeFixture.userKnowledgePath }
+              : paths;
+          };
+        }
+        if (prop === 'getProjectRdxPaths') {
+          return (projectRoot: string) => {
+            const paths = target.getProjectRdxPaths(projectRoot);
+            return knowledgeFixture.projectKnowledgePath
+              ? { ...paths, knowledgePath: knowledgeFixture.projectKnowledgePath }
+              : paths;
+          };
+        }
+        const value = Reflect.get(target, prop, receiver);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    }),
+  };
+});
 
 vi.mock('electron', () => ({
   app: {
@@ -132,6 +172,13 @@ const baseInput = {
 };
 
 describe('AgentOrchestrator prepared turn context', () => {
+  const tempRoots: string[] = [];
+  afterEach(async () => {
+    knowledgeFixture.userKnowledgePath = '';
+    knowledgeFixture.projectKnowledgePath = '';
+    await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
+  });
+
   it('freezes the effective route and keeps provider window separate from prompt budget', async () => {
     const result = await new AgentOrchestrator().prepareTurnContext(baseInput);
     expect(result.summary).toMatchObject({
@@ -157,6 +204,10 @@ describe('AgentOrchestrator prepared turn context', () => {
     });
     expect(result.initialMessages).toEqual([]);
     expect(result.runtime.credentialHandle).toBe('credential-1');
+    expect(Array.isArray(result.runtime.effectivePlan.knowledgeReadRoots)).toBe(true);
+    for (const root of result.runtime.effectivePlan.knowledgeReadRoots) {
+      expect(result.runtime.effectivePlan.permissionSettings.readableRoots).not.toContain(root);
+    }
     expect(result.summary.wirePatch.headers).toEqual({ 'anthropic-beta': 'context-1m' });
     expect(result.summary.breakdown.some((entry) => entry.id === 'free')).toBe(true);
   });
@@ -180,5 +231,54 @@ describe('AgentOrchestrator prepared turn context', () => {
       ...baseInput,
       signal: controller.signal,
     })).rejects.toThrow(/^REQUEST_CANCELLED:/u);
+  });
+
+  it('freezes existing user and project knowledge directories onto the plan', async () => {
+    const user = await mkdtemp(path.join(os.tmpdir(), 'rdx-prep-user-'));
+    const project = await mkdtemp(path.join(os.tmpdir(), 'rdx-prep-proj-'));
+    tempRoots.push(user, project);
+    const userKnowledge = path.join(user, 'knowledge');
+    const projectKnowledge = path.join(project, '.rdx', 'knowledge');
+    await mkdir(userKnowledge, { recursive: true });
+    await mkdir(projectKnowledge, { recursive: true });
+    knowledgeFixture.userKnowledgePath = userKnowledge;
+    knowledgeFixture.projectKnowledgePath = projectKnowledge;
+
+    const result = await new AgentOrchestrator().prepareTurnContext({
+      ...baseInput,
+      projectRootPath: project,
+      projectId: 'proj-kn',
+    });
+    const roots = result.runtime.effectivePlan.knowledgeReadRoots;
+    expect(roots).toHaveLength(2);
+    expect(roots.map((root) => pathIdentityKey(root))).toEqual([
+      pathIdentityKey(userKnowledge),
+      pathIdentityKey(projectKnowledge),
+    ]);
+    expect(result.runtime.effectivePlan.permissionSettings.readableRoots).toEqual([]);
+    expect(result.contextDiagnostic.knowledgeReadRootDiagnostics ?? []).toEqual([]);
+  });
+
+  it('excludes a symlink/junction knowledge root and records a diagnostic', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rdx-prep-link-'));
+    tempRoots.push(tmp);
+    const real = path.join(tmp, 'real-knowledge');
+    const link = path.join(tmp, 'knowledge');
+    await mkdir(real, { recursive: true });
+    try {
+      await symlink(real, link, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch {
+      return;
+    }
+    knowledgeFixture.userKnowledgePath = link;
+    knowledgeFixture.projectKnowledgePath = path.join(tmp, 'missing-project-knowledge');
+
+    const result = await new AgentOrchestrator().prepareTurnContext(baseInput);
+    expect(result.runtime.effectivePlan.knowledgeReadRoots).toEqual([]);
+    expect(result.contextDiagnostic.knowledgeReadRootDiagnostics).toEqual([
+      expect.objectContaining({
+        reason: 'symlink-or-junction',
+      }),
+    ]);
   });
 });

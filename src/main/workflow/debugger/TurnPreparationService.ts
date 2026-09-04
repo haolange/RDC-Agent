@@ -24,6 +24,8 @@ import {
   buildEffectiveRuntimePlan,
 } from '../../agent-runtime/EffectiveRuntimePlan';
 import { compileEffectivePolicy } from '../../agent-runtime/permissions/PolicyCompiler';
+import { resolveKnowledgeReadRoots } from '../../agent-runtime/knowledgeReadRoots';
+import { appPathService } from '../../runtime/AppPathService';
 import { sessionContextJournal } from '../../conversation/SessionContextJournal';
 import {
   isWithinSessionCompactionLine,
@@ -329,6 +331,12 @@ export class TurnPreparationService {
       input.projectRootPath,
       input.agentId,
     );
+    const knowledgeResolution = resolveKnowledgeReadRoots({
+      userKnowledgePath: appPathService.getUserRdxPaths().knowledgePath,
+      projectKnowledgePath: input.projectRootPath
+        ? appPathService.getProjectRdxPaths(input.projectRootPath).knowledgePath
+        : null,
+    });
     const effectivePlan = buildEffectiveRuntimePlan({
       agentId: input.agentId,
       projectRootPath: input.projectRootPath,
@@ -338,6 +346,7 @@ export class TurnPreparationService {
       enabledProfileIds: input.effectiveProfileIds,
       toolAllowlist: input.toolAllowlist,
       permissionSettings: turnSettings.agentRuntime.permissions,
+      knowledgeReadRoots: knowledgeResolution.roots,
       routeCapability: input.routeCapability,
       requestPlan: input.requestPlan,
       promptPlan: input.promptPlan,
@@ -427,6 +436,7 @@ export class TurnPreparationService {
         derivedContextStatus: materialized.derivedContextStatus,
         compactedTurnCount: materialized.compactedTurnCount,
         compactionState: compactionApplied ? 'prepared' : 'not-required',
+        knowledgeReadRootDiagnostics: knowledgeResolution.diagnostics,
       },
       runtime: {
         runtimeTools,

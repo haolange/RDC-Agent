@@ -1,4 +1,3 @@
-import { DEFAULT_EMBEDDING_SETTINGS } from '@shared/types/embedding';
 import type { AppSettings, LlmAgentRoute } from '@shared/types/settings';
 import {
   APP_DEFAULT_WINDOW_HEIGHT,
@@ -83,7 +82,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
       compactionThresholdPercent: 80,
     },
   },
-  llm: { providers: [], agentRoutes: createEmptyAgentRoutes(), embedding: { ...DEFAULT_EMBEDDING_SETTINGS } },
+  llm: { providers: [], agentRoutes: createEmptyAgentRoutes() },
   agents: { directoryPath: '', definitions: [], modelOptions: [], globalInstructions: '', diagnostics: [] },
   resourceCatalog: {
     availableSkills: [],

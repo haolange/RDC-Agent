@@ -34,15 +34,13 @@ function emptyReason(
 function HitButton({
   hit: card,
   active,
-  showSemantic,
   onSelect,
 }: {
   hit: KnowledgeLaneHit;
   active: boolean;
-  showSemantic: boolean;
   onSelect: () => void;
 }) {
-  const chips = card.lanes.filter((lane) => lane !== 'Semantic' || showSemantic);
+  const chips = card.lanes;
   return (
     <Button
       variant="ghost"
@@ -89,7 +87,6 @@ export function ListColumn({ state, inbox }: ListColumnProps) {
             key={hit.cardId}
             hit={hit}
             active={state.selectedCardId === hit.cardId}
-            showSemantic={state.semanticReady}
             onSelect={() => void state.selectCard(hit.spaceId, hit.relativePath, hit.cardId)}
           />
         ))}

@@ -249,7 +249,6 @@
 .knowledge-center-card-preview,
 .knowledge-center-empty-inline,
 .knowledge-center-index-hint,
-.knowledge-center-semantic-status,
 .knowledge-center-missing {
   font-size: var(--text-xs);
   color: var(--token-text-caption);

@@ -10,32 +10,21 @@ import {
   CANONICAL_TOOL_TOKEN_EXPANSIONS,
 } from '@shared/constants/agentToolTokens';
 import { AGENT_WORKBENCH_TOOL_CATALOG } from '@shared/constants/agentWorkbenchCatalog';
-import { SEMANTIC_INDEX_SNAPSHOT_SCHEMA_VERSION, type SemanticLaneStatus } from '@shared/types/embedding';
 import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledge';
 import { createKnowledgeTools } from '../knowledge/KnowledgeTools';
-import { StorageIo } from '../sessions/StorageIo';
 import { createDisposableCandidateService } from '../knowledge/KnowledgeCandidateService';
 import { sourceStatusImpliesVerified } from '../knowledge/knowledgeCardSchema';
-import { KnowledgeCompileService } from '../knowledge/KnowledgeCompileService';
-import { KnowledgeIndexService } from '../knowledge/KnowledgeIndexService';
 import { KNOWLEDGE_STATE_FILE } from '../knowledge/knowledgeStateSchema';
-import { KnowledgeQueryService } from '../knowledge/KnowledgeQueryService';
-import {
-  inspectSemanticIndexVectors,
-  parseSemanticIndexSnapshot,
-} from '../knowledge/semanticIndexSchema';
 import { KnowledgeWriteService } from '../knowledge/KnowledgeWriteService';
 import {
   KnowledgeHumanConfirmationRequiredError,
   KnowledgeLifecycleError,
-  KnowledgeSemanticLaneClosedError,
 } from '../knowledge/knowledgeErrors';
 import {
   combineActiveSkillAllowlists,
   intersectSkillAllowedTools,
 } from '../workflow/debugger/DebuggerRuntimePolicy';
 import { isDeferredToolName, partitionDeferredTools } from '../workflow/debugger/deferredTools';
-import { readFile } from 'node:fs/promises';
 
 const FIVE_DEFERRED = [
   'knowledge_browse',
@@ -71,27 +60,6 @@ function skillAllowedTools(skillId: string): string[] {
 
 function space(rootPath: string): KnowledgeSpace {
   return { spaceId: 'user', kind: 'user', label: 'User', rootPath };
-}
-
-function createStorage(): StorageIo {
-  const files = new Map<string, unknown>();
-  return {
-    ensureDir: () => undefined,
-    readJson: (filePath: string) => (files.has(filePath) ? files.get(filePath) : null),
-    writeJsonAtomic: (filePath: string, data: unknown) => {
-      files.set(filePath, data);
-    },
-  } as unknown as StorageIo;
-}
-
-function status(availability: SemanticLaneStatus['availability'], reason: SemanticLaneStatus['reason']): SemanticLaneStatus {
-  return {
-    availability,
-    reason,
-    selectedIdentity: availability === 'unavailable' ? null : 'openai:text-embedding-3-small',
-    selectedDimensions: 1536,
-    snapshot: null,
-  };
 }
 
 function draftCard(): KnowledgeCardRecord {
@@ -132,43 +100,6 @@ describe('knowledge system contract', () => {
       expect(builtin.includes(id)).toBe(false);
       expect(tools.some((tool) => tool.name === id)).toBe(false);
     }
-  });
-
-  it('knowledge.contract.lanes.semantic-unavailable-stale', async () => {
-    expect.hasAssertions();
-    const root = mkdtempSync(path.join(tmpdir(), 'rdc-know-sem-'));
-    mkdirSync(path.join(root, 'facts'), { recursive: true });
-    writeFileSync(path.join(root, 'facts', 'sample.md'), '---\ntype: "fact"\nlifecycle: "draft"\ntitle: "Sample"\n---\n\nBody.\n', 'utf8');
-    const index = new KnowledgeIndexService({
-      listSpaces: () => [space(root)],
-      snapshotPath: () => path.join(root, 'index.json'),
-      storage: createStorage(),
-      now: () => new Date('2026-09-01T00:00:00.000Z'),
-      readFile: (filePath) => readFile(filePath, 'utf8'),
-      statMtime: async () => Date.parse('2026-09-01T00:00:00.000Z'),
-    });
-    const unavailable = new KnowledgeQueryService({
-      listSpaces: () => [space(root)],
-      resolveSemanticLaneStatus: () => status('unavailable', 'consent-denied'),
-      index,
-      readFile: (filePath) => readFile(filePath, 'utf8'),
-      statMtime: async () => Date.parse('2026-09-01T00:00:00.000Z'),
-    });
-    const stale = new KnowledgeQueryService({
-      listSpaces: () => [space(root)],
-      resolveSemanticLaneStatus: () => status('stale', 'identity-mismatch'),
-      index,
-      readFile: (filePath) => readFile(filePath, 'utf8'),
-      statMtime: async () => Date.parse('2026-09-01T00:00:00.000Z'),
-    });
-    const closed = await unavailable.query({ text: 'sample', lanes: ['Lexical', 'Semantic'] });
-    expect(closed.semantic?.availability).toBe('unavailable');
-    expect(closed.lanes.find((lane) => lane.lane === 'Semantic')?.hits).toEqual([]);
-    expect(closed.hits.length).toBeGreaterThan(0);
-    await expect(unavailable.requireSemanticReady()).rejects.toBeInstanceOf(KnowledgeSemanticLaneClosedError);
-    const staleResult = await stale.query({ lanes: ['Semantic'] });
-    expect(staleResult.semantic?.availability).toBe('stale');
-    expect(new KnowledgeCompileService().compile(staleResult).semanticClaimed).toBe(false);
   });
 
   it('knowledge.contract.write.human-only-candidate-fullaccess', async () => {
@@ -301,41 +232,6 @@ describe('knowledge system contract', () => {
     expect(created?.isError).toBeFalsy();
     expect(await store.listCandidates('constructor-session')).toHaveLength(0);
     expect(await store.listCandidates('context-session')).toHaveLength(1);
-  });
-
-  it('knowledge.contract.semantic.no-metadata-only-ready', () => {
-    expect.hasAssertions();
-    expect(parseSemanticIndexSnapshot({
-      schemaVersion: SEMANTIC_INDEX_SNAPSHOT_SCHEMA_VERSION,
-      identity: 'openai:text-embedding-3-small',
-      dimensions: 8,
-      chunker: 'plain-v1',
-      corpusHash: 'abc',
-      catalogRevision: 'rev',
-      builtAt: '2026-09-01T00:00:00.000Z',
-      chunkCount: 1,
-    })).toBeNull();
-    expect(inspectSemanticIndexVectors({
-      schemaVersion: SEMANTIC_INDEX_SNAPSHOT_SCHEMA_VERSION,
-      identity: 'openai:text-embedding-3-small',
-      dimensions: 8,
-      chunker: 'plain-v1',
-      corpusHash: 'abc',
-      catalogRevision: 'rev',
-      builtAt: '2026-09-01T00:00:00.000Z',
-      chunkCount: 1,
-      chunks: [{
-        cardId: 'user:facts/sample.md',
-        spaceId: 'user',
-        relativePath: 'facts/sample.md',
-        title: 'Sample',
-        chunkIndex: 0,
-        text: 'A fact.',
-      }],
-      vectors: [],
-    }, 8)).toBe('incomplete-vectors');
-    expect(readRepo('src/main/settings/EmbeddingExecutionService.ts')).toMatch(/inspectSemanticIndexVectors/);
-    expect(readRepo('src/main/knowledge/KnowledgeQueryService.ts')).toMatch(/availability === 'ready'/);
   });
 
   it('knowledge.contract.write.fixed-not-verified', async () => {

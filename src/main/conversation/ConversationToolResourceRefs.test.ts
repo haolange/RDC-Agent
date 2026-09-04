@@ -68,6 +68,20 @@ describe('ConversationToolResourceRefs', () => {
     expect(extractConversationToolResourceRefs('rdx_context', success({ contextId: 'internal' }))).toEqual([]);
   });
 
+  it('collects a successful knowledge-root file read as an ordinary file resource', () => {
+    // Contract: grep/glob/read of canonical knowledge paths reuse the file-tool
+    // resource path. Do not add a knowledge-specific Right Rail projection.
+    expect(extractConversationToolResourceRefs('read_file', success({
+      path: 'C:/Users/me/.rdx/knowledge/cards/note.md',
+    }))).toEqual([
+      expect.objectContaining({
+        kind: 'file',
+        label: 'note.md',
+        path: 'C:/Users/me/.rdx/knowledge/cards/note.md',
+      }),
+    ]);
+  });
+
   it('extracts session:// refs as file kind with the URI as path', () => {
     expect(extractConversationToolResourceRefs('grep', success({
       artifactized: true,

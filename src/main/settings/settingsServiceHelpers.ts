@@ -12,10 +12,6 @@ import type {
   AgentRuntimeSettings,
   UiPreferences,
 } from '@shared/types/settings';
-import {
-  sanitizeEmbeddingSettings,
-  type EmbeddingSettings,
-} from '@shared/types/embedding';
 import { createDefaultChromeThemes } from '@shared/theme/presets';
 import { sanitizeUiPreferences } from '@shared/theme/uiPreferences';
 import {
@@ -31,7 +27,6 @@ import { StorageSchemaError } from '../sessions/storageSchema';
 import {
   DEFAULT_APPEARANCE,
   DEFAULT_AGENT_RUNTIME,
-  DEFAULT_EMBEDDING_SETTINGS,
   DEFAULT_LAYOUT,
   DEFAULT_PROFILE,
   DEFAULT_CODE_INTERPRETER,
@@ -80,7 +75,6 @@ export interface NormalizedPersistedSettings {
   agentRuntime: AgentRuntimeSettings;
   llm: {
     providers: LlmProviderEntry[];
-    embedding: EmbeddingSettings;
   };
 }
 
@@ -166,7 +160,6 @@ export function createDefaultRuntimeSettings(): AppSettings {
     llm: {
       providers: [],
       agentRoutes: createEmptyAgentRoutes(),
-      embedding: { ...DEFAULT_EMBEDDING_SETTINGS },
     },
     agents: {
       directoryPath: appPathService.getRuntimePaths().agentsPath,
@@ -257,6 +250,13 @@ export function rebuildPersistedSettings(
     fixes.push('Reset appearance.chromeThemes to RDC preset defaults (schema 6)');
   }
 
+  const incomingLlm = candidate.llm && typeof candidate.llm === 'object' && !Array.isArray(candidate.llm)
+    ? candidate.llm as { embedding?: unknown; providers?: unknown }
+    : undefined;
+  if (incomingLlm && Object.prototype.hasOwnProperty.call(incomingLlm, 'embedding')) {
+    fixes.push('Removed persisted embedding selection (schema 7)');
+  }
+
   const nextSettings: PersistedSettingsPayload = {
     schemaVersion: SETTINGS_SCHEMA_VERSION,
     appearance,
@@ -276,7 +276,6 @@ export function rebuildPersistedSettings(
     agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
     llm: {
       providers: catalogProviders.map((provider) => ({ ...provider, apiKey: '' })),
-      embedding: sanitizeEmbeddingSettings(candidate.llm?.embedding),
     },
   };
 
@@ -321,7 +320,6 @@ export function normalizePersistedSettings(
     agentRuntime: sanitizeAgentRuntimeSettings(candidate.agentRuntime ?? fallback.agentRuntime),
     llm: {
       providers: nextProviders,
-      embedding: sanitizeEmbeddingSettings(candidate.llm?.embedding),
     },
   };
 }
@@ -390,7 +388,6 @@ export function toRuntimeSettings(
     llm: {
       providers: hydratedProviders,
       agentRoutes,
-      embedding: sanitizeEmbeddingSettings(normalized.llm.embedding),
     },
     agents: agentManifestService.projectEffectiveModelOptions(
       baseAgentSettings,

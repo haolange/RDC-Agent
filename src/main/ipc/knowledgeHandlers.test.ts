@@ -66,12 +66,6 @@ vi.mock('../knowledge/KnowledgeIndexService', () => ({
   knowledgeIndexService: { getSnapshot: () => null, rebuild: vi.fn() },
 }));
 
-vi.mock('../settings/EmbeddingExecutionService', () => ({
-  embeddingExecutionService: {
-    resolveSemanticLaneStatus: () => ({ availability: 'unavailable', reason: 'unconfigured' }),
-  },
-}));
-
 vi.mock('../runtime/RuntimeLogService', () => ({
   runtimeLogService: { log: vi.fn() },
 }));

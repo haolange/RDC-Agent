@@ -10,6 +10,7 @@ import { toolToDefinition } from '../../agent-runtime/agent/AgentTool';
 import type { ToolExecutor } from '../../agent-runtime/agent/AgentLoop';
 import type { ToolCall, ToolResultMessage } from '../../agent-runtime/core/types';
 import { getWorkspaceRoot, withTemporaryPathAccess } from '../../agent-runtime/tools/primitives/_shared';
+import { isKnowledgeReadFileTool } from '../../agent-runtime/knowledgeReadRoots';
 import { buildDiagnosticAgentEvent } from '../../agent-runtime/AgentEventBridge';
 import { agentUserInputRequestService } from '../../agent-runtime/interactions/AgentUserInputRequestService';
 import { agentPermissionPolicyService } from '../../agent-runtime/permissions/AgentPermissionPolicy';
@@ -223,6 +224,7 @@ export class ToolExecutorFactory {
             sessionAttachmentsRoot = null;
           }
         }
+        const knowledgeReadRoots = plan?.knowledgeReadRoots ?? [];
         const permissionDecision = agentPermissionPolicyService.evaluate({
           tool,
           toolCall: validatedToolCall,
@@ -231,6 +233,7 @@ export class ToolExecutorFactory {
           ...(permissionSettings ? { permissionSettings } : {}),
           ...(compiledPolicy ? { compiledPolicy } : {}),
           ...(sessionAttachmentsRoot ? { sessionAttachmentsRoot } : {}),
+          ...(knowledgeReadRoots.length > 0 ? { knowledgeReadRoots } : {}),
         });
         if (permissionDecision.action === 'deny') {
           return denyTool(permissionDecision.reason);
@@ -292,9 +295,13 @@ export class ToolExecutorFactory {
             sessionId: runtimeContext?.sessionId ?? null,
             visionInputMode: plan?.routeCapability?.visionInputMode ?? 'disabled',
           };
+          const injectKnowledgeRoots = isKnowledgeReadFileTool(normalizedName);
           const result = await withTemporaryPathAccess(
             toolContext,
-            permissionDecision.temporaryPathRoots,
+            [
+              ...(permissionDecision.temporaryPathRoots ?? []),
+              ...(injectKnowledgeRoots ? knowledgeReadRoots : []),
+            ],
             (scopedContext) => tool.execute(
               toolCall.id,
               validatedArgs,

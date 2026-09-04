@@ -119,9 +119,6 @@ export const RENDERER_INVOKE_CHANNEL = {
     getModelsOverride: 'settings:getModelsOverride',
     setModelsOverride: 'settings:setModelsOverride',
     getResolvedShell: 'settings:getResolvedShell',
-    getEmbeddingCatalog: 'settings:getEmbeddingCatalog',
-    getSemanticLaneStatus: 'settings:getSemanticLaneStatus',
-    rebuildSemanticIndex: 'settings:rebuildSemanticIndex',
     set: 'settings:set',
   },
   project: {

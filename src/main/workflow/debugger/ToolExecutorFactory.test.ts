@@ -30,7 +30,7 @@ vi.mock('../../settings/AgentRuntimeConfigService', () => ({
 vi.mock('../../agent-runtime/core/ToolValidator', () => ({
   ToolValidationError: class ToolValidationError extends Error {},
   toolValidator: {
-    validate: () => ({ ok: true, value: {} }),
+    validate: (_definition: unknown, args: Record<string, unknown> = {}) => args,
   },
 }));
 
@@ -498,5 +498,150 @@ describe('ToolExecutorFactory', () => {
     });
     expect(result.isError).toBe(true);
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('injects knowledgeReadRoots only for the four read-only file tools', async () => {
+    const knowledgeRoot = 'D:/Users/me/.rdx/knowledge';
+    const seen = new Map<string, readonly string[] | undefined>();
+    const makeTool = (name: string) => ({
+      name,
+      description: name,
+      parameters: { type: 'object', properties: {} },
+      execute: vi.fn(async (_id: string, _args: unknown, _signal?: AbortSignal, _onUpdate?: unknown, context?: { temporaryAllowedPathRoots?: readonly string[] }) => {
+        seen.set(name, context?.temporaryAllowedPathRoots);
+        return { content: [{ type: 'text' as const, text: 'ok' }] };
+      }),
+    });
+    const tools = [
+      'read_file',
+      'read_image',
+      'glob',
+      'grep',
+      'write_file',
+      'edit_file',
+      'delete_file',
+      'shell',
+      'code_interpreter',
+    ].map((name) => [name, makeTool(name)] as const);
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+      getActiveTurn: () => null,
+      resolveRuntimeTools: () => ({
+        toolMap: new Map(tools as never),
+        definitions: [],
+        deferredDefinitions: [],
+      }),
+      isAllowedForRuntime: () => true,
+      matchesToolAllowlist: () => true,
+    });
+    const executor = factory.createToolExecutor('ask', tools.map(([name]) => name), null, {
+      effectivePlan: {
+        toolAllowlist: tools.map(([name]) => name),
+        skillIntersection: null,
+        knowledgeReadRoots: [knowledgeRoot],
+        permissionSettings: {
+          mode: 'default',
+          readableRoots: [],
+          writableRoots: [],
+          allowedCommandPrefixes: [],
+          deniedCommandPrefixes: [],
+        },
+        policy: { deniedTools: [], limits: { maxTurns: 5 } },
+        projectId: null,
+        projectRootPath: 'D:/Project',
+      } as never,
+    });
+    for (const [name] of tools) {
+      await executor.execute({
+        type: 'toolCall',
+        id: `tc-${name}`,
+        name,
+        arguments: name === 'shell' ? { command: 'echo ok' } : { path: 'a.txt' },
+      });
+    }
+    for (const name of ['read_file', 'read_image', 'glob', 'grep']) {
+      expect(seen.get(name)).toContain(knowledgeRoot);
+    }
+    for (const name of ['write_file', 'edit_file', 'delete_file', 'shell', 'code_interpreter']) {
+      expect(seen.get(name) ?? []).not.toContain(knowledgeRoot);
+    }
+  });
+
+  it('executes real primitives: read_file rejects knowledge junction escape and write_file cannot use knowledge roots', async () => {
+    const { mkdtemp, mkdir, writeFile, symlink, rm } = await import('node:fs/promises');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const { readFileTool } = await import('../../agent-runtime/tools/primitives/ReadFileTool');
+    const { writeFileTool } = await import('../../agent-runtime/tools/primitives/WriteFileTool');
+    const userRdx = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-exec-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-exec-ws-'));
+    const knowledge = path.join(userRdx, 'knowledge');
+    const memory = path.join(userRdx, 'memory');
+    await mkdir(knowledge, { recursive: true });
+    await mkdir(memory, { recursive: true });
+    await writeFile(path.join(memory, 'secret.md'), 'leak', 'utf8');
+    await writeFile(path.join(knowledge, 'card.md'), 'keep', 'utf8');
+    const planted = path.join(knowledge, 'escape');
+    let junctionReady = true;
+    try {
+      await symlink(memory, planted, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch {
+      junctionReady = false;
+    }
+    const factory = new ToolExecutorFactory({
+      slots: { getSlot: () => null } as unknown as AgentSlotRegistry,
+      deferredActivation: { activate: vi.fn() } as unknown as DeferredToolActivationTracker,
+      getActiveTurn: () => null,
+      resolveRuntimeTools: () => ({
+        toolMap: new Map([
+          ['read_file', readFileTool],
+          ['write_file', writeFileTool],
+        ] as never),
+        definitions: [],
+        deferredDefinitions: [],
+      }),
+      isAllowedForRuntime: () => true,
+      matchesToolAllowlist: () => true,
+    });
+    const executor = factory.createToolExecutor('ask', ['read_file', 'write_file'], null, {
+      effectivePlan: {
+        toolAllowlist: ['read_file', 'write_file'],
+        skillIntersection: null,
+        knowledgeReadRoots: [knowledge],
+        permissionSettings: {
+          mode: 'default',
+          readableRoots: [],
+          writableRoots: [],
+          allowedCommandPrefixes: [],
+          deniedCommandPrefixes: [],
+        },
+        policy: { deniedTools: [], limits: { maxTurns: 5 } },
+        projectId: 'proj',
+        projectRootPath: workspace,
+      } as never,
+    });
+    try {
+      if (junctionReady) {
+        const readResult = await executor.execute({
+          type: 'toolCall',
+          id: 'tc-read-junc',
+          name: 'read_file',
+          arguments: { path: path.join(planted, 'secret.md') },
+        });
+        expect(readResult.isError).toBe(true);
+        expect(JSON.stringify(readResult)).toMatch(/SYMLINK_PATH_REJECTED/);
+      }
+      const writeResult = await executor.execute({
+        type: 'toolCall',
+        id: 'tc-write-kn',
+        name: 'write_file',
+        arguments: { path: path.join(knowledge, 'card.md'), content: 'overwrite' },
+      });
+      expect(writeResult.isError).toBe(true);
+      expect(JSON.stringify(writeResult)).toMatch(/超出 workspace/);
+    } finally {
+      await Promise.all([rm(userRdx, { recursive: true, force: true }), rm(workspace, { recursive: true, force: true })]);
+    }
   });
 });

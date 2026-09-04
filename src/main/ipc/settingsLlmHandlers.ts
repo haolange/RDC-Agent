@@ -19,7 +19,7 @@ import { settingsService } from '../settings/SettingsService';
 import { resolveEffectiveCatalog, resolveEffectiveModel } from '../settings/EffectiveModelResolver';
 import { effectiveCatalogService } from '../settings/EffectiveCatalogService';
 import { providerCapabilityProbeService } from '../settings/ProviderCapabilityProbeService';
-import { getEmbeddingCatalog, loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
+import { loadProviderSurface } from '../provider-catalog/ProviderCatalogRegistry';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
 import { formatShellInterpreterLabel, shellResolver } from '../runtime/ShellResolver';
 import type { WorkbenchIpcContext } from './workbenchContext';
@@ -48,7 +48,6 @@ import {
 } from './validation/settingsLlmSchemas';
 import type { ModelsOverride } from '@shared/provider-catalog/modelsOverrideSchema';
 import { modelsOverrideService } from '../settings/ModelsOverrideService';
-import { embeddingExecutionService } from '../settings/EmbeddingExecutionService';
 
 export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void {
   effectiveCatalogService.setDiscoveryLoaderResolver((request) => (
@@ -370,30 +369,6 @@ export function registerSettingsLlmHandlers(context: WorkbenchIpcContext): void 
       maxBytes: 1024,
     });
     return modelsOverrideService.getOverrides();
-  });
-
-  ipcMain.handle('settings:getEmbeddingCatalog', async (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, {
-      label: 'settings:getEmbeddingCatalog',
-      maxBytes: 1024,
-    });
-    return getEmbeddingCatalog();
-  });
-
-  ipcMain.handle('settings:getSemanticLaneStatus', async (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, {
-      label: 'settings:getSemanticLaneStatus',
-      maxBytes: 1024,
-    });
-    return await embeddingExecutionService.resolveSemanticLaneStatus();
-  });
-
-  ipcMain.handle('settings:rebuildSemanticIndex', async (_event, ...rawArgs: unknown[]) => {
-    parseIpcArgs(EmptyArgsSchema, rawArgs, {
-      label: 'settings:rebuildSemanticIndex',
-      maxBytes: 1024,
-    });
-    return embeddingExecutionService.rebuildSemanticIndex();
   });
 
   ipcMain.handle('settings:setModelsOverride', async (_event, ...rawArgs: unknown[]) => {

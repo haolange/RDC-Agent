@@ -1,4 +1,3 @@
-import type { SemanticLaneStatus } from '@shared/types/embedding';
 import type {
   KnowledgeLaneHit,
   KnowledgePack,
@@ -27,14 +26,13 @@ export function buildKnowledgeCenterQueryRequest(input: {
   type: KnowledgeQueryRequest['type'];
   lifecycle: KnowledgeQueryRequest['lifecycle'];
   lanes: KnowledgeRetrievalLane[];
-  semanticReady: boolean;
 }): KnowledgeQueryRequest {
   return {
     spaceIds: input.spaceIds,
     text: input.text.trim() || undefined,
     type: input.type,
     lifecycle: input.lifecycle,
-    lanes: input.lanes.filter((lane) => lane !== 'Semantic' || input.semanticReady),
+    lanes: input.lanes,
   };
 }
 
@@ -49,11 +47,10 @@ export async function runKnowledgeCenterQuery(input: {
   queryRequest: KnowledgeQueryRequest;
   query: (request: KnowledgeQueryRequest) => Promise<{
     hits: KnowledgeLaneHit[];
-    semantic?: SemanticLaneStatus | null;
   }>;
   compile: (request: KnowledgeQueryRequest & { limit?: number }) => Promise<KnowledgePack>;
   isCurrent?: () => boolean;
-}): Promise<{ hits: KnowledgeLaneHit[]; pack: KnowledgePack; semantic?: SemanticLaneStatus } | null> {
+}): Promise<{ hits: KnowledgeLaneHit[]; pack: KnowledgePack } | null> {
   const stale = () => input.isCurrent != null && !input.isCurrent();
   if (input.viewMode === 'conflicts') {
     const compiled = await input.compile({ ...input.queryRequest, limit: 50 });
@@ -64,8 +61,5 @@ export async function runKnowledgeCenterQuery(input: {
   if (stale()) return null;
   const compiled = await input.compile({ ...input.queryRequest, limit: 50 });
   if (stale()) return null;
-  return {
-    ...assignKnowledgeCenterList(input.viewMode, result.hits, compiled),
-    ...(result.semantic ? { semantic: result.semantic } : {}),
-  };
+  return assignKnowledgeCenterList(input.viewMode, result.hits, compiled);
 }

@@ -34,7 +34,6 @@ export class KnowledgeCompileService {
         }
       }
     }
-    const semanticReady = query.semantic?.availability === 'ready';
     const digest = createHash('sha256')
       .update(hits.map((hit) => hit.cardId).join('|'), 'utf8')
       .digest('hex')
@@ -44,9 +43,6 @@ export class KnowledgeCompileService {
       compiledAt: (this.overrides.now ?? (() => new Date()))().toISOString(),
       hits,
       conflicts,
-      semanticClaimed: semanticReady && query.semantic
-        ? { claimed: true, status: query.semantic }
-        : false,
     };
   }
 }

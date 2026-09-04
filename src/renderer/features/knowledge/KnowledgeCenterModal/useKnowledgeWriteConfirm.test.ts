@@ -34,7 +34,6 @@ const pack: KnowledgePack = {
     { leftCardId: 'user:facts/sample.md', rightCardId: 'user:facts/other.md', kind: 'contradicts' },
     { leftCardId: 'user:facts/a.md', rightCardId: 'user:facts/b.md', kind: 'contradicts' },
   ],
-  semanticClaimed: false,
 };
 
 describe('evaluateWriteGate', () => {
@@ -134,7 +133,6 @@ describe('Cards write confirm without visiting Conflicts', () => {
     conflicts: [
       { leftCardId: 'user:facts/other.md', rightCardId: 'user:facts/sample.md', kind: 'contradicts' },
     ],
-    semanticClaimed: false,
   };
 
   it('requires acknowledge for compile-derived contradicts before issuing a write token', async () => {

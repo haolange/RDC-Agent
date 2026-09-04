@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { SemanticLaneStatus } from '@shared/types/embedding';
-import { isSemanticLaneReady } from '../../embedding/semanticLaneCopy';
 import type {
   KnowledgeCardDetail,
   KnowledgeCardRecord,
@@ -38,11 +36,10 @@ export function useKnowledgeCenter(open: boolean) {
   const [narrowPane, setNarrowPane] = useState<KnowledgeNarrowPane>('spaces');
   const [spaces, setSpaces] = useState<KnowledgeSpace[]>([]);
   const [index, setIndex] = useState<KnowledgeIndexOverview | null>(null);
-  const [semantic, setSemantic] = useState<SemanticLaneStatus | null>(null);
   const [selectedSpaceIds, setSelectedSpaceIds] = useState<string[]>([]);
   const [types, setTypes] = useState(ALL_CARD_TYPES);
   const [lifecycles, setLifecycles] = useState(ALL_LIFECYCLES);
-  const [lanes, setLanes] = useState<KnowledgeRetrievalLane[]>(ALL_LANES.filter((lane) => lane !== 'Semantic'));
+  const [lanes, setLanes] = useState<KnowledgeRetrievalLane[]>([...ALL_LANES]);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [hits, setHits] = useState<KnowledgeLaneHit[]>([]);
@@ -55,8 +52,6 @@ export function useKnowledgeCenter(open: boolean) {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [rebuilding, setRebuilding] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const semanticReady = isSemanticLaneReady(semantic);
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 640px)');
@@ -78,11 +73,7 @@ export function useKnowledgeCenter(open: boolean) {
       const result = await window.electronAPI.knowledge.overview();
       setSpaces(result.spaces);
       setIndex(result.index);
-      setSemantic(result.semantic);
       setSelectedSpaceIds((current) => nextSelectedSpaceIds(current, result.spaces));
-      if (!isSemanticLaneReady(result.semantic)) {
-        setLanes((current) => current.filter((lane) => lane !== 'Semantic'));
-      }
     } catch (err) {
       setError(knowledgeErrorMessage(err));
     } finally {
@@ -96,8 +87,7 @@ export function useKnowledgeCenter(open: boolean) {
     type: types,
     lifecycle: lifecycles,
     lanes,
-    semanticReady,
-  }), [debouncedSearch, lanes, lifecycles, selectedSpaceIds, semanticReady, types]);
+  }), [debouncedSearch, lanes, lifecycles, selectedSpaceIds, types]);
 
   const refreshQuery = useCallback(async () => {
     const seq = querySeq.current.next();
@@ -111,7 +101,6 @@ export function useKnowledgeCenter(open: boolean) {
         isCurrent: () => querySeq.current.isCurrent(seq),
       });
       if (!next || !querySeq.current.isCurrent(seq)) return;
-      if (next.semantic) setSemantic(next.semantic);
       setHits(next.hits);
       setPack(next.pack);
       setPackQueryKey(knowledgeQueryKey(queryRequest));
@@ -184,13 +173,12 @@ export function useKnowledgeCenter(open: boolean) {
   const toggleType = useCallback((value: (typeof ALL_CARD_TYPES)[number]) => setTypes((cur) => toggleSetValue(cur, value)), []);
   const toggleLifecycle = useCallback((value: (typeof ALL_LIFECYCLES)[number]) => setLifecycles((cur) => toggleSetValue(cur, value)), []);
   const toggleLane = useCallback((value: (typeof ALL_LANES)[number]) => {
-    if (value === 'Semantic' && !semanticReady) return;
     setLanes((cur) => toggleSetValue(cur, value));
-  }, [semanticReady]);
+  }, []);
 
   return {
-    sessionId, viewMode, setViewMode, narrow, narrowPane, setNarrowPane, spaces, index, semantic,
-    semanticReady, selectedSpaceIds, types, lifecycles, lanes, allLanes: KNOWLEDGE_RETRIEVAL_LANES,
+    sessionId, viewMode, setViewMode, narrow, narrowPane, setNarrowPane, spaces, index,
+    selectedSpaceIds, types, lifecycles, lanes, allLanes: KNOWLEDGE_RETRIEVAL_LANES,
     searchQuery, setSearchQuery, hits, pack, packQueryKey, selectedCardId, selectedCard, loadingOverview,
     loadingQuery, loadingDetail, rebuilding, error, setError, toggleSpace, toggleType,
     toggleLifecycle, toggleLane, selectCard, selectRecord, rebuildIndex, refreshOverview, refreshQuery, queryRequest,

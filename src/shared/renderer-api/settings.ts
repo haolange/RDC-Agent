@@ -80,9 +80,6 @@ export function createSettingsApi(transport: RendererApiTransport): SettingsApi 
     getModelsOverride: () => transport.invoke(INVOKE.settings.getModelsOverride),
     setModelsOverride: (overrides) => transport.invoke(INVOKE.settings.setModelsOverride, overrides),
     getResolvedShell: (executable) => transport.invoke(INVOKE.settings.getResolvedShell, executable),
-    getEmbeddingCatalog: () => transport.invoke(INVOKE.settings.getEmbeddingCatalog),
-    getSemanticLaneStatus: () => transport.invoke(INVOKE.settings.getSemanticLaneStatus),
-    rebuildSemanticIndex: () => transport.invoke(INVOKE.settings.rebuildSemanticIndex),
     set: (settings) => transport.invoke(INVOKE.settings.set, settings),
   };
 }

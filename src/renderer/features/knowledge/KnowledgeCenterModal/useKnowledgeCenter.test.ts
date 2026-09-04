@@ -23,7 +23,6 @@ describe('assignKnowledgeCenterList', () => {
       { ...hit('query-first', 1), reasons: ['Lexical:1'] },
     ],
     conflicts: [],
-    semanticClaimed: false,
   };
 
   it('keeps knowledge.query hit order for Cards and still stores the pack', () => {

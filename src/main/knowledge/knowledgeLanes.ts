@@ -1,13 +1,12 @@
 import { createHash } from 'node:crypto';
 import type { KnowledgeCardRecord, KnowledgeScope } from '@shared/types/knowledge';
 
-/** Seven retrieval lanes. Order is the walk-pattern contract. */
+/** Six retrieval lanes. Order is the walk-pattern contract. */
 export const KNOWLEDGE_RETRIEVAL_LANES = [
   'Identity/Path',
   'Scope/Metadata',
   'Lexical',
   'Structural',
-  'Semantic',
   'Relation/Graph',
   'Temporal/Version',
 ] as const;
@@ -44,17 +43,6 @@ export interface KnowledgeIndexSnapshot {
   revision: string;
   builtAt: string;
   cards: KnowledgeIndexEntry[];
-}
-
-export interface SemanticCorpusDocument {
-  cardId: string;
-  spaceId: string;
-  relativePath: string;
-  title: string;
-  type?: KnowledgeCardRecord['type'];
-  lifecycle?: KnowledgeCardRecord['lifecycle'];
-  body: string;
-  contentHash: string;
 }
 
 export function knowledgeCorpusHash(

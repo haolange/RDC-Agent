@@ -53,8 +53,77 @@ function normalizeInputPath(input: string): string {
 export function isWithinRoot(target: string, root: string): boolean {
   if (root === '*') return true;
   const resolvedRoot = path.resolve(root);
-  const rel = path.relative(resolvedRoot, target);
+  const rel = path.relative(resolvedRoot, path.resolve(target));
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
+/** True when any existing ancestor is a symlink, junction, or reparse point. */
+export function pathHasSymlinkOrJunction(target: string): boolean {
+  let current = path.resolve(target);
+  while (fs.existsSync(current)) {
+    if (fs.lstatSync(current).isSymbolicLink()) return true;
+    const parent = path.dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
+  return false;
+}
+
+function pathIdentityKey(value: string): string {
+  const resolved = path.resolve(value);
+  return process.platform === 'win32' ? resolved.normalize('NFC').toLowerCase() : resolved;
+}
+
+function sameExistingIdentity(left: string, right: string): boolean {
+  try {
+    return pathIdentityKey(realpathExistingAncestor(left)) === pathIdentityKey(realpathExistingAncestor(right));
+  } catch {
+    return false;
+  }
+}
+
+function ancestorHops(target: string): string[] {
+  const hops: string[] = [];
+  let current = path.resolve(target);
+  hops.push(current);
+  let parent = path.dirname(current);
+  while (parent !== current) {
+    hops.push(parent);
+    current = parent;
+    parent = path.dirname(current);
+  }
+  return hops;
+}
+
+/** Symlink/junction hops strictly below `identRoot`; ancestors of the root are ignored. */
+function hasSymlinkInsideRoot(target: string, identRoot: string): boolean {
+  for (const hop of ancestorHops(target)) {
+    if (sameExistingIdentity(hop, identRoot)) return false;
+    if (fs.existsSync(hop) && fs.lstatSync(hop).isSymbolicLink()) return true;
+  }
+  return false;
+}
+
+/**
+ * Workspace / knowledge-root containment that also recognizes Windows 8.3 and
+ * case aliases. Containment is never enough by itself: every hop from target
+ * to root is checked for symlink/junction/reparse.
+ */
+export function isWithinRootAllowingAliases(target: string, root: string): boolean {
+  if (root === '*') return true;
+  try {
+    const resolvedRoot = path.resolve(root);
+    if (fs.existsSync(resolvedRoot) && fs.lstatSync(resolvedRoot).isSymbolicLink()) {
+      return false;
+    }
+    const identRoot = realpathExistingAncestor(resolvedRoot);
+    const contained = isWithinRoot(target, root)
+      || isWithinRoot(realpathExistingAncestor(target), identRoot);
+    if (!contained) return false;
+    return !hasSymlinkInsideRoot(target, identRoot);
+  } catch {
+    return false;
+  }
 }
 
 function assertInsideAllowedRoots(
@@ -63,11 +132,9 @@ function assertInsideAllowedRoots(
   input: string,
   context?: ToolExecutionContext,
 ): void {
-  const rel = path.relative(workspaceRoot, target);
-  const insideWorkspace = rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
-  if (insideWorkspace) return;
+  if (isWithinRootAllowingAliases(target, workspaceRoot)) return;
   const temporaryRoots = context?.temporaryAllowedPathRoots ?? [];
-  if (temporaryRoots.some((root) => isWithinRoot(target, root))) return;
+  if (temporaryRoots.some((root) => isWithinRootAllowingAliases(target, root))) return;
   throw new Error(`路径 "${input}" 超出 workspace (${workspaceRoot})`);
 }
 
@@ -152,6 +219,20 @@ export async function writeTextFileNoFollow(absolutePath: string, content: strin
   assertNoSymlinkPath(finalTarget);
 }
 
+function stripWindowsExtendedPrefix(value: string): string {
+  if (process.platform !== 'win32') return value;
+  if (value.startsWith('\\\\?\\UNC\\')) return `\\\\${value.slice(8)}`;
+  if (value.startsWith('\\\\?\\')) return value.slice(4);
+  return value;
+}
+
+function realpathNative(target: string): string {
+  const resolved = fs.realpathSync.native
+    ? fs.realpathSync.native(target)
+    : fs.realpathSync(target);
+  return path.resolve(stripWindowsExtendedPrefix(resolved));
+}
+
 function realpathExistingAncestor(target: string): string {
   let current = path.resolve(target);
   const missing: string[] = [];
@@ -161,7 +242,7 @@ function realpathExistingAncestor(target: string): string {
     missing.unshift(path.basename(current));
     current = parent;
   }
-  let resolved = fs.existsSync(current) ? fs.realpathSync(current) : current;
+  let resolved = fs.existsSync(current) ? realpathNative(current) : current;
   for (const part of missing) {
     resolved = path.join(resolved, part);
   }
@@ -182,8 +263,8 @@ export function safeResolvePath(input: string, root?: string, context?: ToolExec
     ? path.resolve(expandedInput)
     : path.resolve(workspaceRoot, expandedInput);
 
-  assertInsideAllowedRoots(lexical, workspaceRoot, input, context);
   assertNoSymlinkPath(lexical);
+  assertInsideAllowedRoots(lexical, workspaceRoot, input, context);
 
   const resolved = realpathExistingAncestor(lexical);
   assertInsideAllowedRoots(resolved, workspaceRoot, input, context);

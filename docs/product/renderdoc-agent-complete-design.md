@@ -104,7 +104,7 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 
 ### 3.3 已废止：Independent Embedding Capability
 
-Embedding capability / Semantic lane **已废止**，见 `DESIGN.md` 裁决 C。U02 将逐文件删除 `EmbeddingCatalog` / `EmbeddingExecutionService` / Semantic lane / `settings.llm.embedding`。**禁止恢复** Embedding capability / Semantic lane / `llm.embedding`。Discovery 对 embedding/embeddings modality 继续 fail-closed 剔除。**当前态诚实**：这些文件与设置现在还在仓库，不是现行产品能力，不得写成已验收；真实 OpenAI embed **不再补跑**。
+Embedding capability / Semantic lane **已删除**，见 `DESIGN.md` 裁决 C。**禁止恢复** Embedding capability / Semantic lane / `llm.embedding`。Discovery 对 embedding/embeddings modality 继续 fail-closed 剔除。真实 OpenAI embed **不再补跑**。
 
 ### 3.4 Durable Handoff（已落地）
 
@@ -517,7 +517,7 @@ Planning：Triage & Taxonomy → Capture Report → Knowledge Retrieval → plan
 
 ## 13. Knowledge Engine
 
-五个主进程服务已落地：`KnowledgeQueryService` / `KnowledgeIndexService` / `KnowledgeCompileService` / `KnowledgeCandidateService` / `KnowledgeWriteService`。目标拓扑 **六 lane**（markdown-first）：Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version。**禁止** Semantic lane / Embedding capability（U02 删除源码中仍存的第七轴）。五个 deferred 工具与 `$knowledge-scout` / `$knowledge-candidate` 已落地。Knowledge Center 三列 UI（Spaces / List / Detail）、Candidate Inbox 与 ColdData Import 已落地；browse-only IPC 已删除。Candidate/Draft/review 已落到 session durable store（`<sessionPath>/knowledge-state.json`，跨进程锁 + revision）；ColdData bounded path ingest 记录并复核源 hash/mtime/size，只进 session Draft；human-confirm 写入经 realpath + 原子替换。**T18 ColdData user-space 持久化已证**（见 `DESIGN.md` T18 已证组）。产品级 Browser QA 全矩阵见 U05。
+五个主进程服务已落地：`KnowledgeQueryService` / `KnowledgeIndexService` / `KnowledgeCompileService` / `KnowledgeCandidateService` / `KnowledgeWriteService`。目标拓扑 **六 lane**（markdown-first）：Identity/Path、Scope/Metadata、Lexical、Structural、Relation/Graph、Temporal/Version。**禁止** Semantic lane / Embedding capability（U02 已删除第七轴）。五个 deferred 工具与 `$knowledge-scout` / `$knowledge-candidate` 已落地。Knowledge Center 三列 UI（Spaces / List / Detail）、Candidate Inbox 与 ColdData Import 已落地；browse-only IPC 已删除。Candidate/Draft/review 已落到 session durable store（`<sessionPath>/knowledge-state.json`，跨进程锁 + revision）；ColdData bounded path ingest 记录并复核源 hash/mtime/size，只进 session Draft；human-confirm 写入经 realpath + 原子替换。**T18 ColdData user-space 持久化已证**（见 `DESIGN.md` T18 已证组）。产品级 Browser QA 全矩阵见 U05。
 
 三个逻辑平面：Evidence（不可变事实，不是 Knowledge）→ Knowledge（结构化、带 Scope 与验证）→ Compiled Context（即时 Pack）。Card 是 Projection，不是存储本体。
 

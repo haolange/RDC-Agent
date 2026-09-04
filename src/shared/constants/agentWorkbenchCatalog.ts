@@ -572,7 +572,7 @@ export const AGENT_WORKBENCH_TOOL_CATALOG: AgentWorkbenchToolDeclaration[] = [
         lanes: { type: 'array', items: { type: 'string' } },
       },
     },
-    resultSummary: 'Searches Knowledge cards across retrieval lanes and reports semantic availability.',
+    resultSummary: 'Searches Knowledge cards across the six markdown-first retrieval lanes.',
     icon: 'library-search',
     approvalRequired: false,
   },

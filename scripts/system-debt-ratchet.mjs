@@ -207,6 +207,37 @@ export function evaluateRule(rule, repoRoot) {
     };
   }
 
+  if (probe === 'walk-path-and-content') {
+    const roots = Array.isArray(rule.roots) && rule.roots.length > 0 ? rule.roots : [rule.file];
+    const includeTests = Boolean(rule.includeTests);
+    const matcher = compilePattern(rule.pattern);
+    const matches = [];
+    for (const root of roots) {
+      const rootTarget = resolveRulePath(repoRoot, root);
+      if (!existsSync(rootTarget)) continue;
+      const files = walkFiles(rootTarget, { includeTests });
+      for (const file of files) {
+        const rel = relativePosix(repoRoot, file);
+        if (matcher && matcher.test(rel)) {
+          matches.push(rel);
+          continue;
+        }
+        const source = readFileSync(file, 'utf8');
+        if (sourceMatches(source, rule)) matches.push(rel);
+      }
+    }
+    const present = matches.length > 0;
+    return {
+      id: rule.id,
+      kind: rule.kind,
+      file: matches[0] || posixFile,
+      pattern: rule.pattern || '',
+      hit: rule.kind === 'missing' ? !present : present,
+      present,
+      matches,
+    };
+  }
+
   if (probe === 'walk-pattern') {
     if (!existsSync(target)) {
       return {

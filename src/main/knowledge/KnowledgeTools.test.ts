@@ -35,7 +35,6 @@ const queryResult: KnowledgeQueryResult = {
     lanes: ['Lexical'],
   }],
   lanes: [{ lane: 'Lexical', hits: [] }],
-  semantic: { availability: 'unavailable', reason: 'consent-denied', selectedIdentity: null, selectedDimensions: 1536, snapshot: null },
 };
 
 function createTools(candidates: KnowledgeCandidateService = createDisposableCandidateService(
@@ -77,12 +76,13 @@ describe('KnowledgeTools', () => {
     expect(cardsResult.details).toMatchObject({ spaceId: 'user', count: 1 });
   });
 
-  it('searches and compiles without claiming a closed semantic lane', async () => {
+  it('searches and compiles sourced packs from markdown-first lanes', async () => {
     const { byName } = createTools();
     const search = await byName.knowledge_search.execute('c3', { query: 'sample' });
-    expect(String(search.content[0] && 'text' in search.content[0] ? search.content[0].text : '')).toContain('semantic: unavailable');
+    expect(String(search.content[0] && 'text' in search.content[0] ? search.content[0].text : '')).toContain('1 hits');
     const compiled = await byName.knowledge_compile.execute('c4', { query: 'sample' });
-    expect(compiled.details).toMatchObject({ semanticClaimed: false });
+    expect(compiled.details).toMatchObject({ packId: expect.stringMatching(/^pack:/), count: 1 });
+    expect(compiled.details).not.toHaveProperty('semanticClaimed');
   });
 
   it('reads one card by space and path', async () => {

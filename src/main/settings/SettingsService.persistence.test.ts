@@ -443,7 +443,11 @@ describe('SettingsService provider persistence', () => {
     expect(general).toBeDefined();
     const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = general!;
     await service.saveAgentDefinition({
-      draft: { ...draft, models: ['volcengine-coding-plan:glm-5.2'] },
+      draft: {
+        ...draft,
+        models: ['volcengine-coding-plan:glm-5.2'],
+        instructions: `${draft.instructions}\nPersist an explicit user route override.`,
+      },
       clientRevision: 1,
       scope: 'user',
     });
@@ -507,7 +511,11 @@ describe('SettingsService provider persistence', () => {
     expect(ask).toBeDefined();
     const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
     await service.saveAgentDefinition({
-      draft: { ...draft, models: ['missing-provider:missing-model'] },
+      draft: {
+        ...draft,
+        models: ['missing-provider:missing-model'],
+        instructions: `${draft.instructions}\nPersist an explicit user route override.`,
+      },
       clientRevision: 1,
       scope: 'user',
     });
@@ -526,17 +534,29 @@ describe('SettingsService provider persistence', () => {
     const settingsBeforeSave = fs.readFileSync(initialized.paths.settingsPath, 'utf8');
 
     const first = service.saveAgentDefinition({
-      draft: { ...draft, models: ['deepseek:model-a'] },
+      draft: {
+        ...draft,
+        models: ['deepseek:model-a'],
+        instructions: `${draft.instructions}\nPersist an explicit user route override.`,
+      },
       clientRevision: 100,
       scope: 'user',
     });
     const middle = service.saveAgentDefinition({
-      draft: { ...draft, models: ['deepseek:model-b'] },
+      draft: {
+        ...draft,
+        models: ['deepseek:model-b'],
+        instructions: `${draft.instructions}\nPersist an explicit user route override.`,
+      },
       clientRevision: 200,
       scope: 'user',
     });
     const newest = service.saveAgentDefinition({
-      draft: { ...draft, models: ['deepseek:model-c'] },
+      draft: {
+        ...draft,
+        models: ['deepseek:model-c'],
+        instructions: `${draft.instructions}\nPersist an explicit user route override.`,
+      },
       clientRevision: 300,
       scope: 'user',
     });
@@ -570,7 +590,11 @@ describe('SettingsService provider persistence', () => {
     expect(ask).toBeDefined();
     const { filePath: _filePath, builtin: _builtin, updatedAt: _updatedAt, ...draft } = ask!;
     const committed = await service.saveAgentDefinition({
-      draft: { ...draft, models: ['deepseek:model-c'] },
+      draft: {
+        ...draft,
+        models: ['deepseek:model-c'],
+        instructions: `${draft.instructions}\nPersist an explicit user route override.`,
+      },
       clientRevision: 300,
       scope: 'user',
     });
@@ -697,8 +721,8 @@ describe('SettingsService provider persistence', () => {
     };
     const defaults = createDefaultChromeThemes();
 
-    expect(SETTINGS_SCHEMA_VERSION).toBe(6);
-    expect(persisted.schemaVersion).toBe(6);
+    expect(SETTINGS_SCHEMA_VERSION).toBe(7);
+    expect(persisted.schemaVersion).toBe(7);
     expect(runtime.appearance.chromeThemes.dark.accent).toBe(defaults.dark.accent);
     expect(runtime.appearance.chromeThemes.dark.presetId).toBe('rdc');
     expect(persisted.appearance.chromeThemes.dark.accent).toBe(defaults.dark.accent);
@@ -706,12 +730,66 @@ describe('SettingsService provider persistence', () => {
     expect(persisted.appearance.chromeThemes.dark.accent).not.toBe('#ff0000');
   });
 
+  it('rebuilds missing schemaVersion and v0-v6 settings to schema 7 without embedding selection', async () => {
+    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const settingsPath = path.join(workspaceRoot, 'config.json');
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    const cases: Array<{ label: string; raw: Record<string, unknown> }> = [
+      { label: 'missing', raw: { llm: { providers: [], embedding: { providerId: 'openai', modelId: 'text-embedding-3-small' } } } },
+      { label: 'v0', raw: { schemaVersion: 0, llm: { providers: [], embedding: { providerId: 'openai' } } } },
+      { label: 'v1', raw: { schemaVersion: 1, llm: { providers: [], embedding: { providerId: 'openai' } } } },
+      { label: 'v2', raw: { schemaVersion: 2, llm: { providers: [], embedding: { providerId: 'openai' } } } },
+      { label: 'v3', raw: { schemaVersion: 3, llm: { providers: [], embedding: { providerId: 'openai' } } } },
+      { label: 'v4', raw: { schemaVersion: 4, llm: { providers: [], embedding: { providerId: 'openai' } } } },
+      { label: 'v5', raw: { schemaVersion: 5, llm: { providers: [], embedding: { providerId: 'openai' } } } },
+      { label: 'v6', raw: { schemaVersion: 6, llm: { providers: [], embedding: { providerId: 'openai' } } } },
+    ];
+
+    for (const entry of cases) {
+      vi.resetModules();
+      fs.writeFileSync(settingsPath, JSON.stringify(entry.raw, null, 2), 'utf8');
+      const { SettingsService, SETTINGS_SCHEMA_VERSION } = await import('./SettingsService');
+      const service = new SettingsService();
+      const runtime = service.initialize();
+      const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+        schemaVersion: number;
+        llm: { embedding?: unknown; providers?: unknown };
+      };
+      expect(SETTINGS_SCHEMA_VERSION, entry.label).toBe(7);
+      expect(persisted.schemaVersion, entry.label).toBe(7);
+      expect(persisted.llm, entry.label).not.toHaveProperty('embedding');
+      expect(runtime.llm, entry.label).not.toHaveProperty('embedding');
+    }
+  });
+
+  it('is a no-op when persisted settings are already schema 7 without embedding selection', async () => {
+    const workspaceRoot = path.join(userDataRoot, '.rdx');
+    const settingsPath = path.join(workspaceRoot, 'config.json');
+    fs.mkdirSync(workspaceRoot, { recursive: true });
+    const current = {
+      schemaVersion: 7,
+      llm: { providers: [] },
+    };
+    fs.writeFileSync(settingsPath, JSON.stringify(current, null, 2), 'utf8');
+
+    const { SettingsService } = await import('./SettingsService');
+    const service = new SettingsService();
+    const runtime = service.initialize();
+    const persisted = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as {
+      schemaVersion: number;
+      llm: { embedding?: unknown };
+    };
+    expect(persisted.schemaVersion).toBe(7);
+    expect(persisted.llm).not.toHaveProperty('embedding');
+    expect(runtime.llm).not.toHaveProperty('embedding');
+  });
+
   it('fail-closes unknown higher settings schemaVersion without rewriting the file', async () => {
     const workspaceRoot = path.join(userDataRoot, '.rdx');
     const settingsPath = path.join(workspaceRoot, 'config.json');
     fs.mkdirSync(workspaceRoot, { recursive: true });
     const future = {
-      schemaVersion: 99,
+      schemaVersion: 8,
       appearance: { theme: 'dark' },
       llm: { providers: [] },
     };
