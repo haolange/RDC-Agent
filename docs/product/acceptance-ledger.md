@@ -36,9 +36,9 @@ Verdict 枚举：`planned` / `verified` / `failed` / `waived-by-user`。`verifie
 | U03-rdx-leak | 删除 `rdx-runtime-leak.json` 写入；改 runtimeLog + `ProcessSupervisor unconfirmed_orphan` | `RdxSessionService.test.ts`；`check:legacy-residue` | — | verified | 60ed27dc | 2026-09-05 |
 | U03-harness | `harness.ts` **不改名**，只确认只剩 `ArtifactKind` / `ArtifactRecord` | `check:legacy-residue` | — | verified | 60ed27dc | 2026-09-05 |
 | U03-legacy-residue | `check:legacy-residue` 零命中（合法词精确上下文白名单）；已接入 `check:gates` | `pnpm run check:legacy-residue` | — | verified | 60ed27dc | 2026-09-05 |
-| U04-gates | CI build job 改为 `pnpm run check:gates` 聚合 | `.github/workflows/ci.yml`；本地 `check:gates` | — | planned | — | — |
-| U04-diff-check | CI 增加 `git diff --check`（有效 base 解析） | U04 脚本 + 首提交测试 | — | planned | — | — |
-| U04-ledger-gate | `check:acceptance-ledger` schema + verified SHA ∈ `git rev-list HEAD`；文档 required/forbidden 短语断言 | `pnpm run check:acceptance-ledger` | — | planned | — | — |
+| U04-gates | CI build job 改为 `pnpm run check:gates` 聚合 | `.github/workflows/ci.yml`；本地 `check:gates` | — | verified | 36fff8a4 | 2026-09-05 |
+| U04-diff-check | CI 增加 `git diff --check`（有效 base 解析） | `scripts/check-git-diff.mjs`；`src/main/testing/gitDiffCheck.test.ts` | — | verified | 36fff8a4 | 2026-09-05 |
+| U04-ledger-gate | `check:acceptance-ledger` schema + verified SHA ∈ `git rev-list HEAD`；文档 required/forbidden 短语断言 | `pnpm run check:acceptance-ledger` | — | verified | 36fff8a4 | 2026-09-05 |
 | U05-browser-matrix | 产品级 Browser QA 全矩阵（1440×900 / 390×844；Light/Dark/reduced-motion；Workbench / Project / Session / Settings 九节 / Knowledge Center / 五卡 / Composer 五底栏 / fail-closed / qaPerformance） | `start:agent-browser` + luna 审 ledger 条目完整性 | `%LOCALAPPDATA%/rdc-agent-qa/<sha>/`（U05 填写） | planned | — | — |
 | U06-t15-completed | T15 Debugger + WhiteHair（Android adb）正常 `completed`：checkpoint + ready report + `final_answer` 引用；负路径复验 | U06 机器校验 `run.json` schemaVersion `'3'` + investigation index | U06 填写；设备 id/serial | planned | — | — |
 | U06-t16-completed | T16 Analyzer + 中文 1.57GB capture：Observed/Reconstructed/Authoring 三层 claim + ready report complete | U06 机器校验 | U06 填写 | planned | — | — |
