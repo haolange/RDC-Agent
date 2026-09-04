@@ -142,3 +142,31 @@ export function hashSeedSemanticManifest(manifest: SeedSemanticManifest): string
     instructions: manifest.instructions,
   }), 'utf8').digest('hex');
 }
+
+/** Canonical identity for shadow vs override. Excludes only top-level models/icon/accent and handoffs[*].model. */
+export function hashCanonicalAgentSemantics(manifest: SeedSemanticManifest): string {
+  return createHash('sha256').update(stableSerialize({
+    id: manifest.id,
+    name: manifest.name,
+    description: manifest.description,
+    argumentHint: manifest.argumentHint,
+    target: manifest.target,
+    enabled: manifest.enabled,
+    userInvocable: manifest.userInvocable,
+    disableModelInvocation: manifest.disableModelInvocation,
+    maxTurns: manifest.maxTurns,
+    tools: manifest.tools,
+    skills: manifest.skills,
+    mcpServers: manifest.mcpServers,
+    agents: manifest.agents,
+    handoffs: manifest.handoffs.map((handoff) => ({
+      label: handoff.label,
+      agent: handoff.agent,
+      prompt: handoff.prompt,
+      ...(typeof handoff.send === 'boolean' ? { send: handoff.send } : {}),
+      ...(typeof handoff.showContinueOn === 'boolean' ? { showContinueOn: handoff.showContinueOn } : {}),
+    })),
+    metadata: manifest.metadata,
+    instructions: manifest.instructions,
+  }), 'utf8').digest('hex');
+}

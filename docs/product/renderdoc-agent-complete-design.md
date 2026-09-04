@@ -91,7 +91,7 @@ Knowledge Plane        六 Type / 多轴 Scope / Lifecycle / Promotion / Negativ
 - 不新增 `mission` / `orchestratorType` / `investigationMode` 等 Profile 领域字段。
 - ask/plan/edit 及 S0 specialist id 为历史非法 id：剔出 effective snapshot + 诊断 `AGENT_ID_RESERVED_HISTORICAL`。**不再有 custom manifest 运行通道**。
 - **迁移 v2（U01 落地）**：canonical hash 只排除顶层 `models` / `icon` / `accent` 与 `handoffs[*].model`；marker `schemaVersion:'2'`；v1 视为未完成；崩溃恢复 isolation manifest；shadow（忽略 model/icon/accent 后与 builtin 相同）purge；真正改过正文/工具的 builtin-id 副本 `retained-override`。官方未改 seed 永久清除，不留 `.migrated`。
-- **当前态诚实**：代码仍是 v1 marker，且会把 concrete model 判成 user-modified（U01 修）。
+- **当前态诚实**：seed 迁移已是 v2 marker；canonical hash 忽略 model/icon/accent 与 handoff.model；v1 视为未完成。
 - 禁止交互式「导出 / 保留 / 移除」选择面。Ask / Plan / Edit 不是目标拓扑，也不是 fallback。
 
 ### 3.2 Right Rail

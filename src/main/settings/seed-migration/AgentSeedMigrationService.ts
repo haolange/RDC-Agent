@@ -1,69 +1,116 @@
+import { createHash } from 'crypto';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
 import { z } from 'zod';
 import { StorageIo } from '../../sessions/StorageIo';
 import { withDirectoryFileLockSync } from '../../sessions/directoryFileLock';
-import { parseStoredDocument, type StorageMigration } from '../../sessions/storageSchema';
-import { extractSeedSemanticManifest, hashSeedSemanticManifest, readSeedFrontmatterId } from './semanticHash';
-import { expandOfficialS0IdAliases, officialSeedHashIndex, officialSeedIdentitySet } from './officialSeedGenerations';
+import { parseStoredDocument, StorageSchemaError, type StorageMigration } from '../../sessions/storageSchema';
+import {
+  extractSeedSemanticManifest,
+  hashCanonicalAgentSemantics,
+  hashSeedSemanticManifest,
+  readSeedFrontmatterId,
+} from './semanticHash';
+import {
+  HISTORICAL_RESERVED_AGENT_IDS,
+  officialSeedHashIndex,
+} from './officialSeedGenerations';
 
 export const SEED_MIGRATION_MARKER_NAME = '.seed-migration.json';
 export const SEED_MIGRATED_DIR_NAME = '.migrated';
+export const SEED_PURGE_ISOLATION_MANIFEST_NAME = '.seed-purge-isolation.json';
+export const SEED_PURGE_ISOLATION_DIR_NAME = '.seed-purge-isolation';
+export const SEED_MIGRATION_RULE_VERSION = 'canonical-v2';
 export const BUILTIN_SEED_AGENT_IDS = ['general', 'debugger', 'analyzer', 'optimizer'] as const;
 
-const PurgedSeedSchema = z.object({
-  id: z.string(),
-  generationId: z.string(),
-  sourceHash: z.string(),
+const SeedMigrationActionSchema = z.enum([
+  'purged-historical',
+  'purged-shadow',
+  'retained-override',
+  'retained-custom',
+  'invalid-id',
+]);
+
+const SeedMigrationActionRecordSchema = z.object({
+  file: z.string(),
+  frontmatterId: z.string().nullable(),
+  filenameId: z.string(),
+  action: SeedMigrationActionSchema,
+  hashBefore: z.string(),
+  canonicalHash: z.string().optional(),
+  reason: z.string(),
 }).strict();
 
-const RetainedSeedSchema = z.object({
-  id: z.string(),
-  reason: z.enum(['user-modified', 'unknown-custom', 'target-hash-conflict']),
-  sourceHash: z.string(),
-}).strict();
-
-const SeedMigrationMarkerV1Schema = z.object({
-  schemaVersion: z.literal('1'),
+const SeedMigrationMarkerV2Schema = z.object({
+  schemaVersion: z.literal('2'),
+  ruleVersion: z.string(),
+  directoryContentHash: z.string(),
   completedAt: z.string(),
   diagnostics: z.array(z.string()),
-  purged: z.array(PurgedSeedSchema).default([]),
-  retained: z.array(RetainedSeedSchema),
-  moved: z.array(PurgedSeedSchema.extend({ archivedPath: z.string() })).optional(),
+  actions: z.array(SeedMigrationActionRecordSchema),
 }).strict();
 
-export type SeedMigrationMarker = z.infer<typeof SeedMigrationMarkerV1Schema>;
+export type SeedMigrationAction = z.infer<typeof SeedMigrationActionSchema>;
+export type SeedMigrationActionRecord = z.infer<typeof SeedMigrationActionRecordSchema>;
+export type SeedMigrationMarker = z.infer<typeof SeedMigrationMarkerV2Schema>;
 
 export const SEED_MIGRATION_MARKER_MIGRATIONS: StorageMigration<SeedMigrationMarker>[] = [
-  { schemaVersion: '1', schema: SeedMigrationMarkerV1Schema },
+  { schemaVersion: '2', schema: SeedMigrationMarkerV2Schema },
 ];
+
+const SeedPurgeIsolationFileSchema = z.object({
+  file: z.string(),
+  hashBefore: z.string(),
+  isolateName: z.string(),
+}).strict();
+
+const SeedPurgeIsolationManifestSchema = z.object({
+  schemaVersion: z.literal('1'),
+  isolationDir: z.string(),
+  files: z.array(SeedPurgeIsolationFileSchema),
+}).strict();
+
+export type SeedPurgeIsolationManifest = z.infer<typeof SeedPurgeIsolationManifestSchema>;
+
+export const SEED_PURGE_ISOLATION_MIGRATIONS: StorageMigration<SeedPurgeIsolationManifest>[] = [
+  { schemaVersion: '1', schema: SeedPurgeIsolationManifestSchema },
+];
+
+const PROTECTED_ACTIONS = new Set<SeedMigrationAction>([
+  'retained-override',
+  'retained-custom',
+  'invalid-id',
+]);
 
 const idFromFileName = (fileName: string): string => fileName.replace(/\.agent\.md$/u, '');
 
-export function collectSeedMigrationCandidateIds(fileName: string, raw: string): string[] {
-  const fileId = idFromFileName(fileName);
-  const frontmatterId = readSeedFrontmatterId(raw);
-  const ordered = [frontmatterId, fileId].filter((entry): entry is string => Boolean(entry?.trim()));
-  const seen = new Set<string>();
-  const candidates: string[] = [];
-  const push = (id: string) => {
-    if (!id || seen.has(id)) return;
-    seen.add(id);
-    candidates.push(id);
-  };
-  for (const id of ordered) {
-    push(id);
-    for (const alias of expandOfficialS0IdAliases(id)) {
-      push(alias);
-    }
-  }
-  return candidates;
+const hashRawContent = (content: string): string =>
+  createHash('sha256').update(content, 'utf8').digest('hex');
+
+export function computeAgentsDirectoryContentHash(agentsPath: string): string {
+  const entries = listAgentFiles(agentsPath).sort((left, right) => left.localeCompare(right));
+  const payload = entries.map((fileName) => ({
+    file: fileName,
+    hash: hashRawContent(fs.readFileSync(path.join(agentsPath, fileName), 'utf8')),
+  }));
+  return createHash('sha256').update(JSON.stringify(payload), 'utf8').digest('hex');
+}
+
+function listAgentFiles(agentsPath: string): string[] {
+  if (!fs.existsSync(agentsPath)) return [];
+  return fs.readdirSync(agentsPath).filter((entry) => entry.endsWith('.agent.md') && !entry.startsWith('.'));
+}
+
+function peekSchemaVersion(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const version = (raw as { schemaVersion?: unknown }).schemaVersion;
+  return typeof version === 'string' ? version : typeof version === 'number' ? String(version) : null;
 }
 
 export interface SeedMigrationResult {
-  marker: SeedMigrationMarker;
+  marker: SeedMigrationMarker | null;
   alreadyComplete: boolean;
+  diagnostics: string[];
 }
 
 export interface AgentSeedMigrationOptions {
@@ -73,6 +120,18 @@ export interface AgentSeedMigrationOptions {
 
 function defaultBuiltinAgentsPath(): string {
   return path.resolve(process.cwd(), 'resources', 'agent-runtime', 'agents');
+}
+
+interface ClassifiedSeed {
+  file: string;
+  sourcePath: string;
+  filenameId: string;
+  frontmatterId: string | null;
+  raw: string;
+  hashBefore: string;
+  action: SeedMigrationAction;
+  canonicalHash?: string;
+  reason: string;
 }
 
 export class AgentSeedMigrationService {
@@ -96,170 +155,402 @@ export class AgentSeedMigrationService {
 
   private migrateUserAgentsLocked(agentsPath: string): SeedMigrationResult {
     const markerPath = path.join(agentsPath, SEED_MIGRATION_MARKER_NAME);
-    const existing = this.readMarker(markerPath);
-    if (existing) {
-      const leftover = this.removeLeftoverMigratedDir(agentsPath);
-      if (leftover.length > 0 && existing.diagnostics.every((entry) => !entry.startsWith('SEED_MIGRATION_LEFTOVER_MIGRATED'))) {
-        existing.diagnostics.push(...leftover);
-      }
-      return { marker: existing, alreadyComplete: true };
+    const peeked = this.peekMarker(markerPath);
+    if (peeked.unsupported) {
+      return {
+        marker: null,
+        alreadyComplete: true,
+        diagnostics: [peeked.diagnostic ?? `SEED_MIGRATION_SCHEMA_UNSUPPORTED: ${markerPath}`],
+      };
     }
 
-    const index = officialSeedHashIndex();
-    const officialIds = officialSeedIdentitySet();
-    const diagnostics: string[] = [];
-    const purged: SeedMigrationMarker['purged'] = [];
-    const retained: SeedMigrationMarker['retained'] = [];
-    const entries = fs.existsSync(agentsPath)
-      ? fs.readdirSync(agentsPath).filter((entry) => entry.endsWith('.agent.md'))
-      : [];
+    const isolationRecovery = this.recoverIsolation(agentsPath);
+    if (isolationRecovery.blocked) {
+      return {
+        marker: null,
+        alreadyComplete: false,
+        diagnostics: isolationRecovery.diagnostics,
+      };
+    }
 
-    const userSnapshot = new Map<string, {
-      hash: string;
-      id: string;
-      candidateIds: string[];
-      official: { generationId: string } | null;
-    }>();
-    for (const entry of entries) {
-      const sourcePath = path.join(agentsPath, entry);
-      try {
-        const raw = fs.readFileSync(sourcePath, 'utf8');
-        const candidateIds = collectSeedMigrationCandidateIds(entry, raw);
-        const fallbackId = candidateIds[0] ?? idFromFileName(entry);
-        let matched: { id: string; hash: string; official: { generationId: string } } | null = null;
-        let fallbackHash = '';
-        for (const candidateId of candidateIds) {
-          const hash = hashSeedSemanticManifest(extractSeedSemanticManifest(raw, candidateId));
-          if (!fallbackHash) fallbackHash = hash;
-          const official = index.get(hash);
-          if (official) {
-            matched = { id: candidateId, hash, official };
-            break;
-          }
+    if (peeked.marker && peeked.marker.directoryContentHash === computeAgentsDirectoryContentHash(agentsPath)) {
+      return {
+        marker: peeked.marker,
+        alreadyComplete: true,
+        diagnostics: isolationRecovery.diagnostics,
+      };
+    }
+
+    const leftoverDiagnostics = this.removeLeftoverMigratedDir(agentsPath);
+
+    const protectedFiles = new Map<string, SeedMigrationActionRecord>();
+    if (peeked.marker) {
+      for (const action of peeked.marker.actions) {
+        if (PROTECTED_ACTIONS.has(action.action)) {
+          protectedFiles.set(action.file, action);
         }
-        userSnapshot.set(entry, {
-          hash: matched?.hash ?? fallbackHash,
-          id: matched?.id ?? fallbackId,
-          candidateIds,
-          official: matched?.official ?? null,
-        });
+      }
+    }
+
+    const diagnostics = [...isolationRecovery.diagnostics, ...leftoverDiagnostics];
+    const actions: SeedMigrationActionRecord[] = [];
+    const toPurge: ClassifiedSeed[] = [];
+    const remainingSnapshot = new Map<string, string>();
+    const officialIndex = officialSeedHashIndex();
+    const builtinCanonical = this.readBuiltinCanonicalHashes(diagnostics);
+
+    for (const file of listAgentFiles(agentsPath)) {
+      const sourcePath = path.join(agentsPath, file);
+      let raw: string;
+      try {
+        raw = fs.readFileSync(sourcePath, 'utf8');
       } catch (error) {
         diagnostics.push(`SEED_MIGRATION_READ_FAILED: ${sourcePath}: ${error instanceof Error ? error.message : String(error)}`);
+        continue;
+      }
+      const hashBefore = hashRawContent(raw);
+      remainingSnapshot.set(file, hashBefore);
+      const previous = protectedFiles.get(file);
+      if (previous) {
+        actions.push(previous);
+        continue;
+      }
+
+      const classified = this.classifySeed(file, sourcePath, raw, hashBefore, builtinCanonical, officialIndex, diagnostics);
+      if (!classified) continue;
+      if (classified.action === 'purged-historical' || classified.action === 'purged-shadow') {
+        toPurge.push(classified);
+      } else {
+        actions.push(this.toActionRecord(classified));
       }
     }
 
-    const isolateRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rdx-seed-purge-'));
-    const isolated: Array<{
-      entry: string;
-      sourcePath: string;
-      isolatePath: string;
-      id: string;
-      sourceHash: string;
-      generationId: string;
-    }> = [];
+    if (toPurge.length === 0) {
+      const marker = this.writeCompletedMarker(markerPath, agentsPath, actions, diagnostics);
+      return { marker, alreadyComplete: false, diagnostics: marker.diagnostics };
+    }
+
+    const isolation = this.beginIsolation(agentsPath, toPurge, diagnostics);
+    actions.push(...isolation.retained.map((item) => this.toActionRecord(item)));
 
     try {
-      for (const entry of entries) {
-        const sourcePath = path.join(agentsPath, entry);
-        let raw: string;
-        try {
-          raw = fs.readFileSync(sourcePath, 'utf8');
-        } catch (error) {
-          diagnostics.push(`SEED_MIGRATION_READ_FAILED: ${sourcePath}: ${error instanceof Error ? error.message : String(error)}`);
-          continue;
-        }
-        const snapshot = userSnapshot.get(entry);
-        const candidates = snapshot?.candidateIds ?? collectSeedMigrationCandidateIds(entry, raw);
-        const fallbackId = snapshot?.id ?? candidates[0] ?? idFromFileName(entry);
-        const matched = snapshot?.official
-          ? { id: snapshot.id, sourceHash: snapshot.hash, official: snapshot.official }
-          : null;
-        if (!matched) {
-          const looksOfficial = candidates.some((candidateId) => officialIds.has(candidateId));
-          retained.push({
-            id: fallbackId,
-            reason: looksOfficial ? 'user-modified' : 'unknown-custom',
-            sourceHash: snapshot?.hash ?? hashSeedSemanticManifest(extractSeedSemanticManifest(raw, fallbackId)),
-          });
-          continue;
-        }
-
-        const { id, sourceHash, official } = matched;
-        const reread = this.rereadSourceHash(sourcePath, id);
-        if (!reread || reread.hash !== sourceHash) {
-          if (snapshot && reread) {
-            snapshot.hash = reread.hash;
-          }
-          retained.push({
-            id,
-            reason: 'user-modified',
-            sourceHash: reread?.hash ?? sourceHash,
-          });
-          diagnostics.push(`SEED_MIGRATION_SOURCE_CHANGED: ${id} changed before isolate; left in place.`);
-          continue;
-        }
-
-        const isolatePath = path.join(isolateRoot, entry);
-        try {
-          fs.renameSync(sourcePath, isolatePath);
-        } catch (error) {
-          diagnostics.push(`SEED_MIGRATION_ISOLATE_FAILED: ${id}: ${error instanceof Error ? error.message : String(error)}`);
-          retained.push({ id, reason: 'user-modified', sourceHash: reread.hash });
-          continue;
-        }
-        isolated.push({
-          entry,
-          sourcePath,
-          isolatePath,
-          id,
-          sourceHash: reread.hash,
-          generationId: official.generationId,
-        });
-      }
-
-      const verifyDiagnostics = this.verifyAssetsIntact(agentsPath, userSnapshot, isolated);
+      const verifyDiagnostics = this.verifyAssetsIntact(
+        agentsPath,
+        remainingSnapshot,
+        isolation.isolated,
+      );
       if (verifyDiagnostics.length > 0) {
-        this.restoreIsolated(isolated, diagnostics);
+        this.restoreIsolated(isolation.isolated, diagnostics);
+        this.clearIsolationArtifacts(agentsPath);
         diagnostics.push(...verifyDiagnostics);
         throw new Error(`SEED_MIGRATION_VERIFY_FAILED: ${verifyDiagnostics.join(' | ')}`);
       }
 
-      for (const item of isolated) {
+      for (const item of isolation.isolated) {
         try {
           fs.unlinkSync(item.isolatePath);
-          purged.push({
-            id: item.id,
-            generationId: item.generationId,
-            sourceHash: item.sourceHash,
-          });
-          diagnostics.push(`SEED_MIGRATION_PURGED: ${item.id} (${item.generationId})`);
+          actions.push(this.toActionRecord(item.classified));
+          diagnostics.push(`SEED_MIGRATION_PURGED: ${item.classified.filenameId} (${item.classified.action})`);
         } catch (error) {
-          diagnostics.push(`SEED_MIGRATION_PURGE_FAILED: ${item.id}: ${error instanceof Error ? error.message : String(error)}`);
+          diagnostics.push(`SEED_MIGRATION_PURGE_FAILED: ${item.classified.filenameId}: ${error instanceof Error ? error.message : String(error)}`);
           this.restoreIsolated([item], diagnostics);
-          retained.push({ id: item.id, reason: 'user-modified', sourceHash: item.sourceHash });
+          actions.push({
+            file: item.classified.file,
+            frontmatterId: item.classified.frontmatterId,
+            filenameId: item.classified.filenameId,
+            action: item.classified.filenameId && HISTORICAL_RESERVED_AGENT_IDS.has(item.classified.filenameId)
+              ? 'retained-custom'
+              : 'retained-override',
+            hashBefore: item.classified.hashBefore,
+            canonicalHash: item.classified.canonicalHash,
+            reason: 'purge-failed-restored',
+          });
         }
       }
     } finally {
-      this.removeDirIfEmpty(isolateRoot);
+      this.clearIsolationArtifacts(agentsPath);
     }
 
-    diagnostics.push(...this.removeLeftoverMigratedDir(agentsPath));
+    const marker = this.writeCompletedMarker(markerPath, agentsPath, actions, diagnostics);
+    return { marker, alreadyComplete: false, diagnostics: marker.diagnostics };
+  }
 
-    const marker: SeedMigrationMarker = {
-      schemaVersion: '1',
-      completedAt: new Date().toISOString(),
-      diagnostics,
-      purged,
-      retained,
+  private classifySeed(
+    file: string,
+    sourcePath: string,
+    raw: string,
+    hashBefore: string,
+    builtinCanonical: Map<string, string>,
+    officialIndex: ReturnType<typeof officialSeedHashIndex>,
+    diagnostics: string[],
+  ): ClassifiedSeed | null {
+    const filenameId = idFromFileName(file);
+    const frontmatterId = readSeedFrontmatterId(raw);
+    if (frontmatterId && frontmatterId !== filenameId) {
+      const reason = `filename/frontmatter id mismatch: ${filenameId} vs ${frontmatterId}`;
+      diagnostics.push(`SEED_MIGRATION_INVALID_ID: ${file}: ${reason}`);
+      return {
+        file,
+        sourcePath,
+        filenameId,
+        frontmatterId,
+        raw,
+        hashBefore,
+        action: 'invalid-id',
+        reason,
+      };
+    }
+
+    const id = filenameId;
+    const manifest = extractSeedSemanticManifest(raw, id);
+    const canonicalHash = hashCanonicalAgentSemantics(manifest);
+    const official = officialIndex.get(hashSeedSemanticManifest(manifest));
+
+    if (HISTORICAL_RESERVED_AGENT_IDS.has(id)) {
+      return {
+        file,
+        sourcePath,
+        filenameId,
+        frontmatterId,
+        raw,
+        hashBefore,
+        action: 'purged-historical',
+        canonicalHash,
+        reason: official
+          ? `historical reserved id (${official.generationId})`
+          : 'historical reserved id',
+      };
+    }
+
+    if ((BUILTIN_SEED_AGENT_IDS as readonly string[]).includes(id)) {
+      const builtinHash = builtinCanonical.get(id);
+      if (builtinHash && builtinHash === canonicalHash) {
+        return {
+          file,
+          sourcePath,
+          filenameId,
+          frontmatterId,
+          raw,
+          hashBefore,
+          action: 'purged-shadow',
+          canonicalHash,
+          reason: 'canonical hash matches current builtin',
+        };
+      }
+      return {
+        file,
+        sourcePath,
+        filenameId,
+        frontmatterId,
+        raw,
+        hashBefore,
+        action: 'retained-override',
+        canonicalHash,
+        reason: 'builtin id differs from current builtin canonical hash',
+      };
+    }
+
+    return {
+      file,
+      sourcePath,
+      filenameId,
+      frontmatterId,
+      raw,
+      hashBefore,
+      action: 'retained-custom',
+      canonicalHash,
+      reason: 'unrelated custom id',
     };
-    this.io.writeJsonAtomic(markerPath, marker);
-    return { marker, alreadyComplete: false };
+  }
+
+  private toActionRecord(classified: ClassifiedSeed): SeedMigrationActionRecord {
+    return {
+      file: classified.file,
+      frontmatterId: classified.frontmatterId,
+      filenameId: classified.filenameId,
+      action: classified.action,
+      hashBefore: classified.hashBefore,
+      ...(classified.canonicalHash ? { canonicalHash: classified.canonicalHash } : {}),
+      reason: classified.reason,
+    };
+  }
+
+  private beginIsolation(
+    agentsPath: string,
+    toPurge: ClassifiedSeed[],
+    diagnostics: string[],
+  ): {
+    isolated: Array<{
+      classified: ClassifiedSeed;
+      sourcePath: string;
+      isolatePath: string;
+    }>;
+    retained: ClassifiedSeed[];
+  } {
+    const isolationDir = path.join(agentsPath, SEED_PURGE_ISOLATION_DIR_NAME);
+    const manifestPath = path.join(agentsPath, SEED_PURGE_ISOLATION_MANIFEST_NAME);
+    this.io.ensureDir(isolationDir);
+    const files = toPurge.map((item) => ({
+      file: item.file,
+      hashBefore: item.hashBefore,
+      isolateName: item.file,
+    }));
+    const manifest: SeedPurgeIsolationManifest = {
+      schemaVersion: '1',
+      isolationDir: SEED_PURGE_ISOLATION_DIR_NAME,
+      files,
+    };
+    this.io.writeJsonAtomic(manifestPath, manifest);
+
+    const isolated: Array<{
+      classified: ClassifiedSeed;
+      sourcePath: string;
+      isolatePath: string;
+    }> = [];
+    const retained: ClassifiedSeed[] = [];
+    for (const item of toPurge) {
+      const isolatePath = path.join(isolationDir, item.file);
+      const current = this.readRawHash(item.sourcePath);
+      let classified = item;
+      if (current && current.hash !== item.hashBefore) {
+        const next = this.classifySeed(
+          item.file,
+          item.sourcePath,
+          current.raw,
+          current.hash,
+          this.readBuiltinCanonicalHashes([]),
+          officialSeedHashIndex(),
+          diagnostics,
+        );
+        if (!next || (next.action !== 'purged-historical' && next.action !== 'purged-shadow')) {
+          diagnostics.push(`SEED_MIGRATION_SOURCE_CHANGED: ${item.filenameId} changed before isolate; left in place.`);
+          if (next) retained.push(next);
+          continue;
+        }
+        classified = next;
+      } else if (!current) {
+        diagnostics.push(`SEED_MIGRATION_SOURCE_CHANGED: ${item.filenameId} disappeared before isolate.`);
+        continue;
+      }
+      try {
+        fs.renameSync(classified.sourcePath, isolatePath);
+        isolated.push({ classified, sourcePath: classified.sourcePath, isolatePath });
+      } catch (error) {
+        diagnostics.push(`SEED_MIGRATION_ISOLATE_FAILED: ${classified.filenameId}: ${error instanceof Error ? error.message : String(error)}`);
+        retained.push({
+          ...classified,
+          action: classified.action === 'purged-historical' ? 'retained-custom' : 'retained-override',
+          reason: 'isolate-failed',
+        });
+      }
+    }
+    return { isolated, retained };
+  }
+
+  private recoverIsolation(agentsPath: string): { blocked: boolean; diagnostics: string[] } {
+    const manifestPath = path.join(agentsPath, SEED_PURGE_ISOLATION_MANIFEST_NAME);
+    const isolationDir = path.join(agentsPath, SEED_PURGE_ISOLATION_DIR_NAME);
+    const manifestExists = fs.existsSync(manifestPath);
+    const dirExists = fs.existsSync(isolationDir);
+    if (!manifestExists && !dirExists) {
+      return { blocked: false, diagnostics: [] };
+    }
+
+    const diagnostics: string[] = [];
+    let manifest: SeedPurgeIsolationManifest | null = null;
+    if (manifestExists) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as unknown;
+        const version = peekSchemaVersion(raw);
+        if (version && Number(version) > 1) {
+          diagnostics.push(`SEED_MIGRATION_ISOLATION_CORRUPT: ${manifestPath}: SEED_MIGRATION_SCHEMA_UNSUPPORTED`);
+          this.restoreIsolationDirByFilename(agentsPath, isolationDir, diagnostics);
+          return { blocked: true, diagnostics };
+        }
+        manifest = parseStoredDocument(raw, SEED_PURGE_ISOLATION_MIGRATIONS, manifestPath);
+      } catch (error) {
+        diagnostics.push(`SEED_MIGRATION_ISOLATION_CORRUPT: ${manifestPath}: ${error instanceof Error ? error.message : String(error)}`);
+        this.restoreIsolationDirByFilename(agentsPath, isolationDir, diagnostics);
+        return { blocked: true, diagnostics };
+      }
+    } else {
+      diagnostics.push(`SEED_MIGRATION_ISOLATION_CORRUPT: missing ${manifestPath}`);
+      this.restoreIsolationDirByFilename(agentsPath, isolationDir, diagnostics);
+      return { blocked: true, diagnostics };
+    }
+
+    const resolvedDir = path.join(agentsPath, manifest.isolationDir);
+    for (const entry of manifest.files) {
+      const isolatePath = path.join(resolvedDir, entry.isolateName);
+      const sourcePath = path.join(agentsPath, entry.file);
+      if (!fs.existsSync(isolatePath)) {
+        if (!fs.existsSync(sourcePath)) {
+          diagnostics.push(`SEED_MIGRATION_ISOLATION_MISSING: ${entry.file}`);
+          return { blocked: true, diagnostics };
+        }
+        continue;
+      }
+      if (fs.existsSync(sourcePath)) {
+        continue;
+      }
+      try {
+        fs.renameSync(isolatePath, sourcePath);
+        diagnostics.push(`SEED_MIGRATION_ISOLATION_RESTORED: ${entry.file}`);
+      } catch (error) {
+        diagnostics.push(`SEED_MIGRATION_RESTORE_FAILED: ${entry.file}: ${error instanceof Error ? error.message : String(error)}`);
+        return { blocked: true, diagnostics };
+      }
+    }
+
+    this.clearIsolationArtifacts(agentsPath);
+    return { blocked: false, diagnostics };
+  }
+
+  private restoreIsolationDirByFilename(agentsPath: string, isolationDir: string, diagnostics: string[]): void {
+    if (!fs.existsSync(isolationDir)) return;
+    let entries: string[] = [];
+    try {
+      entries = fs.readdirSync(isolationDir).filter((entry) => entry.endsWith('.agent.md'));
+    } catch (error) {
+      diagnostics.push(`SEED_MIGRATION_ISOLATION_CORRUPT: ${isolationDir}: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+    for (const entry of entries) {
+      const isolatePath = path.join(isolationDir, entry);
+      const sourcePath = path.join(agentsPath, entry);
+      if (fs.existsSync(sourcePath)) continue;
+      try {
+        fs.renameSync(isolatePath, sourcePath);
+        diagnostics.push(`SEED_MIGRATION_ISOLATION_RESTORED: ${entry}`);
+      } catch (error) {
+        diagnostics.push(`SEED_MIGRATION_RESTORE_FAILED: ${entry}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+  }
+
+  private readBuiltinCanonicalHashes(diagnostics: string[]): Map<string, string> {
+    const hashes = new Map<string, string>();
+    const builtinPath = this.lockOptions.builtinAgentsPath ?? defaultBuiltinAgentsPath();
+    for (const id of BUILTIN_SEED_AGENT_IDS) {
+      const builtinFile = path.join(builtinPath, `${id}.agent.md`);
+      try {
+        const raw = fs.readFileSync(builtinFile, 'utf8');
+        if (!raw.trim()) {
+          diagnostics.push(`SEED_MIGRATION_BUILTIN_EMPTY: ${builtinFile}`);
+          continue;
+        }
+        hashes.set(id, hashCanonicalAgentSemantics(extractSeedSemanticManifest(raw, id)));
+      } catch (error) {
+        diagnostics.push(`SEED_MIGRATION_BUILTIN_UNREADABLE: ${builtinFile}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    return hashes;
   }
 
   private verifyAssetsIntact(
     agentsPath: string,
-    userSnapshot: Map<string, { hash: string; id: string; candidateIds: string[]; official: { generationId: string } | null }>,
-    isolated: Array<{ entry: string; isolatePath: string; id: string; sourceHash: string }>,
+    remainingSnapshot: Map<string, string>,
+    isolated: Array<{ classified: ClassifiedSeed; isolatePath: string }>,
   ): string[] {
     const diagnostics: string[] = [];
     const builtinPath = this.lockOptions.builtinAgentsPath ?? defaultBuiltinAgentsPath();
@@ -279,38 +570,33 @@ export class AgentSeedMigrationService {
       }
     }
 
-    const isolatedEntries = new Set(isolated.map((item) => item.entry));
-    for (const [entry, snapshot] of userSnapshot) {
-      if (isolatedEntries.has(entry)) continue;
-      const remainingPath = path.join(agentsPath, entry);
+    const isolatedFiles = new Set(isolated.map((item) => item.classified.file));
+    for (const [file, hashBefore] of remainingSnapshot) {
+      if (isolatedFiles.has(file)) continue;
+      const remainingPath = path.join(agentsPath, file);
       if (!fs.existsSync(remainingPath)) {
         diagnostics.push(`SEED_MIGRATION_USER_ASSET_MISSING: ${remainingPath}`);
         continue;
       }
-      const currentHash = this.hashFile(
-        remainingPath,
-        collectSeedMigrationCandidateIds(entry, fs.readFileSync(remainingPath, 'utf8'))[0] ?? idFromFileName(entry),
-      );
-      if (currentHash !== snapshot.hash) {
+      if (hashRawContent(fs.readFileSync(remainingPath, 'utf8')) !== hashBefore) {
         diagnostics.push(`SEED_MIGRATION_USER_ASSET_CHANGED: ${remainingPath}`);
       }
     }
 
     for (const item of isolated) {
       if (!fs.existsSync(item.isolatePath)) {
-        diagnostics.push(`SEED_MIGRATION_ISOLATE_MISSING: ${item.id}`);
+        diagnostics.push(`SEED_MIGRATION_ISOLATE_MISSING: ${item.classified.filenameId}`);
         continue;
       }
-      const isolatedHash = this.hashFile(item.isolatePath, item.id);
-      if (isolatedHash !== item.sourceHash) {
-        diagnostics.push(`SEED_MIGRATION_ISOLATE_MISMATCH: ${item.id}`);
+      if (hashRawContent(fs.readFileSync(item.isolatePath, 'utf8')) !== item.classified.hashBefore) {
+        diagnostics.push(`SEED_MIGRATION_ISOLATE_MISMATCH: ${item.classified.filenameId}`);
       }
     }
     return diagnostics;
   }
 
   private restoreIsolated(
-    isolated: Array<{ sourcePath: string; isolatePath: string; id: string }>,
+    isolated: Array<{ sourcePath: string; isolatePath: string; classified: ClassifiedSeed }>,
     diagnostics: string[],
   ): void {
     for (const item of isolated) {
@@ -319,9 +605,42 @@ export class AgentSeedMigrationService {
       try {
         fs.renameSync(item.isolatePath, item.sourcePath);
       } catch (error) {
-        diagnostics.push(`SEED_MIGRATION_RESTORE_FAILED: ${item.id}: ${error instanceof Error ? error.message : String(error)}`);
+        diagnostics.push(`SEED_MIGRATION_RESTORE_FAILED: ${item.classified.filenameId}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
+  }
+
+  private clearIsolationArtifacts(agentsPath: string): void {
+    const manifestPath = path.join(agentsPath, SEED_PURGE_ISOLATION_MANIFEST_NAME);
+    const isolationDir = path.join(agentsPath, SEED_PURGE_ISOLATION_DIR_NAME);
+    try {
+      if (fs.existsSync(manifestPath)) fs.unlinkSync(manifestPath);
+    } catch {
+      // best-effort
+    }
+    try {
+      if (fs.existsSync(isolationDir)) fs.rmSync(isolationDir, { recursive: true, force: true });
+    } catch {
+      // best-effort
+    }
+  }
+
+  private writeCompletedMarker(
+    markerPath: string,
+    agentsPath: string,
+    actions: SeedMigrationActionRecord[],
+    diagnostics: string[],
+  ): SeedMigrationMarker {
+    const marker: SeedMigrationMarker = {
+      schemaVersion: '2',
+      ruleVersion: SEED_MIGRATION_RULE_VERSION,
+      directoryContentHash: computeAgentsDirectoryContentHash(agentsPath),
+      completedAt: new Date().toISOString(),
+      diagnostics,
+      actions,
+    };
+    this.io.writeJsonAtomic(markerPath, marker);
+    return marker;
   }
 
   private removeLeftoverMigratedDir(agentsPath: string): string[] {
@@ -335,36 +654,64 @@ export class AgentSeedMigrationService {
     }
   }
 
-  private removeDirIfEmpty(dirPath: string): void {
+  private readRawHash(filePath: string): { raw: string; hash: string } | null {
     try {
-      fs.rmSync(dirPath, { recursive: true, force: true });
-    } catch {
-      // best-effort temp cleanup
-    }
-  }
-
-  private hashFile(filePath: string, id: string): string {
-    return hashSeedSemanticManifest(extractSeedSemanticManifest(fs.readFileSync(filePath, 'utf8'), id));
-  }
-
-  private rereadSourceHash(sourcePath: string, id: string): { raw: string; hash: string } | null {
-    try {
-      const raw = fs.readFileSync(sourcePath, 'utf8');
-      return { raw, hash: hashSeedSemanticManifest(extractSeedSemanticManifest(raw, id)) };
+      const raw = fs.readFileSync(filePath, 'utf8');
+      return { raw, hash: hashRawContent(raw) };
     } catch {
       return null;
     }
   }
 
-  private readMarker(markerPath: string): SeedMigrationMarker | null {
-    if (!fs.existsSync(markerPath)) return null;
-    const raw = this.io.readJson<unknown>(markerPath);
-    if (raw == null) return null;
-    const parsed = parseStoredDocument(raw, SEED_MIGRATION_MARKER_MIGRATIONS, markerPath);
-    if ((!parsed.purged || parsed.purged.length === 0) && parsed.moved?.length) {
-      parsed.purged = parsed.moved.map(({ id, generationId, sourceHash }) => ({ id, generationId, sourceHash }));
+  private peekMarker(markerPath: string): {
+    marker: SeedMigrationMarker | null;
+    unsupported: boolean;
+    diagnostic?: string;
+  } {
+    if (!fs.existsSync(markerPath)) {
+      return { marker: null, unsupported: false };
     }
-    return parsed;
+    let raw: unknown;
+    try {
+      raw = this.io.readJson<unknown>(markerPath);
+    } catch (error) {
+      if (error instanceof StorageSchemaError && error.message.includes('STORAGE_SCHEMA_UNSUPPORTED')) {
+        return {
+          marker: null,
+          unsupported: true,
+          diagnostic: `SEED_MIGRATION_SCHEMA_UNSUPPORTED: ${markerPath}: ${error.message}`,
+        };
+      }
+      throw error;
+    }
+    if (raw == null) return { marker: null, unsupported: false };
+    const version = peekSchemaVersion(raw);
+    if (version == null || version === '1') {
+      return { marker: null, unsupported: false };
+    }
+    const numeric = Number(version);
+    if (Number.isFinite(numeric) && numeric >= 3) {
+      return {
+        marker: null,
+        unsupported: true,
+        diagnostic: `SEED_MIGRATION_SCHEMA_UNSUPPORTED: ${markerPath} has schemaVersion ${version}`,
+      };
+    }
+    try {
+      return {
+        marker: parseStoredDocument(raw, SEED_MIGRATION_MARKER_MIGRATIONS, markerPath),
+        unsupported: false,
+      };
+    } catch (error) {
+      if (error instanceof StorageSchemaError && error.message.includes('STORAGE_SCHEMA_UNSUPPORTED')) {
+        return {
+          marker: null,
+          unsupported: true,
+          diagnostic: `SEED_MIGRATION_SCHEMA_UNSUPPORTED: ${markerPath}: ${error.message}`,
+        };
+      }
+      throw error;
+    }
   }
 }
 

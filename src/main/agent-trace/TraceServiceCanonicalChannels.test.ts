@@ -73,15 +73,15 @@ describe('TraceService history-turn profile projection', () => {
     expect(profile.agentType).not.toBe('ask');
   });
 
-  it('projects a no-runId custom ask turn as ask instead of debugger', () => {
+  it('projects a no-runId custom-readonly turn with its own profileId, not debugger', () => {
     const profileId = resolveHistoryTurnProfileId({
-      userMessage: { profileId: 'ask' },
-      assistantMessages: [{ agentId: 'ask' }],
+      userMessage: { profileId: 'custom-readonly' },
+      assistantMessages: [{ agentId: 'custom-readonly' }],
     });
     const profile = agentProfileRegistry.get(profileId);
-    expect(profileId).toBe('ask');
-    expect(profile.agentType).toBe('ask');
-    expect(profile.displayName).toBe('ask');
+    expect(profileId).toBe('custom-readonly');
+    expect(profile.agentType).toBe('custom-readonly');
+    expect(profile.displayName).toBe('custom-readonly');
     expect(profile.agentType).not.toBe('debugger');
     expect(profile.displayName).not.toBe('Debugger');
   });
