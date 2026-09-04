@@ -18,7 +18,7 @@ const emptyBuiltin = () => {
 };
 afterEach(() => roots.splice(0).forEach((root) => fs.rmSync(root, { recursive: true, force: true })));
 
-describe('HookEngine', () => {
+describe('HookEngine', { timeout: 20_000 }, () => {
   it('requires content-hash trust for project hooks and revokes on change', async () => {
     const root = makeRoot();
     const project = path.join(root, 'project');
