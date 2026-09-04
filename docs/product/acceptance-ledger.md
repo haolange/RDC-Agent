@@ -4,9 +4,9 @@ Verifier 结论落盘。本文件是二次收敛（U00–U07）与 T18 现场取
 
 **Browser 证据路径在仓库外** `%LOCALAPPDATA%/rdc-agent-qa/<sha>/`。条目若引用 Browser 证据，只记相对该目录的路径、build SHA、QA `projectId` / `sessionId`、viewport、theme/motion、DOM selector、IPC channel + 结果码。**禁止**写入 token / cookie / secret / qaBootstrap。
 
-`pnpm run check:acceptance-ledger` 由 **U04** 落地并接入 CI。U00 只建表，不假装门禁已绿。
+`pnpm run check:acceptance-ledger` 已由 **U04** 落地并接入 CI / `check:gates`。U04 行仍待 Orchestrator 改 verified，不得在实现门禁时自行标完成。
 
-Verdict 枚举：`planned` / `verified` / `failed` / `waived-by-user`。`verified` 行的 Commit SHA 必须是真实 git 对象；没有独立 commit 时写 `—`，不得伪造。
+Verdict 枚举：`planned` / `verified` / `failed` / `waived-by-user`。`verified` 行的 Commit SHA（短或长）必须存在于 `git rev-list HEAD`；空 / `—` 只允许非 verified。不得伪造。
 
 | Task | Criterion | Gate/Test | Browser evidence ref | Verdict | Commit SHA | Date |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -50,6 +50,6 @@ Verdict 枚举：`planned` / `verified` / `failed` / `waived-by-user`。`verifie
 | T18-chinese-capture-open | 中文 1.57GB capture open+preview：`眼睛泪腺白点.rdc` SHA256 `0A79926A92E7E659989BEFC2322DC93B65782252FC5BE2DE33496142735A4094`；size `1647684424`；`openProjectInput` `status: open`；`openHumanPreview` `success`；hash 2026-09-04 复测仍不变 | T18 Capture open/preview | 见 `DESIGN.md` T18 已证组 | verified | b68e4f29 | 2026-09-03 |
 | T18-t15-debugger-neg | T15 Debugger 负路径：无 capture `sess_df6be27d58a5` → `MISSION_COMPLETION_DENIED`（缺 MissionCheckpoint），未伪装 completed。Settings RDX CLI 已配置；未配置 fail-closed 单测在 `adafa804` | `adafa804` 单测 + T18 session 证据摘要 | `sess_df6be27d58a5` | verified | adafa804 | 2026-09-03 |
 | T18-t16-analyzer-blocked | T16 Analyzer Blocked 诚实收口：`sess_5be2b0c52a58` / `proj_a99a24c68de3`；ready report `invart-55a27b669134-1788459010567`（`sha256:3fc09696feae39145fd4c94c66c9260dda460f1da610e0d618789328aba4c5e3`）；`reportContract.status=Blocked` → `MISSION_COMPLETION_DENIED`；`cl_t16` 仍 draft；伴随 `a37c107e` | T16 文档取证 | `sess_5be2b0c52a58` | verified | 215741da | 2026-09-03 |
-| T18-t17-optimizer-blocked | T17 Optimizer Blocked 诚实收口：`sess_a73c57d0d2a5` / `proj_a99a24c68de3`；ready report `invart-71244190ba45-1788459648111`（`sha256:335d77de70a9a196f150330f7ae703366dd240b6723c9714e57eb6bc4ab10bbd`，`reportContract.status=Blocked`）→ `MISSION_COMPLETION_DENIED`；未写 Experiment / 未 mutate 工程。无独立 commit | T18 session 证据摘要 | `sess_a73c57d0d2a5` | verified | — | 2026-09-03 |
+| T18-t17-optimizer-blocked | T17 Optimizer Blocked 诚实收口：`sess_a73c57d0d2a5` / `proj_a99a24c68de3`；ready report `invart-71244190ba45-1788459648111`（`sha256:335d77de70a9a196f150330f7ae703366dd240b6723c9714e57eb6bc4ab10bbd`，`reportContract.status=Blocked`）→ `MISSION_COMPLETION_DENIED`；未写 Experiment / 未 mutate 工程。无独立产品 commit；SHA 为首次写入 ledger 的记录提交 | T18 session 证据摘要 | `sess_a73c57d0d2a5` | verified | fbf5d639 | 2026-09-03 |
 | T18-semantic | Semantic / 真实 OpenAI embed：Embedding / Semantic lane 已由 U02 删除，**不再补跑**真实 OpenAI embed 验收 | U02 `forbidden.embedding-runtime` | build `3bff8172`；Settings 搜索 Embedding 无命中 | verified | 3bff8172 | 2026-09-05 |
 | T18-whitehair-open | WhiteHair local open：`sess_17b59bc0131c` `openProjectInput(input_whitehair)` → `LOCAL_REPLAY_UNSUPPORTED`（Adreno 650 `VK_EXT_fragment_density_map` vs RTX 5090）；SHA256 `03DF08D14E6D5819E5173209D9AC1218C2F740010104EC911A7873E97A258D42`；size `168591424`。BLOCKED-by-device；正路径改 U06 Android adb。不得标 verified | T18 硬件诊断 | `sess_17b59bc0131c` | waived-by-user | — | 2026-09-03 |

@@ -126,6 +126,15 @@ for (const [name, command] of [
 if (!String(packageJson.scripts?.['check:gates'] ?? '').includes('check-release-config.mjs')) {
   fail('check:gates must wire check-release-config.mjs.');
 }
+if (!String(packageJson.scripts?.['check:gates'] ?? '').includes('check-acceptance-ledger.mjs')) {
+  fail('check:gates must wire check-acceptance-ledger.mjs.');
+}
+if (!String(packageJson.scripts?.['check:gates'] ?? '').includes('check-legacy-residue.mjs')) {
+  fail('check:gates must wire check-legacy-residue.mjs.');
+}
+if (packageJson.scripts?.['check:acceptance-ledger'] !== 'node scripts/check-acceptance-ledger.mjs') {
+  fail('package.json scripts.check:acceptance-ledger must be `node scripts/check-acceptance-ledger.mjs`.');
+}
 
 if (!process.exitCode) {
   console.log('[release-config] OK');
