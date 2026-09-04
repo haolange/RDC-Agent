@@ -5,8 +5,6 @@
  * Candidate / Write through thin IPC; list order comes from the service.
  */
 
-import type { SemanticLaneStatus } from './embedding';
-
 export const KNOWLEDGE_CARD_TYPES = [
   'fact',
   'constraint',
@@ -167,13 +165,12 @@ export interface KnowledgeReviewRecord {
   contentHash: string;
 }
 
-/** Seven retrieval lanes. Order is the walk-pattern contract. */
+/** Six retrieval lanes. Order is the walk-pattern contract. */
 export const KNOWLEDGE_RETRIEVAL_LANES = [
   'Identity/Path',
   'Scope/Metadata',
   'Lexical',
   'Structural',
-  'Semantic',
   'Relation/Graph',
   'Temporal/Version',
 ] as const;
@@ -195,7 +192,6 @@ export interface KnowledgeLaneHit {
 export interface KnowledgeLaneResult {
   lane: KnowledgeRetrievalLane;
   hits: KnowledgeLaneHit[];
-  semantic?: SemanticLaneStatus;
 }
 
 export interface KnowledgeQueryRequest {
@@ -214,7 +210,6 @@ export interface KnowledgeQueryRequest {
 export interface KnowledgeQueryResult {
   hits: KnowledgeLaneHit[];
   lanes: KnowledgeLaneResult[];
-  semantic: SemanticLaneStatus | null;
 }
 
 export interface KnowledgeIndexOverview {
@@ -227,7 +222,6 @@ export interface KnowledgeIndexOverview {
 export interface KnowledgeOverviewResult {
   spaces: KnowledgeSpace[];
   index: KnowledgeIndexOverview | null;
-  semantic: SemanticLaneStatus;
 }
 
 export interface KnowledgeCompiledHit extends KnowledgeLaneHit {
@@ -245,7 +239,6 @@ export interface KnowledgePack {
   compiledAt: string;
   hits: KnowledgeCompiledHit[];
   conflicts: KnowledgePackConflict[];
-  semanticClaimed: false | { claimed: true; status: SemanticLaneStatus };
 }
 
 export interface SessionKnowledgeCandidate {

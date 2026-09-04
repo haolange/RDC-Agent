@@ -26,14 +26,23 @@ const BUILTIN_PROFILES = ['general', 'debugger', 'analyzer', 'optimizer'];
 
 export const KNOWLEDGE_CONTRACT_CASES = [
   { title: 'knowledge.contract.tools.registered-permission-deferred', minAssertions: 1 },
-  { title: 'knowledge.contract.lanes.semantic-unavailable-stale', minAssertions: 1 },
   { title: 'knowledge.contract.write.human-only-candidate-fullaccess', minAssertions: 1 },
   { title: 'knowledge.contract.colddata.sanitized-import', minAssertions: 1 },
   { title: 'knowledge.contract.durable.store-single-source', minAssertions: 1 },
   { title: 'knowledge.contract.tools.skill-intersection-caller', minAssertions: 1 },
-  { title: 'knowledge.contract.semantic.no-metadata-only-ready', minAssertions: 1 },
   { title: 'knowledge.contract.write.fixed-not-verified', minAssertions: 1 },
 ];
+
+const EMBEDDING_RUNTIME_FORBIDDEN = [
+  ['Embedd', 'ingExecutionService'].join(''),
+  ['Embedd', 'ingCatalog'].join(''),
+  ['llm', '.embedd', 'ing'].join(''),
+  ['Semantic', 'LaneStatus'].join(''),
+  ['rebuild', 'SemanticIndex'].join(''),
+  ['getEmbedd', 'ingCatalog'].join(''),
+  ['semantic', 'Chunker'].join(''),
+  ['require', 'SemanticReady'].join(''),
+].join('|');
 export const KNOWLEDGE_CONTRACT_CASE_IDS = KNOWLEDGE_CONTRACT_CASES.map((entry) => entry.title);
 
 export const KNOWLEDGE_RULE_REGISTRY = [
@@ -78,12 +87,20 @@ export const KNOWLEDGE_RULE_REGISTRY = [
     note: `five-service ${lane} implementation ${className}`,
   })),
   {
-    id: 'knowledge.missing.lanes.seven',
+    id: 'knowledge.missing.lanes.six',
     kind: 'missing',
     file: 'src/main/knowledge',
-    pattern: 'Identity/Path[\\s\\S]*Scope/Metadata[\\s\\S]*Lexical[\\s\\S]*Structural[\\s\\S]*Semantic[\\s\\S]*Relation/Graph[\\s\\S]*Temporal/Version',
+    pattern: "Identity/Path[\\s\\S]*Scope/Metadata[\\s\\S]*Lexical[\\s\\S]*Structural',[\\s\\n]*'Relation/Graph[\\s\\S]*Temporal/Version",
     probe: 'walk-pattern',
-    note: 'seven retrieval lanes must exist under src/main/knowledge',
+    note: 'six markdown-first retrieval lanes must exist under src/main/knowledge',
+  },
+  {
+    id: 'knowledge.missing.read-roots-contract',
+    kind: 'missing',
+    file: 'src/main/agent-runtime/knowledgeReadRoots.ts',
+    pattern: "KNOWLEDGE_READ_FILE_TOOLS[\\s\\S]*read_file[\\s\\S]*read_image[\\s\\S]*glob[\\s\\S]*grep[\\s\\S]*resolveKnowledgeReadRoots",
+    probe: 'source-pattern',
+    note: 'canonical knowledge read roots freeze user + project knowledge directories for the four read-only file tools',
   },
   ...BUILTIN_PROFILES.map((profile) => ({
     id: `knowledge.missing.profile.ceiling.${profile}`,
@@ -134,22 +151,6 @@ export const KNOWLEDGE_RULE_REGISTRY = [
     note: 'sourceStatus=fixed must not become verified',
   },
   {
-    id: 'knowledge.missing.semantic.vector-inspect',
-    kind: 'missing',
-    file: 'src/main/settings/EmbeddingExecutionService.ts',
-    pattern: "inspectSemanticIndexVectors[\\s\\S]*return this\\.status\\('ready'",
-    probe: 'source-pattern',
-    note: 'Semantic ready requires inspected real vectors, not metadata snapshot',
-  },
-  {
-    id: 'knowledge.missing.query.semantic-ready-only',
-    kind: 'missing',
-    file: 'src/main/knowledge/KnowledgeQueryService.ts',
-    pattern: "availability === 'ready'[\\s\\S]*searchSemantic",
-    probe: 'source-pattern',
-    note: 'Semantic hits are queried only when the lane is ready',
-  },
-  {
     id: 'knowledge.missing.ipc.five-services',
     kind: 'missing',
     file: 'src/main/ipc/knowledgeHandlers.ts',
@@ -187,7 +188,7 @@ export const KNOWLEDGE_RULE_REGISTRY = [
     file: 'src/main/testing/knowledgeSystemContract.test.ts',
     pattern: KNOWLEDGE_CONTRACT_CASE_IDS.join('|'),
     probe: 'contract-suite',
-    note: 'executable Knowledge contract suite: durable store, deferred tools, skill intersection, human-only write, ColdData, Semantic vectors, fixed≠verified',
+    note: 'executable Knowledge contract suite: durable store, deferred tools, skill intersection, human-only write, ColdData, six lanes, fixed≠verified',
     requiredCases: KNOWLEDGE_CONTRACT_CASES,
     minTests: KNOWLEDGE_CONTRACT_CASES.length,
     minAssertions: KNOWLEDGE_CONTRACT_CASES.length,
@@ -271,6 +272,17 @@ export const KNOWLEDGE_RULE_REGISTRY = [
     pattern: 'knowledge-state\\.json|~/?\\.rdx/knowledge[\\s\\S]{0,80}inject',
     probe: 'walk-pattern',
     note: 'Knowledge skills must not inject the durable store or full library into the prompt',
+  },
+  {
+    id: 'knowledge.forbidden.embedding-runtime',
+    kind: 'forbidden',
+    file: 'src',
+    roots: ['src', 'scripts'],
+    includeTests: true,
+    pattern: EMBEDDING_RUNTIME_FORBIDDEN,
+    probe: 'walk-path-and-content',
+    unlessPattern: "NON_AGENT_MODALITIES[\\s\\S]{0,120}'embedding'[\\s\\S]{0,40}'embeddings'|\\*embedding\\*|semanticHash|semanticContext|Semantic Token|图形学 Semantics|provider deprecated",
+    note: 'Embedding capability and Semantic lane runtime must be absent from source, tests, scripts, file paths, and export lists',
   },
 ];
 

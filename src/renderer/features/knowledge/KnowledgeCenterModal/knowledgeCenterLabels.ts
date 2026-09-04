@@ -5,7 +5,6 @@ import type {
   KnowledgeLifecycle,
   KnowledgeRetrievalLane,
 } from '@shared/types/knowledge';
-export { semanticReasonKey } from '../../embedding/semanticLaneCopy';
 
 export const TYPE_LABEL_KEYS: Record<KnowledgeCardType, TranslationKey> = {
   fact: 'knowledgeCenter.typeFact',
@@ -29,7 +28,6 @@ export const LANE_LABEL_KEYS: Record<KnowledgeRetrievalLane, TranslationKey> = {
   'Scope/Metadata': 'knowledgeCenter.laneScopeMetadata',
   Lexical: 'knowledgeCenter.laneLexical',
   Structural: 'knowledgeCenter.laneStructural',
-  Semantic: 'knowledgeCenter.laneSemantic',
   'Relation/Graph': 'knowledgeCenter.laneRelationGraph',
   'Temporal/Version': 'knowledgeCenter.laneTemporalVersion',
 };

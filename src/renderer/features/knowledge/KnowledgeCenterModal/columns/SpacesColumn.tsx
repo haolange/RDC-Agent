@@ -84,8 +84,6 @@ export function SpacesColumn({ state, onImport }: SpacesColumnProps) {
       <LaneStatusList
         lanes={state.allLanes}
         enabled={state.lanes}
-        semantic={state.semantic}
-        semanticReady={state.semanticReady}
         onToggle={state.toggleLane}
       />
       <IndexStatusBar index={state.index} rebuilding={state.rebuilding} onRebuild={() => void state.rebuildIndex()} />

@@ -12,14 +12,6 @@ export class KnowledgeHumanConfirmationRequiredError extends Error {
   }
 }
 
-export class KnowledgeSemanticLaneClosedError extends Error {
-  readonly code = 'KNOWLEDGE_SEMANTIC_LANE_CLOSED';
-  constructor(availability: 'unavailable' | 'stale', reason: string) {
-    super(`KNOWLEDGE_SEMANTIC_LANE_CLOSED: semantic lane is ${availability} (${reason}); retrieval is fail-closed.`);
-    this.name = 'KnowledgeSemanticLaneClosedError';
-  }
-}
-
 export class KnowledgeCandidateRequiresIntentError extends Error {
   readonly code = 'KNOWLEDGE_CANDIDATE_REQUIRES_INTENT';
   constructor() {

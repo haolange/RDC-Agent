@@ -133,6 +133,11 @@ export interface PreparedAgentTurnContext {
     derivedContextStatus: 'none' | 'applied' | 'stale';
     compactedTurnCount: number;
     compactionState: 'prepared' | 'not-required';
+    knowledgeReadRootDiagnostics?: ReadonlyArray<{
+      candidate: string;
+      reason: string;
+      message: string;
+    }>;
   };
   runtime: PreparedAgentRuntime;
 }

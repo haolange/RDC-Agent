@@ -17,7 +17,6 @@ import type {
   LlmProviderEntry,
   LlmProviderModel,
 } from '@shared/types/settings';
-import type { EmbeddingCatalog } from '@shared/types/embedding';
 
 const loadedSurfaces = new Map<string, ProviderSurfaceManifest>();
 const surfaceLoads = new Map<string, Promise<ProviderSurfaceManifest>>();
@@ -29,16 +28,12 @@ function cloneJson<T>(value: T): T {
 function isCompiledIndex(value: unknown): value is CompiledProviderCatalogIndex {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<CompiledProviderCatalogIndex>;
-  const embeddings = candidate.embeddings;
   return candidate.schemaVersion === PROVIDER_CATALOG_SCHEMA_VERSION
     && typeof candidate.catalogRevision === 'string'
     && Array.isArray(candidate.surfaces)
     && typeof candidate.identityCount === 'number'
     && typeof candidate.surfaceCount === 'number'
-    && typeof candidate.modelCount === 'number'
-    && Boolean(embeddings)
-    && typeof embeddings === 'object'
-    && Array.isArray(embeddings.models);
+    && typeof candidate.modelCount === 'number';
 }
 
 if (!isCompiledIndex(bundledCatalogIndex)) {
@@ -110,10 +105,6 @@ function toProviderModel(model: ProviderSurfaceSummary['models'][number] | Model
 
 export function getProviderCatalogRevision(): string {
   return loadCatalogIndex().catalogRevision;
-}
-
-export function getEmbeddingCatalog(): EmbeddingCatalog {
-  return cloneJson(loadCatalogIndex().embeddings);
 }
 
 export function listProviderSummaries(): ProviderSurfaceSummary[] {

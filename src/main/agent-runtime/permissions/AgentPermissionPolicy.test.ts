@@ -1,10 +1,12 @@
 import * as os from 'os';
 import * as path from 'path';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { AgentPermissionMode } from '@shared/types/settings';
 import type { AgentTool } from '../agent/AgentTool';
 import type { ToolCall } from '../core/types';
 import { AgentPermissionPolicyService } from './AgentPermissionPolicy';
+import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
 import { compilePolicyFromRestrictive } from './PolicyCompiler';
 
 const { mockSettings } = vi.hoisted(() => ({
@@ -541,5 +543,165 @@ describe('AgentPermissionPolicyService shell risk classifier', () => {
       projectRootPath: workspaceRoot,
     });
     expect(decision.action).toBe('deny');
+  });
+});
+
+describe('AgentPermissionPolicyService knowledge read roots', () => {
+  const service = new AgentPermissionPolicyService();
+  const userRdx = path.join(fixtureRoot, 'user-rdx');
+  const knowledgeRoot = path.join(userRdx, 'knowledge');
+  const memoryRoot = path.join(userRdx, 'memory');
+  const agentsRoot = path.join(userRdx, 'agents');
+  const knowledgeFile = path.join(knowledgeRoot, 'cards', 'note.md');
+
+  const writeFileTool: AgentTool = {
+    name: 'write_file',
+    description: 'write',
+    parameters: { type: 'object', properties: {} },
+    permissionHint: 'mutation',
+    execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+  };
+  const editFileTool: AgentTool = {
+    name: 'edit_file',
+    description: 'edit',
+    parameters: { type: 'object', properties: {} },
+    permissionHint: 'mutation',
+    execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+  };
+  const codeInterpreterTool: AgentTool = {
+    name: 'code_interpreter',
+    description: 'interpreter',
+    parameters: { type: 'object', properties: {} },
+    permissionHint: 'mutation',
+    execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+  };
+
+  function toolFor(name: string): AgentTool {
+    if (name === 'write_file') return writeFileTool;
+    if (name === 'edit_file') return editFileTool;
+    if (name === 'delete_file') return deleteFileTool;
+    if (name === 'shell') return shellTool;
+    if (name === 'code_interpreter') return codeInterpreterTool;
+    return {
+      name,
+      description: name,
+      parameters: { type: 'object', properties: {} },
+      permissionHint: 'readonly',
+      execute: async () => ({ content: [{ type: 'text', text: 'ok' }] }),
+    };
+  }
+
+  function makeCall(name: string, target: string): ToolCall {
+    if (name === 'glob') {
+      return { type: 'toolCall', id: 'tc-kn', name, arguments: { cwd: target, pattern: '**/*' } };
+    }
+    if (name === 'grep') {
+      return { type: 'toolCall', id: 'tc-kn', name, arguments: { path: target, pattern: 'x' } };
+    }
+    if (name === 'shell') {
+      return { type: 'toolCall', id: 'tc-kn', name, arguments: { command: `type ${target}` } };
+    }
+    if (name === 'code_interpreter') {
+      return { type: 'toolCall', id: 'tc-kn', name, arguments: { cwd: target } };
+    }
+    return { type: 'toolCall', id: 'tc-kn', name, arguments: { path: target } };
+  }
+
+  beforeEach(() => {
+    mockSettings.agentRuntime.permissions.mode = 'default';
+    mockSettings.agentRuntime.permissions.readableRoots = [];
+    mockSettings.agentRuntime.permissions.writableRoots = [];
+    mockSettings.agentRuntime.permissions.allowedCommandPrefixes = [];
+    mockSettings.agentRuntime.permissions.deniedCommandPrefixes = [];
+  });
+
+  it.each(['read_file', 'read_image', 'glob', 'grep'] as const)(
+    'auto-allows %s inside frozen knowledgeReadRoots without approval',
+    (name) => {
+      const decision = service.evaluate({
+        tool: toolFor(name),
+        toolCall: makeCall(name, knowledgeFile),
+        projectRootPath: workspaceRoot,
+        knowledgeReadRoots: [knowledgeRoot],
+      });
+      expect(decision.action).toBe('allow');
+      expect(decision.temporaryPathRoots.some((root) => (
+        root === knowledgeFile || root === knowledgeRoot || root.startsWith(knowledgeRoot)
+      ))).toBe(true);
+    },
+  );
+
+  it('denies sibling ~/.rdx/memory and ~/.rdx/agents reads', () => {
+    for (const sibling of [path.join(memoryRoot, 'x.md'), path.join(agentsRoot, 'ask.md')]) {
+      const decision = service.evaluate({
+        tool: readFileTool,
+        toolCall: makeReadFileToolCall(sibling),
+        projectRootPath: workspaceRoot,
+        knowledgeReadRoots: [knowledgeRoot],
+      });
+      expect(decision.action).toBe('ask_user');
+      expect(decision.reason).toContain('Read access is outside the workspace');
+    }
+  });
+
+  it('does not treat knowledge roots as writable for mutation tools', () => {
+    for (const name of ['write_file', 'edit_file', 'delete_file', 'shell', 'code_interpreter'] as const) {
+      const decision = service.evaluate({
+        tool: toolFor(name),
+        toolCall: makeCall(name, knowledgeFile),
+        projectRootPath: workspaceRoot,
+        knowledgeReadRoots: [knowledgeRoot],
+      });
+      expect(decision.action).toBe('ask_user');
+      expect(decision.temporaryPathRoots).not.toContain(knowledgeRoot);
+    }
+  });
+
+  it('does not auto-allow read_file through a knowledge-root junction into memory/agents', async () => {
+    const tmp = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-policy-junc-'));
+    const knowledge = path.join(tmp, 'knowledge');
+    const memory = path.join(tmp, 'memory');
+    const agents = path.join(tmp, 'agents');
+    await mkdir(knowledge, { recursive: true });
+    await mkdir(memory, { recursive: true });
+    await mkdir(agents, { recursive: true });
+    await writeFile(path.join(memory, 'note.md'), 'secret', 'utf8');
+    await writeFile(path.join(agents, 'ask.md'), 'secret', 'utf8');
+    const memoryLink = path.join(knowledge, 'to-memory');
+    const agentsLink = path.join(knowledge, 'to-agents');
+    try {
+      await symlink(memory, memoryLink, process.platform === 'win32' ? 'junction' : 'dir');
+      await symlink(agents, agentsLink, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch {
+      await rm(tmp, { recursive: true, force: true });
+      return;
+    }
+    try {
+      for (const escaped of [path.join(memoryLink, 'note.md'), path.join(agentsLink, 'ask.md')]) {
+        expect(isWithinRootAllowingAliases(escaped, knowledge)).toBe(false);
+        const decision = service.evaluate({
+          tool: readFileTool,
+          toolCall: makeReadFileToolCall(escaped),
+          projectRootPath: workspaceRoot,
+          knowledgeReadRoots: [knowledge],
+        });
+        expect(decision.action).not.toBe('allow');
+      }
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps Full access write semantics and does not add knowledge roots as writable grants', () => {
+    mockSettings.agentRuntime.permissions.mode = 'full-access';
+    const decision = service.evaluate({
+      tool: writeFileTool,
+      toolCall: makeCall('write_file', knowledgeFile),
+      projectRootPath: workspaceRoot,
+      knowledgeReadRoots: [knowledgeRoot],
+    });
+    expect(decision.action).toBe('allow');
+    expect(decision.temporaryPathRoots).toEqual(['*']);
+    expect(decision.temporaryPathRoots).not.toContain(knowledgeRoot);
   });
 });

@@ -187,6 +187,44 @@ describe('EffectiveRuntimePlan', () => {
     expect(drifted.policyFingerprint).not.toBe(plan.policyFingerprint);
   });
 
+  it('freezes knowledgeReadRoots into the fingerprint without writing readableRoots', () => {
+    const policy = compilePolicyFromRestrictive({ deniedTools: [], limits: { maxTurns: 3 } });
+    const shared = {
+      agentId: 'ask',
+      projectRootPath: 'D:/Project',
+      profile: { skills: [] as string[] },
+      toolAllowlist: ['read_file'],
+      permissionSettings: basePermission,
+      routeCapability,
+      requestPlan: { executionIdentity: { fingerprint: 'kn-fp' } },
+      promptPlan: { systemPrompt: 'system' },
+      policy,
+      skillIntersection: ['read_file'] as const,
+      visibleToolNames: ['read_file'] as const,
+      activatedDeferredTools: [] as string[],
+      mcpDescriptorHash: null,
+    };
+    const empty = buildEffectiveRuntimePlan(shared);
+    const withRoots = buildEffectiveRuntimePlan({
+      ...shared,
+      knowledgeReadRoots: ['D:/Users/me/.rdx/knowledge', 'D:/Project/.rdx/knowledge'],
+    });
+    const again = buildEffectiveRuntimePlan({
+      ...shared,
+      knowledgeReadRoots: ['D:/Users/me/.rdx/knowledge', 'D:/Project/.rdx/knowledge'],
+    });
+
+    expect(empty.schemaVersion).toBe(3);
+    expect(empty.knowledgeReadRoots).toEqual([]);
+    expect(withRoots.knowledgeReadRoots).toEqual([
+      'D:/Users/me/.rdx/knowledge',
+      'D:/Project/.rdx/knowledge',
+    ]);
+    expect(withRoots.permissionSettings.readableRoots).toEqual([]);
+    expect(withRoots.fingerprint).not.toBe(empty.fingerprint);
+    expect(again.fingerprint).toBe(withRoots.fingerprint);
+  });
+
   it('activeToolNamesForPlan filters by allowlist and allows all when empty', () => {
     const policy = compilePolicyFromRestrictive({ deniedTools: [], limits: { maxTurns: 3 } });
     const plan = buildEffectiveRuntimePlan({

@@ -12,7 +12,6 @@ import {
   knowledgeCorpusHash,
   type KnowledgeIndexEntry,
   type KnowledgeIndexSnapshot,
-  type SemanticCorpusDocument,
 } from './knowledgeLanes';
 import { toPosixRelative, walkMarkdownFiles } from './knowledgeFs';
 
@@ -155,38 +154,6 @@ export class KnowledgeIndexService {
     }
     cards.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
     return knowledgeCorpusHash(cards);
-  }
-
-  async listCorpusDocuments(): Promise<SemanticCorpusDocument[]> {
-    const snapshot = await this.getOrRebuild();
-    const spaces = this.dependencies.listSpaces();
-    const documents: SemanticCorpusDocument[] = [];
-    for (const card of snapshot.cards) {
-      const space = spaces.find((entry) => entry.spaceId === card.spaceId);
-      if (!space) continue;
-      try {
-        const absolutePath = path.join(space.rootPath, card.relativePath);
-        const source = await this.dependencies.readFile(absolutePath);
-        const parsed = parseKnowledgeFrontmatter(source, {
-          spaceId: card.spaceId,
-          relativePath: card.relativePath,
-        });
-        documents.push({
-          cardId: card.cardId,
-          spaceId: card.spaceId,
-          relativePath: card.relativePath,
-          title: card.title,
-          type: card.type,
-          lifecycle: card.lifecycle,
-          body: parsed.body,
-          contentHash: card.contentHash,
-        });
-      } catch {
-        // skip unreadable files
-      }
-    }
-    documents.sort((left, right) => left.relativePath.localeCompare(right.relativePath));
-    return documents;
   }
 
   async isSnapshotStale(snapshot: KnowledgeIndexSnapshot | null = this.getSnapshot()): Promise<boolean> {

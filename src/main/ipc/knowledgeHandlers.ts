@@ -7,7 +7,6 @@ import { knowledgeIndexService } from '../knowledge/KnowledgeIndexService';
 import { knowledgeQueryService } from '../knowledge/KnowledgeQueryService';
 import { knowledgeWriteService } from '../knowledge/KnowledgeWriteService';
 import { runtimeLogService } from '../runtime/RuntimeLogService';
-import { embeddingExecutionService } from '../settings/EmbeddingExecutionService';
 import type { WorkbenchIpcContext } from './workbenchContext';
 import { IpcValidationError, parseIpcArgs } from './validation/IpcPayloadGuard';
 import { ipcApprovalTokenService } from './validation/IpcApprovalTokenService';
@@ -174,7 +173,6 @@ export function registerKnowledgeHandlers(_context: WorkbenchIpcContext): void {
     return {
       spaces: knowledgeQueryService.listSpaces(),
       index: toIndexOverview(),
-      semantic: await embeddingExecutionService.resolveSemanticLaneStatus(),
     };
   });
 

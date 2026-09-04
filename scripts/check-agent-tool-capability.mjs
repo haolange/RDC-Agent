@@ -15,9 +15,6 @@ if (!picker.includes('isAgentToolExecutableModel')) {
 if (picker.includes('isEffectiveModelPickerSelectable')) {
   fail('Composer picker must not use the catalog-visibility gate for Agent models');
 }
-if (picker.includes('EmbeddingCatalog') || picker.includes('getEmbeddingCatalog')) {
-  fail('Composer picker must not read the independent EmbeddingCatalog');
-}
 
 const preflight = fs.readFileSync(path.join(repoRoot, 'src/main/conversation/ConversationRoutePreflight.ts'), 'utf8');
 if (!preflight.includes('CONVERSATION_LLM_TOOLS_UNAVAILABLE') || !preflight.includes('isAgentToolExecutableModel')) {

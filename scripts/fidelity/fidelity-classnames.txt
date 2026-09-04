@@ -426,7 +426,6 @@ knowledge-center-scope-chip
 knowledge-center-search
 knowledge-center-section-title
 knowledge-center-segmented
-knowledge-center-semantic-status
 knowledge-center-sheet
 knowledge-center-sheet-actions
 knowledge-center-space-kind

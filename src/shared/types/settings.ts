@@ -1,5 +1,4 @@
 import type { AgentRole } from './agent';
-import type { EmbeddingSettings } from './embedding';
 import type { AgentManifestSettings } from './agentManifest';
 import type {
   AgentRuntimeMcpDescriptor,
@@ -551,8 +550,6 @@ export interface LlmSettings {
   providers: LlmProviderEntry[];
   /** Read-only runtime projection derived from canonical `.agent.md` manifests. */
   agentRoutes: LlmAgentRoute[];
-  /** Independent embedding selection + upload consent. Never an Agent/Composer model. */
-  embedding?: EmbeddingSettings;
 }
 
 export interface SettingsDiagnostic {
@@ -601,7 +598,6 @@ export type AppSettingsPatch = Partial<{
   }>;
   llm: Partial<{
     providers: LlmProviderEntry[];
-    embedding: Partial<EmbeddingSettings>;
   }>;
   agents: Partial<{
     globalInstructions: string;

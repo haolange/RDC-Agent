@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import type { SemanticLaneStatus } from '@shared/types/embedding';
 import type { KnowledgeCardRecord, KnowledgeSpace } from '@shared/types/knowledge';
 import { StorageIo } from '../sessions/StorageIo';
 import { createDisposableCandidateService } from './KnowledgeCandidateService';
@@ -47,19 +46,8 @@ function createStorage(): StorageIo {
   } as unknown as StorageIo;
 }
 
-function semanticStatus(availability: SemanticLaneStatus['availability'], reason: SemanticLaneStatus['reason']): SemanticLaneStatus {
-  return {
-    availability,
-    reason,
-    selectedIdentity: availability === 'unavailable' ? null : 'openai:text-embedding-3-small',
-    selectedDimensions: availability === 'unavailable' ? null : 1536,
-    snapshot: null,
-  };
-}
-
 function createStack(options: {
   root: string;
-  semantic?: SemanticLaneStatus;
 }) {
   const index = new KnowledgeIndexService({
     listSpaces: () => [space(options.root)],
@@ -71,7 +59,6 @@ function createStack(options: {
   });
   const query = new KnowledgeQueryService({
     listSpaces: () => [space(options.root)],
-    resolveSemanticLaneStatus: () => options.semantic ?? semanticStatus('unavailable', 'unconfigured'),
     index,
     readFile: (filePath) => readFile(filePath, 'utf8'),
     statMtime: async () => Date.parse('2026-09-01T00:00:00.000Z'),
@@ -92,22 +79,20 @@ function createStack(options: {
 }
 
 describe('Knowledge five services', () => {
-  it('indexes and queries Identity/Path plus Lexical without claiming Semantic', async () => {
+  it('indexes and queries Identity/Path plus Lexical across the six markdown-first lanes', async () => {
     const root = tempDir();
     mkdirSync(path.join(root, 'facts'), { recursive: true });
     writeFileSync(path.join(root, 'facts', 'sample.md'), serializeKnowledgeCard(draftCard()), 'utf8');
-    const { query, compile } = createStack({
-      root,
-      semantic: semanticStatus('unavailable', 'unconfigured'),
-    });
+    const { query, compile } = createStack({ root });
     const listed = await query.listCards('user');
     expect(listed).toHaveLength(1);
     expect(listed[0]?.title).toBe('Sample fact');
-    const result = await query.query({ text: 'vulkan', lanes: ['Identity/Path', 'Lexical', 'Semantic'] });
+    const result = await query.query({ text: 'vulkan', lanes: ['Identity/Path', 'Lexical'] });
     expect(result.hits.some((hit) => hit.title === 'Sample fact')).toBe(true);
-    expect(result.semantic?.availability).toBe('unavailable');
+    expect(result.lanes.map((lane) => lane.lane)).toEqual(['Identity/Path', 'Lexical']);
     const pack = compile.compile(result);
-    expect(pack.semanticClaimed).toBe(false);
+    expect(pack.hits.length).toBeGreaterThan(0);
+    expect(pack).not.toHaveProperty('semanticClaimed');
   });
 
   it('rejects writes without human confirmation even in full-access', async () => {

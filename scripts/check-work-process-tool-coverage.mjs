@@ -250,7 +250,7 @@ const FIXTURES = {
   },
   knowledge_compile: {
     argsPreview: JSON.stringify({ query: 'vulkan', limit: 8 }),
-    resultPreview: toolEnvelope('pack pack:abcd · 1 hits · semanticClaimed: false', { packId: 'pack:abcd', count: 1 }),
+    resultPreview: toolEnvelope('pack pack:abcd · 1 hits', { packId: 'pack:abcd', count: 1 }),
   },
   knowledge_candidate_create: {
     argsPreview: JSON.stringify({ title: 'New fact', type: 'fact', body: 'A fact.', explicitUserIntent: true }),

@@ -54,6 +54,11 @@ export interface EffectiveRuntimePlan {
   /** Aggregate hash of enabled MCP descriptors; null when none enabled. */
   mcpDescriptorHash: string | null;
   permissionSettings: AgentPermissionSettings;
+  /**
+   * Frozen canonical knowledge read roots (realpath, existing real directories only).
+   * Not written into persisted permissionSettings.readableRoots.
+   */
+  knowledgeReadRoots: readonly string[];
   policy: CompiledPolicy;
   /** Stable hash of CompiledPolicy (independent of sourceFingerprint field naming). */
   policyFingerprint: string;
@@ -87,6 +92,8 @@ export interface BuildEffectiveRuntimePlanInput {
   profileDelegates?: readonly string[];
   toolAllowlist: readonly string[];
   permissionSettings: AgentPermissionSettings;
+  /** Existing real knowledge directories; omitted when empty. Never copied into readableRoots. */
+  knowledgeReadRoots?: readonly string[];
   routeCapability: AgentRouteCapability;
   requestPlan: Pick<RequestPlan, 'executionIdentity'> | { executionIdentity: { fingerprint: string } };
   promptPlan: Pick<PromptPlan, 'systemPrompt'> | { systemPrompt: string };
@@ -158,6 +165,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     allowedCommandPrefixes: [...input.permissionSettings.allowedCommandPrefixes],
     deniedCommandPrefixes: [...input.permissionSettings.deniedCommandPrefixes],
   };
+  const knowledgeReadRoots = freezeStringList(input.knowledgeReadRoots);
   const profileSkills = freezeStringList(input.profile?.skills ?? []);
   const profileMaxTurns = typeof input.profile?.maxTurns === 'number' && input.profile.maxTurns > 0
     ? input.profile.maxTurns
@@ -222,6 +230,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     activatedDeferredTools,
     mcpDescriptorHash,
     permissionSettings,
+    knowledgeReadRoots,
     policyFingerprint,
     contextCompactionPercent,
     input.routeCapability.toolCallingMode,
@@ -250,6 +259,7 @@ export function buildEffectiveRuntimePlan(input: BuildEffectiveRuntimePlanInput)
     activatedDeferredTools,
     mcpDescriptorHash,
     permissionSettings,
+    knowledgeReadRoots,
     policy,
     policyFingerprint,
     contextCompactionPercent,

@@ -11,7 +11,10 @@ import {
   abortPromise,
   writeTextFileNoFollow,
   withTemporaryPathAccess,
+  isWithinRootAllowingAliases,
 } from './_shared';
+import { readFileTool } from './ReadFileTool';
+import { writeFileTool } from './WriteFileTool';
 
 const roots: string[] = [];
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))));
@@ -134,6 +137,177 @@ describe('safeResolvePath', () => {
       sessionId: null,
       temporaryAllowedPathRoots: [],
     })).toThrow(/超出 workspace/);
+  });
+
+  it('rejects sibling ~/.rdx/memory and ~/.rdx/agents even when knowledge is a temporary root', async () => {
+    const userRdx = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-sib-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-ws-'));
+    roots.push(userRdx, workspace);
+    const knowledge = path.join(userRdx, 'knowledge');
+    const memory = path.join(userRdx, 'memory');
+    const agents = path.join(userRdx, 'agents');
+    await mkdir(knowledge, { recursive: true });
+    await mkdir(memory, { recursive: true });
+    await mkdir(agents, { recursive: true });
+    const memoryFile = path.join(memory, 'note.md');
+    const agentFile = path.join(agents, 'ask.md');
+    await writeFile(memoryFile, 'secret', 'utf8');
+    await writeFile(agentFile, 'secret', 'utf8');
+    const context = {
+      workspaceRoot: workspace,
+      projectRootPath: workspace,
+      projectId: null,
+      sessionId: null,
+      temporaryAllowedPathRoots: [knowledge],
+    };
+    expect(() => safeResolvePath(memoryFile, workspace, context)).toThrow(/超出 workspace|SYMLINK/);
+    expect(() => safeResolvePath(agentFile, workspace, context)).toThrow(/超出 workspace|SYMLINK/);
+  });
+
+  it('rejects a junction/symlink planted under a knowledge root that points at a sibling', async () => {
+    const userRdx = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-junc-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-jws-'));
+    roots.push(userRdx, workspace);
+    const knowledge = path.join(userRdx, 'knowledge');
+    const memory = path.join(userRdx, 'memory');
+    await mkdir(knowledge, { recursive: true });
+    await mkdir(memory, { recursive: true });
+    const secret = path.join(memory, 'secret.md');
+    await writeFile(secret, 'leak', 'utf8');
+    const planted = path.join(knowledge, 'escape');
+    try {
+      await symlink(memory, planted, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch {
+      return;
+    }
+    const escaped = path.join(planted, 'secret.md');
+    expect(isWithinRootAllowingAliases(escaped, knowledge)).toBe(false);
+    expect(() => safeResolvePath(escaped, workspace, {
+      workspaceRoot: workspace,
+      projectRootPath: workspace,
+      projectId: null,
+      sessionId: null,
+      temporaryAllowedPathRoots: [knowledge],
+    })).toThrow(/SYMLINK_PATH_REJECTED/);
+  });
+
+  it('read_file rejects a knowledge-root junction that escapes to a sibling', async () => {
+    const userRdx = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-read-junc-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-read-ws-'));
+    roots.push(userRdx, workspace);
+    const knowledge = path.join(userRdx, 'knowledge');
+    const memory = path.join(userRdx, 'memory');
+    await mkdir(knowledge, { recursive: true });
+    await mkdir(memory, { recursive: true });
+    await writeFile(path.join(memory, 'secret.md'), 'leak', 'utf8');
+    const planted = path.join(knowledge, 'escape');
+    try {
+      await symlink(memory, planted, process.platform === 'win32' ? 'junction' : 'dir');
+    } catch {
+      return;
+    }
+    await expect(readFileTool.execute('r-kn-junc', { path: path.join(planted, 'secret.md') }, undefined, undefined, {
+      workspaceRoot: workspace,
+      projectRootPath: workspace,
+      projectId: null,
+      sessionId: null,
+      temporaryAllowedPathRoots: [knowledge],
+    })).rejects.toThrow(/SYMLINK_PATH_REJECTED/);
+  });
+
+  it('write_file rejects a path inside a knowledge root at the execution layer', async () => {
+    const userRdx = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-write-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-write-ws-'));
+    roots.push(userRdx, workspace);
+    const knowledge = path.join(userRdx, 'knowledge');
+    await mkdir(knowledge, { recursive: true });
+    const card = path.join(knowledge, 'card.md');
+    await writeFile(card, 'keep', 'utf8');
+    await expect(writeFileTool.execute('w-kn', { path: card, content: 'overwrite' }, undefined, undefined, {
+      workspaceRoot: workspace,
+      projectRootPath: workspace,
+      projectId: 'proj',
+      sessionId: null,
+    })).rejects.toThrow(/超出 workspace/);
+  });
+
+  it('resolves a missing target through the existing ancestor and refuses to escape the root', async () => {
+    const userRdx = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-miss-'));
+    const workspace = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-mws-'));
+    roots.push(userRdx, workspace);
+    const knowledge = path.join(userRdx, 'knowledge');
+    await mkdir(knowledge, { recursive: true });
+    const context = {
+      workspaceRoot: workspace,
+      projectRootPath: workspace,
+      projectId: null,
+      sessionId: null,
+      temporaryAllowedPathRoots: [knowledge],
+    };
+    const missing = path.join(knowledge, 'ghost', 'card.md');
+    expect(safeResolvePath(missing, workspace, context)).toBe(path.resolve(missing));
+    expect(() => safeResolvePath(path.join(knowledge, '..', 'memory', 'x.md'), workspace, context))
+      .toThrow(/超出 workspace|SYMLINK/);
+  });
+
+  it('recognizes project-root case aliases as the same knowledge root', async () => {
+    const project = await mkdtemp(path.join(os.tmpdir(), 'rdx-kn-case-'));
+    roots.push(project);
+    const knowledge = path.join(project, '.rdx', 'knowledge');
+    await mkdir(knowledge, { recursive: true });
+    const file = path.join(knowledge, 'card.md');
+    await writeFile(file, 'ok', 'utf8');
+    const aliasRoot = knowledge.replace(/[a-z]/g, (ch) => ch.toUpperCase());
+    expect(isWithinRootAllowingAliases(file, aliasRoot)).toBe(true);
+    expect(safeResolvePath(file, project, {
+      workspaceRoot: project,
+      projectRootPath: project,
+      projectId: null,
+      sessionId: null,
+      temporaryAllowedPathRoots: [aliasRoot],
+    })).toBe(path.resolve(file));
+  });
+
+  it('recognizes a Windows 8.3 project alias as the same knowledge root when available', async () => {
+    if (process.platform !== 'win32') return;
+    const { realpathSync } = await import('node:fs');
+    const project = await mkdtemp(path.join(os.tmpdir(), 'rdx-e3ident-'));
+    roots.push(project);
+    const knowledge = path.join(project, '.rdx', 'knowledge');
+    await mkdir(knowledge, { recursive: true });
+    const file = path.join(knowledge, 'card.md');
+    await writeFile(file, 'ok', 'utf8');
+    let shortProject = '';
+    try {
+      const { execFileSync } = await import('node:child_process');
+      const escaped = project.replace(/'/g, "''");
+      shortProject = execFileSync(
+        'powershell.exe',
+        ['-NoProfile', '-Command', `(New-Object -ComObject Scripting.FileSystemObject).GetFolder('${escaped}').ShortPath`],
+        { encoding: 'utf8' },
+      ).trim().replace(/^["']|["']$/g, '');
+    } catch {
+      return;
+    }
+    if (!shortProject) return;
+    const shortKnowledge = path.join(shortProject, '.rdx', 'knowledge');
+    let realShort = '';
+    let realLong = '';
+    try {
+      realShort = realpathSync.native(shortKnowledge);
+      realLong = realpathSync.native(knowledge);
+    } catch {
+      return;
+    }
+    if (realShort.toLowerCase() !== realLong.toLowerCase()) return;
+    expect(isWithinRootAllowingAliases(file, shortKnowledge)).toBe(true);
+    expect(safeResolvePath(path.join(shortKnowledge, 'card.md'), project, {
+      workspaceRoot: project,
+      projectRootPath: project,
+      projectId: null,
+      sessionId: null,
+      temporaryAllowedPathRoots: [knowledge],
+    })).toBe(path.resolve(file));
   });
 
   it('withTemporaryPathAccess treats missing roots as empty and scopes only the callback', async () => {

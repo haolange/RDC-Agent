@@ -2,7 +2,6 @@ import React from 'react';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { ProviderCatalogCategory } from '../types';
 import type { useI18n } from '../../../../i18n';
-import { EmbeddingSettings } from './EmbeddingSettings';
 import { ProvidersSettings } from './ProvidersSettings';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -21,7 +20,6 @@ interface ModelsSettingsProps {
 export const ModelsSettings: React.FC<ModelsSettingsProps> = (props) => (
   <section className="settings-page settings-page-models" data-settings-search="models">
     <div className="settings-models-page">
-      <EmbeddingSettings />
       <ProvidersSettings {...props} />
     </div>
   </section>

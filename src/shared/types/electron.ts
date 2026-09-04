@@ -373,9 +373,6 @@ export interface ElectronAPI {
     getModelsOverride: () => Promise<ModelsOverride>;
     setModelsOverride: (overrides: ModelsOverride) => Promise<ModelsOverride>;
     getResolvedShell: (executable: string) => Promise<ResolvedShellSnapshot>;
-    getEmbeddingCatalog: () => Promise<import('./embedding').EmbeddingCatalog>;
-    getSemanticLaneStatus: () => Promise<import('./embedding').SemanticLaneStatus>;
-    rebuildSemanticIndex: () => Promise<import('./embedding').SemanticLaneStatus>;
     set: (settings: AppSettingsPatch) => Promise<AppSettings>;
   };
 

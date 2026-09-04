@@ -6,7 +6,7 @@
 
 三列网格：`minmax(272px, 300px) minmax(320px, 380px) minmax(0, 1fr)`。
 
-1. **Spaces / 控制列**：Brand、Cards / Candidates / Conflicts 三段切换、User + 已注册 Project 多选（默认全选）、type / lifecycle 过滤、六 lane 开关、结构索引状态与 `Rebuild Index`、`Import ColdData…`。U02 将删除 Semantic UI / Settings Embedding 重建。
+1. **Spaces / 控制列**：Brand、Cards / Candidates / Conflicts 三段切换、User + 已注册 Project 多选（默认全选）、type / lifecycle 过滤、六 lane 开关、结构索引状态与 `Rebuild Index`、`Import ColdData…`。Semantic lane 与 Settings Embedding 重建入口已删除。
 2. **List**：搜索框（300ms debounce）驱动 `knowledge:query`。Cards 按服务返回的 `hits` 顺序渲染，渲染层不得重排。Candidates 分 `listCandidates` 与 `listStagedDrafts` 两段。Conflicts 渲染当前 pack 的 `contradicts`。
 3. **Detail**：标题、relativePath、关闭按钮、元数据、`MessageMarkdown` 正文、写操作。`sourceStatus === 'fixed'` 永远带 “≠ verified”。任一写操作只打开确认面板，不直接落盘。
 
@@ -17,7 +17,7 @@
 - 持久写入只能经 `KnowledgeWriteService.write/promote`，且 `confirmation.explicitHumanConfirmation === true`；`FullAccess` 不得绕过。
 - Candidate 只能经 `createCandidate({ explicitUserIntent: true })`，必须由用户点击触发。
 - ColdData Import 只走 `ingestColdDataToStaging`（Draft / quarantine / conflict），**不得**导入即 Candidate，也不得批量提升。
-- 禁止声称语义检索；U02 将删除 Semantic lane 开关与 Settings > Models Embedding 重建入口。
+- 禁止声称语义检索。Semantic lane 开关与 Settings > Models Embedding 重建入口已删除。
 - Center 的 Rebuild Index 只重建 `KnowledgeIndexService` 结构索引。
 - `change reason` 与 `rollback basis` 只做确认门禁，不落盘。
 - 不做 Repo Wiki、Memory 页签、自动生成、重新生成或有用/无用反馈。

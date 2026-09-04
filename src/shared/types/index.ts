@@ -296,28 +296,6 @@ export {
   KNOWLEDGE_SCOPE_AXES,
 } from './knowledge';
 export type {
-  EmbeddingBatchResult,
-  EmbeddingCatalog,
-  EmbeddingCatalogModel,
-  EmbeddingSettings,
-  EmbeddingVector,
-  SemanticIndexChunk,
-  SemanticIndexSnapshot,
-  SemanticLaneAvailability,
-  SemanticLaneStatus,
-  SemanticLaneStaleReason,
-  SemanticLaneUnavailableReason,
-  SemanticSearchHit,
-} from './embedding';
-export {
-  DEFAULT_EMBEDDING_CHUNKER,
-  DEFAULT_EMBEDDING_SETTINGS,
-  EMBEDDING_CATALOG_SCHEMA_VERSION,
-  SEMANTIC_INDEX_SNAPSHOT_SCHEMA_VERSION,
-  embeddingIdentity,
-  sanitizeEmbeddingSettings,
-} from './embedding';
-export type {
   ParsedSessionArtifactUri,
   SessionArtifactCategory,
   SessionArtifactErrorCode,

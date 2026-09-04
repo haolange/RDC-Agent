@@ -17,6 +17,8 @@ import {
   resolvePolicyApprovalFloor,
 } from './PolicyCompiler';
 import { isMissionForbiddenToolId, isMissionProfileId } from '@shared/constants/missionPlanOnly';
+import { isKnowledgeReadFileTool } from '../knowledgeReadRoots';
+import { isWithinRootAllowingAliases } from '../tools/primitives/_shared';
 
 /**
  * Agent permission risk classifier for tool / shell calls.
@@ -47,9 +49,14 @@ export interface AgentPermissionDecisionInput {
   compiledPolicy?: CompiledPolicy;
   /** Current session attachments directory; readable by read-only file tools only. */
   sessionAttachmentsRoot?: string | null;
+  /**
+   * Frozen plan knowledge read roots. Merged only into READ_ONLY_FILE_TOOLS.
+   * Never written into persisted permissionSettings.readableRoots.
+   */
+  knowledgeReadRoots?: readonly string[];
 }
 
-const READ_ONLY_FILE_TOOLS = new Set(['read_file', 'read_image', 'glob', 'grep']);
+export const READ_ONLY_FILE_TOOLS = new Set(['read_file', 'read_image', 'glob', 'grep']);
 const MUTATION_TOOLS = new Set([
   'write_file',
   'edit_file',
@@ -382,6 +389,9 @@ export class AgentPermissionPolicyService {
     const sessionAttachmentsRoot = input.sessionAttachmentsRoot
       ? path.resolve(input.sessionAttachmentsRoot)
       : null;
+    const knowledgeReadRoots = isKnowledgeReadFileTool(toolName)
+      ? (input.knowledgeReadRoots ?? []).map((root) => path.resolve(root))
+      : [];
     const readRoots = [
       ...configuredReadableRoots,
       ...(sessionAttachmentsRoot ? [sessionAttachmentsRoot] : []),
@@ -393,9 +403,19 @@ export class AgentPermissionPolicyService {
       if (externalTargets.length === 0) {
         return { action: 'allow', risk: 'low', temporaryPathRoots: [] };
       }
-      const allowedTargets = externalTargets.filter((target) => readRoots.some((root) => isWithinRoot(target, root)));
+      const allowedTargets = externalTargets.filter((target) => (
+        readRoots.some((root) => isWithinRoot(target, root))
+        || knowledgeReadRoots.some((root) => isWithinRootAllowingAliases(target, root))
+      ));
       if (allowedTargets.length === externalTargets.length) {
-        return { action: 'allow', risk: 'low', temporaryPathRoots: allowedTargets };
+        const matchingKnowledgeRoots = knowledgeReadRoots.filter((root) => (
+          externalTargets.some((target) => isWithinRootAllowingAliases(target, root))
+        ));
+        return {
+          action: 'allow',
+          risk: 'low',
+          temporaryPathRoots: [...new Set([...allowedTargets, ...matchingKnowledgeRoots])],
+        };
       }
       return request(
         mode,

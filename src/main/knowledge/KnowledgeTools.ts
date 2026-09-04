@@ -157,7 +157,7 @@ function createKnowledgeSearchTool(deps: KnowledgeToolDependencies): AgentTool {
   return {
     name: 'knowledge_search',
     label: 'Search Knowledge',
-    description: 'Search Knowledge cards across retrieval lanes. Semantic unavailable/stale is reported, never claimed.',
+    description: 'Search Knowledge cards across the six markdown-first retrieval lanes. Cite matching cardId and contentHash.',
     parameters: {
       type: 'object',
       properties: {
@@ -185,15 +185,11 @@ function createKnowledgeSearchTool(deps: KnowledgeToolDependencies): AgentTool {
       const lines = result.hits.slice(0, 20).map((hit, index) => (
         `${index + 1}. ${hit.title} · ${hit.type ?? 'unknown'} · ${hit.lifecycle ?? 'unknown'} · ${hit.lanes.join('+')} · ${hit.cardId}`
       ));
-      const semantic = result.semantic
-        ? `semantic: ${result.semantic.availability} (${result.semantic.reason})`
-        : 'semantic: not requested';
-      const header = `${result.hits.length} hits · ${semantic}`;
+      const header = `${result.hits.length} hits`;
       return textResult(
         lines.length > 0 ? `${header}\n${lines.join('\n')}` : header,
         {
           count: result.hits.length,
-          semantic: result.semantic,
           cardIds: result.hits.map((hit) => hit.cardId),
         },
       );
@@ -272,18 +268,14 @@ function createKnowledgeCompileTool(deps: KnowledgeToolDependencies): AgentTool 
       const conflictLines = pack.conflicts.map((conflict) => (
         `conflict ${conflict.kind}: ${conflict.leftCardId} <> ${conflict.rightCardId}`
       ));
-      const semantic = pack.semanticClaimed === false
-        ? 'semanticClaimed: false'
-        : `semanticClaimed: true (${pack.semanticClaimed.status.availability})`;
       const body = [
-        `pack ${pack.packId} · ${pack.hits.length} hits · ${semantic}`,
+        `pack ${pack.packId} · ${pack.hits.length} hits`,
         ...hitLines,
         ...conflictLines,
       ].join('\n');
       return textResult(body, {
         packId: pack.packId,
         count: pack.hits.length,
-        semanticClaimed: pack.semanticClaimed !== false,
         cardIds: pack.hits.map((hit) => hit.cardId),
       });
     },

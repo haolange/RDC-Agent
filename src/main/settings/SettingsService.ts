@@ -30,7 +30,6 @@ import type {
   AgentDefinitionSaveRequest,
   AgentDefinitionSaveResult,
 } from '@shared/types/agentManifest';
-import { sanitizeEmbeddingSettings } from '@shared/types/embedding';
 import type { LLMConfig, LLMProviderConfig } from '@shared/types/llm';
 import { compiledRoutesFromDefinitions } from './compiledAgentRoutes';
 import { mergeUiPreferences, sanitizeUiPreferences } from '@shared/theme/uiPreferences';
@@ -372,10 +371,6 @@ export class SettingsService {
       },
       llm: {
         providers: nextProviders.map((provider) => ({ ...provider, apiKey: '' })),
-        embedding: sanitizeEmbeddingSettings({
-          ...currentPersisted.llm?.embedding,
-          ...(patch.llm?.embedding ?? {}),
-        }),
       },
     };
 

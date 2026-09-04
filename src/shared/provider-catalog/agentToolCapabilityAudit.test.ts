@@ -104,14 +104,10 @@ describe('Agent tool-calling catalog audit', () => {
     expect(missing).toEqual([]);
   });
 
-  it('never treats embedding catalog models as Agent-executable picker models', () => {
-    const embeddingIds = new Set(
-      catalog.embeddings.models.map((model) => `${model.providerId}:${model.modelId}`),
-    );
-    expect(embeddingIds.size).toBeGreaterThan(0);
+  it('never treats embedding-named models as Agent-executable picker models', () => {
+    expect(catalog).not.toHaveProperty('embeddings');
     for (const compiled of catalog.surfaces.values()) {
       for (const model of compiled.surface.models) {
-        expect(embeddingIds.has(`${compiled.surface.id}:${model.modelId}`)).toBe(false);
         expect(isAgentToolExecutableModel({
           enabled: model.enabled !== false,
           availability: model.availability === 'unavailable' ? 'unavailable' : 'available',

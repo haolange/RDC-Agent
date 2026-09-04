@@ -3188,18 +3188,6 @@
   overflow-wrap: anywhere;
 }
 
-.settings-embedding-status[data-availability='ready'] {
-  color: var(--token-status-success);
-}
-
-.settings-embedding-status[data-availability='stale'] {
-  color: var(--token-status-warning);
-}
-
-.settings-embedding-status[data-availability='unavailable'] {
-  color: var(--token-text-caption);
-}
-
 .settings-handoff-target-select[aria-invalid='true'] {
   border-color: var(--token-status-error);
 }
