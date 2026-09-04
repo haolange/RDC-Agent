@@ -10,7 +10,7 @@ Agent manifests 按 scope 解析，优先级 `builtin < user < project`，整资
 - user：`~/.rdx/agents/*.agent.md`
 - project：`<project-root>/.rdx/agents/*.agent.md`
 
-Wave 1 四个 builtin profile：`general` / `debugger` / `analyzer` / `optimizer`。用户保留的 ask/plan/edit 仍可按 custom manifest 运行。运行时不再写 user seed。
+四个 builtin profile：`general` / `debugger` / `analyzer` / `optimizer`。user/project 只能覆盖这四个 id，或新增无关自定义 id。ask/plan/edit 及 S0 specialist id 为历史非法 id：剔出 effective snapshot + 诊断 `AGENT_ID_RESERVED_HISTORICAL`；**不再有 custom manifest 运行通道**（U01 落地）。运行时不再写 user seed。代码仍是 v1 marker，且会把 concrete model 判成 user-modified（U01 修）。
 
 Agent ID 来自文件名 stem，不再从 frontmatter 读取 `id`。
 
@@ -114,7 +114,7 @@ Manifest-facing tool names are canonical tokens (see `CANONICAL_TOOL_TOKEN_EXPAN
 
 Removed tokens `todo` and `search_codebase` are rejected (`REJECTED_TOOL_TOKENS`); use `task` and `glob`/`grep` instead.
 
-`ask` is read-only by default (`read` / `search` / `web` / `askUser` / `tool_search` plus `task_list` / `task_get`; policy removes `task_create` / `task_update` / `task_stop`). `plan` and `edit` may mutate Tasks only when those tools survive profile, policy and route filtering in the frozen effective tool set. A text-only route receives no tool schemas and its Prompt must not imitate or repeatedly search for unavailable Tasks tools. `plan` uses research, questions, handoffs, memory or plan artifacts rather than direct implementation. `edit`、`debugger`、`analyzer`、`optimizer` are executable profiles and may use configured tools such as `shell`、`write`、`edit` and `rdxContext` when policy allows.
+Tasks 能力由 route 与冻结工具集决定，不是独立 profile：只读 route 仅注入 `task_list` / `task_get`；可写 route 仅在冻结工具集确实包含 mutation 工具时才宣称可写（`task_create` / `task_update` / `task_stop`）。text-only route 不接收 tool schemas，Prompt 不得模仿或反复搜索不可用的 Tasks 工具。`askUser` token 仍是用户询问工具。`debugger` / `analyzer` / `optimizer` 是 Mission Planning Orchestrator；`general` 是 Execution Orchestrator。Mission 为 plan-only（见裁决 J）；General 在 policy 允许时可使用 `shell` / `write` / `edit` / `rdxContext`。ask/plan/edit **不是**现行 agent 身份。
 
 ## Plan 输出
 

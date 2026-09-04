@@ -91,7 +91,7 @@ Fast、1M 和 reasoning 的执行方式只在 `ExecutionBinding` 中声明一次
 
 `ModelSelection.pickerVisibility` 与 execution role 解耦。Doubao Lite 可以既是 primary model，又作为其他模型的执行 target；Kimi highspeed、Opus Fast 等纯内部 target 才隐藏。关联必须来自 live metadata 或精确 manifest fact，禁止后缀猜测。Agent/Composer 可执行集合再叠加共享 `isAgentToolExecutableModel` gate：只有 source-backed `toolCalling.supported` 且 route 有已实现 structured-tool adapter 的模型可被选择；Settings catalog 仍展示完整事实。
 
-独立 Embedding capability 不进入上述 Agent 可选集。surface manifest 的可选 `embeddings` 节编译为 `EmbeddingCatalog`，由 `EmbeddingExecutionService` 执行；opaque credential 使用 `operation=embed`。Discovery 对 agent modality 的 fail-closed 剔除规则不变。
+禁止恢复 Embedding capability / Semantic lane / `settings.llm.embedding`。Discovery 继续 fail-closed 剔除非 agent modality（含 embedding/embeddings）。不得把 `EmbeddingCatalog` / `EmbeddingExecutionService` 写成现行产品能力；U02 删除这些源码。
 
 `ResolvedModelControls` 由 UI 与 Planner 共用。selectable control 若没有执行路径、target 缺失或 denied、route 不兼容，则统一解析为 `blocked`；Composer 与发送阶段必须返回相同原因。`RequestPlan` 记录 selected/effective model、adapter、binding IDs、protocol、catalog/route revision 与公开 wire patch。
 
