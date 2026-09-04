@@ -208,6 +208,11 @@ export function encodeMcpNameSegment(value: string): string {
   return encodeNameSegment(value);
 }
 
+/** Decode a name segment; null when encode(decode(x)) !== x. */
+export function decodeMcpNameSegment(encoded: string): string | null {
+  return decodeNameSegment(encoded);
+}
+
 function encodeNameSegment(value: string): string {
   return Buffer.from(value, 'utf8')
     .toString('base64')
@@ -222,7 +227,7 @@ function decodeNameSegment(encoded: string): string | null {
     const padLen = (4 - (padded.length % 4)) % 4;
     const base64 = padded + '='.repeat(padLen);
     const decoded = Buffer.from(base64, 'base64').toString('utf8');
-    // Reject ambiguous legacy/sanitized segments that are not valid encodings.
+    // Fail-closed: only accept segments that survive encode(decode(x)) === x.
     if (encodeNameSegment(decoded) !== encoded) return null;
     return decoded;
   } catch {
@@ -672,7 +677,7 @@ export class MCPManager {
     return toolName.startsWith('mcp__');
   }
 
-  /** 从前缀名称解析服务器和工具名（优先可逆 decode）。 */
+  /** 从前缀名称解析服务器和工具名；两段都必须是可逆编码，否则 null。 */
   parsePrefixedName(
     prefixedName: string,
   ): { serverId: string; serverName: string; toolName: string } | null {
@@ -685,18 +690,11 @@ export class MCPManager {
     if (!serverPart || !toolPart) return null;
     const decodedServer = decodeNameSegment(serverPart);
     const decodedTool = decodeNameSegment(toolPart);
-    if (decodedServer !== null && decodedTool !== null) {
-      return {
-        serverId: decodedServer,
-        serverName: decodedServer,
-        toolName: decodedTool,
-      };
-    }
-    // Legacy sanitized form fallback for in-flight names only.
+    if (decodedServer === null || decodedTool === null) return null;
     return {
-      serverId: serverPart,
-      serverName: serverPart,
-      toolName: toolPart,
+      serverId: decodedServer,
+      serverName: decodedServer,
+      toolName: decodedTool,
     };
   }
 

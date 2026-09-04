@@ -384,7 +384,6 @@ export type {
 } from './settings';
 export type { ToolCallResult, ToolCatalog, ToolRuntimeSummary, ToolTraceEntry } from './tool';
 export type {
-  IntakeContext,
   WorkflowState,
   WorkflowStateView,
 } from './workflow';

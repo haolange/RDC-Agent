@@ -17,20 +17,6 @@ export interface RunRecoveryState {
   staleDetectedAt?: string;
 }
 
-export interface IntakeContext {
-  taskFilePath?: string;
-  taskFileContent?: string;
-  effectiveGoal: string;
-  discoveredProjectRoot?: string;
-  openedCaptureId?: string | null;
-  openedCapturePath?: string | null;
-  availableCaptureIds: string[];
-  providerId?: string;
-  modelId?: string;
-  replayDeviceId?: string | null;
-  replayDeviceLabel?: string | null;
-}
-
 export interface WorkflowState {
   caseId: string;
   runId: string;
@@ -38,7 +24,7 @@ export interface WorkflowState {
   entryMode: 'cli' | 'mcp';
   backend: 'local' | 'remote';
   orchestrationMode: 'multi_agent';
-  coordinationMode: 'staged_handoff';
+  coordinationMode: 'turn_handoff';
   blockers: Blocker[];
   reasoningSummaries?: ReasoningSummary[];
   recoveryState?: RunRecoveryState | null;
@@ -55,15 +41,6 @@ export interface Blocker {
 
 export type WorkflowStateView = WorkflowState;
 
-export interface GateResult {
-  stage: string;
-  status: 'passed' | 'blocked' | 'pending';
-  blockers: Blocker[];
-  refs: string[];
-  paths: Record<string, string>;
-  extra?: Record<string, unknown>;
-}
-
 export interface Report {
   title: string;
   summary: string;
@@ -74,11 +51,4 @@ export interface Report {
   confidence: number;
   generatedAt: string;
   curatorAgentId: string;
-}
-
-export interface ModeCapabilities {
-  profileId: string;
-  requiresLLM: boolean;
-  isFullyImplemented: boolean;
-  disabledReason?: string;
 }

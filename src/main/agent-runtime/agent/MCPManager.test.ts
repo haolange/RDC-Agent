@@ -3,7 +3,12 @@
  * 测试核心逻辑：工具名称前缀、解析、工具注册/发现。
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { MCPManager } from './MCPManager';
+import {
+  MCPManager,
+  buildMcpPrefixedName,
+  decodeMcpNameSegment,
+  encodeMcpNameSegment,
+} from './MCPManager';
 
 describe('MCPManager', () => {
   let manager: MCPManager;
@@ -20,8 +25,9 @@ describe('MCPManager', () => {
       expect(manager.isMCPTool('')).toBe(false);
     });
 
-    it('parsePrefixedName 应正确解析', () => {
-      const result = manager.parsePrefixedName('mcp__filesystem__read');
+    it('parsePrefixedName 应正确解析可逆编码名', () => {
+      const prefixed = buildMcpPrefixedName('filesystem', 'read');
+      const result = manager.parsePrefixedName(prefixed);
       expect(result).not.toBeNull();
       expect(result!.serverName).toBe('filesystem');
       expect(result!.toolName).toBe('read');
@@ -34,8 +40,25 @@ describe('MCPManager', () => {
       expect(manager.parsePrefixedName('')).toBeNull();
     });
 
+    it('parsePrefixedName 对非 roundtrip 片段返回 null', () => {
+      expect(manager.parsePrefixedName('mcp__filesystem__read')).toBeNull();
+      expect(manager.parsePrefixedName('mcp__my_server__my_tool')).toBeNull();
+      expect(decodeMcpNameSegment('filesystem')).toBeNull();
+      expect(decodeMcpNameSegment('not-a-valid-encoding')).toBeNull();
+    });
+
+    it('encode/decode 对合法片段可逆', () => {
+      const samples = ['filesystem', 'read_file', 'my-server', 'tool with space', '中文'];
+      for (const sample of samples) {
+        const encoded = encodeMcpNameSegment(sample);
+        expect(decodeMcpNameSegment(encoded)).toBe(sample);
+        expect(encodeMcpNameSegment(decodeMcpNameSegment(encoded) ?? '')).toBe(encoded);
+      }
+    });
+
     it('parsePrefixedName 应处理带特殊字符的服务器名', () => {
-      const result = manager.parsePrefixedName('mcp__my_server__my_tool');
+      const prefixed = buildMcpPrefixedName('my_server', 'my_tool');
+      const result = manager.parsePrefixedName(prefixed);
       expect(result).not.toBeNull();
       expect(result!.serverName).toBe('my_server');
       expect(result!.toolName).toBe('my_tool');

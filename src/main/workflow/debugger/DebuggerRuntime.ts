@@ -47,7 +47,7 @@ export class DebuggerRuntime {
       entryMode: 'cli',
       backend: 'local',
       orchestrationMode: 'multi_agent',
-      coordinationMode: 'staged_handoff',
+      coordinationMode: 'turn_handoff',
       blockers: [],
       reasoningSummaries: [],
       lastUpdated: nowIso(),

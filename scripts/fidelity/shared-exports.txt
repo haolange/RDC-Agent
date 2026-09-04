@@ -446,7 +446,6 @@ formatPricePerMillion
 formatSessionArtifactUri
 formatTokenCount
 formatUsdCost
-GateResult
 GeminiWireThinkingLevel
 generateCaptureId
 generateCaseId
@@ -489,7 +488,6 @@ hslToRgb
 HumanPreviewSnapshot
 ImagePreview
 index.ts::*
-IntakeContext
 INVESTIGATION_ARTIFACT_KINDS
 INVESTIGATION_ARTIFACT_STATUSES
 INVESTIGATION_KIND_REGISTRY
@@ -650,8 +648,6 @@ MissionId
 MissionKind
 MissionRunRecord
 mixRgb
-MODE_CAPABILITIES
-ModeCapabilities
 ModeConfig
 ModeIconKey
 ModelControlEvaluation
@@ -1087,5 +1083,4 @@ WorldStateReplay
 WorldStateShaderReplacement
 WorldStateValidity
 writeJsonl
-WriteScope
 writeYaml
