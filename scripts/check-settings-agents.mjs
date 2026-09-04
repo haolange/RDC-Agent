@@ -10,6 +10,10 @@ const {
   splitCanonicalAgentModelId,
 } = require('../src/shared/utils/agentModelRoute.ts');
 const { AgentManifestService } = require('../src/main/settings/AgentManifestService.ts');
+const {
+  HISTORICAL_RESERVED_AGENT_IDS,
+  isHistoricalReservedAgentId,
+} = require('../src/main/settings/seed-migration/officialSeedGenerations.ts');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -176,6 +180,12 @@ async function main() {
     !fs.existsSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/DeveloperDiagnosticsSettings.tsx')),
     'DeveloperDiagnosticsSettings must remain removed.',
   );
+  assert(isHistoricalReservedAgentId('ask') && isHistoricalReservedAgentId('plan') && isHistoricalReservedAgentId('edit'), 'ask/plan/edit must be reserved historical ids.');
+  assert(isHistoricalReservedAgentId('ask_agent') && isHistoricalReservedAgentId('triage-agent'), 'S0 specialist aliases must be reserved.');
+  assert(!isHistoricalReservedAgentId('general') && !isHistoricalReservedAgentId('debugger'), 'Four builtins must not be reserved historical ids.');
+  assert(HISTORICAL_RESERVED_AGENT_IDS.has('rdc-debugger'), 'Shared reserved set must include S0 specialist ids.');
+  assert(agentsSettings.includes('settings.agents.diagnostics'), 'Agents settings should render the manifest diagnostics list.');
+  assert(agentsSettings.includes('data-testid="settings-agent-manifest-diagnostics"'), 'Agents diagnostics must keep a stable test id.');
   assert(agentsSettings.includes('settings.agentManifestTitle'), 'Agents settings should render manifest management.');
   assert(!agentsSettings.includes('settings.patterns'), 'Agents settings must not expose internal pattern configuration.');
   assert(!agentsSettings.includes('rdxCliInvoker'), 'Agents settings must not expose the internal CLI invoker name.');
@@ -395,6 +405,65 @@ async function main() {
     });
     const imported = await manifestService.importFile({ agentsPath, instructionsPath }, importPath);
     assert(imported.id === 'custom-imported-agent', 'Import should accept safe non-built-in .agent.md profiles.');
+
+    fs.writeFileSync(path.join(agentsPath, 'ask.agent.md'), `---
+id: leftover-ask
+name: Leftover Ask
+description: Surviving reserved filename used to assert user-scope diagnostics.
+argument-hint: unused
+target: rdc-agent
+model: []
+icon: spark
+accent: "#33d1ff"
+disable-model-invocation: false
+user-invocable: true
+enabled: true
+tools:
+  - read
+agents: []
+handoffs: []
+---
+
+Reserved historical filename.
+`, 'utf8');
+    writeCustomManifest(path.join(agentsPath, 'plan.agent.md'), { name: 'Historical Plan' });
+
+    const projectRoot = path.join(tempRoot, 'project');
+    const projectAgents = path.join(projectRoot, '.rdx', 'agents');
+    fs.mkdirSync(projectAgents, { recursive: true });
+    writeCustomManifest(path.join(projectAgents, 'edit.agent.md'), { name: 'Project Edit' });
+    writeCustomManifest(path.join(projectAgents, 'ask.agent.md'), { name: 'Project Ask' });
+
+    const reservedSettings = manifestService.getSettings(
+      { agentsPath, instructionsPath },
+      [ollama],
+      validRoutes,
+      [],
+      projectRoot,
+    );
+    const effectiveIds = reservedSettings.definitions.map((definition) => definition.id);
+    const userInvocableIds = reservedSettings.definitions
+      .filter((definition) => definition.userInvocable)
+      .map((definition) => definition.id);
+    for (const illegalId of ['ask', 'plan', 'edit']) {
+      assert(!effectiveIds.includes(illegalId), `Effective snapshot must not include reserved id ${illegalId}.`);
+      assert(!userInvocableIds.includes(illegalId), `Settings/Composer user-invocable set must not include ${illegalId}.`);
+    }
+    assert(
+      reservedSettings.diagnostics.some((entry) => (
+        entry.includes('AGENT_ID_RESERVED_HISTORICAL') && entry.includes('user') && entry.includes('ask')
+      )),
+      'User reserved historical ids must emit AGENT_ID_RESERVED_HISTORICAL.',
+    );
+    assert(
+      reservedSettings.diagnostics.some((entry) => (
+        entry.includes('AGENT_ID_RESERVED_HISTORICAL') && entry.includes('project')
+      )),
+      'Project reserved historical ids must emit AGENT_ID_RESERVED_HISTORICAL.',
+    );
+    assert(fs.existsSync(path.join(projectAgents, 'edit.agent.md')), 'Project reserved files must not be auto-deleted.');
+    assert(fs.existsSync(path.join(projectAgents, 'ask.agent.md')), 'Project reserved files must remain on disk.');
+    assert(!fs.existsSync(path.join(agentsPath, 'plan.agent.md')), 'Matching user historical plan seed must be purged.');
   } finally {
     fs.rmSync(tempRoot, { recursive: true, force: true });
   }

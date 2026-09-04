@@ -44,13 +44,13 @@ export function createTestModeStub(
     throw new Error('E2E forced profile LLM request failure');
   }
   const lower = userMessage.toLowerCase();
-  let stub = agentId === 'ask'
-    ? 'Ask is ready. I can inspect readonly context, search files or public pages, and explain next steps without starting a Debugger run.'
+  let stub = agentId === 'custom-readonly'
+    ? 'Custom readonly is ready. I can inspect readonly context, search files or public pages, and explain next steps without starting a Debugger run.'
     : `${displayName} is ready. Describe the goal and I can use the configured tools for this turn.`;
   if (/ue4|unreal/i.test(userMessage)) {
     stub = 'UE4 is Unreal Engine 4, commonly involved in graphics debugging around materials, post-processing, shaders, and render passes.';
   } else if (/hello|hi/i.test(userMessage)) {
-    stub = agentId === 'ask'
+    stub = agentId === 'custom-readonly'
       ? 'Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution.'
       : 'Hello. I can run as a general executable agent using the tools enabled by this agent profile.';
   } else if (/start|execute|debug|analy[sz]e/.test(lower)) {
@@ -90,19 +90,19 @@ export async function createProfileTestResponse(
     throw new Error('E2E forced profile LLM request failure');
   }
   const lower = userMessage.toLowerCase();
-  let stub = agentId === 'ask'
+  let stub = agentId === 'custom-readonly'
     ? 'I can inspect readonly context, search files or public pages, explain boundaries, or guide you to open a .rdc capture without starting a Debugger run.'
     : 'I can help scope the target and execute configured tools directly within this agent turn.';
   if (/ue4|unreal/i.test(userMessage)) {
     stub = 'UE4 is Unreal Engine 4. In RDC-Agent it is usually relevant to render pass, material, post-process, and shader debugging context.';
   } else if (/hello|hi|你好|您好/i.test(userMessage)) {
-    stub = agentId === 'ask'
+    stub = agentId === 'custom-readonly'
       ? 'Hello. I can clarify the issue, explain capability boundaries, or guide you to open a .rdc capture without starting RenderDoc execution.'
       : 'Hello. I can run as a general executable agent using the tools enabled by this agent profile.';
   } else if (/start|execute|debug|analy[sz]e/.test(lower)) {
     stub = 'Received. I will handle this as a normal agent turn using the configured tools and runtime context.';
   }
-  if (agentId === 'ask' && userMessage.includes('__RDC_AGENT_E2E_ASK_READONLY_TOOL__')) {
+  if (agentId === 'custom-readonly' && userMessage.includes('__RDC_AGENT_E2E_READONLY_TOOL__')) {
     const toolCallId = generateEventId('e2e-tool');
     emitProfileTestEvent('tool.started', {
       toolCallId,
@@ -118,7 +118,7 @@ export async function createProfileTestResponse(
           content: [
             {
               type: 'text',
-              text: 'src/main/conversation/ConversationService.ts: Ask readonly trace is visible.',
+              text: 'src/main/conversation/ConversationService.ts: readonly trace is visible.',
             },
           ],
         },
@@ -127,8 +127,8 @@ export async function createProfileTestResponse(
         trace_id: toolCallId,
       },
     }, options);
-    stub = 'I searched the workspace with grep and found the Ask conversation code path. No Debugger run was created.';
-  } else if (agentId === 'ask' && userMessage.includes('__RDC_AGENT_E2E_ASK_DENY_WRITE__')) {
+    stub = 'I searched the workspace with grep and found the conversation code path. No Debugger run was created.';
+  } else if (agentId === 'custom-readonly' && userMessage.includes('__RDC_AGENT_E2E_DENY_WRITE__')) {
     const toolCallId = generateEventId('e2e-tool');
     emitProfileTestEvent('tool.started', {
       toolCallId,
@@ -138,21 +138,21 @@ export async function createProfileTestResponse(
     emitProfileTestEvent('tool.denied', {
       toolCallId,
       toolName: 'write_file',
-      reason: 'Policy denied: ask can only use readonly tools.',
+      reason: 'Policy denied: custom-readonly can only use readonly tools.',
       result: {
         ok: false,
         data: {},
         artifacts: [],
         error: {
           code: 'AGENT_TOOL_POLICY_DENIED',
-          message: 'Policy denied: ask can only use readonly tools.',
+          message: 'Policy denied: custom-readonly can only use readonly tools.',
           category: 'policy',
         },
         duration_ms: 1,
         trace_id: toolCallId,
       },
     }, options);
-    stub = 'I cannot write files in Ask mode. Ask can inspect and search, but mutation requires the appropriate execution flow.';
+    stub = 'I cannot write files in this readonly profile. It can inspect and search, but mutation requires the appropriate execution flow.';
   }
 
   const finalStub = stub;

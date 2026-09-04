@@ -307,4 +307,58 @@ describe('AgentManifestService effective builtin snapshot', () => {
     expect(general?.tools).toContain('write');
     expect(settings.diagnostics.some((entry) => entry.includes('PROJECT_AGENT_MANIFEST_INVALID'))).toBe(true);
   });
+
+  it('drops reserved historical ids from effective snapshot and diagnoses both scopes', async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), 'rdx-agent-reserved-'));
+    roots.push(root);
+    const agentsPath = path.join(root, 'user-agents');
+    const projectAgents = path.join(root, 'project', '.rdx', 'agents');
+    await mkdir(agentsPath, { recursive: true });
+    await mkdir(projectAgents, { recursive: true });
+    await writeFile(path.join(agentsPath, 'ask.agent.md'), `---
+id: leftover-ask
+name: Leftover Ask
+description: reserved
+argument-hint: x
+target: rdc-agent
+model: []
+tools:
+  - read
+agents: []
+handoffs: []
+---
+
+reserved
+`, 'utf8');
+    await writeFile(path.join(projectAgents, 'plan.agent.md'), `---
+name: Plan
+description: reserved
+argument-hint: x
+target: rdc-agent
+model: []
+tools:
+  - read
+agents: []
+handoffs: []
+---
+
+reserved
+`, 'utf8');
+    const settings = agentManifestService.getSettings(
+      { agentsPath, instructionsPath: path.join(root, 'RDX.md') },
+      [],
+      [],
+      [],
+      path.join(root, 'project'),
+    );
+    expect(settings.definitions.map((definition) => definition.id)).not.toContain('ask');
+    expect(settings.definitions.map((definition) => definition.id)).not.toContain('plan');
+    expect(settings.diagnostics.some((entry) => (
+      entry.includes('AGENT_ID_RESERVED_HISTORICAL') && entry.includes('user')
+    ))).toBe(true);
+    expect(settings.diagnostics.some((entry) => (
+      entry.includes('AGENT_ID_RESERVED_HISTORICAL') && entry.includes('project')
+    ))).toBe(true);
+    expect(fs.existsSync(path.join(projectAgents, 'plan.agent.md'))).toBe(true);
+  });
 });

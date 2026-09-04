@@ -10,7 +10,7 @@ Agent manifests 按 scope 解析，优先级 `builtin < user < project`，整资
 - user：`~/.rdx/agents/*.agent.md`
 - project：`<project-root>/.rdx/agents/*.agent.md`
 
-四个 builtin profile：`general` / `debugger` / `analyzer` / `optimizer`。user/project 只能覆盖这四个 id，或新增无关自定义 id。ask/plan/edit 及 S0 specialist id 为历史非法 id：剔出 effective snapshot + 诊断 `AGENT_ID_RESERVED_HISTORICAL`；**不再有 custom manifest 运行通道**（U01 落地）。运行时不再写 user seed。代码仍是 v1 marker，且会把 concrete model 判成 user-modified（U01 修）。
+四个 builtin profile：`general` / `debugger` / `analyzer` / `optimizer`。user/project 只能覆盖这四个 id，或新增无关自定义 id。ask/plan/edit 及 S0 specialist id 为历史非法 id：剔出 effective snapshot + 诊断 `AGENT_ID_RESERVED_HISTORICAL`；**不再有 custom manifest 运行通道**（U01 落地）。运行时不再写 user seed。迁移 marker 为 v2；canonical hash 忽略 model/icon/accent 与 handoff.model。v1 视为未完成。
 
 Agent ID 来自文件名 stem，不再从 frontmatter 读取 `id`。
 

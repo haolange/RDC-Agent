@@ -762,10 +762,9 @@ export class ConversationService {
   }
 
   /**
-   * 将 agentId 映射为 PromptContext.mode。
-   *
-   * Plan 归入 ask（ReadOnly 变体），非顶层 agent 归入 edit；
-   * 与 AgentOrchestrator.modeForAgent 保持一致语义。
+   * 按 effective snapshot 的当前对话路由准备 Prompt。
+   * 顶层身份只有四 builtin：general / debugger / analyzer / optimizer；
+   * 自定义 profile 走同一路由，不再把 ask/plan/edit 当 mode。
    */
   private prepareConversationPrompt(input: PrepareConversationPromptInput) {
     return buildConversationPrompt(input);

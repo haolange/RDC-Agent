@@ -19,7 +19,12 @@ import { appPathService } from '../runtime/AppPathService';
 import { scopedResourceResolver } from '../runtime/ScopedResourceResolver';
 import { parseAgentMarkdownStrict, serializeAgentMarkdown } from './agentManifestParse';
 import { agentSeedMigrationService } from './seed-migration/AgentSeedMigrationService';
-import { extractSeedSemanticManifest, hashSeedSemanticManifest } from './seed-migration/semanticHash';
+import { isHistoricalReservedAgentId } from './seed-migration/officialSeedGenerations';
+import {
+  extractSeedSemanticManifest,
+  hashSeedSemanticManifest,
+  readSeedFrontmatterId,
+} from './seed-migration/semanticHash';
 
 const toSlug = (value: string): string => {
   const slug = value
@@ -56,6 +61,20 @@ const hashManifestContent = (content: string): string => (
 
 const hashManifestFile = (filePath: string, id: string): string =>
   hashSeedSemanticManifest(extractSeedSemanticManifest(fs.readFileSync(filePath, 'utf8'), id));
+
+const reservedHistoricalIdsForCandidate = (
+  candidate: ScopedResourceCandidate<AgentManifestDefinition>,
+): string[] => {
+  const filenameId = idFromFileName(path.basename(candidate.sourcePath));
+  const ids = [filenameId, candidate.id];
+  try {
+    const frontmatterId = readSeedFrontmatterId(fs.readFileSync(candidate.sourcePath, 'utf8'));
+    if (frontmatterId) ids.push(frontmatterId);
+  } catch {
+    // filename / parsed id are enough
+  }
+  return [...new Set(ids.filter((id) => isHistoricalReservedAgentId(id)))];
+};
 
 export interface AgentManifestCommit {
   definition: AgentManifestDefinition | null;
@@ -168,9 +187,9 @@ export class AgentManifestService {
     paths: Pick<AppRuntimePaths, 'agentsPath' | 'instructionsPath'>,
     projectRoot?: string,
   ): { profiles: EffectiveAgentProfile[]; diagnostics: string[] } {
-    agentSeedMigrationService.migrateUserAgents(this.getAgentsDirectory(paths));
+    const migration = agentSeedMigrationService.migrateUserAgents(this.getAgentsDirectory(paths));
     const candidates: Array<ScopedResourceCandidate<AgentManifestDefinition>> = [];
-    const diagnostics: string[] = [];
+    const diagnostics: string[] = [...migration.diagnostics];
 
     const builtinPath = appPathService.getBuiltinAgentsPath();
     if (!fs.existsSync(builtinPath)) {
@@ -181,6 +200,13 @@ export class AgentManifestService {
     }
 
     for (const loaded of loadManifestCandidates(this.getAgentsDirectory(paths), 'user', false)) {
+      const reserved = reservedHistoricalIdsForCandidate(loaded.candidate);
+      if (reserved.length > 0) {
+        diagnostics.push(
+          `AGENT_ID_RESERVED_HISTORICAL: user agent '${reserved[0]}' is a reserved historical id (${loaded.candidate.sourcePath})`,
+        );
+        continue;
+      }
       if (loaded.candidate.invalid) {
         diagnostics.push(`USER_AGENT_MANIFEST_INVALID: ${loaded.candidate.sourcePath}: ${loaded.candidate.invalidReason}`);
       }
@@ -190,6 +216,13 @@ export class AgentManifestService {
     if (projectRoot) {
       const projectAgentsPath = appPathService.getProjectRdxPaths(projectRoot).agentsPath;
       for (const loaded of loadManifestCandidates(projectAgentsPath, 'project', false)) {
+        const reserved = reservedHistoricalIdsForCandidate(loaded.candidate);
+        if (reserved.length > 0) {
+          diagnostics.push(
+            `AGENT_ID_RESERVED_HISTORICAL: project agent '${reserved[0]}' is a reserved historical id (${loaded.candidate.sourcePath})`,
+          );
+          continue;
+        }
         if (loaded.candidate.invalid) {
           diagnostics.push(`PROJECT_AGENT_MANIFEST_INVALID: ${loaded.candidate.sourcePath}: ${loaded.candidate.invalidReason}`);
         }

@@ -343,6 +343,26 @@ export function expandOfficialS0IdAliases(id: string): string[] {
   return [...new Set([official, official.replace(/_/g, '-'), official.replace(/-/g, '_')])];
 }
 
+export const HISTORICAL_TOP_LEVEL_AGENT_IDS = ['ask', 'plan', 'edit'] as const;
+
+export function historicalReservedAgentIds(): Set<string> {
+  const ids = new Set<string>(HISTORICAL_TOP_LEVEL_AGENT_IDS);
+  for (const id of OFFICIAL_S0_SEED_IDS) {
+    ids.add(id);
+    for (const alias of expandOfficialS0IdAliases(id)) {
+      ids.add(alias);
+    }
+  }
+  return ids;
+}
+
+/** Shared reserved set for migration, manifest snapshot, tests, and check:settings-agents. */
+export const HISTORICAL_RESERVED_AGENT_IDS: ReadonlySet<string> = historicalReservedAgentIds();
+
+export function isHistoricalReservedAgentId(id: string): boolean {
+  return HISTORICAL_RESERVED_AGENT_IDS.has(id);
+}
+
 export function officialSeedIdentitySet(): Set<string> {
   const ids = new Set<string>();
   for (const generation of OFFICIAL_SEED_GENERATIONS) {

@@ -79,7 +79,7 @@ const mapRunPlanStatus = (run: RunSummary): PlanStatus => {
   return 'accepted';
 };
 
-interface AskTurn {
+interface HistoryTurn {
   turnId: string;
   createdAt: number;
   completedAt: number;
@@ -284,9 +284,9 @@ export class TraceService {
 
     }
 
-    for (const turn of this.groupAskTurns(conversations)) {
+    for (const turn of this.groupHistoryTurns(conversations)) {
       if (turn.messages.some((m) => m.runId)) continue;
-      const runId = `ask-${turn.turnId}`;
+      const runId = `history-${turn.turnId}`;
       const userPrompt = turn.userMessage?.content.trim() || 'Conversation';
       const assistant = turn.assistantMessages.slice(-1)[0];
       const status: TraceStatus = assistant?.status === 'error'
@@ -309,9 +309,9 @@ export class TraceService {
       agentRun.status = status;
       this.runStore.save(agentRun);
 
-      const existingAskEvents = this.eventStore.getEvents(runId);
-      const existingAskNodeIds = new Set(
-        existingAskEvents.flatMap((traceEvent) => {
+      const existingHistoryEvents = this.eventStore.getEvents(runId);
+      const existingHistoryNodeIds = new Set(
+        existingHistoryEvents.flatMap((traceEvent) => {
           const ids: string[] = [];
           if (traceEvent.type === 'run.completed') ids.push(`__final__:${runId}`);
           const payloadId = (traceEvent.payload as { id?: string })?.id;
@@ -319,23 +319,23 @@ export class TraceService {
           return ids;
         }),
       );
-      const hasAskTaskFrame = existingAskEvents.some(
+      const hasHistoryTaskFrame = existingHistoryEvents.some(
         (traceEvent) => (traceEvent.payload as { kind?: string })?.kind === 'task_frame',
       );
-      if (!hasAskTaskFrame) {
+      if (!hasHistoryTaskFrame) {
         this.emitter.emitTaskFrame(runId, userPrompt);
       }
       for (const msg of turn.assistantMessages) {
         for (const item of collectExplicitThinking(msg.workTrace?.blocks)) {
           const thoughtId = `thought-${msg.id}-${item.blockId}`;
-          if (existingAskNodeIds.has(thoughtId)) continue;
+          if (existingHistoryNodeIds.has(thoughtId)) continue;
           this.emitter.emitThinkingArtifact(runId, item.thinking, thoughtId);
-          existingAskNodeIds.add(thoughtId);
+          existingHistoryNodeIds.add(thoughtId);
         }
       }
       if (
         assistant?.content.trim()
-        && !existingAskNodeIds.has(`__final__:${runId}`)
+        && !existingHistoryNodeIds.has(`__final__:${runId}`)
         && status !== 'running'
       ) {
         this.emitter.emitFinalResponse(runId, assistant.content);
@@ -411,8 +411,8 @@ export class TraceService {
 
   }
 
-  private groupAskTurns(messages: ConversationMessage[]): AskTurn[] {
-    const groups = new Map<string, AskTurn>();
+  private groupHistoryTurns(messages: ConversationMessage[]): HistoryTurn[] {
+    const groups = new Map<string, HistoryTurn>();
     for (const message of messages) {
       const turnId = message.turnId || message.id;
       const group = groups.get(turnId) ?? {
