@@ -1,0 +1,12 @@
+.knowledge-filters { border-bottom: 1px solid var(--token-border-muted); padding-bottom: var(--space-3); }
+.knowledge-filters > summary { display: flex; align-items: center; gap: var(--space-2); width: fit-content; padding: var(--space-2); border-radius: var(--radius-md); color: var(--token-text-caption); font-size: var(--text-sm); list-style: none; }
+.knowledge-filters > summary::-webkit-details-marker { display: none; }
+.knowledge-filters > summary:hover { background: var(--token-interactive-hover); color: var(--token-text-heading); }
+.knowledge-filters > summary:focus-visible { outline: 2px solid var(--token-border-focus); }
+.knowledge-filter-count { color: var(--token-text-heading); font-variant-numeric: tabular-nums; }
+.knowledge-filter-panel { display: grid; gap: var(--space-4); padding: var(--space-3) var(--space-2); }
+.knowledge-filter-panel fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.knowledge-filter-panel legend { font-size: var(--text-sm); color: var(--token-text-caption); margin-bottom: var(--space-2); }
+.knowledge-filter-options { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.knowledge-filter-options .button { border: 1px solid var(--token-border-muted); color: var(--token-text-caption); border-radius: var(--radius-full); }
+.knowledge-filter-options .button[aria-pressed='true'] { background: var(--token-interactive-hover); color: var(--token-text-heading); border-color: var(--token-border-focus); }

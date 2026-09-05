@@ -1,0 +1,22 @@
+.resource-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.resource-empty-state-icon {
+  flex-shrink: 0;
+  box-sizing: content-box;
+  padding: var(--space-4);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-xl);
+  background: var(--token-bg-raised);
+  color: var(--token-text-caption);
+}

@@ -20,7 +20,6 @@ export function IndexStatusBar({ index, rebuilding, onRebuild }: IndexStatusBarP
       <Button variant="secondary" size="sm" onClick={onRebuild} disabled={rebuilding} data-testid="knowledge-center-rebuild">
         {rebuilding ? t('knowledgeCenter.indexRebuilding') : t('knowledgeCenter.indexRebuild')}
       </Button>
-      <p className="knowledge-center-index-hint">{t('knowledgeCenter.indexRebuildHint')}</p>
     </div>
   );
 }

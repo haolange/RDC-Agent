@@ -1,7 +1,9 @@
 import type { KnowledgeCandidatesResult, KnowledgeLaneHit } from '@shared/types/knowledge';
 import { Button } from '../../../../ui/Button';
+import { ResourceEmptyState } from '../../../../ui/ResourceEmptyState';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { CardBadges } from '../parts/CardBadges';
+import { KnowledgeFilters } from '../parts/KnowledgeFilters';
 import { ConflictRow } from '../parts/ConflictRow';
 import type { useKnowledgeCenter } from '../useKnowledgeCenter';
 
@@ -40,7 +42,6 @@ function HitButton({
   active: boolean;
   onSelect: () => void;
 }) {
-  const chips = card.lanes;
   return (
     <Button
       variant="ghost"
@@ -50,7 +51,6 @@ function HitButton({
     >
       <span className="knowledge-center-card-title">{card.title}</span>
       <CardBadges type={card.type} lifecycle={card.lifecycle} />
-      <span className="knowledge-center-card-preview">{chips.join(' · ')}</span>
     </Button>
   );
 }
@@ -77,10 +77,11 @@ export function ListColumn({ state, inbox }: ListColumnProps) {
         />
       </label>
 
+      <KnowledgeFilters state={state} />
       <div className="knowledge-center-tree" data-testid="knowledge-center-tree">
         {loading && <div className="knowledge-center-empty-inline">{t('knowledgeCenter.loading')}</div>}
         {!loading && reason && (
-          <div className="knowledge-center-empty" data-testid="knowledge-center-empty-list">{t(reason)}</div>
+          <div className="knowledge-center-empty" data-testid="knowledge-center-empty-list"><ResourceEmptyState>{t(reason)}</ResourceEmptyState></div>
         )}
         {!loading && state.viewMode === 'cards' && !reason && state.hits.map((hit) => (
           <HitButton

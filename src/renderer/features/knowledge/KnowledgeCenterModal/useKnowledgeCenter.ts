@@ -54,7 +54,7 @@ export function useKnowledgeCenter(open: boolean) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const media = window.matchMedia('(max-width: 640px)');
+    const media = window.matchMedia('(max-width: 960px)');
     const sync = () => setNarrow(media.matches);
     sync();
     media.addEventListener('change', sync);

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { RdxRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdxRuntime';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
+import { ResourceEmptyState } from '../../../../ui/ResourceEmptyState';
 import { ScopedResourceEditor } from './ScopedResourceEditor';
 import { contentFromForm, emptyForm, formFromContent, resourceCardMeta, type ResourceFormState } from './scopedResourceForm';
 
@@ -156,7 +157,7 @@ export const RuntimeScopePanel: React.FC<{
 
       {showResourceStrip ? (
         <div className="settings-runtime-scope-body settings-runtime-scope-body--split">
-          <div className="settings-manifest-layout settings-runtime-manifest-layout">
+          <div className={`settings-manifest-layout settings-runtime-manifest-layout${!editing && resources.length === 0 ? ' is-empty' : ''}`}>
             <div className="settings-manifest-list-column">
               <div className="settings-manifest-toolbar settings-manifest-list-toolbar">
                 <div className="settings-manifest-actions">
@@ -206,7 +207,7 @@ export const RuntimeScopePanel: React.FC<{
               />
             ) : (
               <div className="settings-runtime-editor-placeholder settings-empty-dashed">
-                {t('settings.scopeSelectOrCreate', { kind: kindLabel })}
+                <ResourceEmptyState>{t('settings.scopeSelectOrCreate', { kind: kindLabel })}</ResourceEmptyState>
               </div>
             )}
           </div>
