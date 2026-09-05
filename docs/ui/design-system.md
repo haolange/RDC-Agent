@@ -86,6 +86,8 @@ Session 右侧栏五张卡（Progress / Artifacts / Outputs / Context / Capture�
 
 知识中心与 Settings 用视窗比例驱动：约 `min(92vw, 1920px) × min(90vh, 1240px)`，带最小尺寸下限；960 堆叠，640 全屏。禁止再写互相覆盖的多段 media query。`--settings-content-max` 随大屏上调，避免内容挤在中间一条。
 
+知识中心与 Settings 的内容使用实色分层、紧凑工具栏与清晰标题，避免嵌套装饰框和重复说明。Knowledge 保持空间 / 列表 / 详情三列，左栏仅放视图与空间导航；类型、生命周期与六条检索通道收进列表的筛选入口，以文字按钮表达多选；索引维护与卡片元数据默认折叠；960px 以下用空间 / 列表 / 详情切换且始终提供关闭入口。Settings 保持九项导航与均分 User / Project 作用域；640px 以下导航单行横向滚动，内容全屏。宽屏下 Light / Dark 编辑器并排，小屏堆叠。资源空态共用 `ResourceEmptyState`，不添加装饰性文案；路径、模型名与元数据允许换行。说明文案仅保留操作条件、作用域和必要风险，内部实现细节留在文档。
+
 ## 右键上下文菜单
 
 全应用文本面使用自绘 `ContextMenu`（`src/renderer/ui/ContextMenu`），不走原生 `Menu.popup`，以保证 Browser / Desktop parity。
@@ -115,3 +117,7 @@ pnpm run typecheck
 ```
 
 浏览器真实会话覆盖 Settings → Appearance、agent accent、Light/Dark、Compose Effort 染色边界（见 [`appearance-checklist.md`](appearance-checklist.md)）。验收前须重启最新 `start:agent-browser`，并删除该 QA project 下全部 session 后新建隔离 session。
+
+Knowledge Case 详情正文按章节分节，目录使用可换行的链接控件；缺失章节统一提示，不重复渲染空白章节。卡片信息使用带 aria-expanded 的统一 Button 展开，元数据分组排版。完整 JSON 对象 / 数组仅在阅读层转为字段与列表，保留未知字段及所有值；普通 Markdown 和无法解析的内容保持原文，禁止回写或改变知识事实。
+
+Case 阅读层按内容安排主次：预期 / 实际使用并列对照，短属性使用紧凑网格与行内列表；禁止递归缩进线和宽标签列。证据摘要常驻，来源及参数由统一按钮按需展开，不将编号、参数置于摘要之前占据正文。窄屏对照改为纵向排列。

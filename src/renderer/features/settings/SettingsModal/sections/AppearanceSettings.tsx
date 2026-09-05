@@ -57,22 +57,24 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
       </div>
 
       <div className="appearance-live-preview" aria-hidden="true">
-        <AppearanceChromePreview chrome={light} variant="light" label="ThemePreview" />
-        <AppearanceChromePreview chrome={dark} variant="dark" label="ThemePreview" />
+        <AppearanceChromePreview chrome={light} variant="light" label={t('theme.light')} />
+        <AppearanceChromePreview chrome={dark} variant="dark" label={t('theme.dark')} />
       </div>
 
-      <ChromeThemeCard
-        variant="light"
-        chrome={light}
-        t={t}
-        onChange={(chrome) => void onChromeThemeChange('light', chrome)}
-      />
-      <ChromeThemeCard
-        variant="dark"
-        chrome={dark}
-        t={t}
-        onChange={(chrome) => void onChromeThemeChange('dark', chrome)}
-      />
+      <div className="appearance-theme-editors">
+        <ChromeThemeCard
+          variant="light"
+          chrome={light}
+          t={t}
+          onChange={(chrome) => void onChromeThemeChange('light', chrome)}
+        />
+        <ChromeThemeCard
+          variant="dark"
+          chrome={dark}
+          t={t}
+          onChange={(chrome) => void onChromeThemeChange('dark', chrome)}
+        />
+      </div>
 
       <div className="settings-section appearance-preferences">
         <div className="settings-section-header">

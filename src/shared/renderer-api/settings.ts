@@ -17,7 +17,7 @@ export function createMemoryApi(transport: RendererApiTransport): MemoryApi {
 
 export function createRdxRuntimeApi(transport: RendererApiTransport): ElectronAPI['rdxRuntime'] {
   return {
-    getOverview: (projectRoot) => transport.invoke(INVOKE.rdxRuntime.getOverview, projectRoot),
+    getOverview: (projectRoot) => transport.invoke(INVOKE.rdxRuntime.getOverview, ...(projectRoot === undefined ? [] : [projectRoot])),
     validateResource: (request) => transport.invoke(INVOKE.rdxRuntime.validateResource, request),
     upsertResource: (request) => transport.invoke(INVOKE.rdxRuntime.upsertResource, request),
     importResource: (request) => transport.invoke(INVOKE.rdxRuntime.importResource, request),

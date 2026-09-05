@@ -56,6 +56,17 @@ function listApiFunctions(value: unknown, prefix = ''): Array<{ path: string; fn
 }
 
 describe('canonical renderer API', () => {
+  it('omits an absent overview project argument across JSON transport', async () => {
+    const transport = new RecordingTransport();
+    const api = createRendererApi('win32', transport);
+    await api.rdxRuntime.getOverview();
+    await api.rdxRuntime.getOverview('D:/QA/project');
+    expect(JSON.parse(JSON.stringify(transport.invocations))).toEqual([
+      { channel: 'rdx-runtime:overview', args: [] },
+      { channel: 'rdx-runtime:overview', args: ['D:/QA/project'] },
+    ]);
+  });
+
   it('keeps invoke and event manifests unique', () => {
     expect(new Set(RENDERER_INVOKE_CHANNELS).size).toBe(RENDERER_INVOKE_CHANNELS.length);
     expect(new Set(RENDERER_EVENT_CHANNELS).size).toBe(RENDERER_EVENT_CHANNELS.length);
