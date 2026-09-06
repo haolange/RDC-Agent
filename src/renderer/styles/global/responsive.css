@@ -1,0 +1,209 @@
+/* True viewport breakpoints only. No unconditional chrome overrides. */
+
+@media (max-width: 900px) {
+  .app-body {
+    grid-template-columns:
+      minmax(220px, 280px)
+      var(--left-resize-handle-width, 8px)
+      minmax(0, 1fr)
+      0
+      0;
+  }
+
+  .panel-resize-handle-right {
+    width: 0;
+    pointer-events: none;
+  }
+
+  .app-sidebar-right .right-panel-body {
+    opacity: 0;
+    transform: translateX(var(--space-3));
+    pointer-events: none;
+  }
+
+  .main-floating-utilities {
+    width: calc(100% - var(--space-8));
+  }
+
+  .main-page-shell {
+    width: 100%;
+  }
+
+  .app-titlebar {
+    padding-left: var(--space-3);
+  }
+
+  .app-titlebar-center {
+    display: none;
+  }
+
+  .app-footer {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: center;
+  }
+
+  .footer-left {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .footer-entry {
+    width: 100%;
+  }
+
+  .footer-right {
+    justify-content: flex-start;
+  }
+
+  .main-header {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .main-input-bar {
+    width: var(--workbench-outer-rail-width, 100%);
+    padding: var(--space-2) 0 var(--space-3);
+  }
+
+  .composer-shell {
+    padding: var(--space-3);
+    border-radius: var(--composer-shell-radius);
+  }
+
+  .composer-footer-bar {
+    align-items: center;
+    flex-wrap: nowrap;
+  }
+
+  .composer-toolbar-group-left,
+  .composer-toolbar-group-right {
+    width: auto;
+    flex-wrap: nowrap;
+  }
+
+  .composer-toolbar-group-right {
+    flex: 0 0 auto;
+    margin-left: auto;
+    justify-content: flex-end;
+  }
+
+  .composer-permission-popup {
+    left: auto;
+    right: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-body {
+    min-width: 0;
+    grid-template-columns:
+      3.5rem
+      0
+      minmax(0, 1fr)
+      0
+      0;
+  }
+
+  .panel-resize-handle-left,
+  .panel-resize-handle-right {
+    width: 0;
+    pointer-events: none;
+  }
+
+  .app-sidebar-left .sidebar-nav {
+    padding-inline: var(--space-1);
+  }
+
+  .app-sidebar-left .session-section {
+    opacity: 0;
+    transform: translateX(calc(var(--space-3) * -1));
+    pointer-events: none;
+    flex: 0;
+    max-height: 0;
+    margin-top: 0;
+    padding-top: 0;
+    overflow: hidden;
+    border-top-color: transparent;
+  }
+
+  .app-sidebar-footer {
+    display: flex;
+    padding: var(--space-2);
+  }
+
+  .app-sidebar-footer .sidebar-user-trigger {
+    width: 100%;
+    min-height: var(--control-height-lg);
+    justify-content: center;
+    padding: 0;
+  }
+
+  .app-sidebar-footer .footer-entry-copy,
+  .app-sidebar-footer .footer-entry-trailing {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .chat-send-button-label {
+    display: none;
+  }
+
+  .chat-send-button {
+    min-width: var(--control-height-lg);
+    padding: 0 var(--space-3);
+  }
+
+  .composer-textarea {
+    min-height: 52px;
+    font-size: var(--text-base);
+  }
+
+  .composer-markdown-input {
+    font-size: var(--text-base);
+  }
+
+  .composer-agent-pill {
+    padding-inline: var(--space-3);
+  }
+}
+
+@media (max-width: 480px) {
+  .composer-footer-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-2);
+  }
+
+  .composer-toolbar-group-left,
+  .composer-toolbar-group-right {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .composer-toolbar-group-left {
+    justify-content: stretch;
+  }
+
+  .composer-toolbar-group-right {
+    justify-content: flex-end;
+  }
+
+  .composer-agent-menu,
+  .composer-permission-menu,
+  .composer-model-menu {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .composer-agent-pill,
+  .composer-permission-pill,
+  .composer-model-pill {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+.app-body.has-left-drawer {
+  grid-template-columns: 0 0 minmax(0, 1fr) var(--right-resize-handle-width, 0px) var(--right-panel-width, 0px);
+}

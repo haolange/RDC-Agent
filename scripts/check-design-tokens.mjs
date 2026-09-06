@@ -6,9 +6,9 @@
  *  - feature / ui / patterns / shell CSS must reference semantic tokens
  *    (`--token-*`, `--text-*`, `--space-*`, `--radius-*`, `--control-*`, component vars)
  *    instead of primitive `--color-*` namespaces or literal values.
- *  - token definition files (design-system.css) and the global chrome layer
- *    (styles/global/*) are exempt; the global layer is migrated in the token
- *    convergence batch and then removed from this exemption list.
+ *  - token definition file (design-system.css) may reference primitives.
+ *    styles/global/* is not exempt; reduced-motion !important in base.css is
+ *    the single documented exception.
  *  - SVG presentation-attribute injection for the Right Rail empty visuals is the
  *    single documented exception for `stop-color` primitives (scoped to that file).
  *
@@ -37,10 +37,9 @@ const walk = (dir, files = []) => {
   return files;
 };
 
-// Token definition + global chrome layers may reference primitives.
+// Token definition layer may reference primitives.
 const EXEMPT_PREFIXES = [
   'src/renderer/styles/design-system.css',
-  'src/renderer/styles/global/',
 ];
 
 const isExempt = (rel) => EXEMPT_PREFIXES.some((prefix) => (
@@ -104,6 +103,9 @@ for (const filePath of files) {
       rule.pattern.lastIndex = 0;
       if (!rule.pattern.test(line)) continue;
       if (rule.id === 'primitive-color-var' && STOP_COLOR_EXEMPT.has(rel) && line.includes('stop-color')) continue;
+      if (rule.id === 'important' && rel === 'src/renderer/styles/global/base.css') {
+        continue;
+      }
       hits.push(`${rel}:${index + 1}: ${rule.id} — ${rule.message} :: ${line.trim()}`);
     }
   });

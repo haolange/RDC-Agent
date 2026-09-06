@@ -231,13 +231,9 @@ for (const filePath of walk(rendererRoot, [], /\.(tsx|ts)$/)) {
 }
 
 // R4 — hardcoded hex in TSX inline styles and renderer CSS.
-// B1 清零 hex 后删除本豁免表；当前仅保留 token 定义层与尚未迁移的 chrome / transcript 文件。
+// Token definition layer may contain hex inside compiled/preview helpers.
 const r4CssExempt = (relativePath) => (
   relativePath === 'src/renderer/styles/design-system.css'
-  || relativePath === 'src/renderer/features/debugger/AgentChat/AgentChat.css'
-  || relativePath === 'src/renderer/patterns/EmptyWorkbenchPrompt/EmptyWorkbenchPrompt.css'
-  || relativePath.startsWith('src/renderer/styles/global/')
-  || relativePath === 'src/renderer/features/settings/SettingsModal/sections/AppearanceSettings.css'
 );
 
 for (const filePath of walk(rendererRoot, [], /\.(tsx|css)$/)) {

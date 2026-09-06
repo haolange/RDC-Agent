@@ -5,7 +5,7 @@
 }
 
 html {
-  font-size: 16px;
+  font-size: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -46,15 +46,15 @@ body {
   font-family: var(--font-sans);
   font-size: var(--text-base);
   line-height: var(--leading-normal);
-  color: rgb(var(--color-text-primary));
+  color: var(--token-text-heading);
   background: var(--token-bg-app);
   transition: background var(--transition-base), color var(--transition-base);
 }
 
 html[data-resolved-theme='light'] body {
   background:
-    radial-gradient(circle at top, rgb(var(--color-primary-600) / 0.04), transparent 24%),
-    radial-gradient(circle at 78% 8%, rgb(var(--color-accent-500) / 0.03), transparent 18%),
+    radial-gradient(circle at top, color-mix(in srgb, var(--token-accent-primary) 4%, transparent), transparent 24%),
+    radial-gradient(circle at 78% 8%, color-mix(in srgb, var(--token-accent-primary) 3%, transparent), transparent 18%),
     var(--token-bg-app);
 }
 
@@ -88,13 +88,13 @@ a {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgb(var(--color-border-subtle));
+  background: var(--token-border-muted);
   border-radius: var(--radius-full);
   transition: background var(--transition-fast);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(var(--color-border-strong));
+  background: var(--token-border-strong);
 }
 
 ::-webkit-scrollbar-corner {

@@ -14,7 +14,7 @@ html[data-resolved-theme='light'] .empty-workbench-prompt {
   background:
     radial-gradient(
       ellipse 64% 48% at 50% 34%,
-      rgb(var(--color-accent-500) / 0.024),
+      color-mix(in srgb, var(--token-accent-primary) 2%, transparent),
       transparent 70%
     ),
     var(--token-bg-app);
@@ -67,7 +67,7 @@ html[data-resolved-theme='light'] .empty-workbench-prompt {
 }
 
 .empty-workbench-tool-card {
-  --empty-card-accent: var(--composer-mode-accent, #33d1ff);
+  --empty-card-accent: var(--composer-mode-accent);
   position: relative;
   display: flex;
   min-width: 0;

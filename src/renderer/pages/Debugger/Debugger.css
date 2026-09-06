@@ -9,7 +9,7 @@
 
 html[data-resolved-theme='light'] .debugger-page {
   background:
-    radial-gradient(circle at top, rgb(var(--color-accent-500) / 0.02), transparent 26%),
+    radial-gradient(circle at top, color-mix(in srgb, var(--token-accent-primary) 2%, transparent), transparent 26%),
     var(--token-bg-app);
 }
 
@@ -17,17 +17,17 @@ html[data-resolved-theme='light'] .debugger-page {
   margin-top: var(--space-4);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-xl);
-  background: rgb(var(--color-error) / 0.12);
-  border: 1px solid rgb(var(--color-error) / 0.26);
-  color: rgb(var(--color-error));
+  background: color-mix(in srgb, var(--token-status-error) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--token-status-error) 26%, transparent);
+  color: var(--token-status-error);
   font-size: var(--text-sm);
 }
 
 .plan-intake-panel {
-  margin: 16px 20px 0;
+  margin: var(--space-4) var(--space-5) 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--space-2);
 }
 
 .ask-user-question-panel {
@@ -51,27 +51,27 @@ html[data-resolved-theme='light'] .debugger-page {
 
 .plan-document-card,
 .ask-user-question-card {
-  border: 1px solid rgb(var(--color-border-primary));
-  border-radius: 8px;
-  background: rgb(var(--color-bg-1) / 0.96);
+  border: 1px solid var(--token-border-strong);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-shell) 96%, transparent);
   box-shadow:
     0 1px 0 rgb(255 255 255 / 0.025) inset,
     0 8px 22px rgb(0 0 0 / 0.18);
 }
 
 .ask-user-question-card {
-  border-color: rgb(var(--color-accent-500) / 0.62);
-  background: rgb(var(--color-bg-1) / 0.98);
+  border-color: color-mix(in srgb, var(--token-accent-primary) 62%, transparent);
+  background: color-mix(in srgb, var(--token-bg-shell) 98%, transparent);
 }
 
 .plan-document-header,
 .ask-user-question-header {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-4);
   align-items: flex-start;
-  padding: 16px 18px;
-  border-bottom: 1px solid rgb(var(--color-border-secondary));
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--token-border-card);
 }
 
 .plan-document-heading,
@@ -80,89 +80,89 @@ html[data-resolved-theme='light'] .debugger-page {
 }
 
 .plan-intake-kicker {
-  font-size: 12px;
+  font-size: var(--text-sm);
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: rgb(var(--color-accent-500));
-  margin-bottom: 6px;
+  color: var(--token-accent-primary);
+  margin-bottom: var(--space-1);
 }
 
 .plan-intake-title {
   margin: 0;
   font-size: var(--text-lg);
-  color: rgb(var(--color-text-primary));
+  color: var(--token-text-heading);
   letter-spacing: 0;
 }
 
 .plan-intake-status {
-  padding: 8px 12px;
-  border-radius: 999px;
-  font-size: 12px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
   text-transform: uppercase;
-  background: rgb(var(--color-accent-500) / 0.12);
-  color: rgb(var(--color-accent-500));
+  background: color-mix(in srgb, var(--token-accent-primary) 12%, transparent);
+  color: var(--token-accent-primary);
 }
 
 .plan-document-header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-2);
 }
 
 .plan-collapse-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-2);
   min-width: 34px;
   height: 34px;
-  padding: 0 10px;
-  border-radius: 8px;
-  border: 1px solid rgb(var(--color-border-secondary));
-  background: rgb(var(--color-bg-2) / 0.72);
-  color: rgb(var(--color-text-secondary));
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--token-border-card);
+  background: color-mix(in srgb, var(--token-bg-panel) 72%, transparent);
+  color: var(--token-text-body);
   cursor: pointer;
 }
 
 .plan-collapse-button:hover {
-  border-color: rgb(var(--color-border-strong));
-  color: rgb(var(--color-text-primary));
+  border-color: var(--token-border-strong);
+  color: var(--token-text-heading);
 }
 
 .plan-collapse-button span {
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 .plan-document-body {
   display: grid;
-  gap: 18px;
-  padding: 18px;
+  gap: var(--space-5);
+  padding: var(--space-5);
 }
 
 .plan-document-section h3 {
-  margin: 0 0 8px;
-  color: rgb(var(--color-text-primary));
+  margin: 0 0 var(--space-2);
+  color: var(--token-text-heading);
   font-size: var(--text-md);
   letter-spacing: 0;
 }
 
 .plan-document-section ul {
   margin: 0;
-  padding-left: 18px;
-  color: rgb(var(--color-text-secondary));
+  padding-left: var(--space-5);
+  color: var(--token-text-body);
   font-size: var(--text-sm);
   line-height: 1.65;
 }
 
 .plan-document-section li + li {
-  margin-top: 5px;
+  margin-top: var(--space-1);
 }
 
 .plan-document-preview {
   display: grid;
-  gap: 8px;
-  padding: 14px 18px;
-  color: rgb(var(--color-text-secondary));
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  color: var(--token-text-body);
   font-size: var(--text-sm);
   line-height: 1.5;
 }
@@ -170,11 +170,11 @@ html[data-resolved-theme='light'] .debugger-page {
 .plan-document-preview-row {
   display: grid;
   grid-template-columns: 84px minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .plan-document-preview-row strong {
-  color: rgb(var(--color-text-primary));
+  color: var(--token-text-heading);
 }
 
 .plan-document-preview-row span {
@@ -185,63 +185,63 @@ html[data-resolved-theme='light'] .debugger-page {
 }
 
 .plan-callout {
-  margin: 0 18px 12px;
-  padding: 11px 13px;
-  border-radius: 8px;
-  font-size: 13px;
+  margin: 0 var(--space-5) var(--space-3);
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
 }
 
 .plan-callout-warning {
-  background: rgb(var(--color-warning) / 0.12);
-  border: 1px solid rgb(var(--color-warning) / 0.24);
+  background: color-mix(in srgb, var(--token-status-warning) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--token-status-warning) 24%, transparent);
 }
 
 .plan-callout-error {
-  background: rgb(var(--color-error) / 0.12);
-  border: 1px solid rgb(var(--color-error) / 0.24);
+  background: color-mix(in srgb, var(--token-status-error) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--token-status-error) 24%, transparent);
 }
 
 .ask-user-question-header h2 {
   margin: 0;
-  color: rgb(var(--color-text-primary));
+  color: var(--token-text-heading);
   font-size: var(--text-md);
   letter-spacing: 0;
 }
 
 .ask-user-question-header p {
-  margin: 8px 0 0;
-  color: rgb(var(--color-text-tertiary));
+  margin: var(--space-2) 0 0;
+  color: var(--token-text-caption);
   font-size: var(--text-sm);
   line-height: 1.5;
 }
 
 .ask-user-question-kicker {
-  margin-bottom: 8px;
-  color: rgb(var(--color-accent-500));
-  font-size: 12px;
+  margin-bottom: var(--space-2);
+  color: var(--token-accent-primary);
+  font-size: var(--text-sm);
   font-weight: 700;
 }
 
 .ask-user-question-count {
-  color: rgb(var(--color-text-tertiary));
+  color: var(--token-text-caption);
   font-size: var(--text-sm);
   white-space: nowrap;
 }
 
 .ask-user-question-body {
   display: grid;
-  gap: 16px;
-  padding: 18px;
+  gap: var(--space-4);
+  padding: var(--space-5);
 }
 
 .ask-question {
   display: grid;
-  gap: 10px;
+  gap: var(--space-2);
 }
 
 .ask-question + .ask-question {
-  padding-top: 16px;
-  border-top: 1px solid rgb(var(--color-border-secondary));
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--token-border-card);
 }
 
 .ask-question-prompt,
@@ -249,19 +249,19 @@ html[data-resolved-theme='light'] .debugger-page {
 .ask-freeform-row {
   display: grid;
   grid-template-columns: 28px minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--space-3);
   align-items: flex-start;
 }
 
 .ask-question-prompt {
-  color: rgb(var(--color-text-primary));
+  color: var(--token-text-heading);
   font-weight: 650;
   line-height: 1.45;
 }
 
 .ask-question-number,
 .ask-option-index {
-  color: rgb(var(--color-text-tertiary));
+  color: var(--token-text-caption);
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
@@ -269,37 +269,37 @@ html[data-resolved-theme='light'] .debugger-page {
 .ask-question-options {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .ask-option {
   width: 100%;
   min-height: 52px;
-  padding: 9px 12px 9px 0;
+  padding: var(--space-2) var(--space-3) var(--space-2) 0;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: transparent;
-  color: rgb(var(--color-text-secondary));
+  color: var(--token-text-body);
   text-align: left;
   cursor: pointer;
 }
 
 .ask-option:hover,
 .ask-option.selected {
-  color: rgb(var(--color-text-primary));
-  background: rgb(var(--color-bg-2) / 0.58);
-  border-color: rgb(var(--color-border-secondary));
+  color: var(--token-text-heading);
+  background: color-mix(in srgb, var(--token-bg-panel) 58%, transparent);
+  border-color: var(--token-border-card);
 }
 
 .ask-option.selected .ask-option-index,
 .ask-option.recommended .ask-option-index {
-  color: rgb(var(--color-accent-500));
+  color: var(--token-accent-primary);
 }
 
 .ask-option-copy {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--space-1);
 }
 
 .ask-option-label {
@@ -308,8 +308,8 @@ html[data-resolved-theme='light'] .debugger-page {
 }
 
 .ask-option-description {
-  color: rgb(var(--color-text-tertiary));
-  font-size: 12px;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
   line-height: 1.45;
 }
 
@@ -320,15 +320,15 @@ html[data-resolved-theme='light'] .debugger-page {
 .ask-freeform-input {
   width: 100%;
   min-height: 34px;
-  padding: 0 12px;
-  border-radius: 6px;
-  border: 1px solid rgb(var(--color-border-secondary));
-  background: rgb(var(--color-bg-0));
-  color: rgb(var(--color-text-primary));
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--token-border-card);
+  background: var(--token-bg-app);
+  color: var(--token-text-heading);
 }
 
 .ask-freeform-input:focus {
-  border-color: rgb(var(--color-accent-500));
+  border-color: var(--token-accent-primary);
   outline: none;
 }
 
@@ -336,15 +336,15 @@ html[data-resolved-theme='light'] .debugger-page {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  border-top: 1px solid rgb(var(--color-border-secondary));
-  padding: 12px 18px 14px;
+  gap: var(--space-3);
+  border-top: 1px solid var(--token-border-card);
+  padding: var(--space-3) var(--space-5) var(--space-3);
 }
 
 .ask-user-question-pager {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .ask-question-nav-button {
@@ -353,16 +353,16 @@ html[data-resolved-theme='light'] .debugger-page {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  border: 1px solid rgb(var(--color-border-secondary));
-  background: rgb(var(--color-bg-2) / 0.72);
-  color: rgb(var(--color-text-secondary));
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--token-border-card);
+  background: color-mix(in srgb, var(--token-bg-panel) 72%, transparent);
+  color: var(--token-text-body);
   cursor: pointer;
 }
 
 .ask-question-nav-button:hover:not(:disabled) {
-  color: rgb(var(--color-text-primary));
-  border-color: rgb(var(--color-border-strong));
+  color: var(--token-text-heading);
+  border-color: var(--token-border-strong);
 }
 
 .ask-question-nav-button:disabled {
@@ -376,25 +376,25 @@ html[data-resolved-theme='light'] .debugger-page {
 
 .plan-actions {
   display: flex;
-  gap: 10px;
+  gap: var(--space-2);
   justify-content: flex-end;
-  padding: 0 18px 16px;
+  padding: 0 var(--space-5) var(--space-4);
 }
 
 .plan-action-button {
   min-height: 42px;
-  padding: 0 16px;
-  border-radius: 999px;
-  border: 1px solid rgb(var(--color-border-secondary));
-  background: rgb(var(--color-bg-2));
-  color: rgb(var(--color-text-primary));
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--token-border-card);
+  background: var(--token-bg-panel);
+  color: var(--token-text-heading);
   cursor: pointer;
 }
 
 .plan-action-button.primary {
-  background: rgb(var(--color-accent-500));
-  color: rgb(var(--color-bg-0));
-  border-color: rgb(var(--color-accent-500));
+  background: var(--token-accent-primary);
+  color: var(--token-bg-app);
+  border-color: var(--token-accent-primary);
 }
 
 .plan-action-button:disabled {
@@ -406,11 +406,11 @@ html[data-resolved-theme='light'] .debugger-page {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid rgb(var(--color-border-secondary));
-  border-radius: 8px;
-  background: rgb(var(--color-bg-1) / 0.96);
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-shell) 96%, transparent);
   box-shadow: var(--shadow-panel-hover);
 }
 
@@ -418,21 +418,21 @@ html[data-resolved-theme='light'] .debugger-page {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
+  gap: var(--space-3);
 }
 
 .composer-approval-header h2 {
-  margin: 2px 0 4px;
-  color: rgb(var(--color-text-primary));
-  font-size: 14px;
+  margin: var(--space-0-5) 0 var(--space-1);
+  color: var(--token-text-heading);
+  font-size: var(--text-base);
 }
 
 .composer-approval-header p {
   max-height: 88px;
   margin: 0;
   overflow: hidden;
-  color: rgb(var(--color-text-secondary));
-  font-size: 12px;
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
   line-height: 1.55;
   white-space: pre-wrap;
 }
@@ -441,7 +441,7 @@ html[data-resolved-theme='light'] .debugger-page {
 .composer-revision-row {
   display: flex;
   align-items: stretch;
-  gap: 10px;
+  gap: var(--space-2);
 }
 
 .composer-approval-actions {
@@ -452,14 +452,14 @@ html[data-resolved-theme='light'] .debugger-page {
   flex: 1;
   min-width: 0;
   resize: vertical;
-  border: 1px solid rgb(var(--color-border-secondary));
-  border-radius: 8px;
-  background: rgb(var(--color-bg-0));
-  color: rgb(var(--color-text-primary));
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: var(--token-bg-app);
+  color: var(--token-text-heading);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--text-sm);
   line-height: 1.5;
-  padding: 10px;
+  padding: var(--space-2);
 }
 
 .composer-permission-menu {
@@ -474,18 +474,18 @@ html[data-resolved-theme='light'] .debugger-page {
   min-height: var(--control-height-md);
   max-width: 13rem;
   padding: 0 var(--space-3);
-  border: 1px solid rgb(var(--color-border-default));
+  border: 1px solid var(--token-border-default);
   border-radius: var(--control-radius);
-  background: rgb(var(--color-bg-1) / 0.82);
-  color: rgb(var(--color-text-primary));
+  background: color-mix(in srgb, var(--token-bg-shell) 82%, transparent);
+  color: var(--token-text-heading);
   cursor: pointer;
   transition: border-color var(--transition-fast), background var(--transition-fast), opacity var(--transition-fast);
 }
 
 .composer-permission-pill:hover:not(:disabled),
 .composer-permission-pill.open {
-  border-color: rgb(var(--color-border-strong));
-  background: rgb(var(--color-bg-3));
+  border-color: var(--token-border-strong);
+  background: var(--token-bg-raised);
 }
 
 /* Quiet label/caret cues only — shell stays shared with Agent/Effort pills */
@@ -611,18 +611,18 @@ html[data-resolved-theme='light'] .debugger-page {
   min-height: var(--control-height-md);
   max-width: 12rem;
   padding: 0 var(--space-3);
-  border: 1px solid rgb(var(--color-border-default));
+  border: 1px solid var(--token-border-default);
   border-radius: var(--control-radius);
-  background: rgb(var(--color-bg-1) / 0.82);
-  color: rgb(var(--color-text-primary));
+  background: color-mix(in srgb, var(--token-bg-shell) 82%, transparent);
+  color: var(--token-text-heading);
   cursor: pointer;
   transition: border-color var(--transition-fast), background var(--transition-fast), opacity var(--transition-fast);
 }
 
 .composer-effort-pill:hover:not(:disabled),
 .composer-effort-pill.open {
-  border-color: rgb(var(--color-border-strong));
-  background: rgb(var(--color-bg-3));
+  border-color: var(--token-border-strong);
+  background: var(--token-bg-raised);
 }
 
 .composer-effort-pill:disabled {
@@ -1368,7 +1368,7 @@ html[data-resolved-theme='light'] .debugger-page {
 
 @media (max-width: 900px) {
   .plan-intake-panel {
-    margin: 14px 14px 0;
+    margin: var(--space-3) var(--space-3) 0;
   }
 
   .plan-document-header,

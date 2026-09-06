@@ -9,8 +9,6 @@
   border: 1px solid var(--token-border-default);
   border-radius: var(--radius-lg);
   box-shadow: var(--token-shadow-popover);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
   z-index: var(--z-popover);
   margin-bottom: var(--space-1);
 }
