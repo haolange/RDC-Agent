@@ -112,7 +112,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 ## 按钮规则
 
-- 全局唯一按钮系统：`.button`（基类） + `.button-primary / button-secondary / button-ghost / button-danger`，定义在 `src/renderer/ui/Button.css`（B3 从 `panels-composer.css` 迁入，不得再双轨）。
+- 全局唯一按钮系统：`.button`（基类） + `.button-primary / button-secondary / button-ghost / button-danger`，定义在 `src/renderer/ui/Button.css`（由 `styles/global.css` → `ui/kit.css` 导入，不得再写入 `panels-composer.css`）。
 - React 层用 `<Button variant="primary|secondary|ghost|danger" size="sm|md|lg">`（`src/renderer/ui/Button.tsx`）。
 - **禁止**新增第三套按钮类名，禁止在 feature CSS 中重复定义按钮样式。
 
@@ -201,7 +201,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 ## 视觉参考
 
-`designs/rdc-agent-design-system/Design System Preview.html` 的目标态是直接引用运行时 `src/renderer/styles/design-system.css` 与 `.button-*` class，成为单一真值的只读预览。当前 Preview 仍引用独立 `./styles.css` 与 `designs/tokens/*`，属 B2 债务；B2 删除副本后本段改为「已经引用运行时 CSS」。
+`designs/rdc-agent-design-system/Design System Preview.html` 已经直接引用运行时 `src/renderer/styles/design-system.css` 与 `src/renderer/ui/kit.css`（含 `.button-*` 与分子 class）。`designs/tokens/*` 与独立 `styles.css` 已删除，不得恢复。
 
 ## 验证
 
@@ -223,11 +223,11 @@ pnpm run typecheck
 | `is-*` 状态类（禁裸 `.active` / `.current`） | `check:renderer-structure` 已扫 TSX | B3 清零剩余 5 |
 | 刻度 control 28/32/36、radius 4/6/8/12、duration 120/180/240 | 文档权威；token 文件 B1 已改值 | B1 已落地 |
 | `:hover` 必配 `:focus-visible`；禁无替代 `outline: none` | 无自动门禁 | **B8** 扫描清零 |
-| 分子组件清单与交互态 / CSS 变量 variant / 禁内联 style | 组件未落地，无自动门禁 | **B2** 实现 + luna 审查 |
-| 统一 `EmptyState`（无插画） | 组件未落地；Right Rail 玻璃空态仍在 | **B2** 组件；**B7** 替换五卡空态 |
+| 分子组件清单与交互态 / CSS 变量 variant / 禁内联 style | `src/renderer/ui` 已落地；luna 审查 | **B2** 已落地 |
+| 统一 `EmptyState`（无插画） | 组件已落地；Right Rail 玻璃空态仍在 | **B2** 组件；**B7** 替换五卡空态 |
 | Composer 禁 energy orbit / 流光 | 文档禁止；实现仍在 | **B6** |
 | DropdownSelect 禁 backdrop blur | `check:appearance` 要求实色 `--token-bg-shell`、禁止 blur | B1 已反转 |
-| Preview 引用运行时 CSS，删除 `designs/tokens/*` | 尚未改 Preview | **B2** |
+| Preview 引用运行时 CSS，删除 `designs/tokens/*` | Preview 已改；副本已删并入 `retired` | **B2** 已落地 |
 | i18n 拆分、硬编码入 i18n、sentence case | 无自动门禁 | **B8** |
 | `check:architecture` R4 hex exempt | 仅 `design-system.css` | B1 已清空 |
 | `pages/`、`styles/base/` 删除 | `styles/base` 已删并入 `retired`；`pages/` 仍计结构债务 | B1 已删 `styles/base`；**B3** 删 `pages/` |

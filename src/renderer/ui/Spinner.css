@@ -1,0 +1,18 @@
+.ui-spinner {
+  display: inline-block;
+  width: var(--space-4);
+  height: var(--space-4);
+  border: 2px solid var(--token-border-default);
+  border-top-color: var(--token-accent-primary);
+  border-radius: var(--radius-full);
+}
+
+.ui-spinner.is-size-sm {
+  width: var(--space-3);
+  height: var(--space-3);
+}
+
+.ui-spinner.is-size-lg {
+  width: var(--space-5);
+  height: var(--space-5);
+}

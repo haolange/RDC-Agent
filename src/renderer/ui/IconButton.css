@@ -1,0 +1,47 @@
+.icon-button {
+  width: var(--control-height-md);
+  height: var(--control-height-md);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--control-radius);
+  background: transparent;
+  color: var(--token-text-caption);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.icon-button.is-size-sm {
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+}
+
+.icon-button.is-size-lg {
+  width: var(--control-height-lg);
+  height: var(--control-height-lg);
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--token-bg-raised);
+  color: var(--token-text-heading);
+}
+
+.icon-button:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+  color: var(--token-text-heading);
+}
+
+.icon-button:active:not(:disabled) {
+  background: var(--token-interactive-active);
+}
+
+.icon-button:disabled,
+.icon-button.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

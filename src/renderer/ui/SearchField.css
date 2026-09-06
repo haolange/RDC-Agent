@@ -1,0 +1,26 @@
+.ui-search-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.ui-search-field-icon {
+  position: absolute;
+  left: var(--space-3);
+  color: var(--token-text-caption);
+  pointer-events: none;
+}
+
+.ui-search-field .ui-input {
+  padding-left: var(--space-8);
+}
+
+.ui-search-field.has-clear .ui-input {
+  padding-right: var(--space-8);
+}
+
+.ui-search-field-clear {
+  position: absolute;
+  right: var(--space-1);
+}

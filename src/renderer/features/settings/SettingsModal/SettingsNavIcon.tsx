@@ -1,87 +1,23 @@
 import React from 'react';
+import { Icon, type IconName } from '../../../ui/Icon';
 import type { SettingsSection } from './types';
+
+const SECTION_ICON: Record<SettingsSection, IconName> = {
+  general: 'nav-general',
+  appearance: 'nav-appearance',
+  workspace: 'nav-workspace',
+  models: 'nav-models',
+  skills: 'nav-skills',
+  agents: 'nav-agents',
+  tools: 'nav-tools',
+  hooks: 'nav-hooks',
+  policy: 'nav-policy',
+};
 
 interface SettingsNavIconProps {
   section: SettingsSection;
 }
 
-export const SettingsNavIcon: React.FC<SettingsNavIconProps> = ({ section }) => {
-  const content = (() => {
-    switch (section) {
-      case 'general':
-        return (
-          <>
-            <path d="M5 7h14" />
-            <path d="M5 12h14" />
-            <path d="M5 17h14" />
-            <circle cx="9" cy="7" r="1.5" />
-            <circle cx="15" cy="12" r="1.5" />
-            <circle cx="11" cy="17" r="1.5" />
-          </>
-        );
-      case 'appearance':
-        return (
-          <>
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" />
-          </>
-        );
-      case 'workspace':
-        return (
-          <>
-            <path d="M4 7h6l1.7 2H20v8.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
-            <path d="M4 9.5h16" />
-          </>
-        );
-      case 'models':
-        return (
-          <>
-            <rect x="5" y="5" width="14" height="14" rx="2.5" />
-            <path d="M8.5 9h7M8.5 12h7M8.5 15h4" />
-          </>
-        );
-      case 'skills':
-        return (
-          <>
-            <path d="M5 5.5h10.5a2.5 2.5 0 0 1 2.5 2.5v10.5H7.5A2.5 2.5 0 0 1 5 16z" />
-            <path d="M8.5 9h6M8.5 12h5" />
-            <path d="M18 8h1.5M18.75 7.25v1.5" />
-          </>
-        );
-      case 'agents':
-        return (
-          <>
-            <circle cx="12" cy="8" r="3" />
-            <path d="M6.5 19a5.5 5.5 0 0 1 11 0" />
-            <path d="M18 5.5h2.5M19.25 4.25v2.5" />
-            <path d="M4.5 5.5h3" />
-          </>
-        );
-      case 'tools':
-        return (
-          <>
-            <path d="M14.5 5.5 18 2.5l3.5 3.5-3 3.5" />
-            <path d="M13.5 7 5 15.5 4 20l4.5-1 8.5-8.5" />
-            <path d="M14.5 5.5l4 4" />
-          </>
-        );
-      case 'hooks':
-        return (<><path d="M8 4v6a4 4 0 0 0 8 0V4" /><path d="M6 4h4M14 4h4M12 14v6" /><path d="M9 20h6" /></>);
-      case 'policy':
-        return (
-          <>
-            <path d="M12 3 5.5 6v5.5c0 4.2 2.7 7.9 6.5 9.5 3.8-1.6 6.5-5.3 6.5-9.5V6z" />
-            <path d="M9.5 12.2 11.2 14l3.5-3.8" />
-          </>
-        );
-      default:
-        return null;
-    }
-  })();
-
-  return (
-    <svg className="settings-center-nav-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      {content}
-    </svg>
-  );
-};
+export const SettingsNavIcon: React.FC<SettingsNavIconProps> = ({ section }) => (
+  <Icon name={SECTION_ICON[section]} size={16} className="settings-center-nav-icon" />
+);
