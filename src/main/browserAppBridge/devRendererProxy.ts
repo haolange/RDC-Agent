@@ -58,9 +58,8 @@ export function mapDevRendererProxyPath(pathname: string, search = ''): string {
   if (pathname === '/app' || pathname === '/app/') {
     return `/${search}`;
   }
-  if (pathname.startsWith('/app/')) {
-    return `${pathname.slice('/app'.length)}${search}`;
-  }
+  // /app is also a real Vite source directory (for example /app/App.tsx).
+  // Only the document entry maps to /; module paths must retain their identity.
   return `${pathname}${search}`;
 }
 

@@ -4,6 +4,7 @@ import { useI18n, type TranslationKey } from '../../../../i18n';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
 import { ResourceEmptyState } from '../../../../ui/ResourceEmptyState';
 import { ScopedResourceEditor } from './ScopedResourceEditor';
+import { uniqueResourceId } from './uniqueResourceId';
 import { contentFromForm, emptyForm, formFromContent, resourceCardMeta, type ResourceFormState } from './scopedResourceForm';
 
 const templateId = (kind: ScopedResourceKind): string => `new-${kind}`;
@@ -51,7 +52,7 @@ export const RuntimeScopePanel: React.FC<{
   };
 
   const startNew = () => {
-    const nextId = templateId(kind);
+    const nextId = uniqueResourceId(templateId(kind), resources.map((resource) => resource.id));
     setCreating(true);
     setSelectedId(null);
     setForm(emptyForm(kind, nextId));
@@ -64,11 +65,22 @@ export const RuntimeScopePanel: React.FC<{
     setBusy(true);
     setMessage('');
     try {
+      let content: string;
+      try {
+        content = contentFromForm(kind, form);
+      } catch (error) {
+        setMessage(kind === 'mcp' ? t('settings.resourceArgsInvalid') : String(error));
+        return;
+      }
+      if (creating && resources.some((resource) => resource.id === safeIdPreview(form.id))) {
+        setMessage(t('settings.resourceIdExists'));
+        return;
+      }
       const request = {
         kind,
         scope,
         id: form.id,
-        content: contentFromForm(kind, form),
+        content,
         ...(overview?.projectRoot ? { projectRoot: overview.projectRoot } : {}),
       };
       const validation = await window.electronAPI.rdxRuntime.validateResource(request);
@@ -147,7 +159,7 @@ export const RuntimeScopePanel: React.FC<{
   };
 
   return (
-    <section className="settings-runtime-scope" data-testid="settings-runtime-scope">
+    <section className="settings-runtime-scope" data-testid="settings-runtime-scope" data-resource-kind={kind}>
       <div className="settings-runtime-scope-head">
         <div className="settings-runtime-scope-switch settings-inline-pills" role="group" aria-label={t('settings.resourceScope')}>
           <button type="button" className={`user-menu-pill ${scope === 'user' ? 'active' : ''}`} onClick={() => onScopeChange('user')}>{t('settings.scopeUser')}</button>
@@ -211,7 +223,7 @@ export const RuntimeScopePanel: React.FC<{
               </div>
             )}
           </div>
-          {message ? <div className="settings-runtime-result">{message}</div> : null}
+          {message ? <div className="settings-runtime-result" role="status">{message}</div> : null}
         </div>
       ) : null}
       {pendingDelete ? (

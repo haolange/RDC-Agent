@@ -48,9 +48,9 @@ export const SettingsCenterNav: React.FC<{
     if (items.length === 0) return;
     const currentIndex = items.findIndex((item) => item === document.activeElement);
     let nextIndex: number | null = null;
-    if (event.key === 'ArrowDown') {
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
       nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % items.length;
-    } else if (event.key === 'ArrowUp') {
+    } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
       nextIndex = currentIndex < 0 ? items.length - 1 : (currentIndex - 1 + items.length) % items.length;
     } else if (event.key === 'Home') {
       nextIndex = 0;

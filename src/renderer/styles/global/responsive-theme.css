@@ -203,6 +203,10 @@
   }
 }
 
+.app-body.has-left-drawer {
+  grid-template-columns: 0 0 minmax(0, 1fr) var(--right-resize-handle-width, 0px) var(--right-panel-width, 0px);
+}
+
 /* Professional workstation polish */
 body {
   background: rgb(var(--color-bg-0));

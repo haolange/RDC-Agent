@@ -34,6 +34,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
   t,
 }) => {
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const placementFrameRef = useRef<number | null>(null);
   const [open, setOpen] = useState(false);
   const [activeProviderId, setActiveProviderId] = useState('');
@@ -160,22 +161,37 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
         setOpen(false);
       }
     };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setOpen(false);
-      }
-    };
     document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
     };
   }, [open]);
 
   return (
-    <div className={`settings-model-cascade ${open ? 'open' : ''}`} ref={rootRef}>
+    <div className={`settings-model-cascade ${open ? 'open' : ''}`} ref={rootRef}
+      onKeyDown={(event) => {
+        if (!open) return;
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          setOpen(false);
+          triggerRef.current?.focus();
+          return;
+        }
+        if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+        const column = (event.target as HTMLElement).closest('.settings-model-provider-list, .settings-model-submenu');
+        const items = Array.from(column
+          ? column.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')
+          : rootRef.current?.querySelectorAll<HTMLButtonElement>('.settings-model-cascade-menu button:not(:disabled)') ?? []);
+        if (!items.length) return;
+        event.preventDefault();
+        const current = items.indexOf(document.activeElement as HTMLButtonElement);
+        const index = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
+          : (current + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
+        items[index]?.focus();
+      }}>
       <button
+        ref={triggerRef}
         type="button"
         className="settings-model-cascade-trigger"
         data-testid="settings-model-cascade-trigger"
@@ -192,7 +208,11 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
           {t('settings.routeReasonModelInvalid')}: {value}
         </small>
       ) : null}
-      <div className="settings-model-cascade-menu" role="listbox">
+      <div className={`settings-model-cascade-menu${displayGroups.length ? '' : ' is-empty'}`} role="group" aria-label={t('settings.selectModelPlaceholder')}>
+        {displayGroups.length === 0 ? <div className="settings-model-empty" role="status">
+          <strong>{t('settings.noModelsAvailable')}</strong>
+          <p>{t('settings.modelEmptyHint')}</p>
+        </div> : <>
         <div className="settings-model-provider-list scrollbar-thin">
           {displayGroups.map((group) => (
             <button
@@ -207,7 +227,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
             </button>
           ))}
         </div>
-        <div className="settings-model-submenu scrollbar-thin">
+        <div className="settings-model-submenu scrollbar-thin" role="listbox" aria-label={activeGroup?.label}>
           {activeGroup?.options.map((option) => {
             const accessibleLabel = agentModelOptionAccessibleLabel(option, t('settings.modelUnavailable'));
             return (
@@ -226,6 +246,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
                 onClick={() => {
                   onChange(option.canonicalId);
                   setOpen(false);
+                  triggerRef.current?.focus();
                 }}
               >
                 <span className="settings-model-option-label">{option.modelLabel}</span>
@@ -243,6 +264,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
             );
           })}
         </div>
+        </>}
       </div>
     </div>
   );

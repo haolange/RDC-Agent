@@ -14,7 +14,8 @@ describe('devRendererProxy path mapping', () => {
     expect(mapDevRendererProxyPath('/app')).toBe('/');
     expect(mapDevRendererProxyPath('/app/')).toBe('/');
     expect(mapDevRendererProxyPath('/app/', '?qaPerformance=1')).toBe('/?qaPerformance=1');
-    expect(mapDevRendererProxyPath('/app/src/main.tsx')).toBe('/src/main.tsx');
+    expect(mapDevRendererProxyPath('/app/App.tsx')).toBe('/app/App.tsx');
+    expect(mapDevRendererProxyPath('/app/useWorkbenchLayout.ts', '?t=123')).toBe('/app/useWorkbenchLayout.ts?t=123');
     expect(mapDevRendererProxyPath('/@vite/client')).toBe('/@vite/client');
     expect(mapDevRendererProxyPath('/node_modules/.vite/deps/react.js')).toBe('/node_modules/.vite/deps/react.js');
   });
@@ -99,5 +100,7 @@ describe('devRendererProxy HTTP reverse proxy', () => {
     expect(response.status).toBe(200);
     expect(response.url).toContain(`127.0.0.1:${bridgePort}`);
     expect(await response.text()).toContain('vite:/');
+    const moduleResponse = await fetch(`http://127.0.0.1:${bridgePort}/app/App.tsx?t=123`);
+    expect(await moduleResponse.text()).toContain('vite:/app/App.tsx?t=123');
   });
 });

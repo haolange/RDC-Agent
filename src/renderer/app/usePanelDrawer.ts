@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 
-export function useRightRailDrawer(isAvailable: boolean) {
+export function usePanelDrawer(isAvailable: boolean) {
   const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {

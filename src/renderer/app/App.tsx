@@ -49,7 +49,7 @@ const App: React.FC = () => {
   const nickname = settings.profile.nickname || t('sidebar.userName');
   const avatarPath = settings.profile.avatarPath;
 
-  const layout = useWorkbenchLayout();
+  const layout = useWorkbenchLayout(!isLoading);
   const isTerminalOpen = useTerminalStore((state) => state.isOpen);
   const toggleTerminalOpen = useTerminalStore((state) => state.toggleOpen);
   const activityEntries = useTerminalStore((state) => state.entries);
@@ -70,12 +70,20 @@ const App: React.FC = () => {
   }, [showNotice]);
 
   const syncCapturesFromSnapshot = useSyncCapturesFromSnapshot();
+  const handleToggleLeftSidebar = useCallback(() => {
+    if (layout.isLeftDrawerMode) {
+      layout.closeRightRailDrawer();
+      layout.toggleLeftDrawer();
+      return;
+    }
+    void toggleLeftSidebar();
+  }, [layout, toggleLeftSidebar]);
 
   const composer = useComposer({
     showNotice,
     effectiveLeftCollapsed: layout.effectiveLeftCollapsed,
     leftToggleDisabled: layout.leftToggleDisabled,
-    toggleLeftSidebar,
+    toggleLeftSidebar: handleToggleLeftSidebar,
     openSettings: () => setSettingsModalOpen(true),
   });
 
@@ -110,12 +118,14 @@ const App: React.FC = () => {
         ? 'running'
         : null;
 
-  const leftPanelToggleLabel = layout.effectiveLeftCollapsed ? t('app.leftSidebarExpand') : t('app.leftSidebarCollapse');
+  const leftPanelToggleLabel = (layout.isLeftDrawerMode ? !layout.isLeftDrawerOpen : layout.effectiveLeftCollapsed)
+    ? t('app.leftSidebarExpand') : t('app.leftSidebarCollapse');
   const rightPanelToggleLabel = layout.isRightRailDrawerMode
     ? (layout.isRightRailDrawerOpen ? t('app.rightPanelCollapse') : t('app.rightPanelExpand'))
     : (layout.effectiveRightCollapsed ? t('app.rightPanelExpand') : t('app.rightPanelCollapse'));
   const handleToggleRightRail = useCallback(() => {
     if (layout.isRightRailDrawerMode) {
+      layout.closeLeftDrawer();
       layout.toggleRightRailDrawer();
       return;
     }
@@ -164,7 +174,7 @@ const App: React.FC = () => {
           windowMaximizeLabel={t('app.windowMaximize')}
           windowRestoreLabel={t('app.windowRestore')}
           windowCloseLabel={t('app.windowClose')}
-          onToggleLeft={() => void toggleLeftSidebar()}
+          onToggleLeft={handleToggleLeftSidebar}
           onToggleRight={handleToggleRightRail}
           onMinimize={handleWindowMinimize}
           onToggleMaximize={handleWindowToggleMaximize}
@@ -178,6 +188,9 @@ const App: React.FC = () => {
           effectiveLeftCollapsed={layout.effectiveLeftCollapsed}
           effectiveRightCollapsed={layout.effectiveRightCollapsed}
           isRightRailVisible={layout.isRightRailVisible}
+          isLeftDrawerMode={layout.isLeftDrawerMode}
+          isLeftDrawerOpen={layout.isLeftDrawerOpen}
+          onCloseLeftDrawer={layout.closeLeftDrawer}
           isRightRailDrawerMode={layout.isRightRailDrawerMode}
           isRightRailDrawerOpen={layout.isRightRailDrawerOpen}
           onCloseRightRailDrawer={layout.closeRightRailDrawer}
