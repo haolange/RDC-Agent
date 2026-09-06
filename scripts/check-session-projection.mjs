@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scriptRead } from './renderer-contract.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -11,6 +12,7 @@ const fail = (message) => {
 };
 
 const read = (relativePath) => {
+  if (relativePath.startsWith('src/')) return scriptRead(relativePath);
   const absolute = path.join(root, relativePath);
   if (!fs.existsSync(absolute)) {
     fail(`missing required file: ${relativePath}`);

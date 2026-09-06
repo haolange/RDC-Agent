@@ -1,10 +1,10 @@
 # Knowledge Center
 
-知识中心是 Workbench 左侧边栏底部、用户条上方的常驻入口，打开视窗比例驱动的毛玻璃模态（`min(92vw, 1920px) × min(90vh, 1240px)`；`≤640px` 时单列堆叠）。它只消费已落地的五服务：`Query` / `Index` / `Compile` / `Candidate` / `Write`，不另开 browse 双轨或派生存储。
+知识中心是 Workbench 左侧边栏底部、用户条上方的常驻入口，打开视窗比例驱动的实色分层模态（`min(92vw, 1920px) × min(90vh, 1240px)`；`≤640px` 时单列堆叠）。它只消费已落地的五服务：`Query` / `Index` / `Compile` / `Candidate` / `Write`，不另开 browse 双轨或派生存储。
 
 ## 信息架构
 
-三列网格：`minmax(272px, 300px) minmax(320px, 380px) minmax(0, 1fr)`。
+三列网格：`224px / minmax(280px, 0.8fr) / 1.2fr`；中列可换行。
 
 1. **Spaces / 控制列**：Brand、Cards / Candidates / Conflicts 三段切换、User + 已注册 Project 多选（默认全选）、type / lifecycle 过滤、六 lane 开关、结构索引状态与 `Rebuild Index`、`Import ColdData…`。Semantic lane 与 Settings Embedding 重建入口已删除。
 2. **List**：搜索框（300ms debounce）驱动 `knowledge:query`。Cards 按服务返回的 `hits` 顺序渲染，渲染层不得重排。Candidates 分 `listCandidates` 与 `listStagedDrafts` 两段。Conflicts 渲染当前 pack 的 `contradicts`。

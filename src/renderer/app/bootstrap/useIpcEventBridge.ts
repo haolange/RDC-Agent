@@ -27,7 +27,7 @@ import { useSessionProjectionStore } from '../../stores/sessionProjectionStore';
 import { useLayoutStore } from '../../stores/layoutStore';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
-import { resetWorkbenchStores } from '../../stores/storesReset';
+import { resetWorkbenchStores } from '../storesReset';
 import { acceptsContextUsage } from '../../stores/contextUsageProjectionModel';
 import { createConversationEventBatcher } from './conversationEventBatcher';
 import { isActiveSessionEvent, isActiveSessionScope } from './sessionEventGate';

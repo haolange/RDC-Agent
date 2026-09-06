@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useElectronApi } from '../hooks/useElectronApi';
+
 import './ProfileAvatar.css';
 
 interface ProfileAvatarProps {

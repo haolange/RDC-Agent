@@ -109,6 +109,36 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 
 ### UI
 
+**视觉定位（裁决）**：RDC-Agent 是 restrained、高密度、实色分层的精密工具，参照 VS Code / JetBrains / Linear 的信息密度与克制程度。每一处视觉选择都服务于聚焦与快速研判：不使用 backdrop blur、装饰性动效或插画；层次由 1px 边框与实色表面建立，阴影只用于 popover 与 modal；单一 accent 只承担 focus / selected / primary CTA。该定位是 `docs/ui/design-system.md` 全部刻度的上位依据，冲突时以本段为准。
+
+**渲染层分层（裁决）**：`ui`（无业务原子/分子组件）→ `patterns`（跨 feature 复合，可读 store，不写 store、不直调 IPC）→ `features`（产品面，禁止横向 import 其它 feature）→ `app` / `shell`（编排与窗口 chrome）。`stores` / `services` / `hooks` / `lib` / `platform` 为被依赖层，不得反向 import `features` / `ui` / `patterns` / `app` / `shell`。组件（`.tsx`）不得直调 `window.electronAPI`。门禁：`pnpm run check:renderer-structure` + ESLint `no-restricted-imports`。
+
+**Token 合规（裁决）**：组件 CSS 只允许语义 token 与刻度变量；primitive `--color-*`、hex 字面量、px 字号 / 间距 / 圆角、`!important`、`backdrop-filter` 一律禁止，豁免仅限 token 定义层与全局 chrome 层。门禁：`pnpm run check:design-tokens`。受门禁锁定的 renderer 文件路径集中登记在 [`scripts/fidelity/renderer-contract.json`](scripts/fidelity/renderer-contract.json)。
+
+**渲染层目录（裁决 / 目标态）**：
+
+```
+src/renderer/
+  app/            App、bootstrap、WorkbenchShell、theme、overlays、contextMenu
+  shell/          AppShell、TitleBar、PanelZone、UserMenu、TerminalDrawer 壳
+  features/
+    transcript/   消息、Work Process、markdown（形态不变）
+    composer/     Composer 与共置 CSS
+    right-rail/   Session / Project 右侧栏
+    sidebar/      Project / Session 列表
+    settings/     九 section，CSS 共置
+    knowledge/    Knowledge Center
+    terminal/     终端面板
+    captures/     DeviceSelector 与 capture 入口
+  patterns/       跨 feature 复合，可读 store，不写 store、不直调 IPC
+  ui/             原子 + 分子组件库
+  stores/  services/  hooks/  lib/  platform/
+  i18n/           index.ts + locales/{en,zh-CN}/<feature>.ts
+  styles/         design-system.css、global.css、base.css、responsive.css（仅真 @media）
+```
+
+禁止恢复 `pages/`、`styles/tokens/*`、`styles/base/`、`src/renderer/components`。当前实现尚未全部迁到本树；B3 一次性收敛，不得双轨。
+
 - [`docs/ui/workbench-and-transcript.md`](docs/ui/workbench-and-transcript.md) — Workbench 轨、Work Process、Composer、Markdown
 - [`docs/ui/design-system.md`](docs/ui/design-system.md) — Token、按钮、颜色、组件规则、Appearance 双体系
 - [`docs/ui/work-process-checklist.md`](docs/ui/work-process-checklist.md) — Work Process UI 验收清单
@@ -125,7 +155,7 @@ Agent loop 不能把“耗尽 turns”或“重复相同工具轮次”当作完
 
 **宣称完成必须以门禁与浏览器证据为准**，不得仅靠 commit message。
 
-本地 / CI（`.github/workflows/ci.yml`）必跑：`check:repository-hygiene` → `typecheck` → `lint` → `test` → `test:coverage` → `check:coverage-ratchet`（只升不降；基线 `scripts/fidelity/coverage-ratchet.json`）→ `check:architecture`（含 Orchestrator &lt;800 与 main 单文件 ≤900）→ 全套关键 `check:*`（含 `check:browser-capability` / `check:release-config`）→ `check:contracts` → `build`。并行：`browser-smoke`（Windows + smoke:agent-browser，矩阵 `RDC_AGENT_BROWSER_QA_FULL_ACCESS` 0/1）、`desktop-smoke`、双 OS（ubuntu/windows）`launcher-fresh-checkout`/`pack`（Linux 上 SBOM/checksum）。
+本地 / CI（`.github/workflows/ci.yml`）必跑：`check:repository-hygiene` → `typecheck` → `lint` → `test` → `test:coverage` → `check:coverage-ratchet`（只升不降；基线 `scripts/fidelity/coverage-ratchet.json`）→ `check:architecture`（含 Orchestrator &lt;800 与 main 单文件 ≤900）→ 全套关键 `check:*`（含 `check:design-tokens` / `check:renderer-structure` / `check:browser-capability` / `check:release-config`）→ `check:contracts` → `build`。并行：`browser-smoke`（Windows + smoke:agent-browser，矩阵 `RDC_AGENT_BROWSER_QA_FULL_ACCESS` 0/1）、`desktop-smoke`、双 OS（ubuntu/windows）`launcher-fresh-checkout`/`pack`（Linux 上 SBOM/checksum）。
 
 UI/工作流用 `pnpm run start:agent-browser` 真实会话验收（先停旧进程、删光 QA project 全部 session、再新建隔离 session）。完整清单见 `AGENTS.md`。
 

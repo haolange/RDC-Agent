@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { scriptRead } from './renderer-contract.mjs';
 
 const repoRoot = process.cwd();
 const fidelityDir = path.join(repoRoot, 'scripts/fidelity');
@@ -67,38 +68,14 @@ if (missingClasses.length > 0 || missingTestIds.length > 0) {
 const addedClasses = [...currentClasses].filter((item) => !baselineClasses.has(item)).length;
 const addedTestIds = [...currentTestIds].filter((item) => !baselineTestIds.has(item)).length;
 
-const appShellCss = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/styles/global/app-shell.css'),
-  'utf8',
-);
-const settingsModalCss = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/SettingsModal.css'),
-  'utf8',
-);
-const designSystemCss = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/styles/design-system.css'),
-  'utf8',
-);
-const contextUsageIndicator = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/patterns/ContextUsageIndicator.tsx'),
-  'utf8',
-);
-const contextBreakdownPopover = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/patterns/ContextBreakdownPopover.tsx'),
-  'utf8',
-);
-const contextRunMeterBand = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/patterns/ContextRunMeterBand.tsx'),
-  'utf8',
-);
-const interactionPerformanceProbe = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/platform/performance/InteractionPerformanceProbe.ts'),
-  'utf8',
-);
-const composerAgentMenu = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/features/debugger/composer/ComposerAgentMenu.tsx'),
-  'utf8',
-);
+const appShellCss = scriptRead('src/renderer/styles/global/app-shell.css');
+const settingsModalCss = scriptRead('src/renderer/features/settings/SettingsModal/SettingsModal.css');
+const designSystemCss = scriptRead('src/renderer/styles/design-system.css');
+const contextUsageIndicator = scriptRead('src/renderer/patterns/ContextUsageIndicator.tsx');
+const contextBreakdownPopover = scriptRead('src/renderer/patterns/ContextBreakdownPopover.tsx');
+const contextRunMeterBand = scriptRead('src/renderer/patterns/ContextRunMeterBand.tsx');
+const interactionPerformanceProbe = scriptRead('src/renderer/platform/performance/InteractionPerformanceProbe.ts');
+const composerAgentMenu = scriptRead('src/renderer/features/debugger/composer/ComposerAgentMenu.tsx');
 
 const requireCssContract = (condition, message) => {
   if (condition) return;

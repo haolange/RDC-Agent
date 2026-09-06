@@ -100,10 +100,10 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 
 ## UI / UX 约束
 
-- UI/UX 迭代必须关联 `DESIGN.md`：先确认本次改动是产品变更、结构保真迁移，还是缺陷修复，再决定验证范围。
-- 默认以现有 UI/UX 效果保真为准，不要借重构、整理、命名收敛或类型迁移之名改变既有布局结构、交互路径、信息层级和视觉节奏。
-- 涉及页面结构、面板布局、状态展示、样式引用或视觉资源路径时，必须确认属于明确的产品变更；如果不是，应保持现有效果不变。
-- 修复结构问题时，不要顺手做与任务无关的视觉改版、布局重排或交互重定义。
+- UI/UX 迭代必须关联 `DESIGN.md`：先确认本次改动是产品变更、设计系统收敛，还是缺陷修复，再决定验证范围。
+- **以设计系统为准**：视觉呈现的权威是 [`docs/ui/design-system.md`](docs/ui/design-system.md) 的 restrained 规范（control scale / radius / type hierarchy / spacing / elevation / motion / 状态命名）。既有实现与该规范冲突时，收敛到规范，不以「现状即标准」为由保留。
+- **保真只适用于产品语义**：产品语义、交互路径、信息完整性、IPC 与共享契约必须保持不变；布局节奏、class 命名、尺寸与色彩允许按设计系统重定义。`check:fidelity` 基线是变更审阅锚点，不是禁止收敛的理由；有意收敛后必须 `pnpm run fidelity:extract` 重建基线并在交付说明写明。
+- 不要在与任务无关的区域顺手改版；但在任务覆盖的区域内，必须一次收敛到规范，不得留下半迁移的双轨视觉。
 - 涉及 `src/renderer` 的改动，除检查类型和功能外，还要检查界面入口是否完整、关键面板是否可渲染、现有交互是否可达。
 - Settings 内 General / Appearance / Workspace / Models / Agents / Skills / Tools / Hooks / Policy 为同级导航，顺序即此；左侧导航顶部有深度搜索（section + 字段标题 + 中英关键词），命中后跳转并高亮目标控件，方向键 / Home / End 为 roving tabindex。Appearance 承载 System/Light/Dark、Light/Dark 独立 chrome（预设、accent/surface/ink、contrast、字体、Import/Copy `rdx-theme-v1:`）、`fontScale`、`composerMarkdown`、`usePointerCursors`、`reduceMotion`；Language 留在 General。禁止恢复 translucent / semi-transparent sidebar。禁止恢复 `oklch-themes.css`、`styles/tokens/*` 双轨或解析 `codex-theme-v1:`。scoped 编辑条不展示装饰性 “RDX Runtime” kicker；User | Project 独占作用域行且横向 `1fr 1fr` 拉满均分。Skills/MCP/Hooks/Policy 内容区为 Import + New 列表与右侧详情编辑器；Policy 内容区顶部另有用户级 Agent Runtime 块（压缩阈值 50–90、步长 5），项目 policy `limits.contextCompactionPercent` 只能收紧。Agents 不在 scope 条上放 New（仅 Agents 工具栏 Import + New Agent）。禁止恢复 Settings「诊断信息 / Diagnostics」导航；禁止把 Request Inspector 挂到 Work Process 或右侧默认 Session/Trace 面板。Workspace「RDX Runtime 根目录」与 Control Panel「RDX 运行时上下文」职责不同，不得一并删除。
 - Composer 底栏右侧在 Effort 之前有当前对话的 Provider→Model 按钮（搜索、按 provider 分组）；搜索栏下常驻「按 Agent 配置」（不参与搜索过滤）；pill 仍显示实际生效模型名，仅 `.is-override` 区分覆盖态。永远可点，无 session 时只记草稿，切 Agent 不清模型，不写回 `.agent.md`。`/model default` 与该行共用清除路径。底栏弹窗（Agent / Permission / Effort / Usage / Model）走单一互斥注册表：任意时刻只开一个，Escape 关闭并把焦点还给 trigger，点空白关闭。
@@ -111,12 +111,16 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 
 ## 设计系统约束（agent 写 CSS 必读）
 
-**权威文件**：[`docs/ui/design-system.md`](docs/ui/design-system.md)（Token / 按钮 / 颜色 / 组件规则 / 视觉参考）。本节仅保留高层原则。
+**权威文件**：[`docs/ui/design-system.md`](docs/ui/design-system.md)（视觉定位 / Token / 刻度 / 组件规则 / 视觉参考）。本节仅保留高层原则。
 
-- **必须**引用语义 token（`--token-*`），禁止直接用 primitive token；字号用 `var(--text-*)`，间距用 `var(--space-*)`。
+- **视觉定位**：restrained、高密度、实色分层的精密工具风。不使用 backdrop blur、装饰性特效或插画；单一 accent 只用于 focus / selected / primary CTA。
+- **必须**引用语义 token（`--token-*`），禁止直接用 primitive token；字号用 `var(--text-*)`，间距用 `var(--space-*)`，圆角用 `var(--radius-*)`，控件高度用 `var(--control-height-*)`。门禁：`pnpm run check:design-tokens`。
 - 全局唯一按钮系统：`.button` + variant 修饰类；React 层用 `<Button>`。
 - 颜色双体系：全局 chrome vs Composer agent accent；详见 [`docs/ui/design-system.md`](docs/ui/design-system.md) 与 [`docs/ui/appearance-checklist.md`](docs/ui/appearance-checklist.md)。
+- 状态类一律 `is-*`（`is-active` / `is-selected` / `is-running` / `is-disabled`）并配对应 `aria-*`；禁止裸 `.active` / `.current`。
+- 任何 `:hover` 必须配 `:focus-visible`；禁止 `outline: none` 而不提供等效焦点样式。
 - 新组件必须覆盖所有交互状态、通过 CSS 变量控制 variant、不使用内联 style、文件行数 ≤300/200。
+- 渲染层分层与依赖方向由 `pnpm run check:renderer-structure` 与 ESLint `no-restricted-imports` 强制：`ui → lib`；`patterns → ui/lib/stores`（可读 store，不得写 store、不得直调 IPC）；`features` 不得横向 import 其它 feature，也不得 import `app` / `shell`；`stores` / `services` / `hooks` 不得 import `features` / `ui` / `patterns`；组件（`.tsx`）不得直调 `window.electronAPI` / `getElectronApi`。
 - 视觉参考：`designs/rdc-agent-design-system/Design System Preview.html`。
 
 ## 浏览器真实会话边界
@@ -196,6 +200,9 @@ Phase 7 contract 测试入口：`src/main/testing/contracts/*Contract.test.ts`�
 - **[AUTO]** 代码改动后执行 `pnpm run typecheck` 与 `pnpm run lint`（`no-unused-vars` / `exhaustive-deps` 为 error）。
 - **[AUTO]** 依赖、入口、构建、发布配置或仓库目录治理改动后执行 `pnpm run check:repository-hygiene`。
 - **[AUTO]** renderer 结构或 UI 锚点改动后执行 `pnpm run check:architecture`（含 Orchestrator façade &lt;800 与 `src/main` 单文件 ≤900）、`pnpm run check:fidelity`、`pnpm run check:shared-exports`。
+- **[AUTO]** renderer CSS 改动后执行 `pnpm run check:design-tokens`（非 token 层禁 `var(--color-*)` primitive、hex 字面量、px 字号、px 间距、px 圆角、`!important`、`backdrop-filter`）。豁免仅限 `styles/design-system.css` 与 `styles/global/*`（B1 迁完后删除 global 豁免）。Right Rail `stop-color` 豁免随 B7 空态收敛删除。
+- **[AUTO]** renderer 目录、依赖方向或 IPC 访问层改动后执行 `pnpm run check:renderer-structure`（层依赖矩阵、feature 横向 import、组件直调 IPC、退役目录、`is-*` 状态命名、feature 选择器不得留在 `styles/global`）。
+- **[MANUAL]** renderer 文件路径由 [`scripts/fidelity/renderer-contract.json`](scripts/fidelity/renderer-contract.json) 单点登记（`files` 必存在 / `retired` 必删除）。移动或重命名受门禁锁定的 renderer 文件时，只改该 manifest，不在各 `check-*.mjs` 内散写路径。
 - **[AUTO]** Orchestrator / debugger 编排拆分后执行 `pnpm run check:orchestrator-facade`（`AgentOrchestrator.ts` 少于 800 行；禁止恢复 `legacyGlobalMirror` / `getRdxRuntimeContext`）。
 - **[AUTO] [BROWSER-QA]** Session 切换、IPC 投影、Composer draft 恢复、Stop/Rewrite 或多 session 并行 UI 改动后执行 `pnpm run check:session-projection`；Browser QA 须覆盖：新建/切换 session 无 composer 串台、后台 turn 不污染 active transcript/trace、Rewrite+立即 Stop 单调落停、Preparing Stop 干净撤销本 session 草稿；每次先删尽 QA project sessions 再新建隔离 session。
 - **[MANUAL]** CI（`.github/workflows/ci.yml`）必须跑 hygiene / typecheck / lint / test / test:coverage / 全套关键 `check:*` / `check:contracts` / build；宣称完成不得只靠 commit message。

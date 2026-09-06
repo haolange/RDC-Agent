@@ -1,10 +1,10 @@
-import { useCaptureStore } from './captureStore';
-import { useConversationStore } from './conversationStore';
-import { useEvidenceStore } from './evidenceStore';
-import { useProjectStore } from './projectStore';
-import { useSessionStore } from './sessionStore';
-import { useSessionProjectionStore } from './sessionProjectionStore';
-import { useWorkflowStore } from './workflowStore';
+import { useCaptureStore } from '../stores/captureStore';
+import { useConversationStore } from '../stores/conversationStore';
+import { useEvidenceStore } from '../stores/evidenceStore';
+import { useProjectStore } from '../stores/projectStore';
+import { useSessionStore } from '../stores/sessionStore';
+import { useSessionProjectionStore } from '../stores/sessionProjectionStore';
+import { useWorkflowStore } from '../stores/workflowStore';
 import { useComposerSessionContextStore } from '../features/debugger/composer/composerSessionContext';
 import { useComposerModelDraftStore } from '../features/debugger/composer/composerModelDraft';
 

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import type { AppLanguage, AppSettings, AppTheme, FontScale } from '@shared/types/settings';
 import { useI18n } from '../../i18n';
 import { useDynStyle } from '../../lib/useDynStyle';
-import { ProfileAvatar } from '../../ui/ProfileAvatar';
+import { ProfileAvatar } from '../../patterns/ProfileAvatar';
 import './UserMenu.css';
 
 interface UserMenuProps {
