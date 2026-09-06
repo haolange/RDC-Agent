@@ -1,0 +1,91 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--btn-height-md);
+  padding: var(--btn-padding-md);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--btn-radius);
+  background: var(--token-bg-raised);
+  color: var(--token-text-heading);
+  font-size: var(--btn-font-size);
+  font-weight: var(--btn-font-weight);
+  line-height: var(--leading-tight);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.button:hover:not(:disabled) {
+  background: var(--token-bg-raised);
+  border-color: var(--token-border-strong);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.button:disabled,
+.button.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.button-primary {
+  background: var(--btn-primary-bg);
+  border-color: transparent;
+  color: var(--btn-primary-text);
+}
+
+.button-primary:hover:not(:disabled) {
+  background: var(--btn-primary-bg-hover);
+}
+
+.button-secondary {
+  background: var(--btn-secondary-bg);
+}
+
+.button-secondary:hover:not(:disabled) {
+  background: var(--btn-secondary-bg-hover);
+}
+
+.button-ghost {
+  background: var(--btn-ghost-bg);
+  border-color: transparent;
+}
+
+.button-ghost:hover:not(:disabled) {
+  background: var(--btn-ghost-bg-hover);
+}
+
+.button-danger {
+  background: color-mix(in srgb, var(--token-status-error) 12%, transparent);
+  border-color: color-mix(in srgb, var(--token-status-error) 30%, transparent);
+  color: var(--token-status-error);
+}
+
+.button-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--token-status-error) 18%, transparent);
+}
+
+.button-sm {
+  min-height: var(--btn-height-sm);
+  padding: var(--btn-padding-sm);
+  font-size: var(--text-xs);
+}
+
+.button-lg {
+  min-height: var(--btn-height-lg);
+  padding: var(--btn-padding-lg);
+  font-size: var(--text-md);
+}

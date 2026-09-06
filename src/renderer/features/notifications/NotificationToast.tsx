@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { Toast, ToastStack } from '../../ui/Toast';
 import { useNotificationStore } from '../../stores/notificationStore';
 
 export const NotificationToast: React.FC = () => {
@@ -13,24 +14,20 @@ export const NotificationToast: React.FC = () => {
   const visible = notifications.filter((n) => !n.read && !dismissed.has(n.id)).slice(0, 3);
 
   return (
-    <div className="notification-toast-container">
+    <ToastStack className="notification-toast-container">
       {visible.map((n) => (
-        <div key={n.id} className={`notification-toast notification-toast-${n.type}`}>
-          <span className="notification-toast-title">{n.title}</span>
-          {n.message && <span className="notification-toast-message">{n.message}</span>}
-          <button
-            type="button"
-            className="notification-toast-close"
-            onClick={() => {
-              markRead(n.id);
-              handleDismiss(n.id);
-            }}
-            aria-label="Dismiss"
-          >
-            ×
-          </button>
-        </div>
+        <Toast
+          key={n.id}
+          className={`notification-toast notification-toast-${n.type}`}
+          title={n.title}
+          message={n.message}
+          tone={n.type}
+          onDismiss={() => {
+            markRead(n.id);
+            handleDismiss(n.id);
+          }}
+        />
       ))}
-    </div>
+    </ToastStack>
   );
 };

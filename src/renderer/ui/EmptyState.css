@@ -1,0 +1,41 @@
+.ui-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: calc(var(--control-height-lg) * 4);
+  padding: var(--space-5) var(--space-4);
+  color: var(--token-text-caption);
+  text-align: center;
+}
+
+.ui-empty-state-title {
+  margin: 0;
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
+  overflow-wrap: anywhere;
+}
+
+.ui-empty-state-description {
+  margin: 0;
+  max-width: 36ch;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  overflow-wrap: anywhere;
+}
+
+.ui-empty-state-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/* Fidelity baseline aliases until B9 re-extract. No illustration. */
+.resource-empty-state-icon {
+  display: none;
+}

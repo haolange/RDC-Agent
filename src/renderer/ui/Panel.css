@@ -1,0 +1,27 @@
+.ui-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--token-bg-shell);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.ui-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--control-height-lg);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--token-border-default);
+  background: var(--token-bg-panel);
+}
+
+.ui-panel-body {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-3);
+}

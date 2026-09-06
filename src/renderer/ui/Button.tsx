@@ -1,4 +1,6 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { cn } from '../lib/cn';
+import './Button.css';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
@@ -33,11 +35,13 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   },
   ref,
 ) {
-  const classes = [variantClass[variant], sizeClass[size], className]
-    .filter(Boolean)
-    .join(' ');
   return (
-    <button ref={ref} type={type} className={classes} {...rest}>
+    <button
+      ref={ref}
+      type={type}
+      className={cn(variantClass[variant], sizeClass[size], rest.disabled && 'is-disabled', className)}
+      {...rest}
+    >
       {children}
     </button>
   );

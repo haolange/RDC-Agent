@@ -1,0 +1,15 @@
+.ui-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-5);
+  min-height: var(--space-5);
+  padding: 0 var(--space-1);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-sm);
+  background: var(--token-bg-raised);
+  color: var(--token-text-caption);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-tight);
+}
