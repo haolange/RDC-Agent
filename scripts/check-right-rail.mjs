@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assertRetiredAbsent, scriptRead } from './renderer-contract.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -10,6 +11,7 @@ const fail = (message) => {
 };
 
 const read = (relativePath) => {
+  if (relativePath.startsWith('src/')) return scriptRead(relativePath);
   const absolute = path.join(root, relativePath);
   if (!fs.existsSync(absolute)) fail(`missing required file: ${relativePath}`);
   return fs.readFileSync(absolute, 'utf8');
@@ -47,31 +49,7 @@ const requiredFiles = [
 ];
 for (const relativePath of requiredFiles) read(relativePath);
 
-const retiredFiles = [
-  'src/main/ipc/sessionOutputs.ts',
-  'src/renderer/features/debugger/ControlPanel/ArtifactTree.tsx',
-  'src/renderer/features/debugger/ControlPanel/ArtifactTreeSections.tsx',
-  'src/renderer/features/debugger/ControlPanel/CaptureLibrary.tsx',
-  'src/renderer/features/debugger/ControlPanel/CollapsibleSection.tsx',
-  'src/renderer/features/debugger/ControlPanel/ControlPanel.css',
-  'src/renderer/features/debugger/ControlPanel/MemoryPanel.tsx',
-  'src/renderer/features/debugger/ControlPanel/PlanArtifactPreview.tsx',
-  'src/renderer/features/debugger/ControlPanel/RdxRuntimeContextPanel.tsx',
-  'src/renderer/features/debugger/ControlPanel/SessionCapabilitiesPanel.tsx',
-  'src/renderer/features/debugger/ControlPanel/SessionControlPanel.tsx',
-  'src/renderer/features/debugger/ControlPanel/SessionProgressPanel.tsx',
-  'src/renderer/features/debugger/ControlPanel/SessionWorkingFolderPanel.tsx',
-  'src/renderer/features/debugger/ControlPanel/TraceArtifactList.tsx',
-  'src/renderer/features/debugger/ArtifactViewer/index.tsx',
-  'src/renderer/features/debugger/ArtifactViewer/ArtifactViewerLayout.tsx',
-  'src/renderer/features/debugger/ArtifactViewer/useArtifactViewer.ts',
-  'src/renderer/features/debugger/ArtifactViewer/artifactViewerModel.ts',
-  'src/renderer/features/debugger/ArtifactViewer/artifactViewerIcons.tsx',
-  'src/renderer/features/debugger/ArtifactViewer/ArtifactViewer.css',
-];
-for (const relativePath of retiredFiles) {
-  if (fs.existsSync(path.join(root, relativePath))) fail(`retired path must remain deleted: ${relativePath}`);
-}
+assertRetiredAbsent(fail);
 
 for (const component of [
   'src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx',

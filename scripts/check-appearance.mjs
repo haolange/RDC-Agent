@@ -2,6 +2,7 @@ import { createRequire } from 'module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scriptExists, scriptRead } from './renderer-contract.mjs';
 
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
@@ -93,26 +94,11 @@ assert(
 );
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const effortPopupSource = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/features/debugger/composer/EffortControlPopup.tsx'),
-  'utf8',
-);
-const effortControlSource = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/features/debugger/composer/EffortControl.tsx'),
-  'utf8',
-);
-const effortMaxFieldSource = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/features/debugger/composer/EffortMaxField.tsx'),
-  'utf8',
-);
-const effortLayoutSource = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/features/debugger/composer/useEffortPopupLayout.ts'),
-  'utf8',
-);
-const debuggerCssSource = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/pages/Debugger/Debugger.css'),
-  'utf8',
-);
+const effortPopupSource = scriptRead('src/renderer/features/debugger/composer/EffortControlPopup.tsx');
+const effortControlSource = scriptRead('src/renderer/features/debugger/composer/EffortControl.tsx');
+const effortMaxFieldSource = scriptRead('src/renderer/features/debugger/composer/EffortMaxField.tsx');
+const effortLayoutSource = scriptRead('src/renderer/features/debugger/composer/useEffortPopupLayout.ts');
+const debuggerCssSource = scriptRead('src/renderer/pages/Debugger/Debugger.css');
 assert(
   !effortPopupSource.includes("'--composer-effort-stops-opacity'"),
   'Effort popup must not compete with the Max animation for stop opacity ownership',
@@ -142,20 +128,17 @@ assert(
     && trackObserveKeySource.includes('displayLevelsKey'),
   'Effort layout measurement must settle before enabling position transitions while preserving color/opacity and Max lifecycle animations',
 );
-assert(!fs.existsSync(path.join(repoRoot, 'src/renderer/styles/themes/oklch-themes.css')), 'legacy oklch-themes.css must be removed');
-assert(!fs.existsSync(path.join(repoRoot, 'src/renderer/styles/tokens/index.css')), 'legacy styles/tokens dual track must be removed');
+assert(!scriptExists('src/renderer/styles/themes/oklch-themes.css'), 'legacy oklch-themes.css must be removed');
+assert(!scriptExists('src/renderer/styles/tokens/index.css'), 'legacy styles/tokens dual track must be removed');
 
-const mainTsx = fs.readFileSync(path.join(repoRoot, 'src/renderer/main.tsx'), 'utf8');
+const mainTsx = scriptRead('src/renderer/main.tsx');
 assert(!mainTsx.includes('styles/tokens'), 'main.tsx must not import styles/tokens');
 assert(mainTsx.includes('styles/global.css'), 'main.tsx imports global.css');
 
-const types = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/types.ts'), 'utf8');
+const types = scriptRead('src/renderer/features/settings/SettingsModal/types.ts');
 assert(types.includes("'appearance'"), 'SettingsSection includes appearance');
 
-const applyChromeThemeSource = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/app/theme/applyChromeTheme.ts'),
-  'utf8',
-);
+const applyChromeThemeSource = scriptRead('src/renderer/app/theme/applyChromeTheme.ts');
 assert(applyChromeThemeSource.includes('adoptedStyleSheets'), 'applyChromeTheme must use constructable stylesheets');
 assert(applyChromeThemeSource.includes('replaceSync'), 'applyChromeTheme must replaceSync chrome CSS vars');
 assert(!applyChromeThemeSource.includes("createElement('style')"), 'applyChromeTheme must not inject <style> textContent under CSP');
@@ -181,14 +164,8 @@ assert(designSystemMd.includes('chromeThemes'), 'docs/ui/design-system.md must d
 const workbenchUiMd = fs.readFileSync(path.join(repoRoot, 'docs/ui/workbench-and-transcript.md'), 'utf8');
 assert(workbenchUiMd.includes('Appearance') || workbenchUiMd.includes('chrome'), 'workbench UI doc must reference Appearance chrome');
 
-const appearanceSource = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AppearanceSettings.tsx'),
-  'utf8',
-);
-const appearanceChromeParts = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/AppearanceChromeParts.tsx'),
-  'utf8',
-);
+const appearanceSource = scriptRead('src/renderer/features/settings/SettingsModal/sections/AppearanceSettings.tsx');
+const appearanceChromeParts = scriptRead('src/renderer/features/settings/SettingsModal/sections/AppearanceChromeParts.tsx');
 assert(!appearanceSource.includes('appearance-preset-swatch'), 'Appearance must not keep a side-mounted preset Aa sibling');
 assert(!appearanceChromeParts.includes('appearance-preset-swatch'), 'Chrome parts must not keep a side-mounted preset Aa sibling');
 assert(appearanceChromeParts.includes('swatchColor'), 'Appearance preset options must supply swatchColor');
@@ -197,10 +174,10 @@ assert(appearanceChromeParts.includes('menuAlign="end"'), 'Appearance preset men
 assert(appearanceChromeParts.includes("from '../../../../ui/ColorField'"), 'Appearance must use shared ColorField');
 assert(!appearanceChromeParts.includes('function ColorField'), 'Appearance must not inline a private ColorField');
 assert(appearanceSource.includes('ChromeThemeCard'), 'Appearance page must compose ChromeThemeCard');
-assert(fs.existsSync(path.join(repoRoot, 'src/renderer/ui/ColorField.tsx')), 'shared ColorField component must exist');
-assert(fs.existsSync(path.join(repoRoot, 'src/renderer/ui/ColorField.css')), 'shared ColorField styles must exist');
-const colorFieldSource = fs.readFileSync(path.join(repoRoot, 'src/renderer/ui/ColorField.tsx'), 'utf8');
-const colorFieldCss = fs.readFileSync(path.join(repoRoot, 'src/renderer/ui/ColorField.css'), 'utf8');
+assert(scriptExists('src/renderer/ui/ColorField.tsx'), 'shared ColorField component must exist');
+assert(scriptExists('src/renderer/ui/ColorField.css'), 'shared ColorField styles must exist');
+const colorFieldSource = scriptRead('src/renderer/ui/ColorField.tsx');
+const colorFieldCss = scriptRead('src/renderer/ui/ColorField.css');
 assert(colorFieldSource.includes("layout?: 'grid' | 'inline'"), 'ColorField must support grid and inline layouts');
 assert(colorFieldCss.includes('.color-field-swatch'), 'ColorField must expose a round swatch');
 assert(colorFieldCss.includes('.color-field-native'), 'ColorField must hide the native color input');
@@ -216,18 +193,13 @@ assert(
 );
 assert(colorFieldSource.includes('useDynStyle') || colorFieldSource.includes('assignDynStyle'), 'ColorField must use constructable dyn styles');
 
-const dropdownTypes = fs.readFileSync(path.join(repoRoot, 'src/renderer/ui/DropdownSelect/types.ts'), 'utf8');
+const dropdownTypes = scriptRead('src/renderer/ui/DropdownSelect/types.ts');
 assert(dropdownTypes.includes('swatchColor'), 'DropdownOption must support swatchColor');
 assert(dropdownTypes.includes('menuAlign'), 'DropdownSelect must support menuAlign');
 
-const dropdownCss = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/ui/DropdownSelect/DropdownSelect.css'),
-  'utf8',
-);
-const dropdownPrimitives = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/ui/DropdownSelect/DropdownSelectPrimitives.tsx'),
-  'utf8',
-);
+const dropdownCss = scriptRead('src/renderer/ui/DropdownSelect/DropdownSelect.css');
+const dropdownPrimitives = scriptRead('src/renderer/ui/DropdownSelect/DropdownSelectPrimitives.tsx');
+// B2 将反转本断言：restrained 规范禁止 backdrop blur；当前仍锁定既有实现以免 B0 误伤。
 assert(
   /\.dropdown-select-menu\s*\{[^}]*backdrop-filter:\s*blur\(/s.test(dropdownCss),
   'DropdownSelect menu must use frosted-glass blur by default',

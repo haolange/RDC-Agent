@@ -8,7 +8,7 @@
 - 双栏视觉预览（非 JSON/代码块）。
 - Light/Dark 编辑卡跟随 App chrome。
 - 圆角色板+hex。
-- 可读预设下拉（统一 pill Aa+名称触发体、菜单右缘贴合并向左延伸、caret 衔接 tip、毛玻璃菜单、每项 Aa+勾选、足够宽度）。
+- 可读预设下拉（统一 pill Aa+名称触发体、菜单右缘贴合并向左延伸、caret 衔接 tip、实色 overlay 菜单、每项 Aa+勾选、足够宽度）。
 - Import/Copy `rdx-theme-v1:`。
 - Preferences。
 

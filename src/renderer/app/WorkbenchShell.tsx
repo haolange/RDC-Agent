@@ -3,7 +3,7 @@ import { ControlPanel } from '../features/debugger/ControlPanel';
 import { DeviceSelector } from '../features/captures/DeviceSelector';
 import { Sidebar } from '../features/projects/Sidebar';
 import { TerminalDrawer } from '../features/terminal/TerminalDrawer';
-import { ProfileAvatar } from '../ui/ProfileAvatar';
+import { ProfileAvatar } from '../patterns/ProfileAvatar';
 import { Composer } from '../features/debugger/composer/Composer';
 import type { ComposerController } from '../features/debugger/composer/useComposer';
 import type { TranslationKey } from '../i18n';

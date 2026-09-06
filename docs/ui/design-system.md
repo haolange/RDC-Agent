@@ -9,12 +9,85 @@
 5. [`src/shared/theme/`](../../src/shared/theme/) — preset catalog、`ThemeChromeCompiler`、`rdx-theme-v1`、compose accent 派生
 6. [`designs/rdc-agent-design-system/Design System Preview.html`](../../designs/rdc-agent-design-system/Design%20System%20Preview.html) — 可交互预览
 
+## 视觉定位
+
+RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 VS Code / JetBrains / Linear 的密度与克制）。裁决见 [`DESIGN.md`](../../DESIGN.md) UI 节。
+
+- 层次由 1px 边框 + 实色表面建立；阴影只用于 popover 与 modal。
+- 不使用 backdrop blur、装饰性动效、插画或渐变背景。
+- 单一 accent 只承担 focus / selected / primary CTA；状态色只表达状态。
+- 信息密度优先于留白：同屏能多放一行真实信息，就不要用空白替代。
+
+## 刻度（唯一真值：`src/renderer/styles/design-system.css`）
+
+| 维度 | 变量 | 取值 | 用法 |
+|------|------|------|------|
+| 控件高度 | `--control-height-sm/md/lg` | 28 / 32 / 36 | pill、列表行、导航项、输入框、按钮统一落在此三档 |
+| 圆角 | `--radius-sm/md/lg/xl/full` | 4 / 6 / 8 / 12 / 9999 | 卡片 `md`；输入与按钮 `sm`；Composer 壳 `lg`；pill `full` |
+| 间距 | `--space-*` | 4 基，禁奇数 px | panel 内边距 `--space-3`；section 间距 `--space-5` |
+| 字号 | `--text-xs/sm/base/lg/xl` | 见 token 文件 | 禁 px 字面量 |
+| 行高 | `--leading-tight/normal` | 两档 | 不再引入第三档 |
+| 时长 | `--duration-fast/base` | 120 / 180ms | 统一 `--ease-standard`；B1 以本刻度替换 `--transition-*` |
+
+**排版层级（唯一一套，跨界面通用）**
+
+| 角色 | 组合 | 用于 |
+|------|------|------|
+| `page-title` | `--text-lg` / 600 | 模态标题、详情页头 |
+| `section-title` | `--text-sm` / 600 | 卡片标题、区块标题、Right Rail 卡头 |
+| `description` | `--text-xs` / `--token-text-caption` | 标题下说明、空态副文案 |
+| `body` | `--text-sm` | 正文、列表主文本 |
+| `mono` | `--font-mono` / `--text-xs` | 路径、命令、hash |
+
+禁止再出现第四套 section 标题字号（历史上 Right Rail 用 `--text-xl`、Settings 用 `--text-lg`、Sidebar 用 `--text-xs` 大写、Knowledge 用 `--text-sm` 四套并存）。
+
+## Primitive → Semantic 迁移对照
+
+组件 CSS 只能引用右列。左列 primitive 仅允许出现在 token 定义层。
+
+| Primitive（禁止出现在组件 CSS） | Semantic（使用这个） |
+|------|------|
+| `rgb(var(--color-bg-0))` | `var(--token-bg-app)` |
+| `rgb(var(--color-bg-1))` | `var(--token-bg-shell)` |
+| `rgb(var(--color-bg-2))` | `var(--token-bg-panel)` |
+| `rgb(var(--color-bg-3))` | `var(--token-bg-raised)`；作为 hover 底色时用 `var(--token-interactive-hover)` |
+| `rgb(var(--color-surface-overlay))` | `var(--token-bg-overlay)` |
+| `rgb(var(--color-border-subtle))` | `var(--token-border-muted)` |
+| `rgb(var(--color-border-default))` | `var(--token-border-default)` |
+| `rgb(var(--color-border-secondary))` | `var(--token-border-card)` |
+| `rgb(var(--color-border-strong))` | `var(--token-border-strong)` |
+| `rgb(var(--color-accent-500))` | 焦点环 `var(--token-border-focus)`；强调文本/图标 `var(--token-accent-primary)` |
+| `rgb(var(--color-text-primary))` | `var(--token-text-heading)` |
+| `rgb(var(--color-text-secondary))` | `var(--token-text-body)` |
+| `rgb(var(--color-text-tertiary))` | `var(--token-text-caption)` |
+| `rgb(var(--color-text-muted))` | `var(--token-text-placeholder)` |
+| `rgb(var(--color-text-disabled))` | `var(--token-text-disabled)` |
+| `rgb(var(--color-success \| warning \| error \| info))` | `var(--token-status-success \| warning \| error \| info)` |
+
+**带 alpha 的 primitive**（如 `rgb(var(--color-bg-3) / 0.78)`）不能直接换成语义 token（token 已包含 `rgb()`）。改写为 `color-mix`：
+
+```css
+/* 迁移前 */
+background: rgb(var(--color-bg-3) / 0.78);
+/* 迁移后 */
+background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
+```
+
+边框 token 已内含 alpha，**禁止**再追加 `/ 0.65`。
+
+## 状态与交互态
+
+- 状态类一律 `is-*`：`is-active` / `is-selected` / `is-running` / `is-disabled` / `is-error`，并配对应 `aria-*`。禁止裸 `.active` / `.current`。
+- 任何定义了 `:hover` 的可交互选择器必须同时定义 `:focus-visible`。
+- 焦点环统一 `--token-border-focus`；禁止 `outline: none` 而不提供等效焦点样式。
+- `prefers-reduced-motion` 在 `styles/global/base.css` 单点处理，组件不重复声明全局兜底。
+
 ## 双体系（摘要）
 
 | 体系 | 数据 | 作用域 |
 |------|------|--------|
 | 全局 Appearance | `appearance.theme` + `chromeThemes.light\|dark` | Shell、Settings、transcript、全局 CTA/focus |
-| Compose Agent | `.agent.md` `accent` → `--composer-mode-accent` / `--composer-effort-*` | Composer 边框流光、泛光、mode pill、send、Effort/Max |
+| Compose Agent | `.agent.md` `accent` → `--composer-mode-accent` / `--composer-effort-*` | Composer 边框、send、Effort/Max 色相；禁止 energy orbit / 流光 |
 
 - Light/Dark（含 system）影响两套体系的亮度调制。
 - 不提供 translucent sidebar。
@@ -38,7 +111,7 @@
 
 ## 按钮规则
 
-- 全局唯一按钮系统：`.button`（基类） + `.button-primary / button-secondary / button-ghost / button-danger`，定义在 `panels-composer.css`。
+- 全局唯一按钮系统：`.button`（基类） + `.button-primary / button-secondary / button-ghost / button-danger`，定义在 `src/renderer/ui/Button.css`（B3 从 `panels-composer.css` 迁入，不得再双轨）。
 - React 层用 `<Button variant="primary|secondary|ghost|danger" size="sm|md|lg">`（`src/renderer/ui/Button.tsx`）。
 - **禁止**新增第三套按钮类名，禁止在 feature CSS 中重复定义按钮样式。
 
@@ -46,11 +119,12 @@
 
 - 强调色（`--color-accent-*`）只用于：焦点环、激活状态、主要 CTA（非 Composer）。不得用于正文、装饰或多处背景。全局 accent 来自 Appearance chrome 编译，不接管 Composer。
 - 状态色（success / warning / error / info）只用于语义状态，不得挪作装饰。
-- **双体系**：全局 chrome（`chromeThemes.light|dark` → `ThemeChromeCompiler`）驱动 shell/Settings/transcript；Composer 第二套由当前 agent 的 `.agent.md` `accent` 派生 `--composer-mode-accent` 与 `--composer-effort-*`（边框流光、边缘泛光、mode pill、send、Effort/Max 滑条、Max 字色、Max mode / Fast 开关开态、`2x`/`Fast` pill）。禁止这些 compose 控件再读 `--token-border-focus` 或裸 `--token-effort-*` 作为唯一色源。Light/Dark 只调制 compose 派生色的亮度，不替换色相来源。`--token-effort-*` 仅为 compose 变量缺省回退，禁止挪作其它装饰或背景。
+- **双体系**：全局 chrome（`chromeThemes.light|dark` → `ThemeChromeCompiler`）驱动 shell/Settings/transcript；Composer 第二套由当前 agent 的 `.agent.md` `accent` 派生 `--composer-mode-accent` 与 `--composer-effort-*`（边框、send、Effort/Max 滑条、Max 字色、Max mode / Fast 开关开态、`2x`/`Fast` pill）。禁止这些 compose 控件再读 `--token-border-focus` 或裸 `--token-effort-*` 作为唯一色源。Light/Dark 只调制 compose 派生色的亮度，不替换色相来源。`--token-effort-*` 仅为 compose 变量缺省回退，禁止挪作其它装饰或背景。
 - Effort 弹层的 Max mode / Fast mode 是稳定能力槽位，不随模型消失：unsupported 显示灰色关闭，fixed 显示灰色开启，selectable 才允许切换。
 - Agent accent 必须可配置（`.agent.md` + Settings → Agents GUI）；`AGENT_SEED_ACCENTS` 仅用于 builtin seed 初值，不是运行时权威。
 - `--token-context-*` 色阶专用于 Context breakdown 弹窗的分段条与图例色点，不得挪作其它装饰或背景。
 - 不得引入非 design-system.css / ThemeChromeCompiler 定义的新颜色；需要新颜色时先在 `--token-*` 或 chrome 编译层添加并说明用途。
+- Composer 运行态禁止 energy orbit / 流光 / backdrop blur；agent accent 只体现在边框、send 与 Effort 色相。
 
 ## 新增组件规则
 
@@ -60,15 +134,11 @@
 3. 不使用内联 `style={{}}`，动态值（宽度百分比、JS 计算值）例外。
 4. 文件行数不超过 300 行（组件）/ 200 行（hook / service）。
 
-## 空态插画（Right Rail Empty Visuals）
+## 空态
 
-Session 右侧栏五张卡（Progress / Artifacts / Outputs / Context / Capture）的空态使用统一的**等距 3D 磨砂玻璃插画**语言，实现在 `src/renderer/features/debugger/ControlPanel/RightRailEmptyVisuals.tsx`，样式在 `RightRail.css`：
+所有空态使用统一 `<EmptyState title description? actions?>`（restrained，无插画、无渐变几何体）。Right Rail 五卡、Settings 资源列表、Knowledge 列表、Sidebar 共用同一组件。文案一句 honest copy；需要操作时把按钮放进 `actions` 槽。
 
-- 构图：等距投影几何体（顶面高亮、左右侧面半透明渐变互透）+ 底部 `feGaussianBlur` 弥散地面投影 + 顶部边缘 1px 白色高光；无动画，天然兼容 `prefers-reduced-motion`。
-- 色彩：插画是图形资产而非 UI 语义色载体。渐变 stop 只允许引用既有 primitive 色谱（`--color-primary-*` / `--color-accent-*` / `--color-success` / `--color-warning` / `--color-purple` / `--color-pink` 及其 `color-mix` 淡化），通过 `.rr-eg-{tone}-hi/lo` 类经 CSS 注入 `stop-color` / `stop-opacity`（presentation attribute，CSP 合规），随 chrome light/dark 与预设自动适配；**禁止**在 SVG 属性或 CSS 中写死 hex 色值。白色高光与黑/墨阴影是玻璃技法固有中性色，透明度由 `.right-rail-empty-visual` 上的 `--rr-eg-*-op` 变量按主题分支调制。
-- 上述状态色/彩虹 primitive 在插画内的装饰性使用是本小节的显式例外，不违反「状态色只用于语义状态」；例外范围仅限 `.right-rail-empty-visual` 内部，不得扩散到其它组件。
-- 语义：Progress=上升台阶（蓝→青→绿→琥珀，最高块带进行中光点）；Artifacts=分层玻璃记录+链接节点；Outputs=虚线收集框+悬浮玻璃文件；Context=异色玻璃节点发光连线网；Capture=玻璃 capture 卡+播放徽标+REC 点。文案保持一句 honest copy，图形不承载文字。
-- gradient/filter 的 `id` 必须带场景前缀（`rr-eg-<scene>-*`），保证五卡同屏唯一；不引入 svgr/图片资产双轨。
+当前 `RightRailEmptyVisuals` 等距玻璃插画是待 B7 删除的实现债务，不得再扩散。B7 之后 `check:design-tokens` 不再豁免 `stop-color`。
 
 ## Composer 附件卡
 
@@ -86,7 +156,7 @@ Session 右侧栏五张卡（Progress / Artifacts / Outputs / Context / Capture�
 
 知识中心与 Settings 用视窗比例驱动：约 `min(92vw, 1920px) × min(90vh, 1240px)`，带最小尺寸下限；960 堆叠，640 全屏。禁止再写互相覆盖的多段 media query。`--settings-content-max` 随大屏上调，避免内容挤在中间一条。
 
-知识中心与 Settings 的内容使用实色分层、紧凑工具栏与清晰标题，避免嵌套装饰框和重复说明。Knowledge 保持空间 / 列表 / 详情三列，左栏仅放视图与空间导航；类型、生命周期与六条检索通道收进列表的筛选入口，以文字按钮表达多选；索引维护与卡片元数据默认折叠；960px 以下用空间 / 列表 / 详情切换且始终提供关闭入口。Settings 保持九项导航与均分 User / Project 作用域；640px 以下导航单行横向滚动，内容全屏。宽屏下 Light / Dark 编辑器并排，小屏堆叠。资源空态共用 `ResourceEmptyState`，不添加装饰性文案；路径、模型名与元数据允许换行。说明文案仅保留操作条件、作用域和必要风险，内部实现细节留在文档。
+知识中心与 Settings 的内容使用实色分层、紧凑工具栏与清晰标题，避免嵌套装饰框和重复说明。Knowledge 保持空间 / 列表 / 详情三列（列宽 `224 / minmax(280, 0.8fr) / 1.2fr`），左栏仅放视图与空间导航；类型、生命周期与六条检索通道收进列表的筛选入口，以文字按钮表达多选；索引维护与卡片元数据默认折叠；960px 以下用空间 / 列表 / 详情切换且始终提供关闭入口。Settings 保持九项导航与均分 User / Project 作用域；640px 以下导航单行横向滚动，内容全屏。宽屏下 Light / Dark 编辑器并排，小屏堆叠。资源空态共用 `EmptyState`，不添加装饰性文案；路径、模型名与元数据允许换行。说明文案仅保留操作条件、作用域和必要风险，内部实现细节留在文档。
 
 ## 右键上下文菜单
 
@@ -105,16 +175,63 @@ Session 右侧栏五张卡（Progress / Artifacts / Outputs / Context / Capture�
 - Agent / Permission / Effort / Usage / Model 菜单在窄屏锚定到 Composer 上方并完整位于 viewport 内；同一时刻只开一个；running 与 selected 分列，约 8px 状态点使用 semantic status token，`prefers-reduced-motion: reduce` 时停止动画。
 - Browser 验收至少覆盖约 390px viewport、水平溢出、菜单 selected/running、键盘导航、Escape 焦点返回及 reduced-motion。
 
+## 组件清单（`src/renderer/ui`）
+
+原子：`Button`、`IconButton`、`Icon`、`Switch`、`Checkbox`、`Kbd`、`Divider`、`Spinner`、`Toast`。
+
+分子：`Pill`、`SectionHeader`、`Popover`、`Menu`、`Input`、`Textarea`、`SearchField`、`Select`、`ListRow`、`Panel`、`EmptyState`、`InlineError`、`Tabs`、`ColorField`。
+
+每件必须：全部交互态、CSS 变量 variant、共置 CSS ≤300 行、`ui/index.ts` 导出。禁止 feature 再造第二套弹层 / 空态 / 输入。
+
+## 各面推荐 composition
+
+| 产品面 | 组合 |
+|--------|------|
+| Settings 九 section | `SectionHeader` + `Panel` + `ListRow` + `Input` / `Select` / `Switch` + `Button` |
+| Settings / Composer / Sidebar 弹层 | `Popover` 或 `Menu`（锚定、viewport clamp、Escape 焦点返回） |
+| Knowledge 三列 | `Panel` + `ListRow` + `SearchField` + `Pill` + `EmptyState` + `Tabs` |
+| Composer 底栏 | `Pill` + `Popover` / `Menu`；控件高 `--control-height-sm`（28） |
+| Right Rail 五卡 / Sidebar | `SectionHeader` + `ListRow` + `EmptyState` |
+| 表单校验 | `InlineError`，不用 toast 代替字段错误 |
+
+## 目标目录
+
+见 [`DESIGN.md`](../../DESIGN.md) UI 节「渲染层目录」。CSS 与组件共置；`pages/`、`styles/tokens/*`、`styles/base/` 不得恢复。
+
 ## 视觉参考
 
-`designs/rdc-agent-design-system/Design System Preview.html`——在浏览器打开，可交互查看所有 token、组件规范和完整 dark/light 两套主题展示。写新组件前应先参考对应 section。
+`designs/rdc-agent-design-system/Design System Preview.html` 的目标态是直接引用运行时 `src/renderer/styles/design-system.css` 与 `.button-*` class，成为单一真值的只读预览。当前 Preview 仍引用独立 `./styles.css` 与 `designs/tokens/*`，属 B2 债务；B2 删除副本后本段改为「已经引用运行时 CSS」。
 
 ## 验证
 
 ```bash
+pnpm run check:design-tokens       # 组件 CSS token 合规；B0 棘轮锁定债务，B1 清零
+pnpm run check:renderer-structure  # 分层依赖、feature 横向、组件直调 IPC、is-* 状态命名；B0 棘轮，B3 清零
 pnpm run check:appearance
 pnpm run typecheck
 ```
+
+`check:design-tokens` 的豁免只有两处：token 定义层 `styles/design-system.css`、全局 chrome 层 `styles/global/*`（B1 迁完后删除 global 豁免）。Right Rail `stop-color` 豁免随 B7 空态收敛一并删除。新增豁免必须先改本文件再改脚本。
+
+### 规则 → 门禁 / 债务批次
+
+| 规则 | 当前 enforcement | 清零批次 |
+|------|------------------|----------|
+| 语义 token / 禁 primitive、hex、px 字号间距圆角、`!important`、blur | `check:design-tokens` 棘轮 522 | B1 → hits=0 |
+| 层依赖、feature 横向、组件直调 IPC、退役目录、global feature 选择器 | `check:renderer-structure` 棘轮 46 | B3 → hits=0 |
+| `is-*` 状态类（禁裸 `.active` / `.current`） | `check:renderer-structure` 已扫 TSX | B3 清零剩余 5 |
+| 刻度 control 28/32/36、radius 4/6/8/12、duration 120/180 | 文档权威；token 文件 B1 改值 | B1 |
+| `:hover` 必配 `:focus-visible`；禁无替代 `outline: none` | 无自动门禁 | **B8** 扫描清零 |
+| 分子组件清单与交互态 / CSS 变量 variant / 禁内联 style | 组件未落地，无自动门禁 | **B2** 实现 + luna 审查 |
+| 统一 `EmptyState`（无插画） | 组件未落地；Right Rail 玻璃空态仍在 | **B2** 组件；**B7** 替换五卡空态 |
+| Composer 禁 energy orbit / 流光 | 文档禁止；实现仍在 | **B6** |
+| DropdownSelect 禁 backdrop blur | `check:appearance` 仍锁定旧 blur（脚本已注明） | **B2** 反转断言 |
+| Preview 引用运行时 CSS，删除 `designs/tokens/*` | 尚未改 Preview | **B2** |
+| i18n 拆分、硬编码入 i18n、sentence case | 无自动门禁 | **B8** |
+| `check:architecture` R4 hex exempt | 仍豁免 4 个未迁文件 | **B1** 清空 |
+| `pages/`、`styles/base/` 删除 | 结构门禁计债务，未入 retired | **B1** 删 `styles/base`；**B3** 删 `pages/` |
+
+受门禁锁定的 renderer 文件路径集中登记在 [`scripts/fidelity/renderer-contract.json`](../../scripts/fidelity/renderer-contract.json)：`files` 为必存在锚点，`retired` 为必须保持删除的退役路径。移动或重命名这些文件时只改该 manifest。
 
 浏览器真实会话覆盖 Settings → Appearance、agent accent、Light/Dark、Compose Effort 染色边界（见 [`appearance-checklist.md`](appearance-checklist.md)）。验收前须重启最新 `start:agent-browser`，并删除该 QA project 下全部 session 后新建隔离 session。
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import type { AppSettings } from '@shared/types/settings';
 import { Button } from '../../../../ui/Button';
-import { ProfileAvatar } from '../../../../ui/ProfileAvatar';
+import { ProfileAvatar } from '../../../../patterns/ProfileAvatar';
 import type { useI18n } from '../../../../i18n';
 
 type Translate = ReturnType<typeof useI18n>['t'];
