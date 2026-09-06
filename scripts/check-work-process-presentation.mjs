@@ -944,7 +944,6 @@ const cssSource = [
   scriptRead('src/renderer/features/debugger/AgentChat/AgentChat.extras.css', 'utf8'),
 ].join('\n');
 const appShellSource = scriptRead('src/renderer/styles/global/app-shell.css', 'utf8');
-const responsiveThemeSource = scriptRead('src/renderer/styles/global/responsive-theme.css', 'utf8');
 const presentationSource = [
   scriptRead('src/renderer/features/debugger/AgentChat/workProcessPresentation.ts', 'utf8'),
   scriptRead('src/renderer/features/debugger/AgentChat/workProcessBlockProjection.ts', 'utf8'),
@@ -1191,8 +1190,8 @@ assert(
   'non-prose section adjacency must not lock top padding to zero',
 );
 assert(
-  /\.work-process\s*\+\s*\.conversation-bubble-assistant\s*\{[^}]*margin-top:\s*calc\(10px\s*-\s*var\(--space-2\)\)/.test(cssSource),
-  'final answer body should separate from the Work Process block with a true 10px (cancel stack gap)',
+  /\.work-process\s*\+\s*\.conversation-bubble-assistant\s*\{[^}]*margin-top:\s*var\(--space-0-5\)/.test(cssSource),
+  'final answer body should separate from the Work Process block with space-2 stack + space-0-5 (10px)',
 );
 assert(
   !/\.work-process\.is-collapsed\s*\+\s*\.conversation-bubble-assistant\s*\{[^}]*margin-top:/.test(cssSource),
@@ -1253,9 +1252,9 @@ assert(cssSource.includes('.work-process-step-rail.status-complete'), 'rail mark
 assert(cssSource.includes('.work-process-prose.is-streaming'), 'prose streaming indicator should exist');
 assert(cssSource.includes('.work-process-tool-aggregate'), 'tool aggregate styling should exist');
 assert(cssSource.includes('.work-process-section-list .work-process-step-rail'), 'nested tool rails must be suppressed under section lists');
-assert(cssSource.includes('width: 6px'), 'loop rail marker should be 6px');
+assert(cssSource.includes('--work-process-rail-marker-size: 6px'), 'loop rail marker should be 6px');
 assert(
-  /margin-top:\s*calc\(\(var\(--text-sm\)\s*\*\s*1\.65\s*-\s*6px\)\s*\/\s*2\)/.test(cssSource),
+  /margin-top:\s*calc\(\(var\(--text-sm\)\s*\*\s*1\.65\s*-\s*var\(--work-process-rail-marker-size\)\)\s*\/\s*2\)/.test(cssSource),
   'rail marker must center on the first text-sm line instead of a fixed space-3 drop',
 );
 assert(
@@ -1292,7 +1291,7 @@ assert(!appShellSource.includes('.composer-shell.is-running::after'), 'composer 
 assert(/is-running::before[\s\S]{0,900}drop-shadow/.test(appShellSource), 'composer running border bloom should follow the stroke via drop-shadow');
 assert(appShellSource.includes('.composer-shell.is-running:focus-within'), 'composer running border must preserve the focus ring layer');
 assert(appShellSource.includes('@media (prefers-reduced-motion: reduce)'), 'composer running border should honor reduced motion');
-assert(responsiveThemeSource.includes('--composer-shell-radius: 12px'), 'composer responsive radius token should stay synchronized with the running border');
+assert(appShellSource.includes('--composer-shell-radius: var(--radius-xl)'), 'composer shell radius must use the design-system radius scale');
 
 assert(i18nSource.includes("'chat.workProcessTitle': 'Work process'"), 'English process title copy should be Work process');
 assert(i18nSource.includes("'chat.workProcessTitle': '工作过程'"), 'Chinese process title copy should exist');

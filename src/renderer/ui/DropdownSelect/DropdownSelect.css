@@ -10,7 +10,7 @@
   justify-content: space-between;
   gap: var(--space-3);
   min-width: 0;
-  color: rgb(var(--color-text-primary));
+  color: var(--token-text-heading);
   transition:
     border-color var(--transition-fast),
     background var(--transition-fast),
@@ -29,15 +29,15 @@
 .dropdown-select-trigger.variant-field {
   min-height: var(--control-height-md);
   padding: 0 var(--space-3);
-  border: 1px solid rgb(var(--color-border-subtle));
+  border: 1px solid var(--token-border-muted);
   border-radius: var(--control-radius);
-  background: rgb(var(--color-bg-2));
+  background: var(--token-bg-panel);
 }
 
 .dropdown-select-trigger.variant-field:hover:not(:disabled),
 .dropdown-select.open .dropdown-select-trigger.variant-field {
-  border-color: rgb(var(--color-border-strong));
-  background: rgb(var(--color-bg-2));
+  border-color: var(--token-border-strong);
+  background: var(--token-bg-panel);
   box-shadow: none;
 }
 
@@ -50,7 +50,7 @@
 
 .dropdown-select-trigger.variant-inline:hover:not(:disabled),
 .dropdown-select.open .dropdown-select-trigger.variant-inline {
-  color: rgb(var(--color-text-primary));
+  color: var(--token-text-heading);
 }
 
 .dropdown-select-trigger:disabled {
@@ -68,14 +68,14 @@
 }
 
 .dropdown-select-trigger.placeholder .dropdown-select-trigger-label {
-  color: rgb(var(--color-text-muted));
+  color: var(--token-text-placeholder);
 }
 
 .dropdown-select-trigger-caret {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: rgb(var(--color-text-tertiary));
+  color: var(--token-text-caption);
   flex: 0 0 auto;
   transition:
     transform var(--transition-base) var(--ease-standard),
@@ -84,7 +84,7 @@
 
 .dropdown-select.open .dropdown-select-trigger-caret {
   transform: rotate(180deg);
-  color: rgb(var(--color-text-secondary));
+  color: var(--token-text-body);
 }
 
 .dropdown-select-swatch {
@@ -109,12 +109,10 @@
   z-index: var(--z-dropdown, 30);
   padding: 0;
   overflow: visible;
-  border: 1px solid rgb(var(--color-border-default));
+  border: 1px solid var(--token-border-default);
   border-radius: var(--radius-lg);
-  background: rgb(var(--color-bg-1) / 0.78);
-  box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--token-bg-shell);
+  box-shadow: var(--token-shadow-popover);
 }
 
 .dropdown-select-menu-panel {
@@ -155,21 +153,19 @@
   top: 2px;
   width: 10px;
   height: 10px;
-  border-top: 1px solid rgb(var(--color-border-default));
-  border-left: 1px solid rgb(var(--color-border-default));
-  background: rgb(var(--color-bg-1) / 0.92);
+  border-top: 1px solid var(--token-border-default);
+  border-left: 1px solid var(--token-border-default);
+  background: color-mix(in srgb, var(--token-bg-shell) 92%, transparent);
   transform: translate(-50%, 0) rotate(45deg);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .dropdown-select-menu {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    background: rgb(var(--color-bg-1));
+    background: var(--token-bg-shell);
   }
 
   .dropdown-select-menu-caret::before {
-    background: rgb(var(--color-bg-1));
+    background: var(--token-bg-shell);
   }
 }
 
@@ -186,7 +182,7 @@
   justify-content: space-between;
   gap: var(--space-3);
   width: 100%;
-  color: rgb(var(--color-text-secondary));
+  color: var(--token-text-body);
   text-align: left;
   background: transparent;
   border: 0;
@@ -205,13 +201,13 @@
 
 .dropdown-select-option:hover:not(:disabled),
 .dropdown-select-option.active {
-  background: rgb(var(--color-bg-3) / 0.72);
-  color: rgb(var(--color-text-primary));
+  background: color-mix(in srgb, var(--token-bg-raised) 72%, transparent);
+  color: var(--token-text-heading);
 }
 
 .dropdown-select-option.selected {
-  background: rgb(var(--color-bg-3) / 0.55);
-  color: rgb(var(--color-text-primary));
+  background: color-mix(in srgb, var(--token-bg-raised) 55%, transparent);
+  color: var(--token-text-heading);
 }
 
 .dropdown-select-option.disabled {
@@ -232,7 +228,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: rgb(var(--color-text-primary));
+  color: var(--token-text-heading);
   flex: 0 0 auto;
 }
 
@@ -243,6 +239,6 @@
 .dropdown-select-empty {
   display: flex;
   align-items: center;
-  color: rgb(var(--color-text-tertiary));
+  color: var(--token-text-caption);
   font-size: var(--text-sm);
 }

@@ -27,7 +27,8 @@ RDC-Agent 是 **restrained、高密度、实色分层的精密工具**（参照 
 | 间距 | `--space-*` | 4 基，禁奇数 px | panel 内边距 `--space-3`；section 间距 `--space-5` |
 | 字号 | `--text-xs/sm/base/lg/xl` | 见 token 文件 | 禁 px 字面量 |
 | 行高 | `--leading-tight/normal` | 两档 | 不再引入第三档 |
-| 时长 | `--duration-fast/base` | 120 / 180ms | 统一 `--ease-standard`；B1 以本刻度替换 `--transition-*` |
+| 时长 | `--duration-fast/base/slow` | 120 / 180 / 240ms | 统一 `--ease-standard`；`--transition-*` 是 `duration + ease` 别名 |
+| 字距 | `--tracking-tight/normal/wide` | -0.02 / 0 / 0.04em | 标题收紧、正文默认、标签加宽 |
 
 **排版层级（唯一一套，跨界面通用）**
 
@@ -211,25 +212,25 @@ pnpm run check:appearance
 pnpm run typecheck
 ```
 
-`check:design-tokens` 的豁免只有两处：token 定义层 `styles/design-system.css`、全局 chrome 层 `styles/global/*`（B1 迁完后删除 global 豁免）。Right Rail `stop-color` 豁免随 B7 空态收敛一并删除。新增豁免必须先改本文件再改脚本。
+`check:design-tokens` 豁免：token 定义层 `styles/design-system.css`；`styles/global/base.css` 的 reduced-motion `!important`；Right Rail `stop-color` 随 B7 空态收敛删除。新增豁免必须先改本文件再改脚本。
 
 ### 规则 → 门禁 / 债务批次
 
 | 规则 | 当前 enforcement | 清零批次 |
 |------|------------------|----------|
-| 语义 token / 禁 primitive、hex、px 字号间距圆角、`!important`、blur | `check:design-tokens` 棘轮 522 | B1 → hits=0 |
-| 层依赖、feature 横向、组件直调 IPC、退役目录、global feature 选择器 | `check:renderer-structure` 棘轮 46 | B3 → hits=0 |
+| 语义 token / 禁 primitive、hex、px 字号间距圆角、`!important`、blur | `check:design-tokens` | B1 已清零 |
+| 层依赖、feature 横向、组件直调 IPC、退役目录、global feature 选择器 | `check:renderer-structure` 棘轮 45 | B3 → hits=0 |
 | `is-*` 状态类（禁裸 `.active` / `.current`） | `check:renderer-structure` 已扫 TSX | B3 清零剩余 5 |
-| 刻度 control 28/32/36、radius 4/6/8/12、duration 120/180 | 文档权威；token 文件 B1 改值 | B1 |
+| 刻度 control 28/32/36、radius 4/6/8/12、duration 120/180/240 | 文档权威；token 文件 B1 已改值 | B1 已落地 |
 | `:hover` 必配 `:focus-visible`；禁无替代 `outline: none` | 无自动门禁 | **B8** 扫描清零 |
 | 分子组件清单与交互态 / CSS 变量 variant / 禁内联 style | 组件未落地，无自动门禁 | **B2** 实现 + luna 审查 |
 | 统一 `EmptyState`（无插画） | 组件未落地；Right Rail 玻璃空态仍在 | **B2** 组件；**B7** 替换五卡空态 |
 | Composer 禁 energy orbit / 流光 | 文档禁止；实现仍在 | **B6** |
-| DropdownSelect 禁 backdrop blur | `check:appearance` 仍锁定旧 blur（脚本已注明） | **B2** 反转断言 |
+| DropdownSelect 禁 backdrop blur | `check:appearance` 要求实色 `--token-bg-shell`、禁止 blur | B1 已反转 |
 | Preview 引用运行时 CSS，删除 `designs/tokens/*` | 尚未改 Preview | **B2** |
 | i18n 拆分、硬编码入 i18n、sentence case | 无自动门禁 | **B8** |
-| `check:architecture` R4 hex exempt | 仍豁免 4 个未迁文件 | **B1** 清空 |
-| `pages/`、`styles/base/` 删除 | 结构门禁计债务，未入 retired | **B1** 删 `styles/base`；**B3** 删 `pages/` |
+| `check:architecture` R4 hex exempt | 仅 `design-system.css` | B1 已清空 |
+| `pages/`、`styles/base/` 删除 | `styles/base` 已删并入 `retired`；`pages/` 仍计结构债务 | B1 已删 `styles/base`；**B3** 删 `pages/` |
 
 受门禁锁定的 renderer 文件路径集中登记在 [`scripts/fidelity/renderer-contract.json`](../../scripts/fidelity/renderer-contract.json)：`files` 为必存在锚点，`retired` 为必须保持删除的退役路径。移动或重命名这些文件时只改该 manifest。
 

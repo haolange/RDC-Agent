@@ -3,7 +3,7 @@
   "files": {
     "styles.designSystem": "src/renderer/styles/design-system.css",
     "styles.appShell": "src/renderer/styles/global/app-shell.css",
-    "styles.responsive": "src/renderer/styles/global/responsive-theme.css",
+    "styles.responsive": "src/renderer/styles/global/responsive.css",
     "styles.settingsModal": "src/renderer/features/settings/SettingsModal/SettingsModal.css",
     "styles.debuggerPage": "src/renderer/pages/Debugger/Debugger.css",
     "styles.rightRail": "src/renderer/features/debugger/ControlPanel/RightRail.css",
@@ -117,6 +117,8 @@
   "retired": [
     "src/renderer/styles/themes/oklch-themes.css",
     "src/renderer/styles/tokens/index.css",
+    "src/renderer/styles/base",
+    "src/renderer/styles/global/responsive-theme.css",
     "src/renderer/components",
     "src/renderer/features/debugger/RequestDiagnostics",
     "src/renderer/features/debugger/AgentChat/useAgentHandoffActions.ts",

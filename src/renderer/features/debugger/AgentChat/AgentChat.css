@@ -3,7 +3,7 @@
   --chat-top-transition-height: var(--workbench-chat-top-transition-height, 72px);
   --chat-top-safe-zone: calc(var(--chat-top-hard-stop-height) + var(--chat-top-transition-height));
   /* Match composer: page-shell already applies the outer rail inset. */
-  --chat-inline-padding: 0px;
+  --chat-inline-padding: var(--space-0);
   --chat-transcript-width: 100%;
   display: flex;
   flex-direction: column;
@@ -11,7 +11,7 @@
   min-height: 0;
   overflow: hidden;
   position: relative;
-  background: rgb(var(--color-bg-0));
+  background: var(--token-bg-app);
   container-type: inline-size;
 }
 
@@ -23,21 +23,17 @@
   height: var(--chat-top-hard-stop-height);
   z-index: 2;
   pointer-events: none;
-  background: linear-gradient(180deg, rgb(var(--color-bg-0)), rgb(var(--color-bg-0) / 0.92));
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
+  background: linear-gradient(180deg, var(--token-bg-app), color-mix(in srgb, var(--token-bg-app) 92%, transparent));
+  }
 
 .agent-chat.is-empty .chat-top-hard-stop {
-  background: linear-gradient(180deg, rgb(var(--color-bg-0) / 0.995), rgb(var(--color-bg-0) / 0.965));
-  backdrop-filter: blur(8px) saturate(0.94);
-  -webkit-backdrop-filter: blur(8px) saturate(0.94);
-}
+  background: linear-gradient(180deg, color-mix(in srgb, var(--token-bg-app) 100%, transparent), color-mix(in srgb, var(--token-bg-app) 97%, transparent));
+  }
 
 html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   background:
-    linear-gradient(180deg, rgb(var(--color-bg-0) / 0.995), rgb(var(--color-bg-0) / 0.965)),
-    radial-gradient(circle at 50% 0%, rgb(var(--color-accent-500) / 0.016), transparent 70%);
+    linear-gradient(180deg, color-mix(in srgb, var(--token-bg-app) 100%, transparent), color-mix(in srgb, var(--token-bg-app) 97%, transparent)),
+    radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--token-accent-primary) 2%, transparent), transparent 70%);
 }
 
 .chat-top-transition-fade {
@@ -51,26 +47,24 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   background:
     linear-gradient(
       180deg,
-      rgb(var(--color-bg-0) / 0.94) 0%,
-      rgb(var(--color-bg-0) / 0.72) 34%,
-      rgb(var(--color-bg-0) / 0.34) 68%,
+      color-mix(in srgb, var(--token-bg-app) 94%, transparent) 0%,
+      color-mix(in srgb, var(--token-bg-app) 72%, transparent) 34%,
+      color-mix(in srgb, var(--token-bg-app) 34%, transparent) 68%,
       transparent 100%
     );
-  mask-image: linear-gradient(180deg, #000 0%, rgb(0 0 0 / 0.82) 34%, rgb(0 0 0 / 0.26) 72%, transparent 100%);
+  mask-image: linear-gradient(180deg, rgb(0 0 0) 0%, rgb(0 0 0 / 0.82) 34%, rgb(0 0 0 / 0.26) 72%, transparent 100%);
 }
 
 .agent-chat.is-empty .chat-top-transition-fade {
   background:
     linear-gradient(
       180deg,
-      rgb(var(--color-bg-0) / 0.965) 0%,
-      rgb(var(--color-bg-0) / 0.84) 34%,
-      rgb(var(--color-bg-0) / 0.48) 68%,
+      color-mix(in srgb, var(--token-bg-app) 97%, transparent) 0%,
+      color-mix(in srgb, var(--token-bg-app) 84%, transparent) 34%,
+      color-mix(in srgb, var(--token-bg-app) 48%, transparent) 68%,
       transparent 100%
     );
-  backdrop-filter: blur(20px) saturate(0.9);
-  -webkit-backdrop-filter: blur(20px) saturate(0.9);
-}
+  }
 
 .chat-messages {
   flex: 1;
@@ -83,7 +77,7 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   flex-direction: column;
   align-items: center;
   gap: var(--space-5);
-  padding: calc(12px + var(--chat-top-safe-zone)) var(--chat-inline-padding) 36px;
+  padding: calc(var(--space-3) + var(--chat-top-safe-zone)) var(--chat-inline-padding) var(--control-height-lg);
   position: relative;
   z-index: 0;
 }
@@ -91,7 +85,7 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 .chat-messages.chat-messages-empty {
   align-items: stretch;
   gap: 0;
-  padding: 28px var(--chat-inline-padding) 28px;
+  padding: var(--control-height-sm) var(--chat-inline-padding) var(--control-height-sm);
 }
 
 .message-attachments {
@@ -100,7 +94,7 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   display: flex;
   flex-wrap: wrap;
   gap: var(--message-attachments-gap);
-  padding: 0 var(--message-attachments-inline) 16px;
+  padding: 0 var(--message-attachments-inline) var(--space-4);
 }
 
 .message-attachment-pill {
@@ -159,8 +153,8 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 
 @media (max-width: 760px) {
   .chat-messages {
-    padding-left: 14px;
-    padding-right: 14px;
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
   }
 }
 
@@ -176,7 +170,7 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: var(--space-5);
 }
 
 .conversation-thread.conversation-thread-empty {
@@ -219,7 +213,7 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 .conversation-message-row {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: var(--space-3);
   width: 100%;
 }
 
@@ -312,7 +306,7 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 
 .conversation-bubble-user {
   background: var(--token-surface-raised);
-  color: rgb(var(--color-text-primary));
+  color: var(--token-text-heading);
   border: 1px solid var(--token-border-default);
   border-radius: var(--radius-bubble) var(--radius-bubble) var(--radius-bubble-tail) var(--radius-bubble);
   box-shadow: var(--token-shadow-card), var(--token-elevation-edge);
@@ -339,7 +333,7 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   padding: 0;
   white-space: normal;
   background: transparent;
-  color: rgb(var(--color-text-primary));
+  color: var(--token-text-heading);
   border: 0;
   border-radius: 0;
   box-shadow: none;
@@ -436,11 +430,11 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   display: inline-block;
   width: 2px;
   height: 1em;
-  margin-left: 3px;
+  margin-left: var(--space-1);
   vertical-align: -0.18em;
-  background: rgb(var(--color-accent-500));
-  border-radius: 1px;
-  box-shadow: 0 0 6px rgb(var(--color-accent-500) / 0.6);
+  background: var(--token-accent-primary);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--token-accent-primary) 60%, transparent);
   animation: conversationCursorBlink 1.05s steps(2, end) infinite;
 }
 
@@ -640,7 +634,7 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 .work-process-step {
   display: grid;
   /* Compact rail + tight gap: gray node stays close to Thinking copy. */
-  grid-template-columns: 8px minmax(0, 1fr);
+  grid-template-columns: var(--space-2) minmax(0, 1fr);
   column-gap: var(--space-1);
   padding: 0 0 var(--space-2);
 }
@@ -697,23 +691,24 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 
 /* Quiet 6px loop-level node: hollow stroke at rest, status color when live */
 .work-process-rail-marker {
+  --work-process-rail-marker-size: 6px;
   position: relative;
   z-index: 1;
   display: block;
-  width: 6px;
-  height: 6px;
+  width: var(--work-process-rail-marker-size);
+  height: var(--work-process-rail-marker-size);
   /* Center the 6px node on the first text-sm line, not a fixed 12px drop. */
-  margin-top: calc((var(--text-sm) * 1.65 - 6px) / 2);
+  margin-top: calc((var(--text-sm) * 1.65 - var(--work-process-rail-marker-size)) / 2);
   margin-inline: auto;
   flex-shrink: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   border: 2px solid color-mix(in srgb, var(--token-text-muted) 70%, transparent);
-  background: var(--token-bg-app, rgb(var(--color-bg-0)));
+  background: var(--token-bg-app);
   box-sizing: border-box;
 }
 
 .work-process-section.first-line-caption .work-process-rail-marker {
-  margin-top: calc((var(--text-xs) * 1.45 - 6px) / 2);
+  margin-top: calc((var(--text-xs) * 1.45 - var(--work-process-rail-marker-size)) / 2);
 }
 
 .work-process-step-rail.status-complete .work-process-rail-marker {
@@ -731,7 +726,7 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
   content: '';
   position: absolute;
   inset: calc(var(--space-1) * -1);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   border: 1px solid color-mix(in srgb, var(--token-status-info) 38%, transparent);
   animation: work-process-rail-pulse 1.5s ease-out infinite;
 }
@@ -1485,7 +1480,7 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
    * cannot match .work-process-section + .work-process-section. */
   padding: var(--space-3) 0;
   /* Share the nested tool-card indent line (rail 8px + column-gap space-1). */
-  padding-left: calc(8px + var(--space-1));
+  padding-left: calc(var(--space-2) + var(--space-1));
 }
 
 .work-process-step.kind-section .work-process-step-content {
@@ -1790,10 +1785,10 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 
 /*
  * Process block → final answer (expanded & collapsed).
- * Stack gap is space-2; cancel it here so the sole break is a true 10px.
+ * Stack gap is space-2 (8px); add space-0-5 so the sole break is 10px.
  */
 .conversation-message-assistant .work-process + .conversation-bubble-assistant {
-  margin-top: calc(10px - var(--space-2));
+  margin-top: var(--space-0-5);
 }
 
 .work-process.is-collapsed .work-process-header {
@@ -1858,9 +1853,9 @@ html[data-resolved-theme='light'] .agent-chat.is-empty .chat-top-hard-stop {
 .work-process-path-chip {
   display: inline-flex;
   max-width: 100%;
-  padding: 2px var(--space-2);
+  padding: var(--space-0-5) var(--space-2);
   border: 1px solid var(--token-border-muted);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   color: var(--token-text-muted);
   font-family: var(--font-mono);
   font-size: var(--text-xs);

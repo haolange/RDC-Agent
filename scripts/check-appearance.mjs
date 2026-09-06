@@ -199,10 +199,13 @@ assert(dropdownTypes.includes('menuAlign'), 'DropdownSelect must support menuAli
 
 const dropdownCss = scriptRead('src/renderer/ui/DropdownSelect/DropdownSelect.css');
 const dropdownPrimitives = scriptRead('src/renderer/ui/DropdownSelect/DropdownSelectPrimitives.tsx');
-// B2 将反转本断言：restrained 规范禁止 backdrop blur；当前仍锁定既有实现以免 B0 误伤。
 assert(
-  /\.dropdown-select-menu\s*\{[^}]*backdrop-filter:\s*blur\(/s.test(dropdownCss),
-  'DropdownSelect menu must use frosted-glass blur by default',
+  !/backdrop-filter:\s*blur|-webkit-backdrop-filter:\s*blur/.test(dropdownCss),
+  'DropdownSelect must not use backdrop blur (restrained chrome uses solid surfaces)',
+);
+assert(
+  /\.dropdown-select-menu\s*\{[^}]*background:\s*var\(--token-bg-shell\)/s.test(dropdownCss),
+  'DropdownSelect menu must use a solid shell surface',
 );
 assert(
   dropdownCss.includes('dropdown-select-menu-caret'),

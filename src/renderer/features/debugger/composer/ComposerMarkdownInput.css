@@ -12,7 +12,7 @@
   min-height: 72px;
   max-height: 180px;
   box-sizing: border-box;
-  /* Match .composer-textarea (responsive-theme → --text-base), not --text-md. */
+  /* Match .composer-textarea (responsive.css → --text-base), not --text-md. */
   font-size: var(--text-base);
   line-height: 1.55;
 }
@@ -26,29 +26,23 @@
   grid-template-columns: 1fr 1fr;
   align-items: center;
   gap: 0;
-  padding: 2px;
+  padding: var(--space-0-5);
   border: 1px solid color-mix(in srgb, var(--token-border-default) 70%, transparent);
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   /* Frosted glass — sits above the shell, does not steal prompt width. */
   transform: translateY(calc(-100% - var(--space-2)));
   background: color-mix(in srgb, var(--token-bg-raised) 52%, transparent);
-  backdrop-filter: blur(18px) saturate(1.15);
-  -webkit-backdrop-filter: blur(18px) saturate(1.15);
   box-shadow:
     0 8px 20px rgb(0 0 0 / 0.28),
     inset 0 1px 0 color-mix(in srgb, var(--token-elevation-edge) 55%, transparent);
 }
 
 html[data-reduce-motion='on'] .composer-markdown-toolbar {
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
   background: color-mix(in srgb, var(--token-bg-raised) 92%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {
   html[data-reduce-motion='system'] .composer-markdown-toolbar {
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
     background: color-mix(in srgb, var(--token-bg-raised) 92%, transparent);
   }
 }
@@ -58,7 +52,7 @@ html[data-reduce-motion='on'] .composer-markdown-toolbar {
   min-height: 22px;
   padding: 0 var(--space-2);
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--token-text-caption);
   font-size: var(--text-xs);
@@ -79,7 +73,7 @@ html[data-reduce-motion='on'] .composer-markdown-toolbar {
 
 .composer-markdown-tab.is-active {
   color: var(--token-text-heading);
-  background: color-mix(in srgb, var(--composer-mode-accent, var(--token-accent-primary)) 22%, var(--token-bg-raised));
+  background: color-mix(in srgb, var(--composer-mode-accent) 22%, var(--token-bg-raised));
   box-shadow:
     0 1px 2px rgb(0 0 0 / 0.22),
     inset 0 0 0 1px color-mix(in srgb, var(--composer-mode-accent, var(--token-accent-primary)) 32%, transparent);
@@ -99,7 +93,7 @@ html[data-reduce-motion='on'] .composer-markdown-toolbar {
   position: absolute;
   inset: 0;
   display: grid;
-  padding: 4px 0 6px;
+  padding: var(--space-1) 0 var(--space-1);
   box-sizing: border-box;
 }
 
@@ -150,7 +144,7 @@ html[data-reduce-motion='on'] .composer-markdown-toolbar {
 }
 
 .composer-markdown-editor .cm-line {
-  padding: 0 !important;
+  padding: 0;
 }
 
 .composer-markdown-editor .cm-placeholder {

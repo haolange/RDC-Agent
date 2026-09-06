@@ -1,5 +1,5 @@
 .markdown-body {
-  color: rgb(var(--color-text-primary));
+  color: var(--token-text-heading);
   font-size: var(--text-base);
   line-height: 1.75;
   overflow-wrap: anywhere;
@@ -111,7 +111,7 @@
 }
 
 .markdown-body code {
-  padding: 1px var(--space-1);
+  padding: var(--space-0-5) var(--space-1);
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--token-bg-raised) 70%, transparent);
   border: 1px solid color-mix(in srgb, var(--token-border-muted) 60%, transparent);

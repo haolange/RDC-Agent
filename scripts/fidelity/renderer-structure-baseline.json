@@ -1,12 +1,12 @@
 {
-  "hits": 46,
+  "hits": 45,
   "categories": {
     "layer": 12,
     "cross-feature": 3,
     "ipc": 21,
     "state-class": 5,
-    "retired-bucket": 2,
+    "retired-bucket": 1,
     "global-selector": 3
   },
-  "$comment": "B0 债务棘轮。只降不升；命中下降时必须同步改本文件。B3 清零后改为 0。"
+  "$comment": "B0 债务棘轮；B1 删除 styles/base 后 retired-bucket 46→45。B3 清零后改为 0。"
 }

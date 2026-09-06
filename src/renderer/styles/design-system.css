@@ -81,6 +81,7 @@
 
   /* Spacing Scale - 4px base */
   --space-0: 0;
+  --space-0-5: 2px;
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -94,13 +95,12 @@
   --space-20: 80px;
   --space-24: 96px;
 
-  /* Border Radius — macOS-flavored soft scale */
+  /* Border Radius — restrained 4 / 6 / 8 / 12 / full */
   --radius-none: 0;
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-  --radius-2xl: 18px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
   --radius-full: 9999px;
 
   /* Typography */
@@ -144,11 +144,18 @@
    * On near-black canvases this — not the drop shadow — is what conveys depth. */
   --highlight-edge: inset 0 1px 0 rgb(255 255 255 / 0.08);
 
-  /* Transitions */
-  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slower: 500ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* Tracking */
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.04em;
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
+  --duration-slow: 240ms;
+  --transition-fast: var(--duration-fast) var(--ease-standard);
+  --transition-base: var(--duration-base) var(--ease-standard);
+  --transition-slow: var(--duration-slow) var(--ease-standard);
 
   /* Z-Index Scale */
   --z-base: 0;
@@ -179,8 +186,8 @@
   --radius-card: var(--radius-lg);        /* 8px - card */
   --radius-button: var(--radius-lg);      /* 8px - 按钮 */
   --radius-input: var(--radius-md);       /* 6px - 输入框 */
-  --radius-bubble: 16px;                  /* chat bubble */
-  --radius-bubble-tail: 6px;              /* 聊天气泡底角 */
+  --radius-bubble: var(--radius-xl);
+  --radius-bubble-tail: var(--radius-md);
 
   /* Layout */
   --header-height: 52px;
@@ -470,17 +477,13 @@ html[data-reduce-motion='on'] .active-signal-text.is-active {
 .stagger-4 { animation-delay: 200ms; }
 .stagger-5 { animation-delay: 250ms; }
 
-/* Glass morphism */
+/* Solid surfaces — restrained chrome does not use glass blur */
 .glass {
-  background: rgb(var(--color-bg-2) / 0.8);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: var(--token-bg-panel);
 }
 
 .glass-strong {
-  background: rgb(var(--color-bg-2) / 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--token-bg-raised);
 }
 
 /* Gradient borders */
@@ -847,48 +850,47 @@ html[data-reduce-motion='on'] .active-signal-text.is-active {
   --token-shadow-raised:       var(--shadow-sm);
   --token-shadow-card:         var(--shadow-md);
   --token-shadow-popover:      var(--shadow-lg);
+  --token-shadow-modal:        var(--shadow-xl);
   --token-elevation-edge:      var(--highlight-edge);
   /* Raised surface fill: on dark, depth reads as a surface clearly lighter than
    * the canvas (elevation overlay) plus the highlight edge — shadows barely show. */
   --token-surface-raised:      linear-gradient(180deg, rgb(var(--color-bg-4)), rgb(var(--color-bg-3)));
   --token-surface-sunken:      rgb(var(--color-bg-1) / 0.6);
 
-  /* ── Control sizing scale (shared by buttons, inputs, pills, selects) ──
-   *  Single source of truth for interactive control heights / radius / padding.
-   *  Default interactive control = md (36px). */
-  --control-height-xs:         28px;
-  --control-height-sm:         32px;
-  --control-height-md:         36px;
-  --control-height-lg:         44px;
-  --control-radius:            var(--radius-lg);   /* 8px rounded-rect controls */
-  --control-radius-pill:       var(--radius-full); /* fully-round pills / gauges */
-  --control-padding-x:         var(--space-3);     /* 12px */
+  /* ── Control sizing scale ──
+   *  sm / md / lg = 28 / 32 / 36. Default interactive control = md. */
+  --control-height-sm:         28px;
+  --control-height-md:         32px;
+  --control-height-lg:         36px;
+  --control-radius:            var(--radius-lg);
+  --control-radius-pill:       var(--radius-full);
+  --control-padding-x:         var(--space-3);
 
   /* ── Component: Button ── */
   --btn-height-sm:             var(--control-height-sm);
   --btn-height-md:             var(--control-height-md);
   --btn-height-lg:             var(--control-height-lg);
-  --btn-padding-sm:            0 10px;
-  --btn-padding-md:            0 14px;
-  --btn-padding-lg:            0 20px;
+  --btn-padding-sm:            0 var(--space-2);
+  --btn-padding-md:            0 var(--space-3);
+  --btn-padding-lg:            0 var(--space-5);
   --btn-radius:                var(--control-radius);
   --btn-font-size:             var(--text-sm);
   --btn-font-weight:           var(--font-semibold);
-  --btn-primary-bg:            linear-gradient(135deg, rgb(var(--color-accent-600)), rgb(var(--color-primary-600)));
-  --btn-primary-bg-hover:      linear-gradient(135deg, rgb(var(--color-accent-500)), rgb(var(--color-primary-500)));
+  --btn-primary-bg:            var(--token-accent-primary);
+  --btn-primary-bg-hover:      color-mix(in srgb, var(--token-accent-primary) 88%, var(--token-text-heading));
   --btn-primary-text:          var(--token-text-inverse);
-  --btn-secondary-bg:          rgb(var(--color-bg-3) / 0.52);
-  --btn-secondary-bg-hover:    rgb(var(--color-bg-3));
+  --btn-secondary-bg:          var(--token-bg-muted);
+  --btn-secondary-bg-hover:    var(--token-interactive-hover);
   --btn-secondary-border:      var(--token-border-default);
   --btn-ghost-bg:              transparent;
-  --btn-ghost-bg-hover:        rgb(var(--color-bg-3));
+  --btn-ghost-bg-hover:        var(--token-interactive-hover);
 
   /* ── Component: Input ── */
   --input-height-sm:           var(--control-height-sm);
   --input-height-md:           var(--control-height-md);
   --input-height-lg:           var(--control-height-lg);
-  --input-bg:                  rgb(var(--color-bg-3) / 0.52);
-  --input-bg-hover:            rgb(var(--color-bg-3) / 0.72);
+  --input-bg:                  var(--token-bg-muted);
+  --input-bg-hover:            color-mix(in srgb, var(--token-bg-raised) 72%, transparent);
   --input-border:              var(--token-border-input);
   --input-border-hover:        var(--token-border-strong);
   --input-border-focus:        var(--token-border-focus);
@@ -897,19 +899,18 @@ html[data-reduce-motion='on'] .active-signal-text.is-active {
   --input-placeholder:         var(--token-text-placeholder);
 
   /* ── Component: Card ── */
-  --card-bg:                   rgb(var(--color-bg-2) / 0.52);
-  --card-bg-hover:             rgb(var(--color-bg-3) / 0.72);
+  --card-bg:                   var(--token-bg-panel);
+  --card-bg-hover:             var(--token-interactive-hover);
   --card-border:               var(--token-border-card);
-  --card-radius:               var(--radius-xl);
+  --card-radius:               var(--radius-md);
   --card-shadow:               var(--token-shadow-card);
 
   /* ── Component: Modal / Dialog ── */
-  --modal-bg:                  rgb(var(--color-bg-1));
+  --modal-bg:                  var(--token-bg-shell);
   --modal-border:              var(--token-border-default);
-  --modal-radius:              var(--radius-2xl);
-  --modal-shadow:              var(--shadow-xl);
-  --modal-backdrop:            rgb(0 0 0 / 0.4);
-  --modal-backdrop-blur:       16px;
+  --modal-radius:              var(--radius-lg);
+  --modal-shadow:              var(--token-shadow-popover);
+  --modal-backdrop:            color-mix(in srgb, var(--token-bg-app) 40%, transparent);
 
   /* ── Component: Badge ── */
   --badge-height:              20px;
