@@ -4,6 +4,7 @@ import type { useI18n } from '../../../../i18n';
 import { RdxCliInvokerSettingsFields } from './RdxCliInvokerSettingsFields';
 import { CodeInterpreterSettingsFields } from './CodeInterpreterSettingsFields';
 import { ShellSettingsFields } from './ShellSettingsFields';
+import { Button } from '../../../../ui/Button';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -33,14 +34,23 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
   t,
 }) => {
   const [status, setStatus] = useState('');
+  const [saving, setSaving] = useState(false);
   const save = async () => {
+    if (saving) return;
+    setSaving(true);
     setStatus(t('settings.saving'));
-    await onSaveToolsConfig();
-    setStatus(t('settings.toolsSaved'));
+    try {
+      await onSaveToolsConfig();
+      setStatus(t('settings.toolsSaved'));
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <>
+    <form className="settings-tools-card-stack" onChange={() => setStatus('')} onSubmit={(event) => { event.preventDefault(); void save(); }}>
       <div className="settings-browser-block settings-tool-card" data-testid="settings-rdx-block">
         <RdxCliInvokerSettingsFields
           rdxCliDraft={rdxCliDraft}
@@ -61,9 +71,9 @@ export const ToolsSettings: React.FC<ToolsSettingsProps> = ({
         t={t}
       />
       <div className="settings-actions settings-actions-split">
-        <span className="settings-save-status">{status}</span>
-        <button type="button" className="button button-primary" onClick={() => void save()}>{t('settings.saveTools')}</button>
+        <span className="settings-save-status" role="status">{status}</span>
+        <Button type="submit" variant="primary" disabled={saving}>{t('settings.saveTools')}</Button>
       </div>
-    </>
+    </form>
   );
 };

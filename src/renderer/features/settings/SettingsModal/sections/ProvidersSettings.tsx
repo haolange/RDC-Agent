@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { LlmProviderEntry } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import type { ProviderCatalogCategory } from '../types';
@@ -33,12 +33,15 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
   onOpenProviderConnection,
   t,
 }) => {
+  const [query, setQuery] = useState('');
+  const matchesQuery = (provider: LlmProviderEntry) => [provider.id, provider.label, ...provider.models.map((model) => `${model.id} ${model.label ?? ''}`)]
+    .join(' ').toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
   const shouldCollapseAsUpcoming = (provider: LlmProviderEntry) => !provider.isConfigured
     && provider.providerAvailability.state === 'unavailable';
-  const visibleAccountProviders = accountProviders.filter((provider) => !shouldCollapseAsUpcoming(provider));
-  const visibleProviderCatalog = providerCatalog.filter((provider) => !shouldCollapseAsUpcoming(provider));
+  const visibleAccountProviders = accountProviders.filter((provider) => !shouldCollapseAsUpcoming(provider) && matchesQuery(provider));
+  const visibleProviderCatalog = providerCatalog.filter((provider) => !shouldCollapseAsUpcoming(provider) && matchesQuery(provider));
   const upcomingProviders = [...accountProviders, ...providerCatalog]
-    .filter(shouldCollapseAsUpcoming);
+    .filter((provider) => shouldCollapseAsUpcoming(provider) && matchesQuery(provider));
   const renderProviderRow = (provider: LlmProviderEntry, mode: 'account' | 'connected' | 'add') => {
     const models = getEnabledModels(provider);
     const connected = provider.isConfigured && provider.status === 'verified';
@@ -191,13 +194,17 @@ export const ProvidersSettings: React.FC<ProvidersSettingsProps> = ({
 
   return (
     <>
-      {renderProviderGroup(
+      <input className="input" type="search" aria-label={t('settings.searchProviders')} placeholder={t('settings.searchProviders')}
+        value={query} onChange={(event) => setQuery(event.target.value)} />
+      {!visibleAccountProviders.length && !visibleProviderCatalog.length && !upcomingProviders.length
+        ? <p className="settings-empty" role="status">{t('settings.providerSearchEmpty')}</p> : null}
+      {visibleAccountProviders.length > 0 ? renderProviderGroup(
         t('settings.oauthAccounts'),
         '',
         visibleAccountProviders,
         'settings-oauth-accounts',
         'account',
-      )}
+      ) : null}
       <div className="settings-provider-catalog-groups" data-testid="settings-add-provider">
         {catalogSections.map(({ category, providers }) => (
           <React.Fragment key={category.id}>

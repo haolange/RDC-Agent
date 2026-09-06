@@ -53,7 +53,7 @@ export const ComposerModelOverrideMenu: React.FC<{
   const currentOption = options.find((option) => (
     option.providerId === effective?.providerId && option.modelId === effective?.modelId
   ));
-  const pillLabel = currentOption?.label || effective?.modelId || '';
+  const pillLabel = currentOption?.label || effective?.modelId || t('settings.selectModelPlaceholder');
   const filtered = useMemo(
     () => filterComposerPickerOptions(options, query),
     [options, query],

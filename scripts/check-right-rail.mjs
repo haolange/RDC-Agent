@@ -41,7 +41,7 @@ const requiredFiles = [
   'src/renderer/features/debugger/ControlPanel/RightRailContext.tsx',
   'src/renderer/features/debugger/ControlPanel/CapturePanel.tsx',
   'src/renderer/features/debugger/ControlPanel/RightRail.css',
-  'src/renderer/app/RightRailDrawer.tsx',
+  'src/renderer/app/WorkbenchPanelDrawer.tsx',
   'src/renderer/app/useWorkbenchLayout.ts',
   'src/shared/types/trace.ts',
 ];
@@ -120,7 +120,7 @@ for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail
 forbidText(tracePanel, 'is-empty', 'TraceRightPanel sections must keep one card shell regardless of content');
 
 const projectCaptureImport = read('src/renderer/features/debugger/ControlPanel/ProjectCaptureImportPanel.tsx');
-for (const required of ['project.inputs.import', 'project.inputs.refresh', 'Import .rdc', 'Imported .rdc files appear here.', 'right-rail-section project-capture-import-section', 'project-capture-input-list']) {
+for (const required of ['project.inputs.import', 'project.inputs.refresh', "'projectCapture.import'", "'projectCapture.empty'", 'right-rail-section project-capture-import-section', 'project-capture-input-list']) {
   requireText(projectCaptureImport, required, `ProjectCaptureImportPanel must retain ${required}`);
 }
 for (const forbidden of ['useCaptureStore', 'openedCapture', 'TraceRightPanel', 'project-capture-inputs-section', '<h3>Captures</h3>', 'input.filePath}</small>']) {
@@ -181,9 +181,9 @@ for (const forbidden of ['.control-panel', '.cp-section', '.capture-library', '.
   forbidText(rightRailCss, forbidden, `RightRail.css must not retain ${forbidden}`);
 }
 
-const drawer = read('src/renderer/app/RightRailDrawer.tsx');
+const drawer = read('src/renderer/app/WorkbenchPanelDrawer.tsx');
 for (const requiredDrawerContract of ['role="dialog"', 'aria-modal="true"', "event.key === 'Escape'", 'returnFocusRef']) {
-  requireText(drawer, requiredDrawerContract, `RightRailDrawer must retain ${requiredDrawerContract}`);
+  requireText(drawer, requiredDrawerContract, `WorkbenchPanelDrawer must retain ${requiredDrawerContract}`);
 }
 
 const workbenchLayout = read('src/renderer/app/useWorkbenchLayout.ts');

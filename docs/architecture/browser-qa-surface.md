@@ -11,6 +11,8 @@ Authoritative entry: the launcher logs one-time `GET /qa?qaBootstrap=...`; consu
 
 ## 单轨接口
 
+- `browser-dev` 只将文档入口 `/app` / `/app/` 映射到 Vite 根；`/app/App.tsx` 等真实模块路径保持原样。Vite 开发期 CSS HMR 经 `devStyles.ts` 写入 constructable stylesheet，保留 `style-src 'self'` 与 `style-src-attr 'none'`，不放宽为 inline 样式。
+
 - `src/shared/renderer-api/` 是唯一 `ElectronAPI` 工厂与 channel manifest；Desktop 和 Browser 各自只实现 transport。
 - manifest 中的全部 invoke channel 必须存在 main handler；启动时 `assertRendererIpcParity` fail-closed 校验。
 - Browser bridge 仅接受 canonical manifest 中且已登记 capability 并已注册的 channel。未知、内部、未注册 channel 与不存在的明文 `settings:getProviderSecret` 返回 403。capability 映射是闭合 Record，禁止默认 `mutation` fallback。

@@ -88,9 +88,10 @@ export const formFromContent = (kind: ScopedResourceKind, id: string, content: s
 export const contentFromForm = (kind: ScopedResourceKind, form: ResourceFormState): string => {
   if (kind === 'skill' || kind === 'policy' || kind === 'agent') return form.body;
   if (kind === 'mcp') {
-    let args: unknown[] = [];
-    try { args = JSON.parse(form.argsText) as unknown[]; if (!Array.isArray(args)) args = []; }
-    catch { args = []; }
+    const args: unknown = JSON.parse(form.argsText);
+    if (!Array.isArray(args) || args.some((arg) => typeof arg !== 'string')) {
+      throw new Error('Arguments must be a JSON array of strings.');
+    }
     return JSON.stringify({
       id: form.id,
       name: form.name || form.id,

@@ -642,7 +642,7 @@ html[data-resolved-theme='light'] .app-main {
   width: auto;
   max-width: none;
   /* Soft viewport cap; only the whole panel scrolls — never a nested legend scroller. */
-  max-height: min(90vh, 880px);
+  max-height: min(var(--context-available-height, 90vh), 880px);
   padding: 0;
   border: 1px solid var(--token-border-default);
   border-radius: var(--radius-xl);

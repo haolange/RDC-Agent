@@ -53,6 +53,27 @@ export const ContextBreakdownPopover: React.FC<{
 }> = ({ prepared, phase, usage, selectedProfile, stale, estimated = false, onClose }) => {
   const { t } = useI18n();
   const closeButtonRef = React.useRef<HTMLButtonElement>(null);
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const [availableHeight, setAvailableHeight] = React.useState<number | null>(null);
+  const panelStyle = useDynStyle({ '--context-available-height': availableHeight == null ? undefined : `${availableHeight}px` });
+  React.useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const measure = () => {
+      const titlebarBottom = document.querySelector('.app-titlebar')?.getBoundingClientRect().bottom ?? 0;
+      setAvailableHeight(Math.max(0, panel.getBoundingClientRect().bottom - titlebarBottom - 8));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (panel.parentElement) observer.observe(panel.parentElement);
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, true);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure, true);
+    };
+  }, []);
   const detailsExpanded = useAppSettingsStore(
     (state) => state.settings.appearance.contextBreakdownExpanded,
   );
@@ -152,6 +173,8 @@ export const ContextBreakdownPopover: React.FC<{
     <>
       <div className="context-breakdown-backdrop" onClick={onClose} aria-hidden="true" />
       <div
+        ref={panelRef}
+        {...panelStyle}
         className="context-breakdown"
         role="dialog"
         aria-modal="true"

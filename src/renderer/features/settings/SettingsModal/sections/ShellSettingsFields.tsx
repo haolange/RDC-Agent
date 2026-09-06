@@ -41,12 +41,13 @@ export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({
   }, [draft.executable]);
 
   return (
-    <div className="settings-browser-block settings-tool-card" data-testid="settings-agent-shell">
+    <div className="settings-browser-block settings-tool-card" data-testid="settings-agent-shell" data-settings-search="agent-shell">
       <h3>{t('settings.shellTitle')}</h3>
       <p className="settings-help-text">{t('settings.shellHint')}</p>
-      <label>
+      <label className="settings-input-row">
         {t('settings.shellExecutable')}
         <input
+          className="input"
           type="text"
           data-testid="settings-agent-shell-executable"
           value={draft.executable}

@@ -333,6 +333,23 @@
   display: grid;
 }
 
+.settings-model-cascade-menu.is-empty {
+  height: auto;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.settings-model-empty {
+  padding: var(--space-4);
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.settings-model-empty p {
+  margin: var(--space-2) 0 0;
+  color: var(--token-text-caption);
+}
+
 .settings-model-provider-list {
   display: flex;
   flex-direction: column;
@@ -3051,10 +3068,10 @@
 }
 
 .settings-capability-options {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
   min-height: auto;
   max-height: min(24rem, 42vh);
-  flex-direction: column;
   gap: var(--space-2);
   overflow: auto;
 }
@@ -3626,6 +3643,34 @@
 
 .settings-tool-card {
   margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.settings-tool-card h3,
+.settings-tool-card p {
+  margin: 0;
+}
+
+.settings-tool-card .settings-input-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--text-sm);
+}
+
+.settings-tool-card .settings-help-text {
+  overflow-wrap: anywhere;
+}
+
+.settings-interpreter-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-4);
 }
 
 .settings-page-skills {
@@ -4622,6 +4667,14 @@
   height: min(560px, 60vh);
 }
 
+.settings-runtime-manifest-layout .settings-manifest-card {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.settings-runtime-manifest-layout .settings-manifest-card strong {
+  overflow-wrap: anywhere;
+}
+
 .settings-runtime-list-empty {
   margin: 0;
   padding: var(--space-5) var(--space-3);
@@ -4861,8 +4914,11 @@
 }
 
 .settings-runtime-manifest-layout.is-empty {
-  height: auto;
-  min-height: 200px;
+  height: min(560px, 60vh);
+  min-height: 280px;
+}
+.settings-runtime-scope[data-resource-kind="mcp"] .settings-runtime-manifest-layout.is-empty {
+  height: 280px;
 }
 .settings-center :is(input, textarea, select) { max-width: 100%; }
 .settings-center :is(code, .settings-help-text, .settings-section-subtitle) { overflow-wrap: anywhere; }

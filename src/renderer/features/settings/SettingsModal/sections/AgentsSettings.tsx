@@ -5,6 +5,7 @@ import type { TranslationKey, useI18n } from '../../../../i18n';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
 import { AgentManifestEditor } from './AgentManifestEditor';
+import { uniqueResourceId } from './uniqueResourceId';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -105,12 +106,12 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
   const duplicateAgent = () => {
     if (!selectedAgent) return;
     onAgentManifestDraftsChange((current) => {
-      const nextId = `${toSlug(selectedAgent.id)}-copy`;
+      const nextId = uniqueResourceId(`${toSlug(selectedAgent.id)}-copy`, current.map((agent) => agent.id));
       const duplicate = {
         ...selectedAgent,
         id: nextId,
         fileName: `${nextId}.agent.md`,
-        name: `${selectedAgent.name} Copy`,
+        name: uniqueResourceId(`${selectedAgent.name} Copy`, current.map((agent) => agent.name)),
       };
       setSelectedAgentId(nextId);
       return [...current, duplicate];

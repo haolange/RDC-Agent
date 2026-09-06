@@ -3,6 +3,7 @@ import type { ProjectInputRecord } from '@shared/types/session';
 import { getElectronApi } from '../../../platform/getElectronApi';
 import { useProjectStore } from '../../../stores/projectStore';
 import { Button } from '../../../ui/Button';
+import { useI18n } from '../../../i18n';
 
 const formatSize = (size: number): string => {
   if (size >= 1024 * 1024 * 1024) return `${(size / (1024 * 1024 * 1024)).toFixed(1)} GB`;
@@ -10,10 +11,10 @@ const formatSize = (size: number): string => {
   return `${Math.max(1, Math.round(size / 1024))} KB`;
 };
 
-const formatImportError = (reason: unknown): string => {
+const formatImportError = (reason: unknown, sessionExpired: string): string => {
   const message = reason instanceof Error ? reason.message : String(reason);
   return /^unauthorized(?:\s*\(401\))?$/i.test(message.trim())
-    ? 'Session expired. Refresh to reconnect.'
+    ? sessionExpired
     : message;
 };
 
@@ -40,6 +41,7 @@ const InputRow: React.FC<{ input: ProjectInputRecord }> = ({ input }) => (
 );
 
 export const ProjectCaptureImportPanel: React.FC = () => {
+  const { t } = useI18n();
   const currentProject = useProjectStore((state) => state.currentProject);
   const projectInputs = useProjectStore((state) => state.projectInputs);
   const updateProjectInputs = useProjectStore((state) => state.updateProjectInputs);
@@ -59,30 +61,30 @@ export const ProjectCaptureImportPanel: React.FC = () => {
         : await api.project.inputs.refresh(currentProject.projectId);
       updateProjectInputs(currentProject.projectId, result.inputs ?? []);
     } catch (reason) {
-      setError(formatImportError(reason));
+      setError(formatImportError(reason, t('projectCapture.sessionExpired')));
     } finally {
       setActiveAction(null);
     }
-  }, [currentProject, updateProjectInputs]);
+  }, [currentProject, updateProjectInputs, t]);
 
   if (!currentProject) return null;
 
   return (
-    <aside className="right-rail project-capture-rail" aria-label="Project capture inputs" data-testid="project-capture-import-panel">
+    <aside className="right-rail project-capture-rail" aria-label={t('projectCapture.title')} data-testid="project-capture-import-panel">
       <section className="right-rail-section project-capture-import-section">
-        <h2 className="right-rail-section-heading">Capture files</h2>
+        <h2 className="right-rail-section-heading">{t('projectCapture.title')}</h2>
         <div className="right-rail-section-content">
-          <p>Import RenderDoc captures for this project.</p>
+          <p>{t('projectCapture.description')}</p>
           <div className="project-capture-import-actions">
             <Button className="project-capture-import-primary" variant="primary" size="md" onClick={() => void run('import')} disabled={activeAction !== null}>
-              {activeAction === 'import' ? 'Importing...' : 'Import .rdc'}
+              {t(activeAction === 'import' ? 'projectCapture.importing' : 'projectCapture.import')}
             </Button>
             <Button className="project-capture-import-refresh" variant="secondary" size="md" onClick={() => void run('refresh')} disabled={activeAction !== null}>
-              {activeAction === 'refresh' ? 'Refreshing...' : 'Refresh'}
+              {t(activeAction === 'refresh' ? 'projectCapture.refreshing' : 'sidebar.refresh')}
             </Button>
           </div>
           {error ? <div className="project-capture-import-error" role="alert">{error}</div> : null}
-          {inputs.length ? <div className="project-capture-input-list" role="list" aria-label="Imported captures">{inputs.map((input) => <InputRow key={input.inputId} input={input} />)}</div> : <p className="project-capture-inputs-empty">Imported .rdc files appear here.</p>}
+          {inputs.length ? <div className="project-capture-input-list" role="list" aria-label={t('projectCapture.title')}>{inputs.map((input) => <InputRow key={input.inputId} input={input} />)}</div> : <p className="project-capture-inputs-empty">{t('projectCapture.empty')}</p>}
         </div>
       </section>
     </aside>

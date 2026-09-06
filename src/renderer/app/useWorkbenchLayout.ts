@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLayoutStore } from '../stores/layoutStore';
-import { useRightRailDrawer } from './useRightRailDrawer';
+import { usePanelDrawer } from './usePanelDrawer';
 import { useNarrowViewport } from './useNarrowViewport';
 import { useProjectStore } from '../stores/projectStore';
 import {
@@ -21,7 +21,7 @@ import {
 type DragSide = 'left' | 'right';
 type RightRailMode = 'hidden' | 'project' | 'session';
 
-export function useWorkbenchLayout() {
+export function useWorkbenchLayout(isReady: boolean) {
   const [appBodyWidth, setAppBodyWidth] = useState(() => (typeof window === 'undefined' ? 0 : Math.max(0, Math.round(window.innerWidth))));
   const [isResizing, setIsResizing] = useState(false);
   const appBodyRef = useRef<HTMLDivElement>(null);
@@ -64,7 +64,13 @@ export function useWorkbenchLayout() {
   const leftAutoCollapsed = !leftSidebarCollapsed && effectiveLeftCollapsed;
   const isRightRailAutoCollapsed = isRightRailVisible && !rightPanelCollapsed && effectiveRightCollapsed;
   const isRightRailDrawerMode = isRightRailVisible && (isRightRailDrawerViewport || isRightRailAutoCollapsed);
-  const rightRailDrawer = useRightRailDrawer(isRightRailDrawerMode);
+  const rightRailDrawer = usePanelDrawer(isRightRailDrawerMode);
+  const isLeftDrawerMode = appBodyWidth <= 720 || leftAutoCollapsed;
+  const leftDrawer = usePanelDrawer(isLeftDrawerMode);
+  const closeLeftDrawer = leftDrawer.close;
+  useEffect(() => {
+    closeLeftDrawer();
+  }, [currentProject?.projectId, currentSession?.sessionId, closeLeftDrawer]);
 
   const resolvedWidths = useMemo(
     () => resolveSidebarWidths(
@@ -88,6 +94,7 @@ export function useWorkbenchLayout() {
   );
 
   useEffect(() => {
+    if (!isReady) return;
     const node = appBodyRef.current;
     if (!node) return;
 
@@ -109,7 +116,7 @@ export function useWorkbenchLayout() {
       observer.disconnect();
       window.removeEventListener('resize', syncAppBodyWidth);
     };
-  }, []);
+  }, [isReady]);
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
@@ -186,7 +193,11 @@ export function useWorkbenchLayout() {
     effectiveLeftCollapsed,
     effectiveRightCollapsed,
     bothSidebarsCollapsed,
-    leftToggleDisabled: leftAutoCollapsed,
+    leftToggleDisabled: false,
+    isLeftDrawerMode,
+    isLeftDrawerOpen: leftDrawer.isOpen,
+    toggleLeftDrawer: leftDrawer.toggle,
+    closeLeftDrawer: leftDrawer.close,
     rightToggleDisabled: !isRightRailVisible,
     isRightRailDrawerMode,
     isRightRailDrawerOpen: rightRailDrawer.isOpen,

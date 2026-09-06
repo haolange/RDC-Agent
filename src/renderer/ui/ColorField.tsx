@@ -68,6 +68,7 @@ export function ColorField({
         <input
           type="text"
           className="color-field-hex input"
+          aria-label={label}
           value={draft}
           spellCheck={false}
           data-testid={`${testId}-hex`}

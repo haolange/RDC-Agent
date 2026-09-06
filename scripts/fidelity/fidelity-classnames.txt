@@ -916,7 +916,6 @@ settings-space-row
 settings-space-row-actions
 settings-space-row-copy
 settings-space-stack
-settings-toggle
 settings-tool-card
 settings-tool-section
 settings-toolchain-details

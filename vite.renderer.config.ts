@@ -10,7 +10,17 @@ const rendererRoot = resolve(__dirname, 'src/renderer')
  */
 export default defineConfig({
   root: rendererRoot,
-  plugins: [react()],
+  plugins: [react(), {
+    name: 'rdc-csp-dev-styles',
+    apply: 'serve',
+    enforce: 'post',
+    transform(code, id) {
+      if (!/\.css(?:\?|$)/u.test(id)) return null
+      const styleImport = /import\s*\{\s*updateStyle as __vite__updateStyle,\s*removeStyle as __vite__removeStyle\s*\}\s*from\s*["']\/@vite\/client["']/u
+      if (!styleImport.test(code)) return null
+      return code.replace(styleImport, 'import { updateStyle as __vite__updateStyle, removeStyle as __vite__removeStyle } from "/platform/devStyles.ts"')
+    },
+  }],
   resolve: {
     alias: {
       '@renderer': rendererRoot,

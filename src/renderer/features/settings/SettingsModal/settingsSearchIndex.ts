@@ -99,14 +99,14 @@ export const SETTINGS_SEARCH_INDEX: SettingsSearchEntry[] = [
     section: 'tools',
     titleKey: 'settings.shellTitle',
     keywords: ['shell', 'pwsh', 'powershell', 'bash', 'zsh', 'terminal', '终端', '命令'],
-    target: 'tools',
+    target: 'agent-shell',
   },
   {
     id: 'code-interpreter',
     section: 'tools',
     titleKey: 'settings.codeInterpreterTitle',
     keywords: ['interpreter', 'python', 'code', 'env', '解释器', '环境变量'],
-    target: 'tools',
+    target: 'code-interpreter',
   },
   {
     id: 'hooks',
