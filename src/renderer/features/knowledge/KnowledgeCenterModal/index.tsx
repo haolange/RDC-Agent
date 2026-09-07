@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Button } from '../../../ui/Button';
 import { useModalFocus } from '../../../hooks/useModalFocus';
 import { useI18n } from '../../../i18n';
+import { Icon } from '../../../ui/Icon';
+import { IconButton } from '../../../ui/IconButton';
+import { Tabs } from '../../../ui/Tabs';
 import { SpacesColumn } from './columns/SpacesColumn';
 import { ListColumn } from './columns/ListColumn';
 import { DetailColumn } from './columns/DetailColumn';
@@ -95,19 +97,24 @@ export const KnowledgeCenterModal: React.FC<KnowledgeCenterModalProps> = ({ open
       >
         {state.narrow && (
           <div className="knowledge-center-narrow-tabs" data-testid="knowledge-center-narrow-tabs">
-            {(['spaces', 'list', 'detail'] as const).map((pane) => (
-              <Button
-                key={pane}
-                variant={state.narrowPane === pane ? 'primary' : 'secondary'}
-                size="sm"
-                onClick={() => state.setNarrowPane(pane)}
-              >
-                {t(pane === 'spaces' ? 'knowledgeCenter.paneSpaces' : pane === 'list' ? 'knowledgeCenter.paneList' : 'knowledgeCenter.paneDetail')}
-              </Button>
-            ))}
-            <Button variant="ghost" size="sm" className="knowledge-center-narrow-close" onClick={onClose} aria-label={t('knowledgeCenter.close')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" /></svg>
-            </Button>
+            <Tabs
+              className="knowledge-center-narrow-switch"
+              label={t('knowledgeCenter.viewLabel')}
+              value={state.narrowPane}
+              onChange={(id) => state.setNarrowPane(id as typeof state.narrowPane)}
+              tabs={[
+                { id: 'spaces', label: t('knowledgeCenter.paneSpaces') },
+                { id: 'list', label: t('knowledgeCenter.paneList') },
+                { id: 'detail', label: t('knowledgeCenter.paneDetail') },
+              ]}
+            />
+            <IconButton
+              label={t('knowledgeCenter.close')}
+              className="knowledge-center-narrow-close"
+              onClick={onClose}
+            >
+              <Icon name="close" size={16} />
+            </IconButton>
           </div>
         )}
         <div className="knowledge-center-grid" ref={bodyRef}>

@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { KNOWLEDGE_CASE_CHAPTERS } from '@shared/types/knowledge';
 import { MessageMarkdown } from '../../../../patterns/Markdown/MessageMarkdown';
 import { Button } from '../../../../ui/Button';
-import { ResourceEmptyState } from '../../../../ui/ResourceEmptyState';
+import { EmptyState } from '../../../../ui/EmptyState';
+import { Icon } from '../../../../ui/Icon';
+import { IconButton } from '../../../../ui/IconButton';
+import { Panel } from '../../../../ui/Panel';
 import { useI18n } from '../../../../i18n';
 import { CHAPTER_LABEL_KEYS } from '../knowledgeCenterLabels';
 import { detailToRecord } from '../knowledgeCenterModel';
@@ -31,7 +34,7 @@ export function DetailColumn({ state, write, onClose, onCreateCandidate }: Detai
   const isCandidateView = state.viewMode === 'candidates';
 
   return (
-    <section className="knowledge-center-content" data-testid="knowledge-center-detail-column">
+    <Panel className="knowledge-center-content" data-testid="knowledge-center-detail-column">
       <div className="knowledge-center-header">
         <div>
           {state.narrow && (
@@ -44,25 +47,21 @@ export function DetailColumn({ state, write, onClose, onCreateCandidate }: Detai
             <div className="knowledge-center-header-path" title={card.relativePath}>{card.relativePath}</div>
           )}
         </div>
-        <Button
-          variant="ghost"
+        <IconButton
+          label={t('knowledgeCenter.close')}
           className="knowledge-center-close"
           onClick={onClose}
-          aria-label={t('knowledgeCenter.close')}
           data-testid="knowledge-center-close"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </Button>
+          <Icon name="close" size={16} />
+        </IconButton>
       </div>
 
       <div className="knowledge-center-body" data-testid="knowledge-center-body">
         {state.loadingDetail && <div className="knowledge-center-status">{t('knowledgeCenter.loading')}</div>}
         {!state.loadingDetail && !card && (
           <div className="knowledge-center-empty" data-testid="knowledge-center-empty-detail">
-            <ResourceEmptyState>{t('knowledgeCenter.selectPrompt')}</ResourceEmptyState>
+            <EmptyState title={t('knowledgeCenter.selectPrompt')} />
           </div>
         )}
         {!state.loadingDetail && card && (
@@ -131,6 +130,6 @@ export function DetailColumn({ state, write, onClose, onCreateCandidate }: Detai
           )}
         </div>
       )}
-    </section>
+    </Panel>
   );
 }

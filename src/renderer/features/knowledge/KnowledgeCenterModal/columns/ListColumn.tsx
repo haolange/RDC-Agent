@@ -1,7 +1,9 @@
 import type { KnowledgeCandidatesResult, KnowledgeLaneHit } from '@shared/types/knowledge';
 import { cn } from '../../../../lib/cn';
-import { Button } from '../../../../ui/Button';
-import { ResourceEmptyState } from '../../../../ui/ResourceEmptyState';
+import { EmptyState } from '../../../../ui/EmptyState';
+import { ListRow } from '../../../../ui/ListRow';
+import { Panel } from '../../../../ui/Panel';
+import { SearchField } from '../../../../ui/SearchField';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { CardBadges } from '../parts/CardBadges';
 import { KnowledgeFilters } from '../parts/KnowledgeFilters';
@@ -44,15 +46,15 @@ function HitButton({
   onSelect: () => void;
 }) {
   return (
-    <Button
-      variant="ghost"
+    <ListRow
       className={cn('knowledge-center-card-button', active && 'is-active')}
+      selected={active}
       onClick={onSelect}
       data-testid={`knowledge-card-${card.cardId}`}
     >
       <span className="knowledge-center-card-title">{card.title}</span>
       <CardBadges type={card.type} lifecycle={card.lifecycle} />
-    </Button>
+    </ListRow>
   );
 }
 
@@ -62,27 +64,25 @@ export function ListColumn({ state, inbox }: ListColumnProps) {
   const loading = state.loadingQuery || state.loadingOverview;
 
   return (
-    <section className="knowledge-center-list" data-testid="knowledge-center-list">
-      <label className="knowledge-center-search">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <circle cx="11" cy="11" r="7" />
-          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-        </svg>
-        <input
-          type="search"
-          value={state.searchQuery}
-          onChange={(event) => state.setSearchQuery(event.target.value)}
-          placeholder={t('knowledgeCenter.searchPlaceholder')}
-          data-testid="knowledge-center-search"
-          aria-label={t('knowledgeCenter.searchPlaceholder')}
-        />
-      </label>
+    <Panel className="knowledge-center-list" data-testid="knowledge-center-list">
+      <SearchField
+        className="knowledge-center-search"
+        value={state.searchQuery}
+        onChange={(event) => state.setSearchQuery(event.target.value)}
+        onClear={() => state.setSearchQuery('')}
+        placeholder={t('knowledgeCenter.searchPlaceholder')}
+        data-testid="knowledge-center-search"
+        aria-label={t('knowledgeCenter.searchPlaceholder')}
+        clearLabel={t('knowledgeCenter.close')}
+      />
 
       <KnowledgeFilters state={state} />
       <div className="knowledge-center-tree" data-testid="knowledge-center-tree">
         {loading && <div className="knowledge-center-empty-inline">{t('knowledgeCenter.loading')}</div>}
         {!loading && reason && (
-          <div className="knowledge-center-empty" data-testid="knowledge-center-empty-list"><ResourceEmptyState>{t(reason)}</ResourceEmptyState></div>
+          <div className="knowledge-center-empty" data-testid="knowledge-center-empty-list">
+            <EmptyState title={t(reason)} />
+          </div>
         )}
         {!loading && state.viewMode === 'cards' && !reason && state.hits.map((hit) => (
           <HitButton
@@ -96,28 +96,26 @@ export function ListColumn({ state, inbox }: ListColumnProps) {
           <>
             <div className="knowledge-center-section-title">{t('knowledgeCenter.candidatesSection')}</div>
             {inbox.candidates.map((entry) => (
-              <Button
+              <ListRow
                 key={entry.candidateId}
-                variant="ghost"
                 className="knowledge-center-inbox-row"
                 onClick={() => state.selectRecord(entry.card)}
               >
                 <span className="knowledge-center-card-title">{entry.card.title}</span>
                 <CardBadges type={entry.card.type} lifecycle={entry.card.lifecycle} sourceStatus={entry.card.sourceStatus} />
-              </Button>
+              </ListRow>
             ))}
             <div className="knowledge-center-section-title">{t('knowledgeCenter.draftsSection')}</div>
             {inbox.drafts.map((draft) => (
-              <Button
+              <ListRow
                 key={draft.cardId}
-                variant="ghost"
                 className="knowledge-center-inbox-row"
                 onClick={() => state.selectRecord(draft)}
               >
                 <span className="knowledge-center-card-title">{draft.title}</span>
                 <span className="knowledge-center-badge">{t('knowledgeCenter.draftNotCandidate')}</span>
                 <CardBadges type={draft.type} lifecycle={draft.lifecycle} sourceStatus={draft.sourceStatus} />
-              </Button>
+              </ListRow>
             ))}
           </>
         )}
@@ -125,6 +123,6 @@ export function ListColumn({ state, inbox }: ListColumnProps) {
           <ConflictRow key={`${conflict.leftCardId}:${conflict.rightCardId}`} leftCardId={conflict.leftCardId} rightCardId={conflict.rightCardId} />
         ))}
       </div>
-    </section>
+    </Panel>
   );
 }

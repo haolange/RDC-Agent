@@ -1,5 +1,6 @@
 import { KnowledgeIcon } from './KnowledgeIcon';
 import { Button } from '../../../../ui/Button';
+import { Pill } from '../../../../ui/Pill';
 import { useI18n } from '../../../../i18n';
 import { ALL_CARD_TYPES, ALL_LIFECYCLES } from '../knowledgeCenterModel';
 import { TYPE_LABEL_KEYS, LIFECYCLE_LABEL_KEYS, LANE_LABEL_KEYS } from '../knowledgeCenterLabels';
@@ -30,11 +31,23 @@ export function KnowledgeFilters({ state }: { state: ReturnType<typeof useKnowle
           <fieldset key={group.label}>
             <legend>{group.label}</legend>
             <div className="knowledge-filter-options">
-              {group.options.map(option => <Button key={option.id} variant="ghost" size="sm" aria-pressed={option.selected} onClick={option.toggle}>{option.label}</Button>)}
+              {group.options.map(option => (
+                <Pill key={option.id} selected={option.selected} onClick={option.toggle}>
+                  {option.label}
+                </Pill>
+              ))}
             </div>
           </fieldset>
         ))}
-        {changed.length > 0 && <Button variant="ghost" size="sm" onClick={() => groups.forEach(group => group.options.filter(option => !option.selected).forEach(option => option.toggle()))}>{t('knowledgeCenter.resetFilters')}</Button>}
+        {changed.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => groups.forEach(group => group.options.filter(option => !option.selected).forEach(option => option.toggle()))}
+          >
+            {t('knowledgeCenter.resetFilters')}
+          </Button>
+        )}
       </div>
     </details>
   );
