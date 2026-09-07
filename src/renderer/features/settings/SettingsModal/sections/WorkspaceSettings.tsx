@@ -1,7 +1,7 @@
 import React from 'react';
 import type { RdxRuntimeOverview } from '@shared/types/rdxRuntime';
 import type { TranslationKey, useI18n } from '../../../../i18n';
-import { getElectronApi } from '../../../../platform/getElectronApi';
+import { copyAppText, openAppPath } from '../../../../hooks/appShellBridge';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -29,8 +29,8 @@ export const WorkspaceSettings: React.FC<{ overview: RdxRuntimeOverview | null; 
       {paths ? Object.entries(paths).filter(([key]) => !['projectRoot', 'userRdxRoot'].includes(key)).map(([key, value]) => <div className="settings-space-row" key={key}>
         <div className="settings-space-row-copy"><span>{pathLabel(t, key)}</span><code title={value}>{value}</code></div>
         <div className="settings-space-row-actions">
-          <button type="button" className="button button-secondary" onClick={() => void getElectronApi()?.appShell.openPath(value)}>{t('settings.reveal')}</button>
-          <button type="button" className="button button-secondary" onClick={() => void getElectronApi()?.appShell.copyText(value)}>{t('settings.copy')}</button>
+          <button type="button" className="button button-secondary" onClick={() => void openAppPath(value)}>{t('settings.reveal')}</button>
+          <button type="button" className="button button-secondary" onClick={() => void copyAppText(value)}>{t('settings.copy')}</button>
         </div>
       </div>) : <div className="settings-empty">{t('settings.workspaceProjectEmpty')}</div>}
     </div>
@@ -41,7 +41,7 @@ export const WorkspaceSettings: React.FC<{ overview: RdxRuntimeOverview | null; 
       <div className="settings-workspace-hero settings-workspace-root-card" data-settings-search="runtime-root">
         <div className="settings-workspace-hero-copy"><div className="settings-field-label">{t('settings.workspaceRuntimeRoot')}</div></div>
         <div className="settings-path-value settings-workspace-root-value">{overview?.userRoot ?? (loading ? t('settings.pathLoading') : t('settings.pathUnavailable'))}</div>
-        <div className="settings-path-actions settings-workspace-root-actions"><button type="button" className="button button-secondary" onClick={() => overview?.userRoot && void getElectronApi()?.appShell.openPath(overview.userRoot)}>{t('settings.reveal')}</button></div>
+        <div className="settings-path-actions settings-workspace-root-actions"><button type="button" className="button button-secondary" onClick={() => overview?.userRoot && void openAppPath(overview.userRoot)}>{t('settings.reveal')}</button></div>
       </div>
       {error && <div className="settings-path-card settings-workspace-note-card"><div className="settings-workspace-note-list"><div className="settings-workspace-note-item">{error}</div></div></div>}
       <div className="settings-space-stack">

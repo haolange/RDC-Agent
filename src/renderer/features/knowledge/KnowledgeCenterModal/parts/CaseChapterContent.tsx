@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { MessageMarkdown } from '../../../debugger/AgentChat/MessageMarkdown';
+import { MessageMarkdown } from '../../../../patterns/Markdown/MessageMarkdown';
 import { Button } from '../../../../ui/Button';
 import { useI18n } from '../../../../i18n';
 

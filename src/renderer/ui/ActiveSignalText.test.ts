@@ -39,7 +39,7 @@ describe('ActiveSignalText', () => {
   });
 
   it('does not let Work Process running labels override active shimmer color', () => {
-    const cssPath = path.resolve(process.cwd(), 'src/renderer/features/debugger/AgentChat/AgentChat.css');
+    const cssPath = path.resolve(process.cwd(), 'src/renderer/features/transcript/AgentChat.css');
     const css = fs.readFileSync(cssPath, 'utf8');
     const runningBlock = css.match(/\.work-process-label\.status-running\s*\{[\s\S]*?\}/)?.[0] ?? '';
 

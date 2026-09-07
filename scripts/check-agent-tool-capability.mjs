@@ -8,7 +8,7 @@ const fail = (message) => {
   process.exit(1);
 };
 
-const picker = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/debugger/composer/composerModelPicker.ts'), 'utf8');
+const picker = fs.readFileSync(path.join(repoRoot, 'src/renderer/features/composer/composerModelPicker.ts'), 'utf8');
 if (!picker.includes('isAgentToolExecutableModel')) {
   fail('Composer picker must use isAgentToolExecutableModel');
 }
@@ -27,7 +27,7 @@ if (!sessionHandler.includes('isAgentToolExecutableModel')) {
 }
 
 const resolveOverride = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/features/debugger/composer/resolveComposerModelOverride.ts'),
+  path.join(repoRoot, 'src/renderer/features/composer/resolveComposerModelOverride.ts'),
   'utf8',
 );
 if (resolveOverride.includes('AgentModelOption') || resolveOverride.includes('isComposerOverrideOption')) {
@@ -38,7 +38,7 @@ if (!resolveOverride.includes('ComposerModelPickerOption')) {
 }
 
 const slash = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/features/debugger/composer/slashCommandExecutor.ts'),
+  path.join(repoRoot, 'src/renderer/features/composer/slashCommandExecutor.ts'),
   'utf8',
 );
 if (slash.includes('modelOptions')) {
@@ -53,7 +53,7 @@ if (
 }
 
 const loader = fs.readFileSync(
-  path.join(repoRoot, 'src/renderer/features/debugger/composer/useComposerModelPickerOptions.ts'),
+  path.join(repoRoot, 'src/renderer/features/composer/useComposerModelPickerOptions.ts'),
   'utf8',
 );
 if (
@@ -71,8 +71,8 @@ const result = spawnSync(process.execPath, [vitest, 'run',
   'src/main/conversation/ConversationRoutePreflight.test.ts',
   'src/main/settings/RequestPlanner.test.ts',
   'src/main/settings/EffectiveCatalogService.test.ts',
-  'src/renderer/features/debugger/composer/composerModelPicker.test.ts',
-  'src/renderer/features/debugger/composer/resolveComposerModelOverride.test.ts',
+  'src/renderer/features/composer/composerModelPicker.test.ts',
+  'src/renderer/features/composer/resolveComposerModelOverride.test.ts',
   'src/main/testing/contracts/providerWireFixture.test.ts',
 ], {
   cwd: repoRoot,

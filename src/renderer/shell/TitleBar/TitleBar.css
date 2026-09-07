@@ -1,0 +1,111 @@
+.window-control {
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0;
+  background: transparent;
+  color: var(--token-text-body);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.window-controls {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: 0;
+  -webkit-app-region: no-drag;
+}
+
+.window-control:hover {
+  color: var(--token-text-heading);
+  background: color-mix(in srgb, var(--token-bg-raised) 92%, transparent);
+}
+
+.window-control:focus-visible {
+  outline: none;
+  color: var(--token-text-heading);
+  background: var(--token-bg-raised);
+  box-shadow: inset 0 0 0 1px var(--token-border-strong);
+}
+
+.window-control:active {
+  background: color-mix(in srgb, var(--token-bg-raised) 95%, transparent);
+}
+
+.window-control span {
+  position: relative;
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+
+.window-control span::before,
+.window-control span::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
+.window-control .minimize::before {
+  top: 7px;
+  left: 1px;
+  right: 1px;
+  height: 1.5px;
+  background: currentColor;
+}
+
+.window-control .maximize::before {
+  inset: 1px;
+  border: 1.5px solid currentColor;
+}
+
+.window-control .restore::before,
+.window-control .restore::after {
+  width: 8px;
+  height: 8px;
+  border: 1.5px solid currentColor;
+}
+
+.window-control .restore::before {
+  top: 2px;
+  left: 2px;
+  background: var(--token-bg-shell);
+}
+
+.window-control .restore::after {
+  top: 0;
+  left: 0;
+}
+
+.window-control.close:hover {
+  color: white;
+  background: color-mix(in srgb, var(--token-status-error) 92%, transparent);
+}
+
+.window-control.close:focus-visible,
+.window-control.close:active {
+  color: white;
+  background: color-mix(in srgb, var(--token-status-error) 92%, transparent);
+  box-shadow: none;
+}
+
+.window-control .close-mark::before,
+.window-control .close-mark::after {
+  top: 0;
+  left: 5px;
+  width: 1.5px;
+  height: 12px;
+  background: currentColor;
+  transform-origin: center;
+}
+
+.window-control .close-mark::before {
+  transform: rotate(45deg);
+}
+
+.window-control .close-mark::after {
+  transform: rotate(-45deg);
+}

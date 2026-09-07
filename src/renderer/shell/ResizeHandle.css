@@ -1,0 +1,65 @@
+﻿/* Enhanced resize handle with visual feedback */
+.panel-resize-handle {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  cursor: col-resize;
+  background: transparent;
+  transition: background var(--transition-fast) var(--ease-standard);
+}
+
+.panel-resize-handle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent, var(--token-border-card), transparent);
+  opacity: 0.6;
+}
+
+.panel-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 24px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--token-text-caption) 0%, transparent);
+  transition: background var(--transition-base) var(--ease-standard), height var(--transition-base) var(--ease-standard);
+}
+
+.panel-resize-handle:hover::after {
+  background: color-mix(in srgb, var(--token-accent-primary) 50%, transparent);
+}
+
+.panel-resize-handle:active::after {
+  background: color-mix(in srgb, var(--token-accent-primary) 80%, transparent);
+  height: 40px;
+}
+
+.panel-resize-handle.disabled {
+  cursor: default;
+}
+
+.panel-resize-handle.disabled:hover::after {
+  background: transparent;
+}
+
+.right-panel-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  opacity: 1;
+  transform: translateX(0);
+  transition: opacity var(--transition-base), transform var(--transition-base);
+}
+
+.right-panel-body.collapsed {
+  opacity: 0;
+  transform: translateX(12px);
+  pointer-events: none;
+}

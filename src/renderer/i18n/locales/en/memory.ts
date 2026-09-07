@@ -1,0 +1,15 @@
+export const enMemory = {
+  'memory.panelTitle': 'Memory',
+  'memory.empty': 'No memories yet.',
+  'memory.new': 'New memory',
+  'memory.save': 'Save',
+  'memory.cancel': 'Cancel',
+  'memory.edit': 'Edit',
+  'memory.delete': 'Delete',
+  'memory.deleteConfirm': 'Delete this memory? This cannot be undone.',
+  'memory.deleteTitle': 'Delete memory?',
+  'memory.back': 'Back',
+  'memory.namePlaceholder': 'name (kebab-case)',
+  'memory.descriptionPlaceholder': 'description',
+  'memory.contentPlaceholder': 'content (markdown)',
+} as const;

@@ -8,6 +8,7 @@ import type {
 import { THEME_PRESET_CATALOG, getPresetChrome } from '@shared/theme/presets';
 import { parseRdxThemeV1, serializeRdxThemeV1 } from '@shared/theme/rdxThemeV1';
 import type { useI18n } from '../../../../i18n';
+import { cn } from '../../../../lib/cn';
 import { useDynStyle } from '../../../../lib/useDynStyle';
 import { ColorField } from '../../../../ui/ColorField';
 import { DropdownSelect } from '../../../../ui/DropdownSelect';
@@ -47,7 +48,7 @@ export function ThemeModeTile(props: {
   return (
     <button
       type="button"
-      className={`appearance-mode-tile ${props.active ? 'is-active' : ''}`}
+      className={cn('appearance-mode-tile', props.active && 'is-active')}
       data-testid={`appearance-theme-${props.mode}`}
       onClick={props.onSelect}
       aria-pressed={props.active}

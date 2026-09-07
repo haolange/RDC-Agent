@@ -69,13 +69,21 @@ const addedClasses = [...currentClasses].filter((item) => !baselineClasses.has(i
 const addedTestIds = [...currentTestIds].filter((item) => !baselineTestIds.has(item)).length;
 
 const appShellCss = scriptRead('src/renderer/styles/global/app-shell.css');
+const composerChromeDir = path.join(repoRoot, 'src/renderer/features/composer');
+const composerChromeCss = [
+  scriptRead('src/renderer/features/composer/composer-chrome.css'),
+  ...fs.readdirSync(composerChromeDir)
+    .filter((name) => /^composer-chrome-\d+\.css$/.test(name))
+    .sort()
+    .map((name) => fs.readFileSync(path.join(composerChromeDir, name), 'utf8')),
+].join('\n');
 const settingsModalCss = scriptRead('src/renderer/features/settings/SettingsModal/SettingsModal.css');
 const designSystemCss = scriptRead('src/renderer/styles/design-system.css');
 const contextUsageIndicator = scriptRead('src/renderer/patterns/ContextUsageIndicator.tsx');
 const contextBreakdownPopover = scriptRead('src/renderer/patterns/ContextBreakdownPopover.tsx');
 const contextRunMeterBand = scriptRead('src/renderer/patterns/ContextRunMeterBand.tsx');
 const interactionPerformanceProbe = scriptRead('src/renderer/platform/performance/InteractionPerformanceProbe.ts');
-const composerAgentMenu = scriptRead('src/renderer/features/debugger/composer/ComposerAgentMenu.tsx');
+const composerAgentMenu = scriptRead('src/renderer/features/composer/ComposerAgentMenu.tsx');
 
 const requireCssContract = (condition, message) => {
   if (condition) return;
@@ -174,11 +182,11 @@ requireCssContract(
     && composerAgentMenu.includes('composer-agent-menu-item-running-state')
     && composerAgentMenu.includes('composer-agent-menu-item-running-dot')
     && composerAgentMenu.includes('composer-agent-menu-item-check')
-    && appShellCss.includes('.composer-agent-menu-item.is-selected')
-    && cssBlock(appShellCss, '.composer-agent-menu-item-running-dot').includes('width: var(--space-2);')
-    && cssBlock(appShellCss, '.composer-agent-menu-item-running-dot').includes('height: var(--space-2);')
-    && appShellCss.includes('@media (prefers-reduced-motion: reduce)')
-    && appShellCss.includes('.composer-agent-menu-item-running-dot {\n    animation: none;'),
+    && composerChromeCss.includes('.composer-agent-menu-item.is-selected')
+    && cssBlock(composerChromeCss, '.composer-agent-menu-item-running-dot').includes('width: var(--space-2);')
+    && cssBlock(composerChromeCss, '.composer-agent-menu-item-running-dot').includes('height: var(--space-2);')
+    && composerChromeCss.includes('@media (prefers-reduced-motion: reduce)')
+    && composerChromeCss.includes('.composer-agent-menu-item-running-dot {\n    animation: none;'),
   'Agent menu must keep selected and session-scoped running states separate, accessible, compact, localized, and reduced-motion safe.',
 );
 

@@ -219,10 +219,16 @@ async function main() {
     'utf8',
   );
   assert(personalizationSettings.includes('settings.globalInstructions'), 'Personalization settings should expose global instructions.');
-  const runtimeScopePanel = readSrcFile(
-    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RuntimeScopePanel.tsx'),
-    'utf8',
-  );
+  const runtimeScopePanel = [
+    readSrcFile(
+      path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/RuntimeScopePanel.tsx'),
+      'utf8',
+    ),
+    readSrcFile(
+      path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/runtimeScopeActions.ts'),
+      'utf8',
+    ),
+  ].join('\n');
   const scopedResourceForm = readSrcFile(
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/scopedResourceForm.ts'),
     'utf8',
@@ -244,9 +250,9 @@ async function main() {
   assert(renderDocToolchain.includes('settings-rdx-actions'), 'Skills & Tools should expose Settings-managed RDX shell actions.');
   assert(renderDocToolchain.includes('openCapture'), 'RDX shell actions should include the open capture action.');
 
-  const composer = readSrcFile(path.join(repoRoot, 'src/renderer/features/debugger/composer/Composer.tsx'), 'utf8');
+  const composer = readSrcFile(path.join(repoRoot, 'src/renderer/features/composer/Composer.tsx'), 'utf8');
   const composerAgentMenu = readSrcFile(
-    path.join(repoRoot, 'src/renderer/features/debugger/composer/ComposerAgentMenu.tsx'),
+    path.join(repoRoot, 'src/renderer/features/composer/ComposerAgentMenu.tsx'),
     'utf8',
   );
   assert(
@@ -257,11 +263,11 @@ async function main() {
   assert(!composer.includes('AGENT_MODES.map'), 'Composer should not hardcode mode entries as Agent choices.');
   assert(composerAgentMenu.includes('composer-agent-menu-item-tooltip'), 'Composer should keep Agent descriptions in hover tooltip UI.');
   const capabilityHook = readSrcFile(
-    path.join(repoRoot, 'src/renderer/features/debugger/composer/useEffectiveModelCapability.ts'),
+    path.join(repoRoot, 'src/renderer/features/composer/useEffectiveModelCapability.ts'),
     'utf8',
   );
   const turnControls = readSrcFile(
-    path.join(repoRoot, 'src/renderer/features/debugger/composer/useTurnControls.ts'),
+    path.join(repoRoot, 'src/renderer/features/composer/useTurnControls.ts'),
     'utf8',
   );
   assert(capabilityHook.includes("status: 'syncing-route'"), 'Composer capability resolution should wait for the committed Agent route revision.');
@@ -275,14 +281,14 @@ async function main() {
   const modeGlyph = readSrcFile(path.join(repoRoot, 'src/renderer/ui/ModeGlyph.tsx'), 'utf8');
   assert(modeGlyph.includes('FALLBACK_MODE_CONFIG'), 'ModeGlyph should provide a safe fallback for custom Agent profiles.');
 
-  const composerSendHelpers = readSrcFile(path.join(repoRoot, 'src/renderer/features/debugger/composer/composerSendHelpers.ts'), 'utf8');
+  const composerSendHelpers = readSrcFile(path.join(repoRoot, 'src/renderer/stores/conversationSendHelpers.ts'), 'utf8');
   assert(composerSendHelpers.includes('resolveComposerProfileId'), 'Composer send should freeze the selected profile id without Ask/Edit fallback.');
-  const composerSendFlow = readSrcFile(path.join(repoRoot, 'src/renderer/features/debugger/composer/composerSendFlow.ts'), 'utf8');
+  const composerSendFlow = readSrcFile(path.join(repoRoot, 'src/renderer/features/composer/composerSendFlow.ts'), 'utf8');
   assert(composerSendFlow.includes('agentId: selectedAgentId || null'), 'Conversation sends should freeze the selected Agent id.');
   assert(composerSendFlow.includes('setPromptValue(sentPrompt)') && composerSendFlow.includes('setPendingAttachments(sentAttachments)'), 'Local preflight failures should restore the Composer snapshot.');
   assert(!composerSendFlow.includes('setSelectedAgentId'), 'Local send failures must not rewrite the selected Agent id.');
 
-  assert(!existsSrc(path.join(repoRoot, 'src/renderer/features/debugger/AgentChat/useAgentHandoffActions.ts')), 'Dead renderer handoff actions must be deleted.');
+  assert(!existsSrc(path.join(repoRoot, 'src/renderer/features/transcript/useAgentHandoffActions.ts')), 'Dead renderer handoff actions must be deleted.');
   const profileHandoff = readSrcFile(path.join(repoRoot, 'src/shared/types/profileHandoff.ts'), 'utf8');
   assert(profileHandoff.includes('export interface ProfileHandoffState'), 'ProfileHandoffState must be the durable handoff record.');
   const conversationService = readSrcFile(path.join(repoRoot, 'src/main/conversation/ConversationService.ts'), 'utf8');

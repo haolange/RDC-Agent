@@ -77,7 +77,7 @@ export const INVESTIGATION_RULE_REGISTRY = [
   {
     id: 'investigation.missing.session.artifacts-card',
     kind: 'missing',
-    file: 'src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx',
+    file: 'src/renderer/features/right-rail/TraceRightPanel.tsx',
     pattern: 'id="artifacts"',
     probe: 'source-pattern',
     note: 'Session rail target five cards include Artifacts',
@@ -256,7 +256,7 @@ export const INVESTIGATION_RULE_REGISTRY = [
   {
     id: 'investigation.forbidden.use-agent-handoff-actions',
     kind: 'forbidden',
-    file: 'src/renderer/features/debugger/AgentChat/useAgentHandoffActions.ts',
+    file: 'src/renderer/features/transcript/useAgentHandoffActions.ts',
     pattern: 'export function useAgentHandoffActions',
     probe: 'source-pattern',
     note: 'renderer useAgentHandoffActions is current debt',
@@ -264,7 +264,7 @@ export const INVESTIGATION_RULE_REGISTRY = [
   {
     id: 'investigation.forbidden.session.four-card',
     kind: 'forbidden',
-    file: 'src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx',
+    file: 'src/renderer/features/right-rail/TraceRightPanel.tsx',
     pattern: 'id="progress"[\\s\\S]*id="outputs"[\\s\\S]*id="context"[\\s\\S]*id="capture"',
     unlessPattern: 'id="artifacts"',
     probe: 'source-pattern',

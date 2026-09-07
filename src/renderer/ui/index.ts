@@ -7,7 +7,6 @@ export { ContextMenu, type ContextMenuProps } from './ContextMenu';
 export { ActiveSignalText, type ActiveSignalTone } from './ActiveSignalText';
 export { Divider, type DividerProps } from './Divider';
 export { EmptyState, type EmptyStateProps } from './EmptyState';
-export { FaviconImage } from './FaviconImage';
 export { DropdownSelect } from './DropdownSelect';
 export { Icon, type IconName, type IconProps, type IconSize } from './Icon';
 export { IconButton, type IconButtonProps, type IconButtonSize } from './IconButton';

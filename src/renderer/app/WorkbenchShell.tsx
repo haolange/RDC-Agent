@@ -1,11 +1,11 @@
 import type { ReactNode, RefObject } from 'react';
-import { ControlPanel } from '../features/debugger/ControlPanel';
+import { ControlPanel } from '../features/right-rail';
 import { DeviceSelector } from '../features/captures/DeviceSelector';
-import { Sidebar } from '../features/projects/Sidebar';
+import { Sidebar } from '../features/sidebar/Sidebar';
 import { TerminalDrawer } from '../features/terminal/TerminalDrawer';
 import { ProfileAvatar } from '../patterns/ProfileAvatar';
-import { Composer } from '../features/debugger/composer/Composer';
-import type { ComposerController } from '../features/debugger/composer/useComposer';
+import { Composer } from '../features/composer/Composer';
+import type { ComposerController } from '../features/composer/useComposer';
 import type { TranslationKey } from '../i18n';
 import { APP_RESIZE_HANDLE_WIDTH } from '@shared/constants/layout';
 import { useDynStyle } from '../lib/useDynStyle';

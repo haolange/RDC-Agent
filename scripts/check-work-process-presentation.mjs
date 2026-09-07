@@ -9,8 +9,8 @@ require('./register-ts-source.cjs');
 const {
   buildWorkProcessPresentation,
   normalizeWorkProcessText,
-} = require(path.join(CONTRACT_ROOT, requireRegistered('src/renderer/features/debugger/AgentChat/workProcessPresentation.ts')));
-const { normalizeAssistantMarkdown } = require(path.join(CONTRACT_ROOT, requireRegistered('src/renderer/features/debugger/AgentChat/normalizeAssistantMarkdown.ts')));
+} = require(path.join(CONTRACT_ROOT, requireRegistered('src/renderer/features/transcript/workProcessPresentation.ts')));
+const { normalizeAssistantMarkdown } = require(path.join(CONTRACT_ROOT, requireRegistered('src/renderer/patterns/Markdown/normalizeAssistantMarkdown.ts')));
 
 const now = 1_700_000_000_000;
 
@@ -26,14 +26,14 @@ const assert = (condition, message) => {
 const readSource = (relativePath) => scriptRead(relativePath);
 const activeSignalSource = readSource('src/renderer/ui/ActiveSignalText.tsx');
 const activeSignalStyles = readSource('src/renderer/styles/design-system.css');
-const activeSignalHelper = readSource('src/renderer/features/debugger/AgentChat/workProcessActiveSignal.ts');
+const activeSignalHelper = readSource('src/renderer/features/transcript/workProcessActiveSignal.ts');
 const activeSignalRenderSource = [
-  'src/renderer/features/debugger/AgentChat/WorkProcessSectionRow.tsx',
-  'src/renderer/features/debugger/AgentChat/ToolAggregateRow.tsx',
-  'src/renderer/features/debugger/AgentChat/WorkProcessRows.tsx',
-  'src/renderer/features/debugger/AgentChat/SubagentRow.tsx',
-  'src/renderer/features/debugger/composer/UserInputRequestPanel.tsx',
-  'src/renderer/features/debugger/composer/ToolApprovalRequestPanel.tsx',
+  'src/renderer/features/transcript/WorkProcessSectionRow.tsx',
+  'src/renderer/features/transcript/ToolAggregateRow.tsx',
+  'src/renderer/features/transcript/WorkProcessRows.tsx',
+  'src/renderer/features/transcript/SubagentRow.tsx',
+  'src/renderer/features/composer/UserInputRequestPanel.tsx',
+  'src/renderer/features/composer/ToolApprovalRequestPanel.tsx',
 ].map(readSource).join('\n');
 
 assert(activeSignalSource.includes('data-active-signal={active ? tone : undefined}'), 'ActiveSignalText should expose an active-state DOM contract');
@@ -928,33 +928,45 @@ assert(mcpRow?.target === 'filesystem/read_file', 'dynamic MCP target should sho
 assert(mcpRow?.category === 'MCP' || mcpRow?.groupKind === 'mcp', 'dynamic MCP tools should keep MCP semantics');
 
 const componentSource = [
-  scriptRead('src/renderer/features/debugger/AgentChat/WorkProcess.tsx', 'utf8'),
-  scriptRead('src/renderer/features/debugger/AgentChat/WorkProcessSectionRow.tsx', 'utf8'),
-  scriptRead('src/renderer/features/debugger/AgentChat/ToolAggregateRow.tsx', 'utf8'),
-  scriptRead('src/renderer/features/debugger/AgentChat/workProcessRowRenderer.tsx', 'utf8'),
-  scriptRead('src/renderer/features/debugger/AgentChat/WorkProcessRows.tsx', 'utf8'),
-  scriptRead('src/renderer/features/debugger/AgentChat/WorkProcessRowParts.tsx', 'utf8'),
-  scriptRead('src/renderer/features/debugger/AgentChat/WorkProcessToolCardParts.tsx', 'utf8'),
-  scriptRead('src/renderer/features/debugger/AgentChat/WorkProcessFamilyLayers.tsx', 'utf8'),
-  scriptRead('src/renderer/features/debugger/AgentChat/WorkProcessHighlightedCode.tsx', 'utf8'),
-  scriptRead('src/renderer/features/debugger/AgentChat/WorkProcessIcons.tsx', 'utf8'),
+  scriptRead('src/renderer/features/transcript/WorkProcess.tsx', 'utf8'),
+  scriptRead('src/renderer/features/transcript/WorkProcessSectionRow.tsx', 'utf8'),
+  scriptRead('src/renderer/features/transcript/ToolAggregateRow.tsx', 'utf8'),
+  scriptRead('src/renderer/features/transcript/workProcessRowRenderer.tsx', 'utf8'),
+  scriptRead('src/renderer/features/transcript/WorkProcessRows.tsx', 'utf8'),
+  scriptRead('src/renderer/features/transcript/WorkProcessRowParts.tsx', 'utf8'),
+  scriptRead('src/renderer/features/transcript/WorkProcessToolCardParts.tsx', 'utf8'),
+  scriptRead('src/renderer/features/transcript/WorkProcessFamilyLayers.tsx', 'utf8'),
+  scriptRead('src/renderer/features/transcript/WorkProcessHighlightedCode.tsx', 'utf8'),
+  scriptRead('src/renderer/features/transcript/WorkProcessIcons.tsx', 'utf8'),
 ].join('\n');
 const cssSource = [
-  scriptRead('src/renderer/features/debugger/AgentChat/AgentChat.css', 'utf8'),
-  scriptRead('src/renderer/features/debugger/AgentChat/AgentChat.extras.css', 'utf8'),
+  scriptRead('src/renderer/features/transcript/AgentChat.css', 'utf8'),
+  scriptRead('src/renderer/features/transcript/AgentChat.extras.css', 'utf8'),
 ].join('\n');
-const appShellSource = scriptRead('src/renderer/styles/global/app-shell.css', 'utf8');
+const composerDir = path.join(CONTRACT_ROOT, 'src/renderer/features/composer');
+const appShellSource = [
+  scriptRead('src/renderer/features/composer/composer-chrome.css', 'utf8'),
+  ...fs.readdirSync(composerDir)
+    .filter((name) => /^composer-chrome-\d+\.css$/.test(name))
+    .sort()
+    .map((name) => fs.readFileSync(path.join(composerDir, name), 'utf8')),
+].join('\n');
 const presentationSource = [
-  scriptRead('src/renderer/features/debugger/AgentChat/workProcessPresentation.ts', 'utf8'),
-  scriptRead('src/renderer/features/debugger/AgentChat/workProcessBlockProjection.ts', 'utf8'),
-  scriptRead('src/renderer/features/debugger/AgentChat/workProcessToolAggregate.ts', 'utf8'),
-  scriptRead('src/renderer/features/debugger/AgentChat/workProcessToolCatalog.ts', 'utf8'),
+  scriptRead('src/renderer/features/transcript/workProcessPresentation.ts', 'utf8'),
+  scriptRead('src/renderer/features/transcript/workProcessBlockProjection.ts', 'utf8'),
+  scriptRead('src/renderer/features/transcript/workProcessToolAggregate.ts', 'utf8'),
+  scriptRead('src/renderer/features/transcript/workProcessToolCatalog.ts', 'utf8'),
 ].join('\n');
-const i18nSource = scriptRead('src/renderer/i18n.ts', 'utf8');
-const userInputPanelSource = scriptRead('src/renderer/features/debugger/composer/UserInputRequestPanel.tsx', 'utf8');
-const userInputSubmitHookSource = scriptRead('src/renderer/features/debugger/composer/useUserInputRequestSubmit.ts', 'utf8');
-const toolApprovalPanelSource = scriptRead('src/renderer/features/debugger/composer/ToolApprovalRequestPanel.tsx', 'utf8');
-const toolApprovalSubmitHookSource = scriptRead('src/renderer/features/debugger/composer/useToolApprovalSubmit.ts', 'utf8');
+const i18nSource = [
+  scriptRead('src/renderer/i18n.ts', 'utf8'),
+  ...fs.readdirSync(path.join(CONTRACT_ROOT, 'src/renderer/i18n/locales'), { recursive: true })
+    .filter((entry) => String(entry).endsWith('.ts'))
+    .map((entry) => fs.readFileSync(path.join(CONTRACT_ROOT, 'src/renderer/i18n/locales', entry), 'utf8')),
+].join('\n');
+const userInputPanelSource = scriptRead('src/renderer/features/composer/UserInputRequestPanel.tsx', 'utf8');
+const userInputSubmitHookSource = scriptRead('src/renderer/features/composer/useUserInputRequestSubmit.ts', 'utf8');
+const toolApprovalPanelSource = scriptRead('src/renderer/features/composer/ToolApprovalRequestPanel.tsx', 'utf8');
+const toolApprovalSubmitHookSource = scriptRead('src/renderer/features/composer/useToolApprovalSubmit.ts', 'utf8');
 const orchestratorSource = scriptRead('src/main/workflow/debugger/AgentOrchestrator.ts', 'utf8');
 
 assert(presentationSource.includes('resolveSectionProse'), 'commentary should route through resolveSectionProse');
@@ -1042,7 +1054,7 @@ assert(componentSource.includes('ToolAggregateRow'), 'component should render to
 assert(componentSource.includes('work-process-narrative-stream'), 'component should use narrative stream list class');
 assert(componentSource.includes('work-process-prose'), 'component should render narrative prose');
 assert(!componentSource.includes('ResponseRow'), 'component must not render a Reply response boundary row');
-assert(!scriptExists('src/renderer/features/debugger/AgentChat/WorkProcessResponseRow.tsx'), 'WorkProcessResponseRow must be deleted');
+assert(!scriptExists('src/renderer/features/transcript/WorkProcessResponseRow.tsx'), 'WorkProcessResponseRow must be deleted');
 assert(componentSource.includes("t('chat.workProcessTitle')"), 'header should use the process title translation');
 assert(componentSource.includes("t('chat.workProcessHeadlineRunning')"), 'running header should use Working copy');
 assert(componentSource.includes('ActiveSignalText'), 'running header should use ActiveSignalText');
@@ -1053,23 +1065,23 @@ assert(!componentSource.includes('work-process-step-group'), 'semantic step grou
 assert(!componentSource.includes('WorkProcessViewToggle'), 'grouped/detail view toggle must be removed');
 assert(!componentSource.includes('buildSemanticStepGroups'), 'semantic grouping must not remain in components');
 for (const removedPath of [
-  'src/renderer/features/debugger/AgentChat/workProcessGrouping.ts',
-  'src/renderer/features/debugger/AgentChat/WorkProcessStepGroupRow.tsx',
-  'src/renderer/features/debugger/AgentChat/WorkProcessViewToggle.tsx',
-  'src/renderer/features/debugger/AgentChat/workProcessGroupMetrics.ts',
-  'src/renderer/features/debugger/AgentChat/workProcessSemanticIcons.ts',
-  'src/renderer/features/debugger/AgentChat/workProcessSemanticKind.ts',
+  'src/renderer/features/transcript/workProcessGrouping.ts',
+  'src/renderer/features/transcript/WorkProcessStepGroupRow.tsx',
+  'src/renderer/features/transcript/WorkProcessViewToggle.tsx',
+  'src/renderer/features/transcript/workProcessGroupMetrics.ts',
+  'src/renderer/features/transcript/workProcessSemanticIcons.ts',
+  'src/renderer/features/transcript/workProcessSemanticKind.ts',
 ]) {
   assert(!scriptExists(removedPath), `legacy path must be deleted: ${removedPath}`);
 }
-assert(scriptExists('src/renderer/features/debugger/AgentChat/workProcessToolAggregate.ts'), 'tool aggregate helper must exist');
-assert(scriptExists('src/renderer/features/debugger/AgentChat/ToolAggregateRow.tsx'), 'ToolAggregateRow must exist');
-assert(scriptExists('src/renderer/features/debugger/AgentChat/workProcessUnits.ts'), 'presentation units helper must exist');
+assert(scriptExists('src/renderer/features/transcript/workProcessToolAggregate.ts'), 'tool aggregate helper must exist');
+assert(scriptExists('src/renderer/features/transcript/ToolAggregateRow.tsx'), 'ToolAggregateRow must exist');
+assert(scriptExists('src/renderer/features/transcript/workProcessUnits.ts'), 'presentation units helper must exist');
 assert(componentSource.includes('work-process-tool-diagnostic'), 'failed tools should expose a diagnostic caption exit');
 assert(componentSource.includes('diagnosticCaption'), 'tool rows should carry diagnosticCaption from projection');
 const toolRowSource = [
-  scriptRead('src/renderer/features/debugger/AgentChat/WorkProcessRowParts.tsx', 'utf8'),
-  scriptRead('src/renderer/features/debugger/AgentChat/WorkProcessToolCardParts.tsx', 'utf8'),
+  scriptRead('src/renderer/features/transcript/WorkProcessRowParts.tsx', 'utf8'),
+  scriptRead('src/renderer/features/transcript/WorkProcessToolCardParts.tsx', 'utf8'),
 ].join('\n');
 assert(toolRowSource.includes('useState(false)'), 'tool cards must start collapsed by default');
 assert(!toolRowSource.includes("row.status === 'running' && canExpand"), 'running tools must not auto-expand detail/Raw');
@@ -1123,9 +1135,9 @@ assert(!componentSource.includes("t('chat.workProcessViewSteps'"), 'section shou
 assert(!componentSource.includes('StepsListIcon'), 'legacy steps icon component should be removed');
 assert(!componentSource.includes('thinking-full'), 'component must not render full hidden CoT mode');
 assert(!componentSource.includes('RequestInspector'), 'Request Inspector must not embed in Work Process transcript');
-const traceRightPanelSource = readSource('src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx');
+const traceRightPanelSource = readSource('src/renderer/features/right-rail/TraceRightPanel.tsx');
 assert(
-  !scriptExists('src/renderer/features/debugger/ControlPanel/SessionControlPanel.tsx'),
+  !scriptExists('src/renderer/features/right-rail/SessionControlPanel.tsx'),
   'Retired session right panel must not return.',
 );
 assert(

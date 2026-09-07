@@ -21,11 +21,11 @@ const read = (relativePath) => {
 };
 
 const bridge = read('src/renderer/app/bootstrap/useIpcEventBridge.ts');
-const gate = read('src/renderer/app/bootstrap/sessionEventGate.ts');
-const hygiene = read('src/renderer/app/bootstrap/sessionSwitchHygiene.ts');
+const gate = read('src/renderer/stores/sessionEventGate.ts');
+const hygiene = read('src/renderer/stores/sessionSwitchHygiene.ts');
 const projectionStore = read('src/renderer/stores/sessionProjectionStore.ts');
-const composerContext = read('src/renderer/features/debugger/composer/composerSessionContext.ts');
-const sendFlow = read('src/renderer/features/debugger/composer/composerSendFlow.ts');
+const composerContext = read('src/renderer/stores/composerSessionContextStore.ts');
+const sendFlow = read('src/renderer/features/composer/composerSendFlow.ts');
 const contract = read('docs/contracts/session-projection.md');
 const design = read('DESIGN.md');
 const agents = read('AGENTS.md');

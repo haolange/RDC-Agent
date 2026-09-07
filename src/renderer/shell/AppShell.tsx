@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react';
+import './AppShell.css';
+import './AppShell.misc.css';
 
 export interface AppShellProps {
   titleBar: ReactNode;

@@ -1,0 +1,239 @@
+.composer-effort-toggle.is-active::after {
+  transform: translateX(var(--space-4));
+  background: var(--token-bg-panel);
+}
+
+.composer-effort-toggle:disabled {
+  cursor: not-allowed;
+}
+
+.composer-user-input-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.composer-user-input-option,
+.composer-user-input-custom-select {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--space-10);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--token-bg-raised) 48%, transparent);
+  color: var(--token-text-heading);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.composer-user-input-option:hover:not(:disabled),
+.composer-user-input-custom-select:hover:not(:disabled) {
+  border-color: var(--token-border-strong);
+  background: color-mix(in srgb, var(--token-bg-raised) 72%, transparent);
+}
+
+.composer-user-input-option.is-selected,
+.composer-user-input-custom.is-selected {
+  border-color: var(--token-border-focus);
+  background: color-mix(in srgb, var(--token-bg-raised) 84%, transparent);
+}
+
+.composer-user-input-option:focus-visible,
+.composer-user-input-custom-select:focus-visible,
+.composer-user-input-custom-field:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.composer-user-input-option:disabled,
+.composer-user-input-custom-select:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.composer-user-input-option-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-6);
+  height: var(--space-6);
+  border-radius: var(--radius-sm);
+  background: var(--token-bg-muted);
+  color: var(--token-text-caption);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+}
+
+.composer-user-input-option-label,
+.composer-user-input-custom-label {
+  min-width: 0;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.composer-user-input-option-copy {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.composer-user-input-option-description {
+  position: relative;
+  min-width: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.composer-user-input-option-description-text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  mask-image: linear-gradient(90deg, black 0%, black 82%, transparent 100%);
+}
+
+.composer-user-input-option-tooltip {
+  position: absolute;
+  left: 0;
+  top: calc(100% + var(--space-2));
+  z-index: var(--z-tooltip);
+  display: none;
+  width: max-content;
+  max-width: min(calc(var(--space-24) * 5), calc(100vw - var(--space-8)));
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-panel);
+  box-shadow: var(--shadow-panel);
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  white-space: normal;
+  pointer-events: none;
+}
+
+.composer-user-input-option-description:hover .composer-user-input-option-tooltip,
+.composer-user-input-option:focus-visible .composer-user-input-option-tooltip {
+  display: block;
+}
+
+.composer-user-input-option-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.composer-user-input-custom {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--token-bg-raised) 36%, transparent);
+}
+
+.composer-user-input-custom-select {
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.composer-user-input-custom.is-selected .composer-user-input-custom-select {
+  padding-bottom: var(--space-1);
+}
+
+.composer-user-input-custom-field {
+  width: 100%;
+  min-height: var(--space-8);
+  max-height: calc(var(--space-16) * 3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--token-border-input);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-app);
+  color: var(--token-text-heading);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  resize: none;
+  overflow-y: auto;
+}
+
+.composer-user-input-custom-field::placeholder {
+  color: var(--token-text-placeholder);
+}
+
+.composer-user-input-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.composer-user-input-hint {
+  color: var(--token-text-caption);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.composer-user-input-submit {
+  min-width: var(--space-16);
+}
+
+.composer-user-input-error {
+  margin: 0;
+  color: var(--token-status-error);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+.composer-permission-popup {
+  width: min(24rem, 78vw);
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-color: var(--token-border-strong);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-panel) 94%, var(--token-bg-shell));
+}
+
+.composer-permission-menu-item {
+  --permission-tone: var(--token-text-caption);
+  position: relative;
+  gap: var(--space-1);
+  min-height: calc(var(--space-10) + var(--space-4));
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-5);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--token-text-body);
+}
+
+.composer-permission-menu-item[data-mode='default'] {
+  --permission-tone: var(--token-status-success);
+}
+
+.composer-permission-menu-item[data-mode='auto-review'] {
+  --permission-tone: var(--token-status-info);
+}
+
+.composer-permission-menu-item[data-mode='full-access'] {
+  --permission-tone: var(--token-status-warning);
+}
+
+.composer-permission-menu-item[data-mode='custom'] {
+  --permission-tone: var(--token-text-caption);
+}

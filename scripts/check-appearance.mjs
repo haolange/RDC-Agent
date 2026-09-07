@@ -94,11 +94,17 @@ assert(
 );
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const effortPopupSource = scriptRead('src/renderer/features/debugger/composer/EffortControlPopup.tsx');
-const effortControlSource = scriptRead('src/renderer/features/debugger/composer/EffortControl.tsx');
-const effortMaxFieldSource = scriptRead('src/renderer/features/debugger/composer/EffortMaxField.tsx');
-const effortLayoutSource = scriptRead('src/renderer/features/debugger/composer/useEffortPopupLayout.ts');
-const debuggerCssSource = scriptRead('src/renderer/pages/Debugger/Debugger.css');
+const effortPopupSource = scriptRead('src/renderer/features/composer/EffortControlPopup.tsx');
+const effortControlSource = scriptRead('src/renderer/features/composer/EffortControl.tsx');
+const effortMaxFieldSource = scriptRead('src/renderer/features/composer/EffortMaxField.tsx');
+const effortLayoutSource = scriptRead('src/renderer/features/composer/useEffortPopupLayout.ts');
+const debuggerCssSource = [
+  scriptRead('src/renderer/features/composer/composer-effort.css'),
+  ...fs.readdirSync(path.join(repoRoot, 'src/renderer/features/composer'))
+    .filter((name) => /^composer-effort-\d+\.css$/.test(name))
+    .sort()
+    .map((name) => fs.readFileSync(path.join(repoRoot, 'src/renderer/features/composer', name), 'utf8')),
+].join('\n');
 assert(
   !effortPopupSource.includes("'--composer-effort-stops-opacity'"),
   'Effort popup must not compete with the Max animation for stop opacity ownership',

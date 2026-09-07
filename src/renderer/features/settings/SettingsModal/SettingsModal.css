@@ -104,7 +104,7 @@
   grid-template-columns: var(--space-10) minmax(0, 1fr);
 }
 
-.settings-manifest-card:hover, .settings-manifest-card.active {
+.settings-manifest-card:hover, .settings-manifest-card.is-active {
   border-color: color-mix(in srgb, var(--token-border-focus) 30%, var(--token-border-muted));
   background: color-mix(in srgb, var(--token-bg-raised) 62%, transparent);
 }
@@ -2614,7 +2614,7 @@
   background: var(--token-interactive-hover);
 }
 
-.settings-manifest-card.active {
+.settings-manifest-card.is-active {
   border-color: var(--token-border-default);
   background: var(--token-interactive-active);
   box-shadow: inset 2px 0 0 var(--token-border-focus);
@@ -4168,7 +4168,7 @@
   background: color-mix(in srgb, var(--token-bg-raised) 24%, transparent);
 }
 
-.settings-page-agents .settings-manifest-card:hover, .settings-page-agents .settings-manifest-card.active {
+.settings-page-agents .settings-manifest-card:hover, .settings-page-agents .settings-manifest-card.is-active {
   border-color: color-mix(in srgb, var(--token-border-focus) 26%, var(--token-border-muted));
   background: color-mix(in srgb, var(--token-bg-raised) 54%, transparent);
 }
