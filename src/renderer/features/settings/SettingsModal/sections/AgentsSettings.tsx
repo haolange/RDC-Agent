@@ -2,8 +2,10 @@ import React, { type Dispatch, type SetStateAction, useState } from 'react';
 import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
 import type { TranslationKey, useI18n } from '../../../../i18n';
-import { ModeGlyph } from '../../../../ui/ModeGlyph';
+import { Button } from '../../../../ui/Button';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
+import { ListRow } from '../../../../ui/ListRow';
+import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { AgentManifestEditor } from './AgentManifestEditor';
 import { uniqueResourceId } from './uniqueResourceId';
 
@@ -139,12 +141,12 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
           <div className="settings-manifest-list-column">
             <div className="settings-manifest-toolbar settings-manifest-list-toolbar">
               <div className="settings-manifest-actions">
-                <button type="button" className="button button-secondary" onClick={() => void onImportAgentManifest()}>
+                <Button variant="secondary" onClick={() => void onImportAgentManifest()}>
                   {t('settings.importAgentManifest')}
-                </button>
-                <button type="button" className="button button-secondary" onClick={addAgent}>
+                </Button>
+                <Button variant="secondary" onClick={addAgent}>
                   {t('settings.newAgent')}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -163,20 +165,22 @@ export const AgentsSettings: React.FC<AgentsSettingsProps> = ({
 
             <div className="settings-manifest-list" aria-label={t('settings.agentManifestTitle')}>
               {activeDrafts.map((agent) => (
-                <button
+                <ListRow
                   key={agent.id}
-                  type="button"
-                  className={`settings-manifest-card ${agent.id === selectedId ? 'active' : ''}`}
+                  className="settings-manifest-row"
+                  selected={agent.id === selectedId}
+                  leading={(
+                    <span className="settings-manifest-card-icon" aria-hidden="true">
+                      <ModeGlyph mode={agent.id} icon={agent.icon ?? 'message-orbit'} size={17} strokeWidth={1.9} />
+                    </span>
+                  )}
                   onClick={() => setSelectedAgentId(agent.id)}
                 >
-                  <span className="settings-manifest-card-icon" aria-hidden="true">
-                    <ModeGlyph mode={agent.id} icon={agent.icon ?? 'message-orbit'} size={17} strokeWidth={1.9} />
-                  </span>
-                  <span>
+                  <span className="settings-manifest-row-copy">
                     <strong>{agent.name}</strong>
                     <small>{getAgentCardDescription(agent, t)}</small>
                   </span>
-                </button>
+                </ListRow>
               ))}
             </div>
           </div>

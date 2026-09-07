@@ -17,6 +17,8 @@ import { useRdxRuntimeOverview } from './useRdxRuntimeOverview';
 import { RuntimeScopePanel } from './sections/RuntimeScopePanel';
 import { HooksSettings } from './sections/HooksSettings';
 import { PolicySettings } from './sections/PolicySettings';
+import { Icon } from '../../../ui/Icon';
+import { IconButton } from '../../../ui/IconButton';
 import './SettingsModal.css';
 
 interface SettingsModalProps {
@@ -145,12 +147,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ open, settings, on
               <div className="settings-modal-title" id="settings-modal-title">
                 {sections.find((section) => section.id === activeSection)?.label}
               </div>
-              <button type="button" className="settings-modal-close" onClick={onClose} aria-label={t('settings.close')}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
+              <IconButton
+                className="settings-modal-close"
+                label={t('settings.close')}
+                onClick={onClose}
+              >
+                <Icon name="close" size={16} />
+              </IconButton>
             </div>
 
             <div ref={panelRef} className="settings-center-panel scrollbar-thin" data-testid="settings-center-panel">

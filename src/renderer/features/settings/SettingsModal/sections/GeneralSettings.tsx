@@ -1,6 +1,8 @@
 import React from 'react';
 import type { AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { Pill } from '../../../../ui/Pill';
+import { SettingsField, SettingsSection } from '../parts';
 import { PersonalizationSettings } from './PersonalizationSettings';
 import { ProfileSettings } from './ProfileSettings';
 
@@ -43,36 +45,24 @@ export const GeneralSettings: React.FC<GeneralSettingsProps> = ({
             t={t}
           />
 
-          <div className="settings-section settings-appearance-section settings-appearance-section--compact">
-            <div className="settings-section-header">
-              <div>
-                <div className="settings-section-title">{t('userMenu.language')}</div>
+          <SettingsSection title={t('userMenu.language')} className="settings-appearance-section settings-appearance-section--compact">
+            <SettingsField label={t('userMenu.language')} search="language" layout="row">
+              <div className="settings-choice-group" role="group" aria-label={t('userMenu.language')}>
+                <Pill
+                  selected={settings.appearance.language === 'zh-CN'}
+                  onClick={() => void onLanguageChange('zh-CN')}
+                >
+                  {t('language.zh')}
+                </Pill>
+                <Pill
+                  selected={settings.appearance.language === 'en'}
+                  onClick={() => void onLanguageChange('en')}
+                >
+                  English
+                </Pill>
               </div>
-            </div>
-            <div className="settings-preference-list settings-appearance-list">
-              <div className="settings-preference-row" data-settings-search="language">
-                <div className="settings-preference-copy settings-option-block">
-                  <div className="settings-field-label">{t('userMenu.language')}</div>
-                </div>
-                <div className="user-menu-pill-group settings-inline-pills settings-choice-group">
-                  <button
-                    type="button"
-                    className={`user-menu-pill ${settings.appearance.language === 'zh-CN' ? 'active' : ''}`}
-                    onClick={() => void onLanguageChange('zh-CN')}
-                  >
-                    {t('language.zh')}
-                  </button>
-                  <button
-                    type="button"
-                    className={`user-menu-pill ${settings.appearance.language === 'en' ? 'active' : ''}`}
-                    onClick={() => void onLanguageChange('en')}
-                  >
-                    English
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+            </SettingsField>
+          </SettingsSection>
         </div>
         <PersonalizationSettings
           embedded

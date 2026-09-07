@@ -8,7 +8,9 @@ import type {
   ThemeVariant,
 } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { Pill } from '../../../../ui/Pill';
 import { Switch } from '../../../../ui/Switch';
+import { SettingsField, SettingsSection } from '../parts';
 import {
   AppearanceChromePreview,
   ChromeThemeCard,
@@ -76,74 +78,66 @@ export const AppearanceSettings: React.FC<AppearanceSettingsProps> = ({
         />
       </div>
 
-      <div className="settings-section appearance-preferences">
-        <div className="settings-section-header">
-          <div className="settings-section-title">{t('settings.appearancePreferences')}</div>
-        </div>
+      <SettingsSection title={t('settings.appearancePreferences')} className="appearance-preferences">
         <div className="settings-preference-list settings-appearance-toggles">
-          <div className="settings-preference-row settings-preference-row--switch">
-            <div className="settings-preference-copy settings-option-block">
-              <div className="settings-field-label">{t('settings.usePointerCursors')}</div>
-              <div className="settings-help-text">{t('settings.usePointerCursorsHelp')}</div>
-            </div>
+          <SettingsField
+            layout="row"
+            label={t('settings.usePointerCursors')}
+            description={t('settings.usePointerCursorsHelp')}
+          >
             <Switch
               checked={settings.appearance.usePointerCursors}
               onCheckedChange={(enabled) => void onUsePointerCursorsChange(enabled)}
               aria-label={t('settings.usePointerCursors')}
             />
-          </div>
+          </SettingsField>
 
-          <div className="settings-preference-row">
-            <div className="settings-preference-copy settings-option-block">
-              <div className="settings-field-label">{t('settings.appearanceReduceMotion')}</div>
-              <div className="settings-help-text">{t('settings.appearanceReduceMotionHelp')}</div>
-            </div>
-            <div className="user-menu-pill-group settings-inline-pills settings-choice-group">
+          <SettingsField
+            layout="row"
+            label={t('settings.appearanceReduceMotion')}
+            description={t('settings.appearanceReduceMotionHelp')}
+          >
+            <div className="settings-choice-group">
               {(['system', 'on', 'off'] as ReduceMotionPreference[]).map((value) => (
-                <button
+                <Pill
                   key={value}
-                  type="button"
-                  className={`user-menu-pill ${settings.appearance.reduceMotion === value ? 'active' : ''}`}
+                  selected={settings.appearance.reduceMotion === value}
                   data-testid={`appearance-reduce-motion-${value}`}
                   onClick={() => void onReduceMotionChange(value)}
                 >
                   {t(`settings.appearanceReduceMotion.${value}`)}
-                </button>
+                </Pill>
               ))}
             </div>
-          </div>
+          </SettingsField>
 
-          <div className="settings-preference-row" data-settings-search="font-scale">
-            <div className="settings-preference-copy settings-option-block">
-              <div className="settings-field-label">{t('userMenu.fontScale')}</div>
-            </div>
-            <div className="user-menu-pill-group settings-inline-pills settings-choice-group">
+          <SettingsField layout="row" label={t('userMenu.fontScale')} search="font-scale">
+            <div className="settings-choice-group">
               {(['small', 'medium', 'large'] as FontScale[]).map((fontScale) => (
-                <button
+                <Pill
                   key={fontScale}
-                  type="button"
-                  className={`user-menu-pill ${settings.appearance.fontScale === fontScale ? 'active' : ''}`}
+                  selected={settings.appearance.fontScale === fontScale}
                   onClick={() => void onFontScaleChange(fontScale)}
                 >
                   {t(`font.${fontScale}`)}
-                </button>
+                </Pill>
               ))}
             </div>
-          </div>
+          </SettingsField>
 
-          <div className="settings-preference-row settings-preference-row--switch">
-            <div className="settings-preference-copy settings-option-block">
-              <div className="settings-field-label">{t('settings.composerMarkdown')}</div>
-              <div className="settings-help-text">{t('settings.composerMarkdownHelp')}</div>
-            </div>
+          <SettingsField
+            layout="row"
+            label={t('settings.composerMarkdown')}
+            description={t('settings.composerMarkdownHelp')}
+          >
             <Switch
               checked={settings.appearance.composerMarkdown}
               onCheckedChange={(enabled) => void onComposerMarkdownChange(enabled)}
               aria-label={t('settings.composerMarkdown')}
             />
-          </div>
+          </SettingsField>
         </div>
-      </div>
+      </SettingsSection>
     </section>
   );
 };

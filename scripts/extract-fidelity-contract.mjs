@@ -57,6 +57,8 @@ const testIdPatterns = [
   /data-testid\s*=\s*'([^']+)'/g,
   /data-testid\s*=\s*\{`([^`]+)`\}/g,
   /data-testid\s*=\s*\{\s*['"]([^'"]+)['"]\s*\}/g,
+  /dataTestId\s*=\s*"([^"]+)"/g,
+  /dataTestId\s*=\s*'([^']+)'/g,
 ];
 
 const classNames = new Set();

@@ -7,6 +7,7 @@ import type {
 } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import { AutosizeTextarea } from '../AutosizeTextarea';
+import { SettingsSection } from '../parts';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 type TranslationKey = Parameters<Translate>[0];
@@ -83,9 +84,11 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
 
   return (
     <>
-      <div className="settings-tool-section settings-renderdoc-toolchain">
-        <div className="settings-field-label">{t('settings.localRenderDocToolchain')}</div>
-        <div className="settings-help-text">{t('settings.localRenderDocToolchainHint')}</div>
+      <SettingsSection
+        className="settings-tool-section settings-renderdoc-toolchain"
+        title={t('settings.localRenderDocToolchain')}
+        description={t('settings.localRenderDocToolchainHint')}
+      >
         <div className={`settings-toolchain-status ${rdxCliDraft.enabled ? 'enabled' : 'disabled'}`}>
           <strong>{rdxCliDraft.enabled ? t('settings.toolchainAvailable') : t('settings.toolchainNotEnabled')}</strong>
           {rdxCliDraft.command ? <code>{rdxCliDraft.command}</code> : null}
@@ -176,13 +179,14 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
             </label>
           </div>
         </details>
-      </div>
+      </SettingsSection>
 
-      <div className="settings-tool-section settings-renderdoc-actions" data-testid="settings-rdx-actions">
-        <div className="settings-field-label">{t('settings.rdxShellActions')}</div>
-        <div className="settings-help-text">
-          {t('settings.rdxShellActionsHint')}
-        </div>
+      <SettingsSection
+        className="settings-tool-section settings-renderdoc-actions"
+        data-testid="settings-rdx-actions"
+        title={t('settings.rdxShellActions')}
+        description={t('settings.rdxShellActionsHint')}
+      >
         <div className="settings-rdx-action-list">
           {RDX_ACTIONS.map((entry) => {
             const action = rdxActionsDraft[entry.id];
@@ -276,7 +280,7 @@ export const RdxCliInvokerSettingsFields: React.FC<RdxCliInvokerSettingsFieldsPr
             );
           })}
         </div>
-      </div>
+      </SettingsSection>
     </>
   );
 };

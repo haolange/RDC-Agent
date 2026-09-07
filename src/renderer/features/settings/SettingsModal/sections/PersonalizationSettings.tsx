@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import type { useI18n } from '../../../../i18n';
-import { AutosizeTextarea } from '../AutosizeTextarea';
+import { Button } from '../../../../ui/Button';
+import { Textarea } from '../../../../ui/Textarea';
+import { SettingsSection } from '../parts';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -28,27 +30,25 @@ export const PersonalizationSettings: React.FC<PersonalizationSettingsProps> = (
   };
 
   const block = (
-      <div className="settings-browser-block settings-personalization-block">
-        <div className="settings-browser-section-head">
-          <div>
-            <div className="settings-browser-section-title">{t('settings.globalInstructions')}</div>
-            <div className="settings-help-text">{t('settings.globalInstructionsHint')}</div>
-          </div>
-        </div>
-        <AutosizeTextarea
-          maxHeight={360}
-          className="input settings-agent-instructions settings-personalization-textarea"
-          value={globalInstructionsDraft}
-          onChange={(event) => onGlobalInstructionsDraftChange(event.currentTarget.value)}
-          placeholder={t('settings.globalInstructionsPlaceholder')}
-        />
-        <div className="settings-actions settings-actions-split">
-          <span className="settings-save-status">{status}</span>
-          <button type="button" className="button button-primary" onClick={() => void save()}>
-            {t('settings.savePersonalization')}
-          </button>
-        </div>
+    <SettingsSection
+      className="settings-personalization-block"
+      title={t('settings.globalInstructions')}
+      description={t('settings.globalInstructionsHint')}
+    >
+      <Textarea
+        className="settings-agent-instructions settings-personalization-textarea"
+        value={globalInstructionsDraft}
+        onChange={(event) => onGlobalInstructionsDraftChange(event.currentTarget.value)}
+        placeholder={t('settings.globalInstructionsPlaceholder')}
+        rows={8}
+      />
+      <div className="settings-actions settings-actions-split">
+        <span className="settings-save-status">{status}</span>
+        <Button variant="primary" onClick={() => void save()}>
+          {t('settings.savePersonalization')}
+        </Button>
       </div>
+    </SettingsSection>
   );
 
   if (embedded) {
@@ -57,9 +57,6 @@ export const PersonalizationSettings: React.FC<PersonalizationSettingsProps> = (
 
   return (
     <section className="settings-page settings-page-personalization">
-      <div className="settings-browser-page-head">
-        <h2>{t('settings.personalization')}</h2>
-      </div>
       {block}
     </section>
   );

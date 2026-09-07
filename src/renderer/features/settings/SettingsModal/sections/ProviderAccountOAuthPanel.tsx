@@ -65,7 +65,7 @@ export const ProviderAccountOAuthPanel: React.FC<ProviderAccountOAuthPanelProps>
                 key={mode}
                 variant="secondary"
                 size="sm"
-                className={`settings-provider-oauth-mode-button${mode === selectedMode ? ' active' : ''}`}
+                className={`settings-provider-oauth-mode-button${mode === selectedMode ? ' is-active' : ''}`}
                 data-testid={`settings-provider-oauth-mode-${mode}`}
                 onClick={() => onUpdateConnectionDraft({
                   accountLoginMode: mode,

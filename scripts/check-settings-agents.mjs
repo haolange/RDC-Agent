@@ -1,5 +1,5 @@
 import { createRequire } from 'module';
-import { scriptExists, scriptRead } from './renderer-contract.mjs';
+import { scriptExists, scriptRead, scriptReadCssBundle } from './renderer-contract.mjs';
 
 const require = createRequire(import.meta.url);
 require('./register-ts-source.cjs');
@@ -165,9 +165,8 @@ async function main() {
     path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/types.ts'),
     'utf8',
   );
-  const settingsModalCss = readSrcFile(
-    path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/SettingsModal.css'),
-    'utf8',
+  const settingsModalCss = scriptReadCssBundle(
+    'src/renderer/features/settings/SettingsModal/SettingsModal.css',
   );
   const skillsAgentsWrapperPath = path.join(repoRoot, 'src/renderer/features/settings/SettingsModal/sections/SkillsAgentsSettings.tsx');
   assert(!existsSrc(skillsAgentsWrapperPath), 'Skills and Agents settings must not keep the combined wrapper component.');

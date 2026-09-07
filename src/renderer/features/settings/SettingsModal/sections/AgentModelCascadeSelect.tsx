@@ -218,7 +218,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
             <button
               key={group.providerId}
               type="button"
-              className={`settings-model-provider-trigger ${group.providerId === resolvedActiveProviderId ? 'active' : ''}`}
+              className={`settings-model-provider-trigger ${group.providerId === resolvedActiveProviderId ? 'is-active' : ''}`}
               data-provider-id={group.providerId}
               onClick={() => setActiveProviderId(group.providerId)}
             >
@@ -234,7 +234,7 @@ export const AgentModelCascadeSelect: React.FC<AgentModelCascadeSelectProps> = (
               <button
                 key={option.canonicalId}
                 type="button"
-                className={`settings-model-option ${option.canonicalId === value ? 'active' : ''}`}
+                className={`settings-model-option ${option.canonicalId === value ? 'is-active' : ''}`}
                 data-provider-id={option.providerId}
                 data-model-id={option.modelId}
                 data-canonical-id={option.canonicalId}

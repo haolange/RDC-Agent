@@ -1,0 +1,156 @@
+@media (max-width: 560px) {
+  .settings-provider-row-actions--configured,
+  .settings-provider-connect-actions,
+  .settings-capability-custom {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-provider-row-actions {
+    justify-content: stretch;
+  }
+
+  .settings-provider-row-actions .button {
+    flex: 1 1 100%;
+  }
+
+  .settings-provider-connect-dialog[data-model-list-size='short'],
+  .settings-provider-connect-dialog[data-model-list-size='medium'],
+  .settings-provider-connect-dialog[data-model-list-size='long'] {
+    width: calc(100vw - var(--space-4));
+    max-height: calc(100vh - var(--space-4));
+  }
+}
+
+@media (max-width: 48rem) {
+  .settings-browser-section-head,
+  .settings-slim-meta,
+  .settings-actions-split {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-browser-actions {
+    flex-wrap: wrap;
+  }
+
+  .settings-managed-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .settings-row-badge {
+    display: none;
+  }
+
+  .settings-row-actions {
+    opacity: 1;
+    transform: none;
+  }
+
+  .settings-managed-row-main::after {
+    display: none;
+  }
+}
+
+@media (max-width: 64rem) {
+  .settings-space-row,
+  .settings-manifest-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-space-row-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 68rem) {
+  .settings-page-general .settings-general-top-row,
+  .settings-manifest-layout,
+  .settings-model-route-row,
+  .settings-mcp-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-space-row {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-space-row-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 68rem) {
+  .settings-skill-editor-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 68rem) {
+  .settings-page-agents,
+  .settings-page-agents .settings-manifest-page {
+    display: block;
+    flex: 0 0 auto;
+  }
+
+  .settings-page-agents .settings-manifest-layout {
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-page-agents .settings-manifest-list-column,
+  .settings-page-agents .settings-manifest-editor {
+    height: auto;
+    min-height: 0;
+  }
+
+  .settings-page-agents .settings-manifest-editor {
+    overflow: visible;
+  }
+
+  .settings-page-agents .settings-manifest-editor-head {
+    flex-direction: column;
+  }
+
+  .settings-page-agents .settings-manifest-editor-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .settings-manifest-editor-body {
+    flex: 0 0 auto;
+    height: auto;
+    max-height: min(42rem, 72vh);
+  }
+
+  .settings-page-agents .settings-agent-flags {
+    width: 100%;
+  }
+}
+
+@media (max-width: 48rem) {
+  .settings-page-agents .settings-manifest-page,
+  .settings-page-agents .settings-manifest-layout,
+  .settings-page-agents .settings-manifest-list-column,
+  .settings-page-agents .settings-manifest-editor {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .settings-page-agents .settings-manifest-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-page-agents .settings-manifest-actions,
+  .settings-page-agents .settings-manifest-actions .button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 760px) {
+  .settings-runtime-card { align-items: stretch; flex-direction: column; }
+  .settings-runtime-actions { flex-wrap: wrap; }
+}

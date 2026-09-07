@@ -1,0 +1,273 @@
+/* Settings Modal — single-track design-system compliant styles.
+
+ * Canonical Settings styles built on the semantic design-system tokens.
+
+ */
+
+/* ── Unified empty states ── */
+
+.settings-empty {
+  font-size: var(--text-sm);
+  color: var(--token-text-caption);
+  padding: var(--space-3);
+}
+
+.settings-empty-dashed {
+  border: 1px dashed var(--token-border-muted);
+  border-radius: var(--radius-md);
+  text-align: center;
+}
+
+.settings-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal-backdrop);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: var(--modal-backdrop);
+}
+
+.settings-manifest-page {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.settings-manifest-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.settings-manifest-actions, .settings-manifest-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.settings-manifest-layout {
+  display: grid;
+  grid-template-columns: minmax(15rem, 0.36fr) minmax(0, 0.64fr);
+  min-height: 0;
+  flex: 1;
+  gap: var(--space-4);
+}
+
+.settings-manifest-list-column {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-3);
+  background: var(--token-bg-shell);
+}
+
+.settings-manifest-list-toolbar {
+  justify-content: flex-start;
+  flex: 0 0 auto;
+  padding: 0;
+  margin-bottom: var(--space-3);
+}
+
+.settings-manifest-list {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 0 1 auto;
+  padding: 0 var(--space-1) 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding-right: var(--space-1);
+}
+
+.settings-manifest-card {
+  width: 100%;
+  min-height: var(--space-12);
+  display: grid;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-raised) 30%, transparent);
+  color: var(--token-text-heading);
+  text-align: left;
+  cursor: pointer;
+  grid-template-columns: var(--space-10) minmax(0, 1fr);
+}
+
+.settings-manifest-card:hover, .settings-manifest-card.is-active {
+  border-color: color-mix(in srgb, var(--token-border-focus) 30%, var(--token-border-muted));
+  background: color-mix(in srgb, var(--token-bg-raised) 62%, transparent);
+}
+
+.settings-manifest-card strong, .settings-manifest-card small {
+  display: block;
+}
+
+.settings-manifest-card strong {
+  font-size: var(--text-base);
+  line-height: 1.35;
+}
+
+.settings-manifest-card small {
+  margin-top: 0;
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.settings-manifest-card-meta {
+  flex: 0 0 auto;
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  align-self: center;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-lg);
+  grid-column: 2;
+  justify-self: start;
+  display: none;
+}
+
+.settings-manifest-editor, .settings-tool-section {
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: var(--token-bg-raised);
+}
+
+.settings-manifest-editor {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+
+.settings-manifest-editor-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  align-items: center;
+  min-height: auto;
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--token-border-muted);
+}
+
+.settings-manifest-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.settings-agent-flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-2);
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-agent-instructions {
+  min-height: var(--space-20);
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.settings-agent-tool-diagnostics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--token-status-error) 44%, var(--token-border-muted));
+  border-radius: var(--radius-md);
+  background: var(--token-surface-sunken);
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+}
+
+.settings-agent-tool-diagnostics-title {
+  color: var(--token-text-heading);
+  font-weight: 600;
+}
+
+.settings-agent-tool-diagnostics-list {
+  margin: 0;
+  padding-left: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.settings-agent-tool-diagnostics-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.settings-agent-tool-diagnostics-list code {
+  color: var(--token-status-error);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.settings-model-cascade {
+  position: relative;
+  width: 100%;
+  align-self: start;
+  z-index: 1;
+}
+
+.settings-model-cascade.open {
+  z-index: 120;
+}
+
+.settings-model-cascade-trigger, .settings-model-provider-trigger, .settings-model-option {
+  width: 100%;
+  min-height: var(--space-10);
+  border-radius: var(--radius-md);
+  color: var(--token-text-heading);
+  cursor: pointer;
+}
+
+.settings-model-cascade-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  min-height: var(--space-10);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--settings-subtle-bg);
+}
+
+.settings-model-cascade-trigger[aria-invalid='true'] {
+  border-color: var(--token-status-error);
+}

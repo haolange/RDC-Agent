@@ -65,6 +65,28 @@ export const scriptRead = (relativePath, _encoding) => {
   return readContract(filesByPath.get(normalized));
 };
 
+/** Read a registered CSS entry and inline relative `@import` siblings. */
+export const scriptReadCssBundle = (relativePath) => {
+  const entry = requireRegistered(relativePath);
+  const seen = new Set();
+  const walk = (rel) => {
+    const normalized = normalize(rel);
+    if (seen.has(normalized)) return '';
+    seen.add(normalized);
+    const absolute = path.join(root, normalized);
+    if (!fs.existsSync(absolute)) {
+      throw new Error(`[renderer-contract] missing CSS import: ${normalized}`);
+    }
+    const css = fs.readFileSync(absolute, 'utf8');
+    const imports = [...css.matchAll(/@import\s+['"](\.[^'"]+)['"]/g)].map((match) => match[1]);
+    const dir = path.posix.dirname(normalized);
+    const body = css.replace(/@import\s+['"]\.[^'"]+['"];?\s*/g, '');
+    const children = imports.map((imp) => walk(path.posix.normalize(`${dir}/${imp}`)));
+    return [...children, body].join('\n');
+  };
+  return walk(entry);
+};
+
 export const scriptExists = (relativePath) => {
   const normalized = requireRegistered(relativePath);
   return fs.existsSync(path.join(root, normalized));

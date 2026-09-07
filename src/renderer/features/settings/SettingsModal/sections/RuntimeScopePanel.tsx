@@ -2,8 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { cn } from '../../../../lib/cn';
 import type { RdxRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdxRuntime';
 import { useI18n, type TranslationKey } from '../../../../i18n';
+import { Button } from '../../../../ui/Button';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
-import { ResourceEmptyState } from '../../../../ui/ResourceEmptyState';
+import { EmptyState } from '../../../../ui/EmptyState';
+import { ListRow } from '../../../../ui/ListRow';
+import { SettingsScopeBar } from '../parts';
 import { ScopedResourceEditor } from './ScopedResourceEditor';
 import { uniqueResourceId } from './uniqueResourceId';
 import { contentFromForm, emptyForm, formFromContent, resourceCardMeta, type ResourceFormState } from './scopedResourceForm';
@@ -172,10 +175,14 @@ export const RuntimeScopePanel: React.FC<{
   return (
     <section className="settings-runtime-scope" data-testid="settings-runtime-scope" data-resource-kind={kind}>
       <div className="settings-runtime-scope-head">
-        <div className="settings-runtime-scope-switch settings-inline-pills" role="group" aria-label={t('settings.resourceScope')}>
-          <button type="button" className={`user-menu-pill ${scope === 'user' ? 'active' : ''}`} onClick={() => onScopeChange('user')}>{t('settings.scopeUser')}</button>
-          <button type="button" className={`user-menu-pill ${scope === 'project' ? 'active' : ''}`} disabled={!canProject} onClick={() => onScopeChange('project')}>{t('settings.scopeProject')}</button>
-        </div>
+        <SettingsScopeBar
+          scope={scope}
+          onScopeChange={onScopeChange}
+          canProject={canProject}
+          userLabel={t('settings.scopeUser')}
+          projectLabel={t('settings.scopeProject')}
+          groupLabel={t('settings.resourceScope')}
+        />
       </div>
 
       {showResourceStrip ? (
@@ -184,35 +191,36 @@ export const RuntimeScopePanel: React.FC<{
             <div className="settings-manifest-list-column">
               <div className="settings-manifest-toolbar settings-manifest-list-toolbar">
                 <div className="settings-manifest-actions">
-                  <button type="button" className="button button-secondary" disabled={addDisabled || busy} onClick={() => void importResource()}>
+                  <Button variant="secondary" disabled={addDisabled || busy} onClick={() => void importResource()}>
                     {t('settings.scopeImport')}
-                  </button>
-                  <button type="button" className="button button-secondary" disabled={addDisabled || busy} onClick={startNew}>
+                  </Button>
+                  <Button variant="secondary" disabled={addDisabled || busy} onClick={startNew}>
                     {t('settings.scopeAdd', { kind: kindLabel })}
-                  </button>
+                  </Button>
                 </div>
               </div>
               <div className="settings-manifest-list" aria-label={t('settings.resourceScope')}>
                 {resources.length ? resources.map((resource) => {
                   const meta = resourceCardMeta(resource.kind, resource.content);
-                  const active = !creating && resource.id === selectedId;
+                  const selected = !creating && resource.id === selectedId;
                   return (
-                    <button
-                      type="button"
+                    <ListRow
                       key={`${resource.kind}:${resource.id}`}
-                      className={cn('settings-manifest-card', active && 'is-active', `status-${resource.effectiveStatus}`)}
+                      className={cn('settings-scope-row', `status-${resource.effectiveStatus}`)}
+                      selected={selected}
                       onClick={() => openResource(resource)}
                     >
-                      <span>
+                      <span className="settings-scope-row-copy">
                         <strong>{resource.id}</strong>
                         {meta ? <small>{meta}</small> : null}
                       </span>
-                    </button>
+                    </ListRow>
                   );
                 }) : (
-                  <div className="settings-empty settings-empty-dashed settings-runtime-list-empty">
-                    {t('settings.scopeEmpty', { kind: kindLabel })}
-                  </div>
+                  <EmptyState
+                    className="settings-runtime-list-empty"
+                    title={t('settings.scopeEmpty', { kind: kindLabel })}
+                  />
                 )}
               </div>
             </div>
@@ -229,8 +237,8 @@ export const RuntimeScopePanel: React.FC<{
                 onCancel={cancelEdit}
               />
             ) : (
-              <div className="settings-runtime-editor-placeholder settings-empty-dashed">
-                <ResourceEmptyState>{t('settings.scopeSelectOrCreate', { kind: kindLabel })}</ResourceEmptyState>
+              <div className="settings-runtime-editor-placeholder">
+                <EmptyState title={t('settings.scopeSelectOrCreate', { kind: kindLabel })} />
               </div>
             )}
           </div>
