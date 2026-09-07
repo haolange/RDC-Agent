@@ -163,65 +163,11 @@
 }
 
 .composer-shell.is-running {
-  border-color: color-mix(in srgb, var(--composer-mode-accent) 44%, var(--token-border-strong));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.03),
-    0 0 0 1px color-mix(in srgb, var(--composer-mode-accent) 12%, transparent),
-    0 18px 36px rgb(0 0 0 / 0.24);
+  border-color: var(--composer-mode-accent);
 }
 
 .composer-shell.is-running:focus-within {
-  border-color: color-mix(in srgb, var(--composer-mode-accent) 52%, var(--token-border-strong));
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.03),
-    0 0 0 1px color-mix(in srgb, var(--composer-mode-accent) 18%, transparent),
-    0 0 18px color-mix(in srgb, var(--composer-mode-accent) 14%, transparent),
-    0 18px 36px rgb(0 0 0 / 0.25);
-}
-
-/*
- * Orbiting energy stroke: hard ring mask is fine for the 2px core.
- * Soft bloom MUST NOT use a second masked+blurred ring — mask-composite
- * clips blur to a hard annulus and reads as a top/bottom cut edge.
- * Layered drop-shadow follows the stroke alpha and feathers outward instead.
- */
-.composer-shell.is-running::before {
-  position: absolute;
-  inset: calc(-1 * var(--composer-energy-stroke));
-  padding: var(--composer-energy-stroke);
-  border-radius: calc(var(--composer-shell-radius) + var(--composer-energy-stroke));
-  pointer-events: none;
-  z-index: -1;
-  content: "";
-  background:
-    conic-gradient(
-      from calc(var(--composer-energy-angle) - 28deg) at 50% 50%,
-      transparent 0deg,
-      transparent 10deg,
-      color-mix(in srgb, var(--composer-mode-accent) 8%, transparent) 22deg,
-      color-mix(in srgb, var(--composer-mode-accent) 28%, transparent) 34deg,
-      color-mix(in srgb, var(--composer-mode-accent) 46%, transparent) 46deg,
-      color-mix(in srgb, var(--composer-mode-accent) 30%, transparent) 58deg,
-      color-mix(in srgb, var(--composer-mode-accent) 12%, transparent) 70deg,
-      transparent 88deg,
-      transparent 360deg
-    );
-  filter:
-    drop-shadow(0 0 3px color-mix(in srgb, var(--composer-mode-accent) 40%, transparent))
-    drop-shadow(0 0 8px color-mix(in srgb, var(--composer-mode-accent) 24%, transparent))
-    drop-shadow(0 0 16px color-mix(in srgb, var(--composer-mode-accent) 12%, transparent));
-  animation: composerEnergyOrbit 2.85s linear infinite;
-  -webkit-mask: linear-gradient(rgb(255 255 255) 0 0) content-box, linear-gradient(rgb(255 255 255) 0 0);
-  mask: linear-gradient(rgb(255 255 255) 0 0) content-box, linear-gradient(rgb(255 255 255) 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-}
-
-
-@keyframes composerEnergyOrbit {
-  to {
-    --composer-energy-angle: 230deg;
-  }
+  border-color: var(--composer-mode-accent);
 }
 
 /* Moved from app-shell during B3 colocation */

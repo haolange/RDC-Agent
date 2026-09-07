@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
 import { ModeGlyph } from '../../ui/ModeGlyph';
+import { Pill } from '../../ui/Pill';
 import { useI18n } from '../../i18n';
 import type { AgentMode, ModeConfig } from '@shared/types/layout';
 import type { AgentManifestDefinition } from '@shared/types/agentManifest';
@@ -87,10 +88,10 @@ export const ComposerAgentMenu: React.FC<{
 
   return (
     <div ref={setRootRef} className="composer-agent-menu">
-      <button
+      <Pill
         ref={setTriggerRef}
-        type="button"
         className={`composer-agent-pill ${menu.open ? 'open' : ''}`}
+        selected={menu.open}
         data-testid="composer-mode-pill"
         onClick={() => menu.toggle()}
         aria-haspopup="menu"
@@ -106,7 +107,7 @@ export const ComposerAgentMenu: React.FC<{
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </span>
-      </button>
+      </Pill>
       {menu.open ? (
         <div
           ref={popupRef}

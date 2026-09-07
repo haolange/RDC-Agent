@@ -20,6 +20,8 @@ import { ComposerMarkdownInput, type ComposerMarkdownMode } from './ComposerMark
 import { ComposerMarkdownModeTabs } from './ComposerMarkdownModeTabs';
 import { ComposerAgentMenu } from './ComposerAgentMenu';
 import { ComposerMenuRegistryProvider, useComposerMenu } from './useComposerMenuRegistry';
+import { Icon } from '../../ui/Icon';
+import { IconButton } from '../../ui/IconButton';
 import { ComposerAttachIngest } from './ComposerAttachIngest';
 import { ComposerAttachmentTray } from './ComposerAttachmentTray';
 import { buildComposerSessionScopeKey } from '../../lib/composerSessionScope';
@@ -224,20 +226,17 @@ export const Composer: React.FC<ComposerProps> = ({
       </div>
       <div className="composer-footer-bar" data-testid="composer-footer-bar">
         <div className="composer-toolbar-group composer-toolbar-group-left">
-          <button
-            type="button"
+          <IconButton
             className="composer-attach-button"
             data-testid="composer-attach-button"
-            onClick={() => void handleAttachmentSelect()}
-            disabled={isComposerBusy}
+            size="sm"
+            label={attachButtonLabel}
             title={attachButtonLabel}
-            aria-label={attachButtonLabel}
+            disabled={isComposerBusy}
+            onClick={() => void handleAttachmentSelect()}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 5v14" />
-              <path d="M5 12h14" />
-            </svg>
-          </button>
+            <Icon name="plus" size={14} />
+          </IconButton>
           <ComposerAgentMenu
             currentMode={currentMode}
             currentModeConfig={currentModeConfig}

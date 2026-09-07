@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import type { AgentPermissionMode } from '@shared/types/settings';
+import { Pill } from '../../ui/Pill';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useComposerMenu } from './useComposerMenuRegistry';
 
@@ -60,10 +61,10 @@ export const PermissionModeSelector: React.FC = () => {
 
   return (
     <div ref={setRootRef} className="composer-permission-menu">
-      <button
+      <Pill
         ref={setTriggerRef}
-        type="button"
         className={`composer-permission-pill ${menu.open ? 'open' : ''}`}
+        selected={menu.open}
         data-testid="composer-permission-pill"
         data-mode={current.id}
         aria-haspopup="menu"
@@ -77,14 +78,14 @@ export const PermissionModeSelector: React.FC = () => {
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </span>
-      </button>
+      </Pill>
       {menu.open ? (
         <div className="composer-permission-popup" role="menu">
           {PERMISSION_MODES.map((entry) => (
             <button
               key={entry.id}
               type="button"
-              className={`composer-permission-menu-item ${entry.id === mode ? 'active' : ''}`}
+              className={`composer-permission-menu-item ${entry.id === mode ? 'is-selected' : ''}`}
               data-mode={entry.id}
               role="menuitemradio"
               aria-checked={entry.id === mode}

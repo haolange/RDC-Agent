@@ -225,7 +225,7 @@ pnpm run typecheck
 | `:hover` 必配 `:focus-visible`；禁无替代 `outline: none` | 无自动门禁 | **B8** 扫描清零 |
 | 分子组件清单与交互态 / CSS 变量 variant / 禁内联 style | `src/renderer/ui` 已落地；luna 审查 | **B2** 已落地 |
 | 统一 `EmptyState`（无插画） | 组件已落地；Right Rail 玻璃空态仍在 | **B2** 组件；**B7** 替换五卡空态 |
-| Composer 禁 energy orbit / 流光 | 文档禁止；实现仍在 | **B6** |
+| Composer 禁 energy orbit / 流光 | `check:work-process` 禁止 orbit keyframe / `::before` bloom | **B6** 已落地 |
 | DropdownSelect 禁 backdrop blur | `check:appearance` 要求实色 `--token-bg-shell`、禁止 blur | B1 已反转 |
 | Preview 引用运行时 CSS，删除 `designs/tokens/*` | Preview 已改；副本已删并入 `retired` | **B2** 已落地 |
 | i18n 拆分、硬编码入 i18n、sentence case | key 已拆到 `i18n/locales/{en,zh-CN}/`；硬编码与 sentence case 仍待扫 | **B3** 拆分；**B8** 文案 |

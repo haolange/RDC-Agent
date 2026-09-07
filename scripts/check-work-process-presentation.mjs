@@ -1297,13 +1297,12 @@ assert(!cssSource.includes('.work-process-step-rail.is-section .work-process-rai
 assert(!cssSource.includes('.work-process-steps-toggle'), 'legacy tool-step toggle CSS should be removed');
 assert(!cssSource.includes('.work-process-empty'), 'placeholder empty-state CSS should be removed');
 assert(!appShellSource.includes('composerEnergyFlow'), 'composer running border must not use the legacy uniform sweep keyframe');
-assert(appShellSource.includes('@keyframes composerEnergyOrbit'), 'composer running border orbit keyframe should exist');
-assert(appShellSource.includes('.composer-shell.is-running::before'), 'composer running border core layer should exist');
-assert(!appShellSource.includes('.composer-shell.is-running::after'), 'composer running halo must use drop-shadow bloom, not a second masked ring (reads as cut edges)');
-assert(/is-running::before[\s\S]{0,900}drop-shadow/.test(appShellSource), 'composer running border bloom should follow the stroke via drop-shadow');
+assert(!appShellSource.includes('composerEnergyOrbit'), 'composer running border must not use an energy orbit keyframe');
+assert(!appShellSource.includes('.composer-shell.is-running::before'), 'composer running border must not use an orbit/bloom pseudo layer');
+assert(!appShellSource.includes('.composer-shell.is-running::after'), 'composer running border must not use a halo pseudo layer');
 assert(appShellSource.includes('.composer-shell.is-running:focus-within'), 'composer running border must preserve the focus ring layer');
-assert(appShellSource.includes('@media (prefers-reduced-motion: reduce)'), 'composer running border should honor reduced motion');
-assert(appShellSource.includes('--composer-shell-radius: var(--radius-xl)'), 'composer shell radius must use the design-system radius scale');
+assert(appShellSource.includes('@media (prefers-reduced-motion: reduce)'), 'composer running status motion should honor reduced motion');
+assert(appShellSource.includes('--composer-shell-radius: var(--radius-lg)'), 'composer shell radius must use the restrained radius-lg scale');
 
 assert(i18nSource.includes("'chat.workProcessTitle': 'Work process'"), 'English process title copy should be Work process');
 assert(i18nSource.includes("'chat.workProcessTitle': '工作过程'"), 'Chinese process title copy should exist');

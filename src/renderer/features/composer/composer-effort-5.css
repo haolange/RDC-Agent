@@ -11,7 +11,8 @@
 }
 
 .composer-permission-menu-item:hover:not(:disabled),
-.composer-permission-menu-item.active {
+.composer-permission-menu-item:focus-visible,
+.composer-permission-menu-item.is-selected {
   border-color: color-mix(in srgb, var(--permission-tone) 34%, var(--token-border-muted));
   background: color-mix(in srgb, var(--permission-tone) 10%, var(--token-bg-raised));
 }
