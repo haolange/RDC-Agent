@@ -58,16 +58,16 @@ export const ProjectGroup: React.FC<ProjectGroupProps> = ({
 
   return (
     <section
-      className={`project-stack-item ${isCurrentProject ? 'current' : ''} ${isProjectRailActive ? 'active' : ''} ${isExpanded ? 'expanded' : ''}`}
+      className={`project-stack-item ${isCurrentProject ? 'is-current' : ''} ${isProjectRailActive ? 'is-selected' : ''} ${isExpanded ? 'is-expanded' : ''}`}
     >
       <div
-        className={`session-item project-item ${isProjectRailActive ? 'active' : ''}`}
+        className={`session-item project-item ${isProjectRailActive ? 'is-selected' : ''}`}
       >
         <div className="session-item-header">
           <span className="project-item-leading">
             <button
               type="button"
-              className={`project-item-chevron ${isExpanded ? 'expanded' : ''}`}
+              className={`project-item-chevron ${isExpanded ? 'is-expanded' : ''}`}
               title={t('sidebar.toggleProjectSessions')}
               aria-label={t('sidebar.toggleProjectSessions')}
               aria-expanded={isExpanded}

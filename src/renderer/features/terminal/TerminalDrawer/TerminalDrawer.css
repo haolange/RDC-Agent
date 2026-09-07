@@ -179,7 +179,8 @@ body.terminal-resizing {
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
-.runtime-terminal-close-workspace:hover {
+.runtime-terminal-close-workspace:hover,
+.runtime-terminal-close-workspace:focus-visible {
   background: var(--token-bg-raised);
   color: var(--token-text-heading);
 }
@@ -314,7 +315,9 @@ body.terminal-resizing {
 }
 
 .runtime-terminal-tool-button:hover,
-.runtime-terminal-entry-actions button:hover {
+.runtime-terminal-entry-actions button:hover,
+.runtime-terminal-tool-button:focus-visible,
+.runtime-terminal-entry-actions button:focus-visible {
   background: var(--token-bg-raised);
   color: var(--token-text-heading);
 }
@@ -444,7 +447,8 @@ body.terminal-resizing {
   border-radius: var(--radius-lg);
 }
 
-.runtime-terminal-entry-main:hover {
+.runtime-terminal-entry-main:hover,
+.runtime-terminal-entry-main:focus-visible {
   background: color-mix(in srgb, var(--token-bg-panel) 48%, transparent);
 }
 
@@ -548,7 +552,7 @@ body.terminal-resizing {
   display: grid;
   gap: var(--space-2);
   margin: 0 0 var(--space-1) 0;
-  padding: var(--space-2) var(--space-2) var(--space-3) var(--layout-sidebar-left);
+  padding: var(--space-2) var(--space-2) var(--space-3) var(--space-6);
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--token-bg-shell) 54%, transparent);
 }

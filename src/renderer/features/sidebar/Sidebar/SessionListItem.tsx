@@ -29,7 +29,7 @@ export const SessionListItem: React.FC<SessionListItemProps> = ({
 
   return (
     <div
-      className={`session-item session-subitem ${isSessionRailActive ? 'active' : ''}`}
+      className={`session-item session-subitem ${isSessionRailActive ? 'is-selected' : ''}`}
       data-owns-context-menu=""
       onContextMenu={(event) => onContextMenu(event, session)}
     >

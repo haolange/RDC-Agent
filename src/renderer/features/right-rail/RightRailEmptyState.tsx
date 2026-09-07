@@ -1,13 +1,10 @@
 import React from 'react';
-import { RightRailEmptyVisual } from './RightRailEmptyVisuals';
+import { EmptyState } from '../../ui/EmptyState';
 
 export type RightRailEmptyKind = 'progress' | 'artifacts' | 'outputs' | 'context' | 'capture';
 
 export const RightRailEmptyState: React.FC<{ kind: RightRailEmptyKind; copy: string }> = ({ kind, copy }) => (
-  <div className={`right-rail-empty-state kind-${kind}`}>
-    <RightRailEmptyVisual kind={kind} />
-    <p>{copy}</p>
-  </div>
+  <EmptyState className={`right-rail-empty-state kind-${kind}`} title={copy} />
 );
 
 export default RightRailEmptyState;

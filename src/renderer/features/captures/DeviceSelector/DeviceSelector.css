@@ -243,13 +243,14 @@
   transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
-.device-selector-option:hover {
+.device-selector-option:hover,
+.device-selector-option:focus-visible {
   background: color-mix(in srgb, var(--token-bg-raised) 82%, transparent);
   color: var(--token-text-heading);
   transform: none;
 }
 
-.device-selector-option.selected {
+.device-selector-option.is-selected {
   background: color-mix(in srgb, var(--token-accent-primary) 10%, transparent);
   box-shadow: inset 2px 0 0 var(--token-accent-primary);
 }
