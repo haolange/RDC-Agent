@@ -61,7 +61,7 @@ const DeviceSelectorDropdown: React.FC<{
         return (
           <button
             key={device.id}
-            className={`device-selector-option ${device.id === selectedDevice ? 'selected' : ''}`}
+            className={`device-selector-option ${device.id === selectedDevice ? 'is-selected' : ''}`}
             onClick={() => onSelect(device)}
             role="option"
             aria-selected={device.id === selectedDevice}

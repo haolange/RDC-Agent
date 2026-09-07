@@ -117,7 +117,8 @@
     box-shadow var(--transition-base) var(--ease-standard);
 }
 
-.session-section-action:hover {
+.session-section-action:hover,
+.session-section-action:focus-visible {
   background: color-mix(in srgb, var(--token-bg-raised) 96%, transparent);
   border-color: var(--token-border-default);
   color: var(--token-text-heading);
@@ -162,7 +163,7 @@
   flex-direction: column;
   gap: 0;
   width: 100%;
-  min-height: 42px;
+  min-height: var(--control-height-md);
   padding: var(--space-2) var(--space-2);
   border: 1px solid var(--token-border-card);
   border-radius: var(--radius-lg);
@@ -213,14 +214,16 @@
   white-space: nowrap;
 }
 
-.session-item:hover {
+.session-item:hover,
+.session-item:focus-visible,
+.session-item:focus-within {
   background: color-mix(in srgb, var(--token-bg-panel) 70%, transparent);
   border-color: var(--token-border-default);
   transform: none;
   box-shadow: none;
 }
 
-.session-item.active {
+.session-item.is-selected {
   border-color: color-mix(in srgb, var(--token-accent-primary) 32%, transparent);
   background: color-mix(in srgb, var(--token-accent-primary) 9%, transparent);
   box-shadow: inset 2px 0 0 var(--token-accent-primary);
@@ -237,7 +240,7 @@
 }
 
 .session-subitem {
-  min-height: 38px;
+  min-height: var(--control-height-md);
   padding: var(--space-2) var(--space-2);
   border-radius: var(--radius-lg);
   background: transparent;
@@ -310,7 +313,7 @@
   transition: transform var(--transition-base) var(--ease-standard);
 }
 
-.project-item-chevron.expanded svg {
+.project-item-chevron.is-expanded svg {
   transform: rotate(90deg);
 }
 
@@ -330,7 +333,8 @@
 }
 
 .session-subitem:hover .session-item-gutter,
-.session-subitem.active .session-item-gutter {
+.session-subitem.is-selected .session-item-gutter,
+.session-subitem:focus-visible .session-item-gutter {
   color: color-mix(in srgb, var(--token-accent-primary) 90%, transparent);
 }
 
@@ -396,7 +400,7 @@
 
 .session-item:hover .session-item-icon-button,
 .session-item:focus-visible .session-item-icon-button,
-.session-item.active .session-item-icon-button {
+.session-item.is-selected .session-item-icon-button {
   opacity: 1;
   transform: translateY(0);
 }
@@ -435,7 +439,8 @@
     background var(--transition-base) var(--ease-standard);
 }
 
-.session-empty:hover {
+.session-empty:hover,
+.session-empty:focus-visible {
   border-color: color-mix(in srgb, var(--token-accent-primary) 45%, transparent);
   background: color-mix(in srgb, var(--token-accent-primary) 6%, transparent);
 }

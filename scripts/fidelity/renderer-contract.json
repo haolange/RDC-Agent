@@ -157,6 +157,7 @@
     "src/renderer/features/transcript/WorkProcessStepGroupRow.tsx",
     "src/renderer/features/transcript/WorkProcessViewToggle.tsx",
     "src/renderer/features/transcript/workProcessGroupMetrics.ts",
+    "src/renderer/features/right-rail/RightRailEmptyVisuals.tsx",
     "src/renderer/features/transcript/workProcessSemanticIcons.ts",
     "src/renderer/features/transcript/workProcessSemanticKind.ts",
     "src/renderer/features/right-rail/ArtifactTree.tsx",

@@ -139,7 +139,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 所有空态使用统一 `<EmptyState title description? actions?>`（restrained，无插画、无渐变几何体）。Right Rail 五卡、Settings 资源列表、Knowledge 列表、Sidebar 共用同一组件。文案一句 honest copy；需要操作时把按钮放进 `actions` 槽。
 
-当前 `RightRailEmptyVisuals` 等距玻璃插画是待 B7 删除的实现债务，不得再扩散。B7 之后 `check:design-tokens` 不再豁免 `stop-color`。
+Right Rail 五卡空态使用统一 `<EmptyState>`，无插画。`check:design-tokens` 不再豁免 `stop-color`。
 
 ## Composer 附件卡
 
