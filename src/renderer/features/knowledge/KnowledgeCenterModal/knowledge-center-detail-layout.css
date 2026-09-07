@@ -1,0 +1,121 @@
+.knowledge-center-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--token-border-muted);
+  min-height: var(--control-height-lg);
+  flex-shrink: 0;
+}
+
+.knowledge-center-header > div {
+  min-width: 0;
+}
+
+.knowledge-center-header-title {
+  color: var(--token-text-heading);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  line-height: var(--leading-tight);
+}
+
+.knowledge-center-header-path {
+  margin-top: var(--space-1);
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+
+.knowledge-center-close.icon-button:hover,
+.knowledge-center-close.icon-button:focus-visible {
+  background: var(--token-interactive-hover);
+  color: var(--token-text-heading);
+  border-color: var(--token-border-muted);
+}
+
+.knowledge-center-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-5);
+}
+
+.knowledge-center-markdown {
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  overflow-wrap: anywhere;
+}
+
+.knowledge-center-markdown :is(h1, h2, h3) {
+  color: var(--token-text-heading);
+}
+
+.knowledge-center-actions,
+.knowledge-center-sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.knowledge-center-actions {
+  padding: var(--space-3);
+  border-top: 1px solid var(--token-border-muted);
+}
+
+.knowledge-center-empty,
+.knowledge-center-status {
+  display: flex;
+  min-height: 200px;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+}
+
+.knowledge-center-error {
+  color: var(--token-status-error);
+  font-size: var(--text-xs);
+}
+
+.knowledge-center-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+}
+
+.knowledge-center-meta-wide {
+  grid-column: 1 / -1;
+}
+
+.knowledge-center-meta dt {
+  font-weight: var(--font-semibold);
+}
+
+.knowledge-center-meta dd {
+  margin: var(--space-1) 0 0;
+  overflow-wrap: anywhere;
+  color: var(--token-text-body);
+}
+
+.knowledge-center-scope-chip {
+  display: inline-flex;
+  margin-right: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.knowledge-center-chapters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.knowledge-center-content .knowledge-center-body {
+  padding: var(--space-5);
+}
+
+.knowledge-center-content .knowledge-center-markdown {
+  line-height: var(--leading-normal);
+}

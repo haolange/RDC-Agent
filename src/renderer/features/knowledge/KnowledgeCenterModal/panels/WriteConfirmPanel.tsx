@@ -1,5 +1,8 @@
 import type { RefObject } from 'react';
 import { Button } from '../../../../ui/Button';
+import { Checkbox } from '../../../../ui/Checkbox';
+import { InlineError } from '../../../../ui/InlineError';
+import { Textarea } from '../../../../ui/Textarea';
 import { useI18n } from '../../../../i18n';
 import { ConflictRow } from '../parts/ConflictRow';
 import type { useKnowledgeWriteConfirm } from '../useKnowledgeWriteConfirm';
@@ -48,7 +51,7 @@ export function WriteConfirmPanel({ write, panelRef }: WriteConfirmPanelProps) {
       </section>
       <section>
         <h3>{t('knowledgeCenter.confirmConflict')}</h3>
-        {write.versionStale && <p className="knowledge-center-error">{t('knowledgeCenter.confirmVersionStale')}</p>}
+        {write.versionStale && <InlineError>{t('knowledgeCenter.confirmVersionStale')}</InlineError>}
         {write.contradicts.map((conflict) => (
           <ConflictRow
             key={`${conflict.leftCardId}:${conflict.rightCardId}`}
@@ -60,11 +63,11 @@ export function WriteConfirmPanel({ write, panelRef }: WriteConfirmPanelProps) {
       </section>
       <section>
         <h3>{t('knowledgeCenter.confirmChangeReason')}</h3>
-        <textarea
+        <Textarea
           value={write.changeReason}
           disabled={write.busy}
-          onChange={(event) => write.setChangeReason(event.target.value)}
           required
+          onChange={(event) => write.setChangeReason(event.target.value)}
           data-testid="knowledge-center-change-reason"
         />
         {!write.changeReason.trim() && <p>{t('knowledgeCenter.confirmChangeReasonRequired')}</p>}
@@ -74,31 +77,27 @@ export function WriteConfirmPanel({ write, panelRef }: WriteConfirmPanelProps) {
         <p>{write.basis ? `${write.basis.hash} · ${write.basis.bytes}` : '—'}</p>
         <p>{t('knowledgeCenter.confirmNoAutoRollback')}</p>
       </section>
-      {write.block === 'draft-to-verified' && <p className="knowledge-center-error">{t('knowledgeCenter.confirmBlockedLifecycle')}</p>}
-      {write.block?.startsWith('missing-chapters') && <p className="knowledge-center-error">{t('knowledgeCenter.confirmMissingChapters')}</p>}
-      {write.versionStale && <p className="knowledge-center-error">{t('knowledgeCenter.confirmVersionStale')}</p>}
-      {write.error && <p className="knowledge-center-error" role="alert">{write.error}</p>}
-      <label className="knowledge-center-check">
-        <input
-          type="checkbox"
-          checked={write.confirmed}
-          disabled={write.busy}
-          onChange={(event) => write.setConfirmed(event.target.checked)}
-          data-testid="knowledge-center-explicit-confirm"
-        />
-        <span>{t('knowledgeCenter.confirmExplicit')}</span>
-      </label>
+      {write.block === 'draft-to-verified' && <InlineError>{t('knowledgeCenter.confirmBlockedLifecycle')}</InlineError>}
+      {write.block?.startsWith('missing-chapters') && <InlineError>{t('knowledgeCenter.confirmMissingChapters')}</InlineError>}
+      {write.versionStale && <InlineError>{t('knowledgeCenter.confirmVersionStale')}</InlineError>}
+      {write.error && <InlineError>{write.error}</InlineError>}
+      <Checkbox
+        className="knowledge-center-check"
+        checked={write.confirmed}
+        disabled={write.busy}
+        onCheckedChange={write.setConfirmed}
+        data-testid="knowledge-center-explicit-confirm"
+        label={t('knowledgeCenter.confirmExplicit')}
+      />
       {hasContradicts && (
-        <label className="knowledge-center-check">
-          <input
-            type="checkbox"
-            checked={write.acknowledgedConflicts}
-            disabled={write.busy}
-            onChange={(event) => write.setAcknowledgedConflicts(event.target.checked)}
-            data-testid="knowledge-center-acknowledge-conflicts"
-          />
-          <span>{t('knowledgeCenter.confirmAcknowledgeConflicts')}</span>
-        </label>
+        <Checkbox
+          className="knowledge-center-check"
+          checked={write.acknowledgedConflicts}
+          disabled={write.busy}
+          onCheckedChange={write.setAcknowledgedConflicts}
+          data-testid="knowledge-center-acknowledge-conflicts"
+          label={t('knowledgeCenter.confirmAcknowledgeConflicts')}
+        />
       )}
       <div className="knowledge-center-sheet-actions">
         <Button variant="primary" disabled={blocked || write.busy} onClick={() => void write.submit()}>

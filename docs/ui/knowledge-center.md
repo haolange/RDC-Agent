@@ -1,6 +1,6 @@
 # Knowledge Center
 
-知识中心是 Workbench 左侧边栏底部、用户条上方的常驻入口，打开视窗比例驱动的实色分层模态（`min(92vw, 1920px) × min(90vh, 1240px)`；`≤640px` 时单列堆叠）。它只消费已落地的五服务：`Query` / `Index` / `Compile` / `Candidate` / `Write`，不另开 browse 双轨或派生存储。
+知识中心是 Workbench 左侧边栏底部、用户条上方的常驻入口，打开视窗比例驱动的实色分层模态（`min(92vw, 1920px) × min(90vh, 1240px)`；`≤960px` 时三列切换，`≤640px` 全屏）。它只消费已落地的五服务：`Query` / `Index` / `Compile` / `Candidate` / `Write`，不另开 browse 双轨或派生存储。
 
 ## 信息架构
 
@@ -10,7 +10,7 @@
 2. **List**：搜索框（300ms debounce）驱动 `knowledge:query`。Cards 按服务返回的 `hits` 顺序渲染，渲染层不得重排。Candidates 分 `listCandidates` 与 `listStagedDrafts` 两段。Conflicts 渲染当前 pack 的 `contradicts`。
 3. **Detail**：标题、relativePath、关闭按钮、元数据、`MessageMarkdown` 正文、写操作。`sourceStatus === 'fixed'` 永远带 “≠ verified”。任一写操作只打开确认面板，不直接落盘。
 
-窄屏 `≤640px` 只渲染一列，顶部三段 Spaces / List / Detail；选中卡片进入 Detail，Detail 提供返回。Import 与写确认在窄屏为全高 sheet。Escape 优先关面板，再关模态。
+窄屏 `≤960px` 只渲染一列，顶部三段 Spaces / List / Detail 与常驻关闭；选中卡片进入 Detail，Detail 提供返回。Import 与写确认在窄屏为全高 sheet。Escape 优先关面板，再关模态。
 
 ## 产品边界
 

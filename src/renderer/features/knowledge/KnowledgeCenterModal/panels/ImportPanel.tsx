@@ -1,5 +1,8 @@
 import type { RefObject } from 'react';
 import { Button } from '../../../../ui/Button';
+import { InlineError } from '../../../../ui/InlineError';
+import { Select } from '../../../../ui/Select';
+import { Textarea } from '../../../../ui/Textarea';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import type { ColdDataIngestStatus, KnowledgeSpace } from '@shared/types/knowledge';
 import type { useKnowledgeImport } from '../useKnowledgeImport';
@@ -31,15 +34,21 @@ export function ImportPanel({ importer, spaces, panelRef }: ImportPanelProps) {
       <h2>{t('knowledgeCenter.importTitle')}</h2>
       <label className="knowledge-center-field">
         <span>{t('knowledgeCenter.importTargetSpace')}</span>
-        <select value={importer.spaceId} disabled={importer.busy} onChange={(event) => importer.setSpaceId(event.target.value)}>
-          {spaces.map((space) => (
-            <option key={space.spaceId} value={space.spaceId}>{space.label}</option>
-          ))}
-        </select>
+        <Select
+          dataTestId="knowledge-center-import-space"
+          ariaLabel={t('knowledgeCenter.importTargetSpace')}
+          value={importer.spaceId}
+          disabled={importer.busy}
+          onChange={(value) => importer.setSpaceId(value)}
+          options={spaces.map((space) => ({
+            value: space.spaceId,
+            label: space.label,
+          }))}
+        />
       </label>
       <label className="knowledge-center-field">
         <span>{t('knowledgeCenter.importPasteYaml')}</span>
-        <textarea
+        <Textarea
           value={importer.source}
           disabled={importer.busy}
           onChange={(event) => importer.setSource(event.target.value)}
@@ -56,7 +65,9 @@ export function ImportPanel({ importer, spaces, panelRef }: ImportPanelProps) {
         <Button variant="ghost" disabled={importer.busy} onClick={importer.close}>{t('knowledgeCenter.importClose')}</Button>
       </div>
       {importer.filePath && <p className="knowledge-center-header-path">{importer.filePath}</p>}
-      {importer.error && <p className="knowledge-center-error" role="alert" data-testid="knowledge-center-import-error">{importer.error}</p>}
+      {importer.error && (
+        <InlineError data-testid="knowledge-center-import-error">{importer.error}</InlineError>
+      )}
       {result && (
         <div className="knowledge-center-import-result" data-testid="knowledge-center-import-result">
           <p>{t(IMPORT_STATUS_KEYS[result.status])}</p>
