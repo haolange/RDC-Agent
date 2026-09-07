@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import type { MCPConnectionStatus, MCPServerStatusSummary } from '@shared/types/mcp';
 import { useI18n, type TranslationKey } from '../../../../i18n';
-import { getElectronApi } from '../../../../platform/getElectronApi';
+import { getMcpStatusSummary } from './mcpStatusActions';
 
 type BadgeKind = 'connected' | 'error' | 'loading' | 'disconnected';
 
@@ -27,16 +27,14 @@ export const McpStatusDashboard: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
-    const api = getElectronApi();
-    if (!api?.mcp?.getStatusSummary) {
-      setServers([]);
-      setError(t('settings.mcpStatusUnavailable'));
-      return;
-    }
-
     setLoading(true);
     try {
-      const next = await api.mcp.getStatusSummary();
+      const next = await getMcpStatusSummary();
+      if (!next) {
+        setServers([]);
+        setError(t('settings.mcpStatusUnavailable'));
+        return;
+      }
       setServers(Array.isArray(next) ? next : []);
       setError(null);
     } catch (failure) {

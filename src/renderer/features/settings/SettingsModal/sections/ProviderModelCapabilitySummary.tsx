@@ -9,7 +9,7 @@ import type {
 } from '@shared/types/settings';
 import { resolveContextTierChoices } from '@shared/utils/contextTiers';
 import type { useI18n } from '../../../../i18n';
-import { getElectronApi } from '../../../../platform/getElectronApi';
+import { testModelCapability } from './providerCatalogActions';
 import {
   buildCapabilityChips,
   buildCapabilityEvidenceSummary,
@@ -49,9 +49,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
   const pricing = buildPricingRows(effectiveModel, t);
   const reasoning = effectiveModel?.controls.reasoning;
   const reasoningUnverified = reasoning?.kind === 'unknown';
-  const reasoningDefaultUnverified = reasoningUnverified
-    || reasoning?.defaultState === 'unknown'
-    || reasoning?.defaultState === 'provider-managed';
+  const reasoningDefaultUnverified = reasoningUnverified || reasoning?.defaultState === 'unknown' || reasoning?.defaultState === 'provider-managed';
   const reasoningOptions = reasoningUnverified ? [] : getReasoningSelectionOrder(reasoning);
   const defaultReasoning = reasoning?.defaultSelection ?? 'off';
   const routeOptions = effectiveModel?.routeOptions ?? [];
@@ -80,11 +78,20 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
     setProbeMode(mode);
     setProbeResult(null);
     try {
-      const result = await getElectronApi()!.llm.testModelCapability({
+      const result = await testModelCapability({
         providerId: provider.id,
         modelId: model.id,
         mode,
       });
+      if (!result) {
+        setProbeResult({
+          success: false,
+          status: 'failed',
+          requestSent: false,
+          detail: 'Capability probe is unavailable.',
+        });
+        return;
+      }
       setProbeResult(result);
     } catch (error) {
       setProbeResult({
@@ -265,9 +272,7 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
           {snapshot?.refreshing ? <div className="settings-model-capability-note">{t('settings.providers.capability.refreshing')}</div> : null}
           {snapshot?.stale ? <div className="settings-model-capability-note">{t('settings.providers.capability.stale')}</div> : null}
           {snapshot?.lastRefreshError ? (
-            <div className="settings-model-capability-note settings-model-capability-note--warning">
-              {t('settings.providers.capability.refreshFailed', { error: snapshot.lastRefreshError })}
-            </div>
+            <div className="settings-model-capability-note settings-model-capability-note--warning">{t('settings.providers.capability.refreshFailed', { error: snapshot.lastRefreshError })}</div>
           ) : null}
           {effectiveModel.quota ? (
             <div className="settings-model-capability-note settings-model-capability-note--warning">
@@ -277,15 +282,11 @@ export const ProviderModelCapabilitySummary: React.FC<ProviderModelCapabilitySum
               })}
             </div>
           ) : null}
-          {effectiveModel.unavailableReason ? (
-            <div className="settings-model-capability-note settings-model-capability-note--error">{effectiveModel.unavailableReason}</div>
-          ) : null}
+          {effectiveModel.unavailableReason ? <div className="settings-model-capability-note settings-model-capability-note--error">{effectiveModel.unavailableReason}</div> : null}
         </>
       ) : (
         <div className="settings-model-capability-note">
-          {provider.catalogOwnership === 'user-managed'
-            ? t('settings.providers.capability.userManagedDetail')
-            : t('settings.providers.capability.modelMissing')}
+          {provider.catalogOwnership === 'user-managed' ? t('settings.providers.capability.userManagedDetail') : t('settings.providers.capability.modelMissing')}
         </div>
       )}
     </div>

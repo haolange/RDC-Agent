@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import type { EffectiveCatalogSnapshot } from '@shared/types/providerCapability';
 import type { LlmProviderEntry, LlmProviderModel } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
-import { getElectronApi } from '../../../../platform/getElectronApi';
+import { getEffectiveCatalog, subscribeEffectiveCatalogChanged } from './providerCatalogActions';
 import { snapshotMatchesProvider } from '../modelCapabilitySummaryUtils';
 import { projectProviderModels } from '../providerModelProjection';
 import { ProviderConnectModelRow } from './ProviderConnectModelRow';
@@ -44,13 +44,11 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
     setSnapshot(null);
     setLoading(true);
     setLoadFailed(false);
-    void getElectronApi()?.settings.getEffectiveCatalog(provider.id, catalogAccountId)
-      .then((next) => {
+    void Promise.resolve(getEffectiveCatalog(provider.id, catalogAccountId)).then((next) => {
         if (cancelled) return;
         const matched = next && snapshotMatchesProvider(next, provider, catalogAccountId) ? next : null;
         setSnapshot(matched);
         setLoadFailed(false);
-        // Keep row-level loading while background discovery refresh is in flight.
         setLoading(matched?.refreshing === true);
       })
       .catch(() => {
@@ -59,7 +57,7 @@ export const ProviderConnectModelList: React.FC<ProviderConnectModelListProps> =
           setLoading(false);
         }
       });
-    const unsubscribe = getElectronApi()?.events.onEffectiveCatalogChanged((next) => {
+    const unsubscribe = subscribeEffectiveCatalogChanged((next) => {
       if (!cancelled && snapshotMatchesProvider(next, provider, catalogAccountId)) {
         setSnapshot(next);
         setLoading(next.refreshing === true);

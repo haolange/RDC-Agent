@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { DebuggerPage } from '../pages/Debugger';
+import { DebuggerPage } from '../features/transcript/DebuggerPage';
 import { UserMenu } from '../shell/UserMenu';
 import { TitleBar } from '../shell/TitleBar';
 import { SettingsModal } from '../features/settings/SettingsModal';
 import { KnowledgeCenterModal } from '../features/knowledge/KnowledgeCenterModal';
-import { useComposer } from '../features/debugger/composer/useComposer';
+import { useComposer } from '../features/composer/useComposer';
 import { CommandPalette } from '../patterns/CommandPalette';
-import { NotificationToast } from '../features/notifications/NotificationToast';
+import { NotificationToast } from './NotificationToast';
 import { AppProviders } from './AppProviders';
 import { WorkbenchShell } from './WorkbenchShell';
 import { useWorkbenchLayout } from './useWorkbenchLayout';
@@ -18,6 +18,7 @@ import { useSessionStore } from '../stores/sessionStore';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useI18n } from '../i18n';
+import { useWindowControls } from '../hooks/useWindowControls';
 import type { ResolvedTheme } from '@shared/types/settings';
 
 const App: React.FC = () => {
@@ -132,19 +133,7 @@ const App: React.FC = () => {
     void toggleRightPanel();
   }, [layout, toggleRightPanel]);
 
-  const handleWindowMinimize = useCallback(async () => {
-    await window.electronAPI?.windowControls.minimize();
-  }, []);
-
-  const handleWindowToggleMaximize = useCallback(async () => {
-    const electronAPI = window.electronAPI;
-    if (!electronAPI) return;
-    setWindowMaximized(await electronAPI.windowControls.toggleMaximize());
-  }, []);
-
-  const handleWindowClose = useCallback(async () => {
-    await window.electronAPI?.windowControls.close();
-  }, []);
+  const { handleWindowMinimize, handleWindowToggleMaximize, handleWindowClose } = useWindowControls(setWindowMaximized);
 
   if (isLoading) {
     return (

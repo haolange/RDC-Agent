@@ -1,0 +1,245 @@
+.composer-approval-overlay {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--token-bg-shell) 96%, transparent);
+  box-shadow: var(--shadow-panel-hover);
+}
+
+.composer-approval-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.composer-approval-header h2 {
+  margin: var(--space-0-5) 0 var(--space-1);
+  color: var(--token-text-heading);
+  font-size: var(--text-base);
+}
+
+.composer-approval-header p {
+  max-height: 88px;
+  margin: 0;
+  overflow: hidden;
+  color: var(--token-text-body);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.composer-approval-actions,
+.composer-revision-row {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-2);
+}
+
+.composer-approval-actions {
+  justify-content: flex-end;
+}
+
+.composer-revision-row textarea {
+  flex: 1;
+  min-width: 0;
+  resize: vertical;
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: var(--token-bg-app);
+  color: var(--token-text-heading);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  padding: var(--space-2);
+}
+
+.composer-permission-menu {
+  position: relative;
+}
+
+.composer-permission-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-height-md);
+  min-height: var(--control-height-md);
+  max-width: 13rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--control-radius);
+  background: color-mix(in srgb, var(--token-bg-shell) 82%, transparent);
+  color: var(--token-text-heading);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), opacity var(--transition-fast);
+}
+
+.composer-permission-pill:hover:not(:disabled),
+.composer-permission-pill.open {
+  border-color: var(--token-border-strong);
+  background: var(--token-bg-raised);
+}
+
+.composer-permission-pill[data-mode='default'] .composer-permission-pill-label,
+.composer-permission-pill[data-mode='default'] .composer-permission-pill-caret {
+  color: color-mix(in srgb, var(--token-status-success) 58%, var(--token-text-heading));
+}
+
+.composer-permission-pill[data-mode='auto-review'] .composer-permission-pill-label,
+.composer-permission-pill[data-mode='auto-review'] .composer-permission-pill-caret {
+  color: color-mix(in srgb, var(--token-status-info) 58%, var(--token-text-heading));
+}
+
+.composer-permission-pill[data-mode='full-access'] .composer-permission-pill-label,
+.composer-permission-pill[data-mode='full-access'] .composer-permission-pill-caret {
+  color: color-mix(in srgb, var(--token-status-warning) 58%, var(--token-text-heading));
+}
+
+.composer-permission-pill[data-mode='custom'] .composer-permission-pill-label {
+  color: var(--token-text-heading);
+}
+
+.composer-permission-pill[data-mode='custom'] .composer-permission-pill-caret {
+  color: var(--token-text-caption);
+}
+
+.composer-permission-pill:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.composer-permission-pill:focus-visible,
+.composer-permission-menu-item:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.composer-permission-pill-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  line-height: 1;
+}
+
+.composer-permission-pill-caret {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  color: var(--token-text-caption);
+}
+
+.composer-permission-pill-caret svg {
+  display: block;
+}
+
+.composer-permission-popup {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + var(--space-2));
+  z-index: var(--z-dropdown);
+  width: min(22rem, 72vw);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-panel);
+  box-shadow: var(--shadow-panel-hover);
+}
+
+.composer-permission-menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--token-text-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.composer-permission-menu-item:hover:not(:disabled),
+.composer-permission-menu-item.active {
+  background: var(--token-bg-muted);
+  color: var(--token-text-heading);
+}
+
+.composer-permission-menu-item:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.composer-permission-menu-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.composer-permission-menu-desc {
+  font-size: var(--text-xs);
+  color: var(--token-text-caption);
+  line-height: 1.45;
+  font-weight: var(--font-normal);
+}
+
+.composer-effort-menu {
+  position: relative;
+}
+
+.composer-effort-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--control-height-md);
+  min-height: var(--control-height-md);
+  max-width: 12rem;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--token-border-default);
+  border-radius: var(--control-radius);
+  background: color-mix(in srgb, var(--token-bg-shell) 82%, transparent);
+  color: var(--token-text-heading);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), opacity var(--transition-fast);
+}
+
+.composer-effort-pill:hover:not(:disabled),
+.composer-effort-pill.open {
+  border-color: var(--token-border-strong);
+  background: var(--token-bg-raised);
+}
+
+.composer-effort-pill:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.composer-effort-pill:focus-visible,
+.composer-effort-toggle-row:focus-within .composer-effort-toggle:focus-visible,
+.composer-effort-slider-thumb:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: 2px;
+}
+
+.composer-effort-pill-icon {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  line-height: 0;
+  color: var(--token-text-caption);
+}

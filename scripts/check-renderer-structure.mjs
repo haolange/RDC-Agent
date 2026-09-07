@@ -128,7 +128,7 @@ for (const retired of ['src/renderer/pages', 'src/renderer/components', 'src/ren
 }
 
 // CSS colocation: feature components must not be styled from styles/global.
-for (const globalCss of ['src/renderer/styles/global/app-shell.css', 'src/renderer/styles/global/panels-composer.css']) {
+for (const globalCss of ['src/renderer/styles/global/app-shell.css']) {
   const absolute = path.join(root, globalCss);
   if (!fs.existsSync(absolute)) continue;
   const content = fs.readFileSync(absolute, 'utf8');

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { KNOWLEDGE_CASE_CHAPTERS } from '@shared/types/knowledge';
-import { MessageMarkdown } from '../../../debugger/AgentChat/MessageMarkdown';
+import { MessageMarkdown } from '../../../../patterns/Markdown/MessageMarkdown';
 import { Button } from '../../../../ui/Button';
 import { ResourceEmptyState } from '../../../../ui/ResourceEmptyState';
 import { useI18n } from '../../../../i18n';

@@ -1,0 +1,15 @@
+export const zhMemory = {
+  'memory.panelTitle': '记忆',
+  'memory.empty': '暂无记忆。',
+  'memory.new': '新建记忆',
+  'memory.save': '保存',
+  'memory.cancel': '取消',
+  'memory.edit': '编辑',
+  'memory.delete': '删除',
+  'memory.deleteConfirm': '确认删除这条记忆？此操作不可撤销。',
+  'memory.deleteTitle': '删除记忆？',
+  'memory.back': '返回',
+  'memory.namePlaceholder': '名称（kebab-case）',
+  'memory.descriptionPlaceholder': '描述',
+  'memory.contentPlaceholder': '内容（markdown）',
+} as const;

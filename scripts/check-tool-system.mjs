@@ -37,7 +37,7 @@ function main() {
     REJECTED_TOOL_TOKENS,
   } = require('../src/shared/constants/agentToolTokens.ts');
   const { AGENT_WORKBENCH_TOOL_CATALOG } = require('../src/shared/constants/agentWorkbenchCatalog.ts');
-  const { WORK_PROCESS_TOOL_DISPLAY_CATALOG } = require('../src/renderer/features/debugger/AgentChat/workProcessToolCatalog.ts');
+  const { WORK_PROCESS_TOOL_DISPLAY_CATALOG } = require('../src/renderer/features/transcript/workProcessToolCatalog.ts');
 
   assert(
     BUILTIN_AGENT_TOOL_IDS.length === 49,

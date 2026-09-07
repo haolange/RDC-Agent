@@ -1,0 +1,111 @@
+/* Sidebar chrome extracted from styles/global */
+
+/* from src/renderer/styles/global/app-shell.css */
+.sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: var(--space-3);
+}
+
+.app-sidebar-left.collapsed .sidebar-nav,
+.app-sidebar-left.collapsed .app-sidebar-footer,
+.app-sidebar-right.collapsed .right-panel-body {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-sidebar-left.collapsed .sidebar-nav,
+.app-sidebar-left.collapsed .app-sidebar-footer {
+  transform: translateX(-12px);
+}
+
+/* from src/renderer/styles/global/panels-composer.css */
+.sidebar-footer-entry {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.sidebar-footer-entry.collapsed {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  align-self: center;
+}
+
+.app-sidebar-footer .sidebar-knowledge-icon,
+.app-sidebar-footer .footer-entry-avatar {
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  justify-self: stretch;
+}
+
+/* Knowledge Center: flatter chip than the user card; same title type and text edge. */
+.footer-entry.sidebar-knowledge-trigger {
+  min-height: 40px;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-xl);
+  justify-content: flex-start;
+  cursor: pointer;
+  color: var(--token-text-heading);
+  font: inherit;
+  text-align: left;
+}
+
+.sidebar-knowledge-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: var(--token-text-body);
+}
+
+.sidebar-knowledge-icon svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.sidebar-knowledge-trigger:hover .sidebar-knowledge-icon {
+  color: var(--token-border-focus);
+}
+
+.sidebar-knowledge-trigger .footer-entry-title {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  line-height: 1.15;
+}
+
+.sidebar-user-trigger {
+  min-height: 58px;
+  padding: var(--space-3) var(--space-3);
+  justify-content: flex-start;
+}
+
+.sidebar-user-trigger.collapsed {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  flex: 0 0 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xl);
+}
+
+.sidebar-user-trigger.collapsed .footer-entry-main {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: auto;
+  margin: 0;
+  justify-content: center;
+  gap: 0;
+}

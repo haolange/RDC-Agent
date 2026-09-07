@@ -49,7 +49,7 @@ const isExempt = (rel) => EXEMPT_PREFIXES.some((prefix) => (
 // Right Rail empty visuals inject SVG stop colors via presentation attributes;
 // documented single exception (docs/ui/design-system.md 空态插画).
 const STOP_COLOR_EXEMPT = new Set([
-  'src/renderer/features/debugger/ControlPanel/RightRail.css',
+  'src/renderer/features/right-rail/RightRail.css',
 ]);
 
 const RULES = [

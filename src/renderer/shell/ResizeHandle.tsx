@@ -1,3 +1,5 @@
+import './ResizeHandle.css';
+
 export interface ResizeHandleProps {
   side: 'left' | 'right';
   disabled?: boolean;

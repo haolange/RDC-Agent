@@ -112,7 +112,7 @@ background: color-mix(in srgb, var(--token-bg-raised) 78%, transparent);
 
 ## 按钮规则
 
-- 全局唯一按钮系统：`.button`（基类） + `.button-primary / button-secondary / button-ghost / button-danger`，定义在 `src/renderer/ui/Button.css`（由 `styles/global.css` → `ui/kit.css` 导入，不得再写入 `panels-composer.css`）。
+- 全局唯一按钮系统：`.button`（基类） + `.button-primary / button-secondary / button-ghost / button-danger`，定义在 `src/renderer/ui/Button.css`（由 `styles/global.css` → `ui/kit.css` 导入）。
 - React 层用 `<Button variant="primary|secondary|ghost|danger" size="sm|md|lg">`（`src/renderer/ui/Button.tsx`）。
 - **禁止**新增第三套按钮类名，禁止在 feature CSS 中重复定义按钮样式。
 
@@ -228,9 +228,9 @@ pnpm run typecheck
 | Composer 禁 energy orbit / 流光 | 文档禁止；实现仍在 | **B6** |
 | DropdownSelect 禁 backdrop blur | `check:appearance` 要求实色 `--token-bg-shell`、禁止 blur | B1 已反转 |
 | Preview 引用运行时 CSS，删除 `designs/tokens/*` | Preview 已改；副本已删并入 `retired` | **B2** 已落地 |
-| i18n 拆分、硬编码入 i18n、sentence case | 无自动门禁 | **B8** |
+| i18n 拆分、硬编码入 i18n、sentence case | key 已拆到 `i18n/locales/{en,zh-CN}/`；硬编码与 sentence case 仍待扫 | **B3** 拆分；**B8** 文案 |
 | `check:architecture` R4 hex exempt | 仅 `design-system.css` | B1 已清空 |
-| `pages/`、`styles/base/` 删除 | `styles/base` 已删并入 `retired`；`pages/` 仍计结构债务 | B1 已删 `styles/base`；**B3** 删 `pages/` |
+| `pages/`、`styles/base/` 删除 | 两者已删并入 `retired`；`check:renderer-structure` hits=0 | B1 已删 `styles/base`；**B3** 已删 `pages/` |
 
 受门禁锁定的 renderer 文件路径集中登记在 [`scripts/fidelity/renderer-contract.json`](../../scripts/fidelity/renderer-contract.json)：`files` 为必存在锚点，`retired` 为必须保持删除的退役路径。移动或重命名这些文件时只改该 manifest。
 

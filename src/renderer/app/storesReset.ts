@@ -5,8 +5,8 @@ import { useProjectStore } from '../stores/projectStore';
 import { useSessionStore } from '../stores/sessionStore';
 import { useSessionProjectionStore } from '../stores/sessionProjectionStore';
 import { useWorkflowStore } from '../stores/workflowStore';
-import { useComposerSessionContextStore } from '../features/debugger/composer/composerSessionContext';
-import { useComposerModelDraftStore } from '../features/debugger/composer/composerModelDraft';
+import { useComposerSessionContextStore } from '../stores/composerSessionContextStore';
+import { useComposerModelDraftStore } from '../stores/composerModelDraftStore';
 
 /** Resets session-scoped slices (used by case:new and E2E harness). */
 export function resetWorkbenchStores(): void {

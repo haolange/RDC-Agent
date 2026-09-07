@@ -192,8 +192,8 @@ assert(!routeResolverSource.includes('PROTOCOL_REASONING_DELIVERY'), 'Reasoning 
   assert(routeCapabilityResolver.includes('route_tool_calling_unsupported'), 'Explicit unsupported tool support must use the unsupported diagnostic code.');
   assert(routeCapabilityResolver.includes('route_tool_calling_disabled'), 'Unavailable routes must use the disabled diagnostic code.');
   assert(routeCapabilityResolver.includes('has not confirmed native tool calling'), 'Unknown tool calling must not reuse the explicit-unsupported wording.');
-  assert(!read('src/renderer/features/debugger/composer/composerModelPicker.ts').includes('isEffectiveModelPickerSelectable'), 'Composer picker must use the Agent tool-eligibility gate.');
-  assert(read('src/renderer/features/debugger/composer/composerModelPicker.ts').includes('isAgentToolExecutableModel'), 'Composer picker must share the Agent tool-eligibility gate.');
+  assert(!read('src/renderer/features/composer/composerModelPicker.ts').includes('isEffectiveModelPickerSelectable'), 'Composer picker must use the Agent tool-eligibility gate.');
+  assert(read('src/renderer/features/composer/composerModelPicker.ts').includes('isAgentToolExecutableModel'), 'Composer picker must share the Agent tool-eligibility gate.');
 
   assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/LLMAdapterProvider.ts')), 'Legacy LLMAdapterProvider must be removed from agent runtime.');
   assert(!fs.existsSync(path.join(repoRoot, 'src/main/agent-runtime/cli/StandaloneCli.ts')), 'The unshipped mock StandaloneCli must not return as a second runtime path.');

@@ -122,7 +122,7 @@ src/renderer/
   app/            App、bootstrap、WorkbenchShell、theme、overlays、contextMenu
   shell/          AppShell、TitleBar、PanelZone、UserMenu、TerminalDrawer 壳
   features/
-    transcript/   消息、Work Process、markdown（形态不变）
+    transcript/   消息、Work Process（形态不变）
     composer/     Composer 与共置 CSS
     right-rail/   Session / Project 右侧栏
     sidebar/      Project / Session 列表
@@ -130,14 +130,14 @@ src/renderer/
     knowledge/    Knowledge Center
     terminal/     终端面板
     captures/     DeviceSelector 与 capture 入口
-  patterns/       跨 feature 复合，可读 store，不写 store、不直调 IPC
+  patterns/       跨 feature 复合（含 Markdown），可读 store，不写 store、不直调 IPC
   ui/             原子 + 分子组件库
   stores/  services/  hooks/  lib/  platform/
   i18n/           index.ts + locales/{en,zh-CN}/<feature>.ts
   styles/         design-system.css、global.css、base.css、responsive.css（仅真 @media）
 ```
 
-禁止恢复 `pages/`、`styles/tokens/*`、`styles/base/`、`src/renderer/components`。当前实现尚未全部迁到本树；B3 一次性收敛，不得双轨。
+禁止恢复 `pages/`、`styles/tokens/*`、`styles/base/`、`src/renderer/components`。B3 已迁到本树；不得双轨。
 
 - [`docs/ui/workbench-and-transcript.md`](docs/ui/workbench-and-transcript.md) — Workbench 轨、Work Process、Composer、Markdown
 - [`docs/ui/design-system.md`](docs/ui/design-system.md) — Token、按钮、颜色、组件规则、Appearance 双体系

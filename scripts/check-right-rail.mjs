@@ -34,15 +34,15 @@ const requiredFiles = [
   'src/main/agent-trace/rightRailTaskContextResources.ts',
   'src/main/reports/OutputRegistrationTool.ts',
   'src/main/sessions/SessionArtifactSource.ts',
-  'src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx',
-  'src/renderer/features/debugger/ControlPanel/ProjectCaptureImportPanel.tsx',
-  'src/renderer/features/debugger/ControlPanel/RightRailArtifactList.tsx',
-  'src/renderer/features/debugger/ControlPanel/RightRailInvestigationPreview.tsx',
-  'src/renderer/features/debugger/ControlPanel/RightRailArtifactGlyphs.tsx',
-  'src/renderer/features/debugger/ControlPanel/RightRailOutputList.tsx',
-  'src/renderer/features/debugger/ControlPanel/RightRailContext.tsx',
-  'src/renderer/features/debugger/ControlPanel/CapturePanel.tsx',
-  'src/renderer/features/debugger/ControlPanel/RightRail.css',
+  'src/renderer/features/right-rail/TraceRightPanel.tsx',
+  'src/renderer/features/right-rail/ProjectCaptureImportPanel.tsx',
+  'src/renderer/features/right-rail/RightRailArtifactList.tsx',
+  'src/renderer/features/right-rail/RightRailInvestigationPreview.tsx',
+  'src/renderer/features/right-rail/RightRailArtifactGlyphs.tsx',
+  'src/renderer/features/right-rail/RightRailOutputList.tsx',
+  'src/renderer/features/right-rail/RightRailContext.tsx',
+  'src/renderer/features/right-rail/CapturePanel.tsx',
+  'src/renderer/features/right-rail/RightRail.css',
   'src/renderer/app/WorkbenchPanelDrawer.tsx',
   'src/renderer/app/useWorkbenchLayout.ts',
   'src/shared/types/trace.ts',
@@ -52,13 +52,13 @@ for (const relativePath of requiredFiles) read(relativePath);
 assertRetiredAbsent(fail);
 
 for (const component of [
-  'src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx',
-  'src/renderer/features/debugger/ControlPanel/RightRailArtifactList.tsx',
-  'src/renderer/features/debugger/ControlPanel/RightRailInvestigationPreview.tsx',
-  'src/renderer/features/debugger/ControlPanel/RightRailArtifactGlyphs.tsx',
-  'src/renderer/features/debugger/ControlPanel/RightRailOutputList.tsx',
-  'src/renderer/features/debugger/ControlPanel/RightRailContext.tsx',
-  'src/renderer/features/debugger/ControlPanel/CapturePanel.tsx',
+  'src/renderer/features/right-rail/TraceRightPanel.tsx',
+  'src/renderer/features/right-rail/RightRailArtifactList.tsx',
+  'src/renderer/features/right-rail/RightRailInvestigationPreview.tsx',
+  'src/renderer/features/right-rail/RightRailArtifactGlyphs.tsx',
+  'src/renderer/features/right-rail/RightRailOutputList.tsx',
+  'src/renderer/features/right-rail/RightRailContext.tsx',
+  'src/renderer/features/right-rail/CapturePanel.tsx',
 ]) {
   const limit = component.endsWith('RightRailArtifactList.tsx') || component.endsWith('RightRailArtifactGlyphs.tsx') ? 200 : 300;
   if (lineCount(component) > limit) fail(`component must stay under ${limit} lines: ${component}`);
@@ -67,7 +67,7 @@ if (lineCount('src/main/agent-trace/rightRailInvestigationArtifacts.ts') > 150) 
   fail('rightRailInvestigationArtifacts.ts must stay under 150 lines');
 }
 
-const tracePanel = read('src/renderer/features/debugger/ControlPanel/TraceRightPanel.tsx');
+const tracePanel = read('src/renderer/features/right-rail/TraceRightPanel.tsx');
 for (const requiredSection of ['id="progress"', 'id="artifacts"', 'id="outputs"', 'id="context"', 'id="capture"', 'Progress', 'Artifacts', 'Outputs', 'Context', 'Capture']) {
   requireText(tracePanel, requiredSection, `TraceRightPanel must render ${requiredSection}`);
 }
@@ -97,7 +97,10 @@ for (const forbidden of ['ClassicSessionControlPanel', 'shouldShowTraceRightRail
 }
 forbidText(tracePanel, 'is-empty', 'TraceRightPanel sections must keep one card shell regardless of content');
 
-const projectCaptureImport = read('src/renderer/features/debugger/ControlPanel/ProjectCaptureImportPanel.tsx');
+const projectCaptureImport = [
+  read('src/renderer/features/right-rail/ProjectCaptureImportPanel.tsx'),
+  read('src/renderer/features/right-rail/projectCaptureActions.ts'),
+].join('\n');
 for (const required of ['project.inputs.import', 'project.inputs.refresh', "'projectCapture.import'", "'projectCapture.empty'", 'right-rail-section project-capture-import-section', 'project-capture-input-list']) {
   requireText(projectCaptureImport, required, `ProjectCaptureImportPanel must retain ${required}`);
 }
@@ -105,7 +108,10 @@ for (const forbidden of ['useCaptureStore', 'openedCapture', 'TraceRightPanel', 
   forbidText(projectCaptureImport, forbidden, `ProjectCaptureImportPanel must not retain ${forbidden}`);
 }
 
-const artifactList = read('src/renderer/features/debugger/ControlPanel/RightRailArtifactList.tsx');
+const artifactList = [
+  read('src/renderer/features/right-rail/RightRailArtifactList.tsx'),
+  read('src/renderer/hooks/appShellBridge.ts'),
+].join('\n');
 for (const required of ['RightRailArtifactGlyph', 'control.rightRail.artifacts.copyId', 'control.rightRail.artifacts.preview', 'RightRailInvestigationPreview', 'appShell.copyText']) {
   requireText(artifactList, required, `RightRailArtifactList must retain ${required}`);
 }
@@ -113,7 +119,10 @@ for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:
   forbidText(artifactList, forbidden, `RightRailArtifactList must not retain ${forbidden}`);
 }
 
-const artifactPreview = read('src/renderer/features/debugger/ControlPanel/RightRailInvestigationPreview.tsx');
+const artifactPreview = [
+  read('src/renderer/features/right-rail/RightRailInvestigationPreview.tsx'),
+  read('src/renderer/features/right-rail/investigationPreviewActions.ts'),
+].join('\n');
 for (const required of ['investigation.read', 'expectedHash', "role=\"dialog\"", "event.key === 'Escape'", 'hash-mismatch']) {
   requireText(artifactPreview, required, `RightRailInvestigationPreview must retain ${required}`);
 }
@@ -121,12 +130,12 @@ for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:
   forbidText(artifactPreview, forbidden, `RightRailInvestigationPreview must not retain ${forbidden}`);
 }
 
-const artifactGlyphs = read('src/renderer/features/debugger/ControlPanel/RightRailArtifactGlyphs.tsx');
+const artifactGlyphs = read('src/renderer/features/right-rail/RightRailArtifactGlyphs.tsx');
 for (const forbidden of ['artifactStore', 'readdirSync', 'session:investigation:']) {
   forbidText(artifactGlyphs, forbidden, `RightRailArtifactGlyphs must not retain ${forbidden}`);
 }
 
-const outputList = read('src/renderer/features/debugger/ControlPanel/RightRailOutputList.tsx');
+const outputList = read('src/renderer/features/right-rail/RightRailOutputList.tsx');
 for (const required of ['OutputFileGlyph', "artifact.status === 'failed'", 'control.rightRail.outputs.missing', 'control.rightRail.outputs.open']) {
   requireText(outputList, required, `RightRailOutputList must retain ${required}`);
 }
@@ -134,7 +143,7 @@ for (const forbidden of ['PlanArtifactPreview', 'isPlanArtifact', "artifact.type
   forbidText(outputList, forbidden, `RightRailOutputList must not retain ${forbidden}`);
 }
 
-const context = read('src/renderer/features/debugger/ControlPanel/RightRailContext.tsx');
+const context = read('src/renderer/features/right-rail/RightRailContext.tsx');
 for (const requiredArea of ['TaskContextPanelViewModel', 'TaskContextResource', 'Task context resources']) {
   requireText(context, requiredArea, `RightRailContext must retain ${requiredArea}`);
 }
@@ -145,13 +154,16 @@ for (const forbidden of ['context?: ContextPanelViewModel', 'Rdx', 'Capture', 'P
 for (const forbidden of ['TOOL_LABELS', 'Runtime lookup', 'displayLabel']) {
   forbidText(context, forbidden, 'RightRailContext must not project generic tool category ' + forbidden);
 }
-const capturePanel = read('src/renderer/features/debugger/ControlPanel/CapturePanel.tsx');
+const capturePanel = [
+  read('src/renderer/features/right-rail/CapturePanel.tsx'),
+  read('src/renderer/features/right-rail/capturePanelActions.ts'),
+].join('\n');
 for (const required of ['RdxContextPanelViewModel', "'Open'", "'Preview'", "'Refresh'", "'Copy'", "'Clear'", 'capture.openProjectInput', 'context.openHumanPreview', 'capture.clearOpenedState', 'right-rail-capture-open-row', 'right-rail-capture-open-button']) {
   requireText(capturePanel, required, `CapturePanel must retain ${required}`);
 }
 forbidText(capturePanel, 'right-rail-capture-summary', 'CapturePanel must not duplicate the selected capture above its picker');
 
-const rightRailCss = read('src/renderer/features/debugger/ControlPanel/RightRail.css');
+const rightRailCss = read('src/renderer/features/right-rail/RightRail.css');
 for (const required of ['.right-rail-empty-state', '.right-rail-empty-visual', 'grid-template-rows:', 'flex: 0 0 auto', 'font-size: var(--text-md)', 'font-size: var(--text-xl)', '.right-rail-capture-panel', '.right-rail-capture-open-row', '.project-capture-import-section', '.project-capture-input-list', '.output-visual', '.artifacts-visual', '.context-visual', '.capture-visual', '.right-rail-investigation-list', '.right-rail-investigation-row']) {
   requireText(rightRailCss, required, `RightRail.css must retain ${required}`);
 }
@@ -235,7 +247,7 @@ for (const forbidden of ['readdirSync', 'globSync', 'payload paths']) {
   forbidText(outputRegistrationTool, forbidden, `OutputRegistrationTool must not scan ${forbidden}`);
 }
 
-const controlPanel = read('src/renderer/features/debugger/ControlPanel/index.tsx');
+const controlPanel = read('src/renderer/features/right-rail/index.tsx');
 for (const required of ['rightRailTarget', 'ProjectCaptureImportPanel', "rightRailTarget !== 'session'"]) {
   requireText(controlPanel, required, `ControlPanel must retain ${required}`);
 }

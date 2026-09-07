@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { cn } from '../../../../lib/cn';
 import type { RdxRuntimeOverview, ScopedResourceDocument, ScopedResourceKind } from '@shared/types/rdxRuntime';
 import { useI18n, type TranslationKey } from '../../../../i18n';
 import { ConfirmationDialog } from '../../../../ui/ConfirmationDialog';
@@ -6,6 +7,13 @@ import { ResourceEmptyState } from '../../../../ui/ResourceEmptyState';
 import { ScopedResourceEditor } from './ScopedResourceEditor';
 import { uniqueResourceId } from './uniqueResourceId';
 import { contentFromForm, emptyForm, formFromContent, resourceCardMeta, type ResourceFormState } from './scopedResourceForm';
+import { selectFiles } from '../../../../hooks/appShellBridge';
+import {
+  deleteScopedResource,
+  importScopedResource,
+  upsertScopedResource,
+  validateScopedResource,
+} from './runtimeScopeActions';
 
 const templateId = (kind: ScopedResourceKind): string => `new-${kind}`;
 const kindLabelKey = (kind: ScopedResourceKind): TranslationKey => `settings.kind.${kind}` as TranslationKey;
@@ -83,12 +91,13 @@ export const RuntimeScopePanel: React.FC<{
         content,
         ...(overview?.projectRoot ? { projectRoot: overview.projectRoot } : {}),
       };
-      const validation = await window.electronAPI.rdxRuntime.validateResource(request);
-      if (!validation.valid) {
-        setMessage(validation.diagnostics.join('\n'));
+      const validation = await validateScopedResource(request);
+      if (!validation?.valid) {
+        setMessage(validation?.diagnostics.join('\n') || t('settings.resourceArgsInvalid'));
         return;
       }
-      const next = await window.electronAPI.rdxRuntime.upsertResource(request);
+      const next = await upsertScopedResource(request);
+      if (!next) return;
       onChanged?.(next);
       setCreating(false);
       setSelectedId(safeIdPreview(form.id));
@@ -107,12 +116,13 @@ export const RuntimeScopePanel: React.FC<{
     if (!target) return;
     setBusy(true);
     try {
-      onChanged?.(await window.electronAPI.rdxRuntime.deleteResource(
+      const next = await deleteScopedResource(
         target.kind,
         target.scope,
         target.id,
         overview?.projectRoot,
-      ));
+      );
+      if (next) onChanged?.(next);
       setSelectedId(null);
       setCreating(false);
       setForm(emptyForm(kind, templateId(kind)));
@@ -128,15 +138,16 @@ export const RuntimeScopePanel: React.FC<{
     setBusy(true);
     setMessage('');
     try {
-      const paths = await window.electronAPI.selectFiles();
+      const paths = await selectFiles();
       const filePath = paths?.[0];
       if (!filePath) return;
-      const result = await window.electronAPI.rdxRuntime.importResource({
+      const result = await importScopedResource({
         kind,
         scope,
         filePath,
         ...(overview?.projectRoot ? { projectRoot: overview.projectRoot } : {}),
       });
+      if (!result) return;
       onChanged?.(result.overview);
       const imported = result.overview.resources.find((entry) => entry.scope === scope && entry.kind === kind && entry.id === result.id);
       if (imported) openResource(imported);
@@ -189,7 +200,7 @@ export const RuntimeScopePanel: React.FC<{
                     <button
                       type="button"
                       key={`${resource.kind}:${resource.id}`}
-                      className={`settings-manifest-card ${active ? 'active' : ''} status-${resource.effectiveStatus}`}
+                      className={cn('settings-manifest-card', active && 'is-active', `status-${resource.effectiveStatus}`)}
                       onClick={() => openResource(resource)}
                     >
                       <span>

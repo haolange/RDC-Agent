@@ -1,4 +1,5 @@
 import type { KnowledgeCandidatesResult, KnowledgeLaneHit } from '@shared/types/knowledge';
+import { cn } from '../../../../lib/cn';
 import { Button } from '../../../../ui/Button';
 import { ResourceEmptyState } from '../../../../ui/ResourceEmptyState';
 import { useI18n, type TranslationKey } from '../../../../i18n';
@@ -45,7 +46,7 @@ function HitButton({
   return (
     <Button
       variant="ghost"
-      className={`knowledge-center-card-button ${active ? 'is-active' : ''}`}
+      className={cn('knowledge-center-card-button', active && 'is-active')}
       onClick={onSelect}
       data-testid={`knowledge-card-${card.cardId}`}
     >

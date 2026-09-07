@@ -1,12 +1,12 @@
 {
-  "hits": 45,
+  "hits": 0,
   "categories": {
-    "layer": 12,
-    "cross-feature": 3,
-    "ipc": 21,
-    "state-class": 5,
-    "retired-bucket": 1,
-    "global-selector": 3
+    "layer": 0,
+    "cross-feature": 0,
+    "ipc": 0,
+    "state-class": 0,
+    "retired-bucket": 0,
+    "global-selector": 0
   },
-  "$comment": "B0 债务棘轮；B1 删除 styles/base 后 retired-bucket 46→45。B3 清零后改为 0。"
+  "$comment": "B3 清零：层依赖、跨 feature、TSX IPC、is-* 状态类、retired bucket、global feature selector。"
 }

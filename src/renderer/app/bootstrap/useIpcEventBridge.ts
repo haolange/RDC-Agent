@@ -30,7 +30,7 @@ import { useWorkflowStore } from '../../stores/workflowStore';
 import { resetWorkbenchStores } from '../storesReset';
 import { acceptsContextUsage } from '../../stores/contextUsageProjectionModel';
 import { createConversationEventBatcher } from './conversationEventBatcher';
-import { isActiveSessionEvent, isActiveSessionScope } from './sessionEventGate';
+import { isActiveSessionEvent, isActiveSessionScope } from '../../stores/sessionEventGate';
 
 export function useSyncCapturesFromSnapshot() {
   return useCallback((snapshot: ContextSnapshot) => {

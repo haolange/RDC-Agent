@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import type { AgentShellSettings, ResolvedShellSnapshot } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
-import { getElectronApi } from '../../../../platform/getElectronApi';
+import { getResolvedShell } from './shellSettingsActions';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -21,9 +21,9 @@ export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({
   useEffect(() => {
     let cancelled = false;
     const handle = window.setTimeout(() => {
-      void getElectronApi()?.settings.getResolvedShell(draft.executable)
-        .then((snapshot) => {
-          if (!cancelled) setResolved(snapshot);
+      void getResolvedShell(draft.executable)
+        ?.then((snapshot) => {
+          if (!cancelled) setResolved(snapshot ?? null);
         })
         .catch((error: unknown) => {
           if (!cancelled) {

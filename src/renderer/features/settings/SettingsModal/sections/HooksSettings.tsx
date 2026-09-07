@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { RdxRuntimeOverview } from '@shared/types/rdxRuntime';
 import { useI18n } from '../../../../i18n';
 import { resolveHookTrustProjectRoot } from './hookTrustProjectRoot';
+import { getRdxOverview, revokeHook, testHook, trustHook } from './hooksSettingsActions';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
 
 export const HooksSettings: React.FC<{
@@ -28,15 +29,16 @@ export const HooksSettings: React.FC<{
       });
       if (action === 'trust' || action === 'revoke') {
         const next = action === 'trust'
-          ? await window.electronAPI.rdxRuntime.trustHook(trustProjectRoot, hookId)
-          : await window.electronAPI.rdxRuntime.revokeHook(trustProjectRoot, hookId);
+          ? await trustHook(trustProjectRoot, hookId)
+          : await revokeHook(trustProjectRoot, hookId);
+        if (!next) return;
         onChanged(
           trustProjectRoot == null && overview?.projectRoot
-            ? await window.electronAPI.rdxRuntime.getOverview(overview.projectRoot)
+            ? (await getRdxOverview(overview.projectRoot)) ?? next
             : next,
         );
       } else {
-        const result = await window.electronAPI.rdxRuntime.testHook(
+        const result = await testHook(
           hook?.event ?? 'tool.before-call',
           overview?.projectRoot,
           hookId,

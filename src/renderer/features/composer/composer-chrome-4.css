@@ -1,0 +1,25 @@
+@media (prefers-reduced-motion: reduce) {
+  .composer-agent-menu-item-running-dot {
+    animation: none;
+  }
+
+  .composer-agent-menu-item-tooltip {
+    transition: none;
+  }
+}
+
+@property --composer-energy-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: -130deg;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composer-shell.is-running::before {
+    --composer-energy-angle: -84deg;
+    animation: none;
+    filter:
+      drop-shadow(0 0 3px color-mix(in srgb, var(--composer-mode-accent) 32%, transparent))
+      drop-shadow(0 0 10px color-mix(in srgb, var(--composer-mode-accent) 14%, transparent));
+  }
+}

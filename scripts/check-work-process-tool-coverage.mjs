@@ -9,8 +9,8 @@ const {
   WORK_PROCESS_TOOL_DISPLAY_CATALOG,
   createToolRowForPresentation,
   getToolFamily,
-} = require('../src/renderer/features/debugger/AgentChat/workProcessPresentation.ts');
-const { buildToolAggregateSummary } = require('../src/renderer/features/debugger/AgentChat/workProcessToolAggregate.ts');
+} = require('../src/renderer/features/transcript/workProcessPresentation.ts');
+const { buildToolAggregateSummary } = require('../src/renderer/features/transcript/workProcessToolAggregate.ts');
 
 const fail = (message) => {
   console.error(`[work-process-tool-coverage] ${message}`);

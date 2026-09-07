@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import type { RdxRuntimeOverview } from '@shared/types/rdxRuntime';
 import { useI18n } from '../../../../i18n';
+import { revokeMcp, trustMcp } from './mcpTrustActions';
 
 export const McpTrustPanel: React.FC<{
   overview: RdxRuntimeOverview | null;
@@ -22,9 +23,10 @@ export const McpTrustPanel: React.FC<{
     setBusyId(descriptorId);
     setMessage('');
     try {
-      onChanged(action === 'trust'
-        ? await window.electronAPI.rdxRuntime.trustMcp(overview.projectRoot, descriptorId)
-        : await window.electronAPI.rdxRuntime.revokeMcp(overview.projectRoot, descriptorId));
+      const next = action === 'trust'
+        ? await trustMcp(overview.projectRoot, descriptorId)
+        : await revokeMcp(overview.projectRoot, descriptorId);
+      if (next) onChanged(next);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {
