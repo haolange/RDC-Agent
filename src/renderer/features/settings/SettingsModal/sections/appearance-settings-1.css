@@ -1,0 +1,171 @@
+.settings-page-appearance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.appearance-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.appearance-mode-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-lg);
+  background: var(--token-bg-raised);
+  color: var(--token-text-heading);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.appearance-mode-tile:hover {
+  border-color: var(--token-border-default);
+  background: var(--token-interactive-hover);
+}
+
+.appearance-mode-tile:focus-visible {
+  outline: none;
+  border-color: var(--token-border-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--token-border-focus) 18%, transparent);
+}
+
+.appearance-mode-tile.is-active {
+  border-color: var(--token-border-focus);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--token-border-focus) 36%, transparent);
+}
+
+.appearance-mode-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  text-align: center;
+}
+
+.appearance-mini-win,
+.appearance-mode-preview {
+  display: grid;
+  grid-template-rows: 10px 1fr;
+  height: 64px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--token-border-muted);
+  overflow: hidden;
+  --ap-surface: rgb(250 251 253);
+  --ap-ink: rgb(21 29 39);
+  --ap-accent: rgb(27 157 204);
+}
+
+.appearance-mode-preview--system {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: none;
+  height: 64px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--token-border-muted);
+  overflow: hidden;
+}
+
+.appearance-mode-preview--system .appearance-mini-win {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+}
+
+.appearance-mode-preview--system .appearance-mini-win + .appearance-mini-win {
+  border-left: 1px solid var(--token-border-muted);
+}
+
+.appearance-mini-title {
+  background: color-mix(in srgb, var(--ap-surface) 86%, var(--ap-ink));
+}
+
+.appearance-mini-body {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  min-height: 0;
+}
+
+.appearance-mini-side {
+  background: color-mix(in srgb, var(--ap-ink) 12%, var(--ap-surface));
+}
+
+.appearance-mini-main {
+  position: relative;
+  background: var(--ap-surface);
+}
+
+.appearance-mini-main::after {
+  content: '';
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  width: 18px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--ap-accent);
+}
+
+.appearance-live-preview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--token-border-muted);
+  min-height: 112px;
+}
+
+.appearance-preview-pane {
+  --ap-surface: rgb(250 251 253);
+  --ap-ink: rgb(21 29 39);
+  --ap-accent: rgb(27 157 204);
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  min-height: 112px;
+  background: var(--ap-surface);
+  color: var(--ap-ink);
+}
+
+.appearance-preview-pane + .appearance-preview-pane {
+  border-left: 1px solid color-mix(in srgb, var(--ap-ink) 14%, transparent);
+}
+
+.appearance-preview-side {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-3) var(--space-2);
+  background: color-mix(in srgb, var(--ap-ink) 10%, var(--ap-surface));
+  border-right: 1px solid color-mix(in srgb, var(--ap-ink) 12%, transparent);
+}
+
+.appearance-preview-nav {
+  display: block;
+  width: 100%;
+  height: 8px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--ap-ink) 16%, transparent);
+}
+
+.appearance-preview-nav--accent {
+  background: var(--ap-accent);
+}
+
+.appearance-preview-main {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-4);
+}
+
+.appearance-preview-title {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  opacity: 0.92;
+}

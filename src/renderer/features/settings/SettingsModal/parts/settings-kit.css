@@ -1,0 +1,139 @@
+.settings-page {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.settings-block.ui-panel {
+  background: var(--settings-card-bg, var(--token-bg-raised));
+  border-color: var(--token-border-card);
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--control-height-md);
+  min-width: 0;
+}
+
+.settings-field.is-row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.settings-field-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.settings-field-label {
+  color: var(--token-text-heading);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  line-height: var(--leading-tight);
+}
+
+.settings-field-control {
+  min-width: 0;
+}
+
+.settings-choice-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.settings-scope-bar {
+  width: 100%;
+}
+
+.settings-scope-bar .ui-tabs-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  min-height: var(--control-height-md);
+}
+
+.settings-scope-bar .ui-tabs-tab {
+  width: 100%;
+  min-height: var(--control-height-md);
+}
+
+.settings-manifest-row .ui-list-row-body,
+.settings-scope-row .ui-list-row-body {
+  white-space: normal;
+}
+
+.settings-manifest-row-copy,
+.settings-scope-row-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  min-width: 0;
+}
+
+.settings-manifest-row-copy small,
+.settings-scope-row-copy small {
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+}
+
+.settings-center-nav-item {
+  min-height: var(--control-height-md);
+  font-size: var(--text-sm);
+}
+
+.settings-center-search.ui-search-field {
+  width: 100%;
+  min-height: var(--control-height-md);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-center-search.ui-search-field .ui-input {
+  height: var(--control-height-md);
+  min-height: var(--control-height-md);
+  box-sizing: border-box;
+}
+
+.settings-modal-close.icon-button:hover,
+.settings-modal-close.icon-button:focus-visible {
+  background: var(--token-interactive-hover);
+  color: var(--token-text-heading);
+  border-color: var(--token-border-muted);
+}
+
+.settings-center-nav-item:hover,
+.settings-center-nav-item:focus-visible {
+  background: var(--token-interactive-hover);
+  color: var(--token-text-heading);
+}
+
+.settings-center-nav-item:focus-visible {
+  outline: 2px solid var(--token-border-focus);
+  outline-offset: -2px;
+}
+
+.settings-center-nav-item.is-active {
+  background: var(--token-interactive-active);
+  color: var(--token-text-heading);
+  font-weight: var(--font-semibold);
+  box-shadow: inset 2px 0 0 var(--token-border-focus);
+  border-color: var(--token-border-muted);
+}
+
+.settings-center-nav-item:hover .settings-center-nav-icon,
+.settings-center-nav-item:focus-visible .settings-center-nav-icon,
+.settings-center-nav-item.is-active .settings-center-nav-icon {
+  opacity: 1;
+}

@@ -69,7 +69,7 @@ export const AgentIconPresetPicker: React.FC<AgentIconPresetPickerProps> = ({
           <button
             key={preset.id}
             type="button"
-            className={`settings-agent-icon-option ${value === preset.id ? 'active' : ''}`}
+            className={`settings-agent-icon-option ${value === preset.id ? 'is-active' : ''}`}
             role="menuitemradio"
             aria-checked={value === preset.id}
             title={preset.label}

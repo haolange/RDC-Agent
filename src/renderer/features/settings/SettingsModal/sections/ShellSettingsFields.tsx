@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import type { AgentShellSettings, ResolvedShellSnapshot } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { Input } from '../../../../ui/Input';
+import { SettingsField, SettingsSection } from '../parts';
 import { getResolvedShell } from './shellSettingsActions';
 
 type Translate = ReturnType<typeof useI18n>['t'];
@@ -41,20 +43,22 @@ export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({
   }, [draft.executable]);
 
   return (
-    <div className="settings-browser-block settings-tool-card" data-testid="settings-agent-shell" data-settings-search="agent-shell">
-      <h3>{t('settings.shellTitle')}</h3>
-      <p className="settings-help-text">{t('settings.shellHint')}</p>
-      <label className="settings-input-row">
-        {t('settings.shellExecutable')}
-        <input
-          className="input"
+    <SettingsSection
+      className="settings-tool-card"
+      data-testid="settings-agent-shell"
+      data-settings-search="agent-shell"
+      title={t('settings.shellTitle')}
+      description={t('settings.shellHint')}
+    >
+      <SettingsField label={t('settings.shellExecutable')}>
+        <Input
           type="text"
           data-testid="settings-agent-shell-executable"
           value={draft.executable}
           onChange={(event) => onChange({ ...draft, executable: event.target.value })}
           placeholder="C:\Program Files\PowerShell\7\pwsh.exe"
         />
-      </label>
+      </SettingsField>
       <div className="settings-help-text" data-testid="settings-agent-shell-diagnostics">
         {resolved?.ok ? (
           <>
@@ -74,6 +78,6 @@ export const ShellSettingsFields: React.FC<ShellSettingsFieldsProps> = ({
           <p data-testid="settings-agent-shell-error">{resolved.error}</p>
         ) : null}
       </div>
-    </div>
+    </SettingsSection>
   );
 };

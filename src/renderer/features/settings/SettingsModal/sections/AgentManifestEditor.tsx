@@ -4,9 +4,12 @@ import type { AgentManifestDraft } from '@shared/types/agentManifest';
 import type { AppSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
 import { useDynStyle } from '../../../../lib/useDynStyle';
+import { Button } from '../../../../ui/Button';
 import { ColorField } from '../../../../ui/ColorField';
+import { Input } from '../../../../ui/Input';
 import { ModeGlyph } from '../../../../ui/ModeGlyph';
 import { AutosizeTextarea } from '../AutosizeTextarea';
+import { SettingsField, SettingsSection } from '../parts';
 import { AgentCapabilityPicker, buildAgentCapabilityGroups } from './AgentCapabilityPicker';
 import { AgentHandoffEditor } from './AgentHandoffEditor';
 import { AgentIconPresetPicker } from './AgentIconPresetPicker';
@@ -66,20 +69,17 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           </div>
         </div>
         <div className="settings-manifest-editor-actions">
-          <button type="button" className="button button-ghost" onClick={onDuplicateAgent}>
+          <Button variant="ghost" onClick={onDuplicateAgent}>
             {t('settings.duplicateAgent')}
-          </button>
-          <button type="button" className="button button-danger" onClick={onDeleteAgent}>
+          </Button>
+          <Button variant="danger" onClick={onDeleteAgent}>
             {t('settings.deleteAgent')}
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="settings-manifest-editor-body scrollbar-thin">
-        <section className="settings-agent-route-panel">
-          <div className="settings-section-header">
-            <div className="settings-section-title">{t('settings.agentRouteAvailability')}</div>
-          </div>
+        <SettingsSection title={t('settings.agentRouteAvailability')} className="settings-agent-route-panel">
           <div className="settings-agent-route-body">
             <div
               className="settings-agent-look-strip"
@@ -107,18 +107,24 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
               <p className="settings-agent-look-hint">{t('settings.agentAccentHelp')}</p>
             </div>
 
-            <div className="settings-agent-route-row settings-model-route-row">
-              <span className="settings-field-label">{t('settings.modelFieldLabel')}</span>
+            <SettingsField
+              className="settings-agent-route-row settings-model-route-row"
+              layout="row"
+              label={t('settings.modelFieldLabel')}
+            >
               <AgentModelCascadeSelect
                 value={selectedModel}
                 options={settings.agents.modelOptions}
                 onChange={(model) => onUpdateAgent({ models: [model] })}
                 t={t}
               />
-            </div>
+            </SettingsField>
 
-            <div className="settings-agent-route-row settings-agent-availability-row">
-              <span className="settings-field-label">{t('settings.agentAvailability')}</span>
+            <SettingsField
+              className="settings-agent-route-row settings-agent-availability-row"
+              layout="row"
+              label={t('settings.agentAvailability')}
+            >
               <div className="settings-agent-flags">
                 <label className="settings-checkbox-row compact">
                   <input type="checkbox" checked={selectedAgent.enabled} onChange={(event) => onUpdateAgent({ enabled: event.currentTarget.checked })} />
@@ -133,9 +139,9 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
                   <span>{t('settings.disableModelInvocation')}</span>
                 </label>
               </div>
-            </div>
+            </SettingsField>
           </div>
-        </section>
+        </SettingsSection>
 
         <details className="settings-advanced-panel">
           <summary>
@@ -144,10 +150,9 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
           </summary>
           <div className="settings-advanced-content">
             <div className="settings-manifest-form-grid settings-agent-identity-grid">
-              <label className="settings-input-row">
-                <span className="settings-field-label">{t('settings.agentName')}</span>
-                <input className="input" value={selectedAgent.name} onChange={(event) => onUpdateAgent({ name: event.currentTarget.value })} />
-              </label>
+              <SettingsField className="settings-input-row" label={t('settings.agentName')}>
+                <Input value={selectedAgent.name} onChange={(event) => onUpdateAgent({ name: event.currentTarget.value })} />
+              </SettingsField>
               <label className="settings-input-row">
                 <span className="settings-field-label">{t('settings.agentArgumentHint')}</span>
                 <AutosizeTextarea rows={1} maxHeight={132} className="input settings-agent-textarea-compact" value={selectedAgent.argumentHint} onChange={(event) => onUpdateAgent({ argumentHint: event.currentTarget.value })} />
@@ -229,9 +234,9 @@ export const AgentManifestEditor: React.FC<AgentManifestEditorProps> = ({
         <div className={`settings-agent-autosave-status ${agentManifestSaveState}`}>
           <span>{saveStatusMessage}</span>
           {agentManifestSaveState === 'error' && !agentManifestSaveBlocked ? (
-            <button type="button" className="button button-secondary" onClick={() => void onRetrySaveAgentManifests()}>
+            <Button variant="secondary" onClick={() => void onRetrySaveAgentManifests()}>
               {t('settings.retry')}
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : null}

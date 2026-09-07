@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import type { RdxRuntimeOverview } from '@shared/types/rdxRuntime';
 import { useI18n } from '../../../../i18n';
+import { Button } from '../../../../ui/Button';
+import { EmptyState } from '../../../../ui/EmptyState';
 import { resolveHookTrustProjectRoot } from './hookTrustProjectRoot';
 import { getRdxOverview, revokeHook, testHook, trustHook } from './hooksSettingsActions';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
@@ -78,37 +80,34 @@ export const HooksSettings: React.FC<{
             <div className="settings-runtime-actions">
               {hook.scope !== 'builtin' && (hook.trusted
                 ? (
-                  <button
-                    type="button"
-                    className="button button-secondary"
+                  <Button
+                    variant="secondary"
                     disabled={busyId === hook.id}
                     onClick={() => void run(hook.id, 'revoke')}
                   >
                     {t('settings.hookRevoke')}
-                  </button>
+                  </Button>
                 )
                 : (
-                  <button
-                    type="button"
-                    className="button button-primary"
+                  <Button
+                    variant="primary"
                     disabled={busyId === hook.id}
                     onClick={() => void run(hook.id, 'trust')}
                   >
                     {t('settings.hookTrust')}
-                  </button>
+                  </Button>
                 ))}
-              <button
-                type="button"
-                className="button button-secondary"
+              <Button
+                variant="secondary"
                 disabled={busyId === hook.id || (hook.scope !== 'builtin' && !hook.trusted)}
                 onClick={() => void run(hook.id, 'test')}
               >
                 {t('settings.hookTest')}
-              </button>
+              </Button>
             </div>
           </article>
         ))}
-        {!hooks.length && <div className="settings-empty settings-empty-dashed">{t('settings.hooksEmpty')}</div>}
+        {!hooks.length && <EmptyState title={t('settings.hooksEmpty')} />}
         {message && <pre className="settings-runtime-result">{message}</pre>}
       </div>
     </section>

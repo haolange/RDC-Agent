@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { TranslationKey } from '../../../i18n';
+import { cn } from '../../../lib/cn';
+import { SearchField } from '../../../ui/SearchField';
 import { SettingsNavIcon } from './SettingsNavIcon';
 import {
   matchSettingsSearchEntries,
@@ -37,7 +39,7 @@ export const SettingsCenterNav: React.FC<{
 
   const selectEntry = (entry: SettingsSearchEntry) => {
     onSelectSection(entry.section);
-    window.requestAnimationFrame(() => focusSettingsSearchTarget(entry.target));
+    window.setTimeout(() => focusSettingsSearchTarget(entry.target), 50);
     setQuery('');
   };
 
@@ -65,16 +67,16 @@ export const SettingsCenterNav: React.FC<{
 
   return (
     <>
-      <label className="settings-center-search">
-        <input
-          type="search"
-          value={query}
-          data-testid="settings-nav-search"
-          placeholder={t('settings.searchPlaceholder')}
-          aria-label={t('settings.searchPlaceholder')}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </label>
+      <SearchField
+        className="settings-center-search"
+        value={query}
+        data-testid="settings-nav-search"
+        placeholder={t('settings.searchPlaceholder')}
+        aria-label={t('settings.searchPlaceholder')}
+        onChange={(event) => setQuery(event.target.value)}
+        onClear={() => setQuery('')}
+        clearLabel={t('settings.close')}
+      />
       {results.length > 0 ? (
         <div className="settings-search-results" role="listbox" data-testid="settings-search-results">
           {results.map((entry) => (
@@ -104,7 +106,7 @@ export const SettingsCenterNav: React.FC<{
           <button
             key={section.id}
             type="button"
-            className={`settings-center-nav-item ${activeSection === section.id ? 'active' : ''}`}
+            className={cn('settings-center-nav-item', activeSection === section.id && 'is-active')}
             data-testid={`settings-nav-${section.id}`}
             data-settings-nav-item="true"
             data-section={section.id}

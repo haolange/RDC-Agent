@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import type { CodeInterpreterSettings } from '@shared/types/settings';
 import type { useI18n } from '../../../../i18n';
+import { Input } from '../../../../ui/Input';
 import { AutosizeTextarea } from '../AutosizeTextarea';
+import { SettingsSection } from '../parts';
 
 function parseEnvText(value: string): Record<string, string> {
   const env: Record<string, string> = {};
@@ -32,8 +34,12 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
   const [argsText, setArgsText] = useState(() => draft.argsPrefix.join(' '));
   const [timeoutText, setTimeoutText] = useState(() => String(draft.timeoutMs));
   return (
-    <div className="settings-browser-block settings-tool-card" data-testid="settings-code-interpreter" data-settings-search="code-interpreter">
-      <h3>{t('settings.codeInterpreterTitle')}</h3>
+    <SettingsSection
+      className="settings-tool-card"
+      data-testid="settings-code-interpreter"
+      data-settings-search="code-interpreter"
+      title={t('settings.codeInterpreterTitle')}
+    >
       <label className="settings-checkbox-row">
         <input
           type="checkbox"
@@ -45,8 +51,7 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
       <div className="settings-interpreter-fields">
       <label className="settings-input-row">
         {t('settings.codeInterpreterCommand')}
-        <input
-          className="input"
+        <Input
           type="text"
           value={draft.command}
           onChange={(event) => onChange({ ...draft, command: event.target.value })}
@@ -55,8 +60,7 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
       </label>
       <label className="settings-input-row">
         {t('settings.codeInterpreterArgs')}
-        <input
-          className="input"
+        <Input
           type="text"
           value={argsText}
           onChange={(event) => {
@@ -67,8 +71,7 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
       </label>
       <label className="settings-input-row">
         {t('settings.codeInterpreterTimeout')}
-        <input
-          className="input"
+        <Input
           type="number"
           min={1000}
           max={600000}
@@ -106,6 +109,6 @@ export const CodeInterpreterSettingsFields: React.FC<CodeInterpreterSettingsFiel
         />
         {t('settings.codeInterpreterArtifacts')}
       </label>
-    </div>
+    </SettingsSection>
   );
 };

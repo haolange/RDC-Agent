@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { scriptRead } from './renderer-contract.mjs';
+import { scriptRead, scriptReadCssBundle } from './renderer-contract.mjs';
 
 const repoRoot = process.cwd();
 const fidelityDir = path.join(repoRoot, 'scripts/fidelity');
@@ -77,7 +77,7 @@ const composerChromeCss = [
     .sort()
     .map((name) => fs.readFileSync(path.join(composerChromeDir, name), 'utf8')),
 ].join('\n');
-const settingsModalCss = scriptRead('src/renderer/features/settings/SettingsModal/SettingsModal.css');
+const settingsModalCss = scriptReadCssBundle('src/renderer/features/settings/SettingsModal/SettingsModal.css');
 const designSystemCss = scriptRead('src/renderer/styles/design-system.css');
 const contextUsageIndicator = scriptRead('src/renderer/patterns/ContextUsageIndicator.tsx');
 const contextBreakdownPopover = scriptRead('src/renderer/patterns/ContextBreakdownPopover.tsx');

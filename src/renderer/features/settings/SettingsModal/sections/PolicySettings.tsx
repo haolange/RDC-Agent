@@ -8,6 +8,8 @@ import {
 import { useI18n } from '../../../../i18n';
 import { useAppSettingsStore } from '../../../../stores/appSettingsStore';
 import { DEFAULT_SETTINGS } from '../../../../stores/defaultAppSettings';
+import { Select } from '../../../../ui/Select';
+import { SettingsField, SettingsSection } from '../parts';
 import { RuntimeScopePanel } from './RuntimeScopePanel';
 
 const COMPACTION_PERCENT_OPTIONS: number[] = (() => {
@@ -39,31 +41,26 @@ export const PolicySettings: React.FC<{
 
   return (
     <section className="settings-page settings-page-policy" data-settings-search="policy">
-      <div className="settings-browser-block settings-tool-card" data-testid="settings-agent-runtime-block">
-        <div className="settings-browser-section-head">
-          <div>
-            <div className="settings-browser-section-title">{t('settings.agentRuntime')}</div>
-            <div className="settings-help-text">{t('settings.compactionThresholdHint')}</div>
-          </div>
-        </div>
-        <label className="settings-field" data-settings-search="compaction">
-          <span className="settings-field-label">{t('settings.compactionThreshold')}</span>
-          <select
-            className="input"
-            value={percent}
-            data-testid="settings-compaction-threshold"
-            onChange={(event) => {
-              void setCompactionThresholdPercent(Number(event.currentTarget.value));
+      <SettingsSection
+        title={t('settings.agentRuntime')}
+        description={t('settings.compactionThresholdHint')}
+        data-testid="settings-agent-runtime-block"
+      >
+        <SettingsField label={t('settings.compactionThreshold')} search="compaction" testId="settings-compaction-threshold">
+          <Select
+            dataTestId="settings-compaction-threshold"
+            ariaLabel={t('settings.compactionThreshold')}
+            value={String(percent)}
+            onChange={(value) => {
+              void setCompactionThresholdPercent(Number(value));
             }}
-          >
-            {COMPACTION_PERCENT_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {t('settings.compactionThresholdPercent', { percent: option })}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+            options={COMPACTION_PERCENT_OPTIONS.map((option) => ({
+              value: String(option),
+              label: t('settings.compactionThresholdPercent', { percent: option }),
+            }))}
+          />
+        </SettingsField>
+      </SettingsSection>
       <RuntimeScopePanel
         overview={overview}
         scope={scope}

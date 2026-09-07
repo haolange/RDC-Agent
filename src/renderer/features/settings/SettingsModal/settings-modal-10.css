@@ -1,0 +1,279 @@
+.settings-field .input:hover, .settings-option-block .input:hover, .settings-model-adder-row .input:hover, .settings-select-trigger:hover, .settings-rdx-cli-input:hover {
+  border-color: var(--input-border-hover);
+  background: var(--input-bg-hover);
+}
+
+.settings-field .input:focus-visible, .settings-option-block .input:focus-visible, .settings-model-adder-row .input:focus-visible, .settings-rdx-cli-input:focus-visible {
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--token-border-focus) 18%, transparent);
+}
+
+.settings-workspace-root-actions, .settings-derived-path-actions, .settings-profile-actions, .settings-actions {
+  gap: var(--space-2);
+}
+
+.settings-page-models {
+  --settings-content-max: 1600px;
+}
+
+.settings-provider-row:hover {
+  border-color: var(--token-border-default);
+  background: var(--settings-card-bg-hover);
+}
+
+.settings-provider-row--unavailable .settings-provider-item-meta {
+  color: var(--token-text-caption);
+}
+
+.settings-provider-row--unavailable .settings-provider-row-button:disabled {
+  color: var(--token-text-caption);
+}
+
+.settings-provider-row-main {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.settings-provider-row-titleline {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.settings-provider-protocol-meta {
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  color: var(--token-text-caption);
+  font-size: var(--text-xs);
+  line-height: 1.35;
+}
+
+.settings-provider-protocol-meta-label {
+  flex: 0 0 auto;
+  color: var(--token-text-caption);
+  font-weight: var(--font-medium);
+}
+
+.settings-provider-protocol-meta-value {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--token-text-body);
+  font-weight: var(--font-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-provider-row-actions .button:only-child {
+  min-width: 4.5rem;
+}
+
+.settings-modal .button:disabled {
+  opacity: 1;
+  border-color: var(--token-border-muted);
+  background: color-mix(in srgb, var(--token-bg-raised) 88%, var(--token-bg-panel));
+  color: color-mix(in srgb, var(--token-text-heading) 70%, var(--token-text-disabled));
+  box-shadow: none;
+}
+
+.settings-modal .button-primary:disabled {
+  border-color: var(--token-border-muted);
+  background: color-mix(in srgb, var(--token-bg-raised) 84%, var(--token-bg-panel));
+  color: color-mix(in srgb, var(--token-text-heading) 70%, var(--token-text-disabled));
+}
+
+.settings-manifest-list-toolbar .settings-manifest-actions {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.settings-manifest-list-toolbar .button {
+  width: 100%;
+  justify-content: center;
+}
+
+.settings-manifest-card:hover {
+  border-color: var(--token-border-muted);
+  background: var(--token-interactive-hover);
+}
+
+.settings-manifest-card.is-active {
+  border-color: var(--token-border-default);
+  background: var(--token-interactive-active);
+  box-shadow: inset 2px 0 0 var(--token-border-focus);
+}
+
+.settings-manifest-card small, .settings-manifest-card-meta {
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+}
+
+.settings-renderdoc-toolchain, .settings-renderdoc-actions {
+  gap: var(--space-3);
+  border-color: var(--token-border-card);
+}
+
+.settings-page-general .settings-section {
+  min-width: 0;
+}
+
+.settings-profile-section, .settings-appearance-section {
+  min-height: 0;
+}
+
+.settings-appearance-list {
+  margin-top: 0;
+}
+
+.settings-preference-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.settings-choice-group {
+  width: auto;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  justify-self: end;
+}
+
+.settings-choice-group .user-menu-pill {
+  width: auto;
+  min-width: 72px;
+  flex: 0 0 auto;
+  justify-content: center;
+}
+
+.settings-agent-overview-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+
+.settings-agent-overview-item, .settings-agent-route-panel, .settings-advanced-panel {
+  border: 1px solid var(--token-border-card);
+  border-radius: var(--radius-lg);
+  background: var(--settings-card-bg);
+}
+
+.settings-agent-overview-item {
+  display: flex;
+  min-width: 0;
+  min-height: 72px;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+}
+
+.settings-agent-overview-item span {
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+}
+
+.settings-agent-overview-item strong {
+  min-width: 0;
+  color: var(--token-text-heading);
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  overflow-wrap: anywhere;
+}
+
+.settings-agent-route-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-agent-route-panel .settings-section-header {
+  padding: 0 0 var(--space-2);
+  border-bottom: 1px solid var(--token-border-muted);
+}
+
+.settings-agent-route-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.settings-advanced-panel {
+  min-width: 0;
+  overflow: hidden;
+  border-color: var(--token-border-muted);
+  background: color-mix(in srgb, var(--token-bg-panel) 72%, transparent);
+}
+
+.settings-advanced-panel > summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--space-12);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  color: var(--token-text-heading);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  list-style: none;
+}
+
+.settings-advanced-panel > summary::-webkit-details-marker, .settings-rdx-action-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-advanced-panel > summary::after {
+  display: inline-flex;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  width: var(--btn-height-sm);
+  height: var(--btn-height-sm);
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--token-border-muted);
+  border-radius: var(--radius-md);
+  background: var(--token-bg-shell);
+  color: var(--token-text-caption);
+  content: "+";
+}
+
+.settings-advanced-panel[open] > summary::after {
+  content: "-";
+}
+
+.settings-advanced-panel > summary:hover, .settings-rdx-action-card > summary:hover {
+  background: var(--token-interactive-hover);
+}
+
+.settings-advanced-panel > summary small {
+  display: none;
+  grid-column: 1;
+  margin-top: var(--space-1);
+  color: var(--token-text-caption);
+  font-size: var(--text-sm);
+  font-weight: var(--font-normal);
+  line-height: 1.4;
+}
+
+.settings-advanced-content {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: 0 var(--space-4) var(--space-4);
+}

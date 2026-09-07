@@ -1,8 +1,10 @@
 import React from 'react';
 import type { AppSettings } from '@shared/types/settings';
 import { Button } from '../../../../ui/Button';
+import { Input } from '../../../../ui/Input';
 import { ProfileAvatar } from '../../../../patterns/ProfileAvatar';
 import type { useI18n } from '../../../../i18n';
+import { SettingsField, SettingsSection } from '../parts';
 
 type Translate = ReturnType<typeof useI18n>['t'];
 
@@ -21,11 +23,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
   onSave,
   t,
 }) => (
-  <div className="settings-section settings-profile-section">
-    <div className="settings-section-header">
-      <div className="settings-section-title">{t('settings.profile')}</div>
-    </div>
-
+  <SettingsSection title={t('settings.profile')} className="settings-profile-section">
     <div className="settings-profile-row">
       <div className="settings-account-avatar-shell">
         <ProfileAvatar
@@ -36,14 +34,12 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
         />
       </div>
       <div className="settings-profile-fields">
-        <label className="settings-field">
-          <span className="settings-field-label">{t('settings.nickname')}</span>
-          <input
-            className="input"
+        <SettingsField label={t('settings.nickname')}>
+          <Input
             value={accountDraft.nickname}
             onChange={(event) => onAccountDraftChange((current) => ({ ...current, nickname: event.target.value }))}
           />
-        </label>
+        </SettingsField>
         <div className="settings-profile-actions">
           <Button variant="secondary" size="sm" onClick={() => void onAvatarSelect()}>
             {t('settings.uploadAvatar')}
@@ -54,5 +50,5 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({
         </div>
       </div>
     </div>
-  </div>
+  </SettingsSection>
 );
