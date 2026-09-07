@@ -66,8 +66,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  height: var(--control-height-md);
-  min-height: var(--control-height-md);
+  height: var(--control-height-sm);
+  min-height: var(--control-height-sm);
   max-width: 13rem;
   padding: 0 var(--space-3);
   border: 1px solid var(--token-border-default);
@@ -172,7 +172,8 @@
 }
 
 .composer-permission-menu-item:hover:not(:disabled),
-.composer-permission-menu-item.active {
+.composer-permission-menu-item:focus-visible,
+.composer-permission-menu-item.is-selected {
   background: var(--token-bg-muted);
   color: var(--token-text-heading);
 }
@@ -202,8 +203,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  height: var(--control-height-md);
-  min-height: var(--control-height-md);
+  height: var(--control-height-sm);
+  min-height: var(--control-height-sm);
   max-width: 12rem;
   padding: 0 var(--space-3);
   border: 1px solid var(--token-border-default);

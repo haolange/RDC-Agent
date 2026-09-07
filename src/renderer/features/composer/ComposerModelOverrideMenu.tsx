@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SessionRecord } from '@shared/types/session';
 import { useI18n } from '../../i18n';
+import { Pill } from '../../ui/Pill';
 import { useAppSettingsStore } from '../../stores/appSettingsStore';
 import { useComposerMenu } from './useComposerMenuRegistry';
 import {
@@ -129,10 +130,10 @@ export const ComposerModelOverrideMenu: React.FC<{
 
   return (
     <div ref={assignRoot} className="composer-model-menu">
-      <button
+      <Pill
         ref={assignTrigger}
-        type="button"
         className={`composer-model-pill ${menu.open ? 'open' : ''}${hasChoice ? ' is-override' : ''}`}
+        selected={menu.open}
         data-testid="composer-model-pill"
         aria-haspopup="menu"
         aria-expanded={menu.open}
@@ -145,7 +146,7 @@ export const ComposerModelOverrideMenu: React.FC<{
             <polyline points="6 9 12 15 18 9" />
           </svg>
         </span>
-      </button>
+      </Pill>
       {menu.open ? (
         <div
           className="composer-model-popup"

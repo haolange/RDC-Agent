@@ -3,6 +3,7 @@ import { useComposerMenu } from './useComposerMenuRegistry';
 import type { ReasoningSelection } from '@shared/types/modelCapability';
 import { formatTokenCount } from '@shared/utils/tokens';
 import { useI18n } from '../../i18n';
+import { Pill } from '../../ui/Pill';
 import { useTurnControls } from './useTurnControls';
 import type { SessionRecord } from '@shared/types/session';
 import {
@@ -211,10 +212,10 @@ export const EffortControl: React.FC<{
 
   return (
     <div ref={assignMenuRoot} className="composer-effort-menu">
-      <button
+      <Pill
         ref={assignMenuTrigger}
-        type="button"
         className={`composer-effort-pill ${open ? 'open' : ''}${selectedLevel === 'max' ? ' is-level-max' : ''}`}
+        selected={open}
         data-testid="composer-effort-pill"
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -237,7 +238,7 @@ export const EffortControl: React.FC<{
           </span>
         ) : null}
         <span className="composer-effort-pill-caret" aria-hidden="true"><ChevronIcon /></span>
-      </button>
+      </Pill>
 
       {open ? (
         <EffortControlPopup
